@@ -396,6 +396,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     audioDeviceLabel: "Périphérique de sortie",
     audioDeviceHint: "Sélectionner la carte de son ou le convertisseur numérique-analogique (CNA) pour la lecture.",
     audioDeviceDefault: "Périphérique de sortie par défaut",
+    audioDeviceDisconnected: "{name} (déconnecté)",
+    audioOutputPlayingShared: "Lecture par l'audio partagé pour l'instant.",
     audioAsioControlPanelBtn: "Ouvrir le panneau de contrôle du pilote",
     audioAsioControlPanelHint: "Ajuster la taille du tampon matériel et les paramètres d'horloge dans le panneau natif du pilote.",
     audioAsioNoDevices: "Aucun pilote matériel ASIO détecté.",
@@ -1207,6 +1209,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     outputFallbackFormatUnsupported: "Impossible de démarrer {mode} : l'appareil n'accepte aucun format stéréo que Luminous peut lui envoyer. Lecture par l'audio partagé pour l'instant.",
     outputFallbackUnavailable: "Impossible de démarrer {mode}. Lecture par l'audio partagé pour l'instant.",
     outputFallbackRetry: "Réessayer",
+    outputRestored: "{mode} fonctionne de nouveau. La lecture est en pause, car son volume peut différer de l'audio partagé : vérifiez le volume, puis appuyez sur Lecture.",
     tracksSkippedToast: {
       one: "{count} morceau indisponible ignoré.",
       other: "{count} morceaux indisponibles ignorés."
@@ -2217,6 +2220,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     headroom: "Marge de dynamique",
     resampling: "Rééchantillonnage",
     resamplingDirect: "Direct (sans rééchantillonnage)",
+    resamplingSystemMixer: "Aucun dans Luminous ; le mélangeur du système peut convertir",
     resamplingTo: "Rééchantillonné à {rate}",
     volumeNormalization: "Normalisation du volume",
     normalizationDisabled: "Désactivée",
@@ -2234,6 +2238,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     bitPerfect: "Bit-perfect",
     processed: "Traité",
     directRate: "Taux direct",
+    systemMixer: "Mélangeur du système",
     resampled: "Rééchantillonné"
   },
   auth: {

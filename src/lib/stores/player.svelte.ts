@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext, AudioPipelineInfo, RadioSeed, RadioResult, OutputFallbackPayload, OutputFallbackReason } from "../types";
+import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext, AudioPipelineInfo, RadioSeed, RadioResult, OutputFallbackPayload, OutputFallbackReason, AudioBackendKind } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
 import { toastStore } from "./toast.svelte";
@@ -92,6 +92,8 @@ export class PlayerStore {
   private _playbackErrorTimer: ReturnType<typeof setTimeout> | null = null;
   private _outputUnavailableToastId: number | null = null;
   private _outputFallbackToastId: number | null = null;
+  /** The backend the shown fallback toast is about. */
+  private _outputFallbackRequested: AudioBackendKind | null = null;
 
   constructor() {
     this.init();
@@ -202,6 +204,7 @@ export class PlayerStore {
 
       await listen<AudioPipelineInfo | null>("audio-pipeline-changed", (event) => {
         this.audioPipeline = event.payload;
+        this.noteOutputRestored(event.payload);
       });
 
       // A song couldn't be opened/decoded (e.g. its file just vanished —
@@ -248,6 +251,7 @@ export class PlayerStore {
         const { requested, reason } = event.payload;
         const mode = i18n.t(AUDIO_BACKEND_LABEL_KEYS[requested]);
         if (this._outputFallbackToastId !== null) toastStore.dismiss(this._outputFallbackToastId);
+        this._outputFallbackRequested = requested;
         this._outputFallbackToastId = toastStore.show(
           i18n.t(`playerBar.${OUTPUT_FALLBACK_KEYS[reason]}`, { mode }),
           "warning",
@@ -287,6 +291,19 @@ export class PlayerStore {
     } catch (err) {
       console.error("Failed to initialize PlayerStore:", err);
     }
+  }
+
+  /** The output a fallback toast is about opened after all (Try Again, or the
+   * device came back): replace the toast. Moving off shared output always
+   * pauses (the device's volume can differ from the system volume), so say so. */
+  private noteOutputRestored(pipeline: AudioPipelineInfo | null) {
+    if (this._outputFallbackToastId === null || this._outputFallbackRequested === null) return;
+    if (!pipeline || pipeline.output_fell_back || !pipeline.output_bypasses_mixer) return;
+    const mode = i18n.t(AUDIO_BACKEND_LABEL_KEYS[this._outputFallbackRequested]);
+    toastStore.dismiss(this._outputFallbackToastId);
+    this._outputFallbackToastId = null;
+    this._outputFallbackRequested = null;
+    toastStore.show(i18n.t("playerBar.outputRestored", { mode }), "success");
   }
 
   private flushPlaybackErrorToast() {

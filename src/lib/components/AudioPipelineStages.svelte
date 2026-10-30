@@ -65,12 +65,13 @@
   // track's rate differs from the device's.
   let resampled = $derived(!!pipeline?.resample_rate);
 
-  let isBitPerfect = $derived.by(() => {
-    if (!pipeline) return false;
-    const noEq = !pipeline.eq_enabled;
-    const noLoudness = pipeline.loudness_source === 'disabled';
-    return noEq && noLoudness && !resampled;
-  });
+  // Untouched by Luminous: no EQ, normalization or resampling.
+  let unprocessed = $derived(
+    !!pipeline && !pipeline.eq_enabled && pipeline.loudness_source === 'disabled' && !resampled
+  );
+  // Bit-perfect also needs an output with no system mixer after Luminous.
+  let isBitPerfect = $derived(unprocessed && !!pipeline?.output_bypasses_mixer);
+  let sharedMixer = $derived(!pipeline?.output_bypasses_mixer);
 </script>
 
 <div class={`space-y-4 select-text ${className}`}>
@@ -138,7 +139,7 @@
             <Sparkles class="w-2.5 h-2.5 text-brand-text-primary" />
             {i18n.t('audioPipeline.bitPerfect', {}, 'Bit-perfect')}
           </span>
-        {:else}
+        {:else if !unprocessed}
           <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full">
             {i18n.t('audioPipeline.processed', {}, 'Processed')}
           </span>
@@ -189,13 +190,17 @@
           <Speaker class="w-3.5 h-3.5 text-brand-text-primary" />
           <span>{i18n.t('audioPipeline.stageOutput', {}, 'Output')}</span>
         </div>
-        {#if !resampled}
+        {#if resampled}
           <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full">
-            {i18n.t('audioPipeline.directRate', {}, 'Direct rate')}
+            {i18n.t('audioPipeline.resampled', {}, 'Resampled')}
+          </span>
+        {:else if sharedMixer}
+          <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full">
+            {i18n.t('audioPipeline.systemMixer', {}, 'System mixer')}
           </span>
         {:else}
           <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full">
-            {i18n.t('audioPipeline.resampled', {}, 'Resampled')}
+            {i18n.t('audioPipeline.directRate', {}, 'Direct rate')}
           </span>
         {/if}
       </div>
@@ -225,10 +230,12 @@
         <div class="col-span-2 flex flex-col pt-1 border-t border-brand-border/20">
           <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.resampling', {}, 'Resampling')}</span>
           <span class="text-brand-text-primary font-semibold">
-            {#if !resampled}
-              {i18n.t('audioPipeline.resamplingDirect', {}, 'Direct (no resampling)')}
-            {:else}
+            {#if resampled}
               {i18n.t('audioPipeline.resamplingTo', { rate: formatSampleRate(pipeline.output_sample_rate) }, `Resampled to ${formatSampleRate(pipeline.output_sample_rate)}`)}
+            {:else if sharedMixer}
+              {i18n.t('audioPipeline.resamplingSystemMixer', {}, 'None in Luminous; the system mixer may convert')}
+            {:else}
+              {i18n.t('audioPipeline.resamplingDirect', {}, 'Direct (no resampling)')}
             {/if}
           </span>
         </div>

@@ -390,6 +390,8 @@ export const it = {
     audioDeviceLabel: "Dispositivo di uscita",
     audioDeviceHint: "Seleziona la scheda audio o il convertitore digitale-analogico (DAC) per la riproduzione.",
     audioDeviceDefault: "Dispositivo di uscita predefinito",
+    audioDeviceDisconnected: "{name} (disconnesso)",
+    audioOutputPlayingShared: "Riproduzione tramite audio condiviso per ora.",
     audioAsioControlPanelBtn: "Apri pannello di controllo del driver",
     audioAsioControlPanelHint: "Regola le dimensioni del buffer hardware e le impostazioni del clock nel pannello nativo del driver.",
     audioAsioNoDevices: "Nessun driver hardware ASIO rilevato.",
@@ -1201,6 +1203,7 @@ export const it = {
     outputFallbackFormatUnsupported: "Impossibile avviare {mode}: il dispositivo non accetta alcun formato stereo che Luminous possa inviare. Riproduzione tramite audio condiviso per ora.",
     outputFallbackUnavailable: "Impossibile avviare {mode}. Riproduzione tramite audio condiviso per ora.",
     outputFallbackRetry: "Riprova",
+    outputRestored: "{mode} funziona di nuovo. La riproduzione è in pausa perché il volume può essere diverso dall'audio condiviso: controlla il volume, poi premi Riproduci.",
     tracksSkippedToast: {
       one: "{count} brano non disponibile saltato.",
       other: "{count} brani non disponibili saltati."
@@ -2209,6 +2212,7 @@ export const it = {
     headroom: "Margine dinamico",
     resampling: "Ricampionamento",
     resamplingDirect: "Diretto (nessun ricampionamento)",
+    resamplingSystemMixer: "Nessuno in Luminous; il mixer di sistema può convertire",
     resamplingTo: "Ricampionato a {rate}",
     volumeNormalization: "Normalizzazione del volume",
     normalizationDisabled: "Disattivata",
@@ -2226,6 +2230,7 @@ export const it = {
     bitPerfect: "Bit-perfect",
     processed: "Elaborato",
     directRate: "Frequenza diretta",
+    systemMixer: "Mixer di sistema",
     resampled: "Ricampionato",
   },
   auth: {

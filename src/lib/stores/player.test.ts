@@ -285,6 +285,49 @@ describe("PlayerStore", () => {
     }
   });
 
+  it("replaces the fallback toast once the chosen output opens again", async () => {
+    const originalListenImpl = vi.mocked(listen).getMockImplementation();
+    let fallbackCallback: ((event: { payload: unknown }) => void) | undefined;
+    let pipelineCallback: ((event: { payload: unknown }) => void) | undefined;
+    vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+      if (event === "audio-output-fallback") fallbackCallback = callback;
+      if (event === "audio-pipeline-changed") pipelineCallback = callback;
+      return () => {};
+    });
+    vi.useFakeTimers();
+    const output = (bypasses: boolean, fellBack: boolean) => ({
+      payload: { output_bypasses_mixer: bypasses, output_fell_back: fellBack },
+    });
+    const fallbackToasts = () => toastStore.messages.filter((m) => m.text.startsWith("Couldn't start"));
+    const restoredToasts = () => toastStore.messages.filter((m) => m.text.includes("is working again"));
+
+    toastStore.messages = [];
+
+    try {
+      store = new PlayerStore();
+      await vi.advanceTimersByTimeAsync(50);
+
+      fallbackCallback?.({ payload: { requested: "alsa", reason: "unavailable" } });
+      // The shared output standing in doesn't count as restored.
+      pipelineCallback?.(output(false, true));
+      expect(fallbackToasts()).toHaveLength(1);
+      expect(restoredToasts()).toHaveLength(0);
+
+      pipelineCallback?.(output(true, false));
+      expect(fallbackToasts()).toHaveLength(0);
+      expect(restoredToasts()).toHaveLength(1);
+      expect(restoredToasts()[0].text).toContain("Playback is paused");
+
+      // Later pipeline changes (a rate switch) don't announce it again.
+      pipelineCallback?.(output(true, false));
+      expect(restoredToasts()).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+      toastStore.messages = [];
+      if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+    }
+  });
+
   it("should clear the Queue playlist when queue playback naturally completes", async () => {
     const originalListenImpl = vi.mocked(listen).getMockImplementation();
     let playbackStateCallback: ((event: { payload: any }) => Promise<void>) | undefined;

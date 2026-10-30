@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { AudioDeviceInfo, AudioOutputConfig } from "../types";
+import type { AudioDeviceInfo, AudioOutputConfig, AudioPipelineInfo } from "../types";
 
 export type RatingStyle = "heart" | "stars" | "both";
 type SeekBarMode = "waveform" | "bands";
@@ -77,6 +77,12 @@ class PrefsStore {
   audioOutputDevices = $state<AudioDeviceInfo[]>([]);
   audioOutputConfig = $state<AudioOutputConfig>({ backend: "cpal", device_id: null });
   audioOutputLoading = $state<boolean>(false);
+  /** Names of every output device seen this session, so a chosen device that
+   * has been unplugged can still be shown by name. */
+  private knownDeviceNames = new Map<string, string>();
+  private outputUnlistens: (() => void)[] = [];
+  /** The open output last reported, to reload the device list only when it moves. */
+  private lastOutputKey: string | null = null;
 
   async init() {
     const prefs = await invoke<UiPreferences>("get_ui_preferences");
@@ -115,6 +121,32 @@ class PrefsStore {
       console.error("Failed to read autostart state:", e);
     }
     await this.refreshAudioDevices();
+    await this.followOutputChanges();
+  }
+
+  /** Reloads the device list whenever the open output moves (a fallback, an
+   * unplugged or returning device), so Settings never lists a stale set. */
+  private async followOutputChanges() {
+    this.outputUnlistens.forEach((unlisten) => unlisten());
+    try {
+      this.outputUnlistens = await Promise.all([
+        listen("audio-output-fallback", () => void this.refreshAudioDevices()),
+        listen<AudioPipelineInfo | null>("audio-pipeline-changed", (event) => {
+          const p = event.payload;
+          const key = p ? `${p.output_backend}|${p.output_device_name}` : null;
+          if (key === this.lastOutputKey) return;
+          this.lastOutputKey = key;
+          void this.refreshAudioDevices();
+        }),
+      ]);
+    } catch (e) {
+      console.error("Failed to follow audio output changes:", e);
+    }
+  }
+
+  /** The name of output device `id`, if it has been seen this session. */
+  audioDeviceName(id: string): string | undefined {
+    return this.knownDeviceNames.get(id);
   }
 
   /** Persist the whole current state — fire-and-forget on the backend. */
@@ -278,6 +310,7 @@ class PrefsStore {
         invoke<AudioDeviceInfo[]>("get_audio_output_devices"),
         invoke<AudioOutputConfig>("get_audio_output_settings"),
       ]);
+      for (const d of devices) this.knownDeviceNames.set(d.id, d.name);
       this.audioOutputDevices = devices;
       this.audioOutputConfig = config;
     } catch (e) {

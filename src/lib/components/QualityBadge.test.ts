@@ -55,6 +55,8 @@ describe("QualityBadge.svelte", () => {
     output_format: "32-bit float",
     output_device_name: "Speakers",
     output_backend: "WASAPI",
+    output_bypasses_mixer: false,
+    output_fell_back: false,
   };
 
   beforeEach(() => {

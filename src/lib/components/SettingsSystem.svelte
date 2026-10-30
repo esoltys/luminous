@@ -1,6 +1,7 @@
 <script lang="ts">
   import { i18n } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
+  import { playerStore } from "../stores/player.svelte";
   import { updaterStore, MICROSOFT_STORE_URL } from "../stores/updater.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
@@ -243,16 +244,24 @@
   let directHardware = $derived(isDirectHardware(prefs.audioOutputConfig.backend));
   let noDevicesMessageKey = $derived(noDevicesKey(prefs.audioOutputConfig.backend));
 
+  // The chosen device when it isn't connected (unplugged): it stays chosen,
+  // so it's shown as disconnected rather than replaced by another device.
+  let missingDeviceId = $derived.by(() => {
+    const id = prefs.audioOutputConfig.device_id;
+    return id && !currentBackendDevices.some((d) => d.id === id) ? id : null;
+  });
+
   let selectedDeviceId = $derived.by(() => {
     const id = prefs.audioOutputConfig.device_id;
+    if (id) return id;
     if (directHardware) {
-      if (id && currentBackendDevices.some((d) => d.id === id)) {
-        return id;
-      }
       return currentBackendDevices.length > 0 ? currentBackendDevices[0].id : "";
     }
-    return id ?? "";
+    return "";
   });
+
+  // The chosen bit-perfect output couldn't open and shared output stands in.
+  let playingShared = $derived(!!playerStore.audioPipeline?.output_fell_back);
 
   async function handleBackendChange(backend: AudioBackendKind) {
     const devices = prefs.audioOutputDevices.filter((d) => d.backend === backend);
@@ -414,7 +423,7 @@
       <label for="audio-device-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.audioDeviceLabel')}</label>
       <p class="text-xs text-brand-text-secondary">{i18n.t('settings.audioDeviceHint')}</p>
     </div>
-    {#if currentBackendDevices.length === 0 && noDevicesMessageKey}
+    {#if currentBackendDevices.length === 0 && !missingDeviceId && noDevicesMessageKey}
       <span class="text-xs text-amber-400 font-medium">{i18n.t(noDevicesMessageKey)}</span>
     {:else}
       <Select
@@ -426,6 +435,11 @@
         {#if !directHardware}
           <option value="">{i18n.t('settings.audioDeviceDefault')}</option>
         {/if}
+        {#if missingDeviceId}
+          <option value={missingDeviceId}>
+            {i18n.t('settings.audioDeviceDisconnected', { name: prefs.audioDeviceName(missingDeviceId) ?? missingDeviceId })}
+          </option>
+        {/if}
         {#each currentBackendDevices as dev}
           <option value={dev.id}>
             {dev.name}{dev.is_default ? ` (${i18n.t('settings.audioDeviceDefault')})` : ''}
@@ -434,6 +448,21 @@
       </Select>
     {/if}
   </div>
+
+  {#if playingShared}
+    <div class="flex items-center justify-between gap-4 py-2">
+      <span class="text-xs text-amber-400 font-medium">{i18n.t('settings.audioOutputPlayingShared')}</span>
+      <Button
+        onclick={() => void prefs.reapplyAudioOutput().catch(() => {})}
+        variant="secondary"
+        size="sm"
+        class="shrink-0 text-xs px-3.5 py-1.5"
+      >
+        <RefreshCw class="w-3.5 h-3.5" />
+        {i18n.t('playerBar.outputFallbackRetry')}
+      </Button>
+    </div>
+  {/if}
 
   <!-- ASIO Driver Control Panel Button -->
   {#if prefs.audioOutputConfig.backend === 'asio' && currentBackendDevices.length > 0}

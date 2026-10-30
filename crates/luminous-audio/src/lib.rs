@@ -208,6 +208,13 @@ pub struct OutputInfo {
     pub channels: u16,
     pub device_name: String,
     pub backend_name: String,
+    /// Whether the open output bypasses the system mixer (see
+    /// [`AudioBackendKind::bypasses_mixer`]); false after a fallback to
+    /// shared output, whatever backend is configured.
+    pub bypasses_mixer: bool,
+    /// The configured bit-perfect backend couldn't open, so this is shared
+    /// output standing in for it.
+    pub fell_back: bool,
     /// The sample format the device receives, e.g. "24-bit integer PCM".
     pub format: String,
 }
@@ -275,6 +282,8 @@ pub(crate) struct AudioShared {
     pub(crate) output_channels: std::sync::atomic::AtomicU16,
     pub(crate) output_device_name: parking_lot::RwLock<Option<String>>,
     pub(crate) output_backend_name: parking_lot::RwLock<String>,
+    pub(crate) output_bypasses_mixer: std::sync::atomic::AtomicBool,
+    pub(crate) output_fell_back: std::sync::atomic::AtomicBool,
     pub(crate) output_format: parking_lot::RwLock<&'static str>,
     pub(crate) output_config: parking_lot::RwLock<AudioOutputConfig>,
     pub(crate) equalizer: Mutex<luminous_equalizer::Equalizer>,
@@ -352,6 +361,8 @@ impl AudioEngine {
             output_channels: std::sync::atomic::AtomicU16::new(2),
             output_device_name: parking_lot::RwLock::new(get_default_device_name()),
             output_backend_name: parking_lot::RwLock::new("CPAL".to_string()),
+            output_bypasses_mixer: std::sync::atomic::AtomicBool::new(false),
+            output_fell_back: std::sync::atomic::AtomicBool::new(false),
             output_format: parking_lot::RwLock::new("32-bit float PCM"),
             output_config: parking_lot::RwLock::new(AudioOutputConfig::default()),
             equalizer: Mutex::new(luminous_equalizer::Equalizer::new()),
@@ -581,6 +592,8 @@ impl AudioEngine {
             } else {
                 backend_name
             },
+            bypasses_mixer: self.shared.output_bypasses_mixer.load(Ordering::Relaxed),
+            fell_back: self.shared.output_fell_back.load(Ordering::Relaxed),
             format: self.shared.output_format.read().to_string(),
         }
     }
@@ -884,6 +897,12 @@ impl AudioOutput {
             .store(self.channels, Ordering::Relaxed);
         *shared.output_device_name.write() = self.device_name.clone();
         *shared.output_backend_name.write() = self.backend_name.clone();
+        shared
+            .output_bypasses_mixer
+            .store(self.sink.backend().bypasses_mixer(), Ordering::Relaxed);
+        shared
+            .output_fell_back
+            .store(self.fallback.is_some(), Ordering::Relaxed);
         *shared.output_format.write() = self.sink.output_format();
         if let Some((requested, reason)) = self.fallback {
             let _ = event_tx.send(AudioEvent::OutputFallback { requested, reason });
@@ -1472,7 +1491,7 @@ enum DeviceCheckOutcome {
 /// of the path: shared output goes through the OS mixer's volume, the
 /// bit-perfect backends don't, so the same signal can come out far louder.
 fn bypasses_system_volume(old: AudioBackendKind, new: AudioBackendKind) -> bool {
-    old == AudioBackendKind::Cpal && new != AudioBackendKind::Cpal
+    !old.bypasses_mixer() && new.bypasses_mixer()
 }
 
 enum CmdOutcome {
@@ -2720,6 +2739,8 @@ mod tests {
             output_channels: std::sync::atomic::AtomicU16::new(2),
             output_device_name: parking_lot::RwLock::new(None),
             output_backend_name: parking_lot::RwLock::new("Test".to_string()),
+            output_bypasses_mixer: std::sync::atomic::AtomicBool::new(false),
+            output_fell_back: std::sync::atomic::AtomicBool::new(false),
             output_format: parking_lot::RwLock::new("32-bit float PCM"),
             output_config: parking_lot::RwLock::new(crate::sink::AudioOutputConfig::default()),
             equalizer: Mutex::new(luminous_equalizer::Equalizer::new()),

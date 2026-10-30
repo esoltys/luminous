@@ -24,6 +24,14 @@ pub enum AudioBackendKind {
     Alsa,
 }
 
+impl AudioBackendKind {
+    /// Whether this backend hands the device our samples untouched, with no
+    /// system mixer (and so no system volume) in between.
+    pub fn bypasses_mixer(self) -> bool {
+        self != Self::Cpal
+    }
+}
+
 impl std::fmt::Display for AudioBackendKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

@@ -410,6 +410,8 @@ export const uk = {
     audioDeviceLabel: "Пристрій виводу",
     audioDeviceHint: "Оберіть звукову карту або цифро-аналоговий перетворювач (ЦАП) для відтворення.",
     audioDeviceDefault: "Пристрій виводу за замовчуванням",
+    audioDeviceDisconnected: "{name} (від’єднано)",
+    audioOutputPlayingShared: "Поки що відтворення йде через спільний звук.",
     audioAsioControlPanelBtn: "Відкрити панель керування драйвера",
     audioAsioControlPanelHint: "Налаштуйте розмір апаратного буфера та параметри синхронізації в панелі драйвера.",
     audioAsioNoDevices: "Драйверів обладнання ASIO не виявлено.",
@@ -1265,6 +1267,7 @@ export const uk = {
     outputFallbackFormatUnsupported: "Не вдалося увімкнути {mode}: пристрій не приймає жодного стереоформату, який може надіслати Luminous. Поки що відтворення йде через спільний звук.",
     outputFallbackUnavailable: "Не вдалося увімкнути {mode}. Поки що відтворення йде через спільний звук.",
     outputFallbackRetry: "Повторити",
+    outputRestored: "{mode} знову працює. Відтворення на паузі, бо гучність може відрізнятися від спільного звуку: перевірте гучність і натисніть «Відтворити».",
     tracksSkippedToast: {
       one: "Пропущено {count} недоступну композицію.",
       few: "Пропущено {count} недоступні композиції.",
@@ -2335,6 +2338,7 @@ export const uk = {
     headroom: "Запас по рівню",
     resampling: "Ресемплінг",
     resamplingDirect: "Напряму (без ресемплінгу)",
+    resamplingSystemMixer: "Немає в Luminous; системний мікшер може перетворити",
     resamplingTo: "Ресемплінг до {rate}",
     volumeNormalization: "Нормалізація гучності",
     normalizationDisabled: "Вимкнено",
@@ -2352,6 +2356,7 @@ export const uk = {
     bitPerfect: "Bit-perfect",
     processed: "Оброблено",
     directRate: "Пряма частота",
+    systemMixer: "Системний мікшер",
     resampled: "Ресемплінг виконано",
   },
   auth: {

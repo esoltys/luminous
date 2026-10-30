@@ -501,6 +501,10 @@ export interface AudioPipelineInfo {
   output_format: string;
   output_device_name: string;
   output_backend: string;
+  /** Samples reach the device as sent, with no system mixer in between. */
+  output_bypasses_mixer: boolean;
+  /** The configured bit-perfect output couldn't open; this is shared output standing in for it. */
+  output_fell_back: boolean;
 }
 
 export type AudioBackendKind = "cpal" | "asio" | "wasapi_exclusive" | "alsa";
