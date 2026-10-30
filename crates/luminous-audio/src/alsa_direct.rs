@@ -483,15 +483,13 @@ mod imp {
             })
         }
 
-        /// Runs until asked to quit or the device fails; a failure sets
-        /// `error_flag`, which makes the engine rebuild its output.
+        /// Runs until asked to quit, the card is released to another app, or
+        /// the device fails; the last two set `error_flag`, which makes the
+        /// engine rebuild its output.
         fn run(self, mut period: RenderPeriod, control: &Control, error_flag: &AtomicBool) {
             let mut started = false;
             let failure = loop {
-                if control.released.load(Ordering::Acquire) {
-                    break Some(::alsa::Error::new("card released to another app", EBUSY));
-                }
-                if control.quit.load(Ordering::Acquire) {
+                if control.stopping() {
                     break None;
                 }
                 let want_playing = control.playing.load(Ordering::Acquire);
@@ -512,8 +510,18 @@ mod imp {
             };
 
             let _ = self.pcm.drop();
-            if let Some(e) = failure {
-                log::error!("ALSA hardware stream failed: {e}");
+            // Giving the card away ends the stream like a failure would, so
+            // the engine rebuilds its output (on shared output, since the
+            // app that took the card outranks us).
+            let released = control.released.load(Ordering::Acquire);
+            match &failure {
+                Some(e) => log::error!("ALSA hardware stream failed: {e}"),
+                None if released => {
+                    log::info!("ALSA hardware stream closed: card released to another app")
+                }
+                None => {}
+            }
+            if failure.is_some() || released {
                 error_flag.store(true, Ordering::Relaxed);
             }
         }

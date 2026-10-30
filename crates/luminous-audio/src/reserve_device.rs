@@ -27,7 +27,7 @@ use crate::sink::{OpenError, OutputFallbackReason};
 /// Our claim on a card. Above WirePlumber (−20) and PulseAudio (0), so the
 /// sound server hands its card over; an app holding the card at a higher
 /// priority keeps it.
-pub(crate) const PRIORITY: i32 = 10;
+const PRIORITY: i32 = 10;
 
 /// How long a card stays reserved after its last sink closes.
 const GRACE: Duration = Duration::from_secs(2);
@@ -50,7 +50,7 @@ fn object_path(card: u32) -> String {
 
 /// Whether a request at priority `requester` makes the holder at `holder`
 /// give its card up. Equal priorities keep the card where it is.
-pub(crate) fn outranks(requester: i32, holder: i32) -> bool {
+fn outranks(requester: i32, holder: i32) -> bool {
     requester > holder
 }
 
@@ -107,16 +107,14 @@ pub(crate) fn reserve_card(
     SESSION.reserve(card, device_id, on_release)
 }
 
-/// What both a slot and its D-Bus object see.
-struct Shared {
-    /// The open sink's hook; `None` while no sink uses the card (grace).
-    on_release: Mutex<Option<ReleaseHook>>,
-}
+/// The open sink's release hook, shared by a slot and its D-Bus object;
+/// `None` while no sink uses the card (grace period).
+type HookSlot = Arc<Mutex<Option<ReleaseHook>>>;
 
 /// A reserved card.
 struct Slot {
     conn: Connection,
-    shared: Arc<Shared>,
+    on_release: HookSlot,
     generation: u64,
     /// Open sinks on the card (one in practice).
     users: usize,
@@ -128,7 +126,7 @@ struct Slot {
 type Connect = dyn Fn() -> zbus::Result<connection::Builder<'static>> + Send + Sync;
 
 /// The cards this process has reserved, on one bus.
-pub(crate) struct Reserver {
+struct Reserver {
     connect: Box<Connect>,
     grace: Duration,
     slots: Mutex<HashMap<u32, Slot>>,
@@ -136,7 +134,7 @@ pub(crate) struct Reserver {
 }
 
 impl Reserver {
-    pub(crate) fn new(
+    fn new(
         connect: impl Fn() -> zbus::Result<connection::Builder<'static>> + Send + Sync + 'static,
         grace: Duration,
     ) -> Self {
@@ -148,7 +146,7 @@ impl Reserver {
         }
     }
 
-    pub(crate) fn reserve(
+    fn reserve(
         &'static self,
         card: u32,
         device_id: &str,
@@ -156,7 +154,7 @@ impl Reserver {
     ) -> Result<CardReservation, OpenError> {
         if let Some(slot) = self.slots.lock().get_mut(&card) {
             slot.users += 1;
-            *slot.shared.on_release.lock() = Some(on_release);
+            *slot.on_release.lock() = Some(on_release);
             return Ok(CardReservation {
                 held: Some((self, card, slot.generation)),
                 handed_over: false,
@@ -164,15 +162,13 @@ impl Reserver {
         }
 
         let generation = self.next_generation.fetch_add(1, Ordering::Relaxed);
-        let shared = Arc::new(Shared {
-            on_release: Mutex::new(Some(on_release)),
-        });
+        let on_release: HookSlot = Arc::new(Mutex::new(Some(on_release)));
         let object = ReserveDevice {
             reserver: self,
             card,
             generation,
             device_id: device_id.to_string(),
-            shared: Arc::clone(&shared),
+            on_release: Arc::clone(&on_release),
         };
         // Served from the builder, not `Connection::object_server()`: the
         // blocking `object_server()` starts its task outside any runtime,
@@ -207,7 +203,7 @@ impl Reserver {
             card,
             Slot {
                 conn,
-                shared,
+                on_release,
                 generation,
                 users: 1,
                 idle_token: 0,
@@ -230,7 +226,7 @@ impl Reserver {
         if slot.users > 0 {
             return;
         }
-        *slot.shared.on_release.lock() = None;
+        *slot.on_release.lock() = None;
         slot.idle_token += 1;
         let token = slot.idle_token;
         let grace = self.grace;
@@ -337,7 +333,7 @@ struct ReserveDevice {
     card: u32,
     generation: u64,
     device_id: String,
-    shared: Arc<Shared>,
+    on_release: HookSlot,
 }
 
 #[zbus::interface(name = "org.freedesktop.ReserveDevice1")]
@@ -352,7 +348,9 @@ impl ReserveDevice {
             "Releasing card {} to an app at priority {priority}",
             self.card
         );
-        if let Some(on_release) = self.shared.on_release.lock().take() {
+        // Taken out first so the lock isn't held while the PCM closes.
+        let on_release = self.on_release.lock().take();
+        if let Some(on_release) = on_release {
             on_release();
         }
         self.reserver.surrender(self.card, self.generation);
