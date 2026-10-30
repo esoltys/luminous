@@ -6,7 +6,9 @@
 //! lifetime, as close to the requested rate as the hardware allows; the
 //! engine reopens it to change rate.
 //!
-//! The PCM is opened, fed and closed on one render thread the sink owns.
+//! The PCM is opened, fed and closed on one render thread the sink owns,
+//! which holds the card's reservation (`reserve_device`) around it so the
+//! sound server lets go of the card first and takes it back afterwards.
 
 use crate::pcm::PcmFormat;
 use crate::sink::OutputFallbackReason;
@@ -83,13 +85,14 @@ mod imp {
     use ::alsa::ctl::{CardInfo, Ctl, DeviceIter};
     use ::alsa::pcm::{Access, Format, HwParams, PCM};
     use ::alsa::{Direction, ValueOr};
-    use parking_lot::Mutex;
+    use parking_lot::{Condvar, Mutex};
 
     use super::{
-        classify_failure, device_id, device_label, is_virtual_driver, EAGAIN, ETIMEDOUT,
+        classify_failure, device_id, device_label, is_virtual_driver, EAGAIN, EBUSY, ETIMEDOUT,
         FALLBACK_RATES, FORMATS,
     };
     use crate::pcm::{self, PcmFormat};
+    use crate::reserve_device;
     use crate::sink::{
         negotiate_format, AudioBackendKind, AudioSink, OpenError, OutputFallbackReason,
     };
@@ -106,11 +109,19 @@ mod imp {
     /// on a thread without real-time priority.
     const BUFFER_TIME_US: u32 = 100_000;
     const PERIOD_TIME_US: u32 = 25_000;
+    /// How long a card just handed over by the sound server may still be
+    /// busy while it finishes closing it.
+    const HANDOVER_BUSY_TIMEOUT: Duration = Duration::from_secs(1);
+    /// How long a release request waits for the render thread to close the
+    /// PCM before answering anyway.
+    const RELEASE_TIMEOUT: Duration = Duration::from_secs(1);
 
     /// A playback PCM on a hardware card.
     pub(crate) struct HwDevice {
         pub(crate) id: String,
         pub(crate) name: String,
+        /// The card's ALSA index, which names its reservation.
+        pub(crate) card_index: u32,
     }
 
     /// Lists every playback PCM on every hardware card, skipping software
@@ -119,6 +130,9 @@ mod imp {
     pub(crate) fn list_hw_devices() -> Vec<HwDevice> {
         let mut devices = Vec::new();
         for card in ::alsa::card::Iter::new().filter_map(Result::ok) {
+            let Ok(card_index) = u32::try_from(card.get_index()) else {
+                continue;
+            };
             let Ok(ctl) = Ctl::from_card(&card, false) else {
                 continue;
             };
@@ -144,16 +158,56 @@ mod imp {
                 devices.push(HwDevice {
                     id: device_id(card_id, dev),
                     name: device_label(card_name, pcm_info.get_name().unwrap_or("")),
+                    card_index,
                 });
             }
         }
         devices
     }
 
-    /// What `play`/`pause`/drop ask of the render thread.
+    /// What `play`/`pause`/drop and a release request ask of the render
+    /// thread, and its answer that the PCM is closed.
     struct Control {
         playing: AtomicBool,
         quit: AtomicBool,
+        /// A higher-priority app asked for the card.
+        released: AtomicBool,
+        closed: Mutex<bool>,
+        closed_cv: Condvar,
+    }
+
+    impl Control {
+        fn stopping(&self) -> bool {
+            self.quit.load(Ordering::Acquire) || self.released.load(Ordering::Acquire)
+        }
+
+        fn mark_closed(&self) {
+            *self.closed.lock() = true;
+            self.closed_cv.notify_all();
+        }
+
+        /// The hook the card's reservation runs when another app takes the
+        /// card: stops `render_thread` and waits for it to close the PCM.
+        fn release_hook(self: &Arc<Self>, render_thread: Thread) -> reserve_device::ReleaseHook {
+            let control = Arc::clone(self);
+            Box::new(move || {
+                control.released.store(true, Ordering::Release);
+                render_thread.unpark();
+                let mut closed = control.closed.lock();
+                if !*closed {
+                    let _ = control.closed_cv.wait_for(&mut closed, RELEASE_TIMEOUT);
+                }
+            })
+        }
+    }
+
+    /// Tells a release request the PCM is closed, however the render thread ends.
+    struct ClosedOnDrop(Arc<Control>);
+
+    impl Drop for ClosedOnDrop {
+        fn drop(&mut self) {
+            self.0.mark_closed();
+        }
     }
 
     /// Output straight to a hardware PCM.
@@ -240,6 +294,9 @@ mod imp {
         let control = Arc::new(Control {
             playing: AtomicBool::new(false),
             quit: AtomicBool::new(false),
+            released: AtomicBool::new(false),
+            closed: Mutex::new(false),
+            closed_cv: Condvar::new(),
         });
         let stream_error_flag = Arc::new(AtomicBool::new(false));
         let (ready_tx, ready_rx) = mpsc::channel();
@@ -249,29 +306,46 @@ mod imp {
             let control = Arc::clone(&control);
             let error_flag = Arc::clone(&stream_error_flag);
             let id = device.id.clone();
+            let card_index = device.card_index;
             std::thread::Builder::new()
                 .name("luminous-alsa-render".into())
-                .spawn(move || match HwStream::open(&id, requested_rate) {
-                    Err(e) => {
-                        let _ = ready_tx.send(Err(e));
-                    }
-                    Ok(stream) => {
-                        let samples = stream.period_frames * CHANNELS as usize;
-                        let period = RenderPeriod {
-                            renderer: OutputRenderer {
-                                shared,
-                                consumer,
-                                played_samples,
-                                mono_scratch: Vec::with_capacity(samples),
-                                sample_rate: stream.rate,
-                                channels: CHANNELS,
-                            },
-                            scratch: vec![0.0; samples],
-                            bytes: vec![0; samples * stream.format.container_bytes()],
-                            format: stream.format,
-                        };
-                        let _ = ready_tx.send(Ok((stream.rate, stream.format)));
-                        stream.run(period, &control, &error_flag);
+                .spawn(move || {
+                    let _closed = ClosedOnDrop(Arc::clone(&control));
+                    // Declared before the stream, so it's released after the
+                    // PCM closes.
+                    let reservation = match reserve_device::reserve_card(
+                        card_index,
+                        &id,
+                        control.release_hook(std::thread::current()),
+                    ) {
+                        Ok(reservation) => reservation,
+                        Err(e) => {
+                            let _ = ready_tx.send(Err(e));
+                            return;
+                        }
+                    };
+                    match HwStream::open(&id, requested_rate, reservation.handed_over()) {
+                        Err(e) => {
+                            let _ = ready_tx.send(Err(e));
+                        }
+                        Ok(stream) => {
+                            let samples = stream.period_frames * CHANNELS as usize;
+                            let period = RenderPeriod {
+                                renderer: OutputRenderer {
+                                    shared,
+                                    consumer,
+                                    played_samples,
+                                    mono_scratch: Vec::with_capacity(samples),
+                                    sample_rate: stream.rate,
+                                    channels: CHANNELS,
+                                },
+                                scratch: vec![0.0; samples],
+                                bytes: vec![0; samples * stream.format.container_bytes()],
+                                format: stream.format,
+                            };
+                            let _ = ready_tx.send(Ok((stream.rate, stream.format)));
+                            stream.run(period, &control, &error_flag);
+                        }
                     }
                 })
                 .map_err(|e| unavailable(format!("Failed to spawn render thread: {e}")))?
@@ -342,11 +416,30 @@ mod imp {
     }
 
     impl HwStream {
-        fn open(device_id: &str, requested_rate: u32) -> Result<Self, OpenError> {
-            // Non-blocking, so a device the sound server holds fails at once
-            // with EBUSY instead of waiting for it.
-            let pcm = PCM::new(device_id, Direction::Playback, true)
-                .map_err(|e| open_error("Open", e))?;
+        /// Opens `device_id` near `requested_rate`. `just_handed_over`: the
+        /// sound server released the card a moment ago and may still be
+        /// closing it, so a busy device is retried briefly.
+        fn open(
+            device_id: &str,
+            requested_rate: u32,
+            just_handed_over: bool,
+        ) -> Result<Self, OpenError> {
+            let busy_deadline = std::time::Instant::now() + HANDOVER_BUSY_TIMEOUT;
+            let pcm = loop {
+                // Non-blocking, so a device the sound server holds fails at
+                // once with EBUSY instead of waiting for it.
+                match PCM::new(device_id, Direction::Playback, true) {
+                    Ok(pcm) => break pcm,
+                    Err(e)
+                        if just_handed_over
+                            && e.errno() == EBUSY
+                            && std::time::Instant::now() < busy_deadline =>
+                    {
+                        std::thread::sleep(Duration::from_millis(50));
+                    }
+                    Err(e) => return Err(open_error("Open", e)),
+                }
+            };
 
             let (rate, format) =
                 negotiate_format(requested_rate, &FALLBACK_RATES, &FORMATS, |rate, format| {
@@ -395,6 +488,9 @@ mod imp {
         fn run(self, mut period: RenderPeriod, control: &Control, error_flag: &AtomicBool) {
             let mut started = false;
             let failure = loop {
+                if control.released.load(Ordering::Acquire) {
+                    break Some(::alsa::Error::new("card released to another app", EBUSY));
+                }
                 if control.quit.load(Ordering::Acquire) {
                     break None;
                 }
@@ -449,8 +545,7 @@ mod imp {
             let io = pcm.io_bytes();
             let mut offset = 0;
             while offset < len {
-                if control.quit.load(Ordering::Acquire) || !control.playing.load(Ordering::Acquire)
-                {
+                if control.stopping() || !control.playing.load(Ordering::Acquire) {
                     return Ok(());
                 }
                 match io.writei(&self.bytes[offset..len]) {

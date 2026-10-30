@@ -42,6 +42,8 @@ mod spectrum;
 // only called on its own platform, but are built and tested everywhere.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 mod alsa_direct;
+#[cfg(target_os = "linux")]
+mod reserve_device;
 #[cfg_attr(not(windows), allow(dead_code))]
 mod wasapi;
 
