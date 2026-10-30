@@ -61,6 +61,10 @@ via `flatpak-cargo-generator`, which works fine against `Cargo.lock`; JS via a v
 
 - Audio plays through PipeWire/PulseAudio via `--socket=pulseaudio` (CPAL's usual backend under
   Flatpak).
+- Direct Hardware (ALSA) output opens the card's `/dev/snd` PCM itself (`--device=all`), and
+  first takes the card's `org.freedesktop.ReserveDevice1.Audio<N>` name on the session bus
+  (`--own-name=org.freedesktop.ReserveDevice1.*`) so PipeWire releases the card to it and takes
+  it back afterwards.
 - Adding a music library folder goes through the XDG Desktop Portal file picker (Tauri's dialog
   plugin uses this automatically under Flatpak), which grants persistent access to just the
   folders you pick — Luminous does not request broad `--filesystem=home` access.
