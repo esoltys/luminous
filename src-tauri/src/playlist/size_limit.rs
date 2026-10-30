@@ -99,13 +99,8 @@ impl SizeLimitInput {
         self.fit(Some(name), |item, library_bytes| {
             item.song
                 .as_ref()
-                .and_then(|song| song.path.as_deref())
-                .and_then(|path| {
-                    transcoder
-                        .estimated_size(std::path::Path::new(path), &profile)
-                        .ok()
-                })
-                .unwrap_or(library_bytes)
+                .and_then(|song| crate::devices::assess_song(transcoder, song, &profile))
+                .map_or(library_bytes, |a| a.size)
         })
     }
 

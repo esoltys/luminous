@@ -9,6 +9,12 @@ use std::time::UNIX_EPOCH;
 /// Suffix of the name a file is written under until it is complete.
 pub(crate) const PARTIAL_SUFFIX: &str = ".luminous-partial";
 
+/// Whether a file named `name` is one a [`DeviceBackend::write`] left while
+/// writing, never a finished file: an unplug or crash can leave one behind.
+pub fn is_partial_file(name: &str) -> bool {
+    name.ends_with(PARTIAL_SUFFIX)
+}
+
 /// One file or folder in a listing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirEntry {
@@ -64,6 +70,11 @@ pub trait DeviceBackend: Send {
     /// Removes a file, or a folder and everything in it. Removing something
     /// that is not there succeeds. The root itself is never removed.
     fn remove(&self, path: &str) -> io::Result<()>;
+
+    /// Removes the folder at `path` only if nothing is in it, which the
+    /// storage itself checks as it removes it: `Ok(false)` when something is
+    /// (or there is no such folder). The root itself is never removed.
+    fn remove_empty_folder(&self, path: &str) -> io::Result<bool>;
 
     fn space(&self) -> io::Result<Space>;
 }
@@ -172,6 +183,30 @@ impl DeviceBackend for FsBackend {
         match result {
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
             other => other,
+        }
+    }
+
+    fn remove_empty_folder(&self, path: &str) -> io::Result<bool> {
+        let path = self.resolve(path);
+        if path == self.root {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "cannot remove the root",
+            ));
+        }
+        match std::fs::remove_dir(&path) {
+            Ok(()) => Ok(true),
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    io::ErrorKind::DirectoryNotEmpty
+                        | io::ErrorKind::NotFound
+                        | io::ErrorKind::NotADirectory
+                ) =>
+            {
+                Ok(false)
+            }
+            Err(e) => Err(e),
         }
     }
 
@@ -308,6 +343,22 @@ mod tests {
         assert_eq!(names(&backend, "Music"), vec!["b.mp3"]);
         assert!(backend.remove("").is_err());
         assert!(dir.path().exists());
+    }
+
+    #[test]
+    fn only_empty_folders_are_removed_as_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let backend = FsBackend::new(dir.path());
+        write(&backend, "Music/Kept/mine.txt", "x").unwrap();
+        std::fs::create_dir_all(dir.path().join("Music/Empty")).unwrap();
+
+        assert!(!backend.remove_empty_folder("Music/Kept").unwrap());
+        assert!(dir.path().join("Music/Kept/mine.txt").exists());
+        assert!(!backend.remove_empty_folder("Music/Kept/mine.txt").unwrap());
+        assert!(!backend.remove_empty_folder("Music/Gone").unwrap());
+        assert!(backend.remove_empty_folder("Music/Empty").unwrap());
+        assert!(!dir.path().join("Music/Empty").exists());
+        assert!(backend.remove_empty_folder("").is_err());
     }
 
     #[test]

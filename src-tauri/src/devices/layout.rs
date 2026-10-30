@@ -90,6 +90,18 @@ impl DeviceLayout {
     /// that would land on the same file get " (2)", " (3)"... in song-id
     /// order, so the same songs get the same paths on every sync.
     pub fn plan(profile: &DeviceProfile, tracks: &[SyncedTrack]) -> Self {
+        Self::plan_avoiding(profile, tracks, &HashSet::new())
+    }
+
+    /// [`plan`](Self::plan), with no track placed at a path in `occupied`
+    /// (lower-case, relative to the storage root): a track that would land on
+    /// one gets the next free " (n)" name instead. Sync passes the files it
+    /// must not overwrite.
+    pub fn plan_avoiding(
+        profile: &DeviceProfile,
+        tracks: &[SyncedTrack],
+        occupied: &HashSet<String>,
+    ) -> Self {
         let settings = profile.layout.clone();
         let ascii_only = settings.playlist_format.ascii_names();
         let music_dir = path_parts(&profile.music_path);
@@ -108,7 +120,7 @@ impl DeviceLayout {
             apply_dir_casing_map(&mut d.dirs, &casing);
         }
 
-        let mut taken: HashSet<String> = HashSet::new();
+        let mut taken: HashSet<String> = occupied.clone();
         let mut tracks = HashMap::with_capacity(drafts.len());
         for d in &drafts {
             let dir: Vec<&str> = music_dir
@@ -139,48 +151,71 @@ impl DeviceLayout {
     /// profile writes no playlist files. Playlists whose names clash on the
     /// device get " (2)", " (3)"... in the order given.
     pub fn playlist_files(&self, playlists: &[DevicePlaylist]) -> Vec<DeviceFile> {
-        let (format, extension) = match self.settings.playlist_format {
-            PlaylistFileFormat::M3u8 => (PlaylistFormat::M3u8, "m3u8"),
-            PlaylistFileFormat::M3uAscii => (PlaylistFormat::M3u, "m3u"),
-            PlaylistFileFormat::Pls => (PlaylistFormat::Pls, "pls"),
+        self.playlist_files_avoiding(playlists, &HashSet::new())
+    }
+
+    /// [`playlist_files`](Self::playlist_files), with no file at a path in
+    /// `occupied` (lower-case, relative to the storage root).
+    pub fn playlist_files_avoiding(
+        &self,
+        playlists: &[DevicePlaylist],
+        occupied: &HashSet<String>,
+    ) -> Vec<DeviceFile> {
+        let extension = match self.settings.playlist_format {
+            PlaylistFileFormat::M3u8 => "m3u8",
+            PlaylistFileFormat::M3uAscii => "m3u",
+            PlaylistFileFormat::Pls => "pls",
             PlaylistFileFormat::None => return Vec::new(),
         };
         let ascii_only = self.settings.playlist_format.ascii_names();
-        let (separator, line_ending) = match self.settings.path_separator {
-            PathSeparator::Slash => ("/", LineEnding::Lf),
-            PathSeparator::Backslash => ("\\", LineEnding::CrLf),
-        };
         let dir: Vec<&str> = self.playlists_dir.iter().map(String::as_str).collect();
 
-        let mut taken = HashSet::new();
+        let mut taken = occupied.clone();
         playlists
             .iter()
             .map(|playlist| {
                 let stem = device_name(playlist.name, ascii_only);
-                let path = unique_path(&dir, &stem, extension, &mut taken);
-                let entries: Vec<PlaylistEntry> = playlist
-                    .songs
-                    .iter()
-                    .filter_map(|song| {
-                        let track = self.tracks.get(&song.id)?;
-                        Some(PlaylistEntry {
-                            location: relative_location(&self.playlists_dir, track, separator),
-                            title: song.title.as_deref(),
-                            artist: song.artist.as_deref(),
-                            album: song.album.as_deref(),
-                            duration_sec: song.length_nanosec.map(|ns| ns / 1_000_000_000),
-                        })
-                    })
-                    .collect();
-                let text = render_playlist(playlist.name, &entries, format, line_ending);
-                let content = if ascii_only {
-                    fold_to_ascii(&text, |_| true).into_bytes()
-                } else {
-                    text.into_bytes()
-                };
-                DeviceFile { path, content }
+                DeviceFile {
+                    path: unique_path(&dir, &stem, extension, &mut taken),
+                    content: self.playlist_content(playlist),
+                }
             })
             .collect()
+    }
+
+    /// The bytes of `playlist`'s file, whatever path it goes at. Empty when
+    /// the profile writes no playlist files.
+    pub fn playlist_content(&self, playlist: &DevicePlaylist) -> Vec<u8> {
+        let format = match self.settings.playlist_format {
+            PlaylistFileFormat::M3u8 => PlaylistFormat::M3u8,
+            PlaylistFileFormat::M3uAscii => PlaylistFormat::M3u,
+            PlaylistFileFormat::Pls => PlaylistFormat::Pls,
+            PlaylistFileFormat::None => return Vec::new(),
+        };
+        let (separator, line_ending) = match self.settings.path_separator {
+            PathSeparator::Slash => ("/", LineEnding::Lf),
+            PathSeparator::Backslash => ("\\", LineEnding::CrLf),
+        };
+        let entries: Vec<PlaylistEntry> = playlist
+            .songs
+            .iter()
+            .filter_map(|song| {
+                let track = self.tracks.get(&song.id)?;
+                Some(PlaylistEntry {
+                    location: relative_location(&self.playlists_dir, track, separator),
+                    title: song.title.as_deref(),
+                    artist: song.artist.as_deref(),
+                    album: song.album.as_deref(),
+                    duration_sec: song.length_nanosec.map(|ns| ns / 1_000_000_000),
+                })
+            })
+            .collect();
+        let text = render_playlist(playlist.name, &entries, format, line_ending);
+        if self.settings.playlist_format.ascii_names() {
+            fold_to_ascii(&text, |_| true).into_bytes()
+        } else {
+            text.into_bytes()
+        }
     }
 
     /// The art files the profile asks for, one set per album folder. A

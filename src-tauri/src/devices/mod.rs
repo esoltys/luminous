@@ -12,13 +12,17 @@
 //! first time (another computer, a fresh install).
 
 pub mod layout;
+pub mod sync;
 
 use crate::db::Database;
+use crate::models::{FileType, Song};
 use anyhow::{anyhow, Result};
 use luminous_devices::{Device, DeviceKind, DeviceProfile, DeviceWatcher, Marker};
+use luminous_transcode::{Assessment, KnownSource, Transcoder};
 use parking_lot::{Condvar, Mutex};
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
@@ -107,7 +111,7 @@ impl DeviceMonitor {
     }
 
     /// What the UI is shown for a connected device, `None` once it is gone.
-    fn shown(&self, id: &str) -> Option<ConnectedDevice> {
+    pub fn shown(&self, id: &str) -> Option<ConnectedDevice> {
         self.with_entry(id, |e| e.shown.clone())
     }
 
@@ -192,6 +196,19 @@ impl DeviceMonitor {
         if load_profile(conn, id)?.is_none() {
             upsert_profile(conn, id, &shown.profile, &shown.default_name, now)?;
         }
+        Ok(())
+    }
+
+    /// Records a completed sync of device `id` at `now` (Unix seconds),
+    /// keeping its profile on this computer if it had none, and emits the
+    /// updated list.
+    pub fn record_sync(&self, conn: &rusqlite::Connection, id: &str, now: i64) -> Result<()> {
+        self.keep_profile_without_marker(conn, id, now)?;
+        conn.execute(
+            "UPDATE device_profiles SET last_synced_at = ?1 WHERE id = ?2",
+            params![now, id],
+        )?;
+        self.request_rebuild();
         Ok(())
     }
 
@@ -393,6 +410,67 @@ fn upsert_profile(
         ],
     )?;
     Ok(())
+}
+
+/// What sync does with `song` for `profile` and its size on the device,
+/// from what the scan recorded where that can be trusted. `None` for a song
+/// with no local file, or one that can't be read when it has to be.
+///
+/// Only the preview relies on it: the worker reads each file again before
+/// writing it and fails a song whose file no longer matches the plan.
+pub fn assess_song(
+    transcoder: &Transcoder,
+    song: &Song,
+    profile: &DeviceProfile,
+) -> Option<Assessment> {
+    let path = Path::new(song.path.as_deref()?);
+    let known = known_source(song, path);
+    transcoder.assess(&known, profile).ok()
+}
+
+/// `song`'s row as the transcoder takes it, with no codec where the row
+/// can't be trusted to match a probe of the file, so the file is read.
+fn known_source<'a>(song: &Song, path: &'a Path) -> KnownSource<'a> {
+    let positive = |n: Option<i32>| n.filter(|n| *n > 0);
+    // The scan records the codec the stream declares (#1866), so `.m4a` and
+    // `.ogg` rows say what they hold. A CUE track's length is not its file's.
+    let codec = match song.filetype {
+        _ if song.cue_path.is_some() || song.end_nanosec > 0 => None,
+        FileType::Mp3 => Some("mp3"),
+        FileType::Aac => Some("aac"),
+        FileType::Alac => Some("alac"),
+        FileType::Flac => Some("flac"),
+        FileType::OggVorbis => Some("ogg"),
+        FileType::OggOpus => Some("opus"),
+        FileType::OggSpeex => Some("speex"),
+        FileType::Wav => Some("wav"),
+        FileType::Aiff => Some("aiff"),
+        FileType::WavPack => Some("wavpack"),
+        FileType::Ape => Some("ape"),
+        FileType::Mpc => Some("mpc"),
+        _ => None,
+    };
+    let bit_depth = positive(song.bitdepth).and_then(|d| u8::try_from(d).ok());
+    let complete = positive(song.samplerate).is_some()
+        && positive(song.channels).is_some()
+        && positive(song.bitrate).is_some()
+        && song.length_nanosec.is_some_and(|n| n > 0)
+        && song.filesize.is_some_and(|n| n > 0)
+        // Lossless files always report their depth; a row without one is stale.
+        && (bit_depth.is_some() || !song.filetype.is_lossless());
+    KnownSource {
+        path,
+        size: song.filesize.unwrap_or(0).max(0) as u64,
+        codec: codec.filter(|_| complete),
+        sample_rate: positive(song.samplerate).unwrap_or(0) as u32,
+        bit_depth,
+        channels: positive(song.channels)
+            .and_then(|c| u8::try_from(c).ok())
+            .unwrap_or(0),
+        bitrate_kbps: positive(song.bitrate).map(|b| b as u32),
+        duration: Duration::from_nanos(song.length_nanosec.unwrap_or(0).max(0) as u64),
+        has_art: song.art_embedded,
+    }
 }
 
 #[cfg(test)]
@@ -600,5 +678,36 @@ mod tests {
 
         let entries = build_entries(&conn, &[volume(device_dir.path(), "0088-5572")], NOW).unwrap();
         assert_eq!(entries[0].shown.profile.nickname.as_deref(), Some("Here"));
+    }
+
+    #[test]
+    fn a_row_gives_the_codec_its_stream_declared_not_its_extension() {
+        let row = |path: &str, filetype| Song {
+            path: Some(path.into()),
+            filetype,
+            samplerate: Some(44_100),
+            channels: Some(2),
+            bitdepth: Some(16),
+            bitrate: Some(900),
+            length_nanosec: Some(200_000_000_000),
+            filesize: Some(22_000_000),
+            ..Default::default()
+        };
+        let codec = |song: &Song| known_source(song, Path::new("x")).codec;
+
+        assert_eq!(codec(&row("a.m4a", FileType::Alac)), Some("alac"));
+        assert_eq!(codec(&row("a.m4a", FileType::Aac)), Some("aac"));
+        assert_eq!(codec(&row("a.ogg", FileType::OggOpus)), Some("opus"));
+        assert_eq!(codec(&row("a.ogg", FileType::OggVorbis)), Some("ogg"));
+        let cue_track = Song {
+            cue_path: Some("a.cue".into()),
+            ..row("a.flac", FileType::Flac)
+        };
+        assert_eq!(codec(&cue_track), None);
+        let no_depth = Song {
+            bitdepth: None,
+            ..row("a.m4a", FileType::Alac)
+        };
+        assert_eq!(codec(&no_depth), None);
     }
 }

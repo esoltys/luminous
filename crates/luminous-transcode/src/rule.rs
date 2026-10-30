@@ -3,11 +3,13 @@
 use crate::capabilities::{Capabilities, ConversionTarget};
 use crate::source::SourceInfo;
 use luminous_devices::{ConvertMode, DeviceProfile, TargetFormat};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-/// What happens to a file on its way to the device.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+/// What happens to a file on its way to the device. Device sync keeps it in
+/// the manifest on the device, so its serialized form is a stored format:
+/// renaming a variant or field makes every synced file be prepared again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",

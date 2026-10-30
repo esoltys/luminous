@@ -118,6 +118,8 @@ pub struct AppState {
     pub devices: Arc<devices::DeviceMonitor>,
     /// Converts files for devices and keeps the transcode cache (#838).
     pub transcoder: Arc<luminous_transcode::Transcoder>,
+    /// Plans and runs syncs to devices (#836).
+    pub device_sync: Arc<devices::sync::DeviceSync>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -1144,6 +1146,17 @@ pub fn run() {
 
             let watcher_paused = Arc::new(std::sync::atomic::AtomicU32::new(0));
             let musicbrainz = Arc::new(musicbrainz::MusicBrainzManager::new(Arc::clone(&db)));
+            let device_monitor = Arc::new(devices::DeviceMonitor::new());
+            let transcoder = Arc::new(luminous_transcode::Transcoder::new(
+                crate::paths::resolve_cache_dir(app).join("transcode"),
+            ));
+            let device_sync = Arc::new(devices::sync::DeviceSync::new(
+                device_monitor.clone(),
+                transcoder.clone(),
+                Arc::clone(&db),
+                Arc::new(commands::devices::AppEvents(app.handle().clone())),
+                Arc::new(devices::sync::worker::SystemClock),
+            ));
 
             let state = AppState {
                 db,
@@ -1167,10 +1180,9 @@ pub fn run() {
                 mass_removal_registry: Arc::new(parking_lot::Mutex::new(
                     collection::MassRemovalRegistry::new(),
                 )),
-                devices: Arc::new(devices::DeviceMonitor::new()),
-                transcoder: Arc::new(luminous_transcode::Transcoder::new(
-                    crate::paths::resolve_cache_dir(app).join("transcode"),
-                )),
+                devices: device_monitor,
+                transcoder,
+                device_sync,
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -1626,6 +1638,11 @@ pub fn run() {
             commands::devices::get_transcode_capabilities,
             commands::devices::get_conversion_target,
             commands::devices::preview_device_path,
+            commands::devices::get_device_sync_state,
+            commands::devices::preview_device_sync,
+            commands::devices::get_device_sync_items,
+            commands::devices::start_device_sync,
+            commands::devices::cancel_device_sync,
             // Window & Miniplayer commands
             commands::window::is_remote_devtools_enabled,
             commands::window::geometry_capture_supported,

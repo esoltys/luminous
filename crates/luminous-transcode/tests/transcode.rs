@@ -9,10 +9,12 @@ use lofty::picture::{Picture, PictureType};
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, Tag, TagType};
 use luminous_transcode::{
-    ConvertMode, ConvertSettings, Decision, DeviceProfile, Error, TargetFormat, Transcoder,
+    ConvertMode, ConvertSettings, Decision, DeviceProfile, Error, KnownSource, TargetFormat,
+    Transcoder,
 };
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
+use std::time::Duration;
 
 const SECONDS: usize = 2;
 
@@ -250,4 +252,90 @@ fn mono_sources_convert_to_every_available_format() {
             "{format:?} decoded to {seconds} s"
         );
     }
+}
+
+/// A 200 s FLAC at 900 kbps of 30 MB: 22.5 MB of audio, the rest art.
+fn known_flac(path: &Path) -> KnownSource<'_> {
+    KnownSource {
+        path,
+        size: 30_000_000,
+        codec: Some("flac"),
+        sample_rate: 44_100,
+        bit_depth: Some(16),
+        channels: 2,
+        bitrate_kbps: Some(900),
+        duration: Duration::from_secs(200),
+        has_art: true,
+    }
+}
+
+#[test]
+fn what_the_library_knows_is_assessed_without_opening_the_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let missing = dir.path().join("missing.flac");
+    let transcoder = Transcoder::new(dir.path().join("cache"));
+    let plain = profile(ConvertMode::Unsupported, TargetFormat::Opus, None);
+
+    let flac = transcoder.assess(&known_flac(&missing), &plain).unwrap();
+    assert!(matches!(flac.decision, Decision::Convert { .. }));
+    // 200 s at 192 kbps is 4.8 MB, plus framing and the 7.5 MB of art kept.
+    assert_eq!(flac.size, 4_800_000 + 48_000 + 4096 + 7_500_000);
+
+    let mp3 = KnownSource {
+        codec: Some("mp3"),
+        bitrate_kbps: Some(320),
+        ..known_flac(&missing)
+    };
+    let mp3 = transcoder.assess(&mp3, &plain).unwrap();
+    assert_eq!((mp3.decision, mp3.size), (Decision::Copy, 30_000_000));
+
+    // Art the profile shrinks: assumed large, kept to what it takes now.
+    let shrinking = profile(ConvertMode::Unsupported, TargetFormat::Opus, Some(500));
+    let flac = transcoder
+        .assess(&known_flac(&missing), &shrinking)
+        .unwrap();
+    assert_eq!(flac.size, 4_800_000 + 48_000 + 4096 + 31_250);
+}
+
+#[test]
+fn the_file_is_read_when_the_library_cant_tell() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = library_file(dir.path(), 1200);
+    let missing = dir.path().join("missing.m4a");
+    let transcoder = Transcoder::new(dir.path().join("cache"));
+    let plain = profile(ConvertMode::Unsupported, TargetFormat::Opus, None);
+    let shrinking = profile(ConvertMode::Unsupported, TargetFormat::Opus, Some(500));
+
+    let unknown_codec = KnownSource {
+        codec: None,
+        ..known_flac(&missing)
+    };
+    assert!(transcoder.assess(&unknown_codec, &plain).is_err());
+
+    // Only the art's dimensions decide whether a playable file is rewritten.
+    let wav = KnownSource {
+        path: &source,
+        size: std::fs::metadata(&source).unwrap().len(),
+        codec: Some("wav"),
+        bitrate_kbps: Some(1411),
+        duration: Duration::from_secs(SECONDS as u64),
+        ..known_flac(&missing)
+    };
+    assert_eq!(
+        transcoder.assess(&wav, &shrinking).unwrap().decision,
+        Decision::ShrinkArt { max_px: 500 }
+    );
+    assert!(transcoder
+        .assess(
+            &KnownSource {
+                path: &missing,
+                ..wav.clone()
+            },
+            &shrinking
+        )
+        .is_err());
+    assert_eq!(
+        transcoder.assess(&wav, &plain).unwrap().decision,
+        Decision::Copy
+    );
 }

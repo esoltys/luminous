@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 70;
+pub const CURRENT_SCHEMA_VERSION: i32 = 71;
 
 struct Migration {
     version: i32,
@@ -660,6 +660,11 @@ const MIGRATIONS: &[Migration] = &[
             }
             Ok(())
         },
+    },
+    Migration {
+        version: 71,
+        description: "device_sync_settings: each device's sync selection and last sync summary (#836)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_71)?),
     },
 ];
 
@@ -2479,6 +2484,19 @@ CREATE TABLE IF NOT EXISTS device_profiles (
     created_at        INTEGER NOT NULL,
     updated_at        INTEGER NOT NULL,
     last_synced_at    INTEGER
+);
+";
+
+// Migration 71: what the user chose to sync to each device on this computer
+// (#836). `settings` is the JSON `devices::sync::selection::SyncSettings`;
+// `last_summary` the JSON summary of the last sync, so it is still shown
+// after a restart. Not in the device's marker: playlist ids are local.
+const MIGRATION_71: &str = "
+CREATE TABLE IF NOT EXISTS device_sync_settings (
+    device_id    TEXT PRIMARY KEY,
+    settings     TEXT NOT NULL DEFAULT '{}',
+    last_summary TEXT,
+    updated_at   INTEGER NOT NULL
 );
 ";
 
