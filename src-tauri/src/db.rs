@@ -785,12 +785,13 @@ fn migrate_album_keys(conn: &rusqlite::Connection) -> Result<()> {
 /// orphans, so nothing that was really in the library changes.
 fn migrate_reclassify_opened_files(conn: &rusqlite::Connection) -> Result<()> {
     use crate::models::SongSource;
+    let watched = crate::collection::WatchedFolders::load(conn)?;
     let rows: Vec<(i64, String)> = conn
         .prepare("SELECT id, path FROM songs WHERE source = ?1 AND path IS NOT NULL")?
         .query_map([SongSource::LOCAL_FILE_ID], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
     for (id, path) in rows {
-        if !crate::collection::is_in_watched_folder(conn, std::path::Path::new(&path))? {
+        if watched.source_for(std::path::Path::new(&path)) == SongSource::OpenedFile {
             conn.execute(
                 "UPDATE songs SET source = ?1 WHERE id = ?2",
                 params![SongSource::OPENED_FILE_ID, id],

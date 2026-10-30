@@ -46,7 +46,10 @@ impl SongSource {
     pub const WEBDAV_ID: i32 = Self::WebDav as i32;
     pub const SUBSONIC_ID: i32 = Self::Subsonic as i32;
 
-    /// True if this source represents a local file on disk (LocalFile or Collection).
+    /// True if this source is a library file on disk (LocalFile or
+    /// Collection). Opened files outside the library (`OpenedFile`) are on
+    /// disk too but deliberately excluded: they aren't subject to the
+    /// watched-folder rules library files are.
     pub fn is_local(&self) -> bool {
         matches!(self, Self::LocalFile | Self::Collection)
     }

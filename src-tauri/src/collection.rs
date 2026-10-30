@@ -990,10 +990,14 @@ impl CollectionScanner {
             .context("rescan_paths task panicked")?;
 
         let conn = self.db.pool.get()?;
+        // Targeted callers can pass any known song's path, including a file
+        // opened from outside the library — re-reading it must not add it.
+        let watched = WatchedFolders::load(&conn)?;
         let tx = conn.unchecked_transaction()?;
         for (path, result) in results {
             match result {
-                Ok(song) => {
+                Ok(mut song) => {
+                    song.source = watched.source_for(&path);
                     if let Err(e) = upsert_song(&tx, &song) {
                         log::warn!("Failed to save rescanned tags for {}: {e}", path.display());
                     }
@@ -2029,18 +2033,38 @@ fn write_cue_tracks(conn: &rusqlite::Connection, job: &CueJob, songs: &[Song]) -
     Ok(())
 }
 
-/// Whether `path` lies inside one of the watched music folders (case- and
-/// separator-insensitive on Windows) — i.e. whether a scan would make it a
-/// library song.
-pub(crate) fn is_in_watched_folder(conn: &rusqlite::Connection, path: &Path) -> Result<bool> {
-    let mut stmt = conn.prepare("SELECT path FROM directories")?;
-    let roots = stmt.query_map([], |row| row.get::<_, String>(0))?;
-    for root in roots {
-        if relocate::is_under_root(path, Path::new(&root?)) {
-            return Ok(true);
+/// The watched music folders, loaded once so a caller classifying many paths
+/// doesn't re-query them per path.
+pub(crate) struct WatchedFolders(Vec<PathBuf>);
+
+impl WatchedFolders {
+    pub(crate) fn load(conn: &rusqlite::Connection) -> Result<Self> {
+        let mut stmt = conn.prepare("SELECT path FROM directories")?;
+        let roots = stmt
+            .query_map([], |row| row.get::<_, String>(0))?
+            .map(|r| r.map(PathBuf::from))
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(Self(roots))
+    }
+
+    /// The source a local file at `path` belongs to: `LocalFile` inside a
+    /// watched folder (matched case- and separator-insensitively on
+    /// Windows), `OpenedFile` anywhere else (#1842). Any caller that reads
+    /// and upserts a path that isn't known to come from a watched-folder
+    /// scan must set the song's source from this, since `upsert_song`
+    /// promotes an `OpenedFile` row to the library whenever the incoming
+    /// source isn't `OpenedFile`.
+    pub(crate) fn source_for(&self, path: &Path) -> SongSource {
+        if self
+            .0
+            .iter()
+            .any(|root| relocate::is_under_root(path, root))
+        {
+            SongSource::LocalFile
+        } else {
+            SongSource::OpenedFile
         }
     }
-    Ok(false)
 }
 
 pub(crate) fn read_and_upsert_song(
@@ -2827,8 +2851,7 @@ mod tests {
             SongSource::LocalFile
         );
 
-        // Once its folder is watched, the unchanged file is upgraded in place
-        // and counts as newly added.
+        // A targeted re-read (the album view's Refresh) keeps it out too.
         db.pool
             .get()
             .unwrap()
@@ -2837,6 +2860,17 @@ mod tests {
                 params![opened_id],
             )
             .unwrap();
+        scanner
+            .rescan_paths_core(app_data_dir.clone(), vec![device_copy.clone()])
+            .await
+            .unwrap();
+        assert_eq!(
+            song_source_and_added(&db, opened_id),
+            (SongSource::OpenedFile, 1)
+        );
+
+        // Once its folder is watched, the unchanged file is upgraded in place
+        // and counts as newly added.
         scanner
             .add_directory(&device_dir.to_string_lossy())
             .unwrap();

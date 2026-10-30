@@ -144,6 +144,7 @@ pub(crate) fn resolve_songs_from_paths(
     use rusqlite::OptionalExtension;
 
     let mut songs = Vec::with_capacity(resolved_paths.len());
+    let watched = crate::collection::WatchedFolders::load(conn).map_err(|e| e.to_string())?;
 
     for item_path in resolved_paths {
         let item_path_str = item_path.to_string_lossy().to_string();
@@ -178,12 +179,9 @@ pub(crate) fn resolve_songs_from_paths(
         // Unknown file. Inside a watched folder it's a library song the scan
         // hasn't reached yet; anywhere else it's an opened file, queued,
         // played and counted in history without joining the library (#1842).
-        let prepared =
-            crate::collection::is_in_watched_folder(conn, &item_path).and_then(|in_library| {
-                let mut song = crate::collection::read_and_prepare_song(cover_manager, &item_path)?;
-                if !in_library {
-                    song.source = crate::models::SongSource::OpenedFile;
-                }
+        let prepared = crate::collection::read_and_prepare_song(cover_manager, &item_path)
+            .and_then(|mut song| {
+                song.source = watched.source_for(&item_path);
                 crate::collection::upsert_song(conn, &song)
             });
         if let Err(e) = prepared {
