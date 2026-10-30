@@ -691,10 +691,10 @@ pub async fn get_audio_output_devices(
         .await
         .map_err(|e| e.to_string())?;
     let config = state.audio.lock().await.output_config();
-    let stored_name = crate::db::run_blocking(&state.db, |conn| {
+    let last_seen: Option<SeenDevice> = crate::db::run_blocking(&state.db, |conn| {
         Ok(conn
             .query_row(
-                "SELECT value FROM app_state WHERE key = 'audio_output_device_name'",
+                "SELECT value FROM app_state WHERE key = 'audio_output_device_seen'",
                 [],
                 |row| row.get::<_, String>(0),
             )
@@ -702,14 +702,15 @@ pub async fn get_audio_output_devices(
     })
     .await
     .ok()
-    .flatten();
+    .flatten()
+    .and_then(|json| serde_json::from_str(&json).ok());
 
-    let (devices, name_to_store) = list_with_chosen_device(connected, &config, stored_name);
-    if let Some(name) = name_to_store {
+    let (devices, seen) = list_with_chosen_device(connected, &config, last_seen);
+    if let Some(json) = seen.and_then(|seen| serde_json::to_string(&seen).ok()) {
         let _ = crate::db::run_blocking(&state.db, move |conn| {
             conn.execute(
-                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('audio_output_device_name', ?1)",
-                rusqlite::params![name],
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('audio_output_device_seen', ?1)",
+                rusqlite::params![json],
             )?;
             Ok(())
         })
@@ -718,26 +719,38 @@ pub async fn get_audio_output_devices(
     Ok(devices)
 }
 
+/// The chosen output device as it was last seen connected.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+struct SeenDevice {
+    id: String,
+    name: String,
+}
+
 /// Lists `connected`, adding the device `config` chooses if it isn't among
-/// them, named `stored_name` (its name when last seen) or else its id. Also
-/// returns the chosen device's name to remember when it is connected and the
-/// remembered one differs.
+/// them, under its name in `last_seen` when that is the same device, or else
+/// its id. Also returns the chosen device to remember when it is connected
+/// and differs from `last_seen`.
 fn list_with_chosen_device(
     connected: Vec<luminous_audio::AudioDeviceInfo>,
     config: &luminous_audio::AudioOutputConfig,
-    stored_name: Option<String>,
-) -> (Vec<OutputDevice>, Option<String>) {
+    last_seen: Option<SeenDevice>,
+) -> (Vec<OutputDevice>, Option<SeenDevice>) {
     let chosen = config.device_id.as_deref();
     let present = connected
         .iter()
         .find(|d| d.backend == config.backend && Some(d.id.as_str()) == chosen);
-    let name_to_store = present
-        .map(|d| d.name.clone())
-        .filter(|name| stored_name.as_ref() != Some(name));
+    let seen = present
+        .map(|d| SeenDevice {
+            id: d.id.clone(),
+            name: d.name.clone(),
+        })
+        .filter(|seen| last_seen.as_ref() != Some(seen));
     let missing = chosen.filter(|_| present.is_none()).map(|id| OutputDevice {
         info: luminous_audio::AudioDeviceInfo {
             id: id.to_string(),
-            name: stored_name.unwrap_or_else(|| id.to_string()),
+            name: last_seen
+                .filter(|seen| seen.id == id)
+                .map_or_else(|| id.to_string(), |seen| seen.name),
             backend: config.backend,
             is_default: false,
         },
@@ -751,7 +764,7 @@ fn list_with_chosen_device(
         })
         .chain(missing)
         .collect();
-    (devices, name_to_store)
+    (devices, seen)
 }
 
 /// Returns the current active audio output settings (backend and selected device).
@@ -854,10 +867,14 @@ mod tests {
     #[test]
     fn an_unplugged_chosen_device_stays_listed_under_its_last_name() {
         let pch = device("hw:CARD=PCH,DEV=0", "HDA Intel PCH");
+        let earpods_seen = SeenDevice {
+            id: "hw:CARD=EarPods,DEV=0".into(),
+            name: "EarPods — USB Audio".into(),
+        };
         let (devices, to_store) = list_with_chosen_device(
             vec![pch.clone()],
             &alsa_choosing(Some("hw:CARD=EarPods,DEV=0")),
-            Some("EarPods — USB Audio".into()),
+            Some(earpods_seen.clone()),
         );
         assert_eq!(to_store, None);
         assert_eq!(devices.len(), 2);
@@ -865,13 +882,16 @@ mod tests {
         assert_eq!(devices[1].info.name, "EarPods — USB Audio");
         assert!(!devices[1].connected);
 
-        // Never seen by name: its id stands in.
-        let (devices, _) = list_with_chosen_device(
-            vec![pch],
-            &alsa_choosing(Some("hw:CARD=EarPods,DEV=0")),
-            None,
-        );
-        assert_eq!(devices[1].info.name, "hw:CARD=EarPods,DEV=0");
+        // Never seen by name, or the name seen is another device's: its id
+        // stands in.
+        for last_seen in [None, Some(earpods_seen)] {
+            let (devices, _) = list_with_chosen_device(
+                vec![pch.clone()],
+                &alsa_choosing(Some("hw:CARD=Scarlett,DEV=0")),
+                last_seen,
+            );
+            assert_eq!(devices[1].info.name, "hw:CARD=Scarlett,DEV=0");
+        }
     }
 
     #[test]
@@ -881,10 +901,10 @@ mod tests {
         let (devices, to_store) = list_with_chosen_device(vec![earpods.clone()], &config, None);
         assert_eq!(devices.len(), 1);
         assert!(devices[0].connected);
-        assert_eq!(to_store.as_deref(), Some("EarPods — USB Audio"));
+        let seen = to_store.expect("remembered");
+        assert_eq!(seen.name, "EarPods — USB Audio");
 
-        let (_, to_store) =
-            list_with_chosen_device(vec![earpods], &config, Some("EarPods — USB Audio".into()));
+        let (_, to_store) = list_with_chosen_device(vec![earpods], &config, Some(seen));
         assert_eq!(to_store, None, "already remembered");
     }
 
