@@ -191,6 +191,67 @@ async fn skip_reparsing(w: &mut LibraryScanWorld, fixture_name: String) {
     );
 }
 
+#[given("a watched directory with these files:")]
+fn watched_dir_with_folders(w: &mut LibraryScanWorld, step: &Step) {
+    w.scanner
+        .add_directory(&w.scan_dir.to_string_lossy())
+        .expect("failed to add watched directory");
+    let table = step.table.as_ref().expect("expected table");
+    for row in table.rows.iter().skip(1) {
+        copy_fixture(w, &row[0], &row[1]);
+    }
+}
+
+#[when(expr = "I copy {string} into the folder {string}")]
+fn copy_into_folder(w: &mut LibraryScanWorld, fixture_name: String, folder: String) {
+    copy_fixture(w, &fixture_name, &folder);
+}
+
+fn copy_fixture(w: &LibraryScanWorld, fixture_name: &str, folder: &str) {
+    let dir = w.scan_dir.join(folder);
+    std::fs::create_dir_all(&dir).expect("failed to create folder");
+    std::fs::copy(
+        PathBuf::from(FIXTURES_DIR).join(fixture_name),
+        dir.join(fixture_name),
+    )
+    .unwrap_or_else(|e| panic!("failed to copy fixture {fixture_name}: {e}"));
+}
+
+#[when(expr = "I scan only the folder {string}")]
+async fn scan_only_folder(w: &mut LibraryScanWorld, folder: String) {
+    CollectionScanner::new(Arc::clone(&w.db))
+        .scoped_to(w.scan_dir.join(folder))
+        .scan_all_core(w.app_data_dir.clone(), false, false, false, |_progress| {})
+        .await
+        .expect("scoped scan failed");
+}
+
+fn available_titles(w: &LibraryScanWorld) -> Vec<String> {
+    let conn = w.db.pool.get().expect("db conn failed");
+    let mut stmt = conn
+        .prepare("SELECT title FROM songs WHERE unavailable = 0")
+        .unwrap();
+    stmt.query_map([], |row| row.get::<_, String>(0))
+        .unwrap()
+        .map(|r| r.unwrap())
+        .collect()
+}
+
+#[then(expr = "the library should contain {string}")]
+fn library_contains(w: &mut LibraryScanWorld, title: String) {
+    let titles = available_titles(w);
+    assert!(titles.contains(&title), "{title} not in {titles:?}");
+}
+
+#[then(expr = "the library should not contain {string}")]
+fn library_lacks(w: &mut LibraryScanWorld, title: String) {
+    let titles = available_titles(w);
+    assert!(
+        !titles.contains(&title),
+        "{title} unexpectedly in {titles:?}"
+    );
+}
+
 #[tokio::main]
 async fn main() {
     // with_default_cli() skips clap-parsing argv, so `cargo test <filter>` (which
