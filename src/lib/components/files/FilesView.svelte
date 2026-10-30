@@ -240,7 +240,7 @@
             <div class="flex items-center justify-between gap-3 px-4 py-2.5 text-xs text-brand-text-secondary">
               <span class="truncate">{summary(listing)}</span>
               {#if isLocal && !listing.excluded}
-                <Button size="sm" onclick={scanFolder} disabled={collectionStore.isScanning}>
+                <Button size="sm" class="shrink-0 whitespace-nowrap" onclick={scanFolder} disabled={collectionStore.isScanning}>
                   {collectionStore.isScanning ? i18n.t("files.scanning") : i18n.t("files.scanFolder")}
                 </Button>
               {/if}

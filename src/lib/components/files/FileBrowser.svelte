@@ -139,6 +139,12 @@
     columnEls[column]?.focus();
   }
 
+  /** Parent columns give way to the table as the browser narrows (CSS hides them). */
+  function isShown(column: number): boolean {
+    const el = columnEls[column];
+    return !!el && getComputedStyle(el).display !== "none";
+  }
+
   function openFolder(dir: string[], name: string) {
     onnavigate([...dir, name]);
   }
@@ -163,7 +169,7 @@
         focusColumn(column + 1);
         break;
       case "ArrowLeft":
-        if (column > 0) focusColumn(column - 1);
+        if (column > 0 && isShown(column - 1)) focusColumn(column - 1);
         else if (dir.length > 0) onnavigate(dir);
         break;
       default:
@@ -195,7 +201,7 @@
         else if (entry) onplay(entry);
         break;
       case "ArrowLeft":
-        if (column > 0) focusColumn(column - 1);
+        if (column > 0 && isShown(column - 1)) focusColumn(column - 1);
         else if (path.length > 0) onnavigate(path.slice(0, -1));
         break;
       default:
@@ -221,14 +227,14 @@
   }
 </script>
 
-<div class="flex-1 min-h-0 flex rounded-xl border border-brand-border/40 bg-brand-sidebar/40 overflow-hidden" data-testid="file-browser">
+<div class="@container flex-1 min-h-0 flex rounded-xl border border-brand-border/40 bg-brand-sidebar/40 overflow-hidden" data-testid="file-browser">
   {#each levels as dir, column (keyOf(dir))}
     {@const isCurrent = column === levels.length - 1}
     {@const loaded = listings[keyOf(dir)]}
     {#if !isCurrent}
       <div
         bind:this={columnEls[column]}
-        class="w-56 shrink-0 min-h-0 flex flex-col border-r border-brand-border/40 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
+        class="w-56 shrink-0 min-h-0 {column === levels.length - 2 ? 'hidden @xl:flex' : 'hidden @3xl:flex'} flex-col border-r border-brand-border/40 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
         role="listbox"
         tabindex="0"
         aria-label={dir.length ? dir[dir.length - 1] : i18n.t("files.folders")}
@@ -264,9 +270,9 @@
       <div class="@container flex-1 min-w-0 min-h-0 flex flex-col">
         <div class="h-8 shrink-0 flex items-center gap-3 px-4 border-b border-brand-border/40 text-[11px] text-brand-text-secondary" aria-hidden="true">
           <span class="flex-1 min-w-0 pl-6">{i18n.t("files.columnName")}</span>
-          <span class="w-14 shrink-0 hidden @lg:block">{i18n.t("files.columnType")}</span>
-          <span class="w-20 shrink-0 text-right hidden @lg:block">{i18n.t("files.columnSize")}</span>
-          <span class="w-44 shrink-0 hidden @md:block">{i18n.t("files.columnInLibrary")}</span>
+          <span class="w-12 shrink-0 hidden @lg:block">{i18n.t("files.columnType")}</span>
+          <span class="w-16 shrink-0 text-right hidden @lg:block">{i18n.t("files.columnSize")}</span>
+          <span class="w-40 shrink-0 hidden @md:block">{i18n.t("files.columnInLibrary")}</span>
         </div>
         {#if loaded?.state === "error"}
           <div class="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
@@ -314,9 +320,9 @@
                     {/if}
                     <span class="truncate" title={entry.name}>{entry.name}</span>
                   </span>
-                  <span class="w-14 shrink-0 text-[11px] text-brand-text-secondary hidden @lg:block">{entry.fileType ?? ""}</span>
-                  <span class="w-20 shrink-0 text-right text-[11px] tabular-nums text-brand-text-secondary hidden @lg:block">{entry.isDir || entry.size === null ? "" : formatFileSize(entry.size)}</span>
-                  <span class="w-44 shrink-0 truncate text-xs hidden @md:block {entry.status === 'notScanned' ? 'text-brand-accent-text' : entry.status === 'inLibrary' ? 'text-brand-text-primary' : 'text-brand-text-secondary'}">{statusLabel(entry)}</span>
+                  <span class="w-12 shrink-0 text-[11px] text-brand-text-secondary hidden @lg:block">{entry.fileType ?? ""}</span>
+                  <span class="w-16 shrink-0 text-right text-[11px] tabular-nums text-brand-text-secondary hidden @lg:block">{entry.isDir || entry.size === null ? "" : formatFileSize(entry.size)}</span>
+                  <span class="w-40 shrink-0 truncate text-xs hidden @md:block {entry.status === 'notScanned' ? 'text-brand-accent-text' : entry.status === 'inLibrary' ? 'text-brand-text-primary' : 'text-brand-text-secondary'}">{statusLabel(entry)}</span>
                 </div>
               {/snippet}
             </VirtualList>
