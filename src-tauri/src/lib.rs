@@ -30,6 +30,7 @@ pub mod fade;
 pub mod filter_parser;
 pub mod hierarchy_sidecar;
 pub mod install_format;
+pub mod library_paths;
 pub mod loudness;
 pub mod lyrics;
 pub mod media_session;

@@ -15,6 +15,7 @@
 
 use crate::collection::SelfWriteTracker;
 use crate::db::Database;
+use crate::library_paths;
 use anyhow::{Context, Result};
 use lofty::{file::TaggedFileExt, picture::PictureType, probe::Probe};
 use parking_lot::{Condvar, Mutex};
@@ -1010,23 +1011,6 @@ pub fn clean_or_encode_to_jpeg(data: &[u8]) -> Vec<u8> {
     cleaned.to_vec()
 }
 
-/// Compare two paths for equality regardless of separator style or trailing slash,
-/// case-insensitively on Windows.
-pub(crate) fn normalize_path_cmp(a: &Path, b: &Path) -> bool {
-    let a_str = a.to_string_lossy().replace('\\', "/");
-    let b_str = b.to_string_lossy().replace('\\', "/");
-    let a_norm = a_str.trim_end_matches('/');
-    let b_norm = b_str.trim_end_matches('/');
-    #[cfg(windows)]
-    {
-        a_norm.eq_ignore_ascii_case(b_norm)
-    }
-    #[cfg(not(windows))]
-    {
-        a_norm == b_norm
-    }
-}
-
 /// Shrink an existing oversized cache file in place, keeping its filename —
 /// and so its format, since the filename is what `songs.art_automatic`
 /// stores. Returns the bytes saved, or `None` when the file is already within
@@ -1214,7 +1198,7 @@ impl CoverManager {
             let (song_album, song_path_str) = row;
             let p = Path::new(&song_path_str);
             if p.parent()
-                .map(|parent| normalize_path_cmp(parent, album_dir))
+                .map(|parent| library_paths::same(parent, album_dir))
                 .unwrap_or(false)
             {
                 song_count += 1;
@@ -1258,7 +1242,7 @@ impl CoverManager {
         let dir_rows = dir_stmt.query_map([], |row| row.get::<_, String>(0));
         if let Ok(dirs) = dir_rows {
             for dir in dirs.flatten() {
-                if normalize_path_cmp(Path::new(&dir), artist_dir) {
+                if library_paths::same(Path::new(&dir), artist_dir) {
                     return false;
                 }
             }
@@ -1291,10 +1275,10 @@ impl CoverManager {
             let (song_artist, song_path_str) = row;
             let p = Path::new(&song_path_str);
             if let Some(parent) = p.parent() {
-                let in_artist_dir = normalize_path_cmp(parent, artist_dir)
+                let in_artist_dir = library_paths::same(parent, artist_dir)
                     || parent
                         .parent()
-                        .map(|g| normalize_path_cmp(g, artist_dir))
+                        .map(|g| library_paths::same(g, artist_dir))
                         .unwrap_or(false);
                 if in_artist_dir {
                     song_count += 1;

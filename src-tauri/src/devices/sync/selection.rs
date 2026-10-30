@@ -3,6 +3,7 @@
 
 use crate::album_key::album_key;
 use crate::collection::{row_to_song, SONG_SELECT_COLS};
+use crate::library_paths;
 use crate::models::{Song, LOCAL_SOURCES_SQL};
 use crate::playlist::{fit_to_limit, PlaylistManager};
 use anyhow::Result;
@@ -213,12 +214,16 @@ pub fn resolve(
             SyncSource::Folder { path } => {
                 let songs = library
                     .iter()
-                    .filter(|s| s.path.as_deref().is_some_and(|p| is_under(p, path)))
+                    .filter(|s| {
+                        s.path
+                            .as_deref()
+                            .is_some_and(|p| library_paths::is_under(p, path))
+                    })
                     .collect();
                 (
                     SourceRef {
                         kind: SourceKind::Folder,
-                        key: normalize_path(path),
+                        key: library_paths::key(path),
                         name: path.clone(),
                     },
                     songs,
@@ -308,35 +313,9 @@ fn album_of(song: &Song) -> Option<(String, String)> {
     Some((album, album_key(artist)))
 }
 
-/// `path` with `/` separators and no trailing one; lower-case on Windows,
-/// whose paths ignore case.
-fn normalize_path(path: &str) -> String {
-    let p = path.replace('\\', "/").trim_end_matches('/').to_string();
-    if cfg!(windows) {
-        p.to_lowercase()
-    } else {
-        p
-    }
-}
-
-/// Whether `file` is inside `folder`; `/music/a` does not contain `/music/ab/x`.
-fn is_under(file: &str, folder: &str) -> bool {
-    let (file, folder) = (normalize_path(file), normalize_path(folder));
-    !folder.is_empty() && file.starts_with(&format!("{folder}/"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn folders_contain_only_their_own_files() {
-        assert!(is_under("/music/a/b.flac", "/music/a"));
-        assert!(is_under("/music/a/b.flac", "/music/a/"));
-        assert!(!is_under("/music/ab/b.flac", "/music/a"));
-        assert!(!is_under("/music/a", "/music/a"));
-        assert!(!is_under("/music/a/b.flac", ""));
-    }
 
     #[test]
     fn settings_default_to_removing_unselected_songs() {
