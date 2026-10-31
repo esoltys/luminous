@@ -56,7 +56,8 @@
       : i18n.t(mtp ? "devices.connectedMtp" : "devices.connectedUsb");
   });
   const subtitle = $derived.by(() => {
-    if (tab === "sync" && targetStorage) {
+    // Which storage is synced only matters when there is a choice.
+    if (tab === "sync" && targetStorage && device.storages.length > 1) {
       const where = i18n.t("devices.syncingTo", { storage: storageName(device, targetStorage, unnamedStorage) });
       return `${connection}. ${where}`;
     }

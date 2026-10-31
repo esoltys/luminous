@@ -67,6 +67,6 @@
     ></span>
   {/if}
   {#if scale > capacityBytes || scaleBytes !== undefined}
-    <span class="absolute -inset-y-1 w-0.5 bg-brand-text-primary/80" style:left={pct(capacityBytes)} aria-hidden="true"></span>
+    <span class="absolute -inset-y-1 w-0.5 -translate-x-full bg-brand-text-primary/80" style:left={pct(capacityBytes)} aria-hidden="true"></span>
   {/if}
 </div>

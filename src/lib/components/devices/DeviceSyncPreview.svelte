@@ -39,9 +39,11 @@
   );
 
   const storageLabel = $derived.by(() => {
+    const size = formatStorageSize(storage.capacityBytes);
     const s = deviceStorage(device, plan.storageId);
-    const label = s ? storageName(device, s, (n) => i18n.t("devices.storageNumbered", { n })) : name;
-    return `${label}, ${formatStorageSize(storage.capacityBytes)}`;
+    // Which storage is synced only matters when there is a choice.
+    if (!s || device.storages.length < 2) return size;
+    return `${storageName(device, s, (n) => i18n.t("devices.storageNumbered", { n }))}, ${size}`;
   });
 
   const headline = $derived(
