@@ -14,7 +14,7 @@ const device: ConnectedDevice = {
   kind: "massStorage",
   model: null,
   defaultName: "Walkman",
-  storages: [{ id: "E:\\", name: null, totalBytes: 64 * GB, freeBytes: 20 * GB }],
+  storages: [{ id: "E:\\", label: null, mountPath: "E:\\", filesystem: "exFAT", totalBytes: 64 * GB, freeBytes: 20 * GB }],
   profile: { nickname: null, convert: { mode: "unsupported", format: "aac", bitrateKbps: 256 } } as unknown as ConnectedDevice["profile"],
   lastSyncedAt: null,
 };
