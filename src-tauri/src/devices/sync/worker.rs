@@ -293,14 +293,14 @@ impl Run<'_> {
     }
 
     /// Removes the folders removals left empty, deepest first, and their
-    /// parents as they empty in turn. The storage refuses a folder with
-    /// anything in it, so files the user put there stay.
+    /// parents as they empty in turn. A folder with anything in it but
+    /// system clutter is left, so files the user put there stay.
     fn prune(&mut self, mut dirs: BTreeSet<(usize, String)>, roots: &[String]) -> Result<(), Halt> {
         while let Some((_, dir)) = dirs.pop_last() {
             if dir.is_empty() || roots.iter().any(|r| r.eq_ignore_ascii_case(&dir)) {
                 continue;
             }
-            match self.storage.remove_empty_folder(&dir) {
+            match self.storage.remove_unused_folder(&dir) {
                 Ok(true) => {
                     if let Some(up) = parent(&dir) {
                         dirs.insert((depth(up), up.to_string()));

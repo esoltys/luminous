@@ -36,7 +36,9 @@ use linux_mtp as mtp;
 #[cfg(windows)]
 use windows_mtp as mtp;
 
-pub use backend::{is_partial_file, DeviceBackend, DirEntry, FsBackend, Progress, Space};
+pub use backend::{
+    is_partial_file, is_system_clutter, DeviceBackend, DirEntry, FsBackend, Progress, Space,
+};
 pub use marker::{Marker, MARKER_FILE_NAME};
 pub use profile::{
     ConvertMode, ConvertSettings, DeviceProfile, FolderArt, LayoutSettings, PathSeparator,

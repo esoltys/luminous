@@ -15,6 +15,16 @@ pub fn is_partial_file(name: &str) -> bool {
     name.ends_with(PARTIAL_SUFFIX)
 }
 
+/// Whether a file named `name` is one an operating system leaves in folders
+/// it shows (Windows thumbnail caches and folder settings, macOS metadata):
+/// never music and never something the user put there on purpose.
+pub fn is_system_clutter(name: &str) -> bool {
+    name.eq_ignore_ascii_case("Thumbs.db")
+        || name.eq_ignore_ascii_case("desktop.ini")
+        || name == ".DS_Store"
+        || name.starts_with("._")
+}
+
 /// One file or folder in a listing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirEntry {
@@ -75,6 +85,32 @@ pub trait DeviceBackend: Send {
     /// storage itself checks as it removes it: `Ok(false)` when something is
     /// (or there is no such folder). The root itself is never removed.
     fn remove_empty_folder(&self, path: &str) -> io::Result<bool>;
+
+    /// Removes the folder at `path` when nothing but [system
+    /// clutter](is_system_clutter) is in it, clearing that first: browsing a
+    /// folder in a file manager leaves such files, and they shouldn't keep
+    /// an otherwise empty folder. `Ok(false)` when anything else is there.
+    /// The root itself is never removed.
+    fn remove_unused_folder(&self, path: &str) -> io::Result<bool> {
+        if components(path).is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "cannot remove the root",
+            ));
+        }
+        let entries = self.list(path)?;
+        if !entries
+            .iter()
+            .all(|e| !e.is_dir && is_system_clutter(&e.name))
+        {
+            return Ok(false);
+        }
+        let dir = path.trim_end_matches(['/', '\\']);
+        for entry in &entries {
+            self.remove(&format!("{dir}/{}", entry.name))?;
+        }
+        self.remove_empty_folder(path)
+    }
 
     fn space(&self) -> io::Result<Space>;
 }
@@ -359,6 +395,23 @@ mod tests {
         assert!(backend.remove_empty_folder("Music/Empty").unwrap());
         assert!(!dir.path().join("Music/Empty").exists());
         assert!(backend.remove_empty_folder("").is_err());
+    }
+
+    #[test]
+    fn a_folder_holding_only_system_clutter_is_removed_as_unused() {
+        let dir = tempfile::tempdir().unwrap();
+        let backend = FsBackend::new(dir.path());
+        write(&backend, "Music/Browsed/Thumbs.db", "x").unwrap();
+        write(&backend, "Music/Browsed/._cover.jpg", "x").unwrap();
+        write(&backend, "Music/Kept/Thumbs.db", "x").unwrap();
+        write(&backend, "Music/Kept/notes.txt", "x").unwrap();
+
+        assert!(backend.remove_unused_folder("Music/Browsed").unwrap());
+        assert!(!dir.path().join("Music/Browsed").exists());
+        assert!(!backend.remove_unused_folder("Music/Kept").unwrap());
+        assert_eq!(names(&backend, "Music/Kept"), ["Thumbs.db", "notes.txt"]);
+        assert!(!backend.remove_unused_folder("Music/Gone").unwrap());
+        assert!(backend.remove_unused_folder("").is_err());
     }
 
     #[test]

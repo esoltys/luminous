@@ -64,6 +64,57 @@
   /** Folder columns shown before the current folder's table. */
   const PARENT_COLUMNS = 2;
 
+  /** Folder column width, shared by every column and source; remembered like the sidebar's. */
+  const COLUMN_WIDTH_KEY = "files_columnWidth";
+  const COLUMN_MIN_PX = 140;
+  const COLUMN_MAX_PX = 480;
+  const COLUMN_DEFAULT_PX = 224;
+  const COLUMN_STEP_PX = 16;
+
+  let columnWidth = $state(readColumnWidth());
+
+  function readColumnWidth(): number {
+    try {
+      const saved = Number(localStorage.getItem(COLUMN_WIDTH_KEY));
+      return saved >= COLUMN_MIN_PX && saved <= COLUMN_MAX_PX ? saved : COLUMN_DEFAULT_PX;
+    } catch {
+      return COLUMN_DEFAULT_PX;
+    }
+  }
+
+  function setColumnWidth(width: number) {
+    columnWidth = Math.round(Math.min(COLUMN_MAX_PX, Math.max(COLUMN_MIN_PX, width)));
+    try {
+      localStorage.setItem(COLUMN_WIDTH_KEY, String(columnWidth));
+    } catch {
+      // Not remembered this time; the width still applies.
+    }
+  }
+
+  function startColumnResize(event: PointerEvent) {
+    event.preventDefault();
+    const handle = event.currentTarget as HTMLElement;
+    const startX = event.clientX;
+    const startWidth = columnWidth;
+    handle.setPointerCapture(event.pointerId);
+    const move = (e: PointerEvent) => setColumnWidth(startWidth + e.clientX - startX);
+    const end = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  }
+
+  function columnResizeKey(event: KeyboardEvent) {
+    const step = event.key === "ArrowLeft" ? -COLUMN_STEP_PX : event.key === "ArrowRight" ? COLUMN_STEP_PX : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    setColumnWidth(columnWidth + step);
+  }
+
   type Loaded = { state: "loading" } | { state: "ready"; listing: DirListing } | { state: "error"; code: string };
 
   let listings = $state<Record<string, Loaded>>({});
@@ -260,9 +311,11 @@
     {@const isCurrent = column === levels.length - 1}
     {@const loaded = listings[keyOf(dir)]}
     {#if !isCurrent}
+      {@const visibility = column === levels.length - 2 ? "hidden @xl:flex" : "hidden @3xl:flex"}
       <div
         bind:this={columnEls[column]}
-        class="w-56 shrink-0 min-h-0 {column === levels.length - 2 ? 'hidden @xl:flex' : 'hidden @3xl:flex'} flex-col border-r border-brand-border/40 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
+        style:width="{columnWidth}px"
+        class="shrink-0 min-h-0 {visibility} flex-col border-r border-brand-border/40 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
         role="listbox"
         tabindex="0"
         aria-label={dir.length ? dir[dir.length - 1] : i18n.t("files.folders")}
@@ -293,6 +346,24 @@
         {#if loaded?.state === "error"}
           <p class="p-3 text-xs text-brand-text-secondary">{unreachableLabel}</p>
         {/if}
+      </div>
+      <!-- Drag, or focus and use the arrow keys; it sits over the column's border. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div
+        class="{visibility} relative z-10 w-2 -ml-2 shrink-0 cursor-col-resize touch-none justify-end outline-none group/resize focus-visible:bg-brand-accent/20"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={i18n.t("files.resizeFolders")}
+        aria-valuenow={columnWidth}
+        aria-valuemin={COLUMN_MIN_PX}
+        aria-valuemax={COLUMN_MAX_PX}
+        tabindex="0"
+        onpointerdown={startColumnResize}
+        onkeydown={columnResizeKey}
+        ondblclick={() => setColumnWidth(COLUMN_DEFAULT_PX)}
+      >
+        <div class="w-px h-full group-hover/resize:bg-brand-accent group-focus-visible/resize:bg-brand-accent transition-colors"></div>
       </div>
     {:else}
       <div class="@container flex-1 min-w-0 min-h-0 flex flex-col">

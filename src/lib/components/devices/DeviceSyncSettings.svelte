@@ -36,6 +36,11 @@
   let { device, onpreview }: { device: ConnectedDevice; onpreview: (plan: SyncPlan) => void } = $props();
 
   const PREVIEW_DEBOUNCE_MS = 250;
+  // A sync rewrites the device list on every file, handing over a new `device`
+  // each time; these change only when the id or the saved profile does.
+  const deviceId = $derived(device.id);
+  const savedProfile = $derived(JSON.stringify(device.profile));
+  const syncing = $derived(devicesStore.isSyncing(deviceId));
   const PROFILE_DEBOUNCE_MS = 400;
 
   const name = $derived(deviceName(device));
@@ -60,11 +65,11 @@
 
   // Load the saved selection once per device.
   $effect(() => {
-    const id = device.id;
+    const id = deviceId;
     settings = null;
     plan = null;
     devicesStore.refreshSyncState(id).then((state) => {
-      if (!state || id !== device.id) return;
+      if (!state || id !== untrack(() => deviceId)) return;
       settings = structuredClone($state.snapshot(state.settings));
       listed = [...settings.sources];
     });
@@ -72,8 +77,8 @@
 
   // The device's saved profile, unless an edit here is still on its way.
   $effect(() => {
-    const saved = device.profile;
-    if (!draftDirty) draft = structuredClone($state.snapshot(saved));
+    const saved = savedProfile;
+    if (!draftDirty) draft = JSON.parse(saved);
   });
 
   $effect(() => {
@@ -103,11 +108,12 @@
   $effect(() => {
     if (!settings) return;
     const snapshot = $state.snapshot(settings);
-    void JSON.stringify(device.profile);
+    void savedProfile;
+    const id = deviceId;
     const request = ++previewRequest;
     const timer = setTimeout(async () => {
       try {
-        const result = await invoke<SyncPlan>("preview_device_sync", { deviceId: device.id, settings: snapshot });
+        const result = await invoke<SyncPlan>("preview_device_sync", { deviceId: id, settings: snapshot });
         if (request === previewRequest) {
           plan = result;
           previewError = false;
@@ -291,7 +297,7 @@
     <p class="text-sm text-brand-text-secondary">{i18n.t("common.loading")}</p>
   {:else}
     <div class="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 @container">
-      <div class="grid grid-cols-1 @3xl:grid-cols-[minmax(0,1fr)_20rem] gap-8 pb-2">
+      <div class="grid grid-cols-1 @3xl:grid-cols-2 gap-8 pb-2">
         <!-- What -->
         <section class="min-w-0 flex flex-col gap-3">
           <div class="flex items-baseline justify-between gap-3">
@@ -468,7 +474,7 @@
 
           <div class="flex flex-col gap-3">
             <button
-              class="self-start flex items-center gap-1 text-sm text-brand-accent-text hover:text-brand-accent-text-hover"
+              class="self-start flex items-center gap-1 text-left text-sm text-brand-accent-text hover:text-brand-accent-text-hover"
               aria-expanded={moreOpen}
               onclick={() => (moreOpen = !moreOpen)}
             >
@@ -543,7 +549,7 @@
           <p class="text-sm text-brand-text-secondary">{i18n.t("common.loading")}</p>
         {/if}
       </div>
-      <Button variant="primary" onclick={openPreview} disabled={!plan || opening}>
+      <Button variant="primary" onclick={openPreview} disabled={!plan || opening || syncing}>
         {i18n.t("devices.previewChanges")}
       </Button>
     </div>

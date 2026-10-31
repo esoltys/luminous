@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ArrowsClockwiseIcon, EjectIcon, PlayIcon, StopIcon } from "phosphor-svelte";
+  import { ArrowsClockwiseIcon, CheckIcon, EjectIcon, PencilSimpleIcon, PlayIcon, StopIcon, XIcon } from "phosphor-svelte";
   import { navigationStore, type DeviceTab } from "../../stores/navigation.svelte";
   import { devicesStore } from "../../stores/devices.svelte";
   import { playerStore } from "../../stores/player.svelte";
@@ -66,6 +66,32 @@
       : i18n.t("devices.neverSynced");
     return `${connection}. ${synced}`;
   });
+
+  // Renaming: the nickname lives in the device's profile; a blank one goes back to the device's own name.
+  let renaming = $state(false);
+  let newName = $state("");
+
+  function startRename() {
+    newName = name;
+    renaming = true;
+  }
+
+  async function saveRename() {
+    if (!renaming) return;
+    renaming = false;
+    const nickname = newName.trim();
+    if (nickname === name) return;
+    try {
+      await invoke("update_device_profile", { id: device.id, profile: { ...device.profile, nickname: nickname || null } });
+    } catch (err) {
+      console.error("Failed to rename device:", err);
+    }
+  }
+
+  function focusAndSelect(node: HTMLInputElement) {
+    node.focus();
+    node.select();
+  }
 
   function setTab(next: DeviceTab) {
     navigationStore.filesLocation = { ...location, deviceTab: next };
@@ -166,7 +192,39 @@
           </div>
         {/if}
         <div class="min-w-0">
-          <h1 class="text-3xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{name}</h1>
+          {#if renaming}
+            <div class="flex items-center gap-2">
+              <input
+                bind:value={newName}
+                onkeydown={(e) => { if (e.key === "Enter") saveRename(); else if (e.key === "Escape") renaming = false; }}
+                placeholder={device.defaultName}
+                aria-label={i18n.t("devices.rename")}
+                class="min-w-0 bg-brand-sidebar border border-brand-accent text-brand-text-primary px-3 py-1 text-2xl font-bold rounded-lg focus:outline-none"
+                use:focusAndSelect
+              />
+              <button onclick={saveRename} class="p-1.5 text-brand-accent-text hover:text-brand-accent" title={i18n.t("common.save")} aria-label={i18n.t("common.save")}>
+                <CheckIcon class="w-5 h-5" />
+              </button>
+              <button onclick={() => (renaming = false)} class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary" title={i18n.t("common.cancel")} aria-label={i18n.t("common.cancel")}>
+                <XIcon class="w-5 h-5" />
+              </button>
+            </div>
+          {:else}
+            <div class="flex items-center gap-3 min-w-0 group/title">
+              <h1
+                class="text-3xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5 hover:text-brand-accent-text transition-colors"
+                ondblclick={startRename}
+              >{name}</h1>
+              <button
+                onclick={startRename}
+                class="shrink-0 p-1 text-brand-text-secondary hover:text-brand-text-primary opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 transition-opacity"
+                title={i18n.t("devices.rename")}
+                aria-label={i18n.t("devices.rename")}
+              >
+                <PencilSimpleIcon class="w-4 h-4" />
+              </button>
+            </div>
+          {/if}
           <p class="text-sm text-brand-text-secondary truncate">{subtitle}</p>
         </div>
       </div>

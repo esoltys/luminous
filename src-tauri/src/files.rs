@@ -16,7 +16,7 @@ use crate::library_paths;
 use crate::models::{Song, SongSource, LOCAL_SOURCES_SQL};
 use anyhow::{anyhow, Context, Result};
 use luminous_devices::{
-    is_partial_file, DeviceBackend, DeviceProfile, FsBackend, MARKER_FILE_NAME,
+    is_partial_file, is_system_clutter, DeviceBackend, DeviceProfile, FsBackend, MARKER_FILE_NAME,
 };
 use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -479,6 +479,7 @@ fn list_device(db: &Database, storage: &dyn DeviceBackend, dir: &str) -> Result<
         .into_iter()
         .filter(|e| {
             !is_partial_file(&e.name)
+                && (e.is_dir || !is_system_clutter(&e.name))
                 && !(dir.is_empty() && [MANIFEST_FILE_NAME, MARKER_FILE_NAME].contains(&&*e.name))
         })
         .map(|e| {

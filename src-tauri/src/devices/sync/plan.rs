@@ -651,6 +651,19 @@ pub fn build(input: PlanInput) -> Built {
         plan.conversion_target = Some(conversion_target);
     }
 
+    // Lists read in device-path order, which the folder template makes
+    // artist, album, then track; the worker keeps its own order.
+    for list in [
+        &mut plan.copy,
+        &mut plan.remove,
+        &mut plan.update,
+        &mut plan.adopted,
+        &mut plan.skipped,
+    ] {
+        list.items
+            .sort_by_cached_key(|item| item.path.to_lowercase());
+    }
+
     steps.write = writes;
     Built { plan, steps }
 }
