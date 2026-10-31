@@ -144,6 +144,90 @@ fn is_volume_shim(pnp_id: &str) -> bool {
     pnp_id.to_ascii_lowercase().contains("#wpdbusenum#")
 }
 
+/// The USB serial number of the device behind a WPD interface path, which
+/// is what Linux reads from sysfs, so the device gets the same id on both.
+/// `WPD_DEVICE_SERIAL_NUMBER` is the MTP DeviceInfo serial instead, which
+/// Android reports as an unrelated 32-digit hash.
+fn usb_serial_number(pnp_id: &str) -> Option<String> {
+    use windows::Win32::Devices::DeviceAndDriverInstallation::{
+        CM_Get_Device_IDW, CM_Get_Device_Interface_PropertyW, CM_Get_Parent, CM_Locate_DevNodeW,
+        CM_LOCATE_DEVNODE_NORMAL, CR_SUCCESS, MAX_DEVICE_ID_LEN,
+    };
+    use windows::Win32::Devices::Properties::{DEVPKEY_Device_InstanceId, DEVPROPTYPE};
+
+    let path = wide(pnp_id);
+    let mut buffer = [0u16; MAX_DEVICE_ID_LEN as usize + 1];
+    let mut size = std::mem::size_of_val(&buffer) as u32;
+    let mut kind = DEVPROPTYPE::default();
+    let found = unsafe {
+        CM_Get_Device_Interface_PropertyW(
+            PCWSTR(path.as_ptr()),
+            &DEVPKEY_Device_InstanceId,
+            &mut kind,
+            Some(buffer.as_mut_ptr().cast()),
+            &mut size,
+            0,
+        )
+    };
+    if found != CR_SUCCESS {
+        return None;
+    }
+    let device = String::from_utf16_lossy(&buffer)
+        .trim_end_matches('\0')
+        .to_string();
+
+    let mut node = 0u32;
+    let mut parent_node = 0u32;
+    let mut parent = None;
+    unsafe {
+        if CM_Locate_DevNodeW(&mut node, PCWSTR(buffer.as_ptr()), CM_LOCATE_DEVNODE_NORMAL)
+            == CR_SUCCESS
+            && CM_Get_Parent(&mut parent_node, node, 0) == CR_SUCCESS
+        {
+            let mut id = [0u16; MAX_DEVICE_ID_LEN as usize + 1];
+            if CM_Get_Device_IDW(parent_node, &mut id, 0) == CR_SUCCESS {
+                parent = Some(
+                    String::from_utf16_lossy(&id)
+                        .trim_end_matches('\0')
+                        .to_string(),
+                );
+            }
+        }
+    }
+    usb_serial(&device, parent.as_deref())
+}
+
+/// The serial in a USB instance id (`USB\VID_04E8&PID_6860\RFCY818KC0H`),
+/// from the device's own node or, for one function of a composite device
+/// (`USB\VID_04E8&PID_6860&MS_COMP_MTP...\6&24AA4AB7&0&0000`), its parent
+/// with the same vendor and product. A last segment holding `&` is one
+/// Windows made up from the port, not a serial. The parent must match so
+/// a hub's serial never stands in for a device that has none.
+fn usb_serial(device: &str, parent: Option<&str>) -> Option<String> {
+    fn vid_pid(instance_id: &str) -> Option<String> {
+        let mut parts = instance_id.split('\\');
+        if !parts.next()?.eq_ignore_ascii_case("usb") {
+            return None;
+        }
+        let mut ids = parts.next()?.split('&');
+        let (vid, pid) = (ids.next()?, ids.next()?);
+        let vid_pid = format!("{vid}&{pid}").to_ascii_uppercase();
+        (vid_pid.starts_with("VID_") && pid.to_ascii_uppercase().starts_with("PID_"))
+            .then_some(vid_pid)
+    }
+    fn serial(instance_id: &str) -> Option<String> {
+        let last = instance_id.rsplit('\\').next()?;
+        (instance_id.matches('\\').count() == 2 && !last.is_empty() && !last.contains('&'))
+            .then(|| last.to_string())
+    }
+    let own = vid_pid(device)?;
+    serial(device).or_else(|| {
+        parent
+            .filter(|p| vid_pid(p).as_deref() == Some(own.as_str()))
+            .and_then(serial)
+    })
+}
+
 /// Whether a device's `WPD_DEVICE_PROTOCOL` ("MTP: 1.00", "PTP: 1.00",
 /// "MSC:") is MTP.
 fn is_mtp_protocol(protocol: &str) -> bool {
@@ -303,7 +387,9 @@ impl Connection {
             Ok(Self {
                 pnp_id: pnp_id.to_string(),
                 provisional_id: naming::mtp_provisional_id(
-                    string(&values, &WPD_DEVICE_SERIAL_NUMBER).as_deref(),
+                    usb_serial_number(pnp_id)
+                        .or_else(|| string(&values, &WPD_DEVICE_SERIAL_NUMBER))
+                        .as_deref(),
                     pnp_id,
                 ),
                 device,
@@ -1056,6 +1142,39 @@ mod tests {
         assert!(!is_volume_shim(
             r"\\?\usb#vid_054c&pid_0d9a#5a2b6c1d#{6ac27878-a6fa-4155-ba85-f98f491d4f33}"
         ));
+    }
+
+    #[test]
+    fn usb_serial_comes_from_the_device_or_its_composite_parent() {
+        // A Galaxy S25: the MTP function of a composite device.
+        let s25 = r"USB\VID_04E8&PID_6860&MS_COMP_MTP&SAMSUNG_ANDROID\6&24AA4AB7&0&0000";
+        assert_eq!(
+            usb_serial(s25, Some(r"USB\VID_04E8&PID_6860\RFCY818KC0H")).as_deref(),
+            Some("RFCY818KC0H")
+        );
+        // A player whose MTP interface is the whole device.
+        assert_eq!(
+            usb_serial(r"USB\VID_054C&PID_0D9A\5A2B6C1D", None).as_deref(),
+            Some("5A2B6C1D")
+        );
+        // No serial: Windows names the parent after its port.
+        assert_eq!(
+            usb_serial(s25, Some(r"USB\VID_04E8&PID_6860\5&1A2B3C&0&3")),
+            None
+        );
+        // A hub's serial is not the device's.
+        assert_eq!(
+            usb_serial(s25, Some(r"USB\VID_2109&PID_0817\000000001")),
+            None
+        );
+        // Not on USB at all.
+        assert_eq!(
+            usb_serial(
+                r"SWD\WPDBUSENUM\{E2F0AEA8-DD01-11F0-B47D-8CB87E0DDFA8}",
+                None
+            ),
+            None
+        );
     }
 
     #[test]
