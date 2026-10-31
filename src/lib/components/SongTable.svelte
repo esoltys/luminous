@@ -209,21 +209,29 @@
   $effect(() => {
     const body = bodyContainer;
     if (!body) return;
-    const scroller = scrollParent(body);
+    // The scroller is looked up on every measure, not once: when this effect
+    // first runs the table may not be attached yet, and a scroller picked then
+    // would be the wrong one for good.
     const measure = () => {
+      const scroller = scrollParent(body);
       const top = scroller.scrollTop - bodyOffset(scroller, body);
       viewTop = top;
       // An unlaid-out scroller (jsdom, a hidden view) reports 0; size the
       // window to the screen rather than drawing nothing.
       viewBottom = top + (scroller.clientHeight || window.innerHeight);
     };
+    // Element scroll events don't bubble, so catch them on the way down.
+    const onScroll = (e: Event) => {
+      if (e.target instanceof Node && e.target.contains(body)) measure();
+    };
     measure();
-    scroller.addEventListener("scroll", measure, { passive: true });
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    window.addEventListener("resize", measure);
     const observer = new ResizeObserver(measure);
-    observer.observe(scroller);
     observer.observe(body);
     return () => {
-      scroller.removeEventListener("scroll", measure);
+      document.removeEventListener("scroll", onScroll, { capture: true });
+      window.removeEventListener("resize", measure);
       observer.disconnect();
     };
   });

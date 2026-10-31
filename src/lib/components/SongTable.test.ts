@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "@testing-library/svelte";
+import { tick } from "svelte";
 import SongTable, { type SongTableRow } from "./SongTable.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { inspectorStore } from "../stores/inspector.svelte";
@@ -307,6 +308,25 @@ describe("SongTable.svelte — windowing (#1898)", () => {
     const rowHeight = parseFloat((drawn[0] as HTMLElement).style.height);
     const spacerTotal = spacers.reduce((sum, el) => sum + parseFloat(el.style.height), 0);
     expect(spacerTotal + drawn.length * rowHeight).toBe(5000 * rowHeight);
+  });
+
+  it("moves the window when its scrolling ancestor scrolls", async () => {
+    const rows = Array.from({ length: 5000 }, (_, i) => ({ key: String(i), song: song(i) }));
+    const { container, scroller } = renderInScroller(rows);
+    // jsdom has no layout: place the table body as a real scroller would.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const top = this === scroller ? 0 : -scroller.scrollTop;
+      return { top, bottom: top, left: 0, right: 0, width: 0, height: 0, x: 0, y: top, toJSON() {} } as DOMRect;
+    });
+    const rowHeight = parseFloat((container.querySelector("[data-song-row]") as HTMLElement).style.height);
+
+    scroller.scrollTop = 3000 * rowHeight;
+    scroller.dispatchEvent(new Event("scroll"));
+    await tick();
+
+    expect(container.querySelector('[data-key="0"]')).toBeNull();
+    expect(container.querySelector('[data-key="3000"]')).not.toBeNull();
+    vi.restoreAllMocks();
   });
 
   it("draws a divider row together with its divider", () => {
