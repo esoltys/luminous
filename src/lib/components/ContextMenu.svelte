@@ -62,7 +62,7 @@
   bind:this={menuEl}
   bind:offsetHeight={measuredHeight}
   style="left: {adjustedX}px; top: {adjustedY}px;"
-  class="fixed z-50 w-52 bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary backdrop-blur-xl select-none"
+  class="fixed z-50 w-52 acrylic-float border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none"
   role="menu"
   tabindex="-1"
 >

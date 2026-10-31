@@ -155,7 +155,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     use:portal
-    class="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-6 overflow-hidden"
+    class="fixed inset-0 z-[60] flex items-center justify-center acrylic-scrim p-3 sm:p-6 overflow-hidden"
     onclick={handleBackdropClick}
   >
     <div

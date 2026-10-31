@@ -345,7 +345,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+  class="fixed inset-0 z-50 flex items-center justify-center acrylic-scrim p-4"
   style="padding-bottom: {dockClearance + 16}px"
 >
   <div

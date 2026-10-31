@@ -578,7 +578,7 @@
     </div>
   {/if}
 
-  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md table-surface-blur px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
+  <div class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end min-w-0 max-w-xl">
         {#if !windowLayoutStore.isDetailHeaderCollapsed}
@@ -707,7 +707,7 @@
       </div>
     {/if}
 
-    <div class="border border-brand-border rounded-lg bg-brand-sidebar/50 backdrop-blur-xl shadow-2xl overflow-hidden table-surface-blur">
+    <div class="border border-brand-border rounded-lg acrylic-chrome shadow-2xl overflow-hidden">
       <SongTable
         rows={tableRows}
         rangeSelectionOrder={rangeSelectionRows}

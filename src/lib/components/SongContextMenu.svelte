@@ -309,8 +309,10 @@
     </button>
 
     {#if isSubmenuOpen}
+      <!-- Opaque, not acrylic: nested inside the menu's Backdrop Root, a
+           backdrop-filter here could only sample the menu, not the page. -->
       <div
-        class="absolute z-50 w-52 max-h-60 overflow-y-auto bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary backdrop-blur-xl select-none {opensLeft ? 'right-[calc(100%-2px)]' : 'left-[calc(100%-2px)]'} {opensUp ? 'bottom-0' : 'top-0'}"
+        class="absolute z-50 w-52 max-h-60 overflow-y-auto bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none {opensLeft ? 'right-[calc(100%-2px)]' : 'left-[calc(100%-2px)]'} {opensUp ? 'bottom-0' : 'top-0'}"
         role="menu"
         tabindex="-1"
         onmouseenter={openSubmenu}

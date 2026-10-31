@@ -151,7 +151,7 @@
     style={popoverStyle}
     in:bloomIn
     out:bloomOut
-    class="fixed z-[100] bg-brand-sidebar backdrop-blur-xl border border-brand-border/60 rounded-xl shadow-2xl overflow-hidden flex flex-col"
+    class="fixed z-[100] acrylic-float border border-brand-border/60 rounded-xl shadow-2xl overflow-hidden flex flex-col"
     role="dialog"
     aria-modal="true"
     aria-label={i18n.t('audioPipeline.title', {}, 'Audio Pipeline')}

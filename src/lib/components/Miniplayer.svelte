@@ -774,8 +774,8 @@
 
 <style>
   :global(.glass-surface) {
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: var(--acrylic-chrome-filter);
+    backdrop-filter: var(--acrylic-chrome-filter);
   }
 
   /* backdrop-filter doesn't render without GPU compositing (WebKitGTK with

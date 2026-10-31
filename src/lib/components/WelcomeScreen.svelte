@@ -14,7 +14,7 @@
      first launch, ahead of the rest of the shell. Dismissing it (Get
      Started) hands off straight into the guided tour. -->
 <div
-  class="fixed inset-0 z-[120] flex items-center justify-center bg-brand-main/70 backdrop-blur-md select-none"
+  class="fixed inset-0 z-[120] flex items-center justify-center acrylic-scrim [--acrylic-tint:var(--color-brand-main)] select-none"
   transition:fade={{ duration: 200 }}
 >
   <div

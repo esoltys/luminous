@@ -655,7 +655,7 @@
       class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto"
       use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
     >
-    <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'} shrink-0">
+    <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 acrylic-chrome [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'} shrink-0">
       <div class="flex items-start justify-between gap-6 relative z-10">
         <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
           {#if !windowLayoutStore.isDetailHeaderCollapsed}
@@ -857,7 +857,7 @@
     </div>
 
     <div class="p-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
-      <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-hidden table-surface-blur">
+      <div class="border border-brand-border/60 rounded-xl acrylic-chrome relative overflow-hidden">
         <SongTable
           rows={tableRows}
           rangeSelectionOrder={rangeSelectionRows}
@@ -885,7 +885,7 @@
   </div>
 
     {#if selectedUuids.size > 0}
-      <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
+      <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 acrylic-float border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
         <span class="text-brand-accent-text font-bold">
           {i18n.t("playlists.selectedCount", { count: selectedUuids.size })}
         </span>
@@ -1032,7 +1032,7 @@
 {/if}
 
 {#if showExportOptionsModal}
-  <div use:portal class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs select-none">
+  <div use:portal class="fixed inset-0 z-50 flex items-center justify-center acrylic-scrim select-none">
     <div class="bg-brand-sidebar border border-brand-border rounded-xl p-5 w-96 shadow-2xl space-y-4">
       <h3 class="text-base font-bold text-brand-text-primary flex items-center gap-2">
         <FileOutput class="w-5 h-5 text-brand-accent-text" />

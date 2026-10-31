@@ -37,7 +37,7 @@
 <div
   use:portal
   role="presentation"
-  class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none"
+  class="fixed inset-0 z-50 flex items-center justify-center p-4 acrylic-scrim select-none"
   onclick={closeOnBackdropClick ? onClose : undefined}
 >
   <!-- svelte-ignore a11y_no_static_element_interactions -->

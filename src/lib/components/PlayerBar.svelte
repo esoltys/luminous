@@ -589,8 +589,8 @@
      the shared variable itself. */
   :global(footer.glass-surface) {
     position: relative;
-    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: var(--acrylic-chrome-filter) !important;
+    backdrop-filter: var(--acrylic-chrome-filter) !important;
     background-color: var(--glass-bg-playerbar) !important;
     border-color: var(--glass-border-color, var(--color-border)) !important;
     box-shadow: var(--glass-shadow, none), var(--glass-glow, none);

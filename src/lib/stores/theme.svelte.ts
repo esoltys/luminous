@@ -155,11 +155,21 @@ function glassAlpha(isDark: boolean): number {
 }
 
 /**
+ * Tint alpha for the float acrylic recipe (menus, popovers, toolbars, see
+ * app.css): denser than chrome, since a menu's text sits directly over
+ * whatever text is behind it.
+ */
+function floatAlpha(isDark: boolean): number {
+  return isDark ? 0.7 : 0.75;
+}
+
+/**
  * Opaque equivalent of a .glass-surface panel whose only backdrop is the
  * flat bg-main canvas (sidebar, top nav, right panel — none of them ever
  * overlap other content): `blur(20px)` of a flat color is that same color,
  * so the panel's visible result is exactly the translucent tint composited
- * over `saturate(180%)` of bg-main. Painting that as a solid color keeps
+ * over `saturate(180%)` of bg-main (`--acrylic-chrome-filter` in app.css;
+ * keep `saturation` in step with it). Painting that as a solid color keeps
  * the look while dropping backdrop-filter from those panels, which was
  * re-rasterized whenever anything nearby repainted (main-view hover
  * effects, the reactive logo, the playbar spectrum) and showed up as
@@ -1020,6 +1030,8 @@ export class ThemeStore {
     root.style.setProperty("--glass-bg-sidebar", hexToRgbaString(bgSidebar, alpha));
     root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(bgPlayerbar, alpha));
     root.style.setProperty("--glass-solid-sidebar", flatGlassColor(bgSidebar, alpha, bgMain));
+    root.style.setProperty("--acrylic-chrome-opacity", `${alpha * 100}%`);
+    root.style.setProperty("--acrylic-float-opacity", `${floatAlpha(isDark) * 100}%`);
     root.style.setProperty("--glass-border-color", isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)");
 
     const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
@@ -1064,6 +1076,8 @@ export class ThemeStore {
   private async queryGpuCompositing() {
     try {
       this.gpuCompositing = (await invoke<boolean>("webview_gpu_compositing")) === true;
+      // Lets app.css drop backdrop-filter from the float acrylic recipe.
+      document.documentElement.classList.toggle("no-gpu-compositing", !this.gpuCompositing);
     } catch (e) {
       console.error("Failed to query webview GPU compositing:", e);
     }
