@@ -139,6 +139,17 @@ impl Manifest {
         self.entries.remove(&path.to_lowercase());
     }
 
+    /// Forgets the file at `path`, or everything under the folder at `path`.
+    /// Returns whether anything was listed there.
+    pub fn remove_under(&mut self, path: &str) -> bool {
+        let path = path.to_lowercase();
+        let folder = format!("{path}/");
+        let before = self.entries.len();
+        self.entries
+            .retain(|key, _| *key != path && !key.starts_with(&folder));
+        self.entries.len() != before
+    }
+
     pub fn entries(&self) -> impl Iterator<Item = &ManifestEntry> {
         self.entries.values()
     }
@@ -192,6 +203,21 @@ mod tests {
         assert!(manifest.get("music/a/B.MP3").is_some());
         manifest.remove("MUSIC/a/b.mp3");
         assert_eq!(manifest.entries().count(), 0);
+    }
+
+    #[test]
+    fn removing_a_folder_forgets_everything_under_it() {
+        let mut manifest: Manifest = [
+            entry("Music/A/b.mp3"),
+            entry("Music/A/c.mp3"),
+            entry("Music/AB/d.mp3"),
+        ]
+        .into_iter()
+        .collect();
+        assert!(manifest.remove_under("music/a"));
+        let left: Vec<_> = manifest.entries().map(|e| e.path.as_str()).collect();
+        assert_eq!(left, ["Music/AB/d.mp3"]);
+        assert!(!manifest.remove_under("Music/A"));
     }
 
     #[test]

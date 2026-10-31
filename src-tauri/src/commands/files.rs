@@ -29,7 +29,9 @@ pub async fn list_source_dir(
     let devices = state.devices.clone();
     let db = state.db.clone();
     tokio::task::spawn_blocking(move || {
-        files::list_dir(&db, &source, &path, |id| devices.device(id))
+        files::list_dir(&db, &source, &path, |id, storage| {
+            devices.open_storage(id, storage)
+        })
     })
     .await
     .map_err(|e| e.to_string())?

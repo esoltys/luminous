@@ -217,6 +217,9 @@ pub struct SourceSize {
     pub source: SourceRef,
     pub songs: usize,
     pub bytes: u64,
+    /// A size-capped playlist's limit (#344): `songs` and `bytes` are then
+    /// the songs above its break.
+    pub cap_bytes: Option<u64>,
 }
 
 /// How far a selection that doesn't fit is over, and what would help.
@@ -872,6 +875,7 @@ fn source_sizes(sources: &[SourceRef], tracks: &[TrackInput]) -> Vec<SourceSize>
                 source: source.clone(),
                 songs,
                 bytes,
+                cap_bytes: None,
             }
         })
         .collect()

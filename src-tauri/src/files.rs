@@ -11,10 +11,13 @@ use crate::collection::{
     CollectionScanner, SONG_SELECT_COLS, SONG_SELECT_COLS_QUALIFIED,
 };
 use crate::db::Database;
+use crate::devices::sync::manifest::{EntryKind, Manifest, MANIFEST_FILE_NAME};
 use crate::library_paths;
 use crate::models::{Song, SongSource, LOCAL_SOURCES_SQL};
 use anyhow::{anyhow, Context, Result};
-use luminous_devices::{Device, DeviceBackend, FsBackend};
+use luminous_devices::{
+    is_partial_file, DeviceBackend, DeviceProfile, FsBackend, MARKER_FILE_NAME,
+};
 use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -40,9 +43,12 @@ pub enum FileSource {
     Webdav {
         id: i64,
     },
-    /// A connected device's first storage, by its device id.
+    /// A connected device's music folder, on the storage `storage` names
+    /// (the device's first when `None`).
     Device {
         id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        storage: Option<String>,
     },
 }
 
@@ -72,6 +78,9 @@ pub enum EntryStatus {
     /// Left out of the library on purpose: a folder the scanner never looks
     /// in, anything inside one, or a song marked "Not included".
     Excluded,
+    /// On a device, a file sync didn't copy or a folder holding none: sync
+    /// never removes these.
+    NotFromLuminous,
 }
 
 /// One file or folder in a listing.
@@ -86,7 +95,8 @@ pub struct FileEntry {
     pub modified: Option<i64>,
     /// Upper-case extension ("FLAC"), or the codec for Subsonic tracks.
     pub file_type: Option<String>,
-    /// `None` for ordinary folders and for device files.
+    /// `None` for ordinary folders, and on a device for synced files that
+    /// aren't library songs (playlist files, art, songs since removed).
     pub status: Option<EntryStatus>,
     /// The library song this file is, to play it.
     pub song_id: Option<i64>,
@@ -188,21 +198,17 @@ pub fn list_dir(
     db: &Database,
     source: &FileSource,
     path: &[String],
-    device: impl FnOnce(&str) -> Option<Device>,
+    device: impl FnOnce(&str, Option<&str>) -> Option<(Box<dyn DeviceBackend>, DeviceProfile)>,
 ) -> Result<DirListing> {
     let path = clean_path(path);
     match source {
         FileSource::Folder { id } => list_folder(db, *id, &path),
         FileSource::Subsonic { id } => list_subsonic(&*db.pool.get()?, *id, &path),
         FileSource::Webdav { id } => list_webdav(db, *id, &path),
-        FileSource::Device { id } => {
-            let device = device(id).ok_or_else(|| anyhow!("source-not-found"))?;
-            let storage = device
-                .storages
-                .first()
-                .and_then(|s| device.storage(&s.id))
-                .ok_or_else(|| anyhow!("source-not-found"))?;
-            list_device(storage.as_ref(), &path)
+        FileSource::Device { id, storage } => {
+            let (storage, profile) =
+                device(id, storage.as_deref()).ok_or_else(|| anyhow!("source-not-found"))?;
+            list_device(db, storage.as_ref(), &device_path(&profile, &path))
         }
     }
 }
@@ -433,22 +439,96 @@ fn parent_key(key: &str) -> &str {
     key.rfind('/').map_or("", |i| &key[..i])
 }
 
-fn list_device(storage: &dyn DeviceBackend, path: &[String]) -> Result<DirListing> {
-    let entries = storage
-        .list(&path.join("/"))?
-        .into_iter()
-        .filter(|e| !luminous_devices::is_partial_file(&e.name))
-        .map(|e| FileEntry {
-            file_type: (!e.is_dir).then(|| file_type(&e.name)).flatten(),
-            size: (!e.is_dir).then_some(e.size),
-            status: None,
-            song_id: None,
-            modified: e.modified,
-            is_dir: e.is_dir,
-            name: e.name,
+/// Where `path`, a location the Files view browses on a device, is on the
+/// storage: the profile's music folder is the device's root there.
+pub fn device_path(profile: &DeviceProfile, path: &[String]) -> String {
+    profile
+        .music_path
+        .split(['/', '\\'])
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .chain(clean_path(path))
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+/// The device folder `dir` (storage-relative), told apart by the storage's
+/// sync manifest: what sync didn't copy is `NotFromLuminous`, a synced
+/// track still in the library carries its song, to play the library copy.
+fn list_device(db: &Database, storage: &dyn DeviceBackend, dir: &str) -> Result<DirListing> {
+    let listed = storage.list(dir)?;
+    let manifest = Manifest::read(storage)?;
+    let full = |name: &str| {
+        if dir.is_empty() {
+            name.to_string()
+        } else {
+            format!("{dir}/{name}")
+        }
+    };
+    let synced_folders: HashSet<String> = manifest
+        .entries()
+        .flat_map(|e| {
+            let path = e.path.to_lowercase();
+            path.match_indices('/')
+                .map(|(i, _)| path[..i].to_string())
+                .collect::<Vec<_>>()
         })
         .collect();
-    Ok(finish(None, entries))
+
+    let entries: Vec<(FileEntry, Option<String>)> = listed
+        .into_iter()
+        .filter(|e| {
+            !is_partial_file(&e.name)
+                && !(dir.is_empty() && [MANIFEST_FILE_NAME, MARKER_FILE_NAME].contains(&&*e.name))
+        })
+        .map(|e| {
+            let path = full(&e.name);
+            if e.is_dir {
+                let synced = synced_folders.contains(&path.to_lowercase());
+                let entry = FileEntry {
+                    status: (!synced).then_some(EntryStatus::NotFromLuminous),
+                    modified: e.modified,
+                    ..FileEntry::folder(e.name)
+                };
+                return (entry, None);
+            }
+            let synced = manifest.get(&path);
+            let library_path = synced
+                .filter(|m| m.kind == EntryKind::Track)
+                .and_then(|m| m.source.as_ref())
+                .map(|s| s.path.clone());
+            let entry = FileEntry {
+                file_type: file_type(&e.name),
+                status: synced.is_none().then_some(EntryStatus::NotFromLuminous),
+                song_id: None,
+                size: Some(e.size),
+                modified: e.modified,
+                name: e.name,
+                is_dir: false,
+            };
+            (entry, library_path)
+        })
+        .collect();
+
+    let conn = db.pool.get()?;
+    let mut song_at = conn.prepare(&format!(
+        "SELECT id FROM songs WHERE path = ?1 AND source IN ({}) AND unavailable = 0
+         ORDER BY id LIMIT 1",
+        *LOCAL_SOURCES_SQL
+    ))?;
+    let mut files = Vec::with_capacity(entries.len());
+    for (mut entry, library_path) in entries {
+        if let Some(library_path) = library_path {
+            entry.song_id = song_at
+                .query_row(params![library_path], |r| r.get(0))
+                .optional()?;
+            if entry.song_id.is_some() {
+                entry.status = Some(EntryStatus::InLibrary);
+            }
+        }
+        files.push(entry);
+    }
+    Ok(finish(None, files))
 }
 
 /// Sorts `entries` (folders, then files, by name) and totals the files.
@@ -734,7 +814,7 @@ mod tests {
 
     fn list(f: &Fixture, path: &[&str]) -> DirListing {
         let path: Vec<String> = path.iter().map(|p| p.to_string()).collect();
-        list_dir(&f.db, &FileSource::Folder { id: 1 }, &path, |_| None).unwrap()
+        list_dir(&f.db, &FileSource::Folder { id: 1 }, &path, |_, _| None).unwrap()
     }
 
     fn status_of(listing: &DirListing, name: &str) -> Option<EntryStatus> {
@@ -866,7 +946,7 @@ mod tests {
     #[test]
     fn a_removed_source_is_not_found() {
         let f = fixture(&[], &[]);
-        let err = list_dir(&f.db, &FileSource::Folder { id: 9 }, &[], |_| None).unwrap_err();
+        let err = list_dir(&f.db, &FileSource::Folder { id: 9 }, &[], |_, _| None).unwrap_err();
         assert_eq!(err.to_string(), "source-not-found");
     }
 
@@ -920,7 +1000,7 @@ mod tests {
         let source = FileSource::Subsonic { id: 3 };
         let names = |path: &[&str]| -> Vec<String> {
             let path: Vec<String> = path.iter().map(|p| p.to_string()).collect();
-            list_dir(&f.db, &source, &path, |_| None)
+            list_dir(&f.db, &source, &path, |_, _| None)
                 .unwrap()
                 .entries
                 .into_iter()
