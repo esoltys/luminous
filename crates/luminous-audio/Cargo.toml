@@ -38,6 +38,7 @@ azo = "0.5"
 windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
     "Win32_Media_KernelStreaming",
     "Win32_Security",
     "Win32_System_Com",
@@ -45,6 +46,10 @@ windows = { version = "0.62", features = [
     "Win32_System_Threading",
     "Win32_System_Variant",
 ] }
+# `#[implement]` (the endpoint volume callback, #1891) expands to
+# `::windows_core` paths, so it must be a direct dependency, paired with
+# `windows` 0.62.
+windows-core = "0.62"
 
 [features]
 # Exposes `write_test_pcm16_wav` to the app crate's tests.
