@@ -693,6 +693,55 @@ pub struct PlaybackState {
     /// Total number of tracks in the active play order (#1605).
     #[serde(default)]
     pub playlist_total: usize,
+    /// The volume safety ceiling (#1890); `volume` never exceeds it while on.
+    #[serde(default)]
+    pub volume_safety: VolumeSafety,
+}
+
+/// The volume safety ceiling (#1890), in volume-slider units. While
+/// `enabled`, the audio engine keeps the volume at or below `ceiling` on
+/// every output backend. `ceiling` is remembered while off so re-enabling
+/// restores it. `min`/`max` are the bounds `ceiling` is kept within, sent
+/// along so the settings slider doesn't retype them.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct VolumeSafety {
+    pub enabled: bool,
+    pub ceiling: f32,
+    pub min: f32,
+    pub max: f32,
+}
+
+impl VolumeSafety {
+    pub const MIN_CEILING: f32 = 0.20;
+    pub const MAX_CEILING: f32 = 0.95;
+    pub const DEFAULT_CEILING: f32 = 0.70;
+
+    /// A ceiling clamped to `MIN_CEILING..=MAX_CEILING`; a non-finite one
+    /// falls back to `DEFAULT_CEILING`.
+    pub fn new(enabled: bool, ceiling: f32) -> Self {
+        let ceiling = if ceiling.is_finite() {
+            ceiling.clamp(Self::MIN_CEILING, Self::MAX_CEILING)
+        } else {
+            Self::DEFAULT_CEILING
+        };
+        Self {
+            enabled,
+            ceiling,
+            min: Self::MIN_CEILING,
+            max: Self::MAX_CEILING,
+        }
+    }
+
+    /// The cap for the audio engine: `Some(ceiling)` while enabled.
+    pub fn active_ceiling(&self) -> Option<f32> {
+        self.enabled.then_some(self.ceiling)
+    }
+}
+
+impl Default for VolumeSafety {
+    fn default() -> Self {
+        Self::new(false, Self::DEFAULT_CEILING)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
