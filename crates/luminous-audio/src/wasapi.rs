@@ -140,14 +140,15 @@ mod imp {
     use crate::{AudioShared, OutputRenderer};
 
     const CHANNELS: u16 = 2;
-    /// How long opening may take before the build gives up (inside the
-    /// engine's 5 s rebuild budget).
+    /// How long opening may take before the build gives up. With
+    /// `ENDPOINT_VOLUME_TIMEOUT` after it, the build stays inside the
+    /// engine's 5 s rebuild budget.
     const OPEN_TIMEOUT: Duration = Duration::from_secs(4);
     /// A started stream that signals nothing for this long has stalled.
     const STALL_TIMEOUT_MS: u32 = 2_000;
     /// How long taking over the endpoint volume may take before the sink
     /// settles for software gain.
-    const ENDPOINT_VOLUME_TIMEOUT: Duration = Duration::from_secs(1);
+    const ENDPOINT_VOLUME_TIMEOUT: Duration = Duration::from_millis(500);
 
     /// A Win32 event handle, closed on drop.
     struct Event(HANDLE);
@@ -422,6 +423,10 @@ mod imp {
                 }
             }
         };
+        // `open` gave up waiting: leave the endpoint alone.
+        if quit.load(Ordering::Acquire) {
+            return;
+        }
         // Set before the stream can start, so nothing plays at the level
         // Windows was left at.
         write(f32::from_bits(target.load(Ordering::Acquire)));
@@ -437,7 +442,9 @@ mod imp {
             log::warn!("Endpoint volume change notifications unavailable");
         }
 
-        if ready.send(true).is_ok() {
+        // Fails when `open` gave up waiting after the check above.
+        let took_over = ready.send(true).is_ok();
+        if took_over {
             loop {
                 WaitForSingleObject(wake.0, INFINITE);
                 if quit.load(Ordering::Acquire) {
@@ -457,12 +464,16 @@ mod imp {
         if let Some(muted) = saved_mute {
             let _ = endpoint.SetMute(muted, &context);
         }
-        shared
-            .hardware_volume_active
-            .store(false, Ordering::Release);
-        shared
-            .output_hardware_volume
-            .store(false, Ordering::Release);
+        // Only `open` set these, and only when it took the hand-off; a
+        // straggler clearing them could undo a newer sink's.
+        if took_over {
+            shared
+                .hardware_volume_active
+                .store(false, Ordering::Release);
+            shared
+                .output_hardware_volume
+                .store(false, Ordering::Release);
+        }
     }
 
     /// Hands endpoint volume changes made outside the app (a DAC knob, the
