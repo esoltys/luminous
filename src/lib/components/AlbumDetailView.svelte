@@ -346,22 +346,18 @@
       });
   });
 
-  let scrollContainerEl = $state<HTMLDivElement | undefined>(undefined);
+  let songTable = $state<ReturnType<typeof SongTable> | undefined>(undefined);
 
   // A song picked from search (#1280): once this album's tracks are in, select
-  // it and centre it — scrollIntoView also stops rememberScroll's restores.
+  // it and centre it — scrolling also stops rememberScroll's restores.
   $effect(() => {
     const focusId = navigationStore.pendingFocusSongId;
-    if (focusId === null || loading || loadedAlbumName !== albumName || !scrollContainerEl) return;
+    if (focusId === null || loading || loadedAlbumName !== albumName || !songTable) return;
     navigationStore.pendingFocusSongId = null;
     if (!songs.some((s) => s.id === focusId)) return;
     const key = String(focusId);
     selectedKeys = new Set([key]);
-    tick().then(() => {
-      scrollContainerEl
-        ?.querySelector<HTMLElement>(`[data-song-row][data-key="${key}"]`)
-        ?.scrollIntoView({ block: "center" });
-    });
+    tick().then(() => songTable?.scrollToKey(key));
   });
 
   type AlbumSortField = keyof Song | "track";
@@ -567,7 +563,6 @@
 </script>
 
 <div
-  bind:this={scrollContainerEl}
   class="relative flex-1 flex flex-col overflow-y-auto text-brand-text-secondary h-full {backdropUrl ? '' : 'bg-brand-main'}"
   use:rememberScroll={`album-detail:${albumName}`}
 >
@@ -709,6 +704,7 @@
 
     <div class="border border-brand-border rounded-lg bg-brand-sidebar/50 backdrop-blur-xl shadow-2xl overflow-hidden table-surface-blur">
       <SongTable
+        bind:this={songTable}
         rows={tableRows}
         rangeSelectionOrder={rangeSelectionRows}
         mode="track"

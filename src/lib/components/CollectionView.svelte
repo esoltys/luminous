@@ -459,7 +459,7 @@
     </div>
 
     <div class="flex-1 px-6 pt-2 overflow-hidden flex flex-col {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <div class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">
+      <div class="flex-1 overflow-y-auto border border-brand-border rounded-lg bg-brand-sidebar/40 min-h-0" use:rememberScroll={"collection:songs"}>
         <SongTable
           rows={tableRows}
           mode="track"
@@ -474,8 +474,6 @@
           onRate={rateSong}
           onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
           onEditTags={(song) => openTagEditor(song.id)}
-          virtualized
-          scrollMemoryKey="collection:songs"
           emptyState={songsEmptyState}
         />
       </div>

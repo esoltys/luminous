@@ -15,7 +15,7 @@
     isDuplicate?: boolean;
     /** Position of this row in the caller's underlying (unfiltered) order — required when `onReorder` is provided. */
     underlyingIndex?: number;
-    /** Label for a divider drawn above this row (e.g. where Auto Continue's songs start in the Queue). Not supported with `virtualized`, whose rows have a fixed height. */
+    /** Label for a divider drawn above this row (e.g. where Auto Continue's songs start in the Queue). */
     dividerBefore?: string;
     /** "heading" (default) is an accent section heading; "break" is a dashed page break that marks a limit without suggesting the rows below differ. */
     dividerVariant?: "heading" | "break";
@@ -36,7 +36,7 @@
   import { parseMultiValue } from "../utils/multiValue";
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
   import { columnResize } from "../utils/columnResize";
-  import { watchScrollMemory } from "../utils/scrollMemory";
+  import { rowTops, visibleRows } from "../utils/rowWindow";
   import type { VisibleColumns } from "../stores/collection.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import SongRating from "./SongRating.svelte";
@@ -59,7 +59,6 @@
     ClockIcon as Clock,
     DiscIcon as DiscAlbum
   } from "phosphor-svelte";
-  import { VirtualList } from "svelte-virtual-list-ts";
   import type { Snippet } from "svelte";
 
   const POINTER_DRAG_THRESHOLD_PX = 4;
@@ -110,9 +109,6 @@
      * instance is actually playing.
      */
     isRowPlaying?: (row: SongTableRow) => boolean;
-    virtualized?: boolean;
-    /** Persists/restores virtualized scroll position — only used when `virtualized` is true. */
-    scrollMemoryKey?: string;
   }
 
   let {
@@ -141,8 +137,6 @@
     interactiveWhenDisabled = false,
     disabledPlaceholder = false,
     isRowPlaying,
-    virtualized = false,
-    scrollMemoryKey,
   }: Props = $props();
 
   function rowIsPlaying(row: SongTableRow): boolean {
@@ -172,15 +166,7 @@
     return m;
   });
 
-  // The virtualized body's <svelte-virtual-list-viewport> reserves layout
-  // width for its own scrollbar; the sticky header sits outside that
-  // viewport and doesn't. On platforms with a non-overlay scrollbar (e.g.
-  // Windows), that gutter makes the header's grid track a few pixels wider
-  // than the rows' grid track, misaligning every column after the ones that
-  // can absorb it. Measure the actual scrollbar width and pad the header by
-  // the same amount so both grids compute identical track widths.
   let bodyContainer = $state<HTMLDivElement | undefined>(undefined);
-  let scrollbarWidth = $state(0);
 
   let columnSelector = $state<ReturnType<typeof ColumnSelector> | undefined>(undefined);
 
@@ -189,35 +175,67 @@
     columnSelector?.openAt(e.clientX, e.clientY);
   }
 
+  // --- Windowing (#1898) ---
+  // Only the rows near the visible part of the nearest scrolling ancestor are
+  // drawn, between two spacers that keep the full list's height, so opening a
+  // view costs the same at 50 rows or 50,000. Every height is fixed by the
+  // template (`style:height` below), which is what lets the layout be computed
+  // without measuring the DOM.
+  const ROW_HEIGHT_PX = 49;
+  const DIVIDER_HEIGHT_PX = 32;
+  const OVERSCAN_ROWS = 10;
+
+  let tops = $derived(rowTops(rows.map((r) => ROW_HEIGHT_PX + (r.dividerBefore ? DIVIDER_HEIGHT_PX : 0))));
+  let viewTop = $state(0);
+  let viewBottom = $state(0);
+  let visible = $derived(visibleRows(tops, viewTop, viewBottom, OVERSCAN_ROWS));
+  // Primitives, so scrolling within the drawn rows re-renders nothing.
+  let windowStart = $derived(visible.start);
+  let windowEnd = $derived(visible.end);
+  let windowRows = $derived(rows.slice(windowStart, windowEnd));
+
+  function scrollParent(el: HTMLElement): HTMLElement {
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      if (/(auto|scroll|overlay)/.test(getComputedStyle(p).overflowY)) return p;
+    }
+    return document.documentElement;
+  }
+
+  /** The body's top edge in its scroller's content coordinates. */
+  function bodyOffset(scroller: HTMLElement, body: HTMLElement): number {
+    return body.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+  }
+
   $effect(() => {
-    if (!virtualized || !bodyContainer) return;
-    const viewport = bodyContainer.querySelector<HTMLElement>("svelte-virtual-list-viewport");
-    if (!viewport) return;
-    let rafId: number | undefined;
-    const update = () => {
-      const diff = viewport.offsetWidth - viewport.clientWidth;
-      if (diff !== scrollbarWidth) {
-        scrollbarWidth = diff;
-      }
+    const body = bodyContainer;
+    if (!body) return;
+    const scroller = scrollParent(body);
+    const measure = () => {
+      const top = scroller.scrollTop - bodyOffset(scroller, body);
+      viewTop = top;
+      // An unlaid-out scroller (jsdom, a hidden view) reports 0; size the
+      // window to the screen rather than drawing nothing.
+      viewBottom = top + (scroller.clientHeight || window.innerHeight);
     };
-    update();
-    const observer = new ResizeObserver(() => {
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(update);
-    });
-    observer.observe(viewport);
+    measure();
+    scroller.addEventListener("scroll", measure, { passive: true });
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroller);
+    observer.observe(body);
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
+      scroller.removeEventListener("scroll", measure);
       observer.disconnect();
     };
   });
 
-  $effect(() => {
-    if (!virtualized || !scrollMemoryKey || !bodyContainer) return;
-    const viewport = bodyContainer.querySelector<HTMLElement>("svelte-virtual-list-viewport");
-    if (!viewport) return;
-    return watchScrollMemory(viewport, scrollMemoryKey);
-  });
+  /** Centres the row with `key` in its scroller, whether or not it is drawn yet. Does nothing if no row has that key. */
+  export function scrollToKey(key: string) {
+    const index = rows.findIndex((r) => r.key === key);
+    if (index === -1 || !bodyContainer) return;
+    const scroller = scrollParent(bodyContainer);
+    const rowTop = bodyOffset(scroller, bodyContainer) + tops[index + 1] - ROW_HEIGHT_PX;
+    scroller.scrollTop = rowTop - (scroller.clientHeight - ROW_HEIGHT_PX) / 2;
+  }
 
   let orderForRange = $derived(rangeSelectionOrder ?? rows);
 
@@ -722,24 +740,26 @@
 {#snippet row_(row: SongTableRow, displayIndex: number)}
   {@const song = row.song}
   {@const disabled = rowDisabled(row)}
-  {#if row.dividerBefore && !virtualized && row.dividerVariant === "break"}
+  {#if row.dividerBefore && row.dividerVariant === "break"}
     <div
       data-row-divider="true"
       data-divider-variant="break"
       role="separator"
       aria-label={row.dividerBefore}
-      class="flex items-center gap-3 px-4 py-2 text-[11px] font-medium text-brand-text-secondary select-none"
+      style:height="{DIVIDER_HEIGHT_PX}px"
+      class="flex items-center gap-3 px-4 text-[11px] font-medium text-brand-text-secondary select-none"
     >
       <div class="h-0 flex-1 border-t border-dashed border-brand-text-secondary/50"></div>
       <span class="shrink-0">{row.dividerBefore}</span>
       <div class="h-0 flex-1 border-t border-dashed border-brand-text-secondary/50"></div>
     </div>
-  {:else if row.dividerBefore && !virtualized}
+  {:else if row.dividerBefore}
     <div
       data-row-divider="true"
       role="separator"
       aria-label={row.dividerBefore}
-      class="flex items-center gap-3 px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-brand-accent-text select-none"
+      style:height="{DIVIDER_HEIGHT_PX}px"
+      class="flex items-end gap-3 px-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-brand-accent-text select-none"
     >
       <span>{row.dividerBefore}</span>
       <div class="h-px flex-1 bg-brand-accent/30"></div>
@@ -758,6 +778,7 @@
     onkeydown={(e) => { if (e.key === "Enter" && song && !disabled) onRowDoubleClick(row); }}
     onpointerdown={(e) => handleRowPointerDown(e, row)}
     style={gridColsStyle}
+    style:height="{ROW_HEIGHT_PX}px"
     title={row.disabledTooltip}
     class="grid items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
       {disabled ? 'opacity-50 cursor-not-allowed' : ''}
@@ -778,7 +799,7 @@
 
 <ColumnSelector bind:this={columnSelector} hideTrigger />
 <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-  <div role="row" tabindex="-1" oncontextmenu={handleHeaderContextMenu} class="grid items-center py-3 px-4" style="{gridColsStyle}{virtualized ? `; padding-right: calc(1rem + ${scrollbarWidth}px)` : ''}">
+  <div role="row" tabindex="-1" oncontextmenu={handleHeaderContextMenu} class="grid items-center py-3 px-4" style={gridColsStyle}>
     {#if mode === "position" && positionSortField}
       <SortableHeader
         active={sortField === positionSortField}
@@ -801,7 +822,7 @@
 
 <div
   bind:this={bodyContainer}
-  class="rounded-b-lg overflow-hidden {virtualized ? 'flex-1 min-h-0 relative' : ''}"
+  class="rounded-b-lg overflow-hidden"
 >
   {#if loading}
     <div class="flex items-center justify-center py-16">
@@ -815,18 +836,12 @@
         <EmptyState icon={Music} title={i18n.t("collection.noSongsTitle")} />
       {/if}
     </div>
-  {:else if virtualized}
-    {#key gridColsStyle}
-      <VirtualList items={rows} itemHeight={41}>
-        {#snippet children({ item }: { item: SongTableRow })}
-          {@render row_(item, item.underlyingIndex ?? keyIndex?.get(item.key) ?? 0)}
-        {/snippet}
-      </VirtualList>
-    {/key}
   {:else}
-    {#each rows as row, index (row.key)}
-      {@render row_(row, index)}
+    <div style:height="{tops[windowStart]}px"></div>
+    {#each windowRows as row, i (row.key)}
+      {@render row_(row, windowStart + i)}
     {/each}
+    <div style:height="{tops[rows.length] - tops[windowEnd]}px"></div>
   {/if}
 </div>
 

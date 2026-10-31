@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { rememberScroll, watchScrollMemory } from "./scrollMemory";
+import { rememberScroll } from "./scrollMemory";
 
 function makeScrollableDiv(): HTMLDivElement {
   const div = document.createElement("div");
@@ -73,17 +73,5 @@ describe("scrollMemory", () => {
 
     action.update("home");
     expect(div.scrollTop).toBe(300);
-  });
-
-  it("supports the non-action watchScrollMemory helper for imperatively-reached elements", () => {
-    const div = makeScrollableDiv();
-    const detach = watchScrollMemory(div, "songs-viewport");
-    div.scrollTop = 75;
-    div.dispatchEvent(new Event("scroll"));
-    detach();
-
-    const div2 = makeScrollableDiv();
-    watchScrollMemory(div2, "songs-viewport");
-    expect(div2.scrollTop).toBe(75);
   });
 });

@@ -9,13 +9,6 @@ import { pinnedStore } from "../stores/pinned.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { Song, AlbumItem, ArtistItem } from "../types";
 
-vi.mock("svelte-virtual-list-ts", async () => {
-  const mod = await import("./__mocks__/VirtualList.svelte");
-  return {
-    VirtualList: mod.default,
-  };
-});
-
 
 describe("CollectionView.svelte", () => {
   const mockSongs: Song[] = [

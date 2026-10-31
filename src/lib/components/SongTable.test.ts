@@ -239,3 +239,92 @@ describe("SongTable.svelte — info sidebar selection", () => {
   });
 });
 
+
+describe("SongTable.svelte — windowing (#1898)", () => {
+  const song = (id: number): Song => ({
+    id,
+    source: "local_file",
+    filetype: "MP3",
+    path: `/music/${id}.mp3`,
+    title: `Track ${id}`,
+    artist: "Artist",
+    album: "Album",
+    album_artist: "",
+    composer: "",
+    genre: "",
+    track: id,
+    disc: 1,
+    year: 2024,
+    compilation: false,
+    length_nanosec: 180_000_000_000,
+    beginning_nanosec: 0,
+    end_nanosec: 180_000_000_000,
+    rating: 0,
+    playcount: 0,
+    skipcount: 0,
+    art_embedded: false,
+    art_unset: false,
+    unavailable: false,
+  });
+
+  function renderInScroller(rows: SongTableRow[]) {
+    const scroller = document.createElement("div");
+    scroller.style.overflowY = "auto";
+    document.body.appendChild(scroller);
+    const result = render(SongTable, {
+      target: scroller,
+      props: {
+        rows,
+        mode: "position",
+        leadingColumnWidth: "3rem",
+        colDefaults: {},
+        sortField: "position",
+        sortAsc: true,
+        onToggleSort: () => {},
+        onRowDoubleClick: () => {},
+        onRowContextMenu: () => {},
+        onRate: () => {},
+        onEditTags: () => {},
+      },
+    });
+    return { ...result, scroller };
+  }
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("draws only a window of a long list, with spacers holding its full height", () => {
+    const rows = Array.from({ length: 5000 }, (_, i) => ({ key: String(i), song: song(i) }));
+    const { container } = renderInScroller(rows);
+
+    const drawn = container.querySelectorAll("[data-song-row]");
+    expect(drawn.length).toBeGreaterThan(0);
+    expect(drawn.length).toBeLessThan(100);
+
+    const body = drawn[0].parentElement!;
+    const spacers = [body.firstElementChild as HTMLElement, body.lastElementChild as HTMLElement];
+    const rowHeight = parseFloat((drawn[0] as HTMLElement).style.height);
+    const spacerTotal = spacers.reduce((sum, el) => sum + parseFloat(el.style.height), 0);
+    expect(spacerTotal + drawn.length * rowHeight).toBe(5000 * rowHeight);
+  });
+
+  it("draws a divider row together with its divider", () => {
+    const rows: SongTableRow[] = [
+      { key: "0", song: song(0) },
+      { key: "1", song: song(1), dividerBefore: "Auto Continue" },
+    ];
+    const { getByRole } = renderInScroller(rows);
+    expect(getByRole("separator", { name: "Auto Continue" })).toBeInTheDocument();
+  });
+
+  it("scrollToKey scrolls to a row that is not drawn yet", async () => {
+    const rows = Array.from({ length: 5000 }, (_, i) => ({ key: String(i), song: song(i) }));
+    const { component, container, scroller } = renderInScroller(rows);
+    expect(container.querySelector('[data-key="3000"]')).toBeNull();
+
+    (component as unknown as { scrollToKey: (key: string) => void }).scrollToKey("3000");
+    const rowHeight = parseFloat((container.querySelector("[data-song-row]") as HTMLElement).style.height);
+    expect(scroller.scrollTop).toBeGreaterThan(2999 * rowHeight);
+  });
+});
