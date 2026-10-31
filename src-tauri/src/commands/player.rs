@@ -436,15 +436,31 @@ pub async fn seek_to(
     Ok(())
 }
 
+/// Returns the volume applied, which the safety ceiling (#1890) may have
+/// lowered from `volume`.
 #[tauri::command]
-pub async fn set_volume(volume: f32, state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .player
-        .lock()
-        .await
-        .set_volume(volume)
-        .await
-        .map_err(|e| e.to_string())
+pub async fn set_volume(volume: f32, state: State<'_, AppState>) -> Result<f32, String> {
+    let mut player = state.player.lock().await;
+    player.set_volume(volume).await.map_err(|e| e.to_string())?;
+    Ok(player.volume)
+}
+
+/// Turn the volume safety ceiling (#1890) on or off and set its level; the
+/// result, including any volume it lowered, arrives as `playback-state`.
+#[tauri::command]
+pub async fn set_volume_safety(
+    enabled: bool,
+    ceiling: f32,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let mut player = state.player.lock().await;
+    player.set_volume_safety(enabled, ceiling).await;
+    let playback_state = player.get_state().await;
+    crate::media_session::mirror_state(&app, &playback_state).await;
+    let _ = app.emit("playback-state", playback_state);
+    Ok(())
 }
 
 #[tauri::command]

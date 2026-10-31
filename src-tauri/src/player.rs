@@ -7,7 +7,8 @@ use crate::{
     audio::AudioEngine,
     db::Database,
     models::{
-        LoudnessGainSource, PlayContext, PlaybackState, PlaylistItem, RepeatMode, ShuffleMode, Song,
+        LoudnessGainSource, PlayContext, PlaybackState, PlaylistItem, RepeatMode, ShuffleMode,
+        Song, VolumeSafety,
     },
     stats,
 };
@@ -58,9 +59,10 @@ enum GaplessTargetKind {
 }
 
 // ---------------------------------------------------------------------------
-// Restart-persistence helpers — `Player` owns 8 `app_state` keys (volume,
-// shuffle_mode, repeat_mode, last_song_id, last_playlist_id, last_item_uuid,
-// last_position_nanosec, last_adhoc_song_ids). These give `Player::new`'s
+// Restart-persistence helpers — `Player` owns 10 `app_state` keys (volume,
+// volume_safety_enabled, volume_safety_ceiling, shuffle_mode, repeat_mode,
+// last_song_id, last_playlist_id, last_item_uuid, last_position_nanosec,
+// last_adhoc_song_ids). These give `Player::new`'s
 // restore block and the various persist_*/set_* writers one shared place for
 // the raw SQL shape and the enum<->string mapping, mirroring the field↔key
 // pattern `commands/settings.rs::UiPreferences::fields()` uses for its own
@@ -157,6 +159,9 @@ pub struct Player {
     /// as it nears its end. Persisted as `auto_continue`.
     pub auto_continue: bool,
     pub volume: f32,
+    /// The volume safety ceiling (#1890). Persisted as
+    /// `volume_safety_enabled` / `volume_safety_ceiling`.
+    pub volume_safety: VolumeSafety,
 
     // Loudness normalization (#77) — where the currently applied gain came
     // from, for the player-bar indicator.
@@ -212,6 +217,7 @@ impl Player {
     /// engine paused rather than auto-playing.
     pub fn new(db: Arc<Database>, audio: Arc<Mutex<AudioEngine>>) -> Self {
         let mut volume = 1.0f32;
+        let mut volume_safety = VolumeSafety::default();
         let mut shuffle_mode = ShuffleMode::Off;
         let mut repeat_mode = RepeatMode::Off;
         let mut auto_continue = false;
@@ -224,11 +230,21 @@ impl Player {
 
         // Query database settings on startup
         if let Ok(conn) = db.pool.get() {
-            if let Some(v) = app_state_get_parsed::<f32>(&conn, "volume") {
-                volume = v.clamp(0.0, 1.0);
-                if let Ok(engine) = audio.try_lock() {
-                    engine.set_volume(volume);
-                }
+            volume_safety = VolumeSafety::new(
+                app_state_get(&conn, "volume_safety_enabled").as_deref() == Some("true"),
+                app_state_get_parsed::<f32>(&conn, "volume_safety_ceiling")
+                    .unwrap_or(VolumeSafety::DEFAULT_CEILING),
+            );
+            let saved_volume = app_state_get_parsed::<f32>(&conn, "volume");
+            if let Ok(engine) = audio.try_lock() {
+                // The cap goes in before the restored volume, so playback
+                // can't start above it.
+                engine.set_volume_ceiling(volume_safety.active_ceiling());
+                volume = engine.set_volume(saved_volume.unwrap_or(volume));
+            } else {
+                // Unreachable at construction (nothing else holds the fresh
+                // engine yet), but a skipped safety cap must not be silent.
+                log::error!("Audio engine busy at startup: volume and safety ceiling not restored");
             }
             if let Some(s) = app_state_get(&conn, "shuffle_mode") {
                 shuffle_mode = shuffle_mode_from_key(&s);
@@ -365,6 +381,7 @@ impl Player {
             stop_after_current: false,
             auto_continue,
             volume,
+            volume_safety,
             current_loudness_source: loudness_source,
             current_loudness_gain_db: loudness_gain_db,
             playlist_items,
@@ -1260,14 +1277,35 @@ impl Player {
             .unwrap_or(0)
     }
 
+    /// Set the volume, capped by the safety ceiling; `self.volume` holds
+    /// the level actually applied.
     pub async fn set_volume(&mut self, vol: f32) -> Result<()> {
-        self.volume = vol.clamp(0.0, 1.0);
-        let audio = self.audio.lock().await;
-        audio.set_volume(self.volume);
+        self.volume = self.audio.lock().await.set_volume(vol);
         if let Ok(conn) = self._db.pool.get() {
             app_state_set(&conn, "volume", &self.volume.to_string());
         }
         Ok(())
+    }
+
+    /// Turn the volume safety ceiling (#1890) on or off and set its level
+    /// (kept within `VolumeSafety`'s bounds). Turning it on, or lowering
+    /// it, brings a louder volume down to the ceiling at once.
+    pub async fn set_volume_safety(&mut self, enabled: bool, ceiling: f32) {
+        self.volume_safety = VolumeSafety::new(enabled, ceiling);
+        self.volume = self
+            .audio
+            .lock()
+            .await
+            .set_volume_ceiling(self.volume_safety.active_ceiling());
+        if let Ok(conn) = self._db.pool.get() {
+            app_state_set(&conn, "volume_safety_enabled", &enabled.to_string());
+            app_state_set(
+                &conn,
+                "volume_safety_ceiling",
+                &self.volume_safety.ceiling.to_string(),
+            );
+            app_state_set(&conn, "volume", &self.volume.to_string());
+        }
     }
 
     /// Records an external volume change (e.g. from alsamixer or a physical DAC knob)
@@ -1972,6 +2010,7 @@ impl Player {
             auto_continue: self.auto_continue,
             playlist_index,
             playlist_total,
+            volume_safety: self.volume_safety,
         }
     }
 
@@ -2271,6 +2310,33 @@ mod tests {
         assert_eq!(restarted.current_song.as_ref().unwrap().id, 2);
         assert_eq!(restarted.playlist_items.len(), 3);
         assert_eq!(restarted.current_index, Some(1));
+    }
+
+    #[tokio::test]
+    async fn volume_safety_caps_volume_and_is_restored_before_it() {
+        let (_dir, db) = setup_test_db();
+        let db_arc = Arc::new(db);
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        player.set_volume(0.9).await.unwrap();
+        player.set_volume_safety(true, 0.6).await;
+        assert_eq!(player.volume, 0.6, "turning the limit on lowers the volume");
+        player.set_volume(1.0).await.unwrap();
+        assert_eq!(player.volume, 0.6, "requests above the ceiling stop at it");
+
+        player.set_volume_safety(true, 2.0).await;
+        assert_eq!(player.volume_safety.ceiling, VolumeSafety::MAX_CEILING);
+        player.set_volume_safety(true, 0.6).await;
+
+        // A saved volume above the ceiling (say, from before the limit was
+        // turned on) must not reach a freshly opened engine.
+        app_state_set(&db_arc.pool.get().unwrap(), "volume", "0.9");
+        let fresh_audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let restarted = Player::new(db_arc.clone(), fresh_audio.clone());
+        assert_eq!(restarted.volume_safety, VolumeSafety::new(true, 0.6));
+        assert_eq!(restarted.volume, 0.6);
+        assert_eq!(fresh_audio.lock().await.current_volume(), 0.6);
     }
 
     /// Regression test for the "album skips first track, file not found"

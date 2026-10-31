@@ -631,16 +631,13 @@ mod imp {
                             if let Some(read_vol) = read_from_selem(&selem, self.caps) {
                                 if (read_vol - last_applied_vol).abs() >= EXTERNAL_VOLUME_HYSTERESIS
                                 {
+                                    // The element is at `read_vol` now. When the
+                                    // safety ceiling keeps a lower level, the
+                                    // differing target makes the next loop pass
+                                    // write it back to the element.
                                     last_applied_vol = read_vol;
-                                    self.target_volume
-                                        .store(read_vol.to_bits(), Ordering::Release);
-                                    self.shared
-                                        .volume
-                                        .store(read_vol.to_bits(), Ordering::Release);
-                                    let _ = self
-                                        .shared
-                                        .event_tx
-                                        .send(crate::AudioEvent::VolumeChanged(read_vol));
+                                    let kept = self.shared.accept_external_volume(read_vol);
+                                    self.target_volume.store(kept.to_bits(), Ordering::Release);
                                 }
                             }
                         }

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
+  import { setVolumeFromSlider, volumeSliderBackground } from "../volumeSlider";
   import { collectionStore } from "../stores/collection.svelte";
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { themeStore } from "../stores/theme.svelte";
@@ -51,13 +52,10 @@
 
   // Volume slider gradient style (mirrors PlayerBar.svelte's volume control)
   let volumePercent = $derived(playerStore.volume * 100);
-  let volumeSliderStyle = $derived(
-    `background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${volumePercent}%, var(--color-border) ${volumePercent}%, var(--color-border) 100%)`
-  );
+  let volumeSliderStyle = $derived(volumeSliderBackground(playerStore.volume, playerStore.volumeSafety));
 
   function handleVolumeChange(e: Event) {
-    const input = e.target as HTMLInputElement;
-    playerStore.setVolume(parseFloat(input.value));
+    setVolumeFromSlider(e.target as HTMLInputElement);
   }
 
   function releaseVolumeFocus(e: Event) {

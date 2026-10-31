@@ -1444,6 +1444,7 @@ pub fn run() {
             commands::player::previous_track,
             commands::player::seek_to,
             commands::player::set_volume,
+            commands::player::set_volume_safety,
             commands::player::get_playback_state,
             commands::player::refresh_playback_queue,
             commands::player::set_shuffle_mode,

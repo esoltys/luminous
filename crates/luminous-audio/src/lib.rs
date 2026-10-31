@@ -156,8 +156,10 @@ enum AudioCommand {
     ClearPreload,
     /// Force a rebuild of the audio output stream (e.g. backend or device changed).
     RebuildOutput,
-    /// Update output volume level on the active sink.
-    SetVolume(f32),
+    /// Push the current master volume (`AudioShared::volume`) to the active
+    /// sink's hardware mixer. It carries no level so a stale command can never
+    /// apply one the safety ceiling has since lowered.
+    SyncHardwareVolume,
 }
 
 struct PlayRequest {
@@ -278,7 +280,11 @@ pub enum AudioEvent {
 pub(crate) struct AudioShared {
     pub(crate) open_source: Box<SourceOpener>,
     pub(crate) position: AtomicU64,
+    /// Master volume, never above `volume_ceiling`. Write it only through
+    /// `store_volume`, which keeps that true.
     pub(crate) volume: AtomicU32,
+    /// The volume safety ceiling (#1890); 1.0 while there is none.
+    pub(crate) volume_ceiling: AtomicU32,
     pub(crate) play_state: Mutex<EngineState>,
     pub(crate) visualizer_buf: spectrum::AudioVisualizerBuffer,
     /// Whether the output callback feeds `visualizer_buf` at all: the
@@ -324,6 +330,62 @@ impl AudioShared {
         self.loudness_switch_at.store(at, Ordering::Release);
     }
 
+    /// Store `vol` as the master volume, clamped to 0.0–1.0 and to the safety
+    /// ceiling, and return the level stored.
+    fn store_volume(&self, vol: f32) -> f32 {
+        // The ceiling is re-checked after the store so a concurrent
+        // `set_volume_ceiling` can't be overtaken: whichever runs second sees
+        // the other's write (both are `SeqCst`), so the volume never stays
+        // above the newest ceiling.
+        let ceiling = f32::from_bits(self.volume_ceiling.load(Ordering::SeqCst));
+        let vol = vol.clamp(0.0, 1.0).min(ceiling);
+        self.volume.store(vol.to_bits(), Ordering::SeqCst);
+        self.enforce_volume_ceiling()
+    }
+
+    /// Set (or, with `None`, lift) the safety ceiling and lower the master
+    /// volume to it if needed; returns the volume afterwards.
+    fn set_volume_ceiling(&self, ceiling: Option<f32>) -> f32 {
+        let ceiling = ceiling.map_or(1.0, |c| c.clamp(0.0, 1.0));
+        self.volume_ceiling
+            .store(ceiling.to_bits(), Ordering::SeqCst);
+        self.enforce_volume_ceiling()
+    }
+
+    /// Lower the master volume to the safety ceiling if it is above it, and
+    /// return the volume afterwards.
+    fn enforce_volume_ceiling(&self) -> f32 {
+        let ceiling = f32::from_bits(self.volume_ceiling.load(Ordering::SeqCst));
+        let mut bits = self.volume.load(Ordering::SeqCst);
+        while f32::from_bits(bits) > ceiling {
+            match self.volume.compare_exchange_weak(
+                bits,
+                ceiling.to_bits(),
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => return ceiling,
+                Err(now) => bits = now,
+            }
+        }
+        f32::from_bits(bits)
+    }
+
+    /// Take in a volume change made outside the app (a DAC knob, alsamixer,
+    /// the OS endpoint volume): store it under the safety ceiling and report
+    /// it as [`AudioEvent::VolumeChanged`]. Returns the level kept, which is
+    /// below `reading` when the ceiling cut it; the hardware listener then
+    /// writes that level back to the device.
+    pub(crate) fn accept_external_volume(&self, reading: f32) -> f32 {
+        let kept = self.store_volume(reading);
+        let _ = self.event_tx.send(AudioEvent::VolumeChanged(kept));
+        kept
+    }
+
+    fn current_volume(&self) -> f32 {
+        f32::from_bits(self.volume.load(Ordering::Relaxed))
+    }
+
     /// Drop a scheduled loudness switch: the played-sample space it was
     /// measured in has been reset (seek, new track, device rebuild).
     fn cancel_loudness_switch(&self) {
@@ -363,6 +425,7 @@ impl AudioEngine {
             open_source: Box::new(open_source),
             position: AtomicU64::new(0),
             volume: AtomicU32::new(1.0f32.to_bits()),
+            volume_ceiling: AtomicU32::new(1.0f32.to_bits()),
             play_state: Mutex::new(EngineState::Stopped),
             visualizer_buf: spectrum::AudioVisualizerBuffer::new(4096),
             spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
@@ -479,11 +542,27 @@ impl AudioEngine {
         self.send_cmd(AudioCommand::SeekTo(position_nanosec))
     }
 
-    /// Master volume, clamped to 0.0–1.0.
-    pub fn set_volume(&self, vol: f32) {
-        let vol = vol.clamp(0.0, 1.0);
-        self.shared.volume.store(vol.to_bits(), Ordering::Relaxed);
-        let _ = self.send_cmd(AudioCommand::SetVolume(vol));
+    /// Set the master volume, clamped to 0.0–1.0 and to the safety ceiling
+    /// (see [`set_volume_ceiling`](Self::set_volume_ceiling)). A level above
+    /// the ceiling sets the ceiling. Returns the volume applied.
+    pub fn set_volume(&self, vol: f32) -> f32 {
+        let applied = self.shared.store_volume(vol);
+        let _ = self.send_cmd(AudioCommand::SyncHardwareVolume);
+        applied
+    }
+
+    /// Cap the master volume at `ceiling` (0.0–1.0), or lift the cap with
+    /// `None` (#1890). While a cap is set, no volume command and no external
+    /// hardware change can exceed it, on any output backend; a current
+    /// volume above it is lowered at once. Lifting the cap leaves the volume
+    /// where it is. Returns the volume afterwards.
+    pub fn set_volume_ceiling(&self, ceiling: Option<f32>) -> f32 {
+        let before = self.shared.current_volume();
+        let after = self.shared.set_volume_ceiling(ceiling);
+        if after != before {
+            let _ = self.send_cmd(AudioCommand::SyncHardwareVolume);
+        }
+        after
     }
 
     /// Step the per-track loudness-normalization multiplier (#77) at once,
@@ -544,7 +623,7 @@ impl AudioEngine {
     }
 
     pub fn current_volume(&self) -> f32 {
-        f32::from_bits(self.shared.volume.load(Ordering::Relaxed))
+        self.shared.current_volume()
     }
 
     /// The loudness multiplier in effect now (mid-ramp, the current step).
@@ -1656,9 +1735,9 @@ fn decode_thread(
                         shared.position.store(target_ns, Ordering::Relaxed);
                         continue;
                     }
-                    Ok(AudioCommand::SetVolume(vol)) => {
+                    Ok(AudioCommand::SyncHardwareVolume) => {
                         if let Some(out) = output.as_ref() {
-                            out.sink.set_hardware_volume(vol);
+                            out.sink.set_hardware_volume(shared.current_volume());
                         }
                         continue;
                     }
@@ -1687,9 +1766,9 @@ fn decode_thread(
                     let _ = event_tx.send(AudioEvent::Stopped);
                     continue 'main;
                 }
-                Ok(AudioCommand::SetVolume(vol)) => {
+                Ok(AudioCommand::SyncHardwareVolume) => {
                     if let Some(out) = output.as_ref() {
-                        out.sink.set_hardware_volume(vol);
+                        out.sink.set_hardware_volume(shared.current_volume());
                     }
                 }
                 // Pause/Resume/SeekTo/Preload target a track that hasn't
@@ -2248,8 +2327,8 @@ fn handle_decode_command(
             session.force_device_rebuild = true;
             CmdOutcome::Continue
         }
-        Ok(AudioCommand::SetVolume(vol)) => {
-            out.sink.set_hardware_volume(vol);
+        Ok(AudioCommand::SyncHardwareVolume) => {
+            out.sink.set_hardware_volume(shared.current_volume());
             CmdOutcome::Continue
         }
     }
@@ -2768,6 +2847,7 @@ mod tests {
         AudioShared {
             position: AtomicU64::new(0),
             volume: AtomicU32::new(1.0f32.to_bits()),
+            volume_ceiling: AtomicU32::new(1.0f32.to_bits()),
             open_source: Box::new(open_file),
             play_state: Mutex::new(EngineState::Playing),
             visualizer_buf: spectrum::AudioVisualizerBuffer::new(4096),
@@ -2824,6 +2904,45 @@ mod tests {
             let (a, b) = equal_power_gains(step as f32 / 100.0);
             assert!((a * a + b * b - 1.0).abs() < 1e-6, "p = {step}/100");
         }
+    }
+
+    #[test]
+    fn volume_never_exceeds_the_safety_ceiling() {
+        let shared = test_shared();
+        assert_eq!(shared.store_volume(0.9), 0.9, "no ceiling: any level");
+        assert_eq!(shared.store_volume(1.5), 1.0, "still clamped to 1.0");
+
+        // Setting a ceiling below the current level lowers it at once.
+        assert_eq!(shared.set_volume_ceiling(Some(0.7)), 0.7);
+        assert_eq!(shared.current_volume(), 0.7);
+
+        // A request above the ceiling sets the ceiling; below it is kept.
+        assert_eq!(shared.store_volume(0.95), 0.7);
+        assert_eq!(shared.store_volume(0.4), 0.4);
+
+        // Raising the ceiling doesn't raise the volume, nor does lifting it.
+        assert_eq!(shared.set_volume_ceiling(Some(0.9)), 0.4);
+        assert_eq!(shared.set_volume_ceiling(None), 0.4);
+        assert_eq!(shared.store_volume(1.0), 1.0, "lifted: full range again");
+    }
+
+    #[test]
+    fn external_volume_is_kept_under_the_ceiling_and_reported() {
+        let (tx, rx) = mpsc::channel();
+        let shared = AudioShared {
+            event_tx: tx,
+            ..test_shared()
+        };
+        shared.set_volume_ceiling(Some(0.6));
+
+        assert_eq!(shared.accept_external_volume(0.5), 0.5);
+        assert!(matches!(rx.try_recv(), Ok(AudioEvent::VolumeChanged(v)) if v == 0.5));
+
+        // A knob turned past the ceiling is held at it, and the held level is
+        // what the app hears about.
+        assert_eq!(shared.accept_external_volume(0.9), 0.6);
+        assert_eq!(shared.current_volume(), 0.6);
+        assert!(matches!(rx.try_recv(), Ok(AudioEvent::VolumeChanged(v)) if v == 0.6));
     }
 
     #[test]
