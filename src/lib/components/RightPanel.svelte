@@ -168,7 +168,7 @@
 <aside
   data-walkthrough-target="right-panel"
   style="width: {width}px;"
-  class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}"
+  class="relative flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {pinned ? `bg-brand-sidebar ${themeStore.isGlassTheme ? 'glass-surface' : ''}` : 'bg-transparent'}"
 >
   {#if onTogglePin}
     <button
@@ -343,9 +343,11 @@
     background: transparent;
   }
 
-  /* Nothing ever renders behind this panel but the flat bg-main canvas,
+  /* Docked, nothing renders behind this panel but the flat bg-main canvas,
      so it paints the glass result as a solid color instead of running a
-     backdrop-filter (see flatGlassColor() in theme.svelte.ts). */
+     backdrop-filter (see flatGlassColor() in theme.svelte.ts). Unpinned, it
+     floats over the content and RightPanelHost's overlay supplies the
+     acrylic, so the panel itself stays transparent. */
   aside.glass-surface {
     position: relative;
     -webkit-backdrop-filter: none !important;

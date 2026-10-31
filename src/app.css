@@ -286,9 +286,9 @@
  * - Chrome: large panels that content moves behind (player bar, detail
  *   headers, song table surfaces). A small blur, so what passes underneath
  *   still reads as shapes.
- * - Float: small surfaces that open over content (menus, popovers, selection
- *   toolbars). A large blur, so text behind a menu turns into soft colour
- *   instead of competing with the menu's own text.
+ * - Float: surfaces that open over content (menus, popovers, selection
+ *   toolbars, the unpinned info sidebar). A large blur, so text behind them
+ *   turns into soft colour instead of competing with their own text.
  *
  * Tints and opacities come from ThemeStore.applyGlassVars(). A surface whose
  * tint isn't the sidebar colour sets --acrylic-tint itself.
