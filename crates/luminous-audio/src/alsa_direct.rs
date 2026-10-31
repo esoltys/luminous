@@ -433,12 +433,15 @@ mod imp {
 
     impl Drop for AlsaSink {
         fn drop(&mut self) {
-            drop(self.mixer_controller.take());
             self.control.quit.store(true, Ordering::Release);
             self.render_thread.unpark();
             if let Some(thread) = self.thread.take() {
                 let _ = thread.join();
             }
+            // Only once the stream has stopped: restoring the element's
+            // earlier (often higher) level any sooner would play the last
+            // period at it.
+            drop(self.mixer_controller.take());
         }
     }
 

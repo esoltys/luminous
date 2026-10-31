@@ -3672,6 +3672,7 @@ dependencies = [
  "symphonia",
  "symphonia-adapter-libopus",
  "windows",
+ "windows-core 0.62.2",
  "zbus",
 ]
 
