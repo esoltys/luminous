@@ -12,7 +12,7 @@
 //! mount results arrive in the polling thread's own main context, iterated
 //! at each poll; the GTK main loop is never touched.
 
-use super::{Found, Spool, StorageInfo, Transport, UsbInfo};
+use super::{copy_exactly, Found, Spool, StorageInfo, Transport, UsbInfo};
 use crate::backend::cancelled;
 use crate::{DirEntry, Progress, Space};
 use gio::glib;
@@ -197,29 +197,17 @@ impl GvfsDevice {
             Err(e) if e.matches(gio::IOErrorEnum::NotSupported) => return Ok(false),
             Err(e) => return Err(io_error(e)),
         };
-        let mut buffer = vec![0u8; 256 * 1024];
-        let mut written = 0u64;
-        loop {
-            let n = match source.read(&mut buffer) {
-                Ok(0) => break,
-                Ok(n) => n,
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
-                Err(e) => return Err(e),
-            };
-            stream
-                .write_all(&buffer[..n], None::<&gio::Cancellable>)
-                .map_err(io_error)?;
-            written += n as u64;
-            if progress(written).is_break() {
-                return Err(cancelled());
-            }
-        }
-        if written != len {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                format!("expected {len} bytes, read {written}"),
-            ));
-        }
+        copy_exactly(
+            source,
+            len,
+            |chunk| {
+                stream
+                    .write_all(chunk, None::<&gio::Cancellable>)
+                    .map(drop)
+                    .map_err(io_error)
+            },
+            progress,
+        )?;
         stream.close(None::<&gio::Cancellable>).map_err(io_error)?;
         Ok(true)
     }

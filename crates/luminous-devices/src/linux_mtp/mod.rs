@@ -116,6 +116,8 @@ impl Watcher {
         self.known
             .retain(|key, _| found.iter().any(|f| &f.key == key));
         let mut devices: Vec<crate::Device> = Vec::new();
+        // A device already known keeps its connection (lock, caches); the
+        // transport just found for it, which did no I/O, is dropped.
         for f in found {
             let handle = self
                 .known
@@ -599,31 +601,50 @@ impl Spool {
     /// cancel between chunks.
     fn fill(source: &mut dyn Read, len: u64, progress: Progress<'_>) -> io::Result<Self> {
         let mut spool = Self::new()?;
-        let mut buffer = vec![0u8; 256 * 1024];
-        let mut copied = 0u64;
-        loop {
-            let n = match source.read(&mut buffer) {
-                Ok(0) => break,
-                Ok(n) => n,
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
-                Err(e) => return Err(e),
-            };
-            spool.file.write_all(&buffer[..n])?;
-            copied += n as u64;
-            if progress(0).is_break() {
-                return Err(cancelled());
-            }
-        }
-        if copied != len {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                format!("expected {len} bytes, read {copied}"),
-            ));
-        }
+        copy_exactly(
+            source,
+            len,
+            |chunk| spool.file.write_all(chunk),
+            &mut |_| progress(0),
+        )?;
         spool.file.flush()?;
         spool.file.rewind()?;
         Ok(spool)
     }
+}
+
+/// Copies exactly `len` bytes from `source` to `sink`, telling `progress`
+/// how many have been copied after each chunk. Fails with
+/// [`io::ErrorKind::Interrupted`] when `progress` cancels, and with
+/// [`io::ErrorKind::UnexpectedEof`] when `source` holds fewer or more bytes.
+fn copy_exactly(
+    source: &mut dyn Read,
+    len: u64,
+    mut sink: impl FnMut(&[u8]) -> io::Result<()>,
+    progress: Progress<'_>,
+) -> io::Result<()> {
+    let mut buffer = vec![0u8; 256 * 1024];
+    let mut copied = 0u64;
+    loop {
+        let n = match source.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(n) => n,
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+        sink(&buffer[..n])?;
+        copied += n as u64;
+        if progress(copied).is_break() {
+            return Err(cancelled());
+        }
+    }
+    if copied != len {
+        return Err(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            format!("expected {len} bytes, read {copied}"),
+        ));
+    }
+    Ok(())
 }
 
 impl Drop for Spool {

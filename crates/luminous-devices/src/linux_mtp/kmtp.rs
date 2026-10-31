@@ -5,7 +5,9 @@
 //! exactly. Transfers go through a file descriptor and return at once; the
 //! storage then signals `copyProgress` and `copyFinished`. A transfer cannot
 //! be cancelled once it has started, so a cancel takes effect when the file
-//! is complete and the caller removes it.
+//! is complete and the caller removes it. The signals name the storage, not
+//! the transfer: a copy another program (Dolphin) makes on the same storage
+//! at the same moment would show in Luminous's progress.
 
 use super::{Found, Spool, StorageInfo, Transport, UsbInfo};
 use crate::backend::cancelled;
@@ -18,7 +20,7 @@ use std::time::Duration;
 use zbus::blocking::{fdo::DBusProxy, Connection, MessageIterator, Proxy};
 use zbus::message::Type as MessageType;
 use zbus::proxy::CacheProperties;
-use zbus::zvariant::{Fd, OwnedObjectPath, OwnedValue};
+use zbus::zvariant::{Fd, OwnedObjectPath};
 use zbus::MatchRule;
 
 const SERVICE: &str = "org.kde.kmtpd5";
@@ -112,14 +114,14 @@ fn sysfs_dir(udi: &str) -> PathBuf {
 
 /// A proxy that never caches properties: kmtpd refreshes free space only
 /// when it is read.
-fn proxy<'a>(
+fn proxy(
     connection: &Connection,
-    path: &'a str,
-    interface: &'a str,
-) -> zbus::Result<Proxy<'a>> {
+    path: &str,
+    interface: &'static str,
+) -> zbus::Result<Proxy<'static>> {
     zbus::blocking::proxy::Builder::new(connection)
         .destination(SERVICE)?
-        .path(path)?
+        .path(OwnedObjectPath::try_from(path.to_string())?)?
         .interface(interface)?
         .cache_properties(CacheProperties::No)
         .build()
@@ -148,15 +150,7 @@ fn device_path(path: &[String]) -> String {
 
 impl KmtpDevice {
     fn storage(&self, storage: &str) -> io::Result<Proxy<'static>> {
-        let path =
-            OwnedObjectPath::try_from(storage.to_string()).map_err(|e| dbus_error(e.into()))?;
-        zbus::blocking::proxy::Builder::new(&self.connection)
-            .destination(SERVICE)
-            .and_then(|b| b.path(path))
-            .and_then(|b| b.interface(STORAGE))
-            .map(|b| b.cache_properties(CacheProperties::No))
-            .and_then(|b| b.build())
-            .map_err(dbus_error)
+        proxy(&self.connection, storage, STORAGE).map_err(dbus_error)
     }
 
     /// Starts a transfer with `start` and waits for the storage to finish
@@ -193,11 +187,7 @@ impl KmtpDevice {
                 }
             })?;
 
-        let storage = KmtpDevice {
-            connection,
-            device: self.device.clone(),
-        }
-        .storage(storage)?;
+        let storage = proxy(&connection, storage, STORAGE).map_err(dbus_error)?;
         check(
             start(&storage).map_err(dbus_error)?,
             "starting the transfer",
@@ -232,22 +222,19 @@ impl Transport for KmtpDevice {
         let paths: Vec<OwnedObjectPath> = device.call("listStorages", &()).map_err(dbus_error)?;
         let mut storages = Vec::new();
         for path in paths {
-            let storage = self.storage(path.as_str())?;
-            let number = |name: &str| -> u64 {
-                storage
-                    .get_property::<OwnedValue>(name)
-                    .ok()
-                    .and_then(|v| u64::try_from(v).ok())
-                    .unwrap_or(0)
-            };
+            let space = self.space(path.as_str()).unwrap_or(Space {
+                total_bytes: 0,
+                free_bytes: 0,
+            });
             storages.push(StorageInfo {
-                name: storage
+                name: self
+                    .storage(path.as_str())?
                     .get_property::<String>("description")
                     .ok()
                     .filter(|d| !d.trim().is_empty())
                     .unwrap_or_else(|| "Storage".to_string()),
-                total_bytes: number("maxCapacity"),
-                free_bytes: number("freeSpaceInBytes"),
+                total_bytes: space.total_bytes,
+                free_bytes: space.free_bytes,
                 // kmtpd does not expose the storage's access capability;
                 // like WPD, a storage that does not say is taken as writable.
                 writable: true,
@@ -360,13 +347,11 @@ impl Transport for KmtpDevice {
 
     fn space(&self, storage: &str) -> io::Result<Space> {
         let storage = self.storage(storage)?;
-        let number = |name: &str| -> io::Result<u64> {
-            let value: OwnedValue = storage.get_property(name).map_err(dbus_error)?;
-            u64::try_from(value).map_err(|e| dbus_error(e.into()))
-        };
         Ok(Space {
-            total_bytes: number("maxCapacity")?,
-            free_bytes: number("freeSpaceInBytes")?,
+            total_bytes: storage.get_property("maxCapacity").map_err(dbus_error)?,
+            free_bytes: storage
+                .get_property("freeSpaceInBytes")
+                .map_err(dbus_error)?,
         })
     }
 
