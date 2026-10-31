@@ -132,7 +132,11 @@
         {@const name = deviceName(device)}
         <div class="flex items-center gap-1" data-testid="sidebar-device">
           <button
-            onclick={() => navigationStore.viewDevice(device.id, navigationStore.filesLocation?.deviceTab)}
+            onclick={() => {
+              navigationStore.viewDevice(device.id, navigationStore.filesLocation?.deviceTab);
+              // A running sync's progress comes back with its device.
+              if (fraction !== null) devicesStore.showProgress();
+            }}
             class="flex-1 min-w-0 flex items-start gap-2 px-2.5 py-1.5 rounded-md text-xs text-left transition-colors {open ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <Icon class="w-3.5 h-3.5 icon-align shrink-0 mt-px" />

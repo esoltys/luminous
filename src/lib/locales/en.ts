@@ -268,6 +268,7 @@ export const en = {
     songsOf: "{done} of {total} songs",
     bytesOf: "{done} of {total}",
     hideProgress: "Hide sync progress",
+    showProgress: "Show sync progress",
     stepRemoving: "Removing songs",
     stepConverting: "Converting {song} to {target}",
     stepCopying: "Copying {song}",

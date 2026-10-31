@@ -300,6 +300,7 @@ export const ru = {
     songsOf: "{done} из {total} песен",
     bytesOf: "{done} из {total}",
     hideProgress: "Скрыть ход синхронизации",
+    showProgress: "Показать ход синхронизации",
     stepRemoving: "Удаление песен",
     stepConverting: "Преобразование «{song}» в {target}",
     stepCopying: "Копирование «{song}»",

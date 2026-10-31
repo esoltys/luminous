@@ -268,6 +268,7 @@ export const it = {
     songsOf: "{done} di {total} brani",
     bytesOf: "{done} di {total}",
     hideProgress: "Nascondi l'avanzamento",
+    showProgress: "Mostra l'avanzamento",
     stepRemoving: "Rimozione dei brani",
     stepConverting: "Conversione di {song} in {target}",
     stepCopying: "Copia di {song}",

@@ -300,6 +300,7 @@ export const uk = {
     songsOf: "{done} з {total} пісень",
     bytesOf: "{done} з {total}",
     hideProgress: "Сховати хід синхронізації",
+    showProgress: "Показати хід синхронізації",
     stepRemoving: "Видалення пісень",
     stepConverting: "Перетворення «{song}» на {target}",
     stepCopying: "Копіювання «{song}»",

@@ -118,6 +118,11 @@ class DevicesStore {
     }
   }
 
+  /** Brings the progress drawer back after it was hidden. */
+  showProgress() {
+    this.drawerHidden = false;
+  }
+
   /** Asks the device's sync to stop; `device-sync-finished` follows. */
   async stopSync(id: string) {
     try {

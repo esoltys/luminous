@@ -93,6 +93,12 @@ describe("devicesStore", () => {
     expect(show).toHaveBeenCalledWith("Sync to Walkman complete, but 2 songs couldn't be copied.", "warning");
   });
 
+  it("brings the progress drawer back after it was hidden", () => {
+    devicesStore.drawerHidden = true;
+    devicesStore.showProgress();
+    expect(devicesStore.drawerHidden).toBe(false);
+  });
+
   it("says why a device can't be ejected", async () => {
     const show = vi.spyOn(toastStore, "show");
     ejectError = "device-in-use";

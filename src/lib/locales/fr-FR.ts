@@ -274,6 +274,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     songsOf: "{done} chansons sur {total}",
     bytesOf: "{done} sur {total}",
     hideProgress: "Masquer la progression",
+    showProgress: "Afficher la progression",
     stepRemoving: "Retrait des chansons",
     stepConverting: "Conversion de {song} en {target}",
     stepCopying: "Copie de {song}",

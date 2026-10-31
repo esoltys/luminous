@@ -268,6 +268,7 @@ export const es = {
     songsOf: "{done} de {total} canciones",
     bytesOf: "{done} de {total}",
     hideProgress: "Ocultar el progreso",
+    showProgress: "Mostrar el progreso",
     stepRemoving: "Quitando canciones",
     stepConverting: "Convirtiendo {song} a {target}",
     stepCopying: "Copiando {song}",

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ArrowsClockwiseIcon, CheckIcon, EjectIcon, PencilSimpleIcon, PlayIcon, StopIcon, XIcon } from "phosphor-svelte";
+  import { ArrowsClockwiseIcon, CaretUpIcon, CheckIcon, EjectIcon, PencilSimpleIcon, PlayIcon, StopIcon, XIcon } from "phosphor-svelte";
   import { navigationStore, type DeviceTab } from "../../stores/navigation.svelte";
   import { devicesStore } from "../../stores/devices.svelte";
   import { playerStore } from "../../stores/player.svelte";
@@ -229,6 +229,12 @@
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
+        {#if syncing && devicesStore.drawerHidden}
+          <Button onclick={() => devicesStore.showProgress()}>
+            <CaretUpIcon class="w-4 h-4" />
+            {i18n.t("devices.showProgress")}
+          </Button>
+        {/if}
         {#if syncing}
           <Button onclick={() => devicesStore.stopSync(device.id)}>
             <StopIcon weight="fill" class="w-4 h-4" />
