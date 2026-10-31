@@ -4,8 +4,9 @@
 //! carries that profile between computers, and safe eject.
 //!
 //! Mass-storage volumes are supported on Windows and Linux (udisks2), MTP
-//! players and phones on Windows (Windows Portable Devices; Linux is #1845).
-//! Other platforms compile but see no devices.
+//! players and phones on Windows (Windows Portable Devices) and Linux (the
+//! desktop's gvfs or kio-mtp daemon, #1845). Other platforms compile but see
+//! no devices.
 
 mod backend;
 mod marker;
@@ -14,6 +15,8 @@ mod profile;
 
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "linux")]
+mod linux_mtp;
 #[cfg(not(any(windows, target_os = "linux")))]
 mod unsupported;
 #[cfg(windows)]
@@ -27,6 +30,11 @@ use linux as platform;
 use unsupported as platform;
 #[cfg(windows)]
 use windows as platform;
+
+#[cfg(target_os = "linux")]
+use linux_mtp as mtp;
+#[cfg(windows)]
+use windows_mtp as mtp;
 
 pub use backend::{is_partial_file, DeviceBackend, DirEntry, FsBackend, Progress, Space};
 pub use marker::{Marker, MARKER_FILE_NAME};
@@ -112,8 +120,8 @@ pub struct Storage {
 #[derive(Debug, Clone, PartialEq)]
 enum Access {
     Volume(Volume),
-    #[cfg(windows)]
-    Mtp(windows_mtp::Handle),
+    #[cfg(any(windows, target_os = "linux"))]
+    Mtp(mtp::Handle),
 }
 
 impl Device {
@@ -146,7 +154,7 @@ impl Device {
             Access::Volume(volume) => {
                 (self.storages[0].id == id).then(|| boxed(FsBackend::new(&volume.mount_path)))
             }
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "linux"))]
             Access::Mtp(handle) => self
                 .storages
                 .iter()
@@ -195,7 +203,7 @@ impl Device {
     pub fn contains(&self, path: &str) -> bool {
         match &self.access {
             Access::Volume(volume) => volume.contains(path),
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "linux"))]
             Access::Mtp(_) => false,
         }
     }
@@ -208,7 +216,7 @@ impl Device {
     pub fn eject(&self) -> Result<(), EjectError> {
         match &self.access {
             Access::Volume(volume) => platform::eject(volume),
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "linux"))]
             Access::Mtp(handle) => {
                 handle.eject();
                 Ok(())
@@ -312,16 +320,16 @@ impl std::error::Error for EjectError {}
 /// thread.
 pub struct DeviceWatcher {
     volumes: platform::Watcher,
-    #[cfg(windows)]
-    mtp: windows_mtp::Watcher,
+    #[cfg(any(windows, target_os = "linux"))]
+    mtp: mtp::Watcher,
 }
 
 impl DeviceWatcher {
     pub fn new() -> Self {
         Self {
             volumes: platform::Watcher::new(),
-            #[cfg(windows)]
-            mtp: windows_mtp::Watcher::new(),
+            #[cfg(any(windows, target_os = "linux"))]
+            mtp: mtp::Watcher::new(),
         }
     }
 
@@ -333,7 +341,7 @@ impl DeviceWatcher {
         volumes.sort_by(|a, b| a.mount_path.cmp(&b.mount_path));
         #[allow(unused_mut)]
         let mut devices: Vec<Device> = volumes.into_iter().map(Device::from_volume).collect();
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         {
             let mut mtp = self.mtp.poll();
             mtp.sort_by(|a, b| a.provisional_id.cmp(&b.provisional_id));

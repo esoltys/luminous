@@ -34,6 +34,22 @@ pub(crate) fn model_name(vendor: Option<&str>, model: Option<&str>) -> Option<St
     (!words.is_empty()).then(|| words.join(" "))
 }
 
+/// `mtp-<serial>` for an MTP device, the same on every computer, or an id
+/// derived from `fallback` (a Plug and Play id, a URI host) when the device
+/// reports no serial.
+pub(crate) fn mtp_provisional_id(serial: Option<&str>, fallback: &str) -> String {
+    let clean = |s: &str| -> String {
+        s.chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+            .collect::<String>()
+            .to_ascii_uppercase()
+    };
+    match serial.map(clean).filter(|s| !s.is_empty()) {
+        Some(serial) => format!("mtp-{serial}"),
+        None => format!("mtp-{}", clean(fallback)),
+    }
+}
+
 pub(crate) fn default_name(volume: &Volume) -> String {
     if let Some(label) = volume
         .label
@@ -150,5 +166,14 @@ mod tests {
         let mut v = volume(None, None, None, "E:\\");
         v.serial = Some("0088-55ab".into());
         assert_eq!(v.provisional_id(), "vol-0088-55AB");
+    }
+
+    #[test]
+    fn mtp_provisional_id_prefers_the_serial() {
+        assert_eq!(mtp_provisional_id(Some(" 5a2b6c1d "), "x"), "mtp-5A2B6C1D");
+        assert_eq!(
+            mtp_provisional_id(Some(""), r"\\?\usb#vid_054c&pid_0d9a#5a2b"),
+            "mtp-USBVID_054CPID_0D9A5A2B"
+        );
     }
 }

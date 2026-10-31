@@ -3679,6 +3679,7 @@ dependencies = [
 name = "luminous-devices"
 version = "0.1.0"
 dependencies = [
+ "gio",
  "libc",
  "log",
  "parking_lot",

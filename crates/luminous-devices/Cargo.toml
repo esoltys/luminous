@@ -37,6 +37,9 @@ libc = "0.2"
 # udisks2 over D-Bus: the same pure-Rust client and runtime src-tauri's MPRIS
 # integration uses, through its blocking API (zbus runs its own Tokio runtime).
 zbus = { version = "5", default-features = false, features = ["tokio", "blocking-api"] }
+# MTP through gvfs (#1845): the GIO already in the tree through Tauri's GTK
+# stack, so the Flatpak builds no new C library.
+gio = "0.18"
 
 [dev-dependencies]
 tempfile = "3"
