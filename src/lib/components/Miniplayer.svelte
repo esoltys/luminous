@@ -157,10 +157,6 @@
     }
   }
 
-  // backdrop-filter fallback for webviews without GPU compositing — see
-  // ThemeStore.gpuCompositing.
-  let noBackdrop = $derived(themeStore.gpuCompositing === false);
-
   function handleStartDrag(e: PointerEvent) {
     invoke("start_window_drag").catch(() => {});
   }
@@ -354,7 +350,7 @@
   onpointerleave={hideHover}
   onmouseleave={hideHover}
   tabindex="0"
-  class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''} {noBackdrop ? 'no-backdrop' : ''}"
+  class="miniplayer-surface group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
   <!-- Edge and Corner Resize Handles for Frameless Window -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -617,7 +613,7 @@
       onpointerenter={showHover}
       onpointermove={showHover}
     onpointerleave={hideHover}
-    class="absolute inset-0 z-30 flex flex-col justify-between p-3 transition-opacity duration-200 {isHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'} {noBackdrop ? 'bg-brand-main' : 'bg-brand-main/85 backdrop-blur-md'}"
+    class="absolute inset-0 z-30 flex flex-col justify-between p-3 transition-opacity duration-200 {isHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'} hover-mask bg-brand-main/85 backdrop-blur-md"
   >
     <div
       data-tauri-drag-region
@@ -774,17 +770,24 @@
 
 <style>
   :global(.glass-surface) {
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: var(--acrylic-chrome-filter);
+    backdrop-filter: var(--acrylic-chrome-filter);
   }
 
   /* backdrop-filter doesn't render without GPU compositing (WebKitGTK with
-     its GPU rendering disabled by env var), leaving the panel see-through instead of frosted — same
-     fallback as PlayerBar's footer.no-backdrop. */
-  :global(.glass-surface.no-backdrop) {
+     its GPU rendering disabled by env var; ThemeStore.gpuCompositing sets the
+     root class), leaving the panel and its hover controls see-through instead
+     of frosted, so both go opaque. */
+  :global(:root.no-gpu-compositing) .miniplayer-surface {
     background-color: var(--bg-main, #191918) !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
+  }
+
+  :global(:root.no-gpu-compositing) .hover-mask {
+    background-color: var(--color-brand-main);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   /* Grabber texture: a repeating dot pattern spanning the full drag region,

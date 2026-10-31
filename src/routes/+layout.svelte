@@ -595,7 +595,7 @@
        itself, which the window-level listener in onMount handles. -->
   {#if isDragActive}
     <div
-      class="absolute inset-0 z-[100] flex items-center justify-center bg-brand-main/85 backdrop-blur-sm border-4 border-dashed border-brand-accent pointer-events-none select-none"
+      class="absolute inset-0 z-[100] flex items-center justify-center acrylic-scrim [--acrylic-tint:var(--color-brand-main)] border-4 border-dashed border-brand-accent pointer-events-none select-none"
       transition:fly={{ duration: 150 }}
     >
       <div class="flex flex-col items-center gap-3 text-center px-8">

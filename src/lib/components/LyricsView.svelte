@@ -306,7 +306,7 @@
 </script>
 
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
-  <div class="h-16 flex items-center justify-between gap-4 px-8 border-b border-brand-border bg-brand-main/40 backdrop-blur-md shrink-0">
+  <div class="h-16 flex items-center justify-between gap-4 px-8 border-b border-brand-border acrylic-chrome [--acrylic-tint:var(--color-brand-main)] shrink-0">
     <div class="flex items-center gap-3 min-w-0 flex-1">
       <Lyrics class="w-6 h-6 text-brand-accent-text shrink-0" />
       <div class="min-w-0">

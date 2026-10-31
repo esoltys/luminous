@@ -2,7 +2,6 @@
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
   import { inspectorStore } from "../stores/inspector.svelte";
-  import { themeStore } from "../stores/theme.svelte";
   import {
     MusicNotesIcon as Music,
     ArrowUUpLeftIcon as Return,
@@ -168,7 +167,7 @@
 <aside
   data-walkthrough-target="right-panel"
   style="width: {width}px;"
-  class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}"
+  class="relative flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden"
 >
   {#if onTogglePin}
     <button
@@ -341,18 +340,6 @@
 
   aside ::-webkit-scrollbar-track {
     background: transparent;
-  }
-
-  /* Nothing ever renders behind this panel but the flat bg-main canvas,
-     so it paints the glass result as a solid color instead of running a
-     backdrop-filter (see flatGlassColor() in theme.svelte.ts). */
-  aside.glass-surface {
-    position: relative;
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
-    background-color: var(--glass-solid-sidebar) !important;
-    border-color: var(--glass-border-color, var(--color-border)) !important;
-    box-shadow: var(--glass-shadow, none);
   }
 
   aside ::-webkit-scrollbar-thumb {

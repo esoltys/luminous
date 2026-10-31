@@ -277,32 +277,84 @@
   animation-timing-function: ease;
 }
 
-/* Glassmorphism utility classes */
-.glass {
-  background: rgba(17, 24, 39, 0.7);
-  -webkit-backdrop-filter: blur(12px) !important;
-  backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  /* Pin to its own GPU layer, same fix as .glass-surface (see below), so the
-     backdrop-filter is cached instead of re-rasterized on every composite
-     frame triggered elsewhere in the window. */
+/*
+ * Acrylic: the app's one translucent material, in two recipes picked by the
+ * surface's role rather than per component (#1894). Saturation is what makes
+ * it read as acrylic: blur alone greys out what shows through, saturate brings
+ * its colour back.
+ *
+ * - Chrome: large panels that content moves behind (player bar, detail
+ *   headers, song table surfaces). A small blur, so what passes underneath
+ *   still reads as shapes.
+ * - Float: surfaces that open over content (menus, popovers, selection
+ *   toolbars, the unpinned info sidebar). A large blur, so text behind them
+ *   turns into soft colour instead of competing with their own text.
+ *
+ * Tints and opacities come from ThemeStore.applyGlassVars(). A surface whose
+ * tint isn't the sidebar colour sets --acrylic-tint itself.
+ *
+ * Both pin themselves to their own GPU layer: a hover repaint inside the
+ * blurred region (song rows, menu items, a header toast portaled above)
+ * otherwise re-rasterizes the backdrop-filter against a stale frame, leaving
+ * a smeared or dark patch until something else forces a full repaint. That
+ * pinning (like backdrop-filter itself) makes the surface a Backdrop Root, so
+ * a translucent surface nested inside one can't sample what's behind it —
+ * nested popups stay opaque (see SongContextMenu's submenu).
+ */
+/* Not inherited, so a tint set on one surface never leaks into acrylic
+   nested inside it; an unset tint falls back to each recipe's default. */
+@property --acrylic-tint {
+  syntax: "*";
+  inherits: false;
+}
+
+:root {
+  /* flatGlassColor() reproduces this saturation (CHROME_SATURATION in
+     theme.svelte.ts) for the flattened sidebar, top nav and right panel;
+     themeStore.test.ts fails if the two disagree. */
+  --acrylic-chrome-filter: blur(20px) saturate(180%);
+  --acrylic-float-filter: blur(60px) saturate(200%);
+  --acrylic-scrim-filter: blur(8px);
+}
+
+.acrylic-chrome {
+  background-color: color-mix(in srgb, var(--acrylic-tint, var(--color-brand-sidebar)) var(--acrylic-chrome-opacity, 50%), transparent);
+  -webkit-backdrop-filter: var(--acrylic-chrome-filter);
+  backdrop-filter: var(--acrylic-chrome-filter);
   will-change: backdrop-filter;
   transform: translateZ(0);
 }
 
-.glass-premium {
-  background: linear-gradient(135deg, rgba(17, 24, 39, 0.8), rgba(11, 15, 25, 0.9));
-  -webkit-backdrop-filter: blur(20px) !important;
-  backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.acrylic-float {
+  background-color: color-mix(in srgb, var(--acrylic-tint, var(--color-brand-sidebar)) var(--acrylic-float-opacity, 70%), transparent);
+  -webkit-backdrop-filter: var(--acrylic-float-filter);
+  backdrop-filter: var(--acrylic-float-filter);
   will-change: backdrop-filter;
   transform: translateZ(0);
+}
+
+/* Without GPU compositing (WebKitGTK with GPU rendering disabled, see
+   ThemeStore.gpuCompositing) backdrop-filter doesn't render, and a
+   translucent menu over sharp text is unreadable, so floats go opaque.
+   Chrome surfaces sit over the already-blurred cover art, so they keep
+   their tint. */
+:root.no-gpu-compositing .acrylic-float {
+  background-color: var(--acrylic-tint, var(--color-brand-sidebar));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The dimmed layer behind a modal. Black unless the overlay sets
+   --acrylic-tint (the welcome screen and drop target dim toward the canvas). */
+.acrylic-scrim {
+  background-color: color-mix(in srgb, var(--acrylic-tint, black) 70%, transparent);
+  -webkit-backdrop-filter: var(--acrylic-scrim-filter);
+  backdrop-filter: var(--acrylic-scrim-filter);
 }
 
 /*
- * System auto-theme: frosted glass chrome panels (sidebar, player bar,
- * right panel, top nav). Applied conditionally via class:glass-surface,
- * only when the System theme is active.
+ * Chrome panels (sidebar, player bar, right panel, top nav) use the chrome
+ * recipe's filter with their own tint, edge highlight and elevation.
  *
  * The --glass-* custom properties are computed by ThemeStore.
  * applyActiveTheme() from the theme's own opaque hex colors (adding alpha
@@ -317,27 +369,10 @@
  */
 .glass-surface {
   position: relative;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: var(--acrylic-chrome-filter) !important;
+  backdrop-filter: var(--acrylic-chrome-filter) !important;
   border-color: var(--glass-border-color, var(--color-border));
   box-shadow: var(--glass-shadow, none);
-}
-
-/*
- * Song table surfaces (SongTable wrapper in PlaylistView, AutoPlaylistDetailView,
- * AlbumDetailView, ArtistDetailView) use a raw backdrop-blur-* Tailwind utility
- * rather than .glass/.glass-surface. Row hover triggers frequent repaints
- * (background-color + opacity transitions) inside that blurred region; without
- * pinning it to its own GPU layer the backdrop-filter can be re-rasterized
- * against a stale frame, leaving a smeared/blurred patch behind a hovered row
- * that doesn't clear until something else forces a full repaint.
- * The sticky detail headers (Album/Artist/AutoPlaylist) use it too: a hover
- * repaint in the header toast (portaled above them) re-rasterized their
- * backdrop-blur-md region stale, blanking the title block into a dark patch.
- */
-.table-surface-blur {
-  will-change: backdrop-filter;
-  transform: translateZ(0);
 }
 
 .bg-brand-sidebar.glass-surface,

@@ -17,7 +17,7 @@
 // SvelteKit build.
 //
 // The build's root is an empty temp folder, so Tailwind's class-name scan
-// (which starts at Vite's root) finds nothing. The `.glass*` rules under test
+// (which starts at Vite's root) finds nothing. The acrylic rules under test
 // are plain CSS in app.css and are emitted either way. Scanning the whole
 // project took this test 10-30s+ while the rest of the suite loaded every CPU,
 // and it timed out (#1528).
@@ -80,7 +80,7 @@ describe("production CSS build: backdrop-filter survives minification", () => {
     expect(builtCss.length).toBeGreaterThan(0);
   }, 30_000);
 
-  for (const selector of [".glass", ".glass-premium", ".glass-surface"]) {
+  for (const selector of [".glass-surface", ".acrylic-chrome", ".acrylic-float", ".acrylic-scrim"]) {
     it(`keeps both -webkit-backdrop-filter and backdrop-filter on ${selector} after minification`, () => {
       // Match every minified rule block for this selector — Tailwind/Vite may
       // emit more than one block per selector (e.g. an override rule later in
