@@ -70,6 +70,16 @@ via `flatpak-cargo-generator`, which works fine against `Cargo.lock`; JS via a v
   folders you pick — Luminous does not request broad `--filesystem=home` access.
 - Lyrics (LRCLIB, Lyrics.ovh), cover art (iTunes), and MusicBrainz lookups need network access,
   granted via `--share=network`.
+- Mass-storage players, USB drives and SD cards are found through udisks2
+  (`--system-talk-name=org.freedesktop.UDisks2`, which also unmounts and powers them off for
+  Eject) and read where udisks2 mounts them (`--filesystem=/run/media`, `--filesystem=/media`).
+  A drive mounted anywhere else is not visible to the sandbox.
+- MTP players and phones go through the desktop's own MTP daemon, never the USB device directly:
+  gvfs on GNOME (`--talk-name=org.gtk.vfs.*`) or kio-mtp's `kmtpd` on KDE
+  (`--talk-name=org.kde.kmtpd5`). The host must have `gvfs-mtp` or kio-extras installed; with
+  neither, MTP devices don't appear. Uploads the daemon reads from a file are staged in the app's
+  cache folder (`~/.var/app/org.luminous.music/cache/luminous-mtp/`), which the host sees at the
+  same path.
 
 ## Publishing (maintainers)
 

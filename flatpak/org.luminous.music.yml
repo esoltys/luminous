@@ -31,6 +31,13 @@ finish-args:
   - --filesystem=/run/media
   - --filesystem=/media
   - --system-talk-name=org.freedesktop.UDisks2
+  # MTP players and phones (#1845) go through the desktop's own MTP daemon:
+  # gvfs on GNOME, kio-mtp's kmtpd on KDE. Already covered by
+  # --socket=session-bus below; listed so the need is on record. Uploads the
+  # daemon reads from a file are staged in the app's cache folder, which the
+  # host sees at the same path, so no xdg-run/gvfs access is needed.
+  - --talk-name=org.gtk.vfs.*
+  - --talk-name=org.kde.kmtpd5
   - --talk-name=org.freedesktop.portal.Notification
   # MPRIS2 media-key/session integration (src-tauri/src/media_session/linux.rs)
   # registers its own well-known name on the session bus.
