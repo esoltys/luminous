@@ -1086,6 +1086,7 @@ fn chosen_device_missing(config: &AudioOutputConfig) -> bool {
         AudioBackendKind::Alsa => crate::alsa_direct::list_hw_devices()
             .iter()
             .any(|d| d.id == id),
+        // No ALSA on this platform, so nothing stands in for it.
         #[cfg(not(target_os = "linux"))]
         AudioBackendKind::Alsa => true,
         _ => find_output_device(&cpal::default_host(), id).is_some(),
@@ -1432,8 +1433,10 @@ fn build_output(
         name: device_name,
         stands_in,
     } = resolve_cpal_device(&host, output_cfg.shared_device_id())?;
-    // A fallback whose chosen device is still connected (in use, no usable
-    // format) isn't standing in: its device appearing wouldn't cure it.
+    // Shared output only looked for its own device. A bit-perfect fallback's
+    // chosen device may be on another backend's list (an ALSA `hw:` PCM), so
+    // ask that backend: one still connected (in use, no usable format) isn't
+    // standing in, since its device appearing wouldn't cure it.
     let stands_in = stands_in || (fallback.is_some() && chosen_device_missing(&output_cfg));
     let default_config = device
         .default_output_config()

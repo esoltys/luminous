@@ -333,7 +333,7 @@ mod tests {
     }
 
     #[test]
-    fn wasapi_endpoints_fall_back_on_the_chosen_endpoint() {
+    fn shared_and_wasapi_exclusive_fall_back_on_the_chosen_endpoint() {
         for backend in [AudioBackendKind::Cpal, AudioBackendKind::WasapiExclusive] {
             assert_eq!(config(backend, "dev").shared_device_id(), Some("dev"));
         }
