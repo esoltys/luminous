@@ -351,6 +351,8 @@ const IDENTICAL_OK_ES = new Set<string>([
 
 // Cognates, loanwords and technical terms Windows and the field also leave in English, plus brands, acronyms and symbols.
 const IDENTICAL_OK_DE = new Set<string>([
+  "devices.groupPlaylists", // Same word in this language
+  "devices.playlistsRow", // Same word in this language
   "settings.onlineLabel", // "Online" is the usual word in this language
   "settings.offlineLabel", // "Offline" is the usual word in this language
   "settings.textFilesFilter", // Same word in this language
