@@ -260,16 +260,41 @@ mod imp {
         }
     }
 
+    /// What an [`EndpointVolume`], its thread and its change listener share.
+    struct VolumeControl {
+        /// The master volume to write to the endpoint, as `f32` bits.
+        target: AtomicU32,
+        quit: AtomicBool,
+        wake: Event,
+    }
+
+    impl VolumeControl {
+        /// Asks the volume thread to write `volume` to the endpoint.
+        fn request(&self, volume: f32) {
+            self.target.store(volume.to_bits(), Ordering::Release);
+            self.signal();
+        }
+
+        fn target(&self) -> f32 {
+            f32::from_bits(self.target.load(Ordering::Acquire))
+        }
+
+        fn signal(&self) {
+            unsafe {
+                let _ = SetEvent(self.wake.0);
+            }
+        }
+    }
+
     /// The endpoint's hardware master volume, driven from a thread this owns
     /// (volume calls are cross-process, so they stay off the render thread,
     /// and the engine thread's COM apartment is unknown). While it lives,
     /// the engine's software gain is off; dropping it puts the endpoint's
     /// level and mute back as they were and turns software gain back on.
     struct EndpointVolume {
-        target: Arc<AtomicU32>,
-        wake: Arc<Event>,
-        quit: Arc<AtomicBool>,
+        control: Arc<VolumeControl>,
         thread: Option<JoinHandle<()>>,
+        shared: Arc<AudioShared>,
     }
 
     impl EndpointVolume {
@@ -278,84 +303,114 @@ mod imp {
         /// [`HardwareVolumeSupport::from_mask`]) or it can't be reached; the
         /// engine then keeps its software gain.
         fn open(endpoint_id: String, shared: &Arc<AudioShared>) -> Option<Self> {
-            let wake = Arc::new(Event::new().ok()?);
-            let quit = Arc::new(AtomicBool::new(false));
-            let target = Arc::new(AtomicU32::new(shared.current_volume().to_bits()));
+            let control = Arc::new(VolumeControl {
+                target: AtomicU32::new(shared.current_volume().to_bits()),
+                quit: AtomicBool::new(false),
+                wake: Event::new().ok()?,
+            });
             let (ready_tx, ready_rx) = mpsc::channel();
             let thread = {
-                let shared = Arc::clone(shared);
-                let (target, wake, quit) =
-                    (Arc::clone(&target), Arc::clone(&wake), Arc::clone(&quit));
+                let (shared, control) = (Arc::clone(shared), Arc::clone(&control));
                 std::thread::Builder::new()
                     .name("luminous-wasapi-volume".into())
                     .spawn(move || {
-                        endpoint_volume_thread(&endpoint_id, shared, target, wake, quit, ready_tx)
+                        endpoint_volume_thread(&endpoint_id, &shared, &control, ready_tx)
                     })
                     .ok()?
-            };
-            let this = Self {
-                target,
-                wake,
-                quit,
-                thread: Some(thread),
             };
             match ready_rx.recv_timeout(ENDPOINT_VOLUME_TIMEOUT) {
                 Ok(true) => {
                     shared.hardware_volume_active.store(true, Ordering::Release);
                     shared.output_hardware_volume.store(true, Ordering::Release);
-                    Some(this)
+                    Some(Self {
+                        control,
+                        thread: Some(thread),
+                        shared: Arc::clone(shared),
+                    })
                 }
-                Ok(false) => None,
+                Ok(false) => {
+                    let _ = thread.join();
+                    None
+                }
                 Err(_) => {
                     log::warn!("Timed out taking over the endpoint volume; using software gain");
-                    // Leave the thread to exit on its own once its call returns.
-                    let mut this = this;
-                    this.thread = None;
+                    // The thread puts the endpoint back and exits once its
+                    // call returns.
+                    control.quit.store(true, Ordering::Release);
+                    control.signal();
                     None
                 }
             }
         }
 
         fn set_volume(&self, volume: f32) {
-            self.target.store(volume.to_bits(), Ordering::Release);
-            unsafe {
-                let _ = SetEvent(self.wake.0);
-            }
+            self.control.request(volume);
         }
     }
 
     impl Drop for EndpointVolume {
         fn drop(&mut self) {
-            self.quit.store(true, Ordering::Release);
-            unsafe {
-                let _ = SetEvent(self.wake.0);
-            }
+            self.control.quit.store(true, Ordering::Release);
+            self.control.signal();
             if let Some(thread) = self.thread.take() {
                 let _ = thread.join();
             }
+            self.shared
+                .hardware_volume_active
+                .store(false, Ordering::Release);
+            self.shared
+                .output_hardware_volume
+                .store(false, Ordering::Release);
         }
     }
 
-    /// Owns the endpoint's `IAudioEndpointVolume` for an [`EndpointVolume`]:
-    /// reports on `ready` whether it took over, then writes `target` each
-    /// time `wake` is signalled, until `quit`.
+    /// Runs an [`EndpointVolume`]: reports on `ready` whether the endpoint
+    /// has hardware volume and, if it does, writes `control`'s target to it
+    /// on each signal until `quit`, then puts the endpoint back.
     fn endpoint_volume_thread(
         endpoint_id: &str,
-        shared: Arc<AudioShared>,
-        target: Arc<AtomicU32>,
-        wake: Arc<Event>,
-        quit: Arc<AtomicBool>,
+        shared: &Arc<AudioShared>,
+        control: &Arc<VolumeControl>,
         ready: mpsc::Sender<bool>,
     ) {
         let com = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
         // Scoped so every COM object is released before CoUninitialize.
         {
-            match unsafe { activate_endpoint_volume(endpoint_id) } {
+            match unsafe { HardwareEndpoint::open(endpoint_id) } {
                 None => {
                     let _ = ready.send(false);
                 }
-                Some((endpoint, support)) => unsafe {
-                    drive_endpoint_volume(&endpoint, support, &shared, &target, &wake, &quit, ready)
+                // `open` gave up waiting: leave the endpoint alone.
+                Some(_) if control.quit.load(Ordering::Acquire) => {}
+                Some(endpoint) => unsafe {
+                    // Set before the stream can start, so nothing plays at
+                    // the level Windows was left at.
+                    endpoint.write(control.target());
+                    let listener: IAudioEndpointVolumeCallback = ExternalVolumeListener {
+                        shared: Arc::clone(shared),
+                        control: Arc::clone(control),
+                    }
+                    .into();
+                    let listening = endpoint
+                        .volume
+                        .RegisterControlChangeNotify(&listener)
+                        .is_ok();
+                    if !listening {
+                        log::warn!("Endpoint volume change notifications unavailable");
+                    }
+                    let _ = ready.send(true);
+                    while !control.quit.load(Ordering::Acquire) {
+                        WaitForSingleObject(control.wake.0, INFINITE);
+                        if !control.quit.load(Ordering::Acquire) {
+                            endpoint.write(control.target());
+                        }
+                    }
+                    // Stop listening first, so the restore isn't taken for an
+                    // external change.
+                    if listening {
+                        let _ = endpoint.volume.UnregisterControlChangeNotify(&listener);
+                    }
+                    endpoint.restore();
                 },
             }
         }
@@ -364,115 +419,84 @@ mod imp {
         }
     }
 
-    /// The endpoint's volume control, if it works in hardware.
-    unsafe fn activate_endpoint_volume(
-        endpoint_id: &str,
-    ) -> Option<(IAudioEndpointVolume, HardwareVolumeSupport)> {
-        let unusable = |context: &str, e: Error| {
-            log::info!("No endpoint hardware volume ({context}: {e}); using software gain");
-        };
-        let enumerator: IMMDeviceEnumerator =
-            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
-                .map_err(|e| unusable("device enumerator", e))
-                .ok()?;
-        let device = enumerator
-            .GetDevice(&HSTRING::from(endpoint_id))
-            .map_err(|e| unusable("endpoint lookup", e))
-            .ok()?;
-        let endpoint: IAudioEndpointVolume = device
-            .Activate(CLSCTX_ALL, None)
-            .map_err(|e| unusable("activate", e))
-            .ok()?;
-        let mask = endpoint
-            .QueryHardwareSupport()
-            .map_err(|e| unusable("QueryHardwareSupport", e))
-            .ok()?;
-        let Some(support) = HardwareVolumeSupport::from_mask(mask) else {
-            log::info!(
-                "Endpoint volume is not in hardware (support mask {mask:#x}); using software gain"
-            );
-            return None;
-        };
-        Some((endpoint, support))
+    /// Passed with every endpoint write, marking it as Luminous's own.
+    const OWN_CHANGE: GUID = GUID::from_u128(LUMINOUS_EVENT_CONTEXT);
+
+    /// An endpoint whose volume works in hardware, with the level and mute
+    /// it had when opened.
+    struct HardwareEndpoint {
+        volume: IAudioEndpointVolume,
+        support: HardwareVolumeSupport,
+        saved_level: Option<f32>,
+        saved_mute: Option<bool>,
     }
 
-    unsafe fn drive_endpoint_volume(
-        endpoint: &IAudioEndpointVolume,
-        support: HardwareVolumeSupport,
-        shared: &Arc<AudioShared>,
-        target: &Arc<AtomicU32>,
-        wake: &Arc<Event>,
-        quit: &AtomicBool,
-        ready: mpsc::Sender<bool>,
-    ) {
-        let context = GUID::from_u128(LUMINOUS_EVENT_CONTEXT);
-        let saved_level = endpoint.GetMasterVolumeLevelScalar().ok();
-        let saved_mute = if support.mute {
-            endpoint.GetMute().ok().map(|m| m.as_bool())
-        } else {
-            None
-        };
-        let write = |volume: f32| match endpoint_setting(volume, support) {
-            EndpointSetting::Mute => {
-                let _ = endpoint.SetMute(true, &context);
-            }
-            EndpointSetting::Level { level, unmute } => {
-                let _ = endpoint.SetMasterVolumeLevelScalar(level, &context);
-                if unmute {
-                    let _ = endpoint.SetMute(false, &context);
+    impl HardwareEndpoint {
+        /// `None` when the endpoint can't be reached or its volume is not in
+        /// hardware.
+        unsafe fn open(endpoint_id: &str) -> Option<Self> {
+            let unusable = |context: &str, e: Error| {
+                log::info!("No endpoint hardware volume ({context}: {e}); using software gain");
+            };
+            let enumerator: IMMDeviceEnumerator =
+                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+                    .map_err(|e| unusable("device enumerator", e))
+                    .ok()?;
+            let device = enumerator
+                .GetDevice(&HSTRING::from(endpoint_id))
+                .map_err(|e| unusable("endpoint lookup", e))
+                .ok()?;
+            let volume: IAudioEndpointVolume = device
+                .Activate(CLSCTX_ALL, None)
+                .map_err(|e| unusable("activate", e))
+                .ok()?;
+            let mask = volume
+                .QueryHardwareSupport()
+                .map_err(|e| unusable("QueryHardwareSupport", e))
+                .ok()?;
+            let Some(support) = HardwareVolumeSupport::from_mask(mask) else {
+                log::info!(
+                    "Endpoint volume is not in hardware (support mask {mask:#x}); using software gain"
+                );
+                return None;
+            };
+            let saved_level = volume.GetMasterVolumeLevelScalar().ok();
+            let saved_mute = if support.mute {
+                volume.GetMute().ok().map(|m| m.as_bool())
+            } else {
+                None
+            };
+            Some(Self {
+                volume,
+                support,
+                saved_level,
+                saved_mute,
+            })
+        }
+
+        /// Sets the endpoint for master volume `vol` (see [`endpoint_setting`]).
+        unsafe fn write(&self, vol: f32) {
+            match endpoint_setting(vol, self.support) {
+                EndpointSetting::Mute => {
+                    let _ = self.volume.SetMute(true, &OWN_CHANGE);
+                }
+                EndpointSetting::Level { level, unmute } => {
+                    let _ = self.volume.SetMasterVolumeLevelScalar(level, &OWN_CHANGE);
+                    if unmute {
+                        let _ = self.volume.SetMute(false, &OWN_CHANGE);
+                    }
                 }
             }
-        };
-        // `open` gave up waiting: leave the endpoint alone.
-        if quit.load(Ordering::Acquire) {
-            return;
-        }
-        // Set before the stream can start, so nothing plays at the level
-        // Windows was left at.
-        write(f32::from_bits(target.load(Ordering::Acquire)));
-
-        let listener: IAudioEndpointVolumeCallback = ExternalVolumeListener {
-            shared: Arc::clone(shared),
-            target: Arc::clone(target),
-            wake: Arc::clone(wake),
-        }
-        .into();
-        let listening = endpoint.RegisterControlChangeNotify(&listener).is_ok();
-        if !listening {
-            log::warn!("Endpoint volume change notifications unavailable");
         }
 
-        // Fails when `open` gave up waiting after the check above.
-        let took_over = ready.send(true).is_ok();
-        if took_over {
-            loop {
-                WaitForSingleObject(wake.0, INFINITE);
-                if quit.load(Ordering::Acquire) {
-                    break;
-                }
-                write(f32::from_bits(target.load(Ordering::Acquire)));
+        /// Puts back the level and mute the endpoint had when opened.
+        unsafe fn restore(&self) {
+            if let Some(level) = self.saved_level {
+                let _ = self.volume.SetMasterVolumeLevelScalar(level, &OWN_CHANGE);
             }
-        }
-
-        // Stop listening first, so the restore isn't taken for an external change.
-        if listening {
-            let _ = endpoint.UnregisterControlChangeNotify(&listener);
-        }
-        if let Some(level) = saved_level {
-            let _ = endpoint.SetMasterVolumeLevelScalar(level, &context);
-        }
-        if let Some(muted) = saved_mute {
-            let _ = endpoint.SetMute(muted, &context);
-        }
-        // Only `open` set these, and only when it took the hand-off; a
-        // straggler clearing them could undo a newer sink's.
-        if took_over {
-            shared
-                .hardware_volume_active
-                .store(false, Ordering::Release);
-            shared
-                .output_hardware_volume
-                .store(false, Ordering::Release);
+            if let Some(muted) = self.saved_mute {
+                let _ = self.volume.SetMute(muted, &OWN_CHANGE);
+            }
         }
     }
 
@@ -484,8 +508,7 @@ mod imp {
     #[implement(IAudioEndpointVolumeCallback)]
     struct ExternalVolumeListener {
         shared: Arc<AudioShared>,
-        target: Arc<AtomicU32>,
-        wake: Arc<Event>,
+        control: Arc<VolumeControl>,
     }
 
     impl IAudioEndpointVolumeCallback_Impl for ExternalVolumeListener_Impl {
@@ -505,10 +528,7 @@ mod imp {
             };
             let kept = self.shared.accept_external_volume(reading);
             if kept < reading {
-                self.target.store(kept.to_bits(), Ordering::Release);
-                unsafe {
-                    let _ = SetEvent(self.wake.0);
-                }
+                self.control.request(kept);
             }
             Ok(())
         }
