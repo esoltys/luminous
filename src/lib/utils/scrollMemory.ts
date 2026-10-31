@@ -73,12 +73,3 @@ export function rememberScroll(node: HTMLElement, key: string | null | undefined
     },
   };
 }
-
-/**
- * Non-action variant for elements not reached via a template ref, e.g. the
- * scrolling viewport a third-party virtual-list component creates internally.
- * Call from an `$effect` once the element exists; use the returned cleanup.
- */
-export function watchScrollMemory(node: HTMLElement, key: string): () => void {
-  return attachScrollMemory(node, key);
-}

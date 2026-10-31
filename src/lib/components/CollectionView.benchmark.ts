@@ -158,7 +158,7 @@ describe("CollectionView Virtualization Benchmark", () => {
 
     // 3. Benchmark Rendering (Mount) Performance under JSDOM
     const renderTimes: number[] = [];
-    // Set active sub-tab to songs to render the VirtualList
+    // Set active sub-tab to songs to render the windowed SongTable
     navigationStore.activeSubTab = "songs";
 
     for (let i = 0; i < 5; i++) {
@@ -193,7 +193,7 @@ This file contains automated performance results measuring the rendering and sor
 
 | Component | Target / List Type | Avg Mount Time (JSDOM) | Virtualization Status | FPS |
 | :--- | :--- | :--- | :--- | :--- |
-| **CollectionView** | Tracks (\`VirtualList\`) | ${avgRenderTime.toFixed(2)} ms | Active (\`svelte-virtual-list-ts\`) | ~60 FPS |
+| **CollectionView** | Tracks (windowed \`SongTable\`) | ${avgRenderTime.toFixed(2)} ms | Active (\`rowWindow.ts\`) | ~60 FPS |
 
 > [!NOTE]
 > The JSDOM rendering time measures initial mounting, layout scaffolding, and initial virtual chunk rendering. Actual browser paint performance under virtualized viewport updates runs consistently at 60 FPS because only visible rows (\`20\` items) are rendered in the DOM.

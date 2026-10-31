@@ -354,6 +354,11 @@
   let backingTrackCount = $derived(backingPlaylist?.track_count ?? 0);
   let backingLayoutKey = $derived(`${backingPlaylist?.sort_field ?? ""}:${backingPlaylist?.sort_asc ?? true}`);
 
+  // Which list the table is showing. A re-fetch of that same list (new matches,
+  // a re-sort) keeps its rows up instead of blanking to "Loading". Plain, not
+  // $state: the effect below must not re-run when it changes.
+  let shownListKey: string | null = null;
+
   $effect(() => {
     const k = kind;
     const g = genre;
@@ -363,12 +368,14 @@
     const pid = playlistId;
     const count = backingTrackCount;
     const layout = backingLayoutKey;
-    loading = true;
+    const listKey = JSON.stringify([k, g, at, d, b, pid]);
+    if (listKey !== shownListKey) loading = true;
     fetchSongs(k, g, at, d, b, pid)
       .then(async (loaded) => ({ ...loaded, songs: await unionWithOtherSystem(k, g, at, loaded.songs) }))
       .then((loaded) => {
         if (kind !== k || genre !== g || artistTag !== at || decade !== d || bpm !== b || playlistId !== pid) return;
         applyLoaded(loaded);
+        shownListKey = listKey;
       })
       .catch((err) => {
         console.error("Failed to load auto-playlist detail:", err);

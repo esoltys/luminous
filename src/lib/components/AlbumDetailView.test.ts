@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import AlbumDetailView from "./AlbumDetailView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
@@ -457,10 +457,24 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
   });
 
   describe("song picked from search (#1280)", () => {
-    const scrollIntoView = vi.fn();
+    // SongTable windows its rows, so it scrolls the view's scroller to a row
+    // by offset rather than calling scrollIntoView on a drawn row (#1898).
+    // jsdom has no Tailwind, so give the scroller its overflow, and record
+    // every scrollTop written to it (rememberScroll writes 0 for a new key).
+    let scrolledTo: number[] = [];
+    let style: HTMLStyleElement;
     beforeEach(() => {
-      scrollIntoView.mockClear();
-      Element.prototype.scrollIntoView = scrollIntoView;
+      scrolledTo = [];
+      style = document.createElement("style");
+      style.textContent = ".overflow-y-auto { overflow-y: auto; }";
+      document.head.appendChild(style);
+      vi.spyOn(Element.prototype, "scrollTop", "set").mockImplementation(function (this: Element, value: number) {
+        if (this.classList.contains("overflow-y-auto")) scrolledTo.push(value);
+      });
+    });
+    afterEach(() => {
+      style.remove();
+      vi.restoreAllMocks();
     });
 
     it("selects the focused song's row, scrolls it into view, and clears the signal", async () => {
@@ -471,8 +485,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       const row = container.querySelector<HTMLElement>('[data-song-row][data-key="2"]')!;
       expect(row.className).toContain("bg-brand-accent/20");
       expect(container.querySelector('[data-song-row][data-key="1"]')!.className).not.toContain("bg-brand-accent/20");
-      expect(scrollIntoView).toHaveBeenCalledTimes(1);
-      expect(scrollIntoView.mock.contexts[0]).toBe(row);
+      expect(scrolledTo.some((top) => top > 0)).toBe(true);
       expect(navigationStore.pendingFocusSongId).toBeNull();
     });
 
@@ -484,7 +497,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       for (const row of container.querySelectorAll("[data-song-row]")) {
         expect(row.className).not.toContain("bg-brand-accent/20");
       }
-      expect(scrollIntoView).not.toHaveBeenCalled();
+      expect(scrolledTo.every((top) => top === 0)).toBe(true);
       expect(navigationStore.pendingFocusSongId).toBeNull();
     });
   });

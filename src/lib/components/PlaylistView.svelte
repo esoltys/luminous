@@ -356,6 +356,9 @@
   });
 
   let duplicateCount = $derived(duplicateUuids.length);
+  // Per-row lookups for `itemToRow`, built once per list rather than searched per row (#1898).
+  let duplicateUuidSet = $derived(new Set(duplicateUuids));
+  let indexByUuid = $derived(new Map(playlistsStore.activePlaylistTracks.map((t, i) => [t.uuid, i])));
 
   // The divider only means something in playlist order: sorted or filtered,
   // Auto Continue's songs are no longer a contiguous run.
@@ -378,8 +381,8 @@
           ? i18n.t("collection.driveDisconnectedTooltip")
           : undefined,
       disabledVariant: trueUnavailable ? "strikethrough" : "dim",
-      isDuplicate: duplicateUuids.includes(item.uuid),
-      underlyingIndex: playlistsStore.activePlaylistTracks.findIndex((t) => t.uuid === item.uuid),
+      isDuplicate: duplicateUuidSet.has(item.uuid),
+      underlyingIndex: indexByUuid.get(item.uuid) ?? -1,
       ...(autoContinueStarts.has(item.uuid)
         ? { dividerBefore: i18n.t("playlists.autoContinue") }
         : item.uuid === breakBefore
@@ -578,7 +581,7 @@
     }
   }
 
-  let scrollContainerEl = $state<HTMLDivElement | undefined>(undefined);
+  let songTable = $state<ReturnType<typeof SongTable> | undefined>(undefined);
 
   // Consumes navigationStore.pendingScrollToCurrentSong (set by the playbar's
   // Queue button) once this view is showing the queue with its tracks loaded,
@@ -586,17 +589,15 @@
   // whatever position rememberScroll restored.
   $effect(() => {
     if (!navigationStore.pendingScrollToCurrentSong) return;
-    if (!isQueue || !scrollContainerEl) return;
+    if (!isQueue || !songTable) return;
     const uuid = playerStore.playlistItemUuid;
     const tracks = playlistsStore.activePlaylistTracks;
     if (tracks.length === 0) return;
-    const index = uuid
-      ? tracks.findIndex((t) => t.uuid === uuid)
-      : tracks.findIndex((t) => t.song && playerStore.currentSong && t.song.id === playerStore.currentSong.id);
+    const current = uuid
+      ? tracks.find((t) => t.uuid === uuid)
+      : tracks.find((t) => t.song && playerStore.currentSong && t.song.id === playerStore.currentSong.id);
     navigationStore.pendingScrollToCurrentSong = false;
-    if (index === -1) return;
-    const row = scrollContainerEl.querySelector<HTMLElement>(`[data-song-row][data-index="${index}"]`);
-    row?.scrollIntoView({ block: "center" });
+    if (current) songTable.scrollToKey(current.uuid);
   });
 
   let currentCoverUrl = $derived.by(() => {
@@ -651,7 +652,6 @@
 
   {#if activePlaylist}
     <div
-      bind:this={scrollContainerEl}
       class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto"
       use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
     >
@@ -859,6 +859,7 @@
     <div class="p-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
       <div class="border border-brand-border/60 rounded-xl acrylic-chrome relative overflow-hidden">
         <SongTable
+          bind:this={songTable}
           rows={tableRows}
           rangeSelectionOrder={rangeSelectionRows}
           mode="position"
