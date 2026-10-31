@@ -59,12 +59,12 @@ pub struct AudioOutputConfig {
 
 impl AudioOutputConfig {
     /// The device shared (CPAL) output should use: the chosen one, which is
-    /// the same endpoint when a bit-perfect backend falls back, except for
-    /// ASIO, whose id is a driver CLSID no shared device has, so shared
-    /// output uses the system default.
+    /// the same endpoint when WASAPI exclusive falls back. ASIO's id is a
+    /// driver CLSID and ALSA's a `hw:` PCM, which no shared device has, so
+    /// their fallback uses the system default.
     pub(crate) fn shared_device_id(&self) -> Option<&str> {
         match self.backend {
-            AudioBackendKind::Asio => None,
+            AudioBackendKind::Asio | AudioBackendKind::Alsa => None,
             _ => self.device_id.as_deref(),
         }
     }
@@ -322,21 +322,19 @@ mod tests {
     }
 
     #[test]
-    fn an_asio_fallback_uses_the_system_default_device() {
+    fn asio_and_alsa_fallbacks_use_the_system_default_device() {
         let asio = config(
             AudioBackendKind::Asio,
             "462F2ABF-5278-436A-95B6-72CBF65482AE",
         );
         assert_eq!(asio.shared_device_id(), None);
+        let alsa = config(AudioBackendKind::Alsa, "hw:CARD=EarPods,DEV=0");
+        assert_eq!(alsa.shared_device_id(), None);
     }
 
     #[test]
-    fn other_backends_fall_back_on_the_chosen_endpoint() {
-        for backend in [
-            AudioBackendKind::Cpal,
-            AudioBackendKind::WasapiExclusive,
-            AudioBackendKind::Alsa,
-        ] {
+    fn wasapi_endpoints_fall_back_on_the_chosen_endpoint() {
+        for backend in [AudioBackendKind::Cpal, AudioBackendKind::WasapiExclusive] {
             assert_eq!(config(backend, "dev").shared_device_id(), Some("dev"));
         }
     }

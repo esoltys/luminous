@@ -957,9 +957,10 @@ struct AudioOutput {
     /// Set when the configured backend failed and this is the shared-output
     /// stand-in: what was asked for, and why it couldn't be had.
     fallback: Option<(AudioBackendKind, OutputFallbackReason)>,
-    /// Set when the chosen device wasn't connected and this output is on the
-    /// system default instead; `check_and_rebuild_output` switches back once
-    /// the chosen device returns.
+    /// Set when the chosen device wasn't connected (see
+    /// `chosen_device_missing`) and this output is on the system default
+    /// instead; `check_and_rebuild_output` switches back once the chosen
+    /// device returns.
     stands_in: bool,
     /// The rate this output was opened for. A bit-perfect device may not run
     /// at it (`sample_rate` is what it got); remembering the request keeps a
@@ -1074,6 +1075,34 @@ fn find_output_device(host: &cpal::Host, id: &str) -> Option<(cpal::Device, Stri
             .unwrap_or_else(|| name.clone());
         (dev_id == id).then_some((d, name))
     })
+}
+
+/// Whether the device chosen in `config` isn't connected, so an output opened
+/// for it stands in until it returns. False when no device is chosen, and for
+/// ASIO, whose drivers aren't watched.
+fn chosen_device_missing(config: &AudioOutputConfig) -> bool {
+    device_missing(config, |backend, id| match backend {
+        #[cfg(target_os = "linux")]
+        AudioBackendKind::Alsa => crate::alsa_direct::list_hw_devices()
+            .iter()
+            .any(|d| d.id == id),
+        #[cfg(not(target_os = "linux"))]
+        AudioBackendKind::Alsa => true,
+        _ => find_output_device(&cpal::default_host(), id).is_some(),
+    })
+}
+
+/// [`chosen_device_missing`], asking `is_connected` whether the chosen id is in
+/// its backend's device list.
+fn device_missing(
+    config: &AudioOutputConfig,
+    is_connected: impl FnOnce(AudioBackendKind, &str) -> bool,
+) -> bool {
+    match config.device_id.as_deref().filter(|id| !id.is_empty()) {
+        Some(_) if config.backend == AudioBackendKind::Asio => false,
+        Some(id) => !is_connected(config.backend, id),
+        None => false,
+    }
 }
 
 /// The device to open for `requested_id`.
@@ -1403,6 +1432,9 @@ fn build_output(
         name: device_name,
         stands_in,
     } = resolve_cpal_device(&host, output_cfg.shared_device_id())?;
+    // A fallback whose chosen device is still connected (in use, no usable
+    // format) isn't standing in: its device appearing wouldn't cure it.
+    let stands_in = stands_in || (fallback.is_some() && chosen_device_missing(&output_cfg));
     let default_config = device
         .default_output_config()
         .map_err(|e| format!("Failed to get default output config: {e}"))?;
@@ -2039,9 +2071,7 @@ fn check_and_rebuild_output(
     // usual case.
     let chosen_returned = check_due
         && output.as_ref().is_some_and(|o| o.stands_in)
-        && output_cfg
-            .shared_device_id()
-            .is_some_and(|id| find_output_device(&cpal::default_host(), id).is_some());
+        && !chosen_device_missing(&output_cfg);
 
     if force_rebuild || stream_errored || default_changed || chosen_returned {
         log::info!(
@@ -2816,6 +2846,52 @@ pub fn write_test_pcm16_wav(path: &Path, sample_rate: u32, channels: &[Vec<i16>]
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn chosen(backend: AudioBackendKind, device_id: &str) -> AudioOutputConfig {
+        AudioOutputConfig {
+            backend,
+            device_id: Some(device_id.to_string()),
+        }
+    }
+
+    #[test]
+    fn an_unplugged_chosen_device_is_missing_until_it_is_listed_again() {
+        for backend in [
+            AudioBackendKind::Alsa,
+            AudioBackendKind::WasapiExclusive,
+            AudioBackendKind::Cpal,
+        ] {
+            let cfg = chosen(backend, "hw:CARD=EarPods,DEV=0");
+            assert!(device_missing(&cfg, |_, _| false), "{backend} unplugged");
+            assert!(!device_missing(&cfg, |_, _| true), "{backend} back");
+        }
+    }
+
+    #[test]
+    fn the_chosen_id_is_looked_up_in_its_own_backends_list() {
+        let cfg = chosen(AudioBackendKind::Alsa, "hw:CARD=EarPods,DEV=0");
+        assert!(!device_missing(&cfg, |backend, id| {
+            backend == AudioBackendKind::Alsa && id == "hw:CARD=EarPods,DEV=0"
+        }));
+    }
+
+    #[test]
+    fn nothing_is_missing_without_a_chosen_device_or_for_asio() {
+        let unreachable = |_: AudioBackendKind, _: &str| -> bool {
+            panic!("no device list should be enumerated")
+        };
+        for backend in [AudioBackendKind::Alsa, AudioBackendKind::Cpal] {
+            for device_id in [None, Some(String::new())] {
+                let cfg = AudioOutputConfig { backend, device_id };
+                assert!(!device_missing(&cfg, unreachable), "{backend}");
+            }
+        }
+        let asio = chosen(
+            AudioBackendKind::Asio,
+            "462F2ABF-5278-436A-95B6-72CBF65482AE",
+        );
+        assert!(!device_missing(&asio, unreachable));
+    }
 
     #[test]
     fn moving_from_shared_to_bit_perfect_output_bypasses_system_volume() {
