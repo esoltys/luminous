@@ -7,9 +7,12 @@ import {
   blendToward,
   hexToRgbaString,
   flatGlassColor,
+  CHROME_SATURATION,
   extractColorsFromImage,
   type Theme
 } from "./theme.svelte";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { checkWcagCompliance, hexToRgb, rgbToHsl, hslToRgb } from "../utils/colorUtils";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -391,6 +394,15 @@ describe("flatGlassColor (solid stand-in for glass over the flat canvas)", () =>
 
   it("matches the default dark theme's first-paint value in app.css", () => {
     expect(flatGlassColor(LUMINOUS_DARK_COLORS["bg-sidebar"], 0.5, LUMINOUS_DARK_COLORS["bg-main"])).toBe("#1e1e1c");
+  });
+
+  // The flattened panels only match the live glass beside them (the player
+  // bar) while both use the same saturation, so read the real stylesheet.
+  it("uses the saturation of the chrome acrylic recipe in app.css", () => {
+    const css = readFileSync(resolve(__dirname, "../../app.css"), "utf-8");
+    const match = css.match(/--acrylic-chrome-filter:[^;]*saturate\((\d+)%\)/);
+    if (!match) throw new Error("--acrylic-chrome-filter with a saturate(N%) missing from app.css");
+    expect(Number(match[1]) / 100).toBe(CHROME_SATURATION);
   });
 });
 

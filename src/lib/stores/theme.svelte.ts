@@ -164,18 +164,23 @@ function floatAlpha(isDark: boolean): number {
 }
 
 /**
+ * The chrome acrylic recipe's `saturate()` factor. app.css spells it in
+ * `--acrylic-chrome-filter`; themeStore.test.ts fails if the two disagree.
+ */
+export const CHROME_SATURATION = 1.8;
+
+/**
  * Opaque equivalent of a .glass-surface panel whose only backdrop is the
  * flat bg-main canvas (sidebar, top nav, right panel — none of them ever
  * overlap other content): `blur(20px)` of a flat color is that same color,
  * so the panel's visible result is exactly the translucent tint composited
- * over `saturate(180%)` of bg-main (`--acrylic-chrome-filter` in app.css;
- * keep `saturation` in step with it). Painting that as a solid color keeps
+ * over the chrome recipe's saturation of bg-main. Painting that as a solid color keeps
  * the look while dropping backdrop-filter from those panels, which was
  * re-rasterized whenever anything nearby repainted (main-view hover
  * effects, the reactive logo, the playbar spectrum) and showed up as
  * banding/pulsing in the sidebar.
  */
-export function flatGlassColor(tintHex: string, alpha: number, backdropHex: string, saturation = 1.8): string {
+export function flatGlassColor(tintHex: string, alpha: number, backdropHex: string, saturation = CHROME_SATURATION): string {
   const { r, g, b } = hexToRgb(backdropHex);
   const s = saturation;
   // Filter Effects `saturate()` matrix, applied in sRGB like the browser's

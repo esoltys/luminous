@@ -205,8 +205,8 @@ describe("Miniplayer.svelte", () => {
     await fireEvent.pointerLeave(group);
     expect(hoverMask.className).toContain("opacity-0");
 
-    // Blurred on every platform with GPU compositing; opaque only without it
-    // (ThemeStore.gpuCompositing === false).
+    // Blurred on every platform with GPU compositing; app.css-level
+    // :root.no-gpu-compositing makes it opaque without it.
     expect(hoverMask.className).toContain("bg-brand-main/85");
     expect(hoverMask.className).toContain("backdrop-blur-md");
   });

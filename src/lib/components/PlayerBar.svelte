@@ -285,7 +285,7 @@
 
 <footer
   transition:fly={{ y: 40, duration: windowLayoutStore.isPlaybarOnlyMode ? 0 : 300, easing: cubicOut }}
-  class="relative bg-brand-playerbar flex items-center justify-between gap-3 px-5 md:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme ? 'glass-surface' : ''} {themeStore.gpuCompositing === false ? 'no-backdrop' : ''} {windowLayoutStore.isPlaybarOnlyMode ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none' : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-[2rem]'}"
+  class="relative bg-brand-playerbar flex items-center justify-between gap-3 px-5 md:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme ? 'glass-surface' : ''} {windowLayoutStore.isPlaybarOnlyMode ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none' : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-[2rem]'}"
 >
   {#if themeStore.activeAddon?.overlayEntry}
     <AddonOverlay addon={themeStore.activeAddon} />
@@ -597,9 +597,10 @@
   }
 
   /* No GPU compositing (WebKitGTK with GPU rendering disabled — see
-     ThemeStore.gpuCompositing): backdrop-filter doesn't render there, so the
-     dock goes opaque with a stronger glow instead of see-through. */
-  :global(footer.glass-surface.no-backdrop) {
+     ThemeStore.gpuCompositing, which sets the root class): backdrop-filter
+     doesn't render there, so the dock goes opaque with a stronger glow
+     instead of see-through. */
+  :global(:root.no-gpu-compositing footer.glass-surface) {
     background-color: var(--bg-playerbar, #191b23) !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
@@ -637,7 +638,7 @@
     box-shadow: none !important;
   }
 
-  :global(footer.glass-surface.playbar-only-mode.no-backdrop) {
+  :global(:root.no-gpu-compositing footer.glass-surface.playbar-only-mode) {
     box-shadow: none !important;
   }
 

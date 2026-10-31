@@ -5,6 +5,7 @@
   import { fly, slide } from "../utils/motion";
   import { i18n } from "../stores/i18n.svelte";
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
+  import { themeStore } from "../stores/theme.svelte";
   import {
     RIGHT_PANEL_MIN_WIDTH_PX,
     RIGHT_PANEL_MAX_WIDTH_PX,
@@ -16,6 +17,8 @@
    * leaves the layout: a slim rail stays at the right edge, and the sidebar is an
    * overlay that opens when the pointer rests on the rail and closes shortly after the
    * pointer leaves it, or on Escape or a click outside.
+   *
+   * The host paints the panel's surface in both places, so RightPanel itself is only content.
    *
    * Must sit inside a `relative` container that spans the area the overlay should cover.
    * `instant` snaps the slide, for keyboard-driven changes.
@@ -163,7 +166,7 @@
 {/snippet}
 
 {#if docked}
-  <div transition:slide={{ axis: 'x', duration: instant ? 0 : PANEL_SLIDE_MS }} class="h-full flex-shrink-0 flex overflow-hidden">
+  <div transition:slide={{ axis: 'x', duration: instant ? 0 : PANEL_SLIDE_MS }} class="docked-surface h-full flex-shrink-0 flex overflow-hidden bg-brand-sidebar {themeStore.isGlassTheme ? 'glass-surface' : ''}">
     {@render resizeHandle()}
     <RightPanel isOpen={true} width={layout.rightPanelWidth} pinned={true} onTogglePin={togglePin} />
   </div>
@@ -194,7 +197,7 @@
 {/if}
 
 {#if showOverlay}
-  <!-- Acrylic on the overlay itself, not the panel inside it: fly fades this element's
+  <!-- Acrylic on the overlay itself, not on anything inside it: fly fades this element's
        opacity, which would cut a descendant's backdrop-filter off from the page for the
        length of the slide. -->
   <div
@@ -209,3 +212,18 @@
     <RightPanel isOpen={true} width={layout.rightPanelWidth} pinned={false} onTogglePin={togglePin} />
   </div>
 {/if}
+
+<style>
+  /* Docked, nothing renders behind the panel but the flat bg-main canvas, so
+     it paints the glass result as a solid color instead of running a
+     backdrop-filter (see flatGlassColor() in theme.svelte.ts). Only the inset
+     highlight of --glass-shadow: as before, when the panel inside this
+     overflow-hidden wrapper carried it, the elevation stays off the content. */
+  .docked-surface.glass-surface {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: var(--glass-solid-sidebar) !important;
+    border-color: var(--glass-border-color, var(--color-border)) !important;
+    box-shadow: var(--glass-highlight, none);
+  }
+</style>

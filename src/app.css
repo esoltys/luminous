@@ -309,8 +309,9 @@
 }
 
 :root {
-  /* flatGlassColor() in theme.svelte.ts reproduces this saturation for the
-     flattened sidebar, top nav and right panel. Keep the two in step. */
+  /* flatGlassColor() reproduces this saturation (CHROME_SATURATION in
+     theme.svelte.ts) for the flattened sidebar, top nav and right panel;
+     themeStore.test.ts fails if the two disagree. */
   --acrylic-chrome-filter: blur(20px) saturate(180%);
   --acrylic-float-filter: blur(60px) saturate(200%);
   --acrylic-scrim-filter: blur(8px);
