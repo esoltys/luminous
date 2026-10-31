@@ -239,14 +239,19 @@
     { key: "folders", label: i18n.t("devices.groupFolders"), sources: listed.filter((s) => s.kind === "folder") },
   ].filter((g) => g.sources.length > 0));
 
+  // The pickers list alphabetically, ignoring case, with numbers in order.
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
   const playlistChoices = $derived(
-    playlistsStore.playlists.filter((p) => !p.is_queue && !listed.some((s) => s.kind === "playlist" && s.id === p.id))
+    playlistsStore.playlists
+      .filter((p) => !p.is_queue && !listed.some((s) => s.kind === "playlist" && s.id === p.id))
+      .sort((a, b) => collator.compare(a.name, b.name))
   );
   const artistChoices = $derived.by(() => {
     const q = artistQuery.trim().toLowerCase();
     return collectionStore.artists
       .filter((a): a is typeof a & { name: string } => !!a.name && (!q || a.name.toLowerCase().includes(q)))
       .filter((a) => !listed.some((s) => s.kind === "artist" && s.name === a.name))
+      .sort((a, b) => collator.compare(a.name, b.name))
       .slice(0, 50);
   });
 

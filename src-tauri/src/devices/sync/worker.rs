@@ -14,7 +14,7 @@ use crate::models::Song;
 use luminous_devices::{DeviceBackend, DeviceProfile};
 use luminous_transcode::{Decision, Prepared, TargetFormat, Transcoder};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::BTreeSet;
 use std::io;
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -28,8 +28,9 @@ const LOOKAHEAD: usize = 2;
 const MANIFEST_SAVE_INTERVAL: Duration = Duration::from_secs(5);
 /// Shortest gap between progress reports within one step.
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
-/// The span MB/s is averaged over.
-const RATE_WINDOW: Duration = Duration::from_secs(5);
+/// How long a sync runs before it estimates the time left: until then the
+/// speed is mostly the first file's.
+const ETA_SETTLE: Duration = Duration::from_secs(10);
 
 /// Where time comes from, so tests can drive it.
 pub trait Clock: Send + Sync {
@@ -115,7 +116,8 @@ pub struct SyncProgress {
     /// Bytes written so far, of the plan's estimate.
     pub bytes_done: u64,
     pub bytes_total: u64,
-    /// Averaged over the last few seconds; `None` until there is a rate.
+    /// Averaged over the whole sync so far, converting included; `None`
+    /// until there is a rate.
     pub bytes_per_sec: Option<f64>,
     pub eta_secs: Option<u64>,
 }
@@ -613,14 +615,19 @@ impl Run<'_> {
         }
         self.rate.sample(now, self.progress.bytes_done);
         self.progress.bytes_per_sec = self.rate.bytes_per_sec();
-        self.progress.eta_secs = self.progress.bytes_per_sec.filter(|r| *r > 0.0).map(|r| {
-            (self
-                .progress
-                .bytes_total
-                .saturating_sub(self.progress.bytes_done) as f64
-                / r)
-                .ceil() as u64
-        });
+        let settled = self.rate.elapsed(now) >= ETA_SETTLE;
+        self.progress.eta_secs = self
+            .progress
+            .bytes_per_sec
+            .filter(|r| settled && *r > 0.0)
+            .map(|r| {
+                (self
+                    .progress
+                    .bytes_total
+                    .saturating_sub(self.progress.bytes_done) as f64
+                    / r)
+                    .ceil() as u64
+            });
         self.last_report = Some(now);
         (self.report)(&self.progress);
     }
@@ -645,27 +652,30 @@ impl Run<'_> {
     }
 }
 
-/// Bytes per second over the last [`RATE_WINDOW`].
+/// Bytes per second since the first sample. A sync alternates between
+/// converting, which writes nothing for a while, and copying, which writes in
+/// bursts; only the whole run averages them into a speed that predicts the
+/// rest of it.
 #[derive(Default)]
 struct Rate {
-    samples: VecDeque<(Instant, u64)>,
+    first: Option<(Instant, u64)>,
+    last: Option<(Instant, u64)>,
 }
 
 impl Rate {
     fn sample(&mut self, at: Instant, bytes: u64) {
-        self.samples.push_back((at, bytes));
-        while self
-            .samples
-            .front()
-            .is_some_and(|(t, _)| at.duration_since(*t) > RATE_WINDOW)
-            && self.samples.len() > 2
-        {
-            self.samples.pop_front();
-        }
+        self.first.get_or_insert((at, bytes));
+        self.last = Some((at, bytes));
+    }
+
+    /// Time since the first sample.
+    fn elapsed(&self, now: Instant) -> Duration {
+        self.first
+            .map_or(Duration::ZERO, |(t, _)| now.duration_since(t))
     }
 
     fn bytes_per_sec(&self) -> Option<f64> {
-        let (first, last) = (self.samples.front()?, self.samples.back()?);
+        let (first, last) = (self.first?, self.last?);
         let secs = last.0.duration_since(first.0).as_secs_f64();
         (secs > 0.0).then(|| last.1.saturating_sub(first.1) as f64 / secs)
     }
