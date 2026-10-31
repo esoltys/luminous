@@ -22,12 +22,14 @@ export function volumeSliderBackground(volume: number, safety: VolumeSafety | nu
 }
 
 /**
- * Apply a volume slider's position, then move the thumb to the level the
- * backend actually applied: dragged past the safety ceiling, it snaps back
- * to the ceiling (the store's value may not change, so Svelte wouldn't
- * move it).
+ * Apply a volume slider's position; dragged past the safety ceiling, the
+ * thumb snaps back to the level the backend applied (the store's value may
+ * not change, so Svelte wouldn't move it).
  */
 export async function setVolumeFromSlider(input: HTMLInputElement): Promise<void> {
-  await playerStore.setVolume(parseFloat(input.value));
-  input.value = String(playerStore.volume);
+  const requested = parseFloat(input.value);
+  await playerStore.setVolume(requested);
+  // Only on a cut: rewriting an unchanged level mid-drag would pull the
+  // thumb back to a position the pointer has already left.
+  if (playerStore.volume < requested) input.value = String(playerStore.volume);
 }

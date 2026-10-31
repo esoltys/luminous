@@ -238,11 +238,13 @@ impl Player {
             let saved_volume = app_state_get_parsed::<f32>(&conn, "volume");
             if let Ok(engine) = audio.try_lock() {
                 // The cap goes in before the restored volume, so playback
-                // can never start above it.
+                // can't start above it.
                 engine.set_volume_ceiling(volume_safety.active_ceiling());
                 volume = engine.set_volume(saved_volume.unwrap_or(volume));
-            } else if let Some(v) = saved_volume {
-                volume = v.clamp(0.0, 1.0);
+            } else {
+                // Unreachable at construction (nothing else holds the fresh
+                // engine yet), but a skipped safety cap must not be silent.
+                log::error!("Audio engine busy at startup: volume and safety ceiling not restored");
             }
             if let Some(s) = app_state_get(&conn, "shuffle_mode") {
                 shuffle_mode = shuffle_mode_from_key(&s);

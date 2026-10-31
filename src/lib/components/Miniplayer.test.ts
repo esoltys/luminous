@@ -45,6 +45,7 @@ describe("Miniplayer.svelte", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(invoke).mockReset().mockResolvedValue(null);
     localStorage.clear();
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     playerStore.state = "stopped";

@@ -159,7 +159,7 @@ enum AudioCommand {
     /// Push the current master volume (`AudioShared::volume`) to the active
     /// sink's hardware mixer. It carries no level so a stale command can never
     /// apply one the safety ceiling has since lowered.
-    SetVolume,
+    SyncHardwareVolume,
 }
 
 struct PlayRequest {
@@ -332,12 +332,11 @@ impl AudioShared {
 
     /// Store `vol` as the master volume, clamped to 0.0–1.0 and to the safety
     /// ceiling, and return the level stored.
-    ///
-    /// The ceiling is re-checked after the store so a concurrent
-    /// `set_volume_ceiling` can't be overtaken: whichever runs second sees
-    /// the other's write (both are `SeqCst`), so the volume never stays
-    /// above the newest ceiling.
     fn store_volume(&self, vol: f32) -> f32 {
+        // The ceiling is re-checked after the store so a concurrent
+        // `set_volume_ceiling` can't be overtaken: whichever runs second sees
+        // the other's write (both are `SeqCst`), so the volume never stays
+        // above the newest ceiling.
         let ceiling = f32::from_bits(self.volume_ceiling.load(Ordering::SeqCst));
         let vol = vol.clamp(0.0, 1.0).min(ceiling);
         self.volume.store(vol.to_bits(), Ordering::SeqCst);
@@ -548,7 +547,7 @@ impl AudioEngine {
     /// the ceiling sets the ceiling. Returns the volume applied.
     pub fn set_volume(&self, vol: f32) -> f32 {
         let applied = self.shared.store_volume(vol);
-        let _ = self.send_cmd(AudioCommand::SetVolume);
+        let _ = self.send_cmd(AudioCommand::SyncHardwareVolume);
         applied
     }
 
@@ -561,7 +560,7 @@ impl AudioEngine {
         let before = self.shared.current_volume();
         let after = self.shared.set_volume_ceiling(ceiling);
         if after != before {
-            let _ = self.send_cmd(AudioCommand::SetVolume);
+            let _ = self.send_cmd(AudioCommand::SyncHardwareVolume);
         }
         after
     }
@@ -1736,7 +1735,7 @@ fn decode_thread(
                         shared.position.store(target_ns, Ordering::Relaxed);
                         continue;
                     }
-                    Ok(AudioCommand::SetVolume) => {
+                    Ok(AudioCommand::SyncHardwareVolume) => {
                         if let Some(out) = output.as_ref() {
                             out.sink.set_hardware_volume(shared.current_volume());
                         }
@@ -1767,7 +1766,7 @@ fn decode_thread(
                     let _ = event_tx.send(AudioEvent::Stopped);
                     continue 'main;
                 }
-                Ok(AudioCommand::SetVolume) => {
+                Ok(AudioCommand::SyncHardwareVolume) => {
                     if let Some(out) = output.as_ref() {
                         out.sink.set_hardware_volume(shared.current_volume());
                     }
@@ -2328,7 +2327,7 @@ fn handle_decode_command(
             session.force_device_rebuild = true;
             CmdOutcome::Continue
         }
-        Ok(AudioCommand::SetVolume) => {
+        Ok(AudioCommand::SyncHardwareVolume) => {
             out.sink.set_hardware_volume(shared.current_volume());
             CmdOutcome::Continue
         }

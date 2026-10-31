@@ -40,4 +40,22 @@ describe("setVolumeFromSlider", () => {
     expect(playerStore.volume).toBe(0.7);
     expect(input.value).toBe("0.7");
   });
+
+  it("leaves the thumb alone when the level was applied as asked", async () => {
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = "0";
+    input.max = "1";
+    input.step = "0.01";
+    input.value = "0.4";
+    // The pointer has moved on by the time the backend replies.
+    vi.mocked(invoke).mockImplementationOnce(async () => {
+      input.value = "0.45";
+      return 0.4;
+    });
+
+    await setVolumeFromSlider(input);
+
+    expect(input.value).toBe("0.45");
+  });
 });
