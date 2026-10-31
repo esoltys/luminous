@@ -1,11 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ConnectedDevice, FileSource, FileSourceSummary, ScanProgress } from "../types";
+import { devicesStore } from "./devices.svelte";
 import { deviceName } from "../utils/devices";
 import { collectionStore } from "./collection.svelte";
 import { navigationStore } from "./navigation.svelte";
 
-/** Whether `a` and `b` are the same source. */
+/** Whether `a` and `b` are the same source. Storages of one device count as one source. */
 export function sameSource(a: FileSource, b: FileSource): boolean {
   return a.kind === b.kind && a.id === b.id;
 }
@@ -17,15 +18,18 @@ export function sourceKey(source: FileSource): string {
 
 /**
  * The sources the Files view browses (#1841): watched folders and media
- * servers with their song counts, plus the connected devices. Kept current
- * from backend events; the sidebar and the Files view only read it.
+ * servers with their song counts, plus the connected devices (owned by
+ * `devicesStore`). Kept current from backend events; the sidebar and the
+ * Files view only read it.
  */
 class FilesStore {
   /** Folders, then Subsonic, then WebDAV servers, as the backend orders them. */
   sources = $state<FileSourceSummary[]>([]);
-  devices = $state<ConnectedDevice[]>([]);
-  /** True once both lists have been read, so a missing source means it's gone. */
+  /** True once the folders and servers have been read. */
   loaded = $state(false);
+  get devices(): ConnectedDevice[] {
+    return devicesStore.devices;
+  }
   private refreshDebounce: ReturnType<typeof setTimeout> | undefined;
 
   constructor() {
@@ -38,6 +42,10 @@ class FilesStore {
         void collectionStore.subsonicServers;
         if (this.loaded) this.scheduleRefresh();
       });
+      $effect(() => {
+        void devicesStore.devices;
+        this.leaveGoneSource();
+      });
     });
     this.init();
   }
@@ -48,15 +56,7 @@ class FilesStore {
       await listen<ScanProgress>("scan-progress", (event) => {
         if (event.payload.phase === "done") this.scheduleRefresh();
       });
-      await listen<ConnectedDevice[]>("devices-changed", (event) => {
-        this.devices = event.payload;
-        this.leaveGoneSource();
-      });
-      const [, devices] = await Promise.all([
-        this.refresh(),
-        invoke<ConnectedDevice[]>("get_connected_devices"),
-      ]);
-      this.devices = Array.isArray(devices) ? devices : [];
+      await this.refresh();
       this.loaded = true;
       this.leaveGoneSource();
     } catch (err) {
@@ -84,7 +84,8 @@ class FilesStore {
    */
   private leaveGoneSource() {
     const location = navigationStore.filesLocation;
-    if (this.loaded && location && !this.exists(location.source)) navigationStore.filesLocation = null;
+    const listed = this.loaded && devicesStore.loaded;
+    if (listed && location && !this.exists(location.source)) navigationStore.filesLocation = null;
   }
 
   /** Whether `source` is still there: a listed folder or server, or a connected device. */

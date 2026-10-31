@@ -1,12 +1,16 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
-  import { FoldersIcon, PlusIcon } from "phosphor-svelte";
+  import { EjectIcon, FoldersIcon, PlusIcon, StopIcon } from "phosphor-svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { filesStore, sameSource, sourceKey } from "../../stores/files.svelte";
-  import { sourceIcon } from "./sourceIcon";
+  import { deviceIcon, sourceIcon } from "./sourceIcon";
+  import { devicesStore } from "../../stores/devices.svelte";
+  import { deviceName, syncStorage } from "../../utils/devices";
+  import { formatStorageSize } from "../../utils/formatters";
+  import DeviceProgressRing from "../devices/DeviceProgressRing.svelte";
   import { collectionStore } from "../../stores/collection.svelte";
   import { i18n, formatNumber } from "../../stores/i18n.svelte";
-  import type { FileSource } from "../../types";
+  import type { ConnectedDevice, FileSource } from "../../types";
 
   let { collapsed, showSubItems }: { collapsed: boolean; showSubItems: boolean } = $props();
 
@@ -17,6 +21,33 @@
     const location = navigationStore.filesLocation;
     return active && location !== null && sameSource(location.source, source);
   }
+
+  /** How far the device's running sync is, 0–1; null when none is running. */
+  function syncFraction(id: string): number | null {
+    if (!devicesStore.isSyncing(id)) return null;
+    const p = devicesStore.progress[id];
+    return p && p.songsTotal > 0 ? p.songsDone / p.songsTotal : 0;
+  }
+
+  /** How full the storage the device syncs to is, 0–1. */
+  function usedFraction(device: ConnectedDevice): number {
+    const storage = syncStorage(device, devicesStore.syncStates[device.id]?.settings);
+    return storage && storage.totalBytes > 0 ? 1 - storage.freeBytes / storage.totalBytes : 0;
+  }
+
+  function freeText(device: ConnectedDevice): string {
+    const storage = syncStorage(device, devicesStore.syncStates[device.id]?.settings);
+    return storage ? i18n.t("devices.free", { size: formatStorageSize(storage.freeBytes) }) : "";
+  }
+
+  function syncingText(id: string): string {
+    const p = devicesStore.progress[id];
+    return p
+      ? i18n.t("devices.syncingCount", { done: formatNumber(p.songsDone), total: formatNumber(p.songsTotal) })
+      : i18n.t("devices.syncingStarting");
+  }
+
+  const syncingFraction = $derived(devicesStore.syncingId ? syncFraction(devicesStore.syncingId) : null);
 
   async function addMusicFolder() {
     try {
@@ -36,7 +67,14 @@
       title={i18n.t("sidebar.files")}
       aria-label={i18n.t("sidebar.files")}
     >
-      <FoldersIcon class="w-5 h-5" />
+      <span class="relative">
+        <FoldersIcon class="w-5 h-5" />
+        {#if syncingFraction !== null}
+          <DeviceProgressRing fraction={syncingFraction} class="absolute -top-1.5 -right-1.5 w-3.5 h-3.5" />
+        {:else if filesStore.devices.length > 0}
+          <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-brand-accent-text ring-2 ring-brand-sidebar" data-testid="files-device-dot"></span>
+        {/if}
+      </span>
     </button>
   {:else}
     <div class="w-full flex items-center rounded-lg transition-colors duration-150 {atOverview ? 'bg-brand-accent/20 text-brand-accent-text' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}">
@@ -84,7 +122,54 @@
           <span class="text-[10px] text-brand-text-secondary/60 ml-1">({formatNumber(entry.songCount)})</span>
         </button>
       {/each}
-      <!-- Connected devices follow under a divider (#839). -->
+      {#if filesStore.devices.length > 0}
+        <div class="mx-2.5 my-1.5 border-t border-brand-border/40" role="separator"></div>
+      {/if}
+      {#each filesStore.devices as device (device.id)}
+        {@const Icon = deviceIcon(device)}
+        {@const fraction = syncFraction(device.id)}
+        {@const open = isOpen({ kind: "device", id: device.id })}
+        {@const name = deviceName(device)}
+        <div class="flex items-center gap-1" data-testid="sidebar-device">
+          <button
+            onclick={() => navigationStore.viewDevice(device.id, navigationStore.filesLocation?.deviceTab)}
+            class="flex-1 min-w-0 flex items-start gap-2 px-2.5 py-1.5 rounded-md text-xs text-left transition-colors {open ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+          >
+            <Icon class="w-3.5 h-3.5 icon-align shrink-0 mt-px" />
+            <span class="flex-1 min-w-0 flex flex-col gap-1">
+              <span class="truncate">{name}</span>
+              <span class="h-[3px] rounded-full bg-brand-border/50 overflow-hidden" aria-hidden="true">
+                <span
+                  class="block h-full rounded-full {fraction === null ? 'bg-brand-text-secondary/70' : 'bg-brand-accent-text'}"
+                  style:width="{Math.round((fraction ?? usedFraction(device)) * 100)}%"
+                ></span>
+              </span>
+              <span class="text-[10px] font-normal truncate {fraction === null ? 'text-brand-text-secondary/80' : 'text-brand-accent-text'}">
+                {fraction === null ? freeText(device) : syncingText(device.id)}
+              </span>
+            </span>
+          </button>
+          {#if fraction === null}
+            <button
+              onclick={() => devicesStore.eject(device.id)}
+              class="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 transition-colors"
+              title={i18n.t("devices.ejectNamed", { device: name })}
+              aria-label={i18n.t("devices.ejectNamed", { device: name })}
+            >
+              <EjectIcon class="w-3.5 h-3.5" />
+            </button>
+          {:else}
+            <button
+              onclick={() => devicesStore.stopSync(device.id)}
+              class="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-brand-text-primary hover:bg-brand-accent/10 transition-colors"
+              title={i18n.t("devices.stopSyncNamed", { device: name })}
+              aria-label={i18n.t("devices.stopSyncNamed", { device: name })}
+            >
+              <StopIcon weight="fill" class="w-3.5 h-3.5" />
+            </button>
+          {/if}
+        </div>
+      {/each}
     </div>
   {/if}
 </div>

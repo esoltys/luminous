@@ -1,5 +1,5 @@
-import { CloudIcon, DeviceMobileSpeakerIcon, FolderIcon, HardDrivesIcon } from "phosphor-svelte";
-import type { FileSource } from "../../types";
+import { CloudIcon, DeviceMobileSpeakerIcon, FolderIcon, HardDrivesIcon, UsbIcon } from "phosphor-svelte";
+import type { ConnectedDevice, FileSource } from "../../types";
 
 /** The icon that stands for a kind of source. */
 export function sourceIcon(source: FileSource) {
@@ -13,4 +13,9 @@ export function sourceIcon(source: FileSource) {
     default:
       return FolderIcon;
   }
+}
+
+/** The icon for a device: a player over MTP, a USB drive otherwise. */
+export function deviceIcon(device: ConnectedDevice) {
+  return device.kind === "mtp" ? DeviceMobileSpeakerIcon : UsbIcon;
 }

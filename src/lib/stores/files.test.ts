@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { flushSync } from "svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { ConnectedDevice, FileSourceSummary } from "../types";
 
@@ -25,6 +26,22 @@ const music = { kind: "folder", id: 1 } as const;
 const server = { kind: "subsonic", id: 2 } as const;
 const player = { kind: "device", id: "E:\\" } as const;
 
+const walkman: ConnectedDevice = {
+  id: player.id,
+  kind: "massStorage",
+  model: null,
+  defaultName: "Walkman",
+  storages: [],
+  profile: { nickname: null } as ConnectedDevice["profile"],
+  lastSyncedAt: null,
+};
+
+/** Delivers a `devices-changed` event and lets the stores react to it. */
+function devicesChanged(devices: ConnectedDevice[]) {
+  handlers.get("devices-changed")!({ payload: devices });
+  flushSync();
+}
+
 function summary(source: FileSourceSummary["source"], name: string): FileSourceSummary {
   return { source, name, songCount: 3, available: true };
 }
@@ -34,7 +51,7 @@ describe("filesStore", () => {
     await vi.waitFor(() => expect(filesStore.loaded).toBe(true));
     sources = [summary(music, "Music"), summary(server, "Navidrome")];
     await filesStore.refresh();
-    handlers.get("devices-changed")!({ payload: [{ id: player.id, defaultName: "Walkman", profile: {} } satisfies ConnectedDevice] });
+    devicesChanged([walkman]);
   });
 
   it("names and finds the listed sources and connected devices", () => {
@@ -62,11 +79,11 @@ describe("filesStore", () => {
 
   it("leaves a device that was unplugged, and keeps a source that is still there", () => {
     navigationStore.viewFiles(player, ["Music"]);
-    handlers.get("devices-changed")!({ payload: [] });
+    devicesChanged([]);
     expect(navigationStore.filesLocation).toBeNull();
 
     navigationStore.viewFiles(music, ["Rock"]);
-    handlers.get("devices-changed")!({ payload: [] });
+    devicesChanged([]);
     expect(navigationStore.filesLocation).toEqual({ source: music, path: ["Rock"] });
   });
 });

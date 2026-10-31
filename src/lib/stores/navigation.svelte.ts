@@ -46,7 +46,11 @@ export interface AutoPlaylistRef {
 interface FilesLocation {
   source: FileSource;
   path: string[];
+  /** On a device: its Files or Sync tab (#839). Files when absent. */
+  deviceTab?: DeviceTab;
 }
+
+export type DeviceTab = "files" | "sync";
 
 /** A snapshot of "where the user is" for Back/Forward navigation history. */
 interface NavigationView {
@@ -201,6 +205,14 @@ class NavigationStore {
   viewFiles(source?: FileSource, path: string[] = []) {
     this.activeTab = "files";
     this.filesLocation = source ? { source, path } : null;
+  }
+
+  /** Opens a device's view at `tab`, keeping the storage and folder it was last at. */
+  viewDevice(id: string, tab: DeviceTab = "files") {
+    const here = this._filesLocation;
+    const same = here?.source.kind === "device" && here.source.id === id;
+    this.activeTab = "files";
+    this.filesLocation = same ? { ...here, deviceTab: tab } : { source: { kind: "device", id }, path: [], deviceTab: tab };
   }
 
   // Back/Forward navigation history. Snapshots are coalesced via a microtask

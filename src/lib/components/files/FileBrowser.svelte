@@ -23,6 +23,7 @@
     reloadToken = 0,
     listing = $bindable(null),
     selectedName = $bindable(null),
+    selection = $bindable([]),
     unreachableLabel,
     footer,
   }: {
@@ -36,8 +37,11 @@
     reloadToken?: number;
     /** Out: the current folder's listing once read. */
     listing?: DirListing | null;
-    /** The selected entry of the current folder, by name. */
+    /** The focused entry of the current folder, by name. */
     selectedName?: string | null;
+    /** Every selected entry of the current folder, by name: the focused one, plus
+     * those added with Ctrl/Cmd-click or Shift-click. */
+    selection?: string[];
     /** Shown when the source can't be reached. */
     unreachableLabel: string;
     footer?: Snippet;
@@ -50,7 +54,11 @@
     albumArt: "files.status.albumArt",
     notAudio: "files.status.notAudio",
     excluded: "files.status.excluded",
+    notFromLuminous: "files.status.notFromLuminous",
   };
+
+  /** Entries shown dimmed: not music the library or sync looks after. */
+  const MUTED: (FileEntryStatus | null)[] = ["excluded", "albumArt", "notAudio", "notFromLuminous"];
 
   const ROW_HEIGHT_PX = 31;
   /** Folder columns shown before the current folder's table. */
@@ -184,7 +192,7 @@
       case "ArrowUp": {
         const nextIndex = Math.min(entries.length - 1, Math.max(0, index + (event.key === "ArrowDown" ? 1 : -1)));
         if (entries[nextIndex]) {
-          selectedName = entries[nextIndex].name;
+          select(entries[nextIndex].name);
           scrollIntoView(column, nextIndex);
         }
         break;
@@ -211,12 +219,36 @@
   $effect(() => {
     const now = path;
     if (now.length < previousPath.length && keyOf(previousPath.slice(0, now.length)) === keyOf(now)) {
-      selectedName = previousPath[now.length];
+      select(previousPath[now.length]);
     } else if (keyOf(now) !== keyOf(previousPath)) {
-      selectedName = null;
+      select(null);
     }
     previousPath = now;
   });
+
+  /** Makes `name` the only selected entry. */
+  function select(name: string | null) {
+    selectedName = name;
+    selection = name === null ? [] : [name];
+  }
+
+  /** A click on a file: Ctrl/Cmd adds or drops it, Shift selects the run from the focused entry. */
+  function clickFile(event: MouseEvent, name: string) {
+    if (event.shiftKey && selectedName !== null) {
+      const names = currentEntries.map((e) => e.name);
+      const [a, b] = [names.indexOf(selectedName), names.indexOf(name)].sort((x, y) => x - y);
+      if (a >= 0) {
+        selection = names.slice(a, b + 1);
+        return;
+      }
+    }
+    if (event.ctrlKey || event.metaKey) {
+      selection = selection.includes(name) ? selection.filter((n) => n !== name) : [...selection, name];
+      selectedName = name;
+      return;
+    }
+    select(name);
+  }
 
   function statusLabel(entry: FileEntry): string {
     return entry.status ? i18n.t(STATUS_LABEL_KEYS[entry.status]) : "";
@@ -241,7 +273,7 @@
             {#snippet children({ item: entry }: { item: FileEntry })}
               {@const selected = path[dir.length] === entry.name}
               <button
-                class="w-full h-[31px] flex items-center gap-2 px-2.5 rounded-md text-[13px] text-left transition-colors {selected ? 'bg-brand-accent/20 text-brand-text-primary font-semibold' : 'text-brand-text-primary hover:bg-brand-accent/10'} {entry.status === 'excluded' ? 'opacity-60' : ''}"
+                class="w-full h-[31px] flex items-center gap-2 px-2.5 rounded-md text-[13px] text-left transition-colors {selected ? 'bg-brand-accent/20 text-brand-text-primary font-semibold' : 'text-brand-text-primary hover:bg-brand-accent/10'} {entry.status === 'excluded' || entry.status === 'notFromLuminous' ? 'opacity-60' : ''}"
                 role="option"
                 aria-selected={selected}
                 tabindex="-1"
@@ -249,8 +281,8 @@
               >
                 <FolderIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
                 <span class="truncate flex-1">{entry.name}</span>
-                {#if entry.status === "excluded"}
-                  <span class="text-[11px] text-brand-text-secondary shrink-0">{i18n.t("files.status.excluded")}</span>
+                {#if entry.status === "excluded" || entry.status === "notFromLuminous"}
+                  <span class="text-[11px] text-brand-text-secondary shrink-0">{statusLabel(entry)}</span>
                 {:else}
                   <CaretRightIcon class="w-3 h-3 shrink-0 text-brand-text-secondary" />
                 {/if}
@@ -293,14 +325,14 @@
           >
             <VirtualList items={currentEntries} height="100%" itemHeight={ROW_HEIGHT_PX} bind:this={lists[column]} bind:start={starts[column]} bind:end={ends[column]}>
               {#snippet children({ item: entry }: { item: FileEntry })}
-                {@const selected = selectedName === entry.name}
-                {@const muted = entry.status === "excluded" || entry.status === "albumArt" || entry.status === "notAudio"}
+                {@const selected = selection.includes(entry.name)}
+                {@const muted = MUTED.includes(entry.status)}
                 <div
                   class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'}"
                   role="option"
                   aria-selected={selected}
                   tabindex="-1"
-                  onclick={() => (entry.isDir ? openFolder(dir, entry.name) : (selectedName = entry.name))}
+                  onclick={(e) => (entry.isDir ? openFolder(dir, entry.name) : clickFile(e, entry.name))}
                   ondblclick={() => { if (!entry.isDir) onplay(entry); }}
                   onkeydown={() => {}}
                 >

@@ -36,6 +36,7 @@
   import { formatWindowTitle } from '../lib/utils/formatters';
   import { FrontendErrorReporter } from '../lib/utils/frontendError';
   import TagEditor from '../lib/components/TagEditor.svelte';
+  import DeviceSyncDrawer from '../lib/components/devices/DeviceSyncDrawer.svelte';
   import { onMount } from 'svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -497,8 +498,9 @@
             {/if}
 
             <!-- Central Content Area -->
-            <main class="@container flex-1 bg-brand-main overflow-hidden flex flex-col">
+            <main class="@container relative flex-1 bg-brand-main overflow-hidden flex flex-col">
               {@render children()}
+              <DeviceSyncDrawer />
             </main>
 
             <!-- Right Contextual Panel: docked, or a rail plus hover overlay when unpinned -->
