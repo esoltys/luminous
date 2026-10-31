@@ -6,6 +6,7 @@ import adapter from "@sveltejs/adapter-static";
 import tailwindcss from "@tailwindcss/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
 import { tauriIpcMockPlugin } from "./scripts/vite-mock-plugin.ts";
+import { svelteVirtualStyleGuard } from "./scripts/vite-svelte-style-guard.ts";
 
 import { execSync } from "child_process";
 import path from "node:path";
@@ -124,25 +125,6 @@ function phosphorBarrelOptimizer() {
         return lines.join("\n");
       });
       return mutated ? { code: rewritten, map: null } : null;
-    },
-  };
-}
-
-/**
- * Guard against HMR race conditions where Vite requests a component's virtual
- * CSS module (`?svelte&type=style&lang.css`) before vite-plugin-svelte has
- * compiled the component. Without this, an unhandled virtual module request
- * falls back to Vite's default file loader, which reads the raw .svelte file
- * from disk and feeds its <script> tags into PostCSS, throwing syntax errors.
- */
-function svelteVirtualStyleGuard() {
-  return {
-    name: "svelte-virtual-style-guard",
-    enforce: "post",
-    load(id) {
-      if (id.includes(".svelte") && (id.includes("?svelte&type=style") || id.includes("&type=style"))) {
-        return { code: "", map: null };
-      }
     },
   };
 }
