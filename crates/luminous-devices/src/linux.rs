@@ -1,4 +1,5 @@
-//! Linux: mounted filesystems from udisks2, ejected through udisks2.
+//! Linux: mounted filesystems from udisks2, ejected through udisks2. MTP
+//! devices are `linux_mtp`.
 //!
 //! Under Flatpak this needs `--system-talk-name=org.freedesktop.UDisks2` and
 //! filesystem access to `/run/media` and `/media`.
