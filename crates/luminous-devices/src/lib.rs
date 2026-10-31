@@ -61,8 +61,8 @@ pub enum DeviceKind {
 pub struct Device {
     pub kind: DeviceKind,
     /// The id a device has before a marker gives it one: `vol-<volume
-    /// serial>` for mass storage, `mtp-<device serial>` for MTP, the same on
-    /// every computer. An MTP device that reports no serial gets one from
+    /// serial>` for mass storage, `mtp-<USB serial number>` for MTP, the same
+    /// on every computer. An MTP device that reports no serial gets one from
     /// its Plug and Play id instead, which can change with the USB port or
     /// computer until a saved profile writes its marker.
     pub provisional_id: String,
