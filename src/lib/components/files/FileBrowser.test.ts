@@ -98,6 +98,25 @@ describe("FileBrowser.svelte", () => {
     await waitFor(() => expect(getByRole("option", { name: /Rock/ })).toHaveAttribute("aria-selected", "true"));
   });
 
+  it("adds files to the selection with Ctrl and selects a run with Shift", async () => {
+    const { getByRole, findByText } = setup(["Rock", "Live"]);
+    await findByText("01 Opening.flac");
+    const selected = () =>
+      ["01 Opening.flac", "02 Encore.flac", "cover.jpg", "notes.txt"].filter(
+        (name) => getByRole("option", { name: new RegExp(name) }).getAttribute("aria-selected") === "true"
+      );
+
+    await fireEvent.click(getByRole("option", { name: /01 Opening/ }));
+    await fireEvent.click(getByRole("option", { name: /cover\.jpg/ }), { ctrlKey: true });
+    expect(selected()).toEqual(["01 Opening.flac", "cover.jpg"]);
+
+    await fireEvent.click(getByRole("option", { name: /notes\.txt/ }), { shiftKey: true });
+    expect(selected()).toEqual(["cover.jpg", "notes.txt"]);
+
+    await fireEvent.click(getByRole("option", { name: /02 Encore/ }));
+    expect(selected()).toEqual(["02 Encore.flac"]);
+  });
+
   it("says when the source is gone", async () => {
     const { findByText } = setup(["Missing"]);
     expect(await findByText("This source is no longer available.")).toBeInTheDocument();
