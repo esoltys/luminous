@@ -227,7 +227,7 @@
 </script>
 
 <div class="flex-1 min-h-0 flex flex-col gap-5" data-testid="device-sync-preview">
-  <div class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-5">
+  <div class="flex-1 min-h-0 overflow-y-auto pr-6 flex flex-col gap-5">
     <header>
       <button class="flex items-center gap-1 text-sm text-brand-accent-text hover:text-brand-accent-text-hover" onclick={onback}>
         <CaretLeftIcon class="w-3.5 h-3.5" />{i18n.t("devices.backToSettings", { device: name })}
@@ -285,7 +285,7 @@
     </div>
   </div>
 
-  <footer class="shrink-0 flex items-center justify-end gap-2 border-t border-brand-border/40 pt-4">
+  <footer class="mr-6 shrink-0 flex items-center justify-end gap-2 border-t border-brand-border/40 pt-4">
     {#if storage.fits}
       <Button onclick={onback}>{i18n.t("devices.changeSelection")}</Button>
       <Button variant="primary" onclick={start} disabled={busy}>{i18n.t("devices.startSync")}</Button>

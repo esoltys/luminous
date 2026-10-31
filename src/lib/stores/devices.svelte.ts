@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { ConnectedDevice, DeviceSyncState, SyncProgress, SyncSummary } from "../types";
 import { deviceName } from "../utils/devices";
 import { i18n } from "./i18n.svelte";
@@ -21,6 +21,7 @@ class DevicesStore {
   progress = $state<Record<string, SyncProgress>>({});
   /** The progress drawer is hidden; the sidebar row keeps showing progress. */
   drawerHidden = $state(false);
+  private unlisteners: UnlistenFn[] = [];
 
   constructor() {
     this.init();
@@ -28,14 +29,14 @@ class DevicesStore {
 
   private async init() {
     try {
-      await listen<ConnectedDevice[]>("devices-changed", (event) => this.setDevices(event.payload));
-      await listen<SyncProgress>("device-sync-progress", (event) => {
+      this.unlisteners.push(await listen<ConnectedDevice[]>("devices-changed", (event) => this.setDevices(event.payload)));
+      this.unlisteners.push(await listen<SyncProgress>("device-sync-progress", (event) => {
         const progress = event.payload;
         this.progress[progress.deviceId] = progress;
         const state = this.syncStates[progress.deviceId];
         if (state && !state.running) this.syncStates[progress.deviceId] = { ...state, running: true };
-      });
-      await listen<SyncSummary>("device-sync-finished", (event) => this.finished(event.payload));
+      }));
+      this.unlisteners.push(await listen<SyncSummary>("device-sync-finished", (event) => this.finished(event.payload)));
       const devices = await invoke<ConnectedDevice[]>("get_connected_devices");
       this.setDevices(Array.isArray(devices) ? devices : []);
       this.loaded = true;
@@ -131,6 +132,18 @@ class DevicesStore {
       console.error("Failed to stop device sync:", err);
     }
   }
+
+  /** Stops listening to the backend. */
+  dispose() {
+    for (const unlisten of this.unlisteners.splice(0)) unlisten();
+  }
 }
 
 export const devicesStore = new DevicesStore();
+
+// A hot reload runs this module again and builds a new store; the one it
+// replaces stops listening, or every sync would end with a toast from each.
+if (import.meta.hot) {
+  import.meta.hot.data.devicesStore?.dispose();
+  import.meta.hot.data.devicesStore = devicesStore;
+}

@@ -299,9 +299,9 @@
 
 <div class="flex-1 min-h-0 flex flex-col gap-3" data-testid="device-sync-settings">
   {#if !settings}
-    <p class="text-sm text-brand-text-secondary">{i18n.t("common.loading")}</p>
+    <p class="mr-6 text-sm text-brand-text-secondary">{i18n.t("common.loading")}</p>
   {:else}
-    <div class="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 @container">
+    <div class="flex-1 min-h-0 overflow-y-auto pr-6 grid grid-cols-1 @container">
       <div class="grid grid-cols-1 @3xl:grid-cols-2 gap-8 pb-2">
         <!-- What -->
         <section class="min-w-0 flex flex-col gap-3">
@@ -534,7 +534,7 @@
     </div>
 
     <!-- Projection -->
-    <div class="shrink-0 flex items-center gap-4 rounded-xl border border-brand-border/40 bg-brand-sidebar/60 px-4 py-3" data-testid="sync-projection">
+    <div class="mr-6 shrink-0 flex items-center gap-4 rounded-xl border border-brand-border/40 bg-brand-sidebar/60 px-4 py-3" data-testid="sync-projection">
       <div class="flex-1 min-w-0 flex flex-col gap-2">
         {#if plan}
           <DeviceStorageBar

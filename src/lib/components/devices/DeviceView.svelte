@@ -174,7 +174,8 @@
   }
 </script>
 
-<div class="flex-1 min-h-0 flex flex-col px-6 pt-4 gap-4" class:pb-28={!!playerStore.currentSong} class:pb-6={!playerStore.currentSong} data-testid="device-view">
+<!-- Right padding belongs to each part, so scrollable ones scroll at the window edge. -->
+<div class="flex-1 min-h-0 flex flex-col pl-6 pt-4 gap-4" class:pb-28={!!playerStore.currentSong} class:pb-6={!playerStore.currentSong} data-testid="device-view">
   {#if preview}
     <DeviceSyncPreview
       {device}
@@ -184,7 +185,7 @@
       onstarted={() => (preview = null)}
     />
   {:else}
-    <header class="flex items-start justify-between gap-4 flex-wrap">
+    <header class="mr-6 flex items-start justify-between gap-4 flex-wrap">
       <div class="flex items-center gap-4 min-w-0">
         {#if tab === "files"}
           <div class="w-14 h-14 shrink-0 flex items-center justify-center rounded-xl border border-brand-border/50 bg-brand-sidebar/60">
@@ -254,7 +255,7 @@
     </header>
 
     {#if tab === "files" && storage}
-      <section class="rounded-xl border border-brand-border/40 bg-brand-sidebar/40 px-4 py-3">
+      <section class="mr-6 rounded-xl border border-brand-border/40 bg-brand-sidebar/40 px-4 py-3">
         <DeviceStorageGauge {device} {storage}>
           {#snippet switcher()}
             {#if device.storages.length > 1}
@@ -274,7 +275,7 @@
       </section>
     {/if}
 
-    <div class="flex items-center gap-6 border-b border-brand-border/40" role="tablist">
+    <div class="mr-6 flex items-center gap-6 border-b border-brand-border/40" role="tablist">
       {#each ["files", "sync"] as const as t (t)}
         <button
           class="-mb-px py-2 text-sm font-semibold border-b-2 transition-colors {tab === t ? 'border-brand-accent-text text-brand-text-primary' : 'border-transparent text-brand-text-secondary hover:text-brand-text-primary'}"
@@ -286,36 +287,38 @@
     </div>
 
     {#if tab === "files"}
-      <FileBrowser
-        source={browsed}
-        path={location.path}
-        onnavigate={navigate}
-        onplay={(entry) => play([entry])}
-        {reloadToken}
-        unreachableLabel={i18n.t("files.unreachable", { name })}
-        bind:listing
-        bind:selectedName
-        bind:selection
-      >
-        {#snippet footer()}
-          <div class="flex items-center justify-between gap-3 px-4 py-2 text-xs text-brand-text-secondary">
-            <span class="truncate">
-              {selection.length > 0 ? i18n.plural("devices.selected", selection.length) : i18n.t("devices.onlyRemovesOwn")}
-            </span>
-            {#if selection.length > 0}
-              <div class="flex items-center gap-2 shrink-0">
-                <Button size="sm" onclick={() => play(selectedEntries)} disabled={playable.length === 0}>
-                  <PlayIcon weight="fill" class="w-3.5 h-3.5" />
-                  {i18n.t("devices.play")}
-                </Button>
-                <Button size="sm" variant="warning" onclick={() => (confirmingDelete = true)} disabled={syncing}>
-                  {i18n.t("devices.deleteFromDevice")}
-                </Button>
-              </div>
-            {/if}
-          </div>
-        {/snippet}
-      </FileBrowser>
+      <div class="flex-1 min-h-0 flex mr-6">
+        <FileBrowser
+          source={browsed}
+          path={location.path}
+          onnavigate={navigate}
+          onplay={(entry) => play([entry])}
+          {reloadToken}
+          unreachableLabel={i18n.t("files.unreachable", { name })}
+          bind:listing
+          bind:selectedName
+          bind:selection
+        >
+          {#snippet footer()}
+            <div class="flex items-center justify-between gap-3 px-4 py-2 text-xs text-brand-text-secondary">
+              <span class="truncate">
+                {selection.length > 0 ? i18n.plural("devices.selected", selection.length) : i18n.t("devices.onlyRemovesOwn")}
+              </span>
+              {#if selection.length > 0}
+                <div class="flex items-center gap-2 shrink-0">
+                  <Button size="sm" onclick={() => play(selectedEntries)} disabled={playable.length === 0}>
+                    <PlayIcon weight="fill" class="w-3.5 h-3.5" />
+                    {i18n.t("devices.play")}
+                  </Button>
+                  <Button size="sm" variant="warning" onclick={() => (confirmingDelete = true)} disabled={syncing}>
+                    {i18n.t("devices.deleteFromDevice")}
+                  </Button>
+                </div>
+              {/if}
+            </div>
+          {/snippet}
+        </FileBrowser>
+      </div>
     {:else}
       <DeviceSyncSettings {device} onpreview={(plan) => (preview = plan)} />
     {/if}
