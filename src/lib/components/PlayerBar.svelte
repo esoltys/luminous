@@ -2,6 +2,7 @@
   import { fly, prefersReducedMotion } from '../utils/motion';
   import { cubicOut } from 'svelte/easing';
   import { playerStore } from "../stores/player.svelte";
+  import { setVolumeFromSlider, volumeSliderBackground } from "../volumeSlider";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -64,9 +65,7 @@
 
 
   let volumePercent = $derived(playerStore.volume * 100);
-  let volumeSliderStyle = $derived(
-    `background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${volumePercent}%, var(--color-border) ${volumePercent}%, var(--color-border) 100%)`
-  );
+  let volumeSliderStyle = $derived(volumeSliderBackground(playerStore.volume, playerStore.volumeSafety));
 
   function handleSeek(e: Event) {
     const input = e.target as HTMLInputElement;
@@ -75,9 +74,7 @@
   }
 
   function handleVolumeChange(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const vol = parseFloat(input.value);
-    playerStore.setVolume(vol);
+    setVolumeFromSlider(e.target as HTMLInputElement);
   }
 
   function releaseVolumeFocus(e: Event) {

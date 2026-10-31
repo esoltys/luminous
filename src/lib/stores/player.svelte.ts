@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext, AudioPipelineInfo, RadioSeed, RadioResult, OutputFallbackPayload, OutputFallbackReason, AudioBackendKind } from "../types";
+import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext, AudioPipelineInfo, RadioSeed, RadioResult, OutputFallbackPayload, OutputFallbackReason, AudioBackendKind, VolumeSafety } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
 import { toastStore } from "./toast.svelte";
@@ -36,6 +36,8 @@ export class PlayerStore {
   playlistItemUuid = $state<string | undefined>(undefined);
   positionNanosec = $state<number>(0);
   volume = $state<number>(1.0);
+  /** The volume safety ceiling (#1890); null until the first playback state. */
+  volumeSafety = $state<VolumeSafety | null>(null);
   shuffleMode = $state<ShuffleMode>("off");
   repeatMode = $state<RepeatMode>("off");
   stopAfterCurrent = $state<boolean>(false);
@@ -345,6 +347,7 @@ export class PlayerStore {
     this.playlistItemUuid = state.playlist_item_uuid;
     this.positionNanosec = state.position_nanosec;
     this.volume = state.volume;
+    this.volumeSafety = state.volume_safety ?? null;
     this.shuffleMode = state.shuffle_mode;
     this.repeatMode = state.repeat_mode;
     this.stopAfterCurrent = state.stop_after_current;
@@ -616,9 +619,16 @@ export class PlayerStore {
     await this.seek(nextPositionNs);
   }
 
+  /** The backend may cap `vol` at the safety ceiling (#1890), so keep the
+   * level it reports applying rather than the one asked for. */
   async setVolume(vol: number) {
-    this.volume = vol;
-    await invoke("set_volume", { volume: vol });
+    this.volume = await invoke<number>("set_volume", { volume: vol });
+  }
+
+  /** Turn the volume safety ceiling on or off and set its level; the result
+   * (and any volume it lowered) arrives as `playback-state`. */
+  async setVolumeSafety(enabled: boolean, ceiling: number) {
+    await invoke("set_volume_safety", { enabled, ceiling });
   }
 
   async adjustVolume(delta: number) {

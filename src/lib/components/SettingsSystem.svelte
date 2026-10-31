@@ -256,6 +256,18 @@
   // The chosen bit-perfect output couldn't open and shared output stands in.
   let playingShared = $derived(!!playerStore.audioPipeline?.output_fell_back);
 
+  // Volume safety ceiling (#1890): the slider shows its drag position and
+  // saves the ceiling on release, so a drag isn't a stream of writes.
+  let volumeSafety = $derived(playerStore.volumeSafety);
+  let ceilingDraft = $state<number | null>(null);
+  let ceilingShown = $derived(ceilingDraft ?? volumeSafety?.ceiling ?? 0);
+
+  function commitCeiling(e: Event) {
+    const ceiling = parseFloat((e.currentTarget as HTMLInputElement).value);
+    ceilingDraft = null;
+    if (volumeSafety) void playerStore.setVolumeSafety(volumeSafety.enabled, ceiling);
+  }
+
   async function handleBackendChange(backend: AudioBackendKind) {
     const devices = prefs.audioOutputDevices.filter((d) => d.backend === backend);
     // Shared and exclusive list the same endpoints, so a chosen device carries
@@ -460,6 +472,42 @@
         {i18n.t('playerBar.outputFallbackRetry')}
       </Button>
     </div>
+  {/if}
+
+  {#if volumeSafety}
+    <div class="flex items-center justify-between gap-4 py-2">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.volumeSafetyLabel')}</span>
+        <p class="text-xs text-brand-text-secondary">{i18n.t('settings.volumeSafetyHint')}</p>
+      </div>
+      <Toggle
+        checked={volumeSafety.enabled}
+        onchange={(v) => playerStore.setVolumeSafety(v, volumeSafety.ceiling)}
+        label={i18n.t('settings.volumeSafetyLabel')}
+      />
+    </div>
+    {#if volumeSafety.enabled}
+      <div class="flex items-center justify-between gap-4 py-2">
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <label for="volume-safety-ceiling" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.volumeSafetyCeilingLabel')}</label>
+          <p class="text-xs text-brand-text-secondary">{i18n.t('settings.volumeSafetyCeilingHint')}</p>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+          <input
+            id="volume-safety-ceiling"
+            type="range"
+            min={volumeSafety.min}
+            max={volumeSafety.max}
+            step="0.01"
+            value={volumeSafety.ceiling}
+            oninput={(e) => (ceilingDraft = parseFloat(e.currentTarget.value))}
+            onchange={commitCeiling}
+            class="w-32 accent-brand-accent"
+          />
+          <span class="w-10 text-right text-xs font-medium tabular-nums text-brand-text-primary">{Math.round(ceilingShown * 100)}%</span>
+        </div>
+      </div>
+    {/if}
   {/if}
 
   <!-- ASIO Driver Control Panel Button -->

@@ -74,6 +74,9 @@ vi.mock("@tauri-apps/api/core", () => {
           stop_after_current: false,
         };
       }
+      if (cmd === "set_volume") {
+        return (args as { volume: number }).volume;
+      }
       if (cmd === "validate_playlist_name") {
         return { valid: true, reason: null };
       }

@@ -556,6 +556,17 @@ export interface PlaybackState {
   playlist_index?: number;
   /** Total number of tracks in the active play order (#1605). */
   playlist_total?: number;
+  /** The volume safety ceiling (#1890); `volume` never exceeds it while on. */
+  volume_safety?: VolumeSafety;
+}
+
+/** The volume safety ceiling (#1890), in volume-slider units. `ceiling` is
+ * remembered while off; `min`/`max` are the bounds the backend keeps it in. */
+export interface VolumeSafety {
+  enabled: boolean;
+  ceiling: number;
+  min: number;
+  max: number;
 }
 
 /** Shared shape for anything rendered as a `LibraryBadge` — a music source's

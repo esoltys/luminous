@@ -167,6 +167,9 @@ describe("Miniplayer.svelte", () => {
 
   it("adjusts volume via the slider and mutes/unmutes via the volume button", async () => {
     playerStore.currentSong = mockSong;
+    vi.mocked(invoke).mockImplementation(async (cmd, args) =>
+      cmd === "set_volume" ? (args as { volume: number }).volume : null
+    );
     const setVolumeSpy = vi.spyOn(playerStore, "setVolume");
 
     const { getByTitle, getByLabelText } = render(Miniplayer);
@@ -174,6 +177,8 @@ describe("Miniplayer.svelte", () => {
     const slider = getByLabelText("Volume Slider") as HTMLInputElement;
     await fireEvent.input(slider, { target: { value: "0.4" } });
     expect(setVolumeSpy).toHaveBeenCalledWith(0.4);
+    // The store keeps the level the backend reports applying.
+    await vi.waitFor(() => expect(playerStore.volume).toBe(0.4));
 
     const muteBtn = getByTitle("Volume");
     await fireEvent.click(muteBtn);
