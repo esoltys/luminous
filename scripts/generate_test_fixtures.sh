@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generates the synthetic audio fixtures under src-tauri/tests/fixtures/audio/
-# used by the Cucumber BDD suites (library_scan_bdd, cover_art_bdd, etc.) so
+# used by the backend integration test suites (library_scan_test, cover_art_test, etc.) so
 # those scenarios exercise the real scanner/tag-reading/cover-art code paths
 # against real files instead of hand-seeded DB rows (issue #578).
 #

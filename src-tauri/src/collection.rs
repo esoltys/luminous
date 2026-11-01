@@ -1052,8 +1052,8 @@ impl CollectionScanner {
     /// Core of `scan_all`, decoupled from Tauri's `AppHandle` (progress
     /// emission is a plain callback, and the covers-cache directory is
     /// passed in) so it's directly callable from tests without mocking a
-    /// Tauri app — see `tests/library_scan_bdd.rs` and
-    /// `tests/cover_art_bdd.rs`. `resolve_remote_art` gates Phase 3's iTunes
+    /// Tauri app — see `tests/library_scan_test.rs` and
+    /// `tests/cover_art_test.rs`. `resolve_remote_art` gates Phase 3's iTunes
     /// network fallback; local embedded-art/folder-art resolution always
     /// runs regardless since neither touches the network. Tests pass
     /// `false` to keep scans deterministic and offline.
