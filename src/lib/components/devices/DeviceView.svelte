@@ -111,7 +111,7 @@
     try {
       const settings = syncSettings ? $state.snapshot(syncSettings) : (syncState ?? (await devicesStore.refreshSyncState(device.id)))?.settings;
       if (!settings) return;
-      preview = await invoke<SyncPlan>("preview_device_sync", { deviceId: device.id, settings });
+      preview = await devicesStore.planSync(device.id, settings);
     } catch (err) {
       console.error("Failed to preview device sync:", err);
       toastStore.show(i18n.t("devices.previewFailed", { device: name }), "error");

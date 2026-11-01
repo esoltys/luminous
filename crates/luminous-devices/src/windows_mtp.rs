@@ -6,20 +6,23 @@
 //! to: an iPhone reports MTP too, but its one storage is a read-only camera
 //! roll, so it is left out.
 //!
+//! A device is served as a [`Transport`]; what MTP needs on top of that is
+//! shared with Linux in [`crate::mtp`] (#1893).
+//!
 //! Threading: every WPD object is created through `PortableDeviceFTM` (or
 //! is reached from one that was), so it is free-threaded and any thread that
 //! has joined COM may call it. [`com`] joins the calling thread to the
-//! multithreaded apartment and runs at every entry point; a per-device lock
-//! serializes calls, since MTP handles one operation at a time anyway.
+//! multithreaded apartment and runs at every entry point (the watcher and
+//! each [`Transport`] method); the shared per-device lock serializes calls,
+//! since MTP handles one operation at a time anyway.
 
-use crate::backend::{cancelled, components, PARTIAL_SUFFIX};
-use crate::{naming, DeviceBackend, DeviceCache, DeviceKind, DirEntry, Progress, Space, Storage};
+use crate::backend::{cancelled, PARTIAL_SUFFIX};
+use crate::mtp::{Handle, Identity, StorageInfo, Transport};
+use crate::{naming, DirEntry, Progress, Space};
 use parking_lot::Mutex;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::io::{self, Read};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use windows::core::{Interface, GUID, PCWSTR, PWSTR};
 use windows::Win32::Devices::PortableDevices::*;
 use windows::Win32::Foundation::{E_NOTIMPL, PROPERTYKEY, RPC_E_CHANGED_MODE, S_OK};
@@ -96,8 +99,10 @@ impl Watcher {
         for id in ids.iter().filter(|id| !is_volume_shim(id)) {
             let entry = match self.known.entry(id.clone()) {
                 Entry::Occupied(entry) => entry.into_mut(),
-                Entry::Vacant(entry) => match Connection::open(id, true) {
-                    Ok(c) => entry.insert(Some(Handle(Arc::new(c)))),
+                Entry::Vacant(entry) => match open(id, true) {
+                    Ok((identity, device)) => {
+                        entry.insert(Some(Handle::new(identity, Box::new(device))))
+                    }
                     Err(e) if e.code() == E_NOTIMPL => {
                         log::info!("Not using portable device {id}: {e}");
                         entry.insert(None)
@@ -112,7 +117,7 @@ impl Watcher {
                 },
             };
             let Some(handle) = entry else { continue };
-            if handle.0.ejected.load(Ordering::Relaxed) {
+            if handle.is_ejected() {
                 continue;
             }
             match handle.device() {
@@ -121,7 +126,7 @@ impl Watcher {
                 Ok(None) => {}
                 Err(e) => {
                     // Probably unplugged mid-poll; reopen if it is still there.
-                    log::info!("Lost portable device {id}: {e}");
+                    log::info!("Lost portable device {} ({id}): {e}", handle.name());
                     self.known.remove(id);
                 }
             }
@@ -253,238 +258,125 @@ fn is_writable(access: Option<u32>) -> bool {
     access.is_none_or(|a| a == WPD_STORAGE_ACCESS_CAPABILITY_READWRITE.0 as u32)
 }
 
-/// A shared connection to one device. Equal when it is the same device.
-#[derive(Clone)]
-pub(crate) struct Handle(Arc<Connection>);
+/// Opens a device: who it is, and the device as a [`Transport`]. With
+/// `require_mtp`, fails with `E_NOTIMPL` for anything that is not an MTP
+/// device.
+fn open(pnp_id: &str, require_mtp: bool) -> windows::core::Result<(Identity, WpdDevice)> {
+    com();
+    unsafe {
+        let client: IPortableDeviceValues =
+            CoCreateInstance(&PortableDeviceValues, None, CLSCTX_INPROC_SERVER)?;
+        client.SetStringValue(&WPD_CLIENT_NAME, windows::core::w!("Luminous"))?;
+        client.SetUnsignedIntegerValue(&WPD_CLIENT_MAJOR_VERSION, 1)?;
+        client.SetUnsignedIntegerValue(&WPD_CLIENT_MINOR_VERSION, 0)?;
+        client.SetUnsignedIntegerValue(&WPD_CLIENT_REVISION, 0)?;
+        client.SetUnsignedIntegerValue(
+            &WPD_CLIENT_SECURITY_QUALITY_OF_SERVICE,
+            SECURITY_IMPERSONATION_QOS,
+        )?;
+        let device: IPortableDevice =
+            CoCreateInstance(&PortableDeviceFTM, None, CLSCTX_INPROC_SERVER)?;
+        let pnp = wide(pnp_id);
+        device.Open(PCWSTR(pnp.as_ptr()), &client)?;
+        let content = device.Content()?;
+        let properties = content.Properties()?;
 
-impl PartialEq for Handle {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.pnp_id == other.0.pnp_id
+        let values = properties.GetValues(
+            WPD_DEVICE_OBJECT_ID,
+            &keys(&[
+                WPD_DEVICE_PROTOCOL,
+                WPD_DEVICE_SERIAL_NUMBER,
+                WPD_DEVICE_MANUFACTURER,
+                WPD_DEVICE_MODEL,
+                WPD_DEVICE_FRIENDLY_NAME,
+            ])?,
+        )?;
+        let protocol = string(&values, &WPD_DEVICE_PROTOCOL).unwrap_or_default();
+        if require_mtp && !is_mtp_protocol(&protocol) {
+            let _ = device.Close();
+            return Err(windows::core::Error::new(
+                E_NOTIMPL,
+                format!("not an MTP device ({protocol})"),
+            ));
+        }
+        let model = naming::model_name(
+            string(&values, &WPD_DEVICE_MANUFACTURER).as_deref(),
+            string(&values, &WPD_DEVICE_MODEL).as_deref(),
+        );
+        let identity = Identity {
+            provisional_id: naming::mtp_provisional_id(
+                usb_serial_number(pnp_id)
+                    .or_else(|| string(&values, &WPD_DEVICE_SERIAL_NUMBER))
+                    .as_deref(),
+                pnp_id,
+            ),
+            default_name: string(&values, &WPD_DEVICE_FRIENDLY_NAME)
+                .or_else(|| model.clone())
+                .unwrap_or_else(|| "Portable device".to_string()),
+            model,
+            formats: supported_audio_formats(&device),
+        };
+        Ok((
+            identity,
+            WpdDevice {
+                device,
+                content,
+                properties,
+                folders: Mutex::new(HashMap::new()),
+                listing: Mutex::new(None),
+            },
+        ))
     }
 }
 
-impl std::fmt::Debug for Handle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.pnp_id.fmt(f)
-    }
-}
+/// The objects in one folder, by id, with what a listing shows of each.
+type Children = Vec<(String, DirEntry)>;
 
-impl Handle {
-    pub(crate) fn storage(&self, storage_id: &str) -> MtpStorage {
-        // A storage that has since gone (an SD card taken out) keeps its
-        // public id as its object id, so every call on it fails.
-        let storage_object = self
-            .0
-            .storage_objects
-            .lock()
-            .get(storage_id)
-            .cloned()
-            .unwrap_or_else(|| storage_id.to_string());
-        MtpStorage {
-            connection: Arc::clone(&self.0),
-            storage_object,
-        }
-    }
-
-    pub(crate) fn eject(&self) {
-        com();
-        self.0.ejected.store(true, Ordering::Relaxed);
-        let _guard = self.0.lock.lock();
-        unsafe {
-            let _ = self.0.device.Close();
-        }
-    }
-
-    /// The device as it is now, with fresh storage capacities, or `None`
-    /// while it has no storage Luminous can write to (a read-only camera
-    /// roll, or a phone that is locked or not set to file transfer).
-    fn device(&self) -> windows::core::Result<Option<crate::Device>> {
-        let storages = self.0.storages()?;
-        if storages.is_empty() {
-            return Ok(None);
-        }
-        Ok(Some(crate::Device {
-            kind: DeviceKind::Mtp,
-            provisional_id: self.0.provisional_id.clone(),
-            model: self.0.model.clone(),
-            default_name: self.0.default_name.clone(),
-            storages,
-            access: crate::Access::Mtp(self.clone()),
-            reported_formats: self.0.formats.clone(),
-            cache: Arc::clone(&self.0.cache),
-        }))
-    }
-}
-
-pub(crate) struct Connection {
-    pnp_id: String,
+/// One device through WPD. WPD addresses objects by id rather than path, so
+/// paths are resolved here, through a cache of folder ids and of the last
+/// listing that is forgotten on any failure, as the shared layer forgets its
+/// own.
+struct WpdDevice {
     device: IPortableDevice,
     content: IPortableDeviceContent,
     properties: IPortableDeviceProperties,
-    provisional_id: String,
-    model: Option<String>,
-    default_name: String,
-    /// Lower-case names of the audio formats the device says it plays.
-    formats: Vec<String>,
-    lock: Mutex<()>,
-    ejected: AtomicBool,
-    /// Object ids of folders already found, by storage and lower-case path.
-    folders: Mutex<HashMap<(String, String), String>>,
-    /// Storage object ids by public storage id (see [`Storage::id`]).
-    storage_objects: Mutex<HashMap<String, String>>,
-    /// What `storages` last read, reused while a transfer holds `lock`.
-    last_storages: Mutex<Vec<Storage>>,
-    /// Whether renaming works on this device: unknown until the first write
-    /// tries it. When it does not, writes go straight to the final name.
-    can_rename: Mutex<Option<bool>>,
-    /// Shared with every `Device` built from this connection, so the marker
-    /// and default profile are read once per connection.
-    cache: Arc<DeviceCache>,
+    /// Object ids of folders already found, by storage object and exact
+    /// path. Files are looked up in their folder every time, so a renamed
+    /// file that came back with a new id is never stale here.
+    folders: Mutex<HashMap<(String, Vec<String>), String>>,
+    /// The folder last listed, by object id, and what was in it, so that
+    /// renaming or deleting something just listed does not enumerate its
+    /// folder again (removing a folder deletes each entry of one listing).
+    /// Deletes keep it current; any other change drops it.
+    listing: Mutex<Option<(String, Children)>>,
 }
 
 // SAFETY: see the module comment. The interfaces come from
 // `PortableDeviceFTM` and are free-threaded, every entry point calls `com()`
-// first, and `lock` serializes their use.
-unsafe impl Send for Connection {}
-unsafe impl Sync for Connection {}
+// first, and the shared connection lock serializes their use.
+unsafe impl Send for WpdDevice {}
+unsafe impl Sync for WpdDevice {}
 
-impl Connection {
-    /// Opens a device. With `require_mtp`, fails for anything that is not
-    /// an MTP device.
-    fn open(pnp_id: &str, require_mtp: bool) -> windows::core::Result<Self> {
+impl WpdDevice {
+    /// Runs `op` on a thread joined to COM. A failure forgets what is
+    /// cached, in case it went stale (changed on the device itself).
+    fn run<T>(&self, op: impl FnOnce() -> io::Result<T>) -> io::Result<T> {
         com();
-        unsafe {
-            let client: IPortableDeviceValues =
-                CoCreateInstance(&PortableDeviceValues, None, CLSCTX_INPROC_SERVER)?;
-            client.SetStringValue(&WPD_CLIENT_NAME, windows::core::w!("Luminous"))?;
-            client.SetUnsignedIntegerValue(&WPD_CLIENT_MAJOR_VERSION, 1)?;
-            client.SetUnsignedIntegerValue(&WPD_CLIENT_MINOR_VERSION, 0)?;
-            client.SetUnsignedIntegerValue(&WPD_CLIENT_REVISION, 0)?;
-            client.SetUnsignedIntegerValue(
-                &WPD_CLIENT_SECURITY_QUALITY_OF_SERVICE,
-                SECURITY_IMPERSONATION_QOS,
-            )?;
-            let device: IPortableDevice =
-                CoCreateInstance(&PortableDeviceFTM, None, CLSCTX_INPROC_SERVER)?;
-            let pnp = wide(pnp_id);
-            device.Open(PCWSTR(pnp.as_ptr()), &client)?;
-            let content = device.Content()?;
-            let properties = content.Properties()?;
-
-            let values = properties.GetValues(
-                WPD_DEVICE_OBJECT_ID,
-                &keys(&[
-                    WPD_DEVICE_PROTOCOL,
-                    WPD_DEVICE_SERIAL_NUMBER,
-                    WPD_DEVICE_MANUFACTURER,
-                    WPD_DEVICE_MODEL,
-                    WPD_DEVICE_FRIENDLY_NAME,
-                ])?,
-            )?;
-            let protocol = string(&values, &WPD_DEVICE_PROTOCOL).unwrap_or_default();
-            if require_mtp && !is_mtp_protocol(&protocol) {
-                let _ = device.Close();
-                return Err(windows::core::Error::new(
-                    E_NOTIMPL,
-                    format!("not an MTP device ({protocol})"),
-                ));
-            }
-            let model = naming::model_name(
-                string(&values, &WPD_DEVICE_MANUFACTURER).as_deref(),
-                string(&values, &WPD_DEVICE_MODEL).as_deref(),
-            );
-            let default_name = string(&values, &WPD_DEVICE_FRIENDLY_NAME)
-                .or_else(|| model.clone())
-                .unwrap_or_else(|| "Portable device".to_string());
-            let formats = supported_audio_formats(&device);
-            Ok(Self {
-                pnp_id: pnp_id.to_string(),
-                provisional_id: naming::mtp_provisional_id(
-                    usb_serial_number(pnp_id)
-                        .or_else(|| string(&values, &WPD_DEVICE_SERIAL_NUMBER))
-                        .as_deref(),
-                    pnp_id,
-                ),
-                device,
-                content,
-                properties,
-                model,
-                default_name,
-                formats,
-                lock: Mutex::new(()),
-                ejected: AtomicBool::new(false),
-                folders: Mutex::new(HashMap::new()),
-                storage_objects: Mutex::new(HashMap::new()),
-                last_storages: Mutex::new(Vec::new()),
-                can_rename: Mutex::new(None),
-                cache: Arc::default(),
-            })
-        }
+        op().inspect_err(|_| {
+            self.folders.lock().clear();
+            self.listing.lock().take();
+        })
     }
 
-    /// The device's writable storages with their current free space. While
-    /// a transfer holds the device, returns what the last call read, so
-    /// polling never waits for a copy to finish.
-    fn storages(&self) -> windows::core::Result<Vec<Storage>> {
-        com();
-        let Some(_guard) = self.lock.try_lock() else {
-            return Ok(self.last_storages.lock().clone());
-        };
-        unsafe {
-            let ids = self
-                .device
-                .Capabilities()?
-                .GetFunctionalObjects(&WPD_FUNCTIONAL_CATEGORY_STORAGE)?;
-            let wanted = keys(&[
-                WPD_OBJECT_PERSISTENT_UNIQUE_ID,
-                WPD_STORAGE_DESCRIPTION,
-                WPD_OBJECT_NAME,
-                WPD_STORAGE_FILE_SYSTEM_TYPE,
-                WPD_STORAGE_CAPACITY,
-                WPD_STORAGE_FREE_SPACE_IN_BYTES,
-                WPD_STORAGE_ACCESS_CAPABILITY,
-            ])?;
-            let mut storages = Vec::new();
-            let mut objects = HashMap::new();
-            for object in variant_strings(&ids)? {
-                let values = self
-                    .properties
-                    .GetValues(&windows::core::HSTRING::from(&object), &wanted)?;
-                if !is_writable(
-                    values
-                        .GetUnsignedIntegerValue(&WPD_STORAGE_ACCESS_CAPABILITY)
-                        .ok(),
-                ) {
-                    continue;
-                }
-                // Object ids last one session; the persistent unique id is
-                // what WPD keeps across reconnects.
-                let id = string(&values, &WPD_OBJECT_PERSISTENT_UNIQUE_ID)
-                    .unwrap_or_else(|| object.clone());
-                objects.insert(id.clone(), object);
-                storages.push(Storage {
-                    label: string(&values, &WPD_STORAGE_DESCRIPTION)
-                        .or_else(|| string(&values, &WPD_OBJECT_NAME)),
-                    mount_path: None,
-                    filesystem: string(&values, &WPD_STORAGE_FILE_SYSTEM_TYPE).unwrap_or_default(),
-                    total_bytes: values
-                        .GetUnsignedLargeIntegerValue(&WPD_STORAGE_CAPACITY)
-                        .unwrap_or(0),
-                    free_bytes: values
-                        .GetUnsignedLargeIntegerValue(&WPD_STORAGE_FREE_SPACE_IN_BYTES)
-                        .unwrap_or(0),
-                    id,
-                });
-            }
-            *self.storage_objects.lock() = objects;
-            *self.last_storages.lock() = storages.clone();
-            Ok(storages)
-        }
+    /// What is in `folder` now, kept as the last listing.
+    fn listed(&self, folder: &str) -> io::Result<Children> {
+        let children = self.children(folder)?;
+        *self.listing.lock() = Some((folder.to_string(), children.clone()));
+        Ok(children)
     }
 
     /// The objects in a folder (or storage), with what a listing shows.
-    /// Caller holds the lock.
-    fn children(&self, parent: &str) -> io::Result<Vec<(String, DirEntry)>> {
+    fn children(&self, parent: &str) -> io::Result<Children> {
         unsafe {
             let parent = windows::core::HSTRING::from(parent);
             let objects = self
@@ -553,83 +445,77 @@ impl Connection {
         }
     }
 
-    /// The child of `parent` called `name`: an exact match, else one that
-    /// differs only in case. Caller holds the lock.
+    /// The child of `parent` called exactly `name`, from the last listing
+    /// when that was of `parent`.
     fn child(&self, parent: &str, name: &str) -> io::Result<Option<(String, DirEntry)>> {
-        let children = self.children(parent)?;
-        let exact = children.iter().position(|(_, e)| e.name == name);
-        let index = exact.or_else(|| {
+        let find = |children: &[(String, DirEntry)]| {
             children
                 .iter()
-                .position(|(_, e)| e.name.eq_ignore_ascii_case(name))
-        });
-        Ok(index.map(|i| children.into_iter().nth(i).expect("index from position")))
+                .find(|(_, entry)| entry.name == name)
+                .cloned()
+        };
+        if let Some((folder, children)) = &*self.listing.lock() {
+            if folder == parent {
+                return Ok(find(children));
+            }
+        }
+        Ok(find(&self.listed(parent)?))
     }
 
-    /// Object id of the folder at `parts` under `storage`, creating missing
-    /// folders when `create`. `None` when it does not exist (or is a file).
-    /// Caller holds the lock.
-    fn folder(&self, storage: &str, parts: &[&str], create: bool) -> io::Result<Option<String>> {
+    /// Object id of the folder at `dir` in `storage`, `None` when there is
+    /// no folder there.
+    fn folder(&self, storage: &str, dir: &[String]) -> io::Result<Option<String>> {
         let mut current = storage.to_string();
-        let mut path = String::new();
-        for part in parts {
-            if !path.is_empty() {
-                path.push('/');
-            }
-            path.push_str(&part.to_lowercase());
-            let key = (storage.to_string(), path.clone());
+        for depth in 1..=dir.len() {
+            let key = (storage.to_string(), dir[..depth].to_vec());
             if let Some(id) = self.folders.lock().get(&key) {
                 current = id.clone();
                 continue;
             }
-            current = match self.child(&current, part)? {
-                Some((id, entry)) if entry.is_dir => id,
-                Some(_) => return Ok(None),
-                None if create => self.create_folder(&current, part)?,
-                None => return Ok(None),
-            };
+            match self.child(&current, &dir[depth - 1])? {
+                Some((id, entry)) if entry.is_dir => current = id,
+                _ => return Ok(None),
+            }
             self.folders.lock().insert(key, current.clone());
         }
         Ok(Some(current))
     }
 
-    /// Forgets cached folder ids, after a failure that may mean they are
-    /// stale (the folder was removed on the device itself).
-    fn forget_folders(&self) {
-        self.folders.lock().clear();
+    /// The parent folder's id and the name of the entry at `path`.
+    fn parent<'a>(&self, storage: &str, path: &'a [String]) -> io::Result<(String, &'a str)> {
+        let (name, parents) = path
+            .split_last()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no name"))?;
+        let parent = self
+            .folder(storage, parents)?
+            .ok_or_else(|| not_found(parents))?;
+        Ok((parent, name))
     }
 
-    fn create_folder(&self, parent: &str, name: &str) -> io::Result<String> {
-        unsafe {
-            let values = new_object_values(parent, name)?;
-            values
-                .SetGuidValue(&WPD_OBJECT_CONTENT_TYPE, &WPD_CONTENT_TYPE_FOLDER)
-                .map_err(io_error)?;
-            values
-                .SetGuidValue(&WPD_OBJECT_FORMAT, &WPD_OBJECT_FORMAT_PROPERTIES_ONLY)
-                .map_err(io_error)?;
-            let mut id = PWSTR::null();
-            self.content
-                .CreateObjectWithPropertiesOnly(&values, &mut id)
-                .map_err(io_error)?;
-            take_string(id).ok_or_else(|| io::Error::other("device returned no folder id"))
-        }
+    /// Object id of the entry at `path`.
+    fn object(&self, storage: &str, path: &[String]) -> io::Result<String> {
+        let (parent, name) = self.parent(storage, path)?;
+        Ok(self.child(&parent, name)?.ok_or_else(|| not_found(path))?.0)
     }
 
-    /// Sends `len` bytes as a new object called `name` in `parent`; returns
-    /// its id. The object's type comes from `final_name`, the name it will
-    /// have once renamed. An uncommitted object is discarded by the device.
-    /// Caller holds the lock.
-    fn upload(
+    /// Forgets the cached folder at `path` and everything below it.
+    fn forget(&self, storage: &str, path: &[String]) {
+        self.folders
+            .lock()
+            .retain(|(s, p), _| s != storage || !p.starts_with(path));
+    }
+
+    /// Sends `len` bytes as a new object called `name` in `parent`. An
+    /// uncommitted object is discarded by the device.
+    fn upload_object(
         &self,
         parent: &str,
         name: &str,
-        final_name: &str,
         source: &mut dyn Read,
         len: u64,
         progress: Progress<'_>,
-    ) -> io::Result<String> {
-        let (content_type, format) = object_kind(final_name);
+    ) -> io::Result<()> {
+        let (content_type, format) = object_kind(name);
         unsafe {
             let values = new_object_values(parent, name)?;
             values
@@ -698,94 +584,7 @@ impl Connection {
                 let _ = data.Cancel();
                 return Err(e);
             }
-            stream.Commit(STGC_DEFAULT).map_err(io_error)?;
-            take_string(data.GetObjectID().map_err(io_error)?)
-                .ok_or_else(|| io::Error::other("device returned no object id"))
-        }
-    }
-
-    /// Whether objects in `folder` can be renamed. Learned once per
-    /// connection by renaming a one-byte probe file, so a device that cannot
-    /// rename is found out before any real file is replaced. Caller holds
-    /// the lock.
-    fn can_rename(&self, folder: &str) -> bool {
-        if let Some(known) = *self.can_rename.lock() {
-            return known;
-        }
-        let probe = format!(".luminous-rename-probe{PARTIAL_SUFFIX}");
-        let works = self
-            .upload(folder, &probe, &probe, &mut &b"L"[..], 1, &mut |_| {
-                std::ops::ControlFlow::Continue(())
-            })
-            .and_then(|id| {
-                let renamed_to = format!("{probe}2");
-                let renamed = self.rename(&id, &renamed_to);
-                // Some devices give a renamed object a new id, so find the
-                // probe by whichever name it ended up with.
-                for name in [&renamed_to, &probe] {
-                    if let Ok(Some((id, _))) = self.child(folder, name) {
-                        let _ = self.delete(&id);
-                    }
-                }
-                renamed
-            });
-        if let Err(e) = &works {
-            log::warn!(
-                "{} cannot rename files ({e}); writing in place instead",
-                self.default_name
-            );
-        }
-        *self.can_rename.lock() = Some(works.is_ok());
-        works.is_ok()
-    }
-
-    fn rename(&self, id: &str, name: &str) -> io::Result<()> {
-        unsafe {
-            let values: IPortableDeviceValues =
-                CoCreateInstance(&PortableDeviceValues, None, CLSCTX_INPROC_SERVER)
-                    .map_err(io_error)?;
-            values
-                .SetStringValue(
-                    &WPD_OBJECT_ORIGINAL_FILE_NAME,
-                    &windows::core::HSTRING::from(name),
-                )
-                .map_err(io_error)?;
-            let results = self
-                .properties
-                .SetValues(&windows::core::HSTRING::from(id), &values)
-                .map_err(io_error)?;
-            // Per-property failures come back as error values, not an Err.
-            match results.GetErrorValue(&WPD_OBJECT_ORIGINAL_FILE_NAME) {
-                Ok(hr) if hr.is_err() => Err(io_error(hr.into())),
-                _ => Ok(()),
-            }
-        }
-    }
-
-    fn delete(&self, id: &str) -> io::Result<()> {
-        self.delete_with(id, PORTABLE_DEVICE_DELETE_WITH_RECURSION)
-    }
-
-    /// Deletes `id`, failing if it has anything in it: the device checks.
-    fn delete_if_empty(&self, id: &str) -> io::Result<()> {
-        self.delete_with(id, PORTABLE_DEVICE_DELETE_NO_RECURSION)
-    }
-
-    fn delete_with(&self, id: &str, options: DELETE_OBJECT_OPTIONS) -> io::Result<()> {
-        unsafe {
-            let ids: IPortableDevicePropVariantCollection = CoCreateInstance(
-                &PortableDevicePropVariantCollection,
-                None,
-                CLSCTX_INPROC_SERVER,
-            )
-            .map_err(io_error)?;
-            let mut variant = string_variant(id);
-            let added = ids.Add(&variant);
-            let _ = PropVariantClear(&mut variant);
-            added.map_err(io_error)?;
-            self.content
-                .Delete(options.0 as u32, &ids, std::ptr::null_mut())
-                .map_err(io_error)
+            stream.Commit(STGC_DEFAULT).map_err(io_error)
         }
     }
 
@@ -824,143 +623,177 @@ impl Connection {
     }
 }
 
-/// [`DeviceBackend`] for one storage of an MTP device.
-pub(crate) struct MtpStorage {
-    connection: Arc<Connection>,
-    /// The storage's object id for this connection (its public id is the
-    /// persistent one; see [`Storage::id`]).
-    storage_object: String,
-}
-
-impl MtpStorage {
-    /// Runs `op` with the device locked. A failure forgets cached folder
-    /// ids, in case one went stale.
-    fn locked<T>(&self, op: impl FnOnce(&Connection) -> io::Result<T>) -> io::Result<T> {
-        com();
-        let connection = &*self.connection;
-        if connection.ejected.load(Ordering::Relaxed) {
-            return Err(io::Error::new(
-                io::ErrorKind::NotConnected,
-                "device ejected",
-            ));
-        }
-        let _guard = connection.lock.lock();
-        op(connection).inspect_err(|_| connection.forget_folders())
-    }
-
-    /// The object at `path`, `None` when there is none.
-    fn find(&self, c: &Connection, path: &str) -> io::Result<Option<(String, DirEntry)>> {
-        let parts = components(path);
-        let Some((name, parents)) = parts.split_last() else {
-            return Ok(None);
-        };
-        match c.folder(&self.storage_object, parents, false)? {
-            Some(parent) => c.child(&parent, name),
-            None => Ok(None),
-        }
-    }
-}
-
-impl DeviceBackend for MtpStorage {
-    fn list(&self, dir: &str) -> io::Result<Vec<DirEntry>> {
-        self.locked(
-            |c| match c.folder(&self.storage_object, &components(dir), false)? {
-                Some(folder) => Ok(c.children(&folder)?.into_iter().map(|(_, e)| e).collect()),
-                None => Ok(Vec::new()),
-            },
-        )
-    }
-
-    fn read(&self, path: &str) -> io::Result<Option<Vec<u8>>> {
-        self.locked(|c| match self.find(c, path)? {
-            Some((id, entry)) if !entry.is_dir => c.read_object(&id).map(Some),
-            _ => Ok(None),
+impl Transport for WpdDevice {
+    fn storages(&self) -> io::Result<Vec<StorageInfo>> {
+        self.run(|| unsafe {
+            let ids = self
+                .device
+                .Capabilities()
+                .and_then(|caps| caps.GetFunctionalObjects(&WPD_FUNCTIONAL_CATEGORY_STORAGE))
+                .map_err(io_error)?;
+            let wanted = keys(&[
+                WPD_OBJECT_PERSISTENT_UNIQUE_ID,
+                WPD_STORAGE_DESCRIPTION,
+                WPD_OBJECT_NAME,
+                WPD_STORAGE_FILE_SYSTEM_TYPE,
+                WPD_STORAGE_CAPACITY,
+                WPD_STORAGE_FREE_SPACE_IN_BYTES,
+                WPD_STORAGE_ACCESS_CAPABILITY,
+            ])
+            .map_err(io_error)?;
+            let mut storages = Vec::new();
+            for object in variant_strings(&ids).map_err(io_error)? {
+                let values = self
+                    .properties
+                    .GetValues(&windows::core::HSTRING::from(&object), &wanted)
+                    .map_err(io_error)?;
+                storages.push(StorageInfo {
+                    // Object ids last one session; the persistent unique id
+                    // is what WPD keeps across reconnects.
+                    id: Some(
+                        string(&values, &WPD_OBJECT_PERSISTENT_UNIQUE_ID)
+                            .unwrap_or_else(|| object.clone()),
+                    ),
+                    name: string(&values, &WPD_STORAGE_DESCRIPTION)
+                        .or_else(|| string(&values, &WPD_OBJECT_NAME))
+                        .unwrap_or_default(),
+                    filesystem: string(&values, &WPD_STORAGE_FILE_SYSTEM_TYPE).unwrap_or_default(),
+                    total_bytes: values
+                        .GetUnsignedLargeIntegerValue(&WPD_STORAGE_CAPACITY)
+                        .unwrap_or(0),
+                    free_bytes: values
+                        .GetUnsignedLargeIntegerValue(&WPD_STORAGE_FREE_SPACE_IN_BYTES)
+                        .unwrap_or(0),
+                    writable: is_writable(
+                        values
+                            .GetUnsignedIntegerValue(&WPD_STORAGE_ACCESS_CAPABILITY)
+                            .ok(),
+                    ),
+                    key: object,
+                });
+            }
+            Ok(storages)
         })
     }
 
-    fn write(
+    fn list(&self, storage: &str, dir: &[String]) -> io::Result<Option<Vec<DirEntry>>> {
+        self.run(|| match self.folder(storage, dir)? {
+            Some(folder) => Ok(Some(
+                self.listed(&folder)?
+                    .into_iter()
+                    .map(|(_, entry)| entry)
+                    .collect(),
+            )),
+            None => Ok(None),
+        })
+    }
+
+    fn read(&self, storage: &str, path: &[String]) -> io::Result<Vec<u8>> {
+        self.run(|| self.read_object(&self.object(storage, path)?))
+    }
+
+    fn upload(
         &self,
-        path: &str,
+        storage: &str,
+        path: &[String],
         source: &mut dyn Read,
         len: u64,
         progress: Progress<'_>,
     ) -> io::Result<()> {
-        self.locked(|c| {
-            let parts = components(path);
-            let Some((name, parents)) = parts.split_last() else {
-                return Err(io::Error::new(io::ErrorKind::InvalidInput, "no file name"));
-            };
-            let parent = c
-                .folder(&self.storage_object, parents, true)?
-                .ok_or_else(|| io::Error::other("a file is in the way of the folder"))?;
-
-            if !c.can_rename(&parent) {
-                if let Some((old, _)) = c.child(&parent, name)? {
-                    c.delete(&old)?;
-                }
-                c.upload(&parent, name, name, source, len, progress)?;
-                return Ok(());
-            }
-
-            let partial = format!("{name}{PARTIAL_SUFFIX}");
-            if let Some((stale, _)) = c.child(&parent, &partial)? {
-                c.delete(&stale)?;
-            }
-            let new = c.upload(&parent, &partial, name, source, len, progress)?;
-            if let Some((old, _)) = c.child(&parent, name)? {
-                c.delete(&old).inspect_err(|_| {
-                    let _ = c.delete(&new);
-                })?;
-            }
-            c.rename(&new, name)
+        self.run(|| {
+            let (parent, name) = self.parent(storage, path)?;
+            let uploaded = self.upload_object(&parent, name, source, len, progress);
+            self.listing.lock().take();
+            uploaded
         })
     }
 
-    fn remove(&self, path: &str) -> io::Result<()> {
-        if components(path).is_empty() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "cannot remove the root",
-            ));
-        }
-        self.locked(|c| {
-            if let Some((id, _)) = self.find(c, path)? {
-                c.delete(&id)?;
-            }
-            // The folder may have been cached, along with everything in it.
-            c.forget_folders();
+    fn create_folder(&self, storage: &str, path: &[String]) -> io::Result<()> {
+        self.run(|| unsafe {
+            let (parent, name) = self.parent(storage, path)?;
+            let values = new_object_values(&parent, name)?;
+            values
+                .SetGuidValue(&WPD_OBJECT_CONTENT_TYPE, &WPD_CONTENT_TYPE_FOLDER)
+                .map_err(io_error)?;
+            values
+                .SetGuidValue(&WPD_OBJECT_FORMAT, &WPD_OBJECT_FORMAT_PROPERTIES_ONLY)
+                .map_err(io_error)?;
+            let mut id = PWSTR::null();
+            self.content
+                .CreateObjectWithPropertiesOnly(&values, &mut id)
+                .map_err(io_error)?;
+            let id =
+                take_string(id).ok_or_else(|| io::Error::other("device returned no folder id"))?;
+            self.folders
+                .lock()
+                .insert((storage.to_string(), path.to_vec()), id);
+            self.listing.lock().take();
             Ok(())
         })
     }
 
-    fn remove_empty_folder(&self, path: &str) -> io::Result<bool> {
-        if components(path).is_empty() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "cannot remove the root",
-            ));
-        }
-        self.locked(|c| {
-            let Some((id, entry)) = self.find(c, path)? else {
-                return Ok(false);
-            };
-            // Saves a refused delete in the common case; the device's own
-            // refusal is what guarantees nothing in it is removed.
-            if !entry.is_dir || !c.children(&id)?.is_empty() {
-                return Ok(false);
+    fn rename(&self, storage: &str, path: &[String], name: &str) -> io::Result<()> {
+        self.run(|| unsafe {
+            let id = self.object(storage, path)?;
+            let values: IPortableDeviceValues =
+                CoCreateInstance(&PortableDeviceValues, None, CLSCTX_INPROC_SERVER)
+                    .map_err(io_error)?;
+            values
+                .SetStringValue(
+                    &WPD_OBJECT_ORIGINAL_FILE_NAME,
+                    &windows::core::HSTRING::from(name),
+                )
+                .map_err(io_error)?;
+            let results = self
+                .properties
+                .SetValues(&windows::core::HSTRING::from(&id), &values)
+                .map_err(io_error)?;
+            self.forget(storage, path);
+            self.listing.lock().take();
+            // Per-property failures come back as error values, not an Err.
+            match results.GetErrorValue(&WPD_OBJECT_ORIGINAL_FILE_NAME) {
+                Ok(hr) if hr.is_err() => Err(io_error(hr.into())),
+                _ => Ok(()),
             }
-            c.delete_if_empty(&id)?;
-            c.forget_folders();
-            Ok(true)
         })
     }
 
-    fn space(&self) -> io::Result<Space> {
-        self.locked(|c| unsafe {
-            let values = c
+    /// Deletes without recursion, so the device itself refuses a folder
+    /// that is not empty.
+    fn delete(&self, storage: &str, path: &[String]) -> io::Result<()> {
+        self.run(|| unsafe {
+            let id = self.object(storage, path)?;
+            let ids: IPortableDevicePropVariantCollection = CoCreateInstance(
+                &PortableDevicePropVariantCollection,
+                None,
+                CLSCTX_INPROC_SERVER,
+            )
+            .map_err(io_error)?;
+            let mut variant = string_variant(&id);
+            let added = ids.Add(&variant);
+            let _ = PropVariantClear(&mut variant);
+            added.map_err(io_error)?;
+            self.content
+                .Delete(
+                    PORTABLE_DEVICE_DELETE_NO_RECURSION.0 as u32,
+                    &ids,
+                    std::ptr::null_mut(),
+                )
+                .map_err(io_error)?;
+            self.forget(storage, path);
+            if let Some((_, children)) = &mut *self.listing.lock() {
+                children.retain(|(child, _)| *child != id);
+            }
+            Ok(())
+        })
+    }
+
+    fn space(&self, storage: &str) -> io::Result<Space> {
+        self.run(|| unsafe {
+            let values = self
                 .properties
                 .GetValues(
-                    &windows::core::HSTRING::from(&self.storage_object),
+                    &windows::core::HSTRING::from(storage),
                     &keys(&[WPD_STORAGE_CAPACITY, WPD_STORAGE_FREE_SPACE_IN_BYTES])
                         .map_err(io_error)?,
                 )
@@ -975,6 +808,20 @@ impl DeviceBackend for MtpStorage {
             })
         })
     }
+
+    fn eject(&self) {
+        com();
+        unsafe {
+            let _ = self.device.Close();
+        }
+    }
+}
+
+fn not_found(path: &[String]) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::NotFound,
+        format!("nothing at {}", path.join("/")),
+    )
 }
 
 /// The lower-case format names (as the profile's `supportedFormats` uses
@@ -1010,9 +857,12 @@ fn format_name(format: &GUID) -> Option<&'static str> {
 }
 
 /// Content type and format to create a file with, from its extension.
-/// Devices index audio by these; anything else is a generic file.
+/// Devices index audio by these; anything else is a generic file. A file
+/// written under a partial name gets the kind of the file it becomes.
 fn object_kind(name: &str) -> (GUID, GUID) {
     let extension = name
+        .strip_suffix(PARTIAL_SUFFIX)
+        .unwrap_or(name)
         .rsplit_once('.')
         .map(|(_, ext)| ext.to_ascii_lowercase())
         .unwrap_or_default();
@@ -1142,6 +992,7 @@ fn wide(s: &str) -> Vec<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::DeviceBackend;
     use std::ops::ControlFlow;
 
     #[test]
@@ -1229,6 +1080,10 @@ mod tests {
             object_kind("Playlist.m3u8").0,
             WPD_CONTENT_TYPE_GENERIC_FILE
         );
+        assert_eq!(
+            object_kind(&format!("01 Wail.flac{PARTIAL_SUFFIX}")),
+            (WPD_CONTENT_TYPE_AUDIO, WPD_OBJECT_FORMAT_FLAC)
+        );
     }
 
     /// Prints every portable device Windows lists, its protocol, and what a
@@ -1244,7 +1099,7 @@ mod tests {
             if is_volume_shim(&id) {
                 continue;
             }
-            let c = Connection::open(&id, false).unwrap();
+            let (_, c) = open(&id, false).unwrap();
             unsafe {
                 let values = c
                     .properties
@@ -1330,9 +1185,10 @@ mod tests {
             .into_iter()
             .find(|id| id.to_ascii_lowercase().contains(&needle))
             .expect("no portable device matches LUMINOUS_WPD_TEST_DEVICE");
-        let handle = Handle(Arc::new(Connection::open(&pnp_id, false).unwrap()));
+        let (identity, wpd) = open(&pnp_id, false).unwrap();
+        let handle = Handle::new(identity, Box::new(wpd));
         let device = handle.device().unwrap().expect("a writable storage");
-        println!("{device:#?} formats {:?}", handle.0.formats);
+        println!("{device:#?}");
         let storage = handle.storage(&device.storages[0].id);
         let space = storage.space().unwrap();
         assert!(space.total_bytes >= space.free_bytes && space.total_bytes > 0);

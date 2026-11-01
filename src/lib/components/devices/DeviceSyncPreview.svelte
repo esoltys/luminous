@@ -169,7 +169,7 @@
   async function replan() {
     const state = await devicesStore.refreshSyncState(device.id);
     if (!state) return;
-    onplan(await invoke<SyncPlan>("preview_device_sync", { deviceId: device.id, settings: state.settings }));
+    onplan(await devicesStore.planSync(device.id, state.settings));
   }
 
   /** The suggested fix: convert everything that gets smaller, then plan again. */

@@ -276,7 +276,10 @@ impl Transport for GvfsDevice {
             });
             storages.push(StorageInfo {
                 key: entry.name.clone(),
+                // gvfs does not expose MTP's persistent storage id.
+                id: None,
                 name: entry.name,
+                filesystem: "MTP".to_string(),
                 total_bytes: space.total_bytes,
                 free_bytes: space.free_bytes,
                 writable,

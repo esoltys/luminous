@@ -17,6 +17,8 @@ mod profile;
 mod linux;
 #[cfg(target_os = "linux")]
 mod linux_mtp;
+#[cfg(any(windows, target_os = "linux"))]
+mod mtp;
 #[cfg(not(any(windows, target_os = "linux")))]
 mod unsupported;
 #[cfg(windows)]
@@ -32,9 +34,9 @@ use unsupported as platform;
 use windows as platform;
 
 #[cfg(target_os = "linux")]
-use linux_mtp as mtp;
+use linux_mtp::Watcher as MtpWatcher;
 #[cfg(windows)]
-use windows_mtp as mtp;
+use windows_mtp::Watcher as MtpWatcher;
 
 pub use backend::{
     is_partial_file, is_system_clutter, DeviceBackend, DirEntry, FsBackend, Progress, Space,
@@ -323,7 +325,7 @@ impl std::error::Error for EjectError {}
 pub struct DeviceWatcher {
     volumes: platform::Watcher,
     #[cfg(any(windows, target_os = "linux"))]
-    mtp: mtp::Watcher,
+    mtp: MtpWatcher,
 }
 
 impl DeviceWatcher {
@@ -331,7 +333,7 @@ impl DeviceWatcher {
         Self {
             volumes: platform::Watcher::new(),
             #[cfg(any(windows, target_os = "linux"))]
-            mtp: mtp::Watcher::new(),
+            mtp: MtpWatcher::new(),
         }
     }
 

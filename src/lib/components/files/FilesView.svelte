@@ -11,6 +11,7 @@
   } from "phosphor-svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { filesStore, sourceKey } from "../../stores/files.svelte";
+  import { devicesStore } from "../../stores/devices.svelte";
   import { sourceIcon } from "./sourceIcon";
   import { collectionStore } from "../../stores/collection.svelte";
   import { playerStore } from "../../stores/player.svelte";
@@ -19,7 +20,7 @@
   import { formatFileSize } from "../../utils/formatters";
   import { deviceName } from "../../utils/devices";
   import { isWindows, isLinux } from "../../platform";
-  import type { ConnectedDevice, DeviceSyncState, DirListing, FileEntry, Song } from "../../types";
+  import type { ConnectedDevice, DirListing, FileEntry, Song } from "../../types";
   import Button from "../Button.svelte";
   import FileBrowser from "./FileBrowser.svelte";
   import DeviceView from "../devices/DeviceView.svelte";
@@ -100,17 +101,10 @@
     if (!folderPath) return;
     const name = deviceName(device);
     try {
-      const state = await invoke<DeviceSyncState>("get_device_sync_state", { deviceId: device.id });
-      const already = state.settings.sources.some((s) => s.kind === "folder" && s.path === folderPath);
-      if (already) {
+      if (!(await devicesStore.addFolderToSync(device.id, folderPath))) {
         toastStore.show(i18n.t("files.alreadySyncing", { folder: title, device: name }), "info");
         return;
       }
-      // Previewing saves the selection; the device's Sync tab shows the plan.
-      await invoke("preview_device_sync", {
-        deviceId: device.id,
-        settings: { ...state.settings, sources: [...state.settings.sources, { kind: "folder", path: folderPath }] },
-      });
       toastStore.show(i18n.t("files.addedToSync", { folder: title, device: name }), "success");
     } catch (err) {
       console.error("Failed to add folder to device sync:", err);
