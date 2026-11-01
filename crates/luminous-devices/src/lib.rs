@@ -17,6 +17,8 @@ mod profile;
 mod linux;
 #[cfg(target_os = "linux")]
 mod linux_mtp;
+#[cfg(any(windows, target_os = "linux"))]
+mod mtp;
 #[cfg(not(any(windows, target_os = "linux")))]
 mod unsupported;
 #[cfg(windows)]
@@ -30,11 +32,6 @@ use linux as platform;
 use unsupported as platform;
 #[cfg(windows)]
 use windows as platform;
-
-#[cfg(target_os = "linux")]
-use linux_mtp as mtp;
-#[cfg(windows)]
-use windows_mtp as mtp;
 
 pub use backend::{
     is_partial_file, is_system_clutter, DeviceBackend, DirEntry, FsBackend, Progress, Space,

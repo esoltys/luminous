@@ -239,6 +239,9 @@ impl Transport for KmtpDevice {
                 // like WPD, a storage that does not say is taken as writable.
                 writable: true,
                 key: path.as_str().to_string(),
+                // kmtpd does not expose MTP's persistent storage id either.
+                id: None,
+                filesystem: "MTP".to_string(),
             });
         }
         Ok(storages)
