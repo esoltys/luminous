@@ -8,7 +8,8 @@
   without opening anything.
 
   Use this instead of `title=` whenever the hint is the only place that
-  information appears.
+  information appears. With `onclick` the trigger is also an ordinary button
+  that does something, and the hint explains it.
 -->
 <script lang="ts">
   import type { Snippet } from "svelte";
@@ -21,12 +22,14 @@
     label?: string;
     /** id of a form control this hint explains — it gets `aria-describedby` too. */
     describes?: string;
-    /** Trigger content; defaults to a small info icon. */
+    /** Trigger content; defaults to a small info icon. Custom content brings its own shape through `class`. */
     children?: Snippet;
+    /** What pressing the trigger does; without it the trigger only shows the hint. */
+    onclick?: () => void;
     class?: string;
   }
 
-  let { text, label, describes, children, class: className = "" }: Props = $props();
+  let { text, label, describes, children, onclick, class: className = "" }: Props = $props();
 
   const descriptionId = `help-tip-${Math.random().toString(36).slice(2, 10)}`;
   let trigger = $state<HTMLButtonElement>();
@@ -99,11 +102,12 @@
   type="button"
   aria-label={label ?? text}
   aria-describedby={label ? descriptionId : undefined}
-  class="inline-flex items-center justify-center cursor-help rounded-sm focus-visible:outline focus-visible:outline-1 focus-visible:outline-brand-accent {children ? '' : 'text-brand-text-secondary/50 hover:text-brand-text-secondary focus-visible:text-brand-text-secondary'} {className}"
+  class="inline-flex items-center justify-center {onclick ? '' : 'cursor-help'} focus-visible:outline focus-visible:outline-1 focus-visible:outline-brand-accent {children ? '' : 'rounded-sm text-brand-text-secondary/50 hover:text-brand-text-secondary focus-visible:text-brand-text-secondary'} {className}"
   onpointerenter={(e) => { if (e.pointerType === "mouse") show(); }}
   onpointerleave={hide}
   onfocus={onFocus}
   onblur={hide}
+  {onclick}
 >
   {#if children}
     {@render children()}

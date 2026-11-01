@@ -104,6 +104,8 @@ pub struct Selection {
     pub playlists: Vec<WantedPlaylist>,
     /// Every selected source that still exists, in selection order.
     pub sources: Vec<SourceRef>,
+    /// The size limit of each selected size-capped playlist.
+    pub caps: HashMap<SourceRef, u64>,
 }
 
 /// The library songs and playlists `settings` selects. `size_on_device`
@@ -159,7 +161,9 @@ pub fn resolve(
                 library.iter().collect(),
             ),
             SyncSource::Playlist { id } => {
-                let Some((name, songs)) = playlist_songs(conn, *id, &mut size_on_device)? else {
+                let Some(PlaylistSongs { name, songs, cap }) =
+                    playlist_songs(conn, *id, &mut size_on_device)?
+                else {
                     continue;
                 };
                 let source_ref = SourceRef {
@@ -170,6 +174,9 @@ pub fn resolve(
                 if seen_sources.insert(source_ref.clone()) {
                     for song in &songs {
                         add(&mut selection, song, &source_ref);
+                    }
+                    if let Some(cap) = cap {
+                        selection.caps.insert(source_ref.clone(), cap);
                     }
                     selection.sources.push(source_ref);
                     selection.playlists.push(WantedPlaylist { name, songs });
@@ -256,13 +263,22 @@ pub(super) fn local_songs(conn: &rusqlite::Connection) -> Result<Vec<Song>> {
     Ok(songs)
 }
 
-/// A playlist's name and the local songs of it that go on the device, in
-/// its order. `None` when it no longer exists.
+/// What of a playlist goes on a device.
+struct PlaylistSongs {
+    name: String,
+    /// Its local songs that go on the device, in its order.
+    songs: Vec<Song>,
+    /// Its size limit (#344), which cut `songs` short.
+    cap: Option<u64>,
+}
+
+/// What of playlist `id` goes on the device; `None` when it no longer
+/// exists.
 fn playlist_songs(
     conn: &rusqlite::Connection,
     id: i64,
     size_on_device: &mut impl FnMut(&Song) -> Option<u64>,
-) -> Result<Option<(String, Vec<Song>)>> {
+) -> Result<Option<PlaylistSongs>> {
     let row: Option<(String, Option<i64>)> = conn
         .query_row(
             "SELECT name, size_limit_bytes FROM playlists WHERE id = ?1",
@@ -291,7 +307,11 @@ fn playlist_songs(
         }
         None => songs,
     };
-    Ok(Some((name, songs.into_iter().filter(copyable).collect())))
+    Ok(Some(PlaylistSongs {
+        name,
+        songs: songs.into_iter().filter(copyable).collect(),
+        cap: limit,
+    }))
 }
 
 fn copyable(song: &Song) -> bool {

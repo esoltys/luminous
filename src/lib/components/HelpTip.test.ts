@@ -60,6 +60,15 @@ describe("HelpTip.svelte", () => {
     expect(visibleHint()).toBeNull();
   });
 
+  it("runs its action when pressed, still described by the hint", async () => {
+    let pressed = 0;
+    render(HelpTip, { props: { text: HINT, label: "%genre", onclick: () => pressed++ } });
+    const button = screen.getByRole("button", { name: "%genre" });
+    expect(button).toHaveAccessibleDescription(HINT);
+    await fireEvent.click(button);
+    expect(pressed).toBe(1);
+  });
+
   it("ignores touch/pen hover so a tap doesn't flash it open", async () => {
     render(HelpTip, { props: { text: HINT } });
     await fireEvent.pointerEnter(screen.getByRole("button"), { pointerType: "touch" });

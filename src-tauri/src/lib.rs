@@ -1648,6 +1648,8 @@ pub fn run() {
             commands::files::scan_source_folder,
             commands::devices::update_device_profile,
             commands::devices::eject_device,
+            commands::devices::get_device_storage_usage,
+            commands::devices::delete_device_files,
             commands::devices::get_transcode_capabilities,
             commands::devices::get_conversion_target,
             commands::devices::preview_device_path,

@@ -22,8 +22,12 @@
   import type { ConnectedDevice, DeviceSyncState, DirListing, FileEntry, Song } from "../../types";
   import Button from "../Button.svelte";
   import FileBrowser from "./FileBrowser.svelte";
+  import DeviceView from "../devices/DeviceView.svelte";
 
   const location = $derived(navigationStore.filesLocation);
+  const openDevice = $derived(
+    location?.source.kind === "device" ? filesStore.devices.find((d) => d.id === location.source.id) : undefined
+  );
   const sourceName = $derived(location ? filesStore.name(location.source) : "");
 
   let listing = $state<DirListing | null>(null);
@@ -150,7 +154,11 @@
 <svelte:window onclick={() => (devicePickerOpen = false)} />
 
 <div class="flex-1 flex flex-col h-full min-h-0 bg-brand-main text-brand-text-primary select-none overflow-hidden" data-testid="files-view">
-  {#if location}
+  {#if openDevice}
+    {#key openDevice.id}
+      <DeviceView device={openDevice} />
+    {/key}
+  {:else if location}
     <div class="flex-1 min-h-0 flex flex-col px-6 pt-4 gap-4" class:pb-28={!!playerStore.currentSong} class:pb-6={!playerStore.currentSong}>
       <header class="flex items-end justify-between gap-4 flex-wrap">
         <div class="min-w-0">

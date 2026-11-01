@@ -17,7 +17,7 @@ pub mod sync;
 use crate::db::Database;
 use crate::models::{FileType, Song};
 use anyhow::{anyhow, Result};
-use luminous_devices::{Device, DeviceKind, DeviceProfile, DeviceWatcher, Marker};
+use luminous_devices::{Device, DeviceBackend, DeviceKind, DeviceProfile, DeviceWatcher, Marker};
 use luminous_transcode::{Assessment, KnownSource, Transcoder};
 use parking_lot::{Condvar, Mutex};
 use rusqlite::{params, OptionalExtension};
@@ -113,6 +113,22 @@ impl DeviceMonitor {
     /// What the UI is shown for a connected device, `None` once it is gone.
     pub fn shown(&self, id: &str) -> Option<ConnectedDevice> {
         self.with_entry(id, |e| e.shown.clone())
+    }
+
+    /// One storage of a connected device, with the device's profile: the
+    /// storage `storage_id` names, or the first when `None`. `None` once the
+    /// device or that storage is gone.
+    pub fn open_storage(
+        &self,
+        id: &str,
+        storage_id: Option<&str>,
+    ) -> Option<(Box<dyn DeviceBackend>, DeviceProfile)> {
+        let (device, shown) = self.with_entry(id, |e| (e.device.clone(), e.shown.clone()))?;
+        let storage_id = match storage_id {
+            Some(storage_id) => storage_id,
+            None => &shown.storages.first()?.id,
+        };
+        Some((device.storage(storage_id)?, shown.profile))
     }
 
     fn with_entry<T>(&self, id: &str, read: impl FnOnce(&Entry) -> T) -> Option<T> {

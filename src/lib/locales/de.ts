@@ -30,6 +30,7 @@ export const de = {
     addMusicFolder: "Musikordner hinzufügen",
     noSources: "Einen Musikordner oder Medienserver hinzufügen, um hier seine Dateien zu durchsuchen.",
     folders: "Ordner",
+    resizeFolders: "Ordnerspalten anpassen",
     breadcrumb: "Ordnerpfad",
     columnName: "Dateiname",
     columnType: "Format",
@@ -40,7 +41,8 @@ export const de = {
       notScanned: "Nein, seit der letzten Suche hinzugekommen",
       albumArt: "Albumcover",
       notAudio: "Keine Audiodatei",
-      excluded: "Ausgeschlossen"
+      excluded: "Ausgeschlossen",
+      notFromLuminous: "Nicht von Luminous"
     },
     emptyFolder: "Dieser Ordner ist leer.",
     sourceGone: "Diese Quelle ist nicht mehr verfügbar.",
@@ -84,6 +86,211 @@ export const de = {
     addedToSync: "{folder} wird jetzt mit {device} synchronisiert.",
     addToSyncFailed: "Dieser Ordner konnte nicht zur Synchronisierung mit {device} hinzugefügt werden.",
     scanFailed: "Dieser Ordner konnte nicht durchsucht werden."
+  },
+  devices: {
+    tabFiles: "Dateien",
+    tabSync: "Synchronisierung",
+    syncNow: "Jetzt synchronisieren",
+    eject: "Auswerfen",
+    rename: "Gerät umbenennen",
+    ejectNamed: "{device} auswerfen",
+    ejected: "{device} kann jetzt getrennt werden.",
+    ejectInUse: "{device} konnte nicht ausgeworfen werden: Ein anderes Programm verwendet Dateien darauf. Schließen Sie es und versuchen Sie es erneut.",
+    ejectFailed: "{device} konnte nicht ausgeworfen werden. Versuchen Sie es gleich noch einmal.",
+    stopSync: "Synchronisierung stoppen",
+    stopSyncNamed: "Synchronisierung mit {device} stoppen",
+    free: "{size} frei",
+    syncingCount: "Synchronisiere {done} von {total}",
+    syncingStarting: "Synchronisierung wird vorbereitet …",
+    syncingTo: "Synchronisierung mit {storage}",
+    modelOverMtp: "{model} über MTP",
+    modelOverUsb: "{model} über USB",
+    connectedMtp: "Über MTP verbunden",
+    connectedUsb: "Über USB verbunden",
+    lastSynced: "Zuletzt synchronisiert: {when}.",
+    neverSynced: "Noch nicht von diesem Computer synchronisiert.",
+    storage: "Speicher",
+    storageNumbered: "Speicher {n}",
+    gauge: {
+      music: {
+        one: "Musik {size}, {count} Titel",
+        other: "Musik {size}, {count} Titel"
+      },
+      other: "Andere Dateien {size}",
+      free: "Frei {size}",
+      reserve: "Für das Gerät freigehalten {size}"
+    },
+    selected: {
+      one: "{count} ausgewählt",
+      other: "{count} ausgewählt"
+    },
+    onlyRemovesOwn: "Die Synchronisierung entfernt nur Dateien, die sie hierher kopiert hat. Alles, was Sie anders hinzugefügt haben, bleibt.",
+    play: "Abspielen",
+    notPlayable: "In diesem Tab lassen sich nur Songs abspielen, die Luminous hierher kopiert hat.",
+    deleteFromDevice: "Vom Gerät löschen",
+    deleteTitle: {
+      one: "{count} Element von {device} löschen?",
+      other: "{count} Elemente von {device} löschen?"
+    },
+    deleteMessage: "Die Dateien werden sofort von {device} gelöscht. Songs, die im Tab Synchronisierung noch angehakt sind, kommen bei der nächsten Synchronisierung zurück.",
+    deleted: {
+      one: "{count} Element von {device} gelöscht.",
+      other: "{count} Elemente von {device} gelöscht."
+    },
+    deleteFailed: "Diese Dateien konnten nicht von {device} gelöscht werden.",
+    deleteWhileSyncing: "Warten Sie, bis die Synchronisierung mit {device} fertig ist, und löschen Sie dann.",
+    whatGoesOn: "Was auf {device} kommt",
+    sizeAfterConverting: "Größe auf dem Gerät nach der Konvertierung",
+    nothingSelected: "Noch kommt nichts auf dieses Gerät. Fügen Sie Playlists, Interpreten oder einen Ordner hinzu.",
+    groupPlaylists: "Playlists",
+    groupArtists: "Interpreten und Alben",
+    groupFolders: "Ordner",
+    wholeLibrary: "Ganze Bibliothek",
+    deletedPlaylist: "Gelöschte Playlist",
+    albumBy: "{album} von {artist}",
+    cappedFit: {
+      one: "Begrenzt auf {cap}: {count} Song passt",
+      other: "Begrenzt auf {cap}: Die ersten {count} Songs passen"
+    },
+    autoPlaylistSongs: "Automatische Playlist, {songs}",
+    folderSongs: "Ordner, {songs}",
+    addPlaylists: "Playlists hinzufügen",
+    addArtists: "Interpreten hinzufügen",
+    addFolder: "Ordner hinzufügen",
+    searchArtists: "Interpreten suchen",
+    how: "Wie",
+    syncToStorage: "Synchronisieren mit",
+    songsYouUnselect: "Abgewählte Songs",
+    removeFromDevice: "Vom Gerät entfernen",
+    leaveOnDevice: "Auf dem Gerät lassen",
+    removeHint: "{device} enthält genau das, was angehakt ist. Songs, die aus einer Playlist fallen, verlassen das Gerät bei der nächsten Synchronisierung.",
+    leaveHint: "Abgewählte Songs bleiben auf {device}. Nur neue Songs werden kopiert.",
+    convert: "Konvertieren",
+    convertMode: {
+      unsupported: "Nur, was {device} nicht abspielen kann",
+      saveSpace: "Auch alles, was dadurch kleiner wird",
+      never: "Nichts, unverändert kopieren"
+    },
+    convertCacheHint: "Konvertierte Kopien bleiben auf diesem Computer, damit die nächste Synchronisierung schnell geht.",
+    convertNeverHint: "Dateien werden unverändert kopiert. {device} kann manche davon vielleicht nicht abspielen.",
+    convertSubstituted: "{format} ist auf diesem Computer nicht verfügbar, daher werden Dateien in {actual} konvertiert.",
+    convertDeviceMayNotPlay: "{device} kann {format} vielleicht nicht abspielen.",
+    foldersOnDevice: "Ordner auf dem Gerät",
+    playlistFiles: "Playlist-Dateien",
+    playlistFormat: {
+      m3u8: "M3U8 im Ordner {folder}",
+      m3uAscii: "M3U in reinem ASCII, in {folder}",
+      pls: "PLS im Ordner {folder}",
+      none: "Keine Playlist-Dateien"
+    },
+    more: "Mehr: Covergröße, Pfadtrenner, freizuhaltender Speicher",
+    artSize: "Covergröße",
+    artKeep: "Unverändert lassen",
+    artPx: "Auf {px} px verkleinern",
+    pathSeparator: "Pfadtrenner in Playlist-Dateien",
+    separatorSlash: "Schrägstrich (/)",
+    separatorBackslash: "Umgekehrter Schrägstrich (\\)",
+    spaceToKeepFree: "Freizuhaltender Speicher",
+    projectionFits: "Passt. {copy} zu kopieren, {remove} zu entfernen, danach {free} frei.",
+    projectionTooBig: "Passt nicht: {over} zu viel. Wählen Sie etwas ab.",
+    projectionTooBigLeave: "Passt nicht: {over} zu viel. Wählen Sie etwas ab oder wechseln Sie zu Vom Gerät entfernen.",
+    previewChanges: "Änderungen ansehen",
+    previewFailed: "Die Synchronisierung mit {device} konnte nicht geplant werden.",
+    backToSettings: "Zurück zu den Synchronisierungseinstellungen von {device}",
+    reviewTitle: "Synchronisierung mit {device} prüfen",
+    verdictFits: "Passt, mit {free} Reserve",
+    verdictTooBig: "{over} zu viel für {device}",
+    summaryCopy: {
+      one: "{count} Song zu kopieren.",
+      other: "{count} Songs zu kopieren."
+    },
+    summaryCopyConverted: {
+      one: "{count} Song zu kopieren, davon {converted} in {target} konvertiert.",
+      other: "{count} Songs zu kopieren, davon {converted} in {target} konvertiert."
+    },
+    summaryRemove: {
+      one: "{count} Song verlässt das Gerät.",
+      other: "{count} Songs verlassen das Gerät."
+    },
+    fixConvertSaves: "Alles in {target} zu konvertieren spart etwa {saving}.",
+    fixUncheckLargest: "Wählen Sie {item} ab, das größte Element mit {size}.",
+    fixOrUncheckLargest: "Oder wählen Sie {item} ab, das größte Element mit {size}.",
+    now: "Jetzt",
+    afterSync: "Danach",
+    legendStays: "Bleibt: {size}",
+    legendRemoved: "Entfernt: {size}",
+    legendCopied: "Kopiert: {size}",
+    legendOther: "Keine Musik: {size}",
+    listCopy: {
+      one: "{count} Song kopieren, {size}",
+      other: "{count} Songs kopieren, {size}"
+    },
+    listRemove: {
+      one: "{count} Song entfernen, {size}",
+      other: "{count} Songs entfernen, {size}"
+    },
+    listUpdate: {
+      one: "{count} Song aktualisieren",
+      other: "{count} Songs aktualisieren"
+    },
+    showAllCopy: "Alle zu kopierenden Songs anzeigen",
+    showAllRemove: "Alle zu entfernenden Songs anzeigen",
+    showAllUpdate: "Alle zu aktualisierenden Songs anzeigen",
+    playlistsRow: "Playlists",
+    playlistFilesRewritten: {
+      one: "{count} Datei neu geschrieben",
+      other: "{count} Dateien neu geschrieben"
+    },
+    othersLeftAlone: "Dateien, die Sie anders auf {device} gebracht haben, bleiben unberührt.",
+    reasonFolder: "Ordner",
+    reasonRenamed: "Neben einer eigenen Datei umbenannt",
+    reasonAdopted: "Schon auf dem Gerät",
+    reasonLeft: "Nicht mehr in {source}",
+    reasonUnchecked: {
+      library: "Abgewählt",
+      playlist: "Playlist abgewählt",
+      artist: "Interpret abgewählt",
+      album: "Album abgewählt",
+      folder: "Ordner abgewählt"
+    },
+    reasonDeleted: "Aus der Bibliothek gelöscht",
+    reasonTags: "Tags geändert",
+    reasonFileChanged: "Datei geändert",
+    reasonConvertChanged: "Konvertierung geändert",
+    reasonMoved: "Verschoben",
+    reasonUnreadable: "Nicht lesbar",
+    changeSelection: "Auswahl ändern",
+    startSync: "Synchronisierung starten",
+    convertEverything: "Alles in {target} konvertieren",
+    planChanged: "{device} hat sich seit der Vorschau geändert. Prüfen Sie den neuen Plan und starten Sie die Synchronisierung erneut.",
+    alreadySyncing: "{device} wird bereits synchronisiert.",
+    startFailed: "Die Synchronisierung mit {device} konnte nicht gestartet werden.",
+    songsOf: "{done} von {total} Songs",
+    bytesOf: "{done} von {total}",
+    hideProgress: "Fortschritt ausblenden",
+    showProgress: "Fortschritt anzeigen",
+    stepRemoving: "Songs werden entfernt",
+    stepConverting: "{song} wird in {target} konvertiert",
+    stepCopying: "{song} wird kopiert",
+    stepPlaylists: "Playlist-Dateien werden geschrieben",
+    stepFolderArt: "Cover werden geschrieben",
+    stepFinishing: "Wird abgeschlossen",
+    lessThanAMinute: "Weniger als eine Minute",
+    minutesLeft: {
+      one: "Noch etwa {count} Minute",
+      other: "Noch etwa {count} Minuten"
+    },
+    stoppingKeeps: "Beim Stoppen bleiben alle bisher kopierten Songs erhalten. Lassen Sie {device} verbunden, bis die Synchronisierung fertig ist.",
+    syncDone: "Synchronisierung mit {device} abgeschlossen.",
+    syncDoneWithFailures: {
+      one: "Synchronisierung mit {device} abgeschlossen, aber {count} Song konnte nicht kopiert werden.",
+      other: "Synchronisierung mit {device} abgeschlossen, aber {count} Songs konnten nicht kopiert werden."
+    },
+    syncStopped: {
+      one: "Synchronisierung mit {device} gestoppt. {count} Song wurde kopiert.",
+      other: "Synchronisierung mit {device} gestoppt. {count} Songs wurden kopiert."
+    },
+    syncFailed: "Die Synchronisierung mit {device} wurde wegen eines Fehlers abgebrochen."
   },
   topNav: {
     filterExample: "z. B. rating:>=4 year:<2000 genre:jazz \"miles davis\"",

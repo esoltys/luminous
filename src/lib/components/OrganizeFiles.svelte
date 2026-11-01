@@ -24,6 +24,7 @@
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
   import HelpTip from "./HelpTip.svelte";
+  import TemplateInput from "./TemplateInput.svelte";
 
   const PREVIEW_DEBOUNCE_MS = 300;
   const COL_MIN_WIDTH_PX = 150;
@@ -74,21 +75,6 @@
   let effectiveOpen = $derived(embedded || isOpen);
 
   const DEFAULT_TEMPLATE = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
-  const VARIABLE_CHIPS = [
-    { label: "%albumartist", descKey: "organizer.chipAlbumArtist" },
-    { label: "%artist", descKey: "organizer.chipArtist" },
-    { label: "%album", descKey: "organizer.chipAlbum" },
-    { label: "{%album/}", descKey: "organizer.chipOptionalAlbumFolder" },
-    { label: "/", descKey: "organizer.chipFolderSeparator" },
-    { label: "{%disc-}", descKey: "organizer.chipConditionalDisc" },
-    { label: "%track", descKey: "organizer.chipTrack" },
-    { label: "{%track }", descKey: "organizer.chipOptionalTrack" },
-    { label: "{%track. }", descKey: "organizer.chipOptionalTrackDot" },
-    { label: "%title", descKey: "organizer.chipTitle" },
-    { label: "%year", descKey: "organizer.chipYear" },
-    { label: "%genre", descKey: "organizer.chipGenre" },
-  ];
-
   function highlightPathHtml(path: string): string {
     if (!path) return "";
     const escaped = path
@@ -124,10 +110,6 @@
       customTemplate = template;
     }
     templatePreset = id;
-  }
-
-  function insertChip(chipText: string) {
-    customTemplate = customTemplate + chipText;
   }
 
   // Compact sample data for the live tree preview (artist → album → tracks).
@@ -730,28 +712,7 @@
           {i18n.t("organizer.templateLabel")}
         </label>
 
-        <!-- Plain, directly-editable input — bordered like the destination folder input below so it reads as editable -->
-        <input
-          id="template-input"
-          type="text"
-          bind:value={customTemplate}
-          class="w-full px-3.5 py-2.5 rounded-xl bg-brand-sidebar/80 border border-brand-border/80 focus:outline-none focus:border-brand-accent text-brand-text-primary caret-brand-accent font-mono text-xs leading-normal tracking-normal transition-colors min-h-[40px]"
-          spellcheck="false"
-        />
-
-        <div class="flex flex-wrap items-center gap-1.5 pt-1">
-          <span class="text-[11px] text-brand-text-secondary mr-1">{i18n.t("organizer.placeholders")}:</span>
-          {#each VARIABLE_CHIPS as chip}
-            <button
-              type="button"
-              onclick={() => insertChip(chip.label)}
-              class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors border bg-brand-sidebar hover:bg-brand-accent/15 border-brand-border/80 text-brand-text-primary hover:text-brand-accent-text font-medium"
-              title={i18n.t(chip.descKey)}
-            >
-              {chip.label === '/' ? i18n.t('organizer.chipFolderLabel') : chip.label}
-            </button>
-          {/each}
-        </div>
+        <TemplateInput id="template-input" bind:value={customTemplate} />
       </div>
     {/if}
 

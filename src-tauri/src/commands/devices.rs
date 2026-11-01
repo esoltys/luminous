@@ -8,7 +8,8 @@ use crate::devices::sync::plan::{SyncItem, SyncPlan};
 use crate::devices::sync::selection::SyncSettings;
 use crate::devices::sync::worker::{SyncProgress, SyncSummary};
 use crate::devices::sync::{
-    DeviceSyncState, PlanList, SyncEvents, SYNC_FINISHED_EVENT, SYNC_PROGRESS_EVENT,
+    storage_usage, DeviceSyncState, PlanList, StorageUsage, SyncEvents, SYNC_FINISHED_EVENT,
+    SYNC_PROGRESS_EVENT,
 };
 use crate::devices::ConnectedDevice;
 use crate::AppState;
@@ -130,6 +131,49 @@ pub async fn eject_device(id: String, state: State<'_, AppState>) -> Result<(), 
             EjectError::InUse(_) => "device-in-use".to_string(),
             EjectError::Failed(_) => "device-eject-failed".to_string(),
         }
+    })
+}
+
+/// How one storage of a device is used (`storage_id`, or the first when
+/// `None`), for its gauge. Rejects with `device-not-connected`.
+#[tauri::command]
+pub async fn get_device_storage_usage(
+    device_id: String,
+    storage_id: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<StorageUsage, String> {
+    let devices = state.devices.clone();
+    tokio::task::spawn_blocking(move || {
+        let (storage, profile) = devices
+            .open_storage(&device_id, storage_id.as_deref())
+            .ok_or_else(|| anyhow::anyhow!("device-not-connected"))?;
+        storage_usage(&*storage, &profile)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
+}
+
+/// Deletes `names` in the folder `path` of a device, as the Files view
+/// browses it (inside the device's music folder), and forgets them as
+/// synced. Rejects with `device-not-connected` or `sync-in-progress`.
+#[tauri::command]
+pub async fn delete_device_files(
+    device_id: String,
+    storage_id: Option<String>,
+    path: Vec<String>,
+    names: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let sync = state.device_sync.clone();
+    tokio::task::spawn_blocking(move || {
+        sync.delete(&device_id, storage_id.as_deref(), &path, &names)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| {
+        log::warn!("Deleting files from a device failed: {e:#}");
+        e.to_string()
     })
 }
 

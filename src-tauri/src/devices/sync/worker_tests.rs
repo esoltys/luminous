@@ -341,14 +341,19 @@ fn a_song_that_fails_is_left_out_of_its_playlists() {
 }
 
 #[test]
-fn rate_averages_over_its_window() {
+fn rate_averages_over_the_whole_run_so_a_long_conversion_counts() {
     let start = Instant::now();
     let mut rate = Rate::default();
     assert_eq!(rate.bytes_per_sec(), None);
     rate.sample(start, 0);
-    rate.sample(start + Duration::from_secs(2), 4_000_000);
+    // A fast copy...
+    rate.sample(start + Duration::from_secs(2), 20_000_000);
+    assert_eq!(rate.bytes_per_sec(), Some(10_000_000.0));
+    // ...then eight seconds converting with nothing written.
+    rate.sample(start + Duration::from_secs(10), 20_000_000);
     assert_eq!(rate.bytes_per_sec(), Some(2_000_000.0));
-    rate.sample(start + Duration::from_secs(10), 4_000_000);
-    rate.sample(start + Duration::from_secs(11), 5_000_000);
-    assert_eq!(rate.bytes_per_sec(), Some(1_000_000.0));
+    assert_eq!(
+        rate.elapsed(start + Duration::from_secs(12)),
+        Duration::from_secs(12)
+    );
 }

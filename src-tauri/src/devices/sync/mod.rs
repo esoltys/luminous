@@ -56,6 +56,42 @@ pub struct DeviceSyncState {
     pub running: bool,
 }
 
+/// How one storage of a device is used, for its gauge. `music_bytes` is
+/// what sync copied there (songs, playlist files, folder art), as the sync
+/// preview's "Now" counts it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageUsage {
+    pub capacity_bytes: u64,
+    pub free_bytes: u64,
+    /// What the device's profile keeps free.
+    pub reserve_bytes: u64,
+    pub music_bytes: u64,
+    /// Songs sync copied.
+    pub music_songs: usize,
+    /// Everything else in use.
+    pub other_bytes: u64,
+}
+
+/// [`StorageUsage`] of `storage`, from its free space and sync manifest.
+pub fn storage_usage(storage: &dyn DeviceBackend, profile: &DeviceProfile) -> Result<StorageUsage> {
+    let space = storage.space()?;
+    let manifest = Manifest::read(storage)?;
+    let music_bytes: u64 = manifest.entries().map(|e| e.size).sum();
+    let used = space.total_bytes.saturating_sub(space.free_bytes);
+    Ok(StorageUsage {
+        capacity_bytes: space.total_bytes,
+        free_bytes: space.free_bytes,
+        reserve_bytes: profile.reserve_bytes,
+        music_bytes: music_bytes.min(used),
+        music_songs: manifest
+            .entries()
+            .filter(|e| e.kind == manifest::EntryKind::Track)
+            .count(),
+        other_bytes: used.saturating_sub(music_bytes),
+    })
+}
+
 /// Which of a plan's lists to read in full.
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,7 +195,7 @@ impl DeviceSync {
         let backend = device.storage(&storage.id).ok_or_else(not_connected)?;
         let inventory = self.inventory(device_id, &storage, &profile, &*backend)?;
 
-        let selection = selection::resolve(conn, &settings, |song| {
+        let mut selection = selection::resolve(conn, &settings, |song| {
             assess_song(transcoder, song, &profile).map(|a| a.size)
         })?;
         let save_space = (profile.convert.mode != ConvertMode::SaveSpace).then(|| DeviceProfile {
@@ -169,6 +205,7 @@ impl DeviceSync {
             },
             ..profile.clone()
         });
+        let caps = std::mem::take(&mut selection.caps);
         let mut tracks = Vec::with_capacity(selection.songs.len());
         let mut unreadable = Vec::new();
         for wanted in selection.songs {
@@ -208,6 +245,9 @@ impl DeviceSync {
         });
 
         let mut plan = built.plan;
+        for size in &mut plan.sources {
+            size.cap_bytes = caps.get(&size.source).copied();
+        }
         plan.plan_id = uuid::Uuid::new_v4().to_string();
         plan.device_id = device_id.to_string();
         plan.storage_id = storage.id.clone();
@@ -324,6 +364,53 @@ impl DeviceSync {
                 return;
             }
         }
+    }
+
+    /// Deletes the files and folders `names` in `folder`, a folder as the
+    /// Files view browses the device (inside its music folder), and drops
+    /// them from its sync manifest, so sync no longer counts them as its own.
+    /// A name that's already gone counts as deleted; one that isn't a name
+    /// (`..`, empty, with a separator) is skipped. Rejects with
+    /// `device-not-connected` or `sync-in-progress`.
+    pub fn delete(
+        &self,
+        device_id: &str,
+        storage_id: Option<&str>,
+        folder: &[String],
+        names: &[String],
+    ) -> Result<()> {
+        // Held throughout, so no sync starts while files are going.
+        let running = self.running.lock();
+        if running.contains_key(device_id) {
+            return Err(anyhow!("sync-in-progress"));
+        }
+        let (storage, profile) = self
+            .monitor
+            .open_storage(device_id, storage_id)
+            .ok_or_else(|| anyhow!("device-not-connected"))?;
+        // A name that isn't one resolves to the folder itself: never delete that.
+        let folder_path = crate::files::device_path(&profile, folder);
+        let paths: Vec<String> = names
+            .iter()
+            .map(|name| {
+                crate::files::device_path(&profile, &[folder, std::slice::from_ref(name)].concat())
+            })
+            .filter(|path| *path != folder_path)
+            .collect();
+        let mut manifest = Manifest::read(&*storage)?;
+        let mut forgot = false;
+        let result = paths.iter().try_for_each(|path| {
+            storage.remove(path)?;
+            forgot |= manifest.remove_under(path);
+            std::io::Result::Ok(())
+        });
+        if forgot {
+            manifest.write(&*storage)?;
+        }
+        drop(running);
+        self.inventories.lock().remove(device_id);
+        self.monitor.request_rebuild();
+        result.map_err(Into::into)
     }
 
     fn finish(&self, summary: &SyncSummary) {
@@ -679,6 +766,120 @@ mod tests {
             none.remove.items[0].reason,
             SyncReason::Unselected { .. }
         ));
+    }
+
+    #[test]
+    fn the_device_view_tells_synced_files_from_others_and_deletes_them() {
+        use crate::files::{self, EntryStatus, FileSource};
+
+        let world = world("wav");
+        let plan = world.preview(whole_library()).unwrap();
+        world.start(&plan.plan_id).unwrap();
+        let profile = world.monitor.shown("vol-0088-5572").unwrap().profile;
+        let album: Vec<String> = ["Amorphis", "Halo"].map(String::from).to_vec();
+        let album_dir = world.device_root.join(files::device_path(&profile, &album));
+        std::fs::write(album_dir.join("notes.txt"), b"mine").unwrap();
+        std::fs::create_dir_all(
+            world
+                .device_root
+                .join(files::device_path(&profile, &["Podcasts".into()])),
+        )
+        .unwrap();
+
+        let usage = storage_usage(&FsBackend::new(&world.device_root), &profile).unwrap();
+        assert_eq!(usage.music_songs, 2);
+        assert_eq!(usage.music_bytes, plan.copy.bytes);
+        assert_eq!(usage.reserve_bytes, profile.reserve_bytes);
+
+        let source = FileSource::Device {
+            id: "vol-0088-5572".into(),
+            storage: None,
+        };
+        let list = |path: &[String]| {
+            files::list_dir(&world.db, &source, path, |id, storage| {
+                world.monitor.open_storage(id, storage)
+            })
+            .unwrap()
+        };
+        let root = list(&[]);
+        let status = |listing: &files::DirListing, name: &str| {
+            let entry = listing.entries.iter().find(|e| e.name == name).unwrap();
+            (entry.status, entry.song_id)
+        };
+        assert_eq!(status(&root, "Amorphis"), (None, None));
+        assert_eq!(
+            status(&root, "Podcasts"),
+            (Some(EntryStatus::NotFromLuminous), None)
+        );
+        let listing = list(&album);
+        let synced = listing
+            .entries
+            .iter()
+            .find(|e| e.name.starts_with("01"))
+            .unwrap();
+        assert_eq!(
+            (synced.status, synced.song_id),
+            (Some(EntryStatus::InLibrary), Some(1))
+        );
+        assert_eq!(
+            status(&listing, "notes.txt"),
+            (Some(EntryStatus::NotFromLuminous), None)
+        );
+        assert_eq!(listing.in_library_count, 2);
+
+        let synced_path = files::device_path(
+            &profile,
+            &[album.clone(), vec![synced.name.clone()]].concat(),
+        );
+        world
+            .sync
+            .delete(
+                "vol-0088-5572",
+                None,
+                &album,
+                &[synced.name.clone(), "gone.mp3".into(), "..".into()],
+            )
+            .unwrap();
+        assert!(!world.device_root.join(&synced_path).exists());
+        assert!(
+            album_dir.join("notes.txt").exists(),
+            "`..` never deletes the folder"
+        );
+        let again = world.preview(whole_library()).unwrap();
+        assert_eq!(again.copy.songs, 1, "the deleted song goes back on");
+    }
+
+    #[test]
+    fn a_size_capped_playlist_reports_its_cap_and_the_songs_that_fit() {
+        let world = world("wav");
+        let conn = world.db.pool.get().unwrap();
+        let one_song: i64 = conn
+            .query_row("SELECT filesize FROM songs WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        conn.execute(
+            "INSERT INTO playlists (id, name, size_limit_bytes) VALUES (7, 'Commute', ?1)",
+            params![one_song + 1],
+        )
+        .unwrap();
+        for (position, song) in [(0, 1), (1, 2)] {
+            conn.execute(
+                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid)
+                 VALUES (7, ?1, ?2, ?3)",
+                params![song, position, format!("u{song}")],
+            )
+            .unwrap();
+        }
+        drop(conn);
+
+        let plan = world
+            .preview(SyncSettings {
+                sources: vec![SyncSource::Playlist { id: 7 }],
+                ..SyncSettings::default()
+            })
+            .unwrap();
+        let commute = &plan.sources[0];
+        assert_eq!(commute.cap_bytes, Some(one_song as u64 + 1));
+        assert_eq!(commute.songs, 1);
     }
 
     #[test]

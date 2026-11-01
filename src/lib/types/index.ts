@@ -257,13 +257,74 @@ export interface PlaylistSizeFit {
   device_name: string | null;
 }
 
-/** A connected portable player or drive (backend `get_connected_devices`,
- * `devices-changed`). Only the fields the UI reads so far. */
+/** One storage of a device: the volume of a USB drive, or an MTP player's internal memory or SD card. */
+export interface DeviceStorage {
+  id: string;
+  /** What the device calls it ("SD card"), or the volume label. */
+  label: string | null;
+  /** Null over MTP, which has no path on this computer. */
+  mountPath: string | null;
+  filesystem: string;
+  totalBytes: number;
+  freeBytes: number;
+}
+
+export type ConvertMode = "unsupported" | "saveSpace" | "never";
+export type TargetFormat = "aac" | "mp3" | "opus";
+export type PlaylistFileFormat = "m3u8" | "m3uAscii" | "pls" | "none";
+export type FolderArt = "none" | "cover" | "folder" | "both";
+export type PathSeparator = "slash" | "backslash";
+
+/** How Luminous syncs to a device (backend `DeviceProfile`, #835–#838). */
+export interface DeviceProfile {
+  nickname: string | null;
+  icon: string | null;
+  color: string | null;
+  /** Folder music is synced into, relative to the storage root. */
+  musicPath: string;
+  playlistsPath: string;
+  /** Bytes sync must leave free. */
+  reserveBytes: number;
+  supportedFormats: string[];
+  maxSampleRate: number;
+  maxBitDepth: number;
+  convert: { mode: ConvertMode; format: TargetFormat; bitrateKbps: number; maxArtPx: number | null };
+  layout: {
+    folderTemplate: string;
+    playlistFormat: PlaylistFileFormat;
+    pathSeparator: PathSeparator;
+    folderArt: FolderArt;
+  };
+}
+
+/** What sync can convert to on this computer (`get_transcode_capabilities`); the Convert picker offers only these. */
+export interface TranscodeCapabilities {
+  formats: { format: TargetFormat; bitratesKbps: number[] }[];
+}
+
+/** A connected portable player or drive (backend `get_connected_devices`, `devices-changed`). */
 export interface ConnectedDevice {
   id: string;
+  kind: "massStorage" | "mtp";
+  /** Vendor and model ("Sony NW-A306"), when the device reports them. */
+  model: string | null;
   /** Shown when `profile.nickname` is unset. Never blank. */
   defaultName: string;
-  profile: { nickname?: string | null };
+  storages: DeviceStorage[];
+  profile: DeviceProfile;
+  /** Unix seconds of the last completed sync. */
+  lastSyncedAt: number | null;
+}
+
+/** How one storage of a device is used (`get_device_storage_usage`). Show these; never recompute them. */
+export interface StorageUsage {
+  capacityBytes: number;
+  freeBytes: number;
+  reserveBytes: number;
+  /** What sync copied there. */
+  musicBytes: number;
+  musicSongs: number;
+  otherBytes: number;
 }
 
 /** A place music is read from or written to, in the Files view (#1841). */
@@ -271,7 +332,7 @@ export type FileSource =
   | { kind: "folder"; id: number }
   | { kind: "subsonic"; id: number }
   | { kind: "webdav"; id: number }
-  | { kind: "device"; id: string };
+  | { kind: "device"; id: string; storage?: string | null };
 
 /** A folder or server as the Files sidebar section lists it (`list_file_sources`). */
 export interface FileSourceSummary {
@@ -283,7 +344,7 @@ export interface FileSourceSummary {
 }
 
 /** What a file or folder is to the library. Word it in the UI; never show the code. */
-export type FileEntryStatus = "inLibrary" | "notScanned" | "albumArt" | "notAudio" | "excluded";
+export type FileEntryStatus = "inLibrary" | "notScanned" | "albumArt" | "notAudio" | "excluded" | "notFromLuminous";
 
 export interface FileEntry {
   name: string;
@@ -369,6 +430,8 @@ export interface SyncSourceSize {
   source: SyncSourceRef;
   songs: number;
   bytes: number;
+  /** A size-capped playlist's limit: `songs` and `bytes` are then what fits under it. */
+  capBytes: number | null;
 }
 
 /** What a sync will do (`preview_device_sync`). Show these values; never

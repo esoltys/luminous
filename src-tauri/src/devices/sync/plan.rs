@@ -217,6 +217,9 @@ pub struct SourceSize {
     pub source: SourceRef,
     pub songs: usize,
     pub bytes: u64,
+    /// A size-capped playlist's limit (#344): `songs` and `bytes` are then
+    /// the songs above its break.
+    pub cap_bytes: Option<u64>,
 }
 
 /// How far a selection that doesn't fit is over, and what would help.
@@ -648,6 +651,19 @@ pub fn build(input: PlanInput) -> Built {
         plan.conversion_target = Some(conversion_target);
     }
 
+    // Lists read in device-path order, which the folder template makes
+    // artist, album, then track; the worker keeps its own order.
+    for list in [
+        &mut plan.copy,
+        &mut plan.remove,
+        &mut plan.update,
+        &mut plan.adopted,
+        &mut plan.skipped,
+    ] {
+        list.items
+            .sort_by_cached_key(|item| item.path.to_lowercase());
+    }
+
     steps.write = writes;
     Built { plan, steps }
 }
@@ -872,6 +888,7 @@ fn source_sizes(sources: &[SourceRef], tracks: &[TrackInput]) -> Vec<SourceSize>
                 source: source.clone(),
                 songs,
                 bytes,
+                cap_bytes: None,
             }
         })
         .collect()

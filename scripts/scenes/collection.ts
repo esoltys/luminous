@@ -1,5 +1,5 @@
 import { defineScene } from "./types";
-import type { DirListing, FileSourceSummary } from "../../src/lib/types";
+import type { ConnectedDevice, DirListing, FileSourceSummary } from "../../src/lib/types";
 import { featuredSongId, restorePins, trimPinsToOneRow } from "./helpers";
 
 const WIDE_SIDEBAR = { sidebarWidth: 220 };
@@ -40,6 +40,24 @@ export const collectionScenes = [
       })()`);
     },
   }),
+  // A connected portable player's Files and Sync tabs (#839). Needs a real player plugged in.
+  ...(["files", "sync"] as const).map((tab) =>
+    defineScene({
+      name: `device-${tab}`,
+      file: `device-${tab}.png`,
+      view: { tab: "files" },
+      layout: WIDE_SIDEBAR,
+      settleMs: 1500,
+      run: async ({ driver }) => {
+        const devices = await driver.invoke<ConnectedDevice[]>("get_connected_devices");
+        if (devices.length === 0) throw new Error("Connect a portable player to capture the device scenes.");
+        await driver.evaluate(`(async () => {
+          const { navigationStore } = await import("/src/lib/stores/navigation.svelte.ts");
+          navigationStore.viewDevice(${JSON.stringify(devices[0].id)}, ${JSON.stringify(tab)});
+        })()`);
+      },
+    })
+  ),
   defineScene({
     name: "artist-detail",
     file: "artist-detail.png",

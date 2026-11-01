@@ -23,6 +23,7 @@
     reloadToken = 0,
     listing = $bindable(null),
     selectedName = $bindable(null),
+    selection = $bindable([]),
     unreachableLabel,
     footer,
   }: {
@@ -36,8 +37,11 @@
     reloadToken?: number;
     /** Out: the current folder's listing once read. */
     listing?: DirListing | null;
-    /** The selected entry of the current folder, by name. */
+    /** The focused entry of the current folder, by name. */
     selectedName?: string | null;
+    /** Every selected entry of the current folder, by name: the focused one, plus
+     * those added with Ctrl/Cmd-click or Shift-click. */
+    selection?: string[];
     /** Shown when the source can't be reached. */
     unreachableLabel: string;
     footer?: Snippet;
@@ -50,11 +54,66 @@
     albumArt: "files.status.albumArt",
     notAudio: "files.status.notAudio",
     excluded: "files.status.excluded",
+    notFromLuminous: "files.status.notFromLuminous",
   };
+
+  /** Entries shown dimmed: not music the library or sync looks after. */
+  const MUTED: (FileEntryStatus | null)[] = ["excluded", "albumArt", "notAudio", "notFromLuminous"];
 
   const ROW_HEIGHT_PX = 31;
   /** Folder columns shown before the current folder's table. */
   const PARENT_COLUMNS = 2;
+
+  /** Folder column width, shared by every column and source; remembered like the sidebar's. */
+  const COLUMN_WIDTH_KEY = "files_columnWidth";
+  const COLUMN_MIN_PX = 140;
+  const COLUMN_MAX_PX = 480;
+  const COLUMN_DEFAULT_PX = 224;
+  const COLUMN_STEP_PX = 16;
+
+  let columnWidth = $state(readColumnWidth());
+
+  function readColumnWidth(): number {
+    try {
+      const saved = Number(localStorage.getItem(COLUMN_WIDTH_KEY));
+      return saved >= COLUMN_MIN_PX && saved <= COLUMN_MAX_PX ? saved : COLUMN_DEFAULT_PX;
+    } catch {
+      return COLUMN_DEFAULT_PX;
+    }
+  }
+
+  function setColumnWidth(width: number) {
+    columnWidth = Math.round(Math.min(COLUMN_MAX_PX, Math.max(COLUMN_MIN_PX, width)));
+    try {
+      localStorage.setItem(COLUMN_WIDTH_KEY, String(columnWidth));
+    } catch {
+      // Not remembered this time; the width still applies.
+    }
+  }
+
+  function startColumnResize(event: PointerEvent) {
+    event.preventDefault();
+    const handle = event.currentTarget as HTMLElement;
+    const startX = event.clientX;
+    const startWidth = columnWidth;
+    handle.setPointerCapture(event.pointerId);
+    const move = (e: PointerEvent) => setColumnWidth(startWidth + e.clientX - startX);
+    const end = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  }
+
+  function columnResizeKey(event: KeyboardEvent) {
+    const step = event.key === "ArrowLeft" ? -COLUMN_STEP_PX : event.key === "ArrowRight" ? COLUMN_STEP_PX : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    setColumnWidth(columnWidth + step);
+  }
 
   type Loaded = { state: "loading" } | { state: "ready"; listing: DirListing } | { state: "error"; code: string };
 
@@ -184,7 +243,7 @@
       case "ArrowUp": {
         const nextIndex = Math.min(entries.length - 1, Math.max(0, index + (event.key === "ArrowDown" ? 1 : -1)));
         if (entries[nextIndex]) {
-          selectedName = entries[nextIndex].name;
+          select(entries[nextIndex].name);
           scrollIntoView(column, nextIndex);
         }
         break;
@@ -211,12 +270,36 @@
   $effect(() => {
     const now = path;
     if (now.length < previousPath.length && keyOf(previousPath.slice(0, now.length)) === keyOf(now)) {
-      selectedName = previousPath[now.length];
+      select(previousPath[now.length]);
     } else if (keyOf(now) !== keyOf(previousPath)) {
-      selectedName = null;
+      select(null);
     }
     previousPath = now;
   });
+
+  /** Makes `name` the only selected entry. */
+  function select(name: string | null) {
+    selectedName = name;
+    selection = name === null ? [] : [name];
+  }
+
+  /** A click on a file: Ctrl/Cmd adds or drops it, Shift selects the run from the focused entry. */
+  function clickFile(event: MouseEvent, name: string) {
+    if (event.shiftKey && selectedName !== null) {
+      const names = currentEntries.map((e) => e.name);
+      const [a, b] = [names.indexOf(selectedName), names.indexOf(name)].sort((x, y) => x - y);
+      if (a >= 0) {
+        selection = names.slice(a, b + 1);
+        return;
+      }
+    }
+    if (event.ctrlKey || event.metaKey) {
+      selection = selection.includes(name) ? selection.filter((n) => n !== name) : [...selection, name];
+      selectedName = name;
+      return;
+    }
+    select(name);
+  }
 
   function statusLabel(entry: FileEntry): string {
     return entry.status ? i18n.t(STATUS_LABEL_KEYS[entry.status]) : "";
@@ -228,9 +311,11 @@
     {@const isCurrent = column === levels.length - 1}
     {@const loaded = listings[keyOf(dir)]}
     {#if !isCurrent}
+      {@const visibility = column === levels.length - 2 ? "hidden @xl:flex" : "hidden @3xl:flex"}
       <div
         bind:this={columnEls[column]}
-        class="w-56 shrink-0 min-h-0 {column === levels.length - 2 ? 'hidden @xl:flex' : 'hidden @3xl:flex'} flex-col border-r border-brand-border/40 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
+        style:width="{columnWidth}px"
+        class="shrink-0 min-h-0 {visibility} flex-col border-r border-brand-border/40 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
         role="listbox"
         tabindex="0"
         aria-label={dir.length ? dir[dir.length - 1] : i18n.t("files.folders")}
@@ -241,7 +326,7 @@
             {#snippet children({ item: entry }: { item: FileEntry })}
               {@const selected = path[dir.length] === entry.name}
               <button
-                class="w-full h-[31px] flex items-center gap-2 px-2.5 rounded-md text-[13px] text-left transition-colors {selected ? 'bg-brand-accent/20 text-brand-text-primary font-semibold' : 'text-brand-text-primary hover:bg-brand-accent/10'} {entry.status === 'excluded' ? 'opacity-60' : ''}"
+                class="w-full h-[31px] flex items-center gap-2 px-2.5 rounded-md text-[13px] text-left transition-colors {selected ? 'bg-brand-accent/20 text-brand-text-primary font-semibold' : 'text-brand-text-primary hover:bg-brand-accent/10'} {MUTED.includes(entry.status) ? 'opacity-60' : ''}"
                 role="option"
                 aria-selected={selected}
                 tabindex="-1"
@@ -249,8 +334,8 @@
               >
                 <FolderIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
                 <span class="truncate flex-1">{entry.name}</span>
-                {#if entry.status === "excluded"}
-                  <span class="text-[11px] text-brand-text-secondary shrink-0">{i18n.t("files.status.excluded")}</span>
+                {#if entry.status === "excluded" || entry.status === "notFromLuminous"}
+                  <span class="text-[11px] text-brand-text-secondary shrink-0">{statusLabel(entry)}</span>
                 {:else}
                   <CaretRightIcon class="w-3 h-3 shrink-0 text-brand-text-secondary" />
                 {/if}
@@ -261,6 +346,24 @@
         {#if loaded?.state === "error"}
           <p class="p-3 text-xs text-brand-text-secondary">{unreachableLabel}</p>
         {/if}
+      </div>
+      <!-- Drag, or focus and use the arrow keys; it sits over the column's border. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div
+        class="{visibility} relative z-10 w-2 -ml-2 shrink-0 cursor-col-resize touch-none justify-end outline-none group/resize focus-visible:bg-brand-accent/20"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={i18n.t("files.resizeFolders")}
+        aria-valuenow={columnWidth}
+        aria-valuemin={COLUMN_MIN_PX}
+        aria-valuemax={COLUMN_MAX_PX}
+        tabindex="0"
+        onpointerdown={startColumnResize}
+        onkeydown={columnResizeKey}
+        ondblclick={() => setColumnWidth(COLUMN_DEFAULT_PX)}
+      >
+        <div class="w-px h-full group-hover/resize:bg-brand-accent group-focus-visible/resize:bg-brand-accent transition-colors"></div>
       </div>
     {:else}
       <div class="@container flex-1 min-w-0 min-h-0 flex flex-col">
@@ -293,14 +396,14 @@
           >
             <VirtualList items={currentEntries} height="100%" itemHeight={ROW_HEIGHT_PX} bind:this={lists[column]} bind:start={starts[column]} bind:end={ends[column]}>
               {#snippet children({ item: entry }: { item: FileEntry })}
-                {@const selected = selectedName === entry.name}
-                {@const muted = entry.status === "excluded" || entry.status === "albumArt" || entry.status === "notAudio"}
+                {@const selected = selection.includes(entry.name)}
+                {@const muted = MUTED.includes(entry.status)}
                 <div
                   class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'}"
                   role="option"
                   aria-selected={selected}
                   tabindex="-1"
-                  onclick={() => (entry.isDir ? openFolder(dir, entry.name) : (selectedName = entry.name))}
+                  onclick={(e) => (entry.isDir ? openFolder(dir, entry.name) : clickFile(e, entry.name))}
                   ondblclick={() => { if (!entry.isDir) onplay(entry); }}
                   onkeydown={() => {}}
                 >

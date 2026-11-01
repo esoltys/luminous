@@ -30,6 +30,7 @@ export const en = {
     addMusicFolder: "Add a music folder",
     noSources: "Add a music folder or a media server to browse its files here.",
     folders: "Folders",
+    resizeFolders: "Resize folder columns",
     breadcrumb: "Folder path",
     columnName: "Name",
     columnType: "Type",
@@ -40,7 +41,8 @@ export const en = {
       notScanned: "No, added since last scan",
       albumArt: "Album art",
       notAudio: "Not audio",
-      excluded: "Excluded"
+      excluded: "Excluded",
+      notFromLuminous: "Not from Luminous"
     },
     emptyFolder: "This folder is empty.",
     sourceGone: "This source is no longer available.",
@@ -84,6 +86,211 @@ export const en = {
     addedToSync: "Added {folder} to {device}'s sync.",
     addToSyncFailed: "Couldn't add this folder to {device}'s sync.",
     scanFailed: "Couldn't scan this folder."
+  },
+  devices: {
+    tabFiles: "Files",
+    tabSync: "Sync",
+    syncNow: "Sync now",
+    eject: "Eject",
+    rename: "Rename device",
+    ejectNamed: "Eject {device}",
+    ejected: "{device} can be unplugged now.",
+    ejectInUse: "Couldn't eject {device}: another program is using files on it. Close it and try again.",
+    ejectFailed: "Couldn't eject {device}. Try again in a moment.",
+    stopSync: "Stop sync",
+    stopSyncNamed: "Stop the sync to {device}",
+    free: "{size} free",
+    syncingCount: "Syncing {done} of {total}",
+    syncingStarting: "Getting ready to sync…",
+    syncingTo: "Syncing to {storage}",
+    modelOverMtp: "{model} over MTP",
+    modelOverUsb: "{model} over USB",
+    connectedMtp: "Connected over MTP",
+    connectedUsb: "Connected over USB",
+    lastSynced: "Last synced {when}.",
+    neverSynced: "Not synced from this computer yet.",
+    storage: "Storage",
+    storageNumbered: "Storage {n}",
+    gauge: {
+      music: {
+        one: "Music {size}, {count} track",
+        other: "Music {size}, {count} tracks"
+      },
+      other: "Other files {size}",
+      free: "Free {size}",
+      reserve: "Kept free for the device {size}"
+    },
+    selected: {
+      one: "{count} selected",
+      other: "{count} selected"
+    },
+    onlyRemovesOwn: "Sync only removes files it copied here. Anything you added another way stays.",
+    play: "Play",
+    notPlayable: "Only songs Luminous copied here can be played from this tab.",
+    deleteFromDevice: "Delete from device",
+    deleteTitle: {
+      one: "Delete {count} item from {device}?",
+      other: "Delete {count} items from {device}?"
+    },
+    deleteMessage: "The files are deleted from {device} now. Songs still checked on the Sync tab go back on at the next sync.",
+    deleted: {
+      one: "Deleted {count} item from {device}.",
+      other: "Deleted {count} items from {device}."
+    },
+    deleteFailed: "Couldn't delete these files from {device}.",
+    deleteWhileSyncing: "Wait for the sync to {device} to finish, then delete.",
+    whatGoesOn: "What goes on {device}",
+    sizeAfterConverting: "Size on the device after converting",
+    nothingSelected: "Nothing goes on this device yet. Add playlists, artists or a folder.",
+    groupPlaylists: "Playlists",
+    groupArtists: "Artists and albums",
+    groupFolders: "Folders",
+    wholeLibrary: "Whole library",
+    deletedPlaylist: "Deleted playlist",
+    albumBy: "{album} by {artist}",
+    cappedFit: {
+      one: "Capped at {cap}: {count} song fits",
+      other: "Capped at {cap}: the first {count} songs fit"
+    },
+    autoPlaylistSongs: "Auto playlist, {songs}",
+    folderSongs: "Folder, {songs}",
+    addPlaylists: "Add playlists",
+    addArtists: "Add artists",
+    addFolder: "Add a folder",
+    searchArtists: "Search artists",
+    how: "How",
+    syncToStorage: "Sync to",
+    songsYouUnselect: "Songs you unselect",
+    removeFromDevice: "Remove from device",
+    leaveOnDevice: "Leave on device",
+    removeHint: "{device} holds exactly what is checked. Songs that leave a playlist leave the device on the next sync.",
+    leaveHint: "Songs you uncheck stay on {device}. Only new songs are copied.",
+    convert: "Convert",
+    convertMode: {
+      unsupported: "Only what {device} can't play",
+      saveSpace: "Also anything that gets smaller",
+      never: "Nothing, copy as is"
+    },
+    convertCacheHint: "Converted copies are kept on this computer, so the next sync is quick.",
+    convertNeverHint: "Files are copied as they are. {device} may not play some of them.",
+    convertSubstituted: "{format} isn't available on this computer, so files are converted to {actual}.",
+    convertDeviceMayNotPlay: "{device} may not play {format}.",
+    foldersOnDevice: "Folders on the device",
+    playlistFiles: "Playlist files",
+    playlistFormat: {
+      m3u8: "M3U8 in {folder}",
+      m3uAscii: "M3U in plain ASCII, in {folder}",
+      pls: "PLS in {folder}",
+      none: "No playlist files"
+    },
+    more: "More: album art size, path separators, space to keep free",
+    artSize: "Album art size",
+    artKeep: "Keep as it is",
+    artPx: "Shrink to {px} px",
+    pathSeparator: "Path separators in playlist files",
+    separatorSlash: "Slash (/)",
+    separatorBackslash: "Backslash (\\)",
+    spaceToKeepFree: "Space to keep free",
+    projectionFits: "Fits. {copy} to copy, {remove} to remove, {free} free afterwards.",
+    projectionTooBig: "Doesn't fit: {over} too much. Unselect something.",
+    projectionTooBigLeave: "Doesn't fit: {over} too much. Unselect something, or switch to Remove from device.",
+    previewChanges: "Preview changes",
+    previewFailed: "Couldn't plan the sync to {device}.",
+    backToSettings: "Back to {device} sync settings",
+    reviewTitle: "Review sync to {device}",
+    verdictFits: "Fits, with {free} to spare",
+    verdictTooBig: "{over} too much for {device}",
+    summaryCopy: {
+      one: "{count} song to copy.",
+      other: "{count} songs to copy."
+    },
+    summaryCopyConverted: {
+      one: "{count} song to copy, {converted} converted to {target}.",
+      other: "{count} songs to copy, {converted} of them converted to {target}."
+    },
+    summaryRemove: {
+      one: "{count} song leaves the device.",
+      other: "{count} songs leave the device."
+    },
+    fixConvertSaves: "Converting everything to {target} saves about {saving}.",
+    fixUncheckLargest: "Uncheck {item}, the largest item at {size}.",
+    fixOrUncheckLargest: "Or uncheck {item}, the largest item at {size}.",
+    now: "Now",
+    afterSync: "After sync",
+    legendStays: "Stays: {size}",
+    legendRemoved: "Removed: {size}",
+    legendCopied: "Copied: {size}",
+    legendOther: "Not music: {size}",
+    listCopy: {
+      one: "Copy {count} song, {size}",
+      other: "Copy {count} songs, {size}"
+    },
+    listRemove: {
+      one: "Remove {count} song, {size}",
+      other: "Remove {count} songs, {size}"
+    },
+    listUpdate: {
+      one: "Update {count} song",
+      other: "Update {count} songs"
+    },
+    showAllCopy: "Show all songs to copy",
+    showAllRemove: "Show all songs to remove",
+    showAllUpdate: "Show all songs to update",
+    playlistsRow: "Playlists",
+    playlistFilesRewritten: {
+      one: "{count} file rewritten",
+      other: "{count} files rewritten"
+    },
+    othersLeftAlone: "Files you added to {device} another way are left alone.",
+    reasonFolder: "Folder",
+    reasonRenamed: "Renamed beside a file you added",
+    reasonAdopted: "Already on the device",
+    reasonLeft: "Left {source}",
+    reasonUnchecked: {
+      library: "Unchecked",
+      playlist: "Unchecked playlist",
+      artist: "Unchecked artist",
+      album: "Unchecked album",
+      folder: "Unchecked folder"
+    },
+    reasonDeleted: "Deleted from library",
+    reasonTags: "Tags changed",
+    reasonFileChanged: "File changed",
+    reasonConvertChanged: "Convert setting changed",
+    reasonMoved: "Moved",
+    reasonUnreadable: "Can't be read",
+    changeSelection: "Change selection",
+    startSync: "Start sync",
+    convertEverything: "Convert everything to {target}",
+    planChanged: "{device} changed since the preview. Check the new plan, then start the sync again.",
+    alreadySyncing: "{device} is already syncing.",
+    startFailed: "Couldn't start the sync to {device}.",
+    songsOf: "{done} of {total} songs",
+    bytesOf: "{done} of {total}",
+    hideProgress: "Hide sync progress",
+    showProgress: "Show sync progress",
+    stepRemoving: "Removing songs",
+    stepConverting: "Converting {song} to {target}",
+    stepCopying: "Copying {song}",
+    stepPlaylists: "Writing playlist files",
+    stepFolderArt: "Writing album art",
+    stepFinishing: "Finishing up",
+    lessThanAMinute: "Less than a minute left",
+    minutesLeft: {
+      one: "About {count} minute left",
+      other: "About {count} minutes left"
+    },
+    stoppingKeeps: "Stopping keeps every song copied so far. Keep {device} connected until the sync finishes.",
+    syncDone: "Sync to {device} complete.",
+    syncDoneWithFailures: {
+      one: "Sync to {device} complete, but {count} song couldn't be copied.",
+      other: "Sync to {device} complete, but {count} songs couldn't be copied."
+    },
+    syncStopped: {
+      one: "Sync to {device} stopped. {count} song was copied.",
+      other: "Sync to {device} stopped. {count} songs were copied."
+    },
+    syncFailed: "The sync to {device} stopped with an error."
   },
   topNav: {
     filterExample: "e.g. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
