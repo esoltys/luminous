@@ -5,6 +5,7 @@
   import type { ConnectedDevice, SyncPlan, SyncSettings } from "../../types";
   import DeviceStorageBar from "./DeviceStorageBar.svelte";
   import DeviceStorageLegend from "./DeviceStorageLegend.svelte";
+  import { afterSyncSlices, planLegend } from "./planStorage";
 
   /**
    * The synced storage as the latest preview leaves it (#839), laid out like
@@ -44,18 +45,6 @@
     });
   });
 
-  const legend = $derived(
-    plan
-      ? [
-          { tone: "music" as const, label: i18n.t("devices.legendStays", { size: formatStorageSize(plan.storage.staysBytes) }) },
-          { tone: "copied" as const, label: i18n.t("devices.legendCopied", { size: formatStorageSize(plan.storage.copiedBytes) }) },
-          { tone: "other" as const, label: i18n.t("devices.legendOther", { size: formatStorageSize(plan.storage.otherBytes) }) },
-          ...(plan.storage.reserveBytes > 0
-            ? [{ tone: "reserve" as const, label: i18n.t("devices.gauge.reserve", { size: formatStorageSize(plan.storage.reserveBytes) }) }]
-            : []),
-        ]
-      : []
-  );
 </script>
 
 <div class="flex flex-col gap-2.5 min-w-0" data-testid="sync-projection">
@@ -75,16 +64,12 @@
   </div>
   {#if plan}
     <DeviceStorageBar
-      slices={[
-        { tone: "music", bytes: plan.storage.staysBytes },
-        { tone: "copied", bytes: plan.storage.copiedBytes },
-        { tone: "other", bytes: plan.storage.otherBytes },
-      ]}
+      slices={afterSyncSlices(plan.storage)}
       capacityBytes={plan.storage.capacityBytes}
       reserveBytes={plan.storage.reserveBytes}
       label={verdict}
     />
-    <DeviceStorageLegend items={legend} />
+    <DeviceStorageLegend items={planLegend(plan.storage, false)} />
   {:else}
     <div class="h-2.5 rounded-[3px] bg-brand-border/25" aria-hidden="true"></div>
     <!-- The legend's line, held while loading so the card doesn't grow when it arrives. -->

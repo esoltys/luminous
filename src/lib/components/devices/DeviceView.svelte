@@ -47,11 +47,8 @@
   let syncPlan = $state<SyncPlan | null>(null);
   let syncPlanFailed = $state(false);
 
-  // Another device, or another tab, closes the preview. A sync hands over a
-  // new `device` on every file, so this watches the id, not the object.
-  const deviceId = $derived(device.id);
+  // Another tab closes the preview. (Another device is another DeviceView: FilesView keys it by id.)
   $effect(() => {
-    void deviceId;
     void tab;
     preview = null;
   });

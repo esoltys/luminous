@@ -326,7 +326,7 @@
             {#snippet children({ item: entry }: { item: FileEntry })}
               {@const selected = path[dir.length] === entry.name}
               <button
-                class="w-full h-[31px] flex items-center gap-2 px-2.5 rounded-md text-[13px] text-left transition-colors {selected ? 'bg-brand-accent/20 text-brand-text-primary font-semibold' : 'text-brand-text-primary hover:bg-brand-accent/10'} {entry.status === 'excluded' || entry.status === 'notFromLuminous' ? 'opacity-60' : ''}"
+                class="w-full h-[31px] flex items-center gap-2 px-2.5 rounded-md text-[13px] text-left transition-colors {selected ? 'bg-brand-accent/20 text-brand-text-primary font-semibold' : 'text-brand-text-primary hover:bg-brand-accent/10'} {MUTED.includes(entry.status) ? 'opacity-60' : ''}"
                 role="option"
                 aria-selected={selected}
                 tabindex="-1"

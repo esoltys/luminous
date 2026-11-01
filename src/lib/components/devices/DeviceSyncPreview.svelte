@@ -10,6 +10,7 @@
   import Button from "../Button.svelte";
   import DeviceStorageBar from "./DeviceStorageBar.svelte";
   import DeviceStorageLegend from "./DeviceStorageLegend.svelte";
+  import { afterSyncSlices, beforeSyncSlices, planLegend } from "./planStorage";
 
   /**
    * The sync preview (#839): the verdict, the device now and after the
@@ -80,27 +81,11 @@
     return parts.join(" ");
   });
 
-  const nowSlices = $derived([
-    { tone: "music" as const, bytes: storage.staysBytes },
-    { tone: "removed" as const, bytes: storage.removedBytes },
-    { tone: "other" as const, bytes: storage.otherBytes },
-  ]);
-  const afterSlices = $derived([
-    { tone: "music" as const, bytes: storage.staysBytes },
-    { tone: "copied" as const, bytes: storage.copiedBytes },
-    { tone: "other" as const, bytes: storage.otherBytes },
-  ]);
+  const nowSlices = $derived(beforeSyncSlices(storage));
+  const afterSlices = $derived(afterSyncSlices(storage));
   const total = (slices: { bytes: number }[]) => slices.reduce((sum, s) => sum + s.bytes, 0);
   const scale = $derived(Math.max(storage.capacityBytes, total(nowSlices), total(afterSlices)));
-  const legend = $derived([
-    { tone: "music" as const, label: i18n.t("devices.legendStays", { size: formatStorageSize(storage.staysBytes) }) },
-    { tone: "removed" as const, label: i18n.t("devices.legendRemoved", { size: formatStorageSize(storage.removedBytes) }) },
-    { tone: "copied" as const, label: i18n.t("devices.legendCopied", { size: formatStorageSize(storage.copiedBytes) }) },
-    { tone: "other" as const, label: i18n.t("devices.legendOther", { size: formatStorageSize(storage.otherBytes) }) },
-    ...(storage.reserveBytes > 0
-      ? [{ tone: "reserve" as const, label: i18n.t("devices.gauge.reserve", { size: formatStorageSize(storage.reserveBytes) }) }]
-      : []),
-  ]);
+  const legend = $derived(planLegend(storage, true));
 
   function sourceName(source: SyncSourceRef): string {
     if (source.kind === "library") return i18n.t("devices.wholeLibrary");
