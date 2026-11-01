@@ -26,6 +26,10 @@ const auditWorkflow = fs.readFileSync(path.join(root, ".github/workflows/audit.y
 const tauriCargoToml = fs.readFileSync(path.join(root, "src-tauri/Cargo.toml"), "utf-8");
 const viteConfig = fs.readFileSync(path.join(root, "vite.config.js"), "utf-8");
 const scriptPath = path.join(root, "scripts/ci-should-run.sh");
+const bashExecutable =
+  process.platform === "win32" && fs.existsSync("C:\\Program Files\\Git\\bin\\bash.exe")
+    ? "C:\\Program Files\\Git\\bin\\bash.exe"
+    : "bash";
 
 type Scope = "frontend" | "backend" | "lean" | "actions";
 
@@ -40,12 +44,12 @@ function runScopeCheck(
   );
   fs.writeFileSync(tmpFile, "");
   try {
-    const stdout = execFileSync("bash", [scriptPath, ...scopeArgs], {
+    const stdout = execFileSync(bashExecutable, [scriptPath.replaceAll("\\", "/"), ...scopeArgs], {
       cwd: root,
       encoding: "utf-8",
       env: {
         ...process.env,
-        GITHUB_OUTPUT: tmpFile,
+        GITHUB_OUTPUT: tmpFile.replaceAll("\\", "/"),
         ...envOverrides,
       },
     }).trim();
