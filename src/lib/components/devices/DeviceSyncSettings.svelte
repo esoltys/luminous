@@ -27,7 +27,7 @@
   /**
    * A device's Sync tab (#839): what goes on it, how, and a live verdict.
    * Two writers, one owner each: the selection is saved by
-   * `preview_device_sync`, the How settings by `update_device_profile`
+   * `devicesStore.planSync`, the How settings by `update_device_profile`
    * (after which the device list brings the new profile and a new preview
    * follows). Every size, verdict and free-space figure is the backend
    * plan's; only the newest preview is shown. The selection and its latest
@@ -121,7 +121,7 @@
     const request = ++previewRequest;
     const timer = setTimeout(async () => {
       try {
-        const result = await invoke<SyncPlan>("preview_device_sync", { deviceId: id, settings: snapshot });
+        const result = await devicesStore.planSync(id, snapshot);
         if (request === previewRequest) {
           plan = result;
           previewError = false;

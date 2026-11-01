@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import type { ConnectedDevice, DeviceSyncState, SyncProgress, SyncSummary } from "../types";
+import type { ConnectedDevice, DeviceSyncState, SyncProgress, SyncSettings, SyncSummary } from "../types";
 
 const handlers = vi.hoisted(() => new Map<string, (event: { payload: unknown }) => void>());
 
@@ -23,11 +23,17 @@ const walkman: ConnectedDevice = {
 
 let running = false;
 let ejectError: string | null = null;
+/** The selection the backend has saved; planning saves the one it is given. */
+let saved: SyncSettings = { storageId: null, sources: [], unselected: "remove" };
 function backend() {
-  vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+  vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {
     if (cmd === "get_connected_devices") return [walkman];
     if (cmd === "get_device_sync_state") {
-      return { settings: { storageId: null, sources: [], unselected: "remove" }, lastSummary: null, running } satisfies DeviceSyncState;
+      return { settings: saved, lastSummary: null, running } satisfies DeviceSyncState;
+    }
+    if (cmd === "preview_device_sync") {
+      saved = (args as { settings: SyncSettings }).settings;
+      return { planId: "plan" };
     }
     if (cmd === "eject_device" && ejectError) throw ejectError;
     return null;
@@ -68,6 +74,7 @@ describe("devicesStore", () => {
     await vi.waitFor(() => expect(devicesStore.loaded).toBe(true));
     running = false;
     ejectError = null;
+    saved = { storageId: null, sources: [], unselected: "remove" };
     backend();
     handlers.get("devices-changed")!({ payload: [walkman] });
     handlers.get("device-sync-finished")!({ payload: summary({ kind: "completed" }) });
@@ -97,6 +104,22 @@ describe("devicesStore", () => {
     devicesStore.drawerHidden = true;
     devicesStore.showProgress();
     expect(devicesStore.drawerHidden).toBe(false);
+  });
+
+  it("keeps the selection a folder was added to, so planning it later doesn't drop the folder", async () => {
+    await devicesStore.refreshSyncState(walkman.id);
+
+    expect(await devicesStore.addFolderToSync(walkman.id, "M:\Amon Amarth")).toBe(true);
+    // What the device's Sync now plans when its Sync tab isn't open.
+    await devicesStore.planSync(walkman.id, devicesStore.syncStates[walkman.id].settings);
+
+    expect(saved.sources).toEqual([{ kind: "folder", path: "M:\Amon Amarth" }]);
+  });
+
+  it("adds a folder only once", async () => {
+    expect(await devicesStore.addFolderToSync(walkman.id, "M:\Amon Amarth")).toBe(true);
+    expect(await devicesStore.addFolderToSync(walkman.id, "M:\Amon Amarth")).toBe(false);
+    expect(saved.sources).toHaveLength(1);
   });
 
   it("says why a device can't be ejected", async () => {

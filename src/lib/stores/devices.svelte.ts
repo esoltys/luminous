@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { ConnectedDevice, DeviceSyncState, SyncProgress, SyncSummary } from "../types";
+import type { ConnectedDevice, DeviceSyncState, SyncPlan, SyncProgress, SyncSettings, SyncSummary } from "../types";
 import { deviceName } from "../utils/devices";
 import { i18n } from "./i18n.svelte";
 import { toastStore } from "./toast.svelte";
@@ -15,7 +15,7 @@ class DevicesStore {
   devices = $state<ConnectedDevice[]>([]);
   /** True once the device list has been read. */
   loaded = $state(false);
-  /** Sync state by device id; absent until read. */
+  /** Sync state by device id; absent until read. Its selection is the saved one: [`planSync`](#planSync) is the only way to change it. */
   syncStates = $state<Record<string, DeviceSyncState>>({});
   /** Progress of the running sync by device id; absent before its first report. */
   progress = $state<Record<string, SyncProgress>>({});
@@ -63,6 +63,30 @@ class DevicesStore {
       console.error("Failed to read device sync state:", err);
       return null;
     }
+  }
+
+  /**
+   * Saves `settings` as the device's sync selection and plans syncing it.
+   * Every change to a selection goes through here, so `syncStates` never
+   * holds an older one that a later plan would save back over it.
+   */
+  async planSync(deviceId: string, settings: SyncSettings): Promise<SyncPlan> {
+    const plan = await invoke<SyncPlan>("preview_device_sync", { deviceId, settings });
+    const state = this.syncStates[deviceId];
+    if (state) this.syncStates[deviceId] = { ...state, settings };
+    else await this.refreshSyncState(deviceId);
+    return plan;
+  }
+
+  /**
+   * Adds the folder at `path` to the device's sync selection. False when it
+   * is already there. Rejects when the device can't be planned.
+   */
+  async addFolderToSync(deviceId: string, path: string): Promise<boolean> {
+    const state = await invoke<DeviceSyncState>("get_device_sync_state", { deviceId });
+    if (state.settings.sources.some((s) => s.kind === "folder" && s.path === path)) return false;
+    await this.planSync(deviceId, { ...state.settings, sources: [...state.settings.sources, { kind: "folder", path }] });
+    return true;
   }
 
   private finished(summary: SyncSummary) {
