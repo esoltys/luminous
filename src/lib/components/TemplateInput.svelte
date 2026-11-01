@@ -1,5 +1,6 @@
 <script lang="ts">
   import { i18n } from "../stores/i18n.svelte";
+  import HelpTip from "./HelpTip.svelte";
 
   /**
    * A folder-and-file-name template field in the Organize syntax
@@ -51,13 +52,14 @@
 <div class="flex flex-wrap items-center gap-1.5 pt-1">
   <span class="text-[11px] text-brand-text-secondary mr-1">{i18n.t("organizer.placeholders")}:</span>
   {#each VARIABLE_CHIPS as chip}
-    <button
-      type="button"
+    {@const shown = chip.label === "/" ? i18n.t("organizer.chipFolderLabel") : chip.label}
+    <HelpTip
+      text={i18n.t(chip.descKey)}
+      label={shown}
       onclick={() => insertChip(chip.label)}
       class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors border bg-brand-sidebar hover:bg-brand-accent/15 border-brand-border/80 text-brand-text-primary hover:text-brand-accent-text font-medium"
-      title={i18n.t(chip.descKey)}
     >
-      {chip.label === '/' ? i18n.t('organizer.chipFolderLabel') : chip.label}
-    </button>
+      {shown}
+    </HelpTip>
   {/each}
 </div>
