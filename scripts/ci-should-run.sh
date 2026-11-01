@@ -68,7 +68,7 @@ matches_scope() {
   case "$scope" in
     frontend)
       case "$file" in
-        src/*|scripts/*|e2e/*|ast-grep/*|docs/user-guide/*|static/*|.github/workflows/*)
+        src/*|scripts/*|ast-grep/*|docs/user-guide/*|static/*|.github/workflows/*)
           return 0 ;;
         package.json|bun.lock|tsconfig.json|vite.config.js|vite.perf.config.js|vitest.setup.ts|knip.json|sgconfig.yml)
           return 0 ;;

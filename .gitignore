@@ -35,13 +35,6 @@ scripts/screenshot-scenes.local.json
 /target/
 /src-tauri/target/
 
-# Downloaded msedgedriver binary for Windows e2e tests (see e2e/README.md) —
-# version-specific to the local WebView2 Runtime, never committed.
-/e2e/.bin/
-
-# Session state for scripts/inspect-app.ts (dev-time app inspection tool)
-/.inspect-session.json
-
 # Captures and diff images from scripts/style-diff.ts
 /.style-diff/
 

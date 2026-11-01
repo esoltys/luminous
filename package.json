@@ -36,7 +36,6 @@
     "take-scene-screenshots": "bun run scripts/take-scene-screenshots.ts",
     "take-dynamic-screenshots": "bun run scripts/take-scene-screenshots.ts --locale=en-CA --name=\"theme-dynamic-*\"",
     "style-diff": "bunx tsx scripts/style-diff.ts",
-    "test:e2e:windows": "tauri build --debug --no-bundle && bunx tsx e2e/run-smoke.ts",
     "release": "bun run scripts/release.ts",
     "bump-version": "bun run scripts/bump-version.ts",
     "tauri:windows:build": "tauri-windows-bundle build --runner bun",
