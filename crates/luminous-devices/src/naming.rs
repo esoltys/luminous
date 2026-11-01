@@ -34,9 +34,9 @@ pub(crate) fn model_name(vendor: Option<&str>, model: Option<&str>) -> Option<St
     (!words.is_empty()).then(|| words.join(" "))
 }
 
-/// `mtp-<serial>` for an MTP device, the same on every computer, or an id
-/// derived from `fallback` (a Plug and Play id, a URI host) when the device
-/// reports no serial.
+/// `mtp-<serial>` for an MTP device, the same on every computer as long as
+/// every platform passes the USB serial number, or an id derived from
+/// `fallback` (a Plug and Play id, a URI host) when the device reports none.
 pub(crate) fn mtp_provisional_id(serial: Option<&str>, fallback: &str) -> String {
     let clean = |s: &str| -> String {
         s.chars()
