@@ -8,8 +8,8 @@
   import { i18n } from "../../stores/i18n.svelte";
   import { formatStorageSize } from "../../utils/formatters";
   import { formatDateAdded } from "../../utils/date";
-  import { deviceName, deviceStorage, storageName, syncStorage } from "../../utils/devices";
-  import type { ConnectedDevice, DirListing, FileEntry, SyncPlan } from "../../types";
+  import { deviceName, deviceStorage, storageName } from "../../utils/devices";
+  import type { ConnectedDevice, DirListing, FileEntry, SyncPlan, SyncSettings } from "../../types";
   import Button from "../Button.svelte";
   import ConfirmDialog from "../ConfirmDialog.svelte";
   import FileBrowser from "../files/FileBrowser.svelte";
@@ -17,12 +17,15 @@
   import DeviceStorageGauge from "./DeviceStorageGauge.svelte";
   import DeviceSyncSettings from "./DeviceSyncSettings.svelte";
   import DeviceSyncPreview from "./DeviceSyncPreview.svelte";
+  import DeviceSyncProjection from "./DeviceSyncProjection.svelte";
 
   /**
    * A connected device in the Files view (#839): its header and storage
-   * gauge, the files on it and how it is synced. The tab, storage and
-   * folder live in the saved Files location; the sync preview doesn't,
-   * since its plan only stands until the next preview.
+   * card, the files on it and how it is synced. The header stays put
+   * between tabs; the card shows the storage now on Files and after the
+   * sync on Sync. The tab, storage and folder live in the saved Files
+   * location; the sync preview doesn't, since its plan only stands until
+   * the next preview.
    */
   let { device }: { device: ConnectedDevice } = $props();
 
@@ -36,15 +39,20 @@
   const storage = $derived(
     deviceStorage(device, location.source.kind === "device" ? location.source.storage : null)
   );
-  const targetStorage = $derived(syncStorage(device, syncState?.settings));
   const unnamedStorage = (n: number) => i18n.t("devices.storageNumbered", { n });
 
   let preview = $state<SyncPlan | null>(null);
   let opening = $state(false);
+  // The Sync tab's selection as edited, and its latest plan; bound from DeviceSyncSettings.
+  let syncSettings = $state<SyncSettings | null>(null);
+  let syncPlan = $state<SyncPlan | null>(null);
+  let syncPlanFailed = $state(false);
 
-  // Another device, or another tab, closes the preview.
+  // Another device, or another tab, closes the preview. A sync hands over a
+  // new `device` on every file, so this watches the id, not the object.
+  const deviceId = $derived(device.id);
   $effect(() => {
-    void device.id;
+    void deviceId;
     void tab;
     preview = null;
   });
@@ -56,11 +64,6 @@
       : i18n.t(mtp ? "devices.connectedMtp" : "devices.connectedUsb");
   });
   const subtitle = $derived.by(() => {
-    // Which storage is synced only matters when there is a choice.
-    if (tab === "sync" && targetStorage && device.storages.length > 1) {
-      const where = i18n.t("devices.syncingTo", { storage: storageName(device, targetStorage, unnamedStorage) });
-      return `${connection}. ${where}`;
-    }
     const synced = device.lastSyncedAt
       ? i18n.t("devices.lastSynced", { when: formatDateAdded(device.lastSyncedAt) })
       : i18n.t("devices.neverSynced");
@@ -101,14 +104,18 @@
     navigationStore.filesLocation = { ...location, source: { kind: "device", id: device.id, storage: storageId }, path: [] };
   }
 
-  /** Previews the saved selection and opens the preview; nothing is written before Start sync. */
+  /**
+   * Previews the selection (as edited on the Sync tab, else as saved) and
+   * opens the preview; nothing is written before Start sync.
+   */
   async function syncNow() {
     opening = true;
+    // Switch first: the switch closes any preview, so it must not land after this one opens.
+    if (tab !== "sync") setTab("sync");
     try {
-      const state = syncState ?? (await devicesStore.refreshSyncState(device.id));
-      if (!state) return;
-      preview = await invoke<SyncPlan>("preview_device_sync", { deviceId: device.id, settings: state.settings });
-      if (tab !== "sync") setTab("sync");
+      const settings = syncSettings ? $state.snapshot(syncSettings) : (syncState ?? (await devicesStore.refreshSyncState(device.id)))?.settings;
+      if (!settings) return;
+      preview = await invoke<SyncPlan>("preview_device_sync", { deviceId: device.id, settings });
     } catch (err) {
       console.error("Failed to preview device sync:", err);
       toastStore.show(i18n.t("devices.previewFailed", { device: name }), "error");
@@ -187,11 +194,9 @@
   {:else}
     <header class="mr-6 flex items-start justify-between gap-4 flex-wrap">
       <div class="flex items-center gap-4 min-w-0">
-        {#if tab === "files"}
-          <div class="w-14 h-14 shrink-0 flex items-center justify-center rounded-xl border border-brand-border/50 bg-brand-sidebar/60">
-            <Icon class="w-7 h-7 text-brand-accent-text" />
-          </div>
-        {/if}
+        <div class="w-14 h-14 shrink-0 flex items-center justify-center rounded-xl border border-brand-border/50 bg-brand-sidebar/60">
+          <Icon class="w-7 h-7 text-brand-accent-text" />
+        </div>
         <div class="min-w-0">
           {#if renaming}
             <div class="flex items-center gap-2">
@@ -246,6 +251,10 @@
             <ArrowsClockwiseIcon class="w-4 h-4" />
             {i18n.t("devices.syncNow")}
           </Button>
+        {:else}
+          <Button variant="primary" onclick={syncNow} disabled={opening || !syncPlan}>
+            {i18n.t("devices.previewChanges")}
+          </Button>
         {/if}
         <Button onclick={() => devicesStore.eject(device.id)}>
           <EjectIcon class="w-4 h-4" />
@@ -254,7 +263,11 @@
       </div>
     </header>
 
-    {#if tab === "files" && storage}
+    {#if tab === "sync"}
+      <section class="mr-6 rounded-xl border border-brand-border/40 bg-brand-sidebar/40 px-4 py-3">
+        <DeviceSyncProjection {device} plan={syncPlan} unselected={syncSettings?.unselected} failed={syncPlanFailed} />
+      </section>
+    {:else if storage}
       <section class="mr-6 rounded-xl border border-brand-border/40 bg-brand-sidebar/40 px-4 py-3">
         <DeviceStorageGauge {device} {storage}>
           {#snippet switcher()}
@@ -320,7 +333,7 @@
         </FileBrowser>
       </div>
     {:else}
-      <DeviceSyncSettings {device} onpreview={(plan) => (preview = plan)} />
+      <DeviceSyncSettings {device} bind:settings={syncSettings} bind:plan={syncPlan} bind:previewError={syncPlanFailed} />
     {/if}
   {/if}
 </div>

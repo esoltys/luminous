@@ -23,7 +23,6 @@
   import Button from "../Button.svelte";
   import Select from "../Select.svelte";
   import TemplateInput from "../TemplateInput.svelte";
-  import DeviceStorageBar from "./DeviceStorageBar.svelte";
 
   /**
    * A device's Sync tab (#839): what goes on it, how, and a live verdict.
@@ -31,26 +30,36 @@
    * `preview_device_sync`, the How settings by `update_device_profile`
    * (after which the device list brings the new profile and a new preview
    * follows). Every size, verdict and free-space figure is the backend
-   * plan's; only the newest preview is shown.
+   * plan's; only the newest preview is shown. The selection and its latest
+   * plan are bound out to the device page, which draws the verdict in its
+   * storage card and opens the preview.
    */
-  let { device, onpreview }: { device: ConnectedDevice; onpreview: (plan: SyncPlan) => void } = $props();
+  let {
+    device,
+    settings = $bindable(null),
+    plan = $bindable(null),
+    previewError = $bindable(false),
+  }: {
+    device: ConnectedDevice;
+    /** The selection as edited here; null until the saved one loads. */
+    settings?: SyncSettings | null;
+    /** The newest preview of `settings`. */
+    plan?: SyncPlan | null;
+    previewError?: boolean;
+  } = $props();
 
   const PREVIEW_DEBOUNCE_MS = 250;
   // A sync rewrites the device list on every file, handing over a new `device`
   // each time; these change only when the id or the saved profile does.
   const deviceId = $derived(device.id);
   const savedProfile = $derived(JSON.stringify(device.profile));
-  const syncing = $derived(devicesStore.isSyncing(deviceId));
   const PROFILE_DEBOUNCE_MS = 400;
 
   const name = $derived(deviceName(device));
   const unnamedStorage = (n: number) => i18n.t("devices.storageNumbered", { n });
 
-  let settings = $state<SyncSettings | null>(null);
   /** Everything listed, checked or not: the saved selection plus what was unchecked here. */
   let listed = $state<SyncSource[]>([]);
-  let plan = $state<SyncPlan | null>(null);
-  let previewError = $state(false);
   let capabilities = $state<TranscodeCapabilities | null>(null);
   let conversion = $state<{ substituted: boolean; devicePlays: boolean; format: TargetFormat; bitrateKbps: number } | null>(null);
   let examplePath = $state<string | null>(null);
@@ -125,24 +134,6 @@
     }, PREVIEW_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   });
-
-  /** Previews the selection as it is now, skipping the debounce, and opens it. */
-  let opening = $state(false);
-  async function openPreview() {
-    if (!settings) return;
-    opening = true;
-    const request = ++previewRequest;
-    try {
-      const result = await invoke<SyncPlan>("preview_device_sync", { deviceId: device.id, settings: $state.snapshot(settings) });
-      if (request === previewRequest) plan = result;
-      onpreview(result);
-    } catch (err) {
-      console.error("Failed to preview device sync:", err);
-      previewError = true;
-    } finally {
-      opening = false;
-    }
-  }
 
   function editProfile(change: (profile: DeviceProfile) => void) {
     change(draft);
@@ -279,22 +270,7 @@
   const playlistFolder = $derived(`/${draft.playlistsPath.replace(/^[/\\]+/, "")}`);
   const reserveGb = $derived(Math.round((draft.reserveBytes / STORAGE_GB) * 10) / 10);
 
-  // Projection.
   const target = $derived(syncStorage(device, settings ?? undefined));
-  const projection = $derived.by(() => {
-    if (!plan) return "";
-    const s = plan.storage;
-    if (s.fits) {
-      return i18n.t("devices.projectionFits", {
-        copy: formatStorageSize(s.copiedBytes),
-        remove: formatStorageSize(s.removedBytes),
-        free: formatStorageSize(Math.max(0, s.freeAfterBytes)),
-      });
-    }
-    return i18n.t(settings?.unselected === "leave" ? "devices.projectionTooBigLeave" : "devices.projectionTooBig", {
-      over: formatStorageSize(plan.shortfall?.bytes ?? 0),
-    });
-  });
 </script>
 
 <div class="flex-1 min-h-0 flex flex-col gap-3" data-testid="device-sync-settings">
@@ -531,32 +507,6 @@
           </div>
         </section>
       </div>
-    </div>
-
-    <!-- Projection -->
-    <div class="mr-6 shrink-0 flex items-center gap-4 rounded-xl border border-brand-border/40 bg-brand-sidebar/60 px-4 py-3" data-testid="sync-projection">
-      <div class="flex-1 min-w-0 flex flex-col gap-2">
-        {#if plan}
-          <DeviceStorageBar
-            slices={[
-              { tone: "music", bytes: plan.storage.staysBytes },
-              { tone: "copied", bytes: plan.storage.copiedBytes },
-              { tone: "other", bytes: plan.storage.otherBytes },
-            ]}
-            capacityBytes={plan.storage.capacityBytes}
-            reserveBytes={plan.storage.reserveBytes}
-            label={projection}
-          />
-          <p class="text-sm font-semibold {plan.storage.fits ? 'text-brand-text-primary' : 'text-amber-400'}">{projection}</p>
-        {:else if previewError}
-          <p class="text-sm text-brand-text-secondary">{i18n.t("devices.previewFailed", { device: name })}</p>
-        {:else}
-          <p class="text-sm text-brand-text-secondary">{i18n.t("common.loading")}</p>
-        {/if}
-      </div>
-      <Button variant="primary" onclick={openPreview} disabled={!plan || opening || syncing}>
-        {i18n.t("devices.previewChanges")}
-      </Button>
     </div>
   {/if}
 </div>
