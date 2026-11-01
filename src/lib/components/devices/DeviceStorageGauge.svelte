@@ -79,5 +79,7 @@
     <DeviceStorageLegend items={legend} />
   {:else}
     <div class="h-2.5 rounded-[3px] bg-brand-border/25" aria-hidden="true"></div>
+    <!-- The legend's line, held while loading so the card doesn't grow when it arrives. -->
+    <div class="h-4" aria-hidden="true"></div>
   {/if}
 </div>
