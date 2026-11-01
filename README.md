@@ -63,7 +63,6 @@ luminous/
 │   ├── luminous-equalizer/   # Biquad DSP: 10-band graphic & up-to-20-band parametric filters, Equalizer APO parser
 │   ├── luminous-metadata/    # Audio & playlist metadata: Lofty tag read/write, CUE sheets, DR meter logs, M3U/PLS/XSPF parsers
 │   └── luminous-remote/      # Wire-protocol clients: Subsonic, WebDAV, ListenBrainz, CritiqueBrainz, Lyrics, MusicBrainz OAuth
-├── features/                 # BDD Gherkin Feature Specifications
 ├── src/                      # Svelte 5 + TypeScript Frontend
 │   ├── lib/
 │   │   ├── components/       # PlayerBar, Visualizers, Equalizer, LyricsView, TagEditor, etc.
@@ -216,9 +215,8 @@ bun run test:run
 
 ### Backend Unit & Integration Tests (Rust)
 
-To run the standard cargo unit test suite:
+To run the backend unit and integration test suite:
 ```bash
-cd src-tauri
-cargo test
+cargo test --workspace
 ```
-This also runs the Gherkin feature specs under [`features/`](features) — each `.feature` file has a matching test in `src-tauri/tests/`, so no separate command is needed to exercise them.
+This runs unit tests across all workspace crates and integration tests under `src-tauri/tests/`.

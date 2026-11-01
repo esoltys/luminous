@@ -80,7 +80,7 @@ matches_scope() {
       ;;
     backend)
       case "$file" in
-        src-tauri/*|crates/*|features/*|Cargo.toml|Cargo.lock|deny.toml)
+        src-tauri/*|crates/*|Cargo.toml|Cargo.lock|deny.toml)
           return 0 ;;
         .github/workflows/ci.yml|.github/workflows/audit.yml|.github/workflows/codeql.yml|scripts/ci-should-run.sh)
           return 0 ;;

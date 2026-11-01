@@ -60,7 +60,7 @@ manual.
 - [ ] `bun run lint:ast` — architecture-invariant rules
 - [ ] `bun run test:run` — frontend unit tests, including locale completeness and the
       guide-asset size budget
-- [ ] `cargo test --workspace` (from repo root, so `crates/` members run too) — Rust unit tests + BDD suites
+- [ ] `cargo test --workspace` (from repo root, so `crates/` members run too) — Rust unit and integration tests
 - [ ] `bun run fmt:check` (or `cargo fmt --all --check`), `bun run audit:cargo` (or `cargo deny check`), and `cargo clippy --all-targets -- -D warnings` (from
       `src-tauri/`) — no warnings at all, not just no new ones; fix any pre-existing
       warnings you encounter rather than leaving them

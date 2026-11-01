@@ -1,7 +1,7 @@
 # Testing
 
-Manual and dev-time testing notes. For automated test commands (Vitest, `cargo test`, BDD
-suites), see [AGENTS.md](../AGENTS.md#testing). For "this broke, here's the fix" entries, see
+Manual and dev-time testing notes. For automated test commands (Vitest, `cargo test`),
+see [AGENTS.md](../AGENTS.md#testing). For "this broke, here's the fix" entries, see
 [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## Manual QA walkthrough
@@ -23,7 +23,7 @@ Each of these describes a test that passed while the bug it named was live.
    and check the fixture didn't remove it.
    `test_reconcile_appends_new_matches_and_evicts_stale_without_reordering`
    (`playlist/dynamic.rs`) starts from a populated playlist; an empty one can't show reordering.
-   `equalizer.feature` scenarios start from `Given the equalizer is enabled`. For live-app
+   `equalizer_test.rs` cases start with the equalizer enabled. For live-app
    measurements, confirm nothing covers the element (the first-run walkthrough, a modal), and
    that the input is realistic: audio actually playing and not muted, a real library rather
    than an empty one.

@@ -1108,10 +1108,10 @@ impl CoverManager {
         self
     }
 
-    /// Override the iTunes Search API base URL — used by BDD tests to point
+    /// Override the iTunes Search API base URL — used by tests to point
     /// `fetch_remote_cover` at a local mock server instead of the real
     /// network, so the remote-cover-art fallback can be exercised
-    /// deterministically and offline (see `tests/cover_art_bdd.rs`).
+    /// deterministically and offline (see `tests/cover_art_test.rs`).
     /// Production code never calls this; `new()`'s default is the real API.
     pub fn with_itunes_base_url(mut self, base_url: impl Into<String>) -> Self {
         self.itunes_base_url = base_url.into();

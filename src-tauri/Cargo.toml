@@ -189,31 +189,6 @@ zvariant = "5"
 
 [dev-dependencies]
 luminous-audio = { path = "../crates/luminous-audio", features = ["test-util"] }
-cucumber = { version = "0.23", features = ["macros"] }
 proptest = "1.11.0"
 tempfile = "3"
 wiremock = "0.6"
-
-[[test]]
-name = "equalizer_bdd"
-harness = false
-
-[[test]]
-name = "library_scan_bdd"
-harness = false
-
-[[test]]
-name = "playlists_bdd"
-harness = false
-
-[[test]]
-name = "lyrics_bdd"
-harness = false
-
-[[test]]
-name = "tag_editor_bdd"
-harness = false
-
-[[test]]
-name = "cover_art_bdd"
-harness = false

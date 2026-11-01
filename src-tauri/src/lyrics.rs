@@ -484,8 +484,8 @@ pub fn subtitles_to_lrc(content: &str) -> String {
 /// cache holds synced (or already-checked-unsynced) text, otherwise query
 /// online providers via `lyrics_manager` and cache the result. Extracted
 /// from the `get_lyrics` Tauri command so it's callable without a Tauri
-/// `AppHandle`/`State` — BDD tests exercise this directly (see
-/// `tests/lyrics_bdd.rs`) to verify the cache-hit path never reaches
+/// `AppHandle`/`State` — integration tests exercise this directly (see
+/// `tests/lyrics_test.rs`) to verify the cache-hit path never reaches
 /// `lyrics_manager.fetch_lyrics`.
 /// Returned instead of querying online providers while the master toggle is Offline.
 pub const OFFLINE_LYRICS_ERROR: &str = "offline: online lyrics lookup is disabled";
