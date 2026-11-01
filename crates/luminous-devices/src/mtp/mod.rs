@@ -16,11 +16,6 @@ use std::io::{self, Read};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-#[cfg(target_os = "linux")]
-pub(crate) use crate::linux_mtp::Watcher;
-#[cfg(windows)]
-pub(crate) use crate::windows_mtp::Watcher;
-
 /// One storage as a transport reports it.
 pub(crate) struct StorageInfo {
     /// What the transport calls the storage in every other call.
@@ -49,10 +44,11 @@ pub(crate) trait Transport: Send + Sync {
     fn read(&self, storage: &str, path: &[String]) -> io::Result<Vec<u8>>;
 
     /// Creates the file at `path`, which does not exist, from `len` bytes of
-    /// `source`. A file being written under a [`PARTIAL_SUFFIX`] name is
-    /// renamed to its name without it once complete. A cancelled upload
-    /// fails with [`io::ErrorKind::Interrupted`] and may leave part of the
-    /// file behind, which the caller removes.
+    /// `source`. A name ending in [`PARTIAL_SUFFIX`] is a file still being
+    /// written, renamed to the name without it once complete: a transport
+    /// that types files by their name types it by that final name. A
+    /// cancelled upload fails with [`io::ErrorKind::Interrupted`] and may
+    /// leave part of the file behind, which the caller removes.
     fn upload(
         &self,
         storage: &str,

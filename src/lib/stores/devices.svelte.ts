@@ -15,7 +15,7 @@ class DevicesStore {
   devices = $state<ConnectedDevice[]>([]);
   /** True once the device list has been read. */
   loaded = $state(false);
-  /** Sync state by device id; absent until read. Its selection is the saved one: [`planSync`](#planSync) is the only way to change it. */
+  /** Sync state by device id; absent until read. Its selection is the saved one: {@link planSync} is the only way to change it. */
   syncStates = $state<Record<string, DeviceSyncState>>({});
   /** Progress of the running sync by device id; absent before its first report. */
   progress = $state<Record<string, SyncProgress>>({});
