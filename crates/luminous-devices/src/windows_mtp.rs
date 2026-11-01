@@ -15,13 +15,14 @@
 use crate::backend::{cancelled, components, PARTIAL_SUFFIX};
 use crate::{naming, DeviceBackend, DeviceCache, DeviceKind, DirEntry, Progress, Space, Storage};
 use parking_lot::Mutex;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::io::{self, Read};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use windows::core::{Interface, GUID, PCWSTR, PWSTR};
 use windows::Win32::Devices::PortableDevices::*;
-use windows::Win32::Foundation::{PROPERTYKEY, RPC_E_CHANGED_MODE, S_OK};
+use windows::Win32::Foundation::{E_NOTIMPL, PROPERTYKEY, RPC_E_CHANGED_MODE, S_OK};
 use windows::Win32::System::Com::StructuredStorage::{
     PropVariantClear, PropVariantToGUID, PropVariantToStringAlloc, PROPVARIANT,
 };
@@ -64,8 +65,9 @@ fn com() {
 /// Polls WPD for MTP devices, keeping a connection open to each one.
 pub(crate) struct Watcher {
     manager: Option<IPortableDeviceManager>,
-    /// Every WPD device seen and still present, by PnP id: its connection,
-    /// or `None` when it turned out not to be an MTP device (checked once).
+    /// Every WPD device opened and still present, by PnP id: its connection,
+    /// or `None` when it reported a protocol other than MTP (checked once).
+    /// A device that failed to open is not here, so the next poll retries.
     known: HashMap<String, Option<Handle>>,
 }
 
@@ -92,12 +94,23 @@ impl Watcher {
 
         let mut devices = Vec::new();
         for id in ids.iter().filter(|id| !is_volume_shim(id)) {
-            let entry = self.known.entry(id.clone()).or_insert_with(|| {
-                Connection::open(id, true)
-                    .inspect_err(|e| log::info!("Not using portable device {id}: {e}"))
-                    .ok()
-                    .map(|c| Handle(Arc::new(c)))
-            });
+            let entry = match self.known.entry(id.clone()) {
+                Entry::Occupied(entry) => entry.into_mut(),
+                Entry::Vacant(entry) => match Connection::open(id, true) {
+                    Ok(c) => entry.insert(Some(Handle(Arc::new(c)))),
+                    Err(e) if e.code() == E_NOTIMPL => {
+                        log::info!("Not using portable device {id}: {e}");
+                        entry.insert(None)
+                    }
+                    // A device that just came back (from a VM, a USB reset)
+                    // can refuse to open until the user answers its access
+                    // prompt; it stays listed, so only a retry finds it.
+                    Err(e) => {
+                        log::debug!("Could not open portable device {id}: {e}");
+                        continue;
+                    }
+                },
+            };
             let Some(handle) = entry else { continue };
             if handle.0.ejected.load(Ordering::Relaxed) {
                 continue;
@@ -372,7 +385,7 @@ impl Connection {
             if require_mtp && !is_mtp_protocol(&protocol) {
                 let _ = device.Close();
                 return Err(windows::core::Error::new(
-                    windows::Win32::Foundation::E_NOTIMPL,
+                    E_NOTIMPL,
                     format!("not an MTP device ({protocol})"),
                 ));
             }
