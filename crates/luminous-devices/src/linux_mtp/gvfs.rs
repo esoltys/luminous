@@ -59,33 +59,44 @@ impl Watcher {
                 .unwrap_or_else(|_| gio::VolumeMonitor::get())
         });
 
+        let mut volumes = HashMap::new();
         for volume in monitor.volumes() {
             let Some(uri) = volume.activation_root().map(|root| root.uri().to_string()) else {
                 continue;
             };
-            if is_mtp(&uri) && volume.get_mount().is_none() {
-                mount(context, &self.attempts, &volume, uri);
+            if is_mtp(&uri) {
+                if volume.get_mount().is_none() {
+                    mount(context, &self.attempts, &volume, uri.clone());
+                }
+                volumes.insert(uri, volume);
             }
         }
 
+        // The MTP volume monitor shadows gvfsd's own mount ("mtp", no
+        // volume) with one of its own, so a device can show up as either.
+        // The identity comes from the volume, found by root if the mount
+        // doesn't carry it: the first identity seen for a key is kept for as
+        // long as the device stays connected.
         monitor
             .mounts()
             .into_iter()
             .filter_map(|mount| {
                 let root = mount.root().uri().to_string();
-                if !is_mtp(&root) {
+                if !is_mtp(&root) || mount.is_shadowed() {
                     return None;
                 }
                 self.attempts.borrow_mut().remove(&root);
-                let usb = mount
-                    .volume()
+                let volume = mount.volume().or_else(|| volumes.get(&root).cloned());
+                let usb = volume
+                    .as_ref()
                     .and_then(|v| v.identifier("unix-device"))
                     .and_then(|dev| usb_sysfs_dir(Path::new("/sys/bus/usb/devices"), &dev))
                     .map(|dir| UsbInfo::read(&dir))
                     .unwrap_or_default();
+                let name = volume.map_or_else(|| mount.name(), |v| v.name());
                 Some(Found {
                     key: format!("gvfs:{root}"),
-                    identity: usb.identity(Some(mount.name().to_string()), uri_host(&root)),
+                    identity: usb.identity(Some(name.to_string()), uri_host(&root)),
                     transport: Box::new(GvfsDevice { root }),
                 })
             })
