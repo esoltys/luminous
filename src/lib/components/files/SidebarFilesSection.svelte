@@ -29,15 +29,14 @@
     return p && p.songsTotal > 0 ? p.songsDone / p.songsTotal : 0;
   }
 
-  /** How full the storage the device syncs to is, 0–1. */
-  function usedFraction(device: ConnectedDevice): number {
+  /** The storage the device syncs to: how full it is (0–1) and its free space, as shown. */
+  function syncSpace(device: ConnectedDevice): { used: number; free: string } {
     const storage = syncStorage(device, devicesStore.syncStates[device.id]?.settings);
-    return storage && storage.totalBytes > 0 ? 1 - storage.freeBytes / storage.totalBytes : 0;
-  }
-
-  function freeText(device: ConnectedDevice): string {
-    const storage = syncStorage(device, devicesStore.syncStates[device.id]?.settings);
-    return storage ? i18n.t("devices.free", { size: formatStorageSize(storage.freeBytes) }) : "";
+    if (!storage) return { used: 0, free: "" };
+    return {
+      used: storage.totalBytes > 0 ? 1 - storage.freeBytes / storage.totalBytes : 0,
+      free: i18n.t("devices.free", { size: formatStorageSize(storage.freeBytes) }),
+    };
   }
 
   function syncingText(id: string): string {
@@ -128,6 +127,7 @@
       {#each filesStore.devices as device (device.id)}
         {@const Icon = deviceIcon(device)}
         {@const fraction = syncFraction(device.id)}
+        {@const space = syncSpace(device)}
         {@const open = isOpen({ kind: "device", id: device.id })}
         {@const name = deviceName(device)}
         <div class="flex items-center gap-1" data-testid="sidebar-device">
@@ -145,11 +145,11 @@
               <span class="h-[3px] rounded-full bg-brand-border/50 overflow-hidden" aria-hidden="true">
                 <span
                   class="block h-full rounded-full {fraction === null ? 'bg-brand-text-secondary/70' : 'bg-brand-accent-text'}"
-                  style:width="{Math.round((fraction ?? usedFraction(device)) * 100)}%"
+                  style:width="{Math.round((fraction ?? space.used) * 100)}%"
                 ></span>
               </span>
               <span class="text-[10px] font-normal truncate {fraction === null ? 'text-brand-text-secondary/80' : 'text-brand-accent-text'}">
-                {fraction === null ? freeText(device) : syncingText(device.id)}
+                {fraction === null ? space.free : syncingText(device.id)}
               </span>
             </span>
           </button>

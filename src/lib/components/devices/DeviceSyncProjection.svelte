@@ -24,7 +24,6 @@
     failed: boolean;
   } = $props();
 
-  const unnamedStorage = (n: number) => i18n.t("devices.storageNumbered", { n });
   // Which storage is synced only matters when there is a choice.
   const target = $derived(
     plan && device.storages.length > 1 ? device.storages.find((s) => s.id === plan.storageId) : undefined
@@ -62,7 +61,7 @@
 <div class="flex flex-col gap-2.5 min-w-0" data-testid="sync-projection">
   <div class="flex items-center justify-between gap-3 flex-wrap">
     <span class="min-w-0 text-xs text-brand-text-secondary">
-      {target ? i18n.t("devices.syncingTo", { storage: storageName(device, target, unnamedStorage) }) : ""}
+      {target ? i18n.t("devices.syncingTo", { storage: storageName(device, target) }) : ""}
     </span>
     <span class="text-xs font-semibold {plan && !plan.storage.fits ? 'text-amber-400' : plan ? 'text-brand-text-primary' : 'text-brand-text-secondary'}">
       {#if plan}

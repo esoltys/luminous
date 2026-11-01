@@ -43,7 +43,7 @@
     const s = deviceStorage(device, plan.storageId);
     // Which storage is synced only matters when there is a choice.
     if (!s || device.storages.length < 2) return size;
-    return `${storageName(device, s, (n) => i18n.t("devices.storageNumbered", { n }))}, ${size}`;
+    return `${storageName(device, s)}, ${size}`;
   });
 
   const headline = $derived(

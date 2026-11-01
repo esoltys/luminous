@@ -39,7 +39,6 @@
   const storage = $derived(
     deviceStorage(device, location.source.kind === "device" ? location.source.storage : null)
   );
-  const unnamedStorage = (n: number) => i18n.t("devices.storageNumbered", { n });
 
   let preview = $state<SyncPlan | null>(null);
   let opening = $state(false);
@@ -279,7 +278,7 @@
                     role="radio"
                     aria-checked={s.id === storage.id}
                     onclick={() => setStorage(s.id)}
-                  >{storageName(device, s, unnamedStorage)}, {formatStorageSize(s.totalBytes)}</button>
+                  >{storageName(device, s)}, {formatStorageSize(s.totalBytes)}</button>
                 {/each}
               </div>
             {/if}

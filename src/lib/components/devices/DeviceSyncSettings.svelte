@@ -56,7 +56,6 @@
   const PROFILE_DEBOUNCE_MS = 400;
 
   const name = $derived(deviceName(device));
-  const unnamedStorage = (n: number) => i18n.t("devices.storageNumbered", { n });
 
   /** Everything listed, checked or not: the saved selection plus what was unchecked here. */
   let listed = $state<SyncSource[]>([]);
@@ -360,7 +359,7 @@
                 class="w-full px-3 py-2 pr-8 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm"
               >
                 {#each device.storages as s (s.id)}
-                  <option value={s.id}>{storageName(device, s, unnamedStorage)}</option>
+                  <option value={s.id}>{storageName(device, s)}</option>
                 {/each}
               </Select>
             </div>

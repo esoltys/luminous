@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { i18n } from "../stores/i18n.svelte";
 import type { ConnectedDevice, DeviceStorage, SyncSettings, TargetFormat } from "../types";
 
 /** The name a connected device is shown by: its nickname, else the name it reports. */
@@ -25,8 +26,8 @@ export function syncStorage(device: ConnectedDevice, settings: SyncSettings | un
 }
 
 /** What a storage is called: its label, else "Storage 2" by position. */
-export function storageName(device: ConnectedDevice, storage: DeviceStorage, unnamed: (n: number) => string): string {
-  return storage.label?.trim() || unnamed(device.storages.indexOf(storage) + 1);
+export function storageName(device: ConnectedDevice, storage: DeviceStorage): string {
+  return storage.label?.trim() || i18n.t("devices.storageNumbered", { n: device.storages.indexOf(storage) + 1 });
 }
 
 /** Calls `onChange` when device `deviceId` connects, disconnects or has its

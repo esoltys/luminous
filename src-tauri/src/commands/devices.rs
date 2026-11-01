@@ -165,27 +165,16 @@ pub async fn delete_device_files(
     names: Vec<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let Some(profile) = state.devices.shown(&device_id).map(|d| d.profile) else {
-        return Err("device-not-connected".into());
-    };
-    let folder = crate::files::device_path(&profile, &path);
-    // A name that isn't one (`..`, empty, with a separator) would resolve
-    // to the folder itself: never delete that.
-    let paths: Vec<String> = names
-        .iter()
-        .map(|name| {
-            crate::files::device_path(&profile, &[path.clone(), vec![name.clone()]].concat())
-        })
-        .filter(|p| *p != folder)
-        .collect();
     let sync = state.device_sync.clone();
-    tokio::task::spawn_blocking(move || sync.delete(&device_id, storage_id.as_deref(), &paths))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| {
-            log::warn!("Deleting files from a device failed: {e:#}");
-            e.to_string()
-        })
+    tokio::task::spawn_blocking(move || {
+        sync.delete(&device_id, storage_id.as_deref(), &path, &names)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| {
+        log::warn!("Deleting files from a device failed: {e:#}");
+        e.to_string()
+    })
 }
 
 /// The device's saved sync selection, the summary of its last sync and

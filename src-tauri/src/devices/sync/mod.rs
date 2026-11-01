@@ -366,25 +366,37 @@ impl DeviceSync {
         }
     }
 
-    /// Deletes files and folders (storage-relative `paths`) from a device's
-    /// storage and drops them from its sync manifest, so sync no longer
-    /// counts them as its own. A path that's already gone counts as deleted.
-    /// Rejects with `device-not-connected` or `sync-in-progress`.
+    /// Deletes the files and folders `names` in `folder`, a folder as the
+    /// Files view browses the device (inside its music folder), and drops
+    /// them from its sync manifest, so sync no longer counts them as its own.
+    /// A name that's already gone counts as deleted; one that isn't a name
+    /// (`..`, empty, with a separator) is skipped. Rejects with
+    /// `device-not-connected` or `sync-in-progress`.
     pub fn delete(
         &self,
         device_id: &str,
         storage_id: Option<&str>,
-        paths: &[String],
+        folder: &[String],
+        names: &[String],
     ) -> Result<()> {
         // Held throughout, so no sync starts while files are going.
         let running = self.running.lock();
         if running.contains_key(device_id) {
             return Err(anyhow!("sync-in-progress"));
         }
-        let (storage, _) = self
+        let (storage, profile) = self
             .monitor
             .open_storage(device_id, storage_id)
             .ok_or_else(|| anyhow!("device-not-connected"))?;
+        // A name that isn't one resolves to the folder itself: never delete that.
+        let folder_path = crate::files::device_path(&profile, folder);
+        let paths: Vec<String> = names
+            .iter()
+            .map(|name| {
+                crate::files::device_path(&profile, &[folder, std::slice::from_ref(name)].concat())
+            })
+            .filter(|path| *path != folder_path)
+            .collect();
         let mut manifest = Manifest::read(&*storage)?;
         let mut forgot = false;
         let result = paths.iter().try_for_each(|path| {
@@ -824,10 +836,15 @@ mod tests {
             .delete(
                 "vol-0088-5572",
                 None,
-                &[synced_path.clone(), "gone.mp3".into()],
+                &album,
+                &[synced.name.clone(), "gone.mp3".into(), "..".into()],
             )
             .unwrap();
         assert!(!world.device_root.join(&synced_path).exists());
+        assert!(
+            album_dir.join("notes.txt").exists(),
+            "`..` never deletes the folder"
+        );
         let again = world.preview(whole_library()).unwrap();
         assert_eq!(again.copy.songs, 1, "the deleted song goes back on");
     }
