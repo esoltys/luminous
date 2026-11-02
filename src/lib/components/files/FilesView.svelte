@@ -17,7 +17,7 @@
   import { i18n } from "../../stores/i18n.svelte";
   import { formatFileSize } from "../../utils/formatters";
   import { deviceName } from "../../utils/devices";
-  import type { ConnectedDevice, DirListing, FileEntry } from "../../types";
+  import type { ConnectedDevice, DirListing, FileEntry, FileMenuTarget } from "../../types";
   import Button from "../Button.svelte";
   import TagEditor from "../TagEditor.svelte";
   import FileBrowser from "./FileBrowser.svelte";
@@ -34,7 +34,7 @@
   let listing = $state<DirListing | null>(null);
   let selectedName = $state<string | null>(null);
   let selection = $state<string[]>([]);
-  let menu = $state<{ x: number; y: number; entries: FileEntry[]; inColumn: boolean } | null>(null);
+  let menu = $state<(FileMenuTarget & { x: number; y: number }) | null>(null);
   let editingSongId = $state<number | null>(null);
   let reloadToken = $state(0);
   let devicePickerOpen = $state(false);
@@ -213,8 +213,8 @@
         x={menu.x}
         y={menu.y}
         source={location.source}
-        path={location.path}
-        folderName={title}
+        path={menu.dir}
+        folderName={menu.inColumn ? "" : title}
         entries={menu.entries}
         inColumn={menu.inColumn}
         scannable={isLocal && !listing?.excluded}

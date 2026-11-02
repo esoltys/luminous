@@ -49,7 +49,7 @@
     x: number;
     y: number;
     source: FileSource;
-    /** The folder the entries are in; for a column folder, the open one, unused. */
+    /** The folder the entries are in. */
     path: string[];
     /** What that folder is called, for toasts and the queue's context. */
     folderName: string;
@@ -68,6 +68,7 @@
   const songIds = $derived(entries.flatMap((e) => (e.songId !== null ? [e.songId] : [])));
   const unscanned = $derived(entries.filter((e) => e.songId === null && e.status === "notScanned"));
   const locations = $derived(entries.flatMap((e) => (e.location !== null ? [e.location] : [])));
+  const unscannedLocations = $derived(unscanned.flatMap((e) => (e.location !== null ? [e.location] : [])));
   const single = $derived(entries.length === 1 ? entries[0] : null);
 
   /** What the song menu adds to its toasts when files were left out. */
@@ -81,17 +82,21 @@
   $effect(() => {
     const ids = songIds;
     if (dir || ids.length === 0) return;
+    let stale = false;
     invoke<Song[]>("get_songs_by_ids", { songIds: ids })
-      .then((loaded) => (songs = loaded))
+      .then((loaded) => {
+        if (!stale) songs = loaded;
+      })
       .catch((err) => {
         console.error("Failed to load the selected songs:", err);
-        onClose();
+        if (!stale) onClose();
       });
+    return () => (stale = true);
   });
 
   const dirName = $derived(dir ? shownName(dir.name, dir.missingTag) : "");
   const dirPath = $derived(dir ? [...path, dir.name] : path);
-  const canPlayOutside = $derived(songIds.length === 0 && unscanned.some((e) => e.location !== null));
+  const canPlayOutside = $derived(songIds.length === 0 && unscannedLocations.length > 0);
   const canScanFiles = $derived(songIds.length === 0 && scannable && unscanned.length > 0);
   const canScanDir = $derived(isLocal && dir !== null && dir.status !== "excluded");
   const syncDevices = $derived(isLocal && dir?.location ? filesStore.devices : []);
@@ -101,9 +106,12 @@
     if (isEmpty) onClose();
   });
 
-  function act(action: () => unknown) {
-    action();
+  /** Closes the menu and starts `action`; a failure is logged here, for every item. */
+  function runAndClose(action: () => unknown) {
     onClose();
+    Promise.resolve()
+      .then(action)
+      .catch((err) => console.error("A Files menu action failed:", err));
   }
 
   async function playSongs() {
@@ -113,36 +121,40 @@
   }
 </script>
 
+{#snippet header(text: string)}
+  <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">{text}</div>
+{/snippet}
+
 {#snippet fileItems()}
   {#if single?.location}
-    <ContextMenuItem icon={FolderOpenIcon} label={revealLabel()} onclick={() => act(() => reveal(single.location!))} />
+    <ContextMenuItem icon={FolderOpenIcon} label={revealLabel()} onclick={() => runAndClose(() => reveal(single.location!))} />
   {/if}
   {#if locations.length > 0}
     <ContextMenuItem
       icon={CopyIcon}
       label={i18n.t(locations.length > 1 ? "files.copyPaths" : "files.copyPath")}
-      onclick={() => act(() => copyPaths(locations))}
+      onclick={() => runAndClose(() => copyPaths(locations))}
     />
   {/if}
 {/snippet}
 
 {#if dir}
   <ContextMenu {x} {y} {onClose}>
-    <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">{dirName}</div>
-    <ContextMenuItem icon={PlayIcon} accent label={i18n.t("files.playFolder")} onclick={() => act(() => playFolder(source, dirPath, dirName))} />
-    <ContextMenuItem icon={StackIcon} label={i18n.t("playlists.contextMenuAddQueue")} onclick={() => act(() => queueFolder(source, dirPath, dirName))} />
-    <ContextMenuItem icon={PlusIcon} label={i18n.t("files.newPlaylistFromFolder")} onclick={() => act(() => playlistFromFolder(source, dirPath, dirName))} />
+    {@render header(dirName)}
+    <ContextMenuItem icon={PlayIcon} accent label={i18n.t("files.playFolder")} onclick={() => runAndClose(() => playFolder(source, dirPath, dirName))} />
+    <ContextMenuItem icon={StackIcon} label={i18n.t("playlists.contextMenuAddQueue")} onclick={() => runAndClose(() => queueFolder(source, dirPath, dirName))} />
+    <ContextMenuItem icon={PlusIcon} label={i18n.t("files.newPlaylistFromFolder")} onclick={() => runAndClose(() => playlistFromFolder(source, dirPath, dirName))} />
     {#if canScanDir || syncDevices.length > 0}
       <ContextMenuDivider />
     {/if}
     {#if canScanDir}
-      <ContextMenuItem icon={ArrowsClockwiseIcon} label={i18n.t("files.scanFolder")} onclick={() => act(() => scanFolder(source, dirPath))} />
+      <ContextMenuItem icon={ArrowsClockwiseIcon} label={i18n.t("files.scanFolder")} onclick={() => runAndClose(() => scanFolder(source, dirPath))} />
     {/if}
     {#each syncDevices as device (device.id)}
       <ContextMenuItem
         icon={DeviceMobileSpeakerIcon}
         label={syncDevices.length === 1 ? i18n.t("files.addToDeviceSync") : i18n.t("files.addToNamedDeviceSync", { device: deviceName(device) })}
-        onclick={() => act(() => addFolderToDeviceSync(device, dir.location!, dirName))}
+        onclick={() => runAndClose(() => addFolderToDeviceSync(device, dir.location!, dirName))}
       />
     {/each}
     {#if locations.length > 0}
@@ -173,19 +185,17 @@
   {/if}
 {:else if !isEmpty}
   <ContextMenu {x} {y} {onClose}>
-    <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
-      {single ? shownName(single.name, single.missingTag) : i18n.t("playlists.selectedCount", { count: entries.length })}
-    </div>
+    {@render header(single ? shownName(single.name, single.missingTag) : i18n.t("playlists.selectedCount", { count: entries.length }))}
     {#if canPlayOutside}
       <ContextMenuItem
         icon={PlayIcon}
         accent
         label={i18n.t("files.playWithoutAdding")}
-        onclick={() => act(() => playerStore.openAndPlay(unscanned.flatMap((e) => (e.location !== null ? [e.location] : []))))}
+        onclick={() => runAndClose(() => playerStore.openAndPlay(unscannedLocations))}
       />
     {/if}
     {#if canScanFiles}
-      <ContextMenuItem icon={ArrowsClockwiseIcon} label={i18n.t("files.scanFolder")} onclick={() => act(() => scanFolder(source, path))} />
+      <ContextMenuItem icon={ArrowsClockwiseIcon} label={i18n.t("files.scanFolder")} onclick={() => runAndClose(() => scanFolder(source, path))} />
     {/if}
     {#if (canPlayOutside || canScanFiles) && locations.length > 0}
       <ContextMenuDivider />

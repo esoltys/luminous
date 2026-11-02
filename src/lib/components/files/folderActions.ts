@@ -26,12 +26,13 @@ function songsIn(source: FileSource, path: string[]): Promise<Song[]> {
 export async function playFolder(source: FileSource, path: string[], name: string, startSongId?: number) {
   try {
     const songs = await songsIn(source, path);
-    if (songs.length === 0 && startSongId === undefined) {
+    // A song the folder query didn't return (it can lag a rescan) still plays, alone.
+    const ids = songs.length > 0 ? songs.map((s) => s.id) : startSongId !== undefined ? [startSongId] : [];
+    if (ids.length === 0) {
       toastStore.show(i18n.t("files.nothingToPlay"), "info");
       return;
     }
-    const ids = songs.length > 0 ? songs.map((s) => s.id) : [startSongId!];
-    const start = Math.max(0, ids.indexOf(startSongId ?? ids[0]));
+    const start = startSongId === undefined ? 0 : Math.max(0, ids.indexOf(startSongId));
     await playerStore.playSongs(ids, start, undefined, undefined, name);
   } catch (err) {
     console.error("Failed to play folder:", err);

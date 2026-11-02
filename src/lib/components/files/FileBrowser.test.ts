@@ -186,7 +186,7 @@ describe("FileBrowser.svelte", () => {
 
       await fireEvent.contextMenu(studio);
       expect(names()).toEqual(["Studio"]);
-      expect(oncontextmenu.mock.lastCall![0].inColumn).toBe(true);
+      expect(oncontextmenu.mock.lastCall![0]).toMatchObject({ dir: ["Rock"], inColumn: true });
       expect(studio).toHaveAttribute("aria-selected", "false");
     });
   });
