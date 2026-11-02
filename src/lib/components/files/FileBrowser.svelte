@@ -5,7 +5,7 @@
   import { FolderIcon, FileIcon, MusicNoteIcon, ImageIcon, CaretRightIcon, ArrowClockwiseIcon } from "phosphor-svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import { formatFileSize } from "../../utils/formatters";
-  import type { DirListing, FileEntry, FileEntryStatus, FileSource } from "../../types";
+  import type { DirListing, FileEntry, FileEntryStatus, FileMenuTarget, FileSource } from "../../types";
   import Button from "../Button.svelte";
   import { shownName } from "./shownName";
 
@@ -29,6 +29,7 @@
     arrival = $bindable(null),
     unreachableLabel,
     footer,
+    oncontextmenu,
   }: {
     source: FileSource;
     /** The current folder, as names from the source's root. */
@@ -48,12 +49,18 @@
     listing?: DirListing | null;
     /** The focused entry of the current folder, by name. */
     selectedName?: string | null;
-    /** Every selected entry of the current folder, by name: the focused one, plus
-     * those added with Ctrl/Cmd-click or Shift-click. */
+    /** Every selected entry of the current folder, by name: the focused one, or
+     * files picked with Ctrl/Cmd-click, Shift-click, Shift+arrows or Ctrl+A. */
     selection?: string[];
     /** Shown when the source can't be reached. */
     unreachableLabel: string;
     footer?: Snippet;
+    /** A right-click on a row; `dir` is the folder `entries` are in. In the current
+     * folder they are the selected files when the row is one of them, else just
+     * that row (which becomes the selection); in a folder column they are that
+     * folder, with `inColumn` set, and nothing is selected or opened. Without it
+     * the browser shows no menu. */
+    oncontextmenu?: (target: FileMenuTarget, x: number, y: number) => void;
   } = $props();
 
   /** The words for a status; the backend decides which one a file has. */
@@ -256,13 +263,23 @@
     const entries = currentEntries;
     const index = entries.findIndex((e) => e.name === selectedName);
     const entry = entries[index];
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+      event.preventDefault();
+      selection = entries.filter((e) => !e.isDir).map((e) => e.name);
+      return;
+    }
     let handled = true;
     switch (event.key) {
       case "ArrowDown":
       case "ArrowUp": {
         const nextIndex = Math.min(entries.length - 1, Math.max(0, index + (event.key === "ArrowDown" ? 1 : -1)));
-        if (entries[nextIndex]) {
-          select(entries[nextIndex].name);
+        const next = entries[nextIndex];
+        if (next) {
+          if (event.shiftKey && anchor !== null && !next.isDir) {
+            selectRange(next.name);
+          } else {
+            select(next.name);
+          }
           scrollIntoView(column, nextIndex);
         }
         break;
@@ -372,30 +389,53 @@
   }
   $effect(() => () => clearTimeout(haloTimer));
 
+  /** Where a Shift range starts: the entry last picked without Shift. */
+  let anchor: string | null = null;
+
   /** Makes `name` the only selected entry. */
   function select(name: string | null) {
     if (name !== arrived) arrived = null;
     selectedName = name;
+    anchor = name;
     selection = name === null ? [] : [name];
   }
 
-  /** A click on a file: Ctrl/Cmd adds or drops it, Shift selects the run from the focused entry. */
+  /** Selects the files from the anchor to `name`, skipping folders between, and focuses `name`. */
+  function selectRange(name: string) {
+    const names = currentEntries.map((e) => e.name);
+    const [a, b] = [names.indexOf(anchor ?? name), names.indexOf(name)].sort((x, y) => x - y);
+    if (a < 0) return select(name);
+    selection = currentEntries.slice(a, b + 1).filter((e) => !e.isDir).map((e) => e.name);
+    selectedName = name;
+    arrived = null;
+  }
+
+  /** A click on a file: Ctrl/Cmd adds or drops it, Shift selects the run from the anchor. */
   function clickFile(event: MouseEvent, name: string) {
-    if (event.shiftKey && selectedName !== null) {
-      const names = currentEntries.map((e) => e.name);
-      const [a, b] = [names.indexOf(selectedName), names.indexOf(name)].sort((x, y) => x - y);
-      if (a >= 0) {
-        selection = names.slice(a, b + 1);
-        return;
-      }
-    }
+    if (event.shiftKey && anchor !== null) return selectRange(name);
     if (event.ctrlKey || event.metaKey) {
       selection = selection.includes(name) ? selection.filter((n) => n !== name) : [...selection, name];
       selectedName = name;
+      anchor = name;
       arrived = null;
       return;
     }
     select(name);
+  }
+
+  /** A right-click on a folder acts on it alone; on a file, on the selection it belongs to. */
+  function openMenu(event: MouseEvent, entry: FileEntry) {
+    if (!oncontextmenu) return;
+    event.preventDefault();
+    if (entry.isDir || !selection.includes(entry.name)) select(entry.name);
+    const entries = entry.isDir ? [entry] : currentEntries.filter((e) => !e.isDir && selection.includes(e.name));
+    oncontextmenu({ dir: path, entries, inColumn: false }, event.clientX, event.clientY);
+  }
+
+  function openColumnMenu(event: MouseEvent, dir: string[], entry: FileEntry) {
+    if (!oncontextmenu) return;
+    event.preventDefault();
+    oncontextmenu({ dir, entries: [entry], inColumn: true }, event.clientX, event.clientY);
   }
 
   function statusLabel(entry: FileEntry): string {
@@ -428,6 +468,7 @@
                 aria-selected={selected}
                 tabindex="-1"
                 onclick={() => openFolder(dir, entry.name)}
+                oncontextmenu={(e) => openColumnMenu(e, dir, entry)}
               >
                 <FolderIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
                 <span class="truncate flex-1">{shownName(entry.name, entry.missingTag)}</span>
@@ -506,6 +547,7 @@
                   tabindex="-1"
                   onclick={(e) => (entry.isDir ? openFolder(dir, entry.name) : clickFile(e, entry.name))}
                   ondblclick={() => { if (!entry.isDir) onplay(entry); }}
+                  oncontextmenu={(e) => openMenu(e, entry)}
                   onkeydown={() => {}}
                 >
                   <span class="flex-1 min-w-0 flex items-center gap-2 {muted ? 'text-brand-text-secondary' : 'text-brand-text-primary'} {selected ? 'font-semibold' : ''}">

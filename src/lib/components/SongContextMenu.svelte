@@ -24,6 +24,7 @@
     HeartBreakIcon
   } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import type { Snippet } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -58,6 +59,9 @@
     onOpenInPicard,
     onOrganizeFiles,
     onClose,
+    notice,
+    showViewInFiles = true,
+    trailing,
   }: {
     x: number;
     y: number;
@@ -74,13 +78,31 @@
     onOpenInPicard?: () => void;
     onOrganizeFiles?: () => void;
     onClose: () => void;
+    /** A sentence added to the toast after adding to the queue or a playlist,
+     * e.g. what the caller left out of the selection. */
+    notice?: string;
+    /** False where the song is already shown in the Files view. */
+    showViewInFiles?: boolean;
+    /** Items the caller adds at the end of the menu, after a divider. */
+    trailing?: Snippet;
   } = $props();
+
+  /** A success toast, with the caller's `notice` after it as a second sentence
+   * (the success messages carry no full stop of their own). */
+  function showAdded(message: string) {
+    toastStore.show(notice ? `${message}${/[.!?]$/.test(message) ? "" : "."} ${notice}` : message);
+  }
+
+  /** What a toast calls the songs acted on: the song's title, or how many. */
+  function songsName(count: number): string {
+    return count > 1 ? i18n.plural("playlists.songsCount", count) : (song.title || i18n.t("collection.unknownSong"));
+  }
 
   async function handleDefaultAddToQueue() {
     const ids = selectedSongIds && selectedSongIds.length > 0 ? selectedSongIds : [song.id];
     await playlistsStore.addSongsToQueue(ids);
-    const name = ids.length > 1 ? `${ids.length} songs` : (song.title || i18n.t("collection.unknownSong"));
-    toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
+    const name = songsName(ids.length);
+    showAdded(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
   }
 
   /** Matches the flyout's `max-h-60` (15rem). */
@@ -133,7 +155,7 @@
   async function handleAddToCustomPlaylist(targetPlaylist: Playlist) {
     const ids = selectedSongIds && selectedSongIds.length > 0 ? selectedSongIds : [song.id];
     await playlistsStore.addSongsToPlaylist(targetPlaylist.id, ids);
-    toastStore.show(
+    showAdded(
       i18n.t("playlists.addedToPlaylistSuccess", { name: targetPlaylist.name }, `Added to ${targetPlaylist.name}`)
     );
     if (onAddToPlaylist && onAddToPlaylist.length > 0) {
@@ -156,7 +178,7 @@
       if (created) {
         const ids = selectedSongIds && selectedSongIds.length > 0 ? selectedSongIds : [song.id];
         await playlistsStore.addSongsToPlaylist(created.id, ids);
-        toastStore.show(
+        showAdded(
           i18n.t("playlists.addedToPlaylistSuccess", { name: created.name }, `Added to ${created.name}`)
         );
       }
@@ -175,7 +197,7 @@
     const ids = selectedSongIds && selectedSongIds.length > 0 ? selectedSongIds : [song.id];
     const notIncluded = !song.not_included;
     await invoke("set_songs_not_included", { songIds: ids, notIncluded });
-    const name = ids.length > 1 ? `${ids.length} songs` : (song.title || i18n.t("collection.unknownSong"));
+    const name = songsName(ids.length);
     const message = notIncluded
       ? i18n.t("playlists.markedNotIncluded", { name })
       : i18n.t("playlists.unmarkedNotIncluded", { name });
@@ -433,7 +455,9 @@
       />
     {/if}
 
-    <ViewInFilesItem songId={song.id} onmouseenter={closeSubmenuImmediately} {onClose} />
+    {#if showViewInFiles}
+      <ViewInFilesItem songId={song.id} onmouseenter={closeSubmenuImmediately} {onClose} />
+    {/if}
 
     {#if song.artist}
       <ContextMenuItem
@@ -487,6 +511,12 @@
           ? i18n.t("picard.remoteNotSupportedTooltip")
           : undefined}
     />
+  {/if}
+
+  {#if trailing}
+    <ContextMenuDivider />
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div onmouseenter={closeSubmenuImmediately}>{@render trailing()}</div>
   {/if}
 </ContextMenu>
 {/if}

@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import {
     PlayIcon,
     DeviceMobileSpeakerIcon,
@@ -11,7 +9,6 @@
   } from "phosphor-svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { filesStore, sourceKey } from "../../stores/files.svelte";
-  import { devicesStore } from "../../stores/devices.svelte";
   import { sourceIcon } from "./sourceIcon";
   import { shownName } from "./shownName";
   import { collectionStore } from "../../stores/collection.svelte";
@@ -20,11 +17,13 @@
   import { i18n } from "../../stores/i18n.svelte";
   import { formatFileSize } from "../../utils/formatters";
   import { deviceName } from "../../utils/devices";
-  import { isWindows, isLinux } from "../../platform";
-  import type { ConnectedDevice, DirListing, FileEntry, Song } from "../../types";
+  import type { ConnectedDevice, DirListing, FileEntry, FileMenuTarget } from "../../types";
   import Button from "../Button.svelte";
+  import TagEditor from "../TagEditor.svelte";
   import FileBrowser from "./FileBrowser.svelte";
+  import FileContextMenu from "./FileContextMenu.svelte";
   import DeviceView from "../devices/DeviceView.svelte";
+  import { addFolderToDeviceSync, playFolder, reveal, revealLabel, scanFolder } from "./folderActions";
 
   const location = $derived(navigationStore.filesLocation);
   const openDevice = $derived(
@@ -34,6 +33,9 @@
 
   let listing = $state<DirListing | null>(null);
   let selectedName = $state<string | null>(null);
+  let selection = $state<string[]>([]);
+  let menu = $state<(FileMenuTarget & { x: number; y: number }) | null>(null);
+  let editingSongId = $state<number | null>(null);
   let reloadToken = $state(0);
   let devicePickerOpen = $state(false);
 
@@ -47,9 +49,6 @@
   });
 
   const isLocal = $derived(location?.source.kind === "folder");
-  const revealLabel = $derived(
-    i18n.t(isWindows ? "files.revealWindows" : isLinux ? "files.revealLinux" : "files.revealMac")
-  );
   /** The `i`th name of the current path as shown; the listing says which are missing tags. */
   const pathName = (i: number) => shownName(location?.path[i] ?? "", listing?.pathMissingTags[i]);
   const title = $derived(location && location.path.length > 0 ? pathName(location.path.length - 1) : sourceName);
@@ -60,26 +59,8 @@
     navigationStore.filesLocation = { source: location.source, path };
   }
 
-  async function songsHere(): Promise<Song[]> {
-    if (!location) return [];
-    return invoke<Song[]>("get_source_songs", { source: location.source, path: location.path });
-  }
-
-  async function playFolder() {
-    try {
-      const songs = await songsHere();
-      if (songs.length === 0) {
-        toastStore.show(i18n.t("files.nothingToPlay"), "info");
-        return;
-      }
-      await playerStore.playSongs(songs.map((s) => s.id), 0, undefined, undefined, title);
-    } catch (err) {
-      console.error("Failed to play folder:", err);
-      toastStore.show(i18n.t("files.playFailed"), "error");
-    }
-  }
-
-  async function playEntry(entry: FileEntry) {
+  function playEntry(entry: FileEntry) {
+    if (!location) return;
     if (entry.songId === null) {
       toastStore.show(
         i18n.t(isLocal && entry.status === "notScanned" ? "files.notInLibraryScan" : "files.notInLibrary"),
@@ -87,32 +68,12 @@
       );
       return;
     }
-    try {
-      const songs = await songsHere();
-      const start = Math.max(0, songs.findIndex((s) => s.id === entry.songId));
-      const ids = songs.length > 0 ? songs.map((s) => s.id) : [entry.songId];
-      await playerStore.playSongs(ids, start, undefined, undefined, title);
-    } catch (err) {
-      console.error("Failed to play file:", err);
-      toastStore.show(i18n.t("files.playFailed"), "error");
-    }
+    playFolder(location.source, location.path, title, entry.songId);
   }
 
-  async function addToDeviceSync(device: ConnectedDevice) {
+  function addToDeviceSync(device: ConnectedDevice) {
     devicePickerOpen = false;
-    const folderPath = listing?.location;
-    if (!folderPath) return;
-    const name = deviceName(device);
-    try {
-      if (!(await devicesStore.addFolderToSync(device.id, folderPath))) {
-        toastStore.show(i18n.t("files.alreadySyncing", { folder: title, device: name }), "info");
-        return;
-      }
-      toastStore.show(i18n.t("files.addedToSync", { folder: title, device: name }), "success");
-    } catch (err) {
-      console.error("Failed to add folder to device sync:", err);
-      toastStore.show(i18n.t("files.addToSyncFailed", { device: name }), "error");
-    }
+    if (listing?.location) addFolderToDeviceSync(device, listing.location, title);
   }
 
   function onAddToDeviceSync() {
@@ -120,26 +81,21 @@
     else devicePickerOpen = !devicePickerOpen;
   }
 
-  async function reveal() {
-    if (!listing?.location) return;
-    try {
-      await revealItemInDir(listing.location);
-    } catch (err) {
-      console.error("Failed to show folder in the file manager:", err);
-    }
-  }
-
-  async function scanFolder() {
-    if (!location) return;
-    try {
-      await invoke("scan_source_folder", { source: location.source, path: location.path });
-    } catch (err) {
-      console.error("Failed to scan folder:", err);
-      toastStore.show(i18n.t("files.scanFailed"), "error");
-    }
-  }
+  /** The files selected, when there's more than one; the footer counts them. */
+  const selectedFiles = $derived(
+    selection.length > 1 && listing ? listing.entries.filter((e) => !e.isDir && selection.includes(e.name)) : []
+  );
 
   function summary(l: DirListing): string {
+    if (selectedFiles.length > 1) {
+      const vars = { selected: selectedFiles.length };
+      return l.totalBytes === null
+        ? i18n.plural("files.selectedFilesNoSize", l.fileCount, vars)
+        : i18n.plural("files.selectedFiles", l.fileCount, {
+            ...vars,
+            size: formatFileSize(selectedFiles.reduce((sum, e) => sum + (e.size ?? 0), 0)),
+          });
+    }
     const files =
       l.totalBytes === null
         ? i18n.plural("files.summaryFilesNoSize", l.fileCount)
@@ -180,7 +136,7 @@
           {/if}
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <Button variant="primary" onclick={playFolder}>
+          <Button variant="primary" onclick={() => playFolder(location.source, location.path, title)}>
             <PlayIcon weight="fill" class="w-4 h-4" />
             {i18n.t("files.playFolder")}
           </Button>
@@ -206,9 +162,9 @@
           {#if isLocal && listing?.location}
             <button
               class="w-9 h-9 flex items-center justify-center rounded-full text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 transition-colors"
-              onclick={reveal}
-              title={revealLabel}
-              aria-label={revealLabel}
+              onclick={() => listing?.location && reveal(listing.location)}
+              title={revealLabel()}
+              aria-label={revealLabel()}
             >
               <ArrowSquareOutIcon class="w-4 h-4" />
             </button>
@@ -235,13 +191,15 @@
         {unreachableLabel}
         bind:listing
         bind:selectedName
+        bind:selection
+        oncontextmenu={(target, x, y) => (menu = { x, y, ...target })}
       >
         {#snippet footer()}
           {#if listing}
             <div class="flex items-center justify-between gap-3 px-4 py-2.5 text-xs text-brand-text-secondary">
               <span class="truncate">{summary(listing)}</span>
               {#if isLocal && !listing.excluded}
-                <Button size="sm" class="shrink-0 whitespace-nowrap" onclick={scanFolder} disabled={collectionStore.isScanning}>
+                <Button size="sm" class="shrink-0 whitespace-nowrap" onclick={() => scanFolder(location.source, location.path)} disabled={collectionStore.isScanning}>
                   {collectionStore.isScanning ? i18n.t("files.scanning") : i18n.t("files.scanFolder")}
                 </Button>
               {/if}
@@ -250,6 +208,23 @@
         {/snippet}
       </FileBrowser>
     </div>
+    {#if menu}
+      <FileContextMenu
+        x={menu.x}
+        y={menu.y}
+        source={location.source}
+        path={menu.dir}
+        folderName={menu.inColumn ? "" : title}
+        entries={menu.entries}
+        inColumn={menu.inColumn}
+        scannable={isLocal && !listing?.excluded}
+        onEditTags={(id) => (editingSongId = id)}
+        onClose={() => (menu = null)}
+      />
+    {/if}
+    {#if editingSongId !== null}
+      <TagEditor songId={editingSongId} onClose={() => (editingSongId = null)} />
+    {/if}
   {:else}
     <div class="flex-1 overflow-y-auto px-6 pt-4" class:pb-28={!!playerStore.currentSong} class:pb-12={!playerStore.currentSong}>
       <header class="flex items-end justify-between gap-4 mb-4">

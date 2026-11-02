@@ -86,6 +86,34 @@ export const es = {
     addedToSync: "Se agregó {folder} a la sincronización de {device}.",
     addToSyncFailed: "No se pudo agregar esta carpeta a la sincronización de {device}.",
     scanFailed: "No se pudo analizar esta carpeta.",
+    playWithoutAdding: "Reproducir sin agregar",
+    newPlaylistFromFolder: "Nueva lista de reproducción desde la carpeta",
+    addToNamedDeviceSync: "Agregar a la sincronización de {device}",
+    copyPath: "Copiar ruta",
+    copyPaths: "Copiar rutas",
+    pathsCopied: {
+      one: "Se copió {count} ruta.",
+      other: "Se copiaron {count} rutas."
+    },
+    copyFailed: "No se pudo copiar al portapapeles.",
+    queueFailed: "No se pudo agregar esta carpeta a la cola.",
+    playlistFailed: "No se pudo crear una lista de reproducción desde esta carpeta.",
+    skippedScan: {
+      one: "{count} archivo aún no está en tu biblioteca: analiza esta carpeta para incluirlo.",
+      other: "{count} archivos aún no están en tu biblioteca: analiza esta carpeta para incluirlos."
+    },
+    skipped: {
+      one: "{count} archivo no está en tu biblioteca, así que se omitió.",
+      other: "{count} archivos no están en tu biblioteca, así que se omitieron."
+    },
+    selectedFiles: {
+      one: "{selected} de {count} archivo seleccionado, {size}.",
+      other: "{selected} de {count} archivos seleccionados, {size}."
+    },
+    selectedFilesNoSize: {
+      one: "{selected} de {count} archivo seleccionado.",
+      other: "{selected} de {count} archivos seleccionados."
+    },
     viewInFiles: "Ver en Archivos",
     movedShowingNearest: "Ya no está donde Luminous lo vio por última vez. Se muestra la carpeta más cercana que aún existe."
   },

@@ -374,6 +374,16 @@ export interface FileEntry {
   status: FileEntryStatus | null;
   songId: number | null;
   missingTag: MissingTag | null;
+  /** Where it is on this computer; null on servers and devices. */
+  location: string | null;
+}
+
+/** What a right-click in the Files browser acts on: `entries`, all in the folder `dir`. */
+export interface FileMenuTarget {
+  dir: string[];
+  entries: FileEntry[];
+  /** The entry is a folder shown as a column, not a row of the open folder. */
+  inColumn: boolean;
 }
 
 /** One folder of a source (`list_source_dir`): folders first, then files. */

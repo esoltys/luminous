@@ -86,6 +86,34 @@ export const en = {
     addedToSync: "Added {folder} to {device}'s sync.",
     addToSyncFailed: "Couldn't add this folder to {device}'s sync.",
     scanFailed: "Couldn't scan this folder.",
+    playWithoutAdding: "Play without adding",
+    newPlaylistFromFolder: "New playlist from folder",
+    addToNamedDeviceSync: "Add to {device}'s sync",
+    copyPath: "Copy path",
+    copyPaths: "Copy paths",
+    pathsCopied: {
+      one: "Copied {count} path.",
+      other: "Copied {count} paths."
+    },
+    copyFailed: "Couldn't copy to the clipboard.",
+    queueFailed: "Couldn't add this folder to the queue.",
+    playlistFailed: "Couldn't make a playlist from this folder.",
+    skippedScan: {
+      one: "{count} file isn't in your library yet: scan this folder to include it.",
+      other: "{count} files aren't in your library yet: scan this folder to include them."
+    },
+    skipped: {
+      one: "{count} file isn't in your library, so it was left out.",
+      other: "{count} files aren't in your library, so they were left out."
+    },
+    selectedFiles: {
+      one: "{selected} of {count} file selected, {size}.",
+      other: "{selected} of {count} files selected, {size}."
+    },
+    selectedFilesNoSize: {
+      one: "{selected} of {count} file selected.",
+      other: "{selected} of {count} files selected."
+    },
     viewInFiles: "View in Files",
     movedShowingNearest: "It's no longer where Luminous last saw it. Showing the nearest folder that's still there."
   },

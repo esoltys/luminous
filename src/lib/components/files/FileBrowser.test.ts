@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, fireEvent, waitFor } from "@testing-library/svelte";
+import { render, fireEvent, waitFor, within } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import FileBrowser from "./FileBrowser.svelte";
 import { i18n } from "../../stores/i18n.svelte";
@@ -14,7 +14,7 @@ vi.mock("svelte-virtual-list-ts", async () => {
 const source = { kind: "folder", id: 1 } as const;
 
 function entry(name: string, isDir: boolean, status: FileEntry["status"] = null, songId: number | null = null): FileEntry {
-  return { name, isDir, size: isDir ? null : 4_000_000, modified: null, fileType: isDir ? null : "FLAC", status, songId, missingTag: null };
+  return { name, isDir, size: isDir ? null : 4_000_000, modified: null, fileType: isDir ? null : "FLAC", status, songId, missingTag: null, location: `C:/Music/${name}` };
 }
 
 function listing(entries: FileEntry[]): DirListing {
@@ -115,6 +115,80 @@ describe("FileBrowser.svelte", () => {
 
     await fireEvent.click(getByRole("option", { name: /02 Encore/ }));
     expect(selected()).toEqual(["02 Encore.flac"]);
+  });
+
+  /** The current folder's listing with a folder in it, as "Rock/Live" has none. */
+  function withFolder() {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd !== "list_source_dir") return null;
+      const key = args.path.join("/");
+      return listing(key === "Rock/Live" ? [entry("Scans", true), ...tree[key]] : tree[key]);
+    });
+  }
+
+  /** The names selected in a column. */
+  const selectedIn = (column: HTMLElement) =>
+    within(column).queryAllByRole("option", { selected: true }).map((o) => o.querySelector("[title]")?.getAttribute("title"));
+
+  it("extends the selection with Shift+arrows and selects every file, not folders, with Ctrl+A", async () => {
+    withFolder();
+    const { getByRole, findByText } = setup(["Rock", "Live"]);
+    await findByText("01 Opening.flac");
+    const current = getByRole("listbox", { name: "Live" });
+
+    await fireEvent.click(within(current).getByRole("option", { name: /01 Opening/ }));
+    await fireEvent.keyDown(current, { key: "ArrowDown", shiftKey: true });
+    await fireEvent.keyDown(current, { key: "ArrowDown", shiftKey: true });
+    expect(selectedIn(current)).toEqual(["01 Opening.flac", "02 Encore.flac", "cover.jpg"]);
+
+    await fireEvent.keyDown(current, { key: "a", ctrlKey: true });
+    expect(selectedIn(current)).toEqual(["01 Opening.flac", "02 Encore.flac", "cover.jpg", "notes.txt"]);
+  });
+
+  describe("right-click", () => {
+    function setupMenu() {
+      const oncontextmenu = vi.fn();
+      const result = render(FileBrowser, {
+        props: { source, path: ["Rock", "Live"], onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "", oncontextmenu },
+      });
+      const names = () => oncontextmenu.mock.lastCall![0].entries.map((e: FileEntry) => e.name);
+      return { ...result, oncontextmenu, names };
+    }
+
+    it("acts on the whole selection when the row is in it", async () => {
+      const { getByRole, findByText, names } = setupMenu();
+      await findByText("01 Opening.flac");
+      await fireEvent.click(getByRole("option", { name: /01 Opening/ }));
+      await fireEvent.click(getByRole("option", { name: /02 Encore/ }), { shiftKey: true });
+
+      await fireEvent.contextMenu(getByRole("option", { name: /02 Encore/ }), { clientX: 10, clientY: 20 });
+      expect(names()).toEqual(["01 Opening.flac", "02 Encore.flac"]);
+    });
+
+    it("replaces the selection with a row outside it, and acts on a folder alone", async () => {
+      withFolder();
+      const { getByRole, findByText, names } = setupMenu();
+      await findByText("01 Opening.flac");
+      await fireEvent.click(getByRole("option", { name: /01 Opening/ }));
+
+      await fireEvent.contextMenu(getByRole("option", { name: /cover\.jpg/ }));
+      expect(names()).toEqual(["cover.jpg"]);
+      expect(getByRole("option", { name: /01 Opening/ })).toHaveAttribute("aria-selected", "false");
+
+      await fireEvent.contextMenu(getByRole("option", { name: /Scans/ }));
+      expect(names()).toEqual(["Scans"]);
+    });
+
+    it("offers a folder in a folder column its own menu, without opening or selecting it", async () => {
+      const { getByRole, findByText, names, oncontextmenu } = setupMenu();
+      await findByText("01 Opening.flac");
+      const studio = within(getByRole("listbox", { name: "Rock" })).getByRole("option", { name: /Studio/ });
+
+      await fireEvent.contextMenu(studio);
+      expect(names()).toEqual(["Studio"]);
+      expect(oncontextmenu.mock.lastCall![0]).toMatchObject({ dir: ["Rock"], inColumn: true });
+      expect(studio).toHaveAttribute("aria-selected", "false");
+    });
   });
 
   describe("arriving at a file (View in Files)", () => {

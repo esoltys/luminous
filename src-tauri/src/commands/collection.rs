@@ -355,6 +355,19 @@ pub async fn get_songs(
     .map_err(|e| e.to_string())
 }
 
+/// The songs `song_ids` name, in that order; ids with no song are left out.
+#[tauri::command]
+pub async fn get_songs_by_ids(
+    song_ids: Vec<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<Song>, String> {
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_songs_by_ids(&song_ids)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn get_songs_by_album(
     album: String,
