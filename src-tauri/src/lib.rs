@@ -1393,6 +1393,7 @@ pub fn run() {
             commands::collection::get_library_snapshot,
             commands::collection::get_songs,
             commands::collection::finish_scan,
+            commands::collection::get_songs_by_ids,
             commands::collection::get_songs_by_album,
             commands::collection::get_songs_by_artist,
             commands::collection::get_compilations_by_artist,

@@ -185,6 +185,23 @@ impl CollectionScanner {
         Ok(count)
     }
 
+    /// The songs `ids` name, in that order; an id with no song is left out.
+    pub fn get_songs_by_ids(&self, ids: &[i64]) -> Result<Vec<Song>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let conn = self.db.pool.get()?;
+        let placeholders = vec!["?"; ids.len()].join(",");
+        let sql = format!("SELECT {SONG_SELECT_COLS} FROM songs WHERE id IN ({placeholders})");
+        let mut stmt = conn.prepare(&sql)?;
+        let mut by_id: std::collections::HashMap<i64, Song> = stmt
+            .query_map(rusqlite::params_from_iter(ids), row_to_song)?
+            .filter_map(|r| r.ok())
+            .map(|s| (s.id, s))
+            .collect();
+        Ok(ids.iter().filter_map(|id| by_id.remove(id)).collect())
+    }
+
     /// Every library song of the album `album` names, matched by
     /// `album_key` so any spelling of the title finds them all (#1752).
     pub fn get_songs_by_album(&self, album: &str) -> Result<Vec<Song>> {
@@ -2287,6 +2304,39 @@ mod tests {
         // Beyond range
         let page4 = scanner.get_songs(2, 6).unwrap();
         assert_eq!(page4.len(), 0);
+    }
+
+    #[test]
+    fn test_get_songs_by_ids_keeps_the_order_asked_and_skips_unknown_ids() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_coll_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+        for i in 1..=3 {
+            let song = Song {
+                path: Some(format!("path/{i}.mp3")),
+                title: Some(format!("Track {i}")),
+                source: SongSource::LocalFile,
+                filetype: FileType::Mp3,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        }
+        let id_of = |title: &str| -> i64 {
+            conn.query_row("SELECT id FROM songs WHERE title = ?1", [title], |r| {
+                r.get(0)
+            })
+            .unwrap()
+        };
+        let (one, three) = (id_of("Track 1"), id_of("Track 3"));
+
+        let songs = scanner.get_songs_by_ids(&[three, -1, one]).unwrap();
+        let titles: Vec<_> = songs.iter().map(|s| s.title.as_deref().unwrap()).collect();
+        assert_eq!(titles, ["Track 3", "Track 1"]);
+        assert!(scanner.get_songs_by_ids(&[]).unwrap().is_empty());
     }
 
     #[test]

@@ -111,6 +111,9 @@ pub struct FileEntry {
     /// The library song this file is, to play it.
     pub song_id: Option<i64>,
     pub missing_tag: Option<MissingTag>,
+    /// Where it is on this computer, to show, copy or open it there; `None`
+    /// on servers and devices, which have no such path.
+    pub location: Option<String>,
 }
 
 impl FileEntry {
@@ -124,6 +127,7 @@ impl FileEntry {
             status: None,
             song_id: None,
             missing_tag: None,
+            location: None,
         }
     }
 }
@@ -624,10 +628,12 @@ fn list_folder(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
                 return FileEntry {
                     status: excluded.then_some(EntryStatus::Excluded),
                     modified: e.modified,
+                    location: Some(dir.join(&e.name).to_string_lossy().into_owned()),
                     ..FileEntry::folder(e.name)
                 };
             }
-            let key = library_paths::key(&dir.join(&e.name).to_string_lossy());
+            let location = dir.join(&e.name).to_string_lossy().into_owned();
+            let key = library_paths::key(&location);
             let song = songs.get(&key);
             let status = if in_reserved || song.is_some_and(|(_, not_included)| *not_included) {
                 EntryStatus::Excluded
@@ -645,6 +651,7 @@ fn list_folder(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
                 modified: e.modified,
                 name: e.name,
                 is_dir: false,
+                location: Some(location),
             }
         })
         .collect();
@@ -722,6 +729,7 @@ fn list_device(db: &Database, storage: &dyn DeviceBackend, dir: &str) -> Result<
                 status: synced.is_none().then_some(EntryStatus::NotFromLuminous),
                 song_id: None,
                 missing_tag: None,
+                location: None,
                 size: Some(e.size),
                 modified: e.modified,
                 name: e.name,
@@ -889,6 +897,7 @@ fn list_subsonic(conn: &Connection, id: i64, path: &[String]) -> Result<DirListi
                     status: Some(EntryStatus::InLibrary),
                     song_id: Some(s.id),
                     missing_tag: None,
+                    location: None,
                 })
                 .collect();
             // Already in disc and track order, which name order would break.
@@ -1014,6 +1023,7 @@ fn list_webdav(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
                 status: Some(status),
                 song_id: song.map(|(id, _)| *id),
                 missing_tag: None,
+                location: None,
                 is_dir: false,
                 name,
             })
@@ -1126,6 +1136,27 @@ mod tests {
         assert_eq!(status_of(&reserved, "01.flac"), Some(EntryStatus::Excluded));
         assert!(reserved.excluded);
         assert!(!album.excluded);
+    }
+
+    #[test]
+    fn local_entries_carry_their_real_path() {
+        let f = fixture(&["A/Album/01.flac"], &[]);
+        let location = |listing: &DirListing, name: &str| {
+            listing
+                .entries
+                .iter()
+                .find(|e| e.name == name)
+                .and_then(|e| e.location.clone())
+        };
+        let album_dir = f.root.join("A").join("Album");
+        assert_eq!(
+            location(&list(&f, &["A", "Album"]), "01.flac"),
+            Some(album_dir.join("01.flac").to_string_lossy().into_owned())
+        );
+        assert_eq!(
+            location(&list(&f, &["A"]), "Album"),
+            Some(album_dir.to_string_lossy().into_owned())
+        );
     }
 
     #[cfg(windows)]
