@@ -20,14 +20,11 @@ needs updating to match. Work through it in order:
    do not require an issue and do not need to be listed in the release notes.
 3. **Content**: update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR,DE,ES,IT,RU,UK}.html`) for
    any user-facing changes, editing every guide in the same change. Regenerate screenshots for
-   changed views with your own Luminous closed: `bun run take-scene-screenshots --clone-profile`
-   (real data), then `--library <dir> --stage=fresh` for the first-run scenes; `--name=` /
-   `--locale=` to narrow. Have the user review one locale before the full ~25-minute run, and
-   don't edit this checkout while it runs. Read the resulting PNGs — at least en-CA, en-US and
+   changed views with your own Luminous closed by launching Capture Studio in `esoltys/luminous-store` (`bun run studio`)
+   and executing the guide recipes targeting `docs/user-guide/assets/`. Read the resulting PNGs — at least en-CA, en-US and
    ru or uk. Write `docs/release-notes/vX.Y.Z.md` (chores do not need to be listed). Prepare the
-   Store listing in `esoltys/luminous-store` as its own PR: build the composites from the dark
-   captures with that repo's `New-StoreScreenshots.ps1` (`en-us` ← en-US, `fr` ← fr-CA, `de`/`es`/`it`/`ru`/`uk` ← same
-   tag), update `ReleaseNotes` and captions in every `listing.csv` column, then a dry run.
+   Store listing in `esoltys/luminous-store` as its own PR: compose Store screenshots with Capture Studio,
+   update `ReleaseNotes` and captions in every `listing.csv` column, then run a dry run.
 4. **Verification**: `bun run check`, `bun run lint:ast`, `bun run test:run`, `cargo test --workspace`
    (from repo root), `bun run audit:cargo`, and `cargo clippy --all-targets -- -D warnings`
    (from `src-tauri/` — zero warnings, including pre-existing ones), a `bun run tauri dev`

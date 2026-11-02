@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["scripts/tauri-ipc-mock.ts", "scripts/throwaway-profile.ts"],
+  "entry": ["scripts/throwaway-profile.ts"],
   "ignore": ["docs/**"],
   "ignoreDependencies": ["@typescript/native-preview"],
   "ignoreBinaries": ["pgrep", "magick", "zsyncmake"]

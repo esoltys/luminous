@@ -19,8 +19,6 @@ vite.config.ts.timestamp-*
 !.claude/skills/**
 /.worktrees
 
-# Personal override for the Tauri IPC mock config (scripts/screenshot-scenes.json is tracked directly)
-scripts/screenshot-scenes.local.json
 
 # Local Cargo configuration
 .cargo/
@@ -35,8 +33,6 @@ scripts/screenshot-scenes.local.json
 /target/
 /src-tauri/target/
 
-# Captures and diff images from scripts/style-diff.ts
-/.style-diff/
 
 # Scratch file for Claude's per-task walkthrough summaries (see .claude/CLAUDE.md) —
 # always local-only, never meant to land in a commit.

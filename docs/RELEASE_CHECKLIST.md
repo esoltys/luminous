@@ -19,35 +19,15 @@ manual.
 - [ ] Update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR,DE,ES,IT,RU,UK}.html`) for any
       user-facing changes. Edit every guide in the same change, and quote button and menu
       names exactly as that locale's catalog shows them (see [TRANSLATIONS.md](TRANSLATIONS.md)).
-- [ ] Regenerate screenshots, with your own Luminous closed. Library scenes come from a copy of
-      your real database (real stats, pins and playlists); the first-run scenes need an empty
-      profile, scanned from a music folder:
+- [ ] Regenerate screenshots, with your own Luminous closed. Run Capture Studio in `esoltys/luminous-store`:
   ```bash
-  bun run take-scene-screenshots --clone-profile
+  cd ../luminous-store
+  bun run studio
   ```
-  ```bash
-  bun run take-scene-screenshots --library <music-folder> --stage=fresh
-  ```
-  This drives the real app at 1440×900 (setup in [TESTING.md](TESTING.md)'s "Scene
-  screenshots") and captures every shipped locale into
-  `docs/user-guide/assets/<tag>/screenshots/{light,dark}/`. A full run takes about 25
-  minutes, so capture one locale first (`--locale=en-US`) and review it; `--name=<scene>`
-  narrows further. Don't edit files in this checkout while it runs: Vite reloads the page and
-  the run fails. `bun run take-screenshots` (mocked IPC, `scripts/screenshot-scenes.json`)
-  covers views that only exist there. After replacing a PNG by hand, run
-  `bun run guide-webp`; `scripts/guide-assets.test.ts` fails if the embedded set exceeds
-  its size budget, and `bun scripts/guide-manifest.ts` (or `bun run sync-docs`) verifies
-  all assets match the `docs/user-guide/assets/manifest.json` contract. Read the resulting PNGs before committing — at least en-CA, en-US and
-  one Cyrillic locale (ru or uk).
+  Execute the guide recipes (`guide-*`) targeting the Luminous user guide directory (`docs/user-guide/assets/<tag>/screenshots/{light,dark}/`). Review the resulting PNGs before committing — at least en-CA, en-US and one Cyrillic locale (ru or uk). After replacing or updating any PNG, run `bun run guide-webp`; `scripts/guide-assets.test.ts` fails if the embedded set exceeds its size budget, and `bun scripts/guide-manifest.ts` (or `bun run sync-docs`) verifies all assets match the `docs/user-guide/assets/manifest.json` contract.
 - [ ] Write `docs/release-notes/vX.Y.Z.md` for the new version. Chores do not need to be listed in the release notes.
 - [ ] Prepare the Microsoft Store listing in `esoltys/luminous-store` (its own PR there):
-      - Build the 1366×768 composites (wallpaper, headline, window) from the dark captures
-        above, which include the Store-only `store-*` scenes, with
-        `./New-StoreScreenshots.ps1 -GuideAssets <luminous>/docs/user-guide/assets` in that
-        repo. Its `store-screenshots.json` lists the shots, their scenes and the headline per
-        language. Each Store language has one source locale: `en-us` ← `en-US`, `fr` ←
-        `fr-CA` (the `fr` listing serves every French market, written in Canadian French), and
-        `de`, `es`, `it`, `ru`, `uk` ← the same tag. Read a few results before committing.
+      - Render Store screenshots and artwork via Capture Studio (`bun run studio`), which drives the real app and compiles marketing composites across all supported Store languages into `assets/<locale>/screenshots/` and `assets/<locale>/artwork/`.
       - Update `ReleaseNotes` in every language column of `listing.csv`, and check that
         `Description`, `Feature1..N` and the screenshot captions (one per shot, in shot order)
         still match what ships. The `en-us` column uses US spelling.
