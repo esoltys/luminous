@@ -83,10 +83,20 @@ pub enum EntryStatus {
     NotFromLuminous,
 }
 
+/// The tag a Subsonic folder's songs lack: such a folder's name is empty,
+/// which the UI words ("Unknown Artist") rather than shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MissingTag {
+    Artist,
+    Album,
+}
+
 /// One file or folder in a listing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileEntry {
+    /// Its identity in a path. Empty only for a `missing_tag` folder.
     pub name: String,
     pub is_dir: bool,
     /// Bytes, for files whose source reports it.
@@ -100,6 +110,7 @@ pub struct FileEntry {
     pub status: Option<EntryStatus>,
     /// The library song this file is, to play it.
     pub song_id: Option<i64>,
+    pub missing_tag: Option<MissingTag>,
 }
 
 impl FileEntry {
@@ -112,6 +123,7 @@ impl FileEntry {
             file_type: None,
             status: None,
             song_id: None,
+            missing_tag: None,
         }
     }
 }
@@ -132,6 +144,9 @@ pub struct DirListing {
     /// The folder is one the scanner never looks in, or inside one, so
     /// scanning it would find nothing.
     pub excluded: bool,
+    /// For each name of the listed path, the tag it stands for when it is a
+    /// `missing_tag` folder; empty for sources that have none.
+    pub path_missing_tags: Vec<Option<MissingTag>>,
 }
 
 /// Every folder and server, in the order the sidebar shows them: folders,
@@ -201,38 +216,39 @@ fn server_exists(conn: &Connection, table: &str, id: i64) -> Result<bool> {
 }
 
 /// The folder at `path` in `source`. A folder that isn't there lists as
-/// empty; `path` can't leave the source (`..` and empty names are dropped).
-/// Fails when the source itself is gone (`source-not-found`) or a server
-/// can't be reached. Blocks on the disk or the network, so call it off the
-/// async runtime; it takes a database connection only around its queries,
-/// never while waiting on a slow drive or server.
+/// empty. In a folder, WebDAV server or device, `path` can't leave the
+/// source (see `clean_path`); a Subsonic path names an artist and album by
+/// their exact tags instead, `""` for a missing one. Fails when the source
+/// itself is gone (`source-not-found`) or a server can't be reached. Blocks
+/// on the disk or the network, so call it off the async runtime; it takes a
+/// database connection only around its queries, never while waiting on a
+/// slow drive or server.
 pub fn list_dir(
     db: &Database,
     source: &FileSource,
     path: &[String],
     device: impl FnOnce(&str, Option<&str>) -> Option<(Box<dyn DeviceBackend>, DeviceProfile)>,
 ) -> Result<DirListing> {
-    let path = clean_path(path);
     match source {
-        FileSource::Folder { id } => list_folder(db, *id, &path),
-        FileSource::Subsonic { id } => list_subsonic(&*db.pool.get()?, *id, &path),
-        FileSource::Webdav { id } => list_webdav(db, *id, &path),
+        FileSource::Folder { id } => list_folder(db, *id, &clean_path(path)),
+        FileSource::Subsonic { id } => list_subsonic(&*db.pool.get()?, *id, path),
+        FileSource::Webdav { id } => list_webdav(db, *id, &clean_path(path)),
         FileSource::Device { id, storage } => {
             let (storage, profile) =
                 device(id, storage.as_deref()).ok_or_else(|| anyhow!("source-not-found"))?;
-            list_device(db, storage.as_ref(), &device_path(&profile, &path))
+            list_device(db, storage.as_ref(), &device_path(&profile, path))
         }
     }
 }
 
 /// The library songs at `path` in `source` and in every folder below it,
 /// in the order they are laid out (by path; a Subsonic album by disc and
-/// track). Empty for devices, whose files aren't library songs.
+/// track). `path` is read as `list_dir` reads it. Empty for devices, whose
+/// files aren't library songs.
 pub fn songs_under(conn: &Connection, source: &FileSource, path: &[String]) -> Result<Vec<Song>> {
-    let path = clean_path(path);
     match source {
         FileSource::Folder { id } => {
-            let folder = join_local(&folder_root(conn, *id)?, &path);
+            let folder = join_local(&folder_root(conn, *id)?, &clean_path(path));
             let mut songs = local_songs_under(conn, &folder)?;
             songs.sort_by_cached_key(|s| {
                 (
@@ -247,7 +263,7 @@ pub fn songs_under(conn: &Connection, source: &FileSource, path: &[String]) -> R
                 .into_iter()
                 .filter(|s| {
                     let (artist, album) = subsonic_place(s);
-                    match path.as_slice() {
+                    match path {
                         [] => true,
                         [a] => *a == artist,
                         [a, b, ..] => *a == artist && *b == album,
@@ -266,7 +282,7 @@ pub fn songs_under(conn: &Connection, source: &FileSource, path: &[String]) -> R
             Ok(songs)
         }
         FileSource::Webdav { id } => {
-            let dir = webdav_dir_href(&webdav_server(conn, *id)?.remote_path, &path);
+            let dir = webdav_dir_href(&webdav_server(conn, *id)?.remote_path, &clean_path(path));
             let mut stmt = conn.prepare(&format!(
                 "SELECT c.remote_path, {SONG_SELECT_COLS_QUALIFIED} FROM webdav_cache c
                  JOIN songs s ON s.id = c.song_id
@@ -491,7 +507,9 @@ fn place(conn: &Connection, watched: &[(i64, String)], song: &Song) -> Result<Op
     }))
 }
 
-/// `path` without the names that would leave the source or mean nothing.
+/// `path` without the names that would leave the source or mean nothing, for
+/// sources that are real folder trees. Not for Subsonic, whose names are tags
+/// and may be empty or hold a `/` ("AC/DC").
 fn clean_path(path: &[String]) -> Vec<String> {
     path.iter()
         .map(|p| p.trim())
@@ -622,6 +640,7 @@ fn list_folder(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
                 file_type: file_type(&e.name),
                 status: Some(status),
                 song_id: song.map(|(id, _)| *id),
+                missing_tag: None,
                 size: Some(e.size),
                 modified: e.modified,
                 name: e.name,
@@ -702,6 +721,7 @@ fn list_device(db: &Database, storage: &dyn DeviceBackend, dir: &str) -> Result<
                 file_type: file_type(&e.name),
                 status: synced.is_none().then_some(EntryStatus::NotFromLuminous),
                 song_id: None,
+                missing_tag: None,
                 size: Some(e.size),
                 modified: e.modified,
                 name: e.name,
@@ -754,6 +774,7 @@ fn listing(location: Option<String>, entries: Vec<FileEntry>) -> DirListing {
             .count(),
         entries,
         excluded: false,
+        path_missing_tags: Vec::new(),
     }
 }
 
@@ -774,7 +795,10 @@ fn subsonic_songs(conn: &Connection, id: i64) -> Result<Vec<Song>> {
     Ok(songs)
 }
 
-/// Where a Subsonic song sits in the Artists > Albums > Tracks index.
+/// Where a Subsonic song sits in the Artists > Albums > Tracks index: the
+/// artist and album folder names, `""` for a missing tag. Listing, Play
+/// folder and anything that finds a song's folder must all use this, so a
+/// path one of them gives is one the others open.
 fn subsonic_place(song: &Song) -> (String, String) {
     let artist = song
         .album_artist
@@ -786,6 +810,16 @@ fn subsonic_place(song: &Song) -> (String, String) {
         .to_string();
     let album = song.album.as_deref().unwrap_or("").trim().to_string();
     (artist, album)
+}
+
+/// The tag a Subsonic folder named `name` at `depth` (0 for artists, 1 for
+/// albums) stands for, when it is the folder of songs missing it.
+fn subsonic_missing_tag(depth: usize, name: &str) -> Option<MissingTag> {
+    match depth {
+        0 if name.is_empty() => Some(MissingTag::Artist),
+        1 if name.is_empty() => Some(MissingTag::Album),
+        _ => None,
+    }
 }
 
 /// A Subsonic track's name in its album's listing.
@@ -800,7 +834,15 @@ fn subsonic_entry_name(song: &Song) -> String {
 /// albums, then tracks. Sizes aren't shown and there's nothing but audio.
 fn list_subsonic(conn: &Connection, id: i64, path: &[String]) -> Result<DirListing> {
     let songs = subsonic_songs(conn, id)?;
-    let folder = FileEntry::folder;
+    let path_missing_tags = path
+        .iter()
+        .enumerate()
+        .map(|(depth, name)| subsonic_missing_tag(depth, name))
+        .collect();
+    let folder = |name: String| FileEntry {
+        missing_tag: subsonic_missing_tag(path.len(), &name),
+        ..FileEntry::folder(name)
+    };
     let entries = match path {
         [] => songs
             .iter()
@@ -819,7 +861,8 @@ fn list_subsonic(conn: &Connection, id: i64, path: &[String]) -> Result<DirListi
             .map(folder)
             .collect(),
         [artist, album, ..] => {
-            let mut tracks: BTreeMap<(i32, i32, String), &Song> = BTreeMap::new();
+            // The id keeps same-titled untagged tracks apart.
+            let mut tracks: BTreeMap<(i32, i32, String, i64), &Song> = BTreeMap::new();
             for s in songs
                 .iter()
                 .filter(|s| subsonic_place(s) == (artist.clone(), album.clone()))
@@ -829,6 +872,7 @@ fn list_subsonic(conn: &Connection, id: i64, path: &[String]) -> Result<DirListi
                         s.disc.unwrap_or(0),
                         s.track.unwrap_or(0),
                         s.display_title().to_lowercase(),
+                        s.id,
                     ),
                     s,
                 );
@@ -844,13 +888,20 @@ fn list_subsonic(conn: &Connection, id: i64, path: &[String]) -> Result<DirListi
                         .filter(|t| t != "UNKNOWN"),
                     status: Some(EntryStatus::InLibrary),
                     song_id: Some(s.id),
+                    missing_tag: None,
                 })
                 .collect();
             // Already in disc and track order, which name order would break.
-            return Ok(listing(None, entries));
+            return Ok(DirListing {
+                path_missing_tags,
+                ..listing(None, entries)
+            });
         }
     };
-    Ok(finish(None, entries))
+    Ok(DirListing {
+        path_missing_tags,
+        ..finish(None, entries)
+    })
 }
 
 struct WebDavServerRow {
@@ -962,6 +1013,7 @@ fn list_webdav(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
                 modified: None,
                 status: Some(status),
                 song_id: song.map(|(id, _)| *id),
+                missing_tag: None,
                 is_dir: false,
                 name,
             })
@@ -1485,6 +1537,94 @@ mod tests {
         names.push("01.flac".into());
         assert_eq!(webdav_names_under("/dav/", &href), Some(names));
         assert_eq!(webdav_names_under("/other", &href), None);
+    }
+
+    /// Subsonic folder names are tags, so a missing tag (`""`) or one a
+    /// filesystem path couldn't hold ("AC/DC") still opens and plays.
+    #[test]
+    fn subsonic_folders_open_whatever_their_tags() {
+        let f = fixture(&[], &[]);
+        let conn = f.db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO subsonic_servers (id, name, url, username) VALUES (3, 'Navidrome', 'http://x', 'u')",
+            [],
+        )
+        .unwrap();
+        for (id, artist, album, title) in [
+            ("t1", None, None, "Untitled"),
+            ("t2", Some("  "), Some("Demos"), "Demo"),
+            ("t3", Some("AC/DC"), None, "Thunderstruck"),
+        ] {
+            conn.execute(
+                "INSERT INTO songs (source, path, artist, album, title) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![SongSource::Subsonic as i32, format!("subsonic://3/{id}"), artist, album, title],
+            )
+            .unwrap();
+        }
+        let source = FileSource::Subsonic { id: 3 };
+        let open = |path: &[&str]| -> DirListing {
+            let path: Vec<String> = path.iter().map(|p| p.to_string()).collect();
+            list_dir(&f.db, &source, &path, |_, _| None).unwrap()
+        };
+        let folders = |listing: &DirListing| -> Vec<(String, Option<MissingTag>)> {
+            listing
+                .entries
+                .iter()
+                .map(|e| (e.name.clone(), e.missing_tag))
+                .collect()
+        };
+        let root = open(&[]);
+        assert_eq!(
+            folders(&root),
+            [
+                (String::new(), Some(MissingTag::Artist)),
+                ("AC/DC".into(), None)
+            ]
+        );
+        assert!(root.path_missing_tags.is_empty());
+
+        let unknown = open(&[""]);
+        assert_eq!(
+            folders(&unknown),
+            [
+                (String::new(), Some(MissingTag::Album)),
+                ("Demos".into(), None)
+            ]
+        );
+        assert_eq!(unknown.path_missing_tags, [Some(MissingTag::Artist)]);
+
+        let tracks = open(&["", ""]);
+        assert_eq!(folders(&tracks), [("Untitled".into(), None)]);
+        assert_eq!(
+            tracks.path_missing_tags,
+            [Some(MissingTag::Artist), Some(MissingTag::Album)]
+        );
+        assert_eq!(
+            folders(&open(&["AC/DC"])),
+            [(String::new(), Some(MissingTag::Album))]
+        );
+        assert_eq!(open(&["AC/DC", ""]).entries.len(), 1);
+
+        let titles = |path: &[&str]| -> Vec<String> {
+            let path: Vec<String> = path.iter().map(|p| p.to_string()).collect();
+            songs_under(&conn, &source, &path)
+                .unwrap()
+                .into_iter()
+                .filter_map(|s| s.title)
+                .collect()
+        };
+        assert_eq!(titles(&[""]), ["Untitled", "Demo"]);
+        assert_eq!(titles(&["", ""]), ["Untitled"]);
+        assert_eq!(titles(&["AC/DC"]), ["Thunderstruck"]);
+
+        // The resolver finds them where the listing puts them.
+        drop(conn);
+        for (title, path) in [("Untitled", ["", ""]), ("Thunderstruck", ["AC/DC", ""])] {
+            let found = locate_song(&f.db, song_id(&f, title)).unwrap();
+            assert_eq!(found, target(source.clone(), &path, Some(title), true));
+            let listed = list_dir(&f.db, &source, &found.unwrap().path, |_, _| None).unwrap();
+            assert!(listed.entries.iter().any(|e| e.name == title));
+        }
     }
 
     #[test]

@@ -14,11 +14,11 @@ vi.mock("svelte-virtual-list-ts", async () => {
 const source = { kind: "folder", id: 1 } as const;
 
 function entry(name: string, isDir: boolean, status: FileEntry["status"] = null, songId: number | null = null): FileEntry {
-  return { name, isDir, size: isDir ? null : 4_000_000, modified: null, fileType: isDir ? null : "FLAC", status, songId };
+  return { name, isDir, size: isDir ? null : 4_000_000, modified: null, fileType: isDir ? null : "FLAC", status, songId, missingTag: null };
 }
 
 function listing(entries: FileEntry[]): DirListing {
-  return { location: "C:/Music", entries, fileCount: entries.filter((e) => !e.isDir).length, totalBytes: 0, inLibraryCount: 0, excluded: false };
+  return { location: "C:/Music", entries, fileCount: entries.filter((e) => !e.isDir).length, totalBytes: 0, inLibraryCount: 0, excluded: false, pathMissingTags: [] };
 }
 
 const tree: Record<string, FileEntry[]> = {
@@ -120,5 +120,33 @@ describe("FileBrowser.svelte", () => {
   it("says when the source is gone", async () => {
     const { findByText } = setup(["Missing"]);
     expect(await findByText("This source is no longer available.")).toBeInTheDocument();
+  });
+
+  it("words a Subsonic folder for songs missing a tag and opens it by its empty name", async () => {
+    // Keyed by the whole path: `[""]` is a folder, not the root.
+    const subsonic: Record<string, DirListing> = {
+      "[]": listing([{ ...entry("", true), missingTag: "artist" }, entry("AC/DC", true)]),
+      '[""]': { ...listing([{ ...entry("", true), missingTag: "album" }]), pathMissingTags: ["artist"] },
+    };
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd !== "list_source_dir") return null;
+      const found = subsonic[JSON.stringify(args.path)];
+      if (!found) throw "source-not-found";
+      return found;
+    });
+    const onnavigate = vi.fn();
+    const { getAllByRole, findByText, getByText } = render(FileBrowser, {
+      props: { source: { kind: "subsonic", id: 3 }, path: [""], onnavigate, onplay: vi.fn(), unreachableLabel: "Can't reach" },
+    });
+
+    await findByText("Unknown Album");
+    await waitFor(() =>
+      expect(getAllByRole("listbox").map((c) => c.getAttribute("aria-label"))).toEqual(["Folders", "Unknown Artist"])
+    );
+    expect(getByText("Unknown Artist").closest("[role=option]")).toHaveAttribute("aria-selected", "true");
+    expect(getByText("AC/DC")).toBeInTheDocument();
+
+    await fireEvent.click(getByText("Unknown Album"));
+    expect(onnavigate).toHaveBeenCalledWith(["", ""]);
   });
 });
