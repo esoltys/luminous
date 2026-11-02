@@ -6,10 +6,11 @@
 //! - Tracks missing core identity metadata (title, artist, or album)
 //! - Lossless tracks with suspected lossy transcode or upsampling provenance warnings
 
-use crate::models::{Song, LOCAL_SOURCES_SQL};
+use crate::models::{Playlist, Song, LOCAL_SOURCES_SQL};
 use anyhow::Result;
-use rusqlite::Connection;
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 /// Summary of an album surfaced during curation audit.
 ///
@@ -41,6 +42,25 @@ pub struct IncompleteAlbumItem {
     pub duplicate_track_number_count: i32,
 }
 
+/// A candidate track representation within a duplicate recording cluster (#1678).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DuplicateCandidate {
+    pub song: Song,
+    pub playlist_count: usize,
+    pub tags: Vec<String>,
+    pub provenance: Option<String>,
+}
+
+/// A cluster of two or more candidate copies representing the same musical recording (#1678).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DuplicateTrackGroup {
+    pub group_key: String,
+    pub title: String,
+    pub artist: String,
+    pub album: Option<String>,
+    pub candidates: Vec<DuplicateCandidate>,
+}
+
 /// Comprehensive overview of collection health and curation candidates across local library tracks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CurationOverview {
@@ -48,6 +68,7 @@ pub struct CurationOverview {
     pub incomplete_albums: Vec<IncompleteAlbumItem>,
     pub missing_core_tags_count: usize,
     pub suspected_provenance_songs: Vec<Song>,
+    pub duplicate_groups: Vec<DuplicateTrackGroup>,
 }
 
 /// Common CTEs computing top genres per album and pre-ordering tracks for album aggregation.
@@ -310,6 +331,535 @@ pub(crate) fn query_suspected_provenance_songs(conn: &Connection) -> Result<Vec<
     Ok(songs)
 }
 
+/// Normalizes an identity string token (title, artist, album) for duplicate comparison (#1678).
+/// Trims, lowercases, collapses whitespace, underscores, and dashes into a single space,
+/// and strips common punctuation brackets.
+pub fn normalize_identity_token(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut prev_is_space = true;
+    for ch in s.chars() {
+        if ch.is_alphanumeric() {
+            for lower_ch in ch.to_lowercase() {
+                result.push(lower_ch);
+            }
+            prev_is_space = false;
+        } else if (ch.is_whitespace() || ch == '_' || ch == '-') && !prev_is_space {
+            result.push(' ');
+            prev_is_space = true;
+        }
+    }
+    result.trim().to_string()
+}
+
+/// Checks whether a given file path resides in a `/Duplicates/` directory segment (#1678).
+pub fn is_duplicates_folder(path: Option<&str>) -> bool {
+    let Some(p) = path else { return false };
+    let normalized = p.replace('\\', "/").to_lowercase();
+    normalized.contains("/duplicates/")
+        || normalized.starts_with("duplicates/")
+        || normalized.ends_with("/duplicates")
+}
+
+fn get_filename_stem(path: Option<&str>) -> Option<String> {
+    let p = path?;
+    let path_obj = std::path::Path::new(p);
+    path_obj
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_string())
+}
+
+fn get_parent_dir_normalized(path: Option<&str>) -> Option<String> {
+    let p = path?;
+    let path_obj = std::path::Path::new(p);
+    path_obj
+        .parent()
+        .map(|p| p.to_string_lossy().replace('\\', "/").to_lowercase())
+}
+
+fn are_cue_siblings(a: &Song, b: &Song) -> bool {
+    match (&a.path, &b.path) {
+        (Some(pa), Some(pb)) => pa == pb && a.beginning_nanosec != b.beginning_nanosec,
+        _ => false,
+    }
+}
+
+struct DisjointSet {
+    parent: Vec<usize>,
+}
+
+impl DisjointSet {
+    fn new(size: usize) -> Self {
+        Self {
+            parent: (0..size).collect(),
+        }
+    }
+
+    fn find(&mut self, i: usize) -> usize {
+        let mut root = i;
+        while root != self.parent[root] {
+            root = self.parent[root];
+        }
+        let mut curr = i;
+        while curr != root {
+            let next = self.parent[curr];
+            self.parent[curr] = root;
+            curr = next;
+        }
+        root
+    }
+
+    fn union(&mut self, i: usize, j: usize) {
+        let root_i = self.find(i);
+        let root_j = self.find(j);
+        if root_i != root_j {
+            self.parent[root_i] = root_j;
+        }
+    }
+}
+
+fn candidate_sort_key(c: &DuplicateCandidate) -> (bool, bool, u32, u32, u32, i32, i64) {
+    let is_dup_folder = is_duplicates_folder(c.song.path.as_deref());
+    let is_lossless = c.song.filetype.is_lossless();
+    let bitdepth = c.song.bitdepth.map(|b| b.max(0) as u32).unwrap_or(0);
+    let samplerate = c.song.samplerate.map(|s| s.max(0) as u32).unwrap_or(0);
+    let bitrate = c.song.bitrate.map(|b| b.max(0) as u32).unwrap_or(0);
+    let playcount = c.song.playcount;
+    let id = c.song.id;
+
+    (
+        !is_dup_folder,
+        is_lossless,
+        bitdepth,
+        samplerate,
+        bitrate,
+        playcount,
+        -id,
+    )
+}
+
+/// Queries local library tracks to cluster and detect duplicate recordings (#1678).
+///
+/// Tracks are clustered using disjoint set union over recording identity matches and
+/// duplicates folder path counterparts. CUE sheet tracks sharing a physical file
+/// with distinct starting positions are strictly excluded from clustering.
+pub fn query_duplicate_track_groups(conn: &Connection) -> Result<Vec<DuplicateTrackGroup>> {
+    let sql = format!(
+        "SELECT {} FROM songs
+         WHERE source IN ({local_sources})
+           AND unavailable = 0
+           AND not_included = 0
+           AND loved != -1",
+        crate::collection::SONG_SELECT_COLS,
+        local_sources = *LOCAL_SOURCES_SQL
+    );
+
+    let mut stmt = conn.prepare(&sql)?;
+    let songs: Vec<Song> = stmt
+        .query_map([], crate::collection::row_to_song)?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if songs.len() < 2 {
+        return Ok(Vec::new());
+    }
+
+    let n = songs.len();
+    let mut uf = DisjointSet::new(n);
+
+    struct SongMeta {
+        norm_title: String,
+        norm_artist: String,
+        norm_album: String,
+        is_dup_folder: bool,
+        stem: Option<String>,
+        parent_dir: Option<String>,
+        disc: i32,
+        track: i32,
+    }
+
+    let metas: Vec<SongMeta> = songs
+        .iter()
+        .map(|s| {
+            let artist = s
+                .artist
+                .as_deref()
+                .or(s.album_artist.as_deref())
+                .unwrap_or("");
+            let norm_artist = normalize_identity_token(artist);
+            let norm_title = normalize_identity_token(s.title.as_deref().unwrap_or(""));
+            let norm_album = normalize_identity_token(s.album.as_deref().unwrap_or(""));
+            let is_dup_folder = is_duplicates_folder(s.path.as_deref());
+            let stem = get_filename_stem(s.path.as_deref()).map(|st| normalize_identity_token(&st));
+            let parent_dir = get_parent_dir_normalized(s.path.as_deref());
+            let disc = s.disc.unwrap_or(1);
+            let track = s.track.unwrap_or(0);
+
+            SongMeta {
+                norm_title,
+                norm_artist,
+                norm_album,
+                is_dup_folder,
+                stem,
+                parent_dir,
+                disc,
+                track,
+            }
+        })
+        .collect();
+
+    let mut artist_title_buckets: HashMap<(String, String), Vec<usize>> = HashMap::new();
+    let mut counterpart_buckets: HashMap<String, Vec<usize>> = HashMap::new();
+
+    for (i, meta) in metas.iter().enumerate() {
+        if !meta.norm_artist.is_empty() && !meta.norm_title.is_empty() {
+            artist_title_buckets
+                .entry((meta.norm_artist.clone(), meta.norm_title.clone()))
+                .or_default()
+                .push(i);
+        }
+
+        if let Some(ref stem) = meta.stem {
+            if !stem.is_empty() {
+                if meta.is_dup_folder {
+                    if let Some(ref pd) = meta.parent_dir {
+                        if let Some(grandparent) = std::path::Path::new(pd).parent() {
+                            let gp_norm = grandparent
+                                .to_string_lossy()
+                                .replace('\\', "/")
+                                .to_lowercase();
+                            counterpart_buckets
+                                .entry(format!("{}:{}", gp_norm, stem))
+                                .or_default()
+                                .push(i);
+                        }
+                    }
+                } else if let Some(ref pd) = meta.parent_dir {
+                    counterpart_buckets
+                        .entry(format!("{}:{}", pd, stem))
+                        .or_default()
+                        .push(i);
+                }
+            }
+        }
+    }
+
+    let are_duplicates = |i: usize, j: usize| -> bool {
+        let s_a = &songs[i];
+        let s_b = &songs[j];
+        if are_cue_siblings(s_a, s_b) {
+            return false;
+        }
+
+        let m_a = &metas[i];
+        let m_b = &metas[j];
+
+        // 1. Recording Identity Match
+        if !m_a.norm_artist.is_empty()
+            && !m_b.norm_artist.is_empty()
+            && !m_a.norm_title.is_empty()
+            && !m_b.norm_title.is_empty()
+            && m_a.norm_artist == m_b.norm_artist
+            && m_a.norm_title == m_b.norm_title
+        {
+            let duration_match = match (s_a.length_nanosec, s_b.length_nanosec) {
+                (Some(la), Some(lb)) if la > 0 && lb > 0 => (la - lb).abs() <= 5_000_000_000,
+                _ => true,
+            };
+
+            // Same normalized (artist, title) and one is in Duplicates folder
+            if (m_a.is_dup_folder || m_b.is_dup_folder) && duration_match {
+                return true;
+            }
+
+            // Same normalized (artist, album, track, title) when track > 0 and album is non-empty
+            if !m_a.norm_album.is_empty()
+                && m_a.norm_album == m_b.norm_album
+                && m_a.track > 0
+                && m_a.track == m_b.track
+                && duration_match
+            {
+                return true;
+            }
+
+            // Same normalized (artist, album, title) and (same (disc, track) or at least one missing track)
+            // and duration within ±5s when both have length_nanosec > 0
+            if m_a.norm_album == m_b.norm_album {
+                let track_match = (m_a.disc == m_b.disc && m_a.track == m_b.track)
+                    || m_a.track == 0
+                    || m_b.track == 0;
+
+                if track_match && duration_match {
+                    return true;
+                }
+            }
+        }
+
+        // 2. Duplicates Folder / Path Counterpart
+        if (m_a.is_dup_folder && !m_b.is_dup_folder) || (!m_a.is_dup_folder && m_b.is_dup_folder) {
+            if let (Some(ref st_a), Some(ref st_b)) = (&m_a.stem, &m_b.stem) {
+                if st_a == st_b {
+                    let (dup_meta, orig_meta) = if m_a.is_dup_folder {
+                        (m_a, m_b)
+                    } else {
+                        (m_b, m_a)
+                    };
+                    if let (Some(ref dp), Some(ref op)) =
+                        (&dup_meta.parent_dir, &orig_meta.parent_dir)
+                    {
+                        if let Some(grandparent) = std::path::Path::new(dp).parent() {
+                            let gp_norm = grandparent
+                                .to_string_lossy()
+                                .replace('\\', "/")
+                                .to_lowercase();
+                            if &gp_norm == op {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    };
+
+    for indices in artist_title_buckets.values() {
+        if indices.len() >= 2 {
+            for idx_a in 0..indices.len() {
+                for idx_b in (idx_a + 1)..indices.len() {
+                    let i = indices[idx_a];
+                    let j = indices[idx_b];
+                    if are_duplicates(i, j) {
+                        uf.union(i, j);
+                    }
+                }
+            }
+        }
+    }
+
+    for indices in counterpart_buckets.values() {
+        if indices.len() >= 2 {
+            for idx_a in 0..indices.len() {
+                for idx_b in (idx_a + 1)..indices.len() {
+                    let i = indices[idx_a];
+                    let j = indices[idx_b];
+                    if are_duplicates(i, j) {
+                        uf.union(i, j);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut raw_groups: HashMap<usize, Vec<usize>> = HashMap::new();
+    for i in 0..n {
+        let root = uf.find(i);
+        raw_groups.entry(root).or_default().push(i);
+    }
+
+    let candidate_groups: Vec<Vec<usize>> = raw_groups
+        .into_values()
+        .filter(|indices| indices.len() >= 2)
+        .collect();
+
+    if candidate_groups.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut playlist_counts: HashMap<i64, usize> = HashMap::new();
+    let mut non_queue_playlists: HashSet<i64> = HashSet::new();
+    if let Ok(mut stmt) = conn.prepare("SELECT id, name, dynamic_enabled FROM playlists") {
+        if let Ok(rows) = stmt.query_map([], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, bool>(2)?,
+            ))
+        }) {
+            for (id, name, dynamic_enabled) in rows.flatten() {
+                if !Playlist::is_queue_row(&name, dynamic_enabled) {
+                    non_queue_playlists.insert(id);
+                }
+            }
+        }
+    }
+
+    if !non_queue_playlists.is_empty() {
+        let mut song_to_playlists: HashMap<i64, HashSet<i64>> = HashMap::new();
+        if let Ok(mut stmt) = conn.prepare("SELECT song_id, playlist_id FROM playlist_items") {
+            if let Ok(rows) = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))
+            {
+                for (song_id, playlist_id) in rows.flatten() {
+                    if non_queue_playlists.contains(&playlist_id) {
+                        song_to_playlists
+                            .entry(song_id)
+                            .or_default()
+                            .insert(playlist_id);
+                    }
+                }
+            }
+        }
+        for (song_id, playlists) in song_to_playlists {
+            playlist_counts.insert(song_id, playlists.len());
+        }
+    }
+
+    let mut provenance_map: HashMap<i64, String> = HashMap::new();
+    let has_provenance: bool = conn
+        .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'provenance' LIMIT 1")
+        .and_then(|mut s| s.exists([]))
+        .unwrap_or(false);
+
+    if has_provenance {
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT id, provenance FROM songs WHERE provenance IS NOT NULL AND TRIM(provenance) != ''",
+        ) {
+            if let Ok(rows) = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))) {
+                for row in rows.flatten() {
+                    provenance_map.insert(row.0, row.1);
+                }
+            }
+        }
+    }
+
+    let mut result_groups = Vec::new();
+
+    for indices in candidate_groups {
+        let mut candidates: Vec<DuplicateCandidate> = indices
+            .into_iter()
+            .map(|i| {
+                let song = songs[i].clone();
+                let playlist_count = playlist_counts.get(&song.id).copied().unwrap_or(0);
+                let tags = crate::models::parse_multi_value(song.genre.as_deref().unwrap_or(""));
+                let provenance = provenance_map.get(&song.id).cloned();
+
+                DuplicateCandidate {
+                    song,
+                    playlist_count,
+                    tags,
+                    provenance,
+                }
+            })
+            .collect();
+
+        candidates.sort_by_key(|a| std::cmp::Reverse(candidate_sort_key(a)));
+
+        let canonical = &candidates[0].song;
+        let title = canonical
+            .title
+            .clone()
+            .unwrap_or_else(|| "Unknown Title".to_string());
+        let artist = canonical
+            .artist
+            .clone()
+            .or_else(|| canonical.album_artist.clone())
+            .unwrap_or_else(|| "Unknown Artist".to_string());
+        let album = canonical.album.clone();
+        let group_key = format!(
+            "dup-{}-{}-{}",
+            normalize_identity_token(&artist),
+            normalize_identity_token(&title),
+            canonical.id
+        );
+
+        result_groups.push(DuplicateTrackGroup {
+            group_key,
+            title,
+            artist,
+            album,
+            candidates,
+        });
+    }
+
+    result_groups.sort_by(|a, b| {
+        a.artist
+            .to_lowercase()
+            .cmp(&b.artist.to_lowercase())
+            .then_with(|| a.title.to_lowercase().cmp(&b.title.to_lowercase()))
+    });
+
+    Ok(result_groups)
+}
+
+/// Resolves a duplicate track cluster in the database by folding redundant candidate rows into
+/// the preserved song row (#1678).
+///
+/// Verifies that the preserved track exists and (when `delete_files_from_disk` is requested) that
+/// its file is present on disk before deleting any redundant physical files.
+pub fn resolve_duplicate_group_in_db(
+    conn: &Connection,
+    keep_song_id: i64,
+    remove_song_ids: &[i64],
+    delete_files_from_disk: bool,
+) -> Result<Vec<String>> {
+    if remove_song_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    if remove_song_ids.contains(&keep_song_id) {
+        anyhow::bail!("Cannot remove preserved song ID {keep_song_id}");
+    }
+
+    let keep_path: String = conn
+        .query_row(
+            "SELECT path FROM songs WHERE id = ?1",
+            params![keep_song_id],
+            |r| r.get(0),
+        )
+        .map_err(|_| anyhow::anyhow!("Preserved song ID {keep_song_id} not found in database"))?;
+
+    if delete_files_from_disk {
+        let keep_file = std::path::Path::new(&keep_path);
+        if !keep_file.exists() {
+            anyhow::bail!(
+                "Preserved song file does not exist on disk at '{}'; aborting resolution to prevent data loss",
+                keep_path
+            );
+        }
+    }
+
+    let mut deleted_paths = Vec::new();
+
+    for &remove_id in remove_song_ids {
+        let remove_path: Option<String> = conn
+            .query_row(
+                "SELECT path FROM songs WHERE id = ?1",
+                params![remove_id],
+                |r| r.get(0),
+            )
+            .optional()?;
+
+        crate::collection::reconcile::merge_song_rows(conn, keep_song_id, remove_id)?;
+
+        if delete_files_from_disk {
+            if let Some(rem_path) = remove_path {
+                if rem_path == keep_path {
+                    continue;
+                }
+                let sharing_count: i64 = conn.query_row(
+                    "SELECT COUNT(*) FROM songs WHERE path = ?1",
+                    params![rem_path],
+                    |r| r.get(0),
+                )?;
+                if sharing_count == 0 {
+                    let p = std::path::Path::new(&rem_path);
+                    if p.exists() {
+                        if let Err(e) = std::fs::remove_file(p) {
+                            log::warn!(
+                                "Failed to delete redundant duplicate file at '{rem_path}': {e}"
+                            );
+                        } else {
+                            deleted_paths.push(rem_path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(deleted_paths)
+}
+
 /// Computes the overall collection curation overview across local library files.
 ///
 /// Ensures album keys are up to date via `repair_album_keys` before executing groupings.
@@ -320,12 +870,14 @@ pub fn compute_curation_overview(conn: &Connection) -> Result<CurationOverview> 
     let incomplete_albums = query_incomplete_albums(conn)?;
     let missing_core_tags_count = query_missing_core_tags_count(conn)?;
     let suspected_provenance_songs = query_suspected_provenance_songs(conn)?;
+    let duplicate_groups = query_duplicate_track_groups(conn)?;
 
     Ok(CurationOverview {
         unillustrated_albums,
         incomplete_albums,
         missing_core_tags_count,
         suspected_provenance_songs,
+        duplicate_groups,
     })
 }
 
@@ -356,6 +908,7 @@ mod tests {
         assert!(overview.incomplete_albums.is_empty());
         assert_eq!(overview.missing_core_tags_count, 0);
         assert!(overview.suspected_provenance_songs.is_empty());
+        assert!(overview.duplicate_groups.is_empty());
     }
 
     #[test]
@@ -890,5 +1443,249 @@ mod tests {
         assert!(titles.contains(&"Speex Suspected"));
         assert!(!titles.contains(&"Authentic FLAC"));
         assert!(!titles.contains(&"FLAC Suspected"));
+    }
+
+    #[test]
+    fn test_duplicate_track_groups_clustering_and_cue_exclusion() {
+        let (_temp, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        // 1. Two duplicate tracks (one FLAC, one MP3 in Duplicates/)
+        let track_canonical = Song {
+            path: Some("C:/Music/Radiohead/OK Computer/01 - Airbag.flac".to_string()),
+            title: Some("Airbag".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("OK Computer".to_string()),
+            track: Some(1),
+            disc: Some(1),
+            length_nanosec: Some(284_000_000_000), // 4m 44s
+            filetype: FileType::Flac,
+            bitdepth: Some(16),
+            samplerate: Some(44100),
+            source: SongSource::LocalFile,
+            genre: Some("Alternative Rock".to_string()),
+            rating: 0.8,
+            playcount: 15,
+            ..Default::default()
+        };
+        let track_duplicate = Song {
+            path: Some("C:/Music/Radiohead/OK Computer/Duplicates/01 - Airbag.mp3".to_string()),
+            title: Some("Airbag".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("OK Computer".to_string()),
+            track: Some(1),
+            disc: Some(1),
+            length_nanosec: Some(284_000_000_000),
+            filetype: FileType::Mp3,
+            bitrate: Some(320),
+            source: SongSource::LocalFile,
+            genre: Some("Rock; 90s".to_string()),
+            rating: 1.0,
+            playcount: 40,
+            ..Default::default()
+        };
+
+        // 2. CUE sheet tracks sharing physical file with distinct beginning_nanosec (#78)
+        let cue_track_1 = Song {
+            path: Some("C:/Music/Pink Floyd/The Dark Side of the Moon/album.flac".to_string()),
+            title: Some("Speak to Me".to_string()),
+            artist: Some("Pink Floyd".to_string()),
+            album: Some("The Dark Side of the Moon".to_string()),
+            track: Some(1),
+            disc: Some(1),
+            beginning_nanosec: 0,
+            length_nanosec: Some(65_000_000_000),
+            filetype: FileType::Flac,
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+        let cue_track_2 = Song {
+            path: Some("C:/Music/Pink Floyd/The Dark Side of the Moon/album.flac".to_string()),
+            title: Some("Breathe".to_string()),
+            artist: Some("Pink Floyd".to_string()),
+            album: Some("The Dark Side of the Moon".to_string()),
+            track: Some(2),
+            disc: Some(1),
+            beginning_nanosec: 65_000_000_000,
+            length_nanosec: Some(169_000_000_000),
+            filetype: FileType::Flac,
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+
+        upsert_song(&conn, &track_canonical).unwrap();
+        upsert_song(&conn, &track_duplicate).unwrap();
+        upsert_song(&conn, &cue_track_1).unwrap();
+        upsert_song(&conn, &cue_track_2).unwrap();
+
+        let groups = query_duplicate_track_groups(&conn).unwrap();
+        assert_eq!(groups.len(), 1, "Expected exactly 1 duplicate group");
+
+        let group = &groups[0];
+        assert_eq!(group.title, "Airbag");
+        assert_eq!(group.artist, "Radiohead");
+        assert_eq!(group.album.as_deref(), Some("OK Computer"));
+        assert_eq!(group.candidates.len(), 2);
+
+        // Canonical/best quality copy must be sorted first (non-Duplicates folder + FLAC before MP3 in Duplicates)
+        assert_eq!(group.candidates[0].song.filetype, FileType::Flac);
+        assert!(!is_duplicates_folder(
+            group.candidates[0].song.path.as_deref()
+        ));
+        assert_eq!(group.candidates[1].song.filetype, FileType::Mp3);
+        assert!(is_duplicates_folder(
+            group.candidates[1].song.path.as_deref()
+        ));
+    }
+
+    #[test]
+    fn test_duplicate_track_groups_duration_tolerance() {
+        let (_temp, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        // Track with length 200s
+        let track_a = Song {
+            path: Some("C:/Music/Artist/Album/01 Track.flac".to_string()),
+            title: Some("Tolerance Track".to_string()),
+            artist: Some("Artist".to_string()),
+            album: Some("Album".to_string()),
+            track: Some(1),
+            disc: Some(1),
+            length_nanosec: Some(200_000_000_000),
+            filetype: FileType::Flac,
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+        // Track with length 204s (within 5s tolerance)
+        let track_b = Song {
+            path: Some("C:/Music/Artist/Album 2/01 Track.flac".to_string()),
+            title: Some("tolerance track".to_string()),
+            artist: Some("artist".to_string()),
+            album: Some("album".to_string()),
+            track: Some(1),
+            disc: Some(1),
+            length_nanosec: Some(204_000_000_000),
+            filetype: FileType::Flac,
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+        // Track with length 210s (outside 5s tolerance: 10s difference)
+        let track_c = Song {
+            path: Some("C:/Music/Artist/Album 3/01 Track.flac".to_string()),
+            title: Some("Tolerance Track".to_string()),
+            artist: Some("Artist".to_string()),
+            album: Some("Album".to_string()),
+            track: Some(1),
+            disc: Some(1),
+            length_nanosec: Some(210_000_000_000),
+            filetype: FileType::Flac,
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+
+        upsert_song(&conn, &track_a).unwrap();
+        upsert_song(&conn, &track_b).unwrap();
+        upsert_song(&conn, &track_c).unwrap();
+
+        let groups = query_duplicate_track_groups(&conn).unwrap();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(
+            groups[0].candidates.len(),
+            2,
+            "Only tracks within 5s tolerance should group"
+        );
+        let candidate_lengths: Vec<i64> = groups[0]
+            .candidates
+            .iter()
+            .map(|c| c.song.length_nanosec.unwrap())
+            .collect();
+        assert!(candidate_lengths.contains(&200_000_000_000));
+        assert!(candidate_lengths.contains(&204_000_000_000));
+        assert!(!candidate_lengths.contains(&210_000_000_000));
+    }
+
+    #[test]
+    fn test_resolve_duplicate_group_in_db() {
+        let (temp_dir_guard, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+
+        let file_keep = temp_dir.join("keep.flac");
+        let file_dup = temp_dir.join("dup.mp3");
+        std::fs::write(&file_keep, b"flac data").unwrap();
+        std::fs::write(&file_dup, b"mp3 data").unwrap();
+
+        let song_keep = Song {
+            path: Some(file_keep.to_string_lossy().to_string()),
+            title: Some("Resolution Song".to_string()),
+            artist: Some("Artist".to_string()),
+            album: Some("Album".to_string()),
+            filetype: FileType::Flac,
+            source: SongSource::LocalFile,
+            playcount: 5,
+            ..Default::default()
+        };
+        let song_dup = Song {
+            path: Some(file_dup.to_string_lossy().to_string()),
+            title: Some("Resolution Song".to_string()),
+            artist: Some("Artist".to_string()),
+            album: Some("Album".to_string()),
+            filetype: FileType::Mp3,
+            source: SongSource::LocalFile,
+            playcount: 20,
+            ..Default::default()
+        };
+
+        upsert_song(&conn, &song_keep).unwrap();
+        upsert_song(&conn, &song_dup).unwrap();
+
+        let keep_id: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![file_keep.to_string_lossy().to_string()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let dup_id: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![file_dup.to_string_lossy().to_string()],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        conn.execute(
+            "UPDATE songs SET playcount = 5 WHERE id = ?1",
+            params![keep_id],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE songs SET playcount = 20 WHERE id = ?1",
+            params![dup_id],
+        )
+        .unwrap();
+
+        // 1. Trying to remove the keep_id should bail
+        assert!(resolve_duplicate_group_in_db(&conn, keep_id, &[keep_id], false).is_err());
+
+        // 2. Successful resolution with delete_files_from_disk = true
+        let deleted = resolve_duplicate_group_in_db(&conn, keep_id, &[dup_id], true).unwrap();
+        assert_eq!(deleted.len(), 1);
+        assert_eq!(deleted[0], file_dup.to_string_lossy().to_string());
+
+        // Dup physical file should be deleted on disk
+        assert!(!file_dup.exists());
+        // Kept file must remain intact
+        assert!(file_keep.exists());
+
+        // Kept song should have inherited playcount
+        let playcount: i32 = conn
+            .query_row(
+                "SELECT playcount FROM songs WHERE id = ?1",
+                params![keep_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(playcount, 25);
     }
 }

@@ -1332,4 +1332,52 @@ export interface LyricsPayload {
   source: LyricsSource;
 }
 
+// ---------------------------------------------------------------------------
+// Curation & Duplicate Resolution (#1586, #1678)
+// ---------------------------------------------------------------------------
+
+export interface CurationAlbumItem {
+  album_key: string;
+  album: string;
+  artist?: string | null;
+  year?: number | null;
+  track_count: number;
+  disc_count: number;
+  art_embedded: boolean;
+  art_automatic?: string | null;
+  art_manual?: string | null;
+  genre?: string | null;
+  rating: number;
+  sample_song_id?: number | null;
+  song_ids: number[];
+}
+
+export interface IncompleteAlbumItem extends CurationAlbumItem {
+  unnumbered_count: number;
+  duplicate_track_number_count: number;
+}
+
+export interface DuplicateCandidate {
+  song: Song;
+  playlist_count: number;
+  tags: string[];
+  provenance?: string | null;
+}
+
+export interface DuplicateTrackGroup {
+  group_key: string;
+  title: string;
+  artist: string;
+  album?: string | null;
+  candidates: DuplicateCandidate[];
+}
+
+export interface CurationOverview {
+  unillustrated_albums: CurationAlbumItem[];
+  incomplete_albums: IncompleteAlbumItem[];
+  missing_core_tags_count: number;
+  suspected_provenance_songs: Song[];
+  duplicate_groups: DuplicateTrackGroup[];
+}
+
 

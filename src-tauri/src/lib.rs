@@ -1429,8 +1429,10 @@ pub fn run() {
             commands::collection::set_songs_not_included,
             commands::collection::get_songs_missing_musicbrainz_id,
             commands::collection::get_songs_missing_metadata,
-            // Curation commands (#1586)
+            // Curation commands (#1586, #1678)
             commands::curation::get_curation_overview,
+            commands::curation::get_duplicate_track_groups,
+            commands::curation::resolve_duplicate_group,
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,

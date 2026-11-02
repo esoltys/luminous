@@ -35,6 +35,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import TagEditor from "./TagEditor.svelte";
   import ViewInFilesItem from "./ViewInFilesItem.svelte";
+  import DuplicateReviewModal from "./DuplicateReviewModal.svelte";
 
   const PREVIEW_DEBOUNCE_MS = 300;
   const COL_MIN_WIDTH_PX = 150;
@@ -449,6 +450,7 @@
 
   let isConfigExpanded = $state(false);
   let editingSongId = $state<number | null>(null);
+  let reviewDuplicateSongId = $state<number | null>(null);
   let contextMenu = $state<{ x: number; y: number; item: OrganizePreviewItem } | null>(null);
 
   function openTagEditor(songId: number) {
@@ -1123,6 +1125,17 @@
 
                     <!-- Hover quick actions -->
                     <div class="ml-auto shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pl-2">
+                      {#if st === "duplicate"}
+                        <button
+                          type="button"
+                          onclick={(e) => { e.stopPropagation(); reviewDuplicateSongId = item.song_id; }}
+                          class="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black text-[10px] font-semibold border border-amber-500/40 transition-colors flex items-center gap-1 shadow-sm"
+                          title={i18n.t("curation.compareDuplicatesBtn")}
+                        >
+                          <Duplicate class="w-3 h-3" />
+                          <span>{i18n.t("curation.compareDuplicatesBtn")}</span>
+                        </button>
+                      {/if}
                       <button
                         type="button"
                         onclick={(e) => { e.stopPropagation(); openTagEditor(item.song_id); }}
@@ -1333,6 +1346,17 @@
 
   {#if contextMenu}
     <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => { contextMenu = null; }}>
+      {#if getItemStatus(contextMenu.item) === "duplicate"}
+        <ContextMenuItem
+          icon={Duplicate}
+          label={i18n.t("curation.compareDuplicatesBtn")}
+          onclick={() => {
+            const id = contextMenu!.item.song_id;
+            contextMenu = null;
+            reviewDuplicateSongId = id;
+          }}
+        />
+      {/if}
       <ContextMenuItem
         icon={Edit3}
         label={i18n.t("organizer.editTags")}
@@ -1362,6 +1386,19 @@
       songId={editingSongId}
       onClose={() => { editingSongId = null; }}
       onSave={handleTagEditorSaved}
+    />
+  {/if}
+
+  {#if reviewDuplicateSongId !== null}
+    <DuplicateReviewModal
+      initialSongId={reviewDuplicateSongId}
+      onClose={() => { reviewDuplicateSongId = null; }}
+      onResolved={() => {
+        fetchPreview();
+      }}
+      onEditTags={(songId) => {
+        openTagEditor(songId);
+      }}
     />
   {/if}
 {/if}
