@@ -104,13 +104,13 @@ import {
   type CsvRow,
   type Snapshot,
 } from "./measure-memory";
-import { defaultDbPath } from "./mock-library";
 import { CdpClient } from "./monitor-cdp";
 import {
   AppProfile,
   CDP_PORT,
   canonicalView,
   checkPreconditions as checkProfilePreconditions,
+  defaultDbPath,
   protectRealWindowState,
   TRACK_COLUMNS,
 } from "./throwaway-profile";

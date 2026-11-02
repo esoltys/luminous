@@ -1136,29 +1136,6 @@ export interface TagGroup {
 export function getCoverArtUrl(uri: string | null | undefined): string | null {
   if (!uri || typeof uri !== "string") return null;
   if (uri.startsWith("luminous-art://")) {
-    const isMock = typeof window !== "undefined" && (
-      (window as any).__LUMINOUS_MOCK_LIBRARY__ || 
-      (window as any).mockSettings
-    );
-    if (isMock) {
-      let cleanPath = uri.replace("luminous-art://", "");
-      if (cleanPath.startsWith("local/")) {
-        cleanPath = cleanPath.slice(6);
-      } else if (cleanPath.startsWith("thumb/")) {
-        cleanPath = cleanPath.slice(6);
-      }
-      if (cleanPath.includes(":/") || cleanPath.includes(":\\") || cleanPath.startsWith("/")) {
-        return `/local-art/${encodeURIComponent(cleanPath)}`;
-      }
-      // Album covers and fetched artist images (artist-*.jpg) both live in
-      // the real app's covers/ directory.
-      if (cleanPath.startsWith("album-") || cleanPath.startsWith("artist-")) {
-        // Real DB rows already include the extension (see covermanager.rs); the
-        // dev server's /covers/ route falls back to trying .jpg/.png if not.
-        return `/covers/${cleanPath}`;
-      }
-      return `/fixtures/${cleanPath}`;
-    }
     // On Windows, WebView2 does not intercept non-standard URI schemes (like luminous-art://)
     // directly. Instead, wry sets up an AddWebResourceRequestedFilter for `http://luminous-art.*`
     // (see custom_protocol_workaround.rs in wry). The webview must therefore request
