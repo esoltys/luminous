@@ -312,15 +312,31 @@
     if (name === null || current?.state !== "ready") return;
     scrollPending = null;
     const index = currentEntries.findIndex((e) => e.name === name);
-    if (index >= 0) centreRow(index);
+    if (index < 0) return;
+    centreRow(levels.length - 1, index);
+    if (haloArmed && name === arrived) showHalo();
   });
 
-  /** Scrolls the current folder's table so row `index` sits mid-view. Unlike
-   * `scrollIntoView`, this doesn't rely on the rows drawn so far, which are
-   * none yet on arrival. */
-  async function centreRow(index: number) {
+  // Each parent column, when it mounts, brings the folder open in it into
+  // view; later moves leave it where the user scrolled it.
+  const centredParents = new Set<string>();
+  $effect(() => {
+    const parents = levels.slice(0, -1);
+    const keys = new Set(parents.map(keyOf));
+    for (const key of [...centredParents]) if (!keys.has(key)) centredParents.delete(key);
+    parents.forEach((dir, column) => {
+      const key = keyOf(dir);
+      if (centredParents.has(key) || listings[key]?.state !== "ready" || !lists[column]) return;
+      centredParents.add(key);
+      const index = folderEntries(dir).findIndex((f) => f.name === path[dir.length]);
+      if (index >= 0) centreRow(column, index);
+    });
+  });
+
+  /** Scrolls a column so row `index` sits mid-view. Unlike `scrollIntoView`,
+   * this doesn't rely on the rows drawn so far, which are none yet on arrival. */
+  async function centreRow(column: number, index: number) {
     await tick();
-    const column = levels.length - 1;
     const list = lists[column];
     const el = columnEls[column];
     if (!list || !el) return;
@@ -331,17 +347,29 @@
   const HALO_MS = 1200;
   /** The entry `arrival` last named, outlined while it is the only selection. */
   let arrived = $state<string | null>(null);
+  /** Its halo waits for its row: a slow source can take longer than the halo lasts. */
+  let haloArmed = false;
   let haloShown = $state(false);
   let haloTimer: ReturnType<typeof setTimeout> | undefined;
 
+  // An arrival selects its entry even when `target` already named it (View in
+  // Files twice on the same song, with another row clicked in between).
   $effect(() => {
     if (arrival === null) return;
-    arrived = arrival;
+    const name = arrival;
     arrival = null;
+    arrived = name;
+    select(name);
+    haloArmed = true;
+    scrollPending = name;
+  });
+
+  function showHalo() {
+    haloArmed = false;
     haloShown = true;
     clearTimeout(haloTimer);
     haloTimer = setTimeout(() => (haloShown = false), HALO_MS);
-  });
+  }
   $effect(() => () => clearTimeout(haloTimer));
 
   /** Makes `name` the only selected entry. */
