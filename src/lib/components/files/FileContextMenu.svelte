@@ -30,7 +30,9 @@
    * menu, acting on the library songs and saying how many other files it
    * left out; other files get what can be done without the library. File
    * actions (Show in File Explorer, Copy path) close every menu, where the
-   * files have a local path. A menu with nothing to offer doesn't open.
+   * files have a local path. A folder in a folder column is there to move
+   * around with, so its menu has the file actions only. A menu with nothing
+   * to offer doesn't open.
    */
   let {
     x,
@@ -40,13 +42,14 @@
     folderName,
     entries,
     scannable,
+    inColumn = false,
     onEditTags,
     onClose,
   }: {
     x: number;
     y: number;
     source: FileSource;
-    /** The folder the entries are in. */
+    /** The folder the entries are in; for a column folder, the open one, unused. */
     path: string[];
     /** What that folder is called, for toasts and the queue's context. */
     folderName: string;
@@ -54,12 +57,14 @@
     entries: FileEntry[];
     /** Whether the folder can be scanned for new files (a local, included folder). */
     scannable: boolean;
+    /** The entry is a folder in a folder column, not a row of the open folder. */
+    inColumn?: boolean;
     onEditTags: (songId: number) => void;
     onClose: () => void;
   } = $props();
 
   const isLocal = $derived(source.kind === "folder");
-  const dir = $derived(entries.length === 1 && entries[0].isDir ? entries[0] : null);
+  const dir = $derived(!inColumn && entries.length === 1 && entries[0].isDir ? entries[0] : null);
   const songIds = $derived(entries.flatMap((e) => (e.songId !== null ? [e.songId] : [])));
   const unscanned = $derived(entries.filter((e) => e.songId === null && e.status === "notScanned"));
   const locations = $derived(entries.flatMap((e) => (e.location !== null ? [e.location] : [])));
@@ -169,7 +174,7 @@
 {:else if !isEmpty}
   <ContextMenu {x} {y} {onClose}>
     <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
-      {single ? single.name : i18n.t("playlists.selectedCount", { count: entries.length })}
+      {single ? shownName(single.name, single.missingTag) : i18n.t("playlists.selectedCount", { count: entries.length })}
     </div>
     {#if canPlayOutside}
       <ContextMenuItem

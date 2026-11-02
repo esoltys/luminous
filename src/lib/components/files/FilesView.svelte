@@ -34,7 +34,7 @@
   let listing = $state<DirListing | null>(null);
   let selectedName = $state<string | null>(null);
   let selection = $state<string[]>([]);
-  let menu = $state<{ x: number; y: number; entries: FileEntry[] } | null>(null);
+  let menu = $state<{ x: number; y: number; entries: FileEntry[]; inColumn: boolean } | null>(null);
   let editingSongId = $state<number | null>(null);
   let reloadToken = $state(0);
   let devicePickerOpen = $state(false);
@@ -192,7 +192,7 @@
         bind:listing
         bind:selectedName
         bind:selection
-        oncontextmenu={(entries, x, y) => (menu = { x, y, entries })}
+        oncontextmenu={(target, x, y) => (menu = { x, y, ...target })}
       >
         {#snippet footer()}
           {#if listing}
@@ -216,6 +216,7 @@
         path={location.path}
         folderName={title}
         entries={menu.entries}
+        inColumn={menu.inColumn}
         scannable={isLocal && !listing?.excluded}
         onEditTags={(id) => (editingSongId = id)}
         onClose={() => (menu = null)}

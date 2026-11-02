@@ -48,7 +48,7 @@ function song(id: number, title: string): Song {
 
 const library = { 7: song(7, "Opening"), 8: song(8, "Encore") } as Record<number, Song>;
 
-function open(entries: FileEntry[], over: { source?: FileSource; scannable?: boolean } = {}) {
+function open(entries: FileEntry[], over: { source?: FileSource; scannable?: boolean; inColumn?: boolean } = {}) {
   const onClose = vi.fn();
   const onEditTags = vi.fn();
   render(FileContextMenu, {
@@ -60,6 +60,7 @@ function open(entries: FileEntry[], over: { source?: FileSource; scannable?: boo
       folderName: "Live",
       entries,
       scannable: over.scannable ?? true,
+      inColumn: over.inColumn ?? false,
       onEditTags,
       onClose,
     },
@@ -88,6 +89,12 @@ describe("FileContextMenu.svelte", () => {
     await waitFor(() => expect(addToQueue).toHaveBeenCalledWith([7, 8]));
     expect(invoke).toHaveBeenCalledWith("get_source_songs", { source: folderSource, path: ["Live", "Disc 2"] });
     addToQueue.mockRestore();
+  });
+
+  it("gives a folder in a folder column the file actions only", () => {
+    open([entry("Rock", { isDir: true, status: null, fileType: null, location: "C:/Music/Rock" })], { inColumn: true });
+
+    expect(screen.getAllByRole("menuitem").map((b) => b.textContent?.trim())).toEqual([expect.stringMatching(/^Show in /), "Copy path"]);
   });
 
   it("gives a library song the song menu, with the file's own actions after it", async () => {

@@ -55,10 +55,11 @@
     /** Shown when the source can't be reached. */
     unreachableLabel: string;
     footer?: Snippet;
-    /** A right-click on a row of the current folder, with the entries it acts on:
-     * the selected files when the row is one of them, else just that row (which
-     * becomes the selection). Without it the browser shows no menu. */
-    oncontextmenu?: (entries: FileEntry[], x: number, y: number) => void;
+    /** A right-click on a row. In the current folder `entries` are the selected
+     * files when the row is one of them, else just that row (which becomes the
+     * selection); in a folder column they are that folder, with `inColumn` set,
+     * and nothing is selected or opened. Without it the browser shows no menu. */
+    oncontextmenu?: (target: { entries: FileEntry[]; inColumn: boolean }, x: number, y: number) => void;
   } = $props();
 
   /** The words for a status; the backend decides which one a file has. */
@@ -427,7 +428,13 @@
     event.preventDefault();
     if (entry.isDir || !selection.includes(entry.name)) select(entry.name);
     const entries = entry.isDir ? [entry] : currentEntries.filter((e) => !e.isDir && selection.includes(e.name));
-    oncontextmenu(entries, event.clientX, event.clientY);
+    oncontextmenu({ entries, inColumn: false }, event.clientX, event.clientY);
+  }
+
+  function openColumnMenu(event: MouseEvent, entry: FileEntry) {
+    if (!oncontextmenu) return;
+    event.preventDefault();
+    oncontextmenu({ entries: [entry], inColumn: true }, event.clientX, event.clientY);
   }
 
   function statusLabel(entry: FileEntry): string {
@@ -460,6 +467,7 @@
                 aria-selected={selected}
                 tabindex="-1"
                 onclick={() => openFolder(dir, entry.name)}
+                oncontextmenu={(e) => openColumnMenu(e, entry)}
               >
                 <FolderIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
                 <span class="truncate flex-1">{shownName(entry.name, entry.missingTag)}</span>

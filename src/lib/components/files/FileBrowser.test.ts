@@ -151,7 +151,7 @@ describe("FileBrowser.svelte", () => {
       const result = render(FileBrowser, {
         props: { source, path: ["Rock", "Live"], onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "", oncontextmenu },
       });
-      const names = () => oncontextmenu.mock.lastCall![0].map((e: FileEntry) => e.name);
+      const names = () => oncontextmenu.mock.lastCall![0].entries.map((e: FileEntry) => e.name);
       return { ...result, oncontextmenu, names };
     }
 
@@ -177,6 +177,17 @@ describe("FileBrowser.svelte", () => {
 
       await fireEvent.contextMenu(getByRole("option", { name: /Scans/ }));
       expect(names()).toEqual(["Scans"]);
+    });
+
+    it("offers a folder in a folder column its own menu, without opening or selecting it", async () => {
+      const { getByRole, findByText, names, oncontextmenu } = setupMenu();
+      await findByText("01 Opening.flac");
+      const studio = within(getByRole("listbox", { name: "Rock" })).getByRole("option", { name: /Studio/ });
+
+      await fireEvent.contextMenu(studio);
+      expect(names()).toEqual(["Studio"]);
+      expect(oncontextmenu.mock.lastCall![0].inColumn).toBe(true);
+      expect(studio).toHaveAttribute("aria-selected", "false");
     });
   });
 
