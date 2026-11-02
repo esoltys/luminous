@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext, AudioPipelineInfo, RadioSeed, RadioResult, OutputFallbackPayload, OutputFallbackReason, AudioBackendKind, VolumeSafety } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
+import { createEventScope } from "../utils/eventScope";
 import { themeStore } from "./theme.svelte";
 import { toastStore } from "./toast.svelte";
 import { playlistsStore } from "./playlists.svelte";
@@ -96,6 +96,7 @@ export class PlayerStore {
   private _outputFallbackToastId: number | null = null;
   /** The backend the shown fallback toast is about. */
   private _outputFallbackRequested: AudioBackendKind | null = null;
+  private events = createEventScope(import.meta.hot);
 
   constructor() {
     this.init();
@@ -108,11 +109,11 @@ export class PlayerStore {
       themeStore.updateArtworkColors(this.currentSong);
 
       // Listen for position changes (emitted every ~250ms or on seek)
-      await listen<{ position_nanosec: number }>("playback-position", (event) => {
+      await this.events.listen<{ position_nanosec: number }>("playback-position", (event) => {
         this.positionNanosec = event.payload.position_nanosec;
       });
 
-      await listen<PlaybackState>("playback-state", async (event) => {
+      await this.events.listen<PlaybackState>("playback-state", async (event) => {
         const oldSongId = this.currentSong?.id;
         const oldItemUuid = this.playlistItemUuid;
         const oldSongAlbum = this.currentSong?.album;
@@ -192,7 +193,7 @@ export class PlayerStore {
         }
       });
 
-      await listen<{ song: Song | null; pipeline?: AudioPipelineInfo | null }>("track-changed", async (event) => {
+      await this.events.listen<{ song: Song | null; pipeline?: AudioPipelineInfo | null }>("track-changed", async (event) => {
         this.currentSong = event.payload.song || undefined;
         this.audioPipeline = event.payload.pipeline ?? null;
         themeStore.updateArtworkColors(this.currentSong);
@@ -204,7 +205,7 @@ export class PlayerStore {
         }
       });
 
-      await listen<AudioPipelineInfo | null>("audio-pipeline-changed", (event) => {
+      await this.events.listen<AudioPipelineInfo | null>("audio-pipeline-changed", (event) => {
         this.audioPipeline = event.payload;
         this.noteOutputRestored(event.payload);
       });
@@ -216,7 +217,7 @@ export class PlayerStore {
       // fail several consecutive tracks in a row before the backend's
       // circuit breaker stops it — one toast per failure would be a
       // notification avalanche.
-      await listen<{
+      await this.events.listen<{
         songId: number;
         title: string | null;
         path: string | null;
@@ -238,7 +239,7 @@ export class PlayerStore {
       // track paused at its position; this just says why. Persistent (no
       // durationMs), and each failed retry replaces the previous toast
       // instead of stacking another one.
-      await listen("audio-output-unavailable", () => {
+      await this.events.listen("audio-output-unavailable", () => {
         if (this._outputUnavailableToastId !== null) toastStore.dismiss(this._outputUnavailableToastId);
         this._outputUnavailableToastId = toastStore.show(
           i18n.t("playerBar.outputUnavailableToast", undefined, "Audio output unavailable. Connect a device and press play."),
@@ -249,7 +250,7 @@ export class PlayerStore {
       // The chosen bit-perfect output couldn't open and playback went on through
       // shared audio. Persistent, replaced on each fallback, with a retry for
       // when the cause (another app holding the device) has gone away.
-      await listen<OutputFallbackPayload>("audio-output-fallback", (event) => {
+      await this.events.listen<OutputFallbackPayload>("audio-output-fallback", (event) => {
         const { requested, reason } = event.payload;
         const mode = i18n.t(AUDIO_BACKEND_LABEL_KEYS[requested]);
         if (this._outputFallbackToastId !== null) toastStore.dismiss(this._outputFallbackToastId);
@@ -268,7 +269,7 @@ export class PlayerStore {
 
       // Keep the current song's stats in sync when they change elsewhere
       // (rating edits in list views, scrobble-point playcount bumps).
-      await listen<SongStatsPayload>("song-stats-changed", (event) => {
+      await this.events.listen<SongStatsPayload>("song-stats-changed", (event) => {
         if (this.currentSong && this.currentSong.id === event.payload.song_id) {
           applySongStats(this.currentSong, event.payload);
         }
@@ -277,7 +278,7 @@ export class PlayerStore {
       // A file association (or `luminous <file>`) launched a second instance
       // while this one was already running; the backend forwards the paths
       // here instead of spawning a separate window.
-      await listen<string[]>("open-file-request", (event) => {
+      await this.events.listen<string[]>("open-file-request", (event) => {
         this.openAndPlay(event.payload);
       });
 
@@ -678,6 +679,11 @@ export class PlayerStore {
     const current = this.currentSong.loved ?? 0;
     const next = current === 1 ? 0 : (current === -1 ? 0 : 1);
     await this.setLovedCurrent(next);
+  }
+
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
   }
 }
 

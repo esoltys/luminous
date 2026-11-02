@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { createEventScope } from "../utils/eventScope";
 import { i18n } from "./i18n.svelte";
-import { listen } from "@tauri-apps/api/event";
 
 type DiscordStatus = "connected" | "disconnected" | "not_running";
 
@@ -68,6 +68,7 @@ class ScrobblerStore {
   syncRatingsError = $state<string | null>(null);
 
   private initialized = false;
+  private events = createEventScope(import.meta.hot);
 
   /**
    * What the user-facing indicators (sidebar dot, profile popover badge) should
@@ -102,7 +103,7 @@ class ScrobblerStore {
     }
 
     try {
-      await listen<ScrobblerSettings>("scrobbler-settings-changed", (event) => {
+      await this.events.listen<ScrobblerSettings>("scrobbler-settings-changed", (event) => {
         const s = event.payload;
         this.enabled = s.listenbrainz_enabled;
         this.token = s.listenbrainz_token;
@@ -295,6 +296,12 @@ class ScrobblerStore {
   resetDiscordClientId() {
     this.discordClientId = DEFAULT_DISCORD_CLIENT_ID;
     this.saveSettings();
+  }
+
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
+    this.initialized = false;
   }
 }
 

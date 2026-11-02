@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { createEventScope } from "../utils/eventScope";
 import { openExternalUrl } from "../utils/openExternalUrl";
 import { i18n } from "./i18n.svelte";
 
@@ -28,6 +28,7 @@ class MusicBrainzStore {
   statsError = $state<string | null>(null);
 
   private initialized = false;
+  private events = createEventScope(import.meta.hot);
 
   async init() {
     if (this.initialized) return;
@@ -49,7 +50,7 @@ class MusicBrainzStore {
     }
 
     try {
-      await listen<MusicBrainzAuthState>("musicbrainz-auth-changed", (event) => {
+      await this.events.listen<MusicBrainzAuthState>("musicbrainz-auth-changed", (event) => {
         const s = event.payload;
         this.isLoggedIn = s.is_logged_in;
         this.username = s.username;
@@ -69,7 +70,7 @@ class MusicBrainzStore {
     }
 
     try {
-      await listen<string>("musicbrainz-auth-error", (event) => {
+      await this.events.listen<string>("musicbrainz-auth-error", (event) => {
         this.authError = event.payload;
         this.isLoading = false;
         this.isAuthorizing = false;
@@ -156,6 +157,12 @@ class MusicBrainzStore {
     } finally {
       this.isLoading = false;
     }
+  }
+
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
+    this.initialized = false;
   }
 }
 

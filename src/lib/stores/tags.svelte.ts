@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { createEventScope } from "../utils/eventScope";
 import type { GenreGroup, QueuePopulationMode, Song, Tag, TagGroup, TagGroupChild } from "../types";
 export type { TagGroup, TagGroupChild };
 
@@ -13,6 +13,7 @@ export type { TagGroup, TagGroupChild };
  * store only refreshes afterward.
  */
 class TagsStore {
+  private events = createEventScope(import.meta.hot);
   allTags = $state<Tag[]>([]);
   genreGraph = $state<GenreGroup[]>([]);
   /** Songs with no genre value at all — excluded from allTags/genreGraph
@@ -45,7 +46,7 @@ class TagsStore {
   }
 
   async listenForArtistHierarchyChanges(): Promise<() => void> {
-    return listen("artist-tags-changed", () => {
+    return this.events.listen("artist-tags-changed", () => {
       this.loadArtistHierarchy();
       this.loadArtistTags();
     });
@@ -109,7 +110,7 @@ class TagsStore {
    * with backend reconciliation (new/vanished tag names) without the user
    * having to manually refresh. */
   async listenForHierarchyChanges(): Promise<() => void> {
-    return listen("tags-changed", () => {
+    return this.events.listen("tags-changed", () => {
       this.loadHierarchy();
     });
   }
@@ -208,6 +209,11 @@ class TagsStore {
    * click-through. */
   async getSongsByCuratedTag(tagName: string, limit?: number, mode?: QueuePopulationMode): Promise<Song[]> {
     return invoke<Song[]>("get_songs_by_curated_tag", { tagName, limit, mode });
+  }
+
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
   }
 }
 

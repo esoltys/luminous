@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { createEventScope } from "../utils/eventScope";
 
 /** Shared across Equalizer (settings UI) and SettingsSources (background-activity
  *  notice) so both reflect the same enabled/remaining state without each
@@ -9,6 +9,7 @@ class LoudnessStore {
   enabled = $state(false);
   analysisRemaining = $state(0);
   private initialized = false;
+  private events = createEventScope(import.meta.hot);
 
   async init() {
     if (this.initialized) return;
@@ -27,13 +28,19 @@ class LoudnessStore {
       console.error("Failed to load loudness analysis progress:", e);
     }
 
-    await listen<{ remaining: number }>("loudness-analysis-progress", (event) => {
+    await this.events.listen<{ remaining: number }>("loudness-analysis-progress", (event) => {
       this.analysisRemaining = event.payload.remaining;
     });
   }
 
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
+  }
+
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
+    this.initialized = false;
   }
 }
 
