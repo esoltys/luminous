@@ -150,17 +150,4 @@ mod tests {
         assert!(!has_default_app(Path::new("probe.zzqx")));
         assert!(!has_default_app(Path::new("no-extension")));
     }
-
-    /// What this machine has apps for, to eyeball: `cargo test -- --ignored --nocapture probe`.
-    #[cfg(windows)]
-    #[test]
-    #[ignore]
-    fn probe_default_apps() {
-        for ext in [
-            "txt", "md", "nfo", "lrc", "cue", "log", "pdf", "jpg", "png", "webp", "m3u", "xspf",
-            "zzqx",
-        ] {
-            println!("{ext}: {}", has_default_app(Path::new(&format!("x.{ext}"))));
-        }
-    }
 }
