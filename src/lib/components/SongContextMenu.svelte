@@ -31,14 +31,14 @@
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { navigationStore } from "../stores/navigation.svelte";
   import { VIEWPORT_EDGE_PADDING_PX, PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import { startSongRadio } from "../utils/playlist";
-  import type { FileNavigationTarget, Song, Playlist } from "../types";
+  import type { Song, Playlist } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import ShareModal from "./ShareModal.svelte";
+  import ViewInFilesItem from "./ViewInFilesItem.svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
 
@@ -184,19 +184,6 @@
 
   const picardSelection = $derived(selectedSongs && selectedSongs.length > 0 ? selectedSongs : [song]);
   const allSelectedRemote = $derived(picardSelection.every(isRemoteSource));
-
-  /** Where the song is in the Files view; null until known, and for a song
-   * that has no place there (a stream, a file outside every watched folder),
-   * which hides View in Files. */
-  let filesTarget = $state<FileNavigationTarget | null>(null);
-  $effect(() => {
-    if (selectedCount !== 1) return;
-    let stale = false;
-    invoke<FileNavigationTarget | null>("locate_song_in_files", { songId: song.id })
-      .then((target) => { if (!stale) filesTarget = target ?? null; })
-      .catch((err) => console.error("Failed to find the song in Files:", err));
-    return () => { stale = true; };
-  });
 
   let showShareModal = $state(false);
   // See AlbumContextMenu.svelte for why the menu must be hidden (not left
@@ -446,15 +433,7 @@
       />
     {/if}
 
-    {#if filesTarget}
-      {@const target = filesTarget}
-      <ContextMenuItem
-        icon={Folder}
-        label={i18n.t("files.viewInFiles")}
-        onmouseenter={closeSubmenuImmediately}
-        onclick={() => { navigationStore.openInFiles(target); onClose(); }}
-      />
-    {/if}
+    <ViewInFilesItem songId={song.id} onmouseenter={closeSubmenuImmediately} {onClose} />
 
     {#if song.artist}
       <ContextMenuItem

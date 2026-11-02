@@ -5,15 +5,12 @@
     MicrophoneStageIcon as Mic2,
     DiscIcon as DiscAlbum,
     PencilSimpleIcon as Edit3,
-    ArrowSquareOutIcon as OpenInPicard,
-    FolderIcon as Folder
+    ArrowSquareOutIcon as OpenInPicard
   } from "phosphor-svelte";
-  import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
-  import { navigationStore } from "../stores/navigation.svelte";
-  import type { FileNavigationTarget } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
+  import ViewInFilesItem from "./ViewInFilesItem.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
 
@@ -45,18 +42,6 @@
     allSelectedRemote?: boolean;
     onClose: () => void;
   } = $props();
-
-  /** Where the entry's song is in the Files view; null until known, and when
-   * it has no place there, which hides View in Files. */
-  let filesTarget = $state<FileNavigationTarget | null>(null);
-  $effect(() => {
-    if (selectedCount !== 1 || songId === undefined) return;
-    let stale = false;
-    invoke<FileNavigationTarget | null>("locate_song_in_files", { songId })
-      .then((target) => { if (!stale) filesTarget = target ?? null; })
-      .catch((err) => console.error("Failed to find the song in Files:", err));
-    return () => { stale = true; };
-  });
 </script>
 
 <ContextMenu {x} {y} {onClose}>
@@ -90,13 +75,8 @@
       />
     {/if}
 
-    {#if filesTarget}
-      {@const target = filesTarget}
-      <ContextMenuItem
-        icon={Folder}
-        label={i18n.t("files.viewInFiles")}
-        onclick={() => { navigationStore.openInFiles(target); onClose(); }}
-      />
+    {#if songId !== undefined}
+      <ViewInFilesItem {songId} {onClose} />
     {/if}
 
     {#if onEditTags}

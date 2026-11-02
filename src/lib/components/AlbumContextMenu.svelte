@@ -10,8 +10,7 @@
     PencilSimpleIcon as Edit3,
     ArrowSquareOutIcon as OpenInPicard,
     ChartBarIcon as BarChart2,
-    ShareNetworkIcon as Share,
-    FolderIcon as Folder
+    ShareNetworkIcon as Share
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -22,11 +21,12 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { openInPicard } from "../utils/picard";
   import { invoke } from "@tauri-apps/api/core";
-  import type { FileNavigationTarget, Song } from "../types";
+  import type { Song } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import ShareModal from "./ShareModal.svelte";
+  import ViewInFilesItem from "./ViewInFilesItem.svelte";
 
   let {
     x,
@@ -90,18 +90,6 @@
     }
   }
 
-  /** The album's folder in the Files view; null until known, and when it has
-   * no place there, which hides View in Files. */
-  let filesTarget = $state<FileNavigationTarget | null>(null);
-  $effect(() => {
-    if (!albumName) return;
-    let stale = false;
-    invoke<FileNavigationTarget | null>("locate_album_in_files", { album: albumName })
-      .then((target) => { if (!stale) filesTarget = target ?? null; })
-      .catch((err) => console.error("Failed to find the album in Files:", err));
-    return () => { stale = true; };
-  });
-
   async function handleToggleStatsExcluded() {
     await statsExclusionsStore.toggleWithToast("album", albumName);
   }
@@ -141,22 +129,12 @@
     />
   {/if}
 
-  {#if (onGoToArtist && artistName) || filesTarget}
-    <ContextMenuDivider />
-  {/if}
   {#if onGoToArtist && artistName}
+    <ContextMenuDivider />
     <ContextMenuItem
       icon={Mic2}
       label={i18n.t("playlists.contextMenuGoArtist")}
       onclick={() => { onGoToArtist?.(); onClose(); }}
-    />
-  {/if}
-  {#if filesTarget}
-    {@const target = filesTarget}
-    <ContextMenuItem
-      icon={Folder}
-      label={i18n.t("files.viewInFiles")}
-      onclick={() => { navigationStore.openInFiles(target); onClose(); }}
     />
   {/if}
 
@@ -188,6 +166,7 @@
       disabled={!picardStore.available}
       title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
     />
+    <ViewInFilesItem album={albumName} {onClose} />
     <ContextMenuItem
       icon={Share}
       label={i18n.t("shareModal.menuItem")}
