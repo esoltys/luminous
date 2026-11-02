@@ -2079,6 +2079,22 @@ export const frFR: DeepStringRecord<typeof en> = {
       one: "{count} morceau non organisé",
       other: "{count} morceaux non organisés"
     },
+    summaryWaitingOnCuration: {
+      one: "{count} morceau en attente de balises ou de révision",
+      other: "{count} morceaux en attente de balises ou de révision"
+    },
+    filterAll: "Tous ({count})",
+    filterReady: "Prêts à placer ({count})",
+    filterNeedsTags: "Balises requises ({count})",
+    filterDuplicates: "Doublons ({count})",
+    filterErrors: "Erreurs ({count})",
+    includeMissingTagsToggle: "Inclure les morceaux aux balises manquantes",
+    customizeSummaryBtn: "Personnaliser…",
+    collapseSummaryBtn: "Terminé",
+    activeTemplateLabel: "Modèle",
+    activeDestinationLabel: "Destination",
+    editTags: "Modifier les balises",
+    unknownTrack: "Titre inconnu",
     nothingToOrganize: "Rien à organiser !",
     autoOrganizeToggle: "Auto-organiser",
     autoOrganizeToggleTooltip: "Organisez automatiquement les fichiers en arrière-plan lors de l'arrivée de nouvelles pistes ou de la modification d'balises",

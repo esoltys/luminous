@@ -140,7 +140,7 @@ describe("organizeStore", () => {
   });
 
   describe("computeOrganizeConsequences", () => {
-    it("computes file and folder counts excluding unchanged, collisions, and errors", () => {
+    it("computes file and folder counts excluding unchanged, collisions, errors, and missing tags by default", () => {
       const items = [
         { from_path: "/music/a.mp3", to_path: "/music/artist/a.mp3", status: "ok" },
         { from_path: "/music/b.mp3", to_path: "/music/artist/b.mp3", status: "ok" },
@@ -155,15 +155,26 @@ describe("organizeStore", () => {
         { from_path: "/music/g.mp3", to_path: "/music/artist/g.mp3", status: "error" },
       ];
 
+      // Default: includeMissingTags is false, holding back c.mp3
       const res = computeOrganizeConsequences(items, {
         cleanEmptyDirs: true,
         moveExtraFiles: false,
       });
 
-      expect(res.fileCount).toBe(3);
-      expect(res.folderCount).toBe(2); // "/music/artist" and "/music/other"
+      expect(res.fileCount).toBe(2);
+      expect(res.folderCount).toBe(1); // "/music/artist"
       expect(res.cleanEmptyDirs).toBe(true);
       expect(res.moveExtraFiles).toBe(false);
+
+      // Opt-in: includeMissingTags is true, includes c.mp3
+      const resWithMissing = computeOrganizeConsequences(items, {
+        cleanEmptyDirs: true,
+        moveExtraFiles: false,
+        includeMissingTags: true,
+      });
+
+      expect(resWithMissing.fileCount).toBe(3);
+      expect(resWithMissing.folderCount).toBe(2); // "/music/artist" and "/music/other"
     });
 
     it("returns zero counts when items list is empty", () => {

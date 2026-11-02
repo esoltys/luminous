@@ -2071,6 +2071,22 @@ export const en = {
       one: "{count} unorganized song",
       other: "{count} unorganized songs"
     },
+    summaryWaitingOnCuration: {
+      one: "{count} song waiting on tags or review",
+      other: "{count} songs waiting on tags or review"
+    },
+    filterAll: "All ({count})",
+    filterReady: "Ready to Place ({count})",
+    filterNeedsTags: "Needs Tags ({count})",
+    filterDuplicates: "Duplicate Copies ({count})",
+    filterErrors: "Errors ({count})",
+    includeMissingTagsToggle: "Include songs with missing tags",
+    customizeSummaryBtn: "Customize…",
+    collapseSummaryBtn: "Done",
+    activeTemplateLabel: "Template",
+    activeDestinationLabel: "Destination",
+    editTags: "Edit Tags",
+    unknownTrack: "Unknown Title",
     nothingToOrganize: "Nothing to Organize!",
     autoOrganizeToggle: "Auto-organize",
     autoOrganizeToggleTooltip: "Organize files automatically in the background when new tracks arrive or tags are edited",

@@ -2071,6 +2071,22 @@ export const es = {
       one: "{count} canción sin organizar",
       other: "{count} canciones sin organizar"
     },
+    summaryWaitingOnCuration: {
+      one: "{count} canción esperando etiquetas o revisión",
+      other: "{count} canciones esperando etiquetas o revisión"
+    },
+    filterAll: "Todo ({count})",
+    filterReady: "Listo para ubicar ({count})",
+    filterNeedsTags: "Faltan etiquetas ({count})",
+    filterDuplicates: "Copias duplicadas ({count})",
+    filterErrors: "Errores ({count})",
+    includeMissingTagsToggle: "Incluir canciones con etiquetas faltantes",
+    customizeSummaryBtn: "Personalizar…",
+    collapseSummaryBtn: "Listo",
+    activeTemplateLabel: "Plantilla",
+    activeDestinationLabel: "Destino",
+    editTags: "Editar etiquetas",
+    unknownTrack: "Título desconocido",
     nothingToOrganize: "¡No hay nada que organizar!",
     autoOrganizeToggle: "Organizar automáticamente",
     autoOrganizeToggleTooltip: "Organiza los archivos en segundo plano cuando llegan pistas nuevas o se editan etiquetas",

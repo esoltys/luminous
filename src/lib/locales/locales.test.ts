@@ -78,6 +78,7 @@ function extractPlaceholders(str: string): string[] {
  * (e.g. loanwords, shared musical terminology, technical acronyms, brand names, or symbols).
  */
 const IDENTICAL_OK_FR = new Set([
+  "organizer.activeDestinationLabel", // "Destination"
   "organizer.chipAlbum", // Same word in this language
   "playerBar.albumHeading", // "Album"
   "organizer.chipGenre", // Same word in this language

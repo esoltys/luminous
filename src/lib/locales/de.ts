@@ -2071,6 +2071,22 @@ export const de = {
       one: "{count} nicht organisierte Titel",
       other: "{count} nicht organisierte Titel"
     },
+    summaryWaitingOnCuration: {
+      one: "{count} Titel wartet auf Tags oder Überprüfung",
+      other: "{count} Titel warten auf Tags oder Überprüfung"
+    },
+    filterAll: "Alle ({count})",
+    filterReady: "Bereit zum Verschieben ({count})",
+    filterNeedsTags: "Tags fehlen ({count})",
+    filterDuplicates: "Duplikate ({count})",
+    filterErrors: "Fehler ({count})",
+    includeMissingTagsToggle: "Titel mit fehlenden Tags einschließen",
+    customizeSummaryBtn: "Anpassen…",
+    collapseSummaryBtn: "Fertig",
+    activeTemplateLabel: "Vorlage",
+    activeDestinationLabel: "Ziel",
+    editTags: "Tags bearbeiten",
+    unknownTrack: "Unbekannter Titel",
     nothingToOrganize: "Nichts zu organisieren!",
     autoOrganizeToggle: "Automatisch organisieren",
     autoOrganizeToggleTooltip: "Dateien im Hintergrund automatisch organisieren, wenn neue Titel hinzukommen oder Tags bearbeitet werden",

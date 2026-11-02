@@ -5,8 +5,21 @@ import { invoke } from "@tauri-apps/api/core";
 import { organizeStore } from "../stores/organizer.svelte";
 import OrganizeFiles from "./OrganizeFiles.svelte";
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockImplementation((cmd: string) => {
+vi.mock("svelte-virtual-list-ts", async () => {
+  const mod = await import("./__mocks__/VirtualList.svelte");
+  return { VirtualList: mod.default };
+});
+
+vi.mock("../utils/motion", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../utils/motion")>();
+  return {
+    ...actual,
+    slide: (node: Element, params: any = {}) => actual.slide(node, { ...params, duration: 0 }),
+  };
+});
+
+const { defaultInvokeHandler } = vi.hoisted(() => {
+  const defaultInvokeHandler = (cmd: string) => {
     if (cmd === "get_organize_config") {
       return Promise.resolve({
         auto_organize: false,
@@ -28,6 +41,10 @@ vi.mock("@tauri-apps/api/core", () => ({
           to_path: "/music/Rock/a.mp3",
           status: "ok",
           error_message: null,
+          title: "Track A",
+          artist: "Artist A",
+          album: "Album A",
+          missing_fields: [],
         },
         {
           song_id: 2,
@@ -35,6 +52,10 @@ vi.mock("@tauri-apps/api/core", () => ({
           to_path: "/music/Rock/b.mp3",
           status: "ok",
           error_message: null,
+          title: "Track B",
+          artist: "Artist B",
+          album: "Album B",
+          missing_fields: [],
         },
       ]);
     }
@@ -49,12 +70,20 @@ vi.mock("@tauri-apps/api/core", () => ({
       return Promise.resolve(false);
     }
     return Promise.resolve(null);
-  }),
+  };
+  return { defaultInvokeHandler };
+});
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn().mockImplementation((cmd: string) => defaultInvokeHandler(cmd)),
 }));
 
 describe("OrganizeFiles safeguards", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    vi.mocked(invoke).mockImplementation((cmd: string) => defaultInvokeHandler(cmd));
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(600);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(600);
     await organizeStore.init();
   });
 
@@ -228,6 +257,203 @@ describe("OrganizeFiles safeguards", () => {
       expect(organizeStore.isDraftActive).toBe(false);
     });
     expect(queryByText("Revert")).not.toBeInTheDocument();
+  });
+
+  it("filters preview rows with interactive filter pills and hides zero-count pills", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "preview_organize") {
+        return Promise.resolve([
+          {
+            song_id: 1,
+            from_path: "/music/track1.mp3",
+            to_path: "/music/Rock/track1.mp3",
+            status: "ok",
+            error_message: null,
+            title: "Song Ready",
+            artist: "Artist Alpha",
+            album: "Album Alpha",
+            missing_fields: [],
+          },
+          {
+            song_id: 2,
+            from_path: "/music/track2.mp3",
+            to_path: "/music/Rock/track2.mp3",
+            status: "missing_tag",
+            error_message: "Missing title, artist",
+            title: null,
+            artist: null,
+            album: "Album Alpha",
+            missing_fields: ["title", "artist"],
+          },
+        ]);
+      }
+      return defaultInvokeHandler(cmd);
+    });
+
+    const { findByText, findAllByText, queryByText, findByRole } = render(OrganizeFiles, {
+      isOpen: true,
+      embedded: false,
+      songIds: [1, 2],
+    });
+
+    // Check filter pills
+    expect(await findByText("All (2)")).toBeInTheDocument();
+    expect(await findByText("Ready to Place (1)")).toBeInTheDocument();
+    expect(await findByText("Needs Tags (1)")).toBeInTheDocument();
+
+    // 0-count pills should not be rendered
+    expect(queryByText(/Duplicate Copies/)).not.toBeInTheDocument();
+    expect(queryByText(/Errors/)).not.toBeInTheDocument();
+
+    // Both songs displayed under "All"
+    expect(await findByText("Song Ready")).toBeInTheDocument();
+    expect(await findByText("track2")).toBeInTheDocument();
+    expect(await findByText("Missing Tag: Title, Artist")).toBeInTheDocument();
+
+    // Context menu includes Edit Tags
+    await fireEvent.contextMenu(await findByText("track2"));
+    const editTagsOptions = await findAllByText("Edit Tags");
+    expect(editTagsOptions.length).toBeGreaterThanOrEqual(1);
+
+    // Filter by "Needs Tags"
+    const needsTagsBtn = await findByRole("button", { name: "Needs Tags (1)" });
+    await fireEvent.click(needsTagsBtn);
+
+    await waitFor(() => {
+      expect(queryByText("Song Ready")).not.toBeInTheDocument();
+      expect(queryByText("track2")).toBeInTheDocument();
+    });
+
+    // Filter by "Ready to Place"
+    const readyBtn = await findByRole("button", { name: "Ready to Place (1)" });
+    await fireEvent.click(readyBtn);
+
+    await waitFor(() => {
+      expect(queryByText("Song Ready")).toBeInTheDocument();
+      expect(queryByText("track2")).not.toBeInTheDocument();
+    });
+  });
+
+  it("holds back untagged tracks by default and includes them when toggle is checked", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "preview_organize") {
+        return Promise.resolve([
+          {
+            song_id: 1,
+            from_path: "/music/track1.mp3",
+            to_path: "/music/Rock/track1.mp3",
+            status: "ok",
+            error_message: null,
+            title: "Song Ready",
+            artist: "Artist Alpha",
+            album: "Album Alpha",
+            missing_fields: [],
+          },
+          {
+            song_id: 2,
+            from_path: "/music/track2.mp3",
+            to_path: "/music/Unknown/track2.mp3",
+            status: "missing_tag",
+            error_message: "Missing title, artist",
+            title: null,
+            artist: null,
+            album: null,
+            missing_fields: ["title", "artist"],
+          },
+        ]);
+      }
+      if (cmd === "apply_organize") {
+        return Promise.resolve({ moved_count: 1, skipped_count: 0, errors: [] });
+      }
+      return defaultInvokeHandler(cmd);
+    });
+
+    const { findByText, findAllByText, findByLabelText } = render(OrganizeFiles, {
+      isOpen: true,
+      embedded: false,
+      songIds: [1, 2],
+    });
+
+    const organizeBtn = await findByText("Organize Music");
+    const buttonEl = organizeBtn.closest("button")!;
+    await waitFor(() => {
+      expect(buttonEl).not.toBeDisabled();
+    });
+    await fireEvent.click(buttonEl);
+
+    // Default: only 1 file is about to move (un-tagged track held back)
+    expect(
+      await findByText((content) =>
+        content.includes("You are about to move 1 file into 1 folder.")
+      )
+    ).toBeInTheDocument();
+
+    // Cancel dialog
+    const cancelBtns = await findAllByText("Cancel");
+    await fireEvent.click(cancelBtns[cancelBtns.length - 1]);
+
+    // Turn on the "Include songs with missing tags" toggle
+    const toggle = await findByLabelText("Include songs with missing tags");
+    await fireEvent.click(toggle);
+
+    // Click Organize Music again
+    await waitFor(() => {
+      expect(buttonEl).not.toBeDisabled();
+    });
+    await fireEvent.click(buttonEl);
+
+    // Now 2 files are included
+    expect(
+      await findByText((content) =>
+        content.includes("You are about to move 2 files")
+      )
+    ).toBeInTheDocument();
+
+    // Confirm dialog applies both items
+    const confirmBtns = await findAllByText("Organize Files");
+    const confirmBtn = confirmBtns.find((el) => el.tagName === "BUTTON")!;
+    await fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("apply_organize", {
+        items: [
+          { song_id: 1, from_path: "/music/track1.mp3", to_path: "/music/Rock/track1.mp3" },
+          { song_id: 2, from_path: "/music/track2.mp3", to_path: "/music/Unknown/track2.mp3" },
+        ],
+        cleanEmptyDirs: true,
+        moveExtraFiles: true,
+      });
+    });
+  });
+
+  it("collapses template and destination in embedded mode and expands on Customize", async () => {
+    const { findByText, findAllByText, queryByText, findByRole } = render(OrganizeFiles, {
+      embedded: true,
+      songIds: [],
+    });
+
+    // Summary bar displays active template and destination
+    expect(await findByText("Template:")).toBeInTheDocument();
+    expect(await findByText("Destination:")).toBeInTheDocument();
+
+    // Full template section is collapsed by default in embedded mode
+    expect(queryByText("Sample Output")).not.toBeInTheDocument();
+
+    // Click "Customize…" button
+    const customizeBtn = await findByRole("button", { name: "Customize…" });
+    await fireEvent.click(customizeBtn);
+
+    // Full section should now be visible
+    expect(await findByText("Sample Output")).toBeInTheDocument();
+    expect(await findByText("Done")).toBeInTheDocument();
+
+    // Click "Done" collapses it back
+    const doneBtn = await findByRole("button", { name: "Done" });
+    await fireEvent.click(doneBtn);
+
+    await waitFor(() => {
+      expect(queryByText("Sample Output")).not.toBeInTheDocument();
+    });
   });
 });
 
