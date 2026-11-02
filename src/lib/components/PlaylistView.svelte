@@ -931,6 +931,7 @@
     x={contextMenuState.x}
     y={contextMenuState.y}
     selectedCount={selectedUuids.size}
+    songId={singleItem.song?.id}
     onPlay={playSelected}
     onRemove={removeSelected}
     onGoToArtist={singleItem.song?.artist ? () => navigationStore.viewArtist(singleItem.song?.album_artist?.trim() || singleItem.song?.artist || "") : undefined}
