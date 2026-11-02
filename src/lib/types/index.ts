@@ -362,6 +362,9 @@ export type FileEntryStatus = "inLibrary" | "notScanned" | "albumArt" | "notAudi
 /** The tag a Subsonic folder's songs lack; such a folder's name is empty. Word it with `shownName`. */
 export type MissingTag = "artist" | "album";
 
+/** What a file is, by its type; the backend lists no file of any other type (#1885). */
+export type FileKind = "audio" | "image" | "lyrics" | "notes" | "pdf" | "cueSheet" | "log" | "playlist";
+
 export interface FileEntry {
   /** Its identity in a path; empty only for a `missingTag` folder. */
   name: string;
@@ -370,6 +373,8 @@ export interface FileEntry {
   modified: number | null;
   /** Upper-case extension or codec, e.g. "FLAC". */
   fileType: string | null;
+  /** Null for folders. Audio plays; every other kind opens in its default app. */
+  kind: FileKind | null;
   /** Null for ordinary folders and device files. */
   status: FileEntryStatus | null;
   songId: number | null;
@@ -392,6 +397,8 @@ export interface DirListing {
   location: string | null;
   entries: FileEntry[];
   fileCount: number;
+  /** Files left out because the Files view doesn't list their type. */
+  hiddenCount: number;
   /** Null when the source doesn't report sizes. */
   totalBytes: number | null;
   inLibraryCount: number;

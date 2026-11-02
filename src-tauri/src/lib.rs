@@ -51,6 +51,7 @@ pub mod ratings_sync;
 pub mod remote_scheduler;
 pub mod restart_manager;
 pub mod scrobbler;
+pub mod shell_open;
 pub mod stall_monitor;
 pub mod stats;
 pub mod stats_summary;
@@ -1652,6 +1653,7 @@ pub fn run() {
             commands::files::locate_song_in_files,
             commands::files::locate_album_in_files,
             commands::files::scan_source_folder,
+            commands::files::open_source_file,
             commands::devices::update_device_profile,
             commands::devices::eject_device,
             commands::devices::get_device_storage_usage,

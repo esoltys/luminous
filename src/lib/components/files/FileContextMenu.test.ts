@@ -18,6 +18,7 @@ function entry(name: string, over: Partial<FileEntry> = {}): FileEntry {
     size: 1000,
     modified: null,
     fileType: "FLAC",
+    kind: "audio",
     status: "notScanned",
     songId: null,
     missingTag: null,
@@ -133,8 +134,43 @@ describe("FileContextMenu.svelte", () => {
     openAndPlay.mockRestore();
   });
 
+  it("leads a sidecar's menu with Open, which opens it in its app", async () => {
+    vi.mocked(invoke).mockResolvedValue("opened");
+    open([entry("album.md", { status: "notAudio", kind: "notes", fileType: "MD" })]);
+
+    const items = screen.getAllByRole("menuitem");
+    expect(items[0]).toHaveTextContent("Open");
+    await fireEvent.click(items[0]);
+    expect(invoke).toHaveBeenCalledWith("open_source_file", { source: folderSource, path: ["Live", "album.md"] });
+  });
+
+  it("says why a sidecar was shown in its folder instead", async () => {
+    vi.mocked(invoke).mockResolvedValue("revealed");
+    const show = vi.spyOn(toastStore, "show");
+    open([entry("rip.cue", { status: "inLibrary", kind: "cueSheet", fileType: "CUE" })]);
+
+    await fireEvent.click(screen.getByText("Open"));
+    await waitFor(() =>
+      expect(show).toHaveBeenCalledWith("No app is set up to open .cue files, so it's shown in its folder instead.", "info")
+    );
+    show.mockRestore();
+  });
+
+  it("offers no Open for a song", () => {
+    open([entry("03 Bonus.flac")]);
+    expect(screen.queryByText("Open")).not.toBeInTheDocument();
+  });
+
+  it("offers no Open for several sidecars at once", () => {
+    open([
+      entry("album.md", { status: "notAudio", kind: "notes" }),
+      entry("cover.jpg", { status: "albumArt", kind: "image" }),
+    ]);
+    expect(screen.queryByText("Open")).not.toBeInTheDocument();
+  });
+
   it("doesn't open when there's nothing to offer (a sidecar on a server)", () => {
-    const { onClose } = open([entry("cover.jpg", { status: "albumArt", location: null })], {
+    const { onClose } = open([entry("cover.jpg", { status: "albumArt", kind: "image", location: null })], {
       source: { kind: "webdav", id: 2 },
       scannable: false,
     });

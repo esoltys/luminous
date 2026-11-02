@@ -102,6 +102,13 @@ export const fr: DeepStringRecord<typeof en> = {
       other: "{count} chemins copiés."
     },
     copyFailed: "Impossible de copier dans le presse-papiers.",
+    open: "Ouvrir",
+    noAppToOpen: "Aucune application n'est configurée pour ouvrir les fichiers {type} : le fichier est donc affiché dans son dossier.",
+    openFailed: "Impossible d'ouvrir ce fichier.",
+    hiddenFiles: {
+      one: "{count} autre fichier n'est pas affiché.",
+      other: "{count} autres fichiers ne sont pas affichés."
+    },
     queueFailed: "Impossible d'ajouter ce dossier à la file.",
     playlistFailed: "Impossible de créer une liste de lecture à partir de ce dossier.",
     skippedScan: {

@@ -2,25 +2,26 @@
   import { invoke } from "@tauri-apps/api/core";
   import { tick, type Snippet } from "svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
-  import { FolderIcon, FileIcon, MusicNoteIcon, ImageIcon, CaretRightIcon, ArrowClockwiseIcon } from "phosphor-svelte";
+  import { FolderIcon, CaretRightIcon, ArrowClockwiseIcon } from "phosphor-svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import { formatFileSize } from "../../utils/formatters";
   import type { DirListing, FileEntry, FileEntryStatus, FileMenuTarget, FileSource } from "../../types";
   import Button from "../Button.svelte";
   import { shownName } from "./shownName";
+  import { fileIcon } from "./fileIcon";
 
   /**
    * A column browser over one source (#1841): up to two columns of the
    * folders above the current one, then the current folder's folders and
    * files as a table. It reads listings itself; where it is (`path`) and
-   * what happens on navigate and play belong to the caller. Reused by the
-   * device Files tab (#839).
+   * what happens on navigate and activate belong to the caller. Reused by
+   * the device Files tab (#839).
    */
   let {
     source,
     path,
     onnavigate,
-    onplay,
+    onactivate,
     reloadToken = 0,
     listing = $bindable(null),
     selectedName = $bindable(null),
@@ -41,8 +42,8 @@
      * stays selected, with a halo that fades after a moment. */
     arrival?: string | null;
     onnavigate: (path: string[]) => void;
-    /** Enter or double-click on a file in the current folder. */
-    onplay: (entry: FileEntry) => void;
+    /** Enter or double-click on a file in the current folder: play it, open it... */
+    onactivate: (entry: FileEntry) => void;
     /** Bump to read every listing again (after a scan, say). */
     reloadToken?: number;
     /** Out: the current folder's listing once read. */
@@ -289,7 +290,7 @@
         break;
       case "Enter":
         if (entry?.isDir) openFolder(path, entry.name);
-        else if (entry) onplay(entry);
+        else if (entry) onactivate(entry);
         break;
       case "ArrowLeft":
         if (column > 0 && isShown(column - 1)) focusColumn(column - 1);
@@ -538,6 +539,7 @@
                 {@const muted = MUTED.includes(entry.status)}
                 {@const name = shownName(entry.name, entry.missingTag)}
                 {@const isArrival = entry.name === arrived && selected && selection.length === 1}
+                {@const Icon = fileIcon(entry)}
                 <div
                   class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'}"
                   class:arrival={isArrival}
@@ -546,20 +548,12 @@
                   aria-selected={selected}
                   tabindex="-1"
                   onclick={(e) => (entry.isDir ? openFolder(dir, entry.name) : clickFile(e, entry.name))}
-                  ondblclick={() => { if (!entry.isDir) onplay(entry); }}
+                  ondblclick={() => { if (!entry.isDir) onactivate(entry); }}
                   oncontextmenu={(e) => openMenu(e, entry)}
                   onkeydown={() => {}}
                 >
                   <span class="flex-1 min-w-0 flex items-center gap-2 {muted ? 'text-brand-text-secondary' : 'text-brand-text-primary'} {selected ? 'font-semibold' : ''}">
-                    {#if entry.isDir}
-                      <FolderIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
-                    {:else if entry.status === "albumArt"}
-                      <ImageIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
-                    {:else if entry.status === "inLibrary" || entry.status === "notScanned"}
-                      <MusicNoteIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
-                    {:else}
-                      <FileIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
-                    {/if}
+                    <Icon class="w-4 h-4 shrink-0 text-brand-text-secondary" data-kind={entry.kind ?? "folder"} />
                     <span class="truncate" title={name}>{name}</span>
                   </span>
                   <span class="w-12 shrink-0 text-[11px] text-brand-text-secondary hidden @lg:block">{entry.fileType ?? ""}</span>

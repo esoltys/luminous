@@ -96,6 +96,13 @@ export const de = {
       other: "{count} Pfade kopiert."
     },
     copyFailed: "Konnte nicht in die Zwischenablage kopiert werden.",
+    open: "Öffnen",
+    noAppToOpen: "Keine App ist zum Öffnen von {type}-Dateien eingerichtet, daher wird die Datei stattdessen in ihrem Ordner angezeigt.",
+    openFailed: "Diese Datei konnte nicht geöffnet werden.",
+    hiddenFiles: {
+      one: "{count} weitere Datei wird nicht angezeigt.",
+      other: "{count} weitere Dateien werden nicht angezeigt."
+    },
     queueFailed: "Dieser Ordner konnte nicht zur Warteschlange hinzugefügt werden.",
     playlistFailed: "Aus diesem Ordner konnte keine Wiedergabeliste erstellt werden.",
     skippedScan: {

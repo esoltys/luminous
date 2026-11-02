@@ -23,7 +23,7 @@
   import FileBrowser from "./FileBrowser.svelte";
   import FileContextMenu from "./FileContextMenu.svelte";
   import DeviceView from "../devices/DeviceView.svelte";
-  import { addFolderToDeviceSync, playFolder, reveal, revealLabel, scanFolder } from "./folderActions";
+  import { addFolderToDeviceSync, canOpen, openFile, playFolder, reveal, revealLabel, scanFolder } from "./folderActions";
 
   const location = $derived(navigationStore.filesLocation);
   const openDevice = $derived(
@@ -59,8 +59,13 @@
     navigationStore.filesLocation = { source: location.source, path };
   }
 
-  function playEntry(entry: FileEntry) {
+  /** Enter or double-click on a file: a sidecar opens in its app, a song plays its folder from it. */
+  function activate(entry: FileEntry) {
     if (!location) return;
+    if (canOpen(entry)) {
+      openFile(location.source, location.path, entry);
+      return;
+    }
     if (entry.songId === null) {
       toastStore.show(
         i18n.t(isLocal && entry.status === "notScanned" ? "files.notInLibraryScan" : "files.notInLibrary"),
@@ -100,7 +105,8 @@
       l.totalBytes === null
         ? i18n.plural("files.summaryFilesNoSize", l.fileCount)
         : i18n.plural("files.summaryFiles", l.fileCount, { size: formatFileSize(l.totalBytes) });
-    return `${files} ${i18n.plural("files.summaryInLibrary", l.inLibraryCount)}`;
+    const hidden = l.hiddenCount > 0 ? ` ${i18n.plural("files.hiddenFiles", l.hiddenCount)}` : "";
+    return `${files} ${i18n.plural("files.summaryInLibrary", l.inLibraryCount)}${hidden}`;
   }
 </script>
 
@@ -184,7 +190,7 @@
         source={location.source}
         path={location.path}
         onnavigate={navigate}
-        onplay={playEntry}
+        onactivate={activate}
         target={location.selectedName ?? null}
         bind:arrival={navigationStore.pendingFilesArrival}
         {reloadToken}

@@ -83,6 +83,44 @@ pub enum EntryStatus {
     NotFromLuminous,
 }
 
+/// What a file is, by its type. The Files view lists only these: anything
+/// else (programs, shortcuts, system files) is counted as not shown, so
+/// nothing listed can run when opened.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FileKind {
+    Audio,
+    Image,
+    Lyrics,
+    /// Plain text: bios, liner notes, `.nfo` release notes.
+    Notes,
+    Pdf,
+    CueSheet,
+    /// A rip or dynamic range log.
+    Log,
+    Playlist,
+}
+
+impl FileKind {
+    /// The kind of the file named `name`; `None` for a type the Files view
+    /// doesn't list.
+    pub fn of(name: &str) -> Option<FileKind> {
+        if is_audio_file(Path::new(name)) {
+            return Some(FileKind::Audio);
+        }
+        Some(match extension(name)?.as_str() {
+            "jpg" | "jpeg" | "png" | "webp" | "gif" | "bmp" => FileKind::Image,
+            "lrc" => FileKind::Lyrics,
+            "md" | "txt" | "nfo" => FileKind::Notes,
+            "pdf" => FileKind::Pdf,
+            "cue" => FileKind::CueSheet,
+            "log" => FileKind::Log,
+            "m3u" | "m3u8" | "pls" | "xspf" => FileKind::Playlist,
+            _ => return None,
+        })
+    }
+}
+
 /// The tag a Subsonic folder's songs lack: such a folder's name is empty,
 /// which the UI words ("Unknown Artist") rather than shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -105,6 +143,9 @@ pub struct FileEntry {
     pub modified: Option<i64>,
     /// Upper-case extension ("FLAC"), or the codec for Subsonic tracks.
     pub file_type: Option<String>,
+    /// `None` for folders; a file whose type isn't a [`FileKind`] is never
+    /// listed.
+    pub kind: Option<FileKind>,
     /// `None` for ordinary folders, and on a device for synced files that
     /// aren't library songs (playlist files, art, songs since removed).
     pub status: Option<EntryStatus>,
@@ -124,6 +165,7 @@ impl FileEntry {
             size: None,
             modified: None,
             file_type: None,
+            kind: None,
             status: None,
             song_id: None,
             missing_tag: None,
@@ -140,7 +182,10 @@ pub struct DirListing {
     /// `None` where there is no such thing (a Subsonic index).
     pub location: Option<String>,
     pub entries: Vec<FileEntry>,
+    /// Files listed; `entries` holds them and the folders.
     pub file_count: usize,
+    /// Files left out because the Files view doesn't list their type.
+    pub hidden_count: usize,
     /// Total bytes of the files, `None` when the source doesn't report sizes.
     pub total_bytes: Option<u64>,
     /// How many of the files are library songs.
@@ -321,6 +366,26 @@ pub fn local_folder(
         ))),
         _ => Ok(None),
     }
+}
+
+/// The local file at `path` (its folder's names, then its own) in a folder
+/// source, when the Files view opens it in another app: a listed kind other
+/// than audio, which plays instead. `None` for anything else, files on other
+/// sources included, so only a file inside a watched folder can be opened.
+pub fn openable_file(
+    conn: &Connection,
+    source: &FileSource,
+    path: &[String],
+) -> Result<Option<PathBuf>> {
+    let Some(name) = path.last() else {
+        return Ok(None);
+    };
+    let openable = FileKind::of(name).is_some_and(|k| k != FileKind::Audio);
+    // A name `clean_path` would drop leaves a folder, not this file.
+    if !openable || clean_path(path).len() != path.len() {
+        return Ok(None);
+    }
+    local_folder(conn, source, path)
 }
 
 /// Where a library song or album is in the Files view: the folder to open
@@ -512,12 +577,22 @@ fn place(conn: &Connection, watched: &[(i64, String)], song: &Song) -> Result<Op
 }
 
 /// `path` without the names that would leave the source or mean nothing, for
-/// sources that are real folder trees. Not for Subsonic, whose names are tags
-/// and may be empty or hold a `/` ("AC/DC").
+/// sources that are real folder trees: only plain names are kept, so a `..`,
+/// a separator or a drive (`C:`, which replaces a Windows path it is joined
+/// to) never is. Not for Subsonic, whose names are tags and may be empty or
+/// hold a `/` ("AC/DC").
 fn clean_path(path: &[String]) -> Vec<String> {
+    let is_plain_name = |p: &str| {
+        let mut parts = Path::new(p).components();
+        !p.contains(['/', '\\'])
+            && matches!(
+                (parts.next(), parts.next()),
+                (Some(std::path::Component::Normal(_)), None)
+            )
+    };
     path.iter()
         .map(|p| p.trim())
-        .filter(|p| !p.is_empty() && *p != "." && *p != ".." && !p.contains(['/', '\\']))
+        .filter(|p| is_plain_name(p))
         .map(str::to_string)
         .collect()
 }
@@ -571,22 +646,28 @@ fn escape_like(s: &str) -> String {
     s.replace('!', "!!").replace('%', "!%").replace('_', "!_")
 }
 
-const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif", "bmp"];
-
 fn extension(name: &str) -> Option<String> {
     Path::new(name)
         .extension()
         .map(|e| e.to_string_lossy().to_lowercase())
 }
 
-/// The status of a file that is not a library song, by its name alone.
-fn status_by_name(name: &str) -> EntryStatus {
-    if is_audio_file(Path::new(name)) {
-        EntryStatus::NotScanned
-    } else if extension(name).is_some_and(|e| IMAGE_EXTENSIONS.contains(&e.as_str())) {
-        EntryStatus::AlbumArt
+/// The kind of the file named `name`; a library song is audio whatever its
+/// name says.
+fn kind_of(name: &str, is_song: bool) -> Option<FileKind> {
+    if is_song {
+        Some(FileKind::Audio)
     } else {
-        EntryStatus::NotAudio
+        FileKind::of(name)
+    }
+}
+
+/// The status of a file of `kind` that is not a library song.
+fn status_by_kind(kind: Option<FileKind>) -> EntryStatus {
+    match kind {
+        Some(FileKind::Audio) => EntryStatus::NotScanned,
+        Some(FileKind::Image) => EntryStatus::AlbumArt,
+        _ => EntryStatus::NotAudio,
     }
 }
 
@@ -635,15 +716,17 @@ fn list_folder(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
             let location = dir.join(&e.name).to_string_lossy().into_owned();
             let key = library_paths::key(&location);
             let song = songs.get(&key);
+            let kind = kind_of(&e.name, song.is_some());
             let status = if in_reserved || song.is_some_and(|(_, not_included)| *not_included) {
                 EntryStatus::Excluded
             } else if song.is_some() || cue_sheets.contains(&key) {
                 EntryStatus::InLibrary
             } else {
-                status_by_name(&e.name)
+                status_by_kind(kind)
             };
             FileEntry {
                 file_type: file_type(&e.name),
+                kind,
                 status: Some(status),
                 song_id: song.map(|(id, _)| *id),
                 missing_tag: None,
@@ -726,6 +809,7 @@ fn list_device(db: &Database, storage: &dyn DeviceBackend, dir: &str) -> Result<
                 .map(|s| s.path.clone());
             let entry = FileEntry {
                 file_type: file_type(&e.name),
+                kind: kind_of(&e.name, library_path.is_some()),
                 status: synced.is_none().then_some(EntryStatus::NotFromLuminous),
                 song_id: None,
                 missing_tag: None,
@@ -766,8 +850,19 @@ fn finish(location: Option<String>, mut entries: Vec<FileEntry>) -> DirListing {
     listing(location, entries)
 }
 
-/// Totals the files of `entries`, keeping their order.
-fn listing(location: Option<String>, entries: Vec<FileEntry>) -> DirListing {
+/// Totals the files of `entries`, keeping their order. Every listing goes
+/// through here, which is what keeps files of no [`FileKind`] out of all of
+/// them. System clutter (`Thumbs.db`) isn't counted as hidden: nobody put
+/// it there.
+fn listing(location: Option<String>, mut entries: Vec<FileEntry>) -> DirListing {
+    let mut hidden_count = 0;
+    entries.retain(|e| {
+        let shown = e.is_dir || e.kind.is_some();
+        if !shown && !is_system_clutter(&e.name) {
+            hidden_count += 1;
+        }
+        shown
+    });
     let files = entries.iter().filter(|e| !e.is_dir);
     let total_bytes = files
         .clone()
@@ -776,6 +871,7 @@ fn listing(location: Option<String>, entries: Vec<FileEntry>) -> DirListing {
     DirListing {
         location,
         file_count: files.clone().count(),
+        hidden_count,
         total_bytes,
         in_library_count: files
             .filter(|e| e.status == Some(EntryStatus::InLibrary) && e.song_id.is_some())
@@ -894,6 +990,7 @@ fn list_subsonic(conn: &Connection, id: i64, path: &[String]) -> Result<DirListi
                     modified: None,
                     file_type: Some(format!("{:?}", s.filetype).to_uppercase())
                         .filter(|t| t != "UNKNOWN"),
+                    kind: Some(FileKind::Audio),
                     status: Some(EntryStatus::InLibrary),
                     song_id: Some(s.id),
                     missing_tag: None,
@@ -1011,13 +1108,15 @@ fn list_webdav(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
                 return Some(FileEntry::folder(name));
             }
             let song = songs.get(&item.href);
+            let kind = kind_of(&name, song.is_some());
             let status = match song {
                 Some((_, true)) => EntryStatus::Excluded,
                 Some(_) => EntryStatus::InLibrary,
-                None => status_by_name(&name),
+                None => status_by_kind(kind),
             };
             Some(FileEntry {
                 file_type: file_type(&name),
+                kind,
                 size: item.content_length,
                 modified: None,
                 status: Some(status),
@@ -1119,6 +1218,7 @@ mod tests {
         assert_eq!(status_of(&album, "cover.jpg"), Some(EntryStatus::AlbumArt));
         assert_eq!(status_of(&album, "rip.log"), Some(EntryStatus::NotAudio));
         assert_eq!(album.file_count, 4);
+        assert_eq!(album.hidden_count, 0);
         assert_eq!(album.total_bytes, Some(4));
         assert_eq!(album.in_library_count, 1);
         assert_eq!(
@@ -1136,6 +1236,79 @@ mod tests {
         assert_eq!(status_of(&reserved, "01.flac"), Some(EntryStatus::Excluded));
         assert!(reserved.excluded);
         assert!(!album.excluded);
+    }
+
+    #[test]
+    fn only_kinds_luminous_uses_are_listed() {
+        let f = fixture(
+            &[
+                "01.flac",
+                "lyrics.LRC",
+                "album.md",
+                "booklet.pdf",
+                "rip.cue",
+                "mix.m3u8",
+                "setup.exe",
+                "site.url",
+                "checksums.sfv",
+                "Thumbs.db",
+            ],
+            &["01.flac"],
+        );
+        let root = list(&f, &[]);
+        let kind = |name: &str| {
+            root.entries
+                .iter()
+                .find(|e| e.name == name)
+                .and_then(|e| e.kind)
+        };
+        assert_eq!(kind("01.flac"), Some(FileKind::Audio));
+        assert_eq!(kind("lyrics.LRC"), Some(FileKind::Lyrics));
+        assert_eq!(kind("album.md"), Some(FileKind::Notes));
+        assert_eq!(kind("booklet.pdf"), Some(FileKind::Pdf));
+        assert_eq!(kind("rip.cue"), Some(FileKind::CueSheet));
+        assert_eq!(kind("mix.m3u8"), Some(FileKind::Playlist));
+        let names: Vec<&str> = root.entries.iter().map(|e| e.name.as_str()).collect();
+        for gone in ["setup.exe", "site.url", "checksums.sfv", "Thumbs.db"] {
+            assert!(!names.contains(&gone), "{gone} is listed");
+        }
+        assert_eq!(root.file_count, 6);
+        assert_eq!(root.total_bytes, Some(6));
+        // Thumbs.db is clutter, not a file anyone put there.
+        assert_eq!(root.hidden_count, 3);
+    }
+
+    #[test]
+    fn a_path_never_leaves_its_source() {
+        let path =
+            |names: &[&str]| clean_path(&names.iter().map(|n| n.to_string()).collect::<Vec<_>>());
+        assert_eq!(path(&["A", "..", "B"]), vec!["A", "B"]);
+        assert_eq!(path(&["A/..", "B\\C", ".", ""]), Vec::<String>::new());
+        #[cfg(windows)]
+        assert_eq!(
+            path(&["C:", "Windows", "notepad.txt"]),
+            vec!["Windows", "notepad.txt"]
+        );
+    }
+
+    #[test]
+    fn only_listed_sidecars_in_a_watched_folder_open() {
+        let f = fixture(&["A/notes.txt", "A/01.flac", "A/setup.exe"], &[]);
+        let conn = f.db.pool.get().unwrap();
+        let open = |source: FileSource, names: &[&str]| {
+            let path: Vec<String> = names.iter().map(|n| n.to_string()).collect();
+            openable_file(&conn, &source, &path).unwrap()
+        };
+        let folder = FileSource::Folder { id: 1 };
+        assert_eq!(
+            open(folder.clone(), &["A", "notes.txt"]),
+            Some(f.root.join("A").join("notes.txt"))
+        );
+        assert_eq!(open(folder.clone(), &["A", "01.flac"]), None);
+        assert_eq!(open(folder.clone(), &["A", "setup.exe"]), None);
+        assert_eq!(open(folder.clone(), &["A", "..", "notes.txt"]), None);
+        assert_eq!(open(folder, &[]), None);
+        assert_eq!(open(FileSource::Webdav { id: 1 }, &["notes.txt"]), None);
     }
 
     #[test]

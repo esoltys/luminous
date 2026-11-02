@@ -96,6 +96,13 @@ export const it = {
       other: "{count} percorsi copiati."
     },
     copyFailed: "Impossibile copiare negli appunti.",
+    open: "Apri",
+    noAppToOpen: "Nessuna app è configurata per aprire i file {type}, quindi viene mostrato nella sua cartella.",
+    openFailed: "Impossibile aprire questo file.",
+    hiddenFiles: {
+      one: "{count} altro file non è mostrato.",
+      other: "Altri {count} file non sono mostrati."
+    },
     queueFailed: "Impossibile aggiungere questa cartella alla coda.",
     playlistFailed: "Impossibile creare una playlist da questa cartella.",
     skippedScan: {

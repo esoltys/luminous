@@ -8,6 +8,7 @@
     DeviceMobileSpeakerIcon,
     FolderOpenIcon,
     CopyIcon,
+    ArrowSquareOutIcon,
   } from "phosphor-svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { filesStore } from "../../stores/files.svelte";
@@ -22,13 +23,14 @@
   import ContextMenuDivider from "../ContextMenuDivider.svelte";
   import SongContextMenu from "../SongContextMenu.svelte";
   import { shownName } from "./shownName";
-  import { addFolderToDeviceSync, copyPaths, playFolder, playlistFromFolder, queueFolder, reveal, revealLabel, scanFolder } from "./folderActions";
+  import { addFolderToDeviceSync, canOpen, copyPaths, openFile, playFolder, playlistFromFolder, queueFolder, reveal, revealLabel, scanFolder } from "./folderActions";
 
   /**
    * The right-click menu for rows of the Files view (#1884), one menu per
    * kind of row: a folder gets folder actions; library songs get the song
    * menu, acting on the library songs and saying how many other files it
-   * left out; other files get what can be done without the library. File
+   * left out; other files get what can be done without the library, led by
+   * Open for a sidecar (#1885), which is what Enter does on its row. File
    * actions (Show in File Explorer, Copy path) close every menu, where the
    * files have a local path. A folder in a folder column is there to move
    * around with, so its menu has the file actions only. A menu with nothing
@@ -96,6 +98,7 @@
 
   const dirName = $derived(dir ? shownName(dir.name, dir.missingTag) : "");
   const dirPath = $derived(dir ? [...path, dir.name] : path);
+  const canOpenSingle = $derived(single !== null && single.songId === null && canOpen(single));
   const canPlayOutside = $derived(songIds.length === 0 && unscannedLocations.length > 0);
   const canScanFiles = $derived(songIds.length === 0 && scannable && unscanned.length > 0);
   const canScanDir = $derived(isLocal && dir !== null && dir.status !== "excluded");
@@ -186,6 +189,10 @@
 {:else if !isEmpty}
   <ContextMenu {x} {y} {onClose}>
     {@render header(single ? shownName(single.name, single.missingTag) : i18n.t("playlists.selectedCount", { count: entries.length }))}
+    {#if canOpenSingle}
+      <ContextMenuItem icon={ArrowSquareOutIcon} isDefault label={i18n.t("files.open")} onclick={() => runAndClose(() => openFile(source, path, single!))} />
+      <ContextMenuDivider />
+    {/if}
     {#if canPlayOutside}
       <ContextMenuItem
         icon={PlayIcon}
