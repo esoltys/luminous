@@ -374,6 +374,8 @@ export interface FileEntry {
   status: FileEntryStatus | null;
   songId: number | null;
   missingTag: MissingTag | null;
+  /** Where it is on this computer; null on servers and devices. */
+  location: string | null;
 }
 
 /** One folder of a source (`list_source_dir`): folders first, then files. */

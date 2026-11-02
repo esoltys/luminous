@@ -86,6 +86,34 @@ export const de = {
     addedToSync: "{folder} wird jetzt mit {device} synchronisiert.",
     addToSyncFailed: "Dieser Ordner konnte nicht zur Synchronisierung mit {device} hinzugefügt werden.",
     scanFailed: "Dieser Ordner konnte nicht durchsucht werden.",
+    playWithoutAdding: "Abspielen, ohne hinzuzufügen",
+    newPlaylistFromFolder: "Neue Wiedergabeliste aus Ordner",
+    addToNamedDeviceSync: "Zur Synchronisierung von {device} hinzufügen",
+    copyPath: "Pfad kopieren",
+    copyPaths: "Pfade kopieren",
+    pathsCopied: {
+      one: "{count} Pfad kopiert.",
+      other: "{count} Pfade kopiert."
+    },
+    copyFailed: "Konnte nicht in die Zwischenablage kopiert werden.",
+    queueFailed: "Dieser Ordner konnte nicht zur Warteschlange hinzugefügt werden.",
+    playlistFailed: "Aus diesem Ordner konnte keine Wiedergabeliste erstellt werden.",
+    skippedScan: {
+      one: "{count} Datei ist noch nicht in deiner Mediathek: Durchsuche diesen Ordner, um sie aufzunehmen.",
+      other: "{count} Dateien sind noch nicht in deiner Mediathek: Durchsuche diesen Ordner, um sie aufzunehmen."
+    },
+    skipped: {
+      one: "{count} Datei ist nicht in deiner Mediathek und wurde ausgelassen.",
+      other: "{count} Dateien sind nicht in deiner Mediathek und wurden ausgelassen."
+    },
+    selectedFiles: {
+      one: "{selected} von {count} Datei ausgewählt, {size}.",
+      other: "{selected} von {count} Dateien ausgewählt, {size}."
+    },
+    selectedFilesNoSize: {
+      one: "{selected} von {count} Datei ausgewählt.",
+      other: "{selected} von {count} Dateien ausgewählt."
+    },
     viewInFiles: "In Dateien anzeigen",
     movedShowingNearest: "Nicht mehr dort, wo Luminous es zuletzt gesehen hat. Der nächste noch vorhandene Ordner wird angezeigt."
   },

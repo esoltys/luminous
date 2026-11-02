@@ -94,6 +94,44 @@ export const uk = {
     addedToSync: "Папку «{folder}» додано до синхронізації з «{device}».",
     addToSyncFailed: "Не вдалося додати цю папку до синхронізації з «{device}».",
     scanFailed: "Не вдалося відсканувати цю папку.",
+    playWithoutAdding: "Відтворити без додавання",
+    newPlaylistFromFolder: "Новий список відтворення з папки",
+    addToNamedDeviceSync: "Додати до синхронізації {device}",
+    copyPath: "Копіювати шлях",
+    copyPaths: "Копіювати шляхи",
+    pathsCopied: {
+      one: "Скопійовано {count} шлях.",
+      few: "Скопійовано {count} шляхи.",
+      many: "Скопійовано {count} шляхів.",
+      other: "Скопійовано {count} шляху."
+    },
+    copyFailed: "Не вдалося скопіювати до буфера обміну.",
+    queueFailed: "Не вдалося додати цю папку до черги.",
+    playlistFailed: "Не вдалося створити список відтворення з цієї папки.",
+    skippedScan: {
+      one: "{count} файл ще не у вашій бібліотеці: відскануйте цю папку, щоб додати його.",
+      few: "{count} файли ще не у вашій бібліотеці: відскануйте цю папку, щоб додати їх.",
+      many: "{count} файлів ще не у вашій бібліотеці: відскануйте цю папку, щоб додати їх.",
+      other: "{count} файлу ще не у вашій бібліотеці: відскануйте цю папку, щоб додати їх."
+    },
+    skipped: {
+      one: "{count} файл не у вашій бібліотеці, тому його пропущено.",
+      few: "{count} файли не у вашій бібліотеці, тому їх пропущено.",
+      many: "{count} файлів не у вашій бібліотеці, тому їх пропущено.",
+      other: "{count} файлу не у вашій бібліотеці, тому їх пропущено."
+    },
+    selectedFiles: {
+      one: "Вибрано {selected} з {count} файлу, {size}.",
+      few: "Вибрано {selected} з {count} файлів, {size}.",
+      many: "Вибрано {selected} з {count} файлів, {size}.",
+      other: "Вибрано {selected} з {count} файлу, {size}."
+    },
+    selectedFilesNoSize: {
+      one: "Вибрано {selected} з {count} файлу.",
+      few: "Вибрано {selected} з {count} файлів.",
+      many: "Вибрано {selected} з {count} файлів.",
+      other: "Вибрано {selected} з {count} файлу."
+    },
     viewInFiles: "Показати у файлах",
     movedShowingNearest: "Його вже немає там, де Luminous бачив його востаннє. Показано найближчу наявну папку."
   },

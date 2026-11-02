@@ -92,6 +92,34 @@ export const frFR: DeepStringRecord<typeof en> = {
     addedToSync: "{folder} a été ajouté à la synchronisation de {device}.",
     addToSyncFailed: "Impossible d'ajouter ce dossier à la synchronisation de {device}.",
     scanFailed: "Impossible d'analyser ce dossier.",
+    playWithoutAdding: "Lire sans ajouter",
+    newPlaylistFromFolder: "Nouvelle liste de lecture à partir du dossier",
+    addToNamedDeviceSync: "Ajouter à la synchronisation de {device}",
+    copyPath: "Copier le chemin",
+    copyPaths: "Copier les chemins",
+    pathsCopied: {
+      one: "{count} chemin copié.",
+      other: "{count} chemins copiés."
+    },
+    copyFailed: "Impossible de copier dans le presse-papiers.",
+    queueFailed: "Impossible d'ajouter ce dossier à la file.",
+    playlistFailed: "Impossible de créer une liste de lecture à partir de ce dossier.",
+    skippedScan: {
+      one: "{count} fichier n'est pas encore dans votre bibliothèque : analysez ce dossier pour l'inclure.",
+      other: "{count} fichiers ne sont pas encore dans votre bibliothèque : analysez ce dossier pour les inclure."
+    },
+    skipped: {
+      one: "{count} fichier n'est pas dans votre bibliothèque, il a été laissé de côté.",
+      other: "{count} fichiers ne sont pas dans votre bibliothèque, ils ont été laissés de côté."
+    },
+    selectedFiles: {
+      one: "{selected} sur {count} fichier sélectionné, {size}.",
+      other: "{selected} sur {count} fichiers sélectionnés, {size}."
+    },
+    selectedFilesNoSize: {
+      one: "{selected} sur {count} fichier sélectionné.",
+      other: "{selected} sur {count} fichiers sélectionnés."
+    },
     viewInFiles: "Afficher dans Fichiers",
     movedShowingNearest: "Il n'est plus là où Luminous l'a vu la dernière fois. Voici le dossier le plus proche qui existe encore."
   },
