@@ -39,7 +39,11 @@ tauri-plugin-fs = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
-tauri-plugin-updater = "2"
+# Without the default `zip` feature: our updater artifacts are bare signed
+# installers (`createUpdaterArtifacts: true`, no macOS build), so the
+# zip/tar.gz extraction it gates never runs, and zip 4.x carries advisories
+# with no fix on the 4.x line.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls", "system-proxy"] }
 tauri-plugin-process = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-autostart = "2"
