@@ -1,7 +1,9 @@
 import { collectionStore } from "./collection.svelte";
 import { playlistsStore } from "./playlists.svelte";
+import { toastStore } from "./toast.svelte";
+import { i18n } from "./i18n.svelte";
 import { sameAlbum } from "$lib/utils/albumKey";
-import type { FileSource } from "../types";
+import type { FileNavigationTarget, FileSource } from "../types";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "files" | "settings" | "lyrics" | "stats" | "organize" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
@@ -46,6 +48,9 @@ export interface AutoPlaylistRef {
 interface FilesLocation {
   source: FileSource;
   path: string[];
+  /** The entry selected on arriving at `path`, by listed name (View in Files,
+   * #1883). Dropped by any move to another folder; later clicks don't update it. */
+  selectedName?: string;
   /** On a device: its Files or Sync tab (#839). Files when absent. */
   deviceTab?: DeviceTab;
 }
@@ -205,6 +210,20 @@ class NavigationStore {
   viewFiles(source?: FileSource, path: string[] = []) {
     this.activeTab = "files";
     this.filesLocation = source ? { source, path } : null;
+  }
+
+  /**
+   * Opens the Files view at a song's or album's place (from `locate_song_in_files`
+   * / `locate_album_in_files`), with its file selected and marked as just arrived
+   * at. When the target moved and this is only the nearest folder still there,
+   * says so in a toast.
+   */
+  openInFiles(target: FileNavigationTarget) {
+    const { source, path, selectedName, exact } = target;
+    this.activeTab = "files";
+    this.filesLocation = selectedName ? { source, path, selectedName } : { source, path };
+    this.pendingFilesArrival = selectedName;
+    if (!exact) toastStore.show(i18n.t("files.movedShowingNearest"), "info");
   }
 
   /** Opens a device's view at `tab`, keeping the storage and folder it was last at. */
@@ -471,6 +490,12 @@ class NavigationStore {
    * `selectedAlbumName`'s tracks. Set by `viewAlbum`; consumed and cleared by
    * the view whether or not the song is on that album. */
   pendingFocusSongId = $state<number | null>(null);
+
+  /** One-shot signal (not persisted, not part of Back/Forward history) naming
+   * the Files entry `openInFiles` just arrived at, so the browser can mark it.
+   * Consumed and cleared by FileBrowser; history and restart re-select the
+   * entry through `filesLocation.selectedName` without marking it again. */
+  pendingFilesArrival = $state<string | null>(null);
 }
 
 export const navigationStore = new NavigationStore();

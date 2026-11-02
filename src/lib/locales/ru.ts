@@ -93,7 +93,9 @@ export const ru = {
     alreadySyncing: "Папка «{folder}» уже синхронизируется с «{device}».",
     addedToSync: "Папка «{folder}» добавлена в синхронизацию с «{device}».",
     addToSyncFailed: "Не удалось добавить эту папку в синхронизацию с «{device}».",
-    scanFailed: "Не удалось отсканировать эту папку."
+    scanFailed: "Не удалось отсканировать эту папку.",
+    viewInFiles: "Показать в файлах",
+    movedShowingNearest: "Его больше нет там, где Luminous видел его в последний раз. Показана ближайшая существующая папка."
   },
   devices: {
     tabFiles: "Файлы",

@@ -25,12 +25,20 @@
     listing = $bindable(null),
     selectedName = $bindable(null),
     selection = $bindable([]),
+    target = null,
+    arrival = $bindable(null),
     unreachableLabel,
     footer,
   }: {
     source: FileSource;
     /** The current folder, as names from the source's root. */
     path: string[];
+    /** The entry to select, and scroll to, on arriving at `path` (or when it
+     * changes while there); none clears the selection when the folder changes. */
+    target?: string | null;
+    /** In and cleared: an entry just arrived at (View in Files). Outlined while it
+     * stays selected, with a halo that fades after a moment. */
+    arrival?: string | null;
     onnavigate: (path: string[]) => void;
     /** Enter or double-click on a file in the current folder. */
     onplay: (entry: FileEntry) => void;
@@ -276,20 +284,69 @@
     if (handled) event.preventDefault();
   }
 
-  // Coming back up a level selects the folder just left.
+  // Arriving somewhere selects `target`; without one, coming back up a level
+  // selects the folder just left and any other move selects nothing. A new
+  // `target` in the same folder is an arrival too.
   let previousPath: string[] = [];
+  let previousTarget: string | null = null;
   $effect(() => {
     const now = path;
-    if (now.length < previousPath.length && keyOf(previousPath.slice(0, now.length)) === keyOf(now)) {
+    const wanted = target;
+    const moved = keyOf(now) !== keyOf(previousPath);
+    if (wanted !== null && (moved || wanted !== previousTarget)) {
+      select(wanted);
+      scrollPending = wanted;
+    } else if (now.length < previousPath.length && keyOf(previousPath.slice(0, now.length)) === keyOf(now)) {
       select(previousPath[now.length]);
-    } else if (keyOf(now) !== keyOf(previousPath)) {
+    } else if (moved) {
       select(null);
     }
     previousPath = now;
+    previousTarget = wanted;
   });
+
+  /** An entry to bring into view once the current folder's listing is read. */
+  let scrollPending = $state<string | null>(null);
+  $effect(() => {
+    const name = scrollPending;
+    if (name === null || current?.state !== "ready") return;
+    scrollPending = null;
+    const index = currentEntries.findIndex((e) => e.name === name);
+    if (index >= 0) centreRow(index);
+  });
+
+  /** Scrolls the current folder's table so row `index` sits mid-view. Unlike
+   * `scrollIntoView`, this doesn't rely on the rows drawn so far, which are
+   * none yet on arrival. */
+  async function centreRow(index: number) {
+    await tick();
+    const column = levels.length - 1;
+    const list = lists[column];
+    const el = columnEls[column];
+    if (!list || !el) return;
+    const rowsShown = Math.floor(el.clientHeight / ROW_HEIGHT_PX);
+    list.scrollToIndex(Math.max(0, index - Math.floor(rowsShown / 2)), { behavior: "auto" });
+  }
+
+  const HALO_MS = 1200;
+  /** The entry `arrival` last named, outlined while it is the only selection. */
+  let arrived = $state<string | null>(null);
+  let haloShown = $state(false);
+  let haloTimer: ReturnType<typeof setTimeout> | undefined;
+
+  $effect(() => {
+    if (arrival === null) return;
+    arrived = arrival;
+    arrival = null;
+    haloShown = true;
+    clearTimeout(haloTimer);
+    haloTimer = setTimeout(() => (haloShown = false), HALO_MS);
+  });
+  $effect(() => () => clearTimeout(haloTimer));
 
   /** Makes `name` the only selected entry. */
   function select(name: string | null) {
+    if (name !== arrived) arrived = null;
     selectedName = name;
     selection = name === null ? [] : [name];
   }
@@ -307,6 +364,7 @@
     if (event.ctrlKey || event.metaKey) {
       selection = selection.includes(name) ? selection.filter((n) => n !== name) : [...selection, name];
       selectedName = name;
+      arrived = null;
       return;
     }
     select(name);
@@ -410,8 +468,11 @@
                 {@const selected = selection.includes(entry.name)}
                 {@const muted = MUTED.includes(entry.status)}
                 {@const name = shownName(entry.name, entry.missingTag)}
+                {@const isArrival = entry.name === arrived && selected && selection.length === 1}
                 <div
                   class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'}"
+                  class:arrival={isArrival}
+                  class:arrival-halo={isArrival && haloShown}
                   role="option"
                   aria-selected={selected}
                   tabindex="-1"
@@ -446,3 +507,24 @@
     {/if}
   {/each}
 </div>
+
+<style>
+  /* View in Files (#1883): the entry arrived at is outlined while it stays the
+     only selection. Its halo shows at once and fades on removal (the transition
+     lives on the resting state, so only the exit animates). Reduced motion keeps
+     just the outline. The halo is inset: the list clips anything outside a row. */
+  .arrival {
+    outline: 2px solid var(--color-brand-accent);
+    outline-offset: -2px;
+    transition: background-color 150ms ease, box-shadow 300ms ease-out;
+  }
+  .arrival-halo {
+    box-shadow: inset 0 0 0 5px color-mix(in srgb, var(--color-brand-accent) 30%, transparent);
+    transition: background-color 150ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .arrival-halo {
+      box-shadow: none;
+    }
+  }
+</style>

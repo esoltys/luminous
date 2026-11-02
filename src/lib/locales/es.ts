@@ -85,7 +85,9 @@ export const es = {
     alreadySyncing: "{folder} ya está en la sincronización de {device}.",
     addedToSync: "Se agregó {folder} a la sincronización de {device}.",
     addToSyncFailed: "No se pudo agregar esta carpeta a la sincronización de {device}.",
-    scanFailed: "No se pudo analizar esta carpeta."
+    scanFailed: "No se pudo analizar esta carpeta.",
+    viewInFiles: "Ver en Archivos",
+    movedShowingNearest: "Ya no está donde Luminous lo vio por última vez. Se muestra la carpeta más cercana que aún existe."
   },
   devices: {
     tabFiles: "Archivos",
