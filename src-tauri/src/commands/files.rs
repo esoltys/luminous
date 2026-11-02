@@ -2,7 +2,7 @@
 //! laid out. See `crate::files` for what a listing holds.
 
 use crate::collection::{CollectionScanner, ScanTrigger};
-use crate::files::{self, DirListing, FileSource, SourceSummary};
+use crate::files::{self, DirListing, FileNavigationTarget, FileSource, SourceSummary};
 use crate::models::Song;
 use crate::AppState;
 use tauri::{AppHandle, State};
@@ -56,6 +56,33 @@ pub async fn get_source_songs(
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+/// Where a library song is in the Files view, for View in Files; `None` when
+/// it has no place there (a stream, a file outside every watched folder).
+#[tauri::command]
+pub async fn locate_song_in_files(
+    song_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Option<FileNavigationTarget>, String> {
+    let db = state.db.clone();
+    tokio::task::spawn_blocking(move || files::locate_song(&db, song_id))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+/// The folder an album is in, in the source holding most of its songs.
+#[tauri::command]
+pub async fn locate_album_in_files(
+    album: String,
+    state: State<'_, AppState>,
+) -> Result<Option<FileNavigationTarget>, String> {
+    let db = state.db.clone();
+    tokio::task::spawn_blocking(move || files::locate_album(&db, &album))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
 }
 
 /// Looks for new and changed files in one folder of a folder source; the
