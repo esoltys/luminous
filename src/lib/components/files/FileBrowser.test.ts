@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import FileBrowser from "./FileBrowser.svelte";
@@ -115,6 +115,99 @@ describe("FileBrowser.svelte", () => {
 
     await fireEvent.click(getByRole("option", { name: /02 Encore/ }));
     expect(selected()).toEqual(["02 Encore.flac"]);
+  });
+
+  describe("arriving at a file (View in Files)", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const option = (getByRole: (role: string, opts: object) => HTMLElement, name: string) =>
+      getByRole("option", { name: new RegExp(name) });
+
+    it("selects the target, outlines it, and fades the halo after a moment", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { getByRole, findByText } = render(FileBrowser, {
+        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", arrival: "02 Encore.flac", onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "" },
+      });
+      await findByText("02 Encore.flac");
+      const encore = option(getByRole, "02 Encore");
+
+      expect(encore).toHaveAttribute("aria-selected", "true");
+      expect(encore).toHaveClass("arrival", "arrival-halo");
+
+      await vi.advanceTimersByTimeAsync(1200);
+      expect(encore).toHaveClass("arrival");
+      expect(encore).not.toHaveClass("arrival-halo");
+
+      await fireEvent.click(option(getByRole, "01 Opening"));
+      expect(encore).not.toHaveClass("arrival");
+    });
+
+    it("starts the halo when the row appears, not before, on a slow source", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      let release = () => {};
+      vi.mocked(invoke).mockImplementation(
+        (_cmd: string, args?: any) =>
+          new Promise((resolve) => {
+            const reply = () => resolve(listing(tree[args.path.join("/")]));
+            if (args.path.length === 2) release = reply;
+            else reply();
+          })
+      );
+      const { getByRole, findByText } = render(FileBrowser, {
+        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", arrival: "02 Encore.flac", onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "" },
+      });
+
+      await vi.advanceTimersByTimeAsync(2000);
+      release();
+      await findByText("02 Encore.flac");
+      await waitFor(() => expect(option(getByRole, "02 Encore")).toHaveClass("arrival-halo"));
+
+      await vi.advanceTimersByTimeAsync(1200);
+      expect(option(getByRole, "02 Encore")).not.toHaveClass("arrival-halo");
+    });
+
+    it("arrives again at the file already targeted after another row was clicked", async () => {
+      const { getByRole, findByText, rerender } = render(FileBrowser, {
+        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", arrival: "02 Encore.flac", onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "" },
+      });
+      await findByText("02 Encore.flac");
+      await fireEvent.click(option(getByRole, "01 Opening"));
+      expect(option(getByRole, "02 Encore")).not.toHaveClass("arrival");
+
+      await rerender({ arrival: "02 Encore.flac" });
+      await waitFor(() => expect(option(getByRole, "02 Encore")).toHaveClass("arrival", "arrival-halo"));
+      expect(option(getByRole, "02 Encore")).toHaveAttribute("aria-selected", "true");
+      expect(option(getByRole, "01 Opening")).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("selects the target without marking it when it isn't an arrival (Back, restart)", async () => {
+      const { getByRole, findByText } = render(FileBrowser, {
+        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "" },
+      });
+      await findByText("02 Encore.flac");
+      const encore = option(getByRole, "02 Encore");
+      expect(encore).toHaveAttribute("aria-selected", "true");
+      expect(encore).not.toHaveClass("arrival");
+    });
+
+    it("selects a new target in the folder already shown, and the usual entry after moving on", async () => {
+      const { getByRole, findByText, rerender } = render(FileBrowser, {
+        props: { source, path: ["Rock", "Live"], target: "01 Opening.flac", onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "" },
+      });
+      await findByText("01 Opening.flac");
+      expect(option(getByRole, "01 Opening")).toHaveAttribute("aria-selected", "true");
+
+      await rerender({ target: "02 Encore.flac" });
+      expect(option(getByRole, "02 Encore")).toHaveAttribute("aria-selected", "true");
+      expect(option(getByRole, "01 Opening")).toHaveAttribute("aria-selected", "false");
+
+      await rerender({ path: ["Rock"], target: null });
+      await findByText("Studio");
+      const selected = [...getByRole("listbox", { name: "Rock" }).querySelectorAll("[aria-selected=true]")];
+      expect(selected.map((o) => o.textContent?.trim())).toEqual(["Live"]);
+    });
   });
 
   it("says when the source is gone", async () => {

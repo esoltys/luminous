@@ -10,6 +10,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import ContextMenu from "./ContextMenu.svelte";
+  import ViewInFilesItem from "./ViewInFilesItem.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
 
@@ -17,6 +18,7 @@
     x,
     y,
     selectedCount,
+    songId,
     onPlay,
     onRemove,
     onGoToArtist,
@@ -29,6 +31,8 @@
     x: number;
     y: number;
     selectedCount: number;
+    /** The library song of the entry right-clicked, when it has one. */
+    songId?: number;
     onPlay: () => void;
     onRemove: () => void;
     onGoToArtist?: () => void;
@@ -69,6 +73,10 @@
         label={i18n.t("playlists.contextMenuGoAlbum")}
         onclick={() => { onGoToAlbum?.(); onClose(); }}
       />
+    {/if}
+
+    {#if songId !== undefined}
+      <ViewInFilesItem {songId} {onClose} />
     {/if}
 
     {#if onEditTags}

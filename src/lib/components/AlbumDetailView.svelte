@@ -33,6 +33,7 @@
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
+  import ViewInFilesItem from "./ViewInFilesItem.svelte";
   import CommunityRating from "./CommunityRating.svelte";
   import {
     PlusIcon as Plus,
@@ -813,6 +814,7 @@
           ? i18n.t("picard.remoteNotSupportedTooltip")
           : undefined}
     />
+    <ViewInFilesItem album={albumName} onClose={() => { overflowMenuPos = null; }} />
     <ContextMenuDivider />
     <ContextMenuItem
       icon={BarChart2}

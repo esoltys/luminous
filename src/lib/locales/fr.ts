@@ -91,7 +91,9 @@ export const fr: DeepStringRecord<typeof en> = {
     alreadySyncing: "{folder} fait déjà partie de la synchronisation de {device}.",
     addedToSync: "{folder} a été ajouté à la synchronisation de {device}.",
     addToSyncFailed: "Impossible d'ajouter ce dossier à la synchronisation de {device}.",
-    scanFailed: "Impossible d'analyser ce dossier."
+    scanFailed: "Impossible d'analyser ce dossier.",
+    viewInFiles: "Afficher dans Fichiers",
+    movedShowingNearest: "Il n'est plus là où Luminous l'a vu la dernière fois. Voici le dossier le plus proche qui existe encore."
   },
   devices: {
     tabFiles: "Fichiers",

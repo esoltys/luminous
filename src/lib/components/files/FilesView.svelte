@@ -229,6 +229,8 @@
         path={location.path}
         onnavigate={navigate}
         onplay={playEntry}
+        target={location.selectedName ?? null}
+        bind:arrival={navigationStore.pendingFilesArrival}
         {reloadToken}
         {unreachableLabel}
         bind:listing

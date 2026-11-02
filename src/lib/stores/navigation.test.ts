@@ -13,6 +13,8 @@ vi.mock("@tauri-apps/api/window", () => ({
 import { collectionStore } from "./collection.svelte";
 import { navigationStore } from "./navigation.svelte";
 import { playlistsStore } from "./playlists.svelte";
+import { toastStore } from "./toast.svelte";
+import { i18n } from "./i18n.svelte";
 
 describe("CollectionStore - artist/album navigation and history", () => {
   beforeEach(() => {
@@ -264,5 +266,51 @@ describe("navigationStore - Files location", () => {
     navigationStore.goBack();
     expect(navigationStore.activeTab).toBe("files");
     expect(navigationStore.filesLocation).toEqual({ source: music, path: ["Rock"] });
+  });
+
+  describe("openInFiles", () => {
+    beforeEach(() => {
+      navigationStore.pendingFilesArrival = null;
+      toastStore.messages = [];
+    });
+
+    it("opens the target's folder with its file selected and marked as arrived at", () => {
+      navigationStore.openInFiles({ source: music, path: ["Katatonia", "2006"], selectedName: "11 The Itch.flac", exact: true });
+
+      expect(navigationStore.activeTab).toBe("files");
+      expect(navigationStore.filesLocation).toEqual({ source: music, path: ["Katatonia", "2006"], selectedName: "11 The Itch.flac" });
+      expect(navigationStore.pendingFilesArrival).toBe("11 The Itch.flac");
+      expect(toastStore.messages).toHaveLength(0);
+    });
+
+    it("opens an album's folder with nothing selected", () => {
+      navigationStore.openInFiles({ source: music, path: ["Katatonia", "2006"], selectedName: null, exact: true });
+
+      expect(navigationStore.filesLocation).toEqual({ source: music, path: ["Katatonia", "2006"] });
+      expect(navigationStore.pendingFilesArrival).toBeNull();
+    });
+
+    it("says so when the target moved and this is the nearest folder still there", () => {
+      navigationStore.openInFiles({ source: music, path: ["Katatonia"], selectedName: null, exact: false });
+
+      expect(navigationStore.filesLocation).toEqual({ source: music, path: ["Katatonia"] });
+      expect(toastStore.messages.map((m) => m.text)).toEqual([i18n.t("files.movedShowingNearest")]);
+    });
+
+    it("goes back in one step, and forward re-selects the file without marking it again", async () => {
+      navigationStore.viewAlbum("The Great Cold Distance");
+      await Promise.resolve();
+      navigationStore.openInFiles({ source: music, path: ["Katatonia", "2006"], selectedName: "11 The Itch.flac", exact: true });
+      await Promise.resolve();
+      navigationStore.pendingFilesArrival = null; // consumed by the browser
+
+      navigationStore.goBack();
+      expect(navigationStore.activeTab).toBe("collection");
+      expect(navigationStore.selectedAlbumName).toBe("The Great Cold Distance");
+
+      navigationStore.goForward();
+      expect(navigationStore.filesLocation?.selectedName).toBe("11 The Itch.flac");
+      expect(navigationStore.pendingFilesArrival).toBeNull();
+    });
   });
 });

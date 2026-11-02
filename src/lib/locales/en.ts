@@ -85,7 +85,9 @@ export const en = {
     alreadySyncing: "{folder} is already in {device}'s sync.",
     addedToSync: "Added {folder} to {device}'s sync.",
     addToSyncFailed: "Couldn't add this folder to {device}'s sync.",
-    scanFailed: "Couldn't scan this folder."
+    scanFailed: "Couldn't scan this folder.",
+    viewInFiles: "View in Files",
+    movedShowingNearest: "It's no longer where Luminous last saw it. Showing the nearest folder that's still there."
   },
   devices: {
     tabFiles: "Files",

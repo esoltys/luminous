@@ -85,7 +85,9 @@ export const de = {
     alreadySyncing: "{folder} wird bereits mit {device} synchronisiert.",
     addedToSync: "{folder} wird jetzt mit {device} synchronisiert.",
     addToSyncFailed: "Dieser Ordner konnte nicht zur Synchronisierung mit {device} hinzugefügt werden.",
-    scanFailed: "Dieser Ordner konnte nicht durchsucht werden."
+    scanFailed: "Dieser Ordner konnte nicht durchsucht werden.",
+    viewInFiles: "In Dateien anzeigen",
+    movedShowingNearest: "Nicht mehr dort, wo Luminous es zuletzt gesehen hat. Der nächste noch vorhandene Ordner wird angezeigt."
   },
   devices: {
     tabFiles: "Dateien",

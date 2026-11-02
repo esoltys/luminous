@@ -314,6 +314,26 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     });
   });
 
+  it("opens the album's folder from the overflow menu with View in Files (#1883)", async () => {
+    const target = { source: { kind: "folder", id: 1 }, path: ["The Beatles", "Abbey Road"], selectedName: null, exact: true };
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_songs_by_album") return mockSongs;
+      if (cmd === "locate_album_in_files") return target;
+      if (cmd === "get_all_app_settings") return {};
+      return [];
+    });
+    const openInFiles = vi.spyOn(navigationStore, "openInFiles").mockImplementation(() => {});
+    const { getByTitle, findByText, queryByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+
+    await fireEvent.click(getByTitle("More actions"));
+    await fireEvent.click(await findByText("View in Files"));
+
+    expect(invoke).toHaveBeenCalledWith("locate_album_in_files", { album: mockAlbumName });
+    expect(openInFiles).toHaveBeenCalledWith(target);
+    expect(queryByText("View in Files")).toBeNull();
+    openInFiles.mockRestore();
+  });
+
   it("toggles album stats exclusion from the overflow menu (#1252)", async () => {
     let excluded: [string, string][] = [];
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {

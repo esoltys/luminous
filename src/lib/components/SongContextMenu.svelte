@@ -38,6 +38,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import ShareModal from "./ShareModal.svelte";
+  import ViewInFilesItem from "./ViewInFilesItem.svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
 
@@ -431,6 +432,8 @@
         onclick={() => { onGoToAlbum?.(); onClose(); }}
       />
     {/if}
+
+    <ViewInFilesItem songId={song.id} onmouseenter={closeSubmenuImmediately} {onClose} />
 
     {#if song.artist}
       <ContextMenuItem

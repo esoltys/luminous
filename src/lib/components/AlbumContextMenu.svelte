@@ -26,6 +26,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import ShareModal from "./ShareModal.svelte";
+  import ViewInFilesItem from "./ViewInFilesItem.svelte";
 
   let {
     x,
@@ -165,6 +166,7 @@
       disabled={!picardStore.available}
       title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
     />
+    <ViewInFilesItem album={albumName} {onClose} />
     <ContextMenuItem
       icon={Share}
       label={i18n.t("shareModal.menuItem")}
