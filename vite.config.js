@@ -5,7 +5,6 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import adapter from "@sveltejs/adapter-static";
 import tailwindcss from "@tailwindcss/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
-import { tauriIpcMockPlugin } from "./scripts/vite-mock-plugin.ts";
 import { svelteVirtualStyleGuard } from "./scripts/vite-svelte-style-guard.ts";
 
 import { execSync } from "child_process";
@@ -185,7 +184,6 @@ export default defineConfig(async () => ({
     ...resolveSveltePlugins(),
     safeTailwindcss(),
     svelteVirtualStyleGuard(),
-    tauriIpcMockPlugin(),
   ],
 
   // These are only reachable once specific views actually render (icons,
@@ -193,8 +191,7 @@ export default defineConfig(async () => ({
   // route's static import graph — so Vite's dep scanner misses them at
   // startup and discovers them on first navigation instead, forcing a full
   // client reload mid-session. Declaring them here bundles them upfront so
-  // dev (and the take-screenshots harness, which navigates straight into
-  // arbitrary views) never hits that reload.
+  // dev (which can navigate straight into arbitrary views) never hits that reload.
   optimizeDeps: {
     include: [
       "phosphor-svelte",

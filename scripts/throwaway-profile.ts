@@ -17,16 +17,53 @@
 import { Database } from "bun:sqlite";
 import { execFileSync, spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { defaultDbPath } from "./mock-library";
 import { CdpClient } from "./monitor-cdp";
 import { DevtoolsDriver } from "./devtools-driver";
 
 export { DevtoolsDriver } from "./devtools-driver";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const TAURI_CONF_PATH = path.join(REPO_ROOT, "src-tauri", "tauri.conf.json");
+const TAURI_WINDOWS_CONF_PATH = path.join(REPO_ROOT, "src-tauri", "tauri.windows.conf.json");
+
+/**
+ * Resolves the location of the live Luminous SQLite database:
+ * `{appDataDir}/luminous.db`.
+ */
+export function defaultDbPath(): string | undefined {
+  let identifier: string;
+  try {
+    identifier = JSON.parse(readFileSync(TAURI_CONF_PATH, "utf8")).identifier;
+  } catch {
+    return undefined;
+  }
+  if (process.platform === "win32" && existsSync(TAURI_WINDOWS_CONF_PATH)) {
+    try {
+      const windowsIdentifier = JSON.parse(readFileSync(TAURI_WINDOWS_CONF_PATH, "utf8")).identifier;
+      if (windowsIdentifier) identifier = windowsIdentifier;
+    } catch {
+      // Fall back to the base identifier if the override file is malformed.
+    }
+  }
+  if (!identifier) return undefined;
+
+  const home = homedir();
+  let appDataDir: string;
+  switch (process.platform) {
+    case "win32":
+      appDataDir = path.join(process.env.APPDATA ?? path.join(home, "AppData", "Roaming"), identifier);
+      break;
+    case "darwin":
+      appDataDir = path.join(home, "Library", "Application Support", identifier);
+      break;
+    default:
+      appDataDir = path.join(process.env.XDG_DATA_HOME ?? path.join(home, ".local", "share"), identifier);
+  }
+  return path.join(appDataDir, "luminous.db");
+}
 export const CDP_PORT = 9222;
 
 export const TRACK_COLUMNS = "id, title, album, filetype, samplerate, bitdepth, bitrate, length_nanosec";

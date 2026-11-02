@@ -110,16 +110,13 @@ External capture tools and runners can drive a prebuilt non-release binary witho
 - **Release gating:** Release, MSIX, and Flatpak builds never enable the `capture` feature or `capture` Vite mode. `src/lib/scripting/release-gating.test.ts` scans the release `build/` assets in release workflows to prove that the scripting API was dead-code eliminated and no scripting symbols leaked into published binaries.
 - **Fallback:** Running `bun run dev` in this checkout with `LUMINOUS_REMOTE_DEVTOOLS=true` and a debug exe (`cd src-tauri && cargo build`) remains the supported local development workflow.
 
-### Scene screenshots (`bun run take-scene-screenshots`)
+### Capture Studio & screenshot generation
 
-Docs and Store screenshots are scenes in `scripts/scenes/` run against the real app by `scripts/scene-runner.ts`. The app boots once; the runner loops locale × light/dark, then resets and captures each scene. `AppProfile` takes a `cloneFrom` database to start from a private copy of a real profile (scrobbling and Discord cleared, a missing default library pinned to "none").
-- Needs a dev build of the app (it drives `window.__LUMINOUS_SCRIPT__`): run `bun run dev` in this checkout, build a debug exe once with `cd src-tauri && cargo build`, and close your own Luminous first.
-- `bun run take-scene-screenshots --library <dir>` scans that folder into an empty throwaway profile (about 2 minutes) and also runs the first-run scenes.
-- `bun run take-scene-screenshots --clone-profile` skips the scan and shows your real stats, pins and playlists; plays and setting changes stay in the copy.
-- `--name=a,b`, `--locale=<tag>`, `--scheme=light|dark` narrow a run; one scene in one locale takes seconds once the app is up.
-- A scene is data (`view`, `theme`, `layout`, `viewport`, `position`, `featured`) plus an optional `run`/`cleanup` that calls the scripting API. Component-local states are reached through `screens` hooks registered by the component itself under `import.meta.env.DEV`.
-- Scenes named `store-*` (`scripts/scenes/store.ts`) exist only for the Microsoft Store listing, which takes them with the guide's dark captures; the guides don't reference them. The private `luminous-store` repo composites the listing images from them with `New-StoreScreenshots.ps1` (see `docs/RELEASE_CHECKLIST.md`).
-- The viewport is set by CDP device-metrics override, not by resizing the real window, so output is the exact requested size. A screen recording of the real window needs a real resize.
+Docs and Store screenshots, tutorials, and promotional clips are authored and recorded externally using Capture Studio in `esoltys/luminous-store` (`bun run studio`). Capture Studio connects to Luminous over Chrome DevTools Protocol (CDP), drives the in-app scripting API (`window.__LUMINOUS_SCRIPT__`), and writes generated documentation assets directly into `docs/user-guide/assets/{locale}/screenshots/{light,dark}/`.
+
+- **Scripting Target:** Luminous exposes the versioned in-app scripting engine (`src/lib/scripting/`) in development and capture builds (`bun run build:capture` or `bun run dev`), providing typed access to views, layout, overlays, dialogs, and playback controls.
+- **Throwaway Profiles:** For local testing or performance profiling, `scripts/throwaway-profile.ts` boots an isolated instance with its own data dir and devtools port without affecting the user's real database.
+- **Workflow:** To regenerate user guide or Store screenshots, run `bun run studio` in the `luminous-store` repository and run the desired guide or store recipes.
 
 ### User guide image manifest & validation contract
 
@@ -173,23 +170,6 @@ uv run --with wsgidav --with cheroot wsgidav --config wsgidav.yaml
   re-sync (#1492).
 - **Folder-etag skipping (#1483):** stock wsgidav sends no folder etags, so testing that needs a
   custom provider that adds propagating etags.
-
-## Proving a change is visually neutral (`bun run style-diff`)
-
-For "no visual change" work (Tailwind/dependency upgrades, theme-store or component refactors),
-`scripts/style-diff.ts` diffs the computed style and box of every visible element, plus a
-screenshot, on the mocked IPC harness (same as `take-screenshots.ts`, so no backend or data dir).
-It covers the system theme in light and dark, the playbar-only layout and the Miniplayer
-(`bun run style-diff states`). Playback is paused, animations are frozen and visualisers hidden.
-
-1. On the unchanged code: `bun run style-diff capture base`, then `capture base2`. The second
-   run is the noise baseline: anything that differs between the two is masked.
-2. Make the change, then `bun run style-diff capture after`.
-3. `bun run style-diff compare base after --noise=base2`. It exits 1 on any remaining difference,
-   listing elements whose authored properties changed (reflow-only moves are counted, not
-   listed) and writing `.style-diff/after/<state>.diff.png` with changed pixels in red.
-
-Captures live in `.style-diff/` (gitignored). `--states=a,b` limits a capture to some states.
 
 ## Remote devtools for headless/agent debugging
 

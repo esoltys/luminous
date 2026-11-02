@@ -69,7 +69,7 @@ const ART_URL_PREFIXES = ["http://luminous-art.localhost/", "luminous-art://"];
  *   cover under the same name, so only a changed URL makes the webview fetch
  *   it again; 0 (nothing rescanned yet) adds nothing. The backend drops it.
  *
- * Remote and mock-library URLs are returned as-is. Sizes are picked here
+ * Remote URLs are returned as-is. Sizes are picked here
  * rather than by `srcset`/`sizes="auto"`, which WebKitGTK lacks and which
  * Chromium re-evaluates as `100vw` when an image is unmounted — fetching the
  * largest candidate for every card a virtualized grid drops.
