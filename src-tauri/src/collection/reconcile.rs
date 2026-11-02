@@ -5,7 +5,8 @@
 //! 17).
 
 use anyhow::Result;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
+use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
 
 /// Resolves `path` to its real on-disk path when it differs only in case from
@@ -177,28 +178,112 @@ pub(crate) fn reconcile_moved_songs(
 }
 
 /// Folds song row `dup` into `survivor` — playlist entries and play history
-/// move over, rating/loved keep the higher value, play/skip counts add up —
+/// move over, rating/loved keep the higher value, play/skip counts add up,
+/// earliest `added` date is preserved, and genre tags are merged —
 /// then deletes `dup`. Used wherever two rows turn out to be the same file
-/// (`merge_duplicate_songs`, `relocate::relocate_root`).
+/// (`merge_duplicate_songs`, `relocate::relocate_root`, duplicate curation #1678).
 pub(crate) fn merge_song_rows(conn: &rusqlite::Connection, survivor: i64, dup: i64) -> Result<()> {
+    // 1. Playlist deduplication:
+    // Delete any rows for `dup` where the target playlist already contains `survivor`.
+    conn.execute(
+        "DELETE FROM playlist_items
+         WHERE song_id = ?2
+           AND playlist_id IN (SELECT playlist_id FROM playlist_items WHERE song_id = ?1)",
+        params![survivor, dup],
+    )?;
+
+    // Deduplicate multiple entries of `dup` within the same playlist if `survivor` wasn't there yet,
+    // preserving the earliest position.
+    conn.execute(
+        "DELETE FROM playlist_items
+         WHERE song_id = ?1
+           AND id NOT IN (
+               SELECT id FROM (
+                   SELECT id, ROW_NUMBER() OVER (PARTITION BY playlist_id ORDER BY position ASC, id ASC) AS rn
+                   FROM playlist_items
+                   WHERE song_id = ?1
+               ) WHERE rn = 1
+           )",
+        params![dup],
+    )?;
+
+    // Move surviving playlist items from `dup` to `survivor`.
     conn.execute(
         "UPDATE playlist_items SET song_id = ?1 WHERE song_id = ?2",
         params![survivor, dup],
     )?;
+
+    // 2. Play history reparenting:
     conn.execute(
         "UPDATE play_history SET song_id = ?1 WHERE song_id = ?2",
         params![survivor, dup],
     )?;
+
+    // 3. Stats, rating, loved, and earliest added timestamp preservation:
     conn.execute(
         "UPDATE songs SET
             rating = MAX(rating, (SELECT rating FROM songs WHERE id = ?2)),
             loved = MAX(loved, (SELECT loved FROM songs WHERE id = ?2)),
-            playcount = playcount + (SELECT playcount FROM songs WHERE id = ?2),
-            skipcount = skipcount + (SELECT skipcount FROM songs WHERE id = ?2),
-            lastplayed = MAX(IFNULL(lastplayed, 0), IFNULL((SELECT lastplayed FROM songs WHERE id = ?2), 0))
+            playcount = playcount + COALESCE((SELECT playcount FROM songs WHERE id = ?2), 0),
+            skipcount = skipcount + COALESCE((SELECT skipcount FROM songs WHERE id = ?2), 0),
+            lastplayed = MAX(IFNULL(lastplayed, 0), IFNULL((SELECT lastplayed FROM songs WHERE id = ?2), 0)),
+            added = CASE
+                WHEN IFNULL(added, 0) <= 0 THEN (SELECT added FROM songs WHERE id = ?2)
+                WHEN IFNULL((SELECT added FROM songs WHERE id = ?2), 0) <= 0 THEN added
+                ELSE MIN(added, (SELECT added FROM songs WHERE id = ?2))
+            END
          WHERE id = ?1",
         params![survivor, dup],
     )?;
+
+    // 4. Genre / Tags preservation:
+    let survivor_genre: Option<String> = conn
+        .query_row(
+            "SELECT genre FROM songs WHERE id = ?1",
+            params![survivor],
+            |r| r.get(0),
+        )
+        .optional()?
+        .flatten();
+    let dup_genre: Option<String> = conn
+        .query_row("SELECT genre FROM songs WHERE id = ?1", params![dup], |r| {
+            r.get(0)
+        })
+        .optional()?
+        .flatten();
+
+    if let Some(dup_raw) = dup_genre {
+        let survivor_tags = survivor_genre
+            .as_deref()
+            .map(crate::models::parse_multi_value)
+            .unwrap_or_default();
+        let dup_tags = crate::models::parse_multi_value(&dup_raw);
+
+        let mut seen: HashSet<String> = survivor_tags
+            .iter()
+            .map(|t| t.trim().to_lowercase())
+            .collect();
+        let mut merged_tags = survivor_tags.clone();
+        let mut added_any = false;
+
+        for tag in dup_tags {
+            let norm = tag.trim().to_lowercase();
+            if !norm.is_empty() && seen.insert(norm) {
+                merged_tags.push(tag);
+                added_any = true;
+            }
+        }
+
+        if added_any {
+            let new_genre = crate::models::join_multi_value(&merged_tags);
+            conn.execute(
+                "UPDATE songs SET genre = ?1 WHERE id = ?2",
+                params![new_genre, survivor],
+            )?;
+        }
+    }
+
+    // 5. Delete retired song row:
     conn.execute("DELETE FROM songs WHERE id = ?1", params![dup])?;
     Ok(())
 }
@@ -600,6 +685,174 @@ mod tests {
             Some("album-1234567890abcdef.jpg"),
             "embedded cached artwork filename must be preserved on repath"
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_merge_song_rows_preserves_stats_deduplicates_playlists_and_merges_genres() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_merge_song_rows_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // 1. Insert survivor and dup
+        let song_survivor = Song {
+            path: Some("C:/music/track.flac".to_string()),
+            title: Some("Song".to_string()),
+            artist: Some("Band".to_string()),
+            rating: 0.8,
+            loved: 0,
+            playcount: 10,
+            skipcount: 2,
+            lastplayed: Some(2000),
+            added: Some(1500),
+            genre: Some("Rock; Alternative".to_string()),
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+        let song_dup = Song {
+            path: Some("C:/music/track.mp3".to_string()),
+            title: Some("Song".to_string()),
+            artist: Some("Band".to_string()),
+            rating: 1.0,
+            loved: 1,
+            playcount: 25,
+            skipcount: 3,
+            lastplayed: Some(3000),
+            added: Some(1000), // earlier added timestamp!
+            genre: Some("rock; Grunge; 90s".to_string()),
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+
+        super::super::upsert_song(&conn, &song_survivor).unwrap();
+        super::super::upsert_song(&conn, &song_dup).unwrap();
+
+        let survivor_id: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = 'C:/music/track.flac'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let dup_id: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = 'C:/music/track.mp3'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        // upsert_song does not overwrite stats columns, so set them explicitly
+        conn.execute(
+            "UPDATE songs SET rating = 0.8, loved = 0, playcount = 10, skipcount = 2, lastplayed = 2000, added = 1500 WHERE id = ?1",
+            params![survivor_id],
+        ).unwrap();
+        conn.execute(
+            "UPDATE songs SET rating = 1.0, loved = 1, playcount = 25, skipcount = 3, lastplayed = 3000, added = 1000 WHERE id = ?1",
+            params![dup_id],
+        ).unwrap();
+
+        // 2. Setup playlists
+        // Playlist 1 has BOTH survivor and dup
+        conn.execute(
+            "INSERT INTO playlists (id, name) VALUES (1, 'Rock Favorites')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO playlist_items (playlist_id, song_id, position, uuid) VALUES (1, ?1, 1, 'uuid-s1')",
+            params![survivor_id],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO playlist_items (playlist_id, song_id, position, uuid) VALUES (1, ?1, 5, 'uuid-d1')",
+            params![dup_id],
+        ).unwrap();
+
+        // Playlist 2 has only dup, but dup appears TWICE (positions 2 and 7)
+        conn.execute(
+            "INSERT INTO playlists (id, name) VALUES (2, 'Roadtrip')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO playlist_items (playlist_id, song_id, position, uuid) VALUES (2, ?1, 2, 'uuid-d2a')",
+            params![dup_id],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO playlist_items (playlist_id, song_id, position, uuid) VALUES (2, ?1, 7, 'uuid-d2b')",
+            params![dup_id],
+        ).unwrap();
+
+        // Setup play history for dup
+        conn.execute(
+            "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('song', ?1, 10000)",
+            params![dup_id],
+        ).unwrap();
+
+        // Execute merge
+        merge_song_rows(&conn, survivor_id, dup_id).unwrap();
+
+        // Dup must be deleted
+        let dup_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM songs WHERE id = ?1",
+                params![dup_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(dup_count, 0);
+
+        // Survivor must have merged stats
+        let (rating, loved, playcount, skipcount, lastplayed, added, genre): (f32, i32, i32, i32, i64, i64, String) = conn
+            .query_row(
+                "SELECT rating, loved, playcount, skipcount, lastplayed, added, genre FROM songs WHERE id = ?1",
+                params![survivor_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)),
+            )
+            .unwrap();
+
+        assert_eq!(rating, 1.0);
+        assert_eq!(loved, 1);
+        assert_eq!(playcount, 35); // 10 + 25
+        assert_eq!(skipcount, 5); // 2 + 3
+        assert_eq!(lastplayed, 3000);
+        assert_eq!(added, 1000); // MIN(1500, 1000)
+        assert_eq!(genre, "Rock; Alternative; Grunge; 90s");
+
+        // Playlist 1 should have exactly 1 item (survivor at position 1)
+        let pl1_items: Vec<(i64, i64)> = conn
+            .prepare("SELECT song_id, position FROM playlist_items WHERE playlist_id = 1")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(pl1_items, vec![(survivor_id, 1)]);
+
+        // Playlist 2 should have exactly 1 item (survivor at earliest position 2)
+        let pl2_items: Vec<(i64, i64)> = conn
+            .prepare("SELECT song_id, position FROM playlist_items WHERE playlist_id = 2")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(pl2_items, vec![(survivor_id, 2)]);
+
+        // Play history should point to survivor
+        let ph_song_id: i64 = conn
+            .query_row(
+                "SELECT song_id FROM play_history WHERE played_at = 10000",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(ph_song_id, survivor_id);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

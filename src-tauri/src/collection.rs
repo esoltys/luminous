@@ -46,7 +46,7 @@ fn scan_thread_count() -> usize {
 }
 
 mod query;
-mod reconcile;
+pub(crate) mod reconcile;
 pub mod relocate;
 pub mod safeguard;
 mod watcher;
