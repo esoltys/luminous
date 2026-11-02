@@ -343,6 +343,19 @@ export interface FileSourceSummary {
   available: boolean;
 }
 
+/**
+ * Where a library song or album is in the Files view (`locate_song_in_files`,
+ * `locate_album_in_files`); the commands return null when it has no place there.
+ */
+export interface FileNavigationTarget {
+  source: FileSource;
+  path: string[];
+  /** The entry to select, by listed name; null for an album or a file that's gone. */
+  selectedName: string | null;
+  /** False when the target had moved and `path` is the nearest folder still there. */
+  exact: boolean;
+}
+
 /** What a file or folder is to the library. Word it in the UI; never show the code. */
 export type FileEntryStatus = "inLibrary" | "notScanned" | "albumArt" | "notAudio" | "excluded" | "notFromLuminous";
 

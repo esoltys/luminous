@@ -203,6 +203,18 @@ fn servers(conn: &Connection, table: &str) -> Result<Vec<(i64, String, bool)>> {
     Ok(servers)
 }
 
+/// Whether `table` (`subsonic_servers` or `webdav_servers`) has server `id`.
+fn server_exists(conn: &Connection, table: &str, id: i64) -> Result<bool> {
+    Ok(conn
+        .query_row(
+            &format!("SELECT 1 FROM {table} WHERE id = ?1"),
+            params![id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some())
+}
+
 /// The folder at `path` in `source`. A folder that isn't there lists as
 /// empty. In a folder, WebDAV server or device, `path` can't leave the
 /// source (see `clean_path`); a Subsonic path names an artist and album by
@@ -305,6 +317,194 @@ pub fn local_folder(
         ))),
         _ => Ok(None),
     }
+}
+
+/// Where a library song or album is in the Files view: the folder to open
+/// and the entry to select in it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileNavigationTarget {
+    pub source: FileSource,
+    /// Folder names from the source's root, as [`list_dir`] takes them.
+    pub path: Vec<String>,
+    /// The entry to select in that folder's listing, by its listed name;
+    /// `None` when the target is more than one file (an album) or its file
+    /// is gone.
+    pub selected_name: Option<String>,
+    /// False when the target wasn't where the last scan saw it, and `path`
+    /// is the nearest folder that is still there.
+    pub exact: bool,
+}
+
+/// Where the library song `song_id` is in the Files view. `None` when it has
+/// no place there: a stream or radio station, a file opened from outside
+/// the library or outside every watched folder, an unknown id. Never a
+/// device: device files aren't library songs. Blocks on the disk, so call it
+/// off the async runtime.
+pub fn locate_song(db: &Database, song_id: i64) -> Result<Option<FileNavigationTarget>> {
+    let song = db
+        .pool
+        .get()?
+        .query_row(
+            &format!("SELECT {SONG_SELECT_COLS} FROM songs WHERE id = ?1"),
+            params![song_id],
+            row_to_song,
+        )
+        .optional()?;
+    locate(db, song.as_slice())
+}
+
+/// The folder the album `album` is in, as [`locate_song`] finds a song: its
+/// songs by the rule every album view uses (the title, any spelling, #1752),
+/// in the source holding most of them, at the deepest folder they share
+/// there (`Album` for an album split into `Album/CD1` and `Album/CD2`).
+pub fn locate_album(db: &Arc<Database>, album: &str) -> Result<Option<FileNavigationTarget>> {
+    let songs = CollectionScanner::new(Arc::clone(db)).get_songs_by_album(album)?;
+    locate(db, &songs)
+}
+
+/// One song's place in the Files view, as the last scan or sync saw it.
+struct Place {
+    source: FileSource,
+    folder: Vec<String>,
+    /// `None` for a server's song the last sync didn't find.
+    name: Option<String>,
+    /// The watched folder, for a local song: where to check it's still there.
+    root: Option<PathBuf>,
+}
+
+/// Where `songs` are: the source holding most of them (the first such, on a
+/// tie), the deepest folder they all share in it, and their file when they
+/// are all in the same one (one song, or the tracks of one CUE sheet).
+fn locate(db: &Database, songs: &[Song]) -> Result<Option<FileNavigationTarget>> {
+    let places = {
+        let conn = db.pool.get()?;
+        let watched: Vec<(i64, String)> = conn
+            .prepare("SELECT id, path FROM directories")?
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        songs
+            .iter()
+            .filter_map(|s| place(&conn, &watched, s).transpose())
+            .collect::<Result<Vec<Place>>>()?
+    };
+    let mut groups: Vec<Vec<Place>> = Vec::new();
+    for p in places {
+        match groups.iter_mut().find(|g| g[0].source == p.source) {
+            Some(group) => group.push(p),
+            None => groups.push(vec![p]),
+        }
+    }
+    let most = groups
+        .into_iter()
+        .reduce(|best, g| if g.len() > best.len() { g } else { best });
+    let Some(places) = most else {
+        return Ok(None);
+    };
+
+    let first = &places[0];
+    let mut path = first.folder.clone();
+    for p in &places[1..] {
+        let shared = path.iter().zip(&p.folder).take_while(|(a, b)| a == b);
+        path.truncate(shared.count());
+    }
+    let one_file = places
+        .iter()
+        .all(|p| p.folder == first.folder && p.name == first.name);
+    let mut selected_name = one_file.then(|| first.name.clone()).flatten();
+    // One file with no name to select is a server song gone since its sync.
+    let mut exact = !one_file || selected_name.is_some();
+    // Only a local song can be checked: a server's songs are where its last
+    // sync saw them, and asking it again could wait until it times out. The
+    // disk is asked with no connection held, as it can be a network drive.
+    if let Some(root) = &first.root {
+        if let Some(name) = &selected_name {
+            if !join_local(root, &path).join(name).exists() {
+                selected_name = None;
+                exact = false;
+            }
+        }
+        while !path.is_empty() && !join_local(root, &path).is_dir() {
+            path.pop();
+            exact = false;
+        }
+    }
+    Ok(Some(FileNavigationTarget {
+        source: first.source.clone(),
+        path,
+        selected_name,
+        exact,
+    }))
+}
+
+/// Where `song` is, as its source's listing names it; `None` when it has no
+/// place in the Files view. `watched` is every watched folder, by id.
+fn place(conn: &Connection, watched: &[(i64, String)], song: &Song) -> Result<Option<Place>> {
+    let Some(path) = song.path.as_deref() else {
+        return Ok(None);
+    };
+    let (source, mut names, root) = match song.source {
+        s if s.is_local() => {
+            // The deepest watched folder holding it: watched folders can nest.
+            // A CUE track's `path` is its media file, the entry carrying the
+            // song in the listing.
+            let deepest = watched
+                .iter()
+                .filter_map(|(id, root)| {
+                    Some((*id, root, library_paths::segments_under(path, root)?))
+                })
+                .min_by_key(|(_, _, names)| names.len());
+            let Some((id, root, names)) = deepest else {
+                return Ok(None);
+            };
+            (FileSource::Folder { id }, names, Some(PathBuf::from(root)))
+        }
+        SongSource::Subsonic => {
+            let Some((id, _)) = crate::subsonic::parse_track_uri(path) else {
+                return Ok(None);
+            };
+            if !server_exists(conn, "subsonic_servers", id)? {
+                return Ok(None);
+            }
+            let (artist, album) = subsonic_place(song);
+            let names = vec![artist, album, subsonic_entry_name(song)];
+            (FileSource::Subsonic { id }, names, None)
+        }
+        SongSource::WebDav => {
+            let cached = conn
+                .query_row(
+                    "SELECT c.server_id, s.remote_path, c.remote_path FROM webdav_cache c
+                     JOIN webdav_servers s ON s.id = c.server_id
+                     WHERE c.song_id = ?1",
+                    params![song.id],
+                    |r| {
+                        Ok((
+                            r.get::<_, i64>(0)?,
+                            r.get::<_, String>(1)?,
+                            r.get::<_, String>(2)?,
+                        ))
+                    },
+                )
+                .optional()?;
+            let Some((id, names)) =
+                cached.and_then(|(id, music, href)| Some((id, webdav_names_under(&music, &href)?)))
+            else {
+                return Ok(None);
+            };
+            (FileSource::Webdav { id }, names, None)
+        }
+        _ => return Ok(None),
+    };
+    // A server's song its last sync didn't find isn't in the listing, so
+    // there is nothing to select; a local file's presence is checked on disk
+    // by `locate` instead, whatever the last scan said.
+    let name = names.pop().filter(|_| root.is_some() || !song.unavailable);
+    Ok(Some(Place {
+        source,
+        folder: names,
+        name,
+        root,
+    }))
 }
 
 /// `path` without the names that would leave the source or mean nothing, for
@@ -579,15 +779,7 @@ fn listing(location: Option<String>, entries: Vec<FileEntry>) -> DirListing {
 }
 
 fn subsonic_songs(conn: &Connection, id: i64) -> Result<Vec<Song>> {
-    let exists: bool = conn
-        .query_row(
-            "SELECT 1 FROM subsonic_servers WHERE id = ?1",
-            params![id],
-            |_| Ok(()),
-        )
-        .optional()?
-        .is_some();
-    if !exists {
+    if !server_exists(conn, "subsonic_servers", id)? {
         return Err(anyhow!("source-not-found"));
     }
     let mut stmt = conn.prepare(&format!(
@@ -627,6 +819,14 @@ fn subsonic_missing_tag(depth: usize, name: &str) -> Option<MissingTag> {
         0 if name.is_empty() => Some(MissingTag::Artist),
         1 if name.is_empty() => Some(MissingTag::Album),
         _ => None,
+    }
+}
+
+/// A Subsonic track's name in its album's listing.
+fn subsonic_entry_name(song: &Song) -> String {
+    match song.track {
+        Some(n) => format!("{n:02} {}", song.display_title()),
+        None => song.display_title().to_string(),
     }
 }
 
@@ -680,10 +880,7 @@ fn list_subsonic(conn: &Connection, id: i64, path: &[String]) -> Result<DirListi
             let entries: Vec<FileEntry> = tracks
                 .into_values()
                 .map(|s| FileEntry {
-                    name: match s.track {
-                        Some(n) => format!("{n:02} {}", s.display_title()),
-                        None => s.display_title().to_string(),
-                    },
+                    name: subsonic_entry_name(s),
                     is_dir: false,
                     size: None,
                     modified: None,
@@ -758,6 +955,21 @@ fn webdav_dir_href(remote_path: &str, path: &[String]) -> String {
     }
     href.push('/');
     href
+}
+
+/// The names leading from the server's music folder `remote_path` down to
+/// the file at `href`, decoded as the listing shows them; the inverse of
+/// [`webdav_dir_href`]. `None` when `href` isn't below the music folder.
+fn webdav_names_under(remote_path: &str, href: &str) -> Option<Vec<String>> {
+    // Split before decoding: a name can hold an encoded `/`.
+    let names = |p: &str| -> Vec<String> {
+        p.split('/')
+            .filter(|s| !s.is_empty())
+            .map(|s| percent_decode_str(s).decode_utf8_lossy().into_owned())
+            .collect()
+    };
+    let (mut file, music) = (names(href), names(remote_path));
+    (file.len() > music.len() && file.starts_with(&music)).then(|| file.split_off(music.len()))
 }
 
 fn list_webdav(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
@@ -1070,6 +1282,263 @@ mod tests {
         assert_eq!(songs.len(), 2);
     }
 
+    fn song_id(f: &Fixture, title: &str) -> i64 {
+        f.db.pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT id FROM songs WHERE title = ?1",
+                params![title],
+                |r| r.get(0),
+            )
+            .unwrap()
+    }
+
+    fn target(
+        source: FileSource,
+        path: &[&str],
+        selected_name: Option<&str>,
+        exact: bool,
+    ) -> Option<FileNavigationTarget> {
+        Some(FileNavigationTarget {
+            source,
+            path: path.iter().map(|p| p.to_string()).collect(),
+            selected_name: selected_name.map(str::to_string),
+            exact,
+        })
+    }
+
+    /// Files the songs of `f` titled `titles` as album `album`.
+    fn set_album(f: &Fixture, album: &str, titles: &[&str]) {
+        let conn = f.db.pool.get().unwrap();
+        for title in titles {
+            conn.execute(
+                "UPDATE songs SET album = ?1, album_key = ?2 WHERE title = ?3",
+                params![album, crate::album_key::album_key(album), title],
+            )
+            .unwrap();
+        }
+    }
+
+    #[test]
+    fn a_song_is_found_in_its_folder() {
+        let f = fixture(&["A/Album/01.flac"], &["A/Album/01.flac"]);
+        assert_eq!(
+            locate_song(&f.db, song_id(&f, "A/Album/01.flac")).unwrap(),
+            target(
+                FileSource::Folder { id: 1 },
+                &["A", "Album"],
+                Some("01.flac"),
+                true
+            )
+        );
+    }
+
+    #[test]
+    fn a_song_is_found_in_the_deepest_watched_folder_holding_it() {
+        let f = fixture(&["A/Album/01.flac"], &["A/Album/01.flac"]);
+        f.db.pool
+            .get()
+            .unwrap()
+            .execute(
+                "INSERT INTO directories (id, path, subdirs) VALUES (2, ?1, 1)",
+                params![f.root.join("A").to_string_lossy()],
+            )
+            .unwrap();
+        assert_eq!(
+            locate_song(&f.db, song_id(&f, "A/Album/01.flac")).unwrap(),
+            target(
+                FileSource::Folder { id: 2 },
+                &["Album"],
+                Some("01.flac"),
+                true
+            )
+        );
+    }
+
+    #[test]
+    fn a_moved_song_falls_back_to_the_nearest_folder_still_there() {
+        let f = fixture(
+            &["A/other.flac"],
+            &["A/Album/gone.flac", "A/x.flac", "B/y.flac"],
+        );
+        assert_eq!(
+            locate_song(&f.db, song_id(&f, "A/Album/gone.flac")).unwrap(),
+            target(FileSource::Folder { id: 1 }, &["A"], None, false)
+        );
+        assert_eq!(
+            locate_song(&f.db, song_id(&f, "A/x.flac")).unwrap(),
+            target(FileSource::Folder { id: 1 }, &["A"], None, false)
+        );
+        assert_eq!(
+            locate_song(&f.db, song_id(&f, "B/y.flac")).unwrap(),
+            target(FileSource::Folder { id: 1 }, &[], None, false)
+        );
+    }
+
+    #[test]
+    fn songs_with_no_place_in_files_are_not_found() {
+        let f = fixture(&[], &[]);
+        let conn = f.db.pool.get().unwrap();
+        for (source, path, title) in [
+            (SongSource::LocalFile, "/elsewhere/x.flac", "outside"),
+            (
+                SongSource::OpenedFile,
+                &*f.root.join("o.flac").to_string_lossy(),
+                "opened",
+            ),
+            (SongSource::Stream, "http://radio/stream", "stream"),
+        ] {
+            conn.execute(
+                "INSERT INTO songs (source, path, title) VALUES (?1, ?2, ?3)",
+                params![source as i32, path, title],
+            )
+            .unwrap();
+        }
+        drop(conn);
+        for title in ["outside", "opened", "stream"] {
+            assert_eq!(
+                locate_song(&f.db, song_id(&f, title)).unwrap(),
+                None,
+                "{title}"
+            );
+        }
+        assert_eq!(locate_song(&f.db, 999).unwrap(), None);
+        assert_eq!(locate_album(&f.db, "No Such Album").unwrap(), None);
+    }
+
+    #[test]
+    fn an_album_is_found_in_the_folder_its_discs_share() {
+        let f = fixture(
+            &["X/CD1/01.flac", "X/CD2/01.flac"],
+            &["X/CD1/01.flac", "X/CD2/01.flac"],
+        );
+        set_album(&f, "Live", &["X/CD1/01.flac", "X/CD2/01.flac"]);
+        assert_eq!(
+            locate_album(&f.db, "LIVE ").unwrap(),
+            target(FileSource::Folder { id: 1 }, &["X"], None, true)
+        );
+    }
+
+    #[test]
+    fn a_cue_album_selects_its_media_file() {
+        let f = fixture(&["X/album.flac", "X/album.cue"], &["X/album.flac"]);
+        let conn = f.db.pool.get().unwrap();
+        // A second track of the same media file, starting a minute in.
+        conn.execute(
+            "INSERT INTO songs (source, path, title, beginning_nanosec)
+             SELECT source, path, 'track 2', 60000000000 FROM songs",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE songs SET album = 'Live', album_key = 'live', cue_path = ?1",
+            params![f.root.join("X").join("album.cue").to_string_lossy()],
+        )
+        .unwrap();
+        drop(conn);
+        assert_eq!(
+            locate_album(&f.db, "Live").unwrap(),
+            target(
+                FileSource::Folder { id: 1 },
+                &["X"],
+                Some("album.flac"),
+                true
+            )
+        );
+    }
+
+    #[test]
+    fn subsonic_songs_are_found_by_their_listed_names() {
+        let f = fixture(&[], &[]);
+        let conn = f.db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO subsonic_servers (id, name, url, username) VALUES (3, 'Navidrome', 'http://x', 'u')",
+            [],
+        )
+        .unwrap();
+        for (unavailable, track, title) in [(0, 1, "Ghost of the Sun"), (1, 2, "Wealth")] {
+            conn.execute(
+                "INSERT INTO songs (source, path, artist, album, track, title, unavailable)
+                 VALUES (?1, ?2, 'Katatonia', 'Viva Emptiness', ?3, ?4, ?5)",
+                params![
+                    SongSource::Subsonic as i32,
+                    format!("subsonic://3/t{track}"),
+                    track,
+                    title,
+                    unavailable
+                ],
+            )
+            .unwrap();
+        }
+        drop(conn);
+        let source = FileSource::Subsonic { id: 3 };
+        let found = locate_song(&f.db, song_id(&f, "Ghost of the Sun"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            Some(found.clone()),
+            target(
+                source.clone(),
+                &["Katatonia", "Viva Emptiness"],
+                Some("01 Ghost of the Sun"),
+                true
+            )
+        );
+        let listed = list_dir(&f.db, &source, &found.path, |_, _| None).unwrap();
+        assert!(listed
+            .entries
+            .iter()
+            .any(|e| Some(&e.name) == found.selected_name.as_ref()));
+        // The last sync didn't find it: its album, nothing to select.
+        assert_eq!(
+            locate_song(&f.db, song_id(&f, "Wealth")).unwrap(),
+            target(source, &["Katatonia", "Viva Emptiness"], None, false)
+        );
+    }
+
+    #[test]
+    fn webdav_songs_are_found_by_their_decoded_names() {
+        let f = fixture(&[], &[]);
+        let conn = f.db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO webdav_servers (id, name, url, remote_path) VALUES (4, 'NAS', 'https://nas', '/dav/Music/')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (source, path, title) VALUES (?1, 'https://nas/x', 'dav')",
+            params![SongSource::WebDav as i32],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO webdav_cache (server_id, remote_path, song_id)
+             VALUES (4, '/dav/Music/AC%2FDC/Live%20%231/01%20Intro.flac', last_insert_rowid())",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+        assert_eq!(
+            locate_song(&f.db, song_id(&f, "dav")).unwrap(),
+            target(
+                FileSource::Webdav { id: 4 },
+                &["AC/DC", "Live #1"],
+                Some("01 Intro.flac"),
+                true
+            )
+        );
+    }
+
+    #[test]
+    fn webdav_names_are_the_inverse_of_folder_hrefs() {
+        let path = vec!["AC/DC?".to_string(), "Live #1".to_string()];
+        let href = format!("{}01.flac", webdav_dir_href("/dav", &path));
+        let mut names = path.clone();
+        names.push("01.flac".into());
+        assert_eq!(webdav_names_under("/dav/", &href), Some(names));
+        assert_eq!(webdav_names_under("/other", &href), None);
+    }
+
     /// Subsonic folder names are tags, so a missing tag (`""`) or one a
     /// filesystem path couldn't hold ("AC/DC") still opens and plays.
     #[test]
@@ -1147,6 +1616,15 @@ mod tests {
         assert_eq!(titles(&[""]), ["Untitled", "Demo"]);
         assert_eq!(titles(&["", ""]), ["Untitled"]);
         assert_eq!(titles(&["AC/DC"]), ["Thunderstruck"]);
+
+        // The resolver finds them where the listing puts them.
+        drop(conn);
+        for (title, path) in [("Untitled", ["", ""]), ("Thunderstruck", ["AC/DC", ""])] {
+            let found = locate_song(&f.db, song_id(&f, title)).unwrap();
+            assert_eq!(found, target(source.clone(), &path, Some(title), true));
+            let listed = list_dir(&f.db, &source, &found.unwrap().path, |_, _| None).unwrap();
+            assert!(listed.entries.iter().any(|e| e.name == title));
+        }
     }
 
     #[test]

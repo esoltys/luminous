@@ -38,6 +38,24 @@ pub fn is_under_key(file_key: &str, folder_key: &str) -> bool {
         && file_key.as_bytes()[folder_key.len()] == b'/'
 }
 
+/// The names leading from `folder` down to `file`, spelled as `file` spells
+/// them, when `file` is inside `folder` ([`is_under`]'s rule): the last is the
+/// file's own name. Drive roots (`C:\`) and UNC shares (`\\srv\share`) split
+/// into their components like any folder, so no name is ever empty.
+pub fn segments_under(file: &str, folder: &str) -> Option<Vec<String>> {
+    let components = |p: &str| -> Vec<String> {
+        p.split(['/', '\\'])
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect()
+    };
+    let (mut file, folder) = (components(file), components(folder));
+    let inside = !folder.is_empty()
+        && file.len() > folder.len()
+        && folder.iter().zip(&file).all(|(a, b)| key(a) == key(b));
+    inside.then(|| file.split_off(folder.len()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -57,6 +75,35 @@ mod tests {
         assert!(is_under(r"D:\Music\a\b.flac", "D:/Music/a"));
         assert!(same(Path::new(r"D:\Music\"), Path::new("D:/Music")));
         assert_eq!(key(r"D:\Music\a\"), key("D:/Music/a"));
+    }
+
+    #[test]
+    fn segments_lead_from_the_folder_to_the_file() {
+        let segs = |file, folder| segments_under(file, folder);
+        assert_eq!(
+            segs("/music/a/b/c.flac", "/music/"),
+            Some(vec!["a".into(), "b".into(), "c.flac".into()])
+        );
+        assert_eq!(
+            segs(r"C:\Katatonia\01.flac", r"C:\"),
+            Some(vec!["Katatonia".into(), "01.flac".into()])
+        );
+        assert_eq!(
+            segs(r"\\nas\share\Music\A\01.flac", r"\\nas\share\Music"),
+            Some(vec!["A".into(), "01.flac".into()])
+        );
+        assert_eq!(segs("/music/ab/x.flac", "/music/a"), None);
+        assert_eq!(segs("/music/a", "/music/a"), None);
+        assert_eq!(segs("/music/a/x.flac", ""), None);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn segments_keep_the_files_own_case_on_windows() {
+        assert_eq!(
+            segments_under(r"d:\MUSIC\Ärzte\Ö.flac", r"D:\music"),
+            Some(vec!["Ärzte".into(), "Ö.flac".into()])
+        );
     }
 
     #[cfg(windows)]
