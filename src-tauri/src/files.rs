@@ -396,6 +396,7 @@ fn locate(db: &Database, songs: &[Song]) -> Result<Option<FileNavigationTarget>>
         .iter()
         .all(|p| p.folder == first.folder && p.name == first.name);
     let mut selected_name = one_file.then(|| first.name.clone()).flatten();
+    // One file with no name to select is a server song gone since its sync.
     let mut exact = !one_file || selected_name.is_some();
     // Only a local song can be checked: a server's songs are where its last
     // sync saw them, and asking it again could wait until it times out. The
@@ -426,11 +427,11 @@ fn place(conn: &Connection, watched: &[(i64, String)], song: &Song) -> Result<Op
     let Some(path) = song.path.as_deref() else {
         return Ok(None);
     };
-    let listed = !song.unavailable;
     let (source, mut names, root) = match song.source {
-        // A CUE track's `path` is its media file, the entry carrying the song.
         s if s.is_local() => {
             // The deepest watched folder holding it: watched folders can nest.
+            // A CUE track's `path` is its media file, the entry carrying the
+            // song in the listing.
             let deepest = watched
                 .iter()
                 .filter_map(|(id, root)| {
@@ -443,11 +444,7 @@ fn place(conn: &Connection, watched: &[(i64, String)], song: &Song) -> Result<Op
             (FileSource::Folder { id }, names, Some(PathBuf::from(root)))
         }
         SongSource::Subsonic => {
-            let id = path
-                .strip_prefix("subsonic://")
-                .and_then(|rest| rest.split('/').next())
-                .and_then(|id| id.parse::<i64>().ok());
-            let Some(id) = id else {
+            let Some((id, _)) = crate::subsonic::parse_track_uri(path) else {
                 return Ok(None);
             };
             if !server_exists(conn, "subsonic_servers", id)? {
@@ -482,7 +479,10 @@ fn place(conn: &Connection, watched: &[(i64, String)], song: &Song) -> Result<Op
         }
         _ => return Ok(None),
     };
-    let name = names.pop().filter(|_| listed || root.is_some());
+    // A server's song its last sync didn't find isn't in the listing, so
+    // there is nothing to select; a local file's presence is checked on disk
+    // by `locate` instead, whatever the last scan said.
+    let name = names.pop().filter(|_| root.is_some() || !song.unavailable);
     Ok(Some(Place {
         source,
         folder: names,
