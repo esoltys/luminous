@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { createEventScope } from "../utils/eventScope";
 import type { PinnedItem, PinnedItemType } from "../types";
 import { pinnedRefKeyFor } from "../types";
 import { hasPinnedContent, getNavigablePins, type NavigablePin } from "../utils/pinnedNav";
@@ -8,6 +8,7 @@ class PinnedStore {
   items = $state<PinnedItem[]>([]);
   private keys = $state<Set<string>>(new Set());
   private libraryChangedDebounce: ReturnType<typeof setTimeout> | undefined;
+  private events = createEventScope(import.meta.hot);
 
   constructor() {
     this.init();
@@ -24,12 +25,12 @@ class PinnedStore {
 
   private async init() {
     try {
-      await listen("pinned-items-changed", () => this.refresh());
+      await this.events.listen("pinned-items-changed", () => this.refresh());
       // Pins resolve against live song/album/artist/playlist data (see
       // get_pinned_items), so a tag edit, rescan, etc. elsewhere in the app
       // should refresh what's shown here too — debounced to match
       // HomeView's own library-changed handling.
-      await listen("library-changed", () => {
+      await this.events.listen("library-changed", () => {
         clearTimeout(this.libraryChangedDebounce);
         this.libraryChangedDebounce = setTimeout(() => this.refresh(), 500);
       });
@@ -105,6 +106,11 @@ class PinnedStore {
       pinnedRefKeyFor(item),
     ]);
     await this.reorder(order);
+  }
+
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
   }
 }
 

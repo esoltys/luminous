@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { stripEnclosingQuotes } from "../utils/filterParser";
+import { createEventScope } from "../utils/eventScope";
 import { i18n } from "./i18n.svelte";
 import type {
   AlbumArtRetrievalResult,
@@ -161,6 +161,7 @@ class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
   webdavServers = $state<WebDavServer[]>([]);
   subsonicServers = $state<SubsonicServer[]>([]);
+  private events = createEventScope(import.meta.hot);
   stats = $state<LibraryStats>({
     total_songs: 0,
     total_artists: 0,
@@ -418,7 +419,7 @@ class CollectionStore {
         }
       }
 
-      await listen<ScanProgress>("scan-progress", (event) => {
+      await this.events.listen<ScanProgress>("scan-progress", (event) => {
         this.scanProgress = event.payload;
         this.isScanning = event.payload.phase !== "done";
 
@@ -501,7 +502,7 @@ class CollectionStore {
 
       // Listen to library changed events (e.g. from background directory watcher,
       // or a song getting flagged unavailable after a failed play)
-      await listen("library-changed", () => {
+      await this.events.listen("library-changed", () => {
         this.refreshStats();
         this.refreshLibrary();
         this.refreshDirectories();
@@ -524,7 +525,7 @@ class CollectionStore {
       // rather than cascading into a stack of separate toasts.
       const WATCHER_TASK_ID = "watcher-batch";
 
-      await listen<BatchProgress>("batch-processing-started", (event) => {
+      await this.events.listen<BatchProgress>("batch-processing-started", (event) => {
         const { total_count } = event.payload;
         tasksStore.startTask({
           id: WATCHER_TASK_ID,
@@ -534,7 +535,7 @@ class CollectionStore {
         });
       });
 
-      await listen<BatchProgress>("batch-processing-progress", (event) => {
+      await this.events.listen<BatchProgress>("batch-processing-progress", (event) => {
         const { current_count, total_count } = event.payload;
         tasksStore.updateTask(WATCHER_TASK_ID, {
           label: i18n.t("settings.batchProcessingToast", { current: current_count, total: total_count }),
@@ -543,7 +544,7 @@ class CollectionStore {
         });
       });
 
-      await listen<BatchProgress>("batch-processing-completed", (event) => {
+      await this.events.listen<BatchProgress>("batch-processing-completed", (event) => {
         const { total_count } = event.payload;
         const text = i18n.plural("settings.batchProcessingDoneToast", total_count);
         // Micro-batches (1-2 songs, typical of single tag edits or Picard saving
@@ -554,7 +555,7 @@ class CollectionStore {
       });
 
       // Track WebDAV synchronization (#682, #1083, #1087)
-      await listen<WebDavSyncProgressPayload>("webdav-sync-progress", (event) => {
+      await this.events.listen<WebDavSyncProgressPayload>("webdav-sync-progress", (event) => {
         const { server_id, server_name, current_count, added, updated, errors, done, daily_check } = event.payload;
         const taskId = `webdav-sync-${server_id}`;
         if (done) {
@@ -589,7 +590,7 @@ class CollectionStore {
 
       // Track OpenSubsonic synchronization (#916) — Sync Now and auto-sync
       // both report here, so either shows up in the task tray.
-      await listen<SubsonicSyncProgressPayload>("subsonic-sync-progress", (event) => {
+      await this.events.listen<SubsonicSyncProgressPayload>("subsonic-sync-progress", (event) => {
         const { serverId, serverName, currentCount, stats, done, error } = event.payload;
         const taskId = `subsonic-sync-${serverId}`;
         if (done) {
@@ -618,7 +619,7 @@ class CollectionStore {
       });
 
       // Track batch tag edits (#1087)
-      await listen<TagBatchProgressPayload>("tag-batch-progress", (event) => {
+      await this.events.listen<TagBatchProgressPayload>("tag-batch-progress", (event) => {
         const { current, total, title, done } = event.payload;
         const taskId = "album-tag-save";
         if (done) {
@@ -641,7 +642,7 @@ class CollectionStore {
       });
 
       // Track artwork sidecar sweep (#1274)
-      await listen<ArtworkSweepProgressPayload>("artwork-sweep-progress", (event) => {
+      await this.events.listen<ArtworkSweepProgressPayload>("artwork-sweep-progress", (event) => {
         const { current, total, done } = event.payload;
         const taskId = "artwork-sweep";
         if (done) {
@@ -675,7 +676,7 @@ class CollectionStore {
 
       // Keep cached song rows in sync with rating/playcount changes made
       // anywhere in the app (player bar, other views, scrobble bumps).
-      await listen<SongStatsPayload>("song-stats-changed", (event) => {
+      await this.events.listen<SongStatsPayload>("song-stats-changed", (event) => {
         for (const list of [this.songs, this.searchResults]) {
           const song = list.find((s) => s.id === event.payload.song_id);
           if (song) applySongStats(song, event.payload);
@@ -684,13 +685,13 @@ class CollectionStore {
 
       // Keep cached album rows in sync with ratings set from other views
       // (Album Detail view, other Collection grid instances).
-      await listen<AlbumStatsPayload>("album-stats-changed", (event) => {
+      await this.events.listen<AlbumStatsPayload>("album-stats-changed", (event) => {
         const album = this.albums.find((a) => sameAlbum(a.album, event.payload.album));
         if (album) applyAlbumStats(album, event.payload);
       });
 
       // Listen for mass-removal safeguard events (#1582)
-      await listen<MassRemovalIncident>("mass-removal-detected", (event) => {
+      await this.events.listen<MassRemovalIncident>("mass-removal-detected", (event) => {
         this.handleMassRemovalDetected(event.payload);
       });
 
@@ -1520,6 +1521,11 @@ class CollectionStore {
       const profile = this.artistProfiles[artist.name.toLowerCase()];
       return profile?.tags?.some((t) => t.toLowerCase().includes(query)) ?? false;
     });
+  }
+
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
   }
 }
 

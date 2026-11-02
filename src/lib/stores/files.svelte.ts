@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { createEventScope } from "../utils/eventScope";
 import type { ConnectedDevice, FileSource, FileSourceSummary, ScanProgress } from "../types";
 import { devicesStore } from "./devices.svelte";
 import { deviceName } from "../utils/devices";
@@ -31,6 +31,7 @@ class FilesStore {
     return devicesStore.devices;
   }
   private refreshDebounce: ReturnType<typeof setTimeout> | undefined;
+  private events = createEventScope(import.meta.hot);
 
   constructor() {
     // Settings > Sources reloads these lists after every add, edit and
@@ -52,8 +53,8 @@ class FilesStore {
 
   private async init() {
     try {
-      await listen("library-changed", () => this.scheduleRefresh());
-      await listen<ScanProgress>("scan-progress", (event) => {
+      await this.events.listen("library-changed", () => this.scheduleRefresh());
+      await this.events.listen<ScanProgress>("scan-progress", (event) => {
         if (event.payload.phase === "done") this.scheduleRefresh();
       });
       await this.refresh();
@@ -101,6 +102,11 @@ class FilesStore {
       return device ? deviceName(device) : "";
     }
     return this.sources.find((s) => sameSource(s.source, source))?.name ?? "";
+  }
+
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
   }
 }
 

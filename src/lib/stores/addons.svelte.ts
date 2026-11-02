@@ -1,4 +1,4 @@
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { createEventScope } from "../utils/eventScope";
 import type { Theme } from "./theme.svelte";
 
 /**
@@ -70,7 +70,7 @@ export class AddonsStore {
   statuses = $state<Record<string, AddonStatus>>({});
 
   private listeners = new Set<Listener>();
-  private unlisten: UnlistenFn[] = [];
+  private events = createEventScope(import.meta.hot);
 
   /**
    * Subscribe to the backend's `addon-state-changed` and `addon-theme-defined`
@@ -78,23 +78,27 @@ export class AddonsStore {
    * of an `invoke()`.
    */
   async init() {
-    if (this.unlisten.length) return;
-    this.unlisten = await Promise.all([
-      listen<AddonStateChange>("addon-state-changed", (event) => {
+    await Promise.all([
+      this.events.listen<AddonStateChange>("addon-state-changed", (event) => {
         this.applyEvent(event.payload);
       }),
-      listen<AddonTheme>("addon-theme-defined", (event) => {
+      this.events.listen<AddonTheme>("addon-theme-defined", (event) => {
         this.register(event.payload);
       }),
-      listen<AddonPrice>("addon-price-defined", (event) => {
+      this.events.listen<AddonPrice>("addon-price-defined", (event) => {
         this.prices[event.payload.id] = event.payload;
       })
     ]);
   }
 
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
+  }
+
+  /** @deprecated Use {@link dispose} */
   destroy() {
-    for (const stop of this.unlisten) stop();
-    this.unlisten = [];
+    this.dispose();
   }
 
   /** Called by the theme store so a persisted add-on theme is re-applied once it becomes owned. */

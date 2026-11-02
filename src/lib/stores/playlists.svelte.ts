@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { createEventScope } from "../utils/eventScope";
 import type { Playlist, PlaylistItem, QueuePopulationMode, Song } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { toastStore } from "./toast.svelte";
@@ -17,6 +17,7 @@ class PlaylistsStore {
   playlists = $state<Playlist[]>([]);
   activePlaylistId = $state<number | null>(null);
   activePlaylistTracks = $state<PlaylistItem[]>([]);
+  private events = createEventScope(import.meta.hot);
 
   /** The playlist explicitly pinned via "Make Active" as the quick-add target
    * used across the app ("Add to {name}"). Distinct from `activePlaylistId`
@@ -107,7 +108,7 @@ class PlaylistsStore {
     try {
       // Keep loaded playlist tracks in sync with rating/playcount changes
       // made anywhere in the app.
-      await listen<SongStatsPayload>("song-stats-changed", (event) => {
+      await this.events.listen<SongStatsPayload>("song-stats-changed", (event) => {
         for (const item of this.activePlaylistTracks) {
           if (item.song?.id === event.payload.song_id) {
             applySongStats(item.song, event.payload);
@@ -120,7 +121,7 @@ class PlaylistsStore {
       // song stats change (see reconcile_and_sync in playlist.rs) and
       // announces which ones changed — refresh so views reflect the new
       // membership immediately.
-      await listen<number[]>("playlists-changed", async (event) => {
+      await this.events.listen<number[]>("playlists-changed", async (event) => {
         await this.refreshPlaylists();
         if (this.activePlaylistId !== null && event.payload.includes(this.activePlaylistId)) {
           await this.selectPlaylist(this.activePlaylistId);
@@ -455,6 +456,15 @@ class PlaylistsStore {
     if (this.activePlaylistId === playlistId) {
       await this.selectPlaylist(playlistId);
     }
+  }
+
+  /** Stops listening to backend events and timers. */
+  dispose() {
+    if (this.daypartBoundaryTimer) {
+      clearInterval(this.daypartBoundaryTimer);
+      this.daypartBoundaryTimer = null;
+    }
+    this.events.dispose();
   }
 }
 

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { createEventScope, type EventScope } from "../utils/eventScope";
 import type { AudioDeviceInfo, AudioOutputConfig, AudioPipelineInfo } from "../types";
 
 export type RatingStyle = "heart" | "stars" | "both";
@@ -73,11 +73,11 @@ class PrefsStore {
    * it; this mirrors it (loaded in `init()`, kept current by `online-mode-changed`)
    * so the UI can hide online-only actions. */
   onlineEnabled = $state<boolean>(true);
-  private onlineUnlisten: (() => void) | null = null;
   audioOutputDevices = $state<AudioDeviceInfo[]>([]);
   audioOutputConfig = $state<AudioOutputConfig>({ backend: "cpal", device_id: null });
   audioOutputLoading = $state<boolean>(false);
-  private outputUnlistens: (() => void)[] = [];
+  private events = createEventScope(import.meta.hot);
+  private outputScope: EventScope | null = null;
   /** The open output last reported, to reload the device list only when it moves. */
   private lastOutputKey: string | null = null;
 
@@ -104,8 +104,7 @@ class PrefsStore {
     this.weekStart = prefs.week_start;
     try {
       this.onlineEnabled = await invoke<boolean>("is_context_enrichment_enabled");
-      this.onlineUnlisten?.();
-      this.onlineUnlisten = await listen<boolean>("online-mode-changed", (event) => {
+      await this.events.listen<boolean>("online-mode-changed", (event) => {
         this.onlineEnabled = event.payload;
       });
     } catch (e) {
@@ -124,11 +123,12 @@ class PrefsStore {
   /** Reloads the device list whenever the open output moves (a fallback, an
    * unplugged or returning device), so Settings never lists a stale set. */
   private async followOutputChanges() {
-    this.outputUnlistens.forEach((unlisten) => unlisten());
+    this.outputScope?.dispose();
+    this.outputScope = this.events.createChild();
     try {
-      this.outputUnlistens = await Promise.all([
-        listen("audio-output-fallback", () => void this.refreshAudioDevices()),
-        listen<AudioPipelineInfo | null>("audio-pipeline-changed", (event) => {
+      await Promise.all([
+        this.outputScope.listen("audio-output-fallback", () => void this.refreshAudioDevices()),
+        this.outputScope.listen<AudioPipelineInfo | null>("audio-pipeline-changed", (event) => {
           const p = event.payload;
           const key = p ? `${p.output_backend}|${p.output_device_name}` : null;
           if (key === this.lastOutputKey) return;
@@ -335,6 +335,11 @@ class PrefsStore {
       console.error("Failed to open ASIO control panel:", e);
       throw e;
     }
+  }
+
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
   }
 }
 

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { createEventScope } from "../utils/eventScope";
 import { check as checkForUpdate, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { toastStore } from "./toast.svelte";
@@ -85,6 +85,7 @@ class UpdaterStore {
   private intervalTimer: ReturnType<typeof setInterval> | null = null;
   private pendingUpdate: Update | null = null;
   private initialized = false;
+  private events = createEventScope(import.meta.hot);
 
   async init() {
     if (this.initialized) return;
@@ -120,7 +121,7 @@ class UpdaterStore {
       }
 
       // Back online: catch up on the check that was skipped while offline.
-      void listen<boolean>("online-mode-changed", (event) => {
+      void this.events.listen<boolean>("online-mode-changed", (event) => {
         if (event.payload && this.updateCheckEnabled) void this.checkForUpdates();
       }).catch(() => {});
 
@@ -320,6 +321,13 @@ class UpdaterStore {
         "error"
       );
     }
+  }
+
+  /** Stops listening to backend events and clears background timers. */
+  dispose() {
+    this.stopPeriodicCheck();
+    this.events.dispose();
+    this.initialized = false;
   }
 }
 

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { createEventScope } from "../utils/eventScope";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
 import { albumKey } from "$lib/utils/albumKey";
@@ -18,6 +18,7 @@ function normalizeKey(entityType: string, entityKey: string): string {
  * `get_pinned_items` rather than checking each item's state individually. */
 class StatsExclusionsStore {
   private keys = $state<Set<string>>(new Set());
+  private events = createEventScope(import.meta.hot);
 
   constructor() {
     this.init();
@@ -25,7 +26,7 @@ class StatsExclusionsStore {
 
   private async init() {
     try {
-      await listen("stats-exclusions-changed", () => this.refresh());
+      await this.events.listen("stats-exclusions-changed", () => this.refresh());
       await this.refresh();
     } catch (err) {
       console.error("Failed to initialize StatsExclusionsStore:", err);
@@ -101,6 +102,11 @@ class StatsExclusionsStore {
       ? i18n.t("stats.excludedToast", { name })
       : i18n.t("stats.includedToast", { name });
     toastStore.show(message);
+  }
+
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
   }
 }
 

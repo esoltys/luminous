@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { createEventScope } from "../utils/eventScope";
 import { i18n } from "./i18n.svelte";
 import { toastStore } from "./toast.svelte";
 
@@ -25,15 +25,16 @@ class HierarchySidecarStore {
   /** Last error toasted, so the startup status and the startup event don't
    * both toast the same failure. */
   private toasted: string | null = null;
+  private events = createEventScope(import.meta.hot);
 
   async init() {
-    await listen<SidecarError>("hierarchy-sidecar-error", ({ payload }) => {
+    await this.events.listen<SidecarError>("hierarchy-sidecar-error", ({ payload }) => {
       this.error = payload.message;
       this.toast(payload.path, payload.message);
     });
     // The backend links a lone watched folder on its own when folders are
     // added or removed.
-    await listen("default-library-changed", () => this.refresh());
+    await this.events.listen("default-library-changed", () => this.refresh());
     // An error from the startup load can be emitted before the listener above
     // is attached — the status call reports it too.
     await this.refresh();
@@ -69,6 +70,11 @@ class HierarchySidecarStore {
     if (this.toasted === message) return;
     this.toasted = message;
     toastStore.show(brokenText(path), "error");
+  }
+
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
   }
 }
 

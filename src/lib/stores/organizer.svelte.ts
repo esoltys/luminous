@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { createEventScope } from "../utils/eventScope";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
 import { TOAST_DURATION_MS } from "../constants";
@@ -79,7 +79,7 @@ class OrganizerStore {
   isLoaded = $state<boolean>(false);
   isDraftActive = $state<boolean>(false);
 
-  private unlisten: UnlistenFn | null = null;
+  private events = createEventScope(import.meta.hot);
   private pendingMovedCount = 0;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -97,14 +97,12 @@ class OrganizerStore {
       this.isLoaded = true;
     }
 
-    if (!this.unlisten) {
-      try {
-        this.unlisten = await listen<AutoOrganizeResult>("auto-organize-result", (event) => {
-          this.handleResult(event.payload);
-        });
-      } catch (err) {
-        console.error("Failed to listen for auto-organize-result:", err);
-      }
+    try {
+      await this.events.listen<AutoOrganizeResult>("auto-organize-result", (event) => {
+        this.handleResult(event.payload);
+      });
+    } catch (err) {
+      console.error("Failed to listen for auto-organize-result:", err);
     }
   }
 
@@ -195,15 +193,18 @@ class OrganizerStore {
     }
   }
 
-  destroy() {
-    if (this.unlisten) {
-      this.unlisten();
-      this.unlisten = null;
-    }
+  /** Stops listening to backend events. */
+  dispose() {
+    this.events.dispose();
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
+  }
+
+  /** @deprecated Use {@link dispose} */
+  destroy() {
+    this.dispose();
   }
 }
 
