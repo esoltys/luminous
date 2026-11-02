@@ -346,7 +346,11 @@ export interface FileSourceSummary {
 /** What a file or folder is to the library. Word it in the UI; never show the code. */
 export type FileEntryStatus = "inLibrary" | "notScanned" | "albumArt" | "notAudio" | "excluded" | "notFromLuminous";
 
+/** The tag a Subsonic folder's songs lack; such a folder's name is empty. Word it with `shownName`. */
+export type MissingTag = "artist" | "album";
+
 export interface FileEntry {
+  /** Its identity in a path; empty only for a `missingTag` folder. */
   name: string;
   isDir: boolean;
   size: number | null;
@@ -356,6 +360,7 @@ export interface FileEntry {
   /** Null for ordinary folders and device files. */
   status: FileEntryStatus | null;
   songId: number | null;
+  missingTag: MissingTag | null;
 }
 
 /** One folder of a source (`list_source_dir`): folders first, then files. */
@@ -369,6 +374,8 @@ export interface DirListing {
   inLibraryCount: number;
   /** The folder is one the scanner never looks in, or inside one. */
   excluded: boolean;
+  /** For each name of the listed path, its `missingTag`; empty for sources that have none. */
+  pathMissingTags: (MissingTag | null)[];
 }
 
 /** One thing checked to go on a device (backend `SyncSource`, #836). */

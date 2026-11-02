@@ -13,6 +13,7 @@
   import { filesStore, sourceKey } from "../../stores/files.svelte";
   import { devicesStore } from "../../stores/devices.svelte";
   import { sourceIcon } from "./sourceIcon";
+  import { shownName } from "./shownName";
   import { collectionStore } from "../../stores/collection.svelte";
   import { playerStore } from "../../stores/player.svelte";
   import { toastStore } from "../../stores/toast.svelte";
@@ -49,7 +50,9 @@
   const revealLabel = $derived(
     i18n.t(isWindows ? "files.revealWindows" : isLinux ? "files.revealLinux" : "files.revealMac")
   );
-  const title = $derived(location && location.path.length > 0 ? location.path[location.path.length - 1] : sourceName);
+  /** The `i`th name of the current path as shown; the listing says which are missing tags. */
+  const pathName = (i: number) => shownName(location?.path[i] ?? "", listing?.pathMissingTags[i]);
+  const title = $derived(location && location.path.length > 0 ? pathName(location.path.length - 1) : sourceName);
   const unreachableLabel = $derived(i18n.t("files.unreachable", { name: sourceName }));
 
   function navigate(path: string[]) {
@@ -163,12 +166,12 @@
               class="truncate {location.path.length === 0 ? 'text-brand-text-primary font-semibold' : 'hover:text-brand-text-primary'}"
               onclick={() => navigate([])}
             >{sourceName}</button>
-            {#each location.path as name, i (i)}
+            {#each location.path as _, i (i)}
               <span aria-hidden="true">/</span>
               <button
                 class="truncate {i === location.path.length - 1 ? 'text-brand-text-primary font-semibold' : 'hover:text-brand-text-primary'}"
                 onclick={() => navigate(location.path.slice(0, i + 1))}
-              >{name}</button>
+              >{pathName(i)}</button>
             {/each}
           </nav>
           <h1 class="text-3xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={title}>{title}</h1>

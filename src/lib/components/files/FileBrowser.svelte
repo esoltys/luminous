@@ -7,6 +7,7 @@
   import { formatFileSize } from "../../utils/formatters";
   import type { DirListing, FileEntry, FileEntryStatus, FileSource } from "../../types";
   import Button from "../Button.svelte";
+  import { shownName } from "./shownName";
 
   /**
    * A column browser over one source (#1841): up to two columns of the
@@ -120,7 +121,9 @@
   let listings = $state<Record<string, Loaded>>({});
   let cacheOwner = "";
 
-  const keyOf = (dir: string[]) => dir.join("\u0000");
+  // Not a join: a Subsonic folder's name can be empty, and `[""]` must not
+  // be the source's root.
+  const keyOf = (dir: string[]) => JSON.stringify(dir);
 
   // A new source or reload empties the cache; otherwise moving around
   // reuses what was already read.
@@ -172,6 +175,14 @@
     return loaded?.state === "ready" ? loaded.listing.entries.filter((e) => e.isDir) : [];
   };
   const currentEntries = $derived(current?.state === "ready" ? current.listing.entries : []);
+
+  /** The name a column is labelled with: its folder's, or "Folders" at the root. */
+  function columnLabel(dir: string[]): string {
+    if (dir.length === 0) return i18n.t("files.folders");
+    const loaded = listings[keyOf(dir)];
+    const missingTag = loaded?.state === "ready" ? loaded.listing.pathMissingTags[dir.length - 1] : null;
+    return shownName(dir[dir.length - 1], missingTag);
+  }
 
   // Keyboard focus: which column, and its virtual list for scrolling.
   let columnEls = $state<(HTMLElement | null)[]>([]);
@@ -318,7 +329,7 @@
         class="shrink-0 min-h-0 {visibility} flex-col border-r border-brand-border/40 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
         role="listbox"
         tabindex="0"
-        aria-label={dir.length ? dir[dir.length - 1] : i18n.t("files.folders")}
+        aria-label={columnLabel(dir)}
         onkeydown={(e) => handleParentKey(e, column, dir)}
       >
         <div class="flex-1 min-h-0 p-1.5">
@@ -333,7 +344,7 @@
                 onclick={() => openFolder(dir, entry.name)}
               >
                 <FolderIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
-                <span class="truncate flex-1">{entry.name}</span>
+                <span class="truncate flex-1">{shownName(entry.name, entry.missingTag)}</span>
                 {#if entry.status === "excluded" || entry.status === "notFromLuminous"}
                   <span class="text-[11px] text-brand-text-secondary shrink-0">{statusLabel(entry)}</span>
                 {:else}
@@ -391,13 +402,14 @@
             class="flex-1 min-h-0 p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
             role="listbox"
             tabindex="0"
-            aria-label={dir.length ? dir[dir.length - 1] : i18n.t("files.folders")}
+            aria-label={columnLabel(dir)}
             onkeydown={(e) => handleCurrentKey(e, column)}
           >
             <VirtualList items={currentEntries} height="100%" itemHeight={ROW_HEIGHT_PX} bind:this={lists[column]} bind:start={starts[column]} bind:end={ends[column]}>
               {#snippet children({ item: entry }: { item: FileEntry })}
                 {@const selected = selection.includes(entry.name)}
                 {@const muted = MUTED.includes(entry.status)}
+                {@const name = shownName(entry.name, entry.missingTag)}
                 <div
                   class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'}"
                   role="option"
@@ -417,7 +429,7 @@
                     {:else}
                       <FileIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
                     {/if}
-                    <span class="truncate" title={entry.name}>{entry.name}</span>
+                    <span class="truncate" title={name}>{name}</span>
                   </span>
                   <span class="w-12 shrink-0 text-[11px] text-brand-text-secondary hidden @lg:block">{entry.fileType ?? ""}</span>
                   <span class="w-16 shrink-0 text-right text-[11px] tabular-nums text-brand-text-secondary hidden @lg:block">{entry.isDir || entry.size === null ? "" : formatFileSize(entry.size)}</span>
