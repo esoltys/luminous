@@ -2,6 +2,7 @@ pub mod addons;
 pub mod collection;
 pub mod context;
 pub mod cover;
+pub mod curation;
 pub mod devices;
 pub mod diagnostics;
 pub mod equalizer;

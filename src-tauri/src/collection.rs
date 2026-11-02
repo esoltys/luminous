@@ -53,6 +53,7 @@ mod watcher;
 pub(crate) use query::get_artist_profile_conn;
 #[cfg(test)]
 pub(crate) use query::set_artist_profile_conn;
+pub(crate) use query::MISSING_CORE_TAGS_SQL;
 pub(crate) use reconcile::resolve_case_insensitive_path;
 pub use safeguard::{MassRemovalIncident, MassRemovalRegistry, SafeguardVerdict};
 pub use watcher::{start_watcher, SelfWriteTracker, WatcherPauseGuard};
