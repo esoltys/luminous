@@ -4,6 +4,10 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { collectionStore } from "../stores/collection.svelte";
+  import { picardStore } from "../stores/picard.svelte";
+  import { openInPicard } from "../utils/picard";
+  import { slide } from "../utils/motion";
   import { organizeStore, computeOrganizeConsequences, type OrganizeConsequences } from "../stores/organizer.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import { TOAST_DURATION_MS } from "../constants";
@@ -18,13 +22,19 @@
     StackIcon as Layers,
     MusicNotesIcon as Music,
     CopySimpleIcon as Duplicate,
-    XCircleIcon as ErrorIcon
+    XCircleIcon as ErrorIcon,
+    PencilSimpleIcon as Edit3,
+    ArrowSquareOutIcon as OpenInPicard
   } from "phosphor-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
   import HelpTip from "./HelpTip.svelte";
   import TemplateInput from "./TemplateInput.svelte";
+  import ContextMenu from "./ContextMenu.svelte";
+  import ContextMenuItem from "./ContextMenuItem.svelte";
+  import TagEditor from "./TagEditor.svelte";
+  import ViewInFilesItem from "./ViewInFilesItem.svelte";
 
   const PREVIEW_DEBOUNCE_MS = 300;
   const COL_MIN_WIDTH_PX = 150;
@@ -39,6 +49,10 @@
     to_path: string;
     status: "ok" | "unchanged" | "collision" | "missing_tag" | "error";
     error_message: string | null;
+    title?: string | null;
+    artist?: string | null;
+    album?: string | null;
+    missing_fields?: string[];
   }
 
   let {
@@ -48,6 +62,7 @@
     initialScope = "selection",
     refreshKey = 0,
     summaryReadyCount = $bindable(0),
+    summaryPendingCount = $bindable(0),
     summaryCanApply = $bindable(false),
     summaryIsApplying = $bindable(false),
     applyRequestKey = 0,
@@ -63,6 +78,7 @@
     refreshKey?: number;
     /** Embedded mode only: mirrors readyCount/canApply/isApplying so the host page can render its own Apply control. */
     summaryReadyCount?: number;
+    summaryPendingCount?: number;
     summaryCanApply?: boolean;
     summaryIsApplying?: boolean;
     /** Embedded mode only: bump this from the host page to trigger handleApply. */
@@ -403,16 +419,101 @@
   let errorCount = $derived(items.filter((i) => getItemStatus(i) === "error").length);
   let missingTagCount = $derived(items.filter((i) => getItemStatus(i) === "missing_tag").length);
   let readyCount = $derived(items.filter((i) => getItemStatus(i) === "ok").length);
-  // Missing-tag and duplicate-routed items still get moved by handleApply (their backend
-  // status is "ok"/"missing_tag") — they just aren't counted in readyCount since the UI
-  // shows them as their own buckets.
-  let canApply = $derived((readyCount > 0 || collisionCount > 0 || missingTagCount > 0) && !isLoading && !isApplying);
+  let pendingCount = $derived(missingTagCount + collisionCount + errorCount);
+
+  // Untagged tracks (missing_tag) are held back by default; users can opt in via a toggle
+  let includeMissingTags = $state(false);
+  let eligibleCount = $derived(readyCount + collisionCount + (includeMissingTags ? missingTagCount : 0));
+  let canApply = $derived(eligibleCount > 0 && !isLoading && !isApplying);
 
   $effect(() => {
     summaryReadyCount = readyCount;
+    summaryPendingCount = pendingCount;
     summaryCanApply = canApply;
     summaryIsApplying = isApplying;
   });
+
+  type FilterKey = "all" | "ok" | "missing_tag" | "duplicate" | "error";
+  let activeFilter = $state<FilterKey>("all");
+
+  $effect(() => {
+    if (activeFilter === "missing_tag" && missingTagCount === 0) activeFilter = "all";
+    if (activeFilter === "duplicate" && collisionCount === 0) activeFilter = "all";
+    if (activeFilter === "error" && errorCount === 0) activeFilter = "all";
+  });
+
+  let filteredItems = $derived.by(() => {
+    if (activeFilter === "all") return displayedItems;
+    return displayedItems.filter((i) => getItemStatus(i) === activeFilter);
+  });
+
+  let isConfigExpanded = $state(false);
+  let editingSongId = $state<number | null>(null);
+  let contextMenu = $state<{ x: number; y: number; item: OrganizePreviewItem } | null>(null);
+
+  function openTagEditor(songId: number) {
+    editingSongId = songId;
+  }
+
+  async function handleTagEditorSaved() {
+    await collectionStore.refreshLibrary();
+    await fetchPreview();
+  }
+
+  async function handleOpenInPicard(songId: number) {
+    await openInPicard([songId]);
+  }
+
+  function handleRowDblClick(item: OrganizePreviewItem) {
+    if (getItemStatus(item) === "missing_tag") {
+      openTagEditor(item.song_id);
+    }
+  }
+
+  function handleRowContextMenu(item: OrganizePreviewItem, e: MouseEvent) {
+    e.preventDefault();
+    contextMenu = { x: e.clientX, y: e.clientY, item };
+  }
+
+  function getTrackTitle(item: OrganizePreviewItem): string {
+    if (item.title && item.title.trim().length > 0) return item.title.trim();
+    if (item.from_path) {
+      const parts = item.from_path.split(/[/\\]/);
+      const fileName = parts[parts.length - 1];
+      const stem = fileName.replace(/\.[^/.]+$/, "");
+      if (stem.trim().length > 0) return stem;
+    }
+    return i18n.t("organizer.unknownTrack");
+  }
+
+  function getTrackSubtitle(item: OrganizePreviewItem): string {
+    const artist = item.artist?.trim() || "";
+    const album = item.album?.trim() || "";
+    if (artist && album) return `${artist} • ${album}`;
+    if (artist) return artist;
+    if (album) return album;
+    return "";
+  }
+
+  function formatMissingTagTooltip(item: OrganizePreviewItem): string {
+    const fields = item.missing_fields;
+    if (fields && fields.length > 0) {
+      const fieldNames = fields.map((f) => {
+        switch (f) {
+          case "title": return i18n.t("organizer.chipTitle");
+          case "artist": return i18n.t("organizer.chipArtist");
+          case "album": return i18n.t("organizer.chipAlbum");
+          case "year": return i18n.t("organizer.chipYear");
+          case "genre": return i18n.t("organizer.chipGenre");
+          case "track": return i18n.t("tagEditor.fieldTrack");
+          case "disc": return i18n.t("tagEditor.fieldDisc");
+          default: return f;
+        }
+      });
+      return `${i18n.t("organizer.statusMissingTag")}: ${fieldNames.join(", ")}`;
+    }
+    return item.error_message || i18n.t("organizer.statusMissingTag");
+  }
 
   // -1 sentinel: skip the initial effect run so mounting doesn't fire an apply.
   let lastAppliedRequestKey = $state(-1);
@@ -513,7 +614,7 @@
 
   function requestApply() {
     if (!canApply || isApplying) return;
-    const consequences = computeOrganizeConsequences(items, { cleanEmptyDirs, moveExtraFiles });
+    const consequences = computeOrganizeConsequences(items, { cleanEmptyDirs, moveExtraFiles, includeMissingTags });
     if (consequences.fileCount === 0) return;
     pendingConsequences = consequences;
     showConfirmApply = true;
@@ -550,7 +651,7 @@
     errorMessage = null;
 
     const itemsToApply = items
-      .filter((i) => i.status === "ok" || i.status === "missing_tag")
+      .filter((i) => i.status === "ok" || (includeMissingTags && (i.status === "missing_tag" || (i.status as any) === "missingtag")))
       .map((i) => ({
         song_id: i.song_id,
         from_path: i.from_path,
@@ -801,23 +902,79 @@
 {#snippet previewSection()}
   <div class="space-y-2">
     <div class="flex flex-col gap-1.5">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-medium text-brand-text-primary flex items-center gap-2">
-          <span>{i18n.t("organizer.statusSummary", { errors: errorCount, missingTags: missingTagCount, duplicates: collisionCount, ready: readyCount })}</span>
-        </h3>
-        <Button
-          onclick={fetchPreview}
-          variant="secondary"
-          size="sm"
-          disabled={isLoading}
-          title={i18n.t("organizer.refreshPreviewTooltip")}
-          class="gap-1.5"
-        >
-          <RefreshCw class="w-3.5 h-3.5 {isLoading ? 'animate-spin text-brand-accent-text' : ''}" />
-          {i18n.t("organizer.refreshPreviewTooltip")}
-        </Button>
-      </div>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Status filters">
+          <button
+            type="button"
+            onclick={() => { activeFilter = "all"; }}
+            class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'all' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
+          >
+            {i18n.t("organizer.filterAll", { count: displayedItems.length })}
+          </button>
+          <button
+            type="button"
+            onclick={() => { activeFilter = "ok"; }}
+            class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'ok' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
+          >
+            {i18n.t("organizer.filterReady", { count: readyCount })}
+          </button>
+          {#if missingTagCount > 0}
+            <button
+              type="button"
+              onclick={() => { activeFilter = "missing_tag"; }}
+              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'missing_tag' ? 'bg-amber-500 text-black font-bold shadow-sm' : 'bg-brand-sidebar text-amber-400 hover:text-amber-300 border border-amber-500/30'}"
+            >
+              {i18n.t("organizer.filterNeedsTags", { count: missingTagCount })}
+            </button>
+          {/if}
+          {#if collisionCount > 0}
+            <button
+              type="button"
+              onclick={() => { activeFilter = "duplicate"; }}
+              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'duplicate' ? 'bg-amber-500 text-black font-bold shadow-sm' : 'bg-brand-sidebar text-amber-400 hover:text-amber-300 border border-amber-500/30'}"
+            >
+              {i18n.t("organizer.filterDuplicates", { count: collisionCount })}
+            </button>
+          {/if}
+          {#if errorCount > 0}
+            <button
+              type="button"
+              onclick={() => { activeFilter = "error"; }}
+              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'error' ? 'bg-rose-500 text-white font-bold shadow-sm' : 'bg-brand-sidebar text-rose-400 hover:text-rose-300 border border-rose-500/30'}"
+            >
+              {i18n.t("organizer.filterErrors", { count: errorCount })}
+            </button>
+          {/if}
+        </div>
 
+        <div class="flex items-center gap-3">
+          {#if missingTagCount > 0}
+            <div class="flex items-center gap-2">
+              <Toggle
+                checked={includeMissingTags}
+                onchange={(v) => { includeMissingTags = v; }}
+                label={i18n.t("organizer.includeMissingTagsToggle")}
+                showOnOffLabel={false}
+              />
+              <span class="text-xs text-brand-text-secondary select-none">
+                {i18n.t("organizer.includeMissingTagsToggle")}
+              </span>
+            </div>
+          {/if}
+
+          <Button
+            onclick={fetchPreview}
+            variant="secondary"
+            size="sm"
+            disabled={isLoading}
+            title={i18n.t("organizer.refreshPreviewTooltip")}
+            class="gap-1.5"
+          >
+            <RefreshCw class="w-3.5 h-3.5 {isLoading ? 'animate-spin text-brand-accent-text' : ''}" />
+            {i18n.t("organizer.refreshPreviewTooltip")}
+          </Button>
+        </div>
+      </div>
     </div>
 
     <div class="h-64 border border-brand-border/60 rounded-xl overflow-hidden bg-brand-sidebar/40 flex flex-col">
@@ -829,15 +986,16 @@
             <span>{i18n.t("organizer.noTracksToOrganize")}</span>
           {/if}
         </div>
-      {:else if displayedItems.length === 0}
+      {:else if filteredItems.length === 0}
         <div class="h-full flex items-center justify-center text-brand-text-secondary">
           <span>{i18n.t("organizer.noChangingFilesMatch")}</span>
         </div>
       {:else}
         <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
-          <div style="min-width: {56 + fromColWidth + 24 + toColWidth + 20}px;" class="h-full flex flex-col">
+          <div style="min-width: {48 + 224 + fromColWidth + 24 + toColWidth + 140}px;" class="h-full flex flex-col">
             <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0">
-              <div class="w-14 shrink-0">{i18n.t("organizer.colStatus")}</div>
+              <div class="w-12 shrink-0">{i18n.t("organizer.colStatus")}</div>
+              <div class="w-56 shrink-0 pr-2">{i18n.t("organizer.chipTitle")}</div>
 
               <div class="flex items-center shrink-0 pr-1" style="width: {fromColWidth}px;">
                 <span class="truncate flex-1">{i18n.t("organizer.colSource")}</span>
@@ -871,16 +1029,22 @@
             </div>
 
             <div class="flex-1 min-h-0">
-              <VirtualList items={displayedItems} height="100%" itemHeight={36}>
+              <VirtualList items={filteredItems} height="100%" itemHeight={46}>
                 {#snippet children(rawRow: any)}
                   {@const item = getItemObj(rawRow)}
                   {@const st = getItemStatus(item)}
+                  {@const displayTitle = getTrackTitle(item)}
+                  {@const displaySubtitle = getTrackSubtitle(item)}
                   {@const displayFrom = getDisplayPath(item.from_path, commonPrefix)}
                   {@const displayTo = getDisplayPath(item.to_path, commonPrefix)}
                   <div
-                    class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
+                    class="h-[46px] px-3 flex items-center border-b border-brand-border/20 text-[11px] hover:bg-brand-accent/10 transition-colors whitespace-nowrap group relative cursor-default"
+                    ondblclick={() => handleRowDblClick(item)}
+                    oncontextmenu={(e) => handleRowContextMenu(item, e)}
+                    role="row"
+                    tabindex="0"
                   >
-                    <div class="w-14 shrink-0">
+                    <div class="w-12 shrink-0">
                       {#if st === "ok"}
                         <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30" title={i18n.t("organizer.statusOk")}>
                           <Check class="w-3.5 h-3.5" />
@@ -900,8 +1064,8 @@
                         </HelpTip>
                       {:else if st === "missing_tag"}
                         <HelpTip
-                          text={item.error_message || i18n.t("organizer.statusMissingTag")}
-                          label={item.error_message ? i18n.t("organizer.statusMissingTag") : undefined}
+                          text={formatMissingTagTooltip(item)}
+                          label={i18n.t("organizer.statusMissingTag")}
                           class="w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40"
                         >
                           <AlertTriangle class="w-3.5 h-3.5" />
@@ -914,6 +1078,18 @@
                         >
                           <ErrorIcon class="w-3.5 h-3.5" />
                         </HelpTip>
+                      {/if}
+                    </div>
+
+                    <!-- Track identity -->
+                    <div class="w-56 shrink-0 pr-3 min-w-0 flex flex-col justify-center">
+                      <span class="truncate font-medium text-brand-text-primary text-xs" title={displayTitle}>
+                        {displayTitle}
+                      </span>
+                      {#if displaySubtitle}
+                        <span class="truncate text-[10px] text-brand-text-secondary" title={displaySubtitle}>
+                          {displaySubtitle}
+                        </span>
                       {/if}
                     </div>
 
@@ -942,6 +1118,30 @@
                         </span>
                       {:else}
                         {@html highlightPathHtml(displayTo)}
+                      {/if}
+                    </div>
+
+                    <!-- Hover quick actions -->
+                    <div class="ml-auto shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pl-2">
+                      <button
+                        type="button"
+                        onclick={(e) => { e.stopPropagation(); openTagEditor(item.song_id); }}
+                        class="px-2 py-1 rounded bg-brand-sidebar hover:bg-brand-accent hover:text-brand-accent-contrast text-brand-text-secondary text-[10px] font-medium border border-brand-border/60 transition-colors flex items-center gap-1 shadow-sm"
+                        title={i18n.t("organizer.editTags")}
+                      >
+                        <Edit3 class="w-3 h-3" />
+                        <span>{i18n.t("organizer.editTags")}</span>
+                      </button>
+                      {#if picardStore.available}
+                        <button
+                          type="button"
+                          onclick={(e) => { e.stopPropagation(); handleOpenInPicard(item.song_id); }}
+                          class="px-2 py-1 rounded bg-brand-sidebar hover:bg-brand-accent hover:text-brand-accent-contrast text-brand-text-secondary text-[10px] font-medium border border-brand-border/60 transition-colors flex items-center gap-1 shadow-sm"
+                          title={i18n.t("picard.openInPicard")}
+                        >
+                          <OpenInPicard class="w-3 h-3" />
+                          <span>{i18n.t("picard.openInPicard")}</span>
+                        </button>
                       {/if}
                     </div>
                   </div>
@@ -1001,15 +1201,48 @@
         {@render previewSection()}
       </div>
 
-      <div class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
-        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionTemplatePattern")}</h3>
-        {@render templateSection()}
+      <!-- Collapsible Template & Destination Summary Bar -->
+      <div class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-4 flex items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 min-w-0 flex-1">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider shrink-0">
+              {i18n.t("organizer.activeTemplateLabel")}:
+            </span>
+            <code class="px-2 py-0.5 rounded bg-brand-main/60 border border-brand-border/60 text-xs font-mono text-brand-text-primary truncate">
+              {template}
+            </code>
+          </div>
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider shrink-0">
+              {i18n.t("organizer.activeDestinationLabel")}:
+            </span>
+            <span class="text-xs font-medium text-brand-text-primary truncate">
+              {destinationMode === "custom" && customDestinationDir ? customDestinationDir : i18n.t("organizer.destinationDefault")}
+            </span>
+          </div>
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onclick={() => { isConfigExpanded = !isConfigExpanded; }}
+        >
+          {isConfigExpanded ? i18n.t("organizer.collapseSummaryBtn") : i18n.t("organizer.customizeSummaryBtn")}
+        </Button>
       </div>
 
-      <div class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
-        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionDestinationOptions")}</h3>
-        {@render destinationSection()}
-      </div>
+      {#if isConfigExpanded}
+        <div transition:slide class="space-y-4">
+          <div class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
+            <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionTemplatePattern")}</h3>
+            {@render templateSection()}
+          </div>
+
+          <div class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
+            <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionDestinationOptions")}</h3>
+            {@render destinationSection()}
+          </div>
+        </div>
+      {/if}
     </div>
   {:else}
     <div
@@ -1095,6 +1328,40 @@
       onCancel={() => {
         showConfirmApply = false;
       }}
+    />
+  {/if}
+
+  {#if contextMenu}
+    <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => { contextMenu = null; }}>
+      <ContextMenuItem
+        icon={Edit3}
+        label={i18n.t("organizer.editTags")}
+        onclick={() => {
+          const id = contextMenu!.item.song_id;
+          contextMenu = null;
+          openTagEditor(id);
+        }}
+      />
+      {#if picardStore.available}
+        <ContextMenuItem
+          icon={OpenInPicard}
+          label={i18n.t("picard.openInPicard")}
+          onclick={() => {
+            const id = contextMenu!.item.song_id;
+            contextMenu = null;
+            handleOpenInPicard(id);
+          }}
+        />
+      {/if}
+      <ViewInFilesItem songId={contextMenu.item.song_id} onClose={() => { contextMenu = null; }} />
+    </ContextMenu>
+  {/if}
+
+  {#if editingSongId !== null}
+    <TagEditor
+      songId={editingSongId}
+      onClose={() => { editingSongId = null; }}
+      onSave={handleTagEditorSaved}
     />
   {/if}
 {/if}

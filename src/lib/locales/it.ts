@@ -2071,6 +2071,22 @@ export const it = {
       one: "{count} brano da organizzare",
       other: "{count} brani da organizzare"
     },
+    summaryWaitingOnCuration: {
+      one: "{count} brano in attesa di tag o revisione",
+      other: "{count} brani in attesa di tag o revisione"
+    },
+    filterAll: "Tutti ({count})",
+    filterReady: "Pronti da posizionare ({count})",
+    filterNeedsTags: "Tag mancanti ({count})",
+    filterDuplicates: "Copie duplicate ({count})",
+    filterErrors: "Errori ({count})",
+    includeMissingTagsToggle: "Includi brani con tag mancanti",
+    customizeSummaryBtn: "Personalizza…",
+    collapseSummaryBtn: "Fine",
+    activeTemplateLabel: "Modello",
+    activeDestinationLabel: "Destinazione",
+    editTags: "Modifica tag",
+    unknownTrack: "Titolo sconosciuto",
     nothingToOrganize: "Niente da organizzare!",
     autoOrganizeToggle: "Organizzazione automatica",
     autoOrganizeToggleTooltip: "Organizza i file automaticamente in background quando arrivano nuovi brani o vengono modificati i tag",

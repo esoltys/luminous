@@ -15,6 +15,7 @@
   let pruneMsg = $state<string | null>(null);
   let organizeRefreshKey = $state(0);
   let organizeReadyCount = $state(0);
+  let organizePendingCount = $state(0);
   let organizeCanApply = $state(false);
   let organizeIsApplying = $state(false);
   let organizeApplyRequestKey = $state(0);
@@ -52,13 +53,18 @@
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
   <div class="flex-1 overflow-y-auto px-6 pb-12" class:pb-28={!!playerStore.currentSong} use:rememberScroll={"organize"}>
     <div class="pt-4 pb-4 flex items-start justify-between gap-4">
-      {#if organizeReadyCount === 0}
+      {#if organizeReadyCount === 0 && organizePendingCount === 0}
         <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
           <span class="relative inline-flex shrink-0">
             <span class="absolute inset-0 rounded-full anim-gold-ring"></span>
             <Star weight="fill" class="w-5 h-5 anim-milestone-bounce" />
           </span>
           {i18n.t("organizer.nothingToOrganize")}
+        </span>
+      {:else if organizeReadyCount === 0 && organizePendingCount > 0}
+        <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
+          <Broom class="w-5 h-5 shrink-0" />
+          {i18n.plural("organizer.summaryWaitingOnCuration", organizePendingCount)}
         </span>
       {:else}
         <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
@@ -105,6 +111,7 @@
         initialScope="library"
         refreshKey={organizeRefreshKey}
         bind:summaryReadyCount={organizeReadyCount}
+        bind:summaryPendingCount={organizePendingCount}
         bind:summaryCanApply={organizeCanApply}
         bind:summaryIsApplying={organizeIsApplying}
         applyRequestKey={organizeApplyRequestKey}

@@ -25,16 +25,17 @@ export interface OrganizeConsequences {
 
 /**
  * Computes the aggregate consequences of applying an organize operation from preview items.
- * Only items eligible to be moved (ok or missing_tag without collisions and with from_path != to_path)
- * are counted towards moving files and destination folders.
+ * Only items eligible to be moved (ok, or missing_tag when explicitly included, without collisions and with from_path != to_path)
+ * are counted towards moving files and destination folders. By default, untagged tracks (missing_tag) are held back.
  */
 export function computeOrganizeConsequences(
   items: Array<{ from_path?: string; to_path?: string; status?: string; error_message?: string | null }>,
-  options: { cleanEmptyDirs: boolean; moveExtraFiles: boolean }
+  options: { cleanEmptyDirs: boolean; moveExtraFiles: boolean; includeMissingTags?: boolean }
 ): OrganizeConsequences {
+  const includeMissingTags = options.includeMissingTags ?? false;
   const movingItems = items.filter((item) => {
     const s = String(item.status || "").toLowerCase();
-    const canMove = s === "ok" || s === "missing_tag" || s === "missingtag";
+    const canMove = s === "ok" || (includeMissingTags && (s === "missing_tag" || s === "missingtag"));
     const hasCollision = s === "collision" || (s === "ok" && item.error_message);
     const fromPath = item.from_path ?? "";
     const toPath = item.to_path ?? "";

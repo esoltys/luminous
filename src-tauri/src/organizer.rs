@@ -84,6 +84,14 @@ pub struct OrganizePreviewItem {
     pub to_path: String,
     pub status: OrganizePreviewStatus,
     pub error_message: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub artist: Option<String>,
+    #[serde(default)]
+    pub album: Option<String>,
+    #[serde(default)]
+    pub missing_fields: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -294,6 +302,125 @@ pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
     expanded = expanded.replace("%extension", ext);
 
     expanded
+}
+
+/// Identifies which metadata fields required by the organize template or core track identity
+/// are missing or whitespace-only on the given song.
+///
+/// Conditional blocks `{...}` are stripped first so optional variables (such as `{%year - }`
+/// or `{%album/}`) do not trigger a missing-tag hold-back when absent.
+///
+/// Core track identity fields (`title`, and `artist` or `albumartist`) are always checked:
+/// an audio track must have a title and an artist identity to be ready for file relocation.
+/// For `%albumartist` (or core identity), if `song.album_artist` is missing, it falls back to
+/// `song.artist`, matching the behavior of `expand_template`.
+pub fn required_missing_tags(template: &str, song: &Song) -> Vec<String> {
+    let mut remainder = template.to_string();
+    while let Some(start) = remainder.find('{') {
+        if let Some(end) = remainder[start..].find('}') {
+            let actual_end = start + end;
+            remainder.replace_range(start..=actual_end, "");
+        } else {
+            break;
+        }
+    }
+
+    let mut missing = Vec::new();
+
+    // 1. Title: part of core identity and %title
+    let is_title_empty = song
+        .title
+        .as_deref()
+        .map(|s| s.trim())
+        .unwrap_or("")
+        .is_empty();
+    if is_title_empty {
+        missing.push("title".to_string());
+    }
+
+    // 2. Artist / Album Artist:
+    // If the non-conditional remainder explicitly contains %artist (and not %albumartist),
+    // then only song.artist satisfies it. If %albumartist is present or neither is present
+    // (core identity), %albumartist falls back to song.artist just as expand_template does.
+    let without_albumartist = remainder.replace("%albumartist", "");
+    let explicitly_wants_artist = without_albumartist.contains("%artist");
+
+    let is_artist_empty = song
+        .artist
+        .as_deref()
+        .map(|s| s.trim())
+        .unwrap_or("")
+        .is_empty();
+
+    let is_album_artist_empty = song
+        .album_artist
+        .as_deref()
+        .map(|s| s.trim())
+        .unwrap_or("")
+        .is_empty();
+
+    if explicitly_wants_artist {
+        if is_artist_empty {
+            missing.push("artist".to_string());
+        }
+    } else if is_album_artist_empty && is_artist_empty {
+        missing.push("artist".to_string());
+    }
+
+    // 3. Album: only required if %album is outside conditional blocks
+    if without_albumartist.contains("%album") {
+        let is_album_empty = song
+            .album
+            .as_deref()
+            .map(|s| s.trim())
+            .unwrap_or("")
+            .is_empty();
+        if is_album_empty {
+            missing.push("album".to_string());
+        }
+    }
+
+    // 4. Track: only required if %track, %track3, or %rawtrack is outside conditional blocks
+    if remainder.contains("%track")
+        || remainder.contains("%track3")
+        || remainder.contains("%rawtrack")
+    {
+        let is_track_empty = song.track.is_none_or(|t| t <= 0);
+        if is_track_empty {
+            missing.push("track".to_string());
+        }
+    }
+
+    // 5. Disc: only required if %disc is outside conditional blocks
+    if remainder.contains("%disc") {
+        let is_disc_empty = song.disc.is_none_or(|d| d <= 0);
+        if is_disc_empty {
+            missing.push("disc".to_string());
+        }
+    }
+
+    // 6. Year: only required if %year is outside conditional blocks
+    if remainder.contains("%year") {
+        let is_year_empty = song.year.is_none_or(|y| y <= 0);
+        if is_year_empty {
+            missing.push("year".to_string());
+        }
+    }
+
+    // 7. Genre: only required if %genre is outside conditional blocks
+    if remainder.contains("%genre") {
+        let is_genre_empty = song
+            .genre
+            .as_deref()
+            .map(|s| s.trim())
+            .unwrap_or("")
+            .is_empty();
+        if is_genre_empty {
+            missing.push("genre".to_string());
+        }
+    }
+
+    missing
 }
 
 /// Computes a song's target *directory* segments (sanitized, root-to-leaf-parent,
@@ -636,6 +763,10 @@ pub fn compute_preview(
                 to_path: String::new(),
                 status: OrganizePreviewStatus::Error,
                 error_message: Some("Song record in database has no file path".to_string()),
+                title: song.title.clone(),
+                artist: song.artist.clone(),
+                album: song.album.clone(),
+                missing_fields: Vec::new(),
             });
             continue;
         }
@@ -652,6 +783,8 @@ pub fn compute_preview(
                 relative_path.push(&file_name);
                 let to_path = root_dir.join(relative_path).to_string_lossy().to_string();
 
+                let missing_tags = required_missing_tags(template, song);
+
                 let (status, err_msg) = if !source_exists {
                     (
                         OrganizePreviewStatus::Error,
@@ -659,20 +792,10 @@ pub fn compute_preview(
                     )
                 } else if from_path == to_path {
                     (OrganizePreviewStatus::Unchanged, None)
-                } else if song.title.is_none() && song.artist.is_none() {
+                } else if !missing_tags.is_empty() {
                     (
                         OrganizePreviewStatus::MissingTag,
-                        Some("Missing title and artist tags".to_string()),
-                    )
-                } else if song.title.is_none() {
-                    (
-                        OrganizePreviewStatus::MissingTag,
-                        Some("Missing title tag".to_string()),
-                    )
-                } else if song.artist.is_none() {
-                    (
-                        OrganizePreviewStatus::MissingTag,
-                        Some("Missing artist tag".to_string()),
+                        Some(format!("Missing {}", missing_tags.join(", "))),
                     )
                 } else {
                     (OrganizePreviewStatus::Ok, None)
@@ -684,12 +807,22 @@ pub fn compute_preview(
                     .or_default()
                     .push(idx);
 
+                let missing_fields = if status == OrganizePreviewStatus::MissingTag {
+                    missing_tags
+                } else {
+                    Vec::new()
+                };
+
                 preview_items.push(OrganizePreviewItem {
                     song_id: song.id,
                     from_path,
                     to_path,
                     status,
                     error_message: err_msg,
+                    title: song.title.clone(),
+                    artist: song.artist.clone(),
+                    album: song.album.clone(),
+                    missing_fields,
                 });
             }
             Err(e) => {
@@ -699,6 +832,10 @@ pub fn compute_preview(
                     to_path: String::new(),
                     status: OrganizePreviewStatus::Error,
                     error_message: Some(format!("Template error: {}", e)),
+                    title: song.title.clone(),
+                    artist: song.artist.clone(),
+                    album: song.album.clone(),
+                    missing_fields: Vec::new(),
                 });
             }
         }
@@ -706,12 +843,20 @@ pub fn compute_preview(
 
     for (_target_path, indices) in target_paths_map {
         if indices.len() > 1 {
-            // Find the canonical item (prefer Unchanged)
+            // Find the canonical item (prefer Unchanged, then Ok)
             let mut canonical_idx = indices[0];
             for &idx in &indices {
                 if preview_items[idx].status == OrganizePreviewStatus::Unchanged {
                     canonical_idx = idx;
                     break;
+                }
+            }
+            if preview_items[canonical_idx].status != OrganizePreviewStatus::Unchanged {
+                for &idx in &indices {
+                    if preview_items[idx].status == OrganizePreviewStatus::Ok {
+                        canonical_idx = idx;
+                        break;
+                    }
                 }
             }
 
@@ -720,7 +865,9 @@ pub fn compute_preview(
                     continue; // Canonical item gets to keep its target, but it might still have an external collision (checked below)
                 }
 
-                if preview_items[idx].status == OrganizePreviewStatus::Error {
+                if preview_items[idx].status == OrganizePreviewStatus::Error
+                    || preview_items[idx].status == OrganizePreviewStatus::MissingTag
+                {
                     continue;
                 }
 
@@ -2185,6 +2332,214 @@ mod tests {
         assert_eq!(
             expand_template(template_raw, &song_no_track, "flac"),
             "Single Track"
+        );
+    }
+
+    #[test]
+    fn test_required_missing_tags_default_template_complete_tags() {
+        let song = Song {
+            title: Some("Paranoid Android".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("OK Computer".to_string()),
+            year: Some(1997),
+            track: Some(2),
+            ..Default::default()
+        };
+        let missing = required_missing_tags(DEFAULT_ORGANIZE_TEMPLATE, &song);
+        assert!(
+            missing.is_empty(),
+            "Complete song must have no missing tags: {:?}",
+            missing
+        );
+    }
+
+    #[test]
+    fn test_required_missing_tags_whitespace_treated_as_missing() {
+        let song = Song {
+            title: Some("   ".to_string()),
+            artist: Some("\t\n".to_string()),
+            album: Some("OK Computer".to_string()),
+            ..Default::default()
+        };
+        let missing = required_missing_tags(DEFAULT_ORGANIZE_TEMPLATE, &song);
+        assert_eq!(missing, vec!["title".to_string(), "artist".to_string()]);
+    }
+
+    #[test]
+    fn test_required_missing_tags_album_artist_fallback() {
+        // Song has artist but no album_artist: %albumartist falls back to artist, so not missing
+        let song = Song {
+            title: Some("Karma Police".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album_artist: None,
+            ..Default::default()
+        };
+        let missing = required_missing_tags(DEFAULT_ORGANIZE_TEMPLATE, &song);
+        assert!(
+            missing.is_empty(),
+            "Fallback to artist should satisfy %albumartist"
+        );
+
+        // Song has album_artist but no artist: %albumartist is satisfied
+        let song_album_artist_only = Song {
+            title: Some("Karma Police".to_string()),
+            artist: None,
+            album_artist: Some("Radiohead".to_string()),
+            ..Default::default()
+        };
+        let missing2 = required_missing_tags(DEFAULT_ORGANIZE_TEMPLATE, &song_album_artist_only);
+        assert!(
+            missing2.is_empty(),
+            "album_artist should satisfy %albumartist"
+        );
+
+        // Song has neither artist nor album_artist: artist is missing
+        let song_neither = Song {
+            title: Some("Karma Police".to_string()),
+            artist: None,
+            album_artist: None,
+            ..Default::default()
+        };
+        let missing3 = required_missing_tags(DEFAULT_ORGANIZE_TEMPLATE, &song_neither);
+        assert_eq!(missing3, vec!["artist".to_string()]);
+    }
+
+    #[test]
+    fn test_required_missing_tags_strips_conditional_blocks() {
+        // DEFAULT_ORGANIZE_TEMPLATE contains {%year - }{%album/}{%disc-}{%track }
+        // All of those should be ignored if missing on the song
+        let song_minimal = Song {
+            title: Some("Track One".to_string()),
+            artist: Some("Artist".to_string()),
+            album: None,
+            year: None,
+            track: None,
+            disc: None,
+            ..Default::default()
+        };
+        let missing = required_missing_tags(DEFAULT_ORGANIZE_TEMPLATE, &song_minimal);
+        assert!(
+            missing.is_empty(),
+            "Conditional fields must not trigger missing tags: {:?}",
+            missing
+        );
+    }
+
+    #[test]
+    fn test_required_missing_tags_custom_template_strict_fields() {
+        // When template has %album and %year outside conditional blocks
+        let template = "%artist/%album/%year/%track - %title";
+        let song = Song {
+            title: Some("Track One".to_string()),
+            artist: Some("Artist".to_string()),
+            album: None,
+            year: None,
+            track: None,
+            ..Default::default()
+        };
+        let missing = required_missing_tags(template, &song);
+        assert_eq!(
+            missing,
+            vec!["album".to_string(), "track".to_string(), "year".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_compute_preview_populates_metadata_and_missing_tags() {
+        use crate::collection::upsert_song;
+        use crate::models::{FileType, SongSource};
+
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_preview_test_")
+            .tempdir()
+            .unwrap();
+        let base = temp_dir_guard.path().to_path_buf();
+        let src_dir = base.join("music");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        let db = Database::new(base.join("appdata")).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO directories (path) VALUES (?1)",
+            params![src_dir.to_string_lossy().to_string()],
+        )
+        .unwrap();
+
+        // 1. Ready song
+        let file1 = src_dir.join("track1.mp3");
+        fs::write(&file1, b"audio 1").unwrap();
+        let song1 = Song {
+            path: Some(file1.to_string_lossy().to_string()),
+            title: Some("Airbag".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("OK Computer".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song1).unwrap();
+        let id1: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song1.path],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        // 2. Missing title and artist
+        let file2 = src_dir.join("track2.mp3");
+        fs::write(&file2, b"audio 2").unwrap();
+        let song2 = Song {
+            path: Some(file2.to_string_lossy().to_string()),
+            title: Some("   ".to_string()),
+            artist: None,
+            album: Some("Unknown".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song2).unwrap();
+        let id2: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song2.path],
+                |r| r.get(0),
+            )
+            .unwrap();
+        drop(conn);
+
+        let options = OrganizeOptions {
+            destination_dir: None,
+            replace_spaces_with_underscores: false,
+            ascii_only: false,
+            clean_empty_dirs: false,
+            move_extra_files: false,
+        };
+
+        let preview =
+            compute_preview(&db, &[id1, id2], DEFAULT_ORGANIZE_TEMPLATE, &options).unwrap();
+        assert_eq!(preview.len(), 2);
+
+        let item1 = preview.iter().find(|i| i.song_id == id1).unwrap();
+        assert_eq!(item1.status, OrganizePreviewStatus::Ok);
+        assert_eq!(item1.title.as_deref(), Some("Airbag"));
+        assert_eq!(item1.artist.as_deref(), Some("Radiohead"));
+        assert_eq!(item1.album.as_deref(), Some("OK Computer"));
+        assert!(item1.missing_fields.is_empty());
+        assert!(item1.error_message.is_none());
+
+        let item2 = preview.iter().find(|i| i.song_id == id2).unwrap();
+        assert_eq!(item2.status, OrganizePreviewStatus::MissingTag);
+        assert_eq!(item2.title.as_deref(), Some("   "));
+        assert_eq!(item2.artist, None);
+        assert_eq!(item2.album.as_deref(), Some("Unknown"));
+        assert_eq!(
+            item2.missing_fields,
+            vec!["title".to_string(), "artist".to_string()]
+        );
+        assert_eq!(
+            item2.error_message.as_deref(),
+            Some("Missing title, artist")
         );
     }
 
