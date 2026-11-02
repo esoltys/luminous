@@ -20,6 +20,7 @@ pub mod commands;
 pub mod context;
 pub mod continue_mix;
 pub mod covermanager;
+pub mod curation;
 pub mod db;
 pub mod default_apps;
 pub mod devices;
@@ -1427,6 +1428,8 @@ pub fn run() {
             commands::collection::set_songs_not_included,
             commands::collection::get_songs_missing_musicbrainz_id,
             commands::collection::get_songs_missing_metadata,
+            // Curation commands (#1586)
+            commands::curation::get_curation_overview,
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,

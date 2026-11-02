@@ -17,6 +17,10 @@ use crate::models::{
 use anyhow::Result;
 use rusqlite::{params, OptionalExtension, ToSql};
 
+/// SQL predicate identifying tracks missing any core identity tag (title, artist, or album).
+/// Shared between `get_songs_missing_core_tags` and curation health queries (`curation.rs`).
+pub(crate) const MISSING_CORE_TAGS_SQL: &str = "(title IS NULL OR TRIM(title) = '' OR artist IS NULL OR TRIM(artist) = '' OR album IS NULL OR TRIM(album) = '')";
+
 impl CollectionScanner {
     /// Full-text + field search across the library.
     pub fn search_songs(&self, query: &str, limit: i64) -> Result<Vec<Song>> {
@@ -619,11 +623,7 @@ impl CollectionScanner {
         let (extra_where, order_by) = mode_query_fragments(mode);
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE (
-                 title IS NULL OR TRIM(title) = ''
-                 OR artist IS NULL OR TRIM(artist) = ''
-                 OR album IS NULL OR TRIM(album) = ''
-             )
+             WHERE {}
                AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
@@ -632,6 +632,7 @@ impl CollectionScanner {
              ORDER BY {order_by}
              LIMIT ?1",
             SONG_SELECT_COLS,
+            MISSING_CORE_TAGS_SQL,
             lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
