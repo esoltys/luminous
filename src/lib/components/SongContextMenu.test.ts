@@ -1,10 +1,11 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import SongContextMenu from "./SongContextMenu.svelte";
 import { picardStore } from "../stores/picard.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { Song, Playlist } from "../types";
 
@@ -33,6 +34,49 @@ describe("SongContextMenu.svelte", () => {
 
   beforeEach(() => {
     picardStore.path = "/usr/bin/picard";
+  });
+
+  describe("View in Files", () => {
+    const target = { source: { kind: "folder", id: 1 }, path: ["Radiohead", "OK Computer"], selectedName: "02 Paranoid Android.flac", exact: true };
+
+    function locateReturns(result: unknown) {
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => (cmd === "locate_song_in_files" ? result : null));
+    }
+
+    it("opens the song's place in Files", async () => {
+      locateReturns(target);
+      const openInFiles = vi.spyOn(navigationStore, "openInFiles").mockImplementation(() => {});
+      const onClose = vi.fn();
+      render(SongContextMenu, { x: 0, y: 0, song: localSong, onPlay: () => {}, onGoToAlbum: () => {}, onClose });
+
+      await fireEvent.click(await screen.findByText("View in Files"));
+      expect(invoke).toHaveBeenCalledWith("locate_song_in_files", { songId: 1 });
+      expect(openInFiles).toHaveBeenCalledWith(target);
+      expect(onClose).toHaveBeenCalled();
+      openInFiles.mockRestore();
+    });
+
+    it("sits right after Go to Album", async () => {
+      locateReturns(target);
+      render(SongContextMenu, { x: 0, y: 0, song: localSong, onPlay: () => {}, onGoToAlbum: () => {}, onClose: () => {} });
+      await screen.findByText("View in Files");
+
+      const labels = screen.getAllByRole("menuitem").map((item) => item.textContent?.trim());
+      expect(labels[labels.indexOf("Go to Album") + 1]).toBe("View in Files");
+    });
+
+    it("is hidden for a song with no place in Files", async () => {
+      locateReturns(null);
+      render(SongContextMenu, { x: 0, y: 0, song: localSong, onPlay: () => {}, onClose: () => {} });
+      await waitFor(() => expect(invoke).toHaveBeenCalledWith("locate_song_in_files", { songId: 1 }));
+      expect(screen.queryByText("View in Files")).not.toBeInTheDocument();
+    });
+
+    it("isn't offered for several songs", () => {
+      locateReturns(target);
+      render(SongContextMenu, { x: 0, y: 0, song: localSong, selectedCount: 2, selectedSongIds: [1, 2], onPlay: () => {}, onClose: () => {} });
+      expect(invoke).not.toHaveBeenCalledWith("locate_song_in_files", expect.anything());
+    });
   });
 
   it("enables Open in Picard for a local song", async () => {
