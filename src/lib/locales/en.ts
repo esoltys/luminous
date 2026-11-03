@@ -2577,6 +2577,37 @@ export const en = {
     allResolvedTitle: "All Duplicates Resolved",
     allResolvedMessage: "No remaining duplicate tracks to compare.",
     loadingDuplicates: "Loading duplicates…",
-    closeBtn: "Close"
+    closeBtn: "Close",
+    shelfUnillustratedTitle: "Albums Missing Cover Art",
+    shelfUnillustratedHint: "These albums have no embedded or folder artwork.",
+    addArtworkBtn: "Add Artwork",
+    shelfIncompleteTitle: "Albums with Incomplete Tracklists",
+    shelfIncompleteHint: "These albums have missing track numbers or duplicate track numbers.",
+    unnumberedTracksBadge: {
+      one: "{count} unnumbered track",
+      other: "{count} unnumbered tracks"
+    },
+    duplicateTrackNumbersBadge: {
+      one: "{count} duplicate track number",
+      other: "{count} duplicate track numbers"
+    },
+    openInPicardBtn: "Open in Picard",
+    shelfMissingCoreTitle: {
+      one: "{count} track missing core tags",
+      other: "{count} tracks missing core tags"
+    },
+    shelfMissingCoreHint: "Tracks missing title, artist, or album cannot be organized into structured folders.",
+    reviewMissingMetadataBtn: "Review Missing Tags",
+    shelfDuplicatesTitle: {
+      one: "{count} duplicate recording group",
+      other: "{count} duplicate recording groups"
+    },
+    shelfDuplicatesHint: "Multiple copies of the same musical recording detected across your collection.",
+    reviewDuplicatesBtn: "Compare Duplicates",
+    shelfProvenanceTitle: "Audio Provenance Notices",
+    shelfProvenanceHint: "Lossless tracks flagged with suspected lossy transcode or upsampling characteristics.",
+    shelfProvenanceBadge: "Suspected Transcode",
+    showAllWithCount: "Show all ({count})",
+    showLess: "Show less"
   }
 };

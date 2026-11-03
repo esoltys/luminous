@@ -154,6 +154,8 @@ export interface Song {
   is_instrumental?: boolean;
   /** True when the user marked this song "Not included" — hidden from auto/smart playlists and Auto-Play refill, but still visible and playable in Album/Artist views. */
   not_included?: boolean;
+  /** Audio provenance warning indicator (#1373, #1586). */
+  provenance?: string | null;
 }
 
 /** Result of `get_song_context` — cached live enrichment for the Details

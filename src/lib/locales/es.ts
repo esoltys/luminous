@@ -2577,6 +2577,37 @@ export const es = {
     allResolvedTitle: "Todos los duplicados resueltos",
     allResolvedMessage: "No quedan más pistas duplicadas para comparar.",
     loadingDuplicates: "Cargando duplicados…",
-    closeBtn: "Cerrar"
+    closeBtn: "Cerrar",
+    shelfUnillustratedTitle: "Álbumes sin portada",
+    shelfUnillustratedHint: "Estos álbumes no tienen portada incrustada ni en carpeta.",
+    addArtworkBtn: "Añadir portada",
+    shelfIncompleteTitle: "Álbumes con lista de pistas incompleta",
+    shelfIncompleteHint: "Estos álbumes tienen números de pista faltantes o duplicados.",
+    unnumberedTracksBadge: {
+      one: "{count} pista sin número",
+      other: "{count} pistas sin número"
+    },
+    duplicateTrackNumbersBadge: {
+      one: "{count} número de pista duplicado",
+      other: "{count} números de pista duplicados"
+    },
+    openInPicardBtn: "Abrir en Picard",
+    shelfMissingCoreTitle: {
+      one: "{count} pista sin etiquetas básicas",
+      other: "{count} pistas sin etiquetas básicas"
+    },
+    shelfMissingCoreHint: "Las pistas sin título, artista o álbum no pueden organizarse en carpetas estructuradas.",
+    reviewMissingMetadataBtn: "Revisar etiquetas faltantes",
+    shelfDuplicatesTitle: {
+      one: "{count} grupo de grabaciones duplicadas",
+      other: "{count} grupos de grabaciones duplicadas"
+    },
+    shelfDuplicatesHint: "Se detectaron varias copias de la misma grabación musical en su colección.",
+    reviewDuplicatesBtn: "Comparar duplicados",
+    shelfProvenanceTitle: "Avisos de procedencia de audio",
+    shelfProvenanceHint: "Pistas sin pérdida marcadas por sospecha de transcodificación con pérdida o remuestreo.",
+    shelfProvenanceBadge: "Sospecha de transcodificación",
+    showAllWithCount: "Mostrar todo ({count})",
+    showLess: "Mostrar menos"
   }
 };

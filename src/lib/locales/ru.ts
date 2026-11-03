@@ -2753,6 +2753,45 @@ export const ru = {
     allResolvedTitle: "Все дубликаты урегулированы",
     allResolvedMessage: "Больше нет дубликатов для сравнения в этой сессии.",
     loadingDuplicates: "Загрузка дубликатов…",
-    closeBtn: "Закрыть"
+    closeBtn: "Закрыть",
+    shelfUnillustratedTitle: "Альбомы без обложки",
+    shelfUnillustratedHint: "У этих альбомов нет встроенной или папочной обложки.",
+    addArtworkBtn: "Добавить обложку",
+    shelfIncompleteTitle: "Альбомы с неполным списком треков",
+    shelfIncompleteHint: "У этих альбомов отсутствуют или дублируются номера треков.",
+    unnumberedTracksBadge: {
+      one: "{count} трек без номера",
+      few: "{count} трека без номера",
+      many: "{count} треков без номера",
+      other: "{count} трека без номера"
+    },
+    duplicateTrackNumbersBadge: {
+      one: "{count} дублирующийся номер трека",
+      few: "{count} дублирующихся номера трека",
+      many: "{count} дублирующихся номеров треков",
+      other: "{count} дублирующегося номера трека"
+    },
+    openInPicardBtn: "Открыть в Picard",
+    shelfMissingCoreTitle: {
+      one: "{count} трек без основных тегов",
+      few: "{count} трека без основных тегов",
+      many: "{count} треков без основных тегов",
+      other: "{count} трека без основных тегов"
+    },
+    shelfMissingCoreHint: "Треки без названия, исполнителя или альбома невозможно организовать по структурированным папкам.",
+    reviewMissingMetadataBtn: "Проверить отсутствующие теги",
+    shelfDuplicatesTitle: {
+      one: "{count} группа повторяющихся записей",
+      few: "{count} группы повторяющихся записей",
+      many: "{count} групп повторяющихся записей",
+      other: "{count} группы повторяющихся записей"
+    },
+    shelfDuplicatesHint: "В вашей фонотеке обнаружено несколько копий одной и той же музыкальной записи.",
+    reviewDuplicatesBtn: "Сравнить дубликаты",
+    shelfProvenanceTitle: "Уведомления о подлинности аудио",
+    shelfProvenanceHint: "Lossless-треки с подозрением на пережатие из сжатых форматов или искусственный апсемплинг.",
+    shelfProvenanceBadge: "Подозрение на пережатие",
+    showAllWithCount: "Показать все ({count})",
+    showLess: "Показать меньше"
   }
 };
