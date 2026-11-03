@@ -49,6 +49,9 @@
   });
 
   const isLocal = $derived(location?.source.kind === "folder");
+  /** Folders and WebDAV servers have a real path or URL to show. The header lays out from
+   * this, known at once, so it doesn't jump when a slow folder's listing arrives. */
+  const hasLocation = $derived(isLocal || location?.source.kind === "webdav");
   /** The `i`th name of the current path as shown; the listing says which are missing tags. */
   const pathName = (i: number) => shownName(location?.path[i] ?? "", listing?.pathMissingTags[i]);
   const title = $derived(location && location.path.length > 0 ? pathName(location.path.length - 1) : sourceName);
@@ -137,8 +140,8 @@
             {/each}
           </nav>
           <h1 class="text-3xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={title}>{title}</h1>
-          {#if listing?.location}
-            <p class="text-xs text-brand-text-secondary truncate select-text" title={listing.location}>{listing.location}</p>
+          {#if hasLocation}
+            <p class="text-xs text-brand-text-secondary truncate select-text" title={listing?.location}>{listing?.location ?? " "}</p>
           {/if}
         </div>
         <div class="flex items-center gap-2 shrink-0">
@@ -146,7 +149,7 @@
             <PlayIcon weight="fill" class="w-4 h-4" />
             {i18n.t("files.playFolder")}
           </Button>
-          {#if isLocal && filesStore.devices.length > 0 && listing?.location}
+          {#if isLocal && filesStore.devices.length > 0}
             <div class="relative">
               <Button onclick={(e) => { e.stopPropagation(); onAddToDeviceSync(); }}>
                 <DeviceMobileSpeakerIcon class="w-4 h-4" />
@@ -165,7 +168,7 @@
               {/if}
             </div>
           {/if}
-          {#if isLocal && listing?.location}
+          {#if isLocal}
             <button
               class="w-9 h-9 flex items-center justify-center rounded-full text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 transition-colors"
               onclick={() => listing?.location && reveal(listing.location)}
