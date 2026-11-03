@@ -78,7 +78,7 @@
         playerStore.playSong(item.song.id);
         break;
       case "album":
-        navigationStore.viewAlbum(item.album.album || "");
+        navigationStore.viewAlbum(item.album.album || "", undefined, item.album.album_key ?? undefined);
         break;
       case "artist":
         navigationStore.viewArtist(item.artist.name || "");

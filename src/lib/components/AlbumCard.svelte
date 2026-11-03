@@ -41,11 +41,19 @@
     currentRating = album.rating;
   });
 
+  function openAlbum() {
+    if (album.album_key) {
+      navigationStore.viewAlbum(album.album || "", undefined, album.album_key);
+    } else {
+      navigationStore.viewAlbum(album.album || "");
+    }
+  }
+
   function handleCardClick(e: MouseEvent) {
     if (customClick) {
       customClick(e);
     } else {
-      navigationStore.viewAlbum(album.album || "");
+      openAlbum();
     }
   }
 
@@ -90,7 +98,7 @@
   </div>
   <div class="p-3.5 flex flex-col flex-1">
     <LinkButton
-      onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(album.album || ""); }}
+      onclick={(e) => { e.stopPropagation(); openAlbum(); }}
       class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-colors duration-150 truncate w-full"
       title={i18n.t('collection.filterByAlbum', { album: album.album || i18n.t('collection.unknownAlbum') })}
     >

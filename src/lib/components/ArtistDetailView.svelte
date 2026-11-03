@@ -583,7 +583,7 @@
   let singleTableRows = $derived(sortedSingleSongs.map(songToRow));
 
   function openAlbum(album: AlbumItem) {
-    navigationStore.viewAlbum(album.album || "");
+    navigationStore.viewAlbum(album.album || "", undefined, album.album_key ?? undefined);
   }
 
   // Mirrors PlaylistsCollectionView's openAuto/openPlaylist split so genre/decade

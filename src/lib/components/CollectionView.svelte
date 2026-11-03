@@ -372,9 +372,10 @@
     }
   }
 
-  async function handlePlayAlbum(albumName: string) {
+  async function handlePlayAlbum(albumName: string, albumKey?: string) {
     let songs = await invoke<Song[]>("get_songs_by_album", {
       album: albumName,
+      albumKey: albumKey ?? undefined,
     });
     const playable = songs.filter((s) => !s.not_included);
     if (playable.length > 0) {
@@ -425,7 +426,7 @@
 {/snippet}
 
 {#if navigationStore.selectedAlbumName !== null}
-  <AlbumDetailView albumName={navigationStore.selectedAlbumName} />
+  <AlbumDetailView albumName={navigationStore.selectedAlbumName} albumKey={navigationStore.selectedAlbumKey} />
 {:else if navigationStore.selectedArtistName !== null}
   <ArtistDetailView artistName={navigationStore.selectedArtistName} />
 {:else}
@@ -708,10 +709,14 @@
     x={albumContextMenuState.x}
     y={albumContextMenuState.y}
     albumName={album.album || i18n.t("collection.unknownAlbum")}
+    albumKey={album.album_key ?? undefined}
     artistName={album.artist || undefined}
-    onPlay={() => handlePlayAlbum(album.album || "")}
+    onPlay={() => handlePlayAlbum(album.album || "", album.album_key ?? undefined)}
     onAddToPlaylist={async () => {
-      let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
+      let songs = await invoke<Song[]>("get_songs_by_album", {
+        album: album.album || "",
+        albumKey: album.album_key ?? undefined,
+      });
       const playable = songs.filter((s) => !s.not_included);
       if (playable.length > 0) {
         await playlistsStore.addSongsToActiveTarget(

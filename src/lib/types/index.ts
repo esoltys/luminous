@@ -860,6 +860,7 @@ export interface DbSchemaStatus {
 }
 
 export interface AlbumItem {
+  album_key?: string | null;
   artist: string | null;
   artist_sort?: string | null;
   album: string | null;

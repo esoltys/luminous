@@ -3270,9 +3270,12 @@ mod tests {
                 },
             )
             .unwrap();
-            conn.execute_batch(
+            let album_key =
+                crate::album_key::album_key_for("Oceanborn", None, Some("Nightwish"), false);
+            conn.execute(
                 "INSERT INTO album_profiles (album_key, fetched_cover_filename, fetched_disc_filename)
-                 VALUES ('oceanborn', 'fan_cover.jpg', 'fan_disc.png');",
+                 VALUES (?1, 'fan_cover.jpg', 'fan_disc.png');",
+                params![album_key],
             )
             .unwrap();
             conn.query_row("SELECT id FROM songs", [], |r| r.get(0))

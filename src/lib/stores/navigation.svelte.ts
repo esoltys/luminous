@@ -2,7 +2,7 @@ import { collectionStore } from "./collection.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
-import { sameAlbum } from "$lib/utils/albumKey";
+import { sameAlbum, albumKey as computeAlbumKey } from "$lib/utils/albumKey";
 import type { FileNavigationTarget, FileSource } from "../types";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "files" | "settings" | "lyrics" | "stats" | "organize" | "help";
@@ -64,6 +64,7 @@ interface NavigationView {
   playlistsSubTab: PlaylistsSubTab;
   selectedArtistName: string | null;
   selectedAlbumName: string | null;
+  selectedAlbumKey: string | null;
   selectedPlaylistId: number | null;
   selectedAutoPlaylist: AutoPlaylistRef | null;
   filesLocation: FilesLocation | null;
@@ -143,6 +144,7 @@ class NavigationStore {
 
   private _selectedArtistName = $state<string | null>(null);
   private _selectedAlbumName = $state<string | null>(null);
+  private _selectedAlbumKey = $state<string | null>(null);
   private _selectedPlaylistId = $state<number | null>(null);
   private _selectedAutoPlaylist = $state<AutoPlaylistRef | null>(null);
 
@@ -186,9 +188,26 @@ class NavigationStore {
   get selectedAlbumName() { return this._selectedAlbumName; }
   set selectedAlbumName(val) {
     this._selectedAlbumName = val;
+    if (val === null) {
+      this._selectedAlbumKey = null;
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("navigation_selectedAlbumKey");
+      }
+    }
     if (typeof window !== "undefined") {
       if (val) localStorage.setItem("navigation_selectedAlbumName", val);
       else localStorage.removeItem("navigation_selectedAlbumName");
+    }
+    this.scheduleRecordHistory();
+  }
+
+  /** Selected album's composite key (effective_artist\u{1f}folded_album) (#1932). */
+  get selectedAlbumKey() { return this._selectedAlbumKey; }
+  set selectedAlbumKey(val) {
+    this._selectedAlbumKey = val;
+    if (typeof window !== "undefined") {
+      if (val) localStorage.setItem("navigation_selectedAlbumKey", val);
+      else localStorage.removeItem("navigation_selectedAlbumKey");
     }
     this.scheduleRecordHistory();
   }
@@ -253,6 +272,7 @@ class NavigationStore {
       playlistsSubTab: this._playlistsSubTab,
       selectedArtistName: this._selectedArtistName,
       selectedAlbumName: this._selectedAlbumName,
+      selectedAlbumKey: this._selectedAlbumKey,
       selectedPlaylistId: this._selectedPlaylistId,
       selectedAutoPlaylist: this._selectedAutoPlaylist,
       filesLocation: this._filesLocation,
@@ -286,6 +306,7 @@ class NavigationStore {
     this.activeSubTab = snap.activeSubTab;
     this.playlistsSubTab = snap.playlistsSubTab;
     this.selectedArtistName = snap.selectedArtistName;
+    this.selectedAlbumKey = snap.selectedAlbumKey ?? null;
     this.selectedAlbumName = snap.selectedAlbumName;
     this.selectedPlaylistId = snap.selectedPlaylistId;
     this.selectedAutoPlaylist = snap.selectedAutoPlaylist;
@@ -323,6 +344,9 @@ class NavigationStore {
       // exclusive — CollectionView prefers the album when both are set).
       const savedAlbum = localStorage.getItem("navigation_selectedAlbumName");
       if (savedAlbum) this._selectedAlbumName = savedAlbum;
+
+      const savedAlbumKey = localStorage.getItem("navigation_selectedAlbumKey");
+      if (savedAlbumKey) this._selectedAlbumKey = savedAlbumKey;
 
       const savedArtist = localStorage.getItem("navigation_selectedArtistName");
       if (savedArtist) this._selectedArtistName = savedArtist;
@@ -363,7 +387,13 @@ class NavigationStore {
    */
   reconcile() {
     if (collectionStore.statsLoaded && !collectionStore.isScanning) {
-      if (this._selectedAlbumName !== null) {
+      if (this._selectedAlbumKey !== null) {
+        const albumExists = collectionStore.albums.some((a) => a.album_key === this._selectedAlbumKey);
+        if (!albumExists) {
+          this.selectedAlbumKey = null;
+          this.selectedAlbumName = null;
+        }
+      } else if (this._selectedAlbumName !== null) {
         const albumExists = collectionStore.albums.some((a) => sameAlbum(a.album, this._selectedAlbumName));
         if (!albumExists) {
           this.selectedAlbumName = null;
@@ -443,16 +473,31 @@ class NavigationStore {
 
   /** Opens an album's detail view. Pass `focusSongId` (e.g. a song picked
    * from search) to have AlbumDetailView select that track and scroll it into
-   * view once the album's tracks load (#1280). */
-  viewAlbum(name: string, focusSongId?: number) {
+   * view once the album's tracks load (#1280). Pass `targetAlbumKey` to target an
+   * exact release when multiple albums share a title (#1932). */
+  viewAlbum(name: string, focusSongId?: number, targetAlbumKey?: string) {
     collectionStore.searchQuery = "";
     collectionStore.searchResults = [];
     this.selectedArtistName = null;
     this.activeTab = "collection";
     this.activeSubTab = "albums";
+
+    let resolvedKey = targetAlbumKey;
+    if (!resolvedKey && focusSongId !== undefined) {
+      const song = collectionStore.songs.find((s) => s.id === focusSongId);
+      if (song) {
+        resolvedKey = computeAlbumKey(song.album, song.album_artist || song.artist, song.compilation);
+      }
+    }
+
+    const match = resolvedKey
+      ? collectionStore.albums.find((a) => a.album_key === resolvedKey)
+      : collectionStore.albums.find((a) => sameAlbum(a.album, name));
+
     // A track's own tag may spell the title differently from the album grid
     // (#1752); open the grid's spelling so the header matches the card.
-    this.selectedAlbumName = collectionStore.albums.find((a) => sameAlbum(a.album, name))?.album ?? name;
+    this.selectedAlbumName = match?.album ?? name;
+    this.selectedAlbumKey = resolvedKey ?? match?.album_key ?? null;
     this.pendingFocusSongId = focusSongId ?? null;
   }
 

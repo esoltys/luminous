@@ -2268,7 +2268,14 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.musicbrainz_release_country,
             song.barcode,
             song.catalog_number,
-            song.album.as_deref().map(crate::album_key::album_key),
+            song.album.as_deref().map(|alb| {
+                crate::album_key::album_key_for(
+                    alb,
+                    song.album_artist.as_deref(),
+                    song.artist.as_deref(),
+                    song.compilation,
+                )
+            }),
             song.lyrics_source.as_deref(),
         ],
     )?;

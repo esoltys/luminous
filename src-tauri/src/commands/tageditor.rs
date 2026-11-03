@@ -267,7 +267,20 @@ pub async fn save_song_tags(
             bpm,
             initial_key,
             song_id,
-            crate::album_key::album_key(&album)
+            crate::album_key::album_key_for(
+                &album,
+                if album_artist_str.trim().is_empty() {
+                    None
+                } else {
+                    Some(album_artist_str.as_str())
+                },
+                if artist_str.trim().is_empty() {
+                    None
+                } else {
+                    Some(artist_str.as_str())
+                },
+                compilation,
+            )
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -446,6 +459,23 @@ pub async fn save_album_tags(
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     for &song_id in &song_ids {
+        let track_artist: Option<String> = tx
+            .query_row(
+                "SELECT artist FROM songs WHERE id = ?1",
+                rusqlite::params![song_id],
+                |r| r.get(0),
+            )
+            .ok();
+        let key = crate::album_key::album_key_for(
+            &album,
+            if album_artist_str.trim().is_empty() {
+                None
+            } else {
+                Some(album_artist_str.as_str())
+            },
+            track_artist.as_deref(),
+            compilation,
+        );
         tx.execute(
             "UPDATE songs SET
                 album = ?1,
@@ -470,7 +500,7 @@ pub async fn save_album_tags(
                 disc,
                 compilation,
                 song_id,
-                crate::album_key::album_key(&album)
+                key
             ],
         )
         .map_err(|e| e.to_string())?;

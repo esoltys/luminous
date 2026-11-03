@@ -122,20 +122,36 @@ pub fn normalize_rating(rating: f32) -> f32 {
 /// value actually stored. Independent of any song rating on that album.
 pub fn set_album_rating(conn: &Connection, album: &str, rating: f32) -> Result<f32> {
     let normalized = normalize_rating(rating);
+    let resolved_key: String = if album.contains(crate::album_key::COMPOSITE_KEY_SEPARATOR) {
+        crate::album_key::fold_key(album)
+    } else {
+        let folded = crate::album_key::fold_key(album);
+        let sep = crate::album_key::COMPOSITE_KEY_SEPARATOR.to_string();
+        conn.query_row(
+            "SELECT album_key FROM songs WHERE album_key = ?1 OR album_key LIKE '%' || ?2 || ?1 LIMIT 1",
+            rusqlite::params![folded, sep],
+            |r| r.get(0),
+        )
+        .unwrap_or(folded)
+    };
     conn.execute(
         "INSERT INTO album_ratings (album_key, rating) VALUES (?1, ?2)
          ON CONFLICT(album_key) DO UPDATE SET rating = excluded.rating",
-        params![crate::album_key::album_key(album), normalized],
+        params![resolved_key, normalized],
     )?;
     Ok(normalized)
 }
 
 /// Look up an album's rating, defaulting to unrated when no row exists yet.
 pub fn get_album_rating(conn: &Connection, album: &str) -> Result<f32> {
+    let folded = crate::album_key::fold_key(album);
+    let sep = crate::album_key::COMPOSITE_KEY_SEPARATOR.to_string();
     let rating = conn
         .query_row(
-            "SELECT rating FROM album_ratings WHERE album_key = ?1",
-            params![crate::album_key::album_key(album)],
+            "SELECT rating FROM album_ratings
+             WHERE album_key = ?1 OR album_key LIKE '%' || ?2 || ?1
+             ORDER BY CASE WHEN album_key = ?1 THEN 0 ELSE 1 END LIMIT 1",
+            params![folded, sep],
             |r| r.get::<_, f32>(0),
         )
         .unwrap_or(RATING_UNRATED);
@@ -166,7 +182,19 @@ pub fn set_stats_excluded(
     excluded: bool,
 ) -> Result<()> {
     let entity_key: std::borrow::Cow<str> = if entity_type == "album" {
-        crate::album_key::album_key(entity_key).into()
+        if entity_key.contains(crate::album_key::COMPOSITE_KEY_SEPARATOR) {
+            crate::album_key::fold_key(entity_key).into()
+        } else {
+            let folded = crate::album_key::fold_key(entity_key);
+            let sep = crate::album_key::COMPOSITE_KEY_SEPARATOR.to_string();
+            conn.query_row(
+                "SELECT album_key FROM songs WHERE album_key = ?1 OR album_key LIKE '%' || ?2 || ?1 LIMIT 1",
+                rusqlite::params![folded, sep],
+                |r| r.get::<_, String>(0),
+            )
+            .unwrap_or(folded)
+            .into()
+        }
     } else {
         entity_key.into()
     };

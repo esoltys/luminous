@@ -32,6 +32,7 @@
     x,
     y,
     albumName,
+    albumKey,
     artistName,
     onPlay,
     onAddToQueue,
@@ -44,6 +45,7 @@
     x: number;
     y: number;
     albumName: string;
+    albumKey?: string;
     artistName?: string;
     onPlay: () => void;
     onAddToQueue?: () => void;
@@ -147,7 +149,7 @@
         if (onEditAlbum) {
           onEditAlbum();
         } else {
-          navigationStore.viewAlbum(albumName);
+          navigationStore.viewAlbum(albumName, undefined, albumKey);
         }
         onClose();
       }}

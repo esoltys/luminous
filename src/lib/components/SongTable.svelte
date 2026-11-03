@@ -545,7 +545,7 @@
         <span class="text-brand-text-secondary italic text-xs">{song.album ?? ""}</span>
       {:else if song.album}
         <LinkButton
-          onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(song.album || ""); }}
+          onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(song.album || "", song.id); }}
           class="{secondaryColor(song)} truncate min-w-0"
           title={i18n.t("collection.filterByAlbum", { album: song.album })}
         >

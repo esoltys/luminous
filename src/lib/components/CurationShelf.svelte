@@ -120,6 +120,7 @@
 
   function toAlbumItem(album: CurationAlbumItem): AlbumItem {
     return {
+      album_key: album.album_key,
       album: album.album,
       artist: album.artist ?? null,
       year: album.year ?? null,
@@ -239,7 +240,7 @@
           {#each displayedIncomplete as album (album.album_key)}
             <AlbumRowCard
               album={toAlbumItem(album)}
-              onclick={() => navigationStore.viewAlbum(album.album)}
+              onclick={() => navigationStore.viewAlbum(album.album, undefined, album.album_key)}
             >
               {#snippet suffix()}
                 <div class="flex items-center gap-2">
