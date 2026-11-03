@@ -244,11 +244,11 @@
               {#snippet suffix()}
                 <div class="flex items-center gap-2">
                   {#if album.unnumbered_count > 0}
-                    <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-medium whitespace-nowrap">
+                    <span class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap">
                       {i18n.plural("curation.unnumberedTracksBadge", album.unnumbered_count, { count: album.unnumbered_count })}
                     </span>
                   {:else if album.duplicate_track_number_count > 0}
-                    <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-medium whitespace-nowrap">
+                    <span class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap">
                       {i18n.plural("curation.duplicateTrackNumbersBadge", album.duplicate_track_number_count, { count: album.duplicate_track_number_count })}
                     </span>
                   {/if}
@@ -366,7 +366,7 @@
                   <span class="text-sm font-medium text-brand-text-primary truncate">
                     {song.title || i18n.t("collection.unknownTitle")}
                   </span>
-                  <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-medium whitespace-nowrap border border-amber-500/20">
+                  <span class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap">
                     {song.provenance || i18n.t("curation.shelfProvenanceBadge")}
                   </span>
                 </div>
