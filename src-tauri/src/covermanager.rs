@@ -1863,20 +1863,22 @@ impl CoverManager {
     ) -> Result<()> {
         let q_art = query_artist.to_string();
         let q_alb = query_album.to_string();
+        let comp_key = crate::album_key::album_key_for(&q_alb, None, Some(&q_art), false);
+        let raw_key = crate::album_key::album_key(&q_alb);
         crate::db::run_blocking(&self.db, move |conn| {
             if let Some(filename) = artwork_filename {
                 conn.execute(
                     "UPDATE songs SET art_automatic = ?1, art_unset = 0
                      WHERE id = ?2
-                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?3 COLLATE NOCASE AND album_key = ?4 AND art_automatic IS NULL AND art_embedded = 0)",
-                    params![filename, song_id, q_art, crate::album_key::album_key(&q_alb)],
+                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?3 COLLATE NOCASE AND (album_key = ?4 OR album_key = ?5) AND art_automatic IS NULL AND art_embedded = 0)",
+                    params![filename, song_id, q_art, comp_key, raw_key],
                 )?;
             } else {
                 conn.execute(
                     "UPDATE songs SET art_unset = 1
                      WHERE id = ?1
-                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?2 COLLATE NOCASE AND album_key = ?3 AND art_automatic IS NULL AND art_embedded = 0)",
-                    params![song_id, q_art, crate::album_key::album_key(&q_alb)],
+                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?2 COLLATE NOCASE AND (album_key = ?3 OR album_key = ?4) AND art_automatic IS NULL AND art_embedded = 0)",
+                    params![song_id, q_art, comp_key, raw_key],
                 )?;
             }
             Ok(())

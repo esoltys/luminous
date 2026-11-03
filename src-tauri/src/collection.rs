@@ -1518,12 +1518,15 @@ impl CollectionScanner {
             // Folder art before embedded art, except for albumless singles —
             // see the `covermanager` module docs.
             let folder_first = !album.trim().is_empty();
+            let comp_key =
+                crate::album_key::album_key_for(&album, None, Some(&effective_artist), false);
+            let raw_key = crate::album_key::album_key(&album);
             let try_folder_art = || {
                 let folder_art_path = cover_manager.scan_folder_art(path)?;
                 if let Ok(conn) = self.db.pool.get() {
                     let _ = conn.execute(
-                        "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album_key = ?3",
-                        params![folder_art_path.to_string_lossy(), effective_artist, crate::album_key::album_key(&album)],
+                        "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND (album_key = ?3 OR album_key = ?4)",
+                        params![folder_art_path.to_string_lossy(), effective_artist, comp_key, raw_key],
                     );
                 }
                 Some(())
@@ -1539,8 +1542,8 @@ impl CollectionScanner {
                 {
                     if let Ok(conn) = self.db.pool.get() {
                         let _ = conn.execute(
-                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album_key = ?3",
-                            params![cached_filename, effective_artist, crate::album_key::album_key(&album)],
+                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND (album_key = ?3 OR album_key = ?4)",
+                            params![cached_filename, effective_artist, comp_key, raw_key],
                         );
                     }
                     resolved = true;
@@ -1559,8 +1562,8 @@ impl CollectionScanner {
                 if let Ok(Some(filename)) = cover_manager.fetch_remote_cover(song_id).await {
                     if let Ok(conn) = self.db.pool.get() {
                         let _ = conn.execute(
-                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album_key = ?3",
-                            params![filename, effective_artist, crate::album_key::album_key(&album)],
+                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND (album_key = ?3 OR album_key = ?4)",
+                            params![filename, effective_artist, comp_key, raw_key],
                         );
                     }
                 }
