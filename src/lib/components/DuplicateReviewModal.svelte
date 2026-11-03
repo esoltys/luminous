@@ -233,7 +233,7 @@
     <!-- Modal Header -->
     <div class="h-16 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-sidebar">
       <div class="flex items-center gap-3 min-w-0">
-        <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+        <div class="w-8 h-8 rounded-lg bg-brand-accent/15 text-brand-accent-text flex items-center justify-center shrink-0">
           <MusicNote class="w-4 h-4" />
         </div>
         <div class="min-w-0">
@@ -354,7 +354,7 @@
                         {candidate.song.title || currentGroup.title}
                       </span>
                       {#if isRecommended}
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border border-brand-border bg-brand-sidebar text-brand-text-secondary">
                           {i18n.t("curation.recommendedBadge")}
                         </span>
                       {/if}
@@ -410,8 +410,8 @@
                   </div>
 
                   {#if candidate.provenance && candidate.provenance !== 'authentic'}
-                    <div class="flex items-center gap-1.5 text-[11px] text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">
-                      <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
+                    <div class="flex items-center gap-1.5 text-[11px] text-brand-text-primary bg-brand-sidebar px-2 py-1 rounded border border-brand-border">
+                      <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-brand-accent-text" />
                       <span class="truncate">
                         {i18n.t("curation.provenanceWarning", { provenance: candidate.provenance })}
                       </span>
