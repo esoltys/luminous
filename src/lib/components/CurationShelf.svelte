@@ -236,14 +236,14 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 @3xl:grid-cols-2 gap-3">
+        <div class="flex flex-col gap-3">
           {#each displayedIncomplete as album (album.album_key)}
             <AlbumRowCard
               album={toAlbumItem(album)}
               onclick={() => navigationStore.viewAlbum(album.album, undefined, album.album_key)}
             >
               {#snippet suffix()}
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap justify-end">
                   {#if album.unnumbered_count > 0}
                     <span class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap">
                       {i18n.plural("curation.unnumberedTracksBadge", album.unnumbered_count, { count: album.unnumbered_count })}

@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
+import { createRawSnippet } from "svelte";
 import AlbumRowCard from "./AlbumRowCard.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
@@ -114,5 +115,17 @@ describe("AlbumRowCard.svelte", () => {
 
     rerender({ album: mockAlbum, progressPercent: 0 });
     expect(queryByTestId("stats-accent-bar")).toBeNull();
+  });
+
+  it("renders suffix with shrink-0 and ml-auto alignment", () => {
+    const suffix = createRawSnippet(() => ({
+      render: () => '<span data-testid="custom-suffix">Action</span>',
+    }));
+    const { getByTestId } = render(AlbumRowCard, {
+      props: { album: mockAlbum, suffix },
+    });
+    const suffixEl = getByTestId("custom-suffix");
+    expect(suffixEl).toBeInTheDocument();
+    expect(suffixEl.parentElement).toHaveClass("shrink-0", "ml-auto");
   });
 });

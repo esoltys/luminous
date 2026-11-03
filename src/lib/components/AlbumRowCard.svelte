@@ -107,18 +107,20 @@
   </div>
 
   <div class="relative z-10 min-w-0 flex-1 flex flex-col gap-0.5">
-    <div class="flex items-center justify-between gap-2">
+    <div class="flex items-center justify-between gap-2 min-w-0">
       <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{album.album || i18n.t('collection.unknownAlbum')}</p>
-      <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{album.year || ""}</span>
+      {#if album.year}
+        <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{album.year}</span>
+      {/if}
     </div>
-    <div class="flex items-center justify-between gap-2">
+    <div class="flex items-center justify-between gap-2 min-w-0">
       <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{album.artist || i18n.t('collection.variousArtists')}</p>
       <span class="shrink-0" onclick={(e) => e.stopPropagation()}><SongRating isAlbum rating={currentRating} onRate={rateAlbum} size="sm" /></span>
     </div>
   </div>
 
   {#if suffix}
-    <div class="relative z-10">
+    <div class="relative z-10 shrink-0 ml-auto flex items-center">
       {@render suffix()}
     </div>
   {/if}
