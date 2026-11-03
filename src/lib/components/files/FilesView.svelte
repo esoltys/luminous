@@ -94,22 +94,25 @@
     selection.length > 1 && listing ? listing.entries.filter((e) => !e.isDir && selection.includes(e.name)) : []
   );
 
-  function summary(l: DirListing): string {
+  /** The footer's lines: the selection, or the folder's size, then what is in the library. */
+  function summary(l: DirListing): string[] {
     if (selectedFiles.length > 1) {
       const vars = { selected: selectedFiles.length };
-      return l.totalBytes === null
-        ? i18n.plural("files.selectedFilesNoSize", l.fileCount, vars)
-        : i18n.plural("files.selectedFiles", l.fileCount, {
-            ...vars,
-            size: formatFileSize(selectedFiles.reduce((sum, e) => sum + (e.size ?? 0), 0)),
-          });
+      return [
+        l.totalBytes === null
+          ? i18n.plural("files.selectedFilesNoSize", l.fileCount, vars)
+          : i18n.plural("files.selectedFiles", l.fileCount, {
+              ...vars,
+              size: formatFileSize(selectedFiles.reduce((sum, e) => sum + (e.size ?? 0), 0)),
+            }),
+      ];
     }
     const files =
       l.totalBytes === null
         ? i18n.plural("files.summaryFilesNoSize", l.fileCount)
         : i18n.plural("files.summaryFiles", l.fileCount, { size: formatFileSize(l.totalBytes) });
     const hidden = l.hiddenCount > 0 ? ` ${i18n.plural("files.hiddenFiles", l.hiddenCount)}` : "";
-    return `${files} ${i18n.plural("files.summaryInLibrary", l.inLibraryCount)}${hidden}`;
+    return [files, `${i18n.plural("files.summaryInLibrary", l.inLibraryCount)}${hidden}`];
   }
 </script>
 
@@ -206,7 +209,11 @@
         {#snippet footer()}
           {#if listing}
             <div class="flex items-center justify-between gap-3 px-4 py-2.5 text-xs text-brand-text-secondary">
-              <span class="truncate">{summary(listing)}</span>
+              <span class="min-w-0 flex flex-col">
+                {#each summary(listing) as line, i (i)}
+                  <span class="truncate" title={line}>{line}</span>
+                {/each}
+              </span>
               {#if isLocal && !listing.excluded}
                 <Button size="sm" class="shrink-0 whitespace-nowrap" onclick={() => scanFolder(location.source, location.path)} disabled={collectionStore.isScanning}>
                   {collectionStore.isScanning ? i18n.t("files.scanning") : i18n.t("files.scanFolder")}

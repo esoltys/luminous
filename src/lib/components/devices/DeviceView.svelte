@@ -310,7 +310,7 @@
         >
           {#snippet footer()}
             <div class="flex items-center justify-between gap-3 px-4 py-2 text-xs text-brand-text-secondary">
-              <span class="truncate">
+              <span class="line-clamp-2 min-w-0">
                 {selection.length > 0 ? i18n.plural("devices.selected", selection.length) : i18n.t("devices.onlyRemovesOwn")}
                 {#if selection.length === 0 && listing && listing.hiddenCount > 0}{i18n.plural("files.hiddenFiles", listing.hiddenCount)}{/if}
               </span>
