@@ -25,10 +25,10 @@ pub fn open_or_reveal(
     launch: impl FnOnce(&Path) -> Result<()>,
     reveal: impl FnOnce(&Path) -> Result<()>,
 ) -> Result<OpenOutcome> {
-    decide(has_default_app(file), file, launch, reveal)
+    open_or_reveal_given(has_default_app(file), file, launch, reveal)
 }
 
-fn decide(
+fn open_or_reveal_given(
     has_app: bool,
     file: &Path,
     launch: impl FnOnce(&Path) -> Result<()>,
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn a_file_with_an_app_is_opened_not_shown() {
         let revealed = Cell::new(false);
-        let outcome = decide(
+        let outcome = open_or_reveal_given(
             true,
             Path::new("notes.txt"),
             |_| Ok(()),
@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn a_file_with_no_app_is_shown_without_launching() {
         let launched = Cell::new(false);
-        let outcome = decide(
+        let outcome = open_or_reveal_given(
             false,
             Path::new("rip.cue"),
             |_| {
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn a_failed_launch_falls_back_to_showing_the_file() {
-        let outcome = decide(
+        let outcome = open_or_reveal_given(
             true,
             Path::new("a.nfo"),
             |_| Err(anyhow!("no handler")),
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn fails_only_when_the_file_cannot_even_be_shown() {
-        let outcome = decide(
+        let outcome = open_or_reveal_given(
             true,
             Path::new("gone.txt"),
             |_| Err(anyhow!("not found")),

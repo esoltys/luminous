@@ -23,7 +23,7 @@
   import FileBrowser from "./FileBrowser.svelte";
   import FileContextMenu from "./FileContextMenu.svelte";
   import DeviceView from "../devices/DeviceView.svelte";
-  import { addFolderToDeviceSync, canOpen, openFile, playFolder, reveal, revealLabel, scanFolder } from "./folderActions";
+  import { addFolderToDeviceSync, openFile, playFolder, reveal, revealLabel, scanFolder } from "./folderActions";
 
   const location = $derived(navigationStore.filesLocation);
   const openDevice = $derived(
@@ -65,7 +65,7 @@
   /** Enter or double-click on a file: a sidecar opens in its app, a song plays its folder from it. */
   function activate(entry: FileEntry) {
     if (!location) return;
-    if (canOpen(entry)) {
+    if (entry.opensInApp) {
       openFile(location.source, location.path, entry);
       return;
     }

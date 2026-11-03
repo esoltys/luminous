@@ -19,6 +19,7 @@ function entry(name: string, over: Partial<FileEntry> = {}): FileEntry {
     modified: null,
     fileType: "FLAC",
     kind: "audio",
+    opensInApp: false,
     status: "notScanned",
     songId: null,
     missingTag: null,
@@ -136,7 +137,7 @@ describe("FileContextMenu.svelte", () => {
 
   it("leads a sidecar's menu with Open, which opens it in its app", async () => {
     vi.mocked(invoke).mockResolvedValue("opened");
-    open([entry("album.md", { status: "notAudio", kind: "notes", fileType: "MD" })]);
+    open([entry("album.md", { status: "notAudio", kind: "notes", opensInApp: true, fileType: "MD" })]);
 
     const items = screen.getAllByRole("menuitem");
     expect(items[0]).toHaveTextContent("Open");
@@ -147,7 +148,7 @@ describe("FileContextMenu.svelte", () => {
   it("says why a sidecar was shown in its folder instead", async () => {
     vi.mocked(invoke).mockResolvedValue("revealed");
     const show = vi.spyOn(toastStore, "show");
-    open([entry("rip.cue", { status: "inLibrary", kind: "cueSheet", fileType: "CUE" })]);
+    open([entry("rip.cue", { status: "inLibrary", kind: "cueSheet", opensInApp: true, fileType: "CUE" })]);
 
     await fireEvent.click(screen.getByText("Open"));
     await waitFor(() =>
@@ -163,8 +164,8 @@ describe("FileContextMenu.svelte", () => {
 
   it("offers no Open for several sidecars at once", () => {
     open([
-      entry("album.md", { status: "notAudio", kind: "notes" }),
-      entry("cover.jpg", { status: "albumArt", kind: "image" }),
+      entry("album.md", { status: "notAudio", kind: "notes", opensInApp: true }),
+      entry("cover.jpg", { status: "albumArt", kind: "image", opensInApp: true }),
     ]);
     expect(screen.queryByText("Open")).not.toBeInTheDocument();
   });

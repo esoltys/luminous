@@ -42,7 +42,7 @@
      * stays selected, with a halo that fades after a moment. */
     arrival?: string | null;
     onnavigate: (path: string[]) => void;
-    /** Enter or double-click on a file in the current folder: play it, open it... */
+    /** Enter or double-click on a file in the current folder; what that does is the caller's to decide. */
     onactivate: (entry: FileEntry) => void;
     /** Bump to read every listing again (after a scan, say). */
     reloadToken?: number;

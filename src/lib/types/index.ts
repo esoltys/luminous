@@ -373,7 +373,7 @@ export interface FileEntry {
   modified: number | null;
   /** Upper-case extension or codec, e.g. "FLAC". */
   fileType: string | null;
-  /** Null for folders. Audio plays; every other kind opens in its default app. */
+  /** Null for folders. Picks the row's icon; `opensInApp` says what activating it does. */
   kind: FileKind | null;
   /** Null for ordinary folders and device files. */
   status: FileEntryStatus | null;
@@ -381,6 +381,8 @@ export interface FileEntry {
   missingTag: MissingTag | null;
   /** Where it is on this computer; null on servers and devices. */
   location: string | null;
+  /** Enter, double-click and Open hand it to its default app (`open_source_file`) rather than playing it. */
+  opensInApp: boolean;
 }
 
 /** What a right-click in the Files browser acts on: `entries`, all in the folder `dir`. */

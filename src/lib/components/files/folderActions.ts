@@ -112,14 +112,9 @@ export async function reveal(location: string) {
   }
 }
 
-/** Whether `openFile` can open `entry`: a file on this computer that isn't audio. */
-export function canOpen(entry: FileEntry): boolean {
-  return !entry.isDir && entry.kind !== null && entry.kind !== "audio" && entry.location !== null;
-}
-
-/** Opens `entry`, a file in the folder `path` that isn't audio, in the app
- * its type opens with. When there is none the backend shows it in the file
- * manager instead, and a toast says why. */
+/** Opens `entry`, a file in the folder `path` whose `opensInApp` is set, in
+ * the app its type opens with. When there is none the backend shows it in
+ * the file manager instead, and a toast says why. */
 export async function openFile(source: FileSource, path: string[], entry: FileEntry) {
   try {
     const outcome = await invoke<"opened" | "revealed">("open_source_file", { source, path: [...path, entry.name] });

@@ -23,7 +23,7 @@
   import ContextMenuDivider from "../ContextMenuDivider.svelte";
   import SongContextMenu from "../SongContextMenu.svelte";
   import { shownName } from "./shownName";
-  import { addFolderToDeviceSync, canOpen, copyPaths, openFile, playFolder, playlistFromFolder, queueFolder, reveal, revealLabel, scanFolder } from "./folderActions";
+  import { addFolderToDeviceSync, copyPaths, openFile, playFolder, playlistFromFolder, queueFolder, reveal, revealLabel, scanFolder } from "./folderActions";
 
   /**
    * The right-click menu for rows of the Files view (#1884), one menu per
@@ -98,7 +98,7 @@
 
   const dirName = $derived(dir ? shownName(dir.name, dir.missingTag) : "");
   const dirPath = $derived(dir ? [...path, dir.name] : path);
-  const canOpenSingle = $derived(single !== null && single.songId === null && canOpen(single));
+  const canOpenSingle = $derived(single?.opensInApp ?? false);
   const canPlayOutside = $derived(songIds.length === 0 && unscannedLocations.length > 0);
   const canScanFiles = $derived(songIds.length === 0 && scannable && unscanned.length > 0);
   const canScanDir = $derived(isLocal && dir !== null && dir.status !== "excluded");

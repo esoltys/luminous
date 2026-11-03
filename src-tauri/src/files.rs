@@ -119,6 +119,12 @@ impl FileKind {
             _ => return None,
         })
     }
+
+    /// Whether a file of this kind on this computer opens in its default
+    /// app; audio plays in Luminous instead.
+    pub fn opens_in_app(self) -> bool {
+        self != FileKind::Audio
+    }
 }
 
 /// The tag a Subsonic folder's songs lack: such a folder's name is empty,
@@ -155,6 +161,10 @@ pub struct FileEntry {
     /// Where it is on this computer, to show, copy or open it there; `None`
     /// on servers and devices, which have no such path.
     pub location: Option<String>,
+    /// Whether activating it hands it to its default app (`open_source_file`)
+    /// rather than playing it: a non-audio file with a `location`. Set by
+    /// [`listing`] for every entry.
+    pub opens_in_app: bool,
 }
 
 impl FileEntry {
@@ -170,6 +180,7 @@ impl FileEntry {
             song_id: None,
             missing_tag: None,
             location: None,
+            opens_in_app: false,
         }
     }
 }
@@ -380,7 +391,7 @@ pub fn openable_file(
     let Some(name) = path.last() else {
         return Ok(None);
     };
-    let openable = FileKind::of(name).is_some_and(|k| k != FileKind::Audio);
+    let openable = FileKind::of(name).is_some_and(FileKind::opens_in_app);
     // A name `clean_path` would drop leaves a folder, not this file.
     if !openable || clean_path(path).len() != path.len() {
         return Ok(None);
@@ -654,7 +665,7 @@ fn extension(name: &str) -> Option<String> {
 
 /// The kind of the file named `name`; a library song is audio whatever its
 /// name says.
-fn kind_of(name: &str, is_song: bool) -> Option<FileKind> {
+fn entry_kind(name: &str, is_song: bool) -> Option<FileKind> {
     if is_song {
         Some(FileKind::Audio)
     } else {
@@ -716,7 +727,7 @@ fn list_folder(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
             let location = dir.join(&e.name).to_string_lossy().into_owned();
             let key = library_paths::key(&location);
             let song = songs.get(&key);
-            let kind = kind_of(&e.name, song.is_some());
+            let kind = entry_kind(&e.name, song.is_some());
             let status = if in_reserved || song.is_some_and(|(_, not_included)| *not_included) {
                 EntryStatus::Excluded
             } else if song.is_some() || cue_sheets.contains(&key) {
@@ -735,6 +746,7 @@ fn list_folder(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
                 name: e.name,
                 is_dir: false,
                 location: Some(location),
+                opens_in_app: false,
             }
         })
         .collect();
@@ -809,11 +821,12 @@ fn list_device(db: &Database, storage: &dyn DeviceBackend, dir: &str) -> Result<
                 .map(|s| s.path.clone());
             let entry = FileEntry {
                 file_type: file_type(&e.name),
-                kind: kind_of(&e.name, library_path.is_some()),
+                kind: entry_kind(&e.name, library_path.is_some()),
                 status: synced.is_none().then_some(EntryStatus::NotFromLuminous),
                 song_id: None,
                 missing_tag: None,
                 location: None,
+                opens_in_app: false,
                 size: Some(e.size),
                 modified: e.modified,
                 name: e.name,
@@ -863,6 +876,9 @@ fn listing(location: Option<String>, mut entries: Vec<FileEntry>) -> DirListing 
         }
         shown
     });
+    for e in &mut entries {
+        e.opens_in_app = e.location.is_some() && e.kind.is_some_and(FileKind::opens_in_app);
+    }
     let files = entries.iter().filter(|e| !e.is_dir);
     let total_bytes = files
         .clone()
@@ -995,6 +1011,7 @@ fn list_subsonic(conn: &Connection, id: i64, path: &[String]) -> Result<DirListi
                     song_id: Some(s.id),
                     missing_tag: None,
                     location: None,
+                    opens_in_app: false,
                 })
                 .collect();
             // Already in disc and track order, which name order would break.
@@ -1108,7 +1125,7 @@ fn list_webdav(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
                 return Some(FileEntry::folder(name));
             }
             let song = songs.get(&item.href);
-            let kind = kind_of(&name, song.is_some());
+            let kind = entry_kind(&name, song.is_some());
             let status = match song {
                 Some((_, true)) => EntryStatus::Excluded,
                 Some(_) => EntryStatus::InLibrary,
@@ -1123,6 +1140,7 @@ fn list_webdav(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
                 song_id: song.map(|(id, _)| *id),
                 missing_tag: None,
                 location: None,
+                opens_in_app: false,
                 is_dir: false,
                 name,
             })
@@ -1268,6 +1286,13 @@ mod tests {
         assert_eq!(kind("booklet.pdf"), Some(FileKind::Pdf));
         assert_eq!(kind("rip.cue"), Some(FileKind::CueSheet));
         assert_eq!(kind("mix.m3u8"), Some(FileKind::Playlist));
+        let opens = |name: &str| {
+            root.entries
+                .iter()
+                .any(|e| e.name == name && e.opens_in_app)
+        };
+        assert!(opens("album.md") && opens("rip.cue"));
+        assert!(!opens("01.flac"));
         let names: Vec<&str> = root.entries.iter().map(|e| e.name.as_str()).collect();
         for gone in ["setup.exe", "site.url", "checksums.sfv", "Thumbs.db"] {
             assert!(!names.contains(&gone), "{gone} is listed");

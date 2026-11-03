@@ -17,7 +17,8 @@ const source = { kind: "folder", id: 1 } as const;
 const KIND: Record<string, FileKind> = { flac: "audio", jpg: "image", txt: "notes", lrc: "lyrics", pdf: "pdf" };
 
 function entry(name: string, isDir: boolean, status: FileEntry["status"] = null, songId: number | null = null): FileEntry {
-  return { name, isDir, size: isDir ? null : 4_000_000, modified: null, fileType: isDir ? null : name.split(".").pop()!.toUpperCase(), kind: isDir ? null : KIND[name.split(".").pop()!] ?? null, status, songId, missingTag: null, location: `C:/Music/${name}` };
+  const kind = isDir ? null : KIND[name.split(".").pop()!] ?? null;
+  return { name, isDir, size: isDir ? null : 4_000_000, modified: null, fileType: isDir ? null : name.split(".").pop()!.toUpperCase(), kind, opensInApp: kind !== null && kind !== "audio", status, songId, missingTag: null, location: `C:/Music/${name}` };
 }
 
 function listing(entries: FileEntry[]): DirListing {
