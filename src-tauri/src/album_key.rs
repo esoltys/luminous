@@ -77,13 +77,21 @@ pub fn album_key_for(
         return folded_album;
     }
 
-    let artist_key = if is_compilation || eff_artist.map_or(false, is_various_artists) {
+    let artist_key = if is_compilation || eff_artist.is_some_and(is_various_artists) {
         COMPILATION_ARTIST_KEY.to_string()
     } else {
         eff_artist.map(fold_key).unwrap_or_default()
     };
 
     format!("{artist_key}{COMPOSITE_KEY_SEPARATOR}{folded_album}")
+}
+
+struct SongKeyRow {
+    id: i64,
+    album: String,
+    album_artist: Option<String>,
+    artist: Option<String>,
+    compilation: i64,
 }
 
 /// The identity key for an album title: surrounding whitespace trimmed, then
@@ -126,15 +134,15 @@ pub(crate) fn backfill_song_keys(conn: &rusqlite::Connection) -> anyhow::Result<
          FROM songs
          WHERE album_key IS NULL AND album IS NOT NULL AND TRIM(album) != ''",
     )?;
-    let songs: Vec<(i64, String, Option<String>, Option<String>, i64)> = stmt
+    let songs: Vec<SongKeyRow> = stmt
         .query_map([], |r| {
-            Ok((
-                r.get(0)?,
-                r.get(1)?,
-                r.get(2)?,
-                r.get(3)?,
-                r.get::<_, Option<i64>>(4)?.unwrap_or(0),
-            ))
+            Ok(SongKeyRow {
+                id: r.get(0)?,
+                album: r.get(1)?,
+                album_artist: r.get(2)?,
+                artist: r.get(3)?,
+                compilation: r.get::<_, Option<i64>>(4)?.unwrap_or(0),
+            })
         })?
         .collect::<rusqlite::Result<_>>()?;
 
@@ -143,14 +151,14 @@ pub(crate) fn backfill_song_keys(conn: &rusqlite::Connection) -> anyhow::Result<
     }
 
     let mut update = conn.prepare("UPDATE songs SET album_key = ?1 WHERE id = ?2")?;
-    for (id, album, album_artist, artist, compilation) in &songs {
+    for song in &songs {
         let key = album_key_for(
-            album,
-            album_artist.as_deref(),
-            artist.as_deref(),
-            *compilation != 0,
+            &song.album,
+            song.album_artist.as_deref(),
+            song.artist.as_deref(),
+            song.compilation != 0,
         );
-        update.execute(rusqlite::params![key, id])?;
+        update.execute(rusqlite::params![key, song.id])?;
     }
     Ok(())
 }

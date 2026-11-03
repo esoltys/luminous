@@ -806,6 +806,14 @@ fn migrate_reclassify_opened_files(conn: &rusqlite::Connection) -> Result<()> {
     Ok(())
 }
 
+struct AlbumMigrationSong {
+    id: i64,
+    album: String,
+    album_artist: Option<String>,
+    artist: Option<String>,
+    compilation: i64,
+}
+
 /// Migration 73: albums sharing identical names across different artists are
 /// separated into distinct entities via composite `album_key` (#1932).
 /// Recomputes `songs.album_key` across the library, updates the stale key
@@ -816,27 +824,27 @@ fn migrate_composite_album_keys(conn: &rusqlite::Connection) -> Result<()> {
          FROM songs
          WHERE album IS NOT NULL AND TRIM(album) != ''",
     )?;
-    let rows: Vec<(i64, String, Option<String>, Option<String>, i64)> = stmt
+    let rows: Vec<AlbumMigrationSong> = stmt
         .query_map([], |r| {
-            Ok((
-                r.get(0)?,
-                r.get(1)?,
-                r.get(2)?,
-                r.get(3)?,
-                r.get::<_, Option<i64>>(4)?.unwrap_or(0),
-            ))
+            Ok(AlbumMigrationSong {
+                id: r.get(0)?,
+                album: r.get(1)?,
+                album_artist: r.get(2)?,
+                artist: r.get(3)?,
+                compilation: r.get::<_, Option<i64>>(4)?.unwrap_or(0),
+            })
         })?
         .collect::<rusqlite::Result<_>>()?;
 
     let mut update_song = conn.prepare("UPDATE songs SET album_key = ?1 WHERE id = ?2")?;
-    for (id, album, album_artist, artist, compilation) in &rows {
+    for song in &rows {
         let key = crate::album_key::album_key_for(
-            album,
-            album_artist.as_deref(),
-            artist.as_deref(),
-            *compilation != 0,
+            &song.album,
+            song.album_artist.as_deref(),
+            song.artist.as_deref(),
+            song.compilation != 0,
         );
-        update_song.execute(params![key, id])?;
+        update_song.execute(params![key, song.id])?;
     }
 
     conn.execute_batch(
