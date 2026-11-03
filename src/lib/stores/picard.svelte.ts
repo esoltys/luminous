@@ -49,6 +49,15 @@ class PicardStore {
       console.error("Failed to save picard_missing_playlist_enabled setting:", err);
     }
   }
+
+  async openSongs(songIds: number[]) {
+    if (!songIds || songIds.length === 0) return;
+    try {
+      await invoke("open_in_picard", { songIds });
+    } catch (err) {
+      console.error("Failed to open songs in MusicBrainz Picard:", err);
+    }
+  }
 }
 
 export const picardStore = new PicardStore();

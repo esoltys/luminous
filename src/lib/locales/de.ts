@@ -2577,6 +2577,37 @@ export const de = {
     allResolvedTitle: "Alle Duplikate aufgelöst",
     allResolvedMessage: "Keine weiteren Duplikate zum Vergleichen vorhanden.",
     loadingDuplicates: "Duplikate werden geladen…",
-    closeBtn: "Schließen"
+    closeBtn: "Schließen",
+    shelfUnillustratedTitle: "Alben ohne Cover",
+    shelfUnillustratedHint: "Diese Alben besitzen weder eingebettete noch Ordner-Cover.",
+    addArtworkBtn: "Cover hinzufügen",
+    shelfIncompleteTitle: "Alben mit unvollständiger Titelliste",
+    shelfIncompleteHint: "Diese Alben weisen fehlende oder doppelte Titelnummern auf.",
+    unnumberedTracksBadge: {
+      one: "{count} unnummerierter Titel",
+      other: "{count} unnummerierte Titel"
+    },
+    duplicateTrackNumbersBadge: {
+      one: "{count} doppelte Titelnummer",
+      other: "{count} doppelte Titelnummern"
+    },
+    openInPicardBtn: "In Picard öffnen",
+    shelfMissingCoreTitle: {
+      one: "{count} Titel ohne Basis-Tags",
+      other: "{count} Titel ohne Basis-Tags"
+    },
+    shelfMissingCoreHint: "Titel ohne Titel, Interpret oder Album können nicht in Ordnerstrukturen organisiert werden.",
+    reviewMissingMetadataBtn: "Fehlende Tags prüfen",
+    shelfDuplicatesTitle: {
+      one: "{count} Gruppe doppelter Aufnahmen",
+      other: "{count} Gruppen doppelter Aufnahmen"
+    },
+    shelfDuplicatesHint: "Mehrere Kopien derselben Musikaufnahme wurden in Ihrer Sammlung erkannt.",
+    reviewDuplicatesBtn: "Duplikate vergleichen",
+    shelfProvenanceTitle: "Hinweise zur Audio-Herkunft",
+    shelfProvenanceHint: "Verlustfreie Titel mit Verdacht auf verlustbehaftete Transkodierung oder Upsampling.",
+    shelfProvenanceBadge: "Verdacht auf Transkodierung",
+    showAllWithCount: "Alle anzeigen ({count})",
+    showLess: "Weniger anzeigen"
   }
 };

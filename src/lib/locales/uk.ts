@@ -2753,6 +2753,45 @@ export const uk = {
     allResolvedTitle: "Усі дублікати врегульовано",
     allResolvedMessage: "Більше немає дублікатів для порівняння в цій сесії.",
     loadingDuplicates: "Завантаження дублікатів…",
-    closeBtn: "Закрити"
+    closeBtn: "Закрити",
+    shelfUnillustratedTitle: "Альбоми без обкладинки",
+    shelfUnillustratedHint: "У цих альбомів немає вбудованої або файлової обкладинки.",
+    addArtworkBtn: "Додати обкладинку",
+    shelfIncompleteTitle: "Альбоми з неповним списком треків",
+    shelfIncompleteHint: "У цих альбомів відсутні або дублюються номери треків.",
+    unnumberedTracksBadge: {
+      one: "{count} трек без номера",
+      few: "{count} треки без номера",
+      many: "{count} треків без номера",
+      other: "{count} треки без номера"
+    },
+    duplicateTrackNumbersBadge: {
+      one: "{count} дубльований номер треку",
+      few: "{count} дубльовані номери треку",
+      many: "{count} дубльованих номерів треку",
+      other: "{count} дубльованого номера треку"
+    },
+    openInPicardBtn: "Відкрити в Picard",
+    shelfMissingCoreTitle: {
+      one: "{count} трек без основних тегів",
+      few: "{count} треки без основних тегів",
+      many: "{count} треків без основних тегів",
+      other: "{count} треки без основних тегів"
+    },
+    shelfMissingCoreHint: "Треки без назви, виконавця або альбому неможливо організувати у структуровані папки.",
+    reviewMissingMetadataBtn: "Перевірити відсутні теги",
+    shelfDuplicatesTitle: {
+      one: "{count} група дубльованих записів",
+      few: "{count} групи дубльованих записів",
+      many: "{count} груп дубльованих записів",
+      other: "{count} групи дубльованих записів"
+    },
+    shelfDuplicatesHint: "У вашій фонотеці виявлено кілька копій одного й того самого музичного запису.",
+    reviewDuplicatesBtn: "Порівняти дублікати",
+    shelfProvenanceTitle: "Повідомлення про автентичність аудіо",
+    shelfProvenanceHint: "Lossless-треки з підозрою на перетиснення зі стиснених форматів або штучний апсемплінг.",
+    shelfProvenanceBadge: "Підозра на перетиснення",
+    showAllWithCount: "Показати всі ({count})",
+    showLess: "Показати менше"
   }
 };

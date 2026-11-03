@@ -2585,6 +2585,37 @@ export const frFR: DeepStringRecord<typeof en> = {
     allResolvedTitle: "Tous les doublons ont été résolus",
     allResolvedMessage: "Aucun autre doublon à comparer dans cette session.",
     loadingDuplicates: "Chargement des doublons…",
-    closeBtn: "Fermer"
+    closeBtn: "Fermer",
+    shelfUnillustratedTitle: "Albums sans pochette",
+    shelfUnillustratedHint: "Ces albums n'ont aucune illustration intégrée ou de dossier.",
+    addArtworkBtn: "Ajouter une pochette",
+    shelfIncompleteTitle: "Albums aux listes de pistes incomplètes",
+    shelfIncompleteHint: "Ces albums comportent des numéros de piste manquants ou en double.",
+    unnumberedTracksBadge: {
+      one: "{count} piste sans numéro",
+      other: "{count} pistes sans numéro"
+    },
+    duplicateTrackNumbersBadge: {
+      one: "{count} numéro de piste en double",
+      other: "{count} numéros de piste en double"
+    },
+    openInPicardBtn: "Ouvrir dans Picard",
+    shelfMissingCoreTitle: {
+      one: "{count} piste sans étiquettes de base",
+      other: "{count} pistes sans étiquettes de base"
+    },
+    shelfMissingCoreHint: "Les pistes sans titre, artiste ou album ne peuvent pas être organisées en dossiers structurés.",
+    reviewMissingMetadataBtn: "Examiner les étiquettes manquantes",
+    shelfDuplicatesTitle: {
+      one: "{count} groupe d'enregistrements en double",
+      other: "{count} groupes d'enregistrements en double"
+    },
+    shelfDuplicatesHint: "Plusieurs copies du même enregistrement musical ont été détectées dans votre collection.",
+    reviewDuplicatesBtn: "Comparer les doublons",
+    shelfProvenanceTitle: "Avis sur la provenance audio",
+    shelfProvenanceHint: "Pistes sans perte signalées pour transcodage avec perte ou suréchantillonnage suspect.",
+    shelfProvenanceBadge: "Transcodage suspect",
+    showAllWithCount: "Tout afficher ({count})",
+    showLess: "Afficher moins"
   }
 };

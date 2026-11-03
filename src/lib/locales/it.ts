@@ -2577,6 +2577,37 @@ export const it = {
     allResolvedTitle: "Tutti i duplicati risolti",
     allResolvedMessage: "Nessun altro brano duplicato da confrontare.",
     loadingDuplicates: "Caricamento duplicati…",
-    closeBtn: "Chiudi"
+    closeBtn: "Chiudi",
+    shelfUnillustratedTitle: "Album senza copertina",
+    shelfUnillustratedHint: "Questi album non hanno copertine incorporate o nella cartella.",
+    addArtworkBtn: "Aggiungi copertina",
+    shelfIncompleteTitle: "Album con tracce incomplete",
+    shelfIncompleteHint: "Questi album hanno numeri di traccia mancanti o duplicati.",
+    unnumberedTracksBadge: {
+      one: "{count} traccia non numerata",
+      other: "{count} tracce non numerate"
+    },
+    duplicateTrackNumbersBadge: {
+      one: "{count} numero di traccia duplicato",
+      other: "{count} numeri di traccia duplicati"
+    },
+    openInPicardBtn: "Apri in Picard",
+    shelfMissingCoreTitle: {
+      one: "{count} traccia priva di tag di base",
+      other: "{count} tracce prive di tag di base"
+    },
+    shelfMissingCoreHint: "I brani privi di titolo, artista o album non possono essere organizzati in cartelle strutturate.",
+    reviewMissingMetadataBtn: "Controlla tag mancanti",
+    shelfDuplicatesTitle: {
+      one: "{count} gruppo di registrazioni duplicate",
+      other: "{count} gruppi di registrazioni duplicate"
+    },
+    shelfDuplicatesHint: "Rilevate più copie della stessa registrazione musicale nella collezione.",
+    reviewDuplicatesBtn: "Confronta duplicati",
+    shelfProvenanceTitle: "Avvisi di provenienza audio",
+    shelfProvenanceHint: "Tracce lossless segnalate per sospetta transcodifica con perdita o sovracampionamento.",
+    shelfProvenanceBadge: "Sospetta transcodifica",
+    showAllWithCount: "Mostra tutto ({count})",
+    showLess: "Mostra meno"
   }
 };

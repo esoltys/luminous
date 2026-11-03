@@ -36,6 +36,15 @@ const { defaultInvokeHandler } = vi.hoisted(() => {
     if (cmd === "preview_organize") {
       return Promise.resolve([]);
     }
+    if (cmd === "get_curation_overview") {
+      return Promise.resolve({
+        unillustrated_albums: [],
+        incomplete_albums: [],
+        missing_core_tags_count: 0,
+        suspected_provenance_songs: [],
+        duplicate_groups: [],
+      });
+    }
     if (cmd === "apply_organize") {
       return Promise.resolve({
         moved_count: 0,
@@ -139,6 +148,82 @@ describe("OrganizeView header status", () => {
 
     await waitFor(async () => {
       expect(await findByText("1 unorganized song")).toBeInTheDocument();
+    });
+  });
+
+  it("renders summaryWaitingOnCuration when ready and pending organize counts are 0 but curation shelf has items", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "preview_organize") {
+        return Promise.resolve([]);
+      }
+      if (cmd === "get_curation_overview") {
+        return Promise.resolve({
+          unillustrated_albums: [
+            {
+              album_key: "album-1",
+              album: "Amnesiac",
+              artist: "Radiohead",
+              year: 2001,
+              track_count: 11,
+              disc_count: 1,
+              art_embedded: false,
+              art_automatic: null,
+              art_manual: null,
+              genre: "Art Rock",
+              rating: -1,
+              sample_song_id: 101,
+              song_ids: [101, 102],
+            },
+          ],
+          incomplete_albums: [],
+          missing_core_tags_count: 0,
+          suspected_provenance_songs: [],
+          duplicate_groups: [],
+        });
+      }
+      return defaultInvokeHandler(cmd);
+    });
+
+    const { findByText } = render(OrganizeView);
+
+    await waitFor(async () => {
+      expect(await findByText("1 song waiting on tags or review")).toBeInTheDocument();
+    });
+  });
+
+  it("sums organizePendingCount and curationCount in waitingOnCuration header", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "preview_organize") {
+        return Promise.resolve([
+          {
+            song_id: 1,
+            from_path: "/music/track1.mp3",
+            to_path: "/music/Rock/track1.mp3",
+            status: "missing_tag",
+            error_message: "Missing title",
+            title: null,
+            artist: "Artist",
+            album: "Album",
+            missing_fields: ["title"],
+          },
+        ]);
+      }
+      if (cmd === "get_curation_overview") {
+        return Promise.resolve({
+          unillustrated_albums: [],
+          incomplete_albums: [],
+          missing_core_tags_count: 2,
+          suspected_provenance_songs: [],
+          duplicate_groups: [],
+        });
+      }
+      return defaultInvokeHandler(cmd);
+    });
+
+    const { findByText } = render(OrganizeView);
+
+    await waitFor(async () => {
+      expect(await findByText("3 songs waiting on tags or review")).toBeInTheDocument();
     });
   });
 });

@@ -5,6 +5,7 @@
   import { rememberScroll } from "../utils/scrollMemory";
   import { organizeStore } from "../stores/organizer.svelte";
   import OrganizeFiles from "./OrganizeFiles.svelte";
+  import CurationShelf from "./CurationShelf.svelte";
   import Button from "./Button.svelte";
   import Toggle from "./Toggle.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
@@ -16,6 +17,7 @@
   let organizeRefreshKey = $state(0);
   let organizeReadyCount = $state(0);
   let organizePendingCount = $state(0);
+  let curationCount = $state(0);
   let organizeCanApply = $state(false);
   let organizeIsApplying = $state(false);
   let organizeApplyRequestKey = $state(0);
@@ -53,7 +55,7 @@
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
   <div class="flex-1 overflow-y-auto px-6 pb-12" class:pb-28={!!playerStore.currentSong} use:rememberScroll={"organize"}>
     <div class="pt-4 pb-4 flex items-start justify-between gap-4">
-      {#if organizeReadyCount === 0 && organizePendingCount === 0}
+      {#if organizeReadyCount === 0 && organizePendingCount === 0 && curationCount === 0}
         <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
           <span class="relative inline-flex shrink-0">
             <span class="absolute inset-0 rounded-full anim-gold-ring"></span>
@@ -61,10 +63,10 @@
           </span>
           {i18n.t("organizer.nothingToOrganize")}
         </span>
-      {:else if organizeReadyCount === 0 && organizePendingCount > 0}
+      {:else if organizeReadyCount === 0 && (organizePendingCount > 0 || curationCount > 0)}
         <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
           <Broom class="w-5 h-5 shrink-0" />
-          {i18n.plural("organizer.summaryWaitingOnCuration", organizePendingCount)}
+          {i18n.plural("organizer.summaryWaitingOnCuration", organizePendingCount + curationCount)}
         </span>
       {:else}
         <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
@@ -115,6 +117,12 @@
         bind:summaryCanApply={organizeCanApply}
         bind:summaryIsApplying={organizeIsApplying}
         applyRequestKey={organizeApplyRequestKey}
+      />
+
+      <CurationShelf
+        refreshKey={organizeRefreshKey}
+        bind:totalCurationCount={curationCount}
+        onChanged={() => { organizeRefreshKey++; }}
       />
 
       <!-- Lightweight inline maintenance action — deliberately not its own bordered card. -->
