@@ -40,7 +40,8 @@
       "border border-brand-accent/60 bg-brand-accent/10 hover:bg-brand-accent text-brand-accent-text hover:text-brand-accent-contrast shadow-sm",
     info: "bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:text-purple-300",
     warning: "bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300",
-    destructive: "bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300",
+    destructive:
+      "border border-brand-accent/60 bg-brand-accent/10 hover:bg-brand-accent text-brand-accent-text hover:text-brand-accent-contrast shadow-sm",
   };
 
   const sizeClasses: Record<ButtonSize, string> = {

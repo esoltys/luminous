@@ -35,8 +35,8 @@
 <Modal onClose={onCancel} onKeydown={handleKeydown} maxWidth="max-w-sm">
   <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
     <div class="flex items-center gap-2">
-      <AlertTriangle class="w-4 h-4 {danger ? 'text-red-400' : 'text-brand-accent-text'}" />
-      <h3 class="text-sm font-bold text-balance">{title}</h3>
+      <AlertTriangle class="w-4 h-4 text-brand-accent-text" />
+      <h3 class="text-sm font-bold text-balance text-brand-text-primary">{title}</h3>
     </div>
     <button onclick={onCancel} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
       <X class="w-4 h-4" />
@@ -51,7 +51,7 @@
     <Button onclick={onCancel} variant="secondary" size="sm">
       {cancelLabel}
     </Button>
-    <Button onclick={onConfirm} variant={danger ? "destructive" : "primary"} size="sm">
+    <Button onclick={onConfirm} variant="primary" size="sm">
       {confirmLabel}
     </Button>
   </div>
