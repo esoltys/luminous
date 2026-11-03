@@ -124,8 +124,13 @@ describe("CurationShelf.svelte", () => {
 
     const { findByTestId, findByText } = render(CurationShelf);
 
-    expect(await findByTestId("curation-incomplete-section")).toBeInTheDocument();
+    const section = await findByTestId("curation-incomplete-section");
+    expect(section).toBeInTheDocument();
     expect(await findByText("3 unnumbered tracks")).toBeInTheDocument();
+
+    // Verify incomplete albums render in a single-column flex list to avoid suffix collision (#1934)
+    const listContainer = section.querySelector(".flex.flex-col.gap-3");
+    expect(listContainer).not.toBeNull();
 
     // Clicking Picard button triggers picardStore.openSongs
     const picardBtn = await findByText("Open in Picard");
