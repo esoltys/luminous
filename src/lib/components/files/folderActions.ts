@@ -7,14 +7,15 @@ import { toastStore } from "../../stores/toast.svelte";
 import { i18n } from "../../stores/i18n.svelte";
 import { deviceName } from "../../utils/devices";
 import { isWindows, isLinux } from "../../platform";
-import type { ConnectedDevice, FileSource, Song } from "../../types";
+import type { ConnectedDevice, FileEntry, FileSource, Song } from "../../types";
 
 /**
- * What the Files view does to a folder of a source (#1841, #1884): the
- * header buttons act on the open folder, the folder-row menu on a child
- * folder, both through here. A folder is `(source, path)`, names from the
- * source's root; `name` is what toasts and the queue's context call it.
- * Every action reports its own outcome in a toast and never throws.
+ * What the Files view does to a folder of a source, or a file in one
+ * (#1841, #1884, #1885): the header buttons act on the open folder, the
+ * menus on a child folder or file, all through here. A folder is
+ * `(source, path)`, names from the source's root; `name` is what toasts and
+ * the queue's context call it. Every action reports its own outcome in a
+ * toast and never throws.
  */
 
 /** The library songs in a folder and below it, in layout order. */
@@ -108,6 +109,21 @@ export async function reveal(location: string) {
     await revealItemInDir(location);
   } catch (err) {
     console.error("Failed to show a file in the file manager:", err);
+  }
+}
+
+/** Opens `entry`, a file in the folder `path` whose `opensInApp` is set, in
+ * the app its type opens with. When there is none the backend shows it in
+ * the file manager instead, and a toast says why. */
+export async function openFile(source: FileSource, path: string[], entry: FileEntry) {
+  try {
+    const outcome = await invoke<"opened" | "revealed">("open_source_file", { source, path: [...path, entry.name] });
+    if (outcome === "revealed") {
+      toastStore.show(i18n.t("files.noAppToOpen", { type: `.${(entry.fileType ?? "").toLowerCase()}` }), "info");
+    }
+  } catch (err) {
+    console.error("Failed to open a file:", err);
+    toastStore.show(i18n.t("files.openFailed"), "error");
   }
 }
 

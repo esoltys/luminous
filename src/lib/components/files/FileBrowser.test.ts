@@ -4,7 +4,7 @@ import { render, fireEvent, waitFor, within } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import FileBrowser from "./FileBrowser.svelte";
 import { i18n } from "../../stores/i18n.svelte";
-import type { DirListing, FileEntry } from "../../types";
+import type { DirListing, FileEntry, FileKind } from "../../types";
 
 vi.mock("svelte-virtual-list-ts", async () => {
   const mod = await import("../__mocks__/VirtualList.svelte");
@@ -13,12 +13,16 @@ vi.mock("svelte-virtual-list-ts", async () => {
 
 const source = { kind: "folder", id: 1 } as const;
 
+/** What the backend says each extension in these fixtures is. */
+const KIND: Record<string, FileKind> = { flac: "audio", jpg: "image", txt: "notes", lrc: "lyrics", pdf: "pdf" };
+
 function entry(name: string, isDir: boolean, status: FileEntry["status"] = null, songId: number | null = null): FileEntry {
-  return { name, isDir, size: isDir ? null : 4_000_000, modified: null, fileType: isDir ? null : "FLAC", status, songId, missingTag: null, location: `C:/Music/${name}` };
+  const kind = isDir ? null : KIND[name.split(".").pop()!] ?? null;
+  return { name, isDir, size: isDir ? null : 4_000_000, modified: null, fileType: isDir ? null : name.split(".").pop()!.toUpperCase(), kind, opensInApp: kind !== null && kind !== "audio", status, songId, missingTag: null, location: `C:/Music/${name}` };
 }
 
 function listing(entries: FileEntry[]): DirListing {
-  return { location: "C:/Music", entries, fileCount: entries.filter((e) => !e.isDir).length, totalBytes: 0, inLibraryCount: 0, excluded: false, pathMissingTags: [] };
+  return { location: "C:/Music", entries, fileCount: entries.filter((e) => !e.isDir).length, hiddenCount: 0, totalBytes: 0, inLibraryCount: 0, excluded: false, pathMissingTags: [] };
 }
 
 const tree: Record<string, FileEntry[]> = {
@@ -34,9 +38,9 @@ const tree: Record<string, FileEntry[]> = {
 
 function setup(path: string[]) {
   const onnavigate = vi.fn();
-  const onplay = vi.fn();
-  const result = render(FileBrowser, { props: { source, path, onnavigate, onplay, unreachableLabel: "Can't reach Music" } });
-  return { ...result, onnavigate, onplay };
+  const onactivate = vi.fn();
+  const result = render(FileBrowser, { props: { source, path, onnavigate, onactivate, unreachableLabel: "Can't reach Music" } });
+  return { ...result, onnavigate, onactivate };
 }
 
 describe("FileBrowser.svelte", () => {
@@ -64,6 +68,26 @@ describe("FileBrowser.svelte", () => {
     expect(getAllByRole("option", { selected: true }).map((o) => o.textContent?.trim())).toEqual(["Rock", "Live"]);
   });
 
+  it("draws each file with its kind's icon", async () => {
+    const { findByText, getByRole } = setup(["Rock", "Live"]);
+    await findByText("01 Opening.flac");
+    const kindOf = (name: RegExp) => getByRole("option", { name }).querySelector("[data-kind]")?.getAttribute("data-kind");
+    expect(kindOf(/01 Opening/)).toBe("audio");
+    expect(kindOf(/cover\.jpg/)).toBe("image");
+    expect(kindOf(/notes\.txt/)).toBe("notes");
+  });
+
+  it("activates any file with Enter or a double-click, not just songs", async () => {
+    const { getByRole, findByText, onactivate } = setup(["Rock", "Live"]);
+    const notes = await findByText("notes.txt");
+    await fireEvent.dblClick(notes);
+    expect(onactivate).toHaveBeenCalledWith(expect.objectContaining({ name: "notes.txt", kind: "notes" }));
+
+    await fireEvent.click(notes);
+    await fireEvent.keyDown(getByRole("listbox", { name: "Live" }), { key: "Enter" });
+    expect(onactivate).toHaveBeenCalledTimes(2);
+  });
+
   it("labels reserved folders as excluded", async () => {
     const { findByText } = setup(["Rock"]);
     const duplicates = await findByText("Duplicates");
@@ -71,7 +95,7 @@ describe("FileBrowser.svelte", () => {
   });
 
   it("moves the selection with the arrow keys, opens folders and plays files", async () => {
-    const { getByRole, findByText, onplay, onnavigate } = setup(["Rock", "Live"]);
+    const { getByRole, findByText, onactivate, onnavigate } = setup(["Rock", "Live"]);
     await findByText("01 Opening.flac");
     const current = getByRole("listbox", { name: "Live" });
 
@@ -80,7 +104,7 @@ describe("FileBrowser.svelte", () => {
     expect(getByRole("option", { name: /02 Encore/ })).toHaveAttribute("aria-selected", "true");
 
     await fireEvent.keyDown(current, { key: "Enter" });
-    expect(onplay).toHaveBeenCalledWith(expect.objectContaining({ name: "02 Encore.flac" }));
+    expect(onactivate).toHaveBeenCalledWith(expect.objectContaining({ name: "02 Encore.flac" }));
 
     const parent = getByRole("listbox", { name: "Rock" });
     await fireEvent.keyDown(parent, { key: "ArrowDown" });
@@ -149,7 +173,7 @@ describe("FileBrowser.svelte", () => {
     function setupMenu() {
       const oncontextmenu = vi.fn();
       const result = render(FileBrowser, {
-        props: { source, path: ["Rock", "Live"], onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "", oncontextmenu },
+        props: { source, path: ["Rock", "Live"], onnavigate: vi.fn(), onactivate: vi.fn(), unreachableLabel: "", oncontextmenu },
       });
       const names = () => oncontextmenu.mock.lastCall![0].entries.map((e: FileEntry) => e.name);
       return { ...result, oncontextmenu, names };
@@ -202,7 +226,7 @@ describe("FileBrowser.svelte", () => {
     it("selects the target, outlines it, and fades the halo after a moment", async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const { getByRole, findByText } = render(FileBrowser, {
-        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", arrival: "02 Encore.flac", onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "" },
+        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", arrival: "02 Encore.flac", onnavigate: vi.fn(), onactivate: vi.fn(), unreachableLabel: "" },
       });
       await findByText("02 Encore.flac");
       const encore = option(getByRole, "02 Encore");
@@ -230,7 +254,7 @@ describe("FileBrowser.svelte", () => {
           })
       );
       const { getByRole, findByText } = render(FileBrowser, {
-        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", arrival: "02 Encore.flac", onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "" },
+        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", arrival: "02 Encore.flac", onnavigate: vi.fn(), onactivate: vi.fn(), unreachableLabel: "" },
       });
 
       await vi.advanceTimersByTimeAsync(2000);
@@ -244,7 +268,7 @@ describe("FileBrowser.svelte", () => {
 
     it("arrives again at the file already targeted after another row was clicked", async () => {
       const { getByRole, findByText, rerender } = render(FileBrowser, {
-        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", arrival: "02 Encore.flac", onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "" },
+        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", arrival: "02 Encore.flac", onnavigate: vi.fn(), onactivate: vi.fn(), unreachableLabel: "" },
       });
       await findByText("02 Encore.flac");
       await fireEvent.click(option(getByRole, "01 Opening"));
@@ -258,7 +282,7 @@ describe("FileBrowser.svelte", () => {
 
     it("selects the target without marking it when it isn't an arrival (Back, restart)", async () => {
       const { getByRole, findByText } = render(FileBrowser, {
-        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "" },
+        props: { source, path: ["Rock", "Live"], target: "02 Encore.flac", onnavigate: vi.fn(), onactivate: vi.fn(), unreachableLabel: "" },
       });
       await findByText("02 Encore.flac");
       const encore = option(getByRole, "02 Encore");
@@ -268,7 +292,7 @@ describe("FileBrowser.svelte", () => {
 
     it("selects a new target in the folder already shown, and the usual entry after moving on", async () => {
       const { getByRole, findByText, rerender } = render(FileBrowser, {
-        props: { source, path: ["Rock", "Live"], target: "01 Opening.flac", onnavigate: vi.fn(), onplay: vi.fn(), unreachableLabel: "" },
+        props: { source, path: ["Rock", "Live"], target: "01 Opening.flac", onnavigate: vi.fn(), onactivate: vi.fn(), unreachableLabel: "" },
       });
       await findByText("01 Opening.flac");
       expect(option(getByRole, "01 Opening")).toHaveAttribute("aria-selected", "true");
@@ -303,7 +327,7 @@ describe("FileBrowser.svelte", () => {
     });
     const onnavigate = vi.fn();
     const { getAllByRole, findByText, getByText } = render(FileBrowser, {
-      props: { source: { kind: "subsonic", id: 3 }, path: [""], onnavigate, onplay: vi.fn(), unreachableLabel: "Can't reach" },
+      props: { source: { kind: "subsonic", id: 3 }, path: [""], onnavigate, onactivate: vi.fn(), unreachableLabel: "Can't reach" },
     });
 
     await findByText("Unknown Album");

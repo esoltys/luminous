@@ -96,6 +96,13 @@ export const en = {
       other: "Copied {count} paths."
     },
     copyFailed: "Couldn't copy to the clipboard.",
+    open: "Open",
+    noAppToOpen: "No app is set up to open {type} files, so it's shown in its folder instead.",
+    openFailed: "Couldn't open this file.",
+    hiddenFiles: {
+      one: "{count} other file isn't shown.",
+      other: "{count} other files aren't shown."
+    },
     queueFailed: "Couldn't add this folder to the queue.",
     playlistFailed: "Couldn't make a playlist from this folder.",
     skippedScan: {

@@ -23,7 +23,7 @@
   import FileBrowser from "./FileBrowser.svelte";
   import FileContextMenu from "./FileContextMenu.svelte";
   import DeviceView from "../devices/DeviceView.svelte";
-  import { addFolderToDeviceSync, playFolder, reveal, revealLabel, scanFolder } from "./folderActions";
+  import { addFolderToDeviceSync, openFile, playFolder, reveal, revealLabel, scanFolder } from "./folderActions";
 
   const location = $derived(navigationStore.filesLocation);
   const openDevice = $derived(
@@ -49,6 +49,9 @@
   });
 
   const isLocal = $derived(location?.source.kind === "folder");
+  /** Folders and WebDAV servers have a real path or URL to show. The header lays out from
+   * this, known at once, so it doesn't jump when a slow folder's listing arrives. */
+  const hasLocation = $derived(isLocal || location?.source.kind === "webdav");
   /** The `i`th name of the current path as shown; the listing says which are missing tags. */
   const pathName = (i: number) => shownName(location?.path[i] ?? "", listing?.pathMissingTags[i]);
   const title = $derived(location && location.path.length > 0 ? pathName(location.path.length - 1) : sourceName);
@@ -59,8 +62,13 @@
     navigationStore.filesLocation = { source: location.source, path };
   }
 
-  function playEntry(entry: FileEntry) {
+  /** Enter or double-click on a file: a sidecar opens in its app, a song plays its folder from it. */
+  function activate(entry: FileEntry) {
     if (!location) return;
+    if (entry.opensInApp) {
+      openFile(location.source, location.path, entry);
+      return;
+    }
     if (entry.songId === null) {
       toastStore.show(
         i18n.t(isLocal && entry.status === "notScanned" ? "files.notInLibraryScan" : "files.notInLibrary"),
@@ -86,21 +94,25 @@
     selection.length > 1 && listing ? listing.entries.filter((e) => !e.isDir && selection.includes(e.name)) : []
   );
 
-  function summary(l: DirListing): string {
+  /** The footer's lines: the selection, or the folder's size, then what is in the library. */
+  function summary(l: DirListing): string[] {
     if (selectedFiles.length > 1) {
       const vars = { selected: selectedFiles.length };
-      return l.totalBytes === null
-        ? i18n.plural("files.selectedFilesNoSize", l.fileCount, vars)
-        : i18n.plural("files.selectedFiles", l.fileCount, {
-            ...vars,
-            size: formatFileSize(selectedFiles.reduce((sum, e) => sum + (e.size ?? 0), 0)),
-          });
+      return [
+        l.totalBytes === null
+          ? i18n.plural("files.selectedFilesNoSize", l.fileCount, vars)
+          : i18n.plural("files.selectedFiles", l.fileCount, {
+              ...vars,
+              size: formatFileSize(selectedFiles.reduce((sum, e) => sum + (e.size ?? 0), 0)),
+            }),
+      ];
     }
     const files =
       l.totalBytes === null
         ? i18n.plural("files.summaryFilesNoSize", l.fileCount)
         : i18n.plural("files.summaryFiles", l.fileCount, { size: formatFileSize(l.totalBytes) });
-    return `${files} ${i18n.plural("files.summaryInLibrary", l.inLibraryCount)}`;
+    const hidden = l.hiddenCount > 0 ? ` ${i18n.plural("files.hiddenFiles", l.hiddenCount)}` : "";
+    return [files, `${i18n.plural("files.summaryInLibrary", l.inLibraryCount)}${hidden}`];
   }
 </script>
 
@@ -131,8 +143,8 @@
             {/each}
           </nav>
           <h1 class="text-3xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={title}>{title}</h1>
-          {#if listing?.location}
-            <p class="text-xs text-brand-text-secondary truncate select-text" title={listing.location}>{listing.location}</p>
+          {#if hasLocation}
+            <p class="text-xs text-brand-text-secondary truncate select-text" title={listing?.location}>{listing?.location ?? " "}</p>
           {/if}
         </div>
         <div class="flex items-center gap-2 shrink-0">
@@ -140,7 +152,7 @@
             <PlayIcon weight="fill" class="w-4 h-4" />
             {i18n.t("files.playFolder")}
           </Button>
-          {#if isLocal && filesStore.devices.length > 0 && listing?.location}
+          {#if isLocal && filesStore.devices.length > 0}
             <div class="relative">
               <Button onclick={(e) => { e.stopPropagation(); onAddToDeviceSync(); }}>
                 <DeviceMobileSpeakerIcon class="w-4 h-4" />
@@ -159,7 +171,7 @@
               {/if}
             </div>
           {/if}
-          {#if isLocal && listing?.location}
+          {#if isLocal}
             <button
               class="w-9 h-9 flex items-center justify-center rounded-full text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 transition-colors"
               onclick={() => listing?.location && reveal(listing.location)}
@@ -184,7 +196,7 @@
         source={location.source}
         path={location.path}
         onnavigate={navigate}
-        onplay={playEntry}
+        onactivate={activate}
         target={location.selectedName ?? null}
         bind:arrival={navigationStore.pendingFilesArrival}
         {reloadToken}
@@ -197,7 +209,11 @@
         {#snippet footer()}
           {#if listing}
             <div class="flex items-center justify-between gap-3 px-4 py-2.5 text-xs text-brand-text-secondary">
-              <span class="truncate">{summary(listing)}</span>
+              <span class="min-w-0 flex flex-col">
+                {#each summary(listing) as line, i (i)}
+                  <span class="truncate" title={line}>{line}</span>
+                {/each}
+              </span>
               {#if isLocal && !listing.excluded}
                 <Button size="sm" class="shrink-0 whitespace-nowrap" onclick={() => scanFolder(location.source, location.path)} disabled={collectionStore.isScanning}>
                   {collectionStore.isScanning ? i18n.t("files.scanning") : i18n.t("files.scanFolder")}

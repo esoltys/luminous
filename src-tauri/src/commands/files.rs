@@ -4,8 +4,10 @@
 use crate::collection::{CollectionScanner, ScanTrigger};
 use crate::files::{self, DirListing, FileNavigationTarget, FileSource, SourceSummary};
 use crate::models::Song;
+use crate::shell_open::{self, OpenOutcome};
 use crate::AppState;
 use tauri::{AppHandle, State};
+use tauri_plugin_opener::OpenerExt;
 
 /// Every watched folder and media server, with its library song count.
 /// Devices come from `get_connected_devices`.
@@ -83,6 +85,40 @@ pub async fn locate_album_in_files(
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
+}
+
+/// Opens a sidecar file (`path` ends with its name) in the app its type
+/// opens with, or shows it in the file manager when there is none. Only a
+/// listed non-audio file in a watched folder opens; anything else rejects
+/// with `not-openable`.
+#[tauri::command]
+pub async fn open_source_file(
+    app: AppHandle,
+    source: FileSource,
+    path: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<OpenOutcome, String> {
+    let file = crate::db::run_blocking(&state.db, move |conn| {
+        files::openable_file(conn, &source, &path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| "not-openable".to_string())?;
+    // Asking Windows about the type reads the registry: off the runtime.
+    tokio::task::spawn_blocking(move || {
+        let opener = app.opener();
+        shell_open::open_or_reveal(
+            &file,
+            |f| Ok(opener.open_path(f.to_string_lossy(), None::<&str>)?),
+            |f| Ok(opener.reveal_item_in_dir(f)?),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| {
+        log::warn!("Failed to open a file: {e:#}");
+        e.to_string()
+    })
 }
 
 /// Looks for new and changed files in one folder of a folder source; the

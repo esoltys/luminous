@@ -96,6 +96,13 @@ export const es = {
       other: "Se copiaron {count} rutas."
     },
     copyFailed: "No se pudo copiar al portapapeles.",
+    open: "Abrir",
+    noAppToOpen: "No hay ninguna aplicación configurada para abrir archivos {type}, así que se muestra en su carpeta.",
+    openFailed: "No se pudo abrir este archivo.",
+    hiddenFiles: {
+      one: "No se muestra {count} archivo más.",
+      other: "No se muestran {count} archivos más."
+    },
     queueFailed: "No se pudo agregar esta carpeta a la cola.",
     playlistFailed: "No se pudo crear una lista de reproducción desde esta carpeta.",
     skippedScan: {
