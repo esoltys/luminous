@@ -502,13 +502,13 @@
                   </div>
                 {/each}
 
-                {#each collectionStore.filteredAlbums.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as album (album.album)}
+                {#each collectionStore.filteredAlbums.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as album (album.album_key || album.album)}
                   <div
                     role="button"
                     tabindex="0"
                     onclick={() => {
                       if (album.album) {
-                        navigationStore.viewAlbum(album.album);
+                        navigationStore.viewAlbum(album.album, undefined, album.album_key ?? undefined);
                         collectionStore.addRecentSearch({
                           kind: "album",
                           title: album.album,
@@ -520,7 +520,7 @@
                       }
                     }}
                     onkeydown={(e) => {
-                      if (e.key === 'Enter' && album.album) navigationStore.viewAlbum(album.album);
+                      if (e.key === 'Enter' && album.album) navigationStore.viewAlbum(album.album, undefined, album.album_key ?? undefined);
                       else handleSearchResultKeyDown(e);
                     }}
                     class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"

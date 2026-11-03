@@ -97,11 +97,11 @@
 
   function openItem(item: HomeItem) {
     if (item.type === "song" && item.song.album) {
-      navigationStore.viewAlbum(item.song.album);
+      navigationStore.viewAlbum(item.song.album, item.song.id);
     } else if (item.type === "song") {
       playerStore.playSong(item.song.id);
     } else if (item.type === "album") {
-      navigationStore.viewAlbum(item.album.album || "");
+      navigationStore.viewAlbum(item.album.album || "", undefined, item.album.album_key ?? undefined);
     } else if (item.type === "playlist") {
       openPlaylist(item.playlist);
     }

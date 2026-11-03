@@ -116,7 +116,10 @@ export function getPlaylistDisplayName(
 export async function queueAlbumAsPlaylist(album: AlbumItem): Promise<void> {
   const albumName = album.album || i18n.t("collection.unknownAlbum");
   try {
-    const songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
+    const songs = await invoke<Song[]>("get_songs_by_album", {
+      album: album.album || "",
+      albumKey: album.album_key ?? undefined,
+    });
     if (songs.length > 0) {
       const songIds = songs.map((s) => s.id);
       const queuePl = await playlistsStore.requireQueue();

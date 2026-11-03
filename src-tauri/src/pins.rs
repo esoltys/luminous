@@ -158,6 +158,10 @@ pub fn album_item_from_json(value: &serde_json::Value) -> AlbumItem {
             .get("album")
             .and_then(|v| v.as_str())
             .map(String::from),
+        album_key: value
+            .get("album_key")
+            .and_then(|v| v.as_str())
+            .map(String::from),
         year: value.get("year").and_then(|v| v.as_i64()).map(|n| n as i32),
         track_count: value
             .get("track_count")

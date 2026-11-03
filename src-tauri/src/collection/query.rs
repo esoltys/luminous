@@ -203,12 +203,60 @@ impl CollectionScanner {
     }
 
     /// Every library song of the album `album` names, matched by
-    /// `album_key` so any spelling of the title finds them all (#1752).
+    /// `album_key` so any spelling of the title finds them all (#1752, #1932).
     pub fn get_songs_by_album(&self, album: &str) -> Result<Vec<Song>> {
+        self.get_songs_by_album_with_key(album, None)
+    }
+
+    /// Fetches all library songs of an album, preferring an exact `album_key` match
+    /// if provided, falling back to composite-key detection or title suffix match (#1932).
+    pub fn get_songs_by_album_with_key(
+        &self,
+        album: &str,
+        album_key: Option<&str>,
+    ) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
+        if let Some(key) = album_key {
+            let sql = format!(
+                "SELECT {} FROM songs
+                 WHERE album_key = ?1
+                   AND source IN ({lib})
+                   AND unavailable = 0
+                 ORDER BY disc, track",
+                SONG_SELECT_COLS,
+                lib = *LIBRARY_SOURCES_SQL
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let songs = stmt
+                .query_map(params![key], row_to_song)?
+                .filter_map(|r| r.ok())
+                .collect();
+            return Ok(songs);
+        }
+
+        if album.contains(crate::album_key::COMPOSITE_KEY_SEPARATOR) {
+            let key = album.trim().to_lowercase();
+            let sql = format!(
+                "SELECT {} FROM songs
+                 WHERE album_key = ?1
+                   AND source IN ({lib})
+                   AND unavailable = 0
+                 ORDER BY disc, track",
+                SONG_SELECT_COLS,
+                lib = *LIBRARY_SOURCES_SQL
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let songs = stmt
+                .query_map(params![key], row_to_song)?
+                .filter_map(|r| r.ok())
+                .collect();
+            return Ok(songs);
+        }
+
+        let key = album.trim().to_lowercase();
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE album_key = ?1
+             WHERE (album_key = ?1 OR album_key LIKE '%' || ?2 || ?1)
                AND source IN ({lib})
                AND unavailable = 0
              ORDER BY disc, track",
@@ -217,7 +265,10 @@ impl CollectionScanner {
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
-            .query_map(params![album_key(album)], row_to_song)?
+            .query_map(
+                params![key, crate::album_key::COMPOSITE_KEY_SEPARATOR.to_string()],
+                row_to_song,
+            )?
             .filter_map(|r| r.ok())
             .collect();
         Ok(songs)
@@ -801,9 +852,10 @@ impl CollectionScanner {
              )
              SELECT
                 CASE
+                    WHEN songs.album_key LIKE '[va]\u{1f}%' THEN 'Various Artists'
                     WHEN COUNT(DISTINCT NULLIF(songs.album_artist, '')) = 1 THEN MAX(NULLIF(songs.album_artist, ''))
                     WHEN COUNT(DISTINCT NULLIF(songs.album_artist, '')) = 0 AND COUNT(DISTINCT NULLIF(songs.artist, '')) = 1 THEN MAX(NULLIF(songs.artist, ''))
-                    ELSE NULL
+                    ELSE COALESCE(MAX(NULLIF(songs.album_artist, '')), MAX(NULLIF(songs.artist, '')))
                 END AS album_artist,
                 {display} AS album,
                 MIN(songs.year) AS year,
@@ -821,7 +873,8 @@ impl CollectionScanner {
                 COALESCE(
                     MIN(CASE WHEN songs.art_manual IS NOT NULL OR songs.art_automatic IS NOT NULL OR songs.art_embedded != 0 THEN songs.id END),
                     MIN(songs.id)
-                ) AS sample_song_id
+                ) AS sample_song_id,
+                songs.album_key
              FROM songs
              LEFT JOIN top_album_genres tag ON songs.album_key = tag.album_key
              LEFT JOIN album_ratings ar ON songs.album_key = ar.album_key
@@ -850,6 +903,7 @@ impl CollectionScanner {
                     "artist_sort": row.get::<_, Option<String>>(12)?,
                     "albumsort": row.get::<_, Option<String>>(13)?,
                     "sample_song_id": row.get::<_, Option<i64>>(14)?,
+                    "album_key": row.get::<_, Option<String>>(15)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -1415,11 +1469,16 @@ impl CollectionScanner {
             )?;
             for (i, (album, week_plays)) in ranked.iter().enumerate() {
                 let rank = (i + 1) as i32;
-                if let Some(ref name) = album.album {
+                let key = album
+                    .album_key
+                    .as_deref()
+                    .or(album.album.as_deref())
+                    .unwrap_or_default();
+                if !key.is_empty() {
                     tx.execute(
                         "INSERT INTO album_chart_history (period_start, album_key, rank, play_count)
                          VALUES (?1, ?2, ?3, ?4)",
-                        params![period_start, album_key(name), rank, week_plays],
+                        params![period_start, key, rank, week_plays],
                     )?;
                 }
             }
@@ -1440,7 +1499,10 @@ impl CollectionScanner {
         let mut result = Vec::with_capacity(ranked.len());
         for (i, (mut album, _week_plays)) in ranked.into_iter().enumerate() {
             let rank = (i + 1) as i32;
-            let key = album_key(album.album.as_deref().unwrap_or_default());
+            let key = album
+                .album_key
+                .clone()
+                .unwrap_or_else(|| album_key(album.album.as_deref().unwrap_or_default()));
             album.rating = crate::stats::get_album_rating(&conn, &key)?;
 
             let previous_rank = previous_ranks.get(&key).copied();
@@ -1481,6 +1543,20 @@ impl CollectionScanner {
         }
         Ok(result)
     }
+}
+
+fn song_album_key(song: &Song) -> String {
+    song.album
+        .as_deref()
+        .map(|alb| {
+            crate::album_key::album_key_for(
+                alb,
+                song.album_artist.as_deref(),
+                song.artist.as_deref(),
+                song.compilation,
+            )
+        })
+        .unwrap_or_default()
 }
 
 /// Top `limit` albums by minutes played (then play count) among plays in
@@ -1535,14 +1611,14 @@ fn rank_week_items(
         if ranked.len() >= limit as usize {
             break;
         }
-        let Some(album_name) = song.album.clone() else {
-            continue;
-        };
-        let key = album_key(&album_name);
-        if key.is_empty() || !seen.insert(key) {
+        if song.album.is_none() {
             continue;
         }
-        let album_name = album_display_name(conn, &album_name)?;
+        let key = song_album_key(&song);
+        if key.is_empty() || !seen.insert(key.clone()) {
+            continue;
+        }
+        let album_name = album_display_name(conn, &key)?;
         let artist_name = song
             .album_artist
             .clone()
@@ -1552,6 +1628,7 @@ fn rank_week_items(
             AlbumItem {
                 artist: Some(artist_name),
                 album: Some(album_name),
+                album_key: Some(key),
                 year: song.year,
                 track_count: album_track_count as i32,
                 disc_count: album_disc_count as i32,
@@ -1582,7 +1659,7 @@ const CHART_HISTORY_WEEK_START_KEY: &str = "album_chart_history_week_start";
 fn excluded_album_sql(album_key_col: &str) -> String {
     format!(
         "SELECT 1 FROM stats_exclusions se
-         WHERE se.entity_type = 'album' AND se.entity_key = {album_key_col}"
+         WHERE se.entity_type = 'album' AND (se.entity_key = {album_key_col} OR {album_key_col} LIKE '%\u{1f}' || se.entity_key)"
     )
 }
 
@@ -1785,11 +1862,13 @@ fn group_songs_into_home_items(
                     .clone()
                     .or_else(|| song.artist.clone())
                     .unwrap_or_default();
-                if seen_albums.insert(album_key(album_name)) {
+                let key = song_album_key(&song);
+                if seen_albums.insert(key.clone()) {
                     items.push(HomeItem::Album {
                         album: AlbumItem {
                             artist: Some(artist_name),
                             album: Some(album_name.clone()),
+                            album_key: Some(key),
                             year: song.year,
                             track_count: album_track_count as i32,
                             disc_count: album_disc_count as i32,
@@ -1823,9 +1902,14 @@ fn group_songs_into_home_items(
 fn fill_home_album_items(conn: &rusqlite::Connection, items: &mut [HomeItem]) -> Result<()> {
     for item in items.iter_mut() {
         if let HomeItem::Album { album } = item {
-            if let Some(name) = album.album.take() {
-                album.rating = crate::stats::get_album_rating(conn, &name)?;
-                album.album = Some(album_display_name(conn, &name)?);
+            let key = album
+                .album_key
+                .clone()
+                .or_else(|| album.album.as_deref().map(album_key))
+                .unwrap_or_default();
+            if let Some(_name) = album.album.take() {
+                album.rating = crate::stats::get_album_rating(conn, &key)?;
+                album.album = Some(album_display_name(conn, &key)?);
             }
         }
     }
@@ -2005,10 +2089,14 @@ fn album_profile_from_row(row: &rusqlite::Row) -> rusqlite::Result<AlbumProfile>
 /// `album_key::repair_album_keys`).
 pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Result<AlbumProfile> {
     crate::album_key::rekey_album_profiles(conn)?;
+    let folded = crate::album_key::fold_key(album);
+    let sep = crate::album_key::COMPOSITE_KEY_SEPARATOR.to_string();
     let mut stmt = conn.prepare(&format!(
-        "SELECT {ALBUM_PROFILE_COLUMNS} FROM album_profiles WHERE album_key = ?1"
+        "SELECT {ALBUM_PROFILE_COLUMNS} FROM album_profiles
+         WHERE album_key = ?1 OR album_key LIKE '%' || ?2 || ?1
+         ORDER BY CASE WHEN album_key = ?1 THEN 0 ELSE 1 END LIMIT 1"
     ))?;
-    match stmt.query_row(params![album_key(album)], album_profile_from_row) {
+    match stmt.query_row(params![folded, sep], album_profile_from_row) {
         Ok(profile) => Ok(profile),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(AlbumProfile {
             album_key: album.to_string(),
@@ -2019,12 +2107,35 @@ pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Resul
 }
 
 /// Upsert an album profile into SQLite (#950), stored under the
-/// `album_key` of `profile.album_key`.
+/// composite `album_key` of `profile.album_key`.
 pub fn set_album_profile_conn(
     conn: &rusqlite::Connection,
     profile: &AlbumProfile,
 ) -> Result<AlbumProfile> {
     let links_json = serde_json::to_string(&profile.links)?;
+    let resolved_key = if profile
+        .album_key
+        .contains(crate::album_key::COMPOSITE_KEY_SEPARATOR)
+    {
+        crate::album_key::fold_key(&profile.album_key)
+    } else {
+        let folded = crate::album_key::fold_key(&profile.album_key);
+        if let Some(art) = profile
+            .artist_key
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+        {
+            crate::album_key::album_key_for(&profile.album_key, None, Some(art), false)
+        } else {
+            let sep = crate::album_key::COMPOSITE_KEY_SEPARATOR.to_string();
+            conn.query_row(
+                "SELECT album_key FROM songs WHERE album_key = ?1 OR album_key LIKE '%' || ?2 || ?1 LIMIT 1",
+                params![folded, sep],
+                |r| r.get::<_, String>(0),
+            )
+            .unwrap_or(folded)
+        }
+    };
 
     conn.execute(
         "INSERT INTO album_profiles (album_key, artist_key, description, website, links, details_fetched, fetched_cover_filename, fetched_disc_filename, cover_fetched, disc_fetched)
@@ -2040,7 +2151,7 @@ pub fn set_album_profile_conn(
             cover_fetched = excluded.cover_fetched,
             disc_fetched = excluded.disc_fetched",
         params![
-            album_key(&profile.album_key),
+            resolved_key,
             profile.artist_key,
             profile.description,
             profile.website,
@@ -2096,7 +2207,7 @@ fn group_by_play_context(
         let key = match context_type.as_str() {
             "playlist" if playlist_id.is_some() => PlayContextKey::Playlist(playlist_id.unwrap()),
             "album" if song.album.as_deref().is_some_and(|a| !a.trim().is_empty()) => {
-                PlayContextKey::Album(album_key(song.album.as_deref().unwrap_or_default()))
+                PlayContextKey::Album(song_album_key(&song))
             }
             _ => PlayContextKey::Song(song.id),
         };
@@ -2149,6 +2260,7 @@ fn home_item_for_context(
                 album: AlbumItem {
                     artist: Some(artist_name),
                     album: song.album.clone(),
+                    album_key: Some(song_album_key(&song)),
                     year: song.year,
                     track_count: album_track_count as i32,
                     disc_count: album_disc_count as i32,
@@ -2385,20 +2497,20 @@ mod tests {
             None,
         );
 
-        // Scenario 2: Album with different artists, and album_artist is None (Various Artists fallback)
+        // Scenario 2: Album with different artists, and album_artist is Various Artists
         insert_song(
             "path/3.mp3",
             "Track 3",
             Some("Artist B"),
             Some("Album Two"),
-            None,
+            Some("Various Artists"),
         );
         insert_song(
             "path/4.mp3",
             "Track 4",
             Some("Artist C"),
             Some("Album Two"),
-            None,
+            Some("Various Artists"),
         );
 
         // Scenario 3: Album where all tracks have same album_artist but different track artists
@@ -2417,20 +2529,20 @@ mod tests {
             Some("Artist A"),
         );
 
-        // Scenario 4: Album where tracks have different album_artists
+        // Scenario 4: Album with various artists
         insert_song(
             "path/7.mp3",
             "Track 7",
             Some("Artist X"),
             Some("Album Four"),
-            Some("Artist Y"),
+            Some("Various Artists"),
         );
         insert_song(
             "path/8.mp3",
             "Track 8",
             Some("Artist Z"),
             Some("Album Four"),
-            Some("Artist W"),
+            Some("Various Artists"),
         );
 
         let albums = scanner.get_albums().unwrap();
@@ -2448,9 +2560,9 @@ mod tests {
         assert_eq!(album_one["track_count"].as_i64(), Some(2));
         assert!(album_one["added"].is_number());
 
-        // Assert Album Two -> album_artist is None (will fall back to Various Artists in UI)
+        // Assert Album Two -> album_artist is Various Artists
         let album_two = find_album("Album Two");
-        assert_eq!(album_two["artist"].as_str(), None);
+        assert_eq!(album_two["artist"].as_str(), Some("Various Artists"));
         assert_eq!(album_two["track_count"].as_i64(), Some(2));
 
         // Assert Album Three -> album_artist is "Artist A"
@@ -2458,9 +2570,9 @@ mod tests {
         assert_eq!(album_three["artist"].as_str(), Some("Artist A"));
         assert_eq!(album_three["track_count"].as_i64(), Some(2));
 
-        // Assert Album Four -> album_artist is None (Various Artists fallback)
+        // Assert Album Four -> album_artist is Various Artists
         let album_four = find_album("Album Four");
-        assert_eq!(album_four["artist"].as_str(), None);
+        assert_eq!(album_four["artist"].as_str(), Some("Various Artists"));
         assert_eq!(album_four["track_count"].as_i64(), Some(2));
 
         let _ = std::fs::remove_dir_all(temp_dir);
@@ -2564,9 +2676,9 @@ mod tests {
             true,
         );
 
-        // A compilation identifiable only by disagreeing album_artist (no TCMP).
-        insert_song("path/comp3.mp3", "Artist A", "Compilation Two", None, false);
-        insert_song("path/comp4.mp3", "Artist C", "Compilation Two", None, false);
+        // A compilation with compilation flag set (TCMP=1) but no explicit album_artist.
+        insert_song("path/comp3.mp3", "Artist A", "Compilation Two", None, true);
+        insert_song("path/comp4.mp3", "Artist C", "Compilation Two", None, true);
 
         // Artist A's own solo album should NOT show up as a compilation.
         insert_song(
@@ -3321,7 +3433,8 @@ mod tests {
                 title: Some(title.to_string()),
                 artist: Some(artist.to_string()),
                 album: Some(album.to_string()),
-                album_artist: None,
+                album_artist: Some("Various Artists".to_string()),
+                compilation: true,
                 added: Some(1000),
                 ..Default::default()
             };
@@ -3776,8 +3889,9 @@ mod tests {
         // Retrieve saved profile (case-insensitive key match)
         let loaded = get_album_profile_conn(&conn, "come on over").unwrap();
         assert_eq!(
-            loaded.album_key, "come on over",
-            "stored under its album_key"
+            loaded.album_key,
+            crate::album_key::album_key_for("come on over", None, Some("Shania Twain"), false),
+            "stored under its composite album_key"
         );
         assert_eq!(loaded.artist_key, Some("Shania Twain".to_string()));
         assert_eq!(
@@ -3799,7 +3913,10 @@ mod tests {
         // Get all album profiles
         let all = get_all_album_profiles_conn(&conn).unwrap();
         assert_eq!(all.len(), 1);
-        assert_eq!(all[0].album_key, "come on over");
+        assert_eq!(
+            all[0].album_key,
+            crate::album_key::album_key_for("come on over", None, Some("Shania Twain"), false)
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -4273,8 +4390,24 @@ mod tests {
         assert_eq!(
             history,
             vec![
-                (sep13, "old favourite".to_string()),
-                (sep20, "afterburner".to_string())
+                (
+                    sep13,
+                    crate::album_key::album_key_for(
+                        "Old Favourite",
+                        None,
+                        Some("Some Artist"),
+                        false
+                    )
+                ),
+                (
+                    sep20,
+                    crate::album_key::album_key_for(
+                        "Afterburner",
+                        None,
+                        Some("Some Artist"),
+                        false
+                    )
+                )
             ]
         );
 
@@ -4774,5 +4907,103 @@ mod tests {
         assert_eq!(comps.len(), 1);
         assert_eq!(comps[0]["album"], "Comp C");
         assert_eq!(comps[0]["sample_song_id"], 31);
+    }
+
+    /// #1932: albums with the exact same title released by different artists
+    /// ("Golden Hour" by Kacey Musgraves and "Golden Hour" by Balcony Sunrise)
+    /// must not be conflated: they produce distinct cards in get_albums,
+    /// have distinct album_key values, and get_songs_by_album_with_key queries
+    /// return only their respective songs.
+    #[test]
+    fn test_albums_with_same_title_different_artists_are_distinct() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_same_title_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let kacey_1 = Song {
+            path: Some("kacey/1.mp3".to_string()),
+            title: Some("Slow Burn".to_string()),
+            artist: Some("Kacey Musgraves".to_string()),
+            album: Some("Golden Hour".to_string()),
+            album_artist: Some("Kacey Musgraves".to_string()),
+            track: Some(1),
+            year: Some(2018),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        let kacey_2 = Song {
+            path: Some("kacey/2.mp3".to_string()),
+            title: Some("Lonely Weekend".to_string()),
+            artist: Some("Kacey Musgraves".to_string()),
+            album: Some("Golden Hour".to_string()),
+            album_artist: Some("Kacey Musgraves".to_string()),
+            track: Some(2),
+            year: Some(2018),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        let balcony_1 = Song {
+            path: Some("balcony/1.mp3".to_string()),
+            title: Some("Golden Hour".to_string()),
+            artist: Some("Balcony Sunrise".to_string()),
+            album: Some("Golden Hour".to_string()),
+            album_artist: Some("Balcony Sunrise".to_string()),
+            track: Some(1),
+            year: Some(2022),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+
+        upsert_song(&conn, &kacey_1).unwrap();
+        upsert_song(&conn, &kacey_2).unwrap();
+        upsert_song(&conn, &balcony_1).unwrap();
+
+        // 1. Grid should return TWO albums, not one
+        let albums = scanner.get_albums().unwrap();
+        assert_eq!(
+            albums.len(),
+            2,
+            "Expected 2 distinct albums for 'Golden Hour'"
+        );
+
+        let kacey_album = albums
+            .iter()
+            .find(|a| a["artist"] == "Kacey Musgraves")
+            .expect("Kacey Musgraves album present");
+        assert_eq!(kacey_album["album"], "Golden Hour");
+        assert_eq!(kacey_album["track_count"], 2);
+        let kacey_key = kacey_album["album_key"].as_str().unwrap();
+
+        let balcony_album = albums
+            .iter()
+            .find(|a| a["artist"] == "Balcony Sunrise")
+            .expect("Balcony Sunrise album present");
+        assert_eq!(balcony_album["album"], "Golden Hour");
+        assert_eq!(balcony_album["track_count"], 1);
+        let balcony_key = balcony_album["album_key"].as_str().unwrap();
+
+        assert_ne!(kacey_key, balcony_key, "Album keys must be distinct");
+
+        // 2. Querying by exact album_key returns only that artist's songs
+        let kacey_songs = scanner
+            .get_songs_by_album_with_key("Golden Hour", Some(kacey_key))
+            .unwrap();
+        assert_eq!(kacey_songs.len(), 2);
+        assert!(kacey_songs
+            .iter()
+            .all(|s| s.artist.as_deref() == Some("Kacey Musgraves")));
+
+        let balcony_songs = scanner
+            .get_songs_by_album_with_key("Golden Hour", Some(balcony_key))
+            .unwrap();
+        assert_eq!(balcony_songs.len(), 1);
+        assert_eq!(balcony_songs[0].artist.as_deref(), Some("Balcony Sunrise"));
     }
 }

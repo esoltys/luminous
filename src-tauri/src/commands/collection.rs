@@ -371,10 +371,11 @@ pub async fn get_songs_by_ids(
 #[tauri::command]
 pub async fn get_songs_by_album(
     album: String,
+    album_key: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        scanner.get_songs_by_album(&album)
+        scanner.get_songs_by_album_with_key(&album, album_key.as_deref())
     })
     .await
     .map_err(|e| e.to_string())
@@ -2195,22 +2196,23 @@ where
 
         // 1. Sweep album covers
         let mut album_stmt = conn.prepare(
-            "SELECT DISTINCT album, COALESCE(NULLIF(album_artist, ''), artist), MIN(path), art_automatic
+            "SELECT DISTINCT album, COALESCE(NULLIF(album_artist, ''), artist), MIN(path), art_automatic, album_key
              FROM songs
              WHERE art_automatic LIKE 'album-%'
                AND (source IN (1, 2) OR source IS NULL)
                AND album IS NOT NULL AND TRIM(album) != ''
                AND path IS NOT NULL
-             GROUP BY album_key, COALESCE(NULLIF(album_artist, ''), artist), art_automatic",
+             GROUP BY album_key, art_automatic",
         )?;
 
-        let albums: Vec<(String, String, String, String)> = album_stmt
+        let albums: Vec<(String, String, String, String, Option<String>)> = album_stmt
             .query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, Option<String>>(1)?.unwrap_or_default(),
                     row.get::<_, String>(2)?,
                     row.get::<_, String>(3)?,
+                    row.get::<_, Option<String>>(4)?,
                 ))
             })?
             .filter_map(|r| r.ok())
@@ -2254,7 +2256,7 @@ where
             done: false,
         });
 
-        for (album, artist, song_path_str, cached_filename) in albums {
+        for (album, artist, song_path_str, cached_filename, album_key) in albums {
             current += 1;
             if current.is_multiple_of(5) || current == total {
                 on_progress(ArtworkSweepProgressPayload {
@@ -2281,12 +2283,20 @@ where
             ) {
                 let _ = std::fs::remove_file(&cached_path);
                 let sidecar_val = sidecar_path.to_string_lossy().to_string();
-                if let Err(e) = conn.execute(
+                if let Some(ref key) = album_key {
+                    if let Err(e) = conn.execute(
+                        "UPDATE songs SET art_automatic = ?1
+                         WHERE album_key = ?2 AND art_automatic = ?3",
+                        rusqlite::params![sidecar_val, key, cached_filename],
+                    ) {
+                        log::warn!("Failed to update songs table during sidecar sweep: {e}");
+                    }
+                } else if let Err(e) = conn.execute(
                     "UPDATE songs SET art_automatic = ?1
-                     WHERE album_key = ?2
+                     WHERE album = ?2
                        AND COALESCE(NULLIF(album_artist, ''), artist) = ?3
                        AND art_automatic = ?4",
-                    rusqlite::params![sidecar_val, crate::album_key::album_key(&album), artist, cached_filename],
+                    rusqlite::params![sidecar_val, album, artist, cached_filename],
                 ) {
                     log::warn!("Failed to update songs table during sidecar sweep: {e}");
                 }

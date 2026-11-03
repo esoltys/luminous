@@ -110,9 +110,10 @@ fn curation_album_select_cols() -> String {
         "songs.album_key,
         COALESCE({display}, MIN(songs.album), '') AS album,
         CASE
+            WHEN songs.album_key LIKE '[va]\u{1f}%' THEN 'Various Artists'
             WHEN COUNT(DISTINCT NULLIF(songs.album_artist, '')) = 1 THEN MAX(NULLIF(songs.album_artist, ''))
             WHEN COUNT(DISTINCT NULLIF(songs.album_artist, '')) = 0 AND COUNT(DISTINCT NULLIF(songs.artist, '')) = 1 THEN MAX(NULLIF(songs.artist, ''))
-            ELSE NULL
+            ELSE COALESCE(MAX(NULLIF(songs.album_artist, '')), MAX(NULLIF(songs.artist, '')))
         END AS album_artist,
         MIN(songs.year) AS year,
         COUNT(*) AS track_count,

@@ -64,7 +64,7 @@
   import { openInPicard } from "../utils/picard";
   import { openExternalUrl } from "../utils/openExternalUrl";
 
-  let { albumName }: { albumName: string } = $props();
+  let { albumName, albumKey }: { albumName: string; albumKey?: string | null } = $props();
 
   let songs = $state<Song[]>([]);
   let loading = $state(true);
@@ -75,8 +75,11 @@
   let showShareModal = $state(false);
 
   /** The album's tracks in disc, then track order. */
-  async function fetchAlbumSongs(album: string): Promise<Song[]> {
-    const fetchedSongs = await invoke<Song[]>("get_songs_by_album", { album });
+  async function fetchAlbumSongs(album: string, key?: string | null): Promise<Song[]> {
+    const fetchedSongs = await invoke<Song[]>("get_songs_by_album", {
+      album,
+      albumKey: key ?? undefined,
+    });
     return [...fetchedSongs].sort((a, b) => {
       if (a.disc !== b.disc) {
         return (a.disc ?? 1) - (b.disc ?? 1);
@@ -92,6 +95,7 @@
     // it, navigationStore.reconcile() drops the selection and this view
     // unmounts with `albumName` reading null. Stop once the view has moved on.
     const requested = albumName;
+    const requestedKey = albumKey;
     try {
       // Force re-read this album's own tracks from disk rather than kicking
       // off a whole-library scan: `startScan` doesn't await the scan's
@@ -102,8 +106,8 @@
       // `rescanSongs` is awaited end-to-end and bypasses the mtime-skip a
       // normal scan uses, so it always reflects what's actually on disk.
       await collectionStore.rescanSongs(songs.map((s) => s.id));
-      const fetchedSongs = await fetchAlbumSongs(requested);
-      if (albumName !== requested) return;
+      const fetchedSongs = await fetchAlbumSongs(requested, requestedKey);
+      if (albumName !== requested || albumKey !== requestedKey) return;
       songs = fetchedSongs;
       artworkRefreshToken++;
       toastStore.show(i18n.t("albumDetail.refreshSuccess", {}, "Album metadata and artwork refreshed"));
@@ -200,7 +204,9 @@
   }
 
   let albumItem = $derived(
-    collectionStore.albums.find((a) => sameAlbum(a.album, albumName)) || null
+    (albumKey ? collectionStore.albums.find((a) => a.album_key === albumKey) : null) ||
+    collectionStore.albums.find((a) => sameAlbum(a.album, albumName)) ||
+    null
   );
 
   /** Any one track's id, used to look up extended local artwork (#98/#760)
@@ -331,19 +337,20 @@
 
   $effect(() => {
     const requested = albumName;
+    const requestedKey = albumKey;
     loading = true;
-    fetchAlbumSongs(requested)
+    fetchAlbumSongs(requested, requestedKey)
       .then((fetchedSongs) => {
-        if (requested !== albumName) return;
+        if (requested !== albumName || requestedKey !== albumKey) return;
         songs = fetchedSongs;
         loadedAlbumName = requested;
       })
       .catch((err) => {
         console.error("Failed to load album detail:", err);
-        if (requested === albumName) navigationStore.pendingFocusSongId = null;
+        if (requested === albumName && requestedKey === albumKey) navigationStore.pendingFocusSongId = null;
       })
       .finally(() => {
-        if (requested === albumName) loading = false;
+        if (requested === albumName && requestedKey === albumKey) loading = false;
       });
   });
 

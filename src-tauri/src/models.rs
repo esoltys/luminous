@@ -1115,6 +1115,8 @@ pub struct LibraryStats {
 pub struct AlbumItem {
     pub artist: Option<String>,
     pub album: Option<String>,
+    #[serde(default)]
+    pub album_key: Option<String>,
     pub year: Option<i32>,
     pub track_count: i32,
     pub disc_count: i32,

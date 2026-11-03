@@ -70,13 +70,17 @@ describe("CollectionStore - artist/album navigation and history", () => {
   });
 
   it("persists the selected album/artist detail view to localStorage so a relaunch restores it", () => {
-    navigationStore.viewAlbum("Dark Side of the Moon");
+    navigationStore.viewAlbum("Dark Side of the Moon", undefined, "pink floyd\x1fdark side of the moon");
     expect(localStorage.getItem("navigation_selectedAlbumName")).toBe("Dark Side of the Moon");
+    expect(localStorage.getItem("navigation_selectedAlbumKey")).toBe("pink floyd\x1fdark side of the moon");
+    expect(navigationStore.selectedAlbumKey).toBe("pink floyd\x1fdark side of the moon");
     expect(localStorage.getItem("navigation_selectedArtistName")).toBeNull();
 
     navigationStore.viewArtist("Pink Floyd");
     expect(localStorage.getItem("navigation_selectedArtistName")).toBe("Pink Floyd");
     expect(localStorage.getItem("navigation_selectedAlbumName")).toBeNull();
+    expect(localStorage.getItem("navigation_selectedAlbumKey")).toBeNull();
+    expect(navigationStore.selectedAlbumKey).toBeNull();
 
     navigationStore.selectedArtistName = null;
     expect(localStorage.getItem("navigation_selectedArtistName")).toBeNull();

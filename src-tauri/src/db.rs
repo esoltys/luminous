@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 72;
+pub const CURRENT_SCHEMA_VERSION: i32 = 73;
 
 struct Migration {
     version: i32,
@@ -671,6 +671,11 @@ const MIGRATIONS: &[Migration] = &[
         description: "songs: reclassify files opened from outside every watched folder as OpenedFile (#1842)",
         apply: migrate_reclassify_opened_files,
     },
+    Migration {
+        version: 73,
+        description: "album_key: composite (artist, album) key to prevent cross-artist album collision (#1932)",
+        apply: migrate_composite_album_keys,
+    },
 ];
 
 /// Migration 62: albums whose titles differ only in case or surrounding
@@ -798,6 +803,90 @@ fn migrate_reclassify_opened_files(conn: &rusqlite::Connection) -> Result<()> {
             )?;
         }
     }
+    Ok(())
+}
+
+struct AlbumMigrationSong {
+    id: i64,
+    album: String,
+    album_artist: Option<String>,
+    artist: Option<String>,
+    compilation: i64,
+}
+
+/// Migration 73: albums sharing identical names across different artists are
+/// separated into distinct entities via composite `album_key` (#1932).
+/// Recomputes `songs.album_key` across the library, updates the stale key
+/// trigger to observe artist and compilation tags, and rekeys album-keyed tables.
+fn migrate_composite_album_keys(conn: &rusqlite::Connection) -> Result<()> {
+    let mut stmt = conn.prepare(
+        "SELECT id, album, album_artist, artist, compilation
+         FROM songs
+         WHERE album IS NOT NULL AND TRIM(album) != ''",
+    )?;
+    let rows: Vec<AlbumMigrationSong> = stmt
+        .query_map([], |r| {
+            Ok(AlbumMigrationSong {
+                id: r.get(0)?,
+                album: r.get(1)?,
+                album_artist: r.get(2)?,
+                artist: r.get(3)?,
+                compilation: r.get::<_, Option<i64>>(4)?.unwrap_or(0),
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+
+    let mut update_song = conn.prepare("UPDATE songs SET album_key = ?1 WHERE id = ?2")?;
+    for song in &rows {
+        let key = crate::album_key::album_key_for(
+            &song.album,
+            song.album_artist.as_deref(),
+            song.artist.as_deref(),
+            song.compilation != 0,
+        );
+        update_song.execute(params![key, song.id])?;
+    }
+
+    conn.execute_batch(
+        "DROP TRIGGER IF EXISTS songs_album_key_stale;
+         CREATE TRIGGER IF NOT EXISTS songs_album_key_stale AFTER UPDATE OF album ON songs
+         WHEN new.album IS NOT old.album AND new.album_key IS old.album_key
+              AND lower(trim(new.album)) IS NOT lower(trim(old.album))
+         BEGIN
+             UPDATE songs SET album_key = NULL WHERE id = new.id;
+         END;",
+    )?;
+
+    // Rekey album_ratings
+    let old_ratings: Vec<(String, f64)> = {
+        let mut stmt = conn.prepare("SELECT album_key, rating FROM album_ratings")?;
+        let r_rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        r_rows.collect::<rusqlite::Result<_>>()?
+    };
+    for (old_key, rating) in old_ratings {
+        if !old_key.contains(crate::album_key::COMPOSITE_KEY_SEPARATOR) {
+            let matching_keys: Vec<String> = conn
+                .prepare(
+                    "SELECT DISTINCT album_key FROM songs
+                     WHERE album_key LIKE '%\u{1f}' || ?1 OR album_key = ?1",
+                )?
+                .query_map(params![old_key], |r| r.get(0))?
+                .filter_map(|r| r.ok())
+                .collect();
+            for new_key in matching_keys {
+                conn.execute(
+                    "INSERT INTO album_ratings (album_key, rating) VALUES (?1, ?2)
+                     ON CONFLICT(album_key) DO UPDATE SET rating = excluded.rating",
+                    params![new_key, rating],
+                )?;
+            }
+        }
+    }
+
+    crate::album_key::rekey_album_profiles(conn)?;
+
+    let _ = conn.execute("DELETE FROM album_chart_history", []);
+
     Ok(())
 }
 

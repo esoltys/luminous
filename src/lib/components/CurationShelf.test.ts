@@ -135,7 +135,7 @@ describe("CurationShelf.svelte", () => {
     // Clicking album card navigates to album
     const albumName = await findByText("In Rainbows");
     await fireEvent.click(albumName);
-    expect(viewAlbumSpy).toHaveBeenCalledWith("In Rainbows");
+    expect(viewAlbumSpy).toHaveBeenCalledWith("In Rainbows", undefined, "album-2");
   });
 
   it("renders missing core metadata card and clicking button calls navigationStore.viewAutoPlaylist", async () => {

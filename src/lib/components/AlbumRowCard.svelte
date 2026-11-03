@@ -43,7 +43,11 @@
     if (customClick) {
       customClick(e);
     } else {
+      if (album.album_key) {
+      navigationStore.viewAlbum(album.album || "", undefined, album.album_key);
+    } else {
       navigationStore.viewAlbum(album.album || "");
+    }
     }
   }
 
