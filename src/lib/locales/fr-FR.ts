@@ -128,7 +128,23 @@ export const frFR: DeepStringRecord<typeof en> = {
       other: "{selected} sur {count} fichiers sélectionnés."
     },
     viewInFiles: "Afficher dans Fichiers",
-    movedShowingNearest: "Il n'est plus là où Luminous l'a vu la dernière fois. Voici le dossier le plus proche qui existe encore."
+    movedShowingNearest: "Il n'est plus là où Luminous l'a vu la dernière fois. Voici le dossier le plus proche qui existe encore.",
+    filterPlaceholder: "Filtrer {folder}…",
+    filterCountBadge: "{matched} sur {total}",
+    clearFilter: "Effacer le filtre",
+    filterHelpTitle: "Filtrer ce dossier par nom, type ou présence dans la bibliothèque",
+    filterHelpTypeLabel: "Type\u00a0:",
+    filterHelpStatusLabel: "État\u00a0:",
+    searchWholeLibraryFor: "Rechercher «\u00a0{query}\u00a0» dans toute votre bibliothèque",
+    filterEmptyTitle: "Rien dans ce dossier ne correspond à {query}.",
+    filterEmptyHint: {
+      one: "Effacez le filtre pour voir {count} fichier, ou modifiez-le pour chercher autre chose.",
+      other: "Effacez le filtre pour voir les {count} fichiers, ou modifiez-le pour chercher autre chose."
+    },
+    filterMatchSummary: {
+      one: "{matched} sur {count} fichier correspond au filtre.",
+      other: "{matched} sur {count} fichiers correspondent au filtre."
+    }
   },
   devices: {
     tabFiles: "Fichiers",
@@ -373,7 +389,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     filterSyntaxHint: "💡 Astuce de syntaxe de filtre",
     filterFieldsLabel: "Champs :",
     filterOperatorsLabel: "Opérateurs :",
-    removeRecentSearchTooltip: "Retirer des recherches récentes"
+    removeRecentSearchTooltip: "Retirer des recherches récentes",
+    filesAndFolders: "Fichiers et dossiers"
   },
   home: {
     greetingMorning: "Bon matin",

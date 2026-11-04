@@ -5,6 +5,8 @@ import { invoke } from "@tauri-apps/api/core";
 import TopNavigation from "./TopNavigation.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
+import { filesStore } from "../stores/files.svelte";
 
 
 describe("TopNavigation.svelte", () => {
@@ -16,8 +18,18 @@ describe("TopNavigation.svelte", () => {
     windowLayoutStore.viewportWidth = 1280;
     collectionStore.artists = [];
     collectionStore.searchQuery = "";
+    collectionStore.folderSearchResults = [];
     collectionStore.extendedArtworkByArtist = {};
     collectionStore.recentSearches = [];
+    navigationStore.activeTab = "collection";
+    navigationStore.filesLocation = null;
+    filesStore.sources = [
+      { source: { kind: "folder", id: 1 }, name: "Lossless archive", songCount: 15, available: true },
+    ];
+    filesStore.filterQuery = "";
+    filesStore.filterMatchCount = 0;
+    filesStore.filterTotalCount = 0;
+    filesStore.activeFolderTitle = "";
   });
 
   it("toggles sidebar compact state when clicking the hamburger menu button", async () => {
@@ -132,5 +144,81 @@ describe("TopNavigation.svelte", () => {
 
     const img = await findByAltText(/Album Art/i);
     expect(img.tagName).toBe("IMG");
+  });
+
+  it("switches to folder filter mode when a folder is open in Files and escapes to whole-library search (#1886)", async () => {
+    navigationStore.activeTab = "files";
+    navigationStore.filesLocation = { source: { kind: "folder", id: 1 }, path: ["Katatonia", "2006 - The Great Cold Distance"] };
+    filesStore.activeFolderTitle = "2006 - The Great Cold Distance";
+    filesStore.filterMatchCount = 2;
+    filesStore.filterTotalCount = 15;
+
+    const { getByPlaceholderText, getByTestId, getByText } = render(TopNavigation);
+    const input = getByPlaceholderText("Filter 2006 - The Great Cold Distance…") as HTMLInputElement;
+
+    await fireEvent.focus(input);
+    expect(getByText("Filter this folder by name, type or library status")).toBeInTheDocument();
+
+    await fireEvent.click(getByText("ext:flac"));
+    expect(filesStore.filterQuery).toBe("ext:flac ");
+
+    await fireEvent.input(input, { target: { value: "ext:flac it" } });
+    expect(getByTestId("files-filter-badge")).toHaveTextContent("2 of 15");
+
+    const escapeRow = getByTestId("files-search-whole-library");
+    expect(escapeRow).toHaveTextContent('Search your whole library for "it"');
+
+    await fireEvent.click(escapeRow);
+    expect(navigationStore.activeTab).toBe("collection");
+    expect(collectionStore.searchQuery).toBe("it");
+    expect(filesStore.filterQuery).toBe("");
+  });
+
+  it("focuses the search bar with Ctrl+F or / and clears the Files filter with Escape (#1886)", async () => {
+    navigationStore.activeTab = "files";
+    navigationStore.filesLocation = { source: { kind: "folder", id: 1 }, path: ["Rock"] };
+    filesStore.activeFolderTitle = "Rock";
+    filesStore.filterQuery = "flac";
+
+    const { getByPlaceholderText } = render(TopNavigation);
+    const input = getByPlaceholderText("Filter Rock…") as HTMLInputElement;
+
+    await fireEvent.keyDown(window, { key: "/" });
+    expect(document.activeElement).toBe(input);
+
+    await fireEvent.keyDown(window, { key: "Escape" });
+    expect(filesStore.filterQuery).toBe("");
+
+    await fireEvent.keyDown(window, { key: "f", ctrlKey: true });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("renders matching folders under Files & Folders in global search suggestions and opens the clicked folder (#1886)", async () => {
+    collectionStore.folderSearchResults = [
+      {
+        source: { kind: "folder", id: 1 },
+        path: ["Metal", "Katatonia"],
+        name: "Katatonia",
+        breadcrumb: "Lossless archive / Metal / Katatonia",
+      },
+    ];
+
+    const { getByPlaceholderText, getByTestId, getByText } = render(TopNavigation);
+    const input = getByPlaceholderText(/search/i) as HTMLInputElement;
+    collectionStore.searchQuery = "katat";
+    await fireEvent.focus(input);
+
+    expect(getByText("Files & Folders")).toBeInTheDocument();
+    const row = getByTestId("search-folder-result");
+    expect(row).toHaveTextContent("Katatonia");
+    expect(row).toHaveTextContent("Lossless archive / Metal / Katatonia");
+
+    await fireEvent.click(row);
+    expect(navigationStore.activeTab).toBe("files");
+    expect(navigationStore.filesLocation).toEqual({
+      source: { kind: "folder", id: 1 },
+      path: ["Metal", "Katatonia"],
+      selectedName: undefined,
+    });
   });
 });

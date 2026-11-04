@@ -31,6 +31,7 @@ import type {
   TagBatchProgressPayload,
   ArtworkSweepProgressPayload,
   MassRemovalIncident,
+  FolderSearchResult,
 } from "../types";
 import { parseSubsonicPath } from "../utils/remoteSource";
 import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
@@ -40,7 +41,7 @@ import { tagsStore } from "./tags.svelte";
 import { toastStore } from "./toast.svelte";
 import { tasksStore } from "./tasks.svelte";
 import { prefs } from "./prefs.svelte";
-import { MAX_RECENT_SEARCHES } from "../constants";
+import { MAX_RECENT_SEARCHES, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY } from "../constants";
 import { albumKey, sameAlbum } from "$lib/utils/albumKey";
 import { matchWebDavPath } from "../webdavDisplay";
 
@@ -228,6 +229,7 @@ class CollectionStore {
   private queuedRefreshLibraryPromise: Promise<void> | null = null;
   private activeHydrationId = 0;
   searchResults = $state<Song[]>([]);
+  folderSearchResults = $state<FolderSearchResult[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
   recentSearches = $state<RecentSearchItem[]>([]);
@@ -1411,12 +1413,20 @@ class CollectionStore {
     this.searchQuery = query;
     if (query.trim() === "") {
       this.searchResults = [];
+      this.folderSearchResults = [];
       return;
     }
     this.searchLoading = true;
     try {
-      const results = await invoke<Song[]>("search_songs", { query, limit: 500 });
+      const [results, folders] = await Promise.all([
+        invoke<Song[]>("search_songs", { query, limit: 500 }),
+        invoke<FolderSearchResult[]>("search_source_folders", {
+          query,
+          limit: MAX_SEARCH_SUGGESTIONS_PER_CATEGORY,
+        }).catch(() => [] as FolderSearchResult[]),
+      ]);
       this.searchResults = Array.isArray(results) ? results : [];
+      this.folderSearchResults = Array.isArray(folders) ? folders : [];
     } catch (err) {
       console.error("Failed to execute search:", err);
     } finally {

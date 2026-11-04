@@ -9,6 +9,7 @@
   import Button from "../Button.svelte";
   import { shownName } from "./shownName";
   import { fileIcon } from "./fileIcon";
+  import { highlightSegments, matchesFileFilter, parseFileFilter } from "./fileFilter";
 
   /**
    * A column browser over one source (#1841): up to two columns of the
@@ -26,6 +27,9 @@
     listing = $bindable(null),
     selectedName = $bindable(null),
     selection = $bindable([]),
+    filterQuery = $bindable(""),
+    matchedCount = $bindable(0),
+    totalCount = $bindable(0),
     target = null,
     arrival = $bindable(null),
     unreachableLabel,
@@ -53,6 +57,12 @@
     /** Every selected entry of the current folder, by name: the focused one, or
      * files picked with Ctrl/Cmd-click, Shift-click, Shift+arrows or Ctrl+A. */
     selection?: string[];
+    /** Instant filter query for the current folder (#1886). */
+    filterQuery?: string;
+    /** Out: number of entries in the current folder matching `filterQuery`. */
+    matchedCount?: number;
+    /** Out: total entries in the current folder before filtering. */
+    totalCount?: number;
     /** Shown when the source can't be reached. */
     unreachableLabel: string;
     footer?: Snippet;
@@ -191,6 +201,14 @@
     return loaded?.state === "ready" ? loaded.listing.entries.filter((e) => e.isDir) : [];
   };
   const currentEntries = $derived(current?.state === "ready" ? current.listing.entries : []);
+  const parsedFilter = $derived(parseFileFilter(filterQuery));
+  const visibleEntries = $derived(
+    parsedFilter.isActive ? currentEntries.filter((e) => matchesFileFilter(e, parsedFilter)) : currentEntries
+  );
+  $effect(() => {
+    matchedCount = visibleEntries.length;
+    totalCount = currentEntries.length;
+  });
 
   /** The name a column is labelled with: its folder's, or "Folders" at the root. */
   function columnLabel(dir: string[]): string {
@@ -261,7 +279,7 @@
   }
 
   function handleCurrentKey(event: KeyboardEvent, column: number) {
-    const entries = currentEntries;
+    const entries = visibleEntries;
     const index = entries.findIndex((e) => e.name === selectedName);
     const entry = entries[index];
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
@@ -329,7 +347,7 @@
     const name = scrollPending;
     if (name === null || current?.state !== "ready") return;
     scrollPending = null;
-    const index = currentEntries.findIndex((e) => e.name === name);
+    const index = visibleEntries.findIndex((e) => e.name === name);
     if (index < 0) return;
     centreRow(levels.length - 1, index);
     if (haloArmed && name === arrived) showHalo();
@@ -403,10 +421,10 @@
 
   /** Selects the files from the anchor to `name`, skipping folders between, and focuses `name`. */
   function selectRange(name: string) {
-    const names = currentEntries.map((e) => e.name);
+    const names = visibleEntries.map((e) => e.name);
     const [a, b] = [names.indexOf(anchor ?? name), names.indexOf(name)].sort((x, y) => x - y);
     if (a < 0) return select(name);
-    selection = currentEntries.slice(a, b + 1).filter((e) => !e.isDir).map((e) => e.name);
+    selection = visibleEntries.slice(a, b + 1).filter((e) => !e.isDir).map((e) => e.name);
     selectedName = name;
     arrived = null;
   }
@@ -429,7 +447,7 @@
     if (!oncontextmenu) return;
     event.preventDefault();
     if (entry.isDir || !selection.includes(entry.name)) select(entry.name);
-    const entries = entry.isDir ? [entry] : currentEntries.filter((e) => !e.isDir && selection.includes(e.name));
+    const entries = entry.isDir ? [entry] : visibleEntries.filter((e) => !e.isDir && selection.includes(e.name));
     oncontextmenu({ dir: path, entries, inColumn: false }, event.clientX, event.clientY);
   }
 
@@ -524,6 +542,20 @@
           </div>
         {:else if loaded?.state === "ready" && currentEntries.length === 0}
           <p class="flex-1 flex items-center justify-center text-sm text-brand-text-secondary">{i18n.t("files.emptyFolder")}</p>
+        {:else if loaded?.state === "ready" && visibleEntries.length === 0}
+          <div class="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center" data-testid="files-filter-empty">
+            <p class="text-sm font-semibold text-brand-text-primary">
+              {i18n.t("files.filterEmptyTitle", { query: filterQuery.trim() })}
+            </p>
+            <p class="text-xs text-brand-text-secondary max-w-md">
+              {i18n.plural("files.filterEmptyHint", currentEntries.length)}
+            </p>
+            <div class="mt-2">
+              <Button variant="secondary" onclick={() => (filterQuery = "")}>
+                {i18n.t("files.clearFilter")}
+              </Button>
+            </div>
+          </div>
         {:else}
           <div
             bind:this={columnEls[column]}
@@ -533,7 +565,7 @@
             aria-label={columnLabel(dir)}
             onkeydown={(e) => handleCurrentKey(e, column)}
           >
-            <VirtualList items={currentEntries} height="100%" itemHeight={ROW_HEIGHT_PX} bind:this={lists[column]} bind:start={starts[column]} bind:end={ends[column]}>
+            <VirtualList items={visibleEntries} height="100%" itemHeight={ROW_HEIGHT_PX} bind:this={lists[column]} bind:start={starts[column]} bind:end={ends[column]}>
               {#snippet children({ item: entry }: { item: FileEntry })}
                 {@const selected = selection.includes(entry.name)}
                 {@const muted = MUTED.includes(entry.status)}
@@ -554,7 +586,19 @@
                 >
                   <span class="flex-1 min-w-0 flex items-center gap-2 {muted ? 'text-brand-text-secondary' : 'text-brand-text-primary'} {selected ? 'font-semibold' : ''}">
                     <Icon class="w-4 h-4 shrink-0 text-brand-text-secondary" data-kind={entry.kind ?? "folder"} />
-                    <span class="truncate" title={name}>{name}</span>
+                    <span class="truncate" title={name}>
+                      {#if parsedFilter.terms.length > 0}
+                        {#each highlightSegments(name, parsedFilter.terms) as seg, segIdx (segIdx)}
+                          {#if seg.match}
+                            <mark class="bg-brand-accent/25 text-brand-accent-text font-semibold rounded-xs">{seg.text}</mark>
+                          {:else}
+                            {seg.text}
+                          {/if}
+                        {/each}
+                      {:else}
+                        {name}
+                      {/if}
+                    </span>
                   </span>
                   <span class="w-12 shrink-0 text-[11px] text-brand-text-secondary hidden @lg:block">{entry.fileType ?? ""}</span>
                   <span class="w-16 shrink-0 text-right text-[11px] tabular-nums text-brand-text-secondary hidden @lg:block">{entry.isDir || entry.size === null ? "" : formatFileSize(entry.size)}</span>

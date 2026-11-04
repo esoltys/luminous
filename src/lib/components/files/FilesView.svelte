@@ -24,6 +24,7 @@
   import FileContextMenu from "./FileContextMenu.svelte";
   import DeviceView from "../devices/DeviceView.svelte";
   import { addFolderToDeviceSync, openFile, playFolder, reveal, revealLabel, scanFolder } from "./folderActions";
+  import { parseFileFilter } from "./fileFilter";
 
   const location = $derived(navigationStore.filesLocation);
   const openDevice = $derived(
@@ -56,6 +57,12 @@
   const pathName = (i: number) => shownName(location?.path[i] ?? "", listing?.pathMissingTags[i]);
   const title = $derived(location && location.path.length > 0 ? pathName(location.path.length - 1) : sourceName);
   const unreachableLabel = $derived(i18n.t("files.unreachable", { name: sourceName }));
+
+  $effect(() => {
+    if (!openDevice && location) {
+      filesStore.activeFolderTitle = title;
+    }
+  });
 
   function navigate(path: string[]) {
     if (!location) return;
@@ -105,6 +112,13 @@
               ...vars,
               size: formatFileSize(selectedFiles.reduce((sum, e) => sum + (e.size ?? 0), 0)),
             }),
+      ];
+    }
+    if (parseFileFilter(filesStore.filterQuery).isActive) {
+      return [
+        i18n.plural("files.filterMatchSummary", l.entries.length, {
+          matched: filesStore.filterMatchCount,
+        }),
       ];
     }
     const files =
@@ -204,6 +218,9 @@
         bind:listing
         bind:selectedName
         bind:selection
+        bind:filterQuery={filesStore.filterQuery}
+        bind:matchedCount={filesStore.filterMatchCount}
+        bind:totalCount={filesStore.filterTotalCount}
         oncontextmenu={(target, x, y) => (menu = { x, y, ...target })}
       >
         {#snippet footer()}

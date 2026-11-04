@@ -14,6 +14,9 @@
   import ConfirmDialog from "../ConfirmDialog.svelte";
   import FileBrowser from "../files/FileBrowser.svelte";
   import { deviceIcon } from "../files/sourceIcon";
+  import { shownName } from "../files/shownName";
+  import { parseFileFilter } from "../files/fileFilter";
+  import { filesStore } from "../../stores/files.svelte";
   import DeviceStorageGauge from "./DeviceStorageGauge.svelte";
   import DeviceSyncSettings from "./DeviceSyncSettings.svelte";
   import DeviceSyncPreview from "./DeviceSyncPreview.svelte";
@@ -132,6 +135,14 @@
     (listing?.entries ?? []).filter((e) => selection.includes(e.name))
   );
   const playable = $derived(selectedEntries.filter((e) => e.songId !== null));
+
+  $effect(() => {
+    const folderTitle =
+      location.path.length > 0
+        ? shownName(location.path[location.path.length - 1], listing?.pathMissingTags[location.path.length - 1])
+        : name;
+    filesStore.activeFolderTitle = folderTitle;
+  });
 
   // A sync rewrites the device: read its folders again once one ends.
   let wasSyncing = false;
@@ -307,12 +318,21 @@
           bind:listing
           bind:selectedName
           bind:selection
+          bind:filterQuery={filesStore.filterQuery}
+          bind:matchedCount={filesStore.filterMatchCount}
+          bind:totalCount={filesStore.filterTotalCount}
         >
           {#snippet footer()}
             <div class="flex items-center justify-between gap-3 px-4 py-2 text-xs text-brand-text-secondary">
               <span class="line-clamp-2 min-w-0">
-                {selection.length > 0 ? i18n.plural("devices.selected", selection.length) : i18n.t("devices.onlyRemovesOwn")}
-                {#if selection.length === 0 && listing && listing.hiddenCount > 0}{i18n.plural("files.hiddenFiles", listing.hiddenCount)}{/if}
+                {#if selection.length > 0}
+                  {i18n.plural("devices.selected", selection.length)}
+                {:else if parseFileFilter(filesStore.filterQuery).isActive}
+                  {i18n.plural("files.filterMatchSummary", filesStore.filterTotalCount, { matched: filesStore.filterMatchCount })}
+                {:else}
+                  {i18n.t("devices.onlyRemovesOwn")}
+                  {#if listing && listing.hiddenCount > 0}{i18n.plural("files.hiddenFiles", listing.hiddenCount)}{/if}
+                {/if}
               </span>
               {#if selection.length > 0}
                 <div class="flex items-center gap-2 shrink-0">

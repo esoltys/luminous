@@ -122,7 +122,23 @@ export const it = {
       other: "{selected} di {count} file selezionati."
     },
     viewInFiles: "Mostra in File",
-    movedShowingNearest: "Non si trova più dove Luminous l'ha visto l'ultima volta. Viene mostrata la cartella più vicina ancora esistente."
+    movedShowingNearest: "Non si trova più dove Luminous l'ha visto l'ultima volta. Viene mostrata la cartella più vicina ancora esistente.",
+    filterPlaceholder: "Filtra {folder}…",
+    filterCountBadge: "{matched} di {total}",
+    clearFilter: "Cancella filtro",
+    filterHelpTitle: "Filtra questa cartella per nome, tipo o stato nella libreria",
+    filterHelpTypeLabel: "Tipo:",
+    filterHelpStatusLabel: "Stato:",
+    searchWholeLibraryFor: "Cerca «{query}» in tutta la libreria",
+    filterEmptyTitle: "Nulla in questa cartella corrisponde a {query}.",
+    filterEmptyHint: {
+      one: "Cancella il filtro per vedere {count} file, oppure modificalo per cercare altro.",
+      other: "Cancella il filtro per vedere tutti i {count} file, oppure modificalo per cercare altro."
+    },
+    filterMatchSummary: {
+      one: "{matched} di {count} file corrisponde al filtro.",
+      other: "{matched} di {count} file corrispondono al filtro."
+    }
   },
   devices: {
     tabFiles: "File",
@@ -367,7 +383,8 @@ export const it = {
     filterSyntaxHint: "💡 Suggerimento sulla sintassi dei filtri",
     filterFieldsLabel: "Campi:",
     filterOperatorsLabel: "Operatori:",
-    removeRecentSearchTooltip: "Rimuovi dalle ricerche recenti"
+    removeRecentSearchTooltip: "Rimuovi dalle ricerche recenti",
+    filesAndFolders: "File e cartelle"
   },
   home: {
     greetingMorning: "Buongiorno",

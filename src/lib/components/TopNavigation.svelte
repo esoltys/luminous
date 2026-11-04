@@ -5,6 +5,7 @@
     CaretRightIcon as ChevronRight,
     MagnifyingGlassIcon as Search,
     FolderOpenIcon as FolderOpen,
+    FolderIcon,
     UserIcon as User,
     DiscIcon as Disc,
     PlaylistIcon as ListMusic,
@@ -24,7 +25,10 @@
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
-  import type { RecentSearchItem } from "../types";
+  import { filesStore } from "../stores/files.svelte";
+  import type { FolderSearchResult, RecentSearchItem } from "../types";
+  import { parseFileFilter } from "./files/fileFilter";
+  import { shouldSkipGlobalShortcut } from "../utils/globalShortcuts";
   import { resolveArtistPortraitUrl } from "../utils/covers";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import CoverArt from "./CoverArt.svelte";
@@ -37,6 +41,39 @@
   let searchContainerRef: HTMLDivElement | undefined;
   let searchDropdownRef: HTMLDivElement | undefined = $state();
   let isSearchFocused = $state(false);
+
+  const isFilesFilterMode = $derived(filesStore.isFilteringFolder);
+  const parsedFilesFilter = $derived(parseFileFilter(filesStore.filterQuery));
+  const libraryEscapeQuery = $derived(parsedFilesFilter.freeText || filesStore.filterQuery.trim());
+
+  function toggleFilterToken(token: string) {
+    const current = filesStore.filterQuery.trim();
+    const parts = current ? current.split(/\s+/) : [];
+    const idx = parts.findIndex((p) => p.toLowerCase() === token.toLowerCase());
+    if (idx >= 0) {
+      parts.splice(idx, 1);
+    } else {
+      parts.push(token);
+    }
+    filesStore.filterQuery = parts.length > 0 ? `${parts.join(" ")} ` : "";
+    searchInput?.focus();
+  }
+
+  function searchWholeLibrary(query: string) {
+    const q = query.trim();
+    if (!q) return;
+    filesStore.clearFilter();
+    isSearchFocused = false;
+    navigationStore.activeTab = "collection";
+    navigationStore.activeSubTab = "songs";
+    collectionStore.searchQuery = q;
+    collectionStore.search(q);
+  }
+
+  function openSearchedFolder(folder: FolderSearchResult) {
+    navigationStore.viewFiles(folder.source, folder.path);
+    isSearchFocused = false;
+  }
 
   // Typing fires a real IPC round-trip (search_songs, FTS5) per keystroke —
   // debounce it so a fast typist doesn't queue up one backend query per
@@ -225,12 +262,27 @@
   });
 
   function handleKeyDown(e: KeyboardEvent) {
-    if ((e.ctrlKey || e.metaKey) && e.key === "l") {
+    const keyLower = e.key.toLowerCase();
+    if (
+      ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (keyLower === "l" || keyLower === "f")) ||
+      (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !shouldSkipGlobalShortcut(e))
+    ) {
       e.preventDefault();
       searchInput?.focus();
+      searchInput?.select();
       isSearchFocused = true;
-    } else if (e.key === "Escape" && isSearchFocused) {
-      isSearchFocused = false;
+      return;
+    }
+
+    if (e.key === "Escape") {
+      if (isFilesFilterMode && filesStore.filterQuery !== "") {
+        e.preventDefault();
+        filesStore.clearFilter();
+      }
+      if (isSearchFocused || document.activeElement === searchInput) {
+        isSearchFocused = false;
+        searchInput?.blur();
+      }
     }
 
     if (e.key === "BrowserBack") {
@@ -261,6 +313,10 @@
 
   function handleSearch(e: Event) {
     e.preventDefault();
+    if (isFilesFilterMode) {
+      isSearchFocused = false;
+      return;
+    }
     clearTimeout(searchDebounceTimer);
     const q = collectionStore.searchQuery.trim();
     if (q) {
@@ -356,19 +412,48 @@
       <Search class="w-4 h-4 text-brand-text-secondary flex-shrink-0" />
       <input
         bind:this={searchInput}
-        bind:value={collectionStore.searchQuery}
+        value={isFilesFilterMode ? filesStore.filterQuery : collectionStore.searchQuery}
         onfocus={() => { isSearchFocused = true; }}
         oninput={(e) => {
+          const val = (e.target as HTMLInputElement).value;
           isSearchFocused = true;
-          debouncedSearch((e.target as HTMLInputElement).value);
+          if (isFilesFilterMode) {
+            filesStore.filterQuery = val;
+          } else {
+            collectionStore.searchQuery = val;
+            debouncedSearch(val);
+          }
         }}
         onkeydown={handleSearchInputKeyDown}
         type="text"
-        placeholder={i18n.t('topNav.searchPlaceholder')}
+        placeholder={isFilesFilterMode
+          ? i18n.t('files.filterPlaceholder', { folder: filesStore.activeFolderTitle || i18n.t('sidebar.files') })
+          : i18n.t('topNav.searchPlaceholder')}
         class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
       />
 
-      {#if collectionStore.searchLoading}
+      {#if isFilesFilterMode}
+        {#if filesStore.filterQuery.trim() !== ""}
+          <span
+            class="text-[10px] bg-brand-border/60 px-1.5 py-0.5 rounded text-brand-text-secondary font-mono flex-shrink-0 select-none"
+            data-testid="files-filter-badge"
+          >
+            {i18n.t("files.filterCountBadge", {
+              matched: filesStore.filterMatchCount,
+              total: filesStore.filterTotalCount
+            })}
+          </span>
+          <button
+            type="button"
+            onclick={() => filesStore.clearFilter()}
+            class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0 font-bold leading-none text-sm"
+            title={i18n.t('files.clearFilter')}
+            aria-label={i18n.t('files.clearFilter')}
+          >
+            ✕
+          </button>
+        {/if}
+      {:else if collectionStore.searchLoading}
         <div class="animate-spin rounded-full h-4 w-4 border-2 border-brand-accent border-t-transparent flex-shrink-0" title={i18n.t('topNav.searching')}></div>
       {:else if collectionStore.searchQuery}
         <span class="text-[10px] bg-brand-border/60 px-1.5 py-0.5 rounded text-brand-text-secondary font-mono flex-shrink-0 select-none">
@@ -390,6 +475,59 @@
         bind:this={searchDropdownRef}
         class="absolute left-0 right-0 top-full mt-2 bg-brand-sidebar rounded-xl border border-brand-border shadow-2xl p-3 z-50 max-h-96 overflow-y-auto"
       >
+        {#if isFilesFilterMode}
+          <div class="p-2.5 rounded-xl bg-brand-main/60 border border-brand-border/40 text-xs text-brand-text-secondary/90">
+            <div class="font-semibold text-brand-text-primary mb-2">
+              {i18n.t("files.filterHelpTitle")}
+            </div>
+            <div class="space-y-1.5 text-[11px]">
+              <div class="flex items-center flex-wrap gap-1.5">
+                <span class="font-medium text-brand-text-secondary min-w-12">{i18n.t("files.filterHelpTypeLabel")}</span>
+                {#each ["ext:flac", "ext:cue", "ext:md", "ext:jpg"] as token (token)}
+                  <button
+                    type="button"
+                    onclick={() => toggleFilterToken(token)}
+                    class="font-mono bg-brand-sidebar hover:bg-brand-accent/20 text-brand-text-primary px-1.5 py-0.5 rounded border border-brand-border/50 transition-colors"
+                  >
+                    {token}
+                  </button>
+                {/each}
+              </div>
+              <div class="flex items-center flex-wrap gap-1.5">
+                <span class="font-medium text-brand-text-secondary min-w-12">{i18n.t("files.filterHelpStatusLabel")}</span>
+                {#each ["status:library", "status:unscanned"] as token (token)}
+                  <button
+                    type="button"
+                    onclick={() => toggleFilterToken(token)}
+                    class="font-mono bg-brand-sidebar hover:bg-brand-accent/20 text-brand-text-primary px-1.5 py-0.5 rounded border border-brand-border/50 transition-colors"
+                  >
+                    {token}
+                  </button>
+                {/each}
+              </div>
+            </div>
+          </div>
+          {#if libraryEscapeQuery}
+            <div class="mt-2 pt-2 border-t border-brand-border/40">
+              <div
+                role="button"
+                tabindex="0"
+                onclick={() => searchWholeLibrary(libraryEscapeQuery)}
+                onkeydown={(e) => {
+                  if (e.key === "Enter") searchWholeLibrary(libraryEscapeQuery);
+                  else handleSearchResultKeyDown(e);
+                }}
+                class="search-result-item group flex items-center gap-2.5 p-2 rounded-lg hover:bg-brand-main/80 transition-colors text-xs text-brand-text-secondary hover:text-brand-text-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                data-testid="files-search-whole-library"
+              >
+                <Search class="w-4 h-4 shrink-0 text-brand-text-secondary group-hover:text-brand-accent-text" />
+                <span class="truncate">
+                  {i18n.t("files.searchWholeLibraryFor", { query: libraryEscapeQuery })}
+                </span>
+              </div>
+            </div>
+          {/if}
+        {:else}
         {#if hasAdvancedSearchTerms(collectionStore.searchQuery)}
           <button
             type="button"
@@ -443,7 +581,7 @@
               {/if}
             </div>
 
-            {#if collectionStore.filteredArtists.length === 0 && collectionStore.filteredAlbums.length === 0 && matchingPlaylists.length === 0 && collectionStore.searchResults.length === 0 && !collectionStore.searchLoading}
+            {#if collectionStore.filteredArtists.length === 0 && collectionStore.filteredAlbums.length === 0 && matchingPlaylists.length === 0 && collectionStore.searchResults.length === 0 && collectionStore.folderSearchResults.length === 0 && !collectionStore.searchLoading}
               <div class="p-3 text-center text-xs text-brand-text-secondary/60 select-none">
                 {i18n.t('topNav.noSuggestions', {}, 'No matching suggestions')}
               </div>
@@ -655,6 +793,45 @@
                   </div>
                 {/each}
               </div>
+
+              {#if collectionStore.folderSearchResults.length > 0}
+                <div class="mt-2 pt-1">
+                  <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-brand-border/40 select-none">
+                    <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+                      {i18n.t('topNav.filesAndFolders')}
+                    </span>
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    {#each collectionStore.folderSearchResults.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as folder (`${folder.source.kind}:${folder.source.id}:${folder.path.join("/")}`)}
+                      <div
+                        role="button"
+                        tabindex="0"
+                        onclick={() => openSearchedFolder(folder)}
+                        onkeydown={(e) => {
+                          if (e.key === 'Enter') openSearchedFolder(folder);
+                          else handleSearchResultKeyDown(e);
+                        }}
+                        class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                        data-testid="search-folder-result"
+                      >
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                          <div class="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
+                            <FolderIcon class="w-4 h-4 text-brand-text-secondary" />
+                          </div>
+                          <div class="flex flex-col min-w-0 flex-1">
+                            <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
+                              {folder.name}
+                            </span>
+                            <span class="text-xs text-brand-text-secondary/70 truncate">
+                              {folder.breadcrumb}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
             {/if}
           </div>
         {/if}
@@ -765,6 +942,7 @@
               </div>
             {/each}
           </div>
+        {/if}
         {/if}
       </div>
     {/if}
