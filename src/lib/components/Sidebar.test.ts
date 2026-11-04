@@ -206,3 +206,62 @@ describe("Sidebar.svelte - Files section", () => {
     expect(navigationStore.filesLocation).toBeNull();
   });
 });
+
+describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    i18n.currentLocale = "en-CA";
+    navigationStore.activeTab = "playlists";
+    collectionStore.statsLoaded = true;
+    collectionStore.stats = {
+      total_songs: 10,
+      total_albums: 5,
+      total_artists: 2,
+      total_duration_nanosec: 1000,
+      total_filesize_bytes: 1000,
+      album_art_bytes: 0,
+      artist_art_bytes: 0,
+      thumbnail_bytes: 0,
+    };
+    playlistsStore.playlists = [
+      { id: 1, name: "Queue", is_queue: true } as any,
+      { id: 2, name: "Favorites", is_queue: false } as any,
+    ];
+  });
+
+  it("handles drop onto Queue", async () => {
+    const { fileDrag } = await import("../stores/fileDrag.svelte");
+    const dropSpy = vi.spyOn(fileDrag, "dropToQueue").mockResolvedValue();
+    fileDrag.start([{ name: "track.flac", isDir: false, songId: 10 } as any]);
+
+    const { getByRole } = render(Sidebar, { props: { width: 256 } });
+    const queueBtn = getByRole("button", { name: /queue/i });
+
+    await fireEvent.dragOver(queueBtn, { dataTransfer: { dropEffect: "" } });
+    await fireEvent.drop(queueBtn);
+    expect(dropSpy).toHaveBeenCalled();
+  });
+
+  it("expands custom playlists after dragging over Custom for 500ms and drops to playlist", async () => {
+    vi.useFakeTimers();
+    try {
+      const { fileDrag } = await import("../stores/fileDrag.svelte");
+      const dropSpy = vi.spyOn(fileDrag, "dropToPlaylist").mockResolvedValue();
+      fileDrag.start([{ name: "track.flac", isDir: false, songId: 10 } as any]);
+
+      const { getByRole, findByRole } = render(Sidebar, { props: { width: 256 } });
+      const customBtn = getByRole("button", { name: /custom/i });
+
+      await fireEvent.dragEnter(customBtn);
+      vi.advanceTimersByTime(500);
+
+      const favPlaylistBtn = await findByRole("button", { name: "Favorites" });
+      expect(favPlaylistBtn).toBeInTheDocument();
+
+      await fireEvent.drop(favPlaylistBtn);
+      expect(dropSpy).toHaveBeenCalledWith(expect.objectContaining({ id: 2, name: "Favorites" }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

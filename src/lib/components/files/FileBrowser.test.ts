@@ -402,4 +402,56 @@ describe("FileBrowser.svelte", () => {
       expect(selectedIn(current)).toEqual(["01 Opening.flac", "02 Encore.flac"]);
     });
   });
+
+  describe("sorting, keyboard navigation, and drag-and-drop (#1888)", () => {
+    it("toggles column sorting and updates arrow indicators", async () => {
+      const { findByText, getByRole } = setup(["Rock", "Live"]);
+      await findByText("01 Opening.flac");
+
+      const nameBtn = getByRole("button", { name: "Name" });
+      expect(nameBtn).toHaveTextContent("▲");
+
+      await fireEvent.click(nameBtn);
+      expect(nameBtn).toHaveTextContent("▼");
+
+      const typeBtn = getByRole("button", { name: "Type" });
+      await fireEvent.click(typeBtn);
+      expect(typeBtn).toHaveTextContent("▲");
+      expect(nameBtn).not.toHaveTextContent("▼");
+      expect(nameBtn).not.toHaveTextContent("▲");
+    });
+
+    it("navigates to parent folder on Backspace and Alt+ArrowUp", async () => {
+      const { findByText, getByRole, onnavigate } = setup(["Rock", "Live"]);
+      await findByText("01 Opening.flac");
+      const current = getByRole("listbox", { name: "Live" });
+
+      await fireEvent.keyDown(current, { key: "Backspace" });
+      expect(onnavigate).toHaveBeenCalledWith(["Rock"]);
+
+      await fireEvent.keyDown(current, { key: "ArrowUp", altKey: true });
+      expect(onnavigate).toHaveBeenCalledTimes(2);
+      expect(onnavigate).toHaveBeenLastCalledWith(["Rock"]);
+    });
+
+    it("starts file drag on row dragstart", async () => {
+      const { fileDrag } = await import("../../stores/fileDrag.svelte");
+      const { findByText, getByRole } = setup(["Rock", "Live"]);
+      await findByText("01 Opening.flac");
+      const option = getByRole("option", { name: /01 Opening/ });
+
+      const dataTransfer = {
+        setData: vi.fn(),
+        effectAllowed: "",
+      };
+
+      await fireEvent.dragStart(option, { dataTransfer });
+      expect(fileDrag.isDragging).toBe(true);
+      expect(fileDrag.librarySongIds).toContain(7);
+      expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "01 Opening.flac");
+
+      await fireEvent.dragEnd(option);
+      expect(fileDrag.isDragging).toBe(false);
+    });
+  });
 });

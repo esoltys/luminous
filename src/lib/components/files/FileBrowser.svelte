@@ -10,6 +10,8 @@
   import { shownName } from "./shownName";
   import { fileIcon } from "./fileIcon";
   import { highlightSegments, matchesFileFilter, parseFileFilter } from "./fileFilter";
+  import { sortFileEntries, type FileSortColumn } from "./fileSorting";
+  import { fileDrag } from "../../stores/fileDrag.svelte";
 
   /**
    * A column browser over one source (#1841): up to two columns of the
@@ -30,6 +32,8 @@
     filterQuery = $bindable(""),
     matchedCount = $bindable(0),
     totalCount = $bindable(0),
+    sortColumn = $bindable("name"),
+    sortAsc = $bindable(true),
     target = null,
     arrival = $bindable(null),
     unreachableLabel,
@@ -63,6 +67,10 @@
     matchedCount?: number;
     /** Out: total entries in the current folder before filtering. */
     totalCount?: number;
+    /** Active sorting column for the current folder's file table (#1888). */
+    sortColumn?: FileSortColumn;
+    /** Sort direction for the current folder's file table (#1888). */
+    sortAsc?: boolean;
     /** Shown when the source can't be reached. */
     unreachableLabel: string;
     footer?: Snippet;
@@ -86,6 +94,10 @@
 
   /** Entries shown dimmed: not music the library or sync looks after. */
   const MUTED: (FileEntryStatus | null)[] = ["excluded", "albumArt", "notAudio", "notFromLuminous"];
+
+  function statusLabel(entry: FileEntry): string {
+    return entry.status ? i18n.t(STATUS_LABEL_KEYS[entry.status]) : "";
+  }
 
   const ROW_HEIGHT_PX = 31;
   /** Folder columns shown before the current folder's table. */
@@ -205,10 +217,22 @@
   const visibleEntries = $derived(
     parsedFilter.isActive ? currentEntries.filter((e) => matchesFileFilter(e, parsedFilter)) : currentEntries
   );
+  const sortedEntries = $derived(
+    sortFileEntries(visibleEntries, sortColumn, sortAsc, statusLabel)
+  );
   $effect(() => {
     matchedCount = visibleEntries.length;
     totalCount = currentEntries.length;
   });
+
+  function toggleSort(col: FileSortColumn) {
+    if (sortColumn === col) {
+      sortAsc = !sortAsc;
+    } else {
+      sortColumn = col;
+      sortAsc = true;
+    }
+  }
 
   /** The name a column is labelled with: its folder's, or "Folders" at the root. */
   function columnLabel(dir: string[]): string {
@@ -255,9 +279,23 @@
     const index = folders.findIndex((f) => f.name === selected);
     let handled = true;
     switch (event.key) {
-      case "ArrowDown":
+      case "Backspace":
+        if (dir.length > 0) onnavigate(dir);
+        break;
       case "ArrowUp": {
-        const next = folders[Math.min(folders.length - 1, Math.max(0, index + (event.key === "ArrowDown" ? 1 : -1)))];
+        if (event.altKey && dir.length > 0) {
+          onnavigate(dir);
+          break;
+        }
+        const next = folders[Math.min(folders.length - 1, Math.max(0, index - 1))];
+        if (next) {
+          onnavigate([...dir, next.name]);
+          scrollIntoView(column, folders.indexOf(next));
+        }
+        break;
+      }
+      case "ArrowDown": {
+        const next = folders[Math.min(folders.length - 1, Math.max(0, index + 1))];
         if (next) {
           onnavigate([...dir, next.name]);
           scrollIntoView(column, folders.indexOf(next));
@@ -279,7 +317,7 @@
   }
 
   function handleCurrentKey(event: KeyboardEvent, column: number) {
-    const entries = visibleEntries;
+    const entries = sortedEntries;
     const index = entries.findIndex((e) => e.name === selectedName);
     const entry = entries[index];
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
@@ -289,9 +327,28 @@
     }
     let handled = true;
     switch (event.key) {
-      case "ArrowDown":
+      case "Backspace":
+        if (path.length > 0) onnavigate(path.slice(0, -1));
+        break;
       case "ArrowUp": {
-        const nextIndex = Math.min(entries.length - 1, Math.max(0, index + (event.key === "ArrowDown" ? 1 : -1)));
+        if (event.altKey && path.length > 0) {
+          onnavigate(path.slice(0, -1));
+          break;
+        }
+        const nextIndex = Math.min(entries.length - 1, Math.max(0, index - 1));
+        const next = entries[nextIndex];
+        if (next) {
+          if (event.shiftKey && anchor !== null && !next.isDir) {
+            selectRange(next.name);
+          } else {
+            select(next.name);
+          }
+          scrollIntoView(column, nextIndex);
+        }
+        break;
+      }
+      case "ArrowDown": {
+        const nextIndex = Math.min(entries.length - 1, Math.max(0, index + 1));
         const next = entries[nextIndex];
         if (next) {
           if (event.shiftKey && anchor !== null && !next.isDir) {
@@ -347,7 +404,7 @@
     const name = scrollPending;
     if (name === null || current?.state !== "ready") return;
     scrollPending = null;
-    const index = visibleEntries.findIndex((e) => e.name === name);
+    const index = sortedEntries.findIndex((e) => e.name === name);
     if (index < 0) return;
     centreRow(levels.length - 1, index);
     if (haloArmed && name === arrived) showHalo();
@@ -421,10 +478,10 @@
 
   /** Selects the files from the anchor to `name`, skipping folders between, and focuses `name`. */
   function selectRange(name: string) {
-    const names = visibleEntries.map((e) => e.name);
+    const names = sortedEntries.map((e) => e.name);
     const [a, b] = [names.indexOf(anchor ?? name), names.indexOf(name)].sort((x, y) => x - y);
     if (a < 0) return select(name);
-    selection = visibleEntries.slice(a, b + 1).filter((e) => !e.isDir).map((e) => e.name);
+    selection = sortedEntries.slice(a, b + 1).filter((e) => !e.isDir).map((e) => e.name);
     selectedName = name;
     arrived = null;
   }
@@ -442,12 +499,31 @@
     select(name);
   }
 
+  function onRowDragStart(event: DragEvent, entry: FileEntry) {
+    if (entry.isDir) return;
+    const dragged = selection.includes(entry.name)
+      ? sortedEntries.filter((e) => !e.isDir && selection.includes(e.name))
+      : [entry];
+    if (!selection.includes(entry.name)) {
+      select(entry.name);
+    }
+    fileDrag.start(dragged);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "copy";
+      event.dataTransfer.setData("text/plain", dragged.map((e) => e.name).join("\n"));
+    }
+  }
+
+  function onRowDragEnd() {
+    fileDrag.end();
+  }
+
   /** A right-click on a folder acts on it alone; on a file, on the selection it belongs to. */
   function openMenu(event: MouseEvent, entry: FileEntry) {
     if (!oncontextmenu) return;
     event.preventDefault();
     if (entry.isDir || !selection.includes(entry.name)) select(entry.name);
-    const entries = entry.isDir ? [entry] : visibleEntries.filter((e) => !e.isDir && selection.includes(e.name));
+    const entries = entry.isDir ? [entry] : sortedEntries.filter((e) => !e.isDir && selection.includes(e.name));
     oncontextmenu({ dir: path, entries, inColumn: false }, event.clientX, event.clientY);
   }
 
@@ -455,10 +531,6 @@
     if (!oncontextmenu) return;
     event.preventDefault();
     oncontextmenu({ dir, entries: [entry], inColumn: true }, event.clientX, event.clientY);
-  }
-
-  function statusLabel(entry: FileEntry): string {
-    return entry.status ? i18n.t(STATUS_LABEL_KEYS[entry.status]) : "";
   }
 </script>
 
@@ -524,11 +596,51 @@
       </div>
     {:else}
       <div class="@container flex-1 min-w-0 min-h-0 flex flex-col">
-        <div class="h-8 shrink-0 flex items-center gap-3 px-4 border-b border-brand-border/40 text-[11px] text-brand-text-secondary" aria-hidden="true">
-          <span class="flex-1 min-w-0 pl-6">{i18n.t("files.columnName")}</span>
-          <span class="w-12 shrink-0 hidden @lg:block">{i18n.t("files.columnType")}</span>
-          <span class="w-16 shrink-0 text-right hidden @lg:block">{i18n.t("files.columnSize")}</span>
-          <span class="w-40 shrink-0 hidden @md:block">{i18n.t("files.columnInLibrary")}</span>
+        <div class="h-8 shrink-0 flex items-center gap-3 px-4 border-b border-brand-border/40 text-[11px] text-brand-text-secondary select-none">
+          <button
+            type="button"
+            onclick={() => toggleSort("name")}
+            class="flex-1 min-w-0 pl-6 text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 focus-visible:outline-none focus-visible:text-brand-accent-text"
+            aria-label={i18n.t("files.columnName")}
+          >
+            <span class="truncate">{i18n.t("files.columnName")}</span>
+            {#if sortColumn === "name"}
+              <span class="text-[9px] shrink-0" aria-hidden="true">{sortAsc ? "▲" : "▼"}</span>
+            {/if}
+          </button>
+          <button
+            type="button"
+            onclick={() => toggleSort("fileType")}
+            class="w-12 shrink-0 hidden @lg:flex items-center gap-1 text-left hover:text-brand-text-primary transition-colors focus-visible:outline-none focus-visible:text-brand-accent-text"
+            aria-label={i18n.t("files.columnType")}
+          >
+            <span class="truncate">{i18n.t("files.columnType")}</span>
+            {#if sortColumn === "fileType"}
+              <span class="text-[9px] shrink-0" aria-hidden="true">{sortAsc ? "▲" : "▼"}</span>
+            {/if}
+          </button>
+          <button
+            type="button"
+            onclick={() => toggleSort("size")}
+            class="w-16 shrink-0 hidden @lg:flex items-center justify-end gap-1 text-right hover:text-brand-text-primary transition-colors focus-visible:outline-none focus-visible:text-brand-accent-text"
+            aria-label={i18n.t("files.columnSize")}
+          >
+            <span class="truncate">{i18n.t("files.columnSize")}</span>
+            {#if sortColumn === "size"}
+              <span class="text-[9px] shrink-0" aria-hidden="true">{sortAsc ? "▲" : "▼"}</span>
+            {/if}
+          </button>
+          <button
+            type="button"
+            onclick={() => toggleSort("status")}
+            class="w-40 shrink-0 hidden @md:flex items-center gap-1 text-left hover:text-brand-text-primary transition-colors focus-visible:outline-none focus-visible:text-brand-accent-text"
+            aria-label={i18n.t("files.columnInLibrary")}
+          >
+            <span class="truncate">{i18n.t("files.columnInLibrary")}</span>
+            {#if sortColumn === "status"}
+              <span class="text-[9px] shrink-0" aria-hidden="true">{sortAsc ? "▲" : "▼"}</span>
+            {/if}
+          </button>
         </div>
         {#if loaded?.state === "error"}
           <div class="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
@@ -565,7 +677,7 @@
             aria-label={columnLabel(dir)}
             onkeydown={(e) => handleCurrentKey(e, column)}
           >
-            <VirtualList items={visibleEntries} height="100%" itemHeight={ROW_HEIGHT_PX} bind:this={lists[column]} bind:start={starts[column]} bind:end={ends[column]}>
+            <VirtualList items={sortedEntries} height="100%" itemHeight={ROW_HEIGHT_PX} bind:this={lists[column]} bind:start={starts[column]} bind:end={ends[column]}>
               {#snippet children({ item: entry }: { item: FileEntry })}
                 {@const selected = selection.includes(entry.name)}
                 {@const muted = MUTED.includes(entry.status)}
@@ -573,12 +685,15 @@
                 {@const isArrival = entry.name === arrived && selected && selection.length === 1}
                 {@const Icon = fileIcon(entry)}
                 <div
-                  class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'}"
+                  class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'} {fileDrag.isDragging && selected ? 'opacity-60' : ''}"
                   class:arrival={isArrival}
                   class:arrival-halo={isArrival && haloShown}
                   role="option"
                   aria-selected={selected}
                   tabindex="-1"
+                  draggable={!entry.isDir}
+                  ondragstart={(e) => onRowDragStart(e, entry)}
+                  ondragend={onRowDragEnd}
                   onclick={(e) => (entry.isDir ? openFolder(dir, entry.name) : clickFile(e, entry.name))}
                   ondblclick={() => { if (!entry.isDir) onactivate(entry); }}
                   oncontextmenu={(e) => openMenu(e, entry)}

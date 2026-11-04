@@ -606,4 +606,17 @@ describe("PlayerBar.svelte", () => {
     await fireEvent.click(btn);
     expect(queryByRole("menu")).toBeInTheDocument();
   });
+
+  it("handles drop onto the Queue button (#1888)", async () => {
+    const { fileDrag } = await import("../stores/fileDrag.svelte");
+    const dropSpy = vi.spyOn(fileDrag, "dropToQueue").mockResolvedValue();
+    fileDrag.start([{ name: "track.flac", isDir: false, songId: 10 } as any]);
+
+    const { getByTitle } = render(PlayerBar);
+    const queueBtn = getByTitle("Queue");
+
+    await fireEvent.dragOver(queueBtn, { dataTransfer: { dropEffect: "" } });
+    await fireEvent.drop(queueBtn);
+    expect(dropSpy).toHaveBeenCalled();
+  });
 });
