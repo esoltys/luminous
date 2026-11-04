@@ -109,7 +109,12 @@ describe("FileContextMenu.svelte", () => {
   it("gives a folder in a folder column the file actions only", () => {
     open([entry("Rock", { isDir: true, status: null, fileType: null, location: "C:/Music/Rock" })], { inColumn: true });
 
-    expect(screen.getAllByRole("menuitem").map((b) => b.textContent?.trim())).toEqual([expect.stringMatching(/^Show in /), "Copy path"]);
+    expect(screen.getAllByRole("menuitem").map((b) => b.textContent?.trim())).toEqual([
+      "Edit tags for folder",
+      "Open in Picard",
+      expect.stringMatching(/^Show in /),
+      "Copy path",
+    ]);
   });
 
   it("gives a library song the song menu, with the file's own actions after it", async () => {

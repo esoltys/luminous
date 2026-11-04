@@ -232,6 +232,20 @@
     {#if canScanFiles}
       <ContextMenuItem icon={ArrowsClockwiseIcon} label={i18n.t("files.scanFolder")} onclick={() => runAndClose(() => scanFolder(source, path))} />
     {/if}
+    {#if isLocal && single?.isDir && single.location}
+      <ContextMenuItem
+        icon={PencilSimpleIcon}
+        label={i18n.t("files.editTagsForFolder")}
+        onclick={() => runAndClose(() => onEditFolderTags?.(single!, [...path, single!.name]))}
+      />
+      <ContextMenuItem
+        icon={ArrowSquareOutIcon}
+        label={i18n.t("picard.openInPicard")}
+        disabled={!picardStore.available}
+        title={!picardStore.available ? i18n.t("picard.notFoundTooltip") : undefined}
+        onclick={() => runAndClose(() => openPathsInPicard([single!.location!]))}
+      />
+    {/if}
     {#if isLocal && !inColumn && !single?.isDir && (single?.kind === "audio" || unscanned.length > 0)}
       <ContextMenuDivider />
       <ContextMenuItem
@@ -250,7 +264,7 @@
         onclick={() => runAndClose(() => openPathsInPicard(locations))}
       />
     {/if}
-    {#if (canPlayOutside || canScanFiles || (isLocal && !inColumn && !single?.isDir && (single?.kind === "audio" || unscanned.length > 0))) && locations.length > 0}
+    {#if (canPlayOutside || canScanFiles || (isLocal && (single?.isDir || (!inColumn && (single?.kind === "audio" || unscanned.length > 0))))) && locations.length > 0}
       <ContextMenuDivider />
     {/if}
     {@render fileItems()}
