@@ -56,6 +56,7 @@
     onGoToArtist,
     onGoToAlbum,
     onEditTags,
+    onEditBatchTags,
     onOpenInPicard,
     onOrganizeFiles,
     onClose,
@@ -75,6 +76,7 @@
     onGoToArtist?: () => void;
     onGoToAlbum?: () => void;
     onEditTags?: () => void;
+    onEditBatchTags?: () => void;
     onOpenInPicard?: () => void;
     onOrganizeFiles?: () => void;
     onClose: () => void;
@@ -489,12 +491,16 @@
     />
   {/if}
 
-  {#if selectedCount === 1 && onEditTags}
+  {#if (selectedCount === 1 && onEditTags) || (selectedCount > 1 && onEditBatchTags)}
     <ContextMenuItem
       icon={Edit3}
       label={i18n.t("collection.editTagsTooltip")}
       onmouseenter={closeSubmenuImmediately}
-      onclick={() => { onEditTags?.(); onClose(); }}
+      onclick={() => {
+        if (selectedCount === 1) onEditTags?.();
+        else onEditBatchTags?.();
+        onClose();
+      }}
     />
   {/if}
 

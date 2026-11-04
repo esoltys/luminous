@@ -28,14 +28,31 @@
   import Input from "./Input.svelte";
   import ChipInput from "./ChipInput.svelte";
   import PlainChipInput from "./PlainChipInput.svelte";
+  import type { FileSource } from "../types";
+  import { filesStore } from "../stores/files.svelte";
+  import { scanFolder } from "./files/folderActions";
 
   interface Props {
-    songId: number;
+    songId?: number;
+    filePath?: string;
+    source?: FileSource;
+    folderPath?: string[];
+    folderName?: string;
+    fileName?: string;
     onClose: () => void;
     onSave?: () => void;
   }
 
-  let { songId, onClose, onSave }: Props = $props();
+  let {
+    songId,
+    filePath,
+    source,
+    folderPath,
+    folderName,
+    fileName,
+    onClose,
+    onSave
+  }: Props = $props();
 
   let title = $state("");
   let artist = $state("");
@@ -89,34 +106,63 @@
     isLoading = true;
     errorMsg = "";
     try {
-      const details = await invoke<{
-        id: number;
-        path: string;
-        title: string;
-        titlesort: string | null;
-        artist: string;
-        artistsort: string | null;
-        album: string;
-        albumsort: string | null;
-        album_artist: string;
-        album_artist_sort: string | null;
-        composer: string;
-        composersort: string | null;
-        genre: string;
-        genresort: string | null;
-        track: number | null;
-        disc: number | null;
-        year: number | null;
-        originalyear: number | null;
-        grouping: string;
-        bpm: number | null;
-        initial_key: string;
-        rating: number;
-        loved: number;
-        compilation: boolean;
-        art_embedded: boolean;
-        is_cue_track: boolean;
-      }>("get_song_details", { songId });
+      const details = songId != null
+        ? await invoke<{
+            id: number;
+            path: string;
+            title: string;
+            titlesort: string | null;
+            artist: string;
+            artistsort: string | null;
+            album: string;
+            albumsort: string | null;
+            album_artist: string;
+            album_artist_sort: string | null;
+            composer: string;
+            composersort: string | null;
+            genre: string;
+            genresort: string | null;
+            track: number | null;
+            disc: number | null;
+            year: number | null;
+            originalyear: number | null;
+            grouping: string;
+            bpm: number | null;
+            initial_key: string;
+            rating: number;
+            loved: number;
+            compilation: boolean;
+            art_embedded: boolean;
+            is_cue_track: boolean;
+          }>("get_song_details", { songId })
+        : await invoke<{
+            id: number;
+            path: string;
+            title: string;
+            titlesort: string | null;
+            artist: string;
+            artistsort: string | null;
+            album: string;
+            albumsort: string | null;
+            album_artist: string;
+            album_artist_sort: string | null;
+            composer: string;
+            composersort: string | null;
+            genre: string;
+            genresort: string | null;
+            track: number | null;
+            disc: number | null;
+            year: number | null;
+            originalyear: number | null;
+            grouping: string;
+            bpm: number | null;
+            initial_key: string;
+            rating: number;
+            loved: number;
+            compilation: boolean;
+            art_embedded: boolean;
+            is_cue_track: boolean;
+          }>("get_file_song_details", { path: filePath });
 
       title = details.title;
       titlesort = details.titlesort ?? "";
@@ -154,36 +200,72 @@
   async function handleSave() {
     isSaving = true;
     try {
-      await invoke("save_song_tags", {
-        songId,
-        title,
-        titlesort: titlesort.trim() || null,
-        artist,
-        artistsort: artistsort.trim() || null,
-        album,
-        albumsort: albumsort.trim() || null,
-        albumArtist,
-        albumArtistSort: albumArtistSort.trim() || null,
-        composer,
-        composersort: composersort.trim() || null,
-        genre,
-        genresort: genresort.trim() || null,
-        track,
-        disc,
-        year,
-        originalyear: originalYear,
-        grouping,
-        bpm,
-        initialKey,
-      });
+      if (songId != null) {
+        await invoke("save_song_tags", {
+          songId,
+          title,
+          titlesort: titlesort.trim() || null,
+          artist,
+          artistsort: artistsort.trim() || null,
+          album,
+          albumsort: albumsort.trim() || null,
+          albumArtist,
+          albumArtistSort: albumArtistSort.trim() || null,
+          composer,
+          composersort: composersort.trim() || null,
+          genre,
+          genresort: genresort.trim() || null,
+          track,
+          disc,
+          year,
+          originalyear: originalYear,
+          grouping,
+          bpm,
+          initialKey,
+        });
 
-      await collectionStore.refreshStats();
-      await collectionStore.refreshLibrary();
+        await collectionStore.refreshStats();
+        await collectionStore.refreshLibrary();
 
-      if (playlistsStore.activePlaylistId !== null && playlistsStore.activePlaylistId !== undefined) {
-        await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+        if (playlistsStore.activePlaylistId !== null && playlistsStore.activePlaylistId !== undefined) {
+          await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+        }
+        await playerStore.refreshPlaybackState();
+      } else if (filePath) {
+        await invoke("save_file_tags", {
+          path: filePath,
+          title,
+          titlesort: titlesort.trim() || null,
+          artist,
+          artistsort: artistsort.trim() || null,
+          album,
+          albumsort: albumsort.trim() || null,
+          albumArtist,
+          albumArtistSort: albumArtistSort.trim() || null,
+          composer,
+          composersort: composersort.trim() || null,
+          genre,
+          genresort: genresort.trim() || null,
+          track,
+          disc,
+          year,
+          originalyear: originalYear,
+          grouping,
+          bpm,
+          initialKey,
+        });
+
+        if (source && folderPath) {
+          await scanFolder(source, folderPath);
+          const resolvedFolder = folderName || (folderPath.length > 0 ? folderPath[folderPath.length - 1] : "");
+          const resolvedFile = fileName || title || (path ? path.split(/[\/\\]/).pop() : "") || "file";
+          toastStore.show(
+            i18n.t("files.savedAndScanning", { folder: resolvedFolder, file: resolvedFile }),
+            "success"
+          );
+        }
+        filesStore.reloadFolder();
       }
-      await playerStore.refreshPlaybackState();
 
       if (onSave) onSave();
       onClose();
@@ -198,6 +280,7 @@
   // Rating lives in the library database only (never written to the file),
   // so it saves immediately rather than waiting for the Save button.
   async function handleRate(value: number) {
+    if (songId == null) return;
     try {
       rating = await invoke<number>("set_song_rating", { songId, rating: value });
     } catch (e) {
@@ -206,6 +289,7 @@
   }
 
   async function handleSetLoved(value: number) {
+    if (songId == null) return;
     try {
       loved = await invoke<number>("set_song_loved", { songId, loved: value });
     } catch (e) {
@@ -218,7 +302,9 @@
   async function handleOpenFolder() {
     isOpeningFolder = true;
     try {
-      await invoke("open_song_folder", { songIds: [songId] });
+      if (songId != null) {
+        await invoke("open_song_folder", { songIds: [songId] });
+      }
     } catch (e: any) {
       console.error("Failed to open containing folder:", e);
       toastStore.show(i18n.t('tagEditor.openFolderFailedPrefix', {}, 'Failed to open folder: ') + e.toString(), "error");
@@ -228,6 +314,7 @@
   }
 
   async function handleClearArt() {
+    if (songId == null) return;
     isClearingArt = true;
     try {
       await invoke("clear_song_cover_art", { songId });
@@ -323,7 +410,7 @@
                 {artEmbedded ? i18n.t('tagEditor.artworkEmbedded') : i18n.t('tagEditor.artworkNotEmbedded')}
               </span>
             </div>
-            {#if !isRemoteSource}
+            {#if songId != null && !isRemoteSource}
               <Button
                 onclick={() => { showClearArtConfirm = true; }}
                 disabled={!artEmbedded || isSaving || isClearingArt}
@@ -493,10 +580,12 @@
             </FormField>
 
             <!-- Rating (library-only, saves immediately) -->
-            <div class="flex flex-col gap-1.5">
-              <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('rating.label')}</span>
-              <SongRating {rating} {loved} onRate={handleRate} onSetLoved={handleSetLoved} size="md" />
-            </div>
+            {#if songId != null}
+              <div class="flex flex-col gap-1.5">
+                <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('rating.label')}</span>
+                <SongRating {rating} {loved} onRate={handleRate} onSetLoved={handleSetLoved} size="md" />
+              </div>
+            {/if}
 
             <!-- Sort Overrides ("Sort As") -->
             <details class="col-span-2 group border border-brand-border rounded-lg bg-brand-sidebar/40 overflow-hidden mt-1">

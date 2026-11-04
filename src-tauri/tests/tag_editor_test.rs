@@ -162,3 +162,31 @@ fn test_clear_embedded_artwork() {
         .expect("art_embedded missing");
     assert!(!art_emb);
 }
+
+#[tokio::test]
+async fn test_get_file_song_details_unindexed_file() {
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let song_path = temp_dir.path().join("unindexed.mp3");
+    std::fs::copy(
+        PathBuf::from(FIXTURES_DIR).join("song_alpha.mp3"),
+        &song_path,
+    )
+    .expect("failed to copy fixture");
+
+    let details = luminous_lib::commands::tageditor::get_file_song_details(
+        song_path.to_string_lossy().to_string(),
+    )
+    .await
+    .expect("get_file_song_details should succeed on real audio file");
+
+    assert_eq!(details.id, 0);
+    assert_eq!(details.path, song_path.to_string_lossy().to_string());
+    assert!(!details.title.is_empty());
+}
+
+#[tokio::test]
+async fn test_open_paths_in_picard_empty_paths_rejected() {
+    // Picard with empty paths returns error
+    let res = luminous_lib::picard::launch_picard(Path::new("dummy_picard.exe"), &[]);
+    assert!(res.is_err());
+}

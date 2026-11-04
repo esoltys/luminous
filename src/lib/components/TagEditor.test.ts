@@ -250,4 +250,47 @@ describe("TagEditor.svelte", () => {
     // The modal itself stays open (unlike Save), so the user can keep editing.
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("loads and saves metadata for an unindexed file by path (#1887)", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_file_song_details") return { ...mockSongDetails, id: 0, path: "C:/Music/unscanned.flac", title: "Unscanned Track" };
+      if (cmd === "save_file_tags") return null;
+      if (cmd === "scan_source_folder") return null;
+      return null;
+    });
+
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole } = render(TagEditor, {
+      filePath: "C:/Music/unscanned.flac",
+      source: { kind: "folder", id: 1 },
+      folderPath: ["Music"],
+      folderName: "Music",
+      fileName: "unscanned.flac",
+      onClose,
+      onSave,
+    });
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("get_file_song_details", { path: "C:/Music/unscanned.flac" });
+    });
+
+    const titleInput = getByLabelText("Song Title") as HTMLInputElement;
+    expect(titleInput.value).toBe("Unscanned Track");
+
+    await fireEvent.input(titleInput, { target: { value: "Updated Unscanned Track" } });
+    await fireEvent.click(getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_file_tags", expect.objectContaining({
+        path: "C:/Music/unscanned.flac",
+        title: "Updated Unscanned Track",
+      }));
+    });
+    expect(invoke).toHaveBeenCalledWith("scan_source_folder", {
+      source: { kind: "folder", id: 1 },
+      path: ["Music"],
+    });
+    expect(onClose).toHaveBeenCalled();
+  });
 });

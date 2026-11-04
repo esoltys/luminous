@@ -138,7 +138,10 @@ export const de = {
     filterMatchSummary: {
       one: "{matched} von {count} Datei entspricht dem Filter.",
       other: "{matched} von {count} Dateien entsprechen dem Filter."
-    }
+    },
+    editTags: "Tags bearbeiten",
+    editTagsForFolder: "Tags für Ordner bearbeiten",
+    savedAndScanning: "Tags gespeichert. {folder} wird gescannt, um {file} zu Ihrer Bibliothek hinzuzufügen."
   },
   devices: {
     tabFiles: "Dateien",

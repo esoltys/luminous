@@ -28,6 +28,8 @@ class FilesStore {
   sources = $state<FileSourceSummary[]>([]);
   /** True once the folders and servers have been read. */
   loaded = $state(false);
+  /** Monotonic token incremented to force refreshing the file browser listings (#1887). */
+  reloadToken = $state(0);
   /** Instant filter query for the folder currently open in the Files view (#1886). */
   filterQuery = $state("");
   /** Number of entries matching `filterQuery` in the currently open folder. */
@@ -62,6 +64,10 @@ class FilesStore {
 
   clearFilter() {
     this.filterQuery = "";
+  }
+
+  reloadFolder() {
+    this.reloadToken++;
   }
 
   constructor() {

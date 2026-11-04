@@ -15,3 +15,16 @@ export async function openInPicard(songIds: number[]): Promise<void> {
     toastStore.show(String(err), "error");
   }
 }
+
+/**
+ * Launches MusicBrainz Picard directly with file or folder paths (#1887) —
+ * used when launching Picard from the Files view for folders or unindexed files.
+ */
+export async function openPathsInPicard(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  try {
+    await invoke("open_paths_in_picard", { paths });
+  } catch (err) {
+    toastStore.show(String(err), "error");
+  }
+}

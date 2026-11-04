@@ -9,14 +9,16 @@
     FolderOpenIcon,
     CopyIcon,
     ArrowSquareOutIcon,
+    PencilSimpleIcon,
   } from "phosphor-svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { filesStore } from "../../stores/files.svelte";
   import { playerStore } from "../../stores/player.svelte";
   import { toastStore } from "../../stores/toast.svelte";
+  import { picardStore } from "../../stores/picard.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import { deviceName } from "../../utils/devices";
-  import { openInPicard } from "../../utils/picard";
+  import { openInPicard, openPathsInPicard } from "../../utils/picard";
   import type { FileEntry, FileSource, Song } from "../../types";
   import ContextMenu from "../ContextMenu.svelte";
   import ContextMenuItem from "../ContextMenuItem.svelte";
@@ -46,6 +48,9 @@
     scannable,
     inColumn = false,
     onEditTags,
+    onEditFileTags,
+    onEditFolderTags,
+    onEditBatchTags,
     onClose,
   }: {
     x: number;
@@ -62,6 +67,9 @@
     /** The entry is a folder in a folder column, not a row of the open folder. */
     inColumn?: boolean;
     onEditTags: (songId: number) => void;
+    onEditFileTags?: (entry: FileEntry) => void;
+    onEditFolderTags?: (dir: FileEntry, dirPath: string[]) => void;
+    onEditBatchTags?: (entries: FileEntry[]) => void;
     onClose: () => void;
   } = $props();
 
@@ -103,7 +111,8 @@
   const canScanFiles = $derived(songIds.length === 0 && scannable && unscanned.length > 0);
   const canScanDir = $derived(isLocal && dir !== null && dir.status !== "excluded");
   const syncDevices = $derived(isLocal && dir?.location ? filesStore.devices : []);
-  const isEmpty = $derived(!dir && songIds.length === 0 && !canPlayOutside && !canScanFiles && locations.length === 0);
+  const canEditUnscanned = $derived(isLocal && !inColumn && !single?.isDir && (single?.kind === "audio" || unscanned.length > 0));
+  const isEmpty = $derived(!dir && songIds.length === 0 && !canPlayOutside && !canScanFiles && !canEditUnscanned && locations.length === 0);
 
   $effect(() => {
     if (isEmpty) onClose();
@@ -160,6 +169,21 @@
         onclick={() => runAndClose(() => addFolderToDeviceSync(device, dir.location!, dirName))}
       />
     {/each}
+    {#if isLocal && dir?.location}
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={PencilSimpleIcon}
+        label={i18n.t("files.editTagsForFolder")}
+        onclick={() => runAndClose(() => onEditFolderTags?.(dir, dirPath))}
+      />
+      <ContextMenuItem
+        icon={ArrowSquareOutIcon}
+        label={i18n.t("picard.openInPicard")}
+        disabled={!picardStore.available}
+        title={!picardStore.available ? i18n.t("picard.notFoundTooltip") : undefined}
+        onclick={() => runAndClose(() => openPathsInPicard([dir.location!]))}
+      />
+    {/if}
     {#if locations.length > 0}
       <ContextMenuDivider />
       {@render fileItems()}
@@ -181,7 +205,11 @@
       onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
       onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
       onEditTags={() => onEditTags(song.id)}
-      onOpenInPicard={() => openInPicard(songs!.map((s) => s.id))}
+      onEditBatchTags={() => onEditBatchTags?.(entries)}
+      onOpenInPicard={() => {
+        if (isLocal && locations.length > 0) openPathsInPicard(locations);
+        else openInPicard(songs!.map((s) => s.id));
+      }}
       trailing={locations.length > 0 ? fileItems : undefined}
       {onClose}
     />
@@ -204,7 +232,39 @@
     {#if canScanFiles}
       <ContextMenuItem icon={ArrowsClockwiseIcon} label={i18n.t("files.scanFolder")} onclick={() => runAndClose(() => scanFolder(source, path))} />
     {/if}
-    {#if (canPlayOutside || canScanFiles) && locations.length > 0}
+    {#if isLocal && single?.isDir && single.location}
+      <ContextMenuItem
+        icon={PencilSimpleIcon}
+        label={i18n.t("files.editTagsForFolder")}
+        onclick={() => runAndClose(() => onEditFolderTags?.(single!, [...path, single!.name]))}
+      />
+      <ContextMenuItem
+        icon={ArrowSquareOutIcon}
+        label={i18n.t("picard.openInPicard")}
+        disabled={!picardStore.available}
+        title={!picardStore.available ? i18n.t("picard.notFoundTooltip") : undefined}
+        onclick={() => runAndClose(() => openPathsInPicard([single!.location!]))}
+      />
+    {/if}
+    {#if isLocal && !inColumn && !single?.isDir && (single?.kind === "audio" || unscanned.length > 0)}
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={PencilSimpleIcon}
+        label={i18n.t("files.editTags")}
+        onclick={() => runAndClose(() => {
+          if (single) onEditFileTags?.(single);
+          else onEditBatchTags?.(entries);
+        })}
+      />
+      <ContextMenuItem
+        icon={ArrowSquareOutIcon}
+        label={i18n.t("picard.openInPicard")}
+        disabled={!picardStore.available || locations.length === 0}
+        title={!picardStore.available ? i18n.t("picard.notFoundTooltip") : undefined}
+        onclick={() => runAndClose(() => openPathsInPicard(locations))}
+      />
+    {/if}
+    {#if (canPlayOutside || canScanFiles || (isLocal && (single?.isDir || (!inColumn && (single?.kind === "audio" || unscanned.length > 0))))) && locations.length > 0}
       <ContextMenuDivider />
     {/if}
     {@render fileItems()}

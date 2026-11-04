@@ -20,6 +20,7 @@
   import type { ConnectedDevice, DirListing, FileEntry, FileMenuTarget } from "../../types";
   import Button from "../Button.svelte";
   import TagEditor from "../TagEditor.svelte";
+  import AlbumTagEditor from "../AlbumTagEditor.svelte";
   import FileBrowser from "./FileBrowser.svelte";
   import FileContextMenu from "./FileContextMenu.svelte";
   import DeviceView from "../devices/DeviceView.svelte";
@@ -36,15 +37,51 @@
   let selection = $state<string[]>([]);
   let menu = $state<(FileMenuTarget & { x: number; y: number }) | null>(null);
   let editingSongId = $state<number | null>(null);
-  let reloadToken = $state(0);
+  let editingFile = $state<{ path: string; name: string; folderPath: string[]; folderName: string } | null>(null);
+  let editingFolder = $state<{ folderName: string; songIds: number[]; filePaths: string[]; folderPath: string[] } | null>(null);
+  let editingBatch = $state<{ songIds: number[]; filePaths: string[]; folderPath: string[] } | null>(null);
   let devicePickerOpen = $state(false);
+
+  async function editFolderTags(dir: FileEntry, dirPath: string[]) {
+    if (!location) return;
+    try {
+      const dirListing = await invoke<DirListing>("list_source_dir", {
+        source: location.source,
+        path: dirPath,
+      });
+      const audioEntries = dirListing.entries.filter(
+        (e) => !e.isDir && (e.kind === "audio" || e.status === "inLibrary" || e.status === "notScanned")
+      );
+      const songIds = audioEntries.flatMap((e) => (e.songId !== null ? [e.songId] : []));
+      const filePaths = audioEntries.flatMap((e) => (e.songId === null && e.location !== null ? [e.location] : []));
+      if (songIds.length === 0 && filePaths.length === 0) {
+        toastStore.show(i18n.t("files.nothingToPlay"), "info");
+        return;
+      }
+      editingFolder = {
+        folderName: shownName(dir.name, dir.missingTag),
+        songIds,
+        filePaths,
+        folderPath: dirPath,
+      };
+    } catch (err) {
+      console.error("Failed to list folder for tag editing:", err);
+    }
+  }
+
+  function editBatchTags(entries: FileEntry[]) {
+    if (!location) return;
+    const songIds = entries.flatMap((e) => (e.songId !== null ? [e.songId] : []));
+    const filePaths = entries.flatMap((e) => (e.songId === null && e.location !== null ? [e.location] : []));
+    editingBatch = { songIds, filePaths, folderPath: location.path };
+  }
 
   // Statuses change when the library does; the source list is re-read
   // after every library change and scan, so follow it.
   let seenSources: unknown = null;
   $effect(() => {
     const sources = filesStore.sources;
-    if (seenSources !== null && sources !== seenSources) reloadToken++;
+    if (seenSources !== null && sources !== seenSources) filesStore.reloadFolder();
     seenSources = sources;
   });
 
@@ -212,7 +249,7 @@
         onactivate={activate}
         target={location.selectedName ?? null}
         bind:arrival={navigationStore.pendingFilesArrival}
-        {reloadToken}
+        reloadToken={filesStore.reloadToken}
         {unreachableLabel}
         bind:listing
         bind:selectedName
@@ -251,11 +288,57 @@
         inColumn={menu.inColumn}
         scannable={isLocal && !listing?.excluded}
         onEditTags={(id) => (editingSongId = id)}
+        onEditFileTags={(entry) => {
+          if (entry.location) {
+            editingFile = {
+              path: entry.location,
+              name: entry.name,
+              folderPath: location.path,
+              folderName: title,
+            };
+          }
+        }}
+        onEditFolderTags={editFolderTags}
+        onEditBatchTags={editBatchTags}
         onClose={() => (menu = null)}
       />
     {/if}
     {#if editingSongId !== null}
-      <TagEditor songId={editingSongId} onClose={() => (editingSongId = null)} />
+      <TagEditor songId={editingSongId} onClose={() => (editingSongId = null)} onSave={() => filesStore.reloadFolder()} />
+    {/if}
+    {#if editingFile !== null}
+      <TagEditor
+        filePath={editingFile.path}
+        fileName={editingFile.name}
+        folderPath={editingFile.folderPath}
+        folderName={editingFile.folderName}
+        source={location.source}
+        onClose={() => (editingFile = null)}
+        onSave={() => filesStore.reloadFolder()}
+      />
+    {/if}
+    {#if editingFolder !== null}
+      <AlbumTagEditor
+        title={i18n.t("files.editTagsForFolder")}
+        songIds={editingFolder.songIds}
+        filePaths={editingFolder.filePaths}
+        folderName={editingFolder.folderName}
+        folderPath={editingFolder.folderPath}
+        source={location.source}
+        onClose={() => (editingFolder = null)}
+        onSave={() => filesStore.reloadFolder()}
+      />
+    {/if}
+    {#if editingBatch !== null}
+      <AlbumTagEditor
+        title={i18n.t("files.editTags")}
+        songIds={editingBatch.songIds}
+        filePaths={editingBatch.filePaths}
+        folderPath={editingBatch.folderPath}
+        source={location.source}
+        onClose={() => (editingBatch = null)}
+        onSave={() => filesStore.reloadFolder()}
+      />
     {/if}
   {:else}
     <div class="flex-1 overflow-y-auto px-6 pt-4" class:pb-28={!!playerStore.currentSong} class:pb-12={!playerStore.currentSong}>

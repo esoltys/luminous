@@ -442,4 +442,70 @@ describe("AlbumTagEditor.svelte", () => {
     expect(getByLabelText("Album Artist")).toBeInTheDocument();
     expect(getByText("Artist A")).toBeInTheDocument();
   });
+
+  it("saves batch tags for file paths and scans containing folder (#1887)", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "save_batch_file_tags") return 2;
+      if (cmd === "scan_source_folder") return null;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole } = render(AlbumTagEditor, {
+      filePaths: ["C:/Music/01.flac", "C:/Music/02.flac"],
+      initialAlbum: "Folder Album",
+      initialAlbumArtist: "Folder Artist",
+      source: { kind: "folder", id: 1 },
+      folderPath: ["Music"],
+      folderName: "Music",
+      onClose,
+      onSave,
+    });
+
+    const albumInput = getByLabelText("Album Title") as HTMLInputElement;
+    expect(albumInput.value).toBe("Folder Album");
+
+    await fireEvent.input(albumInput, { target: { value: "Updated Folder Album" } });
+
+    const saveBtn = getByRole("button", { name: /save tags/i });
+    await fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_batch_file_tags", expect.objectContaining({
+        paths: ["C:/Music/01.flac", "C:/Music/02.flac"],
+        album: "Updated Folder Album",
+      }));
+      expect(invoke).toHaveBeenCalledWith("scan_source_folder", {
+        source: { kind: "folder", id: 1 },
+        path: ["Music"],
+      });
+      expect(onSave).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it("pre-populates fields with consensus metadata from songs when opened without initial values", async () => {
+    collectionStore.songs = [
+      { id: 201, album: "Punisher", album_artist: "Phoebe Bridgers", genre: "Indie Rock", year: 2020, disc: 1, compilation: false, art_embedded: true } as any,
+      { id: 202, album: "Punisher", album_artist: "Phoebe Bridgers", genre: "Indie Rock", year: 2020, disc: 1, compilation: false, art_embedded: true } as any,
+    ];
+
+    const { getByLabelText, getByText } = render(AlbumTagEditor, {
+      songIds: [201, 202],
+      onClose: vi.fn(),
+    });
+
+    await waitFor(() => {
+      const albumInput = getByLabelText("Album Title") as HTMLInputElement;
+      expect(albumInput.value).toBe("Punisher");
+      expect(getByText("Phoebe Bridgers")).toBeInTheDocument();
+      expect(getByText("Indie Rock")).toBeInTheDocument();
+      const yearInput = getByLabelText("Release Year") as HTMLInputElement;
+      expect(yearInput.value).toBe("2020");
+      const discInput = getByLabelText("Disc #") as HTMLInputElement;
+      expect(discInput.value).toBe("1");
+    });
+  });
 });
