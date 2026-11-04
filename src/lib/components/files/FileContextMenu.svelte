@@ -204,10 +204,8 @@
       onPlay={playSongs}
       onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
       onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
-      onEditTags={() => {
-        if (songs!.length === 1) onEditTags(song.id);
-        else onEditBatchTags?.(entries);
-      }}
+      onEditTags={() => onEditTags(song.id)}
+      onEditBatchTags={() => onEditBatchTags?.(entries)}
       onOpenInPicard={() => {
         if (isLocal && locations.length > 0) openPathsInPicard(locations);
         else openInPicard(songs!.map((s) => s.id));

@@ -524,4 +524,52 @@ describe("SongContextMenu.svelte", () => {
 
     expect(screen.queryByText("Start Song Radio")).toBeNull();
   });
+
+  it("renders Edit tags for single song when onEditTags is provided", async () => {
+    const onEditTags = vi.fn();
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      selectedCount: 1,
+      onPlay: () => {},
+      onEditTags,
+      onClose: () => {},
+    });
+
+    const item = await screen.findByText("Edit tags");
+    await fireEvent.click(item);
+    expect(onEditTags).toHaveBeenCalled();
+  });
+
+  it("does not render Edit tags when multiple songs are selected and only onEditTags is provided", () => {
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      selectedCount: 2,
+      onPlay: () => {},
+      onEditTags: () => {},
+      onClose: () => {},
+    });
+
+    expect(screen.queryByText("Edit tags")).toBeNull();
+  });
+
+  it("renders Edit tags and triggers onEditBatchTags when multiple songs are selected and onEditBatchTags is provided", async () => {
+    const onEditBatchTags = vi.fn();
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      selectedCount: 2,
+      onPlay: () => {},
+      onEditBatchTags,
+      onClose: () => {},
+    });
+
+    const item = await screen.findByText("Edit tags");
+    await fireEvent.click(item);
+    expect(onEditBatchTags).toHaveBeenCalled();
+  });
 });

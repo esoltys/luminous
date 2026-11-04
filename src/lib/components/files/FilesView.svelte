@@ -40,13 +40,7 @@
   let editingFile = $state<{ path: string; name: string; folderPath: string[]; folderName: string } | null>(null);
   let editingFolder = $state<{ folderName: string; songIds: number[]; filePaths: string[]; folderPath: string[] } | null>(null);
   let editingBatch = $state<{ songIds: number[]; filePaths: string[]; folderPath: string[] } | null>(null);
-  let reloadToken = $state(0);
   let devicePickerOpen = $state(false);
-
-  $effect(() => {
-    void filesStore.reloadToken;
-    reloadToken++;
-  });
 
   async function editFolderTags(dir: FileEntry, dirPath: string[]) {
     if (!location) return;
@@ -255,7 +249,7 @@
         onactivate={activate}
         target={location.selectedName ?? null}
         bind:arrival={navigationStore.pendingFilesArrival}
-        {reloadToken}
+        reloadToken={filesStore.reloadToken}
         {unreachableLabel}
         bind:listing
         bind:selectedName
@@ -310,7 +304,7 @@
       />
     {/if}
     {#if editingSongId !== null}
-      <TagEditor songId={editingSongId} onClose={() => (editingSongId = null)} onSave={() => reloadToken++} />
+      <TagEditor songId={editingSongId} onClose={() => (editingSongId = null)} onSave={() => filesStore.reloadFolder()} />
     {/if}
     {#if editingFile !== null}
       <TagEditor
@@ -320,7 +314,7 @@
         folderName={editingFile.folderName}
         source={location.source}
         onClose={() => (editingFile = null)}
-        onSave={() => reloadToken++}
+        onSave={() => filesStore.reloadFolder()}
       />
     {/if}
     {#if editingFolder !== null}
@@ -332,7 +326,7 @@
         folderPath={editingFolder.folderPath}
         source={location.source}
         onClose={() => (editingFolder = null)}
-        onSave={() => reloadToken++}
+        onSave={() => filesStore.reloadFolder()}
       />
     {/if}
     {#if editingBatch !== null}
@@ -343,7 +337,7 @@
         folderPath={editingBatch.folderPath}
         source={location.source}
         onClose={() => (editingBatch = null)}
-        onSave={() => reloadToken++}
+        onSave={() => filesStore.reloadFolder()}
       />
     {/if}
   {:else}
