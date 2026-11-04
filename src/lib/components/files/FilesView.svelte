@@ -81,7 +81,7 @@
   let seenSources: unknown = null;
   $effect(() => {
     const sources = filesStore.sources;
-    if (seenSources !== null && sources !== seenSources) reloadToken++;
+    if (seenSources !== null && sources !== seenSources) filesStore.reloadFolder();
     seenSources = sources;
   });
 
