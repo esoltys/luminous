@@ -485,4 +485,27 @@ describe("AlbumTagEditor.svelte", () => {
       expect(onClose).toHaveBeenCalled();
     });
   });
+
+  it("pre-populates fields with consensus metadata from songs when opened without initial values", async () => {
+    collectionStore.songs = [
+      { id: 201, album: "Punisher", album_artist: "Phoebe Bridgers", genre: "Indie Rock", year: 2020, disc: 1, compilation: false, art_embedded: true } as any,
+      { id: 202, album: "Punisher", album_artist: "Phoebe Bridgers", genre: "Indie Rock", year: 2020, disc: 1, compilation: false, art_embedded: true } as any,
+    ];
+
+    const { getByLabelText, getByText } = render(AlbumTagEditor, {
+      songIds: [201, 202],
+      onClose: vi.fn(),
+    });
+
+    await waitFor(() => {
+      const albumInput = getByLabelText("Album Title") as HTMLInputElement;
+      expect(albumInput.value).toBe("Punisher");
+      expect(getByText("Phoebe Bridgers")).toBeInTheDocument();
+      expect(getByText("Indie Rock")).toBeInTheDocument();
+      const yearInput = getByLabelText("Release Year") as HTMLInputElement;
+      expect(yearInput.value).toBe("2020");
+      const discInput = getByLabelText("Disc #") as HTMLInputElement;
+      expect(discInput.value).toBe("1");
+    });
+  });
 });

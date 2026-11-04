@@ -53,7 +53,7 @@
         (e) => !e.isDir && (e.kind === "audio" || e.status === "inLibrary" || e.status === "notScanned")
       );
       const songIds = audioEntries.flatMap((e) => (e.songId !== null ? [e.songId] : []));
-      const filePaths = audioEntries.flatMap((e) => (e.location !== null ? [e.location] : []));
+      const filePaths = audioEntries.flatMap((e) => (e.songId === null && e.location !== null ? [e.location] : []));
       if (songIds.length === 0 && filePaths.length === 0) {
         toastStore.show(i18n.t("files.nothingToPlay"), "info");
         return;
@@ -72,7 +72,7 @@
   function editBatchTags(entries: FileEntry[]) {
     if (!location) return;
     const songIds = entries.flatMap((e) => (e.songId !== null ? [e.songId] : []));
-    const filePaths = entries.flatMap((e) => (e.location !== null ? [e.location] : []));
+    const filePaths = entries.flatMap((e) => (e.songId === null && e.location !== null ? [e.location] : []));
     editingBatch = { songIds, filePaths, folderPath: location.path };
   }
 

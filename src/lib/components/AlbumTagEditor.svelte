@@ -24,7 +24,7 @@
   import Input from "./Input.svelte";
   import ChipInput from "./ChipInput.svelte";
   import CoverArt from "./CoverArt.svelte";
-  import type { FileSource } from "../types";
+  import type { FileSource, Song } from "../types";
   import { filesStore } from "../stores/files.svelte";
   import { scanFolder } from "./files/folderActions";
 
@@ -77,7 +77,7 @@
     onSave
   }: Props = $props();
 
-  const tracksCount = $derived((songIds?.length ?? 0) || (filePaths?.length ?? 0));
+  const tracksCount = $derived((songIds?.length ?? 0) + (filePaths?.length ?? 0));
 
   // svelte-ignore state_referenced_locally
   let album = $state(initialAlbum ?? "");
@@ -91,6 +91,8 @@
   let disc = $state<number | null>(initialDisc);
   // svelte-ignore state_referenced_locally
   let compilation = $state(initialCompilation ?? false);
+  // svelte-ignore state_referenced_locally
+  let hasEmbeddedArtState = $state(hasEmbeddedArt);
 
   // svelte-ignore state_referenced_locally
   let albumsort = $state(initialAlbumSort ?? "");
@@ -111,34 +113,133 @@
     return false;
   });
 
+  function consensusString(list: (string | null | undefined)[]): string {
+    const nonBlank = list.map((s) => s?.trim()).filter((s): s is string => !!s);
+    if (nonBlank.length === 0) return "";
+    const first = nonBlank[0];
+    return nonBlank.every((s) => s === first) ? first : "";
+  }
+
+  function consensusNumber(list: (number | null | undefined)[]): number | null {
+    const present = list.filter((n): n is number => n !== null && n !== undefined && n > 0);
+    if (present.length === 0) return null;
+    const first = present[0];
+    return present.every((n) => n === first) ? first : null;
+  }
+
   onMount(async () => {
     // Best-effort preload for the genre field's autocomplete — a failure
     // here shouldn't block or break the editor itself.
     if (!tagsStore.loaded) tagsStore.load().catch(() => {});
-    if (filePaths.length > 0 && songIds.length === 0 && !initialAlbum && !initialAlbumArtist) {
+    if (!initialAlbum && !initialAlbumArtist) {
       try {
-        const details = await invoke<{
-          album: string;
-          albumsort: string | null;
-          album_artist: string;
-          album_artist_sort: string | null;
-          genre: string;
-          genresort: string | null;
-          year: number | null;
-          disc: number | null;
-          compilation: boolean;
-        }>("get_file_song_details", { path: filePaths[0] });
-        if (details) {
-          album = details.album || "";
-          albumsort = details.albumsort ?? "";
-          albumArtist = details.album_artist || "";
-          albumArtistSort = details.album_artist_sort ?? "";
-          genre = details.genre || "";
-          genresort = details.genresort ?? "";
-          year = details.year;
-          disc = details.disc;
-          compilation = details.compilation;
-          previousAlbumArtist = albumArtist;
+        let librarySongs: Song[] = [];
+        if (songIds.length > 0) {
+          const inStore = songIds
+            .map((id) => collectionStore.songs.find((s) => s.id === id))
+            .filter((s): s is Song => !!s);
+          if (inStore.length === songIds.length) {
+            librarySongs = inStore;
+          } else {
+            librarySongs = (await invoke<Song[]>("get_songs_by_ids", { songIds })) ?? [];
+          }
+        }
+
+        const fileSongDetails: Array<{
+          album?: string;
+          albumsort?: string | null;
+          album_artist?: string;
+          album_artist_sort?: string | null;
+          genre?: string;
+          genresort?: string | null;
+          year?: number | null;
+          disc?: number | null;
+          compilation?: boolean;
+          art_embedded?: boolean;
+        }> = [];
+
+        for (const p of filePaths) {
+          try {
+            const details = await invoke<{
+              album: string;
+              albumsort: string | null;
+              album_artist: string;
+              album_artist_sort: string | null;
+              genre: string;
+              genresort: string | null;
+              year: number | null;
+              disc: number | null;
+              compilation: boolean;
+              art_embedded: boolean;
+            }>("get_file_song_details", { path: p });
+            if (details) fileSongDetails.push(details);
+          } catch (err) {
+            console.error("Failed to get file tags:", err);
+          }
+        }
+
+        const allItems = [
+          ...librarySongs.map((s) => ({
+            album: s.album,
+            albumsort: s.albumsort,
+            album_artist: s.album_artist || s.artist,
+            album_artist_sort: s.album_artist_sort,
+            genre: s.genre,
+            genresort: s.genresort,
+            year: s.year,
+            disc: s.disc,
+            compilation: s.compilation,
+            art_embedded: s.art_embedded,
+          })),
+          ...fileSongDetails.map((d) => ({
+            album: d.album,
+            albumsort: d.albumsort,
+            album_artist: d.album_artist,
+            album_artist_sort: d.album_artist_sort,
+            genre: d.genre,
+            genresort: d.genresort,
+            year: d.year,
+            disc: d.disc,
+            compilation: d.compilation,
+            art_embedded: d.art_embedded,
+          })),
+        ];
+
+        if (allItems.length > 0) {
+          const commonAlbum = consensusString(allItems.map((i) => i.album));
+          if (commonAlbum) album = commonAlbum;
+
+          const commonAlbumSort = consensusString(allItems.map((i) => i.albumsort));
+          if (commonAlbumSort) albumsort = commonAlbumSort;
+
+          const commonAlbumArtist = consensusString(allItems.map((i) => i.album_artist));
+          if (commonAlbumArtist) {
+            albumArtist = commonAlbumArtist;
+            previousAlbumArtist = commonAlbumArtist;
+          }
+
+          const commonAlbumArtistSort = consensusString(allItems.map((i) => i.album_artist_sort));
+          if (commonAlbumArtistSort) albumArtistSort = commonAlbumArtistSort;
+
+          const commonGenre = consensusString(allItems.map((i) => i.genre));
+          if (commonGenre) genre = commonGenre;
+
+          const commonGenreSort = consensusString(allItems.map((i) => i.genresort));
+          if (commonGenreSort) genresort = commonGenreSort;
+
+          const commonYear = consensusNumber(allItems.map((i) => i.year));
+          if (commonYear !== null) year = commonYear;
+
+          const commonDisc = consensusNumber(allItems.map((i) => i.disc));
+          if (commonDisc !== null) disc = commonDisc;
+
+          if (allItems.some((i) => i.compilation)) {
+            compilation = allItems.every((i) => i.compilation);
+          }
+
+          if (allItems.some((i) => i.art_embedded)) {
+            hasEmbeddedArtState = true;
+          }
         }
       } catch (err) {
         console.error("Failed to preload file metadata for batch tag editing:", err);
@@ -283,17 +384,17 @@
         {/if}
 
         <div class="flex items-center gap-3">
-          <CoverArt songId={songIds[0]} artEmbedded={hasEmbeddedArt} artAutomatic={initialArtAutomatic} artManual={initialArtManual} sizeClass="w-12 h-12 rounded" />
+          <CoverArt songId={songIds[0]} artEmbedded={hasEmbeddedArtState} artAutomatic={initialArtAutomatic} artManual={initialArtManual} sizeClass="w-12 h-12 rounded" />
           <div class="flex-1 flex flex-col gap-1 min-w-0">
             <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('albumTagEditor.artworkField')}</span>
             <span class="text-xs text-brand-text-secondary">
-              {hasEmbeddedArt ? i18n.t('albumTagEditor.artworkEmbedded') : i18n.t('albumTagEditor.artworkNotEmbedded')}
+              {hasEmbeddedArtState ? i18n.t('albumTagEditor.artworkEmbedded') : i18n.t('albumTagEditor.artworkNotEmbedded')}
             </span>
           </div>
           {#if !isRemoteSource}
             <Button
               onclick={() => { showClearArtConfirm = true; }}
-              disabled={!hasEmbeddedArt || isSaving || isClearingArt}
+              disabled={!hasEmbeddedArtState || isSaving || isClearingArt}
               variant="secondary"
               size="sm"
             >
