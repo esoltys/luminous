@@ -15,7 +15,6 @@
   import FileBrowser from "../files/FileBrowser.svelte";
   import { deviceIcon } from "../files/sourceIcon";
   import { shownName } from "../files/shownName";
-  import { parseFileFilter } from "../files/fileFilter";
   import { filesStore } from "../../stores/files.svelte";
   import DeviceStorageGauge from "./DeviceStorageGauge.svelte";
   import DeviceSyncSettings from "./DeviceSyncSettings.svelte";
@@ -327,7 +326,7 @@
               <span class="line-clamp-2 min-w-0">
                 {#if selection.length > 0}
                   {i18n.plural("devices.selected", selection.length)}
-                {:else if parseFileFilter(filesStore.filterQuery).isActive}
+                {:else if filesStore.isFilterActive}
                   {i18n.plural("files.filterMatchSummary", filesStore.filterTotalCount, { matched: filesStore.filterMatchCount })}
                 {:else}
                   {i18n.t("devices.onlyRemovesOwn")}

@@ -44,7 +44,7 @@
 
   const isFilesFilterMode = $derived(filesStore.isFilteringFolder);
   const parsedFilesFilter = $derived(parseFileFilter(filesStore.filterQuery));
-  const libraryEscapeQuery = $derived(parsedFilesFilter.freeText || filesStore.filterQuery.trim());
+  const libraryEscapeQuery = $derived(parsedFilesFilter.freeText.trim());
 
   function toggleFilterToken(token: string) {
     const current = filesStore.filterQuery.trim();

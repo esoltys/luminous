@@ -24,7 +24,6 @@
   import FileContextMenu from "./FileContextMenu.svelte";
   import DeviceView from "../devices/DeviceView.svelte";
   import { addFolderToDeviceSync, openFile, playFolder, reveal, revealLabel, scanFolder } from "./folderActions";
-  import { parseFileFilter } from "./fileFilter";
 
   const location = $derived(navigationStore.filesLocation);
   const openDevice = $derived(
@@ -114,7 +113,7 @@
             }),
       ];
     }
-    if (parseFileFilter(filesStore.filterQuery).isActive) {
+    if (filesStore.isFilterActive) {
       return [
         i18n.plural("files.filterMatchSummary", l.entries.length, {
           matched: filesStore.filterMatchCount,

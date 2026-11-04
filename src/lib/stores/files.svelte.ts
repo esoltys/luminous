@@ -5,6 +5,7 @@ import { devicesStore } from "./devices.svelte";
 import { deviceName } from "../utils/devices";
 import { collectionStore } from "./collection.svelte";
 import { navigationStore } from "./navigation.svelte";
+import { parseFileFilter } from "../components/files/fileFilter";
 
 /** Whether `a` and `b` are the same source. Storages of one device count as one source. */
 export function sameSource(a: FileSource, b: FileSource): boolean {
@@ -52,6 +53,11 @@ class FilesStore {
     if (navigationStore.activeTab !== "files" || !loc) return false;
     if (loc.source.kind === "device" && loc.deviceTab === "sync") return false;
     return true;
+  }
+
+  /** True when the active folder filter has at least one active extension, status or text term. */
+  get isFilterActive(): boolean {
+    return parseFileFilter(this.filterQuery).isActive;
   }
 
   clearFilter() {
