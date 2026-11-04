@@ -77,6 +77,9 @@ the same file.
 
 To measure an older release, build it in its own worktree and pass that exe with `--exe`. The
 staleness check and the CSV's commit column then use that worktree's checkout, not this one.
+If your local Cargo config shares one target dir across worktrees (`build.target-dir`), build
+both sides with `CARGO_TARGET_DIR=target` so each exe stays in its own checkout: otherwise the
+second build overwrites the first, and an exe outside any checkout gets labelled as this one.
 Builds before #1197 save window placement in the real profile even in a scratch run; the script
 restores that file afterwards.
 
