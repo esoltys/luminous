@@ -314,7 +314,11 @@ export class AppProfile {
   readonly dataDir: string;
   readonly webviewDir: string;
   readonly dbPath: string;
-  readonly exe: string;
+  private exePath?: string;
+  /** Resolved on first use: asking Cargo for its target dir can be slow (rustup may install the pinned toolchain). */
+  get exe(): string {
+    return (this.exePath ??= defaultReleaseExe());
+  }
   readonly port: number;
   /**
    * Where the app's stdout/stderr go (its `log::` output, e.g. the stall watchdog's warnings). Kept beside the
@@ -335,7 +339,7 @@ export class AppProfile {
     mkdirSync(this.dataDir, { recursive: true });
     mkdirSync(this.webviewDir, { recursive: true });
 
-    this.exe = options?.exe ?? defaultReleaseExe();
+    this.exePath = options?.exe;
     const envPortStr = process.env.LUMINOUS_REMOTE_DEVTOOLS_PORT || process.env.CDP_PORT;
     const parsedEnvPort = envPortStr ? Number.parseInt(envPortStr, 10) : NaN;
     this.port =
