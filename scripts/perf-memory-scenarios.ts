@@ -70,8 +70,10 @@
  *   --window <WxH>       pinned outer window size in physical pixels (default 1400x900)
  *   --samples <n>        readings per scenario, median recorded (default 5)
  *   --interval <sec>     seconds between readings (default 5)
- *   --exe <path>         default target/release/LuminousMusicPlayer.exe; a build from another checkout
- *                        (e.g. a baseline worktree) is checked and labelled against that checkout
+ *   --exe <path>         default <cargo target dir>/release/LuminousMusicPlayer.exe; a build from another
+ *                        checkout (e.g. a baseline worktree) is checked and labelled against that checkout.
+ *                        An exe in a target dir shared by several worktrees can't be traced to one, so
+ *                        it's labelled as this checkout — build perf runs with CARGO_TARGET_DIR=target.
  *   --keep-profiles      leave the scratch profiles in the temp folder for inspection (they hold
  *                        the remote servers' passwords, so they're deleted by default)
  *   --allow-busy         measure even while rustc/cargo are running (the readings won't be comparable)
@@ -111,6 +113,7 @@ import {
   canonicalView,
   checkPreconditions as checkProfilePreconditions,
   defaultDbPath,
+  defaultReleaseExe,
   protectRealWindowState,
   TRACK_COLUMNS,
 } from "./throwaway-profile";
@@ -142,7 +145,7 @@ function parseArgs() {
   for (const s of sources) {
     if (!SOURCES.includes(s as Source)) throw new Error(`Unknown source "${s}" — use ${SOURCES.join(", ")}.`);
   }
-  const exe = get("--exe") ?? path.join(REPO_ROOT, "target", "release", "LuminousMusicPlayer.exe");
+  const exe = get("--exe") ?? defaultReleaseExe();
   return {
     track,
     sources: sources as Source[],

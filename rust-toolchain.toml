@@ -1,0 +1,7 @@
+# Every checkout and worktree builds with the same compiler, so `rustup update`
+# can't silently change a long-lived worktree's toolchain mid-branch, and local
+# builds match CI. Bump deliberately (and fix any new clippy lints in the same PR).
+[toolchain]
+channel = "1.99.1"
+profile = "minimal"
+components = ["clippy", "rustfmt"]

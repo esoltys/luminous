@@ -116,7 +116,7 @@ export interface WindowDimensions {
 }
 
 export interface ProfileOptions {
-  /** Path to the Luminous executable. Defaults to target/release/LuminousMusicPlayer.exe. */
+  /** Path to the Luminous executable. Defaults to {@link defaultReleaseExe}. */
   exe?: string;
   /** Remote debugging port for CDP. Defaults to 9222. */
   port?: number;
@@ -270,6 +270,26 @@ export function protectRealWindowState(): () => void {
   };
 }
 
+/**
+ * The release exe Cargo builds for `repoRoot`. Asks Cargo for its target dir rather than assuming
+ * `<repoRoot>/target`, because a local `.cargo/config.toml` `build.target-dir` or `CARGO_TARGET_DIR`
+ * can point every worktree at one shared dir. Falls back to `<repoRoot>/target` if cargo isn't on PATH.
+ */
+export function defaultReleaseExe(repoRoot: string = REPO_ROOT): string {
+  let targetDir = path.join(repoRoot, "target");
+  try {
+    const metadata = execFileSync("cargo", ["metadata", "--format-version", "1", "--no-deps"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    targetDir = JSON.parse(metadata).target_directory;
+  } catch {
+    // keep the conventional location
+  }
+  return path.join(targetDir, "release", "LuminousMusicPlayer.exe");
+}
+
 /** Validates that environment preconditions for driving Luminous are met. */
 export function checkPreconditions(exe: string): void {
   if (process.platform !== "win32") {
@@ -294,7 +314,11 @@ export class AppProfile {
   readonly dataDir: string;
   readonly webviewDir: string;
   readonly dbPath: string;
-  readonly exe: string;
+  private exePath?: string;
+  /** Resolved on first use: asking Cargo for its target dir can be slow (rustup may install the pinned toolchain). */
+  get exe(): string {
+    return (this.exePath ??= defaultReleaseExe());
+  }
   readonly port: number;
   /**
    * Where the app's stdout/stderr go (its `log::` output, e.g. the stall watchdog's warnings). Kept beside the
@@ -315,7 +339,7 @@ export class AppProfile {
     mkdirSync(this.dataDir, { recursive: true });
     mkdirSync(this.webviewDir, { recursive: true });
 
-    this.exe = options?.exe ?? path.join(REPO_ROOT, "target", "release", "LuminousMusicPlayer.exe");
+    this.exePath = options?.exe;
     const envPortStr = process.env.LUMINOUS_REMOTE_DEVTOOLS_PORT || process.env.CDP_PORT;
     const parsedEnvPort = envPortStr ? Number.parseInt(envPortStr, 10) : NaN;
     this.port =

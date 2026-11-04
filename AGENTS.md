@@ -106,7 +106,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 - **Cargo security & licence audit**: `bun run audit:cargo` (or `cargo deny check`)
 - **Headless UI inspection**: run `bun run tauri dev` and connect via Chrome DevTools Protocol (`scripts/monitor-cdp.ts` on port 9222) or the in-app scripting API (`src/lib/scripting/`). See [docs/TESTING.md](docs/TESTING.md).
 - **Release build**: `bun run tauri build`
-- **MSIX build (Windows)**: `bun run tauri:windows:build`, but only after `bun run tauri build` (or a `cargo build --release`) has produced the exe — and only with `CARGO_TARGET_DIR` set to the workspace-root `target/` dir, or it looks in the wrong place. See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+- **MSIX build (Windows)**: `bun run tauri:windows:build`, but only after `bun run tauri build` (or a `cargo build --release`) has produced the exe — and only with `CARGO_TARGET_DIR` set to the target dir the exe was built into (the workspace-root `target/`, or a shared `build.target-dir` from local Cargo config), or it looks in the wrong place. See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## Testing
 
