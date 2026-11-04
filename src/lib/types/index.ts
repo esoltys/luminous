@@ -358,6 +358,14 @@ export interface FileNavigationTarget {
   exact: boolean;
 }
 
+/** A folder in a watched directory or media server matching a global search query (`search_source_folders`, #1886). */
+export interface FolderSearchResult {
+  source: FileSource;
+  path: string[];
+  name: string;
+  breadcrumb: string;
+}
+
 /** What a file or folder is to the library. Word it in the UI; never show the code. */
 export type FileEntryStatus = "inLibrary" | "notScanned" | "albumArt" | "notAudio" | "excluded" | "notFromLuminous";
 

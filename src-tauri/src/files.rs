@@ -416,6 +416,211 @@ pub struct FileNavigationTarget {
     pub exact: bool,
 }
 
+/// A folder in a watched directory or media server matching a global search
+/// query (#1886).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderSearchResult {
+    pub source: FileSource,
+    /// Folder names from the source's root, as [`list_dir`] takes them.
+    pub path: Vec<String>,
+    /// The folder's own name (or the source's display name at the root).
+    pub name: String,
+    /// The source and path leading to this folder (e.g. "Music / Katatonia").
+    pub breadcrumb: String,
+}
+
+/// Searches watched folders and media server directories for folders whose
+/// names match `query` (case-insensitive substring), up to `limit` results.
+/// Exact and prefix matches sort first, then shorter paths (top-level artist
+/// or album folders before deeper subfolders), then alphabetically.
+pub fn search_folders(
+    conn: &Connection,
+    db: &Arc<Database>,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<FolderSearchResult>> {
+    let needle = query.trim().to_lowercase();
+    if needle.is_empty() || limit == 0 {
+        return Ok(Vec::new());
+    }
+
+    let mut seen: HashSet<(String, Vec<String>)> = HashSet::new();
+    let mut matches: Vec<(u8, usize, String, FolderSearchResult)> = Vec::new();
+
+    let mut consider = |source: FileSource, source_name: &str, path: Vec<String>| {
+        let name = path
+            .last()
+            .map(String::as_str)
+            .unwrap_or(source_name)
+            .trim();
+        if name.is_empty() {
+            return;
+        }
+        let name_lower = name.to_lowercase();
+        if !name_lower.contains(&needle) {
+            return;
+        }
+        let source_key = match &source {
+            FileSource::Folder { id } => format!("folder:{id}"),
+            FileSource::Subsonic { id } => format!("subsonic:{id}"),
+            FileSource::Webdav { id } => format!("webdav:{id}"),
+            FileSource::Device { id, .. } => format!("device:{id}"),
+        };
+        let dedup_path: Vec<String> = path
+            .iter()
+            .map(|segment| library_paths::key(segment))
+            .collect();
+        if !seen.insert((source_key, dedup_path)) {
+            return;
+        }
+
+        let rank = if name_lower == needle {
+            0
+        } else if name_lower.starts_with(&needle) {
+            1
+        } else {
+            2
+        };
+        let breadcrumb = if path.is_empty() {
+            source_name.to_string()
+        } else {
+            let mut parts = Vec::with_capacity(path.len() + 1);
+            parts.push(source_name);
+            for seg in &path {
+                parts.push(seg.as_str());
+            }
+            parts.join(" / ")
+        };
+        let depth = path.len();
+        let sort_name = name_lower;
+        matches.push((
+            rank,
+            depth,
+            sort_name,
+            FolderSearchResult {
+                source,
+                name: name.to_string(),
+                path,
+                breadcrumb,
+            },
+        ));
+    };
+
+    let dirs = CollectionScanner::new(Arc::clone(db)).get_directories()?;
+    let watched: Vec<(i64, String, String)> = dirs
+        .into_iter()
+        .map(|d| {
+            let name = directory_display_name(&d);
+            (d.id, d.path, name)
+        })
+        .collect();
+
+    for (id, _, name) in &watched {
+        consider(FileSource::Folder { id: *id }, name, Vec::new());
+    }
+
+    // Local library song folders under their deepest watched folder.
+    let mut local_stmt = conn.prepare(&format!(
+        "SELECT DISTINCT path FROM songs WHERE source IN ({}) AND unavailable = 0 AND path IS NOT NULL",
+        *LOCAL_SOURCES_SQL
+    ))?;
+    let local_paths = local_stmt
+        .query_map([], |r| r.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    for song_path in local_paths {
+        let deepest = watched
+            .iter()
+            .filter_map(|(id, root, name)| {
+                Some((
+                    *id,
+                    name.as_str(),
+                    library_paths::segments_under(&song_path, root)?,
+                ))
+            })
+            .min_by_key(|(_, _, segs)| segs.len());
+        if let Some((id, source_name, mut segs)) = deepest {
+            segs.pop(); // drop file name
+            for depth in 1..=segs.len() {
+                consider(
+                    FileSource::Folder { id },
+                    source_name,
+                    segs[..depth].to_vec(),
+                );
+            }
+        }
+    }
+
+    // Subsonic servers: artist and album folders.
+    for (id, server_name, _) in servers(conn, "subsonic_servers")? {
+        consider(FileSource::Subsonic { id }, &server_name, Vec::new());
+        for song in subsonic_songs(conn, id)? {
+            let (artist, album) = subsonic_place(&song);
+            if !artist.is_empty() {
+                consider(
+                    FileSource::Subsonic { id },
+                    &server_name,
+                    vec![artist.clone()],
+                );
+            }
+            if !album.is_empty() {
+                consider(
+                    FileSource::Subsonic { id },
+                    &server_name,
+                    vec![artist, album],
+                );
+            }
+        }
+    }
+
+    // WebDAV servers: cached song folder hierarchies.
+    for (id, server_name, _) in servers(conn, "webdav_servers")? {
+        consider(FileSource::Webdav { id }, &server_name, Vec::new());
+        let root_path: Option<String> = conn
+            .query_row(
+                "SELECT remote_path FROM webdav_servers WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let Some(root_path) = root_path else {
+            continue;
+        };
+        let mut dav_stmt = conn.prepare(
+            "SELECT DISTINCT c.remote_path FROM webdav_cache c
+             JOIN songs s ON s.id = c.song_id
+             WHERE c.server_id = ?1 AND s.unavailable = 0",
+        )?;
+        let hrefs = dav_stmt
+            .query_map(params![id], |r| r.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        for href in hrefs {
+            if let Some(mut segs) = webdav_names_under(&root_path, &href) {
+                segs.pop(); // drop file name
+                for depth in 1..=segs.len() {
+                    consider(
+                        FileSource::Webdav { id },
+                        &server_name,
+                        segs[..depth].to_vec(),
+                    );
+                }
+            }
+        }
+    }
+
+    matches.sort_by(|a, b| {
+        a.0.cmp(&b.0)
+            .then_with(|| a.1.cmp(&b.1))
+            .then_with(|| a.2.cmp(&b.2))
+            .then_with(|| a.3.breadcrumb.cmp(&b.3.breadcrumb))
+    });
+    Ok(matches
+        .into_iter()
+        .take(limit)
+        .map(|(_, _, _, r)| r)
+        .collect())
+}
+
 /// Where the library song `song_id` is in the Files view. `None` when it has
 /// no place there: a stream or radio station, a file opened from outside
 /// the library or outside every watched folder, an unknown id. Never a
@@ -1863,5 +2068,56 @@ mod tests {
             webdav_dir_href("dav", &["AC/DC?".into(), "Live #1".into()]),
             "/dav/AC%2FDC%3F/Live%20%231/"
         );
+    }
+
+    #[test]
+    fn search_folders_finds_watched_and_nested_folders_across_sources() {
+        let f = fixture(
+            &[
+                "Katatonia/Viva Emptiness/01.flac",
+                "Metal/Katatonia/Dead End Kings/01.flac",
+                "Opeth/Damnation/01.flac",
+            ],
+            &[
+                "Katatonia/Viva Emptiness/01.flac",
+                "Metal/Katatonia/Dead End Kings/01.flac",
+                "Opeth/Damnation/01.flac",
+            ],
+        );
+        let conn = f.db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO webdav_servers (id, name, url, remote_path) VALUES (4, 'Nextcloud', 'https://nas', '/dav/Music/')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (source, path, title) VALUES (?1, 'https://nas/x', 'dav')",
+            params![SongSource::WebDav as i32],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO webdav_cache (server_id, remote_path, song_id)
+             VALUES (4, '/dav/Music/Live/Katatonia%20-%20Bootlegs/01.flac', last_insert_rowid())",
+            [],
+        )
+        .unwrap();
+
+        let results = search_folders(&conn, &f.db, "katat", 10).unwrap();
+        let summary: Vec<(&str, &str)> = results
+            .iter()
+            .map(|r| (r.name.as_str(), r.breadcrumb.as_str()))
+            .collect();
+        assert_eq!(
+            summary,
+            [
+                ("Katatonia", "music / Katatonia"),
+                ("Katatonia", "music / Metal / Katatonia"),
+                (
+                    "Katatonia - Bootlegs",
+                    "Nextcloud / Live / Katatonia - Bootlegs"
+                ),
+            ]
+        );
+        assert!(search_folders(&conn, &f.db, "   ", 10).unwrap().is_empty());
     }
 }

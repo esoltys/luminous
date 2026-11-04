@@ -122,7 +122,23 @@ export const en = {
       other: "{selected} of {count} files selected."
     },
     viewInFiles: "View in Files",
-    movedShowingNearest: "It's no longer where Luminous last saw it. Showing the nearest folder that's still there."
+    movedShowingNearest: "It's no longer where Luminous last saw it. Showing the nearest folder that's still there.",
+    filterPlaceholder: "Filter {folder}…",
+    filterCountBadge: "{matched} of {total}",
+    clearFilter: "Clear filter",
+    filterHelpTitle: "Filter this folder by name, type or library status",
+    filterHelpTypeLabel: "Type:",
+    filterHelpStatusLabel: "Status:",
+    searchWholeLibraryFor: "Search your whole library for \"{query}\"",
+    filterEmptyTitle: "Nothing in this folder matches {query}.",
+    filterEmptyHint: {
+      one: "Clear the filter to see {count} file, or change it to look for something else.",
+      other: "Clear the filter to see all {count} files, or change it to look for something else."
+    },
+    filterMatchSummary: {
+      one: "{matched} of {count} file matches the filter.",
+      other: "{matched} of {count} files match the filter."
+    }
   },
   devices: {
     tabFiles: "Files",
@@ -367,7 +383,8 @@ export const en = {
     filterSyntaxHint: "💡 Filter Syntax Hint",
     filterFieldsLabel: "Fields:",
     filterOperatorsLabel: "Operators:",
-    removeRecentSearchTooltip: "Remove from recent searches"
+    removeRecentSearchTooltip: "Remove from recent searches",
+    filesAndFolders: "Files & Folders"
   },
   home: {
     greetingMorning: "Good Morning",

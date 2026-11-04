@@ -1654,6 +1654,7 @@ pub fn run() {
             commands::files::get_source_songs,
             commands::files::locate_song_in_files,
             commands::files::locate_album_in_files,
+            commands::files::search_source_folders,
             commands::files::scan_source_folder,
             commands::files::open_source_file,
             commands::devices::update_device_profile,

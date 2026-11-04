@@ -25,6 +25,8 @@
       title: i18n.t("shortcuts.groupNavigation"),
       entries: [
         { keys: ["Ctrl", "L"], label: i18n.t("shortcuts.focusSearch") },
+        { keys: ["Ctrl", "F"], label: i18n.t("shortcuts.focusSearch") },
+        { keys: ["/"], label: i18n.t("shortcuts.focusSearch") },
         { keys: ["Esc"], label: i18n.t("shortcuts.closeSearch") },
         { keys: ["Ctrl", "O"], label: i18n.t("shortcuts.openSong") },
         { keys: ["Ctrl", "["], label: i18n.t("shortcuts.goBack") },
@@ -66,7 +68,7 @@
       <div>
         <h3 class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider mb-2">{group.title}</h3>
         <div class="rounded-xl border border-brand-border/60 divide-y divide-brand-border/40 overflow-hidden">
-          {#each group.entries as entry (entry.label)}
+          {#each group.entries as entry (entry.keys.join("+"))}
             <div class="flex items-center justify-between gap-4 px-4 py-2.5 bg-brand-main/30">
               <div class="flex items-center gap-1.5 shrink-0">
                 {#each entry.keys as key (key)}

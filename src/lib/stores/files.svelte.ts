@@ -5,6 +5,7 @@ import { devicesStore } from "./devices.svelte";
 import { deviceName } from "../utils/devices";
 import { collectionStore } from "./collection.svelte";
 import { navigationStore } from "./navigation.svelte";
+import { parseFileFilter } from "../components/files/fileFilter";
 
 /** Whether `a` and `b` are the same source. Storages of one device count as one source. */
 export function sameSource(a: FileSource, b: FileSource): boolean {
@@ -27,11 +28,41 @@ class FilesStore {
   sources = $state<FileSourceSummary[]>([]);
   /** True once the folders and servers have been read. */
   loaded = $state(false);
+  /** Instant filter query for the folder currently open in the Files view (#1886). */
+  filterQuery = $state("");
+  /** Number of entries matching `filterQuery` in the currently open folder. */
+  filterMatchCount = $state(0);
+  /** Total entries in the currently open folder. */
+  filterTotalCount = $state(0);
+  /** Display name of the currently open folder, for the search placeholder. */
+  activeFolderTitle = $state("");
+  private lastLocationKey = "";
   get devices(): ConnectedDevice[] {
     return devicesStore.devices;
   }
   private refreshDebounce: ReturnType<typeof setTimeout> | undefined;
   private events = createEventScope(import.meta.hot);
+
+  /**
+   * True when the Files view is showing an open folder (including a device's
+   * Files tab, but not the Files root overview or a device's Sync tab), so
+   * the TopNavigation search box filters that folder (#1886).
+   */
+  get isFilteringFolder(): boolean {
+    const loc = navigationStore.filesLocation;
+    if (navigationStore.activeTab !== "files" || !loc) return false;
+    if (loc.source.kind === "device" && loc.deviceTab === "sync") return false;
+    return true;
+  }
+
+  /** True when the active folder filter has at least one active extension, status or text term. */
+  get isFilterActive(): boolean {
+    return parseFileFilter(this.filterQuery).isActive;
+  }
+
+  clearFilter() {
+    this.filterQuery = "";
+  }
 
   constructor() {
     // Settings > Sources reloads these lists after every add, edit and
@@ -46,6 +77,16 @@ class FilesStore {
       $effect(() => {
         void devicesStore.devices;
         this.leaveGoneSource();
+      });
+      $effect(() => {
+        const loc = navigationStore.filesLocation;
+        const key = loc
+          ? `${sourceKey(loc.source)}:${loc.source.kind === "device" ? (loc.source.storage ?? "") : ""}:${JSON.stringify(loc.path)}`
+          : "";
+        if (key !== this.lastLocationKey) {
+          this.lastLocationKey = key;
+          this.filterQuery = "";
+        }
       });
     });
     this.init();

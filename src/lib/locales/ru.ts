@@ -142,7 +142,27 @@ export const ru = {
       other: "Выбрано {selected} из {count} файла."
     },
     viewInFiles: "Показать в файлах",
-    movedShowingNearest: "Его больше нет там, где Luminous видел его в последний раз. Показана ближайшая существующая папка."
+    movedShowingNearest: "Его больше нет там, где Luminous видел его в последний раз. Показана ближайшая существующая папка.",
+    filterPlaceholder: "Фильтр по «{folder}»…",
+    filterCountBadge: "{matched} из {total}",
+    clearFilter: "Очистить фильтр",
+    filterHelpTitle: "Фильтровать эту папку по имени, типу или статусу в библиотеке",
+    filterHelpTypeLabel: "Тип:",
+    filterHelpStatusLabel: "Статус:",
+    searchWholeLibraryFor: "Искать «{query}» во всей библиотеке",
+    filterEmptyTitle: "В этой папке ничего не подходит под {query}.",
+    filterEmptyHint: {
+      one: "Очистите фильтр, чтобы увидеть {count} файл, или измените его для другого поиска.",
+      few: "Очистите фильтр, чтобы увидеть все {count} файла, или измените его для другого поиска.",
+      many: "Очистите фильтр, чтобы увидеть все {count} файлов, или измените его для другого поиска.",
+      other: "Очистите фильтр, чтобы увидеть все {count} файла, или измените его для другого поиска."
+    },
+    filterMatchSummary: {
+      one: "Под фильтр подходит {matched} из {count} файла.",
+      few: "Под фильтр подходят {matched} из {count} файлов.",
+      many: "Под фильтр подходят {matched} из {count} файлов.",
+      other: "Под фильтр подходит {matched} из {count} файла."
+    }
   },
   devices: {
     tabFiles: "Файлы",
@@ -419,7 +439,8 @@ export const ru = {
     filterSyntaxHint: "💡 Подсказка по синтаксису фильтров",
     filterFieldsLabel: "Поля:",
     filterOperatorsLabel: "Операторы:",
-    removeRecentSearchTooltip: "Удалить из недавних запросов"
+    removeRecentSearchTooltip: "Удалить из недавних запросов",
+    filesAndFolders: "Файлы и папки"
   },
   home: {
     greetingMorning: "Доброе утро",

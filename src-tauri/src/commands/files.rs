@@ -2,7 +2,9 @@
 //! laid out. See `crate::files` for what a listing holds.
 
 use crate::collection::{CollectionScanner, ScanTrigger};
-use crate::files::{self, DirListing, FileNavigationTarget, FileSource, SourceSummary};
+use crate::files::{
+    self, DirListing, FileNavigationTarget, FileSource, FolderSearchResult, SourceSummary,
+};
 use crate::models::Song;
 use crate::shell_open::{self, OpenOutcome};
 use crate::AppState;
@@ -119,6 +121,23 @@ pub async fn open_source_file(
         log::warn!("Failed to open a file: {e:#}");
         e.to_string()
     })
+}
+
+/// Searches watched folders and media server directories for folders whose
+/// names match `query` (#1886).
+#[tauri::command]
+pub async fn search_source_folders(
+    query: String,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<Vec<FolderSearchResult>, String> {
+    let db = state.db.clone();
+    let max = limit.unwrap_or(5);
+    crate::db::run_blocking(&state.db, move |conn| {
+        files::search_folders(conn, &db, &query, max)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Looks for new and changed files in one folder of a folder source; the

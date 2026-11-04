@@ -340,4 +340,66 @@ describe("FileBrowser.svelte", () => {
     await fireEvent.click(getByText("Unknown Album"));
     expect(onnavigate).toHaveBeenCalledWith(["", ""]);
   });
+
+  describe("folder filtering (#1886)", () => {
+    it("filters entries by free text, ext:, and status:, and highlights matched substrings", async () => {
+      const { findByText, queryByText, container, rerender } = render(FileBrowser, {
+        props: {
+          source,
+          path: ["Rock", "Live"],
+          filterQuery: "ext:flac encore",
+          onnavigate: vi.fn(),
+          onactivate: vi.fn(),
+          unreachableLabel: "Can't reach Music",
+        },
+      });
+
+      await findByText(/02/);
+      expect(queryByText("01 Opening.flac")).not.toBeInTheDocument();
+      expect(queryByText("cover.jpg")).not.toBeInTheDocument();
+      expect(container.querySelector("mark")?.textContent).toBe("Encore");
+
+      await rerender({ filterQuery: "status:unscanned" });
+      expect(queryByText("02 Encore.flac")).toBeInTheDocument();
+      expect(queryByText("01 Opening.flac")).not.toBeInTheDocument();
+    });
+
+    it("shows the empty filter state and clears the filter when Clear filter is clicked", async () => {
+      const { findByTestId, findByText, getByRole } = render(FileBrowser, {
+        props: {
+          source,
+          path: ["Rock", "Live"],
+          filterQuery: "ext:cue",
+          onnavigate: vi.fn(),
+          onactivate: vi.fn(),
+          unreachableLabel: "Can't reach Music",
+        },
+      });
+
+      const empty = await findByTestId("files-filter-empty");
+      expect(empty).toHaveTextContent("Nothing in this folder matches ext:cue.");
+      expect(empty).toHaveTextContent("Clear the filter to see all 4 files, or change it to look for something else.");
+
+      await fireEvent.click(getByRole("button", { name: "Clear filter" }));
+      expect(await findByText("01 Opening.flac")).toBeInTheDocument();
+    });
+
+    it("selects only filtered files on Ctrl+A", async () => {
+      const { findByText, getByRole } = render(FileBrowser, {
+        props: {
+          source,
+          path: ["Rock", "Live"],
+          filterQuery: "ext:flac",
+          onnavigate: vi.fn(),
+          onactivate: vi.fn(),
+          unreachableLabel: "Can't reach Music",
+        },
+      });
+
+      await findByText("01 Opening.flac");
+      const current = getByRole("listbox", { name: "Live" });
+      await fireEvent.keyDown(current, { key: "a", ctrlKey: true });
+      expect(selectedIn(current)).toEqual(["01 Opening.flac", "02 Encore.flac"]);
+    });
+  });
 });
