@@ -31,10 +31,14 @@ class FileDragStore {
   }
 
   /**
-   * Appends dragged library songs to the playback queue and ends the drag.
-   * Reports success and skipped non-library files via toast.
+   * Internal helper executing a drop action across valid library songs,
+   * showing feedback for empty batches, success, and skipped non-library files.
    */
-  async dropToQueue(): Promise<void> {
+  private async executeDrop(
+    action: (songIds: number[]) => Promise<void>,
+    onSuccess: (count: number) => void,
+    onFailureKey: string
+  ): Promise<void> {
     if (!this.isDragging) return;
     const songIds = this.librarySongIds;
     const skippedCount = this.nonLibraryCount;
@@ -46,15 +50,27 @@ class FileDragStore {
     }
 
     try {
-      await playlistsStore.addSongsToQueue(songIds);
-      toastStore.show(i18n.plural("dragDrop.addedSongs", songIds.length), "success");
+      await action(songIds);
+      onSuccess(songIds.length);
       if (skippedCount > 0) {
         toastStore.show(i18n.plural("files.skipped", skippedCount), "info");
       }
     } catch (err) {
-      console.error("Failed to add dragged files to queue:", err);
-      toastStore.show(i18n.t("files.queueFailed"), "error");
+      console.error("Failed to execute file drop:", err);
+      toastStore.show(i18n.t(onFailureKey), "error");
     }
+  }
+
+  /**
+   * Appends dragged library songs to the playback queue and ends the drag.
+   * Reports success and skipped non-library files via toast.
+   */
+  async dropToQueue(): Promise<void> {
+    await this.executeDrop(
+      (songIds) => playlistsStore.addSongsToQueue(songIds),
+      (count) => toastStore.show(i18n.plural("dragDrop.addedSongs", count), "success"),
+      "files.queueFailed"
+    );
   }
 
   /**
@@ -62,26 +78,11 @@ class FileDragStore {
    * Reports success and skipped non-library files via toast.
    */
   async dropToPlaylist(playlist: { id: number; name: string }): Promise<void> {
-    if (!this.isDragging) return;
-    const songIds = this.librarySongIds;
-    const skippedCount = this.nonLibraryCount;
-    this.end();
-
-    if (songIds.length === 0) {
-      toastStore.show(i18n.t("files.nothingToPlay"), "info");
-      return;
-    }
-
-    try {
-      await playlistsStore.addSongsToPlaylist(playlist.id, songIds);
-      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlist.name }), "success");
-      if (skippedCount > 0) {
-        toastStore.show(i18n.plural("files.skipped", skippedCount), "info");
-      }
-    } catch (err) {
-      console.error("Failed to add dragged files to playlist:", err);
-      toastStore.show(i18n.t("files.playlistFailed"), "error");
-    }
+    await this.executeDrop(
+      (songIds) => playlistsStore.addSongsToPlaylist(playlist.id, songIds),
+      () => toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlist.name }), "success"),
+      "files.playlistFailed"
+    );
   }
 }
 

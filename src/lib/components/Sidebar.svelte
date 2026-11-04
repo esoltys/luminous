@@ -166,6 +166,8 @@
     }
   });
 
+  $effect(() => () => clearTimeout(customExpandTimer));
+
 </script>
 
 <aside style="width: {width}px;" class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden transition-[width] duration-200 ease-out {themeStore.isGlassTheme ? 'glass-surface' : ''}" class:transition-none={resizing}>
