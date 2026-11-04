@@ -24,9 +24,17 @@
   import Input from "./Input.svelte";
   import ChipInput from "./ChipInput.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import type { FileSource } from "../types";
+  import { filesStore } from "../stores/files.svelte";
+  import { scanFolder } from "./files/folderActions";
 
   interface Props {
-    songIds: number[];
+    songIds?: number[];
+    filePaths?: string[];
+    title?: string;
+    source?: FileSource;
+    folderPath?: string[];
+    folderName?: string;
     initialAlbum?: string | null;
     initialAlbumSort?: string | null;
     initialAlbumArtist?: string | null;
@@ -47,7 +55,12 @@
   }
 
   let {
-    songIds,
+    songIds = [],
+    filePaths = [],
+    title = "",
+    source,
+    folderPath,
+    folderName,
     initialAlbum = "",
     initialAlbumSort = "",
     initialAlbumArtist = "",
@@ -63,6 +76,8 @@
     onClose,
     onSave
   }: Props = $props();
+
+  const tracksCount = $derived((songIds?.length ?? 0) || (filePaths?.length ?? 0));
 
   // svelte-ignore state_referenced_locally
   let album = $state(initialAlbum ?? "");
@@ -89,14 +104,46 @@
   // reach Luminous's own DB. A representative track's path is enough since
   // an album's tracks all share one source.
   let isRemoteSource = $derived.by(() => {
-    const sample = collectionStore.songs.find((s) => s.id === songIds[0]);
-    return isRemoteSourceOf(sample);
+    if (songIds.length > 0) {
+      const sample = collectionStore.songs.find((s) => s.id === songIds[0]);
+      return isRemoteSourceOf(sample);
+    }
+    return false;
   });
 
-  onMount(() => {
+  onMount(async () => {
     // Best-effort preload for the genre field's autocomplete — a failure
     // here shouldn't block or break the editor itself.
     if (!tagsStore.loaded) tagsStore.load().catch(() => {});
+    if (filePaths.length > 0 && songIds.length === 0 && !initialAlbum && !initialAlbumArtist) {
+      try {
+        const details = await invoke<{
+          album: string;
+          albumsort: string | null;
+          album_artist: string;
+          album_artist_sort: string | null;
+          genre: string;
+          genresort: string | null;
+          year: number | null;
+          disc: number | null;
+          compilation: boolean;
+        }>("get_file_song_details", { path: filePaths[0] });
+        if (details) {
+          album = details.album || "";
+          albumsort = details.albumsort ?? "";
+          albumArtist = details.album_artist || "";
+          albumArtistSort = details.album_artist_sort ?? "";
+          genre = details.genre || "";
+          genresort = details.genresort ?? "";
+          year = details.year;
+          disc = details.disc;
+          compilation = details.compilation;
+          previousAlbumArtist = albumArtist;
+        }
+      } catch (err) {
+        console.error("Failed to preload file metadata for batch tag editing:", err);
+      }
+    }
   });
 
   const VARIOUS_ARTISTS = "Various Artists";
@@ -148,22 +195,42 @@
     tasksStore.startTask({
       id: taskId,
       label: i18n.t("tasks.savingAlbumTags", { album: albumName }, `Saving tags for ${albumName}...`),
-      total: songIds.length,
+      total: tracksCount,
       contextName: albumName,
     });
     try {
-      await invoke("save_album_tags", {
-        songIds,
-        album: album ?? "",
-        albumsort: albumsort.trim() || null,
-        albumArtist: albumArtist ?? "",
-        albumArtistSort: albumArtistSort.trim() || null,
-        genre: genre ?? "",
-        genresort: genresort.trim() || null,
-        year,
-        disc,
-        compilation,
-      });
+      if (songIds.length > 0) {
+        await invoke("save_album_tags", {
+          songIds,
+          album: album ?? "",
+          albumsort: albumsort.trim() || null,
+          albumArtist: albumArtist ?? "",
+          albumArtistSort: albumArtistSort.trim() || null,
+          genre: genre ?? "",
+          genresort: genresort.trim() || null,
+          year,
+          disc,
+          compilation,
+        });
+      }
+      if (filePaths.length > 0) {
+        await invoke("save_batch_file_tags", {
+          paths: filePaths,
+          album: album ?? "",
+          albumsort: albumsort.trim() || null,
+          albumArtist: albumArtist ?? "",
+          albumArtistSort: albumArtistSort.trim() || null,
+          genre: genre ?? "",
+          genresort: genresort.trim() || null,
+          year,
+          disc,
+          compilation,
+        });
+        if (source && folderPath) {
+          await scanFolder(source, folderPath);
+        }
+        filesStore.reloadFolder();
+      }
 
       tasksStore.completeTask(
         taskId,
@@ -199,7 +266,7 @@
     <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
       <div class="flex items-center gap-2">
         <Sliders class="w-4 h-4 text-brand-accent-text" />
-        <h3 class="text-sm font-bold">{i18n.t('albumTagEditor.title')}</h3>
+        <h3 class="text-sm font-bold">{title || i18n.t('albumTagEditor.title')}</h3>
       </div>
       <button onclick={onClose} disabled={isSaving} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-50">
         <X class="w-4 h-4" />
@@ -345,7 +412,7 @@
     <div class="h-16 flex items-center justify-between px-6 border-t border-brand-border bg-brand-main shrink-0">
       <div class="flex items-center gap-2 text-xs font-medium text-brand-text-secondary">
         <Layers class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
-        <span>{i18n.plural("albumTagEditor.tracksAffected", songIds.length)}</span>
+        <span>{i18n.plural("albumTagEditor.tracksAffected", tracksCount)}</span>
       </div>
 
       <div class="flex items-center gap-3">

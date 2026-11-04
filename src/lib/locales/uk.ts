@@ -162,7 +162,10 @@ export const uk = {
       few: "Під фільтр підходять {matched} з {count} файлів.",
       many: "Під фільтр підходять {matched} з {count} файлів.",
       other: "Під фільтр підходить {matched} з {count} файлу."
-    }
+    },
+    editTags: "Редагувати теги",
+    editTagsForFolder: "Редагувати теги для папки",
+    savedAndScanning: "Теги збережено. Сканування {folder} для додавання {file} до вашої бібліотеки."
   },
   devices: {
     tabFiles: "Файли",

@@ -1542,13 +1542,17 @@ pub fn run() {
             commands::context::set_online_enabled,
             // Tag Editor commands
             commands::tageditor::get_song_details,
+            commands::tageditor::get_file_song_details,
             commands::tageditor::save_song_tags,
+            commands::tageditor::save_file_tags,
             commands::tageditor::save_album_tags,
+            commands::tageditor::save_batch_file_tags,
             commands::tageditor::clear_song_cover_art,
             commands::tageditor::clear_album_cover_art,
             commands::tageditor::open_song_folder,
             // MusicBrainz Picard bridge commands (#367)
             commands::picard::open_in_picard,
+            commands::picard::open_paths_in_picard,
             commands::picard::get_picard_path,
             // Genre/tag browsing commands (#224) — read the existing
             // songs.genre column above; editing goes through save_song_tags.

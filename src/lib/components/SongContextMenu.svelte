@@ -489,7 +489,7 @@
     />
   {/if}
 
-  {#if selectedCount === 1 && onEditTags}
+  {#if onEditTags}
     <ContextMenuItem
       icon={Edit3}
       label={i18n.t("collection.editTagsTooltip")}

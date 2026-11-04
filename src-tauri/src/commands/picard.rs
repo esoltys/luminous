@@ -83,6 +83,35 @@ pub async fn open_in_picard(state: State<'_, AppState>, song_ids: Vec<i64>) -> R
     picard::launch_picard(&exe, &dirs).map_err(|e| e.to_string())
 }
 
+/// Launches MusicBrainz Picard directly with the given file or folder paths (#1887) —
+/// used by the Files view when opening files or folders in Picard regardless of
+/// whether they are already indexed in the library.
+#[tauri::command]
+pub async fn open_paths_in_picard(
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+) -> Result<(), String> {
+    if paths.is_empty() {
+        return Err("No files or folders to open in Picard".to_string());
+    }
+
+    let mut path_bufs = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for p in paths {
+        let path_buf = std::path::PathBuf::from(&p);
+        if seen.insert(path_buf.clone()) {
+            path_bufs.push(path_buf);
+        }
+    }
+
+    let custom_path = read_custom_picard_path(&state)?;
+    let exe = picard::find_picard(custom_path.as_deref()).ok_or_else(|| {
+        "MusicBrainz Picard not found. Install it from picard.musicbrainz.org, or set a custom path in Settings.".to_string()
+    })?;
+
+    picard::launch_picard(&exe, &path_bufs).map_err(|e| e.to_string())
+}
+
 /// Resolves the Picard executable's current path, if found — `None` means
 /// not installed/not locatable. Serves both the cheap "is it available"
 /// check the frontend uses to disable "Open in Picard" actions, and the

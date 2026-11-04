@@ -50,9 +50,19 @@ function song(id: number, title: string): Song {
 
 const library = { 7: song(7, "Opening"), 8: song(8, "Encore") } as Record<number, Song>;
 
-function open(entries: FileEntry[], over: { source?: FileSource; scannable?: boolean; inColumn?: boolean } = {}) {
+function open(entries: FileEntry[], over: {
+  source?: FileSource;
+  scannable?: boolean;
+  inColumn?: boolean;
+  onEditFileTags?: (entry: FileEntry) => void;
+  onEditFolderTags?: (dir: FileEntry, dirPath: string[]) => void;
+  onEditBatchTags?: (entries: FileEntry[]) => void;
+} = {}) {
   const onClose = vi.fn();
   const onEditTags = vi.fn();
+  const onEditFileTags = over.onEditFileTags ?? vi.fn();
+  const onEditFolderTags = over.onEditFolderTags ?? vi.fn();
+  const onEditBatchTags = over.onEditBatchTags ?? vi.fn();
   render(FileContextMenu, {
     props: {
       x: 0,
@@ -64,10 +74,13 @@ function open(entries: FileEntry[], over: { source?: FileSource; scannable?: boo
       scannable: over.scannable ?? true,
       inColumn: over.inColumn ?? false,
       onEditTags,
+      onEditFileTags,
+      onEditFolderTags,
+      onEditBatchTags,
       onClose,
     },
   });
-  return { onClose, onEditTags };
+  return { onClose, onEditTags, onEditFileTags, onEditFolderTags, onEditBatchTags };
 }
 
 describe("FileContextMenu.svelte", () => {
@@ -168,6 +181,45 @@ describe("FileContextMenu.svelte", () => {
       entry("cover.jpg", { status: "albumArt", kind: "image", opensInApp: true }),
     ]);
     expect(screen.queryByText("Open")).not.toBeInTheDocument();
+  });
+
+  it("offers Edit tags and Open in Picard for an unscanned audio file", async () => {
+    const onEditFileTags = vi.fn();
+    open([entry("13 Unfurl (bonus).flac")], { onEditFileTags });
+
+    expect(screen.getByText("Edit tags")).toBeInTheDocument();
+    expect(screen.getByText("Open in Picard")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByText("Edit tags"));
+    expect(onEditFileTags).toHaveBeenCalledWith(expect.objectContaining({ name: "13 Unfurl (bonus).flac" }));
+  });
+
+  it("offers Edit tags for folder and Open in Picard for a folder", async () => {
+    const onEditFolderTags = vi.fn();
+    open([entry("2009 - Night Is the New Day", { isDir: true, status: null, fileType: null, location: "C:/Music/2009" })], { onEditFolderTags });
+
+    expect(screen.getByText("Edit tags for folder")).toBeInTheDocument();
+    expect(screen.getByText("Open in Picard")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByText("Edit tags for folder"));
+    expect(onEditFolderTags).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "2009 - Night Is the New Day" }),
+      ["Live", "2009 - Night Is the New Day"]
+    );
+  });
+
+  it("offers Edit tags and Open in Picard for multi-selection of audio files", async () => {
+    const onEditBatchTags = vi.fn();
+    open([entry("01 Track.flac"), entry("02 Track.flac")], { onEditBatchTags });
+
+    expect(screen.getByText("Edit tags")).toBeInTheDocument();
+    expect(screen.getByText("Open in Picard")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByText("Edit tags"));
+    expect(onEditBatchTags).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ name: "01 Track.flac" }),
+      expect.objectContaining({ name: "02 Track.flac" }),
+    ]));
   });
 
   it("doesn't open when there's nothing to offer (a sidecar on a server)", () => {

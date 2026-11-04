@@ -99,6 +99,49 @@ pub async fn get_song_details(
     .map_err(|e| e.to_string())
 }
 
+/// Reads metadata tags directly from an audio file on disk (#1887) —
+/// used by the Tag Editor when opened for an un-scanned audio file.
+#[tauri::command]
+pub async fn get_file_song_details(path: String) -> Result<SongDetails, String> {
+    let p = std::path::Path::new(&path);
+    if !p.exists() {
+        return Err(format!("File not found: {path}"));
+    }
+    let song = crate::collection::read_tags(p).map_err(|e| e.to_string())?;
+    Ok(SongDetails {
+        id: 0,
+        path: path.clone(),
+        title: song.title.unwrap_or_else(|| {
+            p.file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default()
+        }),
+        titlesort: song.titlesort,
+        artist: song.artist.unwrap_or_default(),
+        artistsort: song.artistsort,
+        album: song.album.unwrap_or_default(),
+        albumsort: song.albumsort,
+        album_artist: song.album_artist.unwrap_or_default(),
+        album_artist_sort: song.album_artist_sort,
+        composer: song.composer.unwrap_or_default(),
+        composersort: song.composersort,
+        genre: song.genre.unwrap_or_default(),
+        genresort: None,
+        track: song.track.map(|t| t as u32),
+        disc: song.disc.map(|d| d as u32),
+        year: song.year.map(|y| y as u32),
+        originalyear: song.originalyear.map(|y| y as u32),
+        grouping: song.grouping.unwrap_or_default(),
+        bpm: song.bpm,
+        initial_key: song.initial_key.unwrap_or_default(),
+        rating: crate::stats::RATING_UNRATED,
+        loved: 0,
+        compilation: song.compilation,
+        art_embedded: song.art_embedded,
+        is_cue_track: false,
+    })
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn save_song_tags(
@@ -300,6 +343,166 @@ pub async fn save_song_tags(
         if auto_res.moved_count > 0 {
             let _ = app.emit("library-changed", ());
         }
+    }
+
+    Ok(())
+}
+
+/// Writes metadata tags directly to an audio file on disk (#1887) —
+/// used when saving tags on an audio file from the Files view that is not yet in the library.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn save_file_tags(
+    state: State<'_, AppState>,
+    path: String,
+    title: String,
+    titlesort: Option<String>,
+    artist: String,
+    artistsort: Option<String>,
+    album: String,
+    albumsort: Option<String>,
+    album_artist: String,
+    album_artist_sort: Option<String>,
+    composer: String,
+    composersort: Option<String>,
+    genre: Option<String>,
+    genresort: Option<String>,
+    track: Option<u32>,
+    disc: Option<u32>,
+    year: Option<u32>,
+    originalyear: Option<u32>,
+    grouping: String,
+    bpm: Option<f32>,
+    initial_key: String,
+) -> Result<(), String> {
+    let p = std::path::PathBuf::from(&path);
+    if !p.exists() {
+        return Err(format!("File not found: {path}"));
+    }
+
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+    state.self_writes.mark_written(std::iter::once(p.clone()));
+
+    let artist_str = models::join_multi_value(&models::parse_multi_value(&artist));
+    let album_artist_str = models::join_multi_value(&models::parse_multi_value(&album_artist));
+    let composer_str = models::join_multi_value(&models::parse_multi_value(&composer));
+    let genre_str =
+        models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
+
+    let compilation = crate::collection::read_tags(&p)
+        .map(|s| s.compilation)
+        .unwrap_or(false);
+
+    let path_clone = p.clone();
+    let title_c = title.clone();
+    let titlesort_c = titlesort.clone();
+    let artist_c = artist_str.clone();
+    let artistsort_c = artistsort.clone();
+    let album_c = album.clone();
+    let albumsort_c = albumsort.clone();
+    let album_artist_c = album_artist_str.clone();
+    let album_artist_sort_c = album_artist_sort.clone();
+    let composer_c = composer_str.clone();
+    let composersort_c = composersort.clone();
+    let genre_c = genre_str.clone();
+    let grouping_c = grouping.clone();
+    let initial_key_c = initial_key.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        audio::write_tags(
+            &path_clone,
+            &audio::TagWriteRequest {
+                title: &title_c,
+                titlesort: titlesort_c.as_deref(),
+                artist: &artist_c,
+                artistsort: artistsort_c.as_deref(),
+                album: &album_c,
+                albumsort: albumsort_c.as_deref(),
+                album_artist: &album_artist_c,
+                album_artist_sort: album_artist_sort_c.as_deref(),
+                composer: &composer_c,
+                composersort: composersort_c.as_deref(),
+                genre: &genre_c,
+                track,
+                disc,
+                year,
+                originalyear,
+                grouping: &grouping_c,
+                bpm,
+                initial_key: &initial_key_c,
+                compilation,
+            },
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| format!("{e:#}"))?;
+
+    // If this song already happens to be in the database, keep SQLite in sync
+    if let Ok(conn) = state.db.pool.get() {
+        let _ = conn.execute(
+            "UPDATE songs SET
+                title = ?1,
+                titlesort = ?2,
+                artist = ?3,
+                artistsort = ?4,
+                album = ?5,
+                albumsort = ?6,
+                album_artist = ?7,
+                album_artist_sort = ?8,
+                composer = ?9,
+                composersort = ?10,
+                genre = ?11,
+                genresort = ?12,
+                track = ?13,
+                disc = ?14,
+                year = ?15,
+                originalyear = ?16,
+                grouping = ?17,
+                bpm = ?18,
+                initial_key = ?19
+             WHERE path = ?20",
+            rusqlite::params![
+                title,
+                titlesort
+                    .as_deref()
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty()),
+                artist_str,
+                artistsort
+                    .as_deref()
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty()),
+                album,
+                albumsort
+                    .as_deref()
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty()),
+                album_artist_str,
+                album_artist_sort
+                    .as_deref()
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty()),
+                composer_str,
+                composersort
+                    .as_deref()
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty()),
+                genre_str,
+                genresort
+                    .as_deref()
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty()),
+                track,
+                disc,
+                year,
+                originalyear,
+                grouping,
+                bpm,
+                initial_key,
+                path,
+            ],
+        );
     }
 
     Ok(())
@@ -533,6 +736,160 @@ pub async fn save_album_tags(
             let _ = app.emit("library-changed", ());
         }
     }
+
+    Ok(updated_count)
+}
+
+/// Writes shared album/group metadata tags across multiple audio files on disk (#1887) —
+/// used when batch-editing tags for a folder or multi-file selection from Files view.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn save_batch_file_tags(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+    album: String,
+    albumsort: Option<String>,
+    album_artist: String,
+    album_artist_sort: Option<String>,
+    genre: Option<String>,
+    genresort: Option<String>,
+    year: Option<u32>,
+    disc: Option<u32>,
+    compilation: bool,
+) -> Result<u32, String> {
+    if paths.is_empty() {
+        return Ok(0);
+    }
+
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+
+    let path_bufs: Vec<std::path::PathBuf> = paths.iter().map(std::path::PathBuf::from).collect();
+    state.self_writes.mark_written(path_bufs.iter().cloned());
+
+    let album_artist_str = models::join_multi_value(&models::parse_multi_value(&album_artist));
+    let genre_str =
+        models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
+
+    let total = path_bufs.len();
+    let app_clone = app.clone();
+    let album_c = album.clone();
+    let albumsort_c = albumsort.clone();
+    let album_artist_c = album_artist_str.clone();
+    let album_artist_sort_c = album_artist_sort.clone();
+    let genre_c = genre_str.clone();
+
+    let updated_count = tauri::async_runtime::spawn_blocking(move || {
+        let mut count = 0u32;
+        for (idx, p) in path_bufs.into_iter().enumerate() {
+            let song = match crate::collection::read_tags(&p) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+
+            let title = song.title.clone().unwrap_or_else(|| {
+                p.file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_default()
+            });
+
+            let _ = app_clone.emit(
+                "tag-batch-progress",
+                TagBatchProgressPayload {
+                    current: idx + 1,
+                    total,
+                    title: title.clone(),
+                    done: false,
+                },
+            );
+
+            let artist = song.artist.unwrap_or_default();
+            let composer = song.composer.unwrap_or_default();
+            let grouping = song.grouping.unwrap_or_default();
+            let initial_key = song.initial_key.unwrap_or_default();
+
+            let write_res = audio::write_tags(
+                &p,
+                &audio::TagWriteRequest {
+                    title: &title,
+                    titlesort: song.titlesort.as_deref(),
+                    artist: &artist,
+                    artistsort: song.artistsort.as_deref(),
+                    album: &album_c,
+                    albumsort: albumsort_c.as_deref(),
+                    album_artist: &album_artist_c,
+                    album_artist_sort: album_artist_sort_c.as_deref(),
+                    composer: &composer,
+                    composersort: song.composersort.as_deref(),
+                    genre: &genre_c,
+                    track: song.track.map(|t| t as u32),
+                    disc,
+                    year,
+                    originalyear: song.originalyear.map(|y| y as u32),
+                    grouping: &grouping,
+                    bpm: song.bpm,
+                    initial_key: &initial_key,
+                    compilation,
+                },
+            );
+            if write_res.is_ok() {
+                count += 1;
+            }
+        }
+        count
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // Also update any matching rows in SQLite DB
+    if let Ok(conn) = state.db.pool.get() {
+        for path in &paths {
+            let _ = conn.execute(
+                "UPDATE songs SET
+                    album = ?1,
+                    albumsort = ?2,
+                    album_artist = ?3,
+                    album_artist_sort = ?4,
+                    genre = ?5,
+                    genresort = ?6,
+                    year = ?7,
+                    disc = ?8,
+                    compilation = ?9
+                 WHERE path = ?10",
+                rusqlite::params![
+                    album,
+                    albumsort
+                        .as_deref()
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty()),
+                    album_artist_str,
+                    album_artist_sort
+                        .as_deref()
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty()),
+                    genre_str,
+                    genresort
+                        .as_deref()
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty()),
+                    year,
+                    disc,
+                    compilation,
+                    path,
+                ],
+            );
+        }
+    }
+
+    let _ = app.emit(
+        "tag-batch-progress",
+        TagBatchProgressPayload {
+            current: total,
+            total,
+            title: String::new(),
+            done: true,
+        },
+    );
 
     Ok(updated_count)
 }

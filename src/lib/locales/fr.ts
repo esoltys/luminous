@@ -144,7 +144,10 @@ export const fr: DeepStringRecord<typeof en> = {
     filterMatchSummary: {
       one: "{matched} sur {count} fichier correspond au filtre.",
       other: "{matched} sur {count} fichiers correspondent au filtre."
-    }
+    },
+    editTags: "Modifier les métadonnées",
+    editTagsForFolder: "Modifier les métadonnées du dossier",
+    savedAndScanning: "Étiquettes enregistrées. Analyse de {folder} pour ajouter {file} à votre bibliothèque."
   },
   devices: {
     tabFiles: "Fichiers",

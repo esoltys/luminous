@@ -162,7 +162,10 @@ export const ru = {
       few: "Под фильтр подходят {matched} из {count} файлов.",
       many: "Под фильтр подходят {matched} из {count} файлов.",
       other: "Под фильтр подходит {matched} из {count} файла."
-    }
+    },
+    editTags: "Изменить теги",
+    editTagsForFolder: "Изменить теги для папки",
+    savedAndScanning: "Теги сохранены. Сканирование {folder} для добавления {file} в вашу медиатеку."
   },
   devices: {
     tabFiles: "Файлы",
