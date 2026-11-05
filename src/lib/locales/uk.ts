@@ -2424,6 +2424,35 @@ export const uk = {
     syncRatingsFailed: "(не вдалося надіслати: {failed})",
     syncRatingsNoCritiquebrainz: "Оцінки зірками не отримано: додайте свій профіль CritiqueBrainz вище."
   },
+  lastfm: {
+    integrationTitle: "Скробблер Last.fm",
+    integrationDesc: "це сервіс відкриття музики, який фіксує ваші прослуховування для надання персональної статистики, щотижневих чартів і рекомендацій виконавців.",
+    connectLabel: "Підключити Last.fm",
+    connectHint: "Авторизуйте Luminous у браузері для надсилання прослуховувань до профілю Last.fm",
+    connectBtn: "Підключити Last.fm",
+    authPendingTitle: "Очікування авторизації в браузері",
+    authPendingDesc: "Натисніть «Yes, allow access» на сторінці авторизації Last.fm у браузері, а потім натисніть «Завершити вхід» нижче.",
+    finishAuthBtn: "Завершити вхід",
+    cancelAuthBtn: "Скасувати",
+    authFailed: "Не вдалося авторизуватися в Last.fm",
+    disconnectBtn: "Відключити",
+    enableLabel: "Увімкнути скроблінг Last.fm",
+    enableHint: "Надсилати завершені прослуховування до вашого профілю Last.fm",
+    lovedTracksLabel: "Синхронізувати улюблені треки",
+    lovedTracksHint: "Синхронізувати обрані треки з улюбленими на Last.fm",
+    syncLovedBtn: "Синхронізувати улюблені",
+    syncingLovedBtn: "Синхронізація...",
+    syncLovedSuccess: "Улюблені треки синхронізовано з Last.fm: отримано {loved}, надіслано {pushed}",
+    cacheEmpty: "Офлайн-кеш порожній",
+    cachePending: {
+      one: "{count} прослуховування в офлайн-кеші",
+      few: "{count} прослуховування в офлайн-кеші",
+      many: "{count} прослуховувань в офлайн-кеші",
+      other: "{count} прослуховувань в офлайн-кеші"
+    },
+    cacheDesc: "Прослуховування, зафіксовані без з'єднання з інтернетом, додаються до черги та надсилаються автоматично.",
+    syncNowBtn: "Синхронізувати зараз"
+  },
   discord: {
     integrationTitle: "Discord Rich Presence",
     integrationDesc: "показує пісню, що зараз відтворюється, і статус прослуховування безпосередньо у вашому профілі Discord за допомогою локального міжпроцесного зв’язку (IPC).",

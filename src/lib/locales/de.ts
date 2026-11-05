@@ -2256,6 +2256,33 @@ export const de = {
     syncRatingsFailed: "({failed} konnten nicht gesendet werden)",
     syncRatingsNoCritiquebrainz: "Sternebewertungen wurden nicht abgerufen: Füge oben dein CritiqueBrainz-Profil hinzu."
   },
+  lastfm: {
+    integrationTitle: "Last.fm-Scrobbler",
+    integrationDesc: "ist ein Musikentdeckungsdienst, der Ihre Wiedergaben erfasst, um personalisierte Hörstatistiken, wöchentliche Charts und Künstlerempfehlungen bereitzustellen.",
+    connectLabel: "Last.fm verbinden",
+    connectHint: "Luminous im Browser autorisieren, um Scrobbles an Ihr Last.fm-Profil zu übermitteln",
+    connectBtn: "Last.fm verbinden",
+    authPendingTitle: "Warten auf Autorisierung im Browser",
+    authPendingDesc: "Klicken Sie auf der Last.fm-Autorisierungsseite im Browser auf „Yes, allow access“ und anschließend unten auf „Anmeldung abschließen“.",
+    finishAuthBtn: "Anmeldung abschließen",
+    cancelAuthBtn: "Abbrechen",
+    authFailed: "Autorisierung bei Last.fm fehlgeschlagen",
+    disconnectBtn: "Trennen",
+    enableLabel: "Last.fm-Scrobbling aktivieren",
+    enableHint: "Vollständige Wiedergaben an Ihr Last.fm-Profil übermitteln",
+    lovedTracksLabel: "Lieblingstitel synchronisieren",
+    lovedTracksHint: "Favoriten mit den Lieblingstiteln auf Last.fm abgleichen",
+    syncLovedBtn: "Lieblingstitel synchronisieren",
+    syncingLovedBtn: "Synchronisiere...",
+    syncLovedSuccess: "Lieblingstitel mit Last.fm abgeglichen: {loved} empfangen, {pushed} gesendet",
+    cacheEmpty: "Offline-Zwischenspeicher ist leer",
+    cachePending: {
+      one: "{count} Wiedergabe im Offline-Zwischenspeicher ausstehend",
+      other: "{count} Wiedergaben im Offline-Zwischenspeicher ausstehend"
+    },
+    cacheDesc: "Ohne Internetverbindung erfasste Wiedergaben werden eingereiht und automatisch übertragen.",
+    syncNowBtn: "Jetzt synchronisieren"
+  },
   discord: {
     integrationTitle: "Discord Rich Presence",
     integrationDesc: "zeigt den aktuell gespielten Titel und deinen Hörstatus über lokale Interprozesskommunikation (IPC) direkt in deinem Discord-Profil an.",

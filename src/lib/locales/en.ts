@@ -2256,6 +2256,33 @@ export const en = {
     syncRatingsFailed: "({failed} failed to send)",
     syncRatingsNoCritiquebrainz: "Star ratings were not pulled: add your CritiqueBrainz profile above."
   },
+  lastfm: {
+    integrationTitle: "Last.fm Scrobbler",
+    integrationDesc: "is a music discovery service that tracks what you play to deliver personalized listening stats, weekly charts, and artist recommendations.",
+    connectLabel: "Connect Last.fm",
+    connectHint: "Authorize Luminous in your browser to submit scrobbles to your Last.fm profile",
+    connectBtn: "Connect Last.fm",
+    authPendingTitle: "Waiting for authorization in browser",
+    authPendingDesc: "Click \"Yes, allow access\" on the Last.fm authorization page in your browser, then click Finish Login below.",
+    finishAuthBtn: "Finish Login",
+    cancelAuthBtn: "Cancel",
+    authFailed: "Failed to authorize with Last.fm",
+    disconnectBtn: "Disconnect",
+    enableLabel: "Enable Last.fm scrobbling",
+    enableHint: "Submit completed listens to your Last.fm profile",
+    lovedTracksLabel: "Synchronize loved tracks",
+    lovedTracksHint: "Sync favourite tracks with Last.fm loved tracks",
+    syncLovedBtn: "Sync Loved Tracks",
+    syncingLovedBtn: "Syncing...",
+    syncLovedSuccess: "Synced loved tracks with Last.fm: pulled {loved}, pushed {pushed}",
+    cacheEmpty: "Offline cache is empty",
+    cachePending: {
+      one: "{count} listen pending in offline cache",
+      other: "{count} listens pending in offline cache"
+    },
+    cacheDesc: "Listens recorded without internet connectivity are queued and sent automatically.",
+    syncNowBtn: "Sync Now"
+  },
   discord: {
     integrationTitle: "Discord Rich Presence",
     integrationDesc: "displays your currently playing song and listening status directly on your Discord profile using local inter-process communication (IPC).",

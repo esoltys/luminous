@@ -350,6 +350,205 @@
   {/if}
 </div>
 
+<!-- Last.fm Scrobbler Integration Card -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
+  <div class="pb-3 flex justify-between items-start gap-4">
+    <div class="flex items-center gap-3 min-w-0">
+      <img src="/lastfm-icon.svg" alt="Last.fm" class="w-9 h-9 shrink-0 object-contain rounded-lg" />
+      <div class="space-y-1 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('lastfm.integrationTitle')}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed">
+          <button onclick={() => openExternalUrl("https://www.last.fm")} class="text-brand-accent hover:underline">Last.fm</button>
+          {i18n.t('lastfm.integrationDesc')}
+        </p>
+      </div>
+    </div>
+    {#if scrobblerStore.lastfmEnabled && scrobblerStore.lastfmUsername}
+      <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 font-medium shrink-0">
+        <Check class="w-3 h-3" />
+        {scrobblerStore.lastfmUsername}
+      </span>
+    {:else if scrobblerStore.lastfmEnabled && scrobblerStore.paused}
+      <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium shrink-0">
+        {i18n.t('listenbrainz.statusPaused')}
+      </span>
+    {/if}
+  </div>
+
+  {#if !scrobblerStore.lastfmUsername}
+    <div class="space-y-3 pt-2 border-t border-brand-border/60">
+      {#if !scrobblerStore.lastfmPendingToken}
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('lastfm.connectLabel')}</span>
+            <p class="text-xs text-brand-text-secondary">{i18n.t('lastfm.connectHint')}</p>
+          </div>
+          <Button
+            onclick={() => scrobblerStore.startLastfmAuth()}
+            disabled={scrobblerStore.isStartingLastfm}
+            variant="secondary"
+            size="sm"
+            class="gap-1.5 shrink-0"
+          >
+            {#if scrobblerStore.isStartingLastfm}
+              <LoaderCircle class="w-4 h-4 animate-spin" />
+            {:else}
+              <ArrowUpRight class="w-4 h-4" />
+            {/if}
+            {i18n.t('lastfm.connectBtn')}
+          </Button>
+        </div>
+      {:else}
+        <div class="p-4 rounded-lg bg-brand-surface/60 border border-brand-border/80 space-y-3">
+          <div class="flex flex-col gap-1">
+            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('lastfm.authPendingTitle')}</span>
+            <p class="text-xs text-brand-text-secondary">{i18n.t('lastfm.authPendingDesc')}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <Button
+              onclick={() => scrobblerStore.finishLastfmAuth()}
+              disabled={scrobblerStore.isFinishingLastfm}
+              variant="primary"
+              size="sm"
+              class="gap-1.5"
+            >
+              {#if scrobblerStore.isFinishingLastfm}
+                <LoaderCircle class="w-4 h-4 animate-spin" />
+              {:else}
+                <Check class="w-4 h-4" />
+              {/if}
+              {i18n.t('lastfm.finishAuthBtn')}
+            </Button>
+            <Button
+              onclick={() => scrobblerStore.cancelLastfmAuth()}
+              disabled={scrobblerStore.isFinishingLastfm}
+              variant="secondary"
+              size="sm"
+            >
+              {i18n.t('lastfm.cancelAuthBtn')}
+            </Button>
+          </div>
+        </div>
+      {/if}
+
+      {#if scrobblerStore.lastfmAuthError}
+        <div class="flex items-start gap-2 text-xs text-amber-500 pt-1">
+          <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
+          <span>{scrobblerStore.lastfmAuthError}</span>
+        </div>
+      {/if}
+    </div>
+  {:else}
+    <div class="flex items-center justify-between gap-4 py-1 pt-2 border-t border-brand-border/60">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('lastfm.enableLabel')}</span>
+        <p class="text-xs text-brand-text-secondary">{i18n.t('lastfm.enableHint')}</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <Button
+          onclick={() => scrobblerStore.disconnectLastfm()}
+          variant="secondary"
+          size="sm"
+          class="text-xs text-brand-text-secondary hover:text-brand-text-primary"
+        >
+          {i18n.t('lastfm.disconnectBtn')}
+        </Button>
+        <Toggle
+          checked={scrobblerStore.lastfmEnabled}
+          onchange={(v) => scrobblerStore.setLastfmEnabled(v)}
+          label={i18n.t('lastfm.enableLabel')}
+        />
+      </div>
+    </div>
+
+    {#if scrobblerStore.lastfmEnabled}
+      <!-- Offline cache surface directly under Enable scrobbling -->
+      <div class="ml-2 pl-3 border-l-2 border-brand-accent/30 flex flex-wrap items-center justify-between gap-3 py-1">
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-brand-text-primary">
+              {scrobblerStore.lastfmPendingCount === 0
+                ? i18n.t('lastfm.cacheEmpty')
+                : i18n.plural("lastfm.cachePending", scrobblerStore.lastfmPendingCount)}
+            </span>
+            {#if scrobblerStore.flushSuccessMessage}
+              <span class="text-xs text-brand-text-primary font-medium">({scrobblerStore.flushSuccessMessage})</span>
+            {/if}
+          </div>
+          {#if scrobblerStore.lastError}
+            <span class="text-[11px] text-amber-500 wrap-anywhere">
+              {scrobblerStore.lastError}
+            </span>
+          {:else}
+            <p class="text-[11px] text-brand-text-secondary">
+              {i18n.t('lastfm.cacheDesc')}
+            </p>
+          {/if}
+        </div>
+
+        <Button
+          onclick={() => scrobblerStore.flushCache()}
+          disabled={scrobblerStore.isFlushing || scrobblerStore.lastfmPendingCount === 0}
+          variant="secondary"
+          size="sm"
+        >
+          <RefreshCw class="w-3.5 h-3.5 {scrobblerStore.isFlushing ? 'animate-spin' : ''}" />
+          {i18n.t('lastfm.syncNowBtn')}
+        </Button>
+      </div>
+
+      <div class="space-y-3 pt-3 border-t border-brand-border/60">
+        <div class="flex items-center justify-between gap-4 py-1">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('lastfm.lovedTracksLabel')}</span>
+            <p class="text-xs text-brand-text-secondary">{i18n.t('lastfm.lovedTracksHint')}</p>
+          </div>
+          <Toggle
+            checked={scrobblerStore.ratingsEnabled}
+            onchange={(v) => scrobblerStore.setRatingsEnabled(v)}
+            label={i18n.t('lastfm.lovedTracksLabel')}
+          />
+        </div>
+
+        {#if scrobblerStore.ratingsEnabled}
+          <div class="ml-2 pl-3 border-l-2 border-brand-accent/30 flex flex-wrap items-center justify-between gap-3 py-1">
+            <div class="flex flex-col gap-0.5 min-w-0">
+              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('lastfm.syncLovedBtn')}</span>
+              <p class="text-[11px] text-brand-text-secondary">{i18n.t('lastfm.lovedTracksHint')}</p>
+              {#if scrobblerStore.syncRatingsResult}
+                {@const r = scrobblerStore.syncRatingsResult}
+                <p class="text-[11px] text-brand-text-primary font-medium">
+                  {i18n.t('lastfm.syncLovedSuccess', {
+                    loved: r.pulled_loved,
+                    pushed: r.pushed
+                  })}
+                </p>
+              {:else if scrobblerStore.syncRatingsError}
+                <p class="text-[11px] text-brand-text-primary font-medium">{scrobblerStore.syncRatingsError}</p>
+              {/if}
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onclick={() => scrobblerStore.syncRatings()}
+              disabled={scrobblerStore.isSyncingRatings}
+              class="gap-1.5 shrink-0"
+            >
+              {#if scrobblerStore.isSyncingRatings}
+                <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+                <span>{i18n.t('lastfm.syncingLovedBtn')}</span>
+              {:else}
+                <Heart weight="fill" class="w-3.5 h-3.5 text-rose-400" />
+                <span>{i18n.t('lastfm.syncLovedBtn')}</span>
+              {/if}
+            </Button>
+          </div>
+        {/if}
+      </div>
+    {/if}
+  {/if}
+</div>
+
 {/if}
 
 <!-- MusicBrainz Picard Card -->

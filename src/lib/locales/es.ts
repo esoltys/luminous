@@ -2256,6 +2256,33 @@ export const es = {
     syncRatingsFailed: "({failed} no se pudieron enviar)",
     syncRatingsNoCritiquebrainz: "No se obtuvieron las valoraciones con estrellas: agrega arriba tu perfil de CritiqueBrainz."
   },
+  lastfm: {
+    integrationTitle: "Scrobbler de Last.fm",
+    integrationDesc: "es un servicio de descubrimiento musical que registra lo que escuchas para ofrecer estadísticas personalizadas, listas semanales y recomendaciones de artistas.",
+    connectLabel: "Conectar Last.fm",
+    connectHint: "Autoriza a Luminous en tu navegador para enviar reproducciones a tu perfil de Last.fm",
+    connectBtn: "Conectar Last.fm",
+    authPendingTitle: "Esperando autorización en el navegador",
+    authPendingDesc: "Haz clic en «Yes, allow access» en la página de autorización de Last.fm en tu navegador y luego pulsa Finalizar inicio de sesión a continuación.",
+    finishAuthBtn: "Finalizar inicio de sesión",
+    cancelAuthBtn: "Cancelar",
+    authFailed: "No se pudo autorizar con Last.fm",
+    disconnectBtn: "Desconectar",
+    enableLabel: "Activar scrobbling de Last.fm",
+    enableHint: "Enviar reproducciones completadas a tu perfil de Last.fm",
+    lovedTracksLabel: "Sincronizar temas favoritos",
+    lovedTracksHint: "Sincronizar pistas favoritas con los temas favoritos de Last.fm",
+    syncLovedBtn: "Sincronizar temas favoritos",
+    syncingLovedBtn: "Sincronizando...",
+    syncLovedSuccess: "Temas favoritos sincronizados con Last.fm: {loved} obtenidos, {pushed} enviados",
+    cacheEmpty: "La caché sin conexión está vacía",
+    cachePending: {
+      one: "{count} reproducción pendiente en la caché sin conexión",
+      other: "{count} reproducciones pendientes en la caché sin conexión"
+    },
+    cacheDesc: "Las reproducciones registradas sin conexión a internet se ponen en cola y se envían automáticamente.",
+    syncNowBtn: "Sincronizar ahora"
+  },
   discord: {
     integrationTitle: "Discord Rich Presence",
     integrationDesc: "muestra la canción que estás escuchando y tu estado de escucha directamente en tu perfil de Discord mediante comunicación local entre procesos (IPC).",

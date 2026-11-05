@@ -2264,6 +2264,33 @@ export const frFR: DeepStringRecord<typeof en> = {
     syncRatingsFailed: "({failed} échec(s) de transmission)",
     syncRatingsNoCritiquebrainz: "Les notes en étoiles n’ont pas été récupérées : ajoutez votre profil CritiqueBrainz ci-dessus."
   },
+  lastfm: {
+    integrationTitle: "Scrobbler Last.fm",
+    integrationDesc: "est un service de découverte musicale qui enregistre vos écoutes pour fournir des statistiques personnalisées, des classements hebdomadaires et des recommandations d'artistes.",
+    connectLabel: "Connecter Last.fm",
+    connectHint: "Autorisez Luminous dans votre navigateur pour transmettre vos écoutes à votre profil Last.fm",
+    connectBtn: "Connecter Last.fm",
+    authPendingTitle: "En attente d'autorisation dans le navigateur",
+    authPendingDesc: "Cliquez sur « Yes, allow access » sur la page d'autorisation Last.fm dans votre navigateur, puis cliquez sur Terminer la connexion ci-dessous.",
+    finishAuthBtn: "Terminer la connexion",
+    cancelAuthBtn: "Annuler",
+    authFailed: "Échec de l'autorisation avec Last.fm",
+    disconnectBtn: "Déconnecter",
+    enableLabel: "Activer le scrobbling Last.fm",
+    enableHint: "Transmettre les écoutes terminées à votre profil Last.fm",
+    lovedTracksLabel: "Synchroniser les morceaux aimés",
+    lovedTracksHint: "Synchroniser les morceaux favoris avec les morceaux aimés sur Last.fm",
+    syncLovedBtn: "Synchroniser les morceaux aimés",
+    syncingLovedBtn: "Synchronisation en cours...",
+    syncLovedSuccess: "Morceaux aimés synchronisés avec Last.fm : {loved} récupérés, {pushed} envoyés",
+    cacheEmpty: "La mémoire cache hors ligne est vide",
+    cachePending: {
+      one: "{count} écoute en attente dans la mémoire cache hors ligne",
+      other: "{count} écoutes en attente dans la mémoire cache hors ligne"
+    },
+    cacheDesc: "Les écoutes enregistrées hors ligne sont mises en file d'attente et envoyées automatiquement.",
+    syncNowBtn: "Synchroniser maintenant"
+  },
   discord: {
     integrationTitle: "Discord Rich Presence",
     integrationDesc: "affiche le morceau en cours de lecture et votre statut d'écoute directement sur votre profil Discord via communication inter-processus locale (IPC).",

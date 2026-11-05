@@ -2424,6 +2424,35 @@ export const ru = {
     syncRatingsFailed: "(не удалось отправить: {failed})",
     syncRatingsNoCritiquebrainz: "Оценки в звёздах не получены: добавьте выше свой профиль CritiqueBrainz."
   },
+  lastfm: {
+    integrationTitle: "Скробблер Last.fm",
+    integrationDesc: "это сервис для поиска музыки, который отслеживает ваши прослушивания, составляя персональную статистику, еженедельные чарты и рекомендации артистов.",
+    connectLabel: "Подключить Last.fm",
+    connectHint: "Авторизуйте Luminous в браузере для отправки прослушиваний в профиль Last.fm",
+    connectBtn: "Подключить Last.fm",
+    authPendingTitle: "Ожидание авторизации в браузере",
+    authPendingDesc: "Нажмите «Yes, allow access» на странице авторизации Last.fm в браузере, затем нажмите «Завершить вход» ниже.",
+    finishAuthBtn: "Завершить вход",
+    cancelAuthBtn: "Отмена",
+    authFailed: "Не удалось авторизоваться в Last.fm",
+    disconnectBtn: "Отключить",
+    enableLabel: "Включить скробблинг Last.fm",
+    enableHint: "Отправлять завершённые прослушивания в профиль Last.fm",
+    lovedTracksLabel: "Синхронизировать любимые треки",
+    lovedTracksHint: "Синхронизировать избранные треки с любимыми на Last.fm",
+    syncLovedBtn: "Синхронизировать любимые",
+    syncingLovedBtn: "Синхронизация...",
+    syncLovedSuccess: "Любимые треки синхронизированы с Last.fm: получено {loved}, отправлено {pushed}",
+    cacheEmpty: "Офлайн-кэш пуст",
+    cachePending: {
+      one: "{count} прослушивание в офлайн-кэше",
+      few: "{count} прослушивания в офлайн-кэше",
+      many: "{count} прослушиваний в офлайн-кэше",
+      other: "{count} прослушиваний в офлайн-кэше"
+    },
+    cacheDesc: "Прослушивания, записанные без подключения к интернету, помещаются в очередь и отправляются автоматически.",
+    syncNowBtn: "Синхронизировать сейчас"
+  },
   discord: {
     integrationTitle: "Discord Rich Presence",
     integrationDesc: "— показывает в вашем профиле Discord песню, которая играет сейчас, и статус прослушивания через локальное межпроцессное взаимодействие (IPC).",

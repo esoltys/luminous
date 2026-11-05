@@ -2256,6 +2256,33 @@ export const it = {
     syncRatingsFailed: "(invio non riuscito: {failed})",
     syncRatingsNoCritiquebrainz: "Le valutazioni a stelle non sono state recuperate: aggiungi qui sopra il tuo profilo CritiqueBrainz."
   },
+  lastfm: {
+    integrationTitle: "Scrobbler Last.fm",
+    integrationDesc: "è un servizio di scoperta musicale che registra i brani ascoltati per offrire statistiche personalizzate, classifiche settimanali e consigli sugli artisti.",
+    connectLabel: "Connetti Last.fm",
+    connectHint: "Autorizza Luminous nel browser per inviare gli ascolti al tuo profilo Last.fm",
+    connectBtn: "Connetti Last.fm",
+    authPendingTitle: "In attesa di autorizzazione nel browser",
+    authPendingDesc: "Fai clic su «Yes, allow access» nella pagina di autorizzazione di Last.fm nel browser, quindi fai clic su Completa accesso qui sotto.",
+    finishAuthBtn: "Completa accesso",
+    cancelAuthBtn: "Annulla",
+    authFailed: "Autorizzazione con Last.fm non riuscita",
+    disconnectBtn: "Disconnetti",
+    enableLabel: "Abilita scrobbling Last.fm",
+    enableHint: "Invia gli ascolti completati al tuo profilo Last.fm",
+    lovedTracksLabel: "Sincronizza brani preferiti",
+    lovedTracksHint: "Sincronizza i brani preferiti con i brani piaciuti su Last.fm",
+    syncLovedBtn: "Sincronizza brani preferiti",
+    syncingLovedBtn: "Sincronizzazione in corso...",
+    syncLovedSuccess: "Brani preferiti sincronizzati con Last.fm: {loved} scaricati, {pushed} inviati",
+    cacheEmpty: "La cache non in linea è vuota",
+    cachePending: {
+      one: "{count} ascolto in sospeso nella cache non in linea",
+      other: "{count} ascolti in sospeso nella cache non in linea"
+    },
+    cacheDesc: "Gli ascolti registrati senza connessione internet vengono accodati e inviati automaticamente.",
+    syncNowBtn: "Sincronizza ora"
+  },
   discord: {
     integrationTitle: "Discord Rich Presence",
     integrationDesc: "mostra il brano in riproduzione e il tuo stato di ascolto direttamente sul tuo profilo Discord usando la comunicazione locale tra processi (IPC).",
