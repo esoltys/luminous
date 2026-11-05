@@ -32,8 +32,8 @@
     ArrowUpIcon as ArrowUp,
     QuestionIcon as HelpCircle,
     StackIcon as Layers,
-    PlugsIcon as Plugs,
-    PlugsConnectedIcon as PlugsConnected
+    LightningIcon as Lightning,
+    LightningSlashIcon as LightningSlash
   } from "phosphor-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
@@ -436,7 +436,7 @@
         <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
           <!-- Inner wrapper anchors the status dot to the icon, not the w-7 slot. -->
           <div class="relative flex items-center justify-center">
-            <PlugsConnected class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0" />
+            <Lightning class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0" />
             <span
               class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-brand-sidebar {scrobblingPaused ? 'bg-amber-500' : 'bg-emerald-500'}"
               data-testid="musicbrainz-status-dot"
@@ -458,7 +458,7 @@
         title={i18n.t('sidebar.connectIntegrations', {}, 'Connect...')}
       >
         <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
-          <Plugs class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4 icon-align'} shrink-0" />
+          <LightningSlash class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4 icon-align'} shrink-0" />
         </div>
         {#if !layoutCollapsed}
           <span class="text-left leading-tight min-w-0">{i18n.t('sidebar.connectIntegrations', {}, 'Connect...')}</span>
