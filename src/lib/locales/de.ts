@@ -2195,6 +2195,9 @@ export const de = {
     draftModifiedBadge: "Vorlage geändert — automatische Organisation pausiert",
     revertDraftBtn: "Zurücksetzen"
   },
+  musicbrainz: {
+    integrationDesc: "ist eine kollaborative Musikdatenbank, die weltweite Veröffentlichungen erfasst und Ihren Titeln universelle Metadaten-Kennungen (MBIDs) für präzise Künstlerbiografien, Cover-Abgleiche und nahtloses Scrobbeln zuweist."
+  },
   picard: {
     openInPicard: "In Picard öffnen",
     openAllInPicard: "Alle in Picard öffnen",

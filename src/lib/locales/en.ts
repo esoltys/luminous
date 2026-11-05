@@ -2195,6 +2195,9 @@ export const en = {
     draftModifiedBadge: "Template modified — Auto-Organize paused",
     revertDraftBtn: "Revert"
   },
+  musicbrainz: {
+    integrationDesc: "is a crowd-sourced music database that catalogs releases worldwide, giving your tracks universal metadata identifiers (MBIDs) for accurate artist bios, cover art matching, and seamless scrobbling."
+  },
   picard: {
     openInPicard: "Open in Picard",
     openAllInPicard: "Open All in Picard",

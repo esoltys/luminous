@@ -2195,6 +2195,9 @@ export const es = {
     draftModifiedBadge: "Plantilla modificada — organización automática en pausa",
     revertDraftBtn: "Restablecer"
   },
+  musicbrainz: {
+    integrationDesc: "es una base de datos musical colaborativa que cataloga lanzamientos de todo el mundo, proporcionando a tus pistas identificadores universales (MBID) para biografías de artistas precisas, coincidencia de carátulas y scrobbling fluido."
+  },
   picard: {
     openInPicard: "Abrir en Picard",
     openAllInPicard: "Abrir todo en Picard",

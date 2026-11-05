@@ -159,7 +159,7 @@
         <h3 class="font-bold text-sm text-brand-text-primary">MusicBrainz</h3>
         <p class="text-xs text-brand-text-secondary leading-relaxed">
           <button onclick={() => openExternalUrl("https://musicbrainz.org")} class="text-brand-accent hover:underline">MusicBrainz</button>
-          {i18n.t('auth.modalSubtitle', {}, 'Connect your account to manage integrations and scrobbling')}
+          {i18n.t('musicbrainz.integrationDesc')}
         </p>
       </div>
     </div>

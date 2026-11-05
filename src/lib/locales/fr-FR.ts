@@ -2203,6 +2203,9 @@ export const frFR: DeepStringRecord<typeof en> = {
     draftModifiedBadge: "Modèle modifié — organisation automatique suspendue",
     revertDraftBtn: "Rétablir"
   },
+  musicbrainz: {
+    integrationDesc: "est une base de données musicale collaborative qui répertorie les sorties à l'échelle mondiale, attribuant à vos pistes des identifiants universels (MBID) pour des biographies d'artistes précises, la correspondance des pochettes et un scrobbling fluide."
+  },
   picard: {
     openInPicard: "Ouvrir dans Picard",
     openAllInPicard: "Tout ouvrir dans Picard",
