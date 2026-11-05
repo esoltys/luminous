@@ -11,7 +11,7 @@
   import { fileIcon } from "./fileIcon";
   import { highlightSegments, matchesFileFilter, parseFileFilter } from "./fileFilter";
   import { sortFileEntries, type FileSortColumn } from "./fileSorting";
-  import { fileDrag } from "../../stores/fileDrag.svelte";
+  import { fileDrag, parseDropTarget } from "../../stores/fileDrag.svelte";
 
   /**
    * A column browser over one source (#1841): up to two columns of the
@@ -499,24 +499,125 @@
     select(name);
   }
 
-  function onRowDragStart(event: DragEvent, entry: FileEntry) {
-    if (entry.isDir) return;
-    const dragged = selection.includes(entry.name)
-      ? sortedEntries.filter((e) => !e.isDir && selection.includes(e.name))
-      : [entry];
-    if (!selection.includes(entry.name)) {
-      select(entry.name);
+  const CLICK_VS_DRAG_THRESHOLD_PX = 4;
+  let pointerDragArmed = false;
+  let pointerDragStartX = 0;
+  let pointerDragStartY = 0;
+  let pointerDragEntry: FileEntry | null = null;
+  let capturedEl: HTMLElement | null = null;
+  let capturedPointerId: number | null = null;
+  let wasDragged = false;
+  let wasDraggedTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function handleRowPointerDown(e: PointerEvent, entry: FileEntry) {
+    if (entry.isDir || e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button, a, input, select, textarea, [data-interactive]")) return;
+
+    pointerDragArmed = false;
+    wasDragged = false;
+    pointerDragStartX = e.clientX;
+    pointerDragStartY = e.clientY;
+    pointerDragEntry = entry;
+    capturedEl = e.currentTarget as HTMLElement;
+    capturedPointerId = e.pointerId;
+
+    try {
+      capturedEl.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignored in headless/test environments where setPointerCapture may not be defined
     }
-    fileDrag.start(dragged);
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = "copy";
-      event.dataTransfer.setData("text/plain", dragged.map((e) => e.name).join("\n"));
-    }
+
+    window.addEventListener("pointermove", handlePointerDragMove);
+    window.addEventListener("pointerup", handlePointerDragUp);
+    window.addEventListener("pointercancel", handlePointerDragCancel);
   }
 
-  function onRowDragEnd() {
-    fileDrag.end();
+  function handlePointerDragMove(e: PointerEvent) {
+    if (!pointerDragEntry) return;
+
+    if (!pointerDragArmed) {
+      const dx = e.clientX - pointerDragStartX;
+      const dy = e.clientY - pointerDragStartY;
+      if (Math.hypot(dx, dy) < CLICK_VS_DRAG_THRESHOLD_PX) return;
+      pointerDragArmed = true;
+
+      const dragged = selection.includes(pointerDragEntry.name)
+        ? sortedEntries.filter((ent) => !ent.isDir && selection.includes(ent.name))
+        : [pointerDragEntry];
+      if (!selection.includes(pointerDragEntry.name)) {
+        select(pointerDragEntry.name);
+      }
+      fileDrag.start(dragged, { x: e.clientX, y: e.clientY });
+    }
+
+    const dropEl = (typeof document.elementFromPoint === "function"
+      ? document.elementFromPoint(e.clientX, e.clientY)
+      : null) as HTMLElement | null;
+    const dropTarget = parseDropTarget(dropEl);
+    fileDrag.updatePointer({ x: e.clientX, y: e.clientY }, dropTarget);
   }
+
+  async function handlePointerDragUp() {
+    window.removeEventListener("pointermove", handlePointerDragMove);
+    window.removeEventListener("pointerup", handlePointerDragUp);
+    window.removeEventListener("pointercancel", handlePointerDragCancel);
+
+    try {
+      if (capturedEl && capturedPointerId !== null) {
+        capturedEl.releasePointerCapture(capturedPointerId);
+      }
+    } catch {}
+    capturedEl = null;
+    capturedPointerId = null;
+
+    if (pointerDragArmed) {
+      wasDragged = true;
+      clearTimeout(wasDraggedTimer);
+      wasDraggedTimer = setTimeout(() => {
+        wasDragged = false;
+      }, 100);
+
+      const dropTarget = fileDrag.dropTarget;
+      if (dropTarget?.kind === "queue") {
+        await fileDrag.dropToQueue();
+      } else if (dropTarget?.kind === "playlist") {
+        await fileDrag.dropToPlaylist({ id: dropTarget.id, name: dropTarget.name });
+      } else {
+        fileDrag.end();
+      }
+    }
+
+    pointerDragArmed = false;
+    pointerDragEntry = null;
+  }
+
+  function handlePointerDragCancel() {
+    window.removeEventListener("pointermove", handlePointerDragMove);
+    window.removeEventListener("pointerup", handlePointerDragUp);
+    window.removeEventListener("pointercancel", handlePointerDragCancel);
+
+    try {
+      if (capturedEl && capturedPointerId !== null) {
+        capturedEl.releasePointerCapture(capturedPointerId);
+      }
+    } catch {}
+    capturedEl = null;
+    capturedPointerId = null;
+
+    if (pointerDragArmed) {
+      fileDrag.end();
+    }
+    pointerDragArmed = false;
+    pointerDragEntry = null;
+  }
+
+  $effect(() => () => {
+    window.removeEventListener("pointermove", handlePointerDragMove);
+    window.removeEventListener("pointerup", handlePointerDragUp);
+    window.removeEventListener("pointercancel", handlePointerDragCancel);
+    clearTimeout(wasDraggedTimer);
+  });
 
   /** A right-click on a folder acts on it alone; on a file, on the selection it belongs to. */
   function openMenu(event: MouseEvent, entry: FileEntry) {
@@ -691,10 +792,15 @@
                   role="option"
                   aria-selected={selected}
                   tabindex="-1"
-                  draggable={!entry.isDir}
-                  ondragstart={(e) => onRowDragStart(e, entry)}
-                  ondragend={onRowDragEnd}
-                  onclick={(e) => (entry.isDir ? openFolder(dir, entry.name) : clickFile(e, entry.name))}
+                  onpointerdown={(e) => handleRowPointerDown(e, entry)}
+                  onclick={(e) => {
+                    if (wasDragged) {
+                      wasDragged = false;
+                      return;
+                    }
+                    if (entry.isDir) openFolder(dir, entry.name);
+                    else clickFile(e, entry.name);
+                  }}
                   ondblclick={() => { if (!entry.isDir) onactivate(entry); }}
                   oncontextmenu={(e) => openMenu(e, entry)}
                   onkeydown={() => {}}

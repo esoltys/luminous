@@ -3,9 +3,39 @@ import { playlistsStore } from "./playlists.svelte";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
 
+export type FileDropTarget =
+  | { kind: "queue" }
+  | { kind: "custom-category" }
+  | { kind: "playlist"; id: number; name: string };
+
+/**
+ * Inspects a DOM element or its ancestors for a valid file drop target attribute (`data-drop-target`).
+ */
+export function parseDropTarget(el: HTMLElement | null): FileDropTarget | null {
+  const target = el?.closest<HTMLElement>("[data-drop-target]");
+  if (!target) return null;
+  const kind = target.dataset.dropTarget;
+  if (kind === "queue") {
+    return { kind: "queue" };
+  }
+  if (kind === "custom-category") {
+    return { kind: "custom-category" };
+  }
+  if (kind === "playlist") {
+    const id = Number(target.dataset.playlistId);
+    const name = target.dataset.playlistName ?? "";
+    if (!Number.isNaN(id) && name) {
+      return { kind: "playlist", id, name };
+    }
+  }
+  return null;
+}
+
 class FileDragStore {
   draggedEntries = $state<FileEntry[]>([]);
   isDragging = $state(false);
+  pointerPos = $state<{ x: number; y: number } | null>(null);
+  dropTarget = $state<FileDropTarget | null>(null);
 
   /** Song IDs of all dragged files that are already indexed in the library. */
   librarySongIds = $derived(
@@ -20,14 +50,23 @@ class FileDragStore {
   /** Whether the drag payload has at least one valid library song. */
   hasPlayableSongs = $derived(this.librarySongIds.length > 0);
 
-  start(entries: FileEntry[]) {
+  start(entries: FileEntry[], pos?: { x: number; y: number }) {
     this.draggedEntries = entries;
     this.isDragging = true;
+    this.pointerPos = pos ?? null;
+    this.dropTarget = null;
+  }
+
+  updatePointer(pos: { x: number; y: number }, target: FileDropTarget | null) {
+    this.pointerPos = pos;
+    this.dropTarget = target;
   }
 
   end() {
     this.draggedEntries = [];
     this.isDragging = false;
+    this.pointerPos = null;
+    this.dropTarget = null;
   }
 
   /**

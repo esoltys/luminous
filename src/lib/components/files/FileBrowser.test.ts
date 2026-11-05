@@ -434,23 +434,21 @@ describe("FileBrowser.svelte", () => {
       expect(onnavigate).toHaveBeenLastCalledWith(["Rock"]);
     });
 
-    it("starts file drag on row dragstart", async () => {
+    it("starts file drag on pointer drag gesture", async () => {
       const { fileDrag } = await import("../../stores/fileDrag.svelte");
       const { findByText, getByRole } = setup(["Rock", "Live"]);
       await findByText("01 Opening.flac");
       const option = getByRole("option", { name: /01 Opening/ });
 
-      const dataTransfer = {
-        setData: vi.fn(),
-        effectAllowed: "",
-      };
+      await fireEvent.pointerDown(option, { button: 0, clientX: 100, clientY: 100 });
+      expect(fileDrag.isDragging).toBe(false);
 
-      await fireEvent.dragStart(option, { dataTransfer });
+      // Move past the 4px drag threshold
+      await fireEvent.pointerMove(window, { clientX: 110, clientY: 110 });
       expect(fileDrag.isDragging).toBe(true);
       expect(fileDrag.librarySongIds).toContain(7);
-      expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "01 Opening.flac");
 
-      await fireEvent.dragEnd(option);
+      await fireEvent.pointerUp(window);
       expect(fileDrag.isDragging).toBe(false);
     });
   });

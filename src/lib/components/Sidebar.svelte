@@ -97,8 +97,6 @@
 
   let customExpandTimer: ReturnType<typeof setTimeout> | undefined;
   let dragExpandedCustom = $state(false);
-  let hoveredQueue = $state(false);
-  let hoveredPlaylistId = $state<number | null>(null);
 
   const customPlaylists = $derived(
     playlistsStore.playlists.filter(
@@ -106,63 +104,26 @@
     )
   );
 
-  function handleCustomDragEnter(e: DragEvent) {
-    if (!fileDrag.isDragging) return;
-    e.preventDefault();
-    clearTimeout(customExpandTimer);
-    customExpandTimer = setTimeout(() => {
-      dragExpandedCustom = true;
-    }, 500);
-  }
-
-  function handleCustomDragLeave() {
-    clearTimeout(customExpandTimer);
-  }
-
-  function handleQueueDragOver(e: DragEvent) {
-    if (!fileDrag.isDragging) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-    hoveredQueue = true;
-  }
-
-  function handleQueueDragLeave() {
-    hoveredQueue = false;
-  }
-
-  async function handleQueueDrop(e: DragEvent) {
-    e.preventDefault();
-    hoveredQueue = false;
-    dragExpandedCustom = false;
-    clearTimeout(customExpandTimer);
-    await fileDrag.dropToQueue();
-  }
-
-  function handlePlaylistDragOver(e: DragEvent, plId: number) {
-    if (!fileDrag.isDragging) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-    hoveredPlaylistId = plId;
-  }
-
-  function handlePlaylistDragLeave(plId: number) {
-    if (hoveredPlaylistId === plId) hoveredPlaylistId = null;
-  }
-
-  async function handlePlaylistDrop(e: DragEvent, pl: { id: number; name: string }) {
-    e.preventDefault();
-    hoveredPlaylistId = null;
-    dragExpandedCustom = false;
-    clearTimeout(customExpandTimer);
-    await fileDrag.dropToPlaylist(pl);
-  }
-
   $effect(() => {
     if (!fileDrag.isDragging) {
       dragExpandedCustom = false;
-      hoveredQueue = false;
-      hoveredPlaylistId = null;
       clearTimeout(customExpandTimer);
+      customExpandTimer = undefined;
+      return;
+    }
+
+    if (fileDrag.dropTarget?.kind === "custom-category") {
+      if (!dragExpandedCustom && !customExpandTimer) {
+        customExpandTimer = setTimeout(() => {
+          dragExpandedCustom = true;
+          customExpandTimer = undefined;
+        }, 500);
+      }
+    } else {
+      if (!dragExpandedCustom && customExpandTimer) {
+        clearTimeout(customExpandTimer);
+        customExpandTimer = undefined;
+      }
     }
   });
 
@@ -328,10 +289,8 @@
 
           <button
             onclick={() => openPlaylistsSubTab("custom")}
-            ondragenter={handleCustomDragEnter}
-            ondragover={(e) => { if (fileDrag.isDragging) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; } }}
-            ondragleave={handleCustomDragLeave}
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'custom' && !navigationStore.selectedPlaylistId && !navigationStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {dragExpandedCustom ? 'ring-1 ring-brand-accent/40 bg-brand-accent/10 text-brand-text-primary' : ''}"
+            data-drop-target="custom-category"
+            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'custom' && !navigationStore.selectedPlaylistId && !navigationStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {dragExpandedCustom || (fileDrag.isDragging && fileDrag.dropTarget?.kind === 'custom-category') ? 'ring-1 ring-brand-accent/40 bg-brand-accent/10 text-brand-text-primary' : ''}"
           >
             <div class="flex items-center gap-2 truncate">
               <ListMusic class="w-3.5 h-3.5 icon-align" />
@@ -347,10 +306,10 @@
               {#each customPlaylists as pl (pl.id)}
                 <button
                   type="button"
-                  class="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] truncate transition-colors {hoveredPlaylistId === pl.id ? 'bg-brand-accent/30 text-brand-text-primary ring-1 ring-brand-accent font-semibold' : 'text-brand-text-secondary hover:bg-brand-accent/15'}"
-                  ondragover={(e) => handlePlaylistDragOver(e, pl.id)}
-                  ondragleave={() => handlePlaylistDragLeave(pl.id)}
-                  ondrop={(e) => handlePlaylistDrop(e, pl)}
+                  data-drop-target="playlist"
+                  data-playlist-id={pl.id}
+                  data-playlist-name={pl.name}
+                  class="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] truncate transition-colors {fileDrag.isDragging && fileDrag.dropTarget?.kind === 'playlist' && fileDrag.dropTarget.id === pl.id ? 'bg-brand-accent/30 text-brand-text-primary ring-1 ring-brand-accent font-semibold' : 'text-brand-text-secondary hover:bg-brand-accent/15'}"
                   onclick={() => navigationStore.viewPlaylist(pl.id)}
                 >
                   <span class="truncate">{pl.name}</span>
@@ -365,10 +324,8 @@
               playlistsStore.selectPlaylist(queuePl.id);
               navigationStore.viewPlaylist(queuePl.id);
             }}
-            ondragover={handleQueueDragOver}
-            ondragleave={handleQueueDragLeave}
-            ondrop={handleQueueDrop}
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === navigationStore.selectedPlaylistId)?.is_queue ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {hoveredQueue ? 'bg-brand-accent/30 ring-1 ring-brand-accent text-brand-text-primary' : ''}"
+            data-drop-target="queue"
+            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === navigationStore.selectedPlaylistId)?.is_queue ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {fileDrag.isDragging && fileDrag.dropTarget?.kind === 'queue' ? 'bg-brand-accent/30 ring-1 ring-brand-accent text-brand-text-primary' : ''}"
           >
             <div class="flex items-center gap-2 truncate">
               <Layers class="w-3.5 h-3.5 icon-align" />

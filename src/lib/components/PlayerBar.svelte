@@ -209,24 +209,6 @@
     contextMenuState = { x: rect.left, y: rect.top };
   }
 
-  let hoveredQueue = $state(false);
-
-  function handleQueueDragOver(e: DragEvent) {
-    if (!fileDrag.isDragging) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-    hoveredQueue = true;
-  }
-
-  function handleQueueDragLeave() {
-    hoveredQueue = false;
-  }
-
-  async function handleQueueDrop(e: DragEvent) {
-    e.preventDefault();
-    hoveredQueue = false;
-    await fileDrag.dropToQueue();
-  }
 
   async function navigateToQueue() {
     windowLayoutStore.exitImmersiveMode();
@@ -518,10 +500,8 @@
         {/if}
         <button
           onclick={navigateToQueue}
-          ondragover={handleQueueDragOver}
-          ondragleave={handleQueueDragLeave}
-          ondrop={handleQueueDrop}
-          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors {hoveredQueue ? 'text-brand-accent-text scale-110' : ''}"
+          data-drop-target="queue"
+          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors {fileDrag.isDragging && fileDrag.dropTarget?.kind === 'queue' ? 'text-brand-accent-text scale-110' : ''}"
           title={i18n.t('playerBar.queueTitle', {}, 'Queue')}
         >
           <Layers class="w-5 h-5" />

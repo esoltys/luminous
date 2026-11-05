@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import { tick } from "svelte";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import Sidebar from "./Sidebar.svelte";
@@ -229,37 +230,42 @@ describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
     ];
   });
 
-  it("handles drop onto Queue", async () => {
+  it("exposes Queue drop target and highlights during drag", async () => {
     const { fileDrag } = await import("../stores/fileDrag.svelte");
-    const dropSpy = vi.spyOn(fileDrag, "dropToQueue").mockResolvedValue();
     fileDrag.start([{ name: "track.flac", isDir: false, songId: 10 } as any]);
 
     const { getByRole } = render(Sidebar, { props: { width: 256 } });
     const queueBtn = getByRole("button", { name: /queue/i });
+    expect(queueBtn.getAttribute("data-drop-target")).toBe("queue");
 
-    await fireEvent.dragOver(queueBtn, { dataTransfer: { dropEffect: "" } });
-    await fireEvent.drop(queueBtn);
-    expect(dropSpy).toHaveBeenCalled();
+    fileDrag.updatePointer({ x: 0, y: 0 }, { kind: "queue" });
+    await tick();
+    expect(queueBtn.className).toContain("ring-brand-accent");
+
+    fileDrag.end();
   });
 
-  it("expands custom playlists after dragging over Custom for 500ms and drops to playlist", async () => {
+  it("expands custom playlists after dragging over Custom for 500ms", async () => {
     vi.useFakeTimers();
     try {
       const { fileDrag } = await import("../stores/fileDrag.svelte");
-      const dropSpy = vi.spyOn(fileDrag, "dropToPlaylist").mockResolvedValue();
       fileDrag.start([{ name: "track.flac", isDir: false, songId: 10 } as any]);
 
       const { getByRole, findByRole } = render(Sidebar, { props: { width: 256 } });
       const customBtn = getByRole("button", { name: /custom/i });
+      expect(customBtn.getAttribute("data-drop-target")).toBe("custom-category");
 
-      await fireEvent.dragEnter(customBtn);
+      fileDrag.updatePointer({ x: 0, y: 0 }, { kind: "custom-category" });
+      await tick();
       vi.advanceTimersByTime(500);
+      await tick();
 
       const favPlaylistBtn = await findByRole("button", { name: "Favorites" });
       expect(favPlaylistBtn).toBeInTheDocument();
+      expect(favPlaylistBtn.getAttribute("data-drop-target")).toBe("playlist");
+      expect(favPlaylistBtn.getAttribute("data-playlist-id")).toBe("2");
 
-      await fireEvent.drop(favPlaylistBtn);
-      expect(dropSpy).toHaveBeenCalledWith(expect.objectContaining({ id: 2, name: "Favorites" }));
+      fileDrag.end();
     } finally {
       vi.useRealTimers();
     }

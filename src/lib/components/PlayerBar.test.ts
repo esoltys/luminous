@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import { tick } from "svelte";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import PlayerBar from "./PlayerBar.svelte";
@@ -607,16 +608,18 @@ describe("PlayerBar.svelte", () => {
     expect(queryByRole("menu")).toBeInTheDocument();
   });
 
-  it("handles drop onto the Queue button (#1888)", async () => {
+  it("exposes Queue drop target and highlights during drag (#1888)", async () => {
     const { fileDrag } = await import("../stores/fileDrag.svelte");
-    const dropSpy = vi.spyOn(fileDrag, "dropToQueue").mockResolvedValue();
     fileDrag.start([{ name: "track.flac", isDir: false, songId: 10 } as any]);
 
     const { getByTitle } = render(PlayerBar);
     const queueBtn = getByTitle("Queue");
+    expect(queueBtn.getAttribute("data-drop-target")).toBe("queue");
 
-    await fireEvent.dragOver(queueBtn, { dataTransfer: { dropEffect: "" } });
-    await fireEvent.drop(queueBtn);
-    expect(dropSpy).toHaveBeenCalled();
+    fileDrag.updatePointer({ x: 0, y: 0 }, { kind: "queue" });
+    await tick();
+    expect(queueBtn.className).toContain("text-brand-accent-text");
+
+    fileDrag.end();
   });
 });
