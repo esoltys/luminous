@@ -84,7 +84,7 @@
     const d = decade;
     const b = bpm;
     const pid = playlistId;
-    const tc = trackCount;
+    const currentTrackCount = trackCount;
 
     const request =
       (k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "daypart") && pid !== undefined
@@ -130,7 +130,7 @@
           decade === d &&
           bpm === b &&
           playlistId === pid &&
-          trackCount === tc
+          trackCount === currentTrackCount
         ) {
           songs = res;
         }
