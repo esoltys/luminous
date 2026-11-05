@@ -16,6 +16,7 @@ import {
   siMusicbrainz,
   siDiscogs,
   siWikipedia,
+  siLastdotfm,
 } from "simple-icons";
 
 describe("SocialIcon", () => {
@@ -40,6 +41,7 @@ describe("SocialIcon", () => {
     ["musicbrainz", siMusicbrainz],
     ["discogs", siDiscogs],
     ["wikipedia", siWikipedia],
+    ["lastfm", siLastdotfm],
   ])("renders the correct brand icon path for %s", (platform, icon) => {
     const { container } = render(SocialIcon, { props: { platform } });
     const path = container.querySelector("svg path");

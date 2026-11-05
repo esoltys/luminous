@@ -20,6 +20,7 @@
     siInternetarchive,
     siSongkick,
     siBandsintown,
+    siLastdotfm,
     type SimpleIcon,
   } from "simple-icons";
 
@@ -57,6 +58,9 @@
     internet_archive: siInternetarchive,
     songkick: siSongkick,
     bandsintown: siBandsintown,
+    lastfm: siLastdotfm,
+    last_fm: siLastdotfm,
+    lastdotfm: siLastdotfm,
   };
 
   const brandIcon = $derived(BRAND_ICONS[normalized]);
