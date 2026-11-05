@@ -31,6 +31,48 @@ export function parseDropTarget(el: HTMLElement | null): FileDropTarget | null {
   return null;
 }
 
+/**
+ * Finds the drop target under the given viewport coordinates (x, y).
+ * Uses elementsFromPoint first, and falls back to geometric bounding rect matching
+ * across all [data-drop-target] elements. This guarantees detection even when pointer
+ * capture, CSS backdrop filters, or webview hit-testing limitations obscure targets.
+ */
+export function findDropTargetAt(x: number, y: number): FileDropTarget | null {
+  if (typeof document === "undefined") return null;
+
+  if (typeof document.elementsFromPoint === "function") {
+    const elements = document.elementsFromPoint(x, y);
+    for (const el of elements) {
+      const dropEl = el.closest<HTMLElement>("[data-drop-target]");
+      if (dropEl) {
+        const parsed = parseDropTarget(dropEl);
+        if (parsed) return parsed;
+      }
+    }
+  }
+
+  if (typeof document.querySelectorAll === "function") {
+    const targets = Array.from(document.querySelectorAll<HTMLElement>("[data-drop-target]"));
+    for (let i = targets.length - 1; i >= 0; i--) {
+      const target = targets[i];
+      const rect = target.getBoundingClientRect();
+      if (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        x >= rect.left &&
+        x <= rect.right &&
+        y >= rect.top &&
+        y <= rect.bottom
+      ) {
+        const parsed = parseDropTarget(target);
+        if (parsed) return parsed;
+      }
+    }
+  }
+
+  return null;
+}
+
 class FileDragStore {
   draggedEntries = $state<FileEntry[]>([]);
   isDragging = $state(false);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fileDrag, parseDropTarget } from "./fileDrag.svelte";
+import { fileDrag, parseDropTarget, findDropTargetAt } from "./fileDrag.svelte";
 import type { FileEntry } from "../types";
 
 function mockEntry(name: string, songId: number | null, isDir = false): FileEntry {
@@ -87,6 +87,30 @@ describe("fileDrag store", () => {
       btn.dataset.playlistName = "Road Trip";
 
       expect(parseDropTarget(btn)).toBeNull();
+    });
+  });
+
+  describe("findDropTargetAt", () => {
+    it("finds drop target using geometric bounding rect", () => {
+      const btn = document.createElement("button");
+      btn.dataset.dropTarget = "queue";
+      document.body.appendChild(btn);
+
+      btn.getBoundingClientRect = () =>
+        ({
+          left: 10,
+          right: 110,
+          top: 20,
+          bottom: 60,
+          width: 100,
+          height: 40,
+        }) as DOMRect;
+
+      expect(findDropTargetAt(50, 40)).toEqual({ kind: "queue" });
+      expect(findDropTargetAt(5, 40)).toBeNull();
+      expect(findDropTargetAt(150, 40)).toBeNull();
+
+      document.body.removeChild(btn);
     });
   });
 });

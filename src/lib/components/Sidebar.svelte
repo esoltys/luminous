@@ -290,7 +290,7 @@
           <button
             onclick={() => openPlaylistsSubTab("custom")}
             data-drop-target="custom-category"
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'custom' && !navigationStore.selectedPlaylistId && !navigationStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {dragExpandedCustom || (fileDrag.isDragging && fileDrag.dropTarget?.kind === 'custom-category') ? 'ring-1 ring-brand-accent/40 bg-brand-accent/10 text-brand-text-primary' : ''}"
+            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'custom' && !navigationStore.selectedPlaylistId && !navigationStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {dragExpandedCustom || (fileDrag.isDragging && fileDrag.dropTarget?.kind === 'custom-category') ? 'ring-2 ring-brand-accent/60 bg-brand-accent/20 text-brand-text-primary font-semibold' : ''}"
           >
             <div class="flex items-center gap-2 truncate">
               <ListMusic class="w-3.5 h-3.5 icon-align" />
@@ -309,7 +309,7 @@
                   data-drop-target="playlist"
                   data-playlist-id={pl.id}
                   data-playlist-name={pl.name}
-                  class="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] truncate transition-colors {fileDrag.isDragging && fileDrag.dropTarget?.kind === 'playlist' && fileDrag.dropTarget.id === pl.id ? 'bg-brand-accent/30 text-brand-text-primary ring-1 ring-brand-accent font-semibold' : 'text-brand-text-secondary hover:bg-brand-accent/15'}"
+                  class="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] truncate transition-colors {fileDrag.isDragging && fileDrag.dropTarget?.kind === 'playlist' && fileDrag.dropTarget.id === pl.id ? 'bg-brand-accent/30 text-brand-text-primary ring-2 ring-brand-accent font-semibold' : 'text-brand-text-secondary hover:bg-brand-accent/15'}"
                   onclick={() => navigationStore.viewPlaylist(pl.id)}
                 >
                   <span class="truncate">{pl.name}</span>
@@ -325,7 +325,7 @@
               navigationStore.viewPlaylist(queuePl.id);
             }}
             data-drop-target="queue"
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === navigationStore.selectedPlaylistId)?.is_queue ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {fileDrag.isDragging && fileDrag.dropTarget?.kind === 'queue' ? 'bg-brand-accent/30 ring-1 ring-brand-accent text-brand-text-primary' : ''}"
+            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === navigationStore.selectedPlaylistId)?.is_queue ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {fileDrag.isDragging && fileDrag.dropTarget?.kind === 'queue' ? 'bg-brand-accent/30 ring-2 ring-brand-accent text-brand-text-primary font-semibold' : ''}"
           >
             <div class="flex items-center gap-2 truncate">
               <Layers class="w-3.5 h-3.5 icon-align" />

@@ -11,7 +11,7 @@
   import { fileIcon } from "./fileIcon";
   import { highlightSegments, matchesFileFilter, parseFileFilter } from "./fileFilter";
   import { sortFileEntries, type FileSortColumn } from "./fileSorting";
-  import { fileDrag, parseDropTarget } from "../../stores/fileDrag.svelte";
+  import { fileDrag, findDropTargetAt } from "../../stores/fileDrag.svelte";
 
   /**
    * A column browser over one source (#1841): up to two columns of the
@@ -551,14 +551,11 @@
       fileDrag.start(dragged, { x: e.clientX, y: e.clientY });
     }
 
-    const dropEl = (typeof document.elementFromPoint === "function"
-      ? document.elementFromPoint(e.clientX, e.clientY)
-      : null) as HTMLElement | null;
-    const dropTarget = parseDropTarget(dropEl);
+    const dropTarget = findDropTargetAt(e.clientX, e.clientY);
     fileDrag.updatePointer({ x: e.clientX, y: e.clientY }, dropTarget);
   }
 
-  async function handlePointerDragUp() {
+  async function handlePointerDragUp(e?: PointerEvent) {
     window.removeEventListener("pointermove", handlePointerDragMove);
     window.removeEventListener("pointerup", handlePointerDragUp);
     window.removeEventListener("pointercancel", handlePointerDragCancel);
@@ -578,7 +575,8 @@
         wasDragged = false;
       }, 100);
 
-      const dropTarget = fileDrag.dropTarget;
+      const dropTarget =
+        fileDrag.dropTarget ?? (e ? findDropTargetAt(e.clientX, e.clientY) : null);
       if (dropTarget?.kind === "queue") {
         await fileDrag.dropToQueue();
       } else if (dropTarget?.kind === "playlist") {
