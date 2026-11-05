@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { PinnedItem } from "../types";
 
-import { pinnedStore } from "./pinned.svelte";
+import { PinnedStore, pinnedStore } from "./pinned.svelte";
 
 describe("PinnedStore", () => {
   let eventCallbacks: Record<string, Function> = {};
@@ -103,6 +103,57 @@ describe("PinnedStore", () => {
         ["song", "3"],
         ["song", "1"],
       ],
+    });
+  });
+
+  describe("reactive event listening (#1960)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("refreshes pinned items when song-stats-changed fires, debouncing bursts", async () => {
+      const store = new PinnedStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      vi.mocked(invoke).mockClear();
+
+      expect(eventCallbacks["song-stats-changed"]).toBeDefined();
+
+      // Fire multiple rapid events (e.g. Last.fm sync)
+      eventCallbacks["song-stats-changed"]({ song_id: 10, loved: 1 });
+      eventCallbacks["song-stats-changed"]({ song_id: 20, loved: 1 });
+      eventCallbacks["song-stats-changed"]({ song_id: 30, loved: 1 });
+
+      expect(invoke).not.toHaveBeenCalledWith("get_pinned_items");
+
+      // Advance past the 300ms debounce
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(invoke).toHaveBeenCalledWith("get_pinned_items");
+
+      store.dispose();
+    });
+
+    it("refreshes pinned items when playlists-changed fires", async () => {
+      const store = new PinnedStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      vi.mocked(invoke).mockClear();
+
+      expect(eventCallbacks["playlists-changed"]).toBeDefined();
+
+      eventCallbacks["playlists-changed"]([5]);
+
+      expect(invoke).not.toHaveBeenCalledWith("get_pinned_items");
+
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(invoke).toHaveBeenCalledWith("get_pinned_items");
+
+      store.dispose();
     });
   });
 });

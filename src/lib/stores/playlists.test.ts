@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { Playlist, PlaylistItem } from "../types";
+import type { Playlist, PlaylistItem, Song } from "../types";
 
-import { playlistsStore } from "./playlists.svelte";
+import { PlaylistsStore, playlistsStore } from "./playlists.svelte";
 
 describe("PlaylistsStore", () => {
   let eventCallbacks: Record<string, Function> = {};
@@ -318,5 +318,84 @@ describe("PlaylistsStore", () => {
       { id: 4, name: "Chill Beats", track_count: 8, created: 1700000003, updated: 1700000003, dynamic_enabled: false, is_queue: false },
     ];
     expect(playlistsStore.customPlaylists.map((p) => p.name)).toEqual(["Road Trip", "Chill Beats"]);
+  });
+
+  describe("auto-playlist counts debouncing (#1960)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        switch (cmd) {
+          case "get_playlists":
+            return [
+              { id: 1, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
+              ...mockPlaylists,
+            ];
+          case "get_favourite_songs":
+            return [{ id: 10 }] as Song[];
+          case "get_recently_added_songs":
+          case "get_most_played_songs":
+          case "get_recently_played_songs":
+            return [];
+          default:
+            return null;
+        }
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("coalesces bursts of song-stats-changed into a single debounced count refresh", async () => {
+      const store = new PlaylistsStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      vi.mocked(invoke).mockClear();
+
+      expect(eventCallbacks["song-stats-changed"]).toBeDefined();
+
+      // Rapid burst
+      eventCallbacks["song-stats-changed"]({ song_id: 10, loved: 1 });
+      eventCallbacks["song-stats-changed"]({ song_id: 11, loved: 1 });
+      eventCallbacks["song-stats-changed"]({ song_id: 12, loved: 1 });
+
+      expect(invoke).not.toHaveBeenCalledWith("get_favourite_songs");
+
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(invoke).toHaveBeenCalledWith("get_favourite_songs");
+      expect(store.favouritesCount).toBe(1);
+    });
+
+    it("refreshes auto-playlist counts when playlists-changed fires", async () => {
+      const store = new PlaylistsStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      vi.mocked(invoke).mockClear();
+
+      expect(eventCallbacks["playlists-changed"]).toBeDefined();
+
+      eventCallbacks["playlists-changed"]({ payload: [101] });
+
+      expect(invoke).not.toHaveBeenCalledWith("get_favourite_songs");
+
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(invoke).toHaveBeenCalledWith("get_favourite_songs");
+    });
+
+    it("refreshes auto-playlist counts when library-changed fires", async () => {
+      const store = new PlaylistsStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      vi.mocked(invoke).mockClear();
+
+      expect(eventCallbacks["library-changed"]).toBeDefined();
+
+      eventCallbacks["library-changed"]();
+
+      expect(invoke).not.toHaveBeenCalledWith("get_favourite_songs");
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(invoke).toHaveBeenCalledWith("get_favourite_songs");
+    });
   });
 });

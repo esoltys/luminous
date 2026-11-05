@@ -4,10 +4,10 @@ import type { PinnedItem, PinnedItemType } from "../types";
 import { pinnedRefKeyFor } from "../types";
 import { hasPinnedContent, getNavigablePins, type NavigablePin } from "../utils/pinnedNav";
 
-class PinnedStore {
+export class PinnedStore {
   items = $state<PinnedItem[]>([]);
   private keys = $state<Set<string>>(new Set());
-  private libraryChangedDebounce: ReturnType<typeof setTimeout> | undefined;
+  private refreshDebounce: ReturnType<typeof setTimeout> | undefined;
   private events = createEventScope(import.meta.hot);
 
   constructor() {
@@ -31,8 +31,18 @@ class PinnedStore {
       // should refresh what's shown here too — debounced to match
       // HomeView's own library-changed handling.
       await this.events.listen("library-changed", () => {
-        clearTimeout(this.libraryChangedDebounce);
-        this.libraryChangedDebounce = setTimeout(() => this.refresh(), 500);
+        this.scheduleRefresh(500);
+      });
+      // Song rating / loved / play stats changes alter auto-playlist track
+      // counts (Favourites, Recently Played, Most Played), song pins, and
+      // album ratings (#1960). Coalesce bursts (e.g. Last.fm sync) via debounce.
+      await this.events.listen("song-stats-changed", () => {
+        this.scheduleRefresh(300);
+      });
+      // Dynamic playlist reconciliation updates backing playlist row counts
+      // and definitions for pinned playlists and auto-playlists (#1960).
+      await this.events.listen("playlists-changed", () => {
+        this.scheduleRefresh(300);
       });
       await this.refresh();
     } catch (err) {
@@ -40,7 +50,15 @@ class PinnedStore {
     }
   }
 
+  scheduleRefresh(delayMs = 300) {
+    clearTimeout(this.refreshDebounce);
+    this.refreshDebounce = setTimeout(() => {
+      this.refresh();
+    }, delayMs);
+  }
+
   async refresh() {
+    clearTimeout(this.refreshDebounce);
     const items = await invoke<PinnedItem[]>("get_pinned_items");
     this.items = Array.isArray(items) ? items : [];
     this.keys = new Set(this.items.map((item) => `${item.type}:${pinnedRefKeyFor(item)}`));
