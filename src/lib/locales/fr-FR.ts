@@ -27,6 +27,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     scanningPhaseLabel: "Phase : {phase}",
     musicbrainzLogin: "Connexion à MusicBrainz",
     musicbrainzProfile: "Profil MusicBrainz",
+    connectIntegrations: "Connecter...",
+    connected: "Connecté",
     scrobblingPaused: "Scrobbling en pause",
     pinned: "Épinglés",
     files: "Fichiers"

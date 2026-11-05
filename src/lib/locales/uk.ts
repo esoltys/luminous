@@ -21,6 +21,8 @@ export const uk = {
     scanningPhaseLabel: "Етап: {phase}",
     musicbrainzLogin: "Увійти в MusicBrainz",
     musicbrainzProfile: "Профіль MusicBrainz",
+    connectIntegrations: "Підключити...",
+    connected: "Підключено",
     scrobblingPaused: "Скроблінг призупинено",
     pinned: "Закріплені",
     files: "Файли"

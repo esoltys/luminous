@@ -11,7 +11,6 @@
   import { musicbrainzStore } from "../stores/musicbrainz.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { scrobblerStore } from "../stores/scrobbler.svelte";
-  import MusicBrainzLoginModal from "./MusicBrainzLoginModal.svelte";
   import MusicBrainzProfilePopover from "./MusicBrainzProfilePopover.svelte";
   import PinnedNavList from "./PinnedNavList.svelte";
   import SidebarFilesSection from "./files/SidebarFilesSection.svelte";
@@ -32,7 +31,9 @@
     TagIcon as Tag,
     ArrowUpIcon as ArrowUp,
     QuestionIcon as HelpCircle,
-    StackIcon as Layers
+    StackIcon as Layers,
+    PlugsIcon as Plugs,
+    PlugsConnectedIcon as PlugsConnected
   } from "phosphor-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
@@ -41,8 +42,12 @@
 
   let isCollapsed = $derived(width < SIDEBAR_MIN_WIDTH_PX);
   let showUpdateBadge = $derived(updaterStore.updateAvailable || updaterStore.installStatus === "ready-to-restart");
-  let showLoginModal = $state(false);
   let showProfilePopover = $state(false);
+  let isConnected = $derived(
+    musicbrainzStore.isLoggedIn ||
+    !!scrobblerStore.lastfmUsername ||
+    !!scrobblerStore.username
+  );
   const scrobblingPaused = $derived(scrobblerStore.status === "paused");
   // Undefined unless paused, so the dot and title only carry text when the state differs from the default.
   const pausedLabel = $derived(scrobblingPaused ? i18n.t("sidebar.scrobblingPaused") : undefined);
@@ -418,27 +423,20 @@
   </nav>
 
 
-  <!-- MusicBrainz Login / Profile Section (#1388); hidden while Offline (#1398) -->
+  <!-- Integrations / Profile Section; hidden while Offline (#1398) -->
   {#if prefs.onlineEnabled}
   <div class="{layoutCollapsed ? 'p-2' : 'px-4 py-2'} border-t border-brand-border/40 w-full flex flex-col items-center">
-    {#if musicbrainzStore.isLoggedIn || scrobblerStore.lastfmUsername || scrobblerStore.username}
+    {#if isConnected}
       <button
         bind:this={profileButtonEl}
         onclick={() => { showProfilePopover = !showProfilePopover; }}
         class="flex items-center gap-3 transition-colors duration-150 {showProfilePopover ? 'bg-brand-accent/20 text-brand-accent-text' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-        title={`${musicbrainzStore.username || scrobblerStore.lastfmUsername || scrobblerStore.username} (${musicbrainzStore.isLoggedIn ? 'MusicBrainz' : 'Last.fm'})${pausedLabel ? ` – ${pausedLabel}` : ""}`}
+        title={`${i18n.t('sidebar.connected', {}, 'Connected')}${pausedLabel ? ` – ${pausedLabel}` : ""}`}
       >
         <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
-          <!-- Inner wrapper anchors the status dot to the logo, not the w-7 slot. -->
+          <!-- Inner wrapper anchors the status dot to the icon, not the w-7 slot. -->
           <div class="relative flex items-center justify-center">
-            {#if !musicbrainzStore.isLoggedIn && scrobblerStore.lastfmUsername}
-              <img src="/lastfm-icon.svg" alt="Last.fm" class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} rounded shrink-0 object-contain" />
-            {:else}
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0">
-                <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
-                <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
-              </svg>
-            {/if}
+            <PlugsConnected class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0" />
             <span
               class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-brand-sidebar {scrobblingPaused ? 'bg-amber-500' : 'bg-emerald-500'}"
               data-testid="musicbrainz-status-dot"
@@ -449,33 +447,25 @@
         </div>
         {#if !layoutCollapsed}
           <span class="truncate text-xs font-semibold text-brand-text-primary text-left flex-1 min-w-0">
-            {musicbrainzStore.username || scrobblerStore.lastfmUsername || scrobblerStore.username}
+            {i18n.t('sidebar.connected', {}, 'Connected')}
           </span>
         {/if}
       </button>
     {:else}
       <button
-        bind:this={profileButtonEl}
-        onclick={() => { showLoginModal = true; }}
+        onclick={() => { navigationStore.openSettings("integrations"); }}
         class="flex items-center gap-3 transition-colors duration-150 text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-        title={i18n.t('sidebar.musicbrainzLogin', {}, 'Log In to MusicBrainz')}
+        title={i18n.t('sidebar.connectIntegrations', {}, 'Connect...')}
       >
         <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4 icon-align'} shrink-0">
-            <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
-            <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
-          </svg>
+          <Plugs class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4 icon-align'} shrink-0" />
         </div>
         {#if !layoutCollapsed}
-          <span class="text-left leading-tight min-w-0">{i18n.t('sidebar.musicbrainzLogin', {}, 'Log In to MusicBrainz')}</span>
+          <span class="text-left leading-tight min-w-0">{i18n.t('sidebar.connectIntegrations', {}, 'Connect...')}</span>
         {/if}
       </button>
     {/if}
   </div>
-
-  {#if showLoginModal && !musicbrainzStore.isLoggedIn}
-    <MusicBrainzLoginModal onClose={() => (showLoginModal = false)} />
-  {/if}
 
   <MusicBrainzProfilePopover
     isOpen={showProfilePopover}

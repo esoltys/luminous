@@ -2,7 +2,9 @@
   import { i18n } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { picardStore } from "../stores/picard.svelte";
+  import { musicbrainzStore } from "../stores/musicbrainz.svelte";
   import { scrobblerStore, DEFAULT_DISCORD_CLIENT_ID } from "../stores/scrobbler.svelte";
+  import MusicBrainzLoginModal from "./MusicBrainzLoginModal.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
@@ -39,6 +41,7 @@
   let fanartValidationError = $state<string | null>(null);
   let picardCustomPath = $state("");
   let isRecheckingPicard = $state(false);
+  let showMusicBrainzLoginModal = $state(false);
 
   async function refreshFanartKeyStatus() {
     try {
@@ -548,6 +551,56 @@
     {/if}
   {/if}
 </div>
+
+<!-- MusicBrainz Account Card -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-[#ba478f]/15 border border-[#ba478f]/25 shrink-0 flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="w-5 h-5">
+          <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
+          <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
+        </svg>
+      </div>
+      <div class="space-y-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <h3 class="font-bold text-sm text-brand-text-primary">MusicBrainz</h3>
+          {#if musicbrainzStore.isLoggedIn && musicbrainzStore.username}
+            <span class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <Check class="w-3 h-3" />
+              {musicbrainzStore.username}
+            </span>
+          {/if}
+        </div>
+        <p class="text-xs text-brand-text-secondary leading-relaxed">
+          <button onclick={() => openExternalUrl("https://musicbrainz.org")} class="text-brand-accent hover:underline">MusicBrainz</button>
+          {i18n.t('auth.modalSubtitle', {}, 'Connect your account to manage integrations and scrobbling')}
+        </p>
+      </div>
+    </div>
+    {#if musicbrainzStore.isLoggedIn}
+      <Button
+        variant="secondary"
+        size="sm"
+        onclick={() => musicbrainzStore.logout()}
+      >
+        {i18n.t('lastfm.disconnectBtn', {}, 'Disconnect')}
+      </Button>
+    {:else}
+      <Button
+        variant="secondary"
+        size="sm"
+        onclick={() => (showMusicBrainzLoginModal = true)}
+      >
+        {i18n.t('common.connect', {}, 'Connect')}
+      </Button>
+    {/if}
+  </div>
+</div>
+
+{#if showMusicBrainzLoginModal}
+  <MusicBrainzLoginModal onClose={() => (showMusicBrainzLoginModal = false)} />
+{/if}
 
 {/if}
 

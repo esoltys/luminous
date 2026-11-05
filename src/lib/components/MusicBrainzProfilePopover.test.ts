@@ -57,14 +57,15 @@ describe("MusicBrainzProfilePopover.svelte", () => {
     scrobblerStore.username = "test_lb_user";
   });
 
-  it("renders user identity in header and closes on close button click", async () => {
+  it("renders scrobbling section header and closes on close button click", async () => {
     const { getByText, getByTitle, queryByText } = render(MusicBrainzProfilePopover, {
       isOpen: true,
       anchorEl,
       onClose,
     });
 
-    expect(getByText("test_mb_user")).toBeInTheDocument();
+    expect(getByText("Scrobbling")).toBeInTheDocument();
+    expect(queryByText("test_mb_user")).not.toBeInTheDocument();
     expect(queryByText("test@example.com")).not.toBeInTheDocument();
 
     const closeBtn = getByTitle("Close");
@@ -182,20 +183,13 @@ describe("MusicBrainzProfilePopover.svelte", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("calls logout and onClose when Log out is clicked", async () => {
-    const logoutSpy = vi.spyOn(musicbrainzStore, "logout").mockResolvedValue();
-
-    const { getByText } = render(MusicBrainzProfilePopover, {
+  it("does not render ambiguous log out button", () => {
+    const { queryByText } = render(MusicBrainzProfilePopover, {
       isOpen: true,
       anchorEl,
       onClose,
     });
 
-    const logoutBtn = getByText("Log out");
-    await fireEvent.click(logoutBtn);
-    await tick();
-
-    expect(logoutSpy).toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
+    expect(queryByText("Log out")).not.toBeInTheDocument();
   });
 });

@@ -21,6 +21,8 @@ export const de = {
     scanningPhaseLabel: "Phase: {phase}",
     musicbrainzLogin: "Bei MusicBrainz anmelden",
     musicbrainzProfile: "MusicBrainz-Profil",
+    connectIntegrations: "Verbinden...",
+    connected: "Verbunden",
     scrobblingPaused: "Scrobbling pausiert",
     pinned: "Angeheftet",
     files: "Dateien"
