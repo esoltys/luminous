@@ -1,16 +1,22 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createEventScope } from "../utils/eventScope";
+import { openExternalUrl } from "../utils/openExternalUrl";
 import { i18n } from "./i18n.svelte";
 
 type DiscordStatus = "connected" | "disconnected" | "not_running";
 
-export const DEFAULT_DISCORD_CLIENT_ID = "1548913001715990610";
+const DEFAULT_DISCORD_CLIENT_ID = "1548913001715990610";
 
 interface ScrobblerSettings {
   listenbrainz_enabled: boolean;
   listenbrainz_token: string;
   listenbrainz_username: string | null;
   critiquebrainz_user_id: string;
+  lastfm_enabled?: boolean;
+  lastfm_session_key?: string;
+  lastfm_username?: string | null;
+  lastfm_api_key?: string;
+  lastfm_api_secret?: string;
   scrobble_now_playing: boolean;
   scrobble_ratings: boolean;
   scrobble_paused: boolean;
@@ -23,6 +29,8 @@ interface ScrobblerSettings {
 
 interface ScrobbleCacheStatus {
   pending_count: number;
+  listenbrainz_pending_count?: number;
+  lastfm_pending_count?: number;
   last_error: string | null;
   last_attempt: number | null;
 }
@@ -55,7 +63,19 @@ class ScrobblerStore {
   discordStatus = $state<DiscordStatus>("disconnected");
   isCheckingDiscord = $state(false);
 
+  // Last.fm state (#1954)
+  lastfmEnabled = $state(false);
+  lastfmUsername = $state<string | null>(null);
+  lastfmSessionKey = $state("");
+  lastfmPendingToken = $state<string | null>(null);
+  lastfmPendingAuthUrl = $state<string | null>(null);
+  isStartingLastfm = $state(false);
+  isFinishingLastfm = $state(false);
+  lastfmAuthError = $state<string | null>(null);
+
   pendingCount = $state(0);
+  listenbrainzPendingCount = $state(0);
+  lastfmPendingCount = $state(0);
   lastError = $state<string | null>(null);
   lastAttempt = $state<number | null>(null);
 
@@ -76,7 +96,7 @@ class ScrobblerStore {
    * flag on a disabled scrobbler reads as inactive.
    */
   get status(): "inactive" | "paused" | "active" {
-    if (!this.enabled) return "inactive";
+    if (!this.enabled && !this.lastfmEnabled) return "inactive";
     return this.paused ? "paused" : "active";
   }
 
@@ -90,6 +110,9 @@ class ScrobblerStore {
       this.token = settings.listenbrainz_token;
       this.username = settings.listenbrainz_username;
       this.critiquebrainzUserId = settings.critiquebrainz_user_id;
+      this.lastfmEnabled = settings.lastfm_enabled ?? false;
+      this.lastfmSessionKey = settings.lastfm_session_key ?? "";
+      this.lastfmUsername = settings.lastfm_username ?? null;
       this.nowPlayingEnabled = settings.scrobble_now_playing;
       this.ratingsEnabled = settings.scrobble_ratings;
       this.paused = settings.scrobble_paused;
@@ -109,6 +132,9 @@ class ScrobblerStore {
         this.token = s.listenbrainz_token;
         this.username = s.listenbrainz_username;
         this.critiquebrainzUserId = s.critiquebrainz_user_id;
+        this.lastfmEnabled = s.lastfm_enabled ?? false;
+        this.lastfmSessionKey = s.lastfm_session_key ?? "";
+        this.lastfmUsername = s.lastfm_username ?? null;
         this.nowPlayingEnabled = s.scrobble_now_playing;
         this.ratingsEnabled = s.scrobble_ratings;
         this.paused = s.scrobble_paused;
@@ -134,6 +160,9 @@ class ScrobblerStore {
       listenbrainz_token: this.token,
       listenbrainz_username: this.username,
       critiquebrainz_user_id: this.critiquebrainzUserId,
+      lastfm_enabled: this.lastfmEnabled,
+      lastfm_session_key: this.lastfmSessionKey,
+      lastfm_username: this.lastfmUsername,
       scrobble_now_playing: this.nowPlayingEnabled,
       scrobble_ratings: this.ratingsEnabled,
       scrobble_paused: this.paused,
@@ -197,11 +226,76 @@ class ScrobblerStore {
     try {
       const status = await invoke<ScrobbleCacheStatus>("get_scrobble_cache_status");
       this.pendingCount = status.pending_count;
+      this.listenbrainzPendingCount = status.listenbrainz_pending_count ?? 0;
+      this.lastfmPendingCount = status.lastfm_pending_count ?? 0;
       this.lastError = status.last_error;
       this.lastAttempt = status.last_attempt;
     } catch (e) {
       console.error("Failed to fetch scrobble cache status:", e);
     }
+  }
+
+  async startLastfmAuth() {
+    this.isStartingLastfm = true;
+    this.lastfmAuthError = null;
+    try {
+      const res = await invoke<{ token: string; auth_url: string }>("start_lastfm_login");
+      this.lastfmPendingToken = res.token;
+      this.lastfmPendingAuthUrl = res.auth_url;
+      await openExternalUrl(res.auth_url);
+    } catch (err: any) {
+      this.lastfmAuthError = typeof err === "string" ? err : err?.message ?? i18n.t("lastfm.authFailed");
+    } finally {
+      this.isStartingLastfm = false;
+    }
+  }
+
+  async finishLastfmAuth() {
+    if (!this.lastfmPendingToken) return false;
+    this.isFinishingLastfm = true;
+    this.lastfmAuthError = null;
+    try {
+      const session = await invoke<{ key: string; username: string }>("finish_lastfm_login", {
+        token: this.lastfmPendingToken,
+      });
+      this.lastfmUsername = session.username;
+      this.lastfmSessionKey = session.key;
+      this.lastfmEnabled = true;
+      this.lastfmPendingToken = null;
+      this.lastfmPendingAuthUrl = null;
+      await this.refreshCacheStatus();
+      return true;
+    } catch (err: any) {
+      this.lastfmAuthError = typeof err === "string" ? err : err?.message ?? i18n.t("lastfm.authFailed");
+      return false;
+    } finally {
+      this.isFinishingLastfm = false;
+    }
+  }
+
+  cancelLastfmAuth() {
+    this.lastfmPendingToken = null;
+    this.lastfmPendingAuthUrl = null;
+    this.lastfmAuthError = null;
+  }
+
+  async disconnectLastfm() {
+    try {
+      await invoke("disconnect_lastfm");
+      this.lastfmEnabled = false;
+      this.lastfmUsername = null;
+      this.lastfmSessionKey = "";
+      this.lastfmPendingToken = null;
+      this.lastfmPendingAuthUrl = null;
+      this.lastfmAuthError = null;
+    } catch (e) {
+      console.error("Failed to disconnect Last.fm:", e);
+    }
+  }
+
+  setLastfmEnabled(val: boolean) {
+    this.lastfmEnabled = val;
+    this.saveSettings();
   }
 
   async syncRatings() {
@@ -234,6 +328,14 @@ class ScrobblerStore {
       this.enabled = false;
       this.saveSettings();
     }
+  }
+
+  disconnectListenBrainz() {
+    this.token = "";
+    this.username = null;
+    this.enabled = false;
+    this.validationError = null;
+    this.saveSettings();
   }
 
   setEnabled(val: boolean) {

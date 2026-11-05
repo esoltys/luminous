@@ -15,7 +15,6 @@
     XIcon as X,
     ArrowUpRightIcon as ArrowUpRight,
     ArrowRightIcon as ArrowRight,
-    SignOutIcon as LogOut,
     CircleNotchIcon as LoaderCircle,
     CheckIcon as Check,
     PauseIcon as Pause
@@ -119,11 +118,6 @@
     navigationStore.openSettings("integrations");
     onClose();
   }
-
-  async function handleLogout() {
-    await musicbrainzStore.logout();
-    onClose();
-  }
 </script>
 
 <svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} onresize={updatePosition} />
@@ -137,38 +131,22 @@
     in:scale={{ start: 0.95, duration: 150, easing: cubicOut }}
     out:fade={{ duration: 120, easing: cubicOut }}
   >
-    <!-- Header: User Identity -->
-    <div class="flex items-start justify-between gap-3 pb-3 border-b border-brand-border/60">
-      <div class="flex items-center gap-3 min-w-0">
-        <div class="p-2.5 rounded-xl bg-[#ba478f]/15 border border-[#ba478f]/25 shrink-0 flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="w-5 h-5">
-            <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
-            <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
-          </svg>
-        </div>
-        <div class="min-w-0">
-          <h3 class="font-bold text-sm text-brand-text-primary truncate">
-            {musicbrainzStore.username ?? "MusicBrainz User"}
-          </h3>
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onclick={onClose}
-        class="text-brand-text-secondary hover:text-brand-text-primary p-0.5 rounded hover:bg-white/5 transition-colors cursor-pointer"
-        title={i18n.t('common.close', {}, 'Close')}
-      >
-        <X class="w-4 h-4" />
-      </button>
-    </div>
-
-    <!-- Scrobbling Section -->
-    <div class="space-y-2.5">
-      <div class="flex items-center justify-between">
+    <!-- Scrobbling Section Header with Close Button -->
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-1.5 flex-wrap">
         <span class="text-xs font-semibold text-brand-text-primary">
           {i18n.t('auth.scrobbling', {}, 'Scrobbling')}
         </span>
+        {#if scrobblerStore.enabled}
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-brand-surface border border-brand-border text-brand-text-secondary font-medium">
+            ListenBrainz
+          </span>
+        {/if}
+        {#if scrobblerStore.lastfmEnabled}
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-brand-surface border border-brand-border text-brand-text-secondary font-medium">
+            Last.fm
+          </span>
+        {/if}
         {#if scrobblerStore.status === 'paused'}
           <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
             <Pause class="w-2.5 h-2.5" />
@@ -186,7 +164,20 @@
         {/if}
       </div>
 
-      {#if scrobblerStore.enabled}
+      <button
+        type="button"
+        onclick={onClose}
+        class="text-brand-text-secondary hover:text-brand-text-primary p-0.5 rounded hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+        title={i18n.t('common.close', {}, 'Close')}
+      >
+        <X class="w-4 h-4" />
+      </button>
+    </div>
+
+    <!-- Scrobbling Section -->
+    <div class="space-y-2.5">
+
+      {#if scrobblerStore.enabled || scrobblerStore.lastfmEnabled}
         <!-- Toggles moved from Settings view -->
         <div class="space-y-1.5 py-0.5">
           <div class="flex items-center justify-between gap-3">
@@ -254,6 +245,17 @@
 
       <!-- Profile Links -->
       <div class="space-y-1 pt-2 border-t border-brand-border/60">
+        {#if scrobblerStore.lastfmUsername}
+          <button
+            type="button"
+            onclick={() => openExternalUrl(`https://www.last.fm/user/${encodeURIComponent(scrobblerStore.lastfmUsername!)}`)}
+            class="w-full flex items-center justify-between py-1 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+          >
+            <span class="hover:underline">{i18n.t('auth.lastfmProfile', {}, 'Last.fm listener profile')}</span>
+            <ArrowUpRight class="w-3.5 h-3.5" />
+          </button>
+        {/if}
+
         {#if lbUsername}
           <button
             type="button"
@@ -287,18 +289,6 @@
       >
         <span class="hover:underline">{i18n.t('auth.integrationSettings', {}, 'Integration settings')}</span>
         <ArrowRight class="w-3.5 h-3.5" />
-      </button>
-    </div>
-
-    <!-- Logout -->
-    <div class="pt-2 border-t border-brand-border/60">
-      <button
-        type="button"
-        onclick={handleLogout}
-        class="w-full flex items-center justify-between py-1 text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer"
-      >
-        <span class="hover:underline">{i18n.t('auth.logout', {}, 'Log out')}</span>
-        <LogOut class="w-3.5 h-3.5" />
       </button>
     </div>
   </div>

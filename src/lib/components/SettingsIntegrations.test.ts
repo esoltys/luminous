@@ -61,13 +61,20 @@ describe("SettingsIntegrations.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prefs.onlineEnabled = true;
+    scrobblerStore.username = null;
+    scrobblerStore.token = "";
+    scrobblerStore.enabled = false;
+    scrobblerStore.lastfmUsername = null;
+    scrobblerStore.lastfmEnabled = false;
+    scrobblerStore.lastfmPendingToken = null;
   });
 
-  it("renders all integration cards: Online Services, ListenBrainz, Discord, Picard, and fanart.tv", async () => {
+  it("renders all integration cards: Online Services, ListenBrainz, Last.fm, Discord, Picard, and fanart.tv", async () => {
     const { findByText, findByRole } = render(SettingsIntegrations);
 
     expect(await findByText("Online Services")).toBeInTheDocument();
     expect(await findByText("ListenBrainz Scrobbler")).toBeInTheDocument();
+    expect(await findByRole("heading", { name: "Last.fm Scrobbler" })).toBeInTheDocument();
     expect(await findByRole("heading", { name: "Discord Rich Presence" })).toBeInTheDocument();
     expect(await findByRole("heading", { name: "MusicBrainz Picard" })).toBeInTheDocument();
     expect(await findByRole("heading", { name: "fanart.tv Integration" })).toBeInTheDocument();
@@ -81,6 +88,7 @@ describe("SettingsIntegrations.svelte", () => {
     expect(await findByText("Offline")).toBeInTheDocument();
     expect(await findByRole("heading", { name: "MusicBrainz Picard" })).toBeInTheDocument();
     expect(queryByText("ListenBrainz Scrobbler")).not.toBeInTheDocument();
+    expect(queryByRole("heading", { name: "Last.fm Scrobbler" })).not.toBeInTheDocument();
     expect(queryByRole("heading", { name: "Discord Rich Presence" })).not.toBeInTheDocument();
     expect(queryByRole("heading", { name: "fanart.tv Integration" })).not.toBeInTheDocument();
   });
@@ -215,7 +223,7 @@ describe("SettingsIntegrations.svelte", () => {
   it("toggles Discord Rich Presence and shows sub-options when enabled", async () => {
     scrobblerStore.discordEnabled = false;
 
-    const { getByLabelText, findByText } = render(SettingsIntegrations);
+    const { getByLabelText, findByText, queryByText } = render(SettingsIntegrations);
 
     const toggle = getByLabelText("Enable Discord Rich Presence");
     expect(toggle).toBeInTheDocument();
@@ -227,7 +235,7 @@ describe("SettingsIntegrations.svelte", () => {
     expect(scrobblerStore.discordEnabled).toBe(true);
     expect(await findByText("Show album name")).toBeInTheDocument();
     expect(await findByText("Show elapsed and remaining time")).toBeInTheDocument();
-    expect(await findByText("1548913001715990610")).toBeInTheDocument();
+    expect(queryByText("1548913001715990610")).not.toBeInTheDocument();
   });
 
   it("hides Enable toggle until user token is validated, then enables scrobbling", async () => {
@@ -273,5 +281,33 @@ describe("SettingsIntegrations.svelte", () => {
     await fireEvent.click(toggle);
     await tick();
     expect(toggle).toBeChecked();
+  });
+
+  it("handles Last.fm connection flow and toggle states", async () => {
+    scrobblerStore.lastfmUsername = null;
+    scrobblerStore.lastfmEnabled = false;
+    scrobblerStore.lastfmPendingToken = null;
+
+    const { findByRole, getByRole, queryByRole, findByText } = render(SettingsIntegrations);
+
+    // Initial disconnected state: "Connect Last.fm" button is present
+    const connectBtn = await findByRole("button", { name: "Connect Last.fm" });
+    expect(connectBtn).toBeInTheDocument();
+
+    // Pending browser auth state
+    scrobblerStore.lastfmPendingToken = "temp-token";
+    await tick();
+    expect(await findByText("Waiting for authorization in browser")).toBeInTheDocument();
+    expect(getByRole("button", { name: "Finish Login" })).toBeInTheDocument();
+
+    // Connected state
+    scrobblerStore.lastfmPendingToken = null;
+    scrobblerStore.lastfmUsername = "lastfm_fan";
+    scrobblerStore.lastfmEnabled = true;
+    await tick();
+
+    expect(await findByText("lastfm_fan")).toBeInTheDocument();
+    expect(getByRole("button", { name: "Disconnect" })).toBeInTheDocument();
+    expect(getByRole("switch", { name: "Enable Last.fm scrobbling" })).toBeInTheDocument();
   });
 });

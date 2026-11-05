@@ -8,6 +8,7 @@
 //! SQLite persistence, sync reconciliation, and cover art caching remain in
 //! `src-tauri`.
 
+pub mod lastfm;
 pub mod lyrics;
 pub mod musicbrainz;
 pub mod scrobbler;

@@ -21,6 +21,8 @@ export const en = {
     scanningPhaseLabel: "Phase: {phase}",
     musicbrainzLogin: "Log In to MusicBrainz",
     musicbrainzProfile: "MusicBrainz Profile",
+    connectIntegrations: "Connect...",
+    connected: "Connected",
     scrobblingPaused: "Scrobbling paused",
     pinned: "Pinned",
     files: "Files"
@@ -1976,6 +1978,7 @@ export const en = {
     save: "Save",
     saved: "Saved",
     connect: "Connect",
+    disconnect: "Disconnect",
     active: "Active",
     paused: "Paused",
     inactive: "Inactive",
@@ -2199,6 +2202,9 @@ export const en = {
     draftModifiedBadge: "Template modified — Auto-Organize paused",
     revertDraftBtn: "Revert"
   },
+  musicbrainz: {
+    integrationDesc: "is a crowd-sourced music database that catalogs releases worldwide, giving your tracks universal metadata identifiers (MBIDs) for accurate artist bios, cover art matching, and seamless scrobbling."
+  },
   picard: {
     openInPicard: "Open in Picard",
     openAllInPicard: "Open All in Picard",
@@ -2261,6 +2267,33 @@ export const en = {
     syncRatingsSuccess: "Pulled loves: {loved}; hates: {hated}; track ratings: {songRatings}; album ratings: {albumRatings}; pushed to ListenBrainz: {pushed}",
     syncRatingsFailed: "({failed} failed to send)",
     syncRatingsNoCritiquebrainz: "Star ratings were not pulled: add your CritiqueBrainz profile above."
+  },
+  lastfm: {
+    integrationTitle: "Last.fm Scrobbler",
+    integrationDesc: "is a music discovery service that tracks what you play to deliver personalized listening stats, weekly charts, and artist recommendations.",
+    connectLabel: "Connect Last.fm",
+    connectHint: "Authorize Luminous in your browser to submit scrobbles to your Last.fm profile",
+    connectBtn: "Connect Last.fm",
+    authPendingTitle: "Waiting for authorization in browser",
+    authPendingDesc: "Click \"Yes, allow access\" on the Last.fm authorization page in your browser, then click Finish Login below.",
+    finishAuthBtn: "Finish Login",
+    cancelAuthBtn: "Cancel",
+    authFailed: "Failed to authorize with Last.fm",
+    disconnectBtn: "Disconnect",
+    enableLabel: "Enable Last.fm scrobbling",
+    enableHint: "Submit completed listens to your Last.fm profile",
+    lovedTracksLabel: "Synchronize loved tracks",
+    lovedTracksHint: "Sync favourite tracks with Last.fm loved tracks",
+    syncLovedBtn: "Sync Loved Tracks",
+    syncingLovedBtn: "Syncing...",
+    syncLovedSuccess: "Synced loved tracks with Last.fm: pulled {loved}, pushed {pushed}",
+    cacheEmpty: "Offline cache is empty",
+    cachePending: {
+      one: "{count} listen pending in offline cache",
+      other: "{count} listens pending in offline cache"
+    },
+    cacheDesc: "Listens recorded without internet connectivity are queued and sent automatically.",
+    syncNowBtn: "Sync Now"
   },
   discord: {
     integrationTitle: "Discord Rich Presence",
@@ -2541,6 +2574,7 @@ export const en = {
     scrobbling: "Scrobbling",
     listenbrainzPromptDesc: "Scrobble your listening history automatically to ListenBrainz with your user token.",
     listenbrainzProfile: "ListenBrainz listener profile",
+    lastfmProfile: "Last.fm listener profile",
     musicbrainzProfile: "MusicBrainz editor profile",
     integrationSettings: "Integration settings",
     aboutMusicBrainz: "About MusicBrainz",

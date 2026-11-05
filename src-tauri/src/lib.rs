@@ -1606,7 +1606,7 @@ pub fn run() {
             commands::diagnostics::export_diagnostics,
             commands::diagnostics::get_data_directory_info,
             install_format::get_install_format,
-            // Scrobbler commands (#83)
+            // Scrobbler commands (#83, #1954)
             commands::scrobbler::get_scrobbler_settings,
             commands::scrobbler::set_scrobbler_settings,
             commands::scrobbler::validate_listenbrainz_token,
@@ -1615,6 +1615,9 @@ pub fn run() {
             commands::scrobbler::toggle_scrobble_pause,
             commands::scrobbler::sync_ratings_to_listenbrainz,
             commands::scrobbler::get_discord_status,
+            commands::scrobbler::start_lastfm_login,
+            commands::scrobbler::finish_lastfm_login,
+            commands::scrobbler::disconnect_lastfm,
             // MusicBrainz OAuth commands (#1388)
             commands::musicbrainz::start_musicbrainz_login,
             commands::musicbrainz::submit_musicbrainz_auth_code,

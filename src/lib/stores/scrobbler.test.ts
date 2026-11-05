@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { scrobblerStore } from "./scrobbler.svelte";
 import { invoke } from "@tauri-apps/api/core";
+import { openExternalUrl } from "../utils/openExternalUrl";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
+}));
+
+vi.mock("../utils/openExternalUrl", () => ({
+  openExternalUrl: vi.fn(),
 }));
 
 describe("scrobblerStore", () => {
@@ -147,5 +152,57 @@ describe("scrobblerStore", () => {
     scrobblerStore.setDiscordClientId("999888777");
     scrobblerStore.resetDiscordClientId();
     expect(scrobblerStore.discordClientId).toBe("1548913001715990610");
+  });
+
+  it("handles lastfm authentication flow and disconnection", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string, args?: any) => {
+      if (cmd === "start_lastfm_login") {
+        return Promise.resolve({
+          token: "tok-abc",
+          auth_url: "https://www.last.fm/api/auth/?api_key=key&token=tok-abc",
+        });
+      }
+      if (cmd === "finish_lastfm_login") {
+        if (args?.token === "tok-abc") {
+          return Promise.resolve({
+            key: "session-xyz",
+            username: "lastfm_user",
+          });
+        }
+        return Promise.reject("Invalid token");
+      }
+      if (cmd === "disconnect_lastfm") {
+        return Promise.resolve(null);
+      }
+      if (cmd === "get_scrobble_cache_status") {
+        return Promise.resolve({
+          pending_count: 0,
+          listenbrainz_pending_count: 0,
+          lastfm_pending_count: 0,
+          last_error: null,
+          last_attempt: null,
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    await scrobblerStore.startLastfmAuth();
+    expect(scrobblerStore.lastfmPendingToken).toBe("tok-abc");
+    expect(openExternalUrl).toHaveBeenCalledWith(
+      "https://www.last.fm/api/auth/?api_key=key&token=tok-abc"
+    );
+
+    const ok = await scrobblerStore.finishLastfmAuth();
+    expect(ok).toBe(true);
+    expect(scrobblerStore.lastfmUsername).toBe("lastfm_user");
+    expect(scrobblerStore.lastfmSessionKey).toBe("session-xyz");
+    expect(scrobblerStore.lastfmEnabled).toBe(true);
+    expect(scrobblerStore.lastfmPendingToken).toBeNull();
+    expect(scrobblerStore.status).toBe("active");
+
+    await scrobblerStore.disconnectLastfm();
+    expect(scrobblerStore.lastfmUsername).toBeNull();
+    expect(scrobblerStore.lastfmSessionKey).toBe("");
+    expect(scrobblerStore.lastfmEnabled).toBe(false);
   });
 });

@@ -21,6 +21,8 @@ export const es = {
     scanningPhaseLabel: "Fase: {phase}",
     musicbrainzLogin: "Iniciar sesión en MusicBrainz",
     musicbrainzProfile: "Perfil de MusicBrainz",
+    connectIntegrations: "Conectar...",
+    connected: "Conectado",
     scrobblingPaused: "Scrobbling en pausa",
     pinned: "Anclados",
     files: "Archivos"
@@ -1976,6 +1978,7 @@ export const es = {
     save: "Guardar",
     saved: "Guardado",
     connect: "Conectar",
+    disconnect: "Desconectar",
     active: "Activo",
     paused: "En pausa",
     inactive: "Inactivo",
@@ -2199,6 +2202,9 @@ export const es = {
     draftModifiedBadge: "Plantilla modificada — organización automática en pausa",
     revertDraftBtn: "Restablecer"
   },
+  musicbrainz: {
+    integrationDesc: "es una base de datos musical colaborativa que cataloga lanzamientos de todo el mundo, proporcionando a tus pistas identificadores universales (MBID) para biografías de artistas precisas, coincidencia de carátulas y scrobbling fluido."
+  },
   picard: {
     openInPicard: "Abrir en Picard",
     openAllInPicard: "Abrir todo en Picard",
@@ -2261,6 +2267,33 @@ export const es = {
     syncRatingsSuccess: "Obtenidos: {loved} «me encanta», {hated} «no me gusta», {songRatings} valoraciones de pistas y {albumRatings} valoraciones de álbumes; enviados a ListenBrainz: {pushed}",
     syncRatingsFailed: "({failed} no se pudieron enviar)",
     syncRatingsNoCritiquebrainz: "No se obtuvieron las valoraciones con estrellas: agrega arriba tu perfil de CritiqueBrainz."
+  },
+  lastfm: {
+    integrationTitle: "Scrobbler de Last.fm",
+    integrationDesc: "es un servicio de descubrimiento musical que registra lo que escuchas para ofrecer estadísticas personalizadas, listas semanales y recomendaciones de artistas.",
+    connectLabel: "Conectar Last.fm",
+    connectHint: "Autoriza a Luminous en tu navegador para enviar reproducciones a tu perfil de Last.fm",
+    connectBtn: "Conectar Last.fm",
+    authPendingTitle: "Esperando autorización en el navegador",
+    authPendingDesc: "Haz clic en «Yes, allow access» en la página de autorización de Last.fm en tu navegador y luego pulsa Finalizar inicio de sesión a continuación.",
+    finishAuthBtn: "Finalizar inicio de sesión",
+    cancelAuthBtn: "Cancelar",
+    authFailed: "No se pudo autorizar con Last.fm",
+    disconnectBtn: "Desconectar",
+    enableLabel: "Activar scrobbling de Last.fm",
+    enableHint: "Enviar reproducciones completadas a tu perfil de Last.fm",
+    lovedTracksLabel: "Sincronizar temas favoritos",
+    lovedTracksHint: "Sincronizar pistas favoritas con los temas favoritos de Last.fm",
+    syncLovedBtn: "Sincronizar temas favoritos",
+    syncingLovedBtn: "Sincronizando...",
+    syncLovedSuccess: "Temas favoritos sincronizados con Last.fm: {loved} obtenidos, {pushed} enviados",
+    cacheEmpty: "La caché sin conexión está vacía",
+    cachePending: {
+      one: "{count} reproducción pendiente en la caché sin conexión",
+      other: "{count} reproducciones pendientes en la caché sin conexión"
+    },
+    cacheDesc: "Las reproducciones registradas sin conexión a internet se ponen en cola y se envían automáticamente.",
+    syncNowBtn: "Sincronizar ahora"
   },
   discord: {
     integrationTitle: "Discord Rich Presence",
@@ -2541,6 +2574,7 @@ export const es = {
     scrobbling: "Scrobbling",
     listenbrainzPromptDesc: "Envía automáticamente tu historial de escucha a ListenBrainz con tu token de usuario.",
     listenbrainzProfile: "Perfil de oyente de ListenBrainz",
+    lastfmProfile: "Perfil de oyente de Last.fm",
     musicbrainzProfile: "Perfil de editor de MusicBrainz",
     integrationSettings: "Configuración de integraciones",
     aboutMusicBrainz: "Acerca de MusicBrainz",

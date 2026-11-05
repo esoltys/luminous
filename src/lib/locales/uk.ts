@@ -21,6 +21,8 @@ export const uk = {
     scanningPhaseLabel: "Етап: {phase}",
     musicbrainzLogin: "Увійти в MusicBrainz",
     musicbrainzProfile: "Профіль MusicBrainz",
+    connectIntegrations: "Підключити...",
+    connected: "Підключено",
     scrobblingPaused: "Скроблінг призупинено",
     pinned: "Закріплені",
     files: "Файли"
@@ -2112,6 +2114,7 @@ export const uk = {
     save: "Зберегти",
     saved: "Збережено",
     connect: "Підключити",
+    disconnect: "Відключити",
     active: "Активно",
     paused: "Призупинено",
     inactive: "Неактивно",
@@ -2365,6 +2368,9 @@ export const uk = {
     draftModifiedBadge: "Шаблон змінено — автовпорядкування призупинено",
     revertDraftBtn: "Скинути"
   },
+  musicbrainz: {
+    integrationDesc: "— це краудсорсингова музична база даних, що каталогізує релізи по всьому світу та надає вашим трекам універсальні ідентифікатори метаданих (MBID) для точних біографій виконавців, підбору обкладинок і безперебійного скроблінгу."
+  },
   picard: {
     openInPicard: "Відкрити в Picard",
     openAllInPicard: "Відкрити все в Picard",
@@ -2431,6 +2437,35 @@ export const uk = {
     syncRatingsSuccess: "Отримано вподобань: {loved}; невподобань: {hated}; оцінок композицій: {songRatings}; оцінок альбомів: {albumRatings}; надіслано до ListenBrainz: {pushed}",
     syncRatingsFailed: "(не вдалося надіслати: {failed})",
     syncRatingsNoCritiquebrainz: "Оцінки зірками не отримано: додайте свій профіль CritiqueBrainz вище."
+  },
+  lastfm: {
+    integrationTitle: "Скробблер Last.fm",
+    integrationDesc: "це сервіс відкриття музики, який фіксує ваші прослуховування для надання персональної статистики, щотижневих чартів і рекомендацій виконавців.",
+    connectLabel: "Підключити Last.fm",
+    connectHint: "Авторизуйте Luminous у браузері для надсилання прослуховувань до профілю Last.fm",
+    connectBtn: "Підключити Last.fm",
+    authPendingTitle: "Очікування авторизації в браузері",
+    authPendingDesc: "Натисніть «Yes, allow access» на сторінці авторизації Last.fm у браузері, а потім натисніть «Завершити вхід» нижче.",
+    finishAuthBtn: "Завершити вхід",
+    cancelAuthBtn: "Скасувати",
+    authFailed: "Не вдалося авторизуватися в Last.fm",
+    disconnectBtn: "Відключити",
+    enableLabel: "Увімкнути скроблінг Last.fm",
+    enableHint: "Надсилати завершені прослуховування до вашого профілю Last.fm",
+    lovedTracksLabel: "Синхронізувати улюблені треки",
+    lovedTracksHint: "Синхронізувати обрані треки з улюбленими на Last.fm",
+    syncLovedBtn: "Синхронізувати улюблені",
+    syncingLovedBtn: "Синхронізація...",
+    syncLovedSuccess: "Улюблені треки синхронізовано з Last.fm: отримано {loved}, надіслано {pushed}",
+    cacheEmpty: "Офлайн-кеш порожній",
+    cachePending: {
+      one: "{count} прослуховування в офлайн-кеші",
+      few: "{count} прослуховування в офлайн-кеші",
+      many: "{count} прослуховувань в офлайн-кеші",
+      other: "{count} прослуховувань в офлайн-кеші"
+    },
+    cacheDesc: "Прослуховування, зафіксовані без з'єднання з інтернетом, додаються до черги та надсилаються автоматично.",
+    syncNowBtn: "Синхронізувати зараз"
   },
   discord: {
     integrationTitle: "Discord Rich Presence",
@@ -2717,6 +2752,7 @@ export const uk = {
     scrobbling: "Скроблінг",
     listenbrainzPromptDesc: "Автоматично скроблити історію прослуховування до ListenBrainz за допомогою вашого токена користувача.",
     listenbrainzProfile: "Профіль слухача ListenBrainz",
+    lastfmProfile: "Профіль слухача Last.fm",
     musicbrainzProfile: "Профіль редактора MusicBrainz",
     integrationSettings: "Налаштування інтеграцій",
     aboutMusicBrainz: "Про MusicBrainz",

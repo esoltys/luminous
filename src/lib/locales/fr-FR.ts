@@ -27,6 +27,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     scanningPhaseLabel: "Phase : {phase}",
     musicbrainzLogin: "Connexion à MusicBrainz",
     musicbrainzProfile: "Profil MusicBrainz",
+    connectIntegrations: "Connecter...",
+    connected: "Connecté",
     scrobblingPaused: "Scrobbling en pause",
     pinned: "Épinglés",
     files: "Fichiers"
@@ -2052,6 +2054,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     save: "Enregistrer",
     saved: "Enregistré",
     connect: "Connecter",
+    disconnect: "Déconnecter",
     active: "Actif",
     paused: "En pause",
     inactive: "Inactif",
@@ -2207,6 +2210,9 @@ export const frFR: DeepStringRecord<typeof en> = {
     draftModifiedBadge: "Modèle modifié — organisation automatique suspendue",
     revertDraftBtn: "Rétablir"
   },
+  musicbrainz: {
+    integrationDesc: "est une base de données musicale collaborative qui répertorie les sorties à l'échelle mondiale, attribuant à vos pistes des identifiants universels (MBID) pour des biographies d'artistes précises, la correspondance des pochettes et un scrobbling fluide."
+  },
   picard: {
     openInPicard: "Ouvrir dans Picard",
     openAllInPicard: "Tout ouvrir dans Picard",
@@ -2269,6 +2275,33 @@ export const frFR: DeepStringRecord<typeof en> = {
     syncRatingsSuccess: "Récupérés : {loved} coups de cœur ; {hated} rejets ; {songRatings} notes de morceau ; {albumRatings} notes d’album ; transmis à ListenBrainz : {pushed}",
     syncRatingsFailed: "({failed} échec(s) de transmission)",
     syncRatingsNoCritiquebrainz: "Les notes en étoiles n’ont pas été récupérées : ajoutez votre profil CritiqueBrainz ci-dessus."
+  },
+  lastfm: {
+    integrationTitle: "Scrobbler Last.fm",
+    integrationDesc: "est un service de découverte musicale qui enregistre vos écoutes pour fournir des statistiques personnalisées, des classements hebdomadaires et des recommandations d'artistes.",
+    connectLabel: "Connecter Last.fm",
+    connectHint: "Autorisez Luminous dans votre navigateur pour transmettre vos écoutes à votre profil Last.fm",
+    connectBtn: "Connecter Last.fm",
+    authPendingTitle: "En attente d'autorisation dans le navigateur",
+    authPendingDesc: "Cliquez sur « Yes, allow access » sur la page d'autorisation Last.fm dans votre navigateur, puis cliquez sur Terminer la connexion ci-dessous.",
+    finishAuthBtn: "Terminer la connexion",
+    cancelAuthBtn: "Annuler",
+    authFailed: "Échec de l'autorisation avec Last.fm",
+    disconnectBtn: "Déconnecter",
+    enableLabel: "Activer le scrobbling Last.fm",
+    enableHint: "Transmettre les écoutes terminées à votre profil Last.fm",
+    lovedTracksLabel: "Synchroniser les morceaux aimés",
+    lovedTracksHint: "Synchroniser les morceaux favoris avec les morceaux aimés sur Last.fm",
+    syncLovedBtn: "Synchroniser les morceaux aimés",
+    syncingLovedBtn: "Synchronisation en cours...",
+    syncLovedSuccess: "Morceaux aimés synchronisés avec Last.fm : {loved} récupérés, {pushed} envoyés",
+    cacheEmpty: "La mémoire cache hors ligne est vide",
+    cachePending: {
+      one: "{count} écoute en attente dans la mémoire cache hors ligne",
+      other: "{count} écoutes en attente dans la mémoire cache hors ligne"
+    },
+    cacheDesc: "Les écoutes enregistrées hors ligne sont mises en file d'attente et envoyées automatiquement.",
+    syncNowBtn: "Synchroniser maintenant"
   },
   discord: {
     integrationTitle: "Discord Rich Presence",
@@ -2549,6 +2582,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     scrobbling: "Scrobbling",
     listenbrainzPromptDesc: "Scrobblez automatiquement votre historique d'écoute vers ListenBrainz grâce à votre jeton utilisateur.",
     listenbrainzProfile: "Profil d'auditeur ListenBrainz",
+    lastfmProfile: "Profil d'auditeur Last.fm",
     musicbrainzProfile: "Profil d'éditeur MusicBrainz",
     integrationSettings: "Paramètres d'intégration",
     aboutMusicBrainz: "À propos de MusicBrainz",

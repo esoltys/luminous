@@ -95,3 +95,38 @@ pub async fn get_discord_status(
 ) -> Result<crate::discord::DiscordStatus, String> {
     Ok(state.scrobbler.get_discord_status().await)
 }
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct LastFmAuthPrompt {
+    pub token: String,
+    pub auth_url: String,
+}
+
+#[tauri::command]
+pub async fn start_lastfm_login(state: State<'_, AppState>) -> Result<LastFmAuthPrompt, String> {
+    let (token, auth_url) = state.scrobbler.start_lastfm_auth().await?;
+    Ok(LastFmAuthPrompt { token, auth_url })
+}
+
+#[tauri::command]
+pub async fn finish_lastfm_login(
+    token: String,
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<crate::scrobbler::LastFmSession, String> {
+    let session = state.scrobbler.complete_lastfm_auth(&token).await?;
+    let settings = state.scrobbler.get_settings().await;
+    let _ = app.emit("scrobbler-settings-changed", &settings);
+    Ok(session)
+}
+
+#[tauri::command]
+pub async fn disconnect_lastfm(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    state.scrobbler.disconnect_lastfm().await?;
+    let settings = state.scrobbler.get_settings().await;
+    let _ = app.emit("scrobbler-settings-changed", &settings);
+    Ok(())
+}

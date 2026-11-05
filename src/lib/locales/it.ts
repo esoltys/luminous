@@ -21,6 +21,8 @@ export const it = {
     scanningPhaseLabel: "Fase: {phase}",
     musicbrainzLogin: "Accedi a MusicBrainz",
     musicbrainzProfile: "Profilo MusicBrainz",
+    connectIntegrations: "Connetti...",
+    connected: "Connesso",
     scrobblingPaused: "Scrobbling in pausa",
     pinned: "Fissati",
     files: "File"
@@ -1976,6 +1978,7 @@ export const it = {
     save: "Salva",
     saved: "Salvato",
     connect: "Connetti",
+    disconnect: "Disconnetti",
     active: "Attivo",
     paused: "In pausa",
     inactive: "Inattivo",
@@ -2199,6 +2202,9 @@ export const it = {
     draftModifiedBadge: "Modello modificato — organizzazione automatica in pausa",
     revertDraftBtn: "Ripristina"
   },
+  musicbrainz: {
+    integrationDesc: "è un database musicale collaborativo che cataloga le uscite di tutto il mondo, assegnando ai tuoi brani identificatori universali (MBID) per biografie di artisti accurate, abbinamento delle copertine e scrobbling senza interruzioni."
+  },
   picard: {
     openInPicard: "Apri in Picard",
     openAllInPicard: "Apri tutti in Picard",
@@ -2261,6 +2267,33 @@ export const it = {
     syncRatingsSuccess: "Recuperati: {loved} amati, {hated} odiati, {songRatings} valutazioni di brani e {albumRatings} valutazioni di album; inviati a ListenBrainz: {pushed}",
     syncRatingsFailed: "(invio non riuscito: {failed})",
     syncRatingsNoCritiquebrainz: "Le valutazioni a stelle non sono state recuperate: aggiungi qui sopra il tuo profilo CritiqueBrainz."
+  },
+  lastfm: {
+    integrationTitle: "Scrobbler Last.fm",
+    integrationDesc: "è un servizio di scoperta musicale che registra i brani ascoltati per offrire statistiche personalizzate, classifiche settimanali e consigli sugli artisti.",
+    connectLabel: "Connetti Last.fm",
+    connectHint: "Autorizza Luminous nel browser per inviare gli ascolti al tuo profilo Last.fm",
+    connectBtn: "Connetti Last.fm",
+    authPendingTitle: "In attesa di autorizzazione nel browser",
+    authPendingDesc: "Fai clic su «Yes, allow access» nella pagina di autorizzazione di Last.fm nel browser, quindi fai clic su Completa accesso qui sotto.",
+    finishAuthBtn: "Completa accesso",
+    cancelAuthBtn: "Annulla",
+    authFailed: "Autorizzazione con Last.fm non riuscita",
+    disconnectBtn: "Disconnetti",
+    enableLabel: "Abilita scrobbling Last.fm",
+    enableHint: "Invia gli ascolti completati al tuo profilo Last.fm",
+    lovedTracksLabel: "Sincronizza brani preferiti",
+    lovedTracksHint: "Sincronizza i brani preferiti con i brani piaciuti su Last.fm",
+    syncLovedBtn: "Sincronizza brani preferiti",
+    syncingLovedBtn: "Sincronizzazione in corso...",
+    syncLovedSuccess: "Brani preferiti sincronizzati con Last.fm: {loved} scaricati, {pushed} inviati",
+    cacheEmpty: "La cache non in linea è vuota",
+    cachePending: {
+      one: "{count} ascolto in sospeso nella cache non in linea",
+      other: "{count} ascolti in sospeso nella cache non in linea"
+    },
+    cacheDesc: "Gli ascolti registrati senza connessione internet vengono accodati e inviati automaticamente.",
+    syncNowBtn: "Sincronizza ora"
   },
   discord: {
     integrationTitle: "Discord Rich Presence",
@@ -2541,6 +2574,7 @@ export const it = {
     scrobbling: "Scrobbling",
     listenbrainzPromptDesc: "Registra automaticamente la tua cronologia di ascolto su ListenBrainz con il tuo token utente (scrobbling).",
     listenbrainzProfile: "Profilo ascoltatore ListenBrainz",
+    lastfmProfile: "Profilo ascoltatore Last.fm",
     musicbrainzProfile: "Profilo editor MusicBrainz",
     integrationSettings: "Impostazioni di integrazione",
     aboutMusicBrainz: "Informazioni su MusicBrainz",

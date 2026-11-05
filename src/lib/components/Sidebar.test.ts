@@ -134,7 +134,7 @@ describe("Sidebar.svelte", () => {
     expect(pinnedBtn.length).toBeGreaterThan(0);
   });
 
-  describe("MusicBrainz login indicator", () => {
+  describe("Integrations connection indicator", () => {
     beforeEach(() => {
       musicbrainzStore.isLoggedIn = true;
       musicbrainzStore.username = "soltys";
@@ -149,10 +149,10 @@ describe("Sidebar.svelte", () => {
       scrobblerStore.paused = false;
     });
 
-    it("shows a green dot and plain title while scrobbling is active", () => {
+    it("shows a green dot and Connected title while scrobbling is active", () => {
       const { getByTestId, getByTitle } = render(Sidebar, { props: { width: 256 } });
       expect(getByTestId("musicbrainz-status-dot")).toHaveClass("bg-emerald-500");
-      expect(getByTitle("soltys (MusicBrainz)")).toBeInTheDocument();
+      expect(getByTitle("Connected")).toBeInTheDocument();
     });
 
     it("shows an amber dot, title suffix and label while scrobbling is paused", () => {
@@ -161,7 +161,7 @@ describe("Sidebar.svelte", () => {
       const dot = getByTestId("musicbrainz-status-dot");
       expect(dot).toHaveClass("bg-amber-500");
       expect(dot).toHaveAttribute("aria-label", "Scrobbling paused");
-      expect(getByTitle("soltys (MusicBrainz) – Scrobbling paused")).toBeInTheDocument();
+      expect(getByTitle("Connected – Scrobbling paused")).toBeInTheDocument();
     });
 
     it("ignores a stale paused flag when scrobbling is disabled", () => {
@@ -169,6 +169,23 @@ describe("Sidebar.svelte", () => {
       scrobblerStore.paused = true;
       const { getByTestId } = render(Sidebar, { props: { width: 256 } });
       expect(getByTestId("musicbrainz-status-dot")).toHaveClass("bg-emerald-500");
+    });
+
+    it("shows Connect... when not connected and opens integrations settings on click", async () => {
+      musicbrainzStore.isLoggedIn = false;
+      musicbrainzStore.username = null;
+      scrobblerStore.enabled = false;
+      scrobblerStore.lastfmEnabled = false;
+      scrobblerStore.lastfmUsername = null;
+      scrobblerStore.username = null;
+
+      const openSettingsSpy = vi.spyOn(navigationStore, "openSettings");
+      const { getByTitle } = render(Sidebar, { props: { width: 256 } });
+      const connectBtn = getByTitle("Connect...");
+      expect(connectBtn).toBeInTheDocument();
+
+      await fireEvent.click(connectBtn);
+      expect(openSettingsSpy).toHaveBeenCalledWith("integrations");
     });
   });
 });
