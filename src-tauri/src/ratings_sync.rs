@@ -159,6 +159,107 @@ pub fn apply_critique_ratings(
     Ok(out)
 }
 
+/// Reconciles local library loved tracks with Last.fm's loved tracks list (#1954).
+///
+/// 1. Remote loved tracks update local matching library songs to `loved = 1`.
+/// 2. Local library loved songs (`loved = 1`) not yet present on Last.fm are returned for batch pushing.
+/// 3. Songs marked disliked (`loved = -1`) locally are never pushed as loved.
+pub fn reconcile_lastfm_loved(
+    conn: &mut Connection,
+    remote_loved: &[luminous_remote::lastfm::LastFmLovedTrack],
+) -> Result<(PullOutcome, Vec<(String, String)>)> {
+    let mut out = PullOutcome::default();
+    let mut remote_set = HashSet::new();
+
+    let sql_by_mbid = format!(
+        "SELECT id, loved FROM songs
+         WHERE musicbrainz_recording_id = ?1
+           AND musicbrainz_recording_id IS NOT NULL AND musicbrainz_recording_id != ''
+           AND source IN ({lib}) AND unavailable = 0 AND not_included = 0",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+
+    let sql_by_text = format!(
+        "SELECT id, loved FROM songs
+         WHERE LOWER(artist) = LOWER(?1) AND LOWER(title) = LOWER(?2)
+           AND source IN ({lib}) AND unavailable = 0 AND not_included = 0",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+
+    let tx = conn.transaction()?;
+    {
+        let mut update_stmt = tx.prepare("UPDATE songs SET loved = 1 WHERE id = ?1")?;
+        let mut find_by_mbid = tx.prepare(&sql_by_mbid)?;
+        let mut find_by_text = tx.prepare(&sql_by_text)?;
+
+        for t in remote_loved {
+            let key = (
+                t.artist.trim().to_lowercase(),
+                t.track.trim().to_lowercase(),
+            );
+            remote_set.insert(key);
+
+            let mut matched = Vec::new();
+            if let Some(mbid) = &t.mbid {
+                let rows = find_by_mbid.query_map(params![mbid], |r| {
+                    Ok((r.get::<_, i64>(0)?, r.get::<_, i32>(1)?))
+                })?;
+                for row in rows.flatten() {
+                    matched.push(row);
+                }
+            }
+
+            if matched.is_empty() {
+                let rows = find_by_text
+                    .query_map(params![t.artist.trim(), t.track.trim()], |r| {
+                        Ok((r.get::<_, i64>(0)?, r.get::<_, i32>(1)?))
+                    })?;
+                for row in rows.flatten() {
+                    matched.push(row);
+                }
+            }
+
+            for (id, current_loved) in matched {
+                if current_loved != 1 {
+                    update_stmt.execute(params![id])?;
+                    out.loved += 1;
+                    out.song_ids.push(id);
+                }
+            }
+        }
+    }
+    tx.commit()?;
+
+    // Determine pending pushes: local songs with loved = 1 absent from remote_loved
+    let sql_pushes = format!(
+        "SELECT DISTINCT artist, title FROM songs
+         WHERE loved = 1
+           AND artist IS NOT NULL AND artist != ''
+           AND title IS NOT NULL AND title != ''
+           AND source IN ({lib}) AND unavailable = 0 AND not_included = 0
+         ORDER BY id",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql_pushes)?;
+    let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+
+    let mut pending_pushes = Vec::new();
+    let mut seen_local = HashSet::new();
+
+    for row in rows.flatten() {
+        let (artist, title) = row;
+        let norm_key = (artist.trim().to_lowercase(), title.trim().to_lowercase());
+        if !remote_set.contains(&norm_key) && seen_local.insert(norm_key) {
+            pending_pushes.push((artist, title));
+        }
+    }
+
+    out.song_ids.sort_unstable();
+    out.song_ids.dedup();
+
+    Ok((out, pending_pushes))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,5 +373,71 @@ mod tests {
         );
         let again = apply_critique_ratings(&mut conn, &ratings).unwrap();
         assert_eq!((again.song_ratings, again.album_ratings), (0, 0));
+    }
+
+    #[test]
+    fn lastfm_loved_reconciliation_pulls_remote_and_pushes_novel_local() {
+        let (_d, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+
+        // Helper to insert song with artist & title
+        let insert_song = |conn: &Connection,
+                           path: &str,
+                           artist: &str,
+                           title: &str,
+                           rec: &str,
+                           loved: i32|
+         -> i64 {
+            conn.execute(
+                "INSERT INTO songs (path, artist, title, album, album_key, musicbrainz_recording_id, loved, source)
+                 VALUES (?1, ?2, ?3, 'Album', 'album-key', ?4, ?5, 1)",
+                params![path, artist, title, rec, loved],
+            )
+            .unwrap();
+            conn.last_insert_rowid()
+        };
+
+        let s1 = insert_song(&conn, "p1", "Radiohead", "Creep", "mbid-1", 0); // remote has it loved
+        let s2 = insert_song(&conn, "p2", "Pink Floyd", "Comfortably Numb", "", 1); // local loved, remote lacks
+        let s3 = insert_song(
+            &conn,
+            "p3",
+            "Nirvana",
+            "Smells Like Teen Spirit",
+            "mbid-3",
+            1,
+        ); // both agree
+        let s4 = insert_song(&conn, "p4", "Coldplay", "Yellow", "", -1); // local disliked, must NOT be pushed
+
+        let remote = vec![
+            luminous_remote::lastfm::LastFmLovedTrack {
+                artist: "Radiohead".into(),
+                track: "Creep".into(),
+                mbid: Some("mbid-1".into()),
+                date_uts: Some(1700000000),
+            },
+            luminous_remote::lastfm::LastFmLovedTrack {
+                artist: "Nirvana".into(),
+                track: "Smells Like Teen Spirit".into(),
+                mbid: Some("mbid-3".into()),
+                date_uts: Some(1700000100),
+            },
+        ];
+
+        let (pull_out, pushes) = reconcile_lastfm_loved(&mut conn, &remote).unwrap();
+
+        // Remote pulled s1 to loved = 1
+        assert_eq!(pull_out.loved, 1);
+        assert_eq!(pull_out.song_ids, vec![s1]);
+        assert_eq!(loved_of(&conn, s1), 1);
+        assert_eq!(loved_of(&conn, s2), 1);
+        assert_eq!(loved_of(&conn, s3), 1);
+        assert_eq!(loved_of(&conn, s4), -1);
+
+        // s2 pushed to Last.fm (s4 is disliked so not pushed; s3 is already on remote)
+        assert_eq!(
+            pushes,
+            vec![("Pink Floyd".to_string(), "Comfortably Numb".to_string())]
+        );
     }
 }
