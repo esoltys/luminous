@@ -54,6 +54,9 @@ function open(entries: FileEntry[], over: {
   source?: FileSource;
   scannable?: boolean;
   inColumn?: boolean;
+  fromHeader?: boolean;
+  folderLocation?: string | null;
+  onFolderSettings?: () => void;
   onEditFileTags?: (entry: FileEntry) => void;
   onEditFolderTags?: (dir: FileEntry, dirPath: string[]) => void;
   onEditBatchTags?: (entries: FileEntry[]) => void;
@@ -63,6 +66,7 @@ function open(entries: FileEntry[], over: {
   const onEditFileTags = over.onEditFileTags ?? vi.fn();
   const onEditFolderTags = over.onEditFolderTags ?? vi.fn();
   const onEditBatchTags = over.onEditBatchTags ?? vi.fn();
+  const onFolderSettings = over.onFolderSettings ?? vi.fn();
   render(FileContextMenu, {
     props: {
       x: 0,
@@ -73,6 +77,9 @@ function open(entries: FileEntry[], over: {
       entries,
       scannable: over.scannable ?? true,
       inColumn: over.inColumn ?? false,
+      fromHeader: over.fromHeader ?? false,
+      folderLocation: over.folderLocation ?? null,
+      onFolderSettings,
       onEditTags,
       onEditFileTags,
       onEditFolderTags,
@@ -80,7 +87,7 @@ function open(entries: FileEntry[], over: {
       onClose,
     },
   });
-  return { onClose, onEditTags, onEditFileTags, onEditFolderTags, onEditBatchTags };
+  return { onClose, onEditTags, onEditFileTags, onEditFolderTags, onEditBatchTags, onFolderSettings };
 }
 
 describe("FileContextMenu.svelte", () => {
@@ -234,5 +241,46 @@ describe("FileContextMenu.svelte", () => {
     });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("renders folder actions in header mode without Play folder, including Folder settings", async () => {
+    const onFolderSettings = vi.fn();
+    open([], {
+      fromHeader: true,
+      folderLocation: "C:/Music/Live",
+      scannable: true,
+      onFolderSettings,
+    });
+
+    expect(screen.queryByText("Play folder")).not.toBeInTheDocument();
+    for (const label of [
+      "Add to Queue",
+      "New playlist from folder",
+      "Scan this folder",
+      "Edit tags for folder",
+      "Open in Picard",
+      "Copy path",
+      "Folder settings",
+    ]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+
+    await fireEvent.click(screen.getByText("Folder settings"));
+    expect(onFolderSettings).toHaveBeenCalled();
+  });
+
+  it("calls onEditFolderTags for open folder from header mode", async () => {
+    const onEditFolderTags = vi.fn();
+    open([], {
+      fromHeader: true,
+      folderLocation: "C:/Music/Live",
+      scannable: true,
+      onEditFolderTags,
+    });
+    await fireEvent.click(screen.getByText("Edit tags for folder"));
+    expect(onEditFolderTags).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Live", location: "C:/Music/Live" }),
+      ["Live"]
+    );
   });
 });

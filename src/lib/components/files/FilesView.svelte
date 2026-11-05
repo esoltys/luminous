@@ -1,9 +1,8 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import {
     PlayIcon,
-    DeviceMobileSpeakerIcon,
-    ArrowSquareOutIcon,
-    GearIcon,
+    DotsThreeIcon,
     PlusIcon,
     CaretRightIcon,
   } from "phosphor-svelte";
@@ -16,15 +15,15 @@
   import { toastStore } from "../../stores/toast.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import { formatFileSize } from "../../utils/formatters";
-  import { deviceName } from "../../utils/devices";
-  import type { ConnectedDevice, DirListing, FileEntry, FileMenuTarget } from "../../types";
+  import { CONTEXT_MENU_WIDTH_PX } from "../../constants";
+  import type { DirListing, FileEntry, FileMenuTarget } from "../../types";
   import Button from "../Button.svelte";
   import TagEditor from "../TagEditor.svelte";
   import AlbumTagEditor from "../AlbumTagEditor.svelte";
   import FileBrowser from "./FileBrowser.svelte";
   import FileContextMenu from "./FileContextMenu.svelte";
   import DeviceView from "../devices/DeviceView.svelte";
-  import { addFolderToDeviceSync, openFile, playFolder, reveal, revealLabel, scanFolder } from "./folderActions";
+  import { openFile, playFolder, scanFolder } from "./folderActions";
 
   const location = $derived(navigationStore.filesLocation);
   const openDevice = $derived(
@@ -35,12 +34,29 @@
   let listing = $state<DirListing | null>(null);
   let selectedName = $state<string | null>(null);
   let selection = $state<string[]>([]);
-  let menu = $state<(FileMenuTarget & { x: number; y: number }) | null>(null);
+  let menu = $state<(FileMenuTarget & { x: number; y: number; fromHeader?: boolean }) | null>(null);
+  let headerMenuButtonEl = $state<HTMLButtonElement | null>(null);
   let editingSongId = $state<number | null>(null);
   let editingFile = $state<{ path: string; name: string; folderPath: string[]; folderName: string } | null>(null);
   let editingFolder = $state<{ folderName: string; songIds: number[]; filePaths: string[]; folderPath: string[] } | null>(null);
   let editingBatch = $state<{ songIds: number[]; filePaths: string[]; folderPath: string[] } | null>(null);
-  let devicePickerOpen = $state(false);
+
+  function toggleHeaderMenu() {
+    if (menu?.fromHeader) {
+      menu = null;
+      return;
+    }
+    if (!headerMenuButtonEl) return;
+    const rect = headerMenuButtonEl.getBoundingClientRect();
+    menu = {
+      x: rect.right - CONTEXT_MENU_WIDTH_PX,
+      y: rect.bottom + 6,
+      dir: location?.path ?? [],
+      entries: [],
+      inColumn: false,
+      fromHeader: true,
+    };
+  }
 
   async function editFolderTags(dir: FileEntry, dirPath: string[]) {
     if (!location) return;
@@ -122,19 +138,14 @@
     playFolder(location.source, location.path, title, entry.songId);
   }
 
-  function addToDeviceSync(device: ConnectedDevice) {
-    devicePickerOpen = false;
-    if (listing?.location) addFolderToDeviceSync(device, listing.location, title);
-  }
-
-  function onAddToDeviceSync() {
-    if (filesStore.devices.length === 1) addToDeviceSync(filesStore.devices[0]);
-    else devicePickerOpen = !devicePickerOpen;
-  }
-
   /** The files selected, when there's more than one; the footer counts them. */
   const selectedFiles = $derived(
     selection.length > 1 && listing ? listing.entries.filter((e) => !e.isDir && selection.includes(e.name)) : []
+  );
+
+  /** How many files in this folder are waiting to be scanned into the library. */
+  const unscannedCount = $derived(
+    listing ? listing.entries.filter((e) => !e.isDir && e.status === "notScanned").length : 0
   );
 
   /** The footer's lines: the selection, or the folder's size, then what is in the library. */
@@ -165,8 +176,6 @@
     return [files, `${i18n.plural("files.summaryInLibrary", l.inLibraryCount)}${hidden}`];
   }
 </script>
-
-<svelte:window onclick={() => (devicePickerOpen = false)} />
 
 <div class="flex-1 flex flex-col h-full min-h-0 bg-brand-main text-brand-text-primary select-none overflow-hidden" data-testid="files-view">
   {#if openDevice}
@@ -202,42 +211,17 @@
             <PlayIcon weight="fill" class="w-4 h-4" />
             {i18n.t("files.playFolder")}
           </Button>
-          {#if isLocal && filesStore.devices.length > 0}
-            <div class="relative">
-              <Button onclick={(e) => { e.stopPropagation(); onAddToDeviceSync(); }}>
-                <DeviceMobileSpeakerIcon class="w-4 h-4" />
-                {i18n.t("files.addToDeviceSync")}
-              </Button>
-              {#if devicePickerOpen}
-                <div class="absolute right-0 top-full mt-1 z-20 min-w-48 rounded-lg border border-brand-border/60 bg-brand-sidebar shadow-xl p-1" role="menu">
-                  {#each filesStore.devices as device (device.id)}
-                    <button
-                      class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10"
-                      role="menuitem"
-                      onclick={(e) => { e.stopPropagation(); addToDeviceSync(device); }}
-                    >{deviceName(device)}</button>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/if}
-          {#if isLocal}
-            <button
-              class="w-9 h-9 flex items-center justify-center rounded-full text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 transition-colors"
-              onclick={() => listing?.location && reveal(listing.location)}
-              title={revealLabel()}
-              aria-label={revealLabel()}
-            >
-              <ArrowSquareOutIcon class="w-4 h-4" />
-            </button>
-          {/if}
           <button
-            class="w-9 h-9 flex items-center justify-center rounded-full text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 transition-colors"
-            onclick={() => navigationStore.openSettings("sources")}
-            title={i18n.t("files.folderSettings")}
-            aria-label={i18n.t("files.folderSettings")}
+            bind:this={headerMenuButtonEl}
+            class="w-9 h-9 flex items-center justify-center rounded-full text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 transition-colors cursor-pointer"
+            onclick={(e) => {
+              e.stopPropagation();
+              toggleHeaderMenu();
+            }}
+            title={i18n.t("files.folderActions")}
+            aria-label={i18n.t("files.folderActions")}
           >
-            <GearIcon class="w-4 h-4" />
+            <DotsThreeIcon weight="bold" class="w-5 h-5" />
           </button>
         </div>
       </header>
@@ -261,17 +245,28 @@
       >
         {#snippet footer()}
           {#if listing}
-            <div class="flex items-center justify-between gap-3 px-4 py-2.5 text-xs text-brand-text-secondary">
-              <span class="min-w-0 flex flex-col">
+            <div class="flex items-center px-4 py-2.5 text-xs text-brand-text-secondary">
+              <div class="min-w-0 flex flex-col">
                 {#each summary(listing) as line, i (i)}
-                  <span class="truncate" title={line}>{line}</span>
+                  <span class="truncate" title={line}>
+                    {line}
+                    {#if i === 1 && collectionStore.isScanning}
+                      <span class="text-brand-accent font-medium ml-1.5">· {i18n.t("files.scanning")}</span>
+                    {:else if i === 1 && isLocal && !listing.excluded && unscannedCount > 0}
+                      <span class="ml-1.5">
+                        · {i18n.plural("files.summaryUnscanned", unscannedCount)}
+                        <button
+                          class="text-brand-accent hover:underline font-medium ml-1 cursor-pointer"
+                          onclick={() => scanFolder(location.source, location.path)}
+                        >{i18n.t("files.scanNudge")}</button>
+                      </span>
+                    {/if}
+                  </span>
                 {/each}
-              </span>
-              {#if isLocal && !listing.excluded}
-                <Button size="sm" class="shrink-0 whitespace-nowrap" onclick={() => scanFolder(location.source, location.path)} disabled={collectionStore.isScanning}>
-                  {collectionStore.isScanning ? i18n.t("files.scanning") : i18n.t("files.scanFolder")}
-                </Button>
-              {/if}
+                {#if summary(listing).length === 1 && collectionStore.isScanning}
+                  <span class="text-brand-accent font-medium">{i18n.t("files.scanning")}</span>
+                {/if}
+              </div>
             </div>
           {/if}
         {/snippet}
@@ -286,7 +281,10 @@
         folderName={menu.inColumn ? "" : title}
         entries={menu.entries}
         inColumn={menu.inColumn}
+        fromHeader={menu.fromHeader}
+        folderLocation={menu.fromHeader ? listing?.location : null}
         scannable={isLocal && !listing?.excluded}
+        onFolderSettings={() => navigationStore.openSettings("sources")}
         onEditTags={(id) => (editingSongId = id)}
         onEditFileTags={(entry) => {
           if (entry.location) {
