@@ -145,6 +145,127 @@
 </div>
 
 {#if prefs.onlineEnabled}
+<!-- MusicBrainz Account Card -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="flex justify-between items-center gap-4">
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-9 h-9 rounded-lg bg-[#ba478f]/15 border border-[#ba478f]/25 shrink-0 flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="w-5 h-5">
+          <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
+          <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
+        </svg>
+      </div>
+      <div class="space-y-1 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">MusicBrainz</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed">
+          <button onclick={() => openExternalUrl("https://musicbrainz.org")} class="text-brand-accent hover:underline">MusicBrainz</button>
+          {i18n.t('auth.modalSubtitle', {}, 'Connect your account to manage integrations and scrobbling')}
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 shrink-0">
+      {#if musicbrainzStore.isLoggedIn && musicbrainzStore.username}
+        <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 font-medium">
+          <Check class="w-3 h-3" />
+          {musicbrainzStore.username}
+        </span>
+        <Button
+          variant="secondary"
+          size="sm"
+          onclick={() => musicbrainzStore.logout()}
+          class="text-xs text-brand-text-secondary hover:text-brand-text-primary"
+        >
+          {i18n.t('lastfm.disconnectBtn', {}, 'Disconnect')}
+        </Button>
+      {:else}
+        <Button
+          variant="secondary"
+          size="sm"
+          onclick={() => (showMusicBrainzLoginModal = true)}
+        >
+          {i18n.t('common.connect', {}, 'Connect')}
+        </Button>
+      {/if}
+    </div>
+  </div>
+</div>
+
+{#if showMusicBrainzLoginModal}
+  <MusicBrainzLoginModal onClose={() => (showMusicBrainzLoginModal = false)} />
+{/if}
+{/if}
+
+<!-- MusicBrainz Picard Card -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="pb-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <img src="/picard-icon.png" alt="Picard" class="w-9 h-9 shrink-0 object-contain" />
+      <div class="space-y-1 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('picard.integrationTitle')}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed">
+          <button onclick={() => openExternalUrl("https://picard.musicbrainz.org")} class="text-brand-accent hover:underline">MusicBrainz Picard</button>
+          {i18n.t('picard.integrationDesc')}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 py-1">
+    <div class="flex flex-col gap-0.5 min-w-0">
+      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('picard.missingPlaylistLabel')}</span>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('picard.missingPlaylistHint')}</p>
+    </div>
+    <Toggle
+      checked={picardStore.missingPlaylistEnabled}
+      onchange={(v) => picardStore.setMissingPlaylistEnabled(v)}
+      label={i18n.t('picard.missingPlaylistLabel')}
+    />
+  </div>
+
+  <div class="flex flex-col gap-1.5">
+    <label for="picard-custom-path-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+      {i18n.t('picard.customPathLabel')}
+    </label>
+    <div class="flex items-center gap-2">
+      <div class="max-w-md flex-1">
+        <Input
+          id="picard-custom-path-input"
+          type="text"
+          bind:value={picardCustomPath}
+          onchange={handlePicardCustomPathChange}
+          placeholder={i18n.t(isWindows ? 'picard.customPathPlaceholder' : 'picard.customPathPlaceholderLinux')}
+          class="w-full"
+        />
+      </div>
+      <Button onclick={handleBrowsePicardPath} variant="secondary" size="sm">
+        <FolderOpen class="w-4 h-4" />
+        {i18n.t('picard.browseBtn')}
+      </Button>
+    </div>
+
+    <div class="flex items-center gap-2 text-xs font-medium pt-1">
+      {#if picardStore.available}
+        <Check class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
+        <span class="text-brand-accent-text min-w-0 wrap-anywhere">
+          {i18n.t('picard.foundAt', { path: picardStore.path ?? '' })}
+        </span>
+      {:else}
+        <AlertTriangle class="w-3.5 h-3.5 text-amber-500 shrink-0" />
+        <span class="text-brand-text-secondary">{i18n.t('picard.notFound')}</span>
+      {/if}
+      <button
+        onclick={handleRecheckPicard}
+        disabled={isRecheckingPicard}
+        class="ml-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors disabled:opacity-50"
+        title={i18n.t('picard.recheckTooltip')}
+      >
+        <RefreshCw class="w-3.5 h-3.5 {isRecheckingPicard ? 'animate-spin' : ''}" />
+      </button>
+    </div>
+  </div>
+</div>
+
+{#if prefs.onlineEnabled}
 <!-- ListenBrainz Scrobbler Integration Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
   <div class="pb-3 flex justify-between items-start gap-4">
@@ -552,129 +673,6 @@
   {/if}
 </div>
 
-<!-- MusicBrainz Account Card -->
-<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-  <div class="flex justify-between items-center">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg bg-[#ba478f]/15 border border-[#ba478f]/25 shrink-0 flex items-center justify-center">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="w-5 h-5">
-          <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
-          <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
-        </svg>
-      </div>
-      <div class="space-y-1 min-w-0">
-        <div class="flex items-center gap-2">
-          <h3 class="font-bold text-sm text-brand-text-primary">MusicBrainz</h3>
-          {#if musicbrainzStore.isLoggedIn && musicbrainzStore.username}
-            <span class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              <Check class="w-3 h-3" />
-              {musicbrainzStore.username}
-            </span>
-          {/if}
-        </div>
-        <p class="text-xs text-brand-text-secondary leading-relaxed">
-          <button onclick={() => openExternalUrl("https://musicbrainz.org")} class="text-brand-accent hover:underline">MusicBrainz</button>
-          {i18n.t('auth.modalSubtitle', {}, 'Connect your account to manage integrations and scrobbling')}
-        </p>
-      </div>
-    </div>
-    {#if musicbrainzStore.isLoggedIn}
-      <Button
-        variant="secondary"
-        size="sm"
-        onclick={() => musicbrainzStore.logout()}
-      >
-        {i18n.t('lastfm.disconnectBtn', {}, 'Disconnect')}
-      </Button>
-    {:else}
-      <Button
-        variant="secondary"
-        size="sm"
-        onclick={() => (showMusicBrainzLoginModal = true)}
-      >
-        {i18n.t('common.connect', {}, 'Connect')}
-      </Button>
-    {/if}
-  </div>
-</div>
-
-{#if showMusicBrainzLoginModal}
-  <MusicBrainzLoginModal onClose={() => (showMusicBrainzLoginModal = false)} />
-{/if}
-
-{/if}
-
-<!-- MusicBrainz Picard Card -->
-<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-  <div class="pb-3 flex justify-between items-center">
-    <div class="flex items-center gap-3">
-      <img src="/picard-icon.png" alt="Picard" class="w-9 h-9 shrink-0 object-contain" />
-      <div class="space-y-1 min-w-0">
-        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('picard.integrationTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed">
-          <button onclick={() => openExternalUrl("https://picard.musicbrainz.org")} class="text-brand-accent hover:underline">MusicBrainz Picard</button>
-          {i18n.t('picard.integrationDesc')}
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <div class="flex items-center justify-between gap-4 py-1">
-    <div class="flex flex-col gap-0.5 min-w-0">
-      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('picard.missingPlaylistLabel')}</span>
-      <p class="text-xs text-brand-text-secondary">{i18n.t('picard.missingPlaylistHint')}</p>
-    </div>
-    <Toggle
-      checked={picardStore.missingPlaylistEnabled}
-      onchange={(v) => picardStore.setMissingPlaylistEnabled(v)}
-      label={i18n.t('picard.missingPlaylistLabel')}
-    />
-  </div>
-
-  <div class="flex flex-col gap-1.5">
-    <label for="picard-custom-path-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-      {i18n.t('picard.customPathLabel')}
-    </label>
-    <div class="flex items-center gap-2">
-      <div class="max-w-md flex-1">
-        <Input
-          id="picard-custom-path-input"
-          type="text"
-          bind:value={picardCustomPath}
-          onchange={handlePicardCustomPathChange}
-          placeholder={i18n.t(isWindows ? 'picard.customPathPlaceholder' : 'picard.customPathPlaceholderLinux')}
-          class="w-full"
-        />
-      </div>
-      <Button onclick={handleBrowsePicardPath} variant="secondary" size="sm">
-        <FolderOpen class="w-4 h-4" />
-        {i18n.t('picard.browseBtn')}
-      </Button>
-    </div>
-
-    <div class="flex items-center gap-2 text-xs font-medium pt-1">
-      {#if picardStore.available}
-        <Check class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
-        <span class="text-brand-accent-text min-w-0 wrap-anywhere">
-          {i18n.t('picard.foundAt', { path: picardStore.path ?? '' })}
-        </span>
-      {:else}
-        <AlertTriangle class="w-3.5 h-3.5 text-amber-500 shrink-0" />
-        <span class="text-brand-text-secondary">{i18n.t('picard.notFound')}</span>
-      {/if}
-      <button
-        onclick={handleRecheckPicard}
-        disabled={isRecheckingPicard}
-        class="ml-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors disabled:opacity-50"
-        title={i18n.t('picard.recheckTooltip')}
-      >
-        <RefreshCw class="w-3.5 h-3.5 {isRecheckingPicard ? 'animate-spin' : ''}" />
-      </button>
-    </div>
-  </div>
-</div>
-
-{#if prefs.onlineEnabled}
 <!-- Discord Rich Presence Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
   <div class="pb-3 flex justify-between items-center border-b border-brand-border/60">
