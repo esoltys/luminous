@@ -2738,6 +2738,7 @@ export const ru = {
     scrobbling: "Скробблинг",
     listenbrainzPromptDesc: "Автоматически скробблите историю прослушивания в ListenBrainz с помощью токена пользователя.",
     listenbrainzProfile: "Профиль слушателя ListenBrainz",
+    lastfmProfile: "Профиль слушателя Last.fm",
     musicbrainzProfile: "Профиль редактора MusicBrainz",
     integrationSettings: "Параметры интеграции",
     aboutMusicBrainz: "О MusicBrainz",

@@ -145,12 +145,17 @@ describe("MusicBrainzProfilePopover.svelte", () => {
     expect(setNowPlayingSpy).toHaveBeenCalledWith(false);
   });
 
-  it("opens ListenBrainz listener profile and MusicBrainz editor profile links", async () => {
+  it("opens ListenBrainz listener profile, Last.fm listener profile, and MusicBrainz editor profile links", async () => {
+    scrobblerStore.lastfmUsername = "test_lastfm_user";
     const { getByText } = render(MusicBrainzProfilePopover, {
       isOpen: true,
       anchorEl,
       onClose,
     });
+
+    const lastfmProfileBtn = getByText("Last.fm listener profile");
+    await fireEvent.click(lastfmProfileBtn);
+    expect(openExternalUrl).toHaveBeenCalledWith("https://www.last.fm/user/test_lastfm_user");
 
     const lbProfileBtn = getByText("ListenBrainz listener profile");
     await fireEvent.click(lbProfileBtn);

@@ -2562,6 +2562,7 @@ export const de = {
     scrobbling: "Scrobbling",
     listenbrainzPromptDesc: "Deinen Wiedergabeverlauf mit deinem Benutzertoken automatisch an ListenBrainz scrobbeln.",
     listenbrainzProfile: "ListenBrainz-Hörerprofil",
+    lastfmProfile: "Last.fm-Hörerprofil",
     musicbrainzProfile: "MusicBrainz-Editorprofil",
     integrationSettings: "Integrationseinstellungen",
     aboutMusicBrainz: "Über MusicBrainz",

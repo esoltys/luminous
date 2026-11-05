@@ -2562,6 +2562,7 @@ export const en = {
     scrobbling: "Scrobbling",
     listenbrainzPromptDesc: "Scrobble your listening history automatically to ListenBrainz with your user token.",
     listenbrainzProfile: "ListenBrainz listener profile",
+    lastfmProfile: "Last.fm listener profile",
     musicbrainzProfile: "MusicBrainz editor profile",
     integrationSettings: "Integration settings",
     aboutMusicBrainz: "About MusicBrainz",

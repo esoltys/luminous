@@ -2562,6 +2562,7 @@ export const it = {
     scrobbling: "Scrobbling",
     listenbrainzPromptDesc: "Registra automaticamente la tua cronologia di ascolto su ListenBrainz con il tuo token utente (scrobbling).",
     listenbrainzProfile: "Profilo ascoltatore ListenBrainz",
+    lastfmProfile: "Profilo ascoltatore Last.fm",
     musicbrainzProfile: "Profilo editor MusicBrainz",
     integrationSettings: "Impostazioni di integrazione",
     aboutMusicBrainz: "Informazioni su MusicBrainz",

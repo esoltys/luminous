@@ -421,20 +421,24 @@
   <!-- MusicBrainz Login / Profile Section (#1388); hidden while Offline (#1398) -->
   {#if prefs.onlineEnabled}
   <div class="{layoutCollapsed ? 'p-2' : 'px-4 py-2'} border-t border-brand-border/40 w-full flex flex-col items-center">
-    {#if musicbrainzStore.isLoggedIn}
+    {#if musicbrainzStore.isLoggedIn || scrobblerStore.lastfmUsername || scrobblerStore.username}
       <button
         bind:this={profileButtonEl}
         onclick={() => { showProfilePopover = !showProfilePopover; }}
         class="flex items-center gap-3 transition-colors duration-150 {showProfilePopover ? 'bg-brand-accent/20 text-brand-accent-text' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-        title={`${musicbrainzStore.username} (MusicBrainz)${pausedLabel ? ` – ${pausedLabel}` : ""}`}
+        title={`${musicbrainzStore.username || scrobblerStore.lastfmUsername || scrobblerStore.username} (${musicbrainzStore.isLoggedIn ? 'MusicBrainz' : 'Last.fm'})${pausedLabel ? ` – ${pausedLabel}` : ""}`}
       >
         <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
           <!-- Inner wrapper anchors the status dot to the logo, not the w-7 slot. -->
           <div class="relative flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0">
-              <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
-              <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
-            </svg>
+            {#if !musicbrainzStore.isLoggedIn && scrobblerStore.lastfmUsername}
+              <img src="/lastfm-icon.svg" alt="Last.fm" class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} rounded shrink-0 object-contain" />
+            {:else}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0">
+                <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
+                <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
+              </svg>
+            {/if}
             <span
               class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-brand-sidebar {scrobblingPaused ? 'bg-amber-500' : 'bg-emerald-500'}"
               data-testid="musicbrainz-status-dot"
@@ -445,7 +449,7 @@
         </div>
         {#if !layoutCollapsed}
           <span class="truncate text-xs font-semibold text-brand-text-primary text-left flex-1 min-w-0">
-            {musicbrainzStore.username}
+            {musicbrainzStore.username || scrobblerStore.lastfmUsername || scrobblerStore.username}
           </span>
         {/if}
       </button>

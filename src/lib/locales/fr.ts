@@ -2570,6 +2570,7 @@ export const fr: DeepStringRecord<typeof en> = {
     scrobbling: "Scrobbling",
     listenbrainzPromptDesc: "Scrobblez automatiquement votre historique d'écoute vers ListenBrainz grâce à votre jeton utilisateur.",
     listenbrainzProfile: "Profil d'auditeur ListenBrainz",
+    lastfmProfile: "Profil d'auditeur Last.fm",
     musicbrainzProfile: "Profil d'éditeur MusicBrainz",
     integrationSettings: "Paramètres d'intégration",
     aboutMusicBrainz: "À propos de MusicBrainz",
