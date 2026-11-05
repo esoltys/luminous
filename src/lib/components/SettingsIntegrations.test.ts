@@ -223,7 +223,7 @@ describe("SettingsIntegrations.svelte", () => {
   it("toggles Discord Rich Presence and shows sub-options when enabled", async () => {
     scrobblerStore.discordEnabled = false;
 
-    const { getByLabelText, findByText } = render(SettingsIntegrations);
+    const { getByLabelText, findByText, queryByText } = render(SettingsIntegrations);
 
     const toggle = getByLabelText("Enable Discord Rich Presence");
     expect(toggle).toBeInTheDocument();
@@ -235,7 +235,7 @@ describe("SettingsIntegrations.svelte", () => {
     expect(scrobblerStore.discordEnabled).toBe(true);
     expect(await findByText("Show album name")).toBeInTheDocument();
     expect(await findByText("Show elapsed and remaining time")).toBeInTheDocument();
-    expect(await findByText("1548913001715990610")).toBeInTheDocument();
+    expect(queryByText("1548913001715990610")).not.toBeInTheDocument();
   });
 
   it("hides Enable toggle until user token is validated, then enables scrobbling", async () => {

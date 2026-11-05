@@ -5,7 +5,7 @@ import { i18n } from "./i18n.svelte";
 
 type DiscordStatus = "connected" | "disconnected" | "not_running";
 
-export const DEFAULT_DISCORD_CLIENT_ID = "1548913001715990610";
+const DEFAULT_DISCORD_CLIENT_ID = "1548913001715990610";
 
 interface ScrobblerSettings {
   listenbrainz_enabled: boolean;
