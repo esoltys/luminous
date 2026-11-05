@@ -16,7 +16,8 @@
   import PinnedNavList from "./PinnedNavList.svelte";
   import SidebarFilesSection from "./files/SidebarFilesSection.svelte";
   import { untrack, onMount } from "svelte";
-  import { fade } from "../utils/motion";
+  import { fade, slide } from "../utils/motion";
+  import { fileDrag } from "../stores/fileDrag.svelte";
   import {
     BooksIcon as Library,
     PlaylistIcon as ListMusic,
@@ -93,6 +94,40 @@
     navigationStore.selectedPlaylistId = null;
     navigationStore.selectedAutoPlaylist = null;
   }
+
+  let customExpandTimer: ReturnType<typeof setTimeout> | undefined;
+  let dragExpandedCustom = $state(false);
+
+  const customPlaylists = $derived(
+    playlistsStore.playlists.filter(
+      (p) => (!p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)) && !p.is_queue
+    )
+  );
+
+  $effect(() => {
+    if (!fileDrag.isDragging) {
+      dragExpandedCustom = false;
+      clearTimeout(customExpandTimer);
+      customExpandTimer = undefined;
+      return;
+    }
+
+    if (fileDrag.dropTarget?.kind === "custom-category") {
+      if (!dragExpandedCustom && !customExpandTimer) {
+        customExpandTimer = setTimeout(() => {
+          dragExpandedCustom = true;
+          customExpandTimer = undefined;
+        }, 500);
+      }
+    } else {
+      if (!dragExpandedCustom && customExpandTimer) {
+        clearTimeout(customExpandTimer);
+        customExpandTimer = undefined;
+      }
+    }
+  });
+
+  $effect(() => () => clearTimeout(customExpandTimer));
 
 </script>
 
@@ -254,16 +289,34 @@
 
           <button
             onclick={() => openPlaylistsSubTab("custom")}
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'custom' && !navigationStore.selectedPlaylistId && !navigationStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            data-drop-target="custom-category"
+            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'custom' && !navigationStore.selectedPlaylistId && !navigationStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {dragExpandedCustom || (fileDrag.isDragging && fileDrag.dropTarget?.kind === 'custom-category') ? 'ring-2 ring-brand-accent/60 bg-brand-accent/20 text-brand-text-primary font-semibold' : ''}"
           >
             <div class="flex items-center gap-2 truncate">
               <ListMusic class="w-3.5 h-3.5 icon-align" />
               <span class="truncate">{i18n.t('sidebar.playlistsCustom')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({formatNumber(playlistsStore.playlists.filter((p) => (!p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)) && !p.is_queue).length)})
+              ({formatNumber(customPlaylists.length)})
             </span>
           </button>
+
+          {#if dragExpandedCustom && customPlaylists.length > 0}
+            <div class="pl-4 pr-1 py-0.5 space-y-0.5 border-l border-brand-accent/30 my-0.5" transition:slide={{ duration: 150 }}>
+              {#each customPlaylists as pl (pl.id)}
+                <button
+                  type="button"
+                  data-drop-target="playlist"
+                  data-playlist-id={pl.id}
+                  data-playlist-name={pl.name}
+                  class="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] truncate transition-colors {fileDrag.isDragging && fileDrag.dropTarget?.kind === 'playlist' && fileDrag.dropTarget.id === pl.id ? 'bg-brand-accent/30 text-brand-text-primary ring-2 ring-brand-accent font-semibold' : 'text-brand-text-secondary hover:bg-brand-accent/15'}"
+                  onclick={() => navigationStore.viewPlaylist(pl.id)}
+                >
+                  <span class="truncate">{pl.name}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
 
           <button
             onclick={async () => {
@@ -271,7 +324,8 @@
               playlistsStore.selectPlaylist(queuePl.id);
               navigationStore.viewPlaylist(queuePl.id);
             }}
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === navigationStore.selectedPlaylistId)?.is_queue ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            data-drop-target="queue"
+            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === navigationStore.selectedPlaylistId)?.is_queue ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {fileDrag.isDragging && fileDrag.dropTarget?.kind === 'queue' ? 'bg-brand-accent/30 ring-2 ring-brand-accent text-brand-text-primary font-semibold' : ''}"
           >
             <div class="flex items-center gap-2 truncate">
               <Layers class="w-3.5 h-3.5 icon-align" />

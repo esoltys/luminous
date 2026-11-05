@@ -15,6 +15,7 @@
   import ImmersiveSessionWrap from '../lib/components/ImmersiveSessionWrap.svelte';
   import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
   import Toast from '../lib/components/Toast.svelte';
+  import FileDragGhost from '../lib/components/files/FileDragGhost.svelte';
   import WalkthroughOverlay from '../lib/components/WalkthroughOverlay.svelte';
   import WelcomeScreen from '../lib/components/WelcomeScreen.svelte';
   import ConfirmDialog from '../lib/components/ConfirmDialog.svelte';
@@ -647,6 +648,7 @@
 {/if}
 
   <Toast />
+  <FileDragGhost />
 </IconContext>
 
 <style>

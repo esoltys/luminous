@@ -23,6 +23,7 @@
   import { openInPicard } from "../utils/picard";
   import QualityBadge from "./QualityBadge.svelte";
   import AddonOverlay from "./AddonOverlay.svelte";
+  import { fileDrag } from "../stores/fileDrag.svelte";
 
   // Responsive control trimming (issue #413, refined against real usage,
   // padding/seekbar fixed under #543): three named tiers as this floating
@@ -207,6 +208,7 @@
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     contextMenuState = { x: rect.left, y: rect.top };
   }
+
 
   async function navigateToQueue() {
     windowLayoutStore.exitImmersiveMode();
@@ -498,7 +500,8 @@
         {/if}
         <button
           onclick={navigateToQueue}
-          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          data-drop-target="queue"
+          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors {fileDrag.isDragging && fileDrag.dropTarget?.kind === 'queue' ? 'text-brand-accent-text scale-110' : ''}"
           title={i18n.t('playerBar.queueTitle', {}, 'Queue')}
         >
           <Layers class="w-5 h-5" />

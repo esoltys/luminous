@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import { tick } from "svelte";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import Sidebar from "./Sidebar.svelte";
@@ -204,5 +205,69 @@ describe("Sidebar.svelte - Files section", () => {
 
     await fireEvent.click(getByRole("button", { name: "Files" }));
     expect(navigationStore.filesLocation).toBeNull();
+  });
+});
+
+describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    i18n.currentLocale = "en-CA";
+    navigationStore.activeTab = "playlists";
+    collectionStore.statsLoaded = true;
+    collectionStore.stats = {
+      total_songs: 10,
+      total_albums: 5,
+      total_artists: 2,
+      total_duration_nanosec: 1000,
+      total_filesize_bytes: 1000,
+      album_art_bytes: 0,
+      artist_art_bytes: 0,
+      thumbnail_bytes: 0,
+    };
+    playlistsStore.playlists = [
+      { id: 1, name: "Queue", is_queue: true } as any,
+      { id: 2, name: "Favorites", is_queue: false } as any,
+    ];
+  });
+
+  it("exposes Queue drop target and highlights during drag", async () => {
+    const { fileDrag } = await import("../stores/fileDrag.svelte");
+    fileDrag.start([{ name: "track.flac", isDir: false, songId: 10 } as any]);
+
+    const { getByRole } = render(Sidebar, { props: { width: 256 } });
+    const queueBtn = getByRole("button", { name: /queue/i });
+    expect(queueBtn.getAttribute("data-drop-target")).toBe("queue");
+
+    fileDrag.updatePointer({ x: 0, y: 0 }, { kind: "queue" });
+    await tick();
+    expect(queueBtn.className).toContain("ring-brand-accent");
+
+    fileDrag.end();
+  });
+
+  it("expands custom playlists after dragging over Custom for 500ms", async () => {
+    vi.useFakeTimers();
+    try {
+      const { fileDrag } = await import("../stores/fileDrag.svelte");
+      fileDrag.start([{ name: "track.flac", isDir: false, songId: 10 } as any]);
+
+      const { getByRole, findByRole } = render(Sidebar, { props: { width: 256 } });
+      const customBtn = getByRole("button", { name: /custom/i });
+      expect(customBtn.getAttribute("data-drop-target")).toBe("custom-category");
+
+      fileDrag.updatePointer({ x: 0, y: 0 }, { kind: "custom-category" });
+      await tick();
+      vi.advanceTimersByTime(500);
+      await tick();
+
+      const favPlaylistBtn = await findByRole("button", { name: "Favorites" });
+      expect(favPlaylistBtn).toBeInTheDocument();
+      expect(favPlaylistBtn.getAttribute("data-drop-target")).toBe("playlist");
+      expect(favPlaylistBtn.getAttribute("data-playlist-id")).toBe("2");
+
+      fileDrag.end();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
