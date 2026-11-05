@@ -9,18 +9,6 @@
 
 import { generateEllipseGradientSvg } from "./ellipseGradient";
 import { computeMosaicLayout } from "./mosaicLayout";
-import exposeFontUrl from "../fonts/expose/expose-700.woff2?url";
-
-// The mark's colors are fixed brand values (matching static/luminous-mark.svg
-// and the app icon) — unlike the card's text, it doesn't adapt to the
-// light/dark card theme.
-const LUMINOUS_MARK_SVG = (size: number) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="${size}" height="${size}" style="flex-shrink:0;">` +
-    `<circle cx="100" cy="100" r="77" fill="none" stroke="#626FE8" stroke-width="14"/>` +
-    `<circle cx="100" cy="100" r="92" fill="none" stroke="#FFB648" stroke-width="8"/>` +
-    `<circle cx="100" cy="100" r="68" fill="#0A0A0D"/>` +
-    `<circle cx="152" cy="57" r="11" fill="#FFFFFF"/>` +
-  `</svg>`;
 
 export type ShareAspectRatio = "1:1" | "9:16" | "16:9" | "4:3" | "3:4";
 
@@ -264,10 +252,11 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const baseBg = isDark ? (options.primaryColor ?? "#0a0b0e") : "#ffffff";
   const cardPad = Math.round(width * 0.06);
   // Portrait/square frames stack cover-then-text centered in the middle of
-  // the canvas (a bigger cover, since there's little horizontal room);
-  // landscape frames keep a side-by-side row so the wide aspect isn't mostly
-  // empty gradient either side of a narrow text column.
-  const isPortrait = height >= width;
+  // the canvas; landscape frames keep a side-by-side row so the wide aspect
+  // isn't mostly empty gradient either side of a narrow text column.
+  const isSquare = width === height;
+  const isPortrait = height > width;
+  const isVertical = isPortrait || isSquare;
   // A very elongated portrait frame (9:16) has a lot more vertical room than
   // a mild one (3:4) at the same width, so content sized purely off width
   // reads small and leaves dead space top and bottom. Scale content up
@@ -289,30 +278,37 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // text to begin with, that empty room isn't going to be filled either way,
   // so cap how much of the boost the cover absorbs instead of ballooning it
   // to fill the space on its own (e.g. a 9:16 artist card with just a name).
-  // Portrait/square frames have plenty of room below the cover, so the text
+  // Tall portrait frames have plenty of room below the cover, so the text
   // reads bigger there than the cover-sizing scale alone would make it.
+  // Square (1:1) frames center cover and labels vertically, so text uses a balanced scale.
   // A card with no cover (e.g. Top Genres) is just text, so it scales up to fill the frame.
   const noCover = !options.coverDataUri && !(options.coverStackDataUris ?? []).some(Boolean);
   const textScale = noCover
-    ? isPortrait
+    ? isVertical
       ? Math.min(2.8, contentScale * 2)
       : 1.6 * Math.min(1, 1440 / width)
-    : isPortrait
-      ? Math.min(1.9, contentScale * 1.4)
-      : contentScale;
+    : isSquare
+      ? 1.25
+      : isPortrait
+        ? Math.min(1.9, contentScale * 1.4)
+        : contentScale;
   const coverContentScale = textLineCount >= 3 ? contentScale : textLineCount === 2 ? Math.min(contentScale, 1.15) : Math.min(contentScale, 1);
   // A long track list needs more of the frame for itself, so a cover sized
   // for a typical ~10-track album (no shrink) is too big once a list is
   // long enough to need its "+N more" overflow row — shrink gradually past
   // ~12 tracks, capped so it never gets *too* small either.
+  // On 1:1 square cards, cover is sized to half the card width (0.50) without a track list
+  // so the cover and labels center vertically with generous margins rather than crowding the top.
   const trackCount = options.tracks?.length ?? 0;
   const trackListHasSecondary = !!options.tracks?.some((t) => t.secondary);
   const listTuning = trackListHasSecondary ? TWO_LINE_LIST : ONE_LINE_LIST;
   const trackListDensityScale = willShowTrackList ? Math.max(0.82, 1 - Math.max(0, trackCount - 12) * 0.006) : 1;
   const coverSize = Math.round(
-    isPortrait
-      ? width * (willShowTrackList ? 0.56 * trackListDensityScale * contentScale : 0.72 * coverContentScale)
-      : Math.min(width, height) * (willShowTrackList ? 0.46 * trackListDensityScale : 0.6)
+    isSquare
+      ? width * (willShowTrackList ? 0.40 * trackListDensityScale : 0.50)
+      : isPortrait
+        ? width * (willShowTrackList ? 0.56 * trackListDensityScale * contentScale : 0.72 * coverContentScale)
+        : Math.min(width, height) * (willShowTrackList ? 0.46 * trackListDensityScale : 0.6)
   );
 
   const background = generateEllipseGradientSvg({
@@ -346,8 +342,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
     // Belt-and-suspenders against a pathological combination (a very long,
     // two-line-wrapped title plus a huge box-set tracklist): even though
     // trackListLayout already sizes for the expected case, cap the block's
-    // own height and clip it so it can never grow past the LUMINOUS mark
-    // pinned near the bottom of the frame, rather than overlapping it.
+    // own height and clip it so it can never overflow the frame padding.
     const trackListMaxHeight = Math.round(
       height * (noCover ? (isPortrait ? 0.5 : 0.62) : isPortrait ? 0.36 : 0.4) * listTuning.maxHeightScale
     );
@@ -359,11 +354,11 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   }
 
   const showTrackList = trackListHtml.length > 0;
-  const textAlign = isPortrait ? "center" : "left";
-  const groupDirection = isPortrait ? "column" : "row";
-  const textBlockMaxWidth = isPortrait ? Math.round(width * 0.82) : undefined;
+  const textAlign = isVertical ? "center" : "left";
+  const groupDirection = isVertical ? "column" : "row";
+  const textBlockMaxWidth = isVertical ? Math.round(width * 0.82) : undefined;
   // With no cover the list is the whole card: let it span the content width so the bars read as a chart.
-  const noCoverWidth = Math.round(width * (isPortrait ? 0.82 : 0.8));
+  const noCoverWidth = Math.round(width * (isVertical ? 0.82 : 0.8));
   const contentGap = Math.round(width * 0.035 * contentScale);
 
   // In landscape frames, the mosaic fills a box: coverSize tall and a safe
@@ -379,7 +374,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // the full content width instead of a fanned stack of four.
   const portraitMosaicWidth = width - 2 * cardPad;
   // ...and the height left once the text block (estimated from its own font
-  // sizes) and the footer mark are accounted for, so a tall frame can stack the
+  // sizes) is accounted for, so a tall frame can stack the
   // big tile above the grid instead of leaving the space empty.
   const listRows = willShowTrackList
     ? (() => {
@@ -398,11 +393,8 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
     (options.subtitle ? width * 0.026 * textScale * 1.3 + 6 : 0) +
     (options.metadataLine ? width * 0.019 * textScale * 1.3 + 6 : 0) +
     (listRows > 0 ? width * 0.025 * textScale + listRows * rowHeight(rowFont, trackListHasSecondary, 4) : 0);
-  // The LUMINOUS mark is pinned bottom-left, so tall frames reserve a strip for
-  // it under the centered content rather than letting a long list run into it.
-  const footerReserve = isPortrait ? Math.round(width * 0.075) : noCover ? Math.round(width * 0.05) : 0;
   const portraitMosaicHeight = Math.round(
-    Math.max(coverSize * listTuning.portraitMosaicFloor, Math.min(height - 2 * cardPad - footerReserve - estTextHeight * listTuning.textHeightSlack - contentGap, coverSize * 2))
+    Math.max(coverSize * listTuning.portraitMosaicFloor, Math.min(height - 2 * cardPad - estTextHeight * listTuning.textHeightSlack - contentGap, coverSize * 2))
   );
   const hasMosaic = (options.coverStackDataUris ?? []).filter(Boolean).length >= 2;
   // Landscape: the mosaic grows to the height of the text column beside it (a
@@ -410,23 +402,19 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const landscapeMosaicHeight = Math.round(Math.min(height - 2 * cardPad, Math.max(coverSize, estTextHeight)));
 
   const contentHtml = `
-    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px ${cardPad}px ${cardPad + footerReserve}px;box-sizing:border-box;font-family:'Fira Sans','Inter','Segoe UI',system-ui,sans-serif;">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Fira Sans','Inter','Segoe UI',system-ui,sans-serif;">
       <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${contentGap}px;max-width:100%;${noCover ? `width:${noCoverWidth}px;` : ""}">
-        ${!isPortrait
+        ${!isVertical
           ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: maxMosaicWidth, height: landscapeMosaicHeight, fillBox: willShowTrackList })
           : hasMosaic
           ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: portraitMosaicWidth, height: portraitMosaicHeight })
           : buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, false)}
-        <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${noCover ? "width:100%;" : textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
+        <div style="min-width:0;${isVertical ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isVertical ? "center" : "flex-start"};text-align:${textAlign};${noCover ? "width:100%;" : textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
           <div style="font-size:${Math.round(width * 0.046 * textScale)}px;font-weight:800;color:${textPrimary};line-height:1.25;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
           <div style="font-size:${Math.round(width * 0.026 * textScale)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
           <div style="font-size:${Math.round(width * 0.019 * textScale)}px;color:${textSecondary};margin-top:6px;">${escapeHtml(options.metadataLine)}</div>
           ${showTrackList ? trackListHtml : ""}
         </div>
-      </div>
-      <div style="position:absolute;left:${cardPad}px;bottom:${cardPad}px;display:flex;align-items:center;gap:${Math.round(width * 0.008)}px;opacity:0.85;">
-        ${LUMINOUS_MARK_SVG(Math.round(width * 0.024))}
-        <span style="font-family:'Expose','Fira Sans','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(width * 0.015)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
       </div>
     </div>
   `;
@@ -565,8 +553,8 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
       m.clockTop + m.clockBar + m.clockLabelGap + m.clockLabel * ROW_LINE_HEIGHT
     );
   };
-  // Symmetric padding plus room for the LUMINOUS mark pinned at the bottom.
-  const availableHeight = (s: number) => height - 2 * (s * 0.055 + s * 0.03);
+  // Symmetric padding
+  const availableHeight = (s: number) => height - 2 * (s * 0.055);
   let scaleBasis = Math.min(width, height);
   for (let i = 0; i < 2; i++) {
     const est = estimateContentHeight(scaleBasis);
@@ -653,10 +641,6 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
         ${sectionsHtml}
       </div>
       ${clockHtml}
-      <div style="position:absolute;left:${pad}px;bottom:${pad}px;display:flex;align-items:center;gap:${Math.round(scaleBasis * 0.008)}px;opacity:0.85;">
-        ${LUMINOUS_MARK_SVG(Math.round(scaleBasis * 0.026))}
-        <span style="font-family:'Expose','Fira Sans','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(scaleBasis * 0.016)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
-      </div>
     </div>
   `;
 
@@ -706,16 +690,6 @@ export async function toDataUri(url: string): Promise<string | null> {
   }
 }
 
-let cachedExposeFontDataUri: Promise<string | null> | null = null;
-
-/** Fetches and caches the Expose wordmark font as a data URI (see ShareCardOptions.exposeFontDataUri). */
-function getExposeFontDataUri(): Promise<string | null> {
-  if (!cachedExposeFontDataUri) {
-    cachedExposeFontDataUri = toDataUri(exposeFontUrl);
-  }
-  return cachedExposeFontDataUri;
-}
-
 /** Loads a built card SVG into an <img> and rasterizes it to a PNG blob at `scale`x the card's declared pixel size. Shared by rasterizeShareCard() and rasterizeStatsShareCard(). */
 async function rasterizeSvg(svg: string, width: number, height: number, scale: number): Promise<Blob | null> {
   const svgDataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
@@ -735,14 +709,12 @@ async function rasterizeSvg(svg: string, width: number, height: number, scale: n
 }
 
 export async function rasterizeShareCard(options: ShareCardOptions, scale = 2): Promise<Blob | null> {
-  const exposeFontDataUri = options.exposeFontDataUri ?? (await getExposeFontDataUri());
-  const { svg, width, height } = buildShareCardSvg({ ...options, exposeFontDataUri });
+  const { svg, width, height } = buildShareCardSvg(options);
   return rasterizeSvg(svg, width, height, scale);
 }
 
 export async function rasterizeStatsShareCard(options: StatsShareCardOptions, scale = 2): Promise<Blob | null> {
-  const exposeFontDataUri = options.exposeFontDataUri ?? (await getExposeFontDataUri());
-  const { svg, width, height } = buildStatsShareCardSvg({ ...options, exposeFontDataUri });
+  const { svg, width, height } = buildStatsShareCardSvg(options);
   return rasterizeSvg(svg, width, height, scale);
 }
 

@@ -62,8 +62,10 @@ export const fr: DeepStringRecord<typeof en> = {
     revealMac: "Afficher dans le Finder",
     revealLinux: "Afficher dans le gestionnaire de fichiers",
     folderSettings: "Paramètres du dossier",
+    folderActions: "Actions du dossier",
     scanFolder: "Analyser ce dossier",
     scanning: "Analyse en cours…",
+    scanNudge: "Analyser",
     summaryFiles: {
       one: "{count} fichier, {size}.",
       other: "{count} fichiers, {size}."
@@ -75,6 +77,10 @@ export const fr: DeepStringRecord<typeof en> = {
     summaryInLibrary: {
       one: "{count} est dans votre bibliothèque.",
       other: "{count} sont dans votre bibliothèque."
+    },
+    summaryUnscanned: {
+      one: "{count} fichier n'est pas dans votre bibliothèque —",
+      other: "{count} fichiers ne sont pas dans votre bibliothèque —"
     },
     songCount: {
       one: "{count} chanson",

@@ -56,8 +56,10 @@ export const it = {
     revealMac: "Mostra nel Finder",
     revealLinux: "Mostra nel gestore file",
     folderSettings: "Impostazioni cartella",
+    folderActions: "Azioni cartella",
     scanFolder: "Scansiona questa cartella",
     scanning: "Scansione in corso…",
+    scanNudge: "Scansiona",
     summaryFiles: {
       one: "{count} file, {size}.",
       other: "{count} file, {size}."
@@ -69,6 +71,10 @@ export const it = {
     summaryInLibrary: {
       one: "{count} è nella tua libreria.",
       other: "{count} sono nella tua libreria."
+    },
+    summaryUnscanned: {
+      one: "{count} file non è nella tua libreria —",
+      other: "{count} file non sono nella tua libreria —"
     },
     songCount: {
       one: "{count} brano",

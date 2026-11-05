@@ -56,8 +56,10 @@ export const de = {
     revealMac: "Im Finder anzeigen",
     revealLinux: "Im Dateimanager anzeigen",
     folderSettings: "Ordnereinstellungen",
+    folderActions: "Ordneraktionen",
     scanFolder: "Diesen Ordner durchsuchen",
     scanning: "Wird durchsucht…",
+    scanNudge: "Durchsuchen",
     summaryFiles: {
       one: "{count} Datei, {size}.",
       other: "{count} Dateien, {size}."
@@ -69,6 +71,10 @@ export const de = {
     summaryInLibrary: {
       one: "{count} davon ist in deiner Mediathek.",
       other: "{count} davon sind in deiner Mediathek."
+    },
+    summaryUnscanned: {
+      one: "{count} Datei ist nicht in deiner Mediathek –",
+      other: "{count} Dateien sind nicht in deiner Mediathek –"
     },
     songCount: {
       one: "{count} Titel",

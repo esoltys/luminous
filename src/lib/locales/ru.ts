@@ -56,8 +56,10 @@ export const ru = {
     revealMac: "Показать в Finder",
     revealLinux: "Показать в файловом менеджере",
     folderSettings: "Параметры папки",
+    folderActions: "Действия с папкой",
     scanFolder: "Сканировать эту папку",
     scanning: "Сканирование…",
+    scanNudge: "Сканировать",
     summaryFiles: {
       one: "{count} файл, {size}.",
       few: "{count} файла, {size}.",
@@ -75,6 +77,12 @@ export const ru = {
       few: "В библиотеке: {count}.",
       many: "В библиотеке: {count}.",
       other: "В библиотеке: {count}."
+    },
+    summaryUnscanned: {
+      one: "{count} файл не в библиотеке —",
+      few: "{count} файла не в библиотеке —",
+      many: "{count} файлов не в библиотеке —",
+      other: "{count} файла не в библиотеке —"
     },
     songCount: {
       one: "{count} песня",
