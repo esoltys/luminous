@@ -17,6 +17,7 @@ vite.config.ts.timestamp-*
 !.claude/hooks/**
 !.claude/skills/
 !.claude/skills/**
+.gemini/
 /.worktrees
 
 
