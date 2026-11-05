@@ -136,12 +136,23 @@
     if (isEmpty) onClose();
   });
 
-  /** Closes the menu and starts `action`; a failure is logged here, for every item. */
+  /**
+   * Starts `action` and then closes the menu. `action` runs synchronously
+   * before `onClose()` unmounts this component, ensuring any captured `$derived`
+   * state (such as `dirPath` or `dirName`) evaluates while the reactive scope is
+   * still alive.
+   */
   function runAndClose(action: () => unknown) {
-    onClose();
-    Promise.resolve()
-      .then(action)
-      .catch((err) => console.error("A Files menu action failed:", err));
+    try {
+      const result = action();
+      onClose();
+      if (result instanceof Promise) {
+        result.catch((err) => console.error("A Files menu action failed:", err));
+      }
+    } catch (err) {
+      onClose();
+      console.error("A Files menu action failed:", err);
+    }
   }
 
   async function playSongs() {

@@ -283,4 +283,27 @@ describe("FileContextMenu.svelte", () => {
       ["Live"]
     );
   });
+
+  it("creates playlist from folder in header mode with correct path and name", async () => {
+    const createPlaylistSpy = vi.spyOn(playlistsStore, "createPlaylist").mockResolvedValue({
+      id: 99,
+      name: "Live",
+      dynamic_enabled: false,
+      created: 0,
+      updated: 0,
+      track_count: 2,
+      is_queue: false,
+    });
+    const addSongsSpy = vi.spyOn(playlistsStore, "addSongsToPlaylist").mockResolvedValue();
+
+    open([], {
+      fromHeader: true,
+      folderLocation: "C:/Music/Live",
+      scannable: true,
+    });
+
+    await fireEvent.click(screen.getByText("New playlist from folder"));
+    expect(createPlaylistSpy).toHaveBeenCalledWith("Live");
+    expect(addSongsSpy).toHaveBeenCalledWith(99, [7, 8]);
+  });
 });
