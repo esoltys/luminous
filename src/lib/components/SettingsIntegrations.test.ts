@@ -61,6 +61,12 @@ describe("SettingsIntegrations.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prefs.onlineEnabled = true;
+    scrobblerStore.username = null;
+    scrobblerStore.token = "";
+    scrobblerStore.enabled = false;
+    scrobblerStore.lastfmUsername = null;
+    scrobblerStore.lastfmEnabled = false;
+    scrobblerStore.lastfmPendingToken = null;
   });
 
   it("renders all integration cards: Online Services, ListenBrainz, Last.fm, Discord, Picard, and fanart.tv", async () => {

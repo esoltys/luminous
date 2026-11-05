@@ -2048,6 +2048,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     save: "Enregistrer",
     saved: "Enregistré",
     connect: "Connecter",
+    disconnect: "Déconnecter",
     active: "Actif",
     paused: "En pause",
     inactive: "Inactif",

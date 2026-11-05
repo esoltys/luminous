@@ -1972,6 +1972,7 @@ export const it = {
     save: "Salva",
     saved: "Salvato",
     connect: "Connetti",
+    disconnect: "Disconnetti",
     active: "Attivo",
     paused: "In pausa",
     inactive: "Inattivo",

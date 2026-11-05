@@ -2106,6 +2106,7 @@ export const uk = {
     save: "Зберегти",
     saved: "Збережено",
     connect: "Підключити",
+    disconnect: "Відключити",
     active: "Активно",
     paused: "Призупинено",
     inactive: "Неактивно",

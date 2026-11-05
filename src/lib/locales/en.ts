@@ -1972,6 +1972,7 @@ export const en = {
     save: "Save",
     saved: "Saved",
     connect: "Connect",
+    disconnect: "Disconnect",
     active: "Active",
     paused: "Paused",
     inactive: "Inactive",

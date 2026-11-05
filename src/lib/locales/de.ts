@@ -1972,6 +1972,7 @@ export const de = {
     save: "Speichern",
     saved: "Gespeichert",
     connect: "Verbinden",
+    disconnect: "Trennen",
     active: "Aktiv",
     paused: "Pausiert",
     inactive: "Inaktiv",

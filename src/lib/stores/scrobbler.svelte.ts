@@ -330,6 +330,14 @@ class ScrobblerStore {
     }
   }
 
+  disconnectListenBrainz() {
+    this.token = "";
+    this.username = null;
+    this.enabled = false;
+    this.validationError = null;
+    this.saveSettings();
+  }
+
   setEnabled(val: boolean) {
     this.enabled = val;
     this.saveSettings();

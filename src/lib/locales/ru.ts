@@ -2106,6 +2106,7 @@ export const ru = {
     save: "Сохранить",
     saved: "Сохранено",
     connect: "Подключить",
+    disconnect: "Отключить",
     active: "Активно",
     paused: "Приостановлено",
     inactive: "Неактивно",

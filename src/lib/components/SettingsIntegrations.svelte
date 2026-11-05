@@ -165,7 +165,7 @@
     </div>
     <div class="flex items-center gap-3 shrink-0">
       {#if musicbrainzStore.isLoggedIn && musicbrainzStore.username}
-        <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 font-medium">
+        <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 font-medium shrink-0">
           <Check class="w-3 h-3" />
           {musicbrainzStore.username}
         </span>
@@ -173,15 +173,18 @@
           variant="secondary"
           size="sm"
           onclick={() => musicbrainzStore.logout()}
-          class="text-xs text-brand-text-secondary hover:text-brand-text-primary"
+          class="text-xs text-brand-text-secondary hover:text-brand-text-primary shrink-0"
+          aria-label="Disconnect MusicBrainz"
         >
-          {i18n.t('lastfm.disconnectBtn', {}, 'Disconnect')}
+          {i18n.t('common.disconnect', {}, 'Disconnect')}
         </Button>
       {:else}
         <Button
           variant="secondary"
           size="sm"
           onclick={() => (showMusicBrainzLoginModal = true)}
+          class="shrink-0"
+          aria-label={i18n.t('auth.loginWithMb', {}, 'Log In with MusicBrainz')}
         >
           {i18n.t('common.connect', {}, 'Connect')}
         </Button>
@@ -268,7 +271,7 @@
 {#if prefs.onlineEnabled}
 <!-- ListenBrainz Scrobbler Integration Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
-  <div class="pb-3 flex justify-between items-start gap-4">
+  <div class="flex justify-between items-center gap-4">
     <div class="flex items-center gap-3 min-w-0">
       <img src="/listenbrainz-icon.png" alt="ListenBrainz" class="w-9 h-9 shrink-0 object-contain" />
       <div class="space-y-1 min-w-0">
@@ -279,81 +282,87 @@
         </p>
       </div>
     </div>
-    {#if scrobblerStore.enabled && scrobblerStore.username}
-      <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 font-medium shrink-0">
-        <Check class="w-3 h-3" />
-        {scrobblerStore.username}
-      </span>
-    {:else if scrobblerStore.enabled && scrobblerStore.paused}
-      <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium shrink-0">
-        {i18n.t('listenbrainz.statusPaused')}
-      </span>
-    {/if}
+    <div class="flex items-center gap-3 shrink-0">
+      {#if scrobblerStore.username}
+        <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 font-medium shrink-0">
+          <Check class="w-3 h-3" />
+          {scrobblerStore.username}
+        </span>
+        <Button
+          variant="secondary"
+          size="sm"
+          onclick={() => scrobblerStore.disconnectListenBrainz()}
+          class="text-xs text-brand-text-secondary hover:text-brand-text-primary shrink-0"
+        >
+          {i18n.t('common.disconnect', {}, 'Disconnect')}
+        </Button>
+      {/if}
+    </div>
   </div>
 
-  <div class="space-y-2 pt-2 border-t border-brand-border/60">
-    <div class="flex items-center justify-between">
-      <label for="listenbrainz-token-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-        {i18n.t('listenbrainz.userTokenLabel')}
-      </label>
-      <button
-        type="button"
-        onclick={() => openExternalUrl("https://listenbrainz.org/profile/")}
-        class="text-xs text-brand-accent hover:underline inline-flex items-center gap-1"
-      >
-        {i18n.t('listenbrainz.getTokenLink')}
-        <ArrowUpRight class="w-3 h-3" />
-      </button>
-    </div>
-
-    <div class="flex items-center gap-2">
-      <div class="relative flex-1 max-w-md">
-        <Input
-          id="listenbrainz-token-input"
-          type={showListenBrainzToken ? "text" : "password"}
-          value={scrobblerStore.token}
-          oninput={(e) => scrobblerStore.setToken((e.target as HTMLInputElement).value)}
-          placeholder={i18n.t('listenbrainz.userTokenPlaceholder')}
-          class="w-full pr-10"
-        />
+  {#if !scrobblerStore.username}
+    <div class="space-y-2 pt-2 border-t border-brand-border/60">
+      <div class="flex items-center justify-between">
+        <label for="listenbrainz-token-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+          {i18n.t('listenbrainz.userTokenLabel')}
+        </label>
         <button
           type="button"
-          onclick={() => showListenBrainzToken = !showListenBrainzToken}
-          class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-          title={showListenBrainzToken ? i18n.t("settings.hideToken") : i18n.t("settings.showToken")}
+          onclick={() => openExternalUrl("https://listenbrainz.org/profile/")}
+          class="text-xs text-brand-accent hover:underline inline-flex items-center gap-1"
         >
-          {#if showListenBrainzToken}
-            <EyeOff class="w-4 h-4" />
-          {:else}
-            <Eye class="w-4 h-4" />
-          {/if}
+          {i18n.t('listenbrainz.getTokenLink')}
+          <ArrowUpRight class="w-3 h-3" />
         </button>
       </div>
 
-      <Button
-        onclick={() => scrobblerStore.validateToken()}
-        disabled={scrobblerStore.isValidating || !scrobblerStore.token?.trim()}
-        variant="secondary"
-        size="sm"
-      >
-        {#if scrobblerStore.isValidating}
-          <LoaderCircle class="w-4 h-4 animate-spin" />
-        {:else}
-          <Check class="w-4 h-4" />
-        {/if}
-        {i18n.t('listenbrainz.validateBtn')}
-      </Button>
-    </div>
+      <div class="flex items-center gap-2">
+        <div class="relative flex-1 max-w-md">
+          <Input
+            id="listenbrainz-token-input"
+            type={showListenBrainzToken ? "text" : "password"}
+            value={scrobblerStore.token}
+            oninput={(e) => scrobblerStore.setToken((e.target as HTMLInputElement).value)}
+            placeholder={i18n.t('listenbrainz.userTokenPlaceholder')}
+            class="w-full pr-10"
+          />
+          <button
+            type="button"
+            onclick={() => showListenBrainzToken = !showListenBrainzToken}
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+            title={showListenBrainzToken ? i18n.t("settings.hideToken") : i18n.t("settings.showToken")}
+          >
+            {#if showListenBrainzToken}
+              <EyeOff class="w-4 h-4" />
+            {:else}
+              <Eye class="w-4 h-4" />
+            {/if}
+          </button>
+        </div>
 
-    {#if scrobblerStore.validationError}
-      <div class="flex items-start gap-2 text-xs text-amber-500 pt-1">
-        <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
-        <span>{scrobblerStore.validationError}</span>
+        <Button
+          onclick={() => scrobblerStore.validateToken()}
+          disabled={scrobblerStore.isValidating || !scrobblerStore.token?.trim()}
+          variant="secondary"
+          size="sm"
+        >
+          {#if scrobblerStore.isValidating}
+            <LoaderCircle class="w-4 h-4 animate-spin" />
+          {:else}
+            <Check class="w-4 h-4" />
+          {/if}
+          {i18n.t('common.connect', {}, 'Connect')}
+        </Button>
       </div>
-    {/if}
-  </div>
 
-  {#if scrobblerStore.username}
+      {#if scrobblerStore.validationError}
+        <div class="flex items-start gap-2 text-xs text-amber-500 pt-1">
+          <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
+          <span>{scrobblerStore.validationError}</span>
+        </div>
+      {/if}
+    </div>
+  {:else}
     <div class="flex items-center justify-between gap-4 py-1 pt-2 border-t border-brand-border/60">
       <div class="flex flex-col gap-0.5 min-w-0">
         <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.enableLabel')}</span>
@@ -476,7 +485,7 @@
 
 <!-- Last.fm Scrobbler Integration Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
-  <div class="pb-3 flex justify-between items-start gap-4">
+  <div class="flex justify-between items-center gap-4">
     <div class="flex items-center gap-3 min-w-0">
       <img src="/lastfm-icon.svg" alt="Last.fm" class="w-9 h-9 shrink-0 object-contain rounded-lg" />
       <div class="space-y-1 min-w-0">
@@ -487,102 +496,92 @@
         </p>
       </div>
     </div>
-    {#if scrobblerStore.lastfmEnabled && scrobblerStore.lastfmUsername}
-      <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 font-medium shrink-0">
-        <Check class="w-3 h-3" />
-        {scrobblerStore.lastfmUsername}
-      </span>
-    {:else if scrobblerStore.lastfmEnabled && scrobblerStore.paused}
-      <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium shrink-0">
-        {i18n.t('listenbrainz.statusPaused')}
-      </span>
-    {/if}
+    <div class="flex items-center gap-3 shrink-0">
+      {#if scrobblerStore.lastfmUsername}
+        <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 font-medium shrink-0">
+          <Check class="w-3 h-3" />
+          {scrobblerStore.lastfmUsername}
+        </span>
+        <Button
+          variant="secondary"
+          size="sm"
+          onclick={() => scrobblerStore.disconnectLastfm()}
+          class="text-xs text-brand-text-secondary hover:text-brand-text-primary shrink-0"
+          aria-label={i18n.t('lastfm.disconnectBtn', {}, 'Disconnect Last.fm')}
+        >
+          {i18n.t('common.disconnect', {}, 'Disconnect')}
+        </Button>
+      {:else if !scrobblerStore.lastfmPendingToken}
+        <Button
+          onclick={() => scrobblerStore.startLastfmAuth()}
+          disabled={scrobblerStore.isStartingLastfm}
+          variant="secondary"
+          size="sm"
+          class="gap-1.5 shrink-0"
+          aria-label={i18n.t('lastfm.connectBtn', {}, 'Connect Last.fm')}
+        >
+          {#if scrobblerStore.isStartingLastfm}
+            <LoaderCircle class="w-4 h-4 animate-spin" />
+          {:else}
+            <ArrowUpRight class="w-4 h-4" />
+          {/if}
+          {i18n.t('common.connect', {}, 'Connect')}
+        </Button>
+      {/if}
+    </div>
   </div>
 
   {#if !scrobblerStore.lastfmUsername}
-    <div class="space-y-3 pt-2 border-t border-brand-border/60">
-      {#if !scrobblerStore.lastfmPendingToken}
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div class="flex flex-col gap-0.5 min-w-0">
-            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('lastfm.connectLabel')}</span>
-            <p class="text-xs text-brand-text-secondary">{i18n.t('lastfm.connectHint')}</p>
-          </div>
+    {#if scrobblerStore.lastfmPendingToken}
+      <div class="p-4 rounded-lg bg-brand-surface/60 border border-brand-border/80 space-y-3 pt-2 border-t border-brand-border/60">
+        <div class="flex flex-col gap-1">
+          <span class="text-sm font-medium text-brand-text-primary">{i18n.t('lastfm.authPendingTitle')}</span>
+          <p class="text-xs text-brand-text-secondary">{i18n.t('lastfm.authPendingDesc')}</p>
+        </div>
+        <div class="flex items-center gap-2">
           <Button
-            onclick={() => scrobblerStore.startLastfmAuth()}
-            disabled={scrobblerStore.isStartingLastfm}
-            variant="secondary"
+            onclick={() => scrobblerStore.finishLastfmAuth()}
+            disabled={scrobblerStore.isFinishingLastfm}
+            variant="primary"
             size="sm"
-            class="gap-1.5 shrink-0"
+            class="gap-1.5"
           >
-            {#if scrobblerStore.isStartingLastfm}
+            {#if scrobblerStore.isFinishingLastfm}
               <LoaderCircle class="w-4 h-4 animate-spin" />
             {:else}
-              <ArrowUpRight class="w-4 h-4" />
+              <Check class="w-4 h-4" />
             {/if}
-            {i18n.t('lastfm.connectBtn')}
+            {i18n.t('lastfm.finishAuthBtn')}
+          </Button>
+          <Button
+            onclick={() => scrobblerStore.cancelLastfmAuth()}
+            disabled={scrobblerStore.isFinishingLastfm}
+            variant="secondary"
+            size="sm"
+          >
+            {i18n.t('lastfm.cancelAuthBtn')}
           </Button>
         </div>
-      {:else}
-        <div class="p-4 rounded-lg bg-brand-surface/60 border border-brand-border/80 space-y-3">
-          <div class="flex flex-col gap-1">
-            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('lastfm.authPendingTitle')}</span>
-            <p class="text-xs text-brand-text-secondary">{i18n.t('lastfm.authPendingDesc')}</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <Button
-              onclick={() => scrobblerStore.finishLastfmAuth()}
-              disabled={scrobblerStore.isFinishingLastfm}
-              variant="primary"
-              size="sm"
-              class="gap-1.5"
-            >
-              {#if scrobblerStore.isFinishingLastfm}
-                <LoaderCircle class="w-4 h-4 animate-spin" />
-              {:else}
-                <Check class="w-4 h-4" />
-              {/if}
-              {i18n.t('lastfm.finishAuthBtn')}
-            </Button>
-            <Button
-              onclick={() => scrobblerStore.cancelLastfmAuth()}
-              disabled={scrobblerStore.isFinishingLastfm}
-              variant="secondary"
-              size="sm"
-            >
-              {i18n.t('lastfm.cancelAuthBtn')}
-            </Button>
-          </div>
-        </div>
-      {/if}
+      </div>
+    {/if}
 
-      {#if scrobblerStore.lastfmAuthError}
-        <div class="flex items-start gap-2 text-xs text-amber-500 pt-1">
-          <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
-          <span>{scrobblerStore.lastfmAuthError}</span>
-        </div>
-      {/if}
-    </div>
+    {#if scrobblerStore.lastfmAuthError}
+      <div class="flex items-start gap-2 text-xs text-amber-500 pt-1">
+        <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
+        <span>{scrobblerStore.lastfmAuthError}</span>
+      </div>
+    {/if}
   {:else}
     <div class="flex items-center justify-between gap-4 py-1 pt-2 border-t border-brand-border/60">
       <div class="flex flex-col gap-0.5 min-w-0">
         <span class="text-sm font-medium text-brand-text-primary">{i18n.t('lastfm.enableLabel')}</span>
         <p class="text-xs text-brand-text-secondary">{i18n.t('lastfm.enableHint')}</p>
       </div>
-      <div class="flex items-center gap-3">
-        <Button
-          onclick={() => scrobblerStore.disconnectLastfm()}
-          variant="secondary"
-          size="sm"
-          class="text-xs text-brand-text-secondary hover:text-brand-text-primary"
-        >
-          {i18n.t('lastfm.disconnectBtn')}
-        </Button>
-        <Toggle
-          checked={scrobblerStore.lastfmEnabled}
-          onchange={(v) => scrobblerStore.setLastfmEnabled(v)}
-          label={i18n.t('lastfm.enableLabel')}
-        />
-      </div>
+      <Toggle
+        checked={scrobblerStore.lastfmEnabled}
+        onchange={(v) => scrobblerStore.setLastfmEnabled(v)}
+        label={i18n.t('lastfm.enableLabel')}
+      />
     </div>
 
     {#if scrobblerStore.lastfmEnabled}
