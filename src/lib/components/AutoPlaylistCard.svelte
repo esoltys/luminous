@@ -84,6 +84,7 @@
     const d = decade;
     const b = bpm;
     const pid = playlistId;
+    const tc = trackCount;
 
     const request =
       (k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "daypart") && pid !== undefined
@@ -122,7 +123,15 @@
 
     request
       .then((res) => {
-        if (kind === k && genre === g && artistTag === at && decade === d && bpm === b && playlistId === pid) {
+        if (
+          kind === k &&
+          genre === g &&
+          artistTag === at &&
+          decade === d &&
+          bpm === b &&
+          playlistId === pid &&
+          trackCount === tc
+        ) {
           songs = res;
         }
       })

@@ -4,10 +4,12 @@ import type { PinnedItem, PinnedItemType } from "../types";
 import { pinnedRefKeyFor } from "../types";
 import { hasPinnedContent, getNavigablePins, type NavigablePin } from "../utils/pinnedNav";
 
-class PinnedStore {
+export class PinnedStore {
   items = $state<PinnedItem[]>([]);
   private keys = $state<Set<string>>(new Set());
   private libraryChangedDebounce: ReturnType<typeof setTimeout> | undefined;
+  private statsChangedDebounce: ReturnType<typeof setTimeout> | undefined;
+  private playlistsChangedDebounce: ReturnType<typeof setTimeout> | undefined;
   private events = createEventScope(import.meta.hot);
 
   constructor() {
@@ -33,6 +35,19 @@ class PinnedStore {
       await this.events.listen("library-changed", () => {
         clearTimeout(this.libraryChangedDebounce);
         this.libraryChangedDebounce = setTimeout(() => this.refresh(), 500);
+      });
+      // Song rating / loved / play stats changes alter auto-playlist track
+      // counts (Favourites, Recently Played, Most Played), song pins, and
+      // album ratings (#1960). Coalesce bursts (e.g. Last.fm sync) via debounce.
+      await this.events.listen("song-stats-changed", () => {
+        clearTimeout(this.statsChangedDebounce);
+        this.statsChangedDebounce = setTimeout(() => this.refresh(), 300);
+      });
+      // Dynamic playlist reconciliation updates backing playlist row counts
+      // and definitions for pinned playlists and auto-playlists (#1960).
+      await this.events.listen("playlists-changed", () => {
+        clearTimeout(this.playlistsChangedDebounce);
+        this.playlistsChangedDebounce = setTimeout(() => this.refresh(), 300);
       });
       await this.refresh();
     } catch (err) {

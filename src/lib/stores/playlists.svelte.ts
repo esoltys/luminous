@@ -13,11 +13,12 @@ import { getDaypartBucket } from "../utils/daypart";
  * interval is fine without needing second-level precision. */
 const DAYPART_BOUNDARY_CHECK_INTERVAL_MS = 60_000;
 
-class PlaylistsStore {
+export class PlaylistsStore {
   playlists = $state<Playlist[]>([]);
   activePlaylistId = $state<number | null>(null);
   activePlaylistTracks = $state<PlaylistItem[]>([]);
   private events = createEventScope(import.meta.hot);
+  private autoPlaylistCountsDebounce: ReturnType<typeof setTimeout> | undefined;
 
   /** The playlist explicitly pinned via "Make Active" as the quick-add target
    * used across the app ("Add to {name}"). Distinct from `activePlaylistId`
@@ -107,14 +108,16 @@ class PlaylistsStore {
   private async init() {
     try {
       // Keep loaded playlist tracks in sync with rating/playcount changes
-      // made anywhere in the app.
+      // made anywhere in the app. Coalesce auto-playlist count refreshes
+      // so rapid bursts (e.g. Last.fm/ListenBrainz sync or multi-selection edits)
+      // don't overwhelm IPC (#1960).
       await this.events.listen<SongStatsPayload>("song-stats-changed", (event) => {
         for (const item of this.activePlaylistTracks) {
           if (item.song?.id === event.payload.song_id) {
             applySongStats(item.song, event.payload);
           }
         }
-        this.refreshAutoPlaylistCounts();
+        this.scheduleRefreshAutoPlaylistCounts(300);
       });
 
       // The backend reconciles dynamic playlists whenever the library or
@@ -123,9 +126,16 @@ class PlaylistsStore {
       // membership immediately.
       await this.events.listen<number[]>("playlists-changed", async (event) => {
         await this.refreshPlaylists();
-        if (this.activePlaylistId !== null && event.payload.includes(this.activePlaylistId)) {
+        if (this.activePlaylistId !== null && Array.isArray(event.payload) && event.payload.includes(this.activePlaylistId)) {
           await this.selectPlaylist(this.activePlaylistId);
         }
+        this.scheduleRefreshAutoPlaylistCounts(300);
+      });
+
+      // Library changes (rescans, deletions) alter Recently Added and Favourites
+      // count totals (#1960).
+      await this.events.listen("library-changed", () => {
+        this.scheduleRefreshAutoPlaylistCounts(500);
       });
 
       await this.refreshPlaylists();
@@ -187,7 +197,15 @@ class PlaylistsStore {
     this.notifyQueueChanged();
   }
 
+  scheduleRefreshAutoPlaylistCounts(delayMs = 300) {
+    clearTimeout(this.autoPlaylistCountsDebounce);
+    this.autoPlaylistCountsDebounce = setTimeout(() => {
+      this.refreshAutoPlaylistCounts();
+    }, delayMs);
+  }
+
   async refreshAutoPlaylistCounts() {
+    clearTimeout(this.autoPlaylistCountsDebounce);
     try {
       const [favourites, recentlyAdded, mostPlayed, history] = await Promise.all([
         invoke<Song[]>("get_favourite_songs"),
