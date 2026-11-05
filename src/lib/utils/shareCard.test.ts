@@ -228,6 +228,22 @@ describe("buildShareCardSvg", () => {
     expect(coverPixelWidth(svg)).toBe(1039);
   });
 
+  it("sizes cover to half the card width with symmetric padding on 1:1 cards so content is vertically centered", () => {
+    const { svg } = buildShareCardSvg({ ...withCover, aspectRatio: "1:1", includeTrackList: false });
+    // 1080 * 0.50 = 540px
+    expect(coverPixelWidth(svg)).toBe(540);
+    // Symmetric padding (cardPad 65px on all sides, no watermark)
+    expect(svg).toContain("padding:65px;");
+    expect(svg).not.toContain("LUMINOUS");
+  });
+
+  it("omits the Luminous identity from all share cards", () => {
+    for (const ratio of SHARE_ASPECT_RATIOS) {
+      const { svg } = buildShareCardSvg({ ...withCover, aspectRatio: ratio.id });
+      expect(svg).not.toContain("LUMINOUS");
+    }
+  });
+
   it("shrinks the cover as a long track list needs more of the frame for itself", () => {
     const shortList = Array.from({ length: 10 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}` }));
     const longList = Array.from({ length: 50 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}` }));
