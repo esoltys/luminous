@@ -21,7 +21,7 @@ Luminous is a fast, local-first player for your own audio library. Built for any
 
 **[Issues](https://github.com/esoltys/luminous/issues)** - file a bug report or a feature request
 
-**[Luminous Discussion](https://www.reddit.com/r/LuminousMusicPlayer/)** - announcements, general discussion, Q&A, Show and Tell
+**[r/LuminousMusicPlayer](https://www.reddit.com/r/LuminousMusicPlayer/)** - announcements, general discussion, Q&A
 
 Luminous doesn't accept PRs as this is a hobby project that I enjoy working on in my spare time.
 
@@ -34,74 +34,19 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 | **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW) (recommended — installs and updates automatically)<br>[.exe / .msix](https://github.com/esoltys/luminous/releases/latest) (manual/sideloaded install)<br>[Portable .zip](https://github.com/esoltys/luminous/releases/latest) (no install; keeps your library and settings in a `data` folder beside the app) |
 | **Linux**   | [.deb / .rpm / Flatpak](https://github.com/esoltys/luminous/releases/latest) for your distro<br>[AppImage](https://github.com/esoltys/luminous/releases/latest) (runs on any distro; add an empty `portable` file beside it for portable mode) |
 
-## New in 3.0 Release
+## Features
 
-- **Ten UI locales**: English (CA/US/UK), French (CA/FR), Spanish, German, Italian, Russian and Ukrainian
-- **Cosmetic add-on themes**, including the free Mothman theme on the Microsoft Store
-- **Large-library performance**: faster scanning and WebDAV sync on network drives, with remote-deletion detection
-- **Parametric EQ editor**: free-frequency bands, drag-to-edit response graph, user presets and AutoEq headphone profile import
-- **Auto Continue**, richer lyrics (word-by-word sync, `.srt`/`.vtt` sidecars, timing offset) and Love plus 5-star ratings with ListenBrainz/MusicBrainz sync
-- **Portable mode** and a portable ZIP release for Windows
-- **AppImage** release for Linux
+- **Library**: indexes local folders with instant search, including `field:value` syntax (e.g. `genre:rock`) you can save as smart playlists; portable mode keeps the library and settings beside the app
+- **Playback**: gapless MP3, FLAC, Opus, WAV and more; 10-band graphic and 20-band parametric EQ with AutoEq headphone profiles; ASIO output on Windows
+- **Remote sources**: OpenSubsonic servers (Navidrome, Gonic, …) and WebDAV, synced into the same library
+- **Playlists**: smart and auto playlists (decades, genres, BPM), Song and Artist Radio built from your own library, custom genre hierarchies
+- **Artist and album pages**: filled in from MusicBrainz and fanart.tv, with an info sidebar for whatever you're viewing
+- **Lyrics**: time-synced line by line or word by word, with inline editing and a miniplayer
+- **Tagging and organizing**: tag editor for single or bulk edits (with MusicBrainz Picard handoff) and automatic file organization from your own naming template
+- **Loves, ratings and stats**: 1–5 stars and loves synced with ListenBrainz, Last.fm scrobbling, listening streaks and top artists
+- **Themes and languages**: preset and cover-art-driven themes, seven languages
 
-## Architecture
-
-"Isn't this just a web wrapper?" Not in the Electron sense. Tauri renders the UI in the OS's own webview (WebView2 on Windows, WebKit on Linux/macOS) instead of bundling a full Chromium, so there's no shipped browser engine inflating the binary or idling in RAM. And the UI is the only part that's web tech — audio decoding/output, DSP, the library scanner, and the SQLite index all run as native Rust off the UI thread, driving the frontend through events rather than the other way around. See below for how the two sides split.
-
-Luminous splits cleanly along the Tauri boundary: a Svelte 5 frontend handles UI, state, and rendering, while a Rust backend owns everything performance- or system-sensitive — audio decoding and playback, the SQLite-backed library index, file scanning, and OS media integration. Beneath the Tauri IPC layer, pure engine logic is partitioned into dedicated workspace crates under `crates/`: DSP, cryptographic verification, file/tag parsing, and remote wire protocols run with zero dependencies on `tauri` or `rusqlite`. The application crate in `src-tauri` acts as the coordinator, managing SQLite caching, database transactions, background worker loops, and event emission. Keeping decoding, DSP, and disk I/O in Rust off the UI thread is what lets a multi-thousand-track library scan, gapless-playback, and real-time visualizers stay smooth at once.
-
-The IPC commands are deliberately *deep*: each one owns a whole workflow rather than forwarding a single field. The backend owns the built-in Queue (bootstrapped at startup, exposed via an `is_queue` flag — the frontend never infers it from a name), applies equalizer changes as one whole-config call, and keeps every dynamic playlist — genre/decade/BPM auto playlists and user smart playlists alike — *always complete*: whenever the library or a song's stats change, a backend reconciler immediately appends newly-matching songs and evicts stale ones, syncing the live play order without ever reshuffling it. There is no refill logic, and no such setting, anywhere in the frontend.
-
-![Luminous architecture: Svelte 5 frontend and Rust backend split along the Tauri IPC boundary](./docs/architecture.svg)
-
-```
-luminous/
-├── crates/                   # Engine crates with no Tauri/SQLite dependency
-│   ├── luminous-addons/      # Add-on runtime: Ed25519 bundle verification, ChaCha20 decryption, Store entitlement, key cache, memory URI scheme
-│   ├── luminous-analysis/    # Audio analysis DSP: EBU R128 loudness metering, true-peak calculation, RMS waveforms, 3-band FFT waveform extraction
-│   ├── luminous-audio/       # Playback engine: Symphonia decode, CPAL output, gapless/crossfade, gain chain, spectrum
-│   ├── luminous-equalizer/   # Biquad DSP: 10-band graphic & up-to-20-band parametric filters, Equalizer APO parser
-│   ├── luminous-metadata/    # Audio & playlist metadata: Lofty tag read/write, CUE sheets, DR meter logs, M3U/PLS/XSPF parsers
-│   └── luminous-remote/      # Wire-protocol clients: Subsonic, WebDAV, ListenBrainz, CritiqueBrainz, Lyrics, MusicBrainz OAuth
-├── src/                      # Svelte 5 + TypeScript Frontend
-│   ├── lib/
-│   │   ├── components/       # PlayerBar, Visualizers, Equalizer, LyricsView, TagEditor, etc.
-│   │   ├── locales/          # UI translations (English CA/US/UK, French CA/FR, Spanish, German, Italian, Russian, Ukrainian)
-│   │   ├── stores/           # Global stores (player, collection, navigation, windowLayout, playlists, theme, i18n, prefs)
-│   │   ├── types/            # Frontend interfaces
-│   │   └── utils/            # Shared utilities (color parsing, filter parsing, lyrics, stats, etc.)
-│   └── routes/               # Layouts and navigation views
-└── src-tauri/                # Tauri + Rust Backend Application Core
-    ├── src/
-    │   ├── audio.rs          # Playback adapter: Song -> Track translation, pipeline info
-    │   ├── band_waveform.rs  # Layered 3-band waveform SQLite persistence and cache lookup
-    │   ├── collection.rs     # Library scanner & folder watcher (query/reconcile/watcher split into collection/)
-    │   ├── covermanager.rs   # Cover art extractor and iTunes search API fallback
-    │   ├── db.rs             # SQLite schema migration & connection pool (r2d2)
-    │   ├── eq_store.rs       # Equalizer presets and persistence
-    │   ├── filter_parser.rs  # Search filter syntax parser (artist:, album:, year:, etc.)
-    │   ├── install_format.rs # Distro/package format detection for the updater
-    │   ├── lib.rs            # Application entry point, background loops, & IPC registry
-    │   ├── loudness.rs       # Background R128 loudness analysis worker & SQLite persistence
-    │   ├── lyrics.rs         # Lyrics sidecar discovery, embedded extraction & online lookup adapter
-    │   ├── main.rs           # Binary entry point invoking luminous_lib::run()
-    │   ├── media_session/    # OS media transport integration (SMTC, MPRIS2, Now Playing)
-    │   ├── models.rs         # Shared structs and types
-    │   ├── musicbrainz.rs    # MusicBrainz OAuth flow & artist events coordinator
-    │   ├── organizer.rs      # Tag-based file/folder reorganizer
-    │   ├── player.rs         # Playback controller (Shuffle, Repeat, Next/Prev)
-    │   ├── playlist.rs       # Playlist manager & Queue abstraction (auto-sync/dynamic/import-export/undo split into playlist/)
-    │   ├── ratings_sync.rs   # Two-way rating/Love sync coordinator with ListenBrainz & CritiqueBrainz
-    │   ├── scrobbler.rs      # Scrobble offline queue & background submission coordinator
-    │   ├── stats.rs          # Play counts, ratings, and history tracking
-    │   ├── subsonic/         # Subsonic/Navidrome media-server sync & SQLite caching
-    │   ├── tags.rs           # Genre/tag browsing over the existing songs.genre column
-    │   ├── tray.rs           # System tray icon, menu, and minimize-to-tray behavior
-    │   ├── waveform.rs       # Waveform SQLite persistence and background analysis worker
-    │   ├── webdav/           # WebDAV library sync, tag probing & credential management
-    │   └── commands/         # Tauri IPC command handlers
-    └── Cargo.toml            # App crate dependencies (tauri, rusqlite, r2d2, reqwest, tokio, and engine crates)
-```
+See the [release notes](https://github.com/esoltys/luminous/releases) for what's new in each version.
 
 ---
 
@@ -138,7 +83,6 @@ Ensure the required build tools, GTK, WebKit, ALSA, and SSL development headers 
 
 ```bash
 bun install
-bun run install:git-hooks # sets core.hooksPath to use the repository's tracked .githooks/pre-commit hook
 bun run tauri dev
 ```
 #### 4. Build Production Bundle
@@ -177,6 +121,19 @@ bun run tauri build
 
 ---
 
+### Environment Variables
+
+None are needed for `bun run tauri dev`. Set them in your shell before building; nothing reads a `.env` file. The API keys are compiled in when set at build time and can also be overridden at runtime; a key entered in the app's Settings takes priority over both.
+
+| Variable | Used for | If unset |
+| --- | --- | --- |
+| `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Signing updater artifacts in `bun run tauri build` (read by the Tauri CLI) | The build fails; see [Generating an Updater Signing Key](#generating-an-updater-signing-key) |
+| `FANART_API_KEY` | fanart.tv artist images | fanart.tv images are unavailable unless a key is entered in Settings |
+| `MUSICBRAINZ_CLIENT_ID`, `MUSICBRAINZ_CLIENT_SECRET` | MusicBrainz sign-in | The built-in client is used |
+| `LASTFM_API_KEY`, `LASTFM_API_SECRET` | Last.fm scrobbling | The built-in key is used |
+
+---
+
 ### Generating an Updater Signing Key
 
 Luminous's `tauri.conf.json` has `bundle.createUpdaterArtifacts` set to `true`, so `bun run tauri build` signs every bundle it produces. Without a signing key in the environment, the build fails. Official releases are signed with a repository secret (see [`.github/workflows/release.yml`](.github/workflows/release.yml)), but for local builds you need your own keypair:
@@ -204,6 +161,8 @@ Luminous's `tauri.conf.json` has `bundle.createUpdaterArtifacts` set to `true`, 
 
 Luminous uses automated tests at both the frontend (Svelte 5) and backend (Rust) layers.
 
+`bun run check` and `bun run lint:ast` run the type checks, lints and architecture rules CI enforces.
+
 ### Frontend Unit & Integration Tests (Vitest)
 
 Frontend tests are written with Vitest and test component rendering, Svelte 5 stores, and state updates with mocked Tauri APIs.
@@ -220,3 +179,13 @@ To run the backend unit and integration test suite:
 cargo test --workspace
 ```
 This runs unit tests across all workspace crates and integration tests under `src-tauri/tests/`.
+
+### Formal Proofs (Lean)
+
+Machine-checked Lean models of the player and playlist state machines live in [`verification/lean/`](verification/lean/README.md). Install [elan](https://github.com/leanprover/elan) (the toolchain is pinned in `lean-toolchain`), then:
+```bash
+cd verification/lean
+lake build --wfail
+```
+
+More detail: [Testing](docs/TESTING.md), [Performance](docs/PERFORMANCE.md), [Troubleshooting](docs/TROUBLESHOOTING.md), [CI](docs/CI.md).

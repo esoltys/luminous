@@ -3,8 +3,9 @@
  * Thin wrapper around `tauri` that sets env vars conditionally on the
  * subcommand, since `package.json` scripts can't branch on argv.
  *
- * - `NO_STRIP=true` always (needed for `tauri build` per README; harmless
- *   for other subcommands).
+ * - `NO_STRIP=true` always. `tauri build`'s AppImage step bundles a `strip`
+ *   too old for the RELR relocations in current system libraries on
+ *   rolling-release distros (Arch/CachyOS); harmless for other subcommands.
  * - `LUMINOUS_REMOTE_DEVTOOLS=true` only for `tauri dev` — it must not leak
  *   into `tauri build` (including `--debug` builds), which would silently
  *   enable the loopback inspector server and the "Luminous Debug" app name.
