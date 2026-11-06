@@ -379,41 +379,57 @@ const TLDS: &[&str] = &[
     "uk", "de", "fr", "es", "it", "pl", "nl", "eu", "ws", "xyz", "club", "online", "site", "top",
 ];
 
+/// Sites where a link in a comment is the artist's own page, written by the
+/// artist's store (Bandcamp adds "Visit https://artist.bandcamp.com" to every
+/// download), not by a download site advertising itself.
+const ARTIST_SITES: &[&str] = &["bandcamp.com"];
+
 /// A comment is promotional when it contains a URL and either the URL is
 /// most of it (at most three other words) or it uses a download/promo phrase.
-/// A personal note that merely mentions a link is not.
+/// A personal note that merely mentions a link is not, and neither is a
+/// comment whose only links are to [`ARTIST_SITES`].
 pub(crate) fn is_promotional(text: &str) -> bool {
-    let mut urls = 0;
+    let mut other_sites = 0;
     let mut words = 0;
     for token in text.split_whitespace() {
-        if is_url(token) {
-            urls += 1;
-        } else if token.chars().any(char::is_alphanumeric) {
-            words += 1;
+        match url_host(token) {
+            Some(host) if is_artist_site(&host) => {}
+            Some(_) => other_sites += 1,
+            None if token.chars().any(char::is_alphanumeric) => words += 1,
+            None => {}
         }
     }
-    if urls == 0 {
+    if other_sites == 0 {
         return false;
     }
     let lower = text.to_lowercase();
     words <= 3 || PROMO_PHRASES.iter().any(|phrase| lower.contains(phrase))
 }
 
-fn is_url(token: &str) -> bool {
+fn is_artist_site(host: &str) -> bool {
+    ARTIST_SITES
+        .iter()
+        .any(|site| host == *site || host.ends_with(&format!(".{site}")))
+}
+
+/// The lower-cased host of `token` when it looks like a URL or bare domain.
+fn url_host(token: &str) -> Option<String> {
     let token = token
         .trim_matches(|c: char| "()[]<>{}\"'.,;:!?".contains(c))
         .to_ascii_lowercase();
-    if token.starts_with("http://") || token.starts_with("https://") || token.starts_with("www.") {
-        return true;
+    let rest = token
+        .strip_prefix("http://")
+        .or_else(|| token.strip_prefix("https://"));
+    let host = rest.unwrap_or(&token).split('/').next().unwrap_or_default();
+    if rest.is_some() || host.starts_with("www.") {
+        return Some(host.to_string());
     }
-    if token.contains('@') {
-        return false;
+    if host.contains('@') {
+        return None;
     }
-    let host = token.split('/').next().unwrap_or_default();
-    let Some((name, tld)) = host.rsplit_once('.') else {
-        return false;
-    };
-    name.chars().filter(char::is_ascii_alphanumeric).count() >= 2 && TLDS.contains(&tld)
+    let (name, tld) = host.rsplit_once('.')?;
+    (name.chars().filter(char::is_ascii_alphanumeric).count() >= 2 && TLDS.contains(&tld))
+        .then(|| host.to_string())
 }
 
 #[cfg(test)]
@@ -469,6 +485,8 @@ mod tests {
             "Visit FreeMusicSite.com for more free music!!!",
             "(http://ripgroup.net)",
             "Ripped by XYZ for musicsite.org and all its users, enjoy the album",
+            // A download site riding along with a Bandcamp link is still flagged.
+            "Visit https://artist.bandcamp.com or grab it free at freemp3s.ru",
         ] {
             assert!(is_promotional(text), "{text}");
         }
@@ -482,6 +500,9 @@ mod tests {
             "Recorded live at the Fillmore, 1971. Setlist on archive.org with photos",
             "Vol.II remaster, e.g. the 2009 one",
             "Mail me at someone@example.com about the bootleg",
+            "Visit http://andyjamesuk.bandcamp.com",
+            "Visit https://dancewiththedead.bandcamp.com",
+            "bandcamp.com/album/xyz",
         ] {
             assert!(!is_promotional(text), "{text}");
         }
