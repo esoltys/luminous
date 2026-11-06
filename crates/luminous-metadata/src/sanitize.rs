@@ -22,10 +22,12 @@ use lofty::id3::v2::{Frame, Id3v2Tag};
 use lofty::iff::wav::RiffInfoList;
 use lofty::mp4::{AtomData, AtomIdent, Ilst};
 use lofty::ogg::tag::VorbisComments;
+use lofty::ogg::OggPictureStorage;
 use lofty::probe::Probe;
 use lofty::tag::{TagExt, TagType};
 use serde::{Deserialize, Serialize};
-use std::io::Cursor;
+use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
 
 /// What kind of cruft a [`CruftField`] is. Format-agnostic: an encoder banner
@@ -77,14 +79,17 @@ pub fn strip_cruft(path: &Path, fields: &[CruftField]) -> Result<usize> {
 /// Walks every native tag in `path`, classifying each item. With a
 /// `selection`, items matching it are removed and each changed tag is saved.
 fn scan<'a>(path: &Path, selection: Option<&'a [CruftField]>) -> Result<Scan<'a>> {
-    let file_type = Probe::open(path)
+    let probe = Probe::open(path)
         .context("cannot open file")?
         .guess_file_type()
-        .context("cannot read file header")?
-        .file_type();
-    // Read from memory so no handle on `path` is open while saving below.
-    let mut reader = Cursor::new(std::fs::read(path).context("cannot read file")?);
-    let options = ParseOptions::new().read_properties(false);
+        .context("cannot read file header")?;
+    let file_type = probe.file_type();
+    let reader = probe.into_inner();
+    // A preview never saves, so it can skip pictures; a strip must read them,
+    // since saving a tag writes back only the pictures it holds.
+    let options = ParseOptions::new()
+        .read_properties(false)
+        .read_cover_art(selection.is_some());
     let mut scan = Scan {
         selection,
         found: Vec::new(),
@@ -93,7 +98,7 @@ fn scan<'a>(path: &Path, selection: Option<&'a [CruftField]>) -> Result<Scan<'a>
 
     match file_type {
         Some(FileType::Mpeg) => {
-            let mut file = lofty::mpeg::MpegFile::read_from(&mut reader, options)?;
+            let mut file: lofty::mpeg::MpegFile = read(reader, options)?;
             let has_id3v2 = file.id3v2().is_some();
             if let Some(tag) = file.id3v2_mut() {
                 scan.id3v2(path, tag)?;
@@ -105,34 +110,44 @@ fn scan<'a>(path: &Path, selection: Option<&'a [CruftField]>) -> Result<Scan<'a>
             }
         }
         Some(FileType::Flac) => {
-            let mut file = lofty::flac::FlacFile::read_from(&mut reader, options)?;
+            let mut file: lofty::flac::FlacFile = read(reader, options)?;
             if let Some(tag) = file.id3v2_mut() {
                 scan.id3v2(path, tag)?;
             }
+            // FlacFile keeps picture blocks outside its VorbisComments, but
+            // saving the tag rewrites every picture block from the tag's own
+            // list, so hand the pictures to the tag first.
+            let mut pictures = Vec::new();
+            while !file.pictures().is_empty() {
+                pictures.push(file.remove_picture(0));
+            }
             if let Some(tag) = file.vorbis_comments_mut() {
+                for (picture, info) in pictures {
+                    tag.insert_picture(picture, Some(info))?;
+                }
                 scan.vorbis(path, tag)?;
             }
         }
         Some(FileType::Vorbis) => {
-            let mut file = lofty::ogg::VorbisFile::read_from(&mut reader, options)?;
+            let mut file: lofty::ogg::VorbisFile = read(reader, options)?;
             scan.vorbis(path, file.vorbis_comments_mut())?;
         }
         Some(FileType::Opus) => {
-            let mut file = lofty::ogg::OpusFile::read_from(&mut reader, options)?;
+            let mut file: lofty::ogg::OpusFile = read(reader, options)?;
             scan.vorbis(path, file.vorbis_comments_mut())?;
         }
         Some(FileType::Speex) => {
-            let mut file = lofty::ogg::SpeexFile::read_from(&mut reader, options)?;
+            let mut file: lofty::ogg::SpeexFile = read(reader, options)?;
             scan.vorbis(path, file.vorbis_comments_mut())?;
         }
         Some(FileType::Mp4) => {
-            let mut file = lofty::mp4::Mp4File::read_from(&mut reader, options)?;
+            let mut file: lofty::mp4::Mp4File = read(reader, options)?;
             if let Some(tag) = file.ilst_mut() {
                 scan.ilst(path, tag)?;
             }
         }
         Some(FileType::Wav) => {
-            let mut file = lofty::iff::wav::WavFile::read_from(&mut reader, options)?;
+            let mut file: lofty::iff::wav::WavFile = read(reader, options)?;
             if let Some(tag) = file.id3v2_mut() {
                 scan.id3v2(path, tag)?;
             }
@@ -141,7 +156,7 @@ fn scan<'a>(path: &Path, selection: Option<&'a [CruftField]>) -> Result<Scan<'a>
             }
         }
         Some(FileType::Aiff) => {
-            let mut file = lofty::iff::aiff::AiffFile::read_from(&mut reader, options)?;
+            let mut file: lofty::iff::aiff::AiffFile = read(reader, options)?;
             if let Some(tag) = file.id3v2_mut() {
                 scan.id3v2(path, tag)?;
             }
@@ -150,6 +165,12 @@ fn scan<'a>(path: &Path, selection: Option<&'a [CruftField]>) -> Result<Scan<'a>
     }
 
     Ok(scan)
+}
+
+/// Parses the file from `reader`, consuming it so no handle on the file is
+/// left open while a tag is saved.
+fn read<T: AudioFile>(mut reader: BufReader<File>, options: ParseOptions) -> Result<T> {
+    T::read_from(&mut reader, options).context("cannot read tags")
 }
 
 struct Scan<'a> {
@@ -404,6 +425,7 @@ mod tests {
     use lofty::tag::Accessor;
     use lofty::TextEncoding;
     use std::borrow::Cow;
+    use std::io::Cursor;
     use std::path::PathBuf;
 
     fn fixture_copy(name: &str) -> (tempfile::TempDir, PathBuf) {
@@ -476,6 +498,12 @@ mod tests {
         tag.insert(text_frame("TSSE", "LAME 3.99r"));
         tag.insert(text_frame("TENC", "RipGroup"));
         tag.insert_user_text("REPLAYGAIN_TRACK_GAIN".to_string(), "-6.5 dB".to_string());
+        tag.insert_picture(
+            lofty::picture::Picture::unchecked(vec![0xFF, 0xD8, 0xFF, 0xE0])
+                .pic_type(lofty::picture::PictureType::CoverFront)
+                .mime_type(lofty::picture::MimeType::Jpeg)
+                .build(),
+        );
         tag.save_to_path(&path, WriteOptions::default()).unwrap();
         let mut v1 = Id3v1Tag::new();
         v1.title = Some("Keep Me".to_string());
@@ -506,6 +534,10 @@ mod tests {
             .iter()
             .any(|f| matches!(f, Frame::Comment(c) if c.description == "iTunSMPB")));
         assert_eq!(tag.get_user_text("REPLAYGAIN_TRACK_GAIN"), Some("-6.5 dB"));
+        assert!(
+            tag.iter().any(|f| matches!(f, Frame::Picture(_))),
+            "cover art survives, though previews skip reading it"
+        );
     }
 
     #[test]
@@ -570,6 +602,29 @@ mod tests {
             assert_eq!(meta.comment, None, "{name}");
             assert!(find_cruft(&path).unwrap().is_empty(), "{name}");
         }
+    }
+
+    #[test]
+    fn flac_cover_art_survives_a_strip() {
+        let (_dir, path) = fixture_copy("song_gamma.flac");
+        let mut tag = VorbisComments::new();
+        tag.push("ENCODER".to_string(), "Lavf58.29.100".to_string());
+        tag.insert_picture(
+            lofty::picture::Picture::unchecked(vec![0xFF, 0xD8, 0xFF, 0xE0])
+                .pic_type(lofty::picture::PictureType::CoverFront)
+                .mime_type(lofty::picture::MimeType::Jpeg)
+                .build(),
+            Some(lofty::picture::PictureInformation::default()),
+        )
+        .unwrap();
+        tag.save_to_path(&path, WriteOptions::default()).unwrap();
+
+        let found = find_cruft(&path).unwrap();
+        assert_eq!(strip_cruft(&path, &found).unwrap(), 1);
+
+        let mut reader = Cursor::new(std::fs::read(&path).unwrap());
+        let file = lofty::flac::FlacFile::read_from(&mut reader, ParseOptions::new()).unwrap();
+        assert_eq!(file.pictures().len(), 1);
     }
 
     #[test]
