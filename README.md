@@ -36,7 +36,7 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 
 ## Features
 
-- **Library**: indexes local folders with instant search, including `field:value` syntax (e.g. `genre:rock`) you can save as smart playlists
+- **Library**: indexes local folders with instant search, including `field:value` syntax (e.g. `genre:rock`) you can save as smart playlists; portable mode keeps the library and settings beside the app
 - **Playback**: gapless MP3, FLAC, Opus, WAV and more; 10-band graphic and 20-band parametric EQ with AutoEq headphone profiles; ASIO output on Windows
 - **Remote sources**: OpenSubsonic servers (Navidrome, Gonic, …) and WebDAV, synced into the same library
 - **Playlists**: smart and auto playlists (decades, genres, BPM), Song and Artist Radio built from your own library, custom genre hierarchies
@@ -44,7 +44,7 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 - **Lyrics**: time-synced line by line or word by word, with inline editing and a miniplayer
 - **Tagging and organizing**: tag editor for single or bulk edits (with MusicBrainz Picard handoff) and automatic file organization from your own naming template
 - **Loves, ratings and stats**: 1–5 stars and loves synced with ListenBrainz, Last.fm scrobbling, listening streaks and top artists
-- **Themes and languages**: preset and cover-art-driven themes, seven languages, portable mode
+- **Themes and languages**: preset and cover-art-driven themes, seven languages
 
 See the [release notes](https://github.com/esoltys/luminous/releases) for what's new in each version.
 
