@@ -58,7 +58,13 @@ fn preview_lists_cruft_skips_cue_tracks_and_apply_refreshes_comment() {
     insert_song(&db, 1, &plain, None);
     insert_song(&db, 2, &cue, Some("/music/album.cue"));
 
-    let preview = tag_cleanup::preview(&db, &[1, 2]).unwrap();
+    let progress = std::cell::RefCell::new(Vec::new());
+    let preview = tag_cleanup::preview(&db, &[1, 2], |checked, total| {
+        progress.borrow_mut().push((checked, total));
+        true
+    })
+    .unwrap();
+    assert_eq!(progress.into_inner().last(), Some(&(2, 2)));
     assert_eq!(preview.skipped, 1, "the CUE track can't be cleaned");
     assert_eq!(preview.songs.len(), 1);
     assert_eq!(preview.songs[0].song_id, 1);
@@ -95,7 +101,7 @@ fn preview_lists_cruft_skips_cue_tracks_and_apply_refreshes_comment() {
     assert_eq!(result.removed_fields, 2);
     assert!(result.errors.is_empty());
 
-    let after = tag_cleanup::preview(&db, &[1]).unwrap();
+    let after = tag_cleanup::preview(&db, &[1], |_, _| true).unwrap();
     assert_eq!(after.songs[0].fields.len(), 1);
     assert_eq!(after.songs[0].fields[0].kind, CruftKind::Encoder);
     assert_eq!(
@@ -113,6 +119,15 @@ fn preview_lists_cruft_skips_cue_tracks_and_apply_refreshes_comment() {
         })
         .unwrap();
     assert_eq!(comment, None, "the stale iTunNORM comment is cleared");
+}
+
+#[test]
+fn preview_stops_when_progress_says_so() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+    let plain = mp3_with_cruft(temp_dir.path(), "plain.mp3");
+    insert_song(&db, 1, &plain, None);
+    assert!(tag_cleanup::preview(&db, &[1], |_, _| false).is_err());
 }
 
 #[test]

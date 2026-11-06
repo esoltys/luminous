@@ -2087,6 +2087,7 @@ export const de = {
     action: "Tags bereinigen…",
     title: "Tags bereinigen",
     checking: "Tags werden geprüft…",
+    checkingProgress: "Tags werden geprüft… {checked} von {total}",
     intro: "Entfernen Sie das Häkchen bei allem, was Sie behalten möchten. Titel, Interpret, Album, Songtext, Cover und andere grundlegende Tags werden nie geändert.",
     nothingFound: "Keine überflüssigen Tags gefunden.",
     skipped: "Titel, die nicht geprüft werden konnten (CUE-Datei, entfernte oder unlesbare Dateien): {count}",

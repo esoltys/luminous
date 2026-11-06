@@ -6,6 +6,7 @@ use crate::collection::SelfWriteTracker;
 use crate::db::Database;
 use crate::models::{SongSource, LOCAL_SOURCES_SQL};
 use luminous_metadata::{audio, find_cruft, strip_cruft, CruftField};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -49,27 +50,57 @@ struct SongFile {
     writable: bool,
 }
 
+/// Files read in parallel between progress reports.
+const PREVIEW_CHUNK: usize = 64;
+
 /// Lists the cruft in `song_ids`' files; an empty list means the whole local
-/// library. Reads every file, so callers run it off the async runtime.
-pub fn preview(db: &Database, song_ids: &[i64]) -> Result<TagCleanupPreview, String> {
+/// library. Reads every file (in parallel, since libraries often sit on a
+/// network share where each read is a round trip), so callers run it off the
+/// async runtime. `on_progress(checked, total)` is called after each chunk
+/// and returns whether to go on; returning `false` abandons the preview.
+pub fn preview(
+    db: &Database,
+    song_ids: &[i64],
+    mut on_progress: impl FnMut(usize, usize) -> bool,
+) -> Result<TagCleanupPreview, String> {
+    let songs = load_songs(db, song_ids)?;
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(crate::collection::scan_thread_count())
+        .build()
+        .map_err(|e| e.to_string())?;
+    let total = songs.len();
     let mut result = TagCleanupPreview::default();
-    for song in load_songs(db, song_ids)? {
-        if !song.writable {
-            result.skipped += 1;
-            continue;
-        }
-        match find_cruft(&PathBuf::from(&song.path)) {
-            Ok(fields) if fields.is_empty() => {}
-            Ok(fields) => result.songs.push(SongCruft {
-                song_id: song.id,
-                title: song.title,
-                artist: song.artist,
-                fields,
-            }),
-            Err(e) => {
-                log::warn!("tag clean-up: cannot read {}: {e:#}", song.path);
-                result.skipped += 1;
+    let mut checked = 0;
+
+    for chunk in songs.chunks(PREVIEW_CHUNK) {
+        let found: Vec<Option<Vec<CruftField>>> = pool.install(|| {
+            chunk
+                .par_iter()
+                .map(|song| {
+                    if !song.writable {
+                        return None;
+                    }
+                    find_cruft(&PathBuf::from(&song.path))
+                        .map_err(|e| log::warn!("tag clean-up: cannot read {}: {e:#}", song.path))
+                        .ok()
+                })
+                .collect()
+        });
+        for (song, fields) in chunk.iter().zip(found) {
+            match fields {
+                None => result.skipped += 1,
+                Some(fields) if fields.is_empty() => {}
+                Some(fields) => result.songs.push(SongCruft {
+                    song_id: song.id,
+                    title: song.title.clone(),
+                    artist: song.artist.clone(),
+                    fields,
+                }),
             }
+        }
+        checked += chunk.len();
+        if !on_progress(checked, total) {
+            return Err("Tag clean-up preview cancelled".to_string());
         }
     }
     Ok(result)

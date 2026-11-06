@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
   import {
     BroomIcon as Broom,
@@ -35,6 +36,7 @@
   let preview = $state<TagCleanupPreview | null>(null);
   let errorMsg = $state<string | null>(null);
   let isApplying = $state(false);
+  let progress = $state<{ checked: number; total: number } | null>(null);
   /** Keys (`songId:fieldIndex`) of fields the user unticked; everything else is removed. */
   let kept = $state<Record<string, boolean>>({});
 
@@ -48,12 +50,18 @@
   );
   let showSongHeadings = $derived((preview?.songs.length ?? 0) > 1 || songIds.length !== 1);
 
-  onMount(async () => {
-    try {
-      preview = await invoke<TagCleanupPreview>("preview_tag_cleanup", { songIds });
-    } catch (e) {
-      errorMsg = String(e);
-    }
+  onMount(() => {
+    const unlisten = listen<{ checked: number; total: number }>("tag-cleanup-progress", (event) => {
+      progress = event.payload;
+    });
+    invoke<TagCleanupPreview>("preview_tag_cleanup", { songIds })
+      .then((result) => { preview = result; })
+      .catch((e) => { errorMsg = String(e); });
+    return () => {
+      unlisten.then((fn) => fn());
+      // Closing before the check finishes stops the backend reading files.
+      if (!preview && !errorMsg) invoke("cancel_tag_cleanup").catch(() => {});
+    };
   });
 
   async function handleApply() {
@@ -108,7 +116,12 @@
       </div>
     {:else if !preview}
       <div class="py-12 flex justify-center">
-        <LoadingSpinner label={i18n.t("tagCleanup.checking")} size="sm" />
+        <LoadingSpinner
+          label={progress && progress.total > 1
+            ? i18n.t("tagCleanup.checkingProgress", { checked: progress.checked, total: progress.total })
+            : i18n.t("tagCleanup.checking")}
+          size="sm"
+        />
       </div>
     {:else if preview.songs.length === 0}
       <p class="py-10 text-center text-brand-text-secondary">{i18n.t("tagCleanup.nothingFound")}</p>

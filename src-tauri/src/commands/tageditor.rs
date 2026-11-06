@@ -4,6 +4,7 @@ use crate::tag_cleanup;
 use crate::AppState;
 use luminous_metadata::audio;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_opener::OpenerExt;
@@ -1138,15 +1139,38 @@ mod tests {
 /// Lists removable tag cruft (promotional comments, encoder banners,
 /// `iTunNORM`, duplicate ID3v1 tags) in `song_ids`' files, or in the whole
 /// local library when empty (#1939). Writes nothing.
+/// Bumped by each preview and by `cancel_tag_cleanup`; a preview stops as
+/// soon as it's no longer the latest, so a closed dialog doesn't leave a
+/// library-wide scan reading files for minutes.
+static TAG_CLEANUP_GENERATION: AtomicU64 = AtomicU64::new(0);
+
+/// Emits `tag-cleanup-progress` (`{ checked, total }`) as files are read.
 #[tauri::command]
 pub async fn preview_tag_cleanup(
+    app: AppHandle,
     state: State<'_, AppState>,
     song_ids: Vec<i64>,
 ) -> Result<tag_cleanup::TagCleanupPreview, String> {
     let db = Arc::clone(&state.db);
-    tauri::async_runtime::spawn_blocking(move || tag_cleanup::preview(&db, &song_ids))
-        .await
-        .map_err(|e| e.to_string())?
+    let generation = TAG_CLEANUP_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+    tauri::async_runtime::spawn_blocking(move || {
+        tag_cleanup::preview(&db, &song_ids, |checked, total| {
+            let _ = app.emit(
+                "tag-cleanup-progress",
+                serde_json::json!({ "checked": checked, "total": total }),
+            );
+            TAG_CLEANUP_GENERATION.load(Ordering::SeqCst) == generation
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Stops a running `preview_tag_cleanup` (the review dialog was closed).
+#[tauri::command]
+pub async fn cancel_tag_cleanup() -> Result<(), String> {
+    TAG_CLEANUP_GENERATION.fetch_add(1, Ordering::SeqCst);
+    Ok(())
 }
 
 /// Removes the fields the user kept ticked in the clean-up review (#1939).

@@ -2095,6 +2095,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     action: "Nettoyer les étiquettes…",
     title: "Nettoyer les étiquettes",
     checking: "Vérification des étiquettes…",
+    checkingProgress: "Vérification des étiquettes… {checked} sur {total}",
     intro: "Décochez ce que vous voulez garder. Le titre, l'artiste, l'album, les paroles, la pochette et les autres étiquettes principales ne sont jamais modifiés.",
     nothingFound: "Aucune étiquette superflue trouvée.",
     skipped: "Pistes qui n'ont pas pu être vérifiées (fiche CUE, fichiers distants ou illisibles) : {count}",

@@ -8,6 +8,7 @@ import type { TagCleanupPreview } from "../types";
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
 
 const preview: TagCleanupPreview = {
   songs: [
@@ -66,6 +67,13 @@ describe("TagCleanupDialog.svelte", () => {
     await waitFor(() => expect(getByText("LAME 3.99r")).toBeInTheDocument());
     for (const box of getAllByRole("checkbox")) await fireEvent.click(box);
     expect(getByText("Remove Selected").closest("button")).toBeDisabled();
+  });
+
+  it("cancels the check when closed before it finishes", async () => {
+    vi.mocked(invoke).mockReturnValueOnce(new Promise(() => {}));
+    const { unmount } = render(TagCleanupDialog, { songIds: [], onClose: vi.fn() });
+    unmount();
+    expect(invoke).toHaveBeenLastCalledWith("cancel_tag_cleanup");
   });
 
   it("says so when there is nothing to clean", async () => {

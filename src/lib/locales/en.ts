@@ -2087,6 +2087,7 @@ export const en = {
     action: "Clean Up Tags…",
     title: "Clean Up Tags",
     checking: "Checking tags…",
+    checkingProgress: "Checking tags… {checked} of {total}",
     intro: "Untick anything you want to keep. Title, artist, album, lyrics, artwork and other core tags are never changed.",
     nothingFound: "No tag clutter found.",
     skipped: "Tracks that couldn't be checked (CUE sheet, remote or unreadable files): {count}",

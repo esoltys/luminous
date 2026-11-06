@@ -2087,6 +2087,7 @@ export const it = {
     action: "Ripulisci i tag…",
     title: "Ripulisci i tag",
     checking: "Controllo dei tag…",
+    checkingProgress: "Controllo dei tag… {checked} di {total}",
     intro: "Togli la spunta a ciò che vuoi tenere. Titolo, artista, album, testo, copertina e gli altri tag principali non vengono mai modificati.",
     nothingFound: "Nessun tag superfluo trovato.",
     skipped: "Tracce che non è stato possibile controllare (file CUE, file remoti o illeggibili): {count}",

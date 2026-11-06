@@ -2087,6 +2087,7 @@ export const es = {
     action: "Limpiar etiquetas…",
     title: "Limpiar etiquetas",
     checking: "Comprobando etiquetas…",
+    checkingProgress: "Comprobando etiquetas… {checked} de {total}",
     intro: "Desmarca lo que quieras conservar. El título, el artista, el álbum, la letra, la carátula y las demás etiquetas principales nunca se modifican.",
     nothingFound: "No se encontraron etiquetas sobrantes.",
     skipped: "Pistas que no se pudieron comprobar (hoja CUE, archivos remotos o ilegibles): {count}",
