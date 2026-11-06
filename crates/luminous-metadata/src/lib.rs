@@ -7,6 +7,7 @@ pub mod audio;
 pub mod cue;
 pub mod dr;
 pub mod playlist;
+pub mod sanitize;
 pub mod values;
 
 pub use audio::{
@@ -20,4 +21,5 @@ pub use playlist::{
     clean_track_path, export_playlist, parse_playlist, ExportTrack, ParsedPlaylist, ParsedTrack,
     PlaylistFormat,
 };
+pub use sanitize::{find_cruft, strip_cruft, CruftField, CruftKind};
 pub use values::{join_multi_value, parse_multi_value, MULTI_VALUE_DELIMITER};

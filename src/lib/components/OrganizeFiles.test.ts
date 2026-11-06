@@ -298,7 +298,7 @@ describe("OrganizeFiles safeguards", () => {
 
     // Check filter pills
     expect(await findByText("All (2)")).toBeInTheDocument();
-    expect(await findByText("Ready to Place (1)")).toBeInTheDocument();
+    expect(await findByText("Ready to Move (1)")).toBeInTheDocument();
     expect(await findByText("Needs Tags (1)")).toBeInTheDocument();
 
     // 0-count pills should not be rendered
@@ -324,8 +324,8 @@ describe("OrganizeFiles safeguards", () => {
       expect(queryByText("track2")).toBeInTheDocument();
     });
 
-    // Filter by "Ready to Place"
-    const readyBtn = await findByRole("button", { name: "Ready to Place (1)" });
+    // Filter by "Ready to Move"
+    const readyBtn = await findByRole("button", { name: "Ready to Move (1)" });
     await fireEvent.click(readyBtn);
 
     await waitFor(() => {

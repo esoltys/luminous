@@ -56,6 +56,7 @@ pub mod stall_monitor;
 pub mod stats;
 pub mod stats_summary;
 pub mod subsonic;
+pub mod tag_cleanup;
 pub mod tags;
 #[cfg(target_os = "windows")]
 pub mod taskbar;
@@ -1550,6 +1551,9 @@ pub fn run() {
             commands::tageditor::clear_song_cover_art,
             commands::tageditor::clear_album_cover_art,
             commands::tageditor::open_song_folder,
+            commands::tageditor::preview_tag_cleanup,
+            commands::tageditor::cancel_tag_cleanup,
+            commands::tageditor::apply_tag_cleanup,
             // MusicBrainz Picard bridge commands (#367)
             commands::picard::open_in_picard,
             commands::picard::open_paths_in_picard,

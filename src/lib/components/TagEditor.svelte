@@ -11,7 +11,8 @@
     LockIcon as Lock,
     ImageBrokenIcon as ImageOff,
     CloudIcon,
-    FolderOpenIcon as FolderOpen
+    FolderOpenIcon as FolderOpen,
+    BroomIcon as Broom
   } from "phosphor-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -21,6 +22,7 @@
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Modal from "./Modal.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import TagCleanupDialog from "./TagCleanupDialog.svelte";
   import CoverArt from "./CoverArt.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -90,6 +92,7 @@
   let coverArtVersion = $state(0);
   let showClearArtConfirm = $state(false);
   let isClearingArt = $state(false);
+  let showTagCleanup = $state(false);
 
   let titlesort = $state("");
   let artistsort = $state("");
@@ -334,6 +337,8 @@
   onMount(loadMetadata);
 
   function handleKeydown(e: KeyboardEvent) {
+    // Keys pressed in the clean-up dialog stacked on top belong to it.
+    if (showTagCleanup) return;
     if (e.key === "Enter") {
       const target = e.target as HTMLElement;
       if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
@@ -344,7 +349,7 @@
   }
 </script>
 
-<Modal onClose={onClose} onKeydown={handleKeydown}>
+<Modal onClose={() => { if (!showTagCleanup) onClose(); }} onKeydown={handleKeydown}>
     <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
       <div class="flex items-center gap-2">
         <Sliders class="w-4 h-4 text-brand-accent-text" />
@@ -625,7 +630,19 @@
     </div>
 
     <div class="h-16 flex items-center justify-between px-6 border-t border-brand-border shrink-0 bg-brand-main">
-      <div></div>
+      <div>
+        {#if songId != null && !isRemoteSource && !isCueTrack}
+          <Button
+            onclick={() => { showTagCleanup = true; }}
+            disabled={isLoading || !!errorMsg || isSaving}
+            variant="secondary"
+            size="sm"
+          >
+            <Broom class="w-3.5 h-3.5" />
+            {i18n.t('tagCleanup.action')}
+          </Button>
+        {/if}
+      </div>
 
       <div class="flex items-center gap-2">
         <Button onclick={onClose} disabled={isSaving} variant="secondary" size="sm">
@@ -643,6 +660,13 @@
       </div>
     </div>
 </Modal>
+
+{#if showTagCleanup && songId != null}
+  <TagCleanupDialog
+    songIds={[songId]}
+    onClose={() => { showTagCleanup = false; }}
+  />
+{/if}
 
 {#if showClearArtConfirm}
   <ConfirmDialog

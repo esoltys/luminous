@@ -37,7 +37,7 @@ const SCAN_PROGRESS_INTERVAL: usize = 50;
 /// Thread count for the scan's parallel tag-reading pool. Leaves headroom
 /// below the machine's full core count so a scan doesn't compete with the
 /// audio playback thread or background analysis for CPU.
-fn scan_thread_count() -> usize {
+pub(crate) fn scan_thread_count() -> usize {
     std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)

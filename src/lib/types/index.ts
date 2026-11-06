@@ -1401,3 +1401,44 @@ export interface CurationOverview {
 }
 
 
+
+/** Kind of removable tag cruft (#1939); mirrors `luminous_metadata::CruftKind`. */
+export type CruftKind =
+  | "promo_comment"
+  | "encoder"
+  | "encoded_by"
+  | "itunes_normalization"
+  | "id3v1_duplicate";
+
+/** One removable tag field and its current value. */
+export interface CruftField {
+  kind: CruftKind;
+  value: string;
+}
+
+/** A song's removable fields, from `preview_tag_cleanup`. */
+export interface SongCruft {
+  song_id: number;
+  title: string;
+  artist: string;
+  fields: CruftField[];
+}
+
+export interface TagCleanupPreview {
+  /** Only songs with something to remove. */
+  songs: SongCruft[];
+  /** Songs that couldn't be checked: CUE-sheet, remote or unreadable. */
+  skipped: number;
+}
+
+/** The fields to remove from one song. */
+export interface TagCleanupSelection {
+  song_id: number;
+  fields: CruftField[];
+}
+
+export interface TagCleanupResult {
+  cleaned_songs: number;
+  removed_fields: number;
+  errors: string[];
+}

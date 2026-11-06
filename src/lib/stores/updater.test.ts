@@ -182,7 +182,7 @@ describe("UpdaterStore", () => {
       expect(variant).toBe("success");
       expect(durationMs).toBeUndefined();
       expect(url).toBeUndefined();
-      expect(action).toEqual({ label: expect.any(String), onClick: expect.any(Function) });
+      expect(action).toEqual({ label: expect.any(String), onClick: expect.any(Function), icon: "refresh" });
     });
 
     it("wires the toast's restart action to restartNow(), which installs then relaunches", async () => {

@@ -9,6 +9,9 @@
   import Button from "./Button.svelte";
   import Toggle from "./Toggle.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import TagCleanupDialog from "./TagCleanupDialog.svelte";
+  import { tagCleanupStore } from "../stores/tagCleanup.svelte";
+  import { onDestroy } from "svelte";
   import { EraserIcon as Eraser, ArrowsClockwiseIcon as RefreshCw, BroomIcon as Broom, StarIcon as Star } from "phosphor-svelte";
 
   const PRUNE_MESSAGE_DURATION_MS = 8000;
@@ -22,6 +25,9 @@
   let organizeIsApplying = $state(false);
   let organizeApplyRequestKey = $state(0);
   let showConfirmAutoOrganize = $state(false);
+
+  // Leaving Organize with the tag review open sends its check to the background.
+  onDestroy(() => { if (tagCleanupStore.reviewOpen) tagCleanupStore.close(); });
 
   function handleToggleAutoOrganize(enabled: boolean) {
     if (enabled) {
@@ -125,7 +131,7 @@
         onChanged={() => { organizeRefreshKey++; }}
       />
 
-      <!-- Lightweight inline maintenance action — deliberately not its own bordered card. -->
+      <!-- Lightweight inline maintenance actions — deliberately not their own bordered card. -->
       <div class="max-w-3xl mx-auto flex flex-wrap items-center gap-3 px-1">
         <Button onclick={handlePruneMissing} disabled={collectionStore.isScanning} variant="secondary" size="sm">
           <Eraser class="w-4 h-4" />
@@ -137,9 +143,20 @@
           <span class="text-xs text-brand-accent-text font-medium transition-all">{pruneMsg}</span>
         {/if}
       </div>
+      <div class="max-w-3xl mx-auto flex flex-wrap items-center gap-3 px-1">
+        <Button onclick={() => tagCleanupStore.start()} disabled={collectionStore.isScanning || tagCleanupStore.removing} variant="secondary" size="sm">
+          <Broom class="w-4 h-4" />
+          {i18n.t('tagCleanup.action')}
+        </Button>
+        <span class="text-xs text-brand-text-secondary">{i18n.t('tagCleanup.hint')}</span>
+      </div>
     </div>
   </div>
 </div>
+
+{#if tagCleanupStore.reviewOpen}
+  <TagCleanupDialog songIds={[]} onClose={() => tagCleanupStore.close()} />
+{/if}
 
 {#if showConfirmAutoOrganize}
   <ConfirmDialog

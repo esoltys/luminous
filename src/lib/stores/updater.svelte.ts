@@ -293,6 +293,7 @@ class UpdaterStore {
         {
           label: i18n.t("settings.updateRestartBtn", {}, "Restart to Update"),
           onClick: () => this.restartNow(),
+          icon: "refresh",
         }
       );
     } catch (err: unknown) {
