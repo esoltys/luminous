@@ -21,7 +21,7 @@ Luminous is a fast, local-first player for your own audio library. Built for any
 
 **[Issues](https://github.com/esoltys/luminous/issues)** - file a bug report or a feature request
 
-**[Luminous Discussion](https://www.reddit.com/r/LuminousMusicPlayer/)** - announcements, general discussion, Q&A, Show and Tell
+**[r/LuminousMusicPlayer](https://www.reddit.com/r/LuminousMusicPlayer/)** - announcements, general discussion, Q&A
 
 Luminous doesn't accept PRs as this is a hobby project that I enjoy working on in my spare time.
 
