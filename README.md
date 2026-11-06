@@ -79,7 +79,6 @@ Ensure the required build tools, GTK, WebKit, ALSA, and SSL development headers 
 
 ```bash
 bun install
-bun run install:git-hooks # sets core.hooksPath to use the repository's tracked .githooks/pre-commit hook
 bun run tauri dev
 ```
 #### 4. Build Production Bundle
@@ -158,6 +157,8 @@ Luminous's `tauri.conf.json` has `bundle.createUpdaterArtifacts` set to `true`, 
 
 Luminous uses automated tests at both the frontend (Svelte 5) and backend (Rust) layers.
 
+`bun run check` and `bun run lint:ast` run the type checks, lints and architecture rules CI enforces.
+
 ### Frontend Unit & Integration Tests (Vitest)
 
 Frontend tests are written with Vitest and test component rendering, Svelte 5 stores, and state updates with mocked Tauri APIs.
@@ -174,3 +175,13 @@ To run the backend unit and integration test suite:
 cargo test --workspace
 ```
 This runs unit tests across all workspace crates and integration tests under `src-tauri/tests/`.
+
+### Formal Proofs (Lean)
+
+Machine-checked Lean models of the player and playlist state machines live in [`verification/lean/`](verification/lean/README.md). Install [elan](https://github.com/leanprover/elan) (the toolchain is pinned in `lean-toolchain`), then:
+```bash
+cd verification/lean
+lake build --wfail
+```
+
+More detail: [Testing](docs/TESTING.md), [Performance](docs/PERFORMANCE.md), [Troubleshooting](docs/TROUBLESHOOTING.md), [CI](docs/CI.md).

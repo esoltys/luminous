@@ -284,6 +284,13 @@ Every point is a scratch-profile run, the mean of the newest two for that versio
   scanner (batched at 300 songs/chunk) are already bounded by design and are not expected to be
   concerns.
 
+## Frontend benchmarks (Vitest)
+
+`bun run test:perf` runs the `src/**/*.benchmark.ts` files with `vite.perf.config.js`. Today that's
+`CollectionView.benchmark.ts`, which loads 100,000 mocked tracks and fails if filtering or sorting
+averages 500 ms or more. CI doesn't run it; run it by hand before and after a change to the
+collection view.
+
 ## Tokio scheduler diagnostics (tokio-console)
 
 Tracks scheduler-level questions the memory baseline above can't answer — is an `AppState`
