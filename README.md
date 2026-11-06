@@ -44,7 +44,7 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 - **Lyrics**: time-synced line by line or word by word, with inline editing and a miniplayer
 - **Tagging and organizing**: tag editor for single or bulk edits (with MusicBrainz Picard handoff) and automatic file organization from your own naming template
 - **Loves, ratings and stats**: 1–5 stars and loves synced with ListenBrainz, Last.fm scrobbling, listening streaks and top artists
-- **Your choice of look**: preset and cover-art-driven themes, seven languages, portable mode
+- **Themes and languages**: preset and cover-art-driven themes, seven languages, portable mode
 
 See the [release notes](https://github.com/esoltys/luminous/releases) for what's new in each version.
 
