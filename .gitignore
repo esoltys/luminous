@@ -49,3 +49,6 @@ vite.config.ts.timestamp-*
 /static/fonts/
 /static/assets/
 
+
+# Written by `bun run test:perf` (src/lib/components/CollectionView.benchmark.ts)
+/docs/BENCHMARK.md
