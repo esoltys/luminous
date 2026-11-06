@@ -123,7 +123,7 @@ bun run tauri build
 
 ### Environment Variables
 
-None are needed for `bun run tauri dev`. Set them in your shell before building; nothing reads a `.env` file. The API keys are compiled in when set at build time and can also be overridden at runtime.
+None are needed for `bun run tauri dev`. Set them in your shell before building; nothing reads a `.env` file. The API keys are compiled in when set at build time and can also be overridden at runtime; a key entered in the app's Settings takes priority over both.
 
 | Variable | Used for | If unset |
 | --- | --- | --- |

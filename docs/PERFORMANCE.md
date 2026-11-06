@@ -288,8 +288,8 @@ Every point is a scratch-profile run, the mean of the newest two for that versio
 
 `bun run test:perf` runs the `src/**/*.benchmark.ts` files with `vite.perf.config.js`. Today that's
 `CollectionView.benchmark.ts`, which loads 100,000 mocked tracks and fails if filtering or sorting
-averages 500 ms or more. Results are written to `docs/BENCHMARK.md` (gitignored). CI doesn't run it; run it by hand before and after a change to the
-collection view.
+averages 500 ms or more. Results are written to `docs/BENCHMARK.md` (gitignored). CI doesn't run
+it; run it by hand before and after a change to the collection view.
 
 ## Tokio scheduler diagnostics (tokio-console)
 
