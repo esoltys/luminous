@@ -2321,7 +2321,7 @@ export const uk = {
       other: "{count} пісні очікує на теги або перевірку"
     },
     filterAll: "Усі ({count})",
-    filterReady: "Готові до розміщення ({count})",
+    filterReady: "Готові до переміщення ({count})",
     filterNeedsTags: "Потрібні теги ({count})",
     filterDuplicates: "Дублікати ({count})",
     filterErrors: "Помилки ({count})",

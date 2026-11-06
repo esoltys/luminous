@@ -2165,7 +2165,7 @@ export const es = {
       other: "{count} canciones esperando etiquetas o revisión"
     },
     filterAll: "Todo ({count})",
-    filterReady: "Listo para ubicar ({count})",
+    filterReady: "Listo para mover ({count})",
     filterNeedsTags: "Faltan etiquetas ({count})",
     filterDuplicates: "Copias duplicadas ({count})",
     filterErrors: "Errores ({count})",

@@ -2173,7 +2173,7 @@ export const fr: DeepStringRecord<typeof en> = {
       other: "{count} morceaux en attente d'étiquettes ou de révision"
     },
     filterAll: "Tous ({count})",
-    filterReady: "Prêts à placer ({count})",
+    filterReady: "Prêts à déplacer ({count})",
     filterNeedsTags: "Étiquettes requises ({count})",
     filterDuplicates: "Doublons ({count})",
     filterErrors: "Erreurs ({count})",

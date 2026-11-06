@@ -2165,7 +2165,7 @@ export const it = {
       other: "{count} brani in attesa di tag o revisione"
     },
     filterAll: "Tutti ({count})",
-    filterReady: "Pronti da posizionare ({count})",
+    filterReady: "Pronti da spostare ({count})",
     filterNeedsTags: "Tag mancanti ({count})",
     filterDuplicates: "Copie duplicate ({count})",
     filterErrors: "Errori ({count})",

@@ -2165,7 +2165,7 @@ export const en = {
       other: "{count} songs waiting on tags or review"
     },
     filterAll: "All ({count})",
-    filterReady: "Ready to Place ({count})",
+    filterReady: "Ready to Move ({count})",
     filterNeedsTags: "Needs Tags ({count})",
     filterDuplicates: "Duplicate Copies ({count})",
     filterErrors: "Errors ({count})",
