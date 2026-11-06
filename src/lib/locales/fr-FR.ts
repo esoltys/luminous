@@ -2091,6 +2091,26 @@ export const frFR: DeepStringRecord<typeof en> = {
   osNotification: {
     appUpdated: "Luminous a été mis à jour vers la v{version}"
   },
+  tagCleanup: {
+    action: "Nettoyer les étiquettes…",
+    title: "Nettoyer les étiquettes",
+    checking: "Vérification des étiquettes…",
+    intro: "Décochez ce que vous voulez garder. Le titre, l'artiste, l'album, les paroles, la pochette et les autres étiquettes principales ne sont jamais modifiés.",
+    nothingFound: "Aucune étiquette superflue trouvée.",
+    skipped: "Pistes qui n'ont pas pu être vérifiées (fiche CUE, fichiers distants ou illisibles) : {count}",
+    kindPromoComment: "Commentaire promotionnel",
+    kindEncoder: "Encodeur",
+    kindEncodedBy: "Encodé par",
+    kindItunesNormalization: "Données de volume iTunes",
+    kindId3v1Duplicate: "Ancienne étiquette ID3v1",
+    removeBtn: "Supprimer la sélection",
+    removing: "Suppression…",
+    cancelBtn: "Annuler",
+    closeBtn: "Fermer",
+    done: "Nettoyage des étiquettes terminé. Champs supprimés : {count} ; pistes nettoyées : {songs}",
+    partialErrors: "Fichiers qui n'ont pas pu être nettoyés : {count}",
+    failedPrefix: "Échec du nettoyage des étiquettes : ",
+  },
   organizer: {
     chipAlbumArtist: "Artiste de l'album",
     chipArtist: "Artiste",
