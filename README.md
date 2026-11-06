@@ -36,7 +36,7 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 
 ## Features
 
-- **Your library, fast**: indexes local folders with instant search, including `field:value` syntax (e.g. `genre:rock`) you can save as smart playlists
+- **Library**: indexes local folders with instant search, including `field:value` syntax (e.g. `genre:rock`) you can save as smart playlists
 - **Playback**: gapless MP3, FLAC, Opus, WAV and more; 10-band graphic and 20-band parametric EQ with AutoEq headphone profiles; ASIO output on Windows
 - **Remote sources**: OpenSubsonic servers (Navidrome, Gonic, …) and WebDAV, synced into the same library
 - **Playlists**: smart and auto playlists (decades, genres, BPM), Song and Artist Radio built from your own library, custom genre hierarchies
