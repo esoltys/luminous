@@ -11,9 +11,9 @@
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
-  import { i18n } from "../stores/i18n.svelte";
+  import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import type { CruftKind, TagCleanupPreview, TagCleanupResult } from "../types";
+  import type { CruftField, CruftKind, TagCleanupPreview, TagCleanupResult } from "../types";
 
   interface Props {
     /** Songs to check; empty means the whole local library. */
@@ -33,22 +33,63 @@
     id3v1_duplicate: "tagCleanup.kindId3v1Duplicate",
   };
 
+  /** Section order: the fields most likely to be someone's note first. */
+  const KIND_ORDER: CruftKind[] = ["promo_comment", "encoded_by", "encoder", "itunes_normalization", "id3v1_duplicate"];
+
+  /**
+   * Kinds whose value is one row per track (an ID3v1 summary, an iTunNORM hex
+   * blob) collapse into a single row with an explanation; the rest get one
+   * row per distinct value.
+   */
+  const KIND_DESCRIPTION_KEYS: Partial<Record<CruftKind, string>> = {
+    itunes_normalization: "tagCleanup.itunesNormalizationDesc",
+    id3v1_duplicate: "tagCleanup.id3v1DuplicateDesc",
+  };
+
+  interface CruftGroup {
+    key: string;
+    kind: CruftKind;
+    /** `null` for collapsed kinds. */
+    value: string | null;
+    entries: { songId: number; field: CruftField }[];
+  }
+
   let preview = $state<TagCleanupPreview | null>(null);
   let errorMsg = $state<string | null>(null);
   let isApplying = $state(false);
   let progress = $state<{ checked: number; total: number } | null>(null);
-  /** Keys (`songId:fieldIndex`) of fields the user unticked; everything else is removed. */
+  /** Keys of groups the user unticked; every other group is removed. */
   let kept = $state<Record<string, boolean>>({});
 
-  const fieldKey = (songId: number, index: number) => `${songId}:${index}`;
+  let sections = $derived.by(() => {
+    const groups = new Map<string, CruftGroup>();
+    for (const song of preview?.songs ?? []) {
+      for (const field of song.fields) {
+        const collapsed = field.kind in KIND_DESCRIPTION_KEYS;
+        const key = collapsed ? field.kind : `${field.kind}\u0000${field.value}`;
+        let group = groups.get(key);
+        if (!group) {
+          group = { key, kind: field.kind, value: collapsed ? null : field.value, entries: [] };
+          groups.set(key, group);
+        }
+        group.entries.push({ songId: song.song_id, field });
+      }
+    }
+    return KIND_ORDER.map((kind) => ({
+      kind,
+      groups: [...groups.values()]
+        .filter((g) => g.kind === kind)
+        .sort((a, b) => b.entries.length - a.entries.length || (a.value ?? "").localeCompare(b.value ?? "")),
+    })).filter((section) => section.groups.length > 0);
+  });
 
   let selectedCount = $derived(
-    preview?.songs.reduce(
-      (total, song) => total + song.fields.filter((_, i) => !kept[fieldKey(song.song_id, i)]).length,
+    sections.reduce(
+      (total, section) =>
+        total + section.groups.reduce((n, g) => n + (kept[g.key] ? 0 : g.entries.length), 0),
       0,
-    ) ?? 0,
+    ),
   );
-  let showSongHeadings = $derived((preview?.songs.length ?? 0) > 1 || songIds.length !== 1);
 
   onMount(() => {
     const unlisten = listen<{ checked: number; total: number }>("tag-cleanup-progress", (event) => {
@@ -67,10 +108,16 @@
   async function handleApply() {
     if (!preview || selectedCount === 0) return;
     isApplying = true;
-    const selections = preview.songs.map((song) => ({
-      song_id: song.song_id,
-      fields: song.fields.filter((_, i) => !kept[fieldKey(song.song_id, i)]),
-    }));
+    const bySong = new Map<number, CruftField[]>();
+    for (const section of sections) {
+      for (const group of section.groups) {
+        if (kept[group.key]) continue;
+        for (const { songId, field } of group.entries) {
+          bySong.set(songId, [...(bySong.get(songId) ?? []), field]);
+        }
+      }
+    }
+    const selections = [...bySong].map(([song_id, fields]) => ({ song_id, fields }));
     try {
       const result = await invoke<TagCleanupResult>("apply_tag_cleanup", { selections });
       if (result.cleaned_songs > 0) {
@@ -128,27 +175,31 @@
     {:else}
       <p class="text-brand-text-secondary mb-4">{i18n.t("tagCleanup.intro")}</p>
       <div class="flex flex-col gap-4">
-        {#each preview.songs as song (song.song_id)}
+        {#each sections as section (section.kind)}
           <section class="flex flex-col gap-1.5">
-            {#if showSongHeadings}
-              <h4 class="font-semibold text-brand-text-primary truncate">
-                {song.title}{#if song.artist}<span class="font-normal text-brand-text-secondary"> — {song.artist}</span>{/if}
-              </h4>
-            {/if}
-            {#each song.fields as field, i (i)}
-              {@const key = fieldKey(song.song_id, i)}
+            <h4 class="font-semibold text-brand-text-primary">{i18n.t(KIND_LABEL_KEYS[section.kind])}</h4>
+            {#each section.groups as group (group.key)}
+              {@const descriptionKey = KIND_DESCRIPTION_KEYS[group.kind]}
               <label class="flex items-start gap-2.5 rounded-lg border border-brand-border bg-brand-main px-3 py-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  class="mt-0.5 accent-brand-accent"
-                  checked={!kept[key]}
+                  class="mt-0.5 rounded accent-brand-accent"
+                  checked={!kept[group.key]}
                   disabled={isApplying}
-                  onchange={(e) => { kept[key] = !(e.currentTarget as HTMLInputElement).checked; }}
+                  onchange={(e) => { kept[group.key] = !(e.currentTarget as HTMLInputElement).checked; }}
                 />
-                <span class="flex flex-col gap-0.5 min-w-0">
-                  <span class="font-medium text-brand-text-primary">{i18n.t(KIND_LABEL_KEYS[field.kind])}</span>
-                  <span class="text-brand-text-secondary break-all select-text">{field.value}</span>
+                <span class="flex-1 min-w-0 break-all select-text {group.value === '' ? 'italic text-brand-text-secondary' : 'text-brand-text-primary'}">
+                  {#if descriptionKey}
+                    {i18n.t(descriptionKey)}
+                  {:else if group.value === ""}
+                    {i18n.t("tagCleanup.emptyValue")}
+                  {:else}
+                    {group.value}
+                  {/if}
                 </span>
+                {#if group.entries.length > 1}
+                  <span class="shrink-0 tabular-nums text-brand-text-secondary">×{formatNumber(group.entries.length)}</span>
+                {/if}
               </label>
             {/each}
           </section>

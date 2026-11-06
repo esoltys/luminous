@@ -24,8 +24,7 @@
     CopySimpleIcon as Duplicate,
     XCircleIcon as ErrorIcon,
     PencilSimpleIcon as Edit3,
-    ArrowSquareOutIcon as OpenInPicard,
-    BroomIcon as Broom
+    ArrowSquareOutIcon as OpenInPicard
   } from "phosphor-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import Toggle from "./Toggle.svelte";
@@ -35,7 +34,6 @@
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import TagEditor from "./TagEditor.svelte";
-  import TagCleanupDialog from "./TagCleanupDialog.svelte";
   import ViewInFilesItem from "./ViewInFilesItem.svelte";
   import DuplicateReviewModal from "./DuplicateReviewModal.svelte";
 
@@ -452,7 +450,6 @@
 
   let isConfigExpanded = $state(false);
   let editingSongId = $state<number | null>(null);
-  let showTagCleanup = $state(false);
   let reviewDuplicateSongId = $state<number | null>(null);
   let contextMenu = $state<{ x: number; y: number; item: OrganizePreviewItem } | null>(null);
 
@@ -968,16 +965,6 @@
           {/if}
 
           <Button
-            onclick={() => { showTagCleanup = true; }}
-            variant="secondary"
-            size="sm"
-            class="gap-1.5"
-          >
-            <Broom class="w-3.5 h-3.5" />
-            {i18n.t("tagCleanup.action")}
-          </Button>
-
-          <Button
             onclick={fetchPreview}
             variant="secondary"
             size="sm"
@@ -1400,10 +1387,6 @@
       onClose={() => { editingSongId = null; }}
       onSave={handleTagEditorSaved}
     />
-  {/if}
-
-  {#if showTagCleanup}
-    <TagCleanupDialog songIds={activeSongIds} onClose={() => { showTagCleanup = false; }} />
   {/if}
 
   {#if reviewDuplicateSongId !== null}
