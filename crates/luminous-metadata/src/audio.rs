@@ -242,8 +242,16 @@ pub fn read_tags(path: &Path) -> Result<AudioFileMetadata> {
         if meta.genre.is_none() {
             meta.genre = read_multi_value(tag, ItemKey::Genre);
         }
+        // Only a comment with no description is the user-facing comment: ID3v2
+        // `COMM` frames with a description (iTunes' `iTunNORM`/`iTunSMPB` hex
+        // blobs) also surface as `ItemKey::Comment`, and `tag.comment()` would
+        // return whichever came first.
         if meta.comment.is_none() {
-            meta.comment = tag.comment().map(|c| c.to_string());
+            meta.comment = tag
+                .items()
+                .find(|item| item.key() == ItemKey::Comment && item.description().is_empty())
+                .and_then(|item| item.value().text())
+                .map(str::to_string);
         }
         // `date()` checks ItemKey::RecordingDate (ID3v2 TDRC, MP4, Vorbis DATE)
         // before falling back to ItemKey::Year (ID3v1 only) — using Year alone
@@ -824,11 +832,24 @@ fn save_tagged_file_with_retry(
     path: &Path,
     action: &str,
 ) -> Result<()> {
+    save_with_retry(path, action, || {
+        tagged_file.save_to_path(path, WriteOptions::default())
+    })
+}
+
+/// Runs `save` (a write of `path`), clearing a read-only attribute first and
+/// retrying up to 5 times with a short delay, since the write can transiently
+/// fail while another process (e.g. an antivirus scanner) has the file open.
+pub(crate) fn save_with_retry<E: std::error::Error>(
+    path: &Path,
+    action: &str,
+    mut save: impl FnMut() -> std::result::Result<(), E>,
+) -> Result<()> {
     ensure_writable(path);
 
     let mut attempts = 0;
     loop {
-        match tagged_file.save_to_path(path, WriteOptions::default()) {
+        match save() {
             Ok(_) => break,
             Err(e) => {
                 attempts += 1;
