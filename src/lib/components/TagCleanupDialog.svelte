@@ -115,7 +115,7 @@
         <p class="text-brand-text-primary">{i18n.t("tagCleanup.failedPrefix")}{errorMsg}</p>
       </div>
     {:else if !preview}
-      <div class="py-12 flex justify-center">
+      <div class="py-12 flex flex-col items-center justify-center gap-3">
         <LoadingSpinner
           label={progress && progress.total > 1
             ? i18n.t("tagCleanup.checkingProgress", { checked: progress.checked, total: progress.total })
