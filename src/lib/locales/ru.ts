@@ -2259,6 +2259,9 @@ export const ru = {
     done: "Очистка тегов завершена. Удалено полей: {count}; очищено композиций: {songs}",
     partialErrors: "Файлы, которые не удалось очистить: {count}",
     failedPrefix: "Не удалось очистить теги: ",
+    backgroundBtn: "Выполнять в фоне",
+    readyToReview: "Проверка тегов завершена. Композиции с лишними тегами: {count}",
+    reviewBtn: "Проверить",
   },
   organizer: {
     chipAlbumArtist: "Исполнитель альбома",

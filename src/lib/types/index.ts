@@ -1431,6 +1431,12 @@ export interface TagCleanupPreview {
   skipped: number;
 }
 
+/** The fields to remove from one song. */
+export interface TagCleanupSelection {
+  song_id: number;
+  fields: CruftField[];
+}
+
 export interface TagCleanupResult {
   cleaned_songs: number;
   removed_fields: number;

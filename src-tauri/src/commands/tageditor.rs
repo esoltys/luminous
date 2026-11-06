@@ -1139,12 +1139,15 @@ mod tests {
 /// Lists removable tag cruft (promotional comments, encoder banners,
 /// `iTunNORM`, duplicate ID3v1 tags) in `song_ids`' files, or in the whole
 /// local library when empty (#1939). Writes nothing.
-/// Bumped by each preview and by `cancel_tag_cleanup`; a preview stops as
-/// soon as it's no longer the latest, so a closed dialog doesn't leave a
-/// library-wide scan reading files for minutes.
+/// Bumped by `cancel_tag_cleanup`; a library-wide preview stops as soon as it
+/// changes, so the user can call off a scan that reads every file.
 static TAG_CLEANUP_GENERATION: AtomicU64 = AtomicU64::new(0);
 
-/// Emits `tag-cleanup-progress` (`{ checked, total }`) as files are read.
+/// An empty `song_ids` checks the whole library: that runs as a background
+/// task, emitting `tag-cleanup-progress` (`{ checked, total }`) as files are
+/// read and stopping on `cancel_tag_cleanup`. A list of songs is checked
+/// quietly and can't be cancelled, so a single-track check from the tag
+/// editor never disturbs a library scan in progress.
 #[tauri::command]
 pub async fn preview_tag_cleanup(
     app: AppHandle,
@@ -1152,9 +1155,13 @@ pub async fn preview_tag_cleanup(
     song_ids: Vec<i64>,
 ) -> Result<tag_cleanup::TagCleanupPreview, String> {
     let db = Arc::clone(&state.db);
-    let generation = TAG_CLEANUP_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+    let library = song_ids.is_empty();
+    let generation = TAG_CLEANUP_GENERATION.load(Ordering::SeqCst);
     tauri::async_runtime::spawn_blocking(move || {
         tag_cleanup::preview(&db, &song_ids, |checked, total| {
+            if !library {
+                return true;
+            }
             let _ = app.emit(
                 "tag-cleanup-progress",
                 serde_json::json!({ "checked": checked, "total": total }),
@@ -1166,14 +1173,15 @@ pub async fn preview_tag_cleanup(
     .map_err(|e| e.to_string())?
 }
 
-/// Stops a running `preview_tag_cleanup` (the review dialog was closed).
+/// Stops a running library-wide `preview_tag_cleanup`.
 #[tauri::command]
 pub async fn cancel_tag_cleanup() -> Result<(), String> {
     TAG_CLEANUP_GENERATION.fetch_add(1, Ordering::SeqCst);
     Ok(())
 }
 
-/// Removes the fields the user kept ticked in the clean-up review (#1939).
+/// Removes the fields the user kept ticked in the clean-up review (#1939),
+/// emitting `tag-cleanup-apply-progress` (`{ done, total }`) as it goes.
 #[tauri::command]
 pub async fn apply_tag_cleanup(
     app: AppHandle,
@@ -1184,8 +1192,19 @@ pub async fn apply_tag_cleanup(
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
     let db = Arc::clone(&state.db);
     let self_writes = Arc::clone(&state.self_writes);
+    let progress_app = app.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        tag_cleanup::apply(&db, &self_writes, &selections)
+        let mut last_emit = std::time::Instant::now();
+        tag_cleanup::apply(&db, &self_writes, &selections, |done, total| {
+            // Each write is a round trip on a network share; a few updates a second is plenty.
+            if done == total || last_emit.elapsed() >= std::time::Duration::from_millis(250) {
+                last_emit = std::time::Instant::now();
+                let _ = progress_app.emit(
+                    "tag-cleanup-apply-progress",
+                    serde_json::json!({ "done": done, "total": total }),
+                );
+            }
+        })
     })
     .await
     .map_err(|e| e.to_string())??;

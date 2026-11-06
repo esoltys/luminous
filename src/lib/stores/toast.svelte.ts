@@ -8,6 +8,8 @@ type MilestoneIcon = "checks" | "flag" | "star" | "sparkle";
 interface ToastAction {
   label: string;
   onClick: () => void;
+  /** `refresh` (the default) suits retry/restart actions; `none` suits opening something. */
+  icon?: "refresh" | "none";
 }
 
 interface ToastTaskData {

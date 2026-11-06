@@ -2107,6 +2107,9 @@ export const es = {
     done: "Limpieza de etiquetas terminada. Campos quitados: {count}; pistas limpiadas: {songs}",
     partialErrors: "Archivos que no se pudieron limpiar: {count}",
     failedPrefix: "Error al limpiar las etiquetas: ",
+    backgroundBtn: "Ejecutar en segundo plano",
+    readyToReview: "Comprobación terminada. Pistas con etiquetas sobrantes: {count}",
+    reviewBtn: "Revisar",
   },
   organizer: {
     chipAlbumArtist: "Artista del álbum",

@@ -2107,6 +2107,9 @@ export const en = {
     done: "Tag clean-up done. Fields removed: {count}; tracks cleaned: {songs}",
     partialErrors: "Files that couldn't be cleaned: {count}",
     failedPrefix: "Tag clean-up failed: ",
+    backgroundBtn: "Run in Background",
+    readyToReview: "Tag check done. Tracks with clutter: {count}",
+    reviewBtn: "Review",
   },
   organizer: {
     chipAlbumArtist: "Album Artist",

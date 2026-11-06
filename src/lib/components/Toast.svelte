@@ -203,9 +203,11 @@
             onclick={() => toast.action!.onClick()}
             variant="primary"
             size="sm"
-            class="shrink-0"
+            class="shrink-0 -my-1.5"
           >
-            <RefreshCw class="w-3.5 h-3.5" />
+            {#if toast.action.icon !== "none"}
+              <RefreshCw class="w-3.5 h-3.5" />
+            {/if}
             {toast.action.label}
           </Button>
         {/if}

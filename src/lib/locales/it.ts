@@ -2107,6 +2107,9 @@ export const it = {
     done: "Pulizia dei tag completata. Campi rimossi: {count}; tracce ripulite: {songs}",
     partialErrors: "File che non è stato possibile ripulire: {count}",
     failedPrefix: "Impossibile ripulire i tag: ",
+    backgroundBtn: "Esegui in background",
+    readyToReview: "Controllo completato. Tracce con tag superflui: {count}",
+    reviewBtn: "Esamina",
   },
   organizer: {
     chipAlbumArtist: "Artista dell'album",

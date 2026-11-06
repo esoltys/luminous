@@ -10,6 +10,8 @@
   import Toggle from "./Toggle.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import TagCleanupDialog from "./TagCleanupDialog.svelte";
+  import { tagCleanupStore } from "../stores/tagCleanup.svelte";
+  import { onDestroy } from "svelte";
   import { EraserIcon as Eraser, ArrowsClockwiseIcon as RefreshCw, BroomIcon as Broom, StarIcon as Star } from "phosphor-svelte";
 
   const PRUNE_MESSAGE_DURATION_MS = 8000;
@@ -23,7 +25,9 @@
   let organizeIsApplying = $state(false);
   let organizeApplyRequestKey = $state(0);
   let showConfirmAutoOrganize = $state(false);
-  let showTagCleanup = $state(false);
+
+  // Leaving Organize with the tag review open sends its check to the background.
+  onDestroy(() => { if (tagCleanupStore.reviewOpen) tagCleanupStore.close(); });
 
   function handleToggleAutoOrganize(enabled: boolean) {
     if (enabled) {
@@ -140,7 +144,7 @@
         {/if}
       </div>
       <div class="max-w-3xl mx-auto flex flex-wrap items-center gap-3 px-1">
-        <Button onclick={() => { showTagCleanup = true; }} disabled={collectionStore.isScanning} variant="secondary" size="sm">
+        <Button onclick={() => tagCleanupStore.start()} disabled={collectionStore.isScanning || tagCleanupStore.removing} variant="secondary" size="sm">
           <Broom class="w-4 h-4" />
           {i18n.t('tagCleanup.action')}
         </Button>
@@ -150,8 +154,8 @@
   </div>
 </div>
 
-{#if showTagCleanup}
-  <TagCleanupDialog songIds={[]} onClose={() => { showTagCleanup = false; }} />
+{#if tagCleanupStore.reviewOpen}
+  <TagCleanupDialog songIds={[]} onClose={() => tagCleanupStore.close()} />
 {/if}
 
 {#if showConfirmAutoOrganize}

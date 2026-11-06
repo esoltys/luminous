@@ -2115,6 +2115,9 @@ export const frFR: DeepStringRecord<typeof en> = {
     done: "Nettoyage des balises terminé. Champs supprimés : {count} ; pistes nettoyées : {songs}",
     partialErrors: "Fichiers qui n'ont pas pu être nettoyés : {count}",
     failedPrefix: "Échec du nettoyage des balises : ",
+    backgroundBtn: "Exécuter en arrière-plan",
+    readyToReview: "Vérification terminée. Pistes avec des balises superflues : {count}",
+    reviewBtn: "Examiner",
   },
   organizer: {
     chipAlbumArtist: "Artiste de l'album",

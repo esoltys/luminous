@@ -2259,6 +2259,9 @@ export const uk = {
     done: "Очищення тегів завершено. Видалено полів: {count}; очищено композицій: {songs}",
     partialErrors: "Файли, які не вдалося очистити: {count}",
     failedPrefix: "Не вдалося очистити теги: ",
+    backgroundBtn: "Виконувати у фоні",
+    readyToReview: "Перевірку тегів завершено. Композиції із зайвими тегами: {count}",
+    reviewBtn: "Перевірити",
   },
   organizer: {
     chipAlbumArtist: "Виконавець альбому",

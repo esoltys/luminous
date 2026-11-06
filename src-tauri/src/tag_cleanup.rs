@@ -109,10 +109,12 @@ pub fn preview(
 /// Removes the selected fields and refreshes each changed song's stored
 /// comment. A song that fails is reported in `errors` without stopping the
 /// rest; selections for songs that can't be written are ignored.
+/// `on_progress(done, total)` is called after each selection.
 pub fn apply(
     db: &Database,
     self_writes: &SelfWriteTracker,
     selections: &[TagCleanupSelection],
+    mut on_progress: impl FnMut(usize, usize),
 ) -> Result<TagCleanupResult, String> {
     let ids: Vec<i64> = selections.iter().map(|s| s.song_id).collect();
     if ids.is_empty() {
@@ -122,10 +124,12 @@ pub fn apply(
     let conn = db.pool.get().map_err(|e| e.to_string())?;
     let mut result = TagCleanupResult::default();
 
-    for selection in selections.iter().filter(|s| !s.fields.is_empty()) {
+    for (done, selection) in selections.iter().enumerate() {
+        on_progress(done, selections.len());
         let Some(song) = songs
             .iter()
             .find(|s| s.id == selection.song_id && s.writable)
+            .filter(|_| !selection.fields.is_empty())
         else {
             continue;
         };
@@ -147,6 +151,7 @@ pub fn apply(
             Err(e) => result.errors.push(format!("{}: {e:#}", song.path)),
         }
     }
+    on_progress(selections.len(), selections.len());
     Ok(result)
 }
 

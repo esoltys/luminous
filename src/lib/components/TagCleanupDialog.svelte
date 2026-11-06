@@ -1,6 +1,5 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
   import {
     BroomIcon as Broom,
@@ -13,10 +12,14 @@
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { tagCleanupStore } from "../stores/tagCleanup.svelte";
   import type { CruftField, CruftKind, TagCleanupPreview, TagCleanupResult } from "../types";
 
   interface Props {
-    /** Songs to check; empty means the whole local library. */
+    /**
+     * Songs to check. Empty means the whole local library, whose check lives
+     * in `tagCleanupStore` so it can carry on after this dialog closes.
+     */
     songIds: number[];
     onClose: () => void;
   }
@@ -24,6 +27,7 @@
   // The backend emits `library-changed` after a clean-up, so views refresh
   // from that rather than from a callback here.
   let { songIds, onClose }: Props = $props();
+  let library = $derived(songIds.length === 0);
 
   const KIND_LABEL_KEYS: Record<CruftKind, string> = {
     promo_comment: "tagCleanup.kindPromoComment",
@@ -54,10 +58,12 @@
     entries: { songId: number; field: CruftField }[];
   }
 
-  let preview = $state<TagCleanupPreview | null>(null);
-  let errorMsg = $state<string | null>(null);
+  let ownPreview = $state<TagCleanupPreview | null>(null);
+  let ownError = $state<string | null>(null);
+  let preview = $derived(library ? tagCleanupStore.preview : ownPreview);
+  let errorMsg = $derived(library ? tagCleanupStore.error : ownError);
+  let progress = $derived(library ? tagCleanupStore.progress : null);
   let isApplying = $state(false);
-  let progress = $state<{ checked: number; total: number } | null>(null);
   /** Keys of groups the user unticked; every other group is removed. */
   let kept = $state<Record<string, boolean>>({});
 
@@ -92,17 +98,11 @@
   );
 
   onMount(() => {
-    const unlisten = listen<{ checked: number; total: number }>("tag-cleanup-progress", (event) => {
-      progress = event.payload;
-    });
+    // A few files read in a moment, so only the library check needs the store.
+    if (library) return;
     invoke<TagCleanupPreview>("preview_tag_cleanup", { songIds })
-      .then((result) => { preview = result; })
-      .catch((e) => { errorMsg = String(e); });
-    return () => {
-      unlisten.then((fn) => fn());
-      // Closing before the check finishes stops the backend reading files.
-      if (!preview && !errorMsg) invoke("cancel_tag_cleanup").catch(() => {});
-    };
+      .then((result) => { ownPreview = result; })
+      .catch((e) => { ownError = String(e); });
   });
 
   async function handleApply() {
@@ -118,6 +118,10 @@
       }
     }
     const selections = [...bySong].map(([song_id, fields]) => ({ song_id, fields }));
+    if (library) {
+      void tagCleanupStore.remove(selections);
+      return;
+    }
     try {
       const result = await invoke<TagCleanupResult>("apply_tag_cleanup", { selections });
       if (result.cleaned_songs > 0) {
@@ -224,6 +228,11 @@
           {i18n.t("tagCleanup.removeBtn")}
         {/if}
       </Button>
+    {:else if library && !preview && !errorMsg}
+      <Button onclick={() => tagCleanupStore.cancel()} variant="secondary" size="sm">
+        {i18n.t("tagCleanup.cancelBtn")}
+      </Button>
+      <Button onclick={onClose} variant="primary" size="sm">{i18n.t("tagCleanup.backgroundBtn")}</Button>
     {:else}
       <Button onclick={onClose} variant="secondary" size="sm">{i18n.t("tagCleanup.closeBtn")}</Button>
     {/if}

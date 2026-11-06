@@ -96,7 +96,12 @@ fn preview_lists_cruft_skips_cue_tracks_and_apply_refreshes_comment() {
             fields: kept_ticked,
         },
     ];
-    let result = tag_cleanup::apply(&db, &SelfWriteTracker::new(), &selections).unwrap();
+    let mut progress = Vec::new();
+    let result = tag_cleanup::apply(&db, &SelfWriteTracker::new(), &selections, |done, total| {
+        progress.push((done, total))
+    })
+    .unwrap();
+    assert_eq!(progress, vec![(0, 2), (1, 2), (2, 2)]);
     assert_eq!(result.cleaned_songs, 1);
     assert_eq!(result.removed_fields, 2);
     assert!(result.errors.is_empty());
@@ -134,6 +139,6 @@ fn preview_stops_when_progress_says_so() {
 fn empty_selection_is_a_no_op() {
     let temp_dir = tempfile::tempdir().unwrap();
     let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
-    let result = tag_cleanup::apply(&db, &SelfWriteTracker::new(), &[]).unwrap();
+    let result = tag_cleanup::apply(&db, &SelfWriteTracker::new(), &[], |_, _| {}).unwrap();
     assert_eq!(result.cleaned_songs, 0);
 }

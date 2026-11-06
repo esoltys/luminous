@@ -2107,6 +2107,9 @@ export const de = {
     done: "Tag-Bereinigung abgeschlossen. Entfernte Felder: {count}; bereinigte Titel: {songs}",
     partialErrors: "Dateien, die nicht bereinigt werden konnten: {count}",
     failedPrefix: "Fehler beim Bereinigen der Tags: ",
+    backgroundBtn: "Im Hintergrund ausführen",
+    readyToReview: "Tag-Prüfung abgeschlossen. Titel mit überflüssigen Tags: {count}",
+    reviewBtn: "Überprüfen",
   },
   organizer: {
     chipAlbumArtist: "Albuminterpret",

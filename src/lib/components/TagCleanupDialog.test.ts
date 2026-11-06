@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import TagCleanupDialog from "./TagCleanupDialog.svelte";
 import { invoke } from "@tauri-apps/api/core";
+import { tagCleanupStore } from "../stores/tagCleanup.svelte";
 import type { TagCleanupPreview } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -87,7 +88,7 @@ describe("TagCleanupDialog.svelte", () => {
         skipped: 0,
       })
       .mockResolvedValueOnce({ cleaned_songs: 3, removed_fields: 3, errors: [] });
-    const { getByText, getAllByRole, queryByText } = render(TagCleanupDialog, { songIds: [], onClose });
+    const { getByText, getAllByRole, queryByText } = render(TagCleanupDialog, { songIds: [1, 2, 3], onClose });
 
     await waitFor(() => expect(getByText("P.M.I.A")).toBeInTheDocument());
     expect(getAllByRole("checkbox")).toHaveLength(2);
@@ -103,16 +104,22 @@ describe("TagCleanupDialog.svelte", () => {
     });
   });
 
-  it("cancels the check when closed before it finishes", async () => {
+  it("offers to run a library check in the background or cancel it", async () => {
     vi.mocked(invoke).mockReturnValueOnce(new Promise(() => {}));
-    const { unmount } = render(TagCleanupDialog, { songIds: [], onClose: vi.fn() });
-    unmount();
+    tagCleanupStore.start();
+    const onClose = vi.fn();
+    const { getByText } = render(TagCleanupDialog, { songIds: [], onClose });
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("preview_tag_cleanup", { songIds: [] }));
+    await fireEvent.click(getByText("Run in Background"));
+    expect(onClose).toHaveBeenCalled();
+    await fireEvent.click(getByText("Cancel"));
     expect(invoke).toHaveBeenLastCalledWith("cancel_tag_cleanup");
   });
 
   it("says so when there is nothing to clean", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({ songs: [], skipped: 0 });
-    const { getByText, queryByText } = render(TagCleanupDialog, { songIds: [], onClose: vi.fn() });
+    const { getByText, queryByText } = render(TagCleanupDialog, { songIds: [7], onClose: vi.fn() });
 
     await waitFor(() => expect(getByText("No tag clutter found.")).toBeInTheDocument());
     expect(queryByText("Remove Selected")).not.toBeInTheDocument();
