@@ -57,10 +57,12 @@ describe("TagCleanupDialog.svelte", () => {
     await fireEvent.click(getAllByRole("checkbox")[1]);
     await fireEvent.click(getByText("Remove Selected"));
 
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(invoke).toHaveBeenLastCalledWith("apply_tag_cleanup", {
-      selections: [{ song_id: 7, fields: [preview.songs[0].fields[0]] }],
-    });
+    expect(onClose).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("apply_tag_cleanup", {
+        selections: [{ song_id: 7, fields: [preview.songs[0].fields[0]] }],
+      }),
+    );
   });
 
   it("disables removal when everything is unticked", async () => {
@@ -98,10 +100,12 @@ describe("TagCleanupDialog.svelte", () => {
 
     await fireEvent.click(getAllByRole("checkbox")[1]);
     await fireEvent.click(getByText("Remove Selected"));
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(invoke).toHaveBeenLastCalledWith("apply_tag_cleanup", {
-      selections: [1, 2, 3].map((id) => ({ song_id: id, fields: [{ kind: "encoded_by", value: "P.M.I.A" }] })),
-    });
+    expect(onClose).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("apply_tag_cleanup", {
+        selections: [1, 2, 3].map((id) => ({ song_id: id, fields: [{ kind: "encoded_by", value: "P.M.I.A" }] })),
+      }),
+    );
   });
 
   it("offers to run a library check in the background or cancel it", async () => {

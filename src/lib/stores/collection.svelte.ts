@@ -1352,7 +1352,6 @@ class CollectionStore {
       undefined,
       {
         label: i18n.t("safeguard.reviewBtn", {}, "Review"),
-        icon: "none",
         onClick: () => {
           this.activeMassRemovalIncident = incident;
         },

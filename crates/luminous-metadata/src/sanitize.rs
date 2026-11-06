@@ -308,9 +308,11 @@ fn classify_comment(description: &str, text: &str) -> Option<CruftField> {
     if description.len() >= 4 && description[..4].eq_ignore_ascii_case("iTun") {
         return None;
     }
-    is_promotional(text)
-        .then(|| field(CruftKind::PromoComment, text))
-        .flatten()
+    if is_promotional(text) {
+        field(CruftKind::PromoComment, text)
+    } else {
+        None
+    }
 }
 
 fn classify_id3v2(frame: &Frame<'_>) -> Option<CruftField> {

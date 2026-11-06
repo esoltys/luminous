@@ -3,7 +3,6 @@
   import { onMount } from "svelte";
   import {
     BroomIcon as Broom,
-    CircleNotchIcon as LoaderCircle,
     WarningIcon as AlertTriangle,
     XIcon as X,
   } from "phosphor-svelte";
@@ -11,9 +10,8 @@
   import Button from "./Button.svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
-  import { toastStore } from "../stores/toast.svelte";
   import { tagCleanupStore } from "../stores/tagCleanup.svelte";
-  import type { CruftField, CruftKind, TagCleanupPreview, TagCleanupResult } from "../types";
+  import type { CruftField, CruftKind, TagCleanupPreview } from "../types";
 
   interface Props {
     /**
@@ -63,7 +61,6 @@
   let preview = $derived(library ? tagCleanupStore.preview : ownPreview);
   let errorMsg = $derived(library ? tagCleanupStore.error : ownError);
   let progress = $derived(library ? tagCleanupStore.progress : null);
-  let isApplying = $state(false);
   /** Keys of groups the user unticked; every other group is removed. */
   let kept = $state<Record<string, boolean>>({});
 
@@ -107,7 +104,6 @@
 
   async function handleApply() {
     if (!preview || selectedCount === 0) return;
-    isApplying = true;
     const bySong = new Map<number, CruftField[]>();
     for (const section of sections) {
       for (const group of section.groups) {
@@ -117,33 +113,13 @@
         }
       }
     }
-    const selections = [...bySong].map(([song_id, fields]) => ({ song_id, fields }));
-    if (library) {
-      void tagCleanupStore.remove(selections);
-      return;
-    }
-    try {
-      const result = await invoke<TagCleanupResult>("apply_tag_cleanup", { selections });
-      if (result.cleaned_songs > 0) {
-        toastStore.show(
-          i18n.t("tagCleanup.done", { count: result.removed_fields, songs: result.cleaned_songs }),
-          "success",
-        );
-      }
-      if (result.errors.length > 0) {
-        console.warn("Tag clean-up errors:", result.errors);
-        toastStore.show(i18n.t("tagCleanup.partialErrors", { count: result.errors.length }), "error");
-      }
-      onClose();
-    } catch (e) {
-      toastStore.show(i18n.t("tagCleanup.failedPrefix") + String(e), "error");
-    } finally {
-      isApplying = false;
-    }
+    // Removal reports through task toasts, so it carries on after this closes.
+    void tagCleanupStore.remove([...bySong].map(([song_id, fields]) => ({ song_id, fields })));
+    onClose();
   }
 </script>
 
-<Modal onClose={isApplying ? () => {} : onClose} maxWidth="max-w-xl" ariaLabelledby="tag-cleanup-title">
+<Modal onClose={onClose} maxWidth="max-w-xl" ariaLabelledby="tag-cleanup-title">
   <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
     <div class="flex items-center gap-2">
       <Broom class="w-4 h-4 text-brand-accent-text" />
@@ -151,9 +127,8 @@
     </div>
     <button
       onclick={onClose}
-      disabled={isApplying}
       aria-label={i18n.t("tagCleanup.closeBtn")}
-      class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-50"
+      class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
     >
       <X class="w-4 h-4" />
     </button>
@@ -168,7 +143,7 @@
     {:else if !preview}
       <div class="py-12 flex flex-col items-center justify-center gap-3">
         <LoadingSpinner
-          label={progress && progress.total > 1
+          label={progress
             ? i18n.t("tagCleanup.checkingProgress", { checked: progress.checked, total: progress.total })
             : i18n.t("tagCleanup.checking")}
           size="sm"
@@ -189,7 +164,6 @@
                   type="checkbox"
                   class="mt-0.5 rounded accent-brand-accent"
                   checked={!kept[group.key]}
-                  disabled={isApplying}
                   onchange={(e) => { kept[group.key] = !(e.currentTarget as HTMLInputElement).checked; }}
                 />
                 <span class="flex-1 min-w-0 break-all select-text {group.value === '' ? 'italic text-brand-text-secondary' : 'text-brand-text-primary'}">
@@ -217,16 +191,11 @@
 
   <div class="h-16 flex items-center justify-end gap-2 px-6 border-t border-brand-border shrink-0 bg-brand-main">
     {#if preview && preview.songs.length > 0}
-      <Button onclick={onClose} disabled={isApplying} variant="secondary" size="sm">
+      <Button onclick={onClose} variant="secondary" size="sm">
         {i18n.t("tagCleanup.cancelBtn")}
       </Button>
-      <Button onclick={handleApply} disabled={isApplying || selectedCount === 0} variant="primary" size="sm">
-        {#if isApplying}
-          <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
-          {i18n.t("tagCleanup.removing")}
-        {:else}
-          {i18n.t("tagCleanup.removeBtn")}
-        {/if}
+      <Button onclick={handleApply} disabled={selectedCount === 0} variant="primary" size="sm">
+        {i18n.t("tagCleanup.removeBtn")}
       </Button>
     {:else if library && !preview && !errorMsg}
       <Button onclick={() => tagCleanupStore.cancel()} variant="secondary" size="sm">

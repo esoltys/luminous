@@ -263,6 +263,7 @@ export class PlayerStore {
           {
             label: i18n.t("playerBar.outputFallbackRetry"),
             onClick: () => void prefs.reapplyAudioOutput().catch(() => {}),
+            icon: "refresh",
           }
         );
       });

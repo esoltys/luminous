@@ -59,10 +59,9 @@ class TagCleanupStore {
     this.reviewOpen = false;
   }
 
-  /** Closes the review and removes `selections` as a background task. */
+  /** Closes the review and removes `selections` (from any songs) as a background task. */
   async remove(selections: TagCleanupSelection[]) {
-    this.reviewOpen = false;
-    this.preview = null;
+    this.close();
     this.removing = true;
     tasksStore.startTask({
       id: REMOVE_TASK_ID,
@@ -123,7 +122,6 @@ class TagCleanupStore {
           undefined,
           {
             label: i18n.t("tagCleanup.reviewBtn"),
-            icon: "none",
             onClick: () => {
               toastStore.dismiss(toastId);
               this.openReview();

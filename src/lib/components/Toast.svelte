@@ -205,7 +205,7 @@
             size="sm"
             class="shrink-0 -my-1.5"
           >
-            {#if toast.action.icon !== "none"}
+            {#if toast.action.icon === "refresh"}
               <RefreshCw class="w-3.5 h-3.5" />
             {/if}
             {toast.action.label}
