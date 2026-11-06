@@ -1,5 +1,6 @@
 use crate::collection::WatcherPauseGuard;
 use crate::models;
+use crate::tag_cleanup;
 use crate::AppState;
 use luminous_metadata::audio;
 use serde::{Deserialize, Serialize};
@@ -1132,4 +1133,40 @@ mod tests {
         let album_dir = Path::new("/Music/Big Wreck/2012 - Albatross");
         assert_eq!(resolve_album_dir(album_dir), album_dir);
     }
+}
+
+/// Lists removable tag cruft (promotional comments, encoder banners,
+/// `iTunNORM`, duplicate ID3v1 tags) in `song_ids`' files, or in the whole
+/// local library when empty (#1939). Writes nothing.
+#[tauri::command]
+pub async fn preview_tag_cleanup(
+    state: State<'_, AppState>,
+    song_ids: Vec<i64>,
+) -> Result<tag_cleanup::TagCleanupPreview, String> {
+    let db = Arc::clone(&state.db);
+    tauri::async_runtime::spawn_blocking(move || tag_cleanup::preview(&db, &song_ids))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Removes the fields the user kept ticked in the clean-up review (#1939).
+#[tauri::command]
+pub async fn apply_tag_cleanup(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    selections: Vec<tag_cleanup::TagCleanupSelection>,
+) -> Result<tag_cleanup::TagCleanupResult, String> {
+    // See save_song_tags: these writes are Luminous's own, not external changes (#233).
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+    let db = Arc::clone(&state.db);
+    let self_writes = Arc::clone(&state.self_writes);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        tag_cleanup::apply(&db, &self_writes, &selections)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    if result.cleaned_songs > 0 {
+        let _ = app.emit("library-changed", ());
+    }
+    Ok(result)
 }
