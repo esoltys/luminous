@@ -34,15 +34,19 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 | **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW) (recommended — installs and updates automatically)<br>[.exe / .msix](https://github.com/esoltys/luminous/releases/latest) (manual/sideloaded install)<br>[Portable .zip](https://github.com/esoltys/luminous/releases/latest) (no install; keeps your library and settings in a `data` folder beside the app) |
 | **Linux**   | [.deb / .rpm / Flatpak](https://github.com/esoltys/luminous/releases/latest) for your distro<br>[AppImage](https://github.com/esoltys/luminous/releases/latest) (runs on any distro; add an empty `portable` file beside it for portable mode) |
 
-## New in 3.0 Release
+## Features
 
-- **Ten UI locales**: English (CA/US/UK), French (CA/FR), Spanish, German, Italian, Russian and Ukrainian
-- **Cosmetic add-on themes**, including the free Mothman theme on the Microsoft Store
-- **Large-library performance**: faster scanning and WebDAV sync on network drives, with remote-deletion detection
-- **Parametric EQ editor**: free-frequency bands, drag-to-edit response graph, user presets and AutoEq headphone profile import
-- **Auto Continue**, richer lyrics (word-by-word sync, `.srt`/`.vtt` sidecars, timing offset) and Love plus 5-star ratings with ListenBrainz/MusicBrainz sync
-- **Portable mode** and a portable ZIP release for Windows
-- **AppImage** release for Linux
+- **Your library, fast**: indexes local folders with instant search, including `field:value` syntax (e.g. `genre:rock`) you can save as smart playlists
+- **Playback**: gapless MP3, FLAC, Opus, WAV and more; 10-band graphic and 20-band parametric EQ with AutoEq headphone profiles; ASIO output on Windows
+- **Remote sources**: OpenSubsonic servers (Navidrome, Gonic, …) and WebDAV, synced into the same library
+- **Playlists**: smart and auto playlists (decades, genres, BPM), Song and Artist Radio built from your own library, custom genre hierarchies
+- **Artist and album pages**: filled in from MusicBrainz and fanart.tv, with an info sidebar for whatever you're viewing
+- **Lyrics**: time-synced line by line or word by word, with inline editing and a miniplayer
+- **Tagging and organizing**: tag editor for single or bulk edits (with MusicBrainz Picard handoff) and automatic file organization from your own naming template
+- **Loves, ratings and stats**: 1–5 stars and loves synced with ListenBrainz, Last.fm scrobbling, listening streaks and top artists
+- **Your choice of look**: preset and cover-art-driven themes, seven languages, portable mode
+
+See the [release notes](https://github.com/esoltys/luminous/releases) for what's new in each version.
 
 ---
 
