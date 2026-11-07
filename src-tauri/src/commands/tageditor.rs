@@ -24,9 +24,10 @@ pub struct TagBatchProgressPayload {
 /// per-disc numbers and subtitles. `Set` writes one value to every track,
 /// `None` clearing it. Sent over IPC as `{ mode: "keep" }` or
 /// `{ mode: "set", value }`.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(tag = "mode", content = "value", rename_all = "lowercase")]
 pub enum FieldEdit<T> {
+    #[default]
     Keep,
     Set(Option<T>),
 }
@@ -46,12 +47,6 @@ impl<T: Clone> FieldEdit<T> {
             FieldEdit::Keep => FieldEdit::Keep,
             FieldEdit::Set(value) => FieldEdit::Set(f(value)),
         }
-    }
-}
-
-impl<T> Default for FieldEdit<T> {
-    fn default() -> Self {
-        FieldEdit::Keep
     }
 }
 
