@@ -165,42 +165,88 @@ fn is_reserved_device_name(stem: &str) -> bool {
             && matches!(upper.as_bytes()[3], b'1'..=b'9'))
 }
 
-/// Every `%token` a template can use. Matched longest name first, so
-/// `%albumartist` wins over `%album`, `%disctitle` over `%disc` and `%track3`
-/// over `%track`; a `%` that starts no known name stays literal text.
-const TEMPLATE_TOKENS: &[&str] = &[
-    "discsubtitle",
-    "albumartist",
-    "extension",
-    "disctitle",
-    "rawtrack",
-    "artist",
-    "track3",
-    "album",
-    "genre",
-    "title",
-    "track",
-    "disc",
-    "year",
-];
+/// A `%token` an organize template can use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TemplateToken {
+    AlbumArtist,
+    Artist,
+    Album,
+    Disc,
+    DiscTitle,
+    Track,
+    Track3,
+    RawTrack,
+    Title,
+    Year,
+    Genre,
+    Extension,
+}
+
+impl TemplateToken {
+    /// Every spelling, longest first so `%albumartist` wins over `%album`,
+    /// `%disctitle` over `%disc` and `%track3` over `%track`.
+    const NAMES: &'static [(&'static str, TemplateToken)] = &[
+        ("discsubtitle", TemplateToken::DiscTitle),
+        ("albumartist", TemplateToken::AlbumArtist),
+        ("extension", TemplateToken::Extension),
+        ("disctitle", TemplateToken::DiscTitle),
+        ("rawtrack", TemplateToken::RawTrack),
+        ("artist", TemplateToken::Artist),
+        ("track3", TemplateToken::Track3),
+        ("album", TemplateToken::Album),
+        ("genre", TemplateToken::Genre),
+        ("title", TemplateToken::Title),
+        ("track", TemplateToken::Track),
+        ("disc", TemplateToken::Disc),
+        ("year", TemplateToken::Year),
+    ];
+
+    /// The token `rest` (the text after a `%`) starts with, and its length.
+    fn parse(rest: &str) -> Option<(TemplateToken, usize)> {
+        Self::NAMES
+            .iter()
+            .find(|(name, _)| rest.starts_with(name))
+            .map(|&(name, token)| (token, name.len()))
+    }
+
+    /// Whether a conditional block can hinge on this token. `%title` and
+    /// `%extension` always expand to something, so they never decide one.
+    fn optional(self) -> bool {
+        !matches!(self, TemplateToken::Title | TemplateToken::Extension)
+    }
+
+    /// The tag a track is held back for when this token sits outside every
+    /// conditional block and the track lacks it (see [`required_missing_tags`]).
+    /// Title and artist identity are checked separately; a disc subtitle is
+    /// never required, since most discs have none.
+    fn missing_field(self) -> Option<&'static str> {
+        match self {
+            TemplateToken::Album => Some("album"),
+            TemplateToken::Track | TemplateToken::Track3 | TemplateToken::RawTrack => Some("track"),
+            TemplateToken::Disc => Some("disc"),
+            TemplateToken::Year => Some("year"),
+            TemplateToken::Genre => Some("genre"),
+            _ => None,
+        }
+    }
+}
 
 /// One parsed piece of a template.
 #[derive(Debug, Clone, PartialEq)]
 enum TemplatePiece {
     Text(String),
-    /// A `%token`, holding its name from [`TEMPLATE_TOKENS`] (`discsubtitle`
-    /// is folded into its `disctitle` alias here).
-    Token(&'static str),
-    /// A conditional `{...}` block. It renders when at least one token
-    /// directly inside it (not in a nested block) has a value for the song;
-    /// nested blocks decide for themselves. `{Disc %disc{ - %disctitle}/}`
+    Token(TemplateToken),
+    /// A conditional `{...}` block. It renders when the song has a value for
+    /// at least one optional token directly inside it (not in a nested
+    /// block); nested blocks decide for themselves. `{Disc %disc{ - %disctitle}/}`
     /// therefore drops the whole disc folder for a disc-less track and only
     /// the " - " suffix for a disc without a subtitle.
     Block(Vec<TemplatePiece>),
 }
 
 /// Parses a template into pieces. Never fails: an unclosed `{` is kept as
-/// literal text with its contents always rendered, and a stray `}` is text.
+/// literal text with its contents always rendered, a stray `}` is text, and
+/// so is a `%` that starts no known token.
 fn parse_template(template: &str) -> Vec<TemplatePiece> {
     fn parse(rest: &mut &str, nested: bool) -> (Vec<TemplatePiece>, bool) {
         let mut pieces = Vec::new();
@@ -227,16 +273,11 @@ fn parse_template(template: &str) -> Vec<TemplatePiece> {
                     flush(&mut text, &mut pieces);
                     return (pieces, true);
                 }
-                '%' => match TEMPLATE_TOKENS.iter().find(|name| rest.starts_with(**name)) {
-                    Some(name) => {
+                '%' => match TemplateToken::parse(rest) {
+                    Some((token, len)) => {
                         flush(&mut text, &mut pieces);
-                        *rest = &rest[name.len()..];
-                        let name = if *name == "discsubtitle" {
-                            "disctitle"
-                        } else {
-                            name
-                        };
-                        pieces.push(TemplatePiece::Token(name));
+                        *rest = &rest[len..];
+                        pieces.push(TemplatePiece::Token(token));
                     }
                     None => text.push('%'),
                 },
@@ -250,92 +291,86 @@ fn parse_template(template: &str) -> Vec<TemplatePiece> {
     parse(&mut rest, false).0
 }
 
-/// What every token expands to for one song. `value` is the expansion,
-/// with fallbacks ("Unknown Artist", disc "1", track "00") for an absent
-/// tag; `present` is whether the song really carries the tag, which is what
-/// conditional blocks test. `%title` and `%extension` always have a value
-/// but never make a block render on their own, since they aren't optional.
-struct TemplateValues<'a> {
+/// A song as template tokens see it.
+struct TemplateSong<'a> {
     song: &'a Song,
     ext: &'a str,
-    file_stem: String,
 }
 
-impl<'a> TemplateValues<'a> {
-    fn new(song: &'a Song, ext: &'a str) -> Self {
-        let file_stem = song
-            .path
-            .as_ref()
-            .map(PathBuf::from)
-            .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().to_string()))
-            .unwrap_or_else(|| "Unknown Title".to_string());
-        Self {
-            song,
-            ext,
-            file_stem,
-        }
-    }
-
-    fn present(&self, token: &str) -> bool {
-        let s = self.song;
-        let has_text = |v: &Option<String>| v.as_deref().is_some_and(|t| !t.trim().is_empty());
-        match token {
-            "albumartist" => has_text(&s.album_artist),
-            "artist" => has_text(&s.artist),
-            "album" => has_text(&s.album),
-            "disctitle" => has_text(&s.disc_subtitle),
-            "genre" => has_text(&s.genre),
-            "disc" => s.disc.is_some_and(|d| d > 0),
-            "year" => s.year.is_some_and(|y| y > 0),
-            "track" | "track3" | "rawtrack" => s.track.is_some_and(|t| t > 0),
-            _ => false,
-        }
-    }
-
-    fn value(&self, token: &str) -> String {
-        fn clean(v: &str) -> String {
-            sanitize_component(v, false, false)
-        }
+impl TemplateSong<'_> {
+    /// The song's own value for `token`, ready for a path segment, or `None`
+    /// when it doesn't carry that tag. %artist/%albumartist/%genre use the
+    /// first-listed value of a multi-value tag: a path segment has no slot
+    /// for a whole list.
+    fn tag(&self, token: TemplateToken) -> Option<String> {
         fn non_blank(v: &Option<String>) -> Option<&str> {
             v.as_deref().filter(|t| !t.trim().is_empty())
         }
-        // %artist/%albumartist/%genre use the primary (first-listed) value
-        // when a song carries several — a path segment has no slot for a
-        // full multi-value list, so the first acts as the canonical one.
         fn primary(v: &Option<String>) -> Option<String> {
             non_blank(v).and_then(|t| models::parse_multi_value(t).into_iter().next())
         }
         let s = self.song;
         let track = s.track.filter(|t| *t > 0);
-        match token {
-            "albumartist" => clean(
-                &primary(&s.album_artist)
-                    .or_else(|| primary(&s.artist))
-                    .unwrap_or_else(|| "Unknown Artist".into()),
-            ),
-            "artist" => clean(&primary(&s.artist).unwrap_or_else(|| "Unknown Artist".into())),
-            "album" => clean(non_blank(&s.album).unwrap_or("Unknown Album")),
-            "genre" => clean(&primary(&s.genre).unwrap_or_else(|| "Unknown Genre".into())),
-            "title" => clean(non_blank(&s.title).unwrap_or(&self.file_stem)),
-            "disctitle" => non_blank(&s.disc_subtitle).map(clean).unwrap_or_default(),
-            "disc" => s.disc.map(|d| d.to_string()).unwrap_or_else(|| "1".into()),
-            "year" => s.year.map(|y| y.to_string()).unwrap_or_default(),
-            "track" => track.map_or("00".into(), |t| format!("{t:02}")),
-            "track3" => track.map_or("000".into(), |t| format!("{t:03}")),
-            "rawtrack" => track.map_or("0".into(), |t| t.to_string()),
-            "extension" => self.ext.to_string(),
-            _ => String::new(),
-        }
+        let text = match token {
+            TemplateToken::AlbumArtist => primary(&s.album_artist),
+            TemplateToken::Artist => primary(&s.artist),
+            TemplateToken::Genre => primary(&s.genre),
+            TemplateToken::Album => non_blank(&s.album).map(str::to_string),
+            TemplateToken::Title => non_blank(&s.title).map(str::to_string),
+            TemplateToken::DiscTitle => non_blank(&s.disc_subtitle).map(str::to_string),
+            TemplateToken::Disc => return s.disc.filter(|d| *d > 0).map(|d| d.to_string()),
+            TemplateToken::Year => return s.year.filter(|y| *y > 0).map(|y| y.to_string()),
+            TemplateToken::Track => return track.map(|t| format!("{t:02}")),
+            TemplateToken::Track3 => return track.map(|t| format!("{t:03}")),
+            TemplateToken::RawTrack => return track.map(|t| t.to_string()),
+            TemplateToken::Extension => return Some(self.ext.to_string()),
+        };
+        text.map(|t| sanitize_component(&t, false, false))
+    }
+
+    /// What `token` expands to when the song lacks the tag.
+    fn fallback(&self, token: TemplateToken) -> String {
+        let text = match token {
+            TemplateToken::AlbumArtist => {
+                return self
+                    .tag(TemplateToken::Artist)
+                    .unwrap_or_else(|| "Unknown Artist".into())
+            }
+            TemplateToken::Artist => "Unknown Artist",
+            TemplateToken::Album => "Unknown Album",
+            TemplateToken::Genre => "Unknown Genre",
+            TemplateToken::Title => {
+                let stem = self
+                    .song
+                    .path
+                    .as_ref()
+                    .map(PathBuf::from)
+                    .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().to_string()));
+                return sanitize_component(
+                    stem.as_deref().unwrap_or("Unknown Title"),
+                    false,
+                    false,
+                );
+            }
+            TemplateToken::Disc => "1",
+            TemplateToken::Track => "00",
+            TemplateToken::Track3 => "000",
+            TemplateToken::RawTrack => "0",
+            TemplateToken::DiscTitle | TemplateToken::Year | TemplateToken::Extension => "",
+        };
+        text.to_string()
     }
 
     fn render(&self, pieces: &[TemplatePiece], out: &mut String) {
         for piece in pieces {
             match piece {
                 TemplatePiece::Text(t) => out.push_str(t),
-                TemplatePiece::Token(name) => out.push_str(&self.value(name)),
+                TemplatePiece::Token(token) => {
+                    out.push_str(&self.tag(*token).unwrap_or_else(|| self.fallback(*token)))
+                }
                 TemplatePiece::Block(inner) => {
                     let renders = inner.iter().any(|p| match p {
-                        TemplatePiece::Token(name) => self.present(name),
+                        TemplatePiece::Token(t) => t.optional() && self.tag(*t).is_some(),
                         _ => false,
                     });
                     if renders {
@@ -347,12 +382,14 @@ impl<'a> TemplateValues<'a> {
     }
 }
 
-/// Expands `template` for `song`: substitutes each `%token` and keeps a
-/// conditional `{...}` block only when the song has a value for one of the
-/// block's own tokens (see [`TemplatePiece::Block`]). Blocks may nest.
+/// Expands `template` for `song`: substitutes each `%token`, filling in a
+/// fallback ("Unknown Artist", disc "1", track "00", the file name for the
+/// title) where the song lacks the tag, and keeps a conditional `{...}`
+/// block only when the song has a value for one of the block's own tokens
+/// (see [`TemplatePiece::Block`]). Blocks may nest.
 pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
     let mut out = String::new();
-    TemplateValues::new(song, ext).render(&parse_template(template), &mut out);
+    TemplateSong { song, ext }.render(&parse_template(template), &mut out);
     out
 }
 
@@ -379,55 +416,48 @@ fn organize_song_from_row(row: &rusqlite::Row) -> rusqlite::Result<Song> {
 }
 
 /// Identifies which metadata fields required by the organize template or core track identity
-/// are missing or whitespace-only on the given song.
+/// are missing or whitespace-only on the given song, in the order album, track, disc, year,
+/// genre after title and artist.
 ///
 /// Only tokens outside conditional blocks are required, so optional parts (such as
-/// `{%year - }` or `{%album/}`) never hold a track back. `%disctitle` is never required:
-/// most discs have no subtitle, and outside a block it simply expands to nothing.
+/// `{%year - }` or `{%album/}`) never hold a track back, and `%disctitle` never does.
 ///
 /// Core track identity fields (`title`, and `artist` or `albumartist`) are always checked:
 /// an audio track must have a title and an artist identity to be ready for file relocation.
 /// For `%albumartist` (or core identity), if `song.album_artist` is missing, it falls back to
 /// `song.artist`, matching the behavior of `expand_template`.
 pub fn required_missing_tags(template: &str, song: &Song) -> Vec<String> {
-    let required: HashSet<&str> = parse_template(template)
+    let required: Vec<TemplateToken> = parse_template(template)
         .into_iter()
         .filter_map(|p| match p {
-            TemplatePiece::Token(name) => Some(name),
+            TemplatePiece::Token(token) => Some(token),
             _ => None,
         })
         .collect();
-    let values = TemplateValues::new(song, "");
+    let tags = TemplateSong { song, ext: "" };
+    let has = |token| tags.tag(token).is_some();
     let mut missing = Vec::new();
 
-    // Title and an artist identity are always required. %artist alone is
-    // satisfied only by the track artist; otherwise %albumartist (or core
-    // identity) falls back to it, just as expand_template does.
-    if song.title.as_deref().is_none_or(|t| t.trim().is_empty()) {
+    if !has(TemplateToken::Title) {
         missing.push("title".to_string());
     }
-    let artist_ok = if required.contains("artist") {
-        values.present("artist")
+    // %artist alone is satisfied only by the track artist; otherwise
+    // %albumartist (or core identity) falls back to it, as expand_template does.
+    let artist_ok = if required.contains(&TemplateToken::Artist) {
+        has(TemplateToken::Artist)
     } else {
-        values.present("albumartist") || values.present("artist")
+        has(TemplateToken::AlbumArtist) || has(TemplateToken::Artist)
     };
     if !artist_ok {
         missing.push("artist".to_string());
     }
 
-    let checks: [(&str, &[&str]); 5] = [
-        ("album", &["album"]),
-        ("track", &["track", "track3", "rawtrack"]),
-        ("disc", &["disc"]),
-        ("year", &["year"]),
-        ("genre", &["genre"]),
-    ];
-    for (field, tokens) in checks {
-        let wanted = tokens.iter().find(|t| required.contains(**t));
-        if let Some(token) = wanted {
-            if !values.present(token) {
-                missing.push(field.to_string());
-            }
+    for field in ["album", "track", "disc", "year", "genre"] {
+        let lacking = required
+            .iter()
+            .any(|t| t.missing_field() == Some(field) && !has(*t));
+        if lacking {
+            missing.push(field.to_string());
         }
     }
 

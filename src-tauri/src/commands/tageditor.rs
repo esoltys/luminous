@@ -39,6 +39,14 @@ impl<T: Clone> FieldEdit<T> {
             FieldEdit::Set(value) => value.clone(),
         }
     }
+
+    /// Transforms a `Set` value (e.g. normalizing it); `Keep` stays `Keep`.
+    pub fn map(self, f: impl FnOnce(Option<T>) -> Option<T>) -> Self {
+        match self {
+            FieldEdit::Keep => FieldEdit::Keep,
+            FieldEdit::Set(value) => FieldEdit::Set(f(value)),
+        }
+    }
 }
 
 /// Trims a free-text tag value, mapping blank to `None` so an emptied field
@@ -605,10 +613,7 @@ pub async fn save_album_tags(
         initial_key: String,
     }
 
-    let disc_subtitle = match disc_subtitle {
-        FieldEdit::Set(value) => FieldEdit::Set(non_blank(value)),
-        keep => keep,
-    };
+    let disc_subtitle = disc_subtitle.map(non_blank);
 
     let mut songs_data = Vec::with_capacity(song_ids.len());
     for &song_id in &song_ids {
@@ -850,10 +855,7 @@ pub async fn save_batch_file_tags(
     let album_artist_c = album_artist_str.clone();
     let album_artist_sort_c = album_artist_sort.clone();
     let genre_c = genre_str.clone();
-    let disc_subtitle = match disc_subtitle {
-        FieldEdit::Set(value) => FieldEdit::Set(non_blank(value)),
-        keep => keep,
-    };
+    let disc_subtitle = disc_subtitle.map(non_blank);
 
     // Returns each written file's resolved disc and subtitle for the DB update.
     let (updated_count, written) = tauri::async_runtime::spawn_blocking(move || {
@@ -1202,6 +1204,8 @@ mod tests {
         assert_eq!(keep.resolve(None), None);
         assert_eq!(set.resolve(Some(1)), Some(2));
         assert_eq!(clear.resolve(Some(1)), None);
+        assert_eq!(keep.map(|_| Some(9)), FieldEdit::Keep);
+        assert_eq!(set.map(|v| v.map(|n| n + 1)), FieldEdit::Set(Some(3)));
     }
 
     #[test]

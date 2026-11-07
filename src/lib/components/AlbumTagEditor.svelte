@@ -27,7 +27,8 @@
   import type { FileSource, Song } from "../types";
   import { filesStore } from "../stores/files.svelte";
   import { scanFolder } from "./files/folderActions";
-  import { fieldEdit, sharedValue } from "../utils/fieldEdit";
+  import { MixedField } from "../utils/mixedField.svelte";
+  import DiscFields from "./DiscFields.svelte";
 
   interface Props {
     songIds?: number[];
@@ -90,18 +91,13 @@
   let genre = $state(initialGenre ?? "");
   // svelte-ignore state_referenced_locally
   let year = $state<number | null>(initialYear);
-  // Disc and Disc Subtitle differ per track on a multi-disc album, so they
-  // show "Mixed" when the tracks disagree and are only written once edited.
+  // Disc and Disc Subtitle differ per track on a multi-disc album.
+  const disc = new MixedField<number>();
+  const discSubtitle = new MixedField<string>();
   // svelte-ignore state_referenced_locally
-  const initialDiscs = sharedValue(initialTracks.map((t) => t.disc));
+  disc.reset(initialTracks.map((t) => t.disc));
   // svelte-ignore state_referenced_locally
-  const initialSubtitles = sharedValue(initialTracks.map((t) => t.disc_subtitle));
-  let disc = $state<number | null>(initialDiscs.value);
-  let discMixed = $state(initialDiscs.mixed);
-  let discEdited = $state(false);
-  let discSubtitle = $state(initialSubtitles.value ?? "");
-  let discSubtitleMixed = $state(initialSubtitles.mixed);
-  let discSubtitleEdited = $state(false);
+  discSubtitle.reset(initialTracks.map((t) => t.disc_subtitle));
   // svelte-ignore state_referenced_locally
   let compilation = $state(initialCompilation ?? false);
   // svelte-ignore state_referenced_locally
@@ -247,12 +243,8 @@
           const commonYear = consensusNumber(allItems.map((i) => i.year));
           if (commonYear !== null) year = commonYear;
 
-          const discs = sharedValue(allItems.map((i) => i.disc));
-          disc = discs.value;
-          discMixed = discs.mixed;
-          const subtitles = sharedValue(allItems.map((i) => i.disc_subtitle));
-          discSubtitle = subtitles.value ?? "";
-          discSubtitleMixed = subtitles.mixed;
+          disc.reset(allItems.map((i) => i.disc));
+          discSubtitle.reset(allItems.map((i) => i.disc_subtitle));
 
           if (allItems.some((i) => i.compilation)) {
             compilation = allItems.every((i) => i.compilation);
@@ -331,8 +323,8 @@
           genre: genre ?? "",
           genresort: genresort.trim() || null,
           year,
-          disc: fieldEdit(discEdited, disc),
-          discSubtitle: fieldEdit(discSubtitleEdited, discSubtitle.trim() || null),
+          disc: disc.edit,
+          discSubtitle: discSubtitle.edit,
           compilation,
         });
       }
@@ -346,8 +338,8 @@
           genre: genre ?? "",
           genresort: genresort.trim() || null,
           year,
-          disc: fieldEdit(discEdited, disc),
-          discSubtitle: fieldEdit(discSubtitleEdited, discSubtitle.trim() || null),
+          disc: disc.edit,
+          discSubtitle: discSubtitle.edit,
           compilation,
         });
         if (source && folderPath) {
@@ -494,39 +486,7 @@
             />
           </FormField>
 
-          <FormField label={i18n.t('albumTagEditor.discField')} for="album-tag-disc">
-            <Input
-              id="album-tag-disc"
-              type="number"
-              value={disc ?? ""}
-              disabled={isSaving}
-              placeholder={discMixed && !discEdited ? i18n.t('albumTagEditor.mixedValues') : undefined}
-              oninput={(e) => {
-                const val = parseInt(e.currentTarget.value, 10);
-                disc = isNaN(val) ? null : val;
-                discEdited = true;
-              }}
-              size="sm"
-              class="w-full"
-            />
-          </FormField>
-
-          <FormField label={i18n.t('tagEditor.discSubtitleField')} for="album-tag-disc-subtitle" span2>
-            <Input
-              id="album-tag-disc-subtitle"
-              value={discSubtitle}
-              disabled={isSaving}
-              placeholder={discSubtitleMixed && !discSubtitleEdited
-                ? i18n.t('albumTagEditor.mixedValues')
-                : i18n.t('tagEditor.discSubtitlePlaceholder')}
-              oninput={(e) => {
-                discSubtitle = e.currentTarget.value;
-                discSubtitleEdited = true;
-              }}
-              size="sm"
-              class="w-full"
-            />
-          </FormField>
+          <DiscFields {disc} subtitle={discSubtitle} disabled={isSaving} />
 
           <!-- Sort Overrides ("Sort As") -->
           <details class="col-span-2 group border border-brand-border rounded-lg bg-brand-sidebar/40 overflow-hidden">

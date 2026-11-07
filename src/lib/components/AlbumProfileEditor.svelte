@@ -36,7 +36,8 @@
   import { ALBUM_LINK_PLATFORMS, getPlatformInfo, localizePlatform } from "../utils/artistSocials";
   import { getAlbumFolderPath } from "../utils/pathUtils";
   import type { AlbumProfile, AlbumLink, Song } from "../types";
-  import { fieldEdit, sharedValue } from "../utils/fieldEdit";
+  import { MixedField } from "../utils/mixedField.svelte";
+  import DiscFields from "./DiscFields.svelte";
 
   let {
     albumName,
@@ -99,30 +100,19 @@
   let genre = $state(initialGenre ?? "");
   // svelte-ignore state_referenced_locally
   let year = $state<number | null>(initialYear);
-  // Disc and Disc Subtitle differ per track on a multi-disc album, so they
-  // show "Mixed" when the tracks disagree and are only written once edited —
-  // and are left alone, never cleared, when the tracks aren't known.
-  function discInfo(): Pick<Song, "disc" | "disc_subtitle">[] {
+  // Disc and Disc Subtitle differ per track on a multi-disc album. With no
+  // tracks to read they stay blank and untouched, so a save never clears them.
+  const disc = new MixedField<number>();
+  const discSubtitle = new MixedField<string>();
+  function editedTracks(): Pick<Song, "disc" | "disc_subtitle">[] {
     if (initialTracks.length > 0) return initialTracks;
     const found = songIds.map((id) => collectionStore.songs.find((s) => s.id === id));
     return found.every((s) => s) ? (found as Song[]) : [];
   }
-  let disc = $state<number | null>(null);
-  let discMixed = $state(false);
-  let discEdited = $state(false);
-  let discSubtitle = $state("");
-  let discSubtitleMixed = $state(false);
-  let discSubtitleEdited = $state(false);
   function resetDiscFields() {
-    const tracks = discInfo();
-    const discs = sharedValue(tracks.map((t) => t.disc));
-    const subtitles = sharedValue(tracks.map((t) => t.disc_subtitle));
-    disc = discs.value;
-    discMixed = discs.mixed;
-    discEdited = false;
-    discSubtitle = subtitles.value ?? "";
-    discSubtitleMixed = subtitles.mixed;
-    discSubtitleEdited = false;
+    const tracks = editedTracks();
+    disc.reset(tracks.map((t) => t.disc));
+    discSubtitle.reset(tracks.map((t) => t.disc_subtitle));
   }
   // svelte-ignore state_referenced_locally
   let compilation = $state(initialCompilation ?? false);
@@ -277,8 +267,8 @@
             genre: genre ?? "",
             genresort: genresort.trim() || null,
             year,
-            disc: fieldEdit(discEdited, disc),
-            discSubtitle: fieldEdit(discSubtitleEdited, discSubtitle.trim() || null),
+            disc: disc.edit,
+            discSubtitle: discSubtitle.edit,
             compilation,
           })
         );
@@ -475,39 +465,7 @@
               />
             </FormField>
 
-            <FormField label={i18n.t('albumTagEditor.discField')} for="album-tag-disc">
-              <Input
-                id="album-tag-disc"
-                type="number"
-                value={disc ?? ""}
-                disabled={isSaving}
-                placeholder={discMixed && !discEdited ? i18n.t('albumTagEditor.mixedValues') : undefined}
-                oninput={(e) => {
-                  const val = parseInt(e.currentTarget.value, 10);
-                  disc = isNaN(val) ? null : val;
-                  discEdited = true;
-                }}
-                size="sm"
-                class="w-full"
-              />
-            </FormField>
-
-            <FormField label={i18n.t('tagEditor.discSubtitleField')} for="album-tag-disc-subtitle" span2>
-              <Input
-                id="album-tag-disc-subtitle"
-                value={discSubtitle}
-                disabled={isSaving}
-                placeholder={discSubtitleMixed && !discSubtitleEdited
-                  ? i18n.t('albumTagEditor.mixedValues')
-                  : i18n.t('tagEditor.discSubtitlePlaceholder')}
-                oninput={(e) => {
-                  discSubtitle = e.currentTarget.value;
-                  discSubtitleEdited = true;
-                }}
-                size="sm"
-                class="w-full"
-              />
-            </FormField>
+            <DiscFields {disc} subtitle={discSubtitle} disabled={isSaving} />
 
             <!-- Sort Overrides ("Sort As") -->
             <details class="col-span-2 group border border-brand-border rounded-lg bg-brand-sidebar/40 overflow-hidden">

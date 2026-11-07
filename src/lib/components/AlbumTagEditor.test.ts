@@ -353,7 +353,7 @@ describe("AlbumTagEditor.svelte", () => {
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith("save_album_tags", expect.objectContaining({
         disc: { mode: "keep" },
-        discSubtitle: { mode: "set", value: "Deluxe" },
+        discSubtitle: { mode: "set", value: "  Deluxe  " },
       }));
     });
   });
