@@ -18,6 +18,37 @@ pub struct TagBatchProgressPayload {
     pub done: bool,
 }
 
+/// One field of a multi-track tag edit. `Keep` leaves each track's own value
+/// alone — what the album editors send when the selection's values differ
+/// and the user didn't touch the field, so a multi-disc album keeps its
+/// per-disc numbers and subtitles. `Set` writes one value to every track,
+/// `None` clearing it. Sent over IPC as `{ mode: "keep" }` or
+/// `{ mode: "set", value }`.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(tag = "mode", content = "value", rename_all = "lowercase")]
+pub enum FieldEdit<T> {
+    Keep,
+    Set(Option<T>),
+}
+
+impl<T: Clone> FieldEdit<T> {
+    /// The value a track should end up with, given the one it has now.
+    pub fn resolve(&self, current: Option<T>) -> Option<T> {
+        match self {
+            FieldEdit::Keep => current,
+            FieldEdit::Set(value) => value.clone(),
+        }
+    }
+}
+
+/// Trims a free-text tag value, mapping blank to `None` so an emptied field
+/// clears the tag instead of storing an empty string.
+fn non_blank(value: Option<String>) -> Option<String> {
+    value
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
 #[derive(serde::Serialize)]
 pub struct SongDetails {
     pub id: i64,
@@ -40,6 +71,7 @@ pub struct SongDetails {
     pub genresort: Option<String>,
     pub track: Option<u32>,
     pub disc: Option<u32>,
+    pub disc_subtitle: Option<String>,
     pub year: Option<u32>,
     pub originalyear: Option<u32>,
     pub grouping: String,
@@ -64,7 +96,8 @@ pub async fn get_song_details(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
         "SELECT id, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, genresort, track, disc, year,
-                originalyear, grouping, bpm, initial_key, rating, loved, compilation, art_embedded, cue_path
+                originalyear, grouping, bpm, initial_key, rating, loved, compilation, art_embedded, cue_path,
+                disc_subtitle
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -95,6 +128,7 @@ pub async fn get_song_details(
                 compilation: row.get(23).unwrap_or(false),
                 art_embedded: row.get(24).unwrap_or(false),
                 is_cue_track: row.get::<_, Option<String>>(25)?.is_some(),
+                disc_subtitle: row.get(26)?,
             })
         },
     )
@@ -131,6 +165,7 @@ pub async fn get_file_song_details(path: String) -> Result<SongDetails, String> 
         genresort: None,
         track: song.track.map(|t| t as u32),
         disc: song.disc.map(|d| d as u32),
+        disc_subtitle: song.disc_subtitle,
         year: song.year.map(|y| y as u32),
         originalyear: song.originalyear.map(|y| y as u32),
         grouping: song.grouping.unwrap_or_default(),
@@ -164,6 +199,7 @@ pub async fn save_song_tags(
     genresort: Option<String>,
     track: Option<u32>,
     disc: Option<u32>,
+    disc_subtitle: Option<String>,
     year: Option<u32>,
     originalyear: Option<u32>,
     grouping: String,
@@ -232,6 +268,8 @@ pub async fn save_song_tags(
     let genre_str =
         models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
+    let disc_subtitle = non_blank(disc_subtitle);
+    let disc_subtitle_c = disc_subtitle.clone();
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
 
@@ -253,6 +291,7 @@ pub async fn save_song_tags(
                     genre: &genre_c,
                     track,
                     disc,
+                    disc_subtitle: disc_subtitle_c.as_deref(),
                     year,
                     originalyear,
                     grouping: &grouping_c,
@@ -289,7 +328,8 @@ pub async fn save_song_tags(
             grouping = ?17,
             bpm = ?18,
             initial_key = ?19,
-            album_key = ?21
+            album_key = ?21,
+            disc_subtitle = ?22
          WHERE id = ?20",
         rusqlite::params![
             title,
@@ -325,7 +365,8 @@ pub async fn save_song_tags(
                     Some(artist_str.as_str())
                 },
                 compilation,
-            )
+            ),
+            disc_subtitle,
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -371,6 +412,7 @@ pub async fn save_file_tags(
     genresort: Option<String>,
     track: Option<u32>,
     disc: Option<u32>,
+    disc_subtitle: Option<String>,
     year: Option<u32>,
     originalyear: Option<u32>,
     grouping: String,
@@ -407,6 +449,8 @@ pub async fn save_file_tags(
     let composer_c = composer_str.clone();
     let composersort_c = composersort.clone();
     let genre_c = genre_str.clone();
+    let disc_subtitle = non_blank(disc_subtitle);
+    let disc_subtitle_c = disc_subtitle.clone();
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
 
@@ -427,6 +471,7 @@ pub async fn save_file_tags(
                 genre: &genre_c,
                 track,
                 disc,
+                disc_subtitle: disc_subtitle_c.as_deref(),
                 year,
                 originalyear,
                 grouping: &grouping_c,
@@ -462,7 +507,8 @@ pub async fn save_file_tags(
                 originalyear = ?16,
                 grouping = ?17,
                 bpm = ?18,
-                initial_key = ?19
+                initial_key = ?19,
+                disc_subtitle = ?21
              WHERE path = ?20",
             rusqlite::params![
                 title,
@@ -503,6 +549,7 @@ pub async fn save_file_tags(
                 bpm,
                 initial_key,
                 path,
+                disc_subtitle,
             ],
         );
     }
@@ -523,7 +570,8 @@ pub async fn save_album_tags(
     genre: Option<String>,
     genresort: Option<String>,
     year: Option<u32>,
-    disc: Option<u32>,
+    disc: FieldEdit<u32>,
+    disc_subtitle: FieldEdit<String>,
     compilation: bool,
 ) -> Result<u32, String> {
     if song_ids.is_empty() {
@@ -548,16 +596,25 @@ pub async fn save_album_tags(
         composer: String,
         composersort: Option<String>,
         track: Option<u32>,
+        /// Resolved against the edit: the value this song is saved with.
+        disc: Option<u32>,
+        disc_subtitle: Option<String>,
         originalyear: Option<u32>,
         grouping: String,
         bpm: Option<f32>,
         initial_key: String,
     }
 
+    let disc_subtitle = match disc_subtitle {
+        FieldEdit::Set(value) => FieldEdit::Set(non_blank(value)),
+        keep => keep,
+    };
+
     let mut songs_data = Vec::with_capacity(song_ids.len());
     for &song_id in &song_ids {
         let res = conn.query_row(
-            "SELECT path, source, title, titlesort, artist, artistsort, composer, composersort, track, originalyear, grouping, bpm, initial_key
+            "SELECT path, source, title, titlesort, artist, artistsort, composer, composersort, track, originalyear, grouping, bpm, initial_key,
+                    disc, disc_subtitle
              FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
             |row| {
@@ -576,6 +633,8 @@ pub async fn save_album_tags(
                     grouping: row.get(10).unwrap_or_default(),
                     bpm: row.get(11).ok(),
                     initial_key: row.get(12).unwrap_or_default(),
+                    disc: disc.resolve(row.get(13)?),
+                    disc_subtitle: disc_subtitle.resolve(row.get(14)?),
                 })
             },
         );
@@ -601,6 +660,13 @@ pub async fn save_album_tags(
     let genre_str =
         models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
+
+    // What each song is saved with, kept for the DB update below once
+    // `songs_data` has moved into the writer thread.
+    let resolved: Vec<(i64, Option<u32>, Option<String>)> = songs_data
+        .iter()
+        .map(|m| (m.id, m.disc, m.disc_subtitle.clone()))
+        .collect();
 
     let total_songs = songs_data.len();
     let app_clone = app.clone();
@@ -641,7 +707,8 @@ pub async fn save_album_tags(
                     composersort: item.composersort.as_deref(),
                     genre: &genre_c,
                     track: item.track,
-                    disc,
+                    disc: item.disc,
+                    disc_subtitle: item.disc_subtitle.as_deref(),
                     year,
                     originalyear: item.originalyear,
                     grouping: &item.grouping,
@@ -663,7 +730,7 @@ pub async fn save_album_tags(
     .map_err(|e| e.to_string())?;
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-    for &song_id in &song_ids {
+    for (song_id, disc, disc_subtitle) in resolved {
         let track_artist: Option<String> = tx
             .query_row(
                 "SELECT artist FROM songs WHERE id = ?1",
@@ -692,7 +759,8 @@ pub async fn save_album_tags(
                 year = ?7,
                 disc = ?8,
                 compilation = ?9,
-                album_key = ?11
+                album_key = ?11,
+                disc_subtitle = ?12
              WHERE id = ?10",
             rusqlite::params![
                 album,
@@ -705,7 +773,8 @@ pub async fn save_album_tags(
                 disc,
                 compilation,
                 song_id,
-                key
+                key,
+                disc_subtitle
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -757,7 +826,8 @@ pub async fn save_batch_file_tags(
     genre: Option<String>,
     genresort: Option<String>,
     year: Option<u32>,
-    disc: Option<u32>,
+    disc: FieldEdit<u32>,
+    disc_subtitle: FieldEdit<String>,
     compilation: bool,
 ) -> Result<u32, String> {
     if paths.is_empty() {
@@ -780,9 +850,15 @@ pub async fn save_batch_file_tags(
     let album_artist_c = album_artist_str.clone();
     let album_artist_sort_c = album_artist_sort.clone();
     let genre_c = genre_str.clone();
+    let disc_subtitle = match disc_subtitle {
+        FieldEdit::Set(value) => FieldEdit::Set(non_blank(value)),
+        keep => keep,
+    };
 
-    let updated_count = tauri::async_runtime::spawn_blocking(move || {
+    // Returns each written file's resolved disc and subtitle for the DB update.
+    let (updated_count, written) = tauri::async_runtime::spawn_blocking(move || {
         let mut count = 0u32;
+        let mut written: Vec<(std::path::PathBuf, Option<u32>, Option<String>)> = Vec::new();
         for (idx, p) in path_bufs.into_iter().enumerate() {
             let song = match crate::collection::read_tags(&p) {
                 Ok(s) => s,
@@ -809,6 +885,8 @@ pub async fn save_batch_file_tags(
             let composer = song.composer.unwrap_or_default();
             let grouping = song.grouping.unwrap_or_default();
             let initial_key = song.initial_key.unwrap_or_default();
+            let disc = disc.resolve(song.disc.map(|d| d as u32));
+            let disc_subtitle = disc_subtitle.resolve(song.disc_subtitle);
 
             let write_res = audio::write_tags(
                 &p,
@@ -826,6 +904,7 @@ pub async fn save_batch_file_tags(
                     genre: &genre_c,
                     track: song.track.map(|t| t as u32),
                     disc,
+                    disc_subtitle: disc_subtitle.as_deref(),
                     year,
                     originalyear: song.originalyear.map(|y| y as u32),
                     grouping: &grouping,
@@ -836,16 +915,18 @@ pub async fn save_batch_file_tags(
             );
             if write_res.is_ok() {
                 count += 1;
+                written.push((p, disc, disc_subtitle));
             }
         }
-        count
+        (count, written)
     })
     .await
     .map_err(|e| e.to_string())?;
 
     // Also update any matching rows in SQLite DB
     if let Ok(conn) = state.db.pool.get() {
-        for path in &paths {
+        for (path, disc, disc_subtitle) in &written {
+            let path = path.to_string_lossy();
             let _ = conn.execute(
                 "UPDATE songs SET
                     album = ?1,
@@ -856,7 +937,8 @@ pub async fn save_batch_file_tags(
                     genresort = ?6,
                     year = ?7,
                     disc = ?8,
-                    compilation = ?9
+                    compilation = ?9,
+                    disc_subtitle = ?11
                  WHERE path = ?10",
                 rusqlite::params![
                     album,
@@ -878,6 +960,7 @@ pub async fn save_batch_file_tags(
                     disc,
                     compilation,
                     path,
+                    disc_subtitle,
                 ],
             );
         }
@@ -1105,6 +1188,28 @@ pub async fn open_song_folder(
 mod tests {
     use super::*;
     use std::path::Path;
+
+    /// The album editors send `{ mode: "keep" }` for a mixed field the user
+    /// didn't touch, which must leave every track's own value alone (#1940).
+    #[test]
+    fn test_field_edit_wire_format_and_resolve() {
+        let keep: FieldEdit<u32> = serde_json::from_str(r#"{"mode":"keep"}"#).unwrap();
+        let set: FieldEdit<u32> = serde_json::from_str(r#"{"mode":"set","value":2}"#).unwrap();
+        let clear: FieldEdit<u32> = serde_json::from_str(r#"{"mode":"set","value":null}"#).unwrap();
+
+        assert_eq!(keep, FieldEdit::Keep);
+        assert_eq!(keep.resolve(Some(1)), Some(1));
+        assert_eq!(keep.resolve(None), None);
+        assert_eq!(set.resolve(Some(1)), Some(2));
+        assert_eq!(clear.resolve(Some(1)), None);
+    }
+
+    #[test]
+    fn test_non_blank_trims_and_drops_empty() {
+        assert_eq!(non_blank(Some("  Live  ".into())), Some("Live".into()));
+        assert_eq!(non_blank(Some("   ".into())), None);
+        assert_eq!(non_blank(None), None);
+    }
 
     #[test]
     fn test_is_disc_folder_name() {

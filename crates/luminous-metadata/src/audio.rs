@@ -124,6 +124,9 @@ pub struct AudioFileMetadata {
     pub originalyear: Option<i32>,
     pub track: Option<i32>,
     pub disc: Option<i32>,
+    /// Title of this track's disc within a multi-disc release
+    /// ("Live at the Marquee") — DISCSUBTITLE / TSST.
+    pub disc_subtitle: Option<String>,
     pub compilation: bool,
     pub grouping: Option<String>,
     pub bpm: Option<f32>,
@@ -166,6 +169,8 @@ pub struct TagWriteRequest<'a> {
     pub genre: &'a str,
     pub track: Option<u32>,
     pub disc: Option<u32>,
+    /// Blank or `None` removes the disc subtitle frame.
+    pub disc_subtitle: Option<&'a str>,
     pub year: Option<u32>,
     pub originalyear: Option<u32>,
     pub grouping: &'a str,
@@ -282,6 +287,16 @@ pub fn read_tags(path: &Path) -> Result<AudioFileMetadata> {
         }
         if meta.disc.is_none() {
             meta.disc = tag.disk().map(|d| d as i32);
+        }
+        // `SetSubtitle` is lofty's one key for every container's disc
+        // subtitle: Vorbis DISCSUBTITLE, ID3v2 TSST, MP4
+        // ----:com.apple.iTunes:DISCSUBTITLE and APE DiscSubtitle.
+        if meta.disc_subtitle.is_none() {
+            meta.disc_subtitle = tag
+                .get_string(ItemKey::SetSubtitle)
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string);
         }
         if meta.album_artist.is_none() {
             meta.album_artist = read_multi_value(tag, ItemKey::AlbumArtist);
@@ -622,7 +637,7 @@ fn read_native_vorbis_comments(
 
 /// Write the given tag fields to `path`'s primary tag, creating one if the
 /// file has none yet. Every field is written unconditionally — `Option`
-/// fields (`track`, `disc`, `year`, `originalyear`, `bpm`) are cleared from the file when
+/// fields (`track`, `disc`, `disc_subtitle`, `year`, `originalyear`, `bpm`) are cleared from the file when
 /// `None` rather than left untouched, so callers must pass the full desired
 /// state, not a partial patch. Preserves any existing embedded cover art,
 /// which lofty's tag-mutation calls would otherwise silently drop (#106).
@@ -644,6 +659,7 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
         genre,
         track,
         disc,
+        disc_subtitle,
         year,
         originalyear,
         grouping,
@@ -672,18 +688,19 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
     tag.set_title(title.to_string());
     tag.set_album(album.to_string());
 
-    let mut set_or_remove_sort = |key: lofty::tag::ItemKey, val: Option<&str>| {
+    let mut set_or_remove_text = |key: lofty::tag::ItemKey, val: Option<&str>| {
         tag.remove_key(key);
         if let Some(v) = val.map(|s| s.trim()).filter(|s| !s.is_empty()) {
             tag.insert_text(key, v.to_string());
         }
     };
 
-    set_or_remove_sort(lofty::tag::ItemKey::TrackTitleSortOrder, titlesort);
-    set_or_remove_sort(lofty::tag::ItemKey::TrackArtistSortOrder, artistsort);
-    set_or_remove_sort(lofty::tag::ItemKey::AlbumTitleSortOrder, albumsort);
-    set_or_remove_sort(lofty::tag::ItemKey::AlbumArtistSortOrder, album_artist_sort);
-    set_or_remove_sort(lofty::tag::ItemKey::ComposerSortOrder, composersort);
+    set_or_remove_text(lofty::tag::ItemKey::TrackTitleSortOrder, titlesort);
+    set_or_remove_text(lofty::tag::ItemKey::TrackArtistSortOrder, artistsort);
+    set_or_remove_text(lofty::tag::ItemKey::AlbumTitleSortOrder, albumsort);
+    set_or_remove_text(lofty::tag::ItemKey::AlbumArtistSortOrder, album_artist_sort);
+    set_or_remove_text(lofty::tag::ItemKey::ComposerSortOrder, composersort);
+    set_or_remove_text(lofty::tag::ItemKey::SetSubtitle, disc_subtitle);
 
     tag.remove_key(lofty::tag::ItemKey::TrackArtist);
     for a in crate::values::parse_multi_value(artist) {
@@ -1246,6 +1263,48 @@ mod tests {
         let meta = read_tags(&path).expect("read_tags should succeed");
         assert_eq!(meta.year, Some(2009));
         assert_eq!(meta.originalyear, None);
+    }
+
+    /// Each container stores the disc subtitle in its own frame (Vorbis
+    /// DISCSUBTITLE, ID3v2 TSST, MP4 iTunes DISCSUBTITLE); a blank value
+    /// removes it rather than leaving an empty frame behind (#1940).
+    #[test]
+    fn test_write_tags_round_trips_disc_subtitle_across_containers() {
+        for name in ["song_gamma.flac", "song_alpha.mp3", "song_epsilon.m4a"] {
+            let temp_dir = tempfile::tempdir().expect("temp dir");
+            let path = temp_dir.path().join(name);
+            std::fs::copy(fixture("audio", name), &path).expect("copy fixture");
+
+            let req = TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                disc: Some(2),
+                disc_subtitle: Some("Live at the Marquee"),
+                ..Default::default()
+            };
+            write_tags(&path, &req).expect("write_tags should succeed");
+            let meta = read_tags(&path).expect("read_tags should succeed");
+            assert_eq!(meta.disc, Some(2), "{name}");
+            assert_eq!(
+                meta.disc_subtitle.as_deref(),
+                Some("Live at the Marquee"),
+                "{name}"
+            );
+
+            write_tags(
+                &path,
+                &TagWriteRequest {
+                    disc_subtitle: Some("  "),
+                    ..req
+                },
+            )
+            .expect("write_tags with blank subtitle should succeed");
+            let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+            let tag = tagged_file.primary_tag().unwrap();
+            assert!(tag.get(ItemKey::SetSubtitle).is_none(), "{name}");
+            assert_eq!(read_tags(&path).unwrap().disc_subtitle, None, "{name}");
+        }
     }
 
     #[test]

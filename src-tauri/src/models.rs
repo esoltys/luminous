@@ -291,6 +291,9 @@ pub struct Song {
     // Track info
     pub track: Option<i32>,
     pub disc: Option<i32>,
+    /// Title of this track's disc within a multi-disc release, e.g.
+    /// "Live at the Marquee" (DISCSUBTITLE / TSST tags, #1940).
+    pub disc_subtitle: Option<String>,
     pub year: Option<i32>,
     pub originalyear: Option<i32>,
     pub genre: Option<String>,

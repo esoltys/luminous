@@ -69,6 +69,8 @@ export interface Song {
   // Track info
   track?: number;
   disc?: number;
+  /** Title of this disc within a multi-disc release ("Live at the Marquee"). */
+  disc_subtitle?: string | null;
   year?: number;
   originalyear?: number;
   genre?: string;
