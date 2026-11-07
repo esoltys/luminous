@@ -118,6 +118,8 @@
   let playlistItems = $state<PlaylistItem[] | null>(null);
   let loading = $state(true);
   let editingSongId = $state<number | null>(null);
+  /** A multi-song selection open in the batch tag editor. */
+  let batchEditSongs = $state<Song[] | null>(null);
   let editingAlbumSongs = $state<Song[] | null>(null);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
@@ -819,6 +821,17 @@
   />
 {/if}
 
+{#if batchEditSongs !== null}
+  <AlbumTagEditor
+    title={i18n.t("collection.editTagsTooltip")}
+    songIds={batchEditSongs.map((s) => s.id)}
+    initialTracks={batchEditSongs}
+    hasEmbeddedArt={batchEditSongs.some((s) => s.art_embedded)}
+    onClose={() => { batchEditSongs = null; }}
+    onSave={handleTagEditorSaved}
+  />
+{/if}
+
 {#if contextMenuState}
   {@const song = contextMenuState.song}
   {@const selectedSongs = selectedKeys.size > 1 ? songs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
@@ -846,7 +859,7 @@
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
-    onEditBatchTags={() => { editingAlbumSongs = selectedSongs ?? null; }}
+    onEditBatchTags={() => { batchEditSongs = selectedSongs ?? null; }}
     onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { contextMenuState = null; }}
   />
