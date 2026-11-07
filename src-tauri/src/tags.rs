@@ -352,20 +352,7 @@ impl TagManager {
         mode: QueuePopulationMode,
     ) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
-        let mut targets: HashSet<String> = {
-            let mut stmt = conn.prepare(
-                "SELECT tag_assignments.tag_name FROM tag_assignments
-                 JOIN tag_groups ON tag_groups.id = tag_assignments.group_id
-                 WHERE tag_groups.name = ?1 COLLATE NOCASE",
-            )?;
-            let rows = stmt.query_map(params![group_name], |r| r.get::<_, String>(0))?;
-            let names: HashSet<String> = rows
-                .filter_map(|r| r.ok())
-                .map(|s| s.to_lowercase())
-                .collect();
-            names
-        };
-        targets.insert(group_name.to_lowercase());
+        let targets = Self::curated_group_targets(&conn, group_name)?;
 
         // No cheap LIKE prefilter here (unlike get_songs_by_tag) — with
         // multiple target values a single `LIKE '%'||name||'%'` would miss a
@@ -404,6 +391,66 @@ impl TagManager {
             .take(take_limit(limit))
             .collect();
         Ok(songs)
+    }
+
+    /// `group_name` and its curated children, lowercased: the genre values
+    /// that make a song a member of that card.
+    fn curated_group_targets(
+        conn: &rusqlite::Connection,
+        group_name: &str,
+    ) -> Result<HashSet<String>> {
+        let mut stmt = conn.prepare(
+            "SELECT tag_assignments.tag_name FROM tag_assignments
+             JOIN tag_groups ON tag_groups.id = tag_assignments.group_id
+             WHERE tag_groups.name = ?1 COLLATE NOCASE",
+        )?;
+        let mut targets: HashSet<String> = stmt
+            .query_map(params![group_name], |r| r.get::<_, String>(0))?
+            .filter_map(|r| r.ok())
+            .map(|s| s.to_lowercase())
+            .collect();
+        targets.insert(group_name.to_lowercase());
+        Ok(targets)
+    }
+
+    /// How many library songs [`Self::get_songs_by_curated_tag`] would return
+    /// for `name` in [`QueuePopulationMode::All`], counting no further than
+    /// `cap`. Reads only the genre column, unsorted, so a threshold check
+    /// doesn't pay for sorting and loading the whole library (#1968).
+    pub fn count_songs_by_curated_tag(&self, name: &str, cap: usize) -> Result<usize> {
+        let conn = self.db.pool.get()?;
+        let is_group: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM tag_groups WHERE name = ?1 COLLATE NOCASE)",
+            params![name],
+            |r| r.get(0),
+        )?;
+        let targets = if is_group {
+            Self::curated_group_targets(&conn, name)?
+        } else {
+            HashSet::from([name.to_lowercase()])
+        };
+        let sql = format!(
+            "SELECT genre FROM songs
+             WHERE source IN ({lib})
+               AND unavailable = 0
+               AND not_included = 0
+               AND loved != -1
+               AND genre IS NOT NULL
+               AND genre != ''",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let count = stmt
+            .query_map([], |r| r.get::<_, String>(0))?
+            .filter_map(|r| r.ok())
+            .filter(|genre| {
+                parse_multi_value(genre)
+                    .iter()
+                    .any(|v| targets.contains(&v.to_lowercase()))
+            })
+            .take(cap)
+            .count();
+        Ok(count)
     }
 
     /// Single dispatch point for a curated-hierarchy tag lookup (#548): if
@@ -1753,6 +1800,34 @@ mod tests {
             1,
             "child dispatch is an exact any-position match"
         );
+    }
+
+    /// The cheap count agrees with the song lookups it stands in for, for a
+    /// card (which includes its children) and a chip, and stops at its cap.
+    #[test]
+    fn test_count_songs_by_curated_tag_matches_lookup() {
+        let (_dir, db) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Progressive Metal");
+        insert_song(&db, "/b.mp3", "Metal");
+        insert_song(&db, "/c.mp3", "Progressive Metal");
+        insert_song(&db, "/d.mp3", "Metalcore");
+        insert_song(&db, "/e.mp3", "Ambient");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        for name in ["Metal", "Progressive Metal", "Ambient", "Jazz"] {
+            let looked_up = manager
+                .get_songs_by_curated_tag(name, 50, QueuePopulationMode::All)
+                .unwrap()
+                .len();
+            assert_eq!(
+                manager.count_songs_by_curated_tag(name, 50).unwrap(),
+                looked_up,
+                "count for {name}"
+            );
+        }
+        assert_eq!(manager.count_songs_by_curated_tag("Metal", 1).unwrap(), 1);
     }
 
     /// A genre value containing a literal colon (e.g. from a source that

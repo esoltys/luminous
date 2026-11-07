@@ -127,8 +127,19 @@ impl PlaylistManager {
     /// `sync_decade_auto_playlists`'s prefix-based prune/threshold-gate
     /// shape.
     pub fn sync_genre_auto_playlists(&self) -> Result<()> {
-        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+        for name in self.genre_auto_playlist_tags()? {
+            self.sync_genre_auto_playlist(&name)?;
+        }
+        Ok(())
+    }
 
+    /// The first half of [`Self::sync_genre_auto_playlists`]: reconciles the
+    /// curated hierarchy, prunes genre auto-playlists whose tag has left it,
+    /// and returns every curated tag that may have one — the work list for
+    /// [`Self::sync_genre_auto_playlist`]. Split out so a background sync can
+    /// take the playlists lock once per tag instead of for the whole pass
+    /// (`sync_all_auto_playlists_cooperative`, #1968).
+    pub(crate) fn genre_auto_playlist_tags(&self) -> Result<Vec<String>> {
         let tag_manager = TagManager::new(self.db.clone());
         // Self-contained and idempotent — doesn't rely on the async
         // "library-changed" listener (tags::reconcile_hierarchy_and_notify)
@@ -146,8 +157,7 @@ impl PlaylistManager {
             }
         }
 
-        let mut conn = self.db.pool.get()?;
-        let now = chrono::Utc::now().timestamp();
+        let conn = self.db.pool.get()?;
 
         // Prune genre auto-playlists for curated tags no longer in the
         // hierarchy. Only touch rows using the "tag:" convention — decade/
@@ -172,75 +182,70 @@ impl PlaylistManager {
             }
         }
 
-        for name in &wanted {
-            let spec = format!("tag:{}", name);
-            let existing_row: Option<(i64, i64, i64, String)> = conn
-                .query_row(
-                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
-                    params![spec],
-                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-                )
-                .ok();
-            let mode = existing_row
-                .as_ref()
-                .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
-                .unwrap_or_default();
+        Ok(wanted.into_iter().collect())
+    }
 
-            // Check library threshold first. Auto-playlists are created if the library
-            // has at least MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST total songs for this tag
-            // (QueuePopulationMode::All).
-            // Once created, an auto-playlist is only pruned if all songs for this tag are removed (0 songs).
-            let total_songs = tag_manager.get_songs_by_curated_tag(
-                name,
-                MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST,
-                QueuePopulationMode::All,
-            )?;
-            if existing_row.is_none()
-                && total_songs.len() < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST as usize
-            {
-                continue;
+    /// Brings the genre auto-playlist for curated tag `name` up to date:
+    /// creates it once the tag reaches the library threshold, deletes it when
+    /// no song carries the tag any more, and refills it when it is more than
+    /// 24h old. A fresh playlist costs one small threshold query, so a pass
+    /// with nothing to regenerate stays cheap.
+    pub(crate) fn sync_genre_auto_playlist(&self, name: &str) -> Result<()> {
+        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+
+        let tag_manager = TagManager::new(self.db.clone());
+        let mut conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+        let spec = format!("tag:{}", name);
+        let existing_row: Option<(i64, i64, String)> = conn
+            .query_row(
+                "SELECT id, COALESCE(updated, 0), COALESCE(population_mode, 'all') FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                params![spec],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .ok();
+
+        // Check library threshold first. Auto-playlists are created if the library
+        // has at least MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST total songs for this tag
+        // (QueuePopulationMode::All). A count, not a fetch: it runs for every tag.
+        // Once created, an auto-playlist is only pruned if all songs for this tag are removed (0 songs).
+        let total_songs = tag_manager
+            .count_songs_by_curated_tag(name, MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST as usize)?;
+        let playlist_id = match existing_row {
+            None if total_songs < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST as usize => {
+                return Ok(());
             }
-            if existing_row.is_some() && total_songs.is_empty() {
-                if let Some((id, _, _, _)) = existing_row {
-                    conn.execute(
-                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
-                        params![id],
-                    )?;
-                    conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
-                }
-                continue;
+            None => {
+                conn.execute(
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                    params![name, spec, now],
+                )?;
+                conn.last_insert_rowid()
             }
-
-            let songs = tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?;
-
-            let needs_generation = match existing_row {
-                None => true,
-                Some((_, updated, _, _)) => now - updated > STALE_AFTER_SECS,
-            };
-            if !needs_generation {
-                continue;
+            Some((id, _, _)) if total_songs == 0 => {
+                conn.execute(
+                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                    params![id],
+                )?;
+                conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+                return Ok(());
             }
-
-            let playlist_id = match existing_row {
-                Some((id, _, _, _)) => {
-                    conn.execute(
-                        "UPDATE playlists SET updated = ?1 WHERE id = ?2",
-                        params![now, id],
-                    )?;
-                    id
-                }
-                None => {
-                    conn.execute(
-                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
-                        params![name, spec, now],
-                    )?;
-                    conn.last_insert_rowid()
-                }
-            };
-
-            replace_playlist_items(&mut conn, playlist_id, &songs)?;
-        }
-
+            // Fresh: skip before the full fetch below, the expensive part.
+            Some((_, updated, _)) if now - updated <= STALE_AFTER_SECS => return Ok(()),
+            Some((id, _, _)) => {
+                conn.execute(
+                    "UPDATE playlists SET updated = ?1 WHERE id = ?2",
+                    params![now, id],
+                )?;
+                id
+            }
+        };
+        let mode = existing_row
+            .as_ref()
+            .map(|(_, _, m)| QueuePopulationMode::from(m.as_str()))
+            .unwrap_or_default();
+        let songs = tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?;
+        replace_playlist_items(&mut conn, playlist_id, &songs)?;
         Ok(())
     }
 
