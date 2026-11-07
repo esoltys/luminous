@@ -178,6 +178,12 @@ class CollectionStore {
    *  treating "not loaded yet" as "confirmed empty" (e.g. flashing the sidebar/tab
    *  to an empty-library state on every launch before real stats arrive). */
   statsLoaded = $state<boolean>(false);
+  /** False until the first library snapshot (songs, albums, artists) has been
+   *  applied, or has failed. Until then empty `songs`/`albums`/`artists` mean
+   *  "still loading", not "no library" — on a large library that first read
+   *  can take a while, and LibraryWelcome shows a loading state meanwhile
+   *  instead of offering to create a library (#1968). */
+  libraryLoaded = $state<boolean>(false);
   /** Set once at startup. When `db_newer_than_app` is true, the library looking
    *  empty isn't real emptiness — this build can't read data written by whatever
    *  newer build last touched the database. LibraryWelcome swaps its message
@@ -981,15 +987,23 @@ class CollectionStore {
     const INITIAL_CHUNK = 2000;
     const CHUNK_SIZE = 5000;
 
-    const snapshot = await invoke<LibrarySnapshot>("get_library_snapshot", {
-      limit: INITIAL_CHUNK,
-      offset: 0,
-    });
+    let snapshot: LibrarySnapshot;
+    try {
+      snapshot = await invoke<LibrarySnapshot>("get_library_snapshot", {
+        limit: INITIAL_CHUNK,
+        offset: 0,
+      });
+    } catch (err) {
+      // A failed load ends the loading state rather than leaving it up forever.
+      this.libraryLoaded = true;
+      throw err;
+    }
     if (hydrationId !== this.activeHydrationId) return;
 
     this.songs = snapshot.songs ?? [];
     this.albums = snapshot.albums ?? [];
     this.artists = snapshot.artists ?? [];
+    this.libraryLoaded = true;
     await Promise.all([this.loadArtistProfiles(), this.loadAlbumProfiles()]);
 
     const total = snapshot.total_songs ?? this.songs.length;

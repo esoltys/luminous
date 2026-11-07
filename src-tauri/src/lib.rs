@@ -1094,11 +1094,11 @@ pub fn run() {
             // so startup setup, window render, and initial playback requests proceed
             // without lock contention (#1807).
             {
-                let playlists_clone = Arc::clone(&playlists);
+                let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(crate::playlist::STARTUP_AUTO_SYNC_DELAY).await;
                     if let Err(e) =
-                        crate::playlist::sync_all_auto_playlists_cooperative(&playlists_clone).await
+                        crate::playlist::sync_all_auto_playlists_and_notify(&handle).await
                     {
                         log::error!("Failed to sync auto-playlists at startup: {e}");
                     }

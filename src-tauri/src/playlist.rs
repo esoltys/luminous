@@ -128,15 +128,45 @@ pub const STARTUP_AUTO_SYNC_DELAY: std::time::Duration = std::time::Duration::fr
 /// Startup delay before running daily reconciliation, staggered after auto-sync (#1807).
 pub const STARTUP_RECONCILE_DELAY: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// Synchronizes every auto-playlist (genre, decade, BPM, artist tag, metadata,
+/// Daypart Mix), then announces it with `playlists-changed`, so open views pick
+/// up the auto-playlists the sync created, pruned or refilled. The startup pass
+/// runs after the UI has already loaded its playlist list, so without the event
+/// new auto-playlists stayed hidden until something else reloaded it (#1968).
+/// The event names every dynamic playlist, since the sync doesn't report which
+/// it changed.
+pub async fn sync_all_auto_playlists_and_notify(app: &tauri::AppHandle) -> Result<()> {
+    use tauri::{Emitter, Manager};
+
+    let state = app.state::<crate::AppState>();
+    sync_all_auto_playlists_cooperative(&state.playlists).await?;
+    let dynamic_ids = crate::db::run_blocking(&state.db, |conn| {
+        let mut stmt = conn.prepare("SELECT id FROM playlists WHERE dynamic_enabled = 1")?;
+        let ids = stmt
+            .query_map([], |row| row.get::<_, i64>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(ids)
+    })
+    .await?;
+    let _ = app.emit("playlists-changed", dynamic_ids);
+    Ok(())
+}
+
 /// Synchronizes all auto-playlists in the background cooperatively, ensuring user
 /// interactions and playback commands (`replace_queue`, `play_song`) take precedence
 /// and are never starved by background maintenance (#1807).
-pub async fn sync_all_auto_playlists_cooperative(
+async fn sync_all_auto_playlists_cooperative(
     playlists: &tokio::sync::Mutex<PlaylistManager>,
 ) -> Result<()> {
     // Run each category pass in a separate lock acquisition, yielding with a short
     // pause to ensure any pending user commands waiting on `playlists` acquire the lock next.
-    with_playlists(playlists, |pm| pm.sync_genre_auto_playlists()).await?;
+    // The genre pass is one acquisition per curated tag: a large library has hundreds,
+    // and holding the lock for all of them kept Play waiting for minutes (#1968).
+    // `tokio::sync::Mutex` is FIFO, so a waiting command gets the lock at the next release.
+    let genre_tags = with_playlists(playlists, |pm| pm.genre_auto_playlist_tags()).await?;
+    for name in genre_tags {
+        with_playlists(playlists, move |pm| pm.sync_genre_auto_playlist(&name)).await?;
+    }
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     with_playlists(playlists, |pm| pm.sync_decade_auto_playlists()).await?;
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
@@ -486,5 +516,76 @@ mod tests {
 
         let res = sync_handle.await.unwrap();
         assert!(res.is_ok());
+    }
+
+    /// A large library's genre pass must not hold the playlists lock for all
+    /// of its tags: Play (`replace_queue`) has to get in between them rather
+    /// than wait for the whole pass (#1968).
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_genre_sync_lets_queue_replace_in_between_tags() {
+        const GENRES: i64 = 40;
+        let (_temp_dir, db) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let mut conn = db_arc.pool.get().unwrap();
+            let tx = conn.transaction().unwrap();
+            for genre in 0..GENRES {
+                for track in 0..auto_sync::MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST {
+                    tx.execute(
+                        "INSERT INTO songs (title, artist, path, genre, source) VALUES (?1, 'Artist', ?2, ?3, 1)",
+                        params![
+                            format!("Track {genre}-{track}"),
+                            format!("/g{genre}/t{track}.mp3"),
+                            format!("Genre {genre}")
+                        ],
+                    )
+                    .unwrap();
+                }
+            }
+            tx.commit().unwrap();
+        }
+        let genre_playlists = || -> i64 {
+            db_arc
+                .pool
+                .get()
+                .unwrap()
+                .query_row(
+                    "SELECT COUNT(*) FROM playlists WHERE dynamic_spec LIKE 'tag:%'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap()
+        };
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let playlists = std::sync::Arc::new(tokio::sync::Mutex::new(manager));
+        let playlists_clone = playlists.clone();
+        let sync_handle =
+            tokio::spawn(
+                async move { sync_all_auto_playlists_cooperative(&playlists_clone).await },
+            );
+
+        // Wait until the genre pass is under way, then ask for the queue.
+        let started = std::time::Instant::now();
+        while genre_playlists() == 0 {
+            assert!(started.elapsed().as_secs() < 60, "genre pass never started");
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        }
+        let (_, items) = with_playlists(&playlists, |pm| pm.replace_queue(&[1, 2]))
+            .await
+            .unwrap();
+        assert_eq!(items.len(), 2);
+        let built_when_queue_replaced = genre_playlists();
+        assert!(
+            built_when_queue_replaced < GENRES,
+            "replace_queue waited for the whole genre pass ({built_when_queue_replaced} of {GENRES} built)"
+        );
+
+        sync_handle.await.unwrap().unwrap();
+        assert_eq!(
+            genre_playlists(),
+            GENRES,
+            "the pass still builds every genre"
+        );
     }
 }

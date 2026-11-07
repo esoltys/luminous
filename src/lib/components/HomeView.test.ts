@@ -86,6 +86,7 @@ describe("HomeView.svelte", () => {
     };
     collectionStore.songs = [];
     collectionStore.albums = [];
+    collectionStore.libraryLoaded = true;
   });
 
   it("fetches all three curated home queries on mount", async () => {
