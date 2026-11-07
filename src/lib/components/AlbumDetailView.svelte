@@ -884,7 +884,6 @@
     hasEmbeddedArt={songs.some((s) => s.art_embedded)}
     initialArtAutomatic={albumItem?.art_automatic ?? songs[0]?.art_automatic}
     initialArtManual={albumItem?.art_manual ?? songs[0]?.art_manual}
-    isOpen={isEditorOpen}
     onClose={() => { isEditorOpen = false; }}
     onSaved={() => handleTagEditorSaved(true)}
   />

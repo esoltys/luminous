@@ -400,7 +400,6 @@
     hasEmbeddedArt={editingAlbum.art_embedded}
     initialArtAutomatic={editingAlbum.art_automatic}
     initialArtManual={editingAlbum.art_manual}
-    isOpen={true}
     onClose={() => { editingAlbum = null; }}
     onSaved={() => {
       editingAlbum = null;
