@@ -1663,22 +1663,10 @@ fn excluded_album_sql(album_key_col: &str) -> String {
     )
 }
 
-/// The display spelling of the album `album` names — a full `album_key` or a
-/// bare title — or `album` itself when no library song carries it.
+/// [`crate::album_key::display_name`], falling back to `album` itself when
+/// no library song carries it.
 fn album_display_name(conn: &rusqlite::Connection, album: &str) -> Result<String> {
-    let key = album_key(album);
-    let display_sql = if key.contains(crate::album_key::COMPOSITE_KEY_SEPARATOR) {
-        album_display_sql("?1")
-    } else {
-        crate::album_key::album_title_display_sql("?1")
-    };
-    let display: Option<String> = conn
-        .query_row(&format!("SELECT {display_sql}"), params![key], |row| {
-            row.get(0)
-        })
-        .optional()?
-        .flatten();
-    Ok(display.unwrap_or_else(|| album.to_string()))
+    Ok(crate::album_key::display_name(conn, album)?.unwrap_or_else(|| album.to_string()))
 }
 
 /// What the chart history must have been built under to be reused: the

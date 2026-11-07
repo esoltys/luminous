@@ -20,17 +20,12 @@
   let dbNewer = $derived(collectionStore.dbSchemaStatus?.db_newer_than_app ?? false);
 </script>
 
-<!-- Shown wherever a view would otherwise render an empty grid/list because no
-     watched folder has been added yet — distinct from the "your search/filters
-     matched nothing" empty states, which keep their own dashed-border treatment. -->
+<!-- Shown wherever a view would otherwise render an empty grid/list for want of
+     a library: one a newer build wrote, one still loading, or none added yet —
+     distinct from the "your search/filters matched nothing" empty states, which
+     keep their own dashed-border treatment. -->
 <div class="flex flex-col items-center justify-center max-w-md mx-auto text-center p-8 bg-brand-sidebar/40 rounded-xl border border-brand-border select-none">
-  {#if !collectionStore.libraryLoaded && !dbNewer}
-    <!-- The first library read hasn't landed yet: an empty view here means
-         "still loading", so don't offer to create a library (#1968). -->
-    <div class="flex flex-col items-center gap-3" role="status">
-      <LoadingSpinner label={i18n.t('home.loading')} />
-    </div>
-  {:else if dbNewer}
+  {#if dbNewer}
     <div class="w-14 h-14 rounded-full bg-brand-accent/15 border border-brand-accent/30 flex items-center justify-center mb-4">
       <RefreshCw class="w-7 h-7 text-brand-accent-text" />
     </div>
@@ -44,6 +39,12 @@
     <Button onclick={() => { navigationStore.activeTab = 'settings'; }} variant="primary" size="sm">
       {i18n.t('sidebar.settings')}
     </Button>
+  {:else if !collectionStore.libraryLoaded}
+    <!-- The first library read hasn't landed yet: an empty view here means
+         "still loading", so don't offer to create a library (#1968). -->
+    <div class="flex flex-col items-center gap-3" role="status">
+      <LoadingSpinner label={i18n.t('home.loading')} />
+    </div>
   {:else}
     <!-- The very first launch (before the tour has ever been completed) shows
          the full-screen WelcomeScreen instead — this stays a plain, non-

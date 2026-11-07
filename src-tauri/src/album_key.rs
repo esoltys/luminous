@@ -110,18 +110,38 @@ pub fn album_key(album: &str) -> String {
 /// The match is an exact `album_key` comparison so it stays an index search
 /// on `idx_songs_album_key`: the grid evaluates it once per album, and any
 /// non-indexable predicate here turns into a full table scan per album
-/// (minutes on a 37k-song library, #1968). To resolve a bare title instead
-/// of a key, use [`album_title_display_sql`].
+/// (minutes on a 37k-song library, #1968). To resolve one bare title
+/// instead of a key, use [`display_name`].
 pub fn album_display_sql(key_col: &str) -> String {
     album_display_where_sql(&format!("d.album_key = {key_col}"))
 }
 
-/// Like [`album_display_sql`], but `title_col` is a folded album title
-/// ([`album_key`]) rather than a full key: it matches songs whose key is that
-/// bare title or a composite key ending in it, whichever release artist that
-/// is. The suffix test can't use an index, so this scans the library once
-/// per evaluation; only use it for a single lookup, never per row.
-pub fn album_title_display_sql(title_col: &str) -> String {
+/// The display spelling (as [`album_display_sql`] picks it) of the album
+/// `key_or_title` names: a full `album_key` resolves that release; a bare
+/// title resolves whichever release carries that title. `None` when no
+/// library song carries it.
+pub fn display_name(
+    conn: &rusqlite::Connection,
+    key_or_title: &str,
+) -> rusqlite::Result<Option<String>> {
+    use rusqlite::OptionalExtension;
+    let key = album_key(key_or_title);
+    let display_sql = if key.contains(COMPOSITE_KEY_SEPARATOR) {
+        album_display_sql("?1")
+    } else {
+        album_title_display_sql("?1")
+    };
+    Ok(conn
+        .query_row(&format!("SELECT {display_sql}"), [&key], |row| row.get(0))
+        .optional()?
+        .flatten())
+}
+
+/// Like [`album_display_sql`], but `title_col` is a folded album title rather
+/// than a full key: it matches songs whose key is that bare title or a
+/// composite key ending in it. The suffix test can't use an index, so this
+/// scans the library once per evaluation — only for a single lookup.
+fn album_title_display_sql(title_col: &str) -> String {
     album_display_where_sql(&format!(
         "(d.album_key = {title_col}
           OR substr(d.album_key, -(length({title_col}) + 1)) = char({sep}) || {title_col})",
@@ -464,7 +484,7 @@ mod tests {
     /// A full key resolves only that release; a bare title resolves whichever
     /// release carries it, with the majority spelling winning either way.
     #[test]
-    fn display_sql_resolves_keys_and_bare_titles() {
+    fn display_name_resolves_keys_and_bare_titles() {
         let (_dir, db) = display_test_db("luminous_album_display_names_");
         let conn = db.pool.get().unwrap();
         insert_song(&conn, "a/1.mp3", "Songs Of The Sea", "The Band");
@@ -472,37 +492,21 @@ mod tests {
         insert_song(&conn, "a/3.mp3", "Songs of the Sea", "The Band");
         insert_song(&conn, "b/1.mp3", "SONGS OF THE SEA", "Other Band");
 
-        let resolve = |sql: String, arg: &str| -> Option<String> {
-            conn.query_row(&format!("SELECT {sql}"), [arg], |r| r.get(0))
-                .unwrap()
-        };
+        let name = |key_or_title: &str| display_name(&conn, key_or_title).unwrap();
         let band_key = album_key_for("Songs of the Sea", None, Some("The Band"), false);
         let other_key = album_key_for("Songs of the Sea", None, Some("Other Band"), false);
+        assert_eq!(name(&band_key).as_deref(), Some("Songs of the Sea"));
+        assert_eq!(name(&other_key).as_deref(), Some("SONGS OF THE SEA"));
         assert_eq!(
-            resolve(album_display_sql("?1"), &band_key).as_deref(),
+            name(" Songs OF the Sea ").as_deref(),
             Some("Songs of the Sea")
         );
         assert_eq!(
-            resolve(album_display_sql("?1"), &other_key).as_deref(),
-            Some("SONGS OF THE SEA")
-        );
-        assert_eq!(
-            resolve(album_display_sql("?1"), &album_key("Songs of the Sea")),
-            None,
-            "a bare title is not a full key"
-        );
-        assert_eq!(
-            resolve(
-                album_title_display_sql("?1"),
-                &album_key("Songs of the Sea")
-            )
-            .as_deref(),
-            Some("Songs of the Sea")
-        );
-        assert_eq!(
-            resolve(album_title_display_sql("?1"), &album_key("of the Sea")),
+            name("of the Sea"),
             None,
             "a title matches the whole title part, not a suffix of it"
         );
+        let missing = album_key_for("Songs of the Sea", None, Some("Nobody"), false);
+        assert_eq!(name(&missing), None, "a key resolves only its own release");
     }
 }
