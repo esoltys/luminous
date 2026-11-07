@@ -70,8 +70,8 @@ pub async fn get_playlists(state: State<'_, AppState>) -> Result<Vec<Playlist>, 
 /// frontend used to invoke these as three separate round trips in lockstep
 /// at every call site.
 #[tauri::command]
-pub async fn sync_all_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
-    crate::playlist::sync_all_auto_playlists_cooperative(&state.playlists)
+pub async fn sync_all_auto_playlists(app: tauri::AppHandle) -> Result<(), String> {
+    crate::playlist::sync_all_auto_playlists_and_notify(&app)
         .await
         .map_err(|e| e.to_string())
 }

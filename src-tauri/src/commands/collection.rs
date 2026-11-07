@@ -263,7 +263,11 @@ pub async fn get_library_stats(state: State<'_, AppState>) -> Result<LibraryStat
 /// genres/decades or shift which songs qualify). Callers no longer need to
 /// remember to fire all three separately.
 #[tauri::command]
-pub async fn finish_scan(last_scan_time: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn finish_scan(
+    last_scan_time: String,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let db = state.db.clone();
     if let Err(e) = crate::db::run_blocking(&db, move |conn| {
         conn.execute(
@@ -281,7 +285,7 @@ pub async fn finish_scan(last_scan_time: String, state: State<'_, AppState>) -> 
         log::error!("Failed to resync playback queue after scan: {e}");
     }
 
-    crate::playlist::sync_all_auto_playlists_cooperative(&state.playlists)
+    crate::playlist::sync_all_auto_playlists_and_notify(&app)
         .await
         .map_err(|e| e.to_string())
 }

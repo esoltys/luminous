@@ -128,10 +128,34 @@ pub const STARTUP_AUTO_SYNC_DELAY: std::time::Duration = std::time::Duration::fr
 /// Startup delay before running daily reconciliation, staggered after auto-sync (#1807).
 pub const STARTUP_RECONCILE_DELAY: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// Synchronizes every auto-playlist (genre, decade, BPM, artist tag, metadata,
+/// Daypart Mix), then announces it with `playlists-changed`, so open views pick
+/// up the auto-playlists the sync created, pruned or refilled. The startup pass
+/// runs after the UI has already loaded its playlist list, so without the event
+/// new auto-playlists stayed hidden until something else reloaded it (#1968).
+/// The event names every dynamic playlist, since the sync doesn't report which
+/// it changed.
+pub async fn sync_all_auto_playlists_and_notify(app: &tauri::AppHandle) -> Result<()> {
+    use tauri::{Emitter, Manager};
+
+    let state = app.state::<crate::AppState>();
+    sync_all_auto_playlists_cooperative(&state.playlists).await?;
+    let dynamic_ids = crate::db::run_blocking(&state.db, |conn| {
+        let mut stmt = conn.prepare("SELECT id FROM playlists WHERE dynamic_enabled = 1")?;
+        let ids = stmt
+            .query_map([], |row| row.get::<_, i64>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(ids)
+    })
+    .await?;
+    let _ = app.emit("playlists-changed", dynamic_ids);
+    Ok(())
+}
+
 /// Synchronizes all auto-playlists in the background cooperatively, ensuring user
 /// interactions and playback commands (`replace_queue`, `play_song`) take precedence
 /// and are never starved by background maintenance (#1807).
-pub async fn sync_all_auto_playlists_cooperative(
+async fn sync_all_auto_playlists_cooperative(
     playlists: &tokio::sync::Mutex<PlaylistManager>,
 ) -> Result<()> {
     // Run each category pass in a separate lock acquisition, yielding with a short
