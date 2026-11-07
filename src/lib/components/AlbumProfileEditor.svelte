@@ -36,22 +36,14 @@
   import { ALBUM_LINK_PLATFORMS, getPlatformInfo, localizePlatform } from "../utils/artistSocials";
   import { getAlbumFolderPath } from "../utils/pathUtils";
   import type { AlbumProfile, AlbumLink, Song } from "../types";
-  import { MixedField } from "../utils/mixedField.svelte";
+  import { SharedTagFields, librarySongs, type SharedTagValues } from "../utils/sharedTagFields.svelte";
   import DiscFields from "./DiscFields.svelte";
 
   let {
     albumName,
     artistName,
     songIds = [],
-    initialAlbum = "",
-    initialAlbumSort = "",
-    initialAlbumArtist = "",
-    initialAlbumArtistSort = "",
-    initialGenre = "",
-    initialGenreSort = "",
-    initialYear = null,
     initialTracks = [],
-    initialCompilation = false,
     hasEmbeddedArt = false,
     initialArtAutomatic = null,
     initialArtManual = null,
@@ -67,17 +59,9 @@
         Album..." entries there, each writing a different disagreeing tag
         list, was the actual bug). */
     songIds?: number[];
-    initialAlbum?: string | null;
-    initialAlbumSort?: string | null;
-    initialAlbumArtist?: string | null;
-    initialAlbumArtistSort?: string | null;
-    initialGenre?: string | null;
-    initialGenreSort?: string | null;
-    initialYear?: number | null;
-    /** The edited tracks' disc numbers and subtitles, when the caller has
-        them; otherwise they're looked up in the library by `songIds`. */
-    initialTracks?: Pick<Song, "disc" | "disc_subtitle">[];
-    initialCompilation?: boolean;
+    /** The edited tracks' current tags, when the caller has them; otherwise
+        they're looked up by `songIds`. */
+    initialTracks?: (SharedTagValues & Pick<Song, "artist">)[];
     hasEmbeddedArt?: boolean;
     initialArtAutomatic?: string | null;
     initialArtManual?: string | null;
@@ -92,36 +76,15 @@
   let links = $state<AlbumLink[]>([]);
 
   // -- Embedded ID3 tag fields (songs.genre and friends; save_album_tags) --
-  // svelte-ignore state_referenced_locally
-  let album = $state(initialAlbum ?? "");
-  // svelte-ignore state_referenced_locally
-  let albumArtist = $state(initialAlbumArtist ?? "");
-  // svelte-ignore state_referenced_locally
-  let genre = $state(initialGenre ?? "");
-  // svelte-ignore state_referenced_locally
-  let year = $state<number | null>(initialYear);
-  // Disc and Disc Subtitle differ per track on a multi-disc album. With no
-  // tracks to read they stay blank and untouched, so a save never clears them.
-  const disc = new MixedField<number>();
-  const discSubtitle = new MixedField<string>();
-  function editedTracks(): Pick<Song, "disc" | "disc_subtitle">[] {
-    if (initialTracks.length > 0) return initialTracks;
-    const found = songIds.map((id) => collectionStore.songs.find((s) => s.id === id));
-    return found.every((s) => s) ? (found as Song[]) : [];
+  const fields = new SharedTagFields();
+  async function resetTagFields() {
+    try {
+      fields.reset(initialTracks.length > 0 ? initialTracks : await librarySongs(songIds));
+    } catch (err) {
+      // Unloaded fields stay blank and unedited, so a save keeps every tag.
+      console.error("Failed to load the album's tags:", err);
+    }
   }
-  function resetDiscFields() {
-    const tracks = editedTracks();
-    disc.reset(tracks.map((t) => t.disc));
-    discSubtitle.reset(tracks.map((t) => t.disc_subtitle));
-  }
-  // svelte-ignore state_referenced_locally
-  let compilation = $state(initialCompilation ?? false);
-  // svelte-ignore state_referenced_locally
-  let albumsort = $state(initialAlbumSort ?? "");
-  // svelte-ignore state_referenced_locally
-  let albumArtistSort = $state(initialAlbumArtistSort ?? "");
-  // svelte-ignore state_referenced_locally
-  let genresort = $state(initialGenreSort ?? "");
 
   let isSaving = $state(false);
   let isMarkdownEditorOpen = $state(false);
@@ -147,17 +110,9 @@
       description = existing?.description ?? "";
       links = existing?.links ? existing.links.map((l) => ({ ...l })) : [];
 
-      album = initialAlbum ?? "";
-      albumArtist = initialAlbumArtist ?? "";
-      genre = initialGenre ?? "";
-      year = initialYear;
       // Untracked: a library refresh mid-edit mustn't reset what's typed.
-      untrack(resetDiscFields);
-      compilation = initialCompilation ?? false;
-      albumsort = initialAlbumSort ?? "";
-      albumArtistSort = initialAlbumArtistSort ?? "";
-      genresort = initialGenreSort ?? "";
-      previousAlbumArtist = initialAlbumArtist ?? "";
+      untrack(resetTagFields);
+      restoreAlbumArtist = null;
     }
   });
 
@@ -173,21 +128,26 @@
   }
 
   const VARIOUS_ARTISTS = "Various Artists";
-  // Remembers whatever was in Album Artist before the Compilation toggle
+  // Puts back whatever was in Album Artist before the Compilation toggle
   // overwrote it, so unchecking restores it instead of leaving "Various
   // Artists" behind.
-  // svelte-ignore state_referenced_locally
-  let previousAlbumArtist = $state(initialAlbumArtist ?? "");
+  let restoreAlbumArtist: (() => void) | null = null;
 
   function handleCompilationToggle(e: Event) {
     const next = (e.currentTarget as HTMLInputElement).checked;
     if (next) {
-      previousAlbumArtist = albumArtist;
-      albumArtist = VARIOUS_ARTISTS;
-    } else {
-      albumArtist = previousAlbumArtist;
+      restoreAlbumArtist = fields.albumArtist.snapshot();
+      fields.albumArtist.set(VARIOUS_ARTISTS);
+    } else if (restoreAlbumArtist) {
+      restoreAlbumArtist();
+      restoreAlbumArtist = null;
     }
-    compilation = next;
+    fields.compilation.set(next);
+  }
+
+  /** A field's placeholder: "Mixed" while the tracks disagree. */
+  function mixedOr(showsMixed: boolean, fallback?: string): string | undefined {
+    return showsMixed ? i18n.t("albumTagEditor.mixedValues") : fallback;
   }
 
   let isOpeningFolder = $state(false);
@@ -245,7 +205,7 @@
       };
 
       const taskId = "album-tag-save";
-      const targetAlbumName = album || albumName || i18n.t("collection.unknownAlbum");
+      const targetAlbumName = fields.album.value || albumName || i18n.t("collection.unknownAlbum");
       if (songIds.length > 0) {
         tasksStore.startTask({
           id: taskId,
@@ -258,19 +218,7 @@
       const savePromises: Promise<unknown>[] = [collectionStore.saveAlbumProfile(profile)];
       if (songIds.length > 0) {
         savePromises.push(
-          invoke("save_album_tags", {
-            songIds,
-            album: album ?? "",
-            albumsort: albumsort.trim() || null,
-            albumArtist: albumArtist ?? "",
-            albumArtistSort: albumArtistSort.trim() || null,
-            genre: genre ?? "",
-            genresort: genresort.trim() || null,
-            year,
-            disc: disc.edit,
-            discSubtitle: discSubtitle.edit,
-            compilation,
-          })
+          invoke("save_album_tags", { songIds, edit: fields.edit })
         );
       }
 
@@ -402,11 +350,11 @@
           <!-- Album / Artist / Genre / Year / Disc (embedded file tags) -->
           <div class="grid grid-cols-2 gap-4">
             <FormField label={i18n.t('albumTagEditor.albumField')} for="album-tag-album" span2>
-              <Input id="album-tag-album" bind:value={album} disabled={isSaving} size="sm" class="w-full" />
+              <Input id="album-tag-album" bind:value={() => fields.album.value ?? "", (v) => fields.album.set(v)} placeholder={mixedOr(fields.album.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
 
             <FormField label={i18n.t('albumTagEditor.albumArtistField')} for="album-tag-albumartist" span2>
-              {#if compilation && albumArtist === VARIOUS_ARTISTS}
+              {#if fields.compilation.value === true && fields.albumArtist.value === VARIOUS_ARTISTS}
                 <div class="flex items-center h-9">
                   <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-border bg-brand-main text-xs font-semibold text-brand-text-primary">
                     {VARIOUS_ARTISTS}
@@ -416,9 +364,9 @@
               {:else}
                 <ChipInput
                   id="album-tag-albumartist"
-                  bind:value={albumArtist}
+                  bind:value={() => fields.albumArtist.value ?? "", (v) => fields.albumArtist.set(v)}
                   disabled={isSaving}
-                  placeholder={i18n.t('albumTagEditor.albumArtistPlaceholder')}
+                  placeholder={mixedOr(fields.albumArtist.showsMixed, i18n.t('albumTagEditor.albumArtistPlaceholder'))}
                   class="w-full"
                 />
               {/if}
@@ -428,7 +376,8 @@
               <input
                 type="checkbox"
                 id="album-tag-compilation"
-                checked={compilation}
+                checked={fields.compilation.value === true}
+                indeterminate={fields.compilation.showsMixed}
                 onchange={handleCompilationToggle}
                 disabled={isSaving}
                 class="rounded accent-brand-accent"
@@ -444,9 +393,9 @@
 
               <PlainChipInput
                 id="album-tag-genre-input"
-                bind:value={genre}
+                bind:value={() => fields.genre.value ?? "", (v) => fields.genre.set(v)}
                 disabled={isSaving}
-                placeholder={i18n.t('albumTagEditor.genrePlaceholder')}
+                placeholder={mixedOr(fields.genre.showsMixed, i18n.t('albumTagEditor.genrePlaceholder'))}
               />
             </div>
 
@@ -454,18 +403,19 @@
               <Input
                 id="album-tag-year"
                 type="number"
-                value={year ?? ""}
+                value={fields.year.value ?? ""}
                 disabled={isSaving}
+                placeholder={mixedOr(fields.year.showsMixed)}
                 oninput={(e) => {
                   const val = parseInt(e.currentTarget.value, 10);
-                  year = isNaN(val) ? null : val;
+                  fields.year.set(isNaN(val) ? null : val);
                 }}
                 size="sm"
                 class="w-full"
               />
             </FormField>
 
-            <DiscFields {disc} subtitle={discSubtitle} disabled={isSaving} />
+            <DiscFields disc={fields.disc} subtitle={fields.discSubtitle} disabled={isSaving} />
 
             <!-- Sort Overrides ("Sort As") -->
             <details class="col-span-2 group border border-brand-border rounded-lg bg-brand-sidebar/40 overflow-hidden">
@@ -475,15 +425,15 @@
               </summary>
               <div class="p-3 pt-2 grid grid-cols-2 gap-3 border-t border-brand-border/60">
                 <FormField label={i18n.t("sortOverrides.album")} for="album-tag-albumsort">
-                  <Input id="album-tag-albumsort" bind:value={albumsort} disabled={isSaving} size="sm" class="w-full" />
+                  <Input id="album-tag-albumsort" bind:value={() => fields.albumsort.value ?? "", (v) => fields.albumsort.set(v)} placeholder={mixedOr(fields.albumsort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
                 </FormField>
 
                 <FormField label={i18n.t("sortOverrides.albumArtist")} for="album-tag-albumartistsort">
-                  <Input id="album-tag-albumartistsort" bind:value={albumArtistSort} disabled={isSaving} size="sm" class="w-full" />
+                  <Input id="album-tag-albumartistsort" bind:value={() => fields.albumArtistSort.value ?? "", (v) => fields.albumArtistSort.set(v)} placeholder={mixedOr(fields.albumArtistSort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
                 </FormField>
 
                 <FormField label={i18n.t("sortOverrides.genre")} for="album-tag-genresort" span2>
-                  <Input id="album-tag-genresort" bind:value={genresort} disabled={isSaving} size="sm" class="w-full" />
+                  <Input id="album-tag-genresort" bind:value={() => fields.genresort.value ?? "", (v) => fields.genresort.set(v)} placeholder={mixedOr(fields.genresort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
                 </FormField>
               </div>
             </details>

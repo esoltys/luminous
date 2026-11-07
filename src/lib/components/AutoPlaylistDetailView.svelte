@@ -812,15 +812,7 @@
 {#if editingAlbumSongs !== null && editingAlbumSongs.length > 0}
   <AlbumTagEditor
     songIds={editingAlbumSongs.map((s) => s.id)}
-    initialAlbum={editingAlbumSongs[0].album}
-    initialAlbumSort={editingAlbumSongs[0].albumsort}
-    initialAlbumArtist={editingAlbumSongs[0].album_artist || editingAlbumSongs[0].artist}
-    initialAlbumArtistSort={editingAlbumSongs[0].album_artist_sort || editingAlbumSongs[0].artistsort}
-    initialGenre={editingAlbumSongs[0].genre}
-    initialGenreSort={editingAlbumSongs[0].genresort}
-    initialYear={editingAlbumSongs[0].year}
     initialTracks={editingAlbumSongs}
-    initialCompilation={editingAlbumSongs[0].compilation}
     hasEmbeddedArt={editingAlbumSongs.some((s) => s.art_embedded)}
     onClose={() => { editingAlbumSongs = null; }}
     onSave={handleTagEditorSaved}
@@ -854,6 +846,7 @@
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
+    onEditBatchTags={() => { editingAlbumSongs = selectedSongs ?? null; }}
     onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { contextMenuState = null; }}
   />

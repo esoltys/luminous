@@ -49,12 +49,104 @@ impl<T: Clone> FieldEdit<T> {
     }
 }
 
+impl<T> Default for FieldEdit<T> {
+    fn default() -> Self {
+        FieldEdit::Keep
+    }
+}
+
 /// Trims a free-text tag value, mapping blank to `None` so an emptied field
 /// clears the tag instead of storing an empty string.
 fn non_blank(value: Option<String>) -> Option<String> {
     value
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+}
+
+/// The album-level tags the album and batch editors edit, as one track has
+/// them. Everything else about the track stays its own.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct SharedTags {
+    album: String,
+    albumsort: Option<String>,
+    album_artist: String,
+    album_artist_sort: Option<String>,
+    genre: String,
+    genresort: Option<String>,
+    year: Option<u32>,
+    disc: Option<u32>,
+    disc_subtitle: Option<String>,
+    compilation: bool,
+}
+
+impl SharedTags {
+    fn of(song: &models::Song) -> Self {
+        SharedTags {
+            album: song.album.clone().unwrap_or_default(),
+            albumsort: song.albumsort.clone(),
+            album_artist: song.album_artist.clone().unwrap_or_default(),
+            album_artist_sort: song.album_artist_sort.clone(),
+            genre: song.genre.clone().unwrap_or_default(),
+            genresort: song.genresort.clone(),
+            year: song.year.map(|y| y as u32),
+            disc: song.disc.map(|d| d as u32),
+            disc_subtitle: song.disc_subtitle.clone(),
+            compilation: song.compilation,
+        }
+    }
+}
+
+/// An album or batch edit: each shared tag is kept per track or set on all
+/// of them. Fields missing from the IPC payload are kept, so the editors send
+/// only what the user changed. Sent as `{ album: { mode: "set", value }, … }`.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SharedTagEdit {
+    pub album: FieldEdit<String>,
+    pub albumsort: FieldEdit<String>,
+    pub album_artist: FieldEdit<String>,
+    pub album_artist_sort: FieldEdit<String>,
+    pub genre: FieldEdit<String>,
+    pub genresort: FieldEdit<String>,
+    pub year: FieldEdit<u32>,
+    pub disc: FieldEdit<u32>,
+    pub disc_subtitle: FieldEdit<String>,
+    pub compilation: FieldEdit<bool>,
+}
+
+impl SharedTagEdit {
+    /// One track's tags after the edit. Set values are stored the way the
+    /// single-track editor stores them: text trimmed with blank meaning none,
+    /// multi-value fields (album artist, genre) in their canonical `; ` form.
+    fn apply(&self, current: SharedTags) -> SharedTags {
+        let text = |edit: &FieldEdit<String>, now: Option<String>| {
+            edit.clone().map(non_blank).resolve(now)
+        };
+        let multi = |edit: &FieldEdit<String>, now: String| {
+            edit.clone()
+                .map(|v| {
+                    v.map(|s| models::join_multi_value(&models::parse_multi_value(&s)))
+                        .and_then(|s| non_blank(Some(s)))
+                })
+                .resolve(Some(now))
+                .unwrap_or_default()
+        };
+        SharedTags {
+            album: text(&self.album, Some(current.album)).unwrap_or_default(),
+            albumsort: text(&self.albumsort, current.albumsort),
+            album_artist: multi(&self.album_artist, current.album_artist),
+            album_artist_sort: text(&self.album_artist_sort, current.album_artist_sort),
+            genre: multi(&self.genre, current.genre),
+            genresort: text(&self.genresort, current.genresort),
+            year: self.year.resolve(current.year),
+            disc: self.disc.resolve(current.disc),
+            disc_subtitle: text(&self.disc_subtitle, current.disc_subtitle),
+            compilation: self
+                .compilation
+                .resolve(Some(current.compilation))
+                .unwrap_or(false),
+        }
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -565,22 +657,15 @@ pub async fn save_file_tags(
     Ok(())
 }
 
+/// Writes the album editor's shared tags to library songs. Each field of
+/// `edit` is either kept per track or set on all of them, so a selection that
+/// spans albums, discs or genres keeps whatever the user didn't change.
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
 pub async fn save_album_tags(
     app: AppHandle,
     state: State<'_, AppState>,
     song_ids: Vec<i64>,
-    album: String,
-    albumsort: Option<String>,
-    album_artist: String,
-    album_artist_sort: Option<String>,
-    genre: Option<String>,
-    genresort: Option<String>,
-    year: Option<u32>,
-    disc: FieldEdit<u32>,
-    disc_subtitle: FieldEdit<String>,
-    compilation: bool,
+    edit: SharedTagEdit,
 ) -> Result<u32, String> {
     if song_ids.is_empty() {
         return Ok(0);
@@ -593,97 +678,41 @@ pub async fn save_album_tags(
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
 
-    struct SongMetadata {
-        id: i64,
-        path: String,
-        source: i32,
-        title: String,
-        titlesort: Option<String>,
-        artist: String,
-        artistsort: Option<String>,
-        composer: String,
-        composersort: Option<String>,
-        track: Option<u32>,
-        /// Resolved against the edit: the value this song is saved with.
-        disc: Option<u32>,
-        disc_subtitle: Option<String>,
-        originalyear: Option<u32>,
-        grouping: String,
-        bpm: Option<f32>,
-        initial_key: String,
-    }
-
-    let disc_subtitle = disc_subtitle.map(non_blank);
-
-    let mut songs_data = Vec::with_capacity(song_ids.len());
-    for &song_id in &song_ids {
-        let res = conn.query_row(
-            "SELECT path, source, title, titlesort, artist, artistsort, composer, composersort, track, originalyear, grouping, bpm, initial_key,
-                    disc, disc_subtitle
-             FROM songs WHERE id = ?1",
-            rusqlite::params![song_id],
-            |row| {
-                Ok(SongMetadata {
-                    id: song_id,
-                    path: row.get(0)?,
-                    source: row.get(1)?,
-                    title: row.get(2).unwrap_or_default(),
-                    titlesort: row.get(3).ok(),
-                    artist: row.get(4).unwrap_or_default(),
-                    artistsort: row.get(5).ok(),
-                    composer: row.get(6).unwrap_or_default(),
-                    composersort: row.get(7).ok(),
-                    track: row.get(8).ok(),
-                    originalyear: row.get(9).ok(),
-                    grouping: row.get(10).unwrap_or_default(),
-                    bpm: row.get(11).ok(),
-                    initial_key: row.get(12).unwrap_or_default(),
-                    disc: disc.resolve(row.get(13)?),
-                    disc_subtitle: disc_subtitle.resolve(row.get(14)?),
-                })
-            },
+    // Each song with the tags it's saved with.
+    let mut edited: Vec<(models::Song, SharedTags)> = Vec::with_capacity(song_ids.len());
+    {
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
         );
-        if let Ok(meta) = res {
-            songs_data.push(meta);
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        for &song_id in &song_ids {
+            if let Ok(song) = stmt.query_row([song_id], crate::collection::row_to_song) {
+                let tags = edit.apply(SharedTags::of(&song));
+                edited.push((song, tags));
+            }
         }
     }
 
     // See save_song_tags — close the timing race the coarse guard above can't
     // (#514) by tracking every path this batch is about to write.
-    state
-        .self_writes
-        .mark_written(songs_data.iter().map(|m| std::path::PathBuf::from(&m.path)));
+    state.self_writes.mark_written(
+        edited
+            .iter()
+            .filter_map(|(song, _)| song.path.as_deref().map(std::path::PathBuf::from)),
+    );
 
-    let album_c = album.clone();
-    let albumsort_c = albumsort.clone();
-    // Normalize to the canonical `; `-delimited, trimmed, deduped form
-    // before it hits disk or the DB, regardless of exactly what the chip
-    // input sent over the wire.
-    let album_artist_str = models::join_multi_value(&models::parse_multi_value(&album_artist));
-    let album_artist_c = album_artist_str.clone();
-    let album_artist_sort_c = album_artist_sort.clone();
-    let genre_str =
-        models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
-    let genre_c = genre_str.clone();
-
-    // What each song is saved with, kept for the DB update below once
-    // `songs_data` has moved into the writer thread.
-    let resolved: Vec<(i64, Option<u32>, Option<String>)> = songs_data
-        .iter()
-        .map(|m| (m.id, m.disc, m.disc_subtitle.clone()))
-        .collect();
-
-    let total_songs = songs_data.len();
+    let total_songs = edited.len();
     let app_clone = app.clone();
-    let updated_count = tauri::async_runtime::spawn_blocking(move || {
+    let (updated_count, edited) = tauri::async_runtime::spawn_blocking(move || {
         let mut count = 0u32;
-        for (idx, item) in songs_data.into_iter().enumerate() {
+        for (idx, (song, tags)) in edited.iter().enumerate() {
             let _ = app_clone.emit(
                 "tag-batch-progress",
                 TagBatchProgressPayload {
                     current: idx + 1,
                     total: total_songs,
-                    title: item.title.clone(),
+                    title: song.title.clone().unwrap_or_default(),
                     done: false,
                 },
             );
@@ -692,66 +721,30 @@ pub async fn save_album_tags(
             // tags to, and there's no write-back to the remote server implemented —
             // the change is saved to Luminous's own DB only (the tag editor surfaces
             // this to the user), same as save_song_tags/rewrite_genre_and_persist.
-            if models::SongSource::from(item.source as i64).is_remote() {
+            if song.source.is_remote() {
                 count += 1;
                 continue;
             }
-            let path = std::path::PathBuf::from(&item.path);
-            let write_res = audio::write_tags(
-                &path,
-                &audio::TagWriteRequest {
-                    title: &item.title,
-                    titlesort: item.titlesort.as_deref(),
-                    artist: &item.artist,
-                    artistsort: item.artistsort.as_deref(),
-                    album: &album_c,
-                    albumsort: albumsort_c.as_deref(),
-                    album_artist: &album_artist_c,
-                    album_artist_sort: album_artist_sort_c.as_deref(),
-                    composer: &item.composer,
-                    composersort: item.composersort.as_deref(),
-                    genre: &genre_c,
-                    track: item.track,
-                    disc: item.disc,
-                    disc_subtitle: item.disc_subtitle.as_deref(),
-                    year,
-                    originalyear: item.originalyear,
-                    grouping: &item.grouping,
-                    bpm: item.bpm,
-                    initial_key: &item.initial_key,
-                    compilation,
-                },
-            );
-            match write_res {
+            let path = std::path::PathBuf::from(song.path.as_deref().unwrap_or_default());
+            match write_shared_tags(&path, song, tags) {
                 Ok(_) => count += 1,
                 Err(ref e) => {
-                    log::warn!("Failed to persist tags to disk for song {}: {e:#}", item.id);
+                    log::warn!("Failed to persist tags to disk for song {}: {e:#}", song.id);
                 }
             }
         }
-        count
+        (count, edited)
     })
     .await
     .map_err(|e| e.to_string())?;
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-    for (song_id, disc, disc_subtitle) in resolved {
-        let track_artist: Option<String> = tx
-            .query_row(
-                "SELECT artist FROM songs WHERE id = ?1",
-                rusqlite::params![song_id],
-                |r| r.get(0),
-            )
-            .ok();
+    for (song, tags) in &edited {
         let key = crate::album_key::album_key_for(
-            &album,
-            if album_artist_str.trim().is_empty() {
-                None
-            } else {
-                Some(album_artist_str.as_str())
-            },
-            track_artist.as_deref(),
-            compilation,
+            &tags.album,
+            Some(tags.album_artist.as_str()).filter(|s| !s.trim().is_empty()),
+            song.artist.as_deref(),
+            tags.compilation,
         );
         tx.execute(
             "UPDATE songs SET
@@ -768,18 +761,18 @@ pub async fn save_album_tags(
                 disc_subtitle = ?12
              WHERE id = ?10",
             rusqlite::params![
-                album,
-                albumsort,
-                album_artist_str,
-                album_artist_sort,
-                genre_str,
-                genresort,
-                year,
-                disc,
-                compilation,
-                song_id,
+                tags.album,
+                tags.albumsort,
+                tags.album_artist,
+                tags.album_artist_sort,
+                tags.genre,
+                tags.genresort,
+                tags.year,
+                tags.disc,
+                tags.compilation,
+                song.id,
                 key,
-                disc_subtitle
+                tags.disc_subtitle
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -791,7 +784,10 @@ pub async fn save_album_tags(
         TagBatchProgressPayload {
             current: total_songs,
             total: total_songs,
-            title: album.clone(),
+            title: edited
+                .first()
+                .map(|(_, tags)| tags.album.clone())
+                .unwrap_or_default(),
             done: true,
         },
     );
@@ -816,24 +812,16 @@ pub async fn save_album_tags(
     Ok(updated_count)
 }
 
-/// Writes shared album/group metadata tags across multiple audio files on disk (#1887) —
-/// used when batch-editing tags for a folder or multi-file selection from Files view.
+/// Writes the album editor's shared tags to audio files on disk (#1887) —
+/// used when batch-editing tags for a folder or multi-file selection from
+/// Files view. Each field of `edit` is kept per file or set on all of them,
+/// as in `save_album_tags`.
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
 pub async fn save_batch_file_tags(
     app: AppHandle,
     state: State<'_, AppState>,
     paths: Vec<String>,
-    album: String,
-    albumsort: Option<String>,
-    album_artist: String,
-    album_artist_sort: Option<String>,
-    genre: Option<String>,
-    genresort: Option<String>,
-    year: Option<u32>,
-    disc: FieldEdit<u32>,
-    disc_subtitle: FieldEdit<String>,
-    compilation: bool,
+    edit: SharedTagEdit,
 ) -> Result<u32, String> {
     if paths.is_empty() {
         return Ok(0);
@@ -844,80 +832,37 @@ pub async fn save_batch_file_tags(
     let path_bufs: Vec<std::path::PathBuf> = paths.iter().map(std::path::PathBuf::from).collect();
     state.self_writes.mark_written(path_bufs.iter().cloned());
 
-    let album_artist_str = models::join_multi_value(&models::parse_multi_value(&album_artist));
-    let genre_str =
-        models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
-
     let total = path_bufs.len();
     let app_clone = app.clone();
-    let album_c = album.clone();
-    let albumsort_c = albumsort.clone();
-    let album_artist_c = album_artist_str.clone();
-    let album_artist_sort_c = album_artist_sort.clone();
-    let genre_c = genre_str.clone();
-    let disc_subtitle = disc_subtitle.map(non_blank);
 
-    // Returns each written file's resolved disc and subtitle for the DB update.
+    // Each written file with the tags it was saved with, for the DB update.
     let (updated_count, written) = tauri::async_runtime::spawn_blocking(move || {
         let mut count = 0u32;
-        let mut written: Vec<(std::path::PathBuf, Option<u32>, Option<String>)> = Vec::new();
+        let mut written: Vec<(std::path::PathBuf, SharedTags)> = Vec::new();
         for (idx, p) in path_bufs.into_iter().enumerate() {
-            let song = match crate::collection::read_tags(&p) {
+            let mut song = match crate::collection::read_tags(&p) {
                 Ok(s) => s,
                 Err(_) => continue,
             };
-
-            let title = song.title.clone().unwrap_or_else(|| {
-                p.file_stem()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or_default()
-            });
+            // A file with no title tag keeps its name as one.
+            if song.title.is_none() {
+                song.title = p.file_stem().map(|s| s.to_string_lossy().to_string());
+            }
 
             let _ = app_clone.emit(
                 "tag-batch-progress",
                 TagBatchProgressPayload {
                     current: idx + 1,
                     total,
-                    title: title.clone(),
+                    title: song.title.clone().unwrap_or_default(),
                     done: false,
                 },
             );
 
-            let artist = song.artist.unwrap_or_default();
-            let composer = song.composer.unwrap_or_default();
-            let grouping = song.grouping.unwrap_or_default();
-            let initial_key = song.initial_key.unwrap_or_default();
-            let disc = disc.resolve(song.disc.map(|d| d as u32));
-            let disc_subtitle = disc_subtitle.resolve(song.disc_subtitle);
-
-            let write_res = audio::write_tags(
-                &p,
-                &audio::TagWriteRequest {
-                    title: &title,
-                    titlesort: song.titlesort.as_deref(),
-                    artist: &artist,
-                    artistsort: song.artistsort.as_deref(),
-                    album: &album_c,
-                    albumsort: albumsort_c.as_deref(),
-                    album_artist: &album_artist_c,
-                    album_artist_sort: album_artist_sort_c.as_deref(),
-                    composer: &composer,
-                    composersort: song.composersort.as_deref(),
-                    genre: &genre_c,
-                    track: song.track.map(|t| t as u32),
-                    disc,
-                    disc_subtitle: disc_subtitle.as_deref(),
-                    year,
-                    originalyear: song.originalyear.map(|y| y as u32),
-                    grouping: &grouping,
-                    bpm: song.bpm,
-                    initial_key: &initial_key,
-                    compilation,
-                },
-            );
-            if write_res.is_ok() {
+            let tags = edit.apply(SharedTags::of(&song));
+            if write_shared_tags(&p, &song, &tags).is_ok() {
                 count += 1;
-                written.push((p, disc, disc_subtitle));
+                written.push((p, tags));
             }
         }
         (count, written)
@@ -927,7 +872,7 @@ pub async fn save_batch_file_tags(
 
     // Also update any matching rows in SQLite DB
     if let Ok(conn) = state.db.pool.get() {
-        for (path, disc, disc_subtitle) in &written {
+        for (path, tags) in &written {
             let path = path.to_string_lossy();
             let _ = conn.execute(
                 "UPDATE songs SET
@@ -943,26 +888,17 @@ pub async fn save_batch_file_tags(
                     disc_subtitle = ?11
                  WHERE path = ?10",
                 rusqlite::params![
-                    album,
-                    albumsort
-                        .as_deref()
-                        .map(|s| s.trim())
-                        .filter(|s| !s.is_empty()),
-                    album_artist_str,
-                    album_artist_sort
-                        .as_deref()
-                        .map(|s| s.trim())
-                        .filter(|s| !s.is_empty()),
-                    genre_str,
-                    genresort
-                        .as_deref()
-                        .map(|s| s.trim())
-                        .filter(|s| !s.is_empty()),
-                    year,
-                    disc,
-                    compilation,
+                    tags.album,
+                    tags.albumsort,
+                    tags.album_artist,
+                    tags.album_artist_sort,
+                    tags.genre,
+                    tags.genresort,
+                    tags.year,
+                    tags.disc,
+                    tags.compilation,
                     path,
-                    disc_subtitle,
+                    tags.disc_subtitle,
                 ],
             );
         }
@@ -979,6 +915,40 @@ pub async fn save_batch_file_tags(
     );
 
     Ok(updated_count)
+}
+
+/// Writes `tags` to the file at `path`, keeping `song`'s own per-track tags
+/// (title, artist, track number and the rest).
+fn write_shared_tags(
+    path: &std::path::Path,
+    song: &models::Song,
+    tags: &SharedTags,
+) -> anyhow::Result<()> {
+    audio::write_tags(
+        path,
+        &audio::TagWriteRequest {
+            title: song.title.as_deref().unwrap_or_default(),
+            titlesort: song.titlesort.as_deref(),
+            artist: song.artist.as_deref().unwrap_or_default(),
+            artistsort: song.artistsort.as_deref(),
+            album: &tags.album,
+            albumsort: tags.albumsort.as_deref(),
+            album_artist: &tags.album_artist,
+            album_artist_sort: tags.album_artist_sort.as_deref(),
+            composer: song.composer.as_deref().unwrap_or_default(),
+            composersort: song.composersort.as_deref(),
+            genre: &tags.genre,
+            track: song.track.map(|t| t as u32),
+            disc: tags.disc,
+            disc_subtitle: tags.disc_subtitle.as_deref(),
+            year: tags.year,
+            originalyear: song.originalyear.map(|y| y as u32),
+            grouping: song.grouping.as_deref().unwrap_or_default(),
+            bpm: song.bpm,
+            initial_key: song.initial_key.as_deref().unwrap_or_default(),
+            compilation: tags.compilation,
+        },
+    )
 }
 
 /// Clear a single song's embedded cover art (#386) — removes the picture(s)
@@ -1206,6 +1176,48 @@ mod tests {
         assert_eq!(clear.resolve(Some(1)), None);
         assert_eq!(keep.map(|_| Some(9)), FieldEdit::Keep);
         assert_eq!(set.map(|v| v.map(|n| n + 1)), FieldEdit::Set(Some(3)));
+    }
+
+    /// A selection spanning albums keeps every field the user didn't touch,
+    /// and normalizes the ones they set like the single-track editor does.
+    #[test]
+    fn test_shared_tag_edit_keeps_omitted_fields_and_normalizes_set_ones() {
+        let edit: SharedTagEdit = serde_json::from_str(
+            r#"{
+                "genre": { "mode": "set", "value": " Rock ;Blues; " },
+                "discSubtitle": { "mode": "set", "value": "  Remixes " },
+                "year": { "mode": "set", "value": null },
+                "compilation": { "mode": "keep" }
+            }"#,
+        )
+        .unwrap();
+        let track = SharedTags {
+            album: "Night Visions".into(),
+            albumsort: Some("Night Visions".into()),
+            album_artist: "Imagine Dragons".into(),
+            genre: "Pop".into(),
+            year: Some(2012),
+            disc: Some(3),
+            compilation: true,
+            ..SharedTags::default()
+        };
+
+        let saved = edit.apply(track.clone());
+
+        assert_eq!(
+            saved,
+            SharedTags {
+                genre: "Rock; Blues".into(),
+                disc_subtitle: Some("Remixes".into()),
+                year: None,
+                ..track.clone()
+            }
+        );
+        assert_eq!(SharedTagEdit::default().apply(track.clone()), track);
+
+        let cleared: SharedTagEdit =
+            serde_json::from_str(r#"{ "albumArtist": { "mode": "set", "value": "  " } }"#).unwrap();
+        assert_eq!(cleared.apply(track).album_artist, "");
     }
 
     #[test]

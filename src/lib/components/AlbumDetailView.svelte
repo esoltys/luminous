@@ -21,6 +21,7 @@
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import BoxSetDiscIcons from "./BoxSetDiscIcons.svelte";
   import TagEditor from "./TagEditor.svelte";
+  import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import GenreChips from "./GenreChips.svelte";
   import { tagsStore } from "../stores/tags.svelte";
@@ -72,6 +73,8 @@
   let refreshing = $state(false);
   let retrievingDetails = $state(false);
   let editingSongId = $state<number | null>(null);
+  /** A multi-song selection open in the batch tag editor. */
+  let batchEditSongs = $state<Song[] | null>(null);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
   let showShareModal = $state(false);
 
@@ -756,6 +759,17 @@
   />
 {/if}
 
+{#if batchEditSongs !== null}
+  <AlbumTagEditor
+    title={i18n.t("collection.editTagsTooltip")}
+    songIds={batchEditSongs.map((s) => s.id)}
+    initialTracks={batchEditSongs}
+    hasEmbeddedArt={batchEditSongs.some((s) => s.art_embedded)}
+    onClose={() => { batchEditSongs = null; }}
+    onSave={() => handleTagEditorSaved()}
+  />
+{/if}
+
 {#if contextMenuState}
   {@const song = contextMenuState.song}
   {@const selectedSongs = selectedKeys.size > 1 ? songs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
@@ -783,6 +797,7 @@
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
+    onEditBatchTags={() => { batchEditSongs = selectedSongs ?? null; }}
     onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { contextMenuState = null; }}
   />
@@ -865,15 +880,7 @@
     {albumName}
     {artistName}
     songIds={songs.map((s) => s.id)}
-    initialAlbum={songs[0].album}
-    initialAlbumSort={songs[0].albumsort}
-    initialAlbumArtist={songs[0].album_artist || songs[0].artist}
-    initialAlbumArtistSort={songs[0].album_artist_sort || songs[0].artistsort}
-    initialGenre={songs[0].genre}
-    initialGenreSort={songs[0].genresort}
-    initialYear={songs[0].year}
     initialTracks={songs}
-    initialCompilation={songs[0].compilation}
     hasEmbeddedArt={songs.some((s) => s.art_embedded)}
     initialArtAutomatic={albumItem?.art_automatic ?? songs[0]?.art_automatic}
     initialArtManual={albumItem?.art_manual ?? songs[0]?.art_manual}

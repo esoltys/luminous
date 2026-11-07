@@ -30,4 +30,15 @@ describe("MixedField", () => {
     field.reset([1, 2]);
     expect(field.edit).toEqual({ mode: "keep" });
   });
+
+  it("snapshot puts back the value and whether it was edited", () => {
+    const field = new MixedField<string>();
+    field.reset(["A", "B"]);
+    const restore = field.snapshot();
+    field.set("Various Artists");
+    restore();
+    expect(field.value).toBeNull();
+    expect(field.showsMixed).toBe(true);
+    expect(field.edit).toEqual({ mode: "keep" });
+  });
 });

@@ -37,6 +37,18 @@ export class MixedField<T> {
     this.#edited = true;
   }
 
+  /** Captures the field as it is now; calling the result puts it back,
+      edited or not — for undoing a change the editor made on its own. */
+  snapshot(): () => void {
+    const { value, showsMixed } = this;
+    const edited = this.#edited;
+    return () => {
+      this.value = value;
+      this.showsMixed = showsMixed;
+      this.#edited = edited;
+    };
+  }
+
   /** What to send to the save command. */
   get edit(): FieldEdit<T> {
     return this.#edited ? { mode: "set", value: this.value } : { mode: "keep" };
