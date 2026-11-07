@@ -1,7 +1,7 @@
 <script lang="ts">
   import { isRemotePath } from "../utils/remoteSource";
   import { invoke } from "@tauri-apps/api/core";
-  import { untrack } from "svelte";
+  import { onMount } from "svelte";
   import {
     XIcon as X,
     PlusIcon as Plus,
@@ -47,7 +47,6 @@
     hasEmbeddedArt = false,
     initialArtAutomatic = null,
     initialArtManual = null,
-    isOpen = $bindable(false),
     onClose,
     onSaved,
   }: {
@@ -65,26 +64,32 @@
     hasEmbeddedArt?: boolean;
     initialArtAutomatic?: string | null;
     initialArtManual?: string | null;
-    isOpen?: boolean;
     onClose: () => void;
     onSaved?: (profile: AlbumProfile) => void;
   } = $props();
 
+  // The form is a snapshot of the album taken when the editor mounts (callers
+  // mount it per edit), and nothing reactive may re-seed it: handleSave's own
+  // saveAlbumProfile() updates the profile store before save_album_tags lands,
+  // so a re-seed mid-save would put the stale pre-save tags back in the form.
+
   // -- Curated profile fields (description/website/links; album_profiles table) --
-  let website = $state("");
-  let description = $state("");
-  let links = $state<AlbumLink[]>([]);
+  // svelte-ignore state_referenced_locally
+  const existingProfile = collectionStore.getAlbumProfile(albumName);
+  let website = $state(existingProfile?.website ?? "");
+  let description = $state(existingProfile?.description ?? "");
+  let links = $state<AlbumLink[]>(existingProfile?.links?.map((l) => ({ ...l })) ?? []);
 
   // -- Embedded ID3 tag fields (songs.genre and friends; save_album_tags) --
   const fields = new SharedTagFields();
-  async function resetTagFields() {
+  onMount(async () => {
     try {
       fields.reset(initialTracks.length > 0 ? initialTracks : await librarySongs(songIds));
     } catch (err) {
       // Unloaded fields stay blank and unedited, so a save keeps every tag.
       console.error("Failed to load the album's tags:", err);
     }
-  }
+  });
 
   let isSaving = $state(false);
   let isMarkdownEditorOpen = $state(false);
@@ -100,20 +105,6 @@
       .map((id) => collectionStore.songs.find((s) => s.id === id)?.path)
       .filter((p): p is string => Boolean(p));
     return getAlbumFolderPath(paths);
-  });
-
-  // Sync state when opened or the underlying album changes
-  $effect(() => {
-    if (isOpen) {
-      const existing = collectionStore.getAlbumProfile(albumName);
-      website = existing?.website ?? "";
-      description = existing?.description ?? "";
-      links = existing?.links ? existing.links.map((l) => ({ ...l })) : [];
-
-      // Untracked: a library refresh mid-edit mustn't reset what's typed.
-      untrack(resetTagFields);
-      restoreAlbumArtist = null;
-    }
   });
 
   function handleAddLink() {
@@ -249,7 +240,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape" && isOpen && !isSaving) {
+    if (e.key === "Escape" && !isSaving) {
       onClose();
     }
   }
@@ -257,334 +248,332 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if isOpen}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div
+  use:portal
+  class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 acrylic-scrim"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="album-editor-title"
+  tabindex="-1"
+  onclick={(e) => { if (e.target === e.currentTarget && !isSaving) onClose(); }}
+>
   <div
-    use:portal
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 acrylic-scrim"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="album-editor-title"
-    tabindex="-1"
-    onclick={(e) => { if (e.target === e.currentTarget && !isSaving) onClose(); }}
+    class="bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden text-brand-text-primary"
+    onclick={(e) => e.stopPropagation()}
+    role="document"
   >
-    <div
-      class="bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden text-brand-text-primary"
-      onclick={(e) => e.stopPropagation()}
-      role="document"
-    >
-      <!-- Header -->
-      <div class="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-brand-border bg-brand-sidebar/80 shrink-0">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <Disc class="w-5 h-5 text-brand-accent shrink-0" />
-          <h2 id="album-editor-title" class="text-base sm:text-lg font-bold text-brand-text-primary truncate">
-            {i18n.t("albumProfileEditor.title", {}, "Edit Album Details")}: <span class="text-brand-text-primary font-semibold">{albumName}</span>
-          </h2>
-        </div>
-        <button
-          onclick={onClose}
-          class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 rounded-md transition-colors shrink-0 cursor-pointer"
-          aria-label={i18n.t("common.closeDialog")}
-        >
-          <X class="w-4 h-4" />
-        </button>
+    <!-- Header -->
+    <div class="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-brand-border bg-brand-sidebar/80 shrink-0">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <Disc class="w-5 h-5 text-brand-accent shrink-0" />
+        <h2 id="album-editor-title" class="text-base sm:text-lg font-bold text-brand-text-primary truncate">
+          {i18n.t("albumProfileEditor.title", {}, "Edit Album Details")}: <span class="text-brand-text-primary font-semibold">{albumName}</span>
+        </h2>
       </div>
+      <button
+        onclick={onClose}
+        class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 rounded-md transition-colors shrink-0 cursor-pointer"
+        aria-label={i18n.t("common.closeDialog")}
+      >
+        <X class="w-4 h-4" />
+      </button>
+    </div>
 
-      <!-- Body Form -->
-      <div class="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 flex flex-col gap-4 sm:gap-5 text-sm">
-        {#if isRemoteSource}
-          <div class="flex items-start gap-2.5 bg-brand-main border border-brand-border rounded-lg p-2.5 text-brand-text-secondary text-xs">
-            <CloudIcon class="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{i18n.t('albumTagEditor.remoteSourceNote')}</span>
-          </div>
-        {/if}
-
-        {#if songIds.length > 0}
-          <!-- Location -->
-          <div class="flex items-center gap-3">
-            <div class="flex-1 flex flex-col gap-1 min-w-0">
-              <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('albumTagEditor.locationField')}</span>
-              <span class="text-xs text-brand-text-secondary break-all select-text">{albumFolderPath}</span>
-            </div>
-            {#if !isRemoteSource}
-              <Button
-                onclick={handleOpenFolder}
-                disabled={isSaving || isOpeningFolder}
-                variant="secondary"
-                size="sm"
-              >
-                <FolderOpen class="w-3.5 h-3.5" />
-                {i18n.t('albumTagEditor.openFolderBtn', {}, 'Open Folder')}
-              </Button>
-            {/if}
-          </div>
-
-          <!-- Artwork -->
-          <div class="flex items-center gap-3">
-            <CoverArt songId={songIds[0]} artEmbedded={hasEmbeddedArt} artAutomatic={initialArtAutomatic} artManual={initialArtManual} sizeClass="w-12 h-12 rounded" />
-            <div class="flex-1 flex flex-col gap-1 min-w-0">
-              <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('albumTagEditor.artworkField')}</span>
-              <span class="text-xs text-brand-text-secondary">
-                {hasEmbeddedArt ? i18n.t('albumTagEditor.artworkEmbedded') : i18n.t('albumTagEditor.artworkNotEmbedded')}
-              </span>
-            </div>
-            {#if !isRemoteSource}
-              <Button
-                onclick={() => { showClearArtConfirm = true; }}
-                disabled={!hasEmbeddedArt || isSaving || isClearingArt}
-                variant="secondary"
-                size="sm"
-              >
-                {#if isClearingArt}
-                  <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
-                  <span>{i18n.t('albumTagEditor.clearingArt')}</span>
-                {:else}
-                  <ImageOff class="w-3.5 h-3.5" />
-                  <span>{i18n.t('albumTagEditor.clearArtBtn')}</span>
-                {/if}
-              </Button>
-            {/if}
-          </div>
-
-          <!-- Album / Artist / Genre / Year / Disc (embedded file tags) -->
-          <div class="grid grid-cols-2 gap-4">
-            <FormField label={i18n.t('albumTagEditor.albumField')} for="album-tag-album" span2>
-              <Input id="album-tag-album" bind:value={() => fields.album.value ?? "", (v) => fields.album.set(v)} placeholder={mixedOr(fields.album.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
-            </FormField>
-
-            <FormField label={i18n.t('albumTagEditor.albumArtistField')} for="album-tag-albumartist" span2>
-              {#if fields.compilation.value === true && fields.albumArtist.value === VARIOUS_ARTISTS}
-                <div class="flex items-center h-9">
-                  <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-border bg-brand-main text-xs font-semibold text-brand-text-primary">
-                    {VARIOUS_ARTISTS}
-                    <Lock class="w-3 h-3 text-brand-text-secondary shrink-0" />
-                  </span>
-                </div>
-              {:else}
-                <ChipInput
-                  id="album-tag-albumartist"
-                  bind:value={() => fields.albumArtist.value ?? "", (v) => fields.albumArtist.set(v)}
-                  disabled={isSaving}
-                  placeholder={mixedOr(fields.albumArtist.showsMixed, i18n.t('albumTagEditor.albumArtistPlaceholder'))}
-                  class="w-full"
-                />
-              {/if}
-            </FormField>
-
-            <label class="flex items-center gap-2 col-span-2 text-xs text-brand-text-primary select-none">
-              <input
-                type="checkbox"
-                id="album-tag-compilation"
-                checked={fields.compilation.value === true}
-                indeterminate={fields.compilation.showsMixed}
-                onchange={handleCompilationToggle}
-                disabled={isSaving}
-                class="rounded accent-brand-accent"
-              />
-              {i18n.t('albumTagEditor.compilationField')}
-            </label>
-
-            <div class="col-span-2 flex flex-col gap-2">
-              <label for="album-tag-genre-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
-                <TagIcon class="w-3.5 h-3.5 text-brand-accent" />
-                {i18n.t('albumTagEditor.genreField')}
-              </label>
-
-              <PlainChipInput
-                id="album-tag-genre-input"
-                bind:value={() => fields.genre.value ?? "", (v) => fields.genre.set(v)}
-                disabled={isSaving}
-                placeholder={mixedOr(fields.genre.showsMixed, i18n.t('albumTagEditor.genrePlaceholder'))}
-              />
-            </div>
-
-            <FormField label={i18n.t('albumTagEditor.yearField')} for="album-tag-year">
-              <Input
-                id="album-tag-year"
-                type="number"
-                value={fields.year.value ?? ""}
-                disabled={isSaving}
-                placeholder={mixedOr(fields.year.showsMixed)}
-                oninput={(e) => {
-                  const val = parseInt(e.currentTarget.value, 10);
-                  fields.year.set(isNaN(val) ? null : val);
-                }}
-                size="sm"
-                class="w-full"
-              />
-            </FormField>
-
-            <DiscFields disc={fields.disc} subtitle={fields.discSubtitle} disabled={isSaving} />
-
-            <!-- Sort Overrides ("Sort As") -->
-            <details class="col-span-2 group border border-brand-border rounded-lg bg-brand-sidebar/40 overflow-hidden">
-              <summary class="flex items-center justify-between px-3 py-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
-                <span>{i18n.t("sortOverrides.heading")}</span>
-                <span class="text-[10px] text-brand-text-secondary/70 group-open:rotate-180 transition-transform">▼</span>
-              </summary>
-              <div class="p-3 pt-2 grid grid-cols-2 gap-3 border-t border-brand-border/60">
-                <FormField label={i18n.t("sortOverrides.album")} for="album-tag-albumsort">
-                  <Input id="album-tag-albumsort" bind:value={() => fields.albumsort.value ?? "", (v) => fields.albumsort.set(v)} placeholder={mixedOr(fields.albumsort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
-                </FormField>
-
-                <FormField label={i18n.t("sortOverrides.albumArtist")} for="album-tag-albumartistsort">
-                  <Input id="album-tag-albumartistsort" bind:value={() => fields.albumArtistSort.value ?? "", (v) => fields.albumArtistSort.set(v)} placeholder={mixedOr(fields.albumArtistSort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
-                </FormField>
-
-                <FormField label={i18n.t("sortOverrides.genre")} for="album-tag-genresort" span2>
-                  <Input id="album-tag-genresort" bind:value={() => fields.genresort.value ?? "", (v) => fields.genresort.set(v)} placeholder={mixedOr(fields.genresort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
-                </FormField>
-              </div>
-            </details>
-          </div>
-        {/if}
-
-        <!-- Description / Liner Notes Field -->
-        <div class="flex flex-col gap-1.5">
-          <div class="flex items-center justify-between">
-            <label for="album-description" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-              {i18n.t("albumProfileEditor.description", {}, "Description & Liner Notes")}
-            </label>
-            <button
-              type="button"
-              onclick={() => { isMarkdownEditorOpen = true; }}
-              class="inline-flex items-center gap-1 text-xs text-brand-accent hover:underline cursor-pointer"
-              title={i18n.t("albumProfileEditor.editMarkdownTooltip", {}, "Open roomy Markdown editor")}
-            >
-              <Pencil class="w-3 h-3" />
-              <span>{i18n.t("albumProfileEditor.editMarkdownBtn", {}, "Edit Markdown")}</span>
-            </button>
-          </div>
-          <textarea
-            id="album-description"
-            bind:value={description}
-            rows="4"
-            placeholder={i18n.t("albumProfileEditor.descriptionPlaceholder", {}, "Add album background, liner notes, recording details, or reviews (Markdown links supported e.g. [Review](https://...))...")}
-            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none transition-colors"
-          ></textarea>
+    <!-- Body Form -->
+    <div class="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 flex flex-col gap-4 sm:gap-5 text-sm">
+      {#if isRemoteSource}
+        <div class="flex items-start gap-2.5 bg-brand-main border border-brand-border rounded-lg p-2.5 text-brand-text-secondary text-xs">
+          <CloudIcon class="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{i18n.t('albumTagEditor.remoteSourceNote')}</span>
         </div>
+      {/if}
 
-        <!-- Release Website / Official Page Field -->
-        <div class="flex flex-col gap-1.5">
-          <label for="album-website" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
-            <Globe class="w-3.5 h-3.5 text-brand-accent" />
-            {i18n.t("albumProfileEditor.website", {}, "Official Page / Store")}
-          </label>
-          <input
-            id="album-website"
-            type="text"
-            bind:value={website}
-            placeholder={i18n.t("albumProfileEditor.websitePlaceholder", {}, "https://artist.com/album or www.artist.com/album")}
-            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
-          />
-        </div>
-
-        <!-- Release Links (Bandcamp, Discogs, Spotify, etc.) -->
-        <div class="flex flex-col gap-2.5">
-          <div class="flex items-center justify-between">
-            <label class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
-              <LinkIcon class="w-3.5 h-3.5 text-brand-accent" />
-              {i18n.t("albumProfileEditor.links", {}, "Release & Source Links")}
-            </label>
-            <button
-              type="button"
-              onclick={handleAddLink}
-              class="text-xs font-medium text-brand-text-primary hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <Plus class="w-3.5 h-3.5" />
-              {i18n.t("albumProfileEditor.addLinkBtn", {}, "Add Link")}
-            </button>
+      {#if songIds.length > 0}
+        <!-- Location -->
+        <div class="flex items-center gap-3">
+          <div class="flex-1 flex flex-col gap-1 min-w-0">
+            <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('albumTagEditor.locationField')}</span>
+            <span class="text-xs text-brand-text-secondary break-all select-text">{albumFolderPath}</span>
           </div>
-
-          {#if links.length === 0}
-            <div class="px-4 py-3 rounded-lg border border-dashed border-brand-border text-center text-xs text-brand-text-secondary/60">
-              {i18n.t("albumProfileEditor.noLinks", {}, 'No release links added yet. Click "Add Link" to attach Bandcamp, Discogs, reviews, or streaming links.')}
-            </div>
-          {:else}
-            <div class="flex flex-col gap-2">
-              {#each links as link, idx}
-                {@const platformInfo = getPlatformInfo(link.platform)}
-                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <!-- Platform Select -->
-                  <div class="relative sm:w-40 shrink-0">
-                    <select
-                      bind:value={link.platform}
-                      class="w-full appearance-none pl-8 pr-6 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs focus:outline-none focus:border-brand-accent transition-colors"
-                    >
-                      {#each ALBUM_LINK_PLATFORMS as p (p.id)}
-                        <option value={p.id}>
-                          {p.id === "website" ? i18n.t("albumProfileEditor.website", {}, "Official Page") : p.id === "custom" ? i18n.t("albumProfileEditor.customLink", {}, "Custom Link") : localizePlatform(p).label}
-                        </option>
-                      {/each}
-                    </select>
-                    <div class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-brand-text-secondary">
-                      <SocialIcon platform={link.platform} size={14} />
-                    </div>
-                  </div>
-
-                  <!-- Value / URL Input and Delete Button -->
-                  <div class="flex-1 flex items-center gap-2 min-w-0">
-                    <input
-                      type="text"
-                      bind:value={link.handle_or_url}
-                      placeholder={platformInfo.placeholder}
-                      class="w-full min-w-0 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs placeholder:text-brand-text-secondary/40 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
-                    />
-                    <button
-                      type="button"
-                      onclick={() => handleRemoveLink(idx)}
-                      class="p-1.5 text-brand-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors shrink-0 cursor-pointer"
-                      title={i18n.t("albumProfileEditor.removeLinkTooltip", {}, "Remove link")}
-                    >
-                      <Trash2 class="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              {/each}
-            </div>
+          {#if !isRemoteSource}
+            <Button
+              onclick={handleOpenFolder}
+              disabled={isSaving || isOpeningFolder}
+              variant="secondary"
+              size="sm"
+            >
+              <FolderOpen class="w-3.5 h-3.5" />
+              {i18n.t('albumTagEditor.openFolderBtn', {}, 'Open Folder')}
+            </Button>
           {/if}
         </div>
+
+        <!-- Artwork -->
+        <div class="flex items-center gap-3">
+          <CoverArt songId={songIds[0]} artEmbedded={hasEmbeddedArt} artAutomatic={initialArtAutomatic} artManual={initialArtManual} sizeClass="w-12 h-12 rounded" />
+          <div class="flex-1 flex flex-col gap-1 min-w-0">
+            <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('albumTagEditor.artworkField')}</span>
+            <span class="text-xs text-brand-text-secondary">
+              {hasEmbeddedArt ? i18n.t('albumTagEditor.artworkEmbedded') : i18n.t('albumTagEditor.artworkNotEmbedded')}
+            </span>
+          </div>
+          {#if !isRemoteSource}
+            <Button
+              onclick={() => { showClearArtConfirm = true; }}
+              disabled={!hasEmbeddedArt || isSaving || isClearingArt}
+              variant="secondary"
+              size="sm"
+            >
+              {#if isClearingArt}
+                <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+                <span>{i18n.t('albumTagEditor.clearingArt')}</span>
+              {:else}
+                <ImageOff class="w-3.5 h-3.5" />
+                <span>{i18n.t('albumTagEditor.clearArtBtn')}</span>
+              {/if}
+            </Button>
+          {/if}
+        </div>
+
+        <!-- Album / Artist / Genre / Year / Disc (embedded file tags) -->
+        <div class="grid grid-cols-2 gap-4">
+          <FormField label={i18n.t('albumTagEditor.albumField')} for="album-tag-album" span2>
+            <Input id="album-tag-album" bind:value={() => fields.album.value ?? "", (v) => fields.album.set(v)} placeholder={mixedOr(fields.album.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
+          </FormField>
+
+          <FormField label={i18n.t('albumTagEditor.albumArtistField')} for="album-tag-albumartist" span2>
+            {#if fields.compilation.value === true && fields.albumArtist.value === VARIOUS_ARTISTS}
+              <div class="flex items-center h-9">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-border bg-brand-main text-xs font-semibold text-brand-text-primary">
+                  {VARIOUS_ARTISTS}
+                  <Lock class="w-3 h-3 text-brand-text-secondary shrink-0" />
+                </span>
+              </div>
+            {:else}
+              <ChipInput
+                id="album-tag-albumartist"
+                bind:value={() => fields.albumArtist.value ?? "", (v) => fields.albumArtist.set(v)}
+                disabled={isSaving}
+                placeholder={mixedOr(fields.albumArtist.showsMixed, i18n.t('albumTagEditor.albumArtistPlaceholder'))}
+                class="w-full"
+              />
+            {/if}
+          </FormField>
+
+          <label class="flex items-center gap-2 col-span-2 text-xs text-brand-text-primary select-none">
+            <input
+              type="checkbox"
+              id="album-tag-compilation"
+              checked={fields.compilation.value === true}
+              indeterminate={fields.compilation.showsMixed}
+              onchange={handleCompilationToggle}
+              disabled={isSaving}
+              class="rounded accent-brand-accent"
+            />
+            {i18n.t('albumTagEditor.compilationField')}
+          </label>
+
+          <div class="col-span-2 flex flex-col gap-2">
+            <label for="album-tag-genre-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+              <TagIcon class="w-3.5 h-3.5 text-brand-accent" />
+              {i18n.t('albumTagEditor.genreField')}
+            </label>
+
+            <PlainChipInput
+              id="album-tag-genre-input"
+              bind:value={() => fields.genre.value ?? "", (v) => fields.genre.set(v)}
+              disabled={isSaving}
+              placeholder={mixedOr(fields.genre.showsMixed, i18n.t('albumTagEditor.genrePlaceholder'))}
+            />
+          </div>
+
+          <FormField label={i18n.t('albumTagEditor.yearField')} for="album-tag-year">
+            <Input
+              id="album-tag-year"
+              type="number"
+              value={fields.year.value ?? ""}
+              disabled={isSaving}
+              placeholder={mixedOr(fields.year.showsMixed)}
+              oninput={(e) => {
+                const val = parseInt(e.currentTarget.value, 10);
+                fields.year.set(isNaN(val) ? null : val);
+              }}
+              size="sm"
+              class="w-full"
+            />
+          </FormField>
+
+          <DiscFields disc={fields.disc} subtitle={fields.discSubtitle} disabled={isSaving} />
+
+          <!-- Sort Overrides ("Sort As") -->
+          <details class="col-span-2 group border border-brand-border rounded-lg bg-brand-sidebar/40 overflow-hidden">
+            <summary class="flex items-center justify-between px-3 py-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
+              <span>{i18n.t("sortOverrides.heading")}</span>
+              <span class="text-[10px] text-brand-text-secondary/70 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div class="p-3 pt-2 grid grid-cols-2 gap-3 border-t border-brand-border/60">
+              <FormField label={i18n.t("sortOverrides.album")} for="album-tag-albumsort">
+                <Input id="album-tag-albumsort" bind:value={() => fields.albumsort.value ?? "", (v) => fields.albumsort.set(v)} placeholder={mixedOr(fields.albumsort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
+              </FormField>
+
+              <FormField label={i18n.t("sortOverrides.albumArtist")} for="album-tag-albumartistsort">
+                <Input id="album-tag-albumartistsort" bind:value={() => fields.albumArtistSort.value ?? "", (v) => fields.albumArtistSort.set(v)} placeholder={mixedOr(fields.albumArtistSort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
+              </FormField>
+
+              <FormField label={i18n.t("sortOverrides.genre")} for="album-tag-genresort" span2>
+                <Input id="album-tag-genresort" bind:value={() => fields.genresort.value ?? "", (v) => fields.genresort.set(v)} placeholder={mixedOr(fields.genresort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
+              </FormField>
+            </div>
+          </details>
+        </div>
+      {/if}
+
+      <!-- Description / Liner Notes Field -->
+      <div class="flex flex-col gap-1.5">
+        <div class="flex items-center justify-between">
+          <label for="album-description" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+            {i18n.t("albumProfileEditor.description", {}, "Description & Liner Notes")}
+          </label>
+          <button
+            type="button"
+            onclick={() => { isMarkdownEditorOpen = true; }}
+            class="inline-flex items-center gap-1 text-xs text-brand-accent hover:underline cursor-pointer"
+            title={i18n.t("albumProfileEditor.editMarkdownTooltip", {}, "Open roomy Markdown editor")}
+          >
+            <Pencil class="w-3 h-3" />
+            <span>{i18n.t("albumProfileEditor.editMarkdownBtn", {}, "Edit Markdown")}</span>
+          </button>
+        </div>
+        <textarea
+          id="album-description"
+          bind:value={description}
+          rows="4"
+          placeholder={i18n.t("albumProfileEditor.descriptionPlaceholder", {}, "Add album background, liner notes, recording details, or reviews (Markdown links supported e.g. [Review](https://...))...")}
+          class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none transition-colors"
+        ></textarea>
       </div>
 
-      <!-- Footer Buttons -->
-      <div class="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-brand-border bg-brand-sidebar/80 shrink-0">
-        {#if songIds.length > 0}
-          <div class="flex items-center gap-2 text-xs font-medium text-brand-text-secondary">
-            <Layers class="w-3.5 h-3.5 text-brand-accent shrink-0" />
-            <span>{i18n.plural("albumTagEditor.tracksAffected", songIds.length)}</span>
+      <!-- Release Website / Official Page Field -->
+      <div class="flex flex-col gap-1.5">
+        <label for="album-website" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+          <Globe class="w-3.5 h-3.5 text-brand-accent" />
+          {i18n.t("albumProfileEditor.website", {}, "Official Page / Store")}
+        </label>
+        <input
+          id="album-website"
+          type="text"
+          bind:value={website}
+          placeholder={i18n.t("albumProfileEditor.websitePlaceholder", {}, "https://artist.com/album or www.artist.com/album")}
+          class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+        />
+      </div>
+
+      <!-- Release Links (Bandcamp, Discogs, Spotify, etc.) -->
+      <div class="flex flex-col gap-2.5">
+        <div class="flex items-center justify-between">
+          <label class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+            <LinkIcon class="w-3.5 h-3.5 text-brand-accent" />
+            {i18n.t("albumProfileEditor.links", {}, "Release & Source Links")}
+          </label>
+          <button
+            type="button"
+            onclick={handleAddLink}
+            class="text-xs font-medium text-brand-text-primary hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            <Plus class="w-3.5 h-3.5" />
+            {i18n.t("albumProfileEditor.addLinkBtn", {}, "Add Link")}
+          </button>
+        </div>
+
+        {#if links.length === 0}
+          <div class="px-4 py-3 rounded-lg border border-dashed border-brand-border text-center text-xs text-brand-text-secondary/60">
+            {i18n.t("albumProfileEditor.noLinks", {}, 'No release links added yet. Click "Add Link" to attach Bandcamp, Discogs, reviews, or streaming links.')}
           </div>
         {:else}
-          <span></span>
+          <div class="flex flex-col gap-2">
+            {#each links as link, idx}
+              {@const platformInfo = getPlatformInfo(link.platform)}
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <!-- Platform Select -->
+                <div class="relative sm:w-40 shrink-0">
+                  <select
+                    bind:value={link.platform}
+                    class="w-full appearance-none pl-8 pr-6 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs focus:outline-none focus:border-brand-accent transition-colors"
+                  >
+                    {#each ALBUM_LINK_PLATFORMS as p (p.id)}
+                      <option value={p.id}>
+                        {p.id === "website" ? i18n.t("albumProfileEditor.website", {}, "Official Page") : p.id === "custom" ? i18n.t("albumProfileEditor.customLink", {}, "Custom Link") : localizePlatform(p).label}
+                      </option>
+                    {/each}
+                  </select>
+                  <div class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-brand-text-secondary">
+                    <SocialIcon platform={link.platform} size={14} />
+                  </div>
+                </div>
+
+                <!-- Value / URL Input and Delete Button -->
+                <div class="flex-1 flex items-center gap-2 min-w-0">
+                  <input
+                    type="text"
+                    bind:value={link.handle_or_url}
+                    placeholder={platformInfo.placeholder}
+                    class="w-full min-w-0 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs placeholder:text-brand-text-secondary/40 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onclick={() => handleRemoveLink(idx)}
+                    class="p-1.5 text-brand-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors shrink-0 cursor-pointer"
+                    title={i18n.t("albumProfileEditor.removeLinkTooltip", {}, "Remove link")}
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            {/each}
+          </div>
         {/if}
-        <div class="flex items-center gap-3">
-          <Button
-            onclick={onClose}
-            disabled={isSaving}
-            variant="secondary"
-            size="sm"
-          >
-            {i18n.t("albumProfileEditor.cancel", {}, "Cancel")}
-          </Button>
-          <Button
-            onclick={handleSave}
-            disabled={isSaving}
-            variant="primary"
-            size="sm"
-          >
-            {#if isSaving}
-              <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
-              <span>{i18n.t("albumProfileEditor.saving", {}, "Saving...")}</span>
-            {:else}
-              <Save class="w-3.5 h-3.5" />
-              <span>{i18n.t("albumProfileEditor.save", {}, "Save")}</span>
-            {/if}
-          </Button>
+      </div>
+    </div>
+
+    <!-- Footer Buttons -->
+    <div class="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-brand-border bg-brand-sidebar/80 shrink-0">
+      {#if songIds.length > 0}
+        <div class="flex items-center gap-2 text-xs font-medium text-brand-text-secondary">
+          <Layers class="w-3.5 h-3.5 text-brand-accent shrink-0" />
+          <span>{i18n.plural("albumTagEditor.tracksAffected", songIds.length)}</span>
         </div>
+      {:else}
+        <span></span>
+      {/if}
+      <div class="flex items-center gap-3">
+        <Button
+          onclick={onClose}
+          disabled={isSaving}
+          variant="secondary"
+          size="sm"
+        >
+          {i18n.t("albumProfileEditor.cancel", {}, "Cancel")}
+        </Button>
+        <Button
+          onclick={handleSave}
+          disabled={isSaving}
+          variant="primary"
+          size="sm"
+        >
+          {#if isSaving}
+            <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+            <span>{i18n.t("albumProfileEditor.saving", {}, "Saving...")}</span>
+          {:else}
+            <Save class="w-3.5 h-3.5" />
+            <span>{i18n.t("albumProfileEditor.save", {}, "Save")}</span>
+          {/if}
+        </Button>
       </div>
     </div>
   </div>
-{/if}
+</div>
 
 {#if showClearArtConfirm}
   <ConfirmDialog

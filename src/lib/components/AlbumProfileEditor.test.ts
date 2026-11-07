@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, fireEvent } from "@testing-library/svelte";
+import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import AlbumProfileEditor from "./AlbumProfileEditor.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { collectionStore } from "../stores/collection.svelte";
@@ -43,7 +43,6 @@ describe("AlbumProfileEditor.svelte", () => {
       albumName: "Albatross",
       artistName: "Big Wreck",
       songIds: [1, 2],
-      isOpen: true,
       onClose: vi.fn(),
     });
 
@@ -82,7 +81,6 @@ describe("AlbumProfileEditor.svelte", () => {
       albumName: "The Wall",
       artistName: "Pink Floyd",
       songIds: [10, 11],
-      isOpen: true,
       onClose: vi.fn(),
     });
 
@@ -105,7 +103,6 @@ describe("AlbumProfileEditor.svelte", () => {
       albumName: "Album",
       artistName: "Artist",
       songIds: [1],
-      isOpen: true,
       onClose: vi.fn(),
     });
 
@@ -113,5 +110,40 @@ describe("AlbumProfileEditor.svelte", () => {
     await fireEvent.click(openFolderBtn);
 
     expect(invoke).toHaveBeenCalledWith("open_song_folder", { songIds: [1] });
+  });
+
+  it("keeps the user's edited genres in the form while the save is in flight", async () => {
+    const tracks = [{ id: 1, path: "/m/a.flac", title: "A", artist: "Artist", album: "Album", genre: "Rock" } as Song];
+    collectionStore.songs = tracks;
+    // The profile save lands first and updates the profile store; the tag
+    // save is held open so the form can be inspected mid-save.
+    let finishTagSave!: () => void;
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === "set_album_profile") return args.profile;
+      if (cmd === "save_album_tags") return new Promise<void>((resolve) => { finishTagSave = resolve; });
+      return null;
+    });
+
+    const { getByLabelText, getByTitle, getByRole, queryByText } = render(AlbumProfileEditor, {
+      albumName: "Album",
+      artistName: "Artist",
+      songIds: [1],
+      initialTracks: tracks,
+      onClose: vi.fn(),
+    });
+
+    await waitFor(() => expect(queryByText("Rock")).toBeInTheDocument());
+    await fireEvent.click(getByTitle("Remove Rock"));
+    const genreInput = getByLabelText("Genre") as HTMLInputElement;
+    await fireEvent.input(genreInput, { target: { value: "Folk Metal" } });
+    await fireEvent.keyDown(genreInput, { key: "Enter" });
+
+    await fireEvent.click(getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("save_album_tags", expect.anything()));
+    await waitFor(() => expect(collectionStore.getAlbumProfile("Album")).toBeDefined());
+
+    expect(queryByText("Folk Metal")).toBeInTheDocument();
+    expect(queryByText("Rock")).not.toBeInTheDocument();
+    finishTagSave();
   });
 });
