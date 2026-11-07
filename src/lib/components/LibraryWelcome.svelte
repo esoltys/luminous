@@ -11,6 +11,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { walkthroughStore } from "../stores/walkthrough.svelte";
   import Button from "./Button.svelte";
+  import LoadingSpinner from "./LoadingSpinner.svelte";
 
   // A database last opened by a newer Luminous build looks identical to a
   // genuinely empty library (song queries naming a since-changed column just
@@ -23,7 +24,13 @@
      watched folder has been added yet — distinct from the "your search/filters
      matched nothing" empty states, which keep their own dashed-border treatment. -->
 <div class="flex flex-col items-center justify-center max-w-md mx-auto text-center p-8 bg-brand-sidebar/40 rounded-xl border border-brand-border select-none">
-  {#if dbNewer}
+  {#if !collectionStore.libraryLoaded && !dbNewer}
+    <!-- The first library read hasn't landed yet: an empty view here means
+         "still loading", so don't offer to create a library (#1968). -->
+    <div class="flex flex-col items-center gap-3" role="status">
+      <LoadingSpinner label={i18n.t('home.loading')} />
+    </div>
+  {:else if dbNewer}
     <div class="w-14 h-14 rounded-full bg-brand-accent/15 border border-brand-accent/30 flex items-center justify-center mb-4">
       <RefreshCw class="w-7 h-7 text-brand-accent-text" />
     </div>

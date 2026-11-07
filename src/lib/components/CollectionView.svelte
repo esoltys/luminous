@@ -288,6 +288,7 @@
   });
 
   const albumKey = (album: AlbumItem) => album.artist + "|" + album.album;
+  const artistKey = (artist: ArtistItem) => artist.name ?? "";
 
   let sortedAlbums = $derived.by(() => {
     if (navigationStore.activeSubTab !== "albums") return [];
@@ -628,36 +629,48 @@
           {/if}
         {/if}
         {:else if navigationStore.activeSubTab === "artists"}
-        {#if activeViewMode === "rows"}
-          <div class="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-2">
-            {#each sortedArtists as artist}
-              {@const artistAlbums = getArtistAlbumsFor(artist.name)}
-              {@const artistSongs = getArtistSongsFor(artist.name)}
+        <!-- Virtualized like Albums: every mounted artist card looks up its
+             portrait and loads covers, so mounting a 15k-artist library at once
+             floods the backend and stalls the UI for minutes (#1968). -->
+        {#if sortedArtists.length === 0}
+          <div class="grid">{@render artistEmptyState()}</div>
+        {:else if activeViewMode === "rows"}
+          <VirtualCardGrid
+            items={sortedArtists}
+            key={artistKey}
+            minColumnWidth={280}
+            gap={8}
+            fit
+            estimateRowHeight={() => 66}
+          >
+            {#snippet item(artist)}
               <ArtistRowCard
                 {artist}
-                {artistAlbums}
-                {artistSongs}
+                artistAlbums={getArtistAlbumsFor(artist.name)}
+                artistSongs={getArtistSongsFor(artist.name)}
                 onclick={() => navigationStore.viewArtist(artist.name || "")}
                 oncontextmenu={(e) => handleArtistContextMenu(e, artist)}
               />
-            {/each}
-            {@render artistEmptyState()}
-          </div>
+            {/snippet}
+          </VirtualCardGrid>
         {:else}
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
-            {#each sortedArtists as artist}
-              {@const artistAlbums = getArtistAlbumsFor(artist.name)}
-              {@const artistSongs = getArtistSongsFor(artist.name)}
+          <VirtualCardGrid
+            items={sortedArtists}
+            key={artistKey}
+            minColumnWidth={180}
+            gap={24}
+            estimateRowHeight={(w) => w + 60}
+          >
+            {#snippet item(artist)}
               <ArtistCard
                 {artist}
-                {artistAlbums}
-                {artistSongs}
+                artistAlbums={getArtistAlbumsFor(artist.name)}
+                artistSongs={getArtistSongsFor(artist.name)}
                 onclick={() => navigationStore.viewArtist(artist.name || "")}
                 oncontextmenu={(e) => handleArtistContextMenu(e, artist)}
               />
-            {/each}
-            {@render artistEmptyState()}
-          </div>
+            {/snippet}
+          </VirtualCardGrid>
         {/if}
         {/if}
       </div>

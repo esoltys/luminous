@@ -149,6 +149,28 @@ describe("CollectionView.svelte", () => {
     expect(getByText("Pop")).toBeInTheDocument();
   });
 
+  // Every mounted artist card looks up its portrait and loads covers, so a
+  // large library must not mount them all at once (#1968).
+  it.each(["cards", "rows"] as const)(
+    "mounts only a viewport's worth of a large artist list (%s)",
+    (mode) => {
+      const many: ArtistItem[] = Array.from({ length: 2000 }, (_, i) => ({
+        name: `Artist ${String(i).padStart(4, "0")}`,
+        album_count: 1,
+        song_count: 1,
+      }));
+      collectionStore.artists = many;
+      navigationStore.activeSubTab = "artists";
+      prefs.artistsViewMode = mode;
+      const { getByText, queryAllByText } = render(CollectionView);
+
+      expect(getByText("Artist 0000")).toBeInTheDocument();
+      const mounted = queryAllByText(/^Artist \d{4}$/).length;
+      expect(mounted).toBeGreaterThan(0);
+      expect(mounted).toBeLessThan(100);
+    }
+  );
+
   it("renders Sort: Genre options in Artists sub-tab", () => {
     navigationStore.activeSubTab = "artists";
     const { getByText } = render(CollectionView);

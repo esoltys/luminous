@@ -2,6 +2,7 @@ import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import LibraryWelcome from "./LibraryWelcome.svelte";
+import { collectionStore } from "../stores/collection.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -17,6 +18,17 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 describe("LibraryWelcome.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    collectionStore.libraryLoaded = true;
+  });
+
+  // Before the first library read lands, an empty view is a large library
+  // still loading, not a missing one (#1968).
+  it("shows a loading state instead of offering a library before the first load", () => {
+    collectionStore.libraryLoaded = false;
+    render(LibraryWelcome);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading your collection...");
+    expect(screen.queryByRole("button", { name: /Add Folder to Library/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Open Files/ })).toBeNull();
   });
 
   it("offers playing files without a library alongside building one", () => {
