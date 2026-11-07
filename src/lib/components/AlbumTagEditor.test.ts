@@ -29,7 +29,7 @@ describe("AlbumTagEditor.svelte", () => {
       initialAlbumArtist: "Test Artist",
       initialGenre: "Pop",
       initialYear: 2024,
-      initialDisc: 1,
+      initialTracks: [{ disc: 1 }, { disc: 1 }],
       onClose,
     });
 
@@ -106,7 +106,7 @@ describe("AlbumTagEditor.svelte", () => {
       initialAlbumArtist: "Old Artist",
       initialGenre: "Rock",
       initialYear: 2020,
-      initialDisc: 2,
+      initialTracks: [{ disc: 2 }, { disc: 2 }],
       onClose,
       onSave,
     });
@@ -124,7 +124,7 @@ describe("AlbumTagEditor.svelte", () => {
         albumArtist: "Old Artist",
         genre: "Rock",
         year: 2020,
-        disc: 2,
+        disc: { mode: "keep" },
         compilation: false,
       }));
       expect(onSave).toHaveBeenCalled();
@@ -141,7 +141,6 @@ describe("AlbumTagEditor.svelte", () => {
       initialAlbumArtist: "Test Artist",
       initialGenre: null,
       initialYear: 2024,
-      initialDisc: null,
       onClose,
       onSave,
     });
@@ -161,7 +160,7 @@ describe("AlbumTagEditor.svelte", () => {
         albumArtist: "Test Artist",
         genre: "",
         year: 2024,
-        disc: null,
+        disc: { mode: "keep" },
         compilation: false,
       }));
       expect(onSave).toHaveBeenCalled();
@@ -178,7 +177,7 @@ describe("AlbumTagEditor.svelte", () => {
       initialAlbumArtist: "Test Artist",
       initialGenre: "Rock",
       initialYear: 2024,
-      initialDisc: 1,
+      initialTracks: [{ disc: 1 }, { disc: 1 }],
       onClose,
       onSave,
     });
@@ -203,7 +202,7 @@ describe("AlbumTagEditor.svelte", () => {
         albumArtist: "Test Artist",
         genre: "Rock; Jazz Fusion",
         year: 2024,
-        disc: 1,
+        disc: { mode: "keep" },
         compilation: false,
       }));
       expect(onSave).toHaveBeenCalled();
@@ -220,7 +219,7 @@ describe("AlbumTagEditor.svelte", () => {
       initialAlbumArtist: "Test Artist",
       initialGenre: "Rock; Blues",
       initialYear: 2024,
-      initialDisc: 1,
+      initialTracks: [{ disc: 1 }, { disc: 1 }],
       onClose,
       onSave,
     });
@@ -242,7 +241,7 @@ describe("AlbumTagEditor.svelte", () => {
         albumArtist: "Test Artist",
         genre: "Blues",
         year: 2024,
-        disc: 1,
+        disc: { mode: "keep" },
         compilation: false,
       }));
       expect(onSave).toHaveBeenCalled();
@@ -259,7 +258,7 @@ describe("AlbumTagEditor.svelte", () => {
       initialAlbumArtist: "Artist A",
       initialGenre: "Rock",
       initialYear: 2024,
-      initialDisc: 1,
+      initialTracks: [{ disc: 1 }, { disc: 1 }],
       onClose,
       onSave,
     });
@@ -282,7 +281,7 @@ describe("AlbumTagEditor.svelte", () => {
         albumArtist: "Artist A; Artist B",
         genre: "Rock",
         year: 2024,
-        disc: 1,
+        disc: { mode: "keep" },
         compilation: false,
       }));
       expect(onSave).toHaveBeenCalled();
@@ -299,7 +298,7 @@ describe("AlbumTagEditor.svelte", () => {
       initialAlbumArtist: "Test Artist",
       initialGenre: "Pop",
       initialYear: 2024,
-      initialDisc: 1,
+      initialTracks: [{ disc: 1 }, { disc: 1 }],
       onClose,
       onSave,
     });
@@ -319,11 +318,43 @@ describe("AlbumTagEditor.svelte", () => {
         albumArtist: "Test Artist",
         genre: "Pop",
         year: 2024,
-        disc: null,
+        disc: { mode: "set", value: null },
         compilation: false,
       }));
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  // Saving a multi-disc album without touching Disc or Disc Subtitle must
+  // keep each track's own values rather than writing the first track's (#1940).
+  it("shows Mixed for differing discs and subtitles and keeps them unless edited", async () => {
+    const { getByLabelText, getByRole } = render(AlbumTagEditor, {
+      songIds: [101, 102],
+      initialAlbum: "Box Set",
+      initialAlbumArtist: "Artist",
+      initialTracks: [
+        { disc: 1, disc_subtitle: "The Original Album" },
+        { disc: 2, disc_subtitle: "BBC Sessions" },
+      ],
+      onClose: vi.fn(),
+    });
+
+    const discInput = getByLabelText("Disc #") as HTMLInputElement;
+    const subtitleInput = getByLabelText("Disc Subtitle") as HTMLInputElement;
+    expect(discInput.value).toBe("");
+    expect(discInput.placeholder).toBe("Mixed");
+    expect(subtitleInput.value).toBe("");
+    expect(subtitleInput.placeholder).toBe("Mixed");
+
+    await fireEvent.input(subtitleInput, { target: { value: "  Deluxe  " } });
+    await fireEvent.click(getByRole("button", { name: /save tags/i }));
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", expect.objectContaining({
+        disc: { mode: "keep" },
+        discSubtitle: { mode: "set", value: "Deluxe" },
+      }));
     });
   });
 
@@ -336,7 +367,7 @@ describe("AlbumTagEditor.svelte", () => {
       initialAlbumArtist: "Artist A",
       initialGenre: "Pop",
       initialYear: 2024,
-      initialDisc: 1,
+      initialTracks: [{ disc: 1 }, { disc: 1 }],
       initialCompilation: false,
       onClose,
       onSave,
@@ -363,7 +394,7 @@ describe("AlbumTagEditor.svelte", () => {
         albumArtist: "Various Artists",
         genre: "Pop",
         year: 2024,
-        disc: 1,
+        disc: { mode: "keep" },
         compilation: true,
       }));
       expect(onSave).toHaveBeenCalled();

@@ -1547,6 +1547,8 @@ export const en = {
     composerField: "Composer",
     composerPlaceholder: "Add a composer...",
     discField: "Disc",
+    discSubtitleField: "Disc Subtitle",
+    discSubtitlePlaceholder: "e.g. Live at the Marquee",
     groupingField: "Grouping",
     groupingTooltip: "Groups related tracks together, e.g. movements of a classical work",
     bpmField: "BPM",
@@ -1578,6 +1580,7 @@ export const en = {
     compilationField: "Compilation (mark as Various Artists)",
     yearField: "Release Year",
     discField: "Disc #",
+    mixedValues: "Mixed",
     tracksAffected: {
       one: "Applies to {count} song",
       other: "Applies to {count} songs"
@@ -1883,6 +1886,8 @@ export const en = {
     linkText: "link"
   },
   albumDetail: {
+    discHeading: "Disc {disc}",
+    discHeadingWithSubtitle: "Disc {disc} — {subtitle}",
     backToAlbums: "Back to Albums",
     unknownGenre: "Unknown genre",
     statsLine: "{genre} · {year} · {duration}",
@@ -2118,6 +2123,7 @@ export const en = {
     chipOptionalAlbumFolder: "Optional Album Folder",
     chipFolderSeparator: "Folder Separator",
     chipConditionalDisc: "Conditional Disc Prefix",
+    chipConditionalDiscSubtitle: "Conditional Disc Subtitle",
     chipTrack: "Track # (2-digit padding: 01, 09, 11). Alternatives: %track3 (3-digit: 001), %rawtrack (unpadded: 1)",
     chipOptionalTrack: "Optional Track # (2-digit padding). Alternatives: {%track3 }, {%rawtrack }",
     chipOptionalTrackDot: "Optional Track # with Dot (2-digit padding). Alternatives: {%track3. }, {%rawtrack. }",

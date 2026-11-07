@@ -1,6 +1,7 @@
 <script lang="ts">
   import { isRemotePath } from "../utils/remoteSource";
   import { invoke } from "@tauri-apps/api/core";
+  import { untrack } from "svelte";
   import {
     XIcon as X,
     PlusIcon as Plus,
@@ -34,7 +35,8 @@
   import SocialIcon from "./SocialIcon.svelte";
   import { ALBUM_LINK_PLATFORMS, getPlatformInfo, localizePlatform } from "../utils/artistSocials";
   import { getAlbumFolderPath } from "../utils/pathUtils";
-  import type { AlbumProfile, AlbumLink } from "../types";
+  import type { AlbumProfile, AlbumLink, Song } from "../types";
+  import { fieldEdit, sharedValue } from "../utils/fieldEdit";
 
   let {
     albumName,
@@ -47,7 +49,7 @@
     initialGenre = "",
     initialGenreSort = "",
     initialYear = null,
-    initialDisc = null,
+    initialTracks = [],
     initialCompilation = false,
     hasEmbeddedArt = false,
     initialArtAutomatic = null,
@@ -71,7 +73,9 @@
     initialGenre?: string | null;
     initialGenreSort?: string | null;
     initialYear?: number | null;
-    initialDisc?: number | null;
+    /** The edited tracks' disc numbers and subtitles, when the caller has
+        them; otherwise they're looked up in the library by `songIds`. */
+    initialTracks?: Pick<Song, "disc" | "disc_subtitle">[];
     initialCompilation?: boolean;
     hasEmbeddedArt?: boolean;
     initialArtAutomatic?: string | null;
@@ -95,8 +99,31 @@
   let genre = $state(initialGenre ?? "");
   // svelte-ignore state_referenced_locally
   let year = $state<number | null>(initialYear);
-  // svelte-ignore state_referenced_locally
-  let disc = $state<number | null>(initialDisc);
+  // Disc and Disc Subtitle differ per track on a multi-disc album, so they
+  // show "Mixed" when the tracks disagree and are only written once edited —
+  // and are left alone, never cleared, when the tracks aren't known.
+  function discInfo(): Pick<Song, "disc" | "disc_subtitle">[] {
+    if (initialTracks.length > 0) return initialTracks;
+    const found = songIds.map((id) => collectionStore.songs.find((s) => s.id === id));
+    return found.every((s) => s) ? (found as Song[]) : [];
+  }
+  let disc = $state<number | null>(null);
+  let discMixed = $state(false);
+  let discEdited = $state(false);
+  let discSubtitle = $state("");
+  let discSubtitleMixed = $state(false);
+  let discSubtitleEdited = $state(false);
+  function resetDiscFields() {
+    const tracks = discInfo();
+    const discs = sharedValue(tracks.map((t) => t.disc));
+    const subtitles = sharedValue(tracks.map((t) => t.disc_subtitle));
+    disc = discs.value;
+    discMixed = discs.mixed;
+    discEdited = false;
+    discSubtitle = subtitles.value ?? "";
+    discSubtitleMixed = subtitles.mixed;
+    discSubtitleEdited = false;
+  }
   // svelte-ignore state_referenced_locally
   let compilation = $state(initialCompilation ?? false);
   // svelte-ignore state_referenced_locally
@@ -134,7 +161,8 @@
       albumArtist = initialAlbumArtist ?? "";
       genre = initialGenre ?? "";
       year = initialYear;
-      disc = initialDisc;
+      // Untracked: a library refresh mid-edit mustn't reset what's typed.
+      untrack(resetDiscFields);
       compilation = initialCompilation ?? false;
       albumsort = initialAlbumSort ?? "";
       albumArtistSort = initialAlbumArtistSort ?? "";
@@ -249,7 +277,8 @@
             genre: genre ?? "",
             genresort: genresort.trim() || null,
             year,
-            disc,
+            disc: fieldEdit(discEdited, disc),
+            discSubtitle: fieldEdit(discSubtitleEdited, discSubtitle.trim() || null),
             compilation,
           })
         );
@@ -452,9 +481,28 @@
                 type="number"
                 value={disc ?? ""}
                 disabled={isSaving}
+                placeholder={discMixed && !discEdited ? i18n.t('albumTagEditor.mixedValues') : undefined}
                 oninput={(e) => {
                   const val = parseInt(e.currentTarget.value, 10);
                   disc = isNaN(val) ? null : val;
+                  discEdited = true;
+                }}
+                size="sm"
+                class="w-full"
+              />
+            </FormField>
+
+            <FormField label={i18n.t('tagEditor.discSubtitleField')} for="album-tag-disc-subtitle" span2>
+              <Input
+                id="album-tag-disc-subtitle"
+                value={discSubtitle}
+                disabled={isSaving}
+                placeholder={discSubtitleMixed && !discSubtitleEdited
+                  ? i18n.t('albumTagEditor.mixedValues')
+                  : i18n.t('tagEditor.discSubtitlePlaceholder')}
+                oninput={(e) => {
+                  discSubtitle = e.currentTarget.value;
+                  discSubtitleEdited = true;
                 }}
                 size="sm"
                 class="w-full"

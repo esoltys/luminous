@@ -314,6 +314,29 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     });
   });
 
+  it("heads each disc of a multi-disc album, with its subtitle when tagged (#1940)", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_songs_by_album") {
+        return [
+          { ...mockSongs[0], disc: 1, track: 1 },
+          { ...mockSongs[1], disc: 2, track: 1, disc_subtitle: "BBC Sessions" },
+        ];
+      }
+      if (cmd === "get_all_app_settings") return {};
+      return [];
+    });
+    const { findByRole, getByRole } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+
+    expect(await findByRole("separator", { name: "Disc 1" })).toBeInTheDocument();
+    expect(getByRole("separator", { name: "Disc 2 — BBC Sessions" })).toBeInTheDocument();
+  });
+
+  it("shows no disc headings for a single-disc album without a subtitle", async () => {
+    const { findByText, queryAllByRole } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    await findByText("Come Together");
+    expect(queryAllByRole("separator").filter((el) => el.hasAttribute("data-row-divider"))).toHaveLength(0);
+  });
+
   it("opens the album's folder from the overflow menu with View in Files (#1883)", async () => {
     const target = { source: { kind: "folder", id: 1 }, path: ["The Beatles", "Abbey Road"], selectedName: null, exact: true };
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {

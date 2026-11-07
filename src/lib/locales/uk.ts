@@ -1663,6 +1663,8 @@ export const uk = {
     composerField: "Композитор",
     composerPlaceholder: "Додати композитора…",
     discField: "Диск",
+    discSubtitleField: "Підзаголовок диска",
+    discSubtitlePlaceholder: "наприклад, Концерт у Marquee",
     groupingField: "Групування",
     groupingTooltip: "Об’єднує пов’язані композиції, напр. частини класичного твору",
     bpmField: "BPM",
@@ -1694,6 +1696,7 @@ export const uk = {
     compilationField: "Збірка (позначити як «Різні виконавці»)",
     yearField: "Рік випуску",
     discField: "Диск №",
+    mixedValues: "Різні значення",
     tracksAffected: {
       one: "Стосується {count} пісні",
       few: "Стосується {count} пісень",
@@ -2013,6 +2016,8 @@ export const uk = {
     linkText: "посилання"
   },
   albumDetail: {
+    discHeading: "Диск {disc}",
+    discHeadingWithSubtitle: "Диск {disc} — {subtitle}",
     backToAlbums: "Назад до альбомів",
     unknownGenre: "Невідомий жанр",
     statsLine: "{genre} · {year} · {duration}",
@@ -2270,6 +2275,7 @@ export const uk = {
     chipOptionalAlbumFolder: "Необов'язкова папка альбому",
     chipFolderSeparator: "Роздільник папок",
     chipConditionalDisc: "Умовний префікс диска",
+    chipConditionalDiscSubtitle: "Умовний підзаголовок диска",
     chipTrack: "№ треку (2 цифри: 01, 09, 11). Варіанти: %track3 (3 цифри: 001), %rawtrack (без нулів: 1)",
     chipOptionalTrack: "Необов'язковий № треку (2 цифри). Варіанти: {%track3 }, {%rawtrack }",
     chipOptionalTrackDot: "Необов'язковий № треку з крапкою (2 цифри). Варіанти: {%track3. }, {%rawtrack. }",

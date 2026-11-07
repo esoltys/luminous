@@ -1547,6 +1547,8 @@ export const es = {
     composerField: "Compositor",
     composerPlaceholder: "Agrega un compositor...",
     discField: "Disco",
+    discSubtitleField: "Subtítulo del disco",
+    discSubtitlePlaceholder: "p. ej., En vivo en el Marquee",
     groupingField: "Agrupación",
     groupingTooltip: "Agrupa pistas relacionadas, por ejemplo los movimientos de una obra clásica",
     bpmField: "BPM",
@@ -1578,6 +1580,7 @@ export const es = {
     compilationField: "Recopilación (marcar como Varios artistas)",
     yearField: "Año de lanzamiento",
     discField: "N.º de disco",
+    mixedValues: "Varios valores",
     tracksAffected: {
       one: "Se aplica a {count} canción",
       other: "Se aplica a {count} canciones"
@@ -1883,6 +1886,8 @@ export const es = {
     linkText: "enlace"
   },
   albumDetail: {
+    discHeading: "Disco {disc}",
+    discHeadingWithSubtitle: "Disco {disc} — {subtitle}",
     backToAlbums: "Volver a Álbumes",
     unknownGenre: "Género desconocido",
     statsLine: "{genre} · {year} · {duration}",
@@ -2118,6 +2123,7 @@ export const es = {
     chipOptionalAlbumFolder: "Carpeta de álbum opcional",
     chipFolderSeparator: "Separador de carpetas",
     chipConditionalDisc: "Prefijo de disco condicional",
+    chipConditionalDiscSubtitle: "Subtítulo de disco condicional",
     chipTrack: "N.º de pista (2 dígitos: 01, 09, 11). Alternativas: %track3 (3 dígitos: 001), %rawtrack (sin ceros: 1)",
     chipOptionalTrack: "N.º de pista opcional (2 dígitos). Alternativas: {%track3 }, {%rawtrack }",
     chipOptionalTrackDot: "N.º de pista opcional con punto (2 dígitos). Alternativas: {%track3. }, {%rawtrack. }",

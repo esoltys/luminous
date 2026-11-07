@@ -12,6 +12,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
+  import { discStarts } from "../utils/artist";
   import { shuffleArray } from "../utils/shuffle";
   import { coverRequestUrl } from "../utils/covers";
   import CoverArt from "./CoverArt.svelte";
@@ -417,7 +418,20 @@
     };
   }
 
-  let tableRows = $derived(sortedSongs.map(songToRow));
+  // A heading above each disc ("Disc 2 — BBC Sessions") while the tracks are
+  // in their natural disc/track order; any other sort scatters a disc's tracks.
+  let discHeadings = $derived(sortField === "track" && sortAsc ? discStarts(sortedSongs) : new Map());
+  let tableRows = $derived(
+    sortedSongs.map((song, index) => {
+      const start = discHeadings.get(index);
+      const row = songToRow(song);
+      if (!start) return row;
+      row.dividerBefore = start.subtitle
+        ? i18n.t("albumDetail.discHeadingWithSubtitle", { disc: start.disc, subtitle: start.subtitle })
+        : i18n.t("albumDetail.discHeading", { disc: start.disc });
+      return row;
+    })
+  );
   // Range (shift-click) selection matches natural track order, not the
   // currently displayed sort — preserving the existing behavior.
   let rangeSelectionRows = $derived(songs.map(songToRow));
@@ -858,7 +872,7 @@
     initialGenre={songs[0].genre}
     initialGenreSort={songs[0].genresort}
     initialYear={songs[0].year}
-    initialDisc={songs[0].disc}
+    initialTracks={songs}
     initialCompilation={songs[0].compilation}
     hasEmbeddedArt={songs.some((s) => s.art_embedded)}
     initialArtAutomatic={albumItem?.art_automatic ?? songs[0]?.art_automatic}

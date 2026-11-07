@@ -1547,6 +1547,8 @@ export const it = {
     composerField: "Compositore",
     composerPlaceholder: "Aggiungi un compositore...",
     discField: "Disco",
+    discSubtitleField: "Sottotitolo del disco",
+    discSubtitlePlaceholder: "es. Dal vivo al Marquee",
     groupingField: "Raggruppamento",
     groupingTooltip: "Raggruppa brani correlati, ad esempio i movimenti di un'opera classica",
     bpmField: "BPM",
@@ -1578,6 +1580,7 @@ export const it = {
     compilationField: "Compilation (contrassegna come Artisti vari)",
     yearField: "Anno di pubblicazione",
     discField: "N. disco",
+    mixedValues: "Valori misti",
     tracksAffected: {
       one: "Si applica a {count} brano",
       other: "Si applica a {count} brani"
@@ -1883,6 +1886,8 @@ export const it = {
     linkText: "link"
   },
   albumDetail: {
+    discHeading: "Disco {disc}",
+    discHeadingWithSubtitle: "Disco {disc} — {subtitle}",
     backToAlbums: "Torna agli album",
     unknownGenre: "Genere sconosciuto",
     statsLine: "{genre} · {year} · {duration}",
@@ -2118,6 +2123,7 @@ export const it = {
     chipOptionalAlbumFolder: "Cartella dell'album facoltativa",
     chipFolderSeparator: "Separatore di cartelle",
     chipConditionalDisc: "Prefisso del disco condizionale",
+    chipConditionalDiscSubtitle: "Sottotitolo del disco condizionale",
     chipTrack: "N. traccia (2 cifre: 01, 09, 11). Alternative: %track3 (3 cifre: 001), %rawtrack (senza zeri: 1)",
     chipOptionalTrack: "N. traccia facoltativo (2 cifre). Alternative: {%track3 }, {%rawtrack }",
     chipOptionalTrackDot: "N. traccia facoltativo con punto (2 cifre). Alternative: {%track3. }, {%rawtrack. }",

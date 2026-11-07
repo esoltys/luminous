@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getArtistAlbums, getArtistSongs } from "./artist";
+import { discStarts, getArtistAlbums, getArtistSongs } from "./artist";
 import type { AlbumItem, Song } from "../types";
 
 describe("artist utils", () => {
@@ -31,5 +31,30 @@ describe("artist utils", () => {
       const result = getArtistAlbums(albums, "The War on Drugs");
       expect(result.map((a) => a.year)).toEqual([2017, 2014]);
     });
+  });
+});
+
+describe("discStarts", () => {
+  it("has no headings for a single disc without a subtitle", () => {
+    expect(discStarts([{ disc: 1 }, { disc: 1 }, {}]).size).toBe(0);
+  });
+
+  it("heads each disc of a multi-disc release, with or without a subtitle", () => {
+    const starts = discStarts([
+      { disc: 1 },
+      { disc: 1 },
+      { disc: 2, disc_subtitle: null },
+      { disc: 2, disc_subtitle: "  BBC Sessions " },
+    ]);
+    expect([...starts.entries()]).toEqual([
+      [0, { disc: 1, subtitle: null }],
+      [2, { disc: 2, subtitle: "BBC Sessions" }],
+    ]);
+  });
+
+  it("heads a single disc that has a subtitle", () => {
+    expect([...discStarts([{ disc: 1, disc_subtitle: "The Original Album" }]).values()]).toEqual([
+      { disc: 1, subtitle: "The Original Album" },
+    ]);
   });
 });

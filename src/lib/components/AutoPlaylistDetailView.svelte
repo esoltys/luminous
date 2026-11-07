@@ -819,7 +819,7 @@
     initialGenre={editingAlbumSongs[0].genre}
     initialGenreSort={editingAlbumSongs[0].genresort}
     initialYear={editingAlbumSongs[0].year}
-    initialDisc={editingAlbumSongs[0].disc}
+    initialTracks={editingAlbumSongs}
     initialCompilation={editingAlbumSongs[0].compilation}
     hasEmbeddedArt={editingAlbumSongs.some((s) => s.art_embedded)}
     onClose={() => { editingAlbumSongs = null; }}

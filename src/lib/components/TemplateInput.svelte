@@ -25,6 +25,7 @@
     { label: "{%album/}", descKey: "organizer.chipOptionalAlbumFolder" },
     { label: "/", descKey: "organizer.chipFolderSeparator" },
     { label: "{%disc-}", descKey: "organizer.chipConditionalDisc" },
+    { label: "{ - %disctitle}", descKey: "organizer.chipConditionalDiscSubtitle" },
     { label: "%track", descKey: "organizer.chipTrack" },
     { label: "{%track }", descKey: "organizer.chipOptionalTrack" },
     { label: "{%track. }", descKey: "organizer.chipOptionalTrackDot" },

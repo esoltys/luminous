@@ -27,6 +27,7 @@
   import type { FileSource, Song } from "../types";
   import { filesStore } from "../stores/files.svelte";
   import { scanFolder } from "./files/folderActions";
+  import { fieldEdit, sharedValue } from "../utils/fieldEdit";
 
   interface Props {
     songIds?: number[];
@@ -42,7 +43,9 @@
     initialGenre?: string | null;
     initialGenreSort?: string | null;
     initialYear?: number | null;
-    initialDisc?: number | null;
+    /** The edited tracks' disc numbers and subtitles, when the caller already
+        has them; otherwise they're read from the tracks themselves. */
+    initialTracks?: Pick<Song, "disc" | "disc_subtitle">[];
     initialCompilation?: boolean;
     hasEmbeddedArt?: boolean;
     /** Album-level art overrides (see AlbumItem.art_automatic/art_manual) — take
@@ -68,7 +71,7 @@
     initialGenre = "",
     initialGenreSort = "",
     initialYear = null,
-    initialDisc = null,
+    initialTracks = [],
     initialCompilation = false,
     hasEmbeddedArt = false,
     initialArtAutomatic = null,
@@ -87,8 +90,18 @@
   let genre = $state(initialGenre ?? "");
   // svelte-ignore state_referenced_locally
   let year = $state<number | null>(initialYear);
+  // Disc and Disc Subtitle differ per track on a multi-disc album, so they
+  // show "Mixed" when the tracks disagree and are only written once edited.
   // svelte-ignore state_referenced_locally
-  let disc = $state<number | null>(initialDisc);
+  const initialDiscs = sharedValue(initialTracks.map((t) => t.disc));
+  // svelte-ignore state_referenced_locally
+  const initialSubtitles = sharedValue(initialTracks.map((t) => t.disc_subtitle));
+  let disc = $state<number | null>(initialDiscs.value);
+  let discMixed = $state(initialDiscs.mixed);
+  let discEdited = $state(false);
+  let discSubtitle = $state(initialSubtitles.value ?? "");
+  let discSubtitleMixed = $state(initialSubtitles.mixed);
+  let discSubtitleEdited = $state(false);
   // svelte-ignore state_referenced_locally
   let compilation = $state(initialCompilation ?? false);
   // svelte-ignore state_referenced_locally
@@ -154,6 +167,7 @@
           genresort?: string | null;
           year?: number | null;
           disc?: number | null;
+          disc_subtitle?: string | null;
           compilation?: boolean;
           art_embedded?: boolean;
         }> = [];
@@ -169,6 +183,7 @@
               genresort: string | null;
               year: number | null;
               disc: number | null;
+              disc_subtitle: string | null;
               compilation: boolean;
               art_embedded: boolean;
             }>("get_file_song_details", { path: p });
@@ -188,6 +203,7 @@
             genresort: s.genresort,
             year: s.year,
             disc: s.disc,
+            disc_subtitle: s.disc_subtitle,
             compilation: s.compilation,
             art_embedded: s.art_embedded,
           })),
@@ -200,6 +216,7 @@
             genresort: d.genresort,
             year: d.year,
             disc: d.disc,
+            disc_subtitle: d.disc_subtitle,
             compilation: d.compilation,
             art_embedded: d.art_embedded,
           })),
@@ -230,8 +247,12 @@
           const commonYear = consensusNumber(allItems.map((i) => i.year));
           if (commonYear !== null) year = commonYear;
 
-          const commonDisc = consensusNumber(allItems.map((i) => i.disc));
-          if (commonDisc !== null) disc = commonDisc;
+          const discs = sharedValue(allItems.map((i) => i.disc));
+          disc = discs.value;
+          discMixed = discs.mixed;
+          const subtitles = sharedValue(allItems.map((i) => i.disc_subtitle));
+          discSubtitle = subtitles.value ?? "";
+          discSubtitleMixed = subtitles.mixed;
 
           if (allItems.some((i) => i.compilation)) {
             compilation = allItems.every((i) => i.compilation);
@@ -310,7 +331,8 @@
           genre: genre ?? "",
           genresort: genresort.trim() || null,
           year,
-          disc,
+          disc: fieldEdit(discEdited, disc),
+          discSubtitle: fieldEdit(discSubtitleEdited, discSubtitle.trim() || null),
           compilation,
         });
       }
@@ -324,7 +346,8 @@
           genre: genre ?? "",
           genresort: genresort.trim() || null,
           year,
-          disc,
+          disc: fieldEdit(discEdited, disc),
+          discSubtitle: fieldEdit(discSubtitleEdited, discSubtitle.trim() || null),
           compilation,
         });
         if (source && folderPath) {
@@ -477,9 +500,28 @@
               type="number"
               value={disc ?? ""}
               disabled={isSaving}
+              placeholder={discMixed && !discEdited ? i18n.t('albumTagEditor.mixedValues') : undefined}
               oninput={(e) => {
                 const val = parseInt(e.currentTarget.value, 10);
                 disc = isNaN(val) ? null : val;
+                discEdited = true;
+              }}
+              size="sm"
+              class="w-full"
+            />
+          </FormField>
+
+          <FormField label={i18n.t('tagEditor.discSubtitleField')} for="album-tag-disc-subtitle" span2>
+            <Input
+              id="album-tag-disc-subtitle"
+              value={discSubtitle}
+              disabled={isSaving}
+              placeholder={discSubtitleMixed && !discSubtitleEdited
+                ? i18n.t('albumTagEditor.mixedValues')
+                : i18n.t('tagEditor.discSubtitlePlaceholder')}
+              oninput={(e) => {
+                discSubtitle = e.currentTarget.value;
+                discSubtitleEdited = true;
               }}
               size="sm"
               class="w-full"

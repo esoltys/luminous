@@ -1623,6 +1623,8 @@ export const fr: DeepStringRecord<typeof en> = {
     composerField: "Compositeur",
     composerPlaceholder: "Ajouter un compositeur...",
     discField: "Disque",
+    discSubtitleField: "Sous-titre du disque",
+    discSubtitlePlaceholder: "p. ex. En direct au Marquee",
     groupingField: "Groupement",
     groupingTooltip: "Regroupe des pistes liées, par ex. les mouvements d'une œuvre classique",
     bpmField: "BPM",
@@ -1654,6 +1656,7 @@ export const fr: DeepStringRecord<typeof en> = {
     compilationField: "Compilation (marquer comme Artistes divers)",
     yearField: "Année de sortie",
     discField: "N° de disque",
+    mixedValues: "Valeurs multiples",
     tracksAffected: {
       one: "S'applique à {count} chanson",
       other: "S'applique à {count} chansons"
@@ -1959,6 +1962,8 @@ export const fr: DeepStringRecord<typeof en> = {
     linkText: "lien"
   },
   albumDetail: {
+    discHeading: "Disque {disc}",
+    discHeadingWithSubtitle: "Disque {disc} — {subtitle}",
     backToAlbums: "Retour aux albums",
     unknownGenre: "Genre inconnu",
     statsLine: "{genre} · {year} · {duration}",
@@ -2126,6 +2131,7 @@ export const fr: DeepStringRecord<typeof en> = {
     chipOptionalAlbumFolder: "Dossier d'album facultatif",
     chipFolderSeparator: "Séparateur de dossiers",
     chipConditionalDisc: "Préfixe de disque conditionnel",
+    chipConditionalDiscSubtitle: "Sous-titre de disque conditionnel",
     chipTrack: "N° de piste (2 chiffres : 01, 09, 11). Variantes : %track3 (3 chiffres : 001), %rawtrack (sans zéros : 1)",
     chipOptionalTrack: "N° de piste facultatif (2 chiffres). Variantes : {%track3 }, {%rawtrack }",
     chipOptionalTrackDot: "N° de piste facultatif avec point (2 chiffres). Variantes : {%track3. }, {%rawtrack. }",

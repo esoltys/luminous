@@ -1547,6 +1547,8 @@ export const de = {
     composerField: "Komponist",
     composerPlaceholder: "Komponist hinzufügen ...",
     discField: "Disc",
+    discSubtitleField: "Disc-Untertitel",
+    discSubtitlePlaceholder: "z. B. Live im Marquee",
     groupingField: "Gruppierung",
     groupingTooltip: "Fasst zusammengehörige Titel zusammen, z. B. die Sätze eines klassischen Werks",
     bpmField: "BPM",
@@ -1578,6 +1580,7 @@ export const de = {
     compilationField: "Sampler (als „Verschiedene Interpreten“ markieren)",
     yearField: "Erscheinungsjahr",
     discField: "Disc-Nr.",
+    mixedValues: "Gemischt",
     tracksAffected: {
       one: "Gilt für {count} Titel",
       other: "Gilt für {count} Titel"
@@ -1883,6 +1886,8 @@ export const de = {
     linkText: "Link"
   },
   albumDetail: {
+    discHeading: "Disc {disc}",
+    discHeadingWithSubtitle: "Disc {disc} — {subtitle}",
     backToAlbums: "Zurück zu Alben",
     unknownGenre: "Unbekanntes Genre",
     statsLine: "{genre} · {year} · {duration}",
@@ -2118,6 +2123,7 @@ export const de = {
     chipOptionalAlbumFolder: "Optionaler Albumordner",
     chipFolderSeparator: "Ordnertrennzeichen",
     chipConditionalDisc: "Bedingtes Disc-Präfix",
+    chipConditionalDiscSubtitle: "Bedingter Disc-Untertitel",
     chipTrack: "Titelnr. (2-stellig: 01, 09, 11). Alternativen: %track3 (3-stellig: 001), %rawtrack (ohne Nullen: 1)",
     chipOptionalTrack: "Optionale Titelnr. (2-stellig). Alternativen: {%track3 }, {%rawtrack }",
     chipOptionalTrackDot: "Optionale Titelnr. mit Punkt (2-stellig). Alternativen: {%track3. }, {%rawtrack. }",
