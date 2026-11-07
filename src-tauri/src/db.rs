@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 73;
+pub const CURRENT_SCHEMA_VERSION: i32 = 74;
 
 struct Migration {
     version: i32,
@@ -675,6 +675,19 @@ const MIGRATIONS: &[Migration] = &[
         version: 73,
         description: "album_key: composite (artist, album) key to prevent cross-artist album collision (#1932)",
         apply: migrate_composite_album_keys,
+    },
+    Migration {
+        version: 74,
+        description: "songs.disc_subtitle column for multi-disc release subtitles (#1940)",
+        apply: |conn| {
+            let has_column: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'disc_subtitle'")?
+                .exists([])?;
+            if !has_column {
+                conn.execute_batch("ALTER TABLE songs ADD COLUMN disc_subtitle TEXT;")?;
+            }
+            Ok(())
+        },
     },
 ];
 
@@ -4493,6 +4506,29 @@ mod tests {
             .exists([])
             .unwrap();
         assert!(has_col, "songs table should have lyrics_source column");
+    }
+
+    #[test]
+    fn test_migration_74_adds_nullable_songs_disc_subtitle() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration74_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO songs (path, title, source) VALUES ('/a.flac', 'A', 2)",
+            [],
+        )
+        .unwrap();
+        let subtitle: Option<String> = conn
+            .query_row(
+                "SELECT disc_subtitle FROM songs WHERE path = '/a.flac'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(subtitle, None);
     }
 
     #[test]

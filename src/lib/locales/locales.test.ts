@@ -424,6 +424,8 @@ const IDENTICAL_OK_DE = new Set<string>([
   "tagEditor.albumField",
   "tagEditor.genreField",
   "tagEditor.discField",
+  "albumDetail.discHeading", // "Disc {disc}"
+  "albumDetail.discHeadingWithSubtitle", // "Disc {disc} — {subtitle}"
   "tagEditor.bpmField",
   "albumTagEditor.genreField",
   "equalizer.popPreset",

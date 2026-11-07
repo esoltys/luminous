@@ -397,10 +397,6 @@
     albumName={editingAlbum.album}
     artistName={editingAlbum.artist}
     songIds={editingAlbum.song_ids}
-    initialAlbum={editingAlbum.album}
-    initialAlbumArtist={editingAlbum.artist}
-    initialGenre={editingAlbum.genre}
-    initialYear={editingAlbum.year}
     hasEmbeddedArt={editingAlbum.art_embedded}
     initialArtAutomatic={editingAlbum.art_automatic}
     initialArtManual={editingAlbum.art_manual}

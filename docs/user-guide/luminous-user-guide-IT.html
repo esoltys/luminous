@@ -412,6 +412,7 @@
         <div class="tr"><code>%artist</code><div>L'artista della traccia</div></div>
         <div class="tr"><code>%album</code><div>Titolo dell'album</div></div>
         <div class="tr"><code>%disc</code><div>Numero del disco</div></div>
+        <div class="tr"><code>%disctitle</code><div>Sottotitolo del disco, ad es. «BBC Sessions»</div></div>
         <div class="tr"><code>%track</code><div>Numero di traccia</div></div>
         <div class="tr"><code>%title</code><div>Titolo della traccia</div></div>
         <div class="tr"><code>%year</code><div>Anno di uscita</div></div>
@@ -429,6 +430,7 @@
         <div class="tr"><code>%year - %album</code><div>2019 - Reservoir</div></div>
         <div class="tr"><code>{%album/}</code><div>Aggiunge una cartella con il nome dell'album, solo se la traccia ce l'ha</div></div>
         <div class="tr"><code>{%disc-}%track</code><div>Omette «1-» quando non c'è il numero del disco: 07 oppure 1-07</div></div>
+        <div class="tr"><code>{Disc %disc{ - %disctitle}/}</code><div>Una cartella per disco, con il sottotitolo solo se c'è: Disc 2 - BBC Sessions oppure Disc 2</div></div>
         <div class="tr"><code>{%track }%title</code><div>Aggiunge «07 » prima del titolo, solo se c'è il numero di traccia</div></div>
         <div class="tr"><code>{%track-}%title</code><div>Aggiunge «07-» prima del titolo, solo se c'è il numero di traccia</div></div>
       </div>

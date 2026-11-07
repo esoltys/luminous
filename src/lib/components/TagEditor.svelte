@@ -64,6 +64,7 @@
   let genre = $state("");
   let track = $state<number | null>(null);
   let disc = $state<number | null>(null);
+  let discSubtitle = $state("");
   let year = $state<number | null>(null);
   let originalYear = $state<number | null>(null);
   let grouping = $state("");
@@ -127,6 +128,7 @@
             genresort: string | null;
             track: number | null;
             disc: number | null;
+            disc_subtitle: string | null;
             year: number | null;
             originalyear: number | null;
             grouping: string;
@@ -155,6 +157,7 @@
             genresort: string | null;
             track: number | null;
             disc: number | null;
+            disc_subtitle: string | null;
             year: number | null;
             originalyear: number | null;
             grouping: string;
@@ -181,6 +184,7 @@
       genresort = details.genresort ?? "";
       track = details.track;
       disc = details.disc;
+      discSubtitle = details.disc_subtitle ?? "";
       year = details.year;
       originalYear = details.originalyear;
       grouping = details.grouping;
@@ -220,6 +224,7 @@
           genresort: genresort.trim() || null,
           track,
           disc,
+          discSubtitle,
           year,
           originalyear: originalYear,
           grouping,
@@ -251,6 +256,7 @@
           genresort: genresort.trim() || null,
           track,
           disc,
+          discSubtitle,
           year,
           originalyear: originalYear,
           grouping,
@@ -430,7 +436,8 @@
 
           <!-- Grid form: field order mirrors the collection table's column order (track, title, artist,
                album, composer, album artist, year, genre, grouping, bpm, initial key), with Disc paired
-               alongside Track (Disc first) since it has no column of its own in the table. -->
+               alongside Track (Disc first) and Disc Subtitle under them, since neither has a column
+               of its own in the table. -->
           <div class="grid grid-cols-2 gap-4">
             <FormField label={i18n.t('tagEditor.discField')} for="tag-disc">
               <Input
@@ -457,6 +464,17 @@
                   const val = parseInt(e.currentTarget.value, 10);
                   track = isNaN(val) ? null : val;
                 }}
+                size="sm"
+                class="w-full"
+              />
+            </FormField>
+
+            <FormField label={i18n.t('tagEditor.discSubtitleField')} for="tag-disc-subtitle" span2>
+              <Input
+                id="tag-disc-subtitle"
+                bind:value={discSubtitle}
+                disabled={isSaving}
+                placeholder={i18n.t('tagEditor.discSubtitlePlaceholder')}
                 size="sm"
                 class="w-full"
               />

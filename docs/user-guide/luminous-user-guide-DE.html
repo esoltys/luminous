@@ -412,6 +412,7 @@
         <div class="tr"><code>%artist</code><div>Der Interpret des Titels</div></div>
         <div class="tr"><code>%album</code><div>Albumtitel</div></div>
         <div class="tr"><code>%disc</code><div>Disc-Nummer</div></div>
+        <div class="tr"><code>%disctitle</code><div>Disc-Untertitel, z. B. „BBC Sessions“</div></div>
         <div class="tr"><code>%track</code><div>Titelnummer</div></div>
         <div class="tr"><code>%title</code><div>Titelname</div></div>
         <div class="tr"><code>%year</code><div>Erscheinungsjahr</div></div>
@@ -429,6 +430,7 @@
         <div class="tr"><code>%year - %album</code><div>2019 - Reservoir</div></div>
         <div class="tr"><code>{%album/}</code><div>Fügt einen Ordner mit dem Albumnamen hinzu, nur wenn der Titel einen hat</div></div>
         <div class="tr"><code>{%disc-}%track</code><div>Lässt das „1-“ weg, wenn es keine Disc-Nummer gibt: 07 oder 1-07</div></div>
+        <div class="tr"><code>{Disc %disc{ - %disctitle}/}</code><div>Ein Ordner pro Disc, mit Untertitel nur, wenn es einen gibt: Disc 2 - BBC Sessions oder Disc 2</div></div>
         <div class="tr"><code>{%track }%title</code><div>Fügt „07 “ vor dem Titel hinzu, nur wenn es eine Titelnummer gibt</div></div>
         <div class="tr"><code>{%track-}%title</code><div>Fügt „07-“ vor dem Titel hinzu, nur wenn es eine Titelnummer gibt</div></div>
       </div>

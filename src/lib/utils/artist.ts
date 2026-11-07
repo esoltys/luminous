@@ -49,6 +49,36 @@ export function formatTrackNumber(
   return String(trackNum);
 }
 
+/** A disc heading above the first of that disc's tracks. */
+export interface DiscStart {
+  disc: number;
+  subtitle: string | null;
+}
+
+/**
+ * Where each disc starts in a release's tracks, listed in disc/track order:
+ * maps a track's index to its disc number and subtitle when it is the first
+ * track of its disc. A disc's subtitle is the first one any of its tracks
+ * carries. Empty for a single disc without a subtitle, so an ordinary album
+ * gets no headings.
+ */
+export function discStarts(songs: Pick<Song, "disc" | "disc_subtitle">[]): Map<number, DiscStart> {
+  const starts = new Map<number, DiscStart>();
+  let current: DiscStart | null = null;
+  songs.forEach((song, index) => {
+    const disc = song.disc ?? 1;
+    const subtitle = song.disc_subtitle?.trim() || null;
+    if (!current || current.disc !== disc) {
+      current = { disc, subtitle };
+      starts.set(index, current);
+    } else if (!current.subtitle && subtitle) {
+      current.subtitle = subtitle;
+    }
+  });
+  const only = starts.size === 1 ? [...starts.values()][0] : null;
+  return only && !only.subtitle ? new Map() : starts;
+}
+
 export type ReleaseCategory = "set" | "single" | "ep" | "album";
 
 const EP_MAX_DURATION_NANOSEC = 30 * 60 * 1_000_000_000;

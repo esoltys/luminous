@@ -27,6 +27,8 @@
   import type { FileSource, Song } from "../types";
   import { filesStore } from "../stores/files.svelte";
   import { scanFolder } from "./files/folderActions";
+  import { SharedTagFields, librarySongs, type SharedTagValues } from "../utils/sharedTagFields.svelte";
+  import DiscFields from "./DiscFields.svelte";
 
   interface Props {
     songIds?: number[];
@@ -35,15 +37,9 @@
     source?: FileSource;
     folderPath?: string[];
     folderName?: string;
-    initialAlbum?: string | null;
-    initialAlbumSort?: string | null;
-    initialAlbumArtist?: string | null;
-    initialAlbumArtistSort?: string | null;
-    initialGenre?: string | null;
-    initialGenreSort?: string | null;
-    initialYear?: number | null;
-    initialDisc?: number | null;
-    initialCompilation?: boolean;
+    /** The edited tracks' current tags, when the caller already has them;
+        otherwise they're read from the tracks themselves. */
+    initialTracks?: (SharedTagValues & Pick<Song, "artist">)[];
     hasEmbeddedArt?: boolean;
     /** Album-level art overrides (see AlbumItem.art_automatic/art_manual) — take
         precedence over any single track's embedded art, same as CoverArt.svelte's
@@ -61,15 +57,7 @@
     source,
     folderPath,
     folderName,
-    initialAlbum = "",
-    initialAlbumSort = "",
-    initialAlbumArtist = "",
-    initialAlbumArtistSort = "",
-    initialGenre = "",
-    initialGenreSort = "",
-    initialYear = null,
-    initialDisc = null,
-    initialCompilation = false,
+    initialTracks = [],
     hasEmbeddedArt = false,
     initialArtAutomatic = null,
     initialArtManual = null,
@@ -79,27 +67,11 @@
 
   const tracksCount = $derived((songIds?.length ?? 0) + (filePaths?.length ?? 0));
 
+  const fields = new SharedTagFields();
   // svelte-ignore state_referenced_locally
-  let album = $state(initialAlbum ?? "");
-  // svelte-ignore state_referenced_locally
-  let albumArtist = $state(initialAlbumArtist ?? "");
-  // svelte-ignore state_referenced_locally
-  let genre = $state(initialGenre ?? "");
-  // svelte-ignore state_referenced_locally
-  let year = $state<number | null>(initialYear);
-  // svelte-ignore state_referenced_locally
-  let disc = $state<number | null>(initialDisc);
-  // svelte-ignore state_referenced_locally
-  let compilation = $state(initialCompilation ?? false);
+  fields.reset(initialTracks);
   // svelte-ignore state_referenced_locally
   let hasEmbeddedArtState = $state(hasEmbeddedArt);
-
-  // svelte-ignore state_referenced_locally
-  let albumsort = $state(initialAlbumSort ?? "");
-  // svelte-ignore state_referenced_locally
-  let albumArtistSort = $state(initialAlbumArtistSort ?? "");
-  // svelte-ignore state_referenced_locally
-  let genresort = $state(initialGenreSort ?? "");
 
   // Remote songs (WebDAV #682, OpenSubsonic #916) have no local file Luminous can write lofty tags to,
   // and there's no write-back to the remote server -- edits here only ever
@@ -113,156 +85,49 @@
     return false;
   });
 
-  function consensusString(list: (string | null | undefined)[]): string {
-    const nonBlank = list.map((s) => s?.trim()).filter((s): s is string => !!s);
-    if (nonBlank.length === 0) return "";
-    const first = nonBlank[0];
-    return nonBlank.every((s) => s === first) ? first : "";
-  }
-
-  function consensusNumber(list: (number | null | undefined)[]): number | null {
-    const present = list.filter((n): n is number => n !== null && n !== undefined && n > 0);
-    if (present.length === 0) return null;
-    const first = present[0];
-    return present.every((n) => n === first) ? first : null;
-  }
-
   onMount(async () => {
     // Best-effort preload for the genre field's autocomplete — a failure
     // here shouldn't block or break the editor itself.
     if (!tagsStore.loaded) tagsStore.load().catch(() => {});
-    if (!initialAlbum && !initialAlbumArtist) {
-      try {
-        let librarySongs: Song[] = [];
-        if (songIds.length > 0) {
-          const inStore = songIds
-            .map((id) => collectionStore.songs.find((s) => s.id === id))
-            .filter((s): s is Song => !!s);
-          if (inStore.length === songIds.length) {
-            librarySongs = inStore;
-          } else {
-            librarySongs = (await invoke<Song[]>("get_songs_by_ids", { songIds })) ?? [];
-          }
+    if (initialTracks.length > 0) return;
+    try {
+      const tracks: (SharedTagValues & Pick<Song, "artist" | "art_embedded">)[] =
+        songIds.length > 0 ? await librarySongs(songIds) : [];
+      for (const path of filePaths) {
+        try {
+          tracks.push(await invoke<SharedTagValues & Pick<Song, "artist" | "art_embedded">>("get_file_song_details", { path }));
+        } catch (err) {
+          console.error("Failed to get file tags:", err);
         }
-
-        const fileSongDetails: Array<{
-          album?: string;
-          albumsort?: string | null;
-          album_artist?: string;
-          album_artist_sort?: string | null;
-          genre?: string;
-          genresort?: string | null;
-          year?: number | null;
-          disc?: number | null;
-          compilation?: boolean;
-          art_embedded?: boolean;
-        }> = [];
-
-        for (const p of filePaths) {
-          try {
-            const details = await invoke<{
-              album: string;
-              albumsort: string | null;
-              album_artist: string;
-              album_artist_sort: string | null;
-              genre: string;
-              genresort: string | null;
-              year: number | null;
-              disc: number | null;
-              compilation: boolean;
-              art_embedded: boolean;
-            }>("get_file_song_details", { path: p });
-            if (details) fileSongDetails.push(details);
-          } catch (err) {
-            console.error("Failed to get file tags:", err);
-          }
-        }
-
-        const allItems = [
-          ...librarySongs.map((s) => ({
-            album: s.album,
-            albumsort: s.albumsort,
-            album_artist: s.album_artist || s.artist,
-            album_artist_sort: s.album_artist_sort,
-            genre: s.genre,
-            genresort: s.genresort,
-            year: s.year,
-            disc: s.disc,
-            compilation: s.compilation,
-            art_embedded: s.art_embedded,
-          })),
-          ...fileSongDetails.map((d) => ({
-            album: d.album,
-            albumsort: d.albumsort,
-            album_artist: d.album_artist,
-            album_artist_sort: d.album_artist_sort,
-            genre: d.genre,
-            genresort: d.genresort,
-            year: d.year,
-            disc: d.disc,
-            compilation: d.compilation,
-            art_embedded: d.art_embedded,
-          })),
-        ];
-
-        if (allItems.length > 0) {
-          const commonAlbum = consensusString(allItems.map((i) => i.album));
-          if (commonAlbum) album = commonAlbum;
-
-          const commonAlbumSort = consensusString(allItems.map((i) => i.albumsort));
-          if (commonAlbumSort) albumsort = commonAlbumSort;
-
-          const commonAlbumArtist = consensusString(allItems.map((i) => i.album_artist));
-          if (commonAlbumArtist) {
-            albumArtist = commonAlbumArtist;
-            previousAlbumArtist = commonAlbumArtist;
-          }
-
-          const commonAlbumArtistSort = consensusString(allItems.map((i) => i.album_artist_sort));
-          if (commonAlbumArtistSort) albumArtistSort = commonAlbumArtistSort;
-
-          const commonGenre = consensusString(allItems.map((i) => i.genre));
-          if (commonGenre) genre = commonGenre;
-
-          const commonGenreSort = consensusString(allItems.map((i) => i.genresort));
-          if (commonGenreSort) genresort = commonGenreSort;
-
-          const commonYear = consensusNumber(allItems.map((i) => i.year));
-          if (commonYear !== null) year = commonYear;
-
-          const commonDisc = consensusNumber(allItems.map((i) => i.disc));
-          if (commonDisc !== null) disc = commonDisc;
-
-          if (allItems.some((i) => i.compilation)) {
-            compilation = allItems.every((i) => i.compilation);
-          }
-
-          if (allItems.some((i) => i.art_embedded)) {
-            hasEmbeddedArtState = true;
-          }
-        }
-      } catch (err) {
-        console.error("Failed to preload file metadata for batch tag editing:", err);
       }
+      fields.reset(tracks);
+      if (tracks.some((t) => t.art_embedded)) hasEmbeddedArtState = true;
+    } catch (err) {
+      console.error("Failed to preload file metadata for batch tag editing:", err);
     }
   });
 
   const VARIOUS_ARTISTS = "Various Artists";
-  // Remembers whatever was in Album Artist before the Compilation toggle
+  // Puts back whatever was in Album Artist before the Compilation toggle
   // overwrote it, so unchecking restores it instead of leaving "Various
   // Artists" behind.
-  // svelte-ignore state_referenced_locally
-  let previousAlbumArtist = $state(initialAlbumArtist ?? "");
+  let restoreAlbumArtist: (() => void) | null = null;
 
   function handleCompilationToggle(e: Event) {
     const next = (e.currentTarget as HTMLInputElement).checked;
     if (next) {
-      previousAlbumArtist = albumArtist;
-      albumArtist = VARIOUS_ARTISTS;
-    } else {
-      albumArtist = previousAlbumArtist;
+      restoreAlbumArtist = fields.albumArtist.snapshot();
+      fields.albumArtist.set(VARIOUS_ARTISTS);
+    } else if (restoreAlbumArtist) {
+      restoreAlbumArtist();
+      restoreAlbumArtist = null;
     }
-    compilation = next;
+    fields.compilation.set(next);
+  }
+
+  /** A field's placeholder: "Mixed" while the tracks disagree. */
+  function mixedOr(showsMixed: boolean, fallback?: string): string | undefined {
+    return showsMixed ? i18n.t("albumTagEditor.mixedValues") : fallback;
   }
 
   let isSaving = $state(false);
@@ -291,7 +156,7 @@
 
   async function handleSave() {
     isSaving = true;
-    const albumName = album || i18n.t("collection.unknownAlbum");
+    const albumName = fields.album.value || i18n.t("collection.unknownAlbum");
     const taskId = "album-tag-save";
     tasksStore.startTask({
       id: taskId,
@@ -301,32 +166,10 @@
     });
     try {
       if (songIds.length > 0) {
-        await invoke("save_album_tags", {
-          songIds,
-          album: album ?? "",
-          albumsort: albumsort.trim() || null,
-          albumArtist: albumArtist ?? "",
-          albumArtistSort: albumArtistSort.trim() || null,
-          genre: genre ?? "",
-          genresort: genresort.trim() || null,
-          year,
-          disc,
-          compilation,
-        });
+        await invoke("save_album_tags", { songIds, edit: fields.edit });
       }
       if (filePaths.length > 0) {
-        await invoke("save_batch_file_tags", {
-          paths: filePaths,
-          album: album ?? "",
-          albumsort: albumsort.trim() || null,
-          albumArtist: albumArtist ?? "",
-          albumArtistSort: albumArtistSort.trim() || null,
-          genre: genre ?? "",
-          genresort: genresort.trim() || null,
-          year,
-          disc,
-          compilation,
-        });
+        await invoke("save_batch_file_tags", { paths: filePaths, edit: fields.edit });
         if (source && folderPath) {
           await scanFolder(source, folderPath);
         }
@@ -411,11 +254,11 @@
 
         <div class="grid grid-cols-2 gap-4">
           <FormField label={i18n.t('albumTagEditor.albumField')} for="album-tag-album" span2>
-            <Input id="album-tag-album" bind:value={album} disabled={isSaving} size="sm" class="w-full" />
+            <Input id="album-tag-album" bind:value={() => fields.album.value ?? "", (v) => fields.album.set(v)} placeholder={mixedOr(fields.album.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
           </FormField>
 
           <FormField label={i18n.t('albumTagEditor.albumArtistField')} for="album-tag-albumartist" span2>
-            {#if compilation && albumArtist === VARIOUS_ARTISTS}
+            {#if fields.compilation.value === true && fields.albumArtist.value === VARIOUS_ARTISTS}
               <div class="flex items-center h-9">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-border bg-brand-main text-xs font-semibold text-brand-text-primary">
                   {VARIOUS_ARTISTS}
@@ -425,9 +268,9 @@
             {:else}
               <ChipInput
                 id="album-tag-albumartist"
-                bind:value={albumArtist}
+                bind:value={() => fields.albumArtist.value ?? "", (v) => fields.albumArtist.set(v)}
                 disabled={isSaving}
-                placeholder={i18n.t('albumTagEditor.albumArtistPlaceholder')}
+                placeholder={mixedOr(fields.albumArtist.showsMixed, i18n.t('albumTagEditor.albumArtistPlaceholder'))}
                 class="w-full"
               />
             {/if}
@@ -437,7 +280,8 @@
             <input
               type="checkbox"
               id="album-tag-compilation"
-              checked={compilation}
+              checked={fields.compilation.value === true}
+              indeterminate={fields.compilation.showsMixed}
               onchange={handleCompilationToggle}
               disabled={isSaving}
               class="rounded accent-brand-accent"
@@ -448,9 +292,9 @@
           <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre" span2 tooltip={i18n.t('albumTagEditor.genreTooltip', {}, 'Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.')}>
             <ChipInput
               id="album-tag-genre"
-              bind:value={genre}
+              bind:value={() => fields.genre.value ?? "", (v) => fields.genre.set(v)}
               disabled={isSaving}
-              placeholder={i18n.t('albumTagEditor.genrePlaceholder')}
+              placeholder={mixedOr(fields.genre.showsMixed, i18n.t('albumTagEditor.genrePlaceholder'))}
               suggestions={tagsStore.allTags.map((t) => t.name)}
               class="w-full"
             />
@@ -460,31 +304,19 @@
             <Input
               id="album-tag-year"
               type="number"
-              value={year ?? ""}
+              value={fields.year.value ?? ""}
               disabled={isSaving}
+              placeholder={mixedOr(fields.year.showsMixed)}
               oninput={(e) => {
                 const val = parseInt(e.currentTarget.value, 10);
-                year = isNaN(val) ? null : val;
+                fields.year.set(isNaN(val) ? null : val);
               }}
               size="sm"
               class="w-full"
             />
           </FormField>
 
-          <FormField label={i18n.t('albumTagEditor.discField')} for="album-tag-disc">
-            <Input
-              id="album-tag-disc"
-              type="number"
-              value={disc ?? ""}
-              disabled={isSaving}
-              oninput={(e) => {
-                const val = parseInt(e.currentTarget.value, 10);
-                disc = isNaN(val) ? null : val;
-              }}
-              size="sm"
-              class="w-full"
-            />
-          </FormField>
+          <DiscFields disc={fields.disc} subtitle={fields.discSubtitle} disabled={isSaving} />
 
           <!-- Sort Overrides ("Sort As") -->
           <details class="col-span-2 group border border-brand-border rounded-lg bg-brand-sidebar/40 overflow-hidden">
@@ -494,15 +326,15 @@
             </summary>
             <div class="p-3 pt-2 grid grid-cols-2 gap-3 border-t border-brand-border/60">
               <FormField label={i18n.t("sortOverrides.album")} for="album-tag-albumsort">
-                <Input id="album-tag-albumsort" bind:value={albumsort} disabled={isSaving} size="sm" class="w-full" />
+                <Input id="album-tag-albumsort" bind:value={() => fields.albumsort.value ?? "", (v) => fields.albumsort.set(v)} placeholder={mixedOr(fields.albumsort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
               </FormField>
 
               <FormField label={i18n.t("sortOverrides.albumArtist")} for="album-tag-albumartistsort">
-                <Input id="album-tag-albumartistsort" bind:value={albumArtistSort} disabled={isSaving} size="sm" class="w-full" />
+                <Input id="album-tag-albumartistsort" bind:value={() => fields.albumArtistSort.value ?? "", (v) => fields.albumArtistSort.set(v)} placeholder={mixedOr(fields.albumArtistSort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
               </FormField>
 
               <FormField label={i18n.t("sortOverrides.genre")} for="album-tag-genresort" span2>
-                <Input id="album-tag-genresort" bind:value={genresort} disabled={isSaving} size="sm" class="w-full" />
+                <Input id="album-tag-genresort" bind:value={() => fields.genresort.value ?? "", (v) => fields.genresort.set(v)} placeholder={mixedOr(fields.genresort.showsMixed)} disabled={isSaving} size="sm" class="w-full" />
               </FormField>
             </div>
           </details>

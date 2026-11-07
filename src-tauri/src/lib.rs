@@ -1641,6 +1641,7 @@ pub fn run() {
             commands::stats::set_stats_excluded,
             // Organizer commands
             commands::organizer::preview_organize,
+            commands::organizer::expand_template_samples,
             commands::organizer::apply_organize,
             commands::organizer::get_organize_config,
             commands::organizer::set_organize_config,

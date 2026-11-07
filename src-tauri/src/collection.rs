@@ -1771,6 +1771,7 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         originalyear: meta.originalyear,
         track: meta.track,
         disc: meta.disc,
+        disc_subtitle: meta.disc_subtitle,
         compilation: meta.compilation,
         grouping: meta.grouping,
         bpm: meta.bpm,
@@ -2156,7 +2157,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     album_artist=excluded.album_artist, album_artist_sort=excluded.album_artist_sort,
                     composer=excluded.composer, composersort=excluded.composersort,
                     lyrics=excluded.lyrics, comment=excluded.comment,
-                    track=excluded.track, disc=excluded.disc,
+                    track=excluded.track, disc=excluded.disc, disc_subtitle=excluded.disc_subtitle,
                     year=excluded.year, originalyear=excluded.originalyear,
                     genre=excluded.genre, genresort=excluded.genresort,
                     compilation=excluded.compilation,
@@ -2280,6 +2281,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                 )
             }),
             song.lyrics_source.as_deref(),
+            song.disc_subtitle.as_deref(),
         ],
     )?;
     Ok(())
@@ -2342,7 +2344,7 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     musicbrainz_work_id,
     musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number,
     dynamic_range, dynamic_range_peak, dynamic_range_rms, dynamic_range_album,
-    lyrics_source
+    lyrics_source, disc_subtitle
 ";
 
 /// Same columns as `SONG_SELECT_COLS`, in the same order, qualified with the
@@ -2371,9 +2373,9 @@ pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str =
     s.musicbrainz_work_id,
     s.musicbrainz_release_type, s.musicbrainz_release_country, s.barcode, s.catalog_number,
     s.dynamic_range, s.dynamic_range_peak, s.dynamic_range_rms, s.dynamic_range_album,
-    s.lyrics_source";
+    s.lyrics_source, s.disc_subtitle";
 
-pub(crate) const SONG_SELECT_COL_COUNT: usize = 75;
+pub(crate) const SONG_SELECT_COL_COUNT: usize = 76;
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort,
@@ -2387,11 +2389,11 @@ const SONG_INSERT_COLS: &str = "
     musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
     musicbrainz_work_id,
     musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number,
-    album_key, lyrics_source
+    album_key, lyrics_source, disc_subtitle
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49,?50,?51,?52,?53,?54";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49,?50,?51,?52,?53,?54,?55";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     row_to_song_at(row, 0)
@@ -2483,6 +2485,7 @@ pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Re
         dynamic_range_rms: row.get(col(72))?,
         dynamic_range_album: row.get(col(73))?,
         lyrics_source: row.get(col(74))?,
+        disc_subtitle: row.get(col(75))?,
         ..Default::default()
     })
 }

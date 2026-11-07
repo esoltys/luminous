@@ -17,6 +17,46 @@ pub async fn preview_organize(
     organizer::compute_preview(db, &song_ids, &template, &options).map_err(|e| e.to_string())
 }
 
+/// The tags of one example track for the Organize template preview.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+#[serde(default)]
+pub struct TemplateSample {
+    pub album_artist: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub year: Option<i32>,
+    pub genre: Option<String>,
+    pub disc: Option<i32>,
+    pub disc_subtitle: Option<String>,
+    pub track: Option<i32>,
+    pub title: Option<String>,
+}
+
+/// Expands `template` for each example track, exactly as Organize would
+/// name a real file — so the template editor's preview never re-implements
+/// the token and conditional-block rules.
+#[tauri::command]
+pub fn expand_template_samples(template: String, samples: Vec<TemplateSample>) -> Vec<String> {
+    samples
+        .into_iter()
+        .map(|s| {
+            let song = crate::models::Song {
+                album_artist: s.album_artist,
+                artist: s.artist,
+                album: s.album,
+                year: s.year,
+                genre: s.genre,
+                disc: s.disc,
+                disc_subtitle: s.disc_subtitle,
+                track: s.track,
+                title: s.title,
+                ..Default::default()
+            };
+            organizer::expand_template(&template, &song, "mp3")
+        })
+        .collect()
+}
+
 #[tauri::command]
 pub async fn apply_organize(
     app: AppHandle,

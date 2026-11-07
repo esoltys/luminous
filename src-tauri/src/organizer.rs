@@ -165,258 +165,299 @@ fn is_reserved_device_name(stem: &str) -> bool {
             && matches!(upper.as_bytes()[3], b'1'..=b'9'))
 }
 
-/// Replace placeholders in template with song metadata.
-/// Supports conditional blocks like `{Disc %disc/}`.
-pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
-    let mut expanded = template.to_string();
+/// A `%token` an organize template can use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TemplateToken {
+    AlbumArtist,
+    Artist,
+    Album,
+    Disc,
+    DiscTitle,
+    Track,
+    Track3,
+    RawTrack,
+    Title,
+    Year,
+    Genre,
+    Extension,
+}
 
-    // 1. Process conditional blocks `{...}` first
-    while let Some(start) = expanded.find('{') {
-        if let Some(end) = expanded[start..].find('}') {
-            let actual_end = start + end;
-            let block_content = &expanded[start + 1..actual_end];
+impl TemplateToken {
+    /// Every spelling, longest first so `%albumartist` wins over `%album`,
+    /// `%disctitle` over `%disc` and `%track3` over `%track`.
+    const NAMES: &'static [(&'static str, TemplateToken)] = &[
+        ("discsubtitle", TemplateToken::DiscTitle),
+        ("albumartist", TemplateToken::AlbumArtist),
+        ("extension", TemplateToken::Extension),
+        ("disctitle", TemplateToken::DiscTitle),
+        ("rawtrack", TemplateToken::RawTrack),
+        ("artist", TemplateToken::Artist),
+        ("track3", TemplateToken::Track3),
+        ("album", TemplateToken::Album),
+        ("genre", TemplateToken::Genre),
+        ("title", TemplateToken::Title),
+        ("track", TemplateToken::Track),
+        ("disc", TemplateToken::Disc),
+        ("year", TemplateToken::Year),
+    ];
 
-            let has_disc = block_content.contains("%disc") && song.disc.is_some_and(|d| d > 0);
-            let has_year = block_content.contains("%year") && song.year.is_some_and(|y| y > 0);
-            let has_genre = block_content.contains("%genre")
-                && song.genre.as_deref().is_some_and(|g| !g.trim().is_empty());
-            let has_album_artist = block_content.contains("%albumartist")
-                && song
-                    .album_artist
-                    .as_deref()
-                    .is_some_and(|a| !a.trim().is_empty());
-            let has_album = block_content.contains("%album")
-                && !block_content.contains("%albumartist")
-                && song.album.as_deref().is_some_and(|a| !a.trim().is_empty());
-            let has_artist = block_content.contains("%artist")
-                && !block_content.contains("%albumartist")
-                && song.artist.as_deref().is_some_and(|a| !a.trim().is_empty());
-            let has_track = (block_content.contains("%track")
-                || block_content.contains("%track3")
-                || block_content.contains("%rawtrack"))
-                && song.track.is_some_and(|t| t > 0);
-
-            let should_render = has_disc
-                || has_year
-                || has_genre
-                || has_album_artist
-                || has_album
-                || has_artist
-                || has_track;
-            let replacement = if should_render {
-                block_content.to_string()
-            } else {
-                String::new()
-            };
-
-            expanded.replace_range(start..=actual_end, &replacement);
-        } else {
-            break;
-        }
+    /// The token `rest` (the text after a `%`) starts with, and its length.
+    fn parse(rest: &str) -> Option<(TemplateToken, usize)> {
+        Self::NAMES
+            .iter()
+            .find(|(name, _)| rest.starts_with(name))
+            .map(|&(name, token)| (token, name.len()))
     }
 
-    // 2. Perform variable replacement with fallbacks for empty/whitespace string metadata
-    let file_stem_fallback = song
-        .path
-        .as_ref()
-        .map(PathBuf::from)
-        .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().to_string()))
-        .unwrap_or_else(|| "Unknown Title".to_string());
+    /// Whether a conditional block can hinge on this token. `%title` and
+    /// `%extension` always expand to something, so they never decide one.
+    fn optional(self) -> bool {
+        !matches!(self, TemplateToken::Title | TemplateToken::Extension)
+    }
 
-    // %artist/%albumartist use the primary (first-listed) value when a song
-    // carries multiple — there's no single-value slot in a file path for a
-    // full multi-artist list, so the first artist acts as the canonical
-    // one, same convention used for %genre below.
-    let primary_artist = song
-        .artist
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .and_then(|a| models::parse_multi_value(a).into_iter().next());
-    let artist_str = primary_artist.as_deref().unwrap_or("Unknown Artist");
+    /// The tag a track is held back for when this token sits outside every
+    /// conditional block and the track lacks it (see [`required_missing_tags`]).
+    /// Title and artist identity are checked separately; a disc subtitle is
+    /// never required, since most discs have none.
+    fn missing_field(self) -> Option<&'static str> {
+        match self {
+            TemplateToken::Album => Some("album"),
+            TemplateToken::Track | TemplateToken::Track3 | TemplateToken::RawTrack => Some("track"),
+            TemplateToken::Disc => Some("disc"),
+            TemplateToken::Year => Some("year"),
+            TemplateToken::Genre => Some("genre"),
+            _ => None,
+        }
+    }
+}
 
-    let primary_album_artist = song
-        .album_artist
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .and_then(|a| models::parse_multi_value(a).into_iter().next())
-        .or_else(|| primary_artist.clone());
-    let album_artist_str = primary_album_artist.as_deref().unwrap_or("Unknown Artist");
+/// One parsed piece of a template.
+#[derive(Debug, Clone, PartialEq)]
+enum TemplatePiece {
+    Text(String),
+    Token(TemplateToken),
+    /// A conditional `{...}` block. It renders when the song has a value for
+    /// at least one optional token directly inside it (not in a nested
+    /// block); nested blocks decide for themselves. `{Disc %disc{ - %disctitle}/}`
+    /// therefore drops the whole disc folder for a disc-less track and only
+    /// the " - " suffix for a disc without a subtitle.
+    Block(Vec<TemplatePiece>),
+}
 
-    let album_str = song
-        .album
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or("Unknown Album");
+/// Parses a template into pieces. Never fails: an unclosed `{` is kept as
+/// literal text with its contents always rendered, a stray `}` is text, and
+/// so is a `%` that starts no known token.
+fn parse_template(template: &str) -> Vec<TemplatePiece> {
+    fn parse(rest: &mut &str, nested: bool) -> (Vec<TemplatePiece>, bool) {
+        let mut pieces = Vec::new();
+        let mut text = String::new();
+        let flush = |text: &mut String, pieces: &mut Vec<TemplatePiece>| {
+            if !text.is_empty() {
+                pieces.push(TemplatePiece::Text(std::mem::take(text)));
+            }
+        };
+        while let Some(c) = rest.chars().next() {
+            *rest = &rest[c.len_utf8()..];
+            match c {
+                '{' => {
+                    flush(&mut text, &mut pieces);
+                    let (inner, closed) = parse(rest, true);
+                    if closed {
+                        pieces.push(TemplatePiece::Block(inner));
+                    } else {
+                        pieces.push(TemplatePiece::Text("{".into()));
+                        pieces.extend(inner);
+                    }
+                }
+                '}' if nested => {
+                    flush(&mut text, &mut pieces);
+                    return (pieces, true);
+                }
+                '%' => match TemplateToken::parse(rest) {
+                    Some((token, len)) => {
+                        flush(&mut text, &mut pieces);
+                        *rest = &rest[len..];
+                        pieces.push(TemplatePiece::Token(token));
+                    }
+                    None => text.push('%'),
+                },
+                _ => text.push(c),
+            }
+        }
+        flush(&mut text, &mut pieces);
+        (pieces, false)
+    }
+    let mut rest = template;
+    parse(&mut rest, false).0
+}
 
-    let title_str = song
-        .title
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or(&file_stem_fallback);
+/// A song as template tokens see it.
+struct TemplateSong<'a> {
+    song: &'a Song,
+    ext: &'a str,
+}
 
-    // %genre uses the primary (first-listed) genre when a song carries
-    // multiple — there's no single-value slot in a file path for a full
-    // multi-genre list, so the first genre acts as the canonical one, same
-    // convention used by the majority-vote album genre logic below.
-    let primary_genre = song
-        .genre
-        .as_deref()
-        .and_then(|g| models::parse_multi_value(g).into_iter().next());
-    let genre_str = primary_genre.as_deref().unwrap_or("Unknown Genre");
+impl TemplateSong<'_> {
+    /// The song's own value for `token`, ready for a path segment, or `None`
+    /// when it doesn't carry that tag. %artist/%albumartist/%genre use the
+    /// first-listed value of a multi-value tag: a path segment has no slot
+    /// for a whole list.
+    fn tag(&self, token: TemplateToken) -> Option<String> {
+        fn non_blank(v: &Option<String>) -> Option<&str> {
+            v.as_deref().filter(|t| !t.trim().is_empty())
+        }
+        fn primary(v: &Option<String>) -> Option<String> {
+            non_blank(v).and_then(|t| models::parse_multi_value(t).into_iter().next())
+        }
+        let s = self.song;
+        let track = s.track.filter(|t| *t > 0);
+        let text = match token {
+            TemplateToken::AlbumArtist => primary(&s.album_artist),
+            TemplateToken::Artist => primary(&s.artist),
+            TemplateToken::Genre => primary(&s.genre),
+            TemplateToken::Album => non_blank(&s.album).map(str::to_string),
+            TemplateToken::Title => non_blank(&s.title).map(str::to_string),
+            TemplateToken::DiscTitle => non_blank(&s.disc_subtitle).map(str::to_string),
+            TemplateToken::Disc => return s.disc.filter(|d| *d > 0).map(|d| d.to_string()),
+            TemplateToken::Year => return s.year.filter(|y| *y > 0).map(|y| y.to_string()),
+            TemplateToken::Track => return track.map(|t| format!("{t:02}")),
+            TemplateToken::Track3 => return track.map(|t| format!("{t:03}")),
+            TemplateToken::RawTrack => return track.map(|t| t.to_string()),
+            TemplateToken::Extension => return Some(self.ext.to_string()),
+        };
+        text.map(|t| sanitize_component(&t, false, false))
+    }
 
-    let year_str = song.year.map(|y| y.to_string()).unwrap_or_default();
-    let disc_str = song
-        .disc
-        .map(|d| d.to_string())
-        .unwrap_or_else(|| "1".to_string());
+    /// What `token` expands to when the song lacks the tag.
+    fn fallback(&self, token: TemplateToken) -> String {
+        let text = match token {
+            TemplateToken::AlbumArtist => {
+                return self
+                    .tag(TemplateToken::Artist)
+                    .unwrap_or_else(|| "Unknown Artist".into())
+            }
+            TemplateToken::Artist => "Unknown Artist",
+            TemplateToken::Album => "Unknown Album",
+            TemplateToken::Genre => "Unknown Genre",
+            TemplateToken::Title => {
+                let stem = self
+                    .song
+                    .path
+                    .as_ref()
+                    .map(PathBuf::from)
+                    .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().to_string()));
+                return sanitize_component(
+                    stem.as_deref().unwrap_or("Unknown Title"),
+                    false,
+                    false,
+                );
+            }
+            TemplateToken::Disc => "1",
+            TemplateToken::Track => "00",
+            TemplateToken::Track3 => "000",
+            TemplateToken::RawTrack => "0",
+            TemplateToken::DiscTitle | TemplateToken::Year | TemplateToken::Extension => "",
+        };
+        text.to_string()
+    }
 
-    let track_2digit = match song.track {
-        Some(t) if t > 0 => format!("{:02}", t),
-        _ => "00".to_string(),
-    };
-    let track_unpadded = match song.track {
-        Some(t) if t > 0 => t.to_string(),
-        _ => "0".to_string(),
-    };
-    let track_3digit = match song.track {
-        Some(t) if t > 0 => format!("{:03}", t),
-        _ => "000".to_string(),
-    };
+    fn render(&self, pieces: &[TemplatePiece], out: &mut String) {
+        for piece in pieces {
+            match piece {
+                TemplatePiece::Text(t) => out.push_str(t),
+                TemplatePiece::Token(token) => {
+                    out.push_str(&self.tag(*token).unwrap_or_else(|| self.fallback(*token)))
+                }
+                TemplatePiece::Block(inner) => {
+                    let renders = inner.iter().any(|p| match p {
+                        TemplatePiece::Token(t) => t.optional() && self.tag(*t).is_some(),
+                        _ => false,
+                    });
+                    if renders {
+                        self.render(inner, out);
+                    }
+                }
+            }
+        }
+    }
+}
 
-    let artist_clean = sanitize_component(artist_str, false, false);
-    let album_artist_clean = sanitize_component(album_artist_str, false, false);
-    let album_clean = sanitize_component(album_str, false, false);
-    let title_clean = sanitize_component(title_str, false, false);
-    let genre_clean = sanitize_component(genre_str, false, false);
+/// Expands `template` for `song`: substitutes each `%token`, filling in a
+/// fallback ("Unknown Artist", disc "1", track "00", the file name for the
+/// title) where the song lacks the tag, and keeps a conditional `{...}`
+/// block only when the song has a value for one of the block's own tokens
+/// (see [`TemplatePiece::Block`]). Blocks may nest.
+pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
+    let mut out = String::new();
+    TemplateSong { song, ext }.render(&parse_template(template), &mut out);
+    out
+}
 
-    expanded = expanded.replace("%albumartist", &album_artist_clean);
-    expanded = expanded.replace("%artist", &artist_clean);
-    expanded = expanded.replace("%album", &album_clean);
-    expanded = expanded.replace("%disc", &disc_str);
-    expanded = expanded.replace("%track3", &track_3digit);
-    expanded = expanded.replace("%rawtrack", &track_unpadded);
-    expanded = expanded.replace("%track", &track_2digit);
-    expanded = expanded.replace("%title", &title_clean);
-    expanded = expanded.replace("%year", &year_str);
-    expanded = expanded.replace("%genre", &genre_clean);
-    expanded = expanded.replace("%extension", ext);
+/// The song columns the organizer's templates read, in the order
+/// [`organize_song_from_row`] maps them.
+const ORGANIZE_SONG_COLS: &str =
+    "id, path, title, artist, album, album_artist, track, disc, year, genre, disc_subtitle";
 
-    expanded
+fn organize_song_from_row(row: &rusqlite::Row) -> rusqlite::Result<Song> {
+    Ok(Song {
+        id: row.get(0)?,
+        path: row.get(1)?,
+        title: row.get(2)?,
+        artist: row.get(3)?,
+        album: row.get(4)?,
+        album_artist: row.get(5)?,
+        track: row.get(6)?,
+        disc: row.get(7)?,
+        year: row.get(8)?,
+        genre: row.get(9)?,
+        disc_subtitle: row.get(10)?,
+        ..Default::default()
+    })
 }
 
 /// Identifies which metadata fields required by the organize template or core track identity
-/// are missing or whitespace-only on the given song.
+/// are missing or whitespace-only on the given song, in the order album, track, disc, year,
+/// genre after title and artist.
 ///
-/// Conditional blocks `{...}` are stripped first so optional variables (such as `{%year - }`
-/// or `{%album/}`) do not trigger a missing-tag hold-back when absent.
+/// Only tokens outside conditional blocks are required, so optional parts (such as
+/// `{%year - }` or `{%album/}`) never hold a track back, and `%disctitle` never does.
 ///
 /// Core track identity fields (`title`, and `artist` or `albumartist`) are always checked:
 /// an audio track must have a title and an artist identity to be ready for file relocation.
 /// For `%albumartist` (or core identity), if `song.album_artist` is missing, it falls back to
 /// `song.artist`, matching the behavior of `expand_template`.
 pub fn required_missing_tags(template: &str, song: &Song) -> Vec<String> {
-    let mut remainder = template.to_string();
-    while let Some(start) = remainder.find('{') {
-        if let Some(end) = remainder[start..].find('}') {
-            let actual_end = start + end;
-            remainder.replace_range(start..=actual_end, "");
-        } else {
-            break;
-        }
-    }
-
+    let required: Vec<TemplateToken> = parse_template(template)
+        .into_iter()
+        .filter_map(|p| match p {
+            TemplatePiece::Token(token) => Some(token),
+            _ => None,
+        })
+        .collect();
+    let tags = TemplateSong { song, ext: "" };
+    let has = |token| tags.tag(token).is_some();
     let mut missing = Vec::new();
 
-    // 1. Title: part of core identity and %title
-    let is_title_empty = song
-        .title
-        .as_deref()
-        .map(|s| s.trim())
-        .unwrap_or("")
-        .is_empty();
-    if is_title_empty {
+    if !has(TemplateToken::Title) {
         missing.push("title".to_string());
     }
-
-    // 2. Artist / Album Artist:
-    // If the non-conditional remainder explicitly contains %artist (and not %albumartist),
-    // then only song.artist satisfies it. If %albumartist is present or neither is present
-    // (core identity), %albumartist falls back to song.artist just as expand_template does.
-    let without_albumartist = remainder.replace("%albumartist", "");
-    let explicitly_wants_artist = without_albumartist.contains("%artist");
-
-    let is_artist_empty = song
-        .artist
-        .as_deref()
-        .map(|s| s.trim())
-        .unwrap_or("")
-        .is_empty();
-
-    let is_album_artist_empty = song
-        .album_artist
-        .as_deref()
-        .map(|s| s.trim())
-        .unwrap_or("")
-        .is_empty();
-
-    if explicitly_wants_artist {
-        if is_artist_empty {
-            missing.push("artist".to_string());
-        }
-    } else if is_album_artist_empty && is_artist_empty {
+    // %artist alone is satisfied only by the track artist; otherwise
+    // %albumartist (or core identity) falls back to it, as expand_template does.
+    let artist_ok = if required.contains(&TemplateToken::Artist) {
+        has(TemplateToken::Artist)
+    } else {
+        has(TemplateToken::AlbumArtist) || has(TemplateToken::Artist)
+    };
+    if !artist_ok {
         missing.push("artist".to_string());
     }
 
-    // 3. Album: only required if %album is outside conditional blocks
-    if without_albumartist.contains("%album") {
-        let is_album_empty = song
-            .album
-            .as_deref()
-            .map(|s| s.trim())
-            .unwrap_or("")
-            .is_empty();
-        if is_album_empty {
-            missing.push("album".to_string());
-        }
-    }
-
-    // 4. Track: only required if %track, %track3, or %rawtrack is outside conditional blocks
-    if remainder.contains("%track")
-        || remainder.contains("%track3")
-        || remainder.contains("%rawtrack")
-    {
-        let is_track_empty = song.track.is_none_or(|t| t <= 0);
-        if is_track_empty {
-            missing.push("track".to_string());
-        }
-    }
-
-    // 5. Disc: only required if %disc is outside conditional blocks
-    if remainder.contains("%disc") {
-        let is_disc_empty = song.disc.is_none_or(|d| d <= 0);
-        if is_disc_empty {
-            missing.push("disc".to_string());
-        }
-    }
-
-    // 6. Year: only required if %year is outside conditional blocks
-    if remainder.contains("%year") {
-        let is_year_empty = song.year.is_none_or(|y| y <= 0);
-        if is_year_empty {
-            missing.push("year".to_string());
-        }
-    }
-
-    // 7. Genre: only required if %genre is outside conditional blocks
-    if remainder.contains("%genre") {
-        let is_genre_empty = song
-            .genre
-            .as_deref()
-            .map(|s| s.trim())
-            .unwrap_or("")
-            .is_empty();
-        if is_genre_empty {
-            missing.push("genre".to_string());
+    for field in ["album", "track", "disc", "year", "genre"] {
+        let lacking = required
+            .iter()
+            .any(|t| t.missing_field() == Some(field) && !has(*t));
+        if lacking {
+            missing.push(field.to_string());
         }
     }
 
@@ -655,26 +696,12 @@ pub fn compute_preview(
 
     let songs: Vec<Song> = if song_ids.is_empty() {
         let sql = format!(
-            "SELECT id, path, title, artist, album, album_artist, track, disc, year, genre
+            "SELECT {ORGANIZE_SONG_COLS}
              FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN ({lib}) AND unavailable = 0",
             lib = *LOCAL_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map([], |row| {
-            Ok(Song {
-                id: row.get(0)?,
-                path: row.get(1)?,
-                title: row.get(2)?,
-                artist: row.get(3)?,
-                album: row.get(4)?,
-                album_artist: row.get(5)?,
-                track: row.get(6)?,
-                disc: row.get(7)?,
-                year: row.get(8)?,
-                genre: row.get(9)?,
-                ..Default::default()
-            })
-        })?;
+        let rows = stmt.query_map([], organize_song_from_row)?;
         let items: Vec<Song> = rows.filter_map(|r| r.ok()).collect();
         items
     } else {
@@ -682,7 +709,7 @@ pub fn compute_preview(
         for chunk in song_ids.chunks(500) {
             let placeholders = vec!["?"; chunk.len()].join(",");
             let sql = format!(
-                "SELECT id, path, title, artist, album, album_artist, track, disc, year, genre
+                "SELECT {ORGANIZE_SONG_COLS}
                  FROM songs WHERE id IN ({}) AND path IS NOT NULL AND TRIM(path) != '' AND source IN ({lib}) AND unavailable = 0",
                 placeholders,
                 lib = *LOCAL_SOURCES_SQL
@@ -690,21 +717,7 @@ pub fn compute_preview(
             let mut stmt = conn.prepare(&sql)?;
             let params = rusqlite::params_from_iter(chunk.iter());
             let items: Vec<Song> = stmt
-                .query_map(params, |row| {
-                    Ok(Song {
-                        id: row.get(0)?,
-                        path: row.get(1)?,
-                        title: row.get(2)?,
-                        artist: row.get(3)?,
-                        album: row.get(4)?,
-                        album_artist: row.get(5)?,
-                        track: row.get(6)?,
-                        disc: row.get(7)?,
-                        year: row.get(8)?,
-                        genre: row.get(9)?,
-                        ..Default::default()
-                    })
-                })?
+                .query_map(params, organize_song_from_row)?
                 .filter_map(|r| r.ok())
                 .collect();
             result.extend(items);
@@ -720,26 +733,12 @@ pub fn compute_preview(
         songs.clone()
     } else {
         let sql = format!(
-            "SELECT id, path, title, artist, album, album_artist, track, disc, year, genre
+            "SELECT {ORGANIZE_SONG_COLS}
              FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN ({lib}) AND unavailable = 0",
             lib = *LOCAL_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map([], |row| {
-            Ok(Song {
-                id: row.get(0)?,
-                path: row.get(1)?,
-                title: row.get(2)?,
-                artist: row.get(3)?,
-                album: row.get(4)?,
-                album_artist: row.get(5)?,
-                track: row.get(6)?,
-                disc: row.get(7)?,
-                year: row.get(8)?,
-                genre: row.get(9)?,
-                ..Default::default()
-            })
-        })?;
+        let rows = stmt.query_map([], organize_song_from_row)?;
         rows.filter_map(|r| r.ok()).collect()
     };
 
@@ -2223,6 +2222,77 @@ mod tests {
             expand_template(template, &song_no_disc, "flac"),
             "Artist/Album/01 Track 1"
         );
+    }
+
+    /// A nested `{ - %disctitle}` drops only its own suffix when a disc has
+    /// no subtitle, and the outer disc folder vanishes without a disc (#1940).
+    #[test]
+    fn test_template_expansion_nested_disc_subtitle() {
+        let song = |disc: Option<i32>, subtitle: Option<&str>| Song {
+            title: Some("Song".into()),
+            album_artist: Some("Artist".into()),
+            album: Some("Box".into()),
+            track: Some(3),
+            disc,
+            disc_subtitle: subtitle.map(String::from),
+            ..Default::default()
+        };
+        let template = "%albumartist/%album/{Disc %disc{ - %disctitle}/}%track %title";
+
+        assert_eq!(
+            expand_template(template, &song(Some(2), Some("Live: Marquee")), "flac"),
+            "Artist/Box/Disc 2 - Live_ Marquee/03 Song"
+        );
+        assert_eq!(
+            expand_template(template, &song(Some(2), Some("   ")), "flac"),
+            "Artist/Box/Disc 2/03 Song"
+        );
+        assert_eq!(
+            expand_template(template, &song(None, None), "flac"),
+            "Artist/Box/03 Song"
+        );
+        // %discsubtitle is an alias, and neither prefix-matches as %disc.
+        assert_eq!(
+            expand_template(
+                "{%discsubtitle}|%disctitle|%disc",
+                &song(Some(1), Some("A")),
+                "flac"
+            ),
+            "A|A|1"
+        );
+    }
+
+    #[test]
+    fn test_template_parser_keeps_unbalanced_braces_and_unknown_tokens_literal() {
+        let song = Song {
+            title: Some("Song".into()),
+            artist: Some("Artist".into()),
+            year: Some(1999),
+            ..Default::default()
+        };
+        assert_eq!(
+            expand_template("{%year /%title", &song, "mp3"),
+            "{1999 /Song"
+        );
+        assert_eq!(
+            expand_template("%title}%bogus", &song, "mp3"),
+            "Song}%bogus"
+        );
+        assert_eq!(
+            expand_template("%title.%extension", &song, "mp3"),
+            "Song.mp3"
+        );
+    }
+
+    #[test]
+    fn test_required_missing_tags_never_requires_disc_subtitle() {
+        let song = Song {
+            title: Some("Song".into()),
+            artist: Some("Artist".into()),
+            disc: Some(1),
+            ..Default::default()
+        };
+        assert!(required_missing_tags("%artist/Disc %disc - %disctitle/%title", &song).is_empty());
     }
 
     #[test]

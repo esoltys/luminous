@@ -412,6 +412,7 @@
         <div class="tr"><code>%artist</code><div>El artista de la pista</div></div>
         <div class="tr"><code>%album</code><div>Título del álbum</div></div>
         <div class="tr"><code>%disc</code><div>Número de disco</div></div>
+        <div class="tr"><code>%disctitle</code><div>Subtítulo del disco, p. ej. «BBC Sessions»</div></div>
         <div class="tr"><code>%track</code><div>Número de pista</div></div>
         <div class="tr"><code>%title</code><div>Título de la pista</div></div>
         <div class="tr"><code>%year</code><div>Año de lanzamiento</div></div>
@@ -429,6 +430,7 @@
         <div class="tr"><code>%year - %album</code><div>2019 - Reservoir</div></div>
         <div class="tr"><code>{%album/}</code><div>Agrega una carpeta con el nombre del álbum, solo si la pista lo tiene</div></div>
         <div class="tr"><code>{%disc-}%track</code><div>Omite el «1-» cuando no hay número de disco: 07 o 1-07</div></div>
+        <div class="tr"><code>{Disc %disc{ - %disctitle}/}</code><div>Una carpeta por disco, con el subtítulo solo si lo hay: Disc 2 - BBC Sessions o Disc 2</div></div>
         <div class="tr"><code>{%track }%title</code><div>Agrega «07 » antes del título, solo si hay número de pista</div></div>
         <div class="tr"><code>{%track-}%title</code><div>Agrega «07-» antes del título, solo si hay número de pista</div></div>
       </div>

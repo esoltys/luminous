@@ -24,6 +24,7 @@
     onGoToArtist,
     onGoToAlbum,
     onEditTags,
+    onEditBatchTags,
     onOpenInPicard,
     allSelectedRemote = false,
     onClose,
@@ -38,6 +39,8 @@
     onGoToArtist?: () => void;
     onGoToAlbum?: () => void;
     onEditTags?: () => void;
+    /** Edits the tags of every selected entry together. */
+    onEditBatchTags?: () => void;
     onOpenInPicard?: () => void;
     allSelectedRemote?: boolean;
     onClose: () => void;
@@ -87,6 +90,13 @@
         onclick={() => { onEditTags?.(); onClose(); }}
       />
     {/if}
+  {:else if onEditBatchTags}
+    <ContextMenuDivider />
+    <ContextMenuItem
+      icon={Edit3}
+      label={i18n.t("collection.editTagsTooltip")}
+      onclick={() => { onEditBatchTags?.(); onClose(); }}
+    />
   {/if}
 
   {#if onOpenInPicard}

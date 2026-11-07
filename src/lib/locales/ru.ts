@@ -1663,6 +1663,8 @@ export const ru = {
     composerField: "Композитор",
     composerPlaceholder: "Добавьте композитора…",
     discField: "Диск",
+    discSubtitleField: "Подзаголовок диска",
+    discSubtitlePlaceholder: "например, Концерт в Marquee",
     groupingField: "Группировка",
     groupingTooltip: "Объединяет связанные композиции, например части классического произведения",
     bpmField: "BPM",
@@ -1694,6 +1696,7 @@ export const ru = {
     compilationField: "Сборник (пометить как «Разные исполнители»)",
     yearField: "Год выпуска",
     discField: "№ диска",
+    mixedValues: "Разные значения",
     tracksAffected: {
       one: "Применяется к {count} песне",
       few: "Применяется к {count} песням",
@@ -2013,6 +2016,8 @@ export const ru = {
     linkText: "ссылка"
   },
   albumDetail: {
+    discHeading: "Диск {disc}",
+    discHeadingWithSubtitle: "Диск {disc} — {subtitle}",
     backToAlbums: "К альбомам",
     unknownGenre: "Неизвестный жанр",
     statsLine: "{genre} · {year} · {duration}",
@@ -2270,6 +2275,7 @@ export const ru = {
     chipOptionalAlbumFolder: "Необязательная папка альбома",
     chipFolderSeparator: "Разделитель папок",
     chipConditionalDisc: "Условный префикс диска",
+    chipConditionalDiscSubtitle: "Условный подзаголовок диска",
     chipTrack: "№ трека (2 цифры: 01, 09, 11). Варианты: %track3 (3 цифры: 001), %rawtrack (без нулей: 1)",
     chipOptionalTrack: "Необязательный № трека (2 цифры). Варианты: {%track3 }, {%rawtrack }",
     chipOptionalTrackDot: "Необязательный № трека с точкой (2 цифры). Варианты: {%track3. }, {%rawtrack. }",
