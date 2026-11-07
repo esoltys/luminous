@@ -44,6 +44,18 @@ describe("PlaylistContextMenu.svelte", () => {
     expect(button).toHaveAttribute("title", "Open in Picard isn't available for songs on a remote server");
   });
 
+  it("offers Edit tags for a multi-entry selection only when batch editing is available", async () => {
+    const onEditBatchTags = vi.fn();
+    const base = { x: 0, y: 0, selectedCount: 3, onPlay: () => {}, onRemove: () => {}, onClose: () => {} };
+    const { unmount } = render(PlaylistContextMenu, base);
+    expect(screen.queryByText("Edit tags")).not.toBeInTheDocument();
+    unmount();
+
+    render(PlaylistContextMenu, { ...base, onEditBatchTags });
+    await fireEvent.click(await screen.findByText("Edit tags"));
+    expect(onEditBatchTags).toHaveBeenCalled();
+  });
+
   describe("View in Files", () => {
     const target = { source: { kind: "folder", id: 1 }, path: ["Katatonia", "2006"], selectedName: "11 The Itch.flac", exact: true };
     const props = { x: 0, y: 0, selectedCount: 1, songId: 7, onPlay: () => {}, onRemove: () => {}, onGoToAlbum: () => {} };

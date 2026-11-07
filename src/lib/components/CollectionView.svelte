@@ -9,6 +9,7 @@
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
+  import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import {
     PlayIcon as Play,
     PlusIcon as Plus,
@@ -45,6 +46,8 @@
   // activeSubTab and activeTab are managed globally via collectionStore
 
   let editingSongId = $state<number | null>(null);
+  /** A multi-song selection open in the batch tag editor. */
+  let batchEditSongs = $state<Song[] | null>(null);
   let showColumnsMenu = $state(false);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
@@ -671,6 +674,17 @@
   />
 {/if}
 
+{#if batchEditSongs !== null}
+  <AlbumTagEditor
+    title={i18n.t("collection.editTagsTooltip")}
+    songIds={batchEditSongs.map((s) => s.id)}
+    initialTracks={batchEditSongs}
+    hasEmbeddedArt={batchEditSongs.some((s) => s.art_embedded)}
+    onClose={() => { batchEditSongs = null; }}
+    onSave={handleTagEditorSaved}
+  />
+{/if}
+
 {#if contextMenuState}
   {@const song = contextMenuState.song}
   {@const selectedSongs = selectedKeys.size > 1 ? filteredSongs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
@@ -698,6 +712,7 @@
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
+    onEditBatchTags={() => { batchEditSongs = selectedSongs ?? null; }}
     onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { contextMenuState = null; }}
   />

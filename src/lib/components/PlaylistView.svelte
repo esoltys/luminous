@@ -45,6 +45,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import TagEditor from "./TagEditor.svelte";
+  import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import BlurredCover from "./BlurredCover.svelte";
   import GenreChips from "./GenreChips.svelte";
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
@@ -85,6 +86,8 @@
   };
 
   let editingSongId = $state<number | null>(null);
+  /** A multi-song selection open in the batch tag editor. */
+  let batchEditSongs = $state<Song[] | null>(null);
 
   let isEditingTitle = $state(false);
   let editTitleValue = $state("");
@@ -926,6 +929,7 @@
 {#if contextMenuState}
   {@const singleItem = contextMenuState.item}
   {@const selectedTracks = playlistsStore.activePlaylistTracks.filter((t) => selectedUuids.has(t.uuid) && t.song)}
+  {@const batchEditable = [...new Map(selectedTracks.filter((t) => !isItemUnavailable(t)).map((t) => [t.song!.id, t.song!])).values()]}
   {@const picardTargets = selectedTracks.length > 0 ? selectedTracks.map((t) => t.song!) : singleItem.song ? [singleItem.song] : []}
   <PlaylistContextMenu
     x={contextMenuState.x}
@@ -937,6 +941,7 @@
     onGoToArtist={singleItem.song?.artist ? () => navigationStore.viewArtist(singleItem.song?.album_artist?.trim() || singleItem.song?.artist || "") : undefined}
     onGoToAlbum={singleItem.song?.album ? () => navigationStore.viewAlbum(singleItem.song?.album || "") : undefined}
     onEditTags={singleItem.song?.id && !isItemUnavailable(singleItem) ? () => openTagEditor(singleItem.song!.id) : undefined}
+    onEditBatchTags={batchEditable.length > 1 ? () => { batchEditSongs = batchEditable; } : undefined}
     onOpenInPicard={singleItem.song?.id ? () => openSelectedInPicard(singleItem.song!.id) : undefined}
     allSelectedRemote={picardTargets.length > 0 && picardTargets.every(isRemoteSource)}
     onClose={() => { contextMenuState = null; }}
@@ -1018,6 +1023,17 @@
   <TagEditor
     songId={editingSongId}
     onClose={() => { editingSongId = null; }}
+    onSave={handleTagEditorSaved}
+  />
+{/if}
+
+{#if batchEditSongs !== null}
+  <AlbumTagEditor
+    title={i18n.t("collection.editTagsTooltip")}
+    songIds={batchEditSongs.map((s) => s.id)}
+    initialTracks={batchEditSongs}
+    hasEmbeddedArt={batchEditSongs.some((s) => s.art_embedded)}
+    onClose={() => { batchEditSongs = null; }}
     onSave={handleTagEditorSaved}
   />
 {/if}

@@ -25,6 +25,7 @@
   import { tasksStore } from "../stores/tasks.svelte";
   import { prefs, type CollectionViewMode } from "../stores/prefs.svelte";
   import TagEditor from "./TagEditor.svelte";
+  import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import CardSection from "./CardSection.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
@@ -85,6 +86,8 @@
   // the whole-artist Play/Shuffle Play actions (#104).
   let playableSongs = $derived(songs.filter((s) => !s.not_included));
   let editingSongId = $state<number | null>(null);
+  /** A multi-song selection open in the batch tag editor. */
+  let batchEditSongs = $state<Song[] | null>(null);
   let isEditorOpen = $state(false);
   let showShareModal = $state(false);
   let isBioExpanded = $state(false);
@@ -971,6 +974,7 @@
       }
     }}
     onEditTags={() => openTagEditor(song.id)}
+    onEditBatchTags={() => { batchEditSongs = selectedSongs ?? null; }}
     onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { singleContextMenuState = null; }}
   />
@@ -1039,6 +1043,17 @@
   <TagEditor
     songId={editingSongId}
     onClose={() => { editingSongId = null; }}
+    onSave={handleTagEditorSaved}
+  />
+{/if}
+
+{#if batchEditSongs !== null}
+  <AlbumTagEditor
+    title={i18n.t("collection.editTagsTooltip")}
+    songIds={batchEditSongs.map((s) => s.id)}
+    initialTracks={batchEditSongs}
+    hasEmbeddedArt={batchEditSongs.some((s) => s.art_embedded)}
+    onClose={() => { batchEditSongs = null; }}
     onSave={handleTagEditorSaved}
   />
 {/if}
