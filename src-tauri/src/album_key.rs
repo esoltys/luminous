@@ -102,14 +102,37 @@ pub fn album_key(album: &str) -> String {
 }
 
 /// Correlated SQL subquery yielding the display spelling of the album whose
-/// `album_key` is the SQL expression `key_col`: the spelling most of its
+/// full `album_key` is the SQL expression `key_col`: the spelling most of its
 /// library songs carry, ties going to the lowest binary value. Every query
 /// that emits a title for a merged album uses this, so all views agree on
 /// one name.
+///
+/// The match is an exact `album_key` comparison so it stays an index search
+/// on `idx_songs_album_key`: the grid evaluates it once per album, and any
+/// non-indexable predicate here turns into a full table scan per album
+/// (minutes on a 37k-song library, #1968). To resolve a bare title instead
+/// of a key, use [`album_title_display_sql`].
 pub fn album_display_sql(key_col: &str) -> String {
+    album_display_where_sql(&format!("d.album_key = {key_col}"))
+}
+
+/// Like [`album_display_sql`], but `title_col` is a folded album title
+/// ([`album_key`]) rather than a full key: it matches songs whose key is that
+/// bare title or a composite key ending in it, whichever release artist that
+/// is. The suffix test can't use an index, so this scans the library once
+/// per evaluation; only use it for a single lookup, never per row.
+pub fn album_title_display_sql(title_col: &str) -> String {
+    album_display_where_sql(&format!(
+        "(d.album_key = {title_col}
+          OR substr(d.album_key, -(length({title_col}) + 1)) = char({sep}) || {title_col})",
+        sep = COMPOSITE_KEY_SEPARATOR as u32
+    ))
+}
+
+fn album_display_where_sql(key_match: &str) -> String {
     format!(
         "(SELECT d.album FROM songs d
-          WHERE (d.album_key = {key_col} OR d.album_key LIKE '%\u{1f}' || {key_col}) AND d.source IN ({lib}) AND d.unavailable = 0
+          WHERE {key_match} AND d.source IN ({lib}) AND d.unavailable = 0
           GROUP BY d.album ORDER BY COUNT(*) DESC, d.album LIMIT 1)",
         lib = *crate::models::LIBRARY_SOURCES_SQL
     )
@@ -389,6 +412,97 @@ mod tests {
                 format!("the band{}bar", COMPOSITE_KEY_SEPARATOR),
                 "mcp notes".to_string()
             )]
+        );
+    }
+
+    fn display_test_db(prefix: &str) -> (tempfile::TempDir, crate::db::Database) {
+        let dir = tempfile::Builder::new().prefix(prefix).tempdir().unwrap();
+        let db = crate::db::Database::new(dir.path().to_path_buf()).unwrap();
+        (dir, db)
+    }
+
+    fn insert_song(conn: &rusqlite::Connection, path: &str, album: &str, artist: &str) {
+        let song = crate::models::Song {
+            path: Some(path.into()),
+            album: Some(album.into()),
+            artist: Some(artist.into()),
+            source: crate::models::SongSource::LocalFile,
+            filetype: crate::models::FileType::Mp3,
+            ..Default::default()
+        };
+        crate::collection::upsert_song(conn, &song).unwrap();
+    }
+
+    /// The album grid evaluates `album_display_sql` once per album, so it must
+    /// be an index search: a scan here costs one pass over the library per
+    /// album (#1968).
+    #[test]
+    fn album_display_sql_is_an_index_search() {
+        let (_dir, db) = display_test_db("luminous_album_display_plan_");
+        let conn = db.pool.get().unwrap();
+        let sql = format!(
+            "EXPLAIN QUERY PLAN SELECT {} FROM songs",
+            album_display_sql("songs.album_key")
+        );
+        let mut stmt = conn.prepare(&sql).unwrap();
+        let plan: Vec<String> = stmt
+            .query_map([], |r| r.get::<_, String>(3))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert!(
+            plan.iter()
+                .any(|d| d.contains("SEARCH d USING INDEX idx_songs_album_key")),
+            "display subquery should search idx_songs_album_key, plan: {plan:?}"
+        );
+        assert!(
+            !plan.iter().any(|d| d.starts_with("SCAN d")),
+            "display subquery must not scan songs per row, plan: {plan:?}"
+        );
+    }
+
+    /// A full key resolves only that release; a bare title resolves whichever
+    /// release carries it, with the majority spelling winning either way.
+    #[test]
+    fn display_sql_resolves_keys_and_bare_titles() {
+        let (_dir, db) = display_test_db("luminous_album_display_names_");
+        let conn = db.pool.get().unwrap();
+        insert_song(&conn, "a/1.mp3", "Songs Of The Sea", "The Band");
+        insert_song(&conn, "a/2.mp3", "Songs of the Sea", "The Band");
+        insert_song(&conn, "a/3.mp3", "Songs of the Sea", "The Band");
+        insert_song(&conn, "b/1.mp3", "SONGS OF THE SEA", "Other Band");
+
+        let resolve = |sql: String, arg: &str| -> Option<String> {
+            conn.query_row(&format!("SELECT {sql}"), [arg], |r| r.get(0))
+                .unwrap()
+        };
+        let band_key = album_key_for("Songs of the Sea", None, Some("The Band"), false);
+        let other_key = album_key_for("Songs of the Sea", None, Some("Other Band"), false);
+        assert_eq!(
+            resolve(album_display_sql("?1"), &band_key).as_deref(),
+            Some("Songs of the Sea")
+        );
+        assert_eq!(
+            resolve(album_display_sql("?1"), &other_key).as_deref(),
+            Some("SONGS OF THE SEA")
+        );
+        assert_eq!(
+            resolve(album_display_sql("?1"), &album_key("Songs of the Sea")),
+            None,
+            "a bare title is not a full key"
+        );
+        assert_eq!(
+            resolve(
+                album_title_display_sql("?1"),
+                &album_key("Songs of the Sea")
+            )
+            .as_deref(),
+            Some("Songs of the Sea")
+        );
+        assert_eq!(
+            resolve(album_title_display_sql("?1"), &album_key("of the Sea")),
+            None,
+            "a title matches the whole title part, not a suffix of it"
         );
     }
 }
