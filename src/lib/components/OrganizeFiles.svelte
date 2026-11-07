@@ -130,70 +130,32 @@
   }
 
   // Compact sample data for the live tree preview (artist → album → tracks).
-  // Purely illustrative — never sent to the backend.
+  // Purely illustrative: the backend expands each sample with the same rules
+  // Organize uses for real files (expand_template_samples).
   interface PreviewSample {
-    albumArtist: string;
+    album_artist: string;
     artist: string;
     album: string;
     year: number;
     genre: string;
     disc?: number;
+    disc_subtitle?: string;
     track?: number;
     title: string;
   }
   const PREVIEW_SAMPLES: PreviewSample[] = [
-    { albumArtist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 1, title: "Airbag" },
-    { albumArtist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 2, title: "Paranoid Android" },
-    { albumArtist: "Daft Punk", artist: "Daft Punk", album: "Discovery", year: 2001, genre: "Electronic", track: 1, title: "One More Time" },
+    { album_artist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 1, title: "Airbag" },
+    { album_artist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 2, title: "Paranoid Android" },
+    { album_artist: "Daft Punk", artist: "Daft Punk", album: "Discovery", year: 2001, genre: "Electronic", track: 1, title: "One More Time" },
     // A track with no track number to demonstrate conditional track wrapping
     // ({%track }, {%track-}) omitting leading spaces or hyphens.
-    { albumArtist: "Daft Punk", artist: "Daft Punk", album: "Aerodynamic", year: 2001, genre: "Electronic", title: "Aerodynamic (Remix)" },
+    { album_artist: "Daft Punk", artist: "Daft Punk", album: "Aerodynamic", year: 2001, genre: "Electronic", title: "Aerodynamic (Remix)" },
     // A multi-disc album so the preview demonstrates the conditional
-    // {CD %disc/} / {%disc-} blocks splitting into per-disc folders/prefixes.
-    { albumArtist: "Pink Floyd", artist: "Pink Floyd", album: "The Wall", year: 1979, genre: "Rock", disc: 1, track: 1, title: "In The Flesh?" },
-    { albumArtist: "Pink Floyd", artist: "Pink Floyd", album: "The Wall", year: 1979, genre: "Rock", disc: 2, track: 1, title: "Hey You" },
+    // {CD %disc/} / {%disc-} blocks splitting into per-disc folders/prefixes,
+    // and {%disctitle} blocks showing for the disc that has a subtitle.
+    { album_artist: "Pink Floyd", artist: "Pink Floyd", album: "The Wall", year: 1979, genre: "Rock", disc: 1, track: 1, title: "In The Flesh?" },
+    { album_artist: "Pink Floyd", artist: "Pink Floyd", album: "The Wall", year: 1979, genre: "Rock", disc: 2, disc_subtitle: "Side Three", track: 1, title: "Hey You" },
   ];
-
-  /** A lightweight, display-only mirror of the backend's expand_template
-   * (src-tauri/src/organizer.rs) — conditional {…} blocks plus %variable
-   * substitution — used only to render the sample tree preview below. */
-  function expandTemplatePreview(tpl: string, s: PreviewSample): string {
-    let expanded = tpl;
-    for (let guard = 0; guard < 20; guard++) {
-      const start = expanded.indexOf("{");
-      if (start === -1) break;
-      const end = expanded.indexOf("}", start);
-      if (end === -1) break;
-      const block = expanded.slice(start + 1, end);
-
-      const hasDisc = block.includes("%disc") && !!s.disc && s.disc > 0;
-      const hasYear = block.includes("%year") && !!s.year;
-      const hasGenre = block.includes("%genre") && !!s.genre;
-      const hasAlbumArtist = block.includes("%albumartist") && !!s.albumArtist;
-      const hasAlbum = block.includes("%album") && !block.includes("%albumartist") && !!s.album;
-      const hasArtist = block.includes("%artist") && !block.includes("%albumartist") && !!s.artist;
-      const hasTrack = (block.includes("%track") || block.includes("%rawtrack")) && !!s.track;
-      const shouldRender = hasDisc || hasYear || hasGenre || hasAlbumArtist || hasAlbum || hasArtist || hasTrack;
-
-      expanded = expanded.slice(0, start) + (shouldRender ? block : "") + expanded.slice(end + 1);
-    }
-
-    const track2 = s.track ? String(s.track).padStart(2, "0") : "00";
-    const track3 = s.track ? String(s.track).padStart(3, "0") : "000";
-    const rawtrack = s.track ? String(s.track) : "0";
-    expanded = expanded
-      .split("%albumartist").join(s.albumArtist)
-      .split("%artist").join(s.artist)
-      .split("%album").join(s.album)
-      .split("%disc").join(String(s.disc ?? 1))
-      .split("%track3").join(track3)
-      .split("%rawtrack").join(rawtrack)
-      .split("%track").join(track2)
-      .split("%title").join(s.title)
-      .split("%year").join(String(s.year))
-      .split("%genre").join(s.genre);
-    return expanded;
-  }
 
   interface PreviewTreeNode {
     name: string;
@@ -201,10 +163,9 @@
     children: PreviewTreeNode[];
   }
 
-  function buildPreviewTree(template: string): PreviewTreeNode[] {
+  function buildPreviewTree(expandedPaths: string[]): PreviewTreeNode[] {
     const roots: PreviewTreeNode[] = [];
-    for (const sample of PREVIEW_SAMPLES) {
-      const expanded = expandTemplatePreview(template, sample);
+    for (const expanded of expandedPaths) {
       const parts = expanded.split(/[/\\]/).filter((p) => p.trim() !== "");
       if (parts.length === 0) continue;
 
@@ -223,7 +184,19 @@
     return roots;
   }
 
-  let previewTree = $derived(buildPreviewTree(template));
+  let previewTree = $state<PreviewTreeNode[]>([]);
+  $effect(() => {
+    const tpl = template;
+    let stale = false;
+    invoke<string[]>("expand_template_samples", { template: tpl, samples: PREVIEW_SAMPLES })
+      .then((paths) => {
+        if (!stale) previewTree = buildPreviewTree(paths);
+      })
+      .catch((e) => console.error("Failed to expand template preview:", e));
+    return () => {
+      stale = true;
+    };
+  });
 
   let scope = $state<"selection" | "library">("library");
   let replaceSpaces = $state(false);

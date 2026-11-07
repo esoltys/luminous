@@ -412,6 +412,7 @@
         <div class="tr"><code>%artist</code><div>Исполнитель композиции</div></div>
         <div class="tr"><code>%album</code><div>Название альбома</div></div>
         <div class="tr"><code>%disc</code><div>№ диска</div></div>
+        <div class="tr"><code>%disctitle</code><div>Подзаголовок диска, например «BBC Sessions»</div></div>
         <div class="tr"><code>%track</code><div>№ композиции</div></div>
         <div class="tr"><code>%title</code><div>Название композиции</div></div>
         <div class="tr"><code>%year</code><div>Год выпуска</div></div>
@@ -429,6 +430,7 @@
         <div class="tr"><code>%year - %album</code><div>2019 - Reservoir</div></div>
         <div class="tr"><code>{%album/}</code><div>Добавляет папку с названием альбома, только если оно есть у композиции</div></div>
         <div class="tr"><code>{%disc-}%track</code><div>Пропускает «1-», если номера диска нет: 07 или 1-07</div></div>
+        <div class="tr"><code>{Disc %disc{ - %disctitle}/}</code><div>Папка для каждого диска, с подзаголовком, только если он есть: Disc 2 - BBC Sessions или Disc 2</div></div>
         <div class="tr"><code>{%track }%title</code><div>Добавляет «07 » перед названием, только если есть номер композиции</div></div>
         <div class="tr"><code>{%track-}%title</code><div>Добавляет «07-» перед названием, только если есть номер композиции</div></div>
       </div>

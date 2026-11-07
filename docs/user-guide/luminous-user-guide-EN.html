@@ -412,6 +412,7 @@
         <div class="tr"><code>%artist</code><div>The track's artist</div></div>
         <div class="tr"><code>%album</code><div>Album title</div></div>
         <div class="tr"><code>%disc</code><div>Disc number</div></div>
+        <div class="tr"><code>%disctitle</code><div>Disc subtitle, e.g. "BBC Sessions"</div></div>
         <div class="tr"><code>%track</code><div>Track number</div></div>
         <div class="tr"><code>%title</code><div>Track title</div></div>
         <div class="tr"><code>%year</code><div>Release year</div></div>
@@ -429,6 +430,7 @@
         <div class="tr"><code>%year - %album</code><div>2019 - Reservoir</div></div>
         <div class="tr"><code>{%album/}</code><div>Adds an album-name folder, only if the track has one</div></div>
         <div class="tr"><code>{%disc-}%track</code><div>Skips the "1-" when there's no disc number: 07, or 1-07</div></div>
+        <div class="tr"><code>{Disc %disc{ - %disctitle}/}</code><div>A disc folder, with the subtitle only when there is one: Disc 2 - BBC Sessions, or Disc 2</div></div>
         <div class="tr"><code>{%track }%title</code><div>Adds "07 " before the title, only if there's a track number</div></div>
         <div class="tr"><code>{%track-}%title</code><div>Adds "07-" before the title, only if there's a track number</div></div>
       </div>
