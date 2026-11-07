@@ -403,7 +403,9 @@ log-based watchdog.
 `src-tauri/src/stall_monitor.rs` is a dependency-free proxy for the same signal — it logs a
 warning if a 20ms Tokio sleep overshoots by more than 40ms. Each warning names the likely cause (a
 plain OS-thread probe running alongside tells a blocked Tokio worker apart from the whole process
-being starved) and the IPC commands dispatched around the stall. It also warns when a synchronous
+being starved, and system CPU pressure marks a stall within a few seconds of contention as
+inconclusive, since contention delays Tokio wakes far more than that one thread) and the IPC
+commands dispatched around the stall. It also warns when a synchronous
 command blocks the main thread for 32ms or more. It's coarser than `tokio-console` (it correlates
 rather than naming the exact task) but runs in every build with no special flags or features, so
 it's the first thing to check before reaching for the full `tokio-console` setup above.

@@ -143,8 +143,9 @@ capture = []
 [target.'cfg(windows)'.dependencies]
 tauri-plugin-prevent-default = { version = "6", features = ["platform-windows"] }
 webview2-com = "0.39"
-# Polls the live Shift-key state at drag-and-drop time via GetAsyncKeyState.
-windows-sys = { version = "0.61", features = ["Win32_UI_Input_KeyboardAndMouse"] }
+# Polls the live Shift-key state at drag-and-drop time via GetAsyncKeyState, and
+# reads system CPU busy share (GetSystemTimes) for the stall monitor.
+windows-sys = { version = "0.61", features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_Foundation", "Win32_System_Threading"] }
 windows-collections = "0.3"
 # --- OS "Now Playing" integration: SMTC (#576) ---
 # Registers our window with System Media Transport Controls via
