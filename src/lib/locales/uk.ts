@@ -504,6 +504,8 @@ export const uk = {
     text: "Цю бібліотеку востаннє відкривала новіша версія Luminous (база даних v{dbVersion}, цей застосунок підтримує v{appVersion}). Ваші папки й пісні нікуди не зникли — оновіть Luminous, щоб знову їх побачити."
   },
   collection: {
+    alphabetScrubberLabel: "Алфавітний покажчик",
+    jumpToLetter: "Перейти до літери {letter}",
     columnSelectorVisible: "Видимі",
     columnSelectorNoneVisible: "Немає видимих стовпців",
     columnSelectorMetatags: "Метатеги",

@@ -504,6 +504,8 @@ export const ru = {
     text: "Эта библиотека последний раз открывалась в более новой версии Luminous (база данных v{dbVersion}, это приложение поддерживает v{appVersion}). Ваши папки и песни на месте — обновите Luminous, чтобы снова их увидеть."
   },
   collection: {
+    alphabetScrubberLabel: "Алфавитный указатель",
+    jumpToLetter: "Перейти к букве {letter}",
     columnSelectorVisible: "Видимые",
     columnSelectorNoneVisible: "Нет видимых столбцов",
     columnSelectorMetatags: "Метатеги",

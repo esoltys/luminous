@@ -315,4 +315,38 @@ describe("CollectionView.svelte", () => {
     expect(addedCell).not.toBeNull();
     expect(addedCell).not.toHaveClass("font-mono");
   });
+
+  it("renders the alphabet scrubber in Artists view when >= 15 artists are sorted by name (#1973)", () => {
+    navigationStore.activeSubTab = "artists";
+    const manyArtists: ArtistItem[] = Array.from({ length: 20 }, (_, i) => ({
+      name: `Artist ${String.fromCharCode(65 + (i % 26))}${i}`,
+      album_count: 1,
+      song_count: 1,
+      genre: "Rock",
+    }));
+    collectionStore.artists = manyArtists;
+
+    const { getByTestId } = render(CollectionView);
+    expect(getByTestId("alphabet-scrubber")).toBeInTheDocument();
+  });
+
+  it("hides the alphabet scrubber in Artists view when sorted by non-alphabetical popularity (#1973)", async () => {
+    navigationStore.activeSubTab = "artists";
+    const manyArtists: ArtistItem[] = Array.from({ length: 20 }, (_, i) => ({
+      name: `Artist ${String.fromCharCode(65 + (i % 26))}${i}`,
+      album_count: 1,
+      song_count: 1,
+      genre: "Rock",
+      total_playcount: i * 5,
+    }));
+    collectionStore.artists = manyArtists;
+
+    const { queryByTestId, container } = render(CollectionView);
+    // Find sort select and change to popularity
+    const select = container.querySelector("select");
+    if (select) {
+      await fireEvent.change(select, { target: { value: "total_playcount-true" } });
+    }
+    expect(queryByTestId("alphabet-scrubber")).toBeNull();
+  });
 });

@@ -163,6 +163,18 @@
     ro.observe(node);
     return () => ro.disconnect();
   });
+
+  /**
+   * Scrolls the grid's nearest scrolling ancestor to bring the item at `index` into view (#1973).
+   */
+  export function scrollToIndex(index: number, behavior: ScrollBehavior = "instant") {
+    if (index < 0 || index >= items.length) return;
+    const scrollEl = scroller ?? (root ? findScroller(root) : null);
+    if (!scrollEl) return;
+    const targetRow = Math.max(0, Math.floor(index / columns));
+    const targetTop = targetRow * rowStride;
+    scrollEl.scrollTo({ top: targetTop, behavior });
+  }
 </script>
 
 <!-- overflow-anchor: none, so the browser's own scroll anchoring doesn't

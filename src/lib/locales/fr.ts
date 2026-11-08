@@ -450,6 +450,8 @@ export const fr: DeepStringRecord<typeof en> = {
     text: "Cette bibliothèque a été ouverte pour la dernière fois par une version plus récente de Luminous (base de données v{dbVersion}, cette application prend en charge la v{appVersion}). Vos dossiers et vos morceaux sont toujours là — mettez à jour Luminous pour les retrouver."
   },
   collection: {
+    alphabetScrubberLabel: "Index alphabétique",
+    jumpToLetter: "Aller à la lettre {letter}",
     columnSelectorVisible: "Visibles",
     columnSelectorNoneVisible: "Aucune colonne visible",
     columnSelectorMetatags: "Métabalises",

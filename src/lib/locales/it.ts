@@ -444,6 +444,8 @@ export const it = {
     text: "Questa libreria è stata aperta l'ultima volta da una versione più recente di Luminous (database v{dbVersion}, questa app supporta la v{appVersion}). Le tue cartelle e i tuoi brani sono ancora al loro posto: aggiorna Luminous per rivederli."
   },
   collection: {
+    alphabetScrubberLabel: "Indice alfabetico",
+    jumpToLetter: "Vai alla lettera {letter}",
     columnSelectorVisible: "Visibili",
     columnSelectorNoneVisible: "Nessuna colonna visibile",
     columnSelectorMetatags: "Metatag",

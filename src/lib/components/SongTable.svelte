@@ -251,6 +251,16 @@
     scroller.scrollTop = rowTop - (scroller.clientHeight - ROW_HEIGHT_PX) / 2;
   }
 
+  /**
+   * Scrolls the table's scroller to bring row `index` to the top (#1973).
+   */
+  export function scrollToIndex(index: number, behavior: ScrollBehavior = "instant") {
+    if (index < 0 || index >= rows.length || !bodyContainer) return;
+    const scroller = scrollParent(bodyContainer);
+    const targetTop = tops[index];
+    scroller.scrollTo({ top: targetTop, behavior });
+  }
+
   let orderForRange = $derived(rangeSelectionOrder ?? rows);
 
   function handleRowClick(e: MouseEvent, row: SongTableRow) {
