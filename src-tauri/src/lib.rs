@@ -46,6 +46,7 @@ pub mod picard;
 pub mod pins;
 pub mod player;
 pub mod playlist;
+pub mod provenance;
 pub mod radio;
 pub mod ratings_sync;
 pub mod remote_scheduler;
@@ -1530,6 +1531,9 @@ pub fn run() {
             commands::loudness::get_loudness_settings,
             commands::loudness::set_loudness_settings,
             commands::loudness::get_loudness_analysis_remaining,
+            // Lossless audio provenance commands (#1373)
+            commands::provenance::get_song_provenance,
+            commands::provenance::analyze_song_provenance,
             // Lyrics commands
             commands::lyrics::get_lyrics,
             commands::lyrics::save_lyrics,
