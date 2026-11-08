@@ -386,20 +386,20 @@ fn detect_upsampled_hires(samples: &[f32], sample_rate: u32) -> (bool, u32) {
     // Reference audible band: 5 kHz to 15 kHz
     let ref_start = hz_to_bin(5_000.0);
     let ref_end = hz_to_bin(15_000.0);
-    let ref_energy = band_power_db(&spectrum, ref_start, ref_end);
+    let ref_energy = band_power_db(spectrum, ref_start, ref_end);
 
     // Ultrasonic band: 25 kHz up to 0.85 * Nyquist
     let nyquist = sample_rate as f32 / 2.0;
     let ultra_start = hz_to_bin(25_000.0);
     let ultra_end = hz_to_bin(nyquist * 0.85);
 
-    let ultra_energy = band_power_db(&spectrum, ultra_start, ultra_end);
+    let ultra_energy = band_power_db(spectrum, ultra_start, ultra_end);
 
     // If audible band has clear energy (>-60 dBFS) but ultrasonic is down near noise floor (<-75 dBFS and >35 dB down)
     if ref_energy > -65.0 && ultra_energy < -75.0 && (ref_energy - ultra_energy) > 35.0 {
         // Detect whether cutoff is near 22.05 kHz (upsampled from 44.1k) or 24 kHz (upsampled from 48k)
         let bin_22k = hz_to_bin(22_050.0);
-        let energy_at_22k = band_power_db(&spectrum, bin_22k.saturating_sub(2), bin_22k + 2);
+        let energy_at_22k = band_power_db(spectrum, bin_22k.saturating_sub(2), bin_22k + 2);
         let cutoff = if energy_at_22k < -70.0 {
             22_050
         } else {
