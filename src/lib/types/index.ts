@@ -58,8 +58,7 @@ export type ProvenanceVerdict =
   | "authentic_hires"
   | "suspected_lossy"
   | "suspected_upsampled"
-  | "padded_bit_depth"
-  | "inconclusive";
+  | "padded_bit_depth";
 
 export interface SongProvenance {
   song_id: number;

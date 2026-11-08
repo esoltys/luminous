@@ -4,12 +4,19 @@
 //! `songs.mtime`, and offline DSP execution via `luminous_analysis`.
 
 use crate::db::Database;
-use crate::models::{FileType, SongSource};
+use crate::models::{FileType, SongSource, LOCAL_SOURCES_SQL};
 use anyhow::{bail, Context, Result};
 pub use luminous_analysis::{analyze_provenance, ProvenanceAnalysis, ProvenanceVerdict};
 use rusqlite::params;
+use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter};
+
+/// Lossless file types in SQLite songs table (flac: 2, oggflac: 3, alac: 8, aiff: 9, wav: 10, wavpack: 11, trueaudio: 13, ape: 14, dsf: 15, dsdiff: 16).
+pub(crate) const LOSSLESS_FILETYPES_SQL: &str = "2, 3, 8, 9, 10, 11, 13, 14, 15, 16";
 
 /// Advisory provenance verification verdict and spectral metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,12 +33,11 @@ pub struct SongProvenance {
 
 fn parse_verdict_str(s: &str) -> ProvenanceVerdict {
     match s {
-        "authentic" => ProvenanceVerdict::Authentic,
         "authentic_hires" => ProvenanceVerdict::AuthenticHiRes,
         "suspected_lossy" => ProvenanceVerdict::SuspectedLossy,
         "suspected_upsampled" => ProvenanceVerdict::SuspectedUpsampled,
         "padded_bit_depth" => ProvenanceVerdict::PaddedBitDepth,
-        _ => ProvenanceVerdict::Inconclusive,
+        _ => ProvenanceVerdict::Authentic,
     }
 }
 
@@ -42,8 +48,56 @@ fn verdict_to_str(v: ProvenanceVerdict) -> &'static str {
         ProvenanceVerdict::SuspectedLossy => "suspected_lossy",
         ProvenanceVerdict::SuspectedUpsampled => "suspected_upsampled",
         ProvenanceVerdict::PaddedBitDepth => "padded_bit_depth",
-        ProvenanceVerdict::Inconclusive => "inconclusive",
     }
+}
+
+/// Spawn a low-priority background thread that analyzes unverified local lossless tracks.
+/// Throttles between tracks so it never interferes with playback or UI responsiveness.
+pub fn spawn_background_analyzer(app: AppHandle, db: Arc<Database>) {
+    std::thread::Builder::new()
+        .name("luminous-provenance".to_string())
+        .spawn(move || {
+            loop {
+                let next: Option<(i64, String)> = match db.pool.get() {
+                    Ok(conn) => conn
+                        .query_row(
+                            &format!(
+                                "SELECT s.id, s.path FROM songs s
+                                 LEFT JOIN song_provenance p ON s.id = p.song_id
+                                 WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+                                   AND s.filetype IN ({lossless})
+                                   AND (p.song_id IS NULL OR p.mtime != s.mtime)
+                                 ORDER BY s.added DESC, s.id DESC LIMIT 1",
+                                lib = *LOCAL_SOURCES_SQL,
+                                lossless = LOSSLESS_FILETYPES_SQL
+                            ),
+                            [],
+                            |row| Ok((row.get(0)?, row.get(1)?)),
+                        )
+                        .optional()
+                        .unwrap_or(None),
+                    Err(_) => None,
+                };
+
+                let Some((song_id, _path)) = next else {
+                    std::thread::sleep(Duration::from_secs(15));
+                    continue;
+                };
+
+                match verify_song_provenance(&db, song_id) {
+                    Ok(prov) => {
+                        let _ = app.emit("song-provenance-changed", &prov);
+                    }
+                    Err(e) => {
+                        log::debug!("Background provenance skipped song {song_id}: {e}");
+                    }
+                }
+
+                // Throttle between tracks so background analysis is gentle on disk/CPU
+                std::thread::sleep(Duration::from_millis(250));
+            }
+        })
+        .expect("failed to spawn provenance analyzer thread");
 }
 
 /// Retrieve the cached provenance analysis for a song, checking if the file has modified on disk since.

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import { playerStore } from "../stores/player.svelte";
   import { inspectorStore } from "../stores/inspector.svelte";
   import {
@@ -7,7 +8,6 @@
     ArrowUUpLeftIcon as Return,
     ClockIcon as Clock,
     ArrowSquareOutIcon as ExternalLink,
-    ArrowsClockwiseIcon as RefreshCw,
     CaretDownIcon as CaretDown,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff
@@ -117,8 +117,6 @@
   }
 
   let provenance = $state<SongProvenance | null>(null);
-  let provenanceLoading = $state(false);
-
   let isLosslessTrack = $derived.by(() => {
     if (!currentSong) return false;
     const isLossless = isLosslessFileType(currentSong.filetype);
@@ -131,7 +129,6 @@
     const shouldCheck = isLosslessTrack;
 
     provenance = null;
-    provenanceLoading = false;
 
     if (songId && shouldCheck) {
       invoke<SongProvenance | null>("get_song_provenance", { songId })
@@ -144,36 +141,30 @@
           console.warn("Failed to get cached provenance:", err);
         });
     }
-  });
 
-  async function runVerifyProvenance() {
-    if (!currentSong || provenanceLoading) return;
-    const songId = currentSong.id;
-    provenanceLoading = true;
-    try {
-      const res = await invoke<SongProvenance>("analyze_song_provenance", { songId });
-      if (currentSong?.id === songId) {
-        provenance = res;
+    let unlisten: (() => void) | undefined;
+    listen<SongProvenance>("song-provenance-changed", (event) => {
+      if (currentSong && event.payload.song_id === currentSong.id) {
+        provenance = event.payload;
       }
-    } catch (err) {
-      console.error("Provenance analysis failed:", err);
-    } finally {
-      if (currentSong?.id === songId) {
-        provenanceLoading = false;
-      }
-    }
-  }
+    }).then((un) => {
+      unlisten = un;
+    });
+
+    return () => {
+      unlisten?.();
+    };
+  });
 
   function provenanceBadgeClass(verdict: string): string {
     switch (verdict) {
       case "authentic":
       case "authentic_hires":
-        return "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
+        return "bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30";
       case "suspected_lossy":
       case "suspected_upsampled":
-        return "bg-amber-500/15 text-amber-400 border border-amber-500/30";
       case "padded_bit_depth":
-        return "bg-sky-500/15 text-sky-400 border border-sky-500/30";
+        return "bg-brand-bg/80 text-brand-text-primary border border-brand-border";
       default:
         return "bg-brand-bg/60 text-brand-text-secondary border border-brand-border/40";
     }
@@ -200,7 +191,7 @@
       case "padded_bit_depth":
         return i18n.t('playerBar.provenancePaddedBitDepth', {}, 'Padded Bit Depth');
       default:
-        return i18n.t('playerBar.provenanceInconclusive', {}, 'Inconclusive');
+        return i18n.t('playerBar.provenanceAuthentic', {}, 'Authentic Lossless');
     }
   }
 
@@ -344,43 +335,30 @@
               <span class="text-brand-text-primary text-right break-words min-w-0">{dynamicRangeText}</span>
             </div>
           {/if}
-          {#if isLosslessTrack}
+          {#if currentSong.filetype}
             <div class="flex items-start justify-between gap-3 text-xs" data-testid="provenance-row">
-              <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.provenanceLabel', {}, 'Authenticity')}</span>
+              <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.formatLabel', {}, 'Format')}</span>
               <div class="text-right min-w-0 flex flex-col items-end gap-1">
-                {#if provenanceLoading}
-                  <span class="text-brand-text-secondary/70 italic flex items-center gap-1">
-                    <RefreshCw class="w-3 h-3 animate-spin inline" />
-                    {i18n.t('playerBar.provenanceVerifying', {}, 'Analyzing...')}
-                  </span>
-                {:else if provenance}
-                  <div class="flex items-center gap-1.5 flex-wrap justify-end">
-                    <span
-                      class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium {provenanceBadgeClass(provenance.verdict)}"
-                      title={provenance.description}
-                    >
-                      {provenanceBadgeText(provenance)}
-                    </span>
-                    {#if provenance.is_stale}
-                      <span class="text-[10px] text-brand-text-secondary/60">({i18n.t('playerBar.provenanceStale', {}, 'stale')})</span>
-                      <button
-                        type="button"
-                        onclick={runVerifyProvenance}
-                        class="text-[11px] underline text-brand-accent-text hover:text-brand-accent-contrast transition-colors cursor-pointer"
+                <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                  <span class="font-semibold uppercase text-brand-text-primary">{currentSong.filetype}</span>
+                  {#if isLosslessTrack}
+                    {#if provenance}
+                      <span
+                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium {provenanceBadgeClass(provenance.verdict)}"
+                        title={provenance.description}
                       >
-                        {i18n.t('playerBar.provenanceReverify', {}, 'Re-verify')}
-                      </button>
+                        {provenanceBadgeText(provenance)}
+                      </span>
+                      {#if provenance.is_stale}
+                        <span class="text-[10px] text-brand-text-secondary/60">({i18n.t('playerBar.provenanceStale', {}, 'stale')})</span>
+                      {/if}
+                    {:else}
+                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-bg/60 text-brand-text-secondary/80 border border-brand-border/40">
+                        {i18n.t('playerBar.provenanceUnverified', {}, 'Unverified')}
+                      </span>
                     {/if}
-                  </div>
-                {:else}
-                  <button
-                    type="button"
-                    onclick={runVerifyProvenance}
-                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-brand-border text-[11px] font-medium text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer"
-                  >
-                    {i18n.t('playerBar.provenanceVerify', {}, 'Verify')}
-                  </button>
-                {/if}
+                  {/if}
+                </div>
               </div>
             </div>
           {/if}

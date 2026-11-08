@@ -10,7 +10,8 @@
     PencilSimpleIcon as Edit3,
     ArrowSquareOutIcon as OpenInPicard,
     ChartBarIcon as BarChart2,
-    ShareNetworkIcon as Share
+    ShareNetworkIcon as Share,
+    ShieldCheckIcon as ShieldCheck
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -21,7 +22,7 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { openInPicard } from "../utils/picard";
   import { invoke } from "@tauri-apps/api/core";
-  import type { Song, Playlist } from "../types";
+  import { isLosslessFileType, type Song, type Playlist } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
@@ -96,6 +97,28 @@
 
   async function handleToggleStatsExcluded() {
     await statsExclusionsStore.toggleWithToast("album", albumName);
+  }
+
+  async function handleVerifyAlbum() {
+    try {
+      const songs = await invoke<Song[]>("get_songs_by_album", { album: albumName || "" });
+      const lossless = songs.filter(
+        (s) => isLosslessFileType(s.filetype) && (s.source === "local_file" || s.source === "collection")
+      );
+      if (lossless.length > 0) {
+        toastStore.show(
+          i18n.t("collection.verifyingAuthenticity", { count: lossless.length }, `Verifying audio authenticity for ${lossless.length} tracks...`)
+        );
+        await invoke<number>("analyze_songs_provenance", { songIds: lossless.map((s) => s.id) });
+        toastStore.show(
+          i18n.t("collection.verifyAuthenticityComplete", { count: lossless.length }, `Audio authenticity verification complete for ${lossless.length} tracks`)
+        );
+      } else {
+        toastStore.show(i18n.t("collection.noLosslessTracks", {}, "No local lossless tracks in this album"));
+      }
+    } catch (err) {
+      console.error("Failed to verify album authenticity:", err);
+    }
   }
 
   async function fetchPlayableSongIds(): Promise<number[]> {
@@ -204,6 +227,11 @@
       }}
       disabled={!picardStore.available}
       title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+    />
+    <ContextMenuItem
+      icon={ShieldCheck}
+      label={i18n.t("collection.verifyAuthenticity", {}, "Verify Audio Authenticity")}
+      onclick={() => { handleVerifyAlbum(); onClose(); }}
     />
     <ViewInFilesItem album={albumName} {onClose} />
     <ContextMenuItem

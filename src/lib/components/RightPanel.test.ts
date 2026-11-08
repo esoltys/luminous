@@ -126,12 +126,12 @@ describe("RightPanel.svelte", () => {
   it("renders audio pipeline stages on Technical tab when audioPipeline is set", () => {
     playerStore.currentSong = mockSong;
     playerStore.audioPipeline = mockAudioPipeline;
-    const { getByText } = render(RightPanel);
+    const { getByText, getAllByText } = render(RightPanel);
 
     expect(getByText("Input")).toBeInTheDocument();
     expect(getByText("Processing")).toBeInTheDocument();
     expect(getByText("Output")).toBeInTheDocument();
-    expect(getByText("FLAC")).toBeInTheDocument();
+    expect(getAllByText("FLAC").length).toBeGreaterThan(0);
     expect(getByText("320 kbps")).toBeInTheDocument();
     expect(getByText("Bit-perfect")).toBeInTheDocument();
   });
@@ -489,18 +489,20 @@ describe("RightPanel.svelte", () => {
     expect(scrollEl.scrollTop).toBe(0);
   });
 
-  it("shows Verify button on Technical tab for lossless song without cached provenance", async () => {
+  it("shows Unverified badge on Technical tab for lossless song without cached provenance", async () => {
     playerStore.currentSong = mockSong;
-    const { getByText, findByRole } = render(RightPanel);
-    const verifyBtn = await findByRole("button", { name: "Verify" });
-    expect(verifyBtn).toBeInTheDocument();
-    expect(getByText("Authenticity")).toBeInTheDocument();
+    const { getByTestId, queryByRole } = render(RightPanel);
+    const row = getByTestId("provenance-row");
+    expect(row).toHaveTextContent("Format");
+    expect(row).toHaveTextContent("Unverified");
+    expect(queryByRole("button", { name: "Verify" })).toBeNull();
+    expect(queryByRole("button", { name: "Verify Album" })).toBeNull();
   });
 
-  it("calls analyze_song_provenance when Verify button is clicked", async () => {
+  it("displays cached provenance badge when available", async () => {
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockImplementation(async (cmd: string, args?: any) => {
-      if (cmd === "analyze_song_provenance") {
+      if (cmd === "get_song_provenance") {
         return {
           song_id: 42,
           verdict: "authentic",
@@ -516,16 +518,12 @@ describe("RightPanel.svelte", () => {
     });
 
     playerStore.currentSong = mockSong;
-    const { findByRole, findByText } = render(RightPanel);
-    const verifyBtn = await findByRole("button", { name: "Verify" });
-    await fireEvent.click(verifyBtn);
-
-    expect(invokeMock).toHaveBeenCalledWith("analyze_song_provenance", { songId: 42 });
+    const { findByText } = render(RightPanel);
     const badge = await findByText(/Authentic Lossless/);
     expect(badge).toBeInTheDocument();
   });
 
-  it("displays stale indicator and Re-verify button when cached provenance is stale", async () => {
+  it("displays stale indicator when cached provenance is stale", async () => {
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "get_song_provenance") {
@@ -544,14 +542,16 @@ describe("RightPanel.svelte", () => {
     });
 
     playerStore.currentSong = mockSong;
-    const { findByText, findByRole } = render(RightPanel);
+    const { findByText, queryByRole } = render(RightPanel);
     expect(await findByText("(stale)")).toBeInTheDocument();
-    expect(await findByRole("button", { name: "Re-verify" })).toBeInTheDocument();
+    expect(queryByRole("button", { name: "Re-verify" })).toBeNull();
   });
 
-  it("hides provenance row for lossy tracks", async () => {
+  it("hides provenance actions for lossy tracks", async () => {
     playerStore.currentSong = { ...mockSong, filetype: "MP3" };
-    const { queryByText } = render(RightPanel);
-    expect(queryByText("Authenticity")).toBeNull();
+    const { getByTestId, queryByText } = render(RightPanel);
+    const row = getByTestId("provenance-row");
+    expect(row).toHaveTextContent("MP3");
+    expect(queryByText("Unverified")).toBeNull();
   });
 });

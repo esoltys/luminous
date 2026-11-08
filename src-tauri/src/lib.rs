@@ -1202,6 +1202,12 @@ pub fn run() {
             // Start background EBU R128 loudness analyzer (#77)
             crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
 
+            // Start background lossless audio provenance analyzer (#1373, epic #1441)
+            crate::provenance::spawn_background_analyzer(
+                app.handle().clone(),
+                Arc::clone(&state.db),
+            );
+
             // Correct the codec of tracks scanned when it came from the extension (#1866).
             crate::collection::spawn_codec_reprobe(app.handle().clone(), Arc::clone(&state.db));
 
@@ -1534,6 +1540,7 @@ pub fn run() {
             // Lossless audio provenance commands (#1373)
             commands::provenance::get_song_provenance,
             commands::provenance::analyze_song_provenance,
+            commands::provenance::analyze_songs_provenance,
             // Lyrics commands
             commands::lyrics::get_lyrics,
             commands::lyrics::save_lyrics,

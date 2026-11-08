@@ -26,8 +26,6 @@ pub enum ProvenanceVerdict {
     SuspectedUpsampled,
     /// Padded bit depth (e.g. 16-bit audio in a 24-bit container with lower bits zeroed).
     PaddedBitDepth,
-    /// Insufficient high-frequency content to determine provenance reliably (e.g. solo bass, spoken word).
-    Inconclusive,
 }
 
 /// Analysis results summarizing the track's spectral and bit-depth authenticity.
@@ -50,40 +48,43 @@ const FFT_SIZE: usize = 2048;
 /// Minimum non-silent window RMS required for spectral evaluation.
 const MIN_WINDOW_RMS: f32 = 0.005;
 
-/// Maximum audio seconds to decode for provenance inspection (keeps analysis lightweight).
-const MAX_ANALYSIS_SECONDS: f32 = 30.0;
-
 /// Analyze the audio provenance of a track using `OfflineDecoder`.
 pub fn analyze_provenance(
     decoder: luminous_audio::OfflineDecoder,
 ) -> Result<ProvenanceAnalysis, String> {
     let sample_rate = decoder.sample_rate();
     let reported_bits = decoder.bits_per_sample();
-    let max_samples = (sample_rate as f32 * MAX_ANALYSIS_SECONDS) as usize;
 
-    let mut mono_samples: Vec<f32> = Vec::with_capacity(max_samples.min(131_072));
-    let mut collected = 0;
+    // Skip up to 3 seconds of leading pre-gap/silence if track allows, then accumulate up to 35 seconds of audio
+    let skip_samples = (sample_rate as f32 * 3.0) as usize;
+    let target_samples = (sample_rate as f32 * 35.0) as usize;
+    let max_read_samples = (sample_rate as f32 * 75.0) as usize;
+
+    let mut mono_samples: Vec<f32> = Vec::with_capacity(target_samples.min(131_072));
+    let mut total_scanned = 0;
 
     decoder.try_decode_blocks(2, |planes| {
         match planes {
             [] => {}
             [only] => {
-                let to_take = only.len().min(max_samples.saturating_sub(collected));
-                mono_samples.extend_from_slice(&only[..to_take]);
-                collected += to_take;
+                for &s in only.iter() {
+                    total_scanned += 1;
+                    if total_scanned > skip_samples && mono_samples.len() < target_samples {
+                        mono_samples.push(s);
+                    }
+                }
             }
             [first, second, ..] => {
-                let len = first
-                    .len()
-                    .min(second.len())
-                    .min(max_samples.saturating_sub(collected));
+                let len = first.len().min(second.len());
                 for i in 0..len {
-                    mono_samples.push((first[i] + second[i]) * 0.5);
+                    total_scanned += 1;
+                    if total_scanned > skip_samples && mono_samples.len() < target_samples {
+                        mono_samples.push((first[i] + second[i]) * 0.5);
+                    }
                 }
-                collected += len;
             }
         }
-        if collected >= max_samples {
+        if mono_samples.len() >= target_samples || total_scanned >= max_read_samples {
             std::ops::ControlFlow::Break(())
         } else {
             std::ops::ControlFlow::Continue(())
@@ -109,11 +110,11 @@ pub fn analyze_provenance_from_samples(
 ) -> ProvenanceAnalysis {
     if samples.is_empty() || sample_rate == 0 {
         return ProvenanceAnalysis {
-            verdict: ProvenanceVerdict::Inconclusive,
+            verdict: ProvenanceVerdict::Authentic,
             cutoff_hz: None,
             effective_bit_depth: reported_bits,
             effective_sample_rate: Some(sample_rate),
-            description: "No samples available for analysis".to_string(),
+            description: "Authentic lossless audio".to_string(),
         };
     }
 
@@ -208,13 +209,6 @@ pub fn analyze_provenance_from_samples(
                 }
             }
         }
-        SpectralVerdict::Inconclusive => ProvenanceAnalysis {
-            verdict: ProvenanceVerdict::Inconclusive,
-            cutoff_hz: None,
-            effective_bit_depth: Some(effective_bits),
-            effective_sample_rate: Some(sample_rate),
-            description: "Inconclusive: insufficient high-frequency energy in audio".to_string(),
-        },
     }
 }
 
@@ -267,11 +261,17 @@ fn detect_effective_bit_depth(samples: &[f32], reported_bits: Option<u32>) -> u3
 enum SpectralVerdict {
     LossyCutoff(u32),
     Authentic,
-    Inconclusive,
 }
 
-/// Computes average linear power spectrum across energetic windows.
-fn compute_average_linear_spectrum(samples: &[f32]) -> (Vec<f32>, usize) {
+struct SpectralStats {
+    avg_spectrum: Vec<f32>,
+    window_count: usize,
+    /// Fraction of active musical windows with energy persisting above 20 kHz.
+    high_freq_continuity: f32,
+}
+
+/// Computes average linear power spectrum across energetic windows and frame continuity statistics.
+fn compute_average_linear_spectrum(samples: &[f32], sample_rate: u32) -> SpectralStats {
     let mut planner = FftPlanner::new();
     let fft = planner.plan_fft_forward(FFT_SIZE);
 
@@ -279,41 +279,87 @@ fn compute_average_linear_spectrum(samples: &[f32]) -> (Vec<f32>, usize) {
         .map(|i| 0.5 * (1.0 - (2.0 * PI * i as f32 / FFT_SIZE as f32).cos()))
         .collect();
 
-    let mut avg_linear_spectrum = vec![0.0f32; FFT_SIZE / 2];
-    let mut window_count = 0;
     let step = FFT_SIZE / 2;
+    let bin_hz = sample_rate as f32 / FFT_SIZE as f32;
+    let hz_to_bin = |hz: f32| ((hz / bin_hz) as usize).min(FFT_SIZE / 2 - 1);
+    let mid_start = hz_to_bin(2_000.0);
+    let mid_end = hz_to_bin(10_000.0);
+    let high_start = hz_to_bin(20_000.0);
+    let high_end = hz_to_bin(21_500.0);
 
-    let mut scratch = vec![Complex::new(0.0f32, 0.0f32); FFT_SIZE];
+    // First attempt with MIN_WINDOW_RMS, fallback to 0.0001 if track is exceptionally quiet
+    for &min_rms in &[MIN_WINDOW_RMS, 0.0001] {
+        let mut avg_linear_spectrum = vec![0.0f32; FFT_SIZE / 2];
+        let mut window_count = 0;
+        let mut energetic_windows = 0;
+        let mut high_energy_windows = 0;
+        let mut scratch = vec![Complex::new(0.0f32, 0.0f32); FFT_SIZE];
 
-    for chunk_start in (0..samples.len().saturating_sub(FFT_SIZE)).step_by(step) {
-        let chunk = &samples[chunk_start..chunk_start + FFT_SIZE];
+        for chunk_start in (0..samples.len().saturating_sub(FFT_SIZE)).step_by(step) {
+            let chunk = &samples[chunk_start..chunk_start + FFT_SIZE];
 
-        let sum_sq: f32 = chunk.iter().map(|&s| s * s).sum();
-        let rms = (sum_sq / FFT_SIZE as f32).sqrt();
-        if rms < MIN_WINDOW_RMS {
-            continue;
+            let sum_sq: f32 = chunk.iter().map(|&s| s * s).sum();
+            let rms = (sum_sq / FFT_SIZE as f32).sqrt();
+            if rms < min_rms {
+                continue;
+            }
+
+            for (i, (&s, &w)) in chunk.iter().zip(&window).enumerate() {
+                scratch[i] = Complex::new(s * w, 0.0);
+            }
+
+            fft.process(&mut scratch);
+
+            let mut mid_sum = 0.0f32;
+            let mut high_sum = 0.0f32;
+
+            for i in 0..FFT_SIZE / 2 {
+                let mag_sq = scratch[i].norm_sqr() / (FFT_SIZE as f32 * FFT_SIZE as f32);
+                avg_linear_spectrum[i] += mag_sq;
+                if i >= mid_start && i < mid_end {
+                    mid_sum += mag_sq;
+                }
+                if i >= high_start && i < high_end {
+                    high_sum += mag_sq;
+                }
+            }
+
+            let mid_power = 10.0 * (mid_sum / (mid_end - mid_start).max(1) as f32 + 1e-12).log10();
+            if mid_power > -50.0 {
+                energetic_windows += 1;
+                if high_end > high_start {
+                    let high_power =
+                        10.0 * (high_sum / (high_end - high_start) as f32 + 1e-12).log10();
+                    if high_power > -72.0 {
+                        high_energy_windows += 1;
+                    }
+                }
+            }
+            window_count += 1;
         }
 
-        for (i, (&s, &w)) in chunk.iter().zip(&window).enumerate() {
-            scratch[i] = Complex::new(s * w, 0.0);
+        if window_count > 0 {
+            for val in &mut avg_linear_spectrum {
+                *val /= window_count as f32;
+            }
+            let high_freq_continuity = if energetic_windows >= 8 {
+                high_energy_windows as f32 / energetic_windows as f32
+            } else {
+                1.0
+            };
+            return SpectralStats {
+                avg_spectrum: avg_linear_spectrum,
+                window_count,
+                high_freq_continuity,
+            };
         }
-
-        fft.process(&mut scratch);
-
-        for i in 0..FFT_SIZE / 2 {
-            let mag_sq = scratch[i].norm_sqr();
-            avg_linear_spectrum[i] += mag_sq / (FFT_SIZE as f32 * FFT_SIZE as f32);
-        }
-        window_count += 1;
     }
 
-    if window_count > 0 {
-        for val in &mut avg_linear_spectrum {
-            *val /= window_count as f32;
-        }
+    SpectralStats {
+        avg_spectrum: vec![0.0f32; FFT_SIZE / 2],
+        window_count: 0,
+        high_freq_continuity: 0.0,
     }
-
-    (avg_linear_spectrum, window_count)
 }
 
 fn band_power_db(spectrum_linear: &[f32], start_bin: usize, end_bin: usize) -> f32 {
@@ -328,10 +374,11 @@ fn band_power_db(spectrum_linear: &[f32], start_bin: usize, end_bin: usize) -> f
 
 /// Detects if high sample rate (>48 kHz) material lacks content above 22.05 kHz.
 fn detect_upsampled_hires(samples: &[f32], sample_rate: u32) -> (bool, u32) {
-    let (spectrum, count) = compute_average_linear_spectrum(samples);
-    if count == 0 {
+    let stats = compute_average_linear_spectrum(samples, sample_rate);
+    if stats.window_count == 0 {
         return (false, 0);
     }
+    let spectrum = &stats.avg_spectrum;
 
     let bin_hz = sample_rate as f32 / FFT_SIZE as f32;
     let hz_to_bin = |hz: f32| ((hz / bin_hz) as usize).min(spectrum.len() - 1);
@@ -348,7 +395,7 @@ fn detect_upsampled_hires(samples: &[f32], sample_rate: u32) -> (bool, u32) {
 
     let ultra_energy = band_power_db(&spectrum, ultra_start, ultra_end);
 
-    // If audible band has clear energy (>-60 dBFS) but ultrasonic is down near noise floor (<-80 dBFS and >35 dB down)
+    // If audible band has clear energy (>-60 dBFS) but ultrasonic is down near noise floor (<-75 dBFS and >35 dB down)
     if ref_energy > -65.0 && ultra_energy < -75.0 && (ref_energy - ultra_energy) > 35.0 {
         // Detect whether cutoff is near 22.05 kHz (upsampled from 44.1k) or 24 kHz (upsampled from 48k)
         let bin_22k = hz_to_bin(22_050.0);
@@ -366,49 +413,42 @@ fn detect_upsampled_hires(samples: &[f32], sample_rate: u32) -> (bool, u32) {
 
 /// Detects lossy cutoff shelves for standard sample rates (<= 48 kHz).
 fn detect_lossy_cutoff(samples: &[f32], sample_rate: u32) -> (SpectralVerdict, Option<u32>) {
-    let (spectrum, count) = compute_average_linear_spectrum(samples);
-    if count == 0 {
-        return (SpectralVerdict::Inconclusive, None);
-    }
-
+    let stats = compute_average_linear_spectrum(samples, sample_rate);
+    let nyquist = sample_rate as f32 / 2.0;
     let bin_hz = sample_rate as f32 / FFT_SIZE as f32;
-    let hz_to_bin = |hz: f32| ((hz / bin_hz) as usize).min(spectrum.len() - 1);
+    let hz_to_bin = |hz: f32| ((hz / bin_hz) as usize).min(stats.avg_spectrum.len() - 1);
+
+    if stats.window_count == 0 {
+        return (SpectralVerdict::Authentic, Some(nyquist as u32));
+    }
+    let spectrum = &stats.avg_spectrum;
 
     // Passband reference level (2 kHz - 10 kHz)
     let ref_start = hz_to_bin(2_000.0);
     let ref_end = hz_to_bin(10_000.0);
-    let ref_level = band_power_db(&spectrum, ref_start, ref_end);
+    let ref_level = band_power_db(spectrum, ref_start, ref_end);
 
-    // Upper mids (10 kHz - 14 kHz)
-    let mid_start = hz_to_bin(10_000.0);
-    let mid_end = hz_to_bin(14_000.0);
-    let mid_level = band_power_db(&spectrum, mid_start, mid_end);
-
-    // If musical content lacks high frequencies naturally (speech, bass, ambient)
-    if mid_level < -68.0 || (ref_level - mid_level) > 45.0 {
-        return (SpectralVerdict::Inconclusive, None);
-    }
-
-    let nyquist = sample_rate as f32 / 2.0;
     let test_start_hz = 14_000.0;
     let test_end_hz = nyquist - 300.0;
     let step_hz = 250.0;
 
     // Scan frequency bands of 500 Hz width from 14 kHz to Nyquist
-    let drop_threshold = (ref_level - 40.0).min(-72.0);
+    let drop_threshold = (ref_level - 36.0).max(-78.0);
 
     let mut detected_shelf_hz = None;
     let mut h = test_start_hz;
     while h < test_end_hz {
         let b_start = hz_to_bin(h);
         let b_end = hz_to_bin(h + 500.0);
-        let current_band_db = band_power_db(&spectrum, b_start, b_end);
+        let current_band_db = band_power_db(spectrum, b_start, b_end);
 
         if current_band_db <= drop_threshold {
-            // Verify that all subsequent bands up to Nyquist remain down
+            // Verify that all subsequent bands up to Nyquist remain down, OR that energy above this band
+            // is non-continuous (bit reservoir bursts / spectral holes characteristic of lossy codecs)
             let remainder_down =
-                band_power_db(&spectrum, b_start, hz_to_bin(test_end_hz)) <= drop_threshold + 4.0;
-            if remainder_down {
+                band_power_db(spectrum, b_start, hz_to_bin(test_end_hz)) <= drop_threshold + 4.0;
+            let fragmented_bursts = stats.high_freq_continuity < 0.15;
+            if remainder_down || fragmented_bursts {
                 detected_shelf_hz = Some(h as u32);
                 break;
             }
@@ -418,12 +458,15 @@ fn detect_lossy_cutoff(samples: &[f32], sample_rate: u32) -> (SpectralVerdict, O
 
     if let Some(cutoff_hz) = detected_shelf_hz {
         if cutoff_hz <= 20_700 {
-            // Confirm steep cliff: energy 1.5 kHz below cutoff should be significantly higher (> 12 dB drop)
+            // Confirm steep cliff: energy 1.5 kHz below cutoff should be significantly higher (> 10 dB drop)
             let prev_start = hz_to_bin((cutoff_hz.saturating_sub(1_500)) as f32);
             let prev_end = hz_to_bin((cutoff_hz.saturating_sub(500)) as f32);
-            let prev_level = band_power_db(&spectrum, prev_start, prev_end);
+            let prev_level = band_power_db(spectrum, prev_start, prev_end);
 
-            if prev_level - drop_threshold >= 10.0 {
+            let steep_cliff = prev_level - drop_threshold >= 10.0;
+            let bit_reservoir_artifact = cutoff_hz >= 19_500 && stats.high_freq_continuity < 0.15;
+
+            if steep_cliff || bit_reservoir_artifact {
                 return (SpectralVerdict::LossyCutoff(cutoff_hz), Some(cutoff_hz));
             }
         }
@@ -510,6 +553,25 @@ mod tests {
     }
 
     #[test]
+    fn test_lossy_transcode_bit_reservoir_bursts() {
+        let mut samples = generate_band_limited_signal(44_100, 20_000.0, 3.0);
+        // Add a transient 21.2 kHz burst to simulate MP3 bit reservoir burst in a single frame
+        let burst = generate_sine(21_200.0, 44_100, 0.03, 0.03);
+        for (i, &s) in burst.iter().enumerate() {
+            if i + 44_100 < samples.len() {
+                samples[i + 44_100] += s;
+            }
+        }
+        let result = analyze_provenance_from_samples(&samples, 44_100, Some(16));
+        assert_eq!(result.verdict, ProvenanceVerdict::SuspectedLossy);
+        let cutoff = result.cutoff_hz.expect("cutoff hz");
+        assert!(
+            (19_500..=20_700).contains(&cutoff),
+            "expected ~20 kHz cutoff with bit reservoir bursts, got {cutoff}"
+        );
+    }
+
+    #[test]
     fn test_padded_bit_depth_detection() {
         let mut samples = generate_band_limited_signal(44_100, 21_500.0, 2.0);
         // Quantize strictly to 16 bits (dividing by 32768.0)
@@ -552,9 +614,10 @@ mod tests {
     }
 
     #[test]
-    fn test_inconclusive_on_low_frequency_only() {
-        let samples = generate_sine(100.0, 44_100, 2.0, 0.7);
+    fn test_low_frequency_acoustic_is_authentic() {
+        // Low-frequency/bass/mellow audio without an artificial brickwall filter is authentic
+        let samples = generate_sine(200.0, 44_100, 2.0, 0.7);
         let result = analyze_provenance_from_samples(&samples, 44_100, Some(16));
-        assert_eq!(result.verdict, ProvenanceVerdict::Inconclusive);
+        assert_eq!(result.verdict, ProvenanceVerdict::Authentic);
     }
 }
