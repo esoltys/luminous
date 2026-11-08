@@ -102,7 +102,7 @@
 
 {#if items.length >= minItems}
   <div
-    class="relative h-full flex items-center select-none {className}"
+    class="relative h-full flex flex-col items-center select-none {className}"
     data-testid="alphabet-scrubber-container"
   >
     <!-- Floating active letter bubble -->
@@ -122,7 +122,7 @@
       role="navigation"
       aria-label={i18n.t("collection.alphabetScrubberLabel")}
       data-testid="alphabet-scrubber"
-      class="flex flex-col items-center justify-between py-2 px-1 rounded-full bg-brand-sidebar/85 hover:bg-brand-sidebar/95 border border-brand-border/40 backdrop-blur-xs transition-colors shadow-xs touch-none h-full w-5"
+      class="flex flex-col items-center justify-between py-1.5 px-1 rounded-full bg-brand-sidebar/85 hover:bg-brand-sidebar/95 border border-brand-border/40 backdrop-blur-xs transition-colors shadow-xs touch-none h-full w-5"
       onpointerdown={handlePointerDown}
       onpointermove={handlePointerMove}
       onpointerup={handlePointerUp}

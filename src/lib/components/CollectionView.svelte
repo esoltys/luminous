@@ -517,7 +517,7 @@
           />
         </div>
         {#if isSongSortAlphabetical}
-          <div class="absolute right-2.5 top-12 bottom-3 flex items-center pointer-events-auto z-20">
+          <div class="absolute right-2.5 top-12 bottom-3 pointer-events-auto z-20">
             <AlphabetScrubber
               items={tableRows}
               getKey={getSongAlphabetKey}
@@ -727,7 +727,7 @@
       </div>
       </div>
       {#if (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") || (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists")}
-        <div class="absolute right-2.5 top-16 bottom-3 flex items-center pointer-events-auto z-20">
+        <div class="absolute right-2.5 top-14 bottom-3 pointer-events-auto z-20">
           {#if navigationStore.activeSubTab === "albums"}
             <AlphabetScrubber
               items={sortedAlbums}
