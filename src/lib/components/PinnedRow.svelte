@@ -32,6 +32,14 @@
   import ArtistContextMenu from "./ArtistContextMenu.svelte";
   import PlaylistCardContextMenu from "./PlaylistCardContextMenu.svelte";
   import AutoPlaylistContextMenu from "./AutoPlaylistContextMenu.svelte";
+  import DragGhost from "./DragGhost.svelte";
+  import {
+    DiscIcon as Disc,
+    MicrophoneStageIcon as MicrophoneStage,
+    MusicNotesIcon as Music,
+    PlaylistIcon as ListMusic,
+    SparkleIcon as Sparkles,
+  } from "phosphor-svelte";
 
   function keyFor(item: PinnedItem): string {
     return `${item.type}:${pinnedRefKeyFor(item)}`;
@@ -69,6 +77,21 @@
         const pl = playlistsStore.playlists.find((p) => p.id === ap.playlistId);
         return pl ? getPlaylistDisplayName(pl) : (ap.genre ?? ap.decade ?? ap.bpm ?? ap.artistTag ?? ap.kind);
       }
+    }
+  }
+
+  function itemLabel(item: PinnedItem): string {
+    switch (item.type) {
+      case "song":
+        return item.song.title ?? "";
+      case "album":
+        return item.album.album ?? "";
+      case "artist":
+        return item.artist.name ?? "";
+      case "playlist":
+        return getPlaylistDisplayName(item.playlist);
+      case "auto_playlist":
+        return autoPlaylistLabel(item.autoPlaylist);
     }
   }
 
@@ -115,6 +138,8 @@
   let draggedIndex = $state<number | null>(null);
   let dragOverIndex = $state<number | null>(null);
   let pointerDragArmed = false;
+  /** Cursor position for the drag ghost; set only once a drag is armed, so a click never shows it. */
+  let ghostPos = $state<{ x: number; y: number } | null>(null);
   let pointerDragStartX = 0;
   let pointerDragStartY = 0;
   let pointerDragPointerId: number | null = null;
@@ -169,6 +194,7 @@
         pointerDragEl.setPointerCapture?.(pointerDragPointerId);
       }
     }
+    ghostPos = { x: e.clientX, y: e.clientY };
     const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-pinned-index]") as HTMLElement | null;
     const idx = el?.dataset.pinnedIndex;
     dragOverIndex = idx !== undefined ? Number(idx) : null;
@@ -183,6 +209,7 @@
     }
     draggedIndex = null;
     dragOverIndex = null;
+    ghostPos = null;
     pointerDragArmed = false;
     pointerDragPointerId = null;
     pointerDragEl = null;
@@ -312,6 +339,29 @@
       {/each}
     {/snippet}
   </CardSection>
+{/if}
+
+{#if ghostPos && draggedIndex !== null && visibleItems[draggedIndex]}
+  {@const dragged = visibleItems[draggedIndex]}
+  <DragGhost
+    x={ghostPos.x}
+    y={ghostPos.y}
+    overTarget={dragOverIndex !== null && dragOverIndex !== draggedIndex}
+    testId="pinned-drag-ghost"
+  >
+    {#if dragged.type === "album"}
+      <Disc class="w-3.5 h-3.5 text-brand-accent shrink-0" />
+    {:else if dragged.type === "artist"}
+      <MicrophoneStage class="w-3.5 h-3.5 text-brand-accent shrink-0" />
+    {:else if dragged.type === "playlist"}
+      <ListMusic class="w-3.5 h-3.5 text-brand-accent shrink-0" />
+    {:else if dragged.type === "auto_playlist"}
+      <Sparkles class="w-3.5 h-3.5 text-brand-accent shrink-0" />
+    {:else}
+      <Music class="w-3.5 h-3.5 text-brand-accent shrink-0" />
+    {/if}
+    <span class="max-w-[180px] truncate">{itemLabel(dragged)}</span>
+  </DragGhost>
 {/if}
 
 {#if contextMenuState}
