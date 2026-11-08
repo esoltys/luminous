@@ -98,16 +98,20 @@
     await statsExclusionsStore.toggleWithToast("album", albumName);
   }
 
+  async function fetchPlayableSongIds(): Promise<number[]> {
+    const songs = await invoke<Song[]>("get_songs_by_album", { album: albumName || "" });
+    return songs.filter((s) => !s.not_included).map((s) => s.id);
+  }
+
   async function handleAddToCustomPlaylist(targetPlaylist: Playlist) {
     if (onAddToPlaylist && playlistsStore.activeCustomPlaylist && targetPlaylist.id === playlistsStore.activeCustomPlaylist.id) {
       onAddToPlaylist();
       return;
     }
     try {
-      const songs = await invoke<Song[]>("get_songs_by_album", { album: albumName || "" });
-      const playable = songs.filter((s) => !s.not_included);
-      if (playable.length > 0) {
-        await playlistsStore.addSongsToPlaylist(targetPlaylist.id, playable.map((s) => s.id));
+      const songIds = await fetchPlayableSongIds();
+      if (songIds.length > 0) {
+        await playlistsStore.addSongsToPlaylist(targetPlaylist.id, songIds);
       }
     } catch (err) {
       console.error("Failed to add album to playlist:", err);
@@ -116,8 +120,8 @@
 
   async function handleCreateAndAddToPlaylist(name: string) {
     try {
-      const pl = await playlistsStore.createPlaylist(name);
-      await handleAddToCustomPlaylist(pl);
+      const songIds = await fetchPlayableSongIds();
+      await playlistsStore.createPlaylistWithSongs(name, songIds);
     } catch (err) {
       console.error("Failed to create playlist and add album:", err);
     }

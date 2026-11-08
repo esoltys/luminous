@@ -190,11 +190,11 @@
         case "song":
           return ref.key === String(source.id);
         case "artist":
-          return ref.name === source.name;
+          return ref.name.toLowerCase() === source.name.toLowerCase();
         case "album":
-          return ref.name === source.album;
+          return ref.name.toLowerCase() === source.album.toLowerCase();
         case "folder":
-          return ref.name === source.path;
+          return ref.name.toLowerCase() === source.path.toLowerCase();
         default:
           return true;
       }
