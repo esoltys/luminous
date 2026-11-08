@@ -517,7 +517,7 @@
           />
         </div>
         {#if isSongSortAlphabetical}
-          <div class="absolute right-3.5 top-12 bottom-3 flex items-center pointer-events-auto z-20">
+          <div class="absolute right-2.5 top-12 bottom-3 flex items-center pointer-events-auto z-20">
             <AlphabetScrubber
               items={tableRows}
               getKey={getSongAlphabetKey}
@@ -532,8 +532,9 @@
   {:else if navigationStore.activeSubTab === "genres"}
     <GenreBrowseView />
   {:else}
-    <div class="relative flex-1 min-h-0 flex flex-col {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <div class="flex-1 px-6 overflow-y-auto min-h-0" use:rememberScroll={`collection:${navigationStore.activeSubTab}`}>
+    <div class="flex-1 min-h-0 flex flex-col {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
+      <div class="relative flex-1 min-h-0 flex flex-col">
+        <div class="flex-1 pl-6 pr-8 overflow-y-auto min-h-0" use:rememberScroll={`collection:${navigationStore.activeSubTab}`}>
         <div class="sticky top-0 z-20 bg-brand-main pt-3">
         <div class="h-12 flex items-center justify-between">
           <div class="text-xs text-brand-text-secondary font-medium">
@@ -726,7 +727,7 @@
       </div>
       </div>
       {#if (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") || (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists")}
-        <div class="absolute right-7 top-16 bottom-6 flex items-center pointer-events-auto z-20">
+        <div class="absolute right-2.5 top-16 bottom-3 flex items-center pointer-events-auto z-20">
           {#if navigationStore.activeSubTab === "albums"}
             <AlphabetScrubber
               items={sortedAlbums}
@@ -744,6 +745,7 @@
           {/if}
         </div>
       {/if}
+      </div>
     </div>
   {/if}
 </div>

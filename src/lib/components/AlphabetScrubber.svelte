@@ -102,13 +102,13 @@
 
 {#if items.length >= minItems}
   <div
-    class="relative h-full max-h-[calc(100vh-140px)] flex items-center select-none {className}"
+    class="relative h-full flex items-center select-none {className}"
     data-testid="alphabet-scrubber-container"
   >
     <!-- Floating active letter bubble -->
     {#if activeLetter && bubbleY !== null}
       <div
-        class="absolute right-8 -translate-y-1/2 w-9 h-9 rounded-full bg-brand-accent text-brand-surface font-bold text-sm flex items-center justify-center shadow-lg pointer-events-none z-30 transition-all duration-75"
+        class="absolute right-7 -translate-y-1/2 w-9 h-9 rounded-full bg-brand-accent text-brand-surface font-bold text-sm flex items-center justify-center shadow-lg pointer-events-none z-30 transition-all duration-75"
         style="top: {bubbleY}px;"
         data-testid="alphabet-scrubber-bubble"
       >
@@ -122,7 +122,7 @@
       role="navigation"
       aria-label={i18n.t("collection.alphabetScrubberLabel")}
       data-testid="alphabet-scrubber"
-      class="flex flex-col items-center justify-between py-2 px-1 rounded-full bg-brand-sidebar/85 hover:bg-brand-sidebar/95 border border-brand-border/40 backdrop-blur-xs transition-colors shadow-xs touch-none h-full max-h-[820px] w-5 sm:w-5.5"
+      class="flex flex-col items-center justify-between py-2 px-1 rounded-full bg-brand-sidebar/85 hover:bg-brand-sidebar/95 border border-brand-border/40 backdrop-blur-xs transition-colors shadow-xs touch-none h-full w-5"
       onpointerdown={handlePointerDown}
       onpointermove={handlePointerMove}
       onpointerup={handlePointerUp}
