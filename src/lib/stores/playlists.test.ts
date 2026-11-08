@@ -83,6 +83,13 @@ describe("PlaylistsStore", () => {
     expect(playlistsStore.activePlaylistId).toBe(103);
   });
 
+  it("creates a new playlist and adds songs to it", async () => {
+    await playlistsStore.createPlaylistWithSongs("Rock Anthems", [1, 2, 3]);
+
+    expect(invoke).toHaveBeenCalledWith("create_playlist", { name: "Rock Anthems" });
+    expect(invoke).toHaveBeenCalledWith("add_to_playlist", { playlistId: 103, songIds: [1, 2, 3] });
+  });
+
   it("persists population mode and spec together when saving a smart playlist (#120)", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_playlists") return mockPlaylists;

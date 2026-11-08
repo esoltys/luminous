@@ -15,6 +15,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import ShareModal from "./ShareModal.svelte";
+  import AddToDeviceMenuItem from "./AddToDeviceMenuItem.svelte";
 
   interface Props {
     x: number;
@@ -91,6 +92,11 @@
   />
 
   {#if !playlist.is_queue}
+    <AddToDeviceMenuItem
+      source={{ kind: "playlist", id: playlist.id }}
+      sourceName={title}
+      {onClose}
+    />
     <ContextMenuDivider />
     <ContextMenuItem
       icon={Share}

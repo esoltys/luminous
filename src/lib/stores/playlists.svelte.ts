@@ -266,6 +266,17 @@ export class PlaylistsStore {
     return playlist;
   }
 
+  /**
+   * Creates a new playlist with `name` and immediately adds `songIds` to it.
+   */
+  async createPlaylistWithSongs(name: string, songIds: number[]): Promise<Playlist> {
+    const playlist = await this.createPlaylist(name);
+    if (songIds.length > 0) {
+      await this.addSongsToPlaylist(playlist.id, songIds);
+    }
+    return playlist;
+  }
+
   async updatePlaylistSpec(
     id: number,
     spec: string,

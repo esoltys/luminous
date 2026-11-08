@@ -13,6 +13,7 @@
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
+  import AddToDeviceMenuItem from "./AddToDeviceMenuItem.svelte";
 
   interface Props {
     x: number;
@@ -67,6 +68,12 @@
       }
       onClose();
     }}
+  />
+
+  <AddToDeviceMenuItem
+    source={{ kind: "autoPlaylist", autoType: autoPlaylist.kind, name: label }}
+    sourceName={label}
+    {onClose}
   />
 
   <ContextMenuDivider />

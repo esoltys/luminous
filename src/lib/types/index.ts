@@ -426,6 +426,8 @@ export interface DirListing {
 export type SyncSource =
   | { kind: "library" }
   | { kind: "playlist"; id: number }
+  | { kind: "autoPlaylist"; autoType: string; name?: string }
+  | { kind: "song"; id: number }
   | { kind: "artist"; name: string }
   | { kind: "album"; album: string; artist: string }
   | { kind: "folder"; path: string };
@@ -440,7 +442,7 @@ export interface SyncSettings {
 }
 
 export interface SyncSourceRef {
-  kind: "library" | "playlist" | "artist" | "album" | "folder";
+  kind: "library" | "playlist" | "autoPlaylist" | "song" | "artist" | "album" | "folder";
   key: string;
   /** Playlist, artist or album name, or folder path; empty for the library. */
   name: string;

@@ -3,6 +3,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import DragGhost from "./DragGhost.svelte";
   import {
+    DeviceMobileSpeakerIcon,
     MusicNotesIcon as Music,
     PlaylistIcon as ListMusic,
     StackIcon as Layers,
@@ -33,6 +34,11 @@
       {:else if songDrag.dropTarget.kind === "playlist"}
         <span class="inline-flex items-center gap-1 font-semibold text-brand-accent-text max-w-[140px] truncate">
           <ListMusic class="w-3.5 h-3.5 shrink-0" />
+          <span class="truncate">{songDrag.dropTarget.name}</span>
+        </span>
+      {:else if songDrag.dropTarget.kind === "device"}
+        <span class="inline-flex items-center gap-1 font-semibold text-brand-accent-text max-w-[140px] truncate">
+          <DeviceMobileSpeakerIcon class="w-3.5 h-3.5 shrink-0" />
           <span class="truncate">{songDrag.dropTarget.name}</span>
         </span>
       {/if}

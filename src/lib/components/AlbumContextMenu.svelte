@@ -21,12 +21,14 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { openInPicard } from "../utils/picard";
   import { invoke } from "@tauri-apps/api/core";
-  import type { Song } from "../types";
+  import type { Song, Playlist } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import ShareModal from "./ShareModal.svelte";
   import ViewInFilesItem from "./ViewInFilesItem.svelte";
+  import AddToDeviceMenuItem from "./AddToDeviceMenuItem.svelte";
+  import AddToPlaylistSubmenu from "./AddToPlaylistSubmenu.svelte";
 
   let {
     x,
@@ -95,6 +97,35 @@
   async function handleToggleStatsExcluded() {
     await statsExclusionsStore.toggleWithToast("album", albumName);
   }
+
+  async function fetchPlayableSongIds(): Promise<number[]> {
+    const songs = await invoke<Song[]>("get_songs_by_album", { album: albumName || "" });
+    return songs.filter((s) => !s.not_included).map((s) => s.id);
+  }
+
+  async function handleAddToCustomPlaylist(targetPlaylist: Playlist) {
+    if (onAddToPlaylist && playlistsStore.activeCustomPlaylist && targetPlaylist.id === playlistsStore.activeCustomPlaylist.id) {
+      onAddToPlaylist();
+      return;
+    }
+    try {
+      const songIds = await fetchPlayableSongIds();
+      if (songIds.length > 0) {
+        await playlistsStore.addSongsToPlaylist(targetPlaylist.id, songIds);
+      }
+    } catch (err) {
+      console.error("Failed to add album to playlist:", err);
+    }
+  }
+
+  async function handleCreateAndAddToPlaylist(name: string) {
+    try {
+      const songIds = await fetchPlayableSongIds();
+      await playlistsStore.createPlaylistWithSongs(name, songIds);
+    } catch (err) {
+      console.error("Failed to create playlist and add album:", err);
+    }
+  }
 </script>
 
 {#if menuVisible}
@@ -123,11 +154,17 @@
     }}
   />
 
-  {#if onAddToPlaylist && playlistsStore.activeCustomPlaylist && !playlistsStore.activeCustomPlaylist.is_queue}
-    <ContextMenuItem
-      icon={Plus}
-      label={i18n.t("playlists.contextMenuAddToPlaylist", { name: playlistsStore.activeCustomPlaylist.name })}
-      onclick={() => { onAddToPlaylist?.(); onClose(); }}
+  <AddToPlaylistSubmenu
+    onSelectPlaylist={handleAddToCustomPlaylist}
+    onCreatePlaylist={handleCreateAndAddToPlaylist}
+    {onClose}
+  />
+
+  {#if albumName}
+    <AddToDeviceMenuItem
+      source={{ kind: "album", album: albumName, artist: artistName || "" }}
+      sourceName={artistName ? `${albumName} — ${artistName}` : albumName}
+      {onClose}
     />
   {/if}
 

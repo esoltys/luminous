@@ -63,8 +63,9 @@
   let conversion = $state<{ substituted: boolean; devicePlays: boolean; format: TargetFormat; bitrateKbps: number } | null>(null);
   let examplePath = $state<string | null>(null);
   let moreOpen = $state(false);
-  let picker = $state<"playlists" | "artists" | null>(null);
+  let picker = $state<"playlists" | "artists" | "albums" | null>(null);
   let artistQuery = $state("");
+  let albumQuery = $state("");
 
   /** The profile as edited here; saved after a pause, then echoed back by `devices-changed`. */
   let draft = $state<DeviceProfile>(untrack(() => structuredClone($state.snapshot(device.profile))));
@@ -184,12 +185,16 @@
       switch (source.kind) {
         case "playlist":
           return ref.key === String(source.id);
+        case "autoPlaylist":
+          return ref.key === source.autoType;
+        case "song":
+          return ref.key === String(source.id);
         case "artist":
-          return ref.name === source.name;
+          return ref.name.toLowerCase() === source.name.toLowerCase();
         case "album":
-          return ref.name === source.album;
+          return ref.name.toLowerCase() === source.album.toLowerCase();
         case "folder":
-          return ref.name === source.path;
+          return ref.name.toLowerCase() === source.path.toLowerCase();
         default:
           return true;
       }
@@ -202,10 +207,22 @@
         return i18n.t("devices.wholeLibrary");
       case "playlist":
         return playlistsStore.playlists.find((p) => p.id === source.id)?.name ?? i18n.t("devices.deletedPlaylist");
+      case "autoPlaylist":
+        return source.name ?? source.autoType;
       case "artist":
         return source.name;
       case "album":
         return i18n.t("devices.albumBy", { album: source.album, artist: source.artist });
+      case "song": {
+        const found = collectionStore.songs.find((s) => s.id === source.id);
+        if (found) {
+          return i18n.t("devices.songBy", {
+            title: found.title || i18n.t("collection.unknownSong"),
+            artist: found.artist || i18n.t("collection.unknownArtist"),
+          });
+        }
+        return i18n.t("collection.unknownSong");
+      }
       case "folder":
         return source.path;
     }
@@ -217,20 +234,32 @@
       return i18n.plural("devices.cappedFit", size.songs, { cap: formatStorageSize(size.capBytes), count: formatNumber(size.songs) });
     }
     const songs = i18n.plural("files.songCount", size.songs, { count: formatNumber(size.songs) });
+    if (source.kind === "autoPlaylist") {
+      return i18n.t("devices.autoPlaylistSongs", { songs });
+    }
     if (source.kind === "playlist" && playlistsStore.playlists.find((p) => p.id === source.id)?.dynamic_enabled) {
       return i18n.t("devices.autoPlaylistSongs", { songs });
+    }
+    if (source.kind === "song") {
+      return "";
     }
     return source.kind === "folder" ? i18n.t("devices.folderSongs", { songs }) : songs;
   }
 
   const groups = $derived([
-    { key: "playlists", label: i18n.t("devices.groupPlaylists"), sources: listed.filter((s) => s.kind === "playlist" || s.kind === "library") },
+    { key: "playlists", label: i18n.t("devices.groupPlaylists"), sources: listed.filter((s) => s.kind === "playlist" || s.kind === "autoPlaylist" || s.kind === "library") },
     { key: "artists", label: i18n.t("devices.groupArtists"), sources: listed.filter((s) => s.kind === "artist" || s.kind === "album") },
+    { key: "songs", label: i18n.t("devices.groupSongs"), sources: listed.filter((s) => s.kind === "song") },
     { key: "folders", label: i18n.t("devices.groupFolders"), sources: listed.filter((s) => s.kind === "folder") },
   ].filter((g) => g.sources.length > 0));
 
   // The pickers list alphabetically, ignoring case, with numbers in order.
   const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+  const virtualAutoPlaylists = $derived([
+    { autoType: "favourites", name: i18n.t("playlists.autoFavourites") },
+    { autoType: "recently_added", name: i18n.t("playlists.autoRecentlyAdded") },
+    { autoType: "most_played", name: i18n.t("playlists.autoMostPlayed") },
+  ].filter((ap) => !listed.some((s) => s.kind === "autoPlaylist" && s.autoType === ap.autoType)));
   const playlistChoices = $derived(
     playlistsStore.playlists
       .filter((p) => !p.is_queue && !listed.some((s) => s.kind === "playlist" && s.id === p.id))
@@ -242,6 +271,14 @@
       .filter((a): a is typeof a & { name: string } => !!a.name && (!q || a.name.toLowerCase().includes(q)))
       .filter((a) => !listed.some((s) => s.kind === "artist" && s.name === a.name))
       .sort((a, b) => collator.compare(a.name, b.name))
+      .slice(0, 50);
+  });
+  const albumChoices = $derived.by(() => {
+    const q = albumQuery.trim().toLowerCase();
+    return collectionStore.albums
+      .filter((a): a is typeof a & { album: string } => !!a.album && (!q || a.album.toLowerCase().includes(q) || (a.artist ? a.artist.toLowerCase().includes(q) : false)))
+      .filter((a) => !listed.some((s) => s.kind === "album" && s.album === a.album))
+      .sort((a, b) => collator.compare(a.album, b.album))
       .slice(0, 50);
   });
 
@@ -313,6 +350,9 @@
             <Button size="sm" onclick={() => (picker = picker === "artists" ? null : "artists")}>
               <PlusIcon class="w-3.5 h-3.5" />{i18n.t("devices.addArtists")}
             </Button>
+            <Button size="sm" onclick={() => (picker = picker === "albums" ? null : "albums")}>
+              <PlusIcon class="w-3.5 h-3.5" />{i18n.t("devices.addAlbums")}
+            </Button>
             <Button size="sm" onclick={addFolder}>
               <PlusIcon class="w-3.5 h-3.5" />{i18n.t("devices.addFolder")}
             </Button>
@@ -325,18 +365,34 @@
                     placeholder={i18n.t("devices.searchArtists")}
                     class="m-1 px-2.5 py-1.5 rounded-md bg-brand-main/60 border border-brand-border/60 text-sm focus:outline-none focus:border-brand-accent"
                   />
+                {:else if picker === "albums"}
+                  <input
+                    type="search"
+                    bind:value={albumQuery}
+                    placeholder={i18n.t("devices.searchAlbums")}
+                    class="m-1 px-2.5 py-1.5 rounded-md bg-brand-main/60 border border-brand-border/60 text-sm focus:outline-none focus:border-brand-accent"
+                  />
                 {/if}
                 <div class="overflow-y-auto">
                   {#if picker === "playlists"}
                     {#if !listed.some((s) => s.kind === "library")}
                       <button class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10" onclick={() => add({ kind: "library" })}>{i18n.t("devices.wholeLibrary")}</button>
                     {/if}
+                    {#each virtualAutoPlaylists as ap (ap.autoType)}
+                      <button class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate font-medium text-brand-accent-text" onclick={() => add({ kind: "autoPlaylist", autoType: ap.autoType, name: ap.name })}>{ap.name}</button>
+                    {/each}
                     {#each playlistChoices as p (p.id)}
                       <button class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate" onclick={() => add({ kind: "playlist", id: p.id })}>{p.name}</button>
                     {/each}
-                  {:else}
+                  {:else if picker === "artists"}
                     {#each artistChoices as a (a.name)}
                       <button class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate" onclick={() => add({ kind: "artist", name: a.name })}>{a.name}</button>
+                    {/each}
+                  {:else if picker === "albums"}
+                    {#each albumChoices as a (a.album)}
+                      <button class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate" onclick={() => add({ kind: "album", album: a.album, artist: a.artist ?? "" })}>
+                        {i18n.t("devices.albumBy", { album: a.album, artist: a.artist || i18n.t("collection.unknownArtist") })}
+                      </button>
                     {/each}
                   {/if}
                 </div>

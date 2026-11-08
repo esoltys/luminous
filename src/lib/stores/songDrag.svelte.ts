@@ -1,12 +1,14 @@
 import type { FileEntry, Song } from "../types";
 import { playlistsStore } from "./playlists.svelte";
+import { devicesStore } from "./devices.svelte";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
 
 export type SongDropTarget =
   | { kind: "queue" }
   | { kind: "custom-category" }
-  | { kind: "playlist"; id: number; name: string };
+  | { kind: "playlist"; id: number; name: string }
+  | { kind: "device"; id: string; name: string };
 
 /**
  * Inspects a DOM element or its ancestors for a song drop target attribute (`data-drop-target`).
@@ -26,6 +28,13 @@ export function parseDropTarget(el: HTMLElement | null): SongDropTarget | null {
     const name = target.dataset.playlistName ?? "";
     if (!Number.isNaN(id) && name) {
       return { kind: "playlist", id, name };
+    }
+  }
+  if (kind === "device") {
+    const id = target.dataset.deviceId ?? "";
+    const name = target.dataset.deviceName ?? "";
+    if (id && name) {
+      return { kind: "device", id, name };
     }
   }
   return null;
@@ -156,7 +165,7 @@ class SongDragStore {
     const { songIds, skippedCount } = this.payload;
     this.end();
 
-    if (target?.kind !== "queue" && target?.kind !== "playlist") return false;
+    if (target?.kind !== "queue" && target?.kind !== "playlist" && target?.kind !== "device") return false;
     if (songIds.length === 0) {
       toastStore.show(i18n.t("files.nothingToPlay"), "info");
       return true;
@@ -166,16 +175,20 @@ class SongDragStore {
       if (target.kind === "queue") {
         await playlistsStore.addSongsToQueue(songIds);
         toastStore.show(i18n.plural("dragDrop.addedSongs", songIds.length), "success");
-      } else {
+      } else if (target.kind === "playlist") {
         await playlistsStore.addSongsToPlaylist(target.id, songIds);
         toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: target.name }), "success");
+      } else if (target.kind === "device") {
+        await devicesStore.addSongsToSync(target.id, songIds, target.name);
       }
     } catch (err) {
       console.error("Failed to add dragged songs:", err);
       toastStore.show(
         target.kind === "queue"
           ? i18n.t("dragDrop.queueFailed")
-          : i18n.t("dragDrop.playlistFailed", { name: target.name }),
+          : target.kind === "playlist"
+          ? i18n.t("dragDrop.playlistFailed", { name: target.name })
+          : i18n.t("devices.addItemToSyncFailed", { name: target.name, device: target.name }),
         "error"
       );
       return true;
