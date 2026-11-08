@@ -2469,7 +2469,9 @@ export const en = {
       one: "Added {count} song to queue",
       other: "Added {count} songs to queue"
     },
-    nothingToAdd: "No supported audio files found to add."
+    nothingToAdd: "No supported audio files found to add.",
+    queueFailed: "Couldn't add to the queue.",
+    playlistFailed: "Couldn't add to {name}."
   },
   walkthrough: {
     takeTour: "Take a quick tour",
