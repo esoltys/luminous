@@ -880,6 +880,7 @@
           onEditTags={(song) => openTagEditor(song.id)}
           onRemoveFromPlaylist={(row) => handleRemoveItem(row.key)}
           onReorder={isSearching ? undefined : handleReorder}
+          dragSourcePlaylistId={activePlaylist?.id ?? null}
           isRowPlaying={(row) => (!!playerStore.playlistItemUuid && playerStore.playlistItemUuid === row.key) || (!!playerStore.currentSong && !!row.song && playerStore.currentSong.id === row.song.id)}
           interactiveWhenDisabled
           disabledPlaceholder

@@ -1,10 +1,12 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render } from "@testing-library/svelte";
+import { render, fireEvent } from "@testing-library/svelte";
 import { tick } from "svelte";
 import SongTable, { type SongTableRow } from "./SongTable.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { inspectorStore } from "../stores/inspector.svelte";
+import { playlistsStore } from "../stores/playlists.svelte";
+import { songDrag } from "../stores/songDrag.svelte";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -346,5 +348,166 @@ describe("SongTable.svelte — windowing (#1898)", () => {
     (component as unknown as { scrollToKey: (key: string) => void }).scrollToKey("3000");
     const rowHeight = parseFloat((container.querySelector("[data-song-row]") as HTMLElement).style.height);
     expect(scroller.scrollTop).toBeGreaterThan(2999 * rowHeight);
+  });
+});
+
+describe("SongTable.svelte — dragging songs out (#1974)", () => {
+  const makeSong = (id: number, title: string): Song => ({
+    id,
+    source: "local_file",
+    filetype: "MP3",
+    path: `/music/${id}.mp3`,
+    title,
+    artist: "Artist",
+    album: "Album",
+    compilation: false,
+    length_nanosec: 180_000_000_000,
+    beginning_nanosec: 0,
+    end_nanosec: 180_000_000_000,
+    rating: 0,
+    playcount: 0,
+    skipcount: 0,
+    art_embedded: false,
+    art_unset: false,
+    unavailable: false,
+  });
+  const rows: SongTableRow[] = [
+    { key: "a", song: makeSong(1, "One"), underlyingIndex: 0 },
+    { key: "b", song: makeSong(2, "Two"), underlyingIndex: 1 },
+    { key: "c", song: makeSong(3, "Three"), underlyingIndex: 2 },
+  ];
+
+  // jsdom has no layout: drop targets get a fixed box at (10..110, 20..60), and each test
+  // points elementFromPoint at the row under the cursor where it needs one.
+  function placeTarget(attrs: Record<string, string>) {
+    const el = document.createElement("button");
+    Object.assign(el.dataset, attrs);
+    el.getBoundingClientRect = () => ({ left: 10, right: 110, top: 20, bottom: 60, width: 100, height: 40 }) as DOMRect;
+    document.body.appendChild(el);
+  }
+  const OVER_TARGET = { clientX: 50, clientY: 40 };
+  const originalElementFromPoint = document.elementFromPoint;
+
+  let addToQueue: ReturnType<typeof vi.spyOn>;
+  let addToPlaylist: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    addToQueue = vi.spyOn(playlistsStore, "addSongsToQueue").mockResolvedValue();
+    addToPlaylist = vi.spyOn(playlistsStore, "addSongsToPlaylist").mockResolvedValue();
+    document.elementFromPoint = () => null;
+  });
+  afterEach(() => {
+    document.elementFromPoint = originalElementFromPoint;
+    document.body.innerHTML = "";
+    songDrag.end();
+    vi.restoreAllMocks();
+  });
+
+  function renderTable(extra: Record<string, unknown> = {}) {
+    return render(SongTable, {
+      props: {
+        rows,
+        mode: "position",
+        leadingColumnWidth: "3rem",
+        colDefaults: {},
+        sortField: "title",
+        sortAsc: true,
+        onToggleSort: () => {},
+        onRowDoubleClick: () => {},
+        onRowContextMenu: () => {},
+        onRate: () => {},
+        onEditTags: () => {},
+        ...extra,
+      },
+    });
+  }
+  const row = (key: string) => document.querySelector<HTMLElement>(`[data-key="${key}"]`)!;
+  const isSelected = (key: string) => row(key).className.includes("bg-brand-accent/20");
+
+  it("adds the selected songs to the Queue and leaves the selection as it was", async () => {
+    placeTarget({ dropTarget: "queue" });
+    renderTable({ selectedKeys: new Set(["a", "c"]) });
+
+    await fireEvent.pointerDown(row("a"), { button: 0, clientX: 300, clientY: 300 });
+    await fireEvent.pointerMove(window, OVER_TARGET);
+    expect(songDrag.payload?.songIds).toEqual([1, 3]);
+    expect(songDrag.dropTarget).toEqual({ kind: "queue" });
+
+    await fireEvent.pointerUp(window, OVER_TARGET);
+    await fireEvent.click(row("a")); // the click the release produces
+    await tick();
+
+    expect(addToQueue).toHaveBeenCalledWith([1, 3]);
+    expect(isSelected("a") && isSelected("c")).toBe(true);
+    expect(isSelected("b")).toBe(false);
+  });
+
+  it("drags only the pressed row when it isn't part of the selection", async () => {
+    placeTarget({ dropTarget: "playlist", playlistId: "9", playlistName: "Road Trip" });
+    renderTable({ selectedKeys: new Set(["a", "c"]) });
+
+    await fireEvent.pointerDown(row("b"), { button: 0, clientX: 300, clientY: 300 });
+    await fireEvent.pointerMove(window, OVER_TARGET);
+    await fireEvent.pointerUp(window, OVER_TARGET);
+
+    expect(addToPlaylist).toHaveBeenCalledWith(9, [2]);
+  });
+
+  it("still selects on a plain click, and a click after an earlier drag isn't swallowed", async () => {
+    renderTable();
+    // A drag released away from any target, with no click following it.
+    await fireEvent.pointerDown(row("a"), { button: 0, clientX: 300, clientY: 300 });
+    await fireEvent.pointerMove(window, { clientX: 500, clientY: 500 });
+    await fireEvent.pointerUp(window, { clientX: 500, clientY: 500 });
+
+    await fireEvent.pointerDown(row("b"), { button: 0, clientX: 0, clientY: 0 });
+    await fireEvent.pointerUp(window, { clientX: 0, clientY: 0 });
+    await fireEvent.click(row("b"));
+    await tick();
+
+    expect(isSelected("b")).toBe(true);
+    expect(addToQueue).not.toHaveBeenCalled();
+  });
+
+  it("reorders when released over a row of a reorderable table", async () => {
+    placeTarget({ dropTarget: "queue" });
+    const onReorder = vi.fn();
+    renderTable({ onReorder });
+
+    await fireEvent.pointerDown(row("a"), { button: 0, clientX: 300, clientY: 300 });
+    document.elementFromPoint = () => row("c");
+    await fireEvent.pointerMove(window, { clientX: 300, clientY: 340 });
+    await fireEvent.pointerUp(window, { clientX: 300, clientY: 340 });
+
+    expect(onReorder).toHaveBeenCalledWith(0, 2, ["a"]);
+    expect(addToQueue).not.toHaveBeenCalled();
+  });
+
+  it("adds instead of reordering when a reorderable row is released on a target", async () => {
+    placeTarget({ dropTarget: "queue" });
+    const onReorder = vi.fn();
+    renderTable({ onReorder, dragSourcePlaylistId: 9 });
+
+    await fireEvent.pointerDown(row("a"), { button: 0, clientX: 300, clientY: 300 });
+    document.elementFromPoint = () => row("c"); // passes over another row on the way
+    await fireEvent.pointerMove(window, { clientX: 300, clientY: 340 });
+    await fireEvent.pointerMove(window, OVER_TARGET);
+    await fireEvent.pointerUp(window, OVER_TARGET);
+
+    expect(addToQueue).toHaveBeenCalledWith([1]);
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when a playlist's songs are released on that same playlist", async () => {
+    placeTarget({ dropTarget: "playlist", playlistId: "9", playlistName: "Road Trip" });
+    const onReorder = vi.fn();
+    renderTable({ onReorder, dragSourcePlaylistId: 9 });
+
+    await fireEvent.pointerDown(row("a"), { button: 0, clientX: 300, clientY: 300 });
+    await fireEvent.pointerMove(window, OVER_TARGET);
+    expect(songDrag.dropTarget).toBeNull();
+    await fireEvent.pointerUp(window, OVER_TARGET);
+
+    expect(addToPlaylist).not.toHaveBeenCalled();
+    expect(onReorder).not.toHaveBeenCalled();
   });
 });

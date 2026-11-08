@@ -2471,7 +2471,9 @@ export const de = {
       one: "{count} Titel zur Warteschlange hinzugefügt",
       other: "{count} Titel zur Warteschlange hinzugefügt"
     },
-    nothingToAdd: "Es wurden keine unterstützten Audiodateien zum Hinzufügen gefunden."
+    nothingToAdd: "Es wurden keine unterstützten Audiodateien zum Hinzufügen gefunden.",
+    queueFailed: "Konnte nicht zur Warteschlange hinzugefügt werden.",
+    playlistFailed: "Konnte nicht zu {name} hinzugefügt werden."
   },
   walkthrough: {
     takeTour: "Kurze Tour starten",

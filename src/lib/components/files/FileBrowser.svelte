@@ -12,7 +12,7 @@
   import { fileIcon } from "./fileIcon";
   import { highlightSegments, matchesFileFilter, parseFileFilter } from "./fileFilter";
   import { sortFileEntries, type FileSortColumn } from "./fileSorting";
-  import { fileDrag, findDropTargetAt } from "../../stores/fileDrag.svelte";
+  import { songDrag, filesPayload } from "../../stores/songDrag.svelte";
 
   /**
    * A column browser over one source (#1841): up to two columns of the
@@ -549,11 +549,10 @@
       if (!selection.includes(pointerDragEntry.name)) {
         select(pointerDragEntry.name);
       }
-      fileDrag.start(dragged, { x: e.clientX, y: e.clientY });
+      songDrag.start(filesPayload(dragged), { x: e.clientX, y: e.clientY });
     }
 
-    const dropTarget = findDropTargetAt(e.clientX, e.clientY);
-    fileDrag.updatePointer({ x: e.clientX, y: e.clientY }, dropTarget);
+    songDrag.move({ x: e.clientX, y: e.clientY });
   }
 
   async function handlePointerDragUp(e?: PointerEvent) {
@@ -576,15 +575,7 @@
         wasDragged = false;
       }, 100);
 
-      const dropTarget =
-        fileDrag.dropTarget ?? (e ? findDropTargetAt(e.clientX, e.clientY) : null);
-      if (dropTarget?.kind === "queue") {
-        await fileDrag.dropToQueue();
-      } else if (dropTarget?.kind === "playlist") {
-        await fileDrag.dropToPlaylist({ id: dropTarget.id, name: dropTarget.name });
-      } else {
-        fileDrag.end();
-      }
+      await songDrag.drop(e ? { x: e.clientX, y: e.clientY } : undefined);
     }
 
     pointerDragArmed = false;
@@ -605,7 +596,7 @@
     capturedPointerId = null;
 
     if (pointerDragArmed) {
-      fileDrag.end();
+      songDrag.end();
     }
     pointerDragArmed = false;
     pointerDragEntry = null;
@@ -786,7 +777,7 @@
                   {@const isArrival = entry.name === arrived && selected && selection.length === 1}
                   {@const Icon = fileIcon(entry)}
                   <div
-                    class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'} {fileDrag.isDragging && selected ? 'opacity-60' : ''}"
+                    class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'} {songDrag.isDragging && selected ? 'opacity-60' : ''}"
                     class:arrival={isArrival}
                     class:arrival-halo={isArrival && haloShown}
                     role="option"
@@ -819,7 +810,6 @@
                         {:else}
                           {name}
                         {/if}
-                      </span>
                     </span>
                     <span class="w-12 shrink-0 text-[11px] text-brand-text-secondary hidden @lg:block">{entry.fileType ?? ""}</span>
                     <span class="w-16 shrink-0 text-right text-[11px] tabular-nums text-brand-text-secondary hidden @lg:block">{entry.isDir || entry.size === null ? "" : formatFileSize(entry.size)}</span>

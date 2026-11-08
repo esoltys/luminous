@@ -248,31 +248,31 @@ describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
   });
 
   it("exposes Queue drop target and highlights during drag", async () => {
-    const { fileDrag } = await import("../stores/fileDrag.svelte");
-    fileDrag.start([{ name: "track.flac", isDir: false, songId: 10 } as any]);
+    const { songDrag, songsPayload } = await import("../stores/songDrag.svelte");
+    songDrag.start(songsPayload([{ id: 10, title: "Track" } as any]), { x: 0, y: 0 });
 
     const { getByRole } = render(Sidebar, { props: { width: 256 } });
     const queueBtn = getByRole("button", { name: /queue/i });
     expect(queueBtn.getAttribute("data-drop-target")).toBe("queue");
 
-    fileDrag.updatePointer({ x: 0, y: 0 }, { kind: "queue" });
+    songDrag.dropTarget = { kind: "queue" };
     await tick();
     expect(queueBtn.className).toContain("ring-brand-accent");
 
-    fileDrag.end();
+    songDrag.end();
   });
 
   it("expands custom playlists after dragging over Custom for 500ms", async () => {
     vi.useFakeTimers();
     try {
-      const { fileDrag } = await import("../stores/fileDrag.svelte");
-      fileDrag.start([{ name: "track.flac", isDir: false, songId: 10 } as any]);
+      const { songDrag, songsPayload } = await import("../stores/songDrag.svelte");
+      songDrag.start(songsPayload([{ id: 10, title: "Track" } as any]), { x: 0, y: 0 });
 
       const { getByRole, findByRole } = render(Sidebar, { props: { width: 256 } });
       const customBtn = getByRole("button", { name: /custom/i });
       expect(customBtn.getAttribute("data-drop-target")).toBe("custom-category");
 
-      fileDrag.updatePointer({ x: 0, y: 0 }, { kind: "custom-category" });
+      songDrag.dropTarget = { kind: "custom-category" };
       await tick();
       vi.advanceTimersByTime(500);
       await tick();
@@ -282,9 +282,44 @@ describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
       expect(favPlaylistBtn.getAttribute("data-drop-target")).toBe("playlist");
       expect(favPlaylistBtn.getAttribute("data-playlist-id")).toBe("2");
 
-      fileDrag.end();
+      songDrag.end();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("offers only hand-built playlists as drop targets, not smart ones", async () => {
+    // The smart playlist still counts towards Custom and opens from it; it just can't take a drop,
+    // because its rules decide what it holds.
+    playlistsStore.playlists = [
+      ...playlistsStore.playlists,
+      { id: 3, name: "Rock Rules", is_queue: false, dynamic_enabled: true, dynamic_spec: "genre:rock" } as any,
+    ];
+    vi.useFakeTimers();
+    try {
+      const { songDrag, songsPayload } = await import("../stores/songDrag.svelte");
+      songDrag.start(songsPayload([{ id: 10, title: "Track" } as any]), { x: 0, y: 0 });
+      const { findByRole, queryByRole } = render(Sidebar, { props: { width: 256 } });
+
+      songDrag.dropTarget = { kind: "custom-category" };
+      await tick();
+      vi.advanceTimersByTime(500);
+      await tick();
+
+      expect(await findByRole("button", { name: "Favorites" })).toHaveAttribute("data-drop-target", "playlist");
+      expect(queryByRole("button", { name: "Rock Rules" })).toBeNull();
+      songDrag.end();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("doesn't offer Custom as a target when it holds only smart playlists", () => {
+    playlistsStore.playlists = [
+      { id: 1, name: "Queue", is_queue: true } as any,
+      { id: 3, name: "Rock Rules", is_queue: false, dynamic_enabled: true, dynamic_spec: "genre:rock" } as any,
+    ];
+    const { getByRole } = render(Sidebar, { props: { width: 256 } });
+    expect(getByRole("button", { name: /custom/i })).not.toHaveAttribute("data-drop-target");
   });
 });

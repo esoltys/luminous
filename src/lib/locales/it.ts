@@ -2471,7 +2471,9 @@ export const it = {
       one: "{count} brano aggiunto alla coda",
       other: "{count} brani aggiunti alla coda"
     },
-    nothingToAdd: "Nessun file audio supportato da aggiungere."
+    nothingToAdd: "Nessun file audio supportato da aggiungere.",
+    queueFailed: "Impossibile aggiungere alla coda.",
+    playlistFailed: "Impossibile aggiungere a {name}."
   },
   walkthrough: {
     takeTour: "Fai un rapido tour",

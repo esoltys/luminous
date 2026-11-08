@@ -10,6 +10,8 @@
   import GenreContextMenu from "./GenreContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import ColorPicker from "./ColorPicker.svelte";
+  import DragGhost from "./DragGhost.svelte";
+  import { cardDropApplies, chipDropAction, type TagCardDropTarget } from "../utils/tagCardDrop";
 
   const genreColorChoices = getGenreColorChoices();
 
@@ -142,7 +144,7 @@
    * the same dropTarget tracking as chip drags since hit-testing doesn't
    * care which kind of drag is in progress. */
   let draggedCard = $state<string | null>(null);
-  let dropTarget = $state<{ kind: "card" | "header" | "chip"; group: string; chip?: string } | null>(null);
+  let dropTarget = $state<TagCardDropTarget | null>(null);
   /** Cursor position while a drag is active, for the floating ghost label —
    * cleared alongside draggedChip/draggedCard on pointerup. */
   let pointerPos = $state<{ x: number; y: number } | null>(null);
@@ -153,7 +155,9 @@
    * makes it a drag rather than a click. */
   const CLICK_VS_DRAG_THRESHOLD_PX = 4;
   let dragStartPos: { x: number; y: number } | null = null;
-  let dragMoved = false;
+  /** Reactive so the ghost only appears once the pointer has actually moved — a plain click
+   * on a chip must not flash it. */
+  let dragMoved = $state(false);
 
   /** What the floating ghost shows: the dragged item's own label, colored
    * like its current card (falls back to the target card's own hue for a
@@ -229,6 +233,10 @@
     onOpenMainTag(name);
   }
 
+  let dropApplies = $derived(
+    draggedCard ? cardDropApplies(draggedCard, dropTarget) : draggedChip ? chipDropAction(draggedChip, dropTarget) !== null : false
+  );
+
   async function handlePointerUp() {
     const chip = draggedChip;
     const card = draggedCard;
@@ -242,8 +250,8 @@
     dragMoved = false;
 
     if (card) {
-      if (target && target.group !== card) {
-        await tagsStore.demoteGroupToChild(card, target.group);
+      if (cardDropApplies(card, target)) {
+        await tagsStore.demoteGroupToChild(card, target!.group);
       }
       return;
     }
@@ -257,17 +265,19 @@
       return;
     }
 
-    if (!target) return;
-    if (target.kind === "header" && target.group === chip.fromGroup) {
-      await tagsStore.promoteTag(chip.name);
-    } else if (target.kind === "card" && target.group !== chip.fromGroup) {
-      await tagsStore.reparentTag(chip.name, target.group);
-    } else if (target.kind === "chip" && target.group === chip.fromGroup && target.chip !== chip.name) {
-      const group = tagsStore.hierarchy.find((g) => g.name === chip.fromGroup);
-      const newIndex = group?.children.findIndex((c) => c.name === target.chip) ?? 0;
-      await tagsStore.reorderTagInGroup(chip.name, newIndex);
-    } else if (target.kind === "chip" && target.group !== chip.fromGroup) {
-      await tagsStore.reparentTag(chip.name, target.group);
+    switch (chipDropAction(chip, target)) {
+      case "promote":
+        await tagsStore.promoteTag(chip.name);
+        break;
+      case "reparent":
+        await tagsStore.reparentTag(chip.name, target!.group);
+        break;
+      case "reorder": {
+        const group = tagsStore.hierarchy.find((g) => g.name === chip.fromGroup);
+        const newIndex = group?.children.findIndex((c) => c.name === target!.chip) ?? 0;
+        await tagsStore.reorderTagInGroup(chip.name, newIndex);
+        break;
+      }
     }
   }
 </script>
@@ -401,13 +411,16 @@
   {/if}
 </div>
 
-{#if ghostInfo && pointerPos}
-  <div
-    class="fixed z-50 pointer-events-none px-3 py-1.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-semibold shadow-2xl -translate-y-1/2"
-    style={`left: ${pointerPos.x + 16}px; top: ${pointerPos.y}px; border-color: ${genreColorHsl(ghostInfo.colorIndex)};`}
+{#if ghostInfo && pointerPos && dragMoved}
+  <DragGhost
+    x={pointerPos.x}
+    y={pointerPos.y}
+    overTarget={dropApplies}
+    color={genreColorHsl(ghostInfo.colorIndex)}
+    testId="genre-drag-ghost"
   >
-    {ghostInfo.label}
-  </div>
+    <span class="max-w-[180px] truncate font-semibold">{ghostInfo.label}</span>
+  </DragGhost>
 {/if}
 
 {#if colorPopoverFor && colorPopoverPos}

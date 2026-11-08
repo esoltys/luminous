@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent, screen } from "@testing-library/svelte";
 import PinnedRow from "./PinnedRow.svelte";
 import { pinnedStore } from "../stores/pinned.svelte";
@@ -110,6 +110,49 @@ describe("PinnedRow.svelte", () => {
     expect(getByText("Portishead")).toBeInTheDocument();
     expect(getByText("My Best Songs")).toBeInTheDocument();
     expect(getByText("Favourite Songs")).toBeInTheDocument();
+  });
+
+  describe("drag ghost", () => {
+    // jsdom has no elementFromPoint; each test points it at the card under the cursor.
+    const originalElementFromPoint = document.elementFromPoint;
+    afterEach(() => {
+      document.elementFromPoint = originalElementFromPoint;
+    });
+
+    function pinned(container: HTMLElement, index: number): HTMLElement {
+      return container.querySelector<HTMLElement>(`[data-pinned-index="${index}"]`)!;
+    }
+
+    it("does not appear for a click that never moves", async () => {
+      const { container } = render(PinnedRow);
+      await fireEvent.pointerDown(pinned(container, 2), { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
+      expect(screen.queryByTestId("pinned-drag-ghost")).toBeNull();
+      await fireEvent.pointerUp(window);
+      expect(screen.queryByTestId("pinned-drag-ghost")).toBeNull();
+    });
+
+    it("follows the drag with the item's name and lights up only over another pin", async () => {
+      const reorder = vi.spyOn(pinnedStore, "reorder").mockImplementation(async () => {});
+      const { container } = render(PinnedRow);
+      await fireEvent.pointerDown(pinned(container, 2), { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
+
+      // Still over its own slot: dropping here changes nothing.
+      document.elementFromPoint = () => pinned(container, 2);
+      await fireEvent.pointerMove(window, { clientX: 40, clientY: 40 });
+      const ghost = screen.getByTestId("pinned-drag-ghost");
+      expect(ghost).toHaveTextContent("Portishead");
+      expect(ghost).not.toHaveAttribute("data-over-target");
+
+      document.elementFromPoint = () => pinned(container, 0);
+      await fireEvent.pointerMove(window, { clientX: 80, clientY: 40 });
+      expect(ghost).toHaveAttribute("data-over-target");
+
+      document.elementFromPoint = () => null;
+      await fireEvent.pointerMove(window, { clientX: 900, clientY: 900 });
+      await fireEvent.pointerUp(window);
+      expect(screen.queryByTestId("pinned-drag-ghost")).toBeNull();
+      expect(reorder).not.toHaveBeenCalled();
+    });
   });
 
   it("opens AlbumContextMenu on right-click on album card", async () => {

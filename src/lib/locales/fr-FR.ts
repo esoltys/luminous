@@ -2479,7 +2479,9 @@ export const frFR: DeepStringRecord<typeof en> = {
       one: "{count} chanson ajoutée à la file d'attente",
       other: "{count} chansons ajoutées à la file d'attente"
     },
-    nothingToAdd: "Aucun fichier audio pris en charge trouvé à ajouter."
+    nothingToAdd: "Aucun fichier audio pris en charge trouvé à ajouter.",
+    queueFailed: "Impossible d'ajouter à la file d'attente.",
+    playlistFailed: "Impossible d'ajouter à « {name} »."
   },
   walkthrough: {
     takeTour: "Faire une visite rapide",
