@@ -40,6 +40,7 @@
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import ShareModal from "./ShareModal.svelte";
   import ViewInFilesItem from "./ViewInFilesItem.svelte";
+  import AddToDeviceMenuItem from "./AddToDeviceMenuItem.svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
 
@@ -399,6 +400,13 @@
       </div>
     {/if}
   </div>
+
+  {#if !allSelectedRemote}
+    <AddToDeviceMenuItem
+      songIds={selectedSongIds && selectedSongIds.length > 0 ? selectedSongIds : [song.id]}
+      {onClose}
+    />
+  {/if}
 
   <ContextMenuItem
     icon={song.not_included ? Eye : EyeSlash}

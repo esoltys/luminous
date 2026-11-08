@@ -2,7 +2,7 @@
 //! computer by [`super::store`]), and the library songs it stands for.
 
 use crate::album_key::album_key;
-use crate::collection::{row_to_song, SONG_SELECT_COLS};
+use crate::collection::{row_to_song, SONG_SELECT_COLS, SONG_SELECT_COLS_QUALIFIED};
 use crate::library_paths;
 use crate::models::{Song, LOCAL_SOURCES_SQL};
 use crate::playlist::{fit_to_limit, PlaylistManager};
@@ -24,6 +24,14 @@ pub enum SyncSource {
     /// A playlist's songs; for a size-capped playlist (#344), only those
     /// above its break, measured in the device's converted sizes.
     Playlist { id: i64 },
+    /// An auto-playlist (e.g. "favourites", "recently_added", "most_played", "history").
+    AutoPlaylist {
+        auto_type: String,
+        #[serde(default)]
+        name: Option<String>,
+    },
+    /// An individual song by its library id.
+    Song { id: i64 },
     /// Songs whose artist or album artist is `name` (ignoring case).
     Artist { name: String },
     /// An album as the library groups albums: its title and album artist
@@ -61,9 +69,11 @@ pub struct SyncSettings {
 pub enum SourceKind {
     Library,
     Playlist,
+    AutoPlaylist,
     Artist,
     Album,
     Folder,
+    Song,
 }
 
 /// A selected source as plans and the device's manifest name it.
@@ -116,10 +126,12 @@ pub fn resolve(
     settings: &SyncSettings,
     mut size_on_device: impl FnMut(&Song) -> Option<u64>,
 ) -> Result<Selection> {
-    let needs_library = settings
-        .sources
-        .iter()
-        .any(|s| !matches!(s, SyncSource::Playlist { .. }));
+    let needs_library = settings.sources.iter().any(|s| {
+        !matches!(
+            s,
+            SyncSource::Playlist { .. } | SyncSource::AutoPlaylist { .. }
+        )
+    });
     let library = if needs_library {
         local_songs(conn)?
     } else {
@@ -182,6 +194,42 @@ pub fn resolve(
                     selection.playlists.push(WantedPlaylist { name, songs });
                 }
                 continue;
+            }
+            SyncSource::AutoPlaylist { auto_type, name } => {
+                let Some(AutoPlaylistSongs {
+                    name: resolved_name,
+                    songs,
+                }) = auto_playlist_songs(conn, auto_type, name.as_deref())?
+                else {
+                    continue;
+                };
+                let source_ref = SourceRef {
+                    kind: SourceKind::AutoPlaylist,
+                    key: auto_type.clone(),
+                    name: resolved_name.clone(),
+                };
+                if seen_sources.insert(source_ref.clone()) {
+                    for song in &songs {
+                        add(&mut selection, song, &source_ref);
+                    }
+                    selection.sources.push(source_ref);
+                    selection.playlists.push(WantedPlaylist {
+                        name: resolved_name,
+                        songs,
+                    });
+                }
+                continue;
+            }
+            SyncSource::Song { id } => {
+                let Some(song) = library.iter().find(|s| s.id == *id) else {
+                    continue;
+                };
+                let source_ref = SourceRef {
+                    kind: SourceKind::Song,
+                    key: id.to_string(),
+                    name: song.title.clone().unwrap_or_default(),
+                };
+                (source_ref, vec![song])
             }
             SyncSource::Artist { name } => {
                 let key = album_key(name);
@@ -314,6 +362,136 @@ fn playlist_songs(
     }))
 }
 
+/// What of an auto-playlist goes on a device.
+struct AutoPlaylistSongs {
+    name: String,
+    /// Its local songs that go on the device, in its order.
+    songs: Vec<Song>,
+}
+
+fn auto_playlist_songs(
+    conn: &rusqlite::Connection,
+    auto_type: &str,
+    custom_name: Option<&str>,
+) -> Result<Option<AutoPlaylistSongs>> {
+    let (default_name, sql, params_limit): (&str, String, Option<i64>) = match auto_type {
+        "favourites" => (
+            "Favourites",
+            format!(
+                "SELECT {SONG_SELECT_COLS} FROM songs
+                 WHERE loved = 1
+                   AND source IN ({})
+                   AND unavailable = 0
+                   AND not_included = 0
+                   AND path IS NOT NULL
+                 ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track",
+                *LOCAL_SOURCES_SQL
+            ),
+            None,
+        ),
+        "recently_added" => (
+            "Recently Added",
+            format!(
+                "SELECT {SONG_SELECT_COLS} FROM songs
+                 WHERE source IN ({})
+                   AND unavailable = 0
+                   AND not_included = 0
+                   AND loved != -1
+                   AND added IS NOT NULL
+                   AND path IS NOT NULL
+                 ORDER BY added DESC
+                 LIMIT ?1",
+                *LOCAL_SOURCES_SQL
+            ),
+            Some(100),
+        ),
+        "most_played" => (
+            "Most Played",
+            format!(
+                "SELECT {SONG_SELECT_COLS_QUALIFIED}
+                 FROM songs s
+                 JOIN (
+                     SELECT song_id, COUNT(*) AS play_count
+                     FROM play_history
+                     GROUP BY song_id
+                 ) ph ON ph.song_id = s.id
+                 WHERE s.source IN ({})
+                   AND s.unavailable = 0
+                   AND s.not_included = 0
+                   AND s.loved != -1
+                   AND s.path IS NOT NULL
+                 ORDER BY ph.play_count DESC, s.added DESC
+                 LIMIT ?1",
+                *LOCAL_SOURCES_SQL
+            ),
+            Some(100),
+        ),
+        "history" => (
+            "History",
+            format!(
+                "SELECT {SONG_SELECT_COLS_QUALIFIED}
+                 FROM songs s
+                 JOIN play_history ph ON ph.song_id = s.id
+                 WHERE s.source IN ({})
+                   AND s.unavailable = 0
+                   AND s.not_included = 0
+                   AND s.loved != -1
+                   AND s.path IS NOT NULL
+                 ORDER BY ph.played_at DESC
+                 LIMIT ?1",
+                *LOCAL_SOURCES_SQL
+            ),
+            Some(100),
+        ),
+        spec => {
+            let row: Option<i64> = conn
+                .query_row(
+                    "SELECT id FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                    params![spec],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if let Some(id) = row {
+                let mut dummy_size = |_s: &Song| None;
+                if let Some(pl) = playlist_songs(conn, id, &mut dummy_size)? {
+                    let name = custom_name
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or(&pl.name)
+                        .to_string();
+                    return Ok(Some(AutoPlaylistSongs {
+                        name,
+                        songs: pl.songs,
+                    }));
+                }
+            }
+            return Ok(None);
+        }
+    };
+
+    let mut stmt = conn.prepare(&sql)?;
+    let songs: Vec<Song> = match params_limit {
+        Some(limit) => stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .filter(copyable)
+            .collect(),
+        None => stmt
+            .query_map([], row_to_song)?
+            .filter_map(|r| r.ok())
+            .filter(copyable)
+            .collect(),
+    };
+
+    let name = custom_name
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(default_name)
+        .to_string();
+
+    Ok(Some(AutoPlaylistSongs { name, songs }))
+}
+
 fn copyable(song: &Song) -> bool {
     song.source.is_local() && !song.unavailable && song.path.is_some()
 }
@@ -351,6 +529,11 @@ mod tests {
             sources: vec![
                 SyncSource::Library,
                 SyncSource::Playlist { id: 4 },
+                SyncSource::AutoPlaylist {
+                    auto_type: "favourites".into(),
+                    name: Some("Coups de cœur".into()),
+                },
+                SyncSource::Song { id: 42 },
                 SyncSource::Album {
                     album: "Halo".into(),
                     artist: "Amorphis".into(),
@@ -360,8 +543,51 @@ mod tests {
         };
         let json = serde_json::to_value(&settings).unwrap();
         assert_eq!(json["sources"][1]["kind"], "playlist");
+        assert_eq!(json["sources"][2]["kind"], "autoPlaylist");
+        assert_eq!(json["sources"][2]["autoType"], "favourites");
+        assert_eq!(json["sources"][2]["name"], "Coups de cœur");
+        assert_eq!(json["sources"][3]["kind"], "song");
+        assert_eq!(json["sources"][3]["id"], 42);
         assert_eq!(json["unselected"], "leave");
         let back: SyncSettings = serde_json::from_value(json).unwrap();
         assert_eq!(back, settings);
+    }
+
+    #[test]
+    fn auto_playlist_and_song_resolve_correctly() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = crate::db::Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute_batch(
+            "INSERT INTO songs (id, title, artist, album, path, loved, unavailable, not_included, source)
+             VALUES (1, 'Song One', 'Artist A', 'Album X', '/music/1.flac', 1, 0, 0, 1);
+             INSERT INTO songs (id, title, artist, album, path, loved, unavailable, not_included, source)
+             VALUES (2, 'Song Two', 'Artist B', 'Album Y', '/music/2.flac', 0, 0, 0, 1);",
+        )
+        .unwrap();
+
+        let auto = auto_playlist_songs(&conn, "favourites", Some("My Faves"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(auto.name, "My Faves");
+        assert_eq!(auto.songs.len(), 1);
+        assert_eq!(auto.songs[0].id, 1);
+
+        let settings = SyncSettings {
+            storage_id: None,
+            sources: vec![
+                SyncSource::AutoPlaylist {
+                    auto_type: "favourites".into(),
+                    name: Some("My Faves".into()),
+                },
+                SyncSource::Song { id: 2 },
+            ],
+            unselected: UnselectedSongs::Remove,
+        };
+        let selection = resolve(&conn, &settings, |_| None).unwrap();
+        assert_eq!(selection.playlists.len(), 1);
+        assert_eq!(selection.playlists[0].name, "My Faves");
+        assert_eq!(selection.playlists[0].songs.len(), 1);
+        assert_eq!(selection.songs.len(), 2);
     }
 }

@@ -5,6 +5,7 @@
   import { filesStore, sameSource, sourceKey } from "../../stores/files.svelte";
   import { deviceIcon, sourceIcon } from "./sourceIcon";
   import { devicesStore } from "../../stores/devices.svelte";
+  import { songDrag } from "../../stores/songDrag.svelte";
   import { deviceName, syncStorage } from "../../utils/devices";
   import { formatStorageSize } from "../../utils/formatters";
   import DeviceProgressRing from "../devices/DeviceProgressRing.svelte";
@@ -137,7 +138,10 @@
               // A running sync's progress comes back with its device.
               if (fraction !== null) devicesStore.showProgress();
             }}
-            class="flex-1 min-w-0 flex items-start gap-2 px-2.5 py-1.5 rounded-md text-xs text-left transition-colors {open ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            data-drop-target="device"
+            data-device-id={device.id}
+            data-device-name={name}
+            class="flex-1 min-w-0 flex items-start gap-2 px-2.5 py-1.5 rounded-md text-xs text-left transition-colors {open ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {songDrag.isDragging && songDrag.dropTarget?.kind === 'device' && songDrag.dropTarget.id === device.id ? 'bg-brand-accent/30 ring-2 ring-brand-accent text-brand-text-primary font-semibold' : ''}"
           >
             <Icon class="w-3.5 h-3.5 icon-align shrink-0 mt-px" />
             <span class="flex-1 min-w-0 flex flex-col gap-1">

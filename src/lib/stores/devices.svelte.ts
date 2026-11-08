@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ConnectedDevice, DeviceSyncState, SyncPlan, SyncProgress, SyncSettings, SyncSummary } from "../types";
+import type { ConnectedDevice, DeviceSyncState, SyncPlan, SyncProgress, SyncSettings, SyncSummary, SyncSource } from "../types";
 import { deviceName } from "../utils/devices";
 import { createEventScope } from "../utils/eventScope";
 import { i18n } from "./i18n.svelte";
@@ -79,13 +79,113 @@ class DevicesStore {
   }
 
   /**
+   * Checks whether `source` is already included in `sources`.
+   */
+  hasSource(sources: SyncSource[], source: SyncSource): boolean {
+    const key = (s: SyncSource) => {
+      switch (s.kind) {
+        case "library":
+          return "library";
+        case "playlist":
+          return `playlist:${s.id}`;
+        case "autoPlaylist":
+          return `autoPlaylist:${s.autoType}`;
+        case "song":
+          return `song:${s.id}`;
+        case "artist":
+          return `artist:${s.name.toLowerCase()}`;
+        case "album":
+          return `album:${s.album.toLowerCase()}\u{1f}${s.artist.toLowerCase()}`;
+        case "folder":
+          return `folder:${s.path}`;
+      }
+    };
+    const targetKey = key(source);
+    return sources.some((s) => key(s) === targetKey);
+  }
+
+  /**
+   * Adds `source` (playlist, auto-playlist, album, artist, song, or folder)
+   * to the device's sync selection. False when it is already there.
+   * Rejects when the device can't be planned.
+   */
+  async addSourceToSync(deviceId: string, source: SyncSource): Promise<boolean> {
+    const state = await invoke<DeviceSyncState>("get_device_sync_state", { deviceId });
+    if (this.hasSource(state.settings.sources, source)) return false;
+    await this.planSync(deviceId, {
+      ...state.settings,
+      sources: [...state.settings.sources, source],
+    });
+    return true;
+  }
+
+  /**
+   * Adds `source` to `device`'s sync and displays a toast confirming addition,
+   * reporting when it is already syncing, or reporting failure.
+   */
+  async addToDeviceSync(device: ConnectedDevice, source: SyncSource, name: string): Promise<boolean> {
+    const deviceLabel = deviceName(device);
+    try {
+      if (!(await this.addSourceToSync(device.id, source))) {
+        toastStore.show(i18n.t("devices.itemAlreadyInSync", { name, device: deviceLabel }), "info");
+        return false;
+      }
+      toastStore.show(i18n.t("devices.addedItemToSync", { name, device: deviceLabel }), "success");
+      return true;
+    } catch (err) {
+      console.error("Failed to add source to device sync:", err);
+      toastStore.show(i18n.t("devices.addItemToSyncFailed", { name, device: deviceLabel }), "error");
+      return false;
+    }
+  }
+
+  /**
    * Adds the folder at `path` to the device's sync selection. False when it
    * is already there. Rejects when the device can't be planned.
    */
   async addFolderToSync(deviceId: string, path: string): Promise<boolean> {
+    return this.addSourceToSync(deviceId, { kind: "folder", path });
+  }
+
+  /**
+   * Adds songs to the device's sync selection. Filters out songs that are already selected.
+   */
+  async addSongsToSync(
+    deviceOrId: ConnectedDevice | string,
+    songIds: number[],
+    name?: string
+  ): Promise<boolean> {
+    const deviceId = typeof deviceOrId === "string" ? deviceOrId : deviceOrId.id;
+    const device = typeof deviceOrId === "string" ? this.device(deviceId) : deviceOrId;
+    const deviceLabel = device ? deviceName(device) : "";
+    const itemName = name ?? i18n.plural("playlists.songsCount", songIds.length);
+
     const state = await invoke<DeviceSyncState>("get_device_sync_state", { deviceId });
-    if (state.settings.sources.some((s) => s.kind === "folder" && s.path === path)) return false;
-    await this.planSync(deviceId, { ...state.settings, sources: [...state.settings.sources, { kind: "folder", path }] });
+    const existing = new Set(
+      state.settings.sources
+        .filter((s): s is { kind: "song"; id: number } => s.kind === "song")
+        .map((s) => s.id)
+    );
+    const newSources: SyncSource[] = songIds
+      .filter((id) => !existing.has(id))
+      .map((id) => ({ kind: "song", id }));
+
+    if (newSources.length === 0) {
+      toastStore.show(i18n.t("devices.itemAlreadyInSync", { name: itemName, device: deviceLabel }), "info");
+      return false;
+    }
+
+    await this.planSync(deviceId, {
+      ...state.settings,
+      sources: [...state.settings.sources, ...newSources],
+    });
+    toastStore.show(
+      i18n.plural("devices.addedSongsToSync", newSources.length, {
+        count: newSources.length,
+        device: deviceLabel,
+      }),
+      "success"
+    );
     return true;
   }
 
