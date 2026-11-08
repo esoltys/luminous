@@ -26,23 +26,63 @@ export interface AlphabetIndexResult {
   getJumpIndex: (letter: string) => number;
 }
 
-export const BASE_LETTERS_ASC = [
+const LATIN_LETTERS_ASC = [
   "#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
   "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
 ] as const;
 
-export const BASE_LETTERS_DESC = [
-  "Z", "Y", "X", "W", "V", "U", "T", "S", "R", "Q", "P", "O", "N", "M",
-  "L", "K", "J", "I", "H", "G", "F", "E", "D", "C", "B", "A", "#"
+const SPANISH_LETTERS_ASC = [
+  "#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+  "N", "Ñ", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
 ] as const;
 
+const RUSSIAN_LETTERS_ASC = [
+  "#", "А", "Б", "В", "Г", "Д", "Е", "Ж", "З", "И", "К", "Л", "М",
+  "Н", "О", "П", "Р", "С", "Т", "У", "Ф", "Х", "Ц", "Ч", "Ш", "Щ",
+  "Э", "Ю", "Я"
+] as const;
+
+const UKRAINIAN_LETTERS_ASC = [
+  "#", "А", "Б", "В", "Г", "Ґ", "Д", "Е", "Є", "Ж", "З", "И", "І",
+  "Ї", "К", "Л", "М", "Н", "О", "П", "Р", "С", "Т", "У", "Ф", "Х",
+  "Ц", "Ч", "Ш", "Щ", "Ю", "Я"
+] as const;
+
+export const BASE_LETTERS_ASC = LATIN_LETTERS_ASC;
+export const BASE_LETTERS_DESC = [...LATIN_LETTERS_ASC].reverse();
+
 /**
- * Normalizes an item key string to determine its alphabet bucket ('#' or 'A'–'Z').
- *
- * Strips leading quotes/brackets and normalizes Unicode diacritics so accented
- * characters (e.g. 'É', 'ö', 'Å') map to their base Latin letters.
+ * Returns the ascending and descending alphabet character lists for a given locale.
  */
-export function extractBucketLetter(str: string | null | undefined): string {
+function getAlphabetForLocale(locale = "en"): {
+  asc: readonly string[];
+  desc: readonly string[];
+  lang: string;
+} {
+  const lang = (locale || "en").toLowerCase().split("-")[0];
+  let asc: readonly string[];
+
+  if (lang === "ru") {
+    asc = RUSSIAN_LETTERS_ASC;
+  } else if (lang === "uk") {
+    asc = UKRAINIAN_LETTERS_ASC;
+  } else if (lang === "es") {
+    asc = SPANISH_LETTERS_ASC;
+  } else {
+    asc = LATIN_LETTERS_ASC;
+  }
+
+  const desc = [...asc].reverse();
+  return { asc, desc, lang };
+}
+
+/**
+ * Normalizes an item key string to determine its alphabet bucket ('#' or alphabet letters).
+ *
+ * Strips leading quotes/brackets and normalizes Unicode diacritics according to the locale
+ * (e.g. Spanish preserves 'Ñ', Russian merges 'Ё' -> 'Е' and 'Й' -> 'И', Latin strips diacritics).
+ */
+export function extractBucketLetter(str: string | null | undefined, locale = "en"): string {
   if (!str) return "#";
   const trimmed = str.trim();
   if (!trimmed) return "#";
@@ -51,8 +91,31 @@ export function extractBucketLetter(str: string | null | undefined): string {
   const cleaned = trimmed.replace(/^["'([{‘“«\s]+/, "");
   if (!cleaned) return "#";
 
-  // Decompose diacritics and strip combining marks
-  const char = cleaned.charAt(0).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const { lang, asc } = getAlphabetForLocale(locale);
+  const firstChar = cleaned.charAt(0);
+
+  if (lang === "ru") {
+    const upper = firstChar.toUpperCase();
+    if (upper === "Ё") return "Е";
+    if (upper === "Й") return "И";
+    if (asc.includes(upper)) return upper;
+    return "#";
+  }
+
+  if (lang === "uk") {
+    const upper = firstChar.toUpperCase();
+    if (upper === "Й") return "И";
+    if (asc.includes(upper)) return upper;
+    return "#";
+  }
+
+  if (lang === "es") {
+    const upper = firstChar.toUpperCase();
+    if (upper === "Ñ") return "Ñ";
+  }
+
+  // Decompose diacritics and strip combining marks for Latin letters
+  const char = firstChar.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
   if (char >= "A" && char <= "Z") {
     return char;
   }
@@ -64,15 +127,35 @@ export function extractBucketLetter(str: string | null | undefined): string {
  *
  * @param items The sorted collection of items.
  * @param getKey Extractor function returning the string sort key for each item.
- * @param ascending True if items are sorted A-Z / #-Z; false if sorted Z-A / Z-#.
+ * @param ascending True if items are sorted ascending; false if descending.
+ * @param locale The active BCP 47 UI locale code (e.g. 'en-CA', 'ru', 'es', 'uk').
  */
 export function buildAlphabetIndex<T>(
   items: T[],
   getKey: (item: T) => string | null | undefined,
-  ascending = true
+  ascending = true,
+  locale = "en"
 ): AlphabetIndexResult {
+  // For Cyrillic locales (ru, uk), if the collection contains zero Cyrillic items but has
+  // Latin items, adapt to Latin so the scrubber remains functional for foreign music collections.
+  let effectiveLocale = locale;
+  const lang = (locale || "en").toLowerCase().split("-")[0];
+  if (lang === "ru" || lang === "uk") {
+    const hasCyrillic = items.some((item) => {
+      const k = getKey(item);
+      if (!k) return false;
+      const ch = k.trim().replace(/^["'([{‘“«\s]+/, "").charAt(0);
+      return /[\u0400-\u04FF]/.test(ch);
+    });
+    if (!hasCyrillic && items.length > 0) {
+      effectiveLocale = "en";
+    }
+  }
+
+  const { asc, desc } = getAlphabetForLocale(effectiveLocale);
+  const baseLetters = ascending ? asc : desc;
+
   if (items.length === 0) {
-    const baseLetters = ascending ? BASE_LETTERS_ASC : BASE_LETTERS_DESC;
     return {
       sections: baseLetters.map((letter) => ({ letter, startIndex: -1, count: 0 })),
       getJumpIndex: () => -1,
@@ -84,7 +167,7 @@ export function buildAlphabetIndex<T>(
 
   for (let i = 0; i < items.length; i++) {
     const rawKey = getKey(items[i]);
-    const letter = extractBucketLetter(rawKey);
+    const letter = extractBucketLetter(rawKey, effectiveLocale);
 
     if (!firstIndexMap.has(letter)) {
       firstIndexMap.set(letter, i);
@@ -92,7 +175,6 @@ export function buildAlphabetIndex<T>(
     countMap.set(letter, (countMap.get(letter) ?? 0) + 1);
   }
 
-  const baseLetters = ascending ? BASE_LETTERS_ASC : BASE_LETTERS_DESC;
   const sections: LetterSection[] = baseLetters.map((letter) => ({
     letter,
     startIndex: firstIndexMap.has(letter) ? firstIndexMap.get(letter)! : -1,

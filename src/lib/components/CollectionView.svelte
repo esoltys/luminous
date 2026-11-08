@@ -118,7 +118,7 @@
     return map;
   });
 
-  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+  let collator = $derived(new Intl.Collator(i18n.currentLocale, { numeric: true, sensitivity: "base" }));
 
   let artistSongsIndex = $derived.by(() => {
     if (navigationStore.activeSubTab !== "artists") return new Map<string, Song[]>();

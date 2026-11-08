@@ -11,6 +11,8 @@
     /** Minimum item count required before the scrubber is rendered. Defaults to 15. */
     minItems?: number;
     class?: string;
+    /** Active locale to adapt alphabet sections. Defaults to i18n.currentLocale. */
+    locale?: string;
   }
 
   let {
@@ -20,6 +22,7 @@
     onjump,
     minItems = 15,
     class: className = "",
+    locale = i18n.currentLocale,
   }: Props = $props();
 
   let scrubberEl = $state<HTMLDivElement>();
@@ -32,7 +35,7 @@
     if (dismissTimer) clearTimeout(dismissTimer);
   });
 
-  let indexData = $derived(buildAlphabetIndex(items, getKey, ascending));
+  let indexData = $derived(buildAlphabetIndex(items, getKey, ascending, locale));
 
   function updateFromPointer(clientY: number) {
     if (!scrubberEl || indexData.sections.length === 0) return;

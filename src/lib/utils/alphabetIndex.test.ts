@@ -119,4 +119,71 @@ describe("alphabetIndex.ts — buildAlphabetIndex (#1973)", () => {
     expect(getJumpIndex("A")).toBe(2);
     expect(getJumpIndex("#")).toBe(3);
   });
+
+  it("adapts alphabet to Spanish (es) with 'Ñ' section", () => {
+    const items = ["Alejandro", "Niño de Elche", "Ñu", "Zahara"];
+    const { sections, getJumpIndex } = buildAlphabetIndex(items, (x) => x, true, "es");
+
+    const letters = sections.map((s) => s.letter);
+    expect(letters).toContain("Ñ");
+    const nPos = letters.indexOf("N");
+    const enyePos = letters.indexOf("Ñ");
+    const oPos = letters.indexOf("O");
+    expect(enyePos).toBe(nPos + 1);
+    expect(oPos).toBe(enyePos + 1);
+
+    expect(getJumpIndex("Ñ")).toBe(2);
+  });
+
+  it("adapts alphabet to Russian Cyrillic (ru)", () => {
+    const items = [
+      "123",
+      "Аквариум",
+      "Би-2",
+      "Ёлка",
+      "Земфира",
+      "Кино",
+      "Ялла"
+    ];
+    const { sections, getJumpIndex } = buildAlphabetIndex(items, (x) => x, true, "ru");
+
+    const letters = sections.map((s) => s.letter);
+    expect(letters[0]).toBe("#");
+    expect(letters[1]).toBe("А");
+    expect(letters[letters.length - 1]).toBe("Я");
+
+    // 'Ёлка' normalizes to 'Е' bucket
+    const eSec = sections.find((s) => s.letter === "Е");
+    expect(eSec?.count).toBe(1);
+
+    expect(getJumpIndex("А")).toBe(1);
+    expect(getJumpIndex("Б")).toBe(2);
+    expect(getJumpIndex("К")).toBe(5);
+    expect(getJumpIndex("Я")).toBe(6);
+  });
+
+  it("adapts alphabet to Ukrainian Cyrillic (uk) with Ґ, Є, І, Ї", () => {
+    const items = ["123", "Антитіла", "Ґринджоли", "Євген", "Іван", "Їжак", "Океан Ельзи"];
+    const { sections, getJumpIndex } = buildAlphabetIndex(items, (x) => x, true, "uk");
+
+    const letters = sections.map((s) => s.letter);
+    expect(letters).toContain("Ґ");
+    expect(letters).toContain("Є");
+    expect(letters).toContain("І");
+    expect(letters).toContain("Ї");
+
+    expect(getJumpIndex("Ґ")).toBe(2);
+    expect(getJumpIndex("Є")).toBe(3);
+    expect(getJumpIndex("І")).toBe(4);
+    expect(getJumpIndex("Ї")).toBe(5);
+  });
+
+  it("falls back to Latin alphabet for ru/uk locale when collection has zero Cyrillic items", () => {
+    const englishItems = ["Beatles", "Coldplay", "Queen", "Radiohead"];
+    const { sections } = buildAlphabetIndex(englishItems, (x) => x, true, "ru");
+
+    const letters = sections.map((s) => s.letter);
+    expect(letters[1]).toBe("A");
+    expect(letters[letters.length - 1]).toBe("Z");
+  });
 });
