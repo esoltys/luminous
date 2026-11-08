@@ -31,56 +31,18 @@ const LATIN_LETTERS_ASC = [
   "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
 ] as const;
 
-const SPANISH_LETTERS_ASC = [
-  "#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
-  "N", "Ñ", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
-] as const;
-
-const RUSSIAN_LETTERS_ASC = [
-  "#", "А", "Б", "В", "Г", "Д", "Е", "Ж", "З", "И", "К", "Л", "М",
-  "Н", "О", "П", "Р", "С", "Т", "У", "Ф", "Х", "Ц", "Ч", "Ш", "Щ",
-  "Э", "Ю", "Я"
-] as const;
-
-const UKRAINIAN_LETTERS_ASC = [
-  "#", "А", "Б", "В", "Г", "Ґ", "Д", "Е", "Є", "Ж", "З", "И", "І",
-  "Ї", "К", "Л", "М", "Н", "О", "П", "Р", "С", "Т", "У", "Ф", "Х",
-  "Ц", "Ч", "Ш", "Щ", "Ю", "Я"
-] as const;
-
 export const BASE_LETTERS_ASC = LATIN_LETTERS_ASC;
 export const BASE_LETTERS_DESC = [...LATIN_LETTERS_ASC].reverse();
 
 /**
- * Returns the ascending and descending alphabet character lists for a given locale.
- */
-function getAlphabetForLocale(locale = "en"): {
-  asc: readonly string[];
-  desc: readonly string[];
-  lang: string;
-} {
-  const lang = (locale || "en").toLowerCase().split("-")[0];
-  let asc: readonly string[];
-
-  if (lang === "ru") {
-    asc = RUSSIAN_LETTERS_ASC;
-  } else if (lang === "uk") {
-    asc = UKRAINIAN_LETTERS_ASC;
-  } else if (lang === "es") {
-    asc = SPANISH_LETTERS_ASC;
-  } else {
-    asc = LATIN_LETTERS_ASC;
-  }
-
-  const desc = [...asc].reverse();
-  return { asc, desc, lang };
-}
-
-/**
  * Normalizes an item key string to determine its alphabet bucket ('#' or alphabet letters).
  *
- * Strips leading quotes/brackets and normalizes Unicode diacritics according to the locale
- * (e.g. Spanish preserves 'Ñ', Russian merges 'Ё' -> 'Е' and 'Й' -> 'И', Latin strips diacritics).
+ * Strips leading quotes/brackets and normalizes Unicode characters:
+ * - Spanish preserves 'Ñ' / 'ñ'
+ * - Cyrillic: Russian merges 'Ё' -> 'Е' and 'Й' -> 'И'; Ukrainian merges 'Й' -> 'И'
+ * - Latin diacritics (e.g. 'É', 'ö', 'Å') decompose and map to their base Latin letters
+ * - Non-Latin alphabetic scripts (Cyrillic, Greek, etc.) preserve their uppercase letters
+ * - Digits, punctuation and symbols map to '#'
  */
 export function extractBucketLetter(str: string | null | undefined, locale = "en"): string {
   if (!str) return "#";
@@ -91,27 +53,25 @@ export function extractBucketLetter(str: string | null | undefined, locale = "en
   const cleaned = trimmed.replace(/^["'([{‘“«\s]+/, "");
   if (!cleaned) return "#";
 
-  const { lang, asc } = getAlphabetForLocale(locale);
+  const lang = (locale || "en").toLowerCase().split("-")[0];
   const firstChar = cleaned.charAt(0);
-
-  if (lang === "ru") {
-    const upper = firstChar.toUpperCase();
-    if (upper === "Ё") return "Е";
-    if (upper === "Й") return "И";
-    if (asc.includes(upper)) return upper;
-    return "#";
-  }
-
-  if (lang === "uk") {
-    const upper = firstChar.toUpperCase();
-    if (upper === "Й") return "И";
-    if (asc.includes(upper)) return upper;
-    return "#";
-  }
 
   if (lang === "es") {
     const upper = firstChar.toUpperCase();
     if (upper === "Ñ") return "Ñ";
+  }
+
+  // Cyrillic script
+  if (/[\u0400-\u04FF]/.test(firstChar)) {
+    const upper = firstChar.toUpperCase();
+    if (upper === "Ё") return "Е";
+    if (upper === "Й") return "И";
+    return upper;
+  }
+
+  // Greek script
+  if (/[\u0370-\u03FF]/.test(firstChar)) {
+    return firstChar.toUpperCase();
   }
 
   // Decompose diacritics and strip combining marks for Latin letters
@@ -119,11 +79,21 @@ export function extractBucketLetter(str: string | null | undefined, locale = "en
   if (char >= "A" && char <= "Z") {
     return char;
   }
+
+  // Any other Unicode letter character
+  if (/\p{L}/u.test(firstChar)) {
+    return firstChar.toUpperCase();
+  }
+
   return "#";
 }
 
 /**
- * Computes alphabet sections and jump lookup for a sorted list of items.
+ * Computes alphabet sections and jump lookup derived from the items in a sorted list (#1973).
+ *
+ * For multilingual libraries, sections are dynamically derived from the items present
+ * in the collection in their actual sorted collation order, ensuring every scrubber letter
+ * maps to existing content.
  *
  * @param items The sorted collection of items.
  * @param getKey Extractor function returning the string sort key for each item.
@@ -133,65 +103,37 @@ export function extractBucketLetter(str: string | null | undefined, locale = "en
 export function buildAlphabetIndex<T>(
   items: T[],
   getKey: (item: T) => string | null | undefined,
-  ascending = true,
+  _ascending = true,
   locale = "en"
 ): AlphabetIndexResult {
-  const { asc, desc } = getAlphabetForLocale(locale);
-  const baseLetters = ascending ? asc : desc;
-
   if (items.length === 0) {
     return {
-      sections: baseLetters.map((letter) => ({ letter, startIndex: -1, count: 0 })),
+      sections: [],
       getJumpIndex: () => -1,
     };
   }
 
-  const firstIndexMap = new Map<string, number>();
-  const countMap = new Map<string, number>();
+  const sections: LetterSection[] = [];
+  const letterMap = new Map<string, LetterSection>();
 
   for (let i = 0; i < items.length; i++) {
     const rawKey = getKey(items[i]);
     const letter = extractBucketLetter(rawKey, locale);
 
-    if (!firstIndexMap.has(letter)) {
-      firstIndexMap.set(letter, i);
+    let sec = letterMap.get(letter);
+    if (!sec) {
+      sec = { letter, startIndex: i, count: 0 };
+      letterMap.set(letter, sec);
+      sections.push(sec);
     }
-    countMap.set(letter, (countMap.get(letter) ?? 0) + 1);
+    sec.count++;
   }
 
-  const sections: LetterSection[] = baseLetters.map((letter) => ({
-    letter,
-    startIndex: firstIndexMap.has(letter) ? firstIndexMap.get(letter)! : -1,
-    count: countMap.get(letter) ?? 0,
-  }));
-
-  function getJumpIndex(letter: string): number {
-    if (items.length === 0) return -1;
-    const target = letter.toUpperCase();
-    const idx = sections.findIndex((s) => s.letter === target);
-
-    if (idx !== -1 && sections[idx].startIndex !== -1) {
-      return sections[idx].startIndex;
-    }
-
-    const startIdx = idx === -1 ? 0 : idx;
-
-    // Search forward for the next populated section
-    for (let i = startIdx + 1; i < sections.length; i++) {
-      if (sections[i].startIndex !== -1) {
-        return sections[i].startIndex;
-      }
-    }
-
-    // Search backward if no subsequent section has items
-    for (let i = startIdx - 1; i >= 0; i--) {
-      if (sections[i].startIndex !== -1) {
-        return sections[i].startIndex;
-      }
-    }
-
+  const getJumpIndex = (targetLetter: string): number => {
+    const sec = letterMap.get(targetLetter.toUpperCase());
+    if (sec) return sec.startIndex;
     return -1;
-  }
+  };
 
   return { sections, getJumpIndex };
 }

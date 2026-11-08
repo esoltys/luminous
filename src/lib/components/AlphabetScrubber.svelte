@@ -138,8 +138,7 @@
           tabindex="-1"
           data-scrubber-letter={section.letter}
           aria-label={i18n.t("collection.jumpToLetter", { letter: section.letter })}
-          class="w-full flex-1 min-h-[14px] max-h-[28px] flex items-center justify-center text-[10px] sm:text-[11px] leading-none font-semibold transition-all rounded-xs focus:outline-none
-            {section.count > 0 ? 'text-brand-text-secondary hover:text-brand-accent-text hover:font-bold hover:scale-130' : 'text-brand-text-secondary/35 cursor-default'}
+          class="w-full flex-1 min-h-[10px] sm:min-h-[12px] max-h-[28px] flex items-center justify-center text-[10px] sm:text-[11px] leading-none font-semibold transition-all rounded-xs focus:outline-none text-brand-text-secondary hover:text-brand-accent-text hover:font-bold hover:scale-130
             {activeLetter === section.letter ? 'text-brand-accent-text font-bold scale-140' : ''}"
           onclick={(e) => {
             e.stopPropagation();

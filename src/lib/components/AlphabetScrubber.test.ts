@@ -48,9 +48,12 @@ describe("AlphabetScrubber.svelte (#1973)", () => {
     expect(scrubber).toBeInTheDocument();
     expect(scrubber.getAttribute("role")).toBe("navigation");
 
-    // 27 letter buttons: # and A-Z
+    // 19 distinct letters derived from sampleItems: # and A through R
     const buttons = getAllByRole("button");
-    expect(buttons).toHaveLength(27);
+    expect(buttons).toHaveLength(19);
+    expect(buttons[0].textContent?.trim()).toBe("#");
+    expect(buttons[1].textContent?.trim()).toBe("A");
+    expect(buttons[buttons.length - 1].textContent?.trim()).toBe("R");
   });
 
   it("invokes onjump with correct index and letter when a letter button is clicked", async () => {
@@ -70,24 +73,6 @@ describe("AlphabetScrubber.svelte (#1973)", () => {
     expect(handleJump).toHaveBeenCalledWith(3, "B");
   });
 
-  it("falls forward to next available letter when clicking a letter without items", async () => {
-    // List with no 'X' items; 'Queen' is index 18, 'Radiohead' is 19
-    const handleJump = vi.fn();
-    const { getByLabelText } = render(AlphabetScrubber, {
-      items: sampleItems,
-      getKey: (x: unknown) => String(x),
-      minItems: 15,
-      onjump: handleJump,
-    });
-
-    // 'X' has no items, falls backward to 'Radiohead' at index 19 (since no items after R)
-    const xButton = getByLabelText("Jump to X");
-    await fireEvent.click(xButton);
-
-    expect(handleJump).toHaveBeenCalledTimes(1);
-    expect(handleJump).toHaveBeenCalledWith(19, "X");
-  });
-
   it("reverses letter order when ascending is false", () => {
     const reversedItems = [...sampleItems].reverse();
     const { getAllByRole } = render(AlphabetScrubber, {
@@ -99,13 +84,18 @@ describe("AlphabetScrubber.svelte (#1973)", () => {
     });
 
     const buttons = getAllByRole("button");
-    expect(buttons[0].textContent?.trim()).toBe("Z");
+    expect(buttons[0].textContent?.trim()).toBe("R");
     expect(buttons[buttons.length - 1].textContent?.trim()).toBe("#");
   });
 
-  it("renders Russian Cyrillic alphabet when locale is 'ru'", () => {
+  it("derives Cyrillic alphabet when collection has Cyrillic items", () => {
+    const cyrillicItems = [
+      "Аквариум", "Би-2", "Воскресение", "Гражданская Оборона", "ДДТ",
+      "Земфира", "Кино", "Ленинград", "Мумий Тролль", "Наутилус Помпилиус",
+      "Океан Ельзи", "Пикник", "Руки Вверх", "Сплин", "Чайф"
+    ];
     const { getAllByRole } = render(AlphabetScrubber, {
-      items: sampleItems,
+      items: cyrillicItems,
       getKey: (x: unknown) => String(x),
       minItems: 15,
       locale: "ru",
@@ -114,16 +104,19 @@ describe("AlphabetScrubber.svelte (#1973)", () => {
 
     const buttons = getAllByRole("button");
     const letters = buttons.map((b) => b.textContent?.trim());
-    expect(letters[0]).toBe("#");
-    expect(letters[1]).toBe("А");
-    expect(letters[letters.length - 1]).toBe("Я");
-    expect(letters).toContain("Б");
-    expect(letters).toContain("Ж");
+    expect(letters[0]).toBe("А");
+    expect(letters).toContain("К");
+    expect(letters).toContain("Ч");
   });
 
-  it("renders Spanish alphabet with Ñ when locale is 'es'", () => {
+  it("derives Spanish alphabet with Ñ when collection has Spanish items", () => {
+    const spanishItems = [
+      "Alejandro", "Barón Rojo", "Camela", "Duncan Dhu", "Estopa",
+      "Fito", "Heroes del Silencio", "Ivan Ferreiro", "Jarabe de Palo", "Kiko Veneno",
+      "Los Secretos", "M Clan", "Nacho Vegas", "Ñu", "Zahara"
+    ];
     const { getAllByRole } = render(AlphabetScrubber, {
-      items: sampleItems,
+      items: spanishItems,
       getKey: (x: unknown) => String(x),
       minItems: 15,
       locale: "es",
