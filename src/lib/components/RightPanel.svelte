@@ -16,6 +16,7 @@
   import { prefs } from "../stores/prefs.svelte";
   import { lyricsStatus } from "../utils/lyrics";
   import { openExternalUrl } from "../utils/openExternalUrl";
+  import { isLosslessFileType, type SongProvenance } from "../types";
   import GenreChips from "./GenreChips.svelte";
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
   import InfoSections from "./InfoSections.svelte";
@@ -112,6 +113,94 @@
       case "synced": return i18n.t('playerBar.lyricsSynced', {}, 'Synced (LRC)');
       case "plain": return i18n.t('playerBar.lyricsPlain', {}, 'Plain text');
       default: return i18n.t('playerBar.lyricsNone', {}, 'Not downloaded');
+    }
+  }
+
+  let provenance = $state<SongProvenance | null>(null);
+  let provenanceLoading = $state(false);
+
+  let isLosslessTrack = $derived.by(() => {
+    if (!currentSong) return false;
+    const isLossless = isLosslessFileType(currentSong.filetype);
+    const isLocal = currentSong.source === "local_file" || currentSong.source === "collection";
+    return isLossless && isLocal;
+  });
+
+  $effect(() => {
+    const songId = currentSong?.id;
+    const shouldCheck = isLosslessTrack;
+
+    provenance = null;
+    provenanceLoading = false;
+
+    if (songId && shouldCheck) {
+      invoke<SongProvenance | null>("get_song_provenance", { songId })
+        .then((res) => {
+          if (currentSong?.id === songId) {
+            provenance = res;
+          }
+        })
+        .catch((err) => {
+          console.warn("Failed to get cached provenance:", err);
+        });
+    }
+  });
+
+  async function runVerifyProvenance() {
+    if (!currentSong || provenanceLoading) return;
+    const songId = currentSong.id;
+    provenanceLoading = true;
+    try {
+      const res = await invoke<SongProvenance>("analyze_song_provenance", { songId });
+      if (currentSong?.id === songId) {
+        provenance = res;
+      }
+    } catch (err) {
+      console.error("Provenance analysis failed:", err);
+    } finally {
+      if (currentSong?.id === songId) {
+        provenanceLoading = false;
+      }
+    }
+  }
+
+  function provenanceBadgeClass(verdict: string): string {
+    switch (verdict) {
+      case "authentic":
+      case "authentic_hires":
+        return "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
+      case "suspected_lossy":
+      case "suspected_upsampled":
+        return "bg-amber-500/15 text-amber-400 border border-amber-500/30";
+      case "padded_bit_depth":
+        return "bg-sky-500/15 text-sky-400 border border-sky-500/30";
+      default:
+        return "bg-brand-bg/60 text-brand-text-secondary border border-brand-border/40";
+    }
+  }
+
+  function provenanceBadgeText(p: SongProvenance): string {
+    const formattedFreq = p.cutoff_hz
+      ? formatNumber(p.cutoff_hz / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+      : undefined;
+
+    switch (p.verdict) {
+      case "authentic":
+        return formattedFreq
+          ? `${i18n.t('playerBar.provenanceAuthentic', {}, 'Authentic Lossless')} (~${formattedFreq} kHz)`
+          : i18n.t('playerBar.provenanceAuthentic', {}, 'Authentic Lossless');
+      case "authentic_hires":
+        return i18n.t('playerBar.provenanceAuthenticHiRes', {}, 'Authentic Hi-Res');
+      case "suspected_lossy":
+        return formattedFreq
+          ? `${i18n.t('playerBar.provenanceSuspectedLossy', {}, 'Suspected Lossy')} (~${formattedFreq} kHz)`
+          : i18n.t('playerBar.provenanceSuspectedLossy', {}, 'Suspected Lossy');
+      case "suspected_upsampled":
+        return i18n.t('playerBar.provenanceSuspectedUpsampled', {}, 'Suspected Upsample');
+      case "padded_bit_depth":
+        return i18n.t('playerBar.provenancePaddedBitDepth', {}, 'Padded Bit Depth');
+      default:
+        return i18n.t('playerBar.provenanceInconclusive', {}, 'Inconclusive');
     }
   }
 
@@ -253,6 +342,46 @@
             <div class="flex items-start justify-between gap-3 text-xs">
               <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.dynamicRangeLabel', {}, 'Dynamic Range')}</span>
               <span class="text-brand-text-primary text-right break-words min-w-0">{dynamicRangeText}</span>
+            </div>
+          {/if}
+          {#if isLosslessTrack}
+            <div class="flex items-start justify-between gap-3 text-xs" data-testid="provenance-row">
+              <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.provenanceLabel', {}, 'Authenticity')}</span>
+              <div class="text-right min-w-0 flex flex-col items-end gap-1">
+                {#if provenanceLoading}
+                  <span class="text-brand-text-secondary/70 italic flex items-center gap-1">
+                    <RefreshCw class="w-3 h-3 animate-spin inline" />
+                    {i18n.t('playerBar.provenanceVerifying', {}, 'Analyzing...')}
+                  </span>
+                {:else if provenance}
+                  <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                    <span
+                      class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium {provenanceBadgeClass(provenance.verdict)}"
+                      title={provenance.description}
+                    >
+                      {provenanceBadgeText(provenance)}
+                    </span>
+                    {#if provenance.is_stale}
+                      <span class="text-[10px] text-brand-text-secondary/60">({i18n.t('playerBar.provenanceStale', {}, 'stale')})</span>
+                      <button
+                        type="button"
+                        onclick={runVerifyProvenance}
+                        class="text-[11px] underline text-brand-accent-text hover:text-brand-accent-contrast transition-colors cursor-pointer"
+                      >
+                        {i18n.t('playerBar.provenanceReverify', {}, 'Re-verify')}
+                      </button>
+                    {/if}
+                  </div>
+                {:else}
+                  <button
+                    type="button"
+                    onclick={runVerifyProvenance}
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-brand-border text-[11px] font-medium text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer"
+                  >
+                    {i18n.t('playerBar.provenanceVerify', {}, 'Verify')}
+                  </button>
+                {/if}
+              </div>
             </div>
           {/if}
           <div class="flex items-start justify-between gap-3 text-xs">

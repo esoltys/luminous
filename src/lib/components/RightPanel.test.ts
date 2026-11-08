@@ -488,4 +488,70 @@ describe("RightPanel.svelte", () => {
 
     expect(scrollEl.scrollTop).toBe(0);
   });
+
+  it("shows Verify button on Technical tab for lossless song without cached provenance", async () => {
+    playerStore.currentSong = mockSong;
+    const { getByText, findByRole } = render(RightPanel);
+    const verifyBtn = await findByRole("button", { name: "Verify" });
+    expect(verifyBtn).toBeInTheDocument();
+    expect(getByText("Authenticity")).toBeInTheDocument();
+  });
+
+  it("calls analyze_song_provenance when Verify button is clicked", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === "analyze_song_provenance") {
+        return {
+          song_id: 42,
+          verdict: "authentic",
+          cutoff_hz: 21800,
+          effective_bit_depth: 16,
+          effective_sample_rate: 44100,
+          description: "Authentic lossless audio (16-bit, 21.8 kHz cutoff)",
+          is_stale: false,
+          analyzed_at: 1000,
+        };
+      }
+      return null;
+    });
+
+    playerStore.currentSong = mockSong;
+    const { findByRole, findByText } = render(RightPanel);
+    const verifyBtn = await findByRole("button", { name: "Verify" });
+    await fireEvent.click(verifyBtn);
+
+    expect(invokeMock).toHaveBeenCalledWith("analyze_song_provenance", { songId: 42 });
+    const badge = await findByText(/Authentic Lossless/);
+    expect(badge).toBeInTheDocument();
+  });
+
+  it("displays stale indicator and Re-verify button when cached provenance is stale", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === "get_song_provenance") {
+        return {
+          song_id: 42,
+          verdict: "authentic",
+          cutoff_hz: 21800,
+          effective_bit_depth: 16,
+          effective_sample_rate: 44100,
+          description: "Authentic lossless",
+          is_stale: true,
+          analyzed_at: 1000,
+        };
+      }
+      return null;
+    });
+
+    playerStore.currentSong = mockSong;
+    const { findByText, findByRole } = render(RightPanel);
+    expect(await findByText("(stale)")).toBeInTheDocument();
+    expect(await findByRole("button", { name: "Re-verify" })).toBeInTheDocument();
+  });
+
+  it("hides provenance row for lossy tracks", async () => {
+    playerStore.currentSong = { ...mockSong, filetype: "MP3" };
+    const { queryByText } = render(RightPanel);
+    expect(queryByText("Authenticity")).toBeNull();
+  });
 });
