@@ -727,7 +727,7 @@
       </div>
       </div>
       {#if (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") || (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists")}
-        <div class="absolute right-2.5 top-14 bottom-3 pointer-events-auto z-20">
+        <div class="absolute right-2.5 top-[68px] bottom-2 pointer-events-auto z-20">
           {#if navigationStore.activeSubTab === "albums"}
             <AlphabetScrubber
               items={sortedAlbums}
