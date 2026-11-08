@@ -178,12 +178,13 @@ describe("alphabetIndex.ts — buildAlphabetIndex (#1973)", () => {
     expect(getJumpIndex("Ї")).toBe(5);
   });
 
-  it("falls back to Latin alphabet for ru/uk locale when collection has zero Cyrillic items", () => {
+  it("always provides Cyrillic alphabet for ru/uk locale regardless of item language", () => {
     const englishItems = ["Beatles", "Coldplay", "Queen", "Radiohead"];
     const { sections } = buildAlphabetIndex(englishItems, (x) => x, true, "ru");
 
     const letters = sections.map((s) => s.letter);
-    expect(letters[1]).toBe("A");
-    expect(letters[letters.length - 1]).toBe("Z");
+    expect(letters[0]).toBe("#");
+    expect(letters[1]).toBe("А");
+    expect(letters[letters.length - 1]).toBe("Я");
   });
 });

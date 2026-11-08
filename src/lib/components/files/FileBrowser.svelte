@@ -834,6 +834,7 @@
                   items={sortedEntries}
                   getKey={(entry) => shownName(entry.name, entry.missingTag)}
                   ascending={sortAsc}
+                  locale={i18n.currentLocale}
                   onjump={(index) => {
                     lists[column]?.scrollToIndex(index, { behavior: "auto" });
                   }}

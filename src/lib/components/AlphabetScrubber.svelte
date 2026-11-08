@@ -22,7 +22,7 @@
     onjump,
     minItems = 15,
     class: className = "",
-    locale = i18n.currentLocale,
+    locale,
   }: Props = $props();
 
   let scrubberEl = $state<HTMLDivElement>();
@@ -35,7 +35,8 @@
     if (dismissTimer) clearTimeout(dismissTimer);
   });
 
-  let indexData = $derived(buildAlphabetIndex(items, getKey, ascending, locale));
+  let activeLocale = $derived(locale ?? i18n.currentLocale);
+  let indexData = $derived(buildAlphabetIndex(items, getKey, ascending, activeLocale));
 
   function updateFromPointer(clientY: number) {
     if (!scrubberEl || indexData.sections.length === 0) return;

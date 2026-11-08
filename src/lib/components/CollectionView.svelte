@@ -522,6 +522,7 @@
               items={tableRows}
               getKey={getSongAlphabetKey}
               ascending={sortAsc}
+              locale={i18n.currentLocale}
               onjump={(index) => songTable?.scrollToIndex(index)}
             />
           </div>
@@ -733,6 +734,7 @@
               items={sortedAlbums}
               getKey={getAlbumSortKey}
               ascending={albumSortAsc}
+              locale={i18n.currentLocale}
               onjump={(index) => albumGrid?.scrollToIndex(index)}
             />
           {:else}
@@ -740,6 +742,7 @@
               items={sortedArtists}
               getKey={getArtistSortKey}
               ascending={artistSortAsc}
+              locale={i18n.currentLocale}
               onjump={(index) => artistGrid?.scrollToIndex(index)}
             />
           {/if}

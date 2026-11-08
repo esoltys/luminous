@@ -102,4 +102,39 @@ describe("AlphabetScrubber.svelte (#1973)", () => {
     expect(buttons[0].textContent?.trim()).toBe("Z");
     expect(buttons[buttons.length - 1].textContent?.trim()).toBe("#");
   });
+
+  it("renders Russian Cyrillic alphabet when locale is 'ru'", () => {
+    const { getAllByRole } = render(AlphabetScrubber, {
+      items: sampleItems,
+      getKey: (x: unknown) => String(x),
+      minItems: 15,
+      locale: "ru",
+      onjump: vi.fn(),
+    });
+
+    const buttons = getAllByRole("button");
+    const letters = buttons.map((b) => b.textContent?.trim());
+    expect(letters[0]).toBe("#");
+    expect(letters[1]).toBe("А");
+    expect(letters[letters.length - 1]).toBe("Я");
+    expect(letters).toContain("Б");
+    expect(letters).toContain("Ж");
+  });
+
+  it("renders Spanish alphabet with Ñ when locale is 'es'", () => {
+    const { getAllByRole } = render(AlphabetScrubber, {
+      items: sampleItems,
+      getKey: (x: unknown) => String(x),
+      minItems: 15,
+      locale: "es",
+      onjump: vi.fn(),
+    });
+
+    const buttons = getAllByRole("button");
+    const letters = buttons.map((b) => b.textContent?.trim());
+    expect(letters).toContain("Ñ");
+    const nPos = letters.indexOf("N");
+    const enyePos = letters.indexOf("Ñ");
+    expect(enyePos).toBe(nPos + 1);
+  });
 });

@@ -136,23 +136,7 @@ export function buildAlphabetIndex<T>(
   ascending = true,
   locale = "en"
 ): AlphabetIndexResult {
-  // For Cyrillic locales (ru, uk), if the collection contains zero Cyrillic items but has
-  // Latin items, adapt to Latin so the scrubber remains functional for foreign music collections.
-  let effectiveLocale = locale;
-  const lang = (locale || "en").toLowerCase().split("-")[0];
-  if (lang === "ru" || lang === "uk") {
-    const hasCyrillic = items.some((item) => {
-      const k = getKey(item);
-      if (!k) return false;
-      const ch = k.trim().replace(/^["'([{‘“«\s]+/, "").charAt(0);
-      return /[\u0400-\u04FF]/.test(ch);
-    });
-    if (!hasCyrillic && items.length > 0) {
-      effectiveLocale = "en";
-    }
-  }
-
-  const { asc, desc } = getAlphabetForLocale(effectiveLocale);
+  const { asc, desc } = getAlphabetForLocale(locale);
   const baseLetters = ascending ? asc : desc;
 
   if (items.length === 0) {
@@ -167,7 +151,7 @@ export function buildAlphabetIndex<T>(
 
   for (let i = 0; i < items.length; i++) {
     const rawKey = getKey(items[i]);
-    const letter = extractBucketLetter(rawKey, effectiveLocale);
+    const letter = extractBucketLetter(rawKey, locale);
 
     if (!firstIndexMap.has(letter)) {
       firstIndexMap.set(letter, i);
