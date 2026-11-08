@@ -22,7 +22,7 @@
 <!--
   Floating label that follows the pointer during a pointer-based drag. Native HTML5 drag images
   aren't available (Tauri's dragDropEnabled swallows dragstart), so in-app drags draw this instead.
-  Dense single-axis lists (table rows, chips) can skip it: the dimmed item and drop marker suffice.
+  Reordering chips in place (ChipInput) skips it: the dimmed chip and its drop ring suffice.
 -->
 <div
   class="fixed z-[9999] pointer-events-none select-none px-3 py-1.5 rounded-full border-2 bg-brand-surface/95 backdrop-blur-md text-brand-text-primary text-xs font-medium shadow-2xl flex items-center gap-2 -translate-y-1/2 transition-[border-color,background-color,box-shadow] duration-150 {overTarget ? 'ring-2 ring-brand-accent/40 bg-brand-accent/20' : ''} {color ? '' : overTarget ? 'border-brand-accent' : 'border-brand-accent/60'}"

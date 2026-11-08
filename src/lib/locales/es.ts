@@ -2469,7 +2469,9 @@ export const es = {
       one: "Se agregó {count} canción a la cola",
       other: "Se agregaron {count} canciones a la cola"
     },
-    nothingToAdd: "No se encontraron archivos de audio compatibles para agregar."
+    nothingToAdd: "No se encontraron archivos de audio compatibles para agregar.",
+    queueFailed: "No se pudo añadir a la cola.",
+    playlistFailed: "No se pudo añadir a {name}."
   },
   walkthrough: {
     takeTour: "Haz un recorrido rápido",

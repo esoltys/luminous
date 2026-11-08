@@ -30,6 +30,7 @@
   import { inspectorStore } from "../stores/inspector.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { songDrag, songsPayload } from "../stores/songDrag.svelte";
   import { formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { formatTrackNumber } from "../utils/artist";
@@ -109,6 +110,10 @@
      * instance is actually playing.
      */
     isRowPlaying?: (row: SongTableRow) => boolean;
+    /** The playlist (or Queue) these rows belong to. Rows can always be dragged onto the Queue or a
+     * playlist; this one is left out as a target, since dropping its own songs back would only
+     * duplicate them. */
+    dragSourcePlaylistId?: number | null;
   }
 
   let {
@@ -137,6 +142,7 @@
     interactiveWhenDisabled = false,
     disabledPlaceholder = false,
     isRowPlaying,
+    dragSourcePlaylistId = null,
   }: Props = $props();
 
   function rowIsPlaying(row: SongTableRow): boolean {
@@ -248,6 +254,10 @@
   let orderForRange = $derived(rangeSelectionOrder ?? rows);
 
   function handleRowClick(e: MouseEvent, row: SongTableRow) {
+    if (swallowNextRowClick) {
+      swallowNextRowClick = false;
+      return;
+    }
     const order = orderForRange;
     if (e.shiftKey && lastSelectedKey !== null) {
       const idx1 = order.findIndex((r) => r.key === lastSelectedKey);
@@ -310,66 +320,116 @@
     selectedKeys = new Set();
   }
 
-  // --- Pointer-based drag reorder (only active when onReorder is provided) ---
+  // --- Pointer-based row drag ---
   // Native HTML5 drag events are swallowed by Tauri's dragDropEnabled window
-  // option (needed for OS file-drop import), so reordering uses pointer
-  // events instead.
+  // option (needed for OS file-drop import), so dragging uses pointer events.
+  // One gesture serves both jobs: released over the Queue or a playlist in the
+  // sidebar/player bar it adds the dragged songs there (songDrag); released
+  // over a row of a reorderable table it reorders.
+  let pressedRow: SongTableRow | null = null;
   let draggedIndex = $state<number | null>(null);
   let dragOverIndex = $state<number | null>(null);
   let pointerDragArmed = false;
   let pointerDragStartX = 0;
   let pointerDragStartY = 0;
 
+  /** The rows a drag from `row` carries: the whole selection when `row` is part of it, in table
+   * order, so songs dropped on the Queue or a playlist arrive in the order shown. (A reorder,
+   * below, passes the same selection in selection order instead: that is what it always passed.) */
+  function draggedRowsFor(row: SongTableRow): SongTableRow[] {
+    return selectedKeys.size > 1 && selectedKeys.has(row.key) ? rows.filter((r) => selectedKeys.has(r.key)) : [row];
+  }
+
   function commitReorder(targetIndex: number) {
-    if (draggedIndex === null || targetIndex === draggedIndex) return;
+    if (!pressedRow || draggedIndex === null || targetIndex === draggedIndex) return;
     const keys =
-      selectedKeys.size > 1 && selectedKeys.has(rows.find((r) => r.underlyingIndex === draggedIndex)?.key ?? "")
-        ? Array.from(selectedKeys)
-        : [rows.find((r) => r.underlyingIndex === draggedIndex)?.key ?? ""];
+      selectedKeys.size > 1 && selectedKeys.has(pressedRow.key) ? Array.from(selectedKeys) : [pressedRow.key];
     onReorder?.(draggedIndex, targetIndex, keys);
   }
 
+  // Set when a drag ends, so the click that follows the release (sent to the pressed row, which
+  // holds pointer capture) doesn't also change the selection. The next press clears it, so a
+  // release that produces no click can't swallow a later one.
+  let swallowNextRowClick = false;
+
   function handleRowPointerDown(e: PointerEvent, row: SongTableRow) {
-    if (!onReorder || row.underlyingIndex === undefined || row.disabled) return;
+    swallowNextRowClick = false;
+    if (!row.song || row.disabled) return;
     const target = e.target as HTMLElement;
     if (target.closest("button, a, input, select, textarea, [data-interactive]")) return;
     if (e.button !== 0) return;
+    pressedRow = row;
     pointerDragArmed = false;
     pointerDragStartX = e.clientX;
     pointerDragStartY = e.clientY;
-    draggedIndex = row.underlyingIndex;
     // With the window's dragDropEnabled option on, WebView2 can hijack an in-progress mouse
     // gesture into a native OS drag once it crosses the platform's drag threshold, silently
     // stopping pointermove/pointerup from reaching the DOM. Explicit pointer capture pins
     // subsequent events to this element (and this JS event loop) instead, preventing that.
+    // The row's own click/dblclick handlers live on this same element, so capture doesn't
+    // retarget them.
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     window.addEventListener("pointermove", handlePointerDragMove);
     window.addEventListener("pointerup", handlePointerDragUp);
+    window.addEventListener("pointercancel", handlePointerDragCancel);
   }
 
   function handlePointerDragMove(e: PointerEvent) {
-    if (draggedIndex === null) return;
+    if (!pressedRow) return;
+    const pos = { x: e.clientX, y: e.clientY };
     if (!pointerDragArmed) {
-      const dx = e.clientX - pointerDragStartX;
-      const dy = e.clientY - pointerDragStartY;
-      if (Math.hypot(dx, dy) < POINTER_DRAG_THRESHOLD_PX) return;
+      if (Math.hypot(pos.x - pointerDragStartX, pos.y - pointerDragStartY) < POINTER_DRAG_THRESHOLD_PX) return;
       pointerDragArmed = true;
+      const songs = draggedRowsFor(pressedRow).flatMap((r) => (r.song && !r.disabled ? [r.song] : []));
+      songDrag.start(songsPayload(songs, dragSourcePlaylistId), pos);
+      if (onReorder && pressedRow.underlyingIndex !== undefined) draggedIndex = pressedRow.underlyingIndex;
     }
-    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-song-row]") as HTMLElement | null;
+    songDrag.move(pos);
+    if (draggedIndex === null || songDrag.dropTarget) {
+      dragOverIndex = null;
+      return;
+    }
+    const el = document.elementFromPoint(pos.x, pos.y)?.closest("[data-song-row]") as HTMLElement | null;
     const idx = el?.dataset.index;
     dragOverIndex = idx !== undefined ? Number(idx) : null;
   }
 
-  function handlePointerDragUp() {
+  function stopListening() {
     window.removeEventListener("pointermove", handlePointerDragMove);
     window.removeEventListener("pointerup", handlePointerDragUp);
-    if (pointerDragArmed && dragOverIndex !== null) {
-      commitReorder(dragOverIndex);
-    }
+    window.removeEventListener("pointercancel", handlePointerDragCancel);
+  }
+
+  function resetDrag() {
+    pressedRow = null;
     draggedIndex = null;
     dragOverIndex = null;
     pointerDragArmed = false;
   }
+
+  async function handlePointerDragUp(e: PointerEvent) {
+    stopListening();
+    if (!pointerDragArmed) {
+      resetDrag();
+      return;
+    }
+    swallowNextRowClick = true;
+    const reorderTo = dragOverIndex;
+    const droppedOnTarget = await songDrag.drop({ x: e.clientX, y: e.clientY });
+    if (!droppedOnTarget && reorderTo !== null) commitReorder(reorderTo);
+    resetDrag();
+  }
+
+  function handlePointerDragCancel() {
+    stopListening();
+    if (pointerDragArmed) songDrag.end();
+    resetDrag();
+  }
+
+  $effect(() => () => {
+    stopListening();
+    if (pointerDragArmed) songDrag.end();
+  });
 
   async function handleSetLoved(song: Song, loved: number) {
     if (onSetLoved) {
@@ -790,7 +850,7 @@
     title={row.disabledTooltip}
     class="grid items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
       {disabled ? 'opacity-50 cursor-not-allowed' : ''}
-      {onReorder ? 'cursor-grab active:cursor-grabbing' : ''}
+      {song && !disabled ? 'cursor-grab active:cursor-grabbing' : ''}
       {selectedKeys.has(row.key) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (song && rowIsPlaying(row) ? 'bg-brand-accent/10' : '')}
       {draggedIndex !== null && dragOverIndex === row.underlyingIndex ? 'bg-brand-accent/30!' : ''}"
   >

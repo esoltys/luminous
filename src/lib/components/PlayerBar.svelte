@@ -23,7 +23,7 @@
   import { openInPicard } from "../utils/picard";
   import QualityBadge from "./QualityBadge.svelte";
   import AddonOverlay from "./AddonOverlay.svelte";
-  import { fileDrag } from "../stores/fileDrag.svelte";
+  import { songDrag } from "../stores/songDrag.svelte";
 
   // Responsive control trimming (issue #413, refined against real usage,
   // padding/seekbar fixed under #543): three named tiers as this floating
@@ -501,7 +501,7 @@
         <button
           onclick={navigateToQueue}
           data-drop-target="queue"
-          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors {fileDrag.isDragging && fileDrag.dropTarget?.kind === 'queue' ? 'text-brand-accent-text scale-110' : ''}"
+          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors {songDrag.isDragging && songDrag.dropTarget?.kind === 'queue' ? 'text-brand-accent-text scale-110' : ''}"
           title={i18n.t('playerBar.queueTitle', {}, 'Queue')}
         >
           <Layers class="w-5 h-5" />

@@ -609,17 +609,17 @@ describe("PlayerBar.svelte", () => {
   });
 
   it("exposes Queue drop target and highlights during drag (#1888)", async () => {
-    const { fileDrag } = await import("../stores/fileDrag.svelte");
-    fileDrag.start([{ name: "track.flac", isDir: false, songId: 10 } as any]);
+    const { songDrag, songsPayload } = await import("../stores/songDrag.svelte");
+    songDrag.start(songsPayload([{ id: 10, title: "Track" } as any]), { x: 0, y: 0 });
 
     const { getByTitle } = render(PlayerBar);
     const queueBtn = getByTitle("Queue");
     expect(queueBtn.getAttribute("data-drop-target")).toBe("queue");
 
-    fileDrag.updatePointer({ x: 0, y: 0 }, { kind: "queue" });
+    songDrag.dropTarget = { kind: "queue" };
     await tick();
     expect(queueBtn.className).toContain("text-brand-accent-text");
 
-    fileDrag.end();
+    songDrag.end();
   });
 });
