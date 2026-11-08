@@ -7,60 +7,61 @@ import { collectionStore } from "../stores/collection.svelte";
 import { inspectorStore } from "../stores/inspector.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { songDrag } from "../stores/songDrag.svelte";
+import { provenanceStore } from "../stores/provenance.svelte";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
 }));
 
-describe("SongTable.svelte — Album column (#428)", () => {
-  const baseSong: Song = {
-    id: 1,
-    source: "local_file",
-    filetype: "MP3",
-    path: "/music/test.mp3",
-    title: "Test Track",
-    artist: "Test Artist",
-    album: "Test Album",
-    album_artist: "",
-    composer: "",
-    genre: "",
-    track: 1,
-    disc: 1,
-    year: 2024,
-    compilation: false,
-    length_nanosec: 180_000_000_000,
-    beginning_nanosec: 0,
-    end_nanosec: 180_000_000_000,
-    rating: 0,
-    playcount: 0,
-    skipcount: 0,
-    art_embedded: false,
-    art_unset: false,
-    unavailable: false,
-  };
+const baseSong: Song = {
+  id: 1,
+  source: "local_file",
+  filetype: "MP3",
+  path: "/music/test.mp3",
+  title: "Test Track",
+  artist: "Test Artist",
+  album: "Test Album",
+  album_artist: "",
+  composer: "",
+  genre: "",
+  track: 1,
+  disc: 1,
+  year: 2024,
+  compilation: false,
+  length_nanosec: 180_000_000_000,
+  beginning_nanosec: 0,
+  end_nanosec: 180_000_000_000,
+  rating: 0,
+  playcount: 0,
+  skipcount: 0,
+  art_embedded: false,
+  art_unset: false,
+  unavailable: false,
+};
 
+function renderTable(rows: SongTableRow[]) {
+  return render(SongTable, {
+    props: {
+      rows,
+      mode: "track",
+      leadingColumnWidth: "3rem",
+      colDefaults: {},
+      sortField: "title",
+      sortAsc: true,
+      onToggleSort: () => {},
+      onRowDoubleClick: () => {},
+      onRowContextMenu: () => {},
+      onRate: () => {},
+      onEditTags: () => {},
+    },
+  });
+}
+
+describe("SongTable.svelte — Album column (#428)", () => {
   beforeEach(() => {
     collectionStore.visibleColumns.album = true;
   });
-
-  function renderTable(rows: SongTableRow[]) {
-    return render(SongTable, {
-      props: {
-        rows,
-        mode: "track",
-        leadingColumnWidth: "3rem",
-        colDefaults: {},
-        sortField: "title",
-        sortAsc: true,
-        onToggleSort: () => {},
-        onRowDoubleClick: () => {},
-        onRowContextMenu: () => {},
-        onRate: () => {},
-        onEditTags: () => {},
-      },
-    });
-  }
 
   it("renders an em-dash for a song with no album", () => {
     const song: Song = { ...baseSong, album: "" };
@@ -509,5 +510,58 @@ describe("SongTable.svelte — dragging songs out (#1974)", () => {
 
     expect(addToPlaylist).not.toHaveBeenCalled();
     expect(onReorder).not.toHaveBeenCalled();
+  });
+});
+
+describe("SongTable.svelte — Format column and verification icon", () => {
+  it("renders ShieldCheck icon next to FLAC for verified songs", () => {
+    collectionStore.visibleColumns.format = true;
+    provenanceStore.verdicts = new Map([[42, "authentic"]]);
+
+    const flacSong: Song = {
+      ...baseSong,
+      id: 42,
+      filetype: "FLAC",
+    };
+
+    const { getByText, container } = renderTable([{ key: "42", song: flacSong }]);
+
+    expect(getByText("FLAC")).toBeInTheDocument();
+    const icon = container.querySelector('span[title="Authentic Lossless"] svg');
+    expect(icon).not.toBeNull();
+  });
+
+  it("omits ShieldCheck icon for suspected lossy songs", () => {
+    collectionStore.visibleColumns.format = true;
+    provenanceStore.verdicts = new Map([[42, "suspected_lossy"]]);
+
+    const flacSong: Song = {
+      ...baseSong,
+      id: 42,
+      filetype: "FLAC",
+    };
+
+    const { getByText, container } = renderTable([{ key: "42", song: flacSong }]);
+
+    expect(getByText("FLAC")).toBeInTheDocument();
+    const icon = container.querySelector('span[title="Authentic Lossless"] svg');
+    expect(icon).toBeNull();
+  });
+
+  it("omits ShieldCheck icon for unverified FLAC songs", () => {
+    collectionStore.visibleColumns.format = true;
+    provenanceStore.verdicts = new Map();
+
+    const flacSong: Song = {
+      ...baseSong,
+      id: 99,
+      filetype: "FLAC",
+    };
+
+    const { getByText, container } = renderTable([{ key: "99", song: flacSong }]);
+
+    expect(getByText("FLAC")).toBeInTheDocument();
+    const icon = container.querySelector('span[title="Authentic Lossless"] svg');
+    expect(icon).toBeNull();
   });
 });

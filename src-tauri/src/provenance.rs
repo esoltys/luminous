@@ -142,6 +142,25 @@ pub fn get_cached_provenance(db: &Database, song_id: i64) -> Result<Option<SongP
     Ok(row)
 }
 
+/// Retrieve all cached provenance verdicts mapped by song_id.
+pub fn get_all_provenance_verdicts(
+    db: &Database,
+) -> Result<std::collections::HashMap<i64, String>> {
+    let conn = db.pool.get().context("failed to get db connection")?;
+    let mut stmt = conn.prepare("SELECT song_id, verdict FROM song_provenance")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+    })?;
+
+    let mut map = std::collections::HashMap::new();
+    for r in rows {
+        if let Ok((id, verdict)) = r {
+            map.insert(id, verdict);
+        }
+    }
+    Ok(map)
+}
+
 /// Verify a song's audio provenance, saving the result to `song_provenance`.
 pub fn verify_song_provenance(db: &Database, song_id: i64) -> Result<SongProvenance> {
     let conn = db.pool.get().context("failed to get db connection")?;

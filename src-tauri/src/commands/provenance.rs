@@ -13,6 +13,13 @@ pub async fn get_song_provenance(
 }
 
 #[tauri::command]
+pub async fn get_provenance_verdicts(
+    state: State<'_, AppState>,
+) -> Result<std::collections::HashMap<i64, String>, String> {
+    crate::provenance::get_all_provenance_verdicts(&state.db).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn analyze_song_provenance(
     state: State<'_, AppState>,
     song_id: i64,
@@ -33,12 +40,21 @@ pub async fn analyze_songs_provenance(
     use tauri::Emitter;
     let db = state.db.clone();
     tokio::task::spawn_blocking(move || {
+        let total = song_ids.len();
         let mut count = 0;
-        for id in song_ids {
+        for (idx, id) in song_ids.into_iter().enumerate() {
             if let Ok(res) = verify_song_provenance(&db, id) {
                 let _ = app.emit("song-provenance-changed", &res);
                 count += 1;
             }
+            let _ = app.emit(
+                "provenance-progress",
+                serde_json::json!({
+                    "current": idx + 1,
+                    "total": total,
+                    "song_id": id,
+                }),
+            );
         }
         count
     })

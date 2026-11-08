@@ -1539,6 +1539,7 @@ pub fn run() {
             commands::loudness::get_loudness_analysis_remaining,
             // Lossless audio provenance commands (#1373)
             commands::provenance::get_song_provenance,
+            commands::provenance::get_provenance_verdicts,
             commands::provenance::analyze_song_provenance,
             commands::provenance::analyze_songs_provenance,
             // Lyrics commands

@@ -32,6 +32,7 @@
   import { pinnedStore } from "../stores/pinned.svelte";
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { provenanceStore } from "../stores/provenance.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { VIEWPORT_EDGE_PADDING_PX, PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import { startSongRadio } from "../utils/playlist";
@@ -211,18 +212,8 @@
     }
     if (idsToVerify.length === 0) return;
 
-    toastStore.show(
-      idsToVerify.length > 1
-        ? i18n.t("collection.verifyingAuthenticity", { count: idsToVerify.length }, `Verifying audio authenticity for ${idsToVerify.length} tracks...`)
-        : i18n.t("playerBar.provenanceVerifying", {}, "Analyzing...")
-    );
     try {
-      await invoke<number>("analyze_songs_provenance", { songIds: idsToVerify });
-      if (idsToVerify.length > 1) {
-        toastStore.show(
-          i18n.t("collection.verifyAuthenticityComplete", { count: idsToVerify.length }, `Audio authenticity verification complete for ${idsToVerify.length} tracks`)
-        );
-      }
+      await provenanceStore.verifySongs(idsToVerify, song.album || song.title);
     } catch (err) {
       console.error("Batch provenance verification failed:", err);
     }

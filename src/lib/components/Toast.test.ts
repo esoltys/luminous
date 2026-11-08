@@ -160,4 +160,22 @@ describe("Toast.svelte", () => {
     expect(screen.queryByText("Done")).not.toBeInTheDocument();
     expect(screen.queryByText("10 / 15")).not.toBeInTheDocument();
   });
+
+  it("displays explicit completedText when provided on completeTask", async () => {
+    toastStore.startTask({
+      taskId: "provenance-verify",
+      text: "Verifying audio authenticity for 13 tracks...",
+      total: 13,
+      current: 0,
+    });
+
+    render(Toast);
+    expect(screen.getByText("Verifying audio authenticity for 13 tracks...")).toBeInTheDocument();
+
+    toastStore.completeTask("provenance-verify", "Audio authenticity verification complete for 13 tracks", 4000);
+    await tick();
+
+    expect(screen.getByText("Audio authenticity verification complete for 13 tracks")).toBeInTheDocument();
+    expect(screen.queryByText("Verifying audio authenticity for 13 tracks...")).not.toBeInTheDocument();
+  });
 });

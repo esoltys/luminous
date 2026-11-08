@@ -29,8 +29,10 @@
   import { playerStore } from "../stores/player.svelte";
   import { inspectorStore } from "../stores/inspector.svelte";
   import { prefs } from "../stores/prefs.svelte";
+  import { provenanceStore } from "../stores/provenance.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { songDrag, songsPayload } from "../stores/songDrag.svelte";
+  import { isLosslessFileType } from "../types";
   import { formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { formatTrackNumber } from "../utils/artist";
@@ -58,7 +60,8 @@
     EyeSlashIcon as EyeSlash,
     MusicNotesIcon as Music,
     ClockIcon as Clock,
-    DiscIcon as DiscAlbum
+    DiscIcon as DiscAlbum,
+    ShieldCheckIcon as ShieldCheck
   } from "phosphor-svelte";
   import type { Snippet } from "svelte";
 
@@ -645,8 +648,17 @@
       {/if}
     </div>
   {:else if col.key === "format"}
-    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-semibold uppercase">
-      {song.filetype ? song.filetype.toUpperCase() : "—"}
+    {@const verdict = song.id ? provenanceStore.getVerdict(song.id) : undefined}
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-semibold uppercase flex items-center gap-1">
+      <span>{song.filetype ? song.filetype.toUpperCase() : "—"}</span>
+      {#if isLosslessFileType(song.filetype) && (verdict === 'authentic' || verdict === 'authentic_hires')}
+        <span
+          class="inline-flex shrink-0 text-brand-accent"
+          title={i18n.t('playerBar.provenanceAuthentic', {}, 'Authentic Lossless')}
+        >
+          <ShieldCheck class="w-3.5 h-3.5" />
+        </span>
+      {/if}
     </div>
   {:else if col.key === "year"}
     <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">

@@ -62,6 +62,8 @@
   import { picardStore } from "../stores/picard.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { provenanceStore } from "../stores/provenance.svelte";
+  import { TOAST_DURATION_MS } from "../constants";
   import { compareSongs } from "../utils/songSort";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -503,19 +505,13 @@
       (s) => isLosslessFileType(s.filetype) && (s.source === "local_file" || s.source === "collection")
     );
     if (lossless.length > 0) {
-      toastStore.show(
-        i18n.t("collection.verifyingAuthenticity", { count: lossless.length }, `Verifying audio authenticity for ${lossless.length} tracks...`)
-      );
       try {
-        await invoke<number>("analyze_songs_provenance", { songIds: lossless.map((s) => s.id) });
-        toastStore.show(
-          i18n.t("collection.verifyAuthenticityComplete", { count: lossless.length }, `Audio authenticity verification complete for ${lossless.length} tracks`)
-        );
+        await provenanceStore.verifySongs(lossless.map((s) => s.id), albumName);
       } catch (err) {
         console.error("Failed to verify album provenance:", err);
       }
     } else {
-      toastStore.show(i18n.t("collection.noLosslessTracks", {}, "No local lossless tracks in this album"));
+      toastStore.show(i18n.t("collection.noLosslessTracks", {}, "No local lossless tracks in this album"), "info", TOAST_DURATION_MS);
     }
   }
 
