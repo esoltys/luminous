@@ -2748,7 +2748,7 @@ export const ru = {
     syncingWebdavCount: "Синхронизация «{name}» (элементов: {count})…",
     syncingWebdavDaily: "Ежедневная полная проверка «{name}» (элементов: {count}); выполняется раз в сутки, поэтому занимает больше времени…",
     savingAlbumTags: "Сохранение тегов альбома «{album}»…",
-    savingTagsCount: "Сохранение тегов ({current}/{total})…",
+    savingTags: "Сохранение тегов…",
     albumTagsSaved: "Теги альбома «{album}» сохранены",
     exportingArtwork: "Экспорт обложек…",
     exportingArtworkCount: "Экспорт обложек ({current}/{total})…",

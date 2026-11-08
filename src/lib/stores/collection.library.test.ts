@@ -543,4 +543,66 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     expect(collectionStore.songs).toHaveLength(4);
     expect(collectionStore.songs.map((s) => s.id)).toEqual([1, 2, 3, 4]);
   });
+
+  it("handles tag-batch-progress updates without duplicating counter in message text", async () => {
+    await (collectionStore as any).init();
+    expect(eventCallbacks["tag-batch-progress"]).toBeDefined();
+
+    tasksStore.tasks = [];
+
+    // 1. Pre-started task (e.g. by AlbumTagEditor with album name)
+    const taskId = "album-tag-save";
+    tasksStore.startTask({
+      id: taskId,
+      label: "Saving tags for Nevermind…",
+      total: 13,
+      contextName: "Nevermind",
+    });
+
+    // In-flight progress update
+    eventCallbacks["tag-batch-progress"]({
+      payload: {
+        current: 10,
+        total: 13,
+        title: "Come as You Are",
+        done: false,
+      },
+    });
+
+    const activeTask = tasksStore.tasks.find((t) => t.id === taskId);
+    expect(activeTask).toBeDefined();
+    // Label preserves original descriptive album text, without appending redundant (10/13)
+    expect(activeTask?.label).toBe("Saving tags for Nevermind…");
+    expect(activeTask?.current).toBe(10);
+    expect(activeTask?.total).toBe(13);
+
+    // Completion
+    eventCallbacks["tag-batch-progress"]({
+      payload: {
+        current: 13,
+        total: 13,
+        title: "Nevermind",
+        done: true,
+      },
+    });
+    expect(activeTask?.status).toBe("done");
+    expect(activeTask?.label).toBe("Saved tags for Nevermind");
+
+    // 2. Unstarted task (fallback)
+    tasksStore.tasks = [];
+    eventCallbacks["tag-batch-progress"]({
+      payload: {
+        current: 3,
+        total: 5,
+        title: "Song 3",
+        done: false,
+      },
+    });
+
+    const fallbackTask = tasksStore.tasks.find((t) => t.id === taskId);
+    expect(fallbackTask).toBeDefined();
+    expect(fallbackTask?.label).toBe("Saving tags…");
+    expect(fallbackTask?.current).toBe(3);
+    expect(fallbackTask?.total).toBe(5);
+  });
 });

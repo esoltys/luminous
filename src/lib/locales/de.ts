@@ -2566,7 +2566,7 @@ export const de = {
     syncingWebdavCount: "{name} wird synchronisiert ({count} Elemente) …",
     syncingWebdavDaily: "Tägliche vollständige Prüfung von {name} ({count} Elemente), einmal am Tag, daher dauert dieser Durchlauf länger …",
     savingAlbumTags: "Tags für {album} werden gespeichert …",
-    savingTagsCount: "Tags werden gespeichert ({current}/{total}) …",
+    savingTags: "Tags werden gespeichert …",
     albumTagsSaved: "Tags für {album} gespeichert",
     exportingArtwork: "Cover werden exportiert …",
     exportingArtworkCount: "Cover werden exportiert ({current}/{total}) …",

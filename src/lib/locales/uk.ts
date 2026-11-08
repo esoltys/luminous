@@ -2748,7 +2748,7 @@ export const uk = {
     syncingWebdavCount: "Синхронізація {name} (елементів: {count})…",
     syncingWebdavDaily: "Щоденна повна перевірка {name} (елементів: {count}) — раз на день, тому цей запуск триває довше…",
     savingAlbumTags: "Збереження тегів для {album}…",
-    savingTagsCount: "Збереження тегів ({current}/{total})…",
+    savingTags: "Збереження тегів…",
     albumTagsSaved: "Теги для {album} збережено",
     exportingArtwork: "Експорт обкладинок…",
     exportingArtworkCount: "Експорт обкладинок ({current}/{total})…",

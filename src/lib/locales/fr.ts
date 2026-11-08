@@ -2574,7 +2574,7 @@ export const fr: DeepStringRecord<typeof en> = {
     syncingWebdavCount: "Synchronisation de {name} ({count} éléments)…",
     syncingWebdavDaily: "Vérification quotidienne complète de {name} ({count} éléments), une fois par jour, donc plus longue que d’habitude…",
     savingAlbumTags: "Enregistrement des étiquettes pour {album}…",
-    savingTagsCount: "Enregistrement des étiquettes ({current}/{total})…",
+    savingTags: "Enregistrement des étiquettes…",
     albumTagsSaved: "Étiquettes enregistrées pour {album}",
     exportingArtwork: "Exportation des pochettes…",
     exportingArtworkCount: "Exportation des pochettes ({current}/{total})…",
