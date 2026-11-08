@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CaretRightIcon as CaretRight, DeviceMobileSpeakerIcon } from "phosphor-svelte";
+  import { CaretRightIcon as CaretRight, DeviceMobileSpeakerIcon, CheckIcon } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { filesStore } from "../stores/files.svelte";
   import { devicesStore } from "../stores/devices.svelte";
@@ -20,6 +20,26 @@
   let { source, sourceName, songIds, onClose }: Props = $props();
 
   const devices = $derived(filesStore.devices);
+
+  $effect(() => {
+    for (const dev of devices) {
+      if (!devicesStore.syncStates[dev.id]) {
+        devicesStore.refreshSyncState(dev.id);
+      }
+    }
+  });
+
+  function isDeviceInSync(dev: ConnectedDevice): boolean {
+    if (songIds && songIds.length > 0) {
+      return devicesStore.areSongsInSync(dev.id, songIds);
+    }
+    if (source) {
+      return devicesStore.isSourceInSync(dev.id, source);
+    }
+    return false;
+  }
+
+  const allInSync = $derived(devices.length > 0 && devices.every((d) => isDeviceInSync(d)));
 
   const SUBMENU_MAX_HEIGHT_PX = 240;
   let isSubmenuOpen = $state(false);
@@ -57,23 +77,22 @@
     isSubmenuOpen = false;
   }
 
-  async function handleAddToDevice(device: ConnectedDevice) {
+  async function handleToggleDevice(device: ConnectedDevice) {
     closeSubmenuImmediately();
-    if (songIds && songIds.length > 0) {
-      await devicesStore.addSongsToSync(device, songIds);
-    } else if (source) {
-      await devicesStore.addToDeviceSync(device, source, sourceName ?? "");
-    }
+    await devicesStore.toggleDeviceSync(device, source, sourceName, songIds);
     onClose();
   }
 </script>
 
 {#if devices.length === 1}
   {@const dev = devices[0]}
+  {@const inSync = isDeviceInSync(dev)}
   <ContextMenuItem
     icon={DeviceMobileSpeakerIcon}
-    label={i18n.t("devices.addToDevice", { device: deviceName(dev) })}
-    onclick={() => handleAddToDevice(dev)}
+    label={inSync
+      ? i18n.t("devices.removeFromDeviceName", { device: deviceName(dev) })
+      : i18n.t("devices.addToDevice", { device: deviceName(dev) })}
+    onclick={() => handleToggleDevice(dev)}
   />
 {:else if devices.length > 1}
   <div
@@ -101,7 +120,7 @@
       }}
     >
       <DeviceMobileSpeakerIcon class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary" />
-      <span class="flex-1">{i18n.t("devices.addToPortablePlayer")}</span>
+      <span class="flex-1">{allInSync ? i18n.t("devices.removeFromPortablePlayer") : i18n.t("devices.addToPortablePlayer")}</span>
       <CaretRight class="w-3 h-3 shrink-0 text-brand-text-secondary/70 {isSubmenuOpen ? 'text-brand-text-primary' : ''}" />
     </button>
 
@@ -122,18 +141,30 @@
         {#each devices as dev (dev.id)}
           {@const name = deviceName(dev)}
           {@const storage = syncStorage(dev, devicesStore.syncStates[dev.id]?.settings)}
+          {@const inSync = isDeviceInSync(dev)}
           <button
             type="button"
-            onclick={() => handleAddToDevice(dev)}
+            onclick={() => handleToggleDevice(dev)}
             class="w-full text-left px-3 py-1.5 flex items-center justify-between gap-2 transition-colors hover:bg-brand-main hover:text-brand-text-primary group"
             role="menuitem"
           >
-            <span class="truncate flex-1 font-medium text-brand-text-primary" title={name}>{name}</span>
-            {#if storage}
-              <span class="text-[10px] text-brand-text-secondary/70 shrink-0">
-                {formatStorageSize(storage.freeBytes)}
-              </span>
-            {/if}
+            <div class="flex items-center gap-2 truncate">
+              {#if inSync}
+                <CheckIcon class="w-3.5 h-3.5 shrink-0 text-brand-accent-text" />
+              {:else}
+                <DeviceMobileSpeakerIcon class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary" />
+              {/if}
+              <span class="truncate font-medium {inSync ? 'text-brand-accent-text' : 'text-brand-text-primary'}" title={name}>{name}</span>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              {#if inSync}
+                <span class="text-[10px] text-brand-text-secondary">{i18n.t("devices.inSync")}</span>
+              {:else if storage}
+                <span class="text-[10px] text-brand-text-secondary/70 shrink-0">
+                  {formatStorageSize(storage.freeBytes)}
+                </span>
+              {/if}
+            </div>
           </button>
         {/each}
       </div>

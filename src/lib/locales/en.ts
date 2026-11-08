@@ -228,14 +228,23 @@ export const en = {
     groupSongs: "Songs",
     songBy: "\"{title}\" by {artist}",
     addToDevice: "Add to {device}",
+    removeFromDeviceName: "Remove from {device}",
     addToPortablePlayer: "Add to portable player",
+    removeFromPortablePlayer: "Remove from portable player",
     addedItemToSync: "Added {name} to {device}'s sync.",
+    removedItemFromSync: "Removed {name} from {device}'s sync.",
     itemAlreadyInSync: "{name} is already in {device}'s sync.",
     addItemToSyncFailed: "Failed to add {name} to {device}'s sync.",
+    removeItemFromSyncFailed: "Failed to remove {name} from {device}'s sync.",
     addedSongsToSync: {
       one: "Added {count} song to {device}'s sync.",
       other: "Added {count} songs to {device}'s sync."
     },
+    removedSongsFromSync: {
+      one: "Removed {count} song from {device}'s sync.",
+      other: "Removed {count} songs from {device}'s sync."
+    },
+    inSync: "In sync",
     how: "How",
     syncToStorage: "Sync to",
     songsYouUnselect: "Songs you unselect",

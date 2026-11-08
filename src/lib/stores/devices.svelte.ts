@@ -79,29 +79,56 @@ class DevicesStore {
   }
 
   /**
+   * Identifies a source across syncs for comparison.
+   */
+  sourceKey(s: SyncSource): string {
+    switch (s.kind) {
+      case "library":
+        return "library";
+      case "playlist":
+        return `playlist:${s.id}`;
+      case "autoPlaylist":
+        return `autoPlaylist:${s.autoType}`;
+      case "song":
+        return `song:${s.id}`;
+      case "artist":
+        return `artist:${s.name.toLowerCase()}`;
+      case "album":
+        return `album:${s.album.toLowerCase()}\u{1f}${(s.artist ?? "").toLowerCase()}`;
+      case "folder":
+        return `folder:${s.path.toLowerCase()}`;
+    }
+  }
+
+  /**
    * Checks whether `source` is already included in `sources`.
    */
   hasSource(sources: SyncSource[], source: SyncSource): boolean {
-    const key = (s: SyncSource) => {
-      switch (s.kind) {
-        case "library":
-          return "library";
-        case "playlist":
-          return `playlist:${s.id}`;
-        case "autoPlaylist":
-          return `autoPlaylist:${s.autoType}`;
-        case "song":
-          return `song:${s.id}`;
-        case "artist":
-          return `artist:${s.name.toLowerCase()}`;
-        case "album":
-          return `album:${s.album.toLowerCase()}\u{1f}${s.artist.toLowerCase()}`;
-        case "folder":
-          return `folder:${s.path}`;
-      }
-    };
-    const targetKey = key(source);
-    return sources.some((s) => key(s) === targetKey);
+    const targetKey = this.sourceKey(source);
+    return sources.some((s) => this.sourceKey(s) === targetKey);
+  }
+
+  /**
+   * Checks whether `source` is currently selected in `deviceId`'s sync settings.
+   */
+  isSourceInSync(deviceId: string, source: SyncSource): boolean {
+    const state = this.syncStates[deviceId];
+    if (!state) return false;
+    return this.hasSource(state.settings.sources, source);
+  }
+
+  /**
+   * Checks whether all songs in `songIds` are currently selected in `deviceId`'s sync settings.
+   */
+  areSongsInSync(deviceId: string, songIds: number[]): boolean {
+    const state = this.syncStates[deviceId];
+    if (!state || songIds.length === 0) return false;
+    const existing = new Set(
+      state.settings.sources
+        .filter((s): s is { kind: "song"; id: number } => s.kind === "song")
+        .map((s) => s.id)
+    );
+    return songIds.every((id) => existing.has(id));
   }
 
   /**
@@ -115,6 +142,21 @@ class DevicesStore {
     await this.planSync(deviceId, {
       ...state.settings,
       sources: [...state.settings.sources, source],
+    });
+    return true;
+  }
+
+  /**
+   * Removes `source` from the device's sync selection. False when it wasn't there.
+   */
+  async removeSourceFromSync(deviceId: string, source: SyncSource): Promise<boolean> {
+    const state = await invoke<DeviceSyncState>("get_device_sync_state", { deviceId });
+    const targetKey = this.sourceKey(source);
+    const filtered = state.settings.sources.filter((s) => this.sourceKey(s) !== targetKey);
+    if (filtered.length === state.settings.sources.length) return false;
+    await this.planSync(deviceId, {
+      ...state.settings,
+      sources: filtered,
     });
     return true;
   }
@@ -135,6 +177,24 @@ class DevicesStore {
     } catch (err) {
       console.error("Failed to add source to device sync:", err);
       toastStore.show(i18n.t("devices.addItemToSyncFailed", { name, device: deviceLabel }), "error");
+      return false;
+    }
+  }
+
+  /**
+   * Removes `source` from `device`'s sync and displays a toast confirming removal.
+   */
+  async removeFromDeviceSync(device: ConnectedDevice, source: SyncSource, name: string): Promise<boolean> {
+    const deviceLabel = deviceName(device);
+    try {
+      if (!(await this.removeSourceFromSync(device.id, source))) {
+        return false;
+      }
+      toastStore.show(i18n.t("devices.removedItemFromSync", { name, device: deviceLabel }), "success");
+      return true;
+    } catch (err) {
+      console.error("Failed to remove source from device sync:", err);
+      toastStore.show(i18n.t("devices.removeItemFromSyncFailed", { name, device: deviceLabel }), "error");
       return false;
     }
   }
@@ -187,6 +247,66 @@ class DevicesStore {
       "success"
     );
     return true;
+  }
+
+  /**
+   * Removes songs from the device's sync selection.
+   */
+  async removeSongsFromSync(
+    deviceOrId: ConnectedDevice | string,
+    songIds: number[],
+    name?: string
+  ): Promise<boolean> {
+    const deviceId = typeof deviceOrId === "string" ? deviceOrId : deviceOrId.id;
+    const device = typeof deviceOrId === "string" ? this.device(deviceId) : deviceOrId;
+    const deviceLabel = device ? deviceName(device) : "";
+
+    const state = await invoke<DeviceSyncState>("get_device_sync_state", { deviceId });
+    const toRemove = new Set(songIds);
+    const filtered = state.settings.sources.filter(
+      (s) => !(s.kind === "song" && toRemove.has(s.id))
+    );
+    const removedCount = state.settings.sources.length - filtered.length;
+    if (removedCount === 0) return false;
+
+    await this.planSync(deviceId, {
+      ...state.settings,
+      sources: filtered,
+    });
+    toastStore.show(
+      i18n.plural("devices.removedSongsFromSync", removedCount, {
+        count: removedCount,
+        device: deviceLabel,
+      }),
+      "success"
+    );
+    return true;
+  }
+
+  /**
+   * Toggles the sync state of a source or songs on `device`.
+   * Removes if currently in sync, otherwise adds.
+   */
+  async toggleDeviceSync(
+    device: ConnectedDevice,
+    source?: SyncSource,
+    sourceName?: string,
+    songIds?: number[]
+  ): Promise<boolean> {
+    if (songIds && songIds.length > 0) {
+      if (this.areSongsInSync(device.id, songIds)) {
+        return this.removeSongsFromSync(device, songIds, sourceName);
+      } else {
+        return this.addSongsToSync(device, songIds, sourceName);
+      }
+    } else if (source) {
+      if (this.isSourceInSync(device.id, source)) {
+        return this.removeFromDeviceSync(device, source, sourceName ?? "");
+      } else {
+        return this.addToDeviceSync(device, source, sourceName ?? "");
+      }
+    }
+    return false;
   }
 
   private finished(summary: SyncSummary) {

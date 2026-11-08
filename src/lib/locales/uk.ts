@@ -264,16 +264,27 @@ export const uk = {
     groupSongs: "Пісні",
     songBy: "«{title}» — {artist}",
     addToDevice: "Додати на «{device}»",
+    removeFromDeviceName: "Видалити з «{device}»",
     addToPortablePlayer: "Додати на плеєр",
+    removeFromPortablePlayer: "Видалити з плеєра",
     addedItemToSync: "«{name}» додано до синхронізації з «{device}».",
+    removedItemFromSync: "«{name}» видалено із синхронізації з «{device}».",
     itemAlreadyInSync: "«{name}» уже синхронізується з «{device}».",
     addItemToSyncFailed: "Не вдалося додати «{name}» до синхронізації з «{device}».",
+    removeItemFromSyncFailed: "Не вдалося видалити «{name}» із синхронізації з «{device}».",
     addedSongsToSync: {
       one: "До синхронізації з «{device}» додано {count} пісню.",
       few: "До синхронізації з «{device}» додано {count} пісні.",
       many: "До синхронізації з «{device}» додано {count} пісень.",
       other: "До синхронізації з «{device}» додано {count} пісні."
     },
+    removedSongsFromSync: {
+      one: "Із синхронізації з «{device}» видалено {count} пісню.",
+      few: "Із синхронізації з «{device}» видалено {count} пісні.",
+      many: "Із синхронізації з «{device}» видалено {count} пісень.",
+      other: "Із синхронізації з «{device}» видалено {count} пісні."
+    },
+    inSync: "Синхронізується",
     how: "Як",
     syncToStorage: "Куди синхронізувати",
     songsYouUnselect: "Пісні, з яких знято вибір",

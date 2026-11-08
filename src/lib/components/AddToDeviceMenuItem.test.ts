@@ -45,9 +45,12 @@ describe("AddToDeviceMenuItem.svelte", () => {
     expect(container.firstElementChild).toBeNull();
   });
 
-  it("renders direct 1-click item when 1 device is connected", async () => {
+  it("renders direct 1-click item when 1 device is connected and adds when not in sync", async () => {
     devicesStore.devices = [walkman];
-    const addSpy = vi.spyOn(devicesStore, "addToDeviceSync").mockResolvedValue(true);
+    devicesStore.syncStates = {
+      [walkman.id]: { settings: { storageId: null, sources: [], unselected: "remove" }, lastSummary: null, running: false },
+    };
+    const toggleSpy = vi.spyOn(devicesStore, "toggleDeviceSync").mockResolvedValue(true);
     const onClose = vi.fn();
 
     const { getByText } = render(AddToDeviceMenuItem, {
@@ -62,13 +65,61 @@ describe("AddToDeviceMenuItem.svelte", () => {
     expect(item).toBeInTheDocument();
 
     await fireEvent.click(item);
-    expect(addSpy).toHaveBeenCalledWith(walkman, { kind: "album", album: "Damnation", artist: "Opeth" }, "Damnation");
+    expect(toggleSpy).toHaveBeenCalledWith(walkman, { kind: "album", album: "Damnation", artist: "Opeth" }, "Damnation", undefined);
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("renders submenu when multiple devices are connected", async () => {
+  it("renders 'Remove from {device}' when item is already in sync", async () => {
+    devicesStore.devices = [walkman];
+    devicesStore.syncStates = {
+      [walkman.id]: {
+        settings: {
+          storageId: null,
+          sources: [{ kind: "album", album: "Damnation", artist: "Opeth" }],
+          unselected: "remove",
+        },
+        lastSummary: null,
+        running: false,
+      },
+    };
+    const toggleSpy = vi.spyOn(devicesStore, "toggleDeviceSync").mockResolvedValue(true);
+    const onClose = vi.fn();
+
+    const { getByText } = render(AddToDeviceMenuItem, {
+      props: {
+        source: { kind: "album", album: "Damnation", artist: "Opeth" },
+        sourceName: "Damnation",
+        onClose,
+      },
+    });
+
+    const item = getByText("Remove from Walkman");
+    expect(item).toBeInTheDocument();
+
+    await fireEvent.click(item);
+    expect(toggleSpy).toHaveBeenCalledWith(walkman, { kind: "album", album: "Damnation", artist: "Opeth" }, "Damnation", undefined);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("renders submenu when multiple devices are connected and displays sync status", async () => {
     devicesStore.devices = [walkman, ipod];
-    const addSpy = vi.spyOn(devicesStore, "addToDeviceSync").mockResolvedValue(true);
+    devicesStore.syncStates = {
+      [walkman.id]: {
+        settings: {
+          storageId: null,
+          sources: [{ kind: "artist", name: "Opeth" }],
+          unselected: "remove",
+        },
+        lastSummary: null,
+        running: false,
+      },
+      [ipod.id]: {
+        settings: { storageId: null, sources: [], unselected: "remove" },
+        lastSummary: null,
+        running: false,
+      },
+    };
+    const toggleSpy = vi.spyOn(devicesStore, "toggleDeviceSync").mockResolvedValue(true);
     const onClose = vi.fn();
 
     const { getByText } = render(AddToDeviceMenuItem, {
@@ -86,30 +137,43 @@ describe("AddToDeviceMenuItem.svelte", () => {
     await fireEvent.click(trigger);
     const walkmanOption = getByText("Walkman");
     expect(walkmanOption).toBeInTheDocument();
+    expect(getByText("In sync")).toBeInTheDocument();
     expect(getByText("iPod Classic")).toBeInTheDocument();
 
     await fireEvent.click(walkmanOption);
-    expect(addSpy).toHaveBeenCalledWith(walkman, { kind: "artist", name: "Opeth" }, "Opeth");
+    expect(toggleSpy).toHaveBeenCalledWith(walkman, { kind: "artist", name: "Opeth" }, "Opeth", undefined);
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("handles songIds directly when adding multiple songs", async () => {
+  it("handles songIds directly and toggles them", async () => {
     devicesStore.devices = [walkman];
-    const addSongsSpy = vi.spyOn(devicesStore, "addSongsToSync").mockResolvedValue(true);
+    devicesStore.syncStates = {
+      [walkman.id]: {
+        settings: {
+          storageId: null,
+          sources: [{ kind: "song", id: 1 }, { kind: "song", id: 2 }],
+          unselected: "remove",
+        },
+        lastSummary: null,
+        running: false,
+      },
+    };
+    const toggleSpy = vi.spyOn(devicesStore, "toggleDeviceSync").mockResolvedValue(true);
     const onClose = vi.fn();
 
     const { getByText } = render(AddToDeviceMenuItem, {
       props: {
-        songIds: [1, 2, 3],
+        songIds: [1, 2],
         onClose,
       },
     });
 
-    const item = getByText("Add to Walkman");
+    // Both songs in sync -> "Remove from Walkman"
+    const item = getByText("Remove from Walkman");
     expect(item).toBeInTheDocument();
 
     await fireEvent.click(item);
-    expect(addSongsSpy).toHaveBeenCalledWith(walkman, [1, 2, 3]);
+    expect(toggleSpy).toHaveBeenCalledWith(walkman, undefined, undefined, [1, 2]);
     expect(onClose).toHaveBeenCalled();
   });
 });

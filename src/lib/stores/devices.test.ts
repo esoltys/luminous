@@ -161,4 +161,30 @@ describe("devicesStore", () => {
     );
     expect(show).toHaveBeenCalledWith("Added 3 songs to Walkman's sync.", "success");
   });
+
+  it("removes a source from sync and shows a success toast", async () => {
+    const show = vi.spyOn(toastStore, "show");
+    await devicesStore.refreshSyncState(walkman.id);
+    await devicesStore.addToDeviceSync(walkman, { kind: "album", album: "Deliverance", artist: "Opeth" }, "Deliverance");
+
+    const ok = await devicesStore.removeFromDeviceSync(walkman, { kind: "album", album: "Deliverance", artist: "Opeth" }, "Deliverance");
+    expect(ok).toBe(true);
+    expect(saved.sources).not.toContainEqual({ kind: "album", album: "Deliverance", artist: "Opeth" });
+    expect(show).toHaveBeenCalledWith("Removed Deliverance from Walkman's sync.", "success");
+  });
+
+  it("toggles device sync state between added and removed", async () => {
+    const show = vi.spyOn(toastStore, "show");
+    await devicesStore.refreshSyncState(walkman.id);
+
+    // Toggle on
+    await devicesStore.toggleDeviceSync(walkman, { kind: "album", album: "Deliverance", artist: "Opeth" }, "Deliverance");
+    expect(devicesStore.isSourceInSync(walkman.id, { kind: "album", album: "Deliverance", artist: "Opeth" })).toBe(true);
+    expect(show).toHaveBeenCalledWith("Added Deliverance to Walkman's sync.", "success");
+
+    // Toggle off
+    await devicesStore.toggleDeviceSync(walkman, { kind: "album", album: "Deliverance", artist: "Opeth" }, "Deliverance");
+    expect(devicesStore.isSourceInSync(walkman.id, { kind: "album", album: "Deliverance", artist: "Opeth" })).toBe(false);
+    expect(show).toHaveBeenCalledWith("Removed Deliverance from Walkman's sync.", "success");
+  });
 });

@@ -228,14 +228,23 @@ export const it = {
     groupSongs: "Brani",
     songBy: "«{title}» di {artist}",
     addToDevice: "Aggiungi a {device}",
+    removeFromDeviceName: "Rimuovi da {device}",
     addToPortablePlayer: "Aggiungi al lettore portatile",
+    removeFromPortablePlayer: "Rimuovi dal lettore portatile",
     addedItemToSync: "«{name}» aggiunta alla sincronizzazione di {device}.",
+    removedItemFromSync: "«{name}» rimossa dalla sincronizzazione di {device}.",
     itemAlreadyInSync: "«{name}» è già nella sincronizzazione di {device}.",
     addItemToSyncFailed: "Impossibile aggiungere «{name}» alla sincronizzazione di {device}.",
+    removeItemFromSyncFailed: "Impossibile rimuovere «{name}» dalla sincronizzazione di {device}.",
     addedSongsToSync: {
       one: "{count} brano aggiunto alla sincronizzazione di {device}.",
       other: "{count} brani aggiunti alla sincronizzazione di {device}."
     },
+    removedSongsFromSync: {
+      one: "{count} brano rimosso dalla sincronizzazione di {device}.",
+      other: "{count} brani rimossi dalla sincronizzazione di {device}."
+    },
+    inSync: "Sincronizzato",
     how: "Come",
     syncToStorage: "Sincronizza con",
     songsYouUnselect: "Brani deselezionati",

@@ -264,16 +264,27 @@ export const ru = {
     groupSongs: "Треки",
     songBy: "«{title}» — {artist}",
     addToDevice: "Добавить на {device}",
+    removeFromDeviceName: "Удалить с {device}",
     addToPortablePlayer: "Добавить на плеер",
+    removeFromPortablePlayer: "Удалить с плеера",
     addedItemToSync: "«{name}» добавлено в синхронизацию с «{device}».",
+    removedItemFromSync: "«{name}» удалено из синхронизации с «{device}».",
     itemAlreadyInSync: "«{name}» уже синхронизируется с «{device}».",
     addItemToSyncFailed: "Не удалось добавить «{name}» в синхронизацию с «{device}».",
+    removeItemFromSyncFailed: "Не удалось удалить «{name}» из синхронизации с «{device}».",
     addedSongsToSync: {
       one: "В синхронизацию с «{device}» добавлен {count} трек.",
       few: "В синхронизацию с «{device}» добавлено {count} трека.",
       many: "В синхронизацию с «{device}» добавлено {count} треков.",
       other: "В синхронизацию с «{device}» добавлено {count} треков."
     },
+    removedSongsFromSync: {
+      one: "Из синхронизации с «{device}» удалён {count} трек.",
+      few: "Из синхронизации с «{device}» удалено {count} трека.",
+      many: "Из синхронизации с «{device}» удалено {count} треков.",
+      other: "Из синхронизации с «{device}» удалено {count} треков."
+    },
+    inSync: "Синхронизируется",
     how: "Как",
     syncToStorage: "Куда синхронизировать",
     songsYouUnselect: "Снятые с выбора песни",
