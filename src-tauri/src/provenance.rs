@@ -153,10 +153,8 @@ pub fn get_all_provenance_verdicts(
     })?;
 
     let mut map = std::collections::HashMap::new();
-    for r in rows {
-        if let Ok((id, verdict)) = r {
-            map.insert(id, verdict);
-        }
+    for (id, verdict) in rows.flatten() {
+        map.insert(id, verdict);
     }
     Ok(map)
 }
