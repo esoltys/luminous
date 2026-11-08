@@ -117,7 +117,9 @@ export function songsPayload(songs: Song[], sourcePlaylistId: number | null = nu
 class SongDragStore {
   payload = $state<SongDragPayload | null>(null);
   pointerPos = $state<{ x: number; y: number } | null>(null);
-  /** The target under the pointer that would accept a drop right now, or null. */
+  /** What is under the pointer, or null. The Queue and playlists here accept a drop; the Custom
+   * heading (`custom-category`) doesn't, it opens the list of playlists that do. Targets that
+   * wouldn't take these songs (their own playlist) are never set. */
   dropTarget = $state<SongDropTarget | null>(null);
 
   get isDragging(): boolean {
@@ -133,7 +135,7 @@ class SongDragStore {
   move(pos: { x: number; y: number }) {
     if (!this.payload) return;
     this.pointerPos = pos;
-    this.dropTarget = this.accepts(findDropTargetAt(pos.x, pos.y));
+    this.dropTarget = this.acceptedTarget(findDropTargetAt(pos.x, pos.y));
   }
 
   end() {
@@ -185,7 +187,7 @@ class SongDragStore {
   }
 
   /** Filters out the playlist the songs came from (and the Queue, when they came from it). */
-  private accepts(target: SongDropTarget | null): SongDropTarget | null {
+  private acceptedTarget(target: SongDropTarget | null): SongDropTarget | null {
     const source = this.payload?.sourcePlaylistId ?? null;
     if (!target || source === null) return target;
     if (target.kind === "playlist" && target.id === source) return null;

@@ -333,7 +333,9 @@
   let pointerDragStartX = 0;
   let pointerDragStartY = 0;
 
-  /** The rows a drag from `row` carries: the whole selection when `row` is part of it. */
+  /** The rows a drag from `row` carries: the whole selection when `row` is part of it, in table
+   * order, so songs dropped on the Queue or a playlist arrive in the order shown. (A reorder,
+   * below, passes the same selection in selection order instead: that is what it always passed.) */
   function draggedRowsFor(row: SongTableRow): SongTableRow[] {
     return selectedKeys.size > 1 && selectedKeys.has(row.key) ? rows.filter((r) => selectedKeys.has(r.key)) : [row];
   }

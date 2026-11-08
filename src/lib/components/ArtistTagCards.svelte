@@ -9,6 +9,7 @@
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import ColorPicker from "./ColorPicker.svelte";
   import DragGhost from "./DragGhost.svelte";
+  import { cardDropApplies, chipDropAction, type TagCardDropTarget } from "../utils/tagCardDrop";
 
   const genreColorChoices = getGenreColorChoices();
 
@@ -109,7 +110,7 @@
 
   let draggedChip = $state<{ name: string; fromGroup: string } | null>(null);
   let draggedCard = $state<string | null>(null);
-  let dropTarget = $state<{ kind: "card" | "header" | "chip"; group: string; chip?: string } | null>(null);
+  let dropTarget = $state<TagCardDropTarget | null>(null);
   let pointerPos = $state<{ x: number; y: number } | null>(null);
   const CLICK_VS_DRAG_THRESHOLD_PX = 4;
   let dragStartPos: { x: number; y: number } | null = null;
@@ -176,26 +177,6 @@
     if (target.closest("[data-artist-chip-key], [data-color-swatch-for]")) return;
     if (target.tagName === "INPUT") return;
     onOpenTag(name);
-  }
-
-  type DropTarget = { kind: "card" | "header" | "chip"; group: string; chip?: string };
-
-  /** A whole card dropped anywhere on another card demotes it into that card. */
-  function cardDropApplies(card: string, target: DropTarget | null): boolean {
-    return target !== null && target.group !== card;
-  }
-
-  /** What dropping a chip on `target` does — the single source for both the drop itself and the
-   * ghost's "over a valid target" highlight, so the highlight never promises a no-op. */
-  function chipDropAction(
-    chip: { name: string; fromGroup: string },
-    target: DropTarget | null
-  ): "promote" | "reparent" | "reorder" | null {
-    if (!target) return null;
-    if (target.kind === "header") return target.group === chip.fromGroup ? "promote" : null;
-    if (target.group !== chip.fromGroup) return "reparent";
-    if (target.kind === "chip" && target.chip !== chip.name) return "reorder";
-    return null;
   }
 
   let dropApplies = $derived(

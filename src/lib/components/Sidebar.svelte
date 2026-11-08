@@ -103,7 +103,9 @@
   let customExpandTimer: ReturnType<typeof setTimeout> | undefined;
   let dragExpandedCustom = $state(false);
 
-  const customPlaylists = $derived(
+  // Everything the Custom heading counts, smart playlists included (they open from it). Not the
+  // same set as playlistsStore.customPlaylists, the hand-built ones that can take a drop.
+  const customCategoryPlaylists = $derived(
     playlistsStore.playlists.filter(
       (p) => (!p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)) && !p.is_queue
     )
@@ -302,7 +304,7 @@
               <span class="truncate">{i18n.t('sidebar.playlistsCustom')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({formatNumber(customPlaylists.length)})
+              ({formatNumber(customCategoryPlaylists.length)})
             </span>
           </button>
 
