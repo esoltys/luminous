@@ -1,4 +1,5 @@
 <script lang="ts" generics="T">
+  import { onDestroy } from "svelte";
   import { buildAlphabetIndex } from "../utils/alphabetIndex";
   import { i18n } from "../stores/i18n.svelte";
 
@@ -26,6 +27,10 @@
   let activeLetter = $state<string | null>(null);
   let bubbleY = $state<number | null>(null);
   let dismissTimer: ReturnType<typeof setTimeout> | null = null;
+
+  onDestroy(() => {
+    if (dismissTimer) clearTimeout(dismissTimer);
+  });
 
   let indexData = $derived(buildAlphabetIndex(items, getKey, ascending));
 

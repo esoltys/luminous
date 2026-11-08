@@ -725,23 +725,23 @@
         {/if}
       </div>
       </div>
-      {#if isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums"}
+      {#if (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") || (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists")}
         <div class="absolute right-7 top-16 bottom-6 flex items-center pointer-events-auto z-20">
-          <AlphabetScrubber
-            items={sortedAlbums}
-            getKey={getAlbumSortKey}
-            ascending={albumSortAsc}
-            onjump={(index) => albumGrid?.scrollToIndex(index)}
-          />
-        </div>
-      {:else if isArtistSortAlphabetical && navigationStore.activeSubTab === "artists"}
-        <div class="absolute right-7 top-16 bottom-6 flex items-center pointer-events-auto z-20">
-          <AlphabetScrubber
-            items={sortedArtists}
-            getKey={getArtistSortKey}
-            ascending={artistSortAsc}
-            onjump={(index) => artistGrid?.scrollToIndex(index)}
-          />
+          {#if navigationStore.activeSubTab === "albums"}
+            <AlphabetScrubber
+              items={sortedAlbums}
+              getKey={getAlbumSortKey}
+              ascending={albumSortAsc}
+              onjump={(index) => albumGrid?.scrollToIndex(index)}
+            />
+          {:else}
+            <AlphabetScrubber
+              items={sortedArtists}
+              getKey={getArtistSortKey}
+              ascending={artistSortAsc}
+              onjump={(index) => artistGrid?.scrollToIndex(index)}
+            />
+          {/if}
         </div>
       {/if}
     </div>
