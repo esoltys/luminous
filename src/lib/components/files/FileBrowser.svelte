@@ -7,6 +7,7 @@
   import { formatFileSize } from "../../utils/formatters";
   import type { DirListing, FileEntry, FileEntryStatus, FileMenuTarget, FileSource } from "../../types";
   import Button from "../Button.svelte";
+  import AlphabetScrubber from "../AlphabetScrubber.svelte";
   import { shownName } from "./shownName";
   import { fileIcon } from "./fileIcon";
   import { highlightSegments, matchesFileFilter, parseFileFilter } from "./fileFilter";
@@ -768,63 +769,77 @@
             </div>
           </div>
         {:else}
-          <div
-            bind:this={columnEls[column]}
-            class="flex-1 min-h-0 p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
-            role="listbox"
-            tabindex="0"
-            aria-label={columnLabel(dir)}
-            onkeydown={(e) => handleCurrentKey(e, column)}
-          >
-            <VirtualList items={sortedEntries} height="100%" itemHeight={ROW_HEIGHT_PX} bind:this={lists[column]} bind:start={starts[column]} bind:end={ends[column]}>
-              {#snippet children({ item: entry }: { item: FileEntry })}
-                {@const selected = selection.includes(entry.name)}
-                {@const muted = MUTED.includes(entry.status)}
-                {@const name = shownName(entry.name, entry.missingTag)}
-                {@const isArrival = entry.name === arrived && selected && selection.length === 1}
-                {@const Icon = fileIcon(entry)}
-                <div
-                  class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'} {fileDrag.isDragging && selected ? 'opacity-60' : ''}"
-                  class:arrival={isArrival}
-                  class:arrival-halo={isArrival && haloShown}
-                  role="option"
-                  aria-selected={selected}
-                  tabindex="-1"
-                  onpointerdown={(e) => handleRowPointerDown(e, entry)}
-                  onclick={(e) => {
-                    if (wasDragged) {
-                      wasDragged = false;
-                      return;
-                    }
-                    if (entry.isDir) openFolder(dir, entry.name);
-                    else clickFile(e, entry.name);
-                  }}
-                  ondblclick={() => { if (!entry.isDir) onactivate(entry); }}
-                  oncontextmenu={(e) => openMenu(e, entry)}
-                  onkeydown={() => {}}
-                >
-                  <span class="flex-1 min-w-0 flex items-center gap-2 {muted ? 'text-brand-text-secondary' : 'text-brand-text-primary'} {selected ? 'font-semibold' : ''}">
-                    <Icon class="w-4 h-4 shrink-0 text-brand-text-secondary" data-kind={entry.kind ?? "folder"} />
-                    <span class="truncate" title={name}>
-                      {#if parsedFilter.terms.length > 0}
-                        {#each highlightSegments(name, parsedFilter.terms) as seg, segIdx (segIdx)}
-                          {#if seg.match}
-                            <mark class="bg-brand-accent/25 text-brand-accent-text font-semibold rounded-xs">{seg.text}</mark>
-                          {:else}
-                            {seg.text}
-                          {/if}
-                        {/each}
-                      {:else}
-                        {name}
-                      {/if}
+          <div class="relative flex-1 min-h-0 flex">
+            <div
+              bind:this={columnEls[column]}
+              class="flex-1 min-h-0 p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
+              role="listbox"
+              tabindex="0"
+              aria-label={columnLabel(dir)}
+              onkeydown={(e) => handleCurrentKey(e, column)}
+            >
+              <VirtualList items={sortedEntries} height="100%" itemHeight={ROW_HEIGHT_PX} bind:this={lists[column]} bind:start={starts[column]} bind:end={ends[column]}>
+                {#snippet children({ item: entry }: { item: FileEntry })}
+                  {@const selected = selection.includes(entry.name)}
+                  {@const muted = MUTED.includes(entry.status)}
+                  {@const name = shownName(entry.name, entry.missingTag)}
+                  {@const isArrival = entry.name === arrived && selected && selection.length === 1}
+                  {@const Icon = fileIcon(entry)}
+                  <div
+                    class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'} {fileDrag.isDragging && selected ? 'opacity-60' : ''}"
+                    class:arrival={isArrival}
+                    class:arrival-halo={isArrival && haloShown}
+                    role="option"
+                    aria-selected={selected}
+                    tabindex="-1"
+                    onpointerdown={(e) => handleRowPointerDown(e, entry)}
+                    onclick={(e) => {
+                      if (wasDragged) {
+                        wasDragged = false;
+                        return;
+                      }
+                      if (entry.isDir) openFolder(dir, entry.name);
+                      else clickFile(e, entry.name);
+                    }}
+                    ondblclick={() => { if (!entry.isDir) onactivate(entry); }}
+                    oncontextmenu={(e) => openMenu(e, entry)}
+                    onkeydown={() => {}}
+                  >
+                    <span class="flex-1 min-w-0 flex items-center gap-2 {muted ? 'text-brand-text-secondary' : 'text-brand-text-primary'} {selected ? 'font-semibold' : ''}">
+                      <Icon class="w-4 h-4 shrink-0 text-brand-text-secondary" data-kind={entry.kind ?? "folder"} />
+                      <span class="truncate" title={name}>
+                        {#if parsedFilter.terms.length > 0}
+                          {#each highlightSegments(name, parsedFilter.terms) as seg, segIdx (segIdx)}
+                            {#if seg.match}
+                              <mark class="bg-brand-accent/25 text-brand-accent-text font-semibold rounded-xs">{seg.text}</mark>
+                            {:else}
+                              {seg.text}
+                            {/if}
+                          {/each}
+                        {:else}
+                          {name}
+                        {/if}
+                      </span>
                     </span>
-                  </span>
-                  <span class="w-12 shrink-0 text-[11px] text-brand-text-secondary hidden @lg:block">{entry.fileType ?? ""}</span>
-                  <span class="w-16 shrink-0 text-right text-[11px] tabular-nums text-brand-text-secondary hidden @lg:block">{entry.isDir || entry.size === null ? "" : formatFileSize(entry.size)}</span>
-                  <span class="w-40 shrink-0 truncate text-xs hidden @md:block {entry.status === 'notScanned' ? 'text-brand-accent-text' : entry.status === 'inLibrary' ? 'text-brand-text-primary' : 'text-brand-text-secondary'}">{statusLabel(entry)}</span>
-                </div>
-              {/snippet}
-            </VirtualList>
+                    <span class="w-12 shrink-0 text-[11px] text-brand-text-secondary hidden @lg:block">{entry.fileType ?? ""}</span>
+                    <span class="w-16 shrink-0 text-right text-[11px] tabular-nums text-brand-text-secondary hidden @lg:block">{entry.isDir || entry.size === null ? "" : formatFileSize(entry.size)}</span>
+                    <span class="w-40 shrink-0 truncate text-xs hidden @md:block {entry.status === 'notScanned' ? 'text-brand-accent-text' : entry.status === 'inLibrary' ? 'text-brand-text-primary' : 'text-brand-text-secondary'}">{statusLabel(entry)}</span>
+                  </div>
+                {/snippet}
+              </VirtualList>
+            </div>
+            {#if sortColumn === "name"}
+              <div class="absolute right-2 top-2 bottom-2 flex items-center pointer-events-auto z-20">
+                <AlphabetScrubber
+                  items={sortedEntries}
+                  getKey={(entry) => shownName(entry.name, entry.missingTag)}
+                  ascending={sortAsc}
+                  onjump={(index) => {
+                    lists[column]?.scrollToIndex(index, { behavior: "auto" });
+                  }}
+                />
+              </div>
+            {/if}
           </div>
         {/if}
         {#if footer}

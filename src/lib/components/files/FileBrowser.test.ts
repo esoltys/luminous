@@ -452,4 +452,15 @@ describe("FileBrowser.svelte", () => {
       expect(fileDrag.isDragging).toBe(false);
     });
   });
+
+  it("renders AlphabetScrubber when a folder has >= 15 items sorted by name (#1973)", async () => {
+    const manyEntries: FileEntry[] = Array.from({ length: 20 }, (_, i) =>
+      entry(`Track ${String.fromCharCode(65 + (i % 26))}${i}.flac`, false, "inLibrary", i + 100)
+    );
+    tree["ManyTracks"] = manyEntries;
+
+    const { findByTestId } = setup(["ManyTracks"]);
+    const scrubber = await findByTestId("alphabet-scrubber");
+    expect(scrubber).toBeInTheDocument();
+  });
 });

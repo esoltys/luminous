@@ -102,13 +102,13 @@
 
 {#if items.length >= minItems}
   <div
-    class="relative flex items-center select-none {className}"
+    class="relative h-full max-h-[calc(100vh-140px)] flex items-center select-none {className}"
     data-testid="alphabet-scrubber-container"
   >
     <!-- Floating active letter bubble -->
     {#if activeLetter && bubbleY !== null}
       <div
-        class="absolute right-7 -translate-y-1/2 w-8 h-8 rounded-full bg-brand-accent text-brand-surface font-bold text-xs flex items-center justify-center shadow-lg pointer-events-none z-30 transition-all duration-75"
+        class="absolute right-8 -translate-y-1/2 w-9 h-9 rounded-full bg-brand-accent text-brand-surface font-bold text-sm flex items-center justify-center shadow-lg pointer-events-none z-30 transition-all duration-75"
         style="top: {bubbleY}px;"
         data-testid="alphabet-scrubber-bubble"
       >
@@ -122,7 +122,7 @@
       role="navigation"
       aria-label={i18n.t("collection.alphabetScrubberLabel")}
       data-testid="alphabet-scrubber"
-      class="flex flex-col items-center justify-between py-1.5 px-0.5 rounded-full bg-brand-sidebar/75 hover:bg-brand-sidebar/95 border border-brand-border/40 backdrop-blur-xs transition-colors shadow-xs touch-none h-full max-h-[520px]"
+      class="flex flex-col items-center justify-between py-2 px-1 rounded-full bg-brand-sidebar/85 hover:bg-brand-sidebar/95 border border-brand-border/40 backdrop-blur-xs transition-colors shadow-xs touch-none h-full max-h-[820px] w-5 sm:w-5.5"
       onpointerdown={handlePointerDown}
       onpointermove={handlePointerMove}
       onpointerup={handlePointerUp}
@@ -134,9 +134,9 @@
           tabindex="-1"
           data-scrubber-letter={section.letter}
           aria-label={i18n.t("collection.jumpToLetter", { letter: section.letter })}
-          class="w-3.5 flex-1 flex items-center justify-center text-[9px] sm:text-[10px] leading-none font-medium transition-transform rounded-xs focus:outline-none
-            {section.count > 0 ? 'text-brand-text-secondary hover:text-brand-accent-text hover:font-bold' : 'text-brand-text-secondary/35 cursor-default'}
-            {activeLetter === section.letter ? 'text-brand-accent-text font-bold scale-125' : ''}"
+          class="w-full flex-1 min-h-[14px] max-h-[28px] flex items-center justify-center text-[10px] sm:text-[11px] leading-none font-semibold transition-all rounded-xs focus:outline-none
+            {section.count > 0 ? 'text-brand-text-secondary hover:text-brand-accent-text hover:font-bold hover:scale-130' : 'text-brand-text-secondary/35 cursor-default'}
+            {activeLetter === section.letter ? 'text-brand-accent-text font-bold scale-140' : ''}"
           onclick={(e) => {
             e.stopPropagation();
             handleLetterClick(section.letter, i);
