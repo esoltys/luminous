@@ -767,6 +767,7 @@ impl ActiveTrack {
             track_id,
             sample_rate: src_rate,
             channels: src_channels,
+            ..
         } = ProbedTrack::open(source, extension)?;
 
         if start_nanosec > 0 {
