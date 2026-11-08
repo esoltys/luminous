@@ -8,6 +8,7 @@
   import ArtistTagContextMenu from "./ArtistTagContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import ColorPicker from "./ColorPicker.svelte";
+  import DragGhost from "./DragGhost.svelte";
 
   const genreColorChoices = getGenreColorChoices();
 
@@ -112,7 +113,9 @@
   let pointerPos = $state<{ x: number; y: number } | null>(null);
   const CLICK_VS_DRAG_THRESHOLD_PX = 4;
   let dragStartPos: { x: number; y: number } | null = null;
-  let dragMoved = false;
+  /** Reactive so the ghost only appears once the pointer has actually moved — a plain click
+   * on a chip must not flash it. */
+  let dragMoved = $state(false);
 
   let ghostInfo = $derived.by(() => {
     if (draggedChip) {
@@ -175,6 +178,30 @@
     onOpenTag(name);
   }
 
+  type DropTarget = { kind: "card" | "header" | "chip"; group: string; chip?: string };
+
+  /** A whole card dropped anywhere on another card demotes it into that card. */
+  function cardDropApplies(card: string, target: DropTarget | null): boolean {
+    return target !== null && target.group !== card;
+  }
+
+  /** What dropping a chip on `target` does — the single source for both the drop itself and the
+   * ghost's "over a valid target" highlight, so the highlight never promises a no-op. */
+  function chipDropAction(
+    chip: { name: string; fromGroup: string },
+    target: DropTarget | null
+  ): "promote" | "reparent" | "reorder" | null {
+    if (!target) return null;
+    if (target.kind === "header") return target.group === chip.fromGroup ? "promote" : null;
+    if (target.group !== chip.fromGroup) return "reparent";
+    if (target.kind === "chip" && target.chip !== chip.name) return "reorder";
+    return null;
+  }
+
+  let dropApplies = $derived(
+    draggedCard ? cardDropApplies(draggedCard, dropTarget) : draggedChip ? chipDropAction(draggedChip, dropTarget) !== null : false
+  );
+
   async function handlePointerUp() {
     const chip = draggedChip;
     const card = draggedCard;
@@ -188,8 +215,8 @@
     dragMoved = false;
 
     if (card) {
-      if (target && target.group !== card) {
-        await tagsStore.demoteArtistGroupToChild(card, target.group);
+      if (cardDropApplies(card, target)) {
+        await tagsStore.demoteArtistGroupToChild(card, target!.group);
       }
       return;
     }
@@ -200,17 +227,19 @@
       return;
     }
 
-    if (!target) return;
-    if (target.kind === "header" && target.group === chip.fromGroup) {
-      await tagsStore.promoteArtistTag(chip.name);
-    } else if (target.kind === "card" && target.group !== chip.fromGroup) {
-      await tagsStore.reparentArtistTag(chip.name, target.group);
-    } else if (target.kind === "chip" && target.group === chip.fromGroup && target.chip !== chip.name) {
-      const group = effectiveHierarchy.find((g) => g.name === chip.fromGroup);
-      const newIndex = group?.children.findIndex((c: TagGroupChild) => c.name === target.chip) ?? 0;
-      await tagsStore.reorderArtistTagInGroup(chip.name, newIndex);
-    } else if (target.kind === "chip" && target.group !== chip.fromGroup) {
-      await tagsStore.reparentArtistTag(chip.name, target.group);
+    switch (chipDropAction(chip, target)) {
+      case "promote":
+        await tagsStore.promoteArtistTag(chip.name);
+        break;
+      case "reparent":
+        await tagsStore.reparentArtistTag(chip.name, target!.group);
+        break;
+      case "reorder": {
+        const group = effectiveHierarchy.find((g) => g.name === chip.fromGroup);
+        const newIndex = group?.children.findIndex((c: TagGroupChild) => c.name === target!.chip) ?? 0;
+        await tagsStore.reorderArtistTagInGroup(chip.name, newIndex);
+        break;
+      }
     }
   }
 </script>
@@ -320,13 +349,16 @@
   {/each}
 </div>
 
-{#if ghostInfo && pointerPos}
-  <div
-    class="fixed z-50 pointer-events-none px-3 py-1.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-semibold shadow-2xl -translate-y-1/2"
-    style={`left: ${pointerPos.x + 16}px; top: ${pointerPos.y}px; border-color: ${genreColorHsl(ghostInfo.colorIndex)};`}
+{#if ghostInfo && pointerPos && dragMoved}
+  <DragGhost
+    x={pointerPos.x}
+    y={pointerPos.y}
+    overTarget={dropApplies}
+    color={genreColorHsl(ghostInfo.colorIndex)}
+    testId="artist-tag-drag-ghost"
   >
-    {ghostInfo.label}
-  </div>
+    <span class="max-w-[180px] truncate font-semibold">{ghostInfo.label}</span>
+  </DragGhost>
 {/if}
 
 {#if colorPopoverFor && colorPopoverPos}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fileDrag } from "../../stores/fileDrag.svelte";
   import { i18n } from "../../stores/i18n.svelte";
+  import DragGhost from "../DragGhost.svelte";
   import {
     MusicNotesIcon as Music,
     PlaylistIcon as ListMusic,
@@ -17,10 +18,11 @@
 </script>
 
 {#if fileDrag.isDragging && fileDrag.pointerPos}
-  <div
-    class="fixed z-[9999] pointer-events-none select-none px-3 py-1.5 rounded-full border bg-brand-surface/95 backdrop-blur-md text-brand-text-primary text-xs font-medium shadow-2xl flex items-center gap-2 -translate-y-1/2 transition-[border-color,background-color] duration-150 {fileDrag.dropTarget ? 'border-brand-accent ring-2 ring-brand-accent/40 bg-brand-accent/20' : 'border-brand-accent/60'}"
-    style="left: {fileDrag.pointerPos.x + 14}px; top: {fileDrag.pointerPos.y}px;"
-    data-testid="file-drag-ghost"
+  <DragGhost
+    x={fileDrag.pointerPos.x}
+    y={fileDrag.pointerPos.y}
+    overTarget={fileDrag.dropTarget !== null}
+    testId="file-drag-ghost"
   >
     <Music class="w-3.5 h-3.5 text-brand-accent shrink-0" />
     <span class="max-w-[180px] truncate">{ghostLabel}</span>
@@ -43,5 +45,5 @@
         </span>
       {/if}
     {/if}
-  </div>
+  </DragGhost>
 {/if}
