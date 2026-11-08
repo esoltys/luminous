@@ -444,6 +444,8 @@ export const en = {
     text: "This library was last opened by a newer version of Luminous (database v{dbVersion}, this app supports v{appVersion}). Your folders and songs are still there — update Luminous to see them again."
   },
   collection: {
+    alphabetScrubberLabel: "Alphabet index",
+    jumpToLetter: "Jump to {letter}",
     columnSelectorVisible: "Visible",
     columnSelectorNoneVisible: "No columns visible",
     columnSelectorMetatags: "Metatags",

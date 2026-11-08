@@ -1,0 +1,145 @@
+<script lang="ts" generics="T">
+  import { buildAlphabetIndex } from "../utils/alphabetIndex";
+  import { i18n } from "../stores/i18n.svelte";
+
+  interface Props {
+    items: T[];
+    getKey: (item: T) => string | null | undefined;
+    ascending?: boolean;
+    onjump: (index: number, letter: string) => void;
+    /** Minimum item count required before the scrubber is rendered. Defaults to 15. */
+    minItems?: number;
+    class?: string;
+  }
+
+  let {
+    items,
+    getKey,
+    ascending = true,
+    onjump,
+    minItems = 15,
+    class: className = "",
+  }: Props = $props();
+
+  let scrubberEl = $state<HTMLDivElement>();
+  let isScrubbing = $state(false);
+  let activeLetter = $state<string | null>(null);
+  let bubbleY = $state<number | null>(null);
+  let dismissTimer: ReturnType<typeof setTimeout> | null = null;
+
+  let indexData = $derived(buildAlphabetIndex(items, getKey, ascending));
+
+  function updateFromPointer(clientY: number) {
+    if (!scrubberEl || indexData.sections.length === 0) return;
+    const rect = scrubberEl.getBoundingClientRect();
+    const clampedY = Math.max(0, Math.min(clientY - rect.top, rect.height - 1));
+    const secIndex = Math.min(
+      indexData.sections.length - 1,
+      Math.floor((clampedY / rect.height) * indexData.sections.length)
+    );
+    const section = indexData.sections[secIndex];
+    if (section) {
+      activeLetter = section.letter;
+      bubbleY = (secIndex + 0.5) * (rect.height / indexData.sections.length);
+      const targetIndex = indexData.getJumpIndex(section.letter);
+      if (targetIndex !== -1) {
+        onjump(targetIndex, section.letter);
+      }
+    }
+  }
+
+  function handlePointerDown(e: PointerEvent) {
+    if (e.button !== 0) return;
+    if (dismissTimer) clearTimeout(dismissTimer);
+    isScrubbing = true;
+    try {
+      scrubberEl?.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore in environments where setPointerCapture might not be supported
+    }
+    updateFromPointer(e.clientY);
+  }
+
+  function handlePointerMove(e: PointerEvent) {
+    if (!isScrubbing) return;
+    updateFromPointer(e.clientY);
+  }
+
+  function handlePointerUp(e: PointerEvent) {
+    if (!isScrubbing) return;
+    isScrubbing = false;
+    try {
+      scrubberEl?.releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore
+    }
+    dismissTimer = setTimeout(() => {
+      if (!isScrubbing) activeLetter = null;
+    }, 350);
+  }
+
+  function handleLetterClick(letter: string, secIndex: number) {
+    if (dismissTimer) clearTimeout(dismissTimer);
+    activeLetter = letter;
+    if (scrubberEl) {
+      const rect = scrubberEl.getBoundingClientRect();
+      bubbleY = (secIndex + 0.5) * (rect.height / indexData.sections.length);
+    }
+    const targetIndex = indexData.getJumpIndex(letter);
+    if (targetIndex !== -1) {
+      onjump(targetIndex, letter);
+    }
+    dismissTimer = setTimeout(() => {
+      if (!isScrubbing) activeLetter = null;
+    }, 350);
+  }
+</script>
+
+{#if items.length >= minItems}
+  <div
+    class="relative flex items-center select-none {className}"
+    data-testid="alphabet-scrubber-container"
+  >
+    <!-- Floating active letter bubble -->
+    {#if activeLetter && bubbleY !== null}
+      <div
+        class="absolute right-7 -translate-y-1/2 w-8 h-8 rounded-full bg-brand-accent text-brand-surface font-bold text-xs flex items-center justify-center shadow-lg pointer-events-none z-30 transition-all duration-75"
+        style="top: {bubbleY}px;"
+        data-testid="alphabet-scrubber-bubble"
+      >
+        {activeLetter}
+      </div>
+    {/if}
+
+    <!-- Scrubber strip -->
+    <div
+      bind:this={scrubberEl}
+      role="navigation"
+      aria-label={i18n.t("collection.alphabetScrubberLabel")}
+      data-testid="alphabet-scrubber"
+      class="flex flex-col items-center justify-between py-1.5 px-0.5 rounded-full bg-brand-sidebar/75 hover:bg-brand-sidebar/95 border border-brand-border/40 backdrop-blur-xs transition-colors shadow-xs touch-none h-full max-h-[520px]"
+      onpointerdown={handlePointerDown}
+      onpointermove={handlePointerMove}
+      onpointerup={handlePointerUp}
+      onpointercancel={handlePointerUp}
+    >
+      {#each indexData.sections as section, i (section.letter)}
+        <button
+          type="button"
+          tabindex="-1"
+          data-scrubber-letter={section.letter}
+          aria-label={i18n.t("collection.jumpToLetter", { letter: section.letter })}
+          class="w-3.5 flex-1 flex items-center justify-center text-[9px] sm:text-[10px] leading-none font-medium transition-transform rounded-xs focus:outline-none
+            {section.count > 0 ? 'text-brand-text-secondary hover:text-brand-accent-text hover:font-bold' : 'text-brand-text-secondary/35 cursor-default'}
+            {activeLetter === section.letter ? 'text-brand-accent-text font-bold scale-125' : ''}"
+          onclick={(e) => {
+            e.stopPropagation();
+            handleLetterClick(section.letter, i);
+          }}
+        >
+          {section.letter}
+        </button>
+      {/each}
+    </div>
+  </div>
+{/if}

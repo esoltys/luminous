@@ -444,6 +444,8 @@ export const de = {
     text: "Diese Mediathek wurde zuletzt mit einer neueren Version von Luminous geöffnet (Datenbank v{dbVersion}, diese App unterstützt v{appVersion}). Ordner und Titel sind weiterhin vorhanden – aktualisiere Luminous, um sie wieder zu sehen."
   },
   collection: {
+    alphabetScrubberLabel: "Alphabetischer Index",
+    jumpToLetter: "Zu Buchstabe {letter} springen",
     columnSelectorVisible: "Sichtbar",
     columnSelectorNoneVisible: "Keine Spalten sichtbar",
     columnSelectorMetatags: "Metatags",

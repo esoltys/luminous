@@ -38,6 +38,7 @@
   import LibraryWelcome from "./LibraryWelcome.svelte";
   import SearchEmptyState from "./SearchEmptyState.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
+  import AlphabetScrubber from "./AlphabetScrubber.svelte";
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -348,6 +349,37 @@
     });
   });
 
+  let songTable = $state<ReturnType<typeof SongTable> | undefined>(undefined);
+  let albumGrid = $state<ReturnType<typeof VirtualCardGrid> | undefined>(undefined);
+  let artistGrid = $state<ReturnType<typeof VirtualCardGrid> | undefined>(undefined);
+
+  const ALPHABETICAL_SONG_FIELDS = new Set<keyof Song>([
+    "title", "artist", "album", "album_artist", "composer", "genre", "grouping", "path",
+  ]);
+  let isSongSortAlphabetical = $derived(ALPHABETICAL_SONG_FIELDS.has(sortField));
+  let isAlbumSortAlphabetical = $derived(albumSortField === "album" || albumSortField === "artist");
+  let isArtistSortAlphabetical = $derived(artistSortField === "name" || artistSortField === "genre");
+
+  function getSongAlphabetKey(row: SongTableRow): string {
+    if (!row.song) return "";
+    const key = getSongSortKey(row.song, sortField);
+    return typeof key === "string" ? key : "";
+  }
+
+  function getAlbumSortKey(album: AlbumItem): string {
+    if (albumSortField === "artist") {
+      return album.artist_sort?.trim() || album.artist || "";
+    }
+    return album.albumsort?.trim() || album.album || "";
+  }
+
+  function getArtistSortKey(artist: ArtistItem): string {
+    if (artistSortField === "genre") {
+      return artist.genre?.trim() || "";
+    }
+    return artist.sort_artist?.trim() || artist.name || "";
+  }
+
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const COLLECTION_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
     track: "48px", title: "2fr", artist: "1.5fr", album: "1.5fr",
@@ -464,31 +496,45 @@
     </div>
 
     <div class="flex-1 px-6 pt-2 overflow-hidden flex flex-col {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <div class="flex-1 overflow-y-auto border border-brand-border rounded-lg bg-brand-sidebar/40 min-h-0" use:rememberScroll={"collection:songs"}>
-        <SongTable
-          rows={tableRows}
-          mode="track"
-          leadingColumnWidth="36px"
-          colDefaults={COLLECTION_COL_DEFAULTS}
-          {sortField}
-          {sortAsc}
-          onToggleSort={(f) => toggleSort(f as keyof Song)}
-          bind:selectedKeys
-          onRowDoubleClick={(row) => row.song && handlePlaySong(row.song)}
-          onRowContextMenu={handleRowContextMenu}
-          onRate={rateSong}
-          onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
-          onEditTags={(song) => openTagEditor(song.id)}
-          emptyState={songsEmptyState}
-        />
+      <div class="relative flex-1 min-h-0 flex">
+        <div class="flex-1 overflow-y-auto border border-brand-border rounded-lg bg-brand-sidebar/40 min-h-0" use:rememberScroll={"collection:songs"}>
+          <SongTable
+            bind:this={songTable}
+            rows={tableRows}
+            mode="track"
+            leadingColumnWidth="36px"
+            colDefaults={COLLECTION_COL_DEFAULTS}
+            {sortField}
+            {sortAsc}
+            onToggleSort={(f) => toggleSort(f as keyof Song)}
+            bind:selectedKeys
+            onRowDoubleClick={(row) => row.song && handlePlaySong(row.song)}
+            onRowContextMenu={handleRowContextMenu}
+            onRate={rateSong}
+            onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
+            onEditTags={(song) => openTagEditor(song.id)}
+            emptyState={songsEmptyState}
+          />
+        </div>
+        {#if isSongSortAlphabetical}
+          <div class="absolute right-3.5 top-12 bottom-3 flex items-center pointer-events-auto z-20">
+            <AlphabetScrubber
+              items={tableRows}
+              getKey={getSongAlphabetKey}
+              ascending={sortAsc}
+              onjump={(index) => songTable?.scrollToIndex(index)}
+            />
+          </div>
+        {/if}
       </div>
     </div>
 
   {:else if navigationStore.activeSubTab === "genres"}
     <GenreBrowseView />
   {:else}
-    <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`collection:${navigationStore.activeSubTab}`}>
-      <div class="sticky top-0 z-20 bg-brand-main pt-3">
+    <div class="relative flex-1 min-h-0 flex flex-col {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
+      <div class="flex-1 px-6 overflow-y-auto min-h-0" use:rememberScroll={`collection:${navigationStore.activeSubTab}`}>
+        <div class="sticky top-0 z-20 bg-brand-main pt-3">
         <div class="h-12 flex items-center justify-between">
           <div class="text-xs text-brand-text-secondary font-medium">
             {#if navigationStore.activeSubTab === "albums"}
@@ -592,6 +638,7 @@
             <div class="grid">{@render albumEmptyState()}</div>
           {:else}
             <VirtualCardGrid
+              bind:this={albumGrid}
               items={sortedAlbums}
               key={albumKey}
               minColumnWidth={280}
@@ -612,6 +659,7 @@
             <div class="grid">{@render albumEmptyState()}</div>
           {:else}
             <VirtualCardGrid
+              bind:this={albumGrid}
               items={sortedAlbums}
               key={albumKey}
               minColumnWidth={180}
@@ -636,6 +684,7 @@
           <div class="grid">{@render artistEmptyState()}</div>
         {:else if activeViewMode === "rows"}
           <VirtualCardGrid
+            bind:this={artistGrid}
             items={sortedArtists}
             key={artistKey}
             minColumnWidth={280}
@@ -655,6 +704,7 @@
           </VirtualCardGrid>
         {:else}
           <VirtualCardGrid
+            bind:this={artistGrid}
             items={sortedArtists}
             key={artistKey}
             minColumnWidth={180}
@@ -674,6 +724,26 @@
         {/if}
         {/if}
       </div>
+      </div>
+      {#if isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums"}
+        <div class="absolute right-7 top-16 bottom-6 flex items-center pointer-events-auto z-20">
+          <AlphabetScrubber
+            items={sortedAlbums}
+            getKey={getAlbumSortKey}
+            ascending={albumSortAsc}
+            onjump={(index) => albumGrid?.scrollToIndex(index)}
+          />
+        </div>
+      {:else if isArtistSortAlphabetical && navigationStore.activeSubTab === "artists"}
+        <div class="absolute right-7 top-16 bottom-6 flex items-center pointer-events-auto z-20">
+          <AlphabetScrubber
+            items={sortedArtists}
+            getKey={getArtistSortKey}
+            ascending={artistSortAsc}
+            onjump={(index) => artistGrid?.scrollToIndex(index)}
+          />
+        </div>
+      {/if}
     </div>
   {/if}
 </div>

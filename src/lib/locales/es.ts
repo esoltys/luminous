@@ -444,6 +444,8 @@ export const es = {
     text: "Esta biblioteca se abrió por última vez con una versión más reciente de Luminous (base de datos v{dbVersion}; esta aplicación admite v{appVersion}). Tus carpetas y canciones siguen ahí: actualiza Luminous para volver a verlas."
   },
   collection: {
+    alphabetScrubberLabel: "Índice alfabético",
+    jumpToLetter: "Ir a la letra {letter}",
     columnSelectorVisible: "Visibles",
     columnSelectorNoneVisible: "Ninguna columna visible",
     columnSelectorMetatags: "Metaetiquetas",
