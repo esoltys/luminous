@@ -22,6 +22,8 @@ pub(crate) struct ProbedTrack {
     pub(crate) sample_rate: u32,
     /// Falls back to stereo when the container doesn't say.
     pub(crate) channels: usize,
+    /// Bit depth reported by the container/stream header, if known.
+    pub(crate) bits_per_sample: Option<u32>,
 }
 
 impl ProbedTrack {
@@ -63,6 +65,7 @@ impl ProbedTrack {
             .as_ref()
             .map(|c| c.count())
             .unwrap_or(2);
+        let bits_per_sample = audio_params.bits_per_sample;
 
         Ok(Self {
             format,
@@ -70,6 +73,7 @@ impl ProbedTrack {
             track_id,
             sample_rate,
             channels,
+            bits_per_sample,
         })
     }
 }
@@ -103,6 +107,11 @@ impl OfflineDecoder {
     /// Channel count of the decoded audio, before any `max_channels` cap.
     pub fn channels(&self) -> usize {
         self.track.channels
+    }
+
+    /// Bits per sample reported by the codec parameters, if known (e.g. 16, 24).
+    pub fn bits_per_sample(&self) -> Option<u32> {
+        self.track.bits_per_sample
     }
 
     /// Decode to the end, handing each decoded packet to `on_block` as planar

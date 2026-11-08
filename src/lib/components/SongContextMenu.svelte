@@ -21,7 +21,8 @@
     PlaylistIcon as PlaylistIcon,
     XIcon as X,
     HeartIcon,
-    HeartBreakIcon
+    HeartBreakIcon,
+    ShieldCheckIcon as ShieldCheck
   } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import type { Snippet } from "svelte";
@@ -31,10 +32,11 @@
   import { pinnedStore } from "../stores/pinned.svelte";
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { provenanceStore } from "../stores/provenance.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { VIEWPORT_EDGE_PADDING_PX, PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import { startSongRadio } from "../utils/playlist";
-  import type { Song, Playlist } from "../types";
+  import { isLosslessFileType, type Song, type Playlist } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
@@ -190,6 +192,31 @@
     }
     showNewPlaylistModal = false;
     onClose();
+  }
+
+  const hasLosslessSelected = $derived.by(() => {
+    if (selectedSongs && selectedSongs.length > 0) {
+      return selectedSongs.some((s) => isLosslessFileType(s.filetype) && (s.source === "local_file" || s.source === "collection"));
+    }
+    return isLosslessFileType(song.filetype) && (song.source === "local_file" || song.source === "collection");
+  });
+
+  async function handleVerifyLossless() {
+    let idsToVerify: number[] = [];
+    if (selectedSongs && selectedSongs.length > 0) {
+      idsToVerify = selectedSongs
+        .filter((s) => isLosslessFileType(s.filetype) && (s.source === "local_file" || s.source === "collection"))
+        .map((s) => s.id);
+    } else if (isLosslessFileType(song.filetype) && (song.source === "local_file" || song.source === "collection")) {
+      idsToVerify = [song.id];
+    }
+    if (idsToVerify.length === 0) return;
+
+    try {
+      await provenanceStore.verifySongs(idsToVerify, song.album || song.title);
+    } catch (err) {
+      console.error("Batch provenance verification failed:", err);
+    }
   }
 
   function autofocus(node: HTMLInputElement) {
@@ -489,6 +516,17 @@
   {/if}
 
   <ContextMenuDivider />
+
+  {#if hasLosslessSelected}
+    <ContextMenuItem
+      icon={ShieldCheck}
+      label={selectedCount > 1
+        ? i18n.t("collection.verifyAuthenticityCount", { count: selectedCount }, `Verify Audio Authenticity (${selectedCount})`)
+        : i18n.t("collection.verifyAuthenticity", {}, "Verify Audio Authenticity")}
+      onmouseenter={closeSubmenuImmediately}
+      onclick={() => { handleVerifyLossless(); onClose(); }}
+    />
+  {/if}
 
   {#if onOrganizeFiles}
     <ContextMenuItem

@@ -49,18 +49,21 @@
     ArrowSquareOutIcon as ExternalLink,
     ChartBarIcon as BarChart2,
     ShareNetworkIcon as Share,
+    ShieldCheckIcon as ShieldCheck,
   } from "phosphor-svelte";
   import ShareModal from "./ShareModal.svelte";
   import AlbumProfileEditor from "./AlbumProfileEditor.svelte";
   import { contextStore, entitySubject } from "../stores/context.svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
-  import { getCoverArtUrl, resolveArtUrl } from "../types";
+  import { getCoverArtUrl, resolveArtUrl, isLosslessFileType } from "../types";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { formatHoursMinutes } from "../utils/formatters";
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { provenanceStore } from "../stores/provenance.svelte";
+  import { TOAST_DURATION_MS } from "../constants";
   import { compareSongs } from "../utils/songSort";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -497,6 +500,21 @@
     openInPicard(songs.map((s) => s.id));
   }
 
+  async function handleVerifyAlbum() {
+    const lossless = songs.filter(
+      (s) => isLosslessFileType(s.filetype) && (s.source === "local_file" || s.source === "collection")
+    );
+    if (lossless.length > 0) {
+      try {
+        await provenanceStore.verifySongs(lossless.map((s) => s.id), albumName);
+      } catch (err) {
+        console.error("Failed to verify album provenance:", err);
+      }
+    } else {
+      toastStore.show(i18n.t("collection.noLosslessTracks", {}, "No local lossless tracks in this album"), "info", TOAST_DURATION_MS);
+    }
+  }
+
   async function handleToggleStatsExcluded() {
     await statsExclusionsStore.toggleWithToast("album", albumName);
   }
@@ -849,6 +867,12 @@
         : songs.length > 0 && songs.every(isRemoteSource)
           ? i18n.t("picard.remoteNotSupportedTooltip")
           : undefined}
+    />
+    <ContextMenuItem
+      icon={ShieldCheck}
+      label={i18n.t("collection.verifyAuthenticity", {}, "Verify Audio Authenticity")}
+      onclick={() => { handleVerifyAlbum(); overflowMenuPos = null; }}
+      disabled={loading || songs.length === 0}
     />
     <ViewInFilesItem album={albumName} onClose={() => { overflowMenuPos = null; }} />
     <ContextMenuDivider />

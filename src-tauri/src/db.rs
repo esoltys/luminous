@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 74;
+pub const CURRENT_SCHEMA_VERSION: i32 = 75;
 
 struct Migration {
     version: i32,
@@ -686,6 +686,25 @@ const MIGRATIONS: &[Migration] = &[
             if !has_column {
                 conn.execute_batch("ALTER TABLE songs ADD COLUMN disc_subtitle TEXT;")?;
             }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 75,
+        description: "song_provenance: lossless audio authenticity and fake FLAC detection results (#1373)",
+        apply: |conn| {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS song_provenance (
+                    song_id               INTEGER PRIMARY KEY REFERENCES songs(id) ON DELETE CASCADE,
+                    mtime                 INTEGER NOT NULL,
+                    verdict               TEXT NOT NULL,
+                    cutoff_hz             INTEGER,
+                    effective_bit_depth   INTEGER,
+                    effective_sample_rate INTEGER,
+                    details               TEXT,
+                    analyzed_at           INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+                );",
+            )?;
             Ok(())
         },
     },
@@ -4529,6 +4548,62 @@ mod tests {
             )
             .unwrap();
         assert_eq!(subtitle, None);
+    }
+
+    #[test]
+    fn test_migration_75_creates_song_provenance_table() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration75_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        let has_table: bool = conn
+            .prepare(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'song_provenance'",
+            )
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(has_table, "song_provenance table should exist");
+
+        // Verify foreign key cascade delete
+        conn.execute(
+            "INSERT INTO songs (path, title, source, mtime) VALUES ('/prov.flac', 'Prov', 2, 1000)",
+            [],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO song_provenance (song_id, mtime, verdict, cutoff_hz, effective_bit_depth, effective_sample_rate, details)
+             VALUES (?1, 1000, 'authentic', 21800, 16, 44100, 'Authentic CD')",
+            params![song_id],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM song_provenance WHERE song_id = ?1",
+                params![song_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+
+        conn.execute("DELETE FROM songs WHERE id = ?1", params![song_id])
+            .unwrap();
+        let count_after: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM song_provenance WHERE song_id = ?1",
+                params![song_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            count_after, 0,
+            "cascade delete should remove provenance record"
+        );
     }
 
     #[test]

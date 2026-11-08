@@ -633,16 +633,14 @@ class CollectionStore {
         if (done) {
           tasksStore.completeTask(taskId, i18n.t("tasks.albumTagsSaved", { album: title }, `Saved tags for ${title}`));
         } else {
-          const label = i18n.t("tasks.savingTagsCount", { current, total }, `Saving tags (${current}/${total})...`);
           if (!tasksStore.isTaskActive(taskId)) {
             tasksStore.startTask({
               id: taskId,
-              label,
+              label: i18n.t("tasks.savingTags", {}, "Saving tags…"),
               total,
             });
           }
           tasksStore.updateTask(taskId, {
-            label,
             current,
             total,
           });

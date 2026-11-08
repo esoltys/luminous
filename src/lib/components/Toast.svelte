@@ -169,7 +169,7 @@
               class="text-pretty transition-all duration-200"
               class:text-brand-text-secondary={toast.task.status === "done"}
             >
-              {toast.task.status === "done" ? (toast.task.taskName || toast.text) : toast.text}
+              {toast.task.status === "done" ? (toast.task.completedText || toast.task.taskName || toast.text) : toast.text}
             </span>
             {#if toast.task.status === "running" && toast.task.current !== undefined && toast.task.total !== undefined}
               <span class="text-xs font-mono text-brand-text-secondary shrink-0 select-none">

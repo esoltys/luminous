@@ -38,6 +38,39 @@ export type FileType =
   | "ASF"
   | "STREAM";
 
+export function isLosslessFileType(filetype: FileType): boolean {
+  return (
+    filetype === "FLAC" ||
+    filetype === "OGG_FLAC" ||
+    filetype === "ALAC" ||
+    filetype === "AIFF" ||
+    filetype === "WAV" ||
+    filetype === "WAV_PACK" ||
+    filetype === "TRUE_AUDIO" ||
+    filetype === "APE" ||
+    filetype === "DSF" ||
+    filetype === "DSDIFF"
+  );
+}
+
+export type ProvenanceVerdict =
+  | "authentic"
+  | "authentic_hires"
+  | "suspected_lossy"
+  | "suspected_upsampled"
+  | "padded_bit_depth";
+
+export interface SongProvenance {
+  song_id: number;
+  verdict: ProvenanceVerdict;
+  cutoff_hz?: number;
+  effective_bit_depth?: number;
+  effective_sample_rate?: number;
+  description: string;
+  is_stale: boolean;
+  analyzed_at: number;
+}
+
 export interface Song {
   id: number;
   source: SongSource;
