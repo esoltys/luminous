@@ -294,7 +294,7 @@
 
           <button
             onclick={() => openPlaylistsSubTab("custom")}
-            data-drop-target="custom-category"
+            data-drop-target={playlistsStore.customPlaylists.length > 0 ? "custom-category" : undefined}
             class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'custom' && !navigationStore.selectedPlaylistId && !navigationStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {dragExpandedCustom || (songDrag.isDragging && songDrag.dropTarget?.kind === 'custom-category') ? 'ring-2 ring-brand-accent/60 bg-brand-accent/20 text-brand-text-primary font-semibold' : ''}"
           >
             <div class="flex items-center gap-2 truncate">
