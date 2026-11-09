@@ -1611,7 +1611,7 @@ export const en = {
     historyTimestampHint: "View scan timestamps as the moment Luminous detected changes on disk, as external taggers may preserve original file modification times.",
     clearHistoryBtn: "Clear History",
     historyEmptyValue: "(empty)",
-    historyActorScan: "Detected on scan",
+    historyActorScan: "External change",
     historyActorLuminous: "Luminous",
     historyBatchNote: "edited with {count} other tracks",
     historyEmptySince: "No recorded changes since {date}.",

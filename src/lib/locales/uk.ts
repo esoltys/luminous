@@ -1731,7 +1731,7 @@ export const uk = {
     historyTimestampHint: "Враховуйте час сканування як момент виявлення змін Luminous на диску, оскільки сторонні редактори тегів можуть зберігати початковий час змінення файлу.",
     clearHistoryBtn: "Очистити історію",
     historyEmptyValue: "(порожньо)",
-    historyActorScan: "Виявлено під час сканування",
+    historyActorScan: "Зовнішня зміна",
     historyActorLuminous: "Luminous",
     historyBatchNote: "відредаговано разом із {count} іншими треками",
     historyEmptySince: "Немає записаних змін з {date}.",

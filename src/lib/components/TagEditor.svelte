@@ -902,8 +902,6 @@
                           <div class="p-2 rounded bg-brand-surface/40 border border-brand-border/40 text-xs flex flex-col gap-1.5">
                             <div class="flex items-center justify-between text-brand-text-secondary text-[11px]">
                               <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="font-medium text-brand-text-primary">{getFieldLabel(entry.field)}</span>
-                                <span class="text-brand-text-secondary/60">•</span>
                                 <span>{entry.actor === "scan" ? i18n.t("tagEditor.historyActorScan") : i18n.t("tagEditor.historyActorLuminous")}</span>
                                 {#if entry.batchOtherTracks > 0}
                                   <span class="text-brand-text-secondary/60">•</span>
@@ -928,6 +926,7 @@
                             </div>
                             <div class="flex items-center justify-between gap-2">
                               <div class="flex items-center gap-1.5 text-brand-text-primary break-all flex-wrap">
+                                <span class="font-medium text-brand-text-primary">{getFieldLabel(entry.field)}:</span>
                                 <span class="text-brand-text-secondary line-through opacity-80">{formatHistoryValue(entry.oldValue)}</span>
                                 <span class="text-brand-text-secondary/70">→</span>
                                 <span class="font-medium">{formatHistoryValue(entry.newValue)}</span>

@@ -1611,7 +1611,7 @@ export const de = {
     historyTimestampHint: "Betrachten Sie Scan-Zeitstempel als den Moment, in dem Luminous Änderungen auf dem Datenträger erkannt hat, da externe Tagger die Dateiänderungszeit möglicherweise beibehalten.",
     clearHistoryBtn: "Verlauf löschen",
     historyEmptyValue: "(leer)",
-    historyActorScan: "Beim Scan erkannt",
+    historyActorScan: "Externe Änderung",
     historyActorLuminous: "Luminous",
     historyBatchNote: "mit {count} weiteren Titeln bearbeitet",
     historyEmptySince: "Keine erfassten Änderungen seit {date}.",

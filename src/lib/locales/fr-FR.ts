@@ -1687,7 +1687,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     historyTimestampHint: "Consultez l'horodatage d'analyse comme le moment où Luminous a détecté la modification sur le disque, car les éditeurs externes peuvent conserver l'heure de modification du fichier.",
     clearHistoryBtn: "Effacer l'historique",
     historyEmptyValue: "(vide)",
-    historyActorScan: "Détecté lors de l'analyse",
+    historyActorScan: "Modification externe",
     historyActorLuminous: "Luminous",
     historyBatchNote: "modifié avec {count} autres pistes",
     historyEmptySince: "Aucune modification enregistrée depuis le {date}.",

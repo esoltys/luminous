@@ -1731,7 +1731,7 @@ export const ru = {
     historyTimestampHint: "Учитывайте время сканирования как момент обнаружения изменений Luminous на диске, поскольку сторонние редакторы тегов могут сохранять исходное время изменения файла.",
     clearHistoryBtn: "Очистить историю",
     historyEmptyValue: "(пусто)",
-    historyActorScan: "Обнаружено при сканировании",
+    historyActorScan: "Внешнее изменение",
     historyActorLuminous: "Luminous",
     historyBatchNote: "отредактировано вместе с {count} другими треками",
     historyEmptySince: "Нет записанных изменений с {date}.",

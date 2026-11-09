@@ -1611,7 +1611,7 @@ export const it = {
     historyTimestampHint: "Considera i timestamp di scansione come il momento in cui Luminous ha rilevato le modifiche sul disco, poiché i tagger esterni potrebbero preservare l'ora di modifica originale del file.",
     clearHistoryBtn: "Cancella cronologia",
     historyEmptyValue: "(vuoto)",
-    historyActorScan: "Rilevato durante la scansione",
+    historyActorScan: "Modifica esterna",
     historyActorLuminous: "Luminous",
     historyBatchNote: "modificato con altri {count} brani",
     historyEmptySince: "Nessuna modifica registrata dal {date}.",

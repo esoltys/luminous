@@ -1611,7 +1611,7 @@ export const es = {
     historyTimestampHint: "Consulte las marcas de tiempo de análisis como el momento en que Luminous detectó los cambios en el disco, ya que los editores externos pueden conservar la fecha de modificación original del archivo.",
     clearHistoryBtn: "Borrar historial",
     historyEmptyValue: "(vacío)",
-    historyActorScan: "Detectado en el análisis",
+    historyActorScan: "Cambio externo",
     historyActorLuminous: "Luminous",
     historyBatchNote: "editado con {count} pistas más",
     historyEmptySince: "Sin cambios registrados desde el {date}.",

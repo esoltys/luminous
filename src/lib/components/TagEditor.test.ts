@@ -374,7 +374,7 @@ describe("TagEditor.svelte", () => {
 
     await findByText("History");
     expect(getByText("Luminous")).toBeInTheDocument();
-    expect(getByText("Detected on scan")).toBeInTheDocument();
+    expect(getByText("External change")).toBeInTheDocument();
     expect(getByText("Classic Rock")).toBeInTheDocument();
     expect(getByText("Hard Rock")).toBeInTheDocument();
     expect(getByText("(empty)")).toBeInTheDocument();
