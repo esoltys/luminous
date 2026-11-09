@@ -2400,6 +2400,7 @@ export const ru = {
     filterReady: "Готовы к перемещению ({count})",
     filterNeedsTags: "Требуются теги ({count})",
     filterDuplicates: "Дубликаты ({count})",
+    collisionDiskNotice: "Целевой файл уже существует на диске. Этот трек будет направлен в папку Duplicates во избежание перезаписи.",
     filterErrors: "Ошибки ({count})",
     includeMissingTagsToggle: "Включить песни с отсутствующими тегами",
     customizeSummaryBtn: "Настроить…",

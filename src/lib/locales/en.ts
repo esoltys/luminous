@@ -2240,6 +2240,7 @@ export const en = {
     filterReady: "Ready to Move ({count})",
     filterNeedsTags: "Needs Tags ({count})",
     filterDuplicates: "Duplicate Copies ({count})",
+    collisionDiskNotice: "Destination file already exists on disk. This track will be routed to the Duplicates folder to prevent overwriting.",
     filterErrors: "Errors ({count})",
     includeMissingTagsToggle: "Include songs with missing tags",
     customizeSummaryBtn: "Customize…",

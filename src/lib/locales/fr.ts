@@ -2248,6 +2248,7 @@ export const fr: DeepStringRecord<typeof en> = {
     filterReady: "Prêts à déplacer ({count})",
     filterNeedsTags: "Étiquettes requises ({count})",
     filterDuplicates: "Doublons ({count})",
+    collisionDiskNotice: "Le fichier de destination existe déjà sur le disque. Cette piste sera acheminée vers le dossier Duplicates pour éviter de l'écraser.",
     filterErrors: "Erreurs ({count})",
     includeMissingTagsToggle: "Inclure les morceaux aux étiquettes manquantes",
     customizeSummaryBtn: "Personnaliser…",

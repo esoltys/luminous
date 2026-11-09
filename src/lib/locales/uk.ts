@@ -2400,6 +2400,7 @@ export const uk = {
     filterReady: "Готові до переміщення ({count})",
     filterNeedsTags: "Потрібні теги ({count})",
     filterDuplicates: "Дублікати ({count})",
+    collisionDiskNotice: "Цільовий файл уже існує на диску. Цей трек буде спрямовано до папки Duplicates, щоб уникнути перезапису.",
     filterErrors: "Помилки ({count})",
     includeMissingTagsToggle: "Включити пісні з відсутніми тегами",
     customizeSummaryBtn: "Налаштувати…",

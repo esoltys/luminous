@@ -297,7 +297,7 @@
         </div>
       {:else if activeGroups.length === 0}
         <div class="h-64 flex flex-col items-center justify-center text-center space-y-3">
-          <div class="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+          <div class="w-12 h-12 rounded-full bg-brand-accent/15 text-brand-accent-text flex items-center justify-center">
             <Check class="w-6 h-6" />
           </div>
           <h3 class="text-sm font-bold text-brand-text-primary">

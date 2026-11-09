@@ -2240,6 +2240,7 @@ export const it = {
     filterReady: "Pronti da spostare ({count})",
     filterNeedsTags: "Tag mancanti ({count})",
     filterDuplicates: "Copie duplicate ({count})",
+    collisionDiskNotice: "Il file di destinazione esiste già sul disco. Questo brano verrà indirizzato alla cartella Duplicates per evitarne la sovrascrittura.",
     filterErrors: "Errori ({count})",
     includeMissingTagsToggle: "Includi brani con tag mancanti",
     customizeSummaryBtn: "Personalizza…",

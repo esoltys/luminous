@@ -2240,6 +2240,7 @@ export const es = {
     filterReady: "Listo para mover ({count})",
     filterNeedsTags: "Faltan etiquetas ({count})",
     filterDuplicates: "Copias duplicadas ({count})",
+    collisionDiskNotice: "El archivo de destino ya existe en el disco. Esta pista se dirigirá a la carpeta Duplicates para evitar sobrescribirla.",
     filterErrors: "Errores ({count})",
     includeMissingTagsToggle: "Incluir canciones con etiquetas faltantes",
     customizeSummaryBtn: "Personalizar…",

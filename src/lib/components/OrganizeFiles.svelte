@@ -430,6 +430,20 @@
     editingSongId = songId;
   }
 
+  async function handleReviewDuplicate(songId: number) {
+    try {
+      const groups = await invoke<import("../types").DuplicateTrackGroup[]>("get_duplicate_track_groups");
+      const hasGroup = groups.some((g) => g.candidates.some((c) => c.song.id === songId));
+      if (hasGroup) {
+        reviewDuplicateSongId = songId;
+      } else {
+        toastStore.show(i18n.t("organizer.collisionDiskNotice"), "info", TOAST_DURATION_MS);
+      }
+    } catch {
+      reviewDuplicateSongId = songId;
+    }
+  }
+
   async function handleTagEditorSaved() {
     await collectionStore.refreshLibrary();
     await fetchPreview();
@@ -732,9 +746,9 @@
 {#snippet templateSection()}
   <div class="space-y-4">
     {#if isDraftModified && organizeStore.autoOrganize}
-      <div class="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200">
+      <div class="flex items-center justify-between p-2.5 rounded-xl bg-brand-sidebar border border-brand-border/60 text-brand-text-primary">
         <div class="flex items-center gap-2 min-w-0">
-          <AlertTriangle class="w-4 h-4 shrink-0 text-amber-400" />
+          <AlertTriangle class="w-4 h-4 shrink-0 text-brand-text-secondary" />
           <span class="text-xs font-medium truncate">
             {i18n.t("organizer.draftModifiedBadge")}
           </span>
@@ -742,7 +756,7 @@
         <button
           type="button"
           onclick={revertDraft}
-          class="text-xs underline hover:text-white shrink-0 ml-2 font-medium"
+          class="text-xs underline hover:text-brand-text-primary text-brand-text-secondary shrink-0 ml-2 font-medium"
         >
           {i18n.t("organizer.revertDraftBtn")}
         </button>
@@ -897,7 +911,7 @@
             <button
               type="button"
               onclick={() => { activeFilter = "missing_tag"; }}
-              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'missing_tag' ? 'bg-amber-500 text-black font-bold shadow-sm' : 'bg-brand-sidebar text-amber-400 hover:text-amber-300 border border-amber-500/30'}"
+              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'missing_tag' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
             >
               {i18n.t("organizer.filterNeedsTags", { count: missingTagCount })}
             </button>
@@ -906,7 +920,7 @@
             <button
               type="button"
               onclick={() => { activeFilter = "duplicate"; }}
-              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'duplicate' ? 'bg-amber-500 text-black font-bold shadow-sm' : 'bg-brand-sidebar text-amber-400 hover:text-amber-300 border border-amber-500/30'}"
+              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'duplicate' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
             >
               {i18n.t("organizer.filterDuplicates", { count: collisionCount })}
             </button>
@@ -915,7 +929,7 @@
             <button
               type="button"
               onclick={() => { activeFilter = "error"; }}
-              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'error' ? 'bg-rose-500 text-white font-bold shadow-sm' : 'bg-brand-sidebar text-rose-400 hover:text-rose-300 border border-rose-500/30'}"
+              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'error' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
             >
               {i18n.t("organizer.filterErrors", { count: errorCount })}
             </button>
@@ -1033,7 +1047,7 @@
                         <HelpTip
                           text={item.error_message || i18n.t("organizer.statusCollision")}
                           label={item.error_message ? i18n.t("organizer.statusCollision") : undefined}
-                          class="w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                          class="w-6 h-6 rounded bg-brand-sidebar text-brand-text-secondary border border-brand-border/60"
                         >
                           <Duplicate class="w-3.5 h-3.5" />
                         </HelpTip>
@@ -1041,7 +1055,7 @@
                         <HelpTip
                           text={formatMissingTagTooltip(item)}
                           label={i18n.t("organizer.statusMissingTag")}
-                          class="w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                          class="w-6 h-6 rounded bg-brand-sidebar text-brand-text-secondary border border-brand-border/60"
                         >
                           <AlertTriangle class="w-3.5 h-3.5" />
                         </HelpTip>
@@ -1049,7 +1063,7 @@
                         <HelpTip
                           text={item.error_message || i18n.t("organizer.statusError")}
                           label={item.error_message ? i18n.t("organizer.statusError") : undefined}
-                          class="w-6 h-6 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                          class="w-6 h-6 rounded bg-brand-sidebar text-brand-text-secondary border border-brand-border/60"
                         >
                           <ErrorIcon class="w-3.5 h-3.5" />
                         </HelpTip>
@@ -1069,7 +1083,7 @@
                     </div>
 
                     <div
-                      class="px-2 overflow-x-auto scrollbar-none shrink-0 {item.from_path ? 'text-brand-text-secondary' : 'text-rose-400 font-medium'}"
+                      class="px-2 overflow-x-auto scrollbar-none shrink-0 {item.from_path ? 'text-brand-text-secondary' : 'text-brand-text-primary font-medium'}"
                       style="width: {fromColWidth}px;"
                       title={item.from_path}
                     >
@@ -1079,16 +1093,16 @@
                     <div class="w-6 text-center text-brand-text-secondary shrink-0">→</div>
 
                     <div
-                      class="px-2 overflow-x-auto scrollbar-none shrink-0 {st === 'ok' ? 'text-brand-text-primary font-medium' : st === 'error' ? 'text-rose-400 font-semibold' : st === 'duplicate' ? 'text-amber-400 font-medium' : 'text-brand-text-primary'}"
+                      class="px-2 overflow-x-auto scrollbar-none shrink-0 text-brand-text-primary font-medium"
                       style="width: {toColWidth}px;"
                       title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
                     >
                       {#if st === 'error'}
-                        <span class="text-rose-400 font-medium">
+                        <span class="text-brand-text-secondary font-medium">
                           {item.error_message ? item.error_message : (displayTo || i18n.t("organizer.unknownError"))}
                         </span>
                       {:else if st === 'duplicate'}
-                        <span class="text-amber-400 font-medium">
+                        <span class="text-brand-text-secondary font-medium">
                           {item.error_message ? shortenDuplicateMessage(item.error_message) : displayTo}
                         </span>
                       {:else}
@@ -1101,8 +1115,8 @@
                       {#if st === "duplicate"}
                         <button
                           type="button"
-                          onclick={(e) => { e.stopPropagation(); reviewDuplicateSongId = item.song_id; }}
-                          class="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black text-[10px] font-semibold border border-amber-500/40 transition-colors flex items-center gap-1 shadow-sm"
+                          onclick={(e) => { e.stopPropagation(); handleReviewDuplicate(item.song_id); }}
+                          class="px-2 py-1 rounded bg-brand-sidebar hover:bg-brand-main text-brand-text-primary text-[10px] font-semibold border border-brand-border/60 transition-colors flex items-center gap-1 shadow-sm"
                           title={i18n.t("curation.compareDuplicatesBtn")}
                         >
                           <Duplicate class="w-3 h-3" />
@@ -1158,7 +1172,7 @@
 
 {#snippet actionMessages()}
   {#if errorMessage}
-    <div class="text-rose-400 flex items-center gap-2 font-medium text-xs">
+    <div class="text-brand-text-secondary flex items-center gap-2 font-medium text-xs">
       <AlertTriangle class="w-4 h-4 shrink-0" />
       <span>{errorMessage}</span>
     </div>
@@ -1326,7 +1340,7 @@
           onclick={() => {
             const id = contextMenu!.item.song_id;
             contextMenu = null;
-            reviewDuplicateSongId = id;
+            handleReviewDuplicate(id);
           }}
         />
       {/if}
