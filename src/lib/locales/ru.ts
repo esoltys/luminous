@@ -531,6 +531,12 @@ export const ru = {
     text: "Эта библиотека последний раз открывалась в более новой версии Luminous (база данных v{dbVersion}, это приложение поддерживает v{appVersion}). Ваши папки и песни на месте — обновите Luminous, чтобы снова их увидеть."
   },
   collection: {
+    externalChangesToast: {
+      one: "{name}: {count} трек изменён вне Luminous",
+      few: "{name}: {count} трека изменено вне Luminous",
+      many: "{name}: {count} треков изменено вне Luminous",
+      other: "{name}: {count} треков изменено вне Luminous"
+    },
     alphabetScrubberLabel: "Алфавитный указатель",
     jumpToLetter: "Перейти к букве {letter}",
     columnSelectorVisible: "Видимые",
@@ -1728,14 +1734,18 @@ export const ru = {
     historyImported: "Импортировано",
     historyFormat: "Формат",
     historyFileSize: "Размер",
-    historyTimestampHint: "Учитывайте время сканирования как момент обнаружения изменений Luminous на диске, поскольку сторонние редакторы тегов могут сохранять исходное время изменения файла.",
+    historyTimestampHint: "Временные метки и источники изменений тегов. Внешние изменения определяются по дате изменения файлов при сканировании; запустите полное сканирование для обнаружения правок с сохранённой датой.",
     clearHistoryBtn: "Очистить историю",
     historyEmptyValue: "(пусто)",
-    historyActorScan: "Внешнее изменение",
+    historyActorScan: "Обнаружено при сканировании",
     historyActorLuminous: "Luminous",
     historyBatchNote: "отредактировано вместе с {count} другими песнями",
     historyEmptySince: "Нет записанных изменений с {date}.",
     historyEmpty: "Нет записанных изменений.",
+    historyFilterLabel: "Фильтр истории",
+    historyFilterAll: "Все ({count})",
+    historyFilterScan: "Обнаружено при сканировании ({count})",
+    historyFilterEmpty: "При сканировании изменений не обнаружено.",
     restoreAction: "Восстановить",
     restoreBatchBtn: "Восстановить всё",
     restoreBatchTooltip: "Восстановить все песни, изменённые в этом редактировании",

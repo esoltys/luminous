@@ -312,6 +312,55 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     expect(activeTask?.label).toBe("Fast SSD: Library refreshed");
   });
 
+  it("shows persistent toast when scan completes with external tag changes", async () => {
+    await (collectionStore as any).init();
+    const toastSpy = vi.spyOn(toastStore, "show");
+
+    eventCallbacks["scan-progress"]({
+      payload: {
+        phase: "done",
+        scanned: 10,
+        total: 10,
+        directory_name: "Music",
+        silent: false,
+        external_changes: 3,
+      }
+    });
+
+    await vi.waitFor(() => {
+      expect(toastSpy).toHaveBeenCalledWith("Music: 3 tracks changed outside Luminous", "info");
+    });
+
+    // When external_changes is 0, no toast is shown
+    toastSpy.mockClear();
+    eventCallbacks["scan-progress"]({
+      payload: {
+        phase: "done",
+        scanned: 10,
+        total: 10,
+        directory_name: "Music",
+        silent: false,
+        external_changes: 0,
+      }
+    });
+    expect(toastSpy).not.toHaveBeenCalled();
+
+    // When silent is true, no toast is shown
+    toastSpy.mockClear();
+    eventCallbacks["scan-progress"]({
+      payload: {
+        phase: "done",
+        scanned: 10,
+        total: 10,
+        directory_name: "Music",
+        silent: true,
+        external_changes: 5,
+      }
+    });
+    expect(toastSpy).not.toHaveBeenCalled();
+    toastSpy.mockRestore();
+  });
+
   it("resolves directory display names and scan library names correctly", () => {
     const dirWithNickname = {
       id: 1,

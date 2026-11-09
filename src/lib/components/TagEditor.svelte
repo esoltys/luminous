@@ -107,6 +107,15 @@
   let tagHistory = $state<SongTagHistory | null>(null);
   let isClearingHistory = $state(false);
   let isRestoring = $state(false);
+  let historyFilter = $state<"all" | "scan">("all");
+
+  let scanEntries = $derived(
+    tagHistory?.entries.filter((e) => e.actor === "scan") ?? []
+  );
+  let scanEntryCount = $derived(scanEntries.length);
+  let displayedEntries = $derived(
+    historyFilter === "scan" ? scanEntries : (tagHistory?.entries ?? [])
+  );
 
   let isLoading = $state(false);
   let isSaving = $state(false);
@@ -143,6 +152,7 @@
   }
 
   async function loadTagHistory(id: number) {
+    historyFilter = "all";
     try {
       const history = await invoke<SongTagHistory>("get_song_tag_history", { songId: id });
       tagHistory = history ?? null;
@@ -867,12 +877,28 @@
                     </div>
                   {:else}
                     <div class="space-y-2 pt-2 border-t border-brand-border/40">
-                      <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-1.5 text-brand-text-secondary text-xs">
+                      <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div class="flex items-center gap-2">
                           <HelpTip
                             text={i18n.t("tagEditor.historyTimestampHint")}
                             label={i18n.t("tagEditor.historyTimestampHint")}
                           />
+                          <div class="flex items-center gap-1 bg-brand-surface/60 p-0.5 rounded border border-brand-border/40 text-[11px]" role="radiogroup" aria-label={i18n.t("tagEditor.historyFilterLabel")}>
+                            <button
+                              type="button"
+                              class="px-2 py-0.5 rounded transition-colors {historyFilter === 'all' ? 'bg-brand-primary text-white font-medium' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                              onclick={() => { historyFilter = 'all'; }}
+                            >
+                              {i18n.t("tagEditor.historyFilterAll", { count: tagHistory.entries.length })}
+                            </button>
+                            <button
+                              type="button"
+                              class="px-2 py-0.5 rounded transition-colors {historyFilter === 'scan' ? 'bg-brand-primary text-white font-medium' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                              onclick={() => { historyFilter = 'scan'; }}
+                            >
+                              {i18n.t("tagEditor.historyFilterScan", { count: scanEntryCount })}
+                            </button>
+                          </div>
                         </div>
                         <Button
                           variant="secondary"
@@ -885,54 +911,66 @@
                         </Button>
                       </div>
 
-                      <div class="space-y-2">
-                        {#each tagHistory.entries as entry (entry.id)}
-                          <div class="p-2 rounded bg-brand-surface/40 border border-brand-border/40 text-xs flex flex-col gap-1.5">
-                            <div class="flex items-center justify-between text-brand-text-secondary text-[11px]">
-                              <div class="flex items-center gap-1.5 flex-wrap">
-                                <span>{entry.actor === "scan" ? i18n.t("tagEditor.historyActorScan") : i18n.t("tagEditor.historyActorLuminous")}</span>
-                                {#if entry.batchOtherTracks > 0}
-                                  <span class="text-brand-text-secondary/60">•</span>
-                                  <span>{i18n.t("tagEditor.historyBatchNote", { count: entry.batchOtherTracks })}</span>
-                                {/if}
+                      {#if displayedEntries.length === 0}
+                        <div class="py-4 text-center text-brand-text-secondary text-xs italic">
+                          {i18n.t("tagEditor.historyFilterEmpty")}
+                        </div>
+                      {:else}
+                        <div class="space-y-2">
+                          {#each displayedEntries as entry (entry.id)}
+                            <div class="p-2 rounded bg-brand-surface/40 border border-brand-border/40 text-xs flex flex-col gap-1.5">
+                              <div class="flex items-center justify-between text-brand-text-secondary text-[11px]">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                  {#if entry.actor === "scan"}
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                      {i18n.t("tagEditor.historyActorScan")}
+                                    </span>
+                                  {:else}
+                                    <span class="text-brand-text-secondary font-medium">{i18n.t("tagEditor.historyActorLuminous")}</span>
+                                  {/if}
+                                  {#if entry.batchOtherTracks > 0}
+                                    <span class="text-brand-text-secondary/60">•</span>
+                                    <span>{i18n.t("tagEditor.historyBatchNote", { count: entry.batchOtherTracks })}</span>
+                                  {/if}
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                  <span class="text-brand-text-secondary">{formatDate(entry.at)}</span>
+                                  {#if entry.batchId && entry.batchOtherTracks > 0}
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      disabled={isRestoring || isSaving}
+                                      onclick={() => handleRestoreBatch(entry.batchId!)}
+                                      class="text-[10px] h-5 px-1.5 py-0"
+                                      title={i18n.t("tagEditor.restoreBatchTooltip")}
+                                    >
+                                      {i18n.t("tagEditor.restoreBatchBtn")}
+                                    </Button>
+                                  {/if}
+                                </div>
                               </div>
-                              <div class="flex items-center gap-2 shrink-0">
-                                <span class="text-brand-text-secondary">{formatDate(entry.at)}</span>
-                                {#if entry.batchId && entry.batchOtherTracks > 0}
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    disabled={isRestoring || isSaving}
-                                    onclick={() => handleRestoreBatch(entry.batchId!)}
-                                    class="text-[10px] h-5 px-1.5 py-0"
-                                    title={i18n.t("tagEditor.restoreBatchTooltip")}
-                                  >
-                                    {i18n.t("tagEditor.restoreBatchBtn")}
-                                  </Button>
-                                {/if}
+                              <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-1.5 text-brand-text-primary break-all flex-wrap">
+                                  <span class="font-medium text-brand-text-primary">{getFieldLabel(entry.field)}:</span>
+                                  <span class="text-brand-text-secondary line-through opacity-80">{formatHistoryValue(entry.oldValue)}</span>
+                                  <span class="text-brand-text-secondary/70">→</span>
+                                  <span class="font-medium">{formatHistoryValue(entry.newValue)}</span>
+                                </div>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  disabled={isRestoring || isSaving || isValueCurrent(entry.field, entry.oldValue)}
+                                  onclick={() => handleRestoreEntry(entry)}
+                                  class="text-xs h-6 px-2 shrink-0"
+                                  title={isValueCurrent(entry.field, entry.oldValue) ? i18n.t("tagEditor.restoreAlreadyCurrent") : undefined}
+                                >
+                                  {i18n.t("tagEditor.restoreAction")}
+                                </Button>
                               </div>
                             </div>
-                            <div class="flex items-center justify-between gap-2">
-                              <div class="flex items-center gap-1.5 text-brand-text-primary break-all flex-wrap">
-                                <span class="font-medium text-brand-text-primary">{getFieldLabel(entry.field)}:</span>
-                                <span class="text-brand-text-secondary line-through opacity-80">{formatHistoryValue(entry.oldValue)}</span>
-                                <span class="text-brand-text-secondary/70">→</span>
-                                <span class="font-medium">{formatHistoryValue(entry.newValue)}</span>
-                              </div>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                disabled={isRestoring || isSaving || isValueCurrent(entry.field, entry.oldValue)}
-                                onclick={() => handleRestoreEntry(entry)}
-                                class="text-xs h-6 px-2 shrink-0"
-                                title={isValueCurrent(entry.field, entry.oldValue) ? i18n.t("tagEditor.restoreAlreadyCurrent") : undefined}
-                              >
-                                {i18n.t("tagEditor.restoreAction")}
-                              </Button>
-                            </div>
-                          </div>
-                        {/each}
-                      </div>
+                          {/each}
+                        </div>
+                      {/if}
                     </div>
                   {/if}
                 </div>

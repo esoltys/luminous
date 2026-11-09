@@ -473,6 +473,10 @@ export const frFR: DeepStringRecord<typeof en> = {
     text: "Cette bibliothèque a été ouverte pour la dernière fois par une version plus récente de Luminous (base de données v{dbVersion}, cette application prend en charge la v{appVersion}). Vos dossiers et vos morceaux sont toujours là — mettez à jour Luminous pour les retrouver."
   },
   collection: {
+    externalChangesToast: {
+      one: "{name} : {count} piste modifiée en dehors de Luminous",
+      other: "{name} : {count} pistes modifiées en dehors de Luminous"
+    },
     alphabetScrubberLabel: "Index alphabétique",
     jumpToLetter: "Aller à la lettre {letter}",
     columnSelectorVisible: "Visibles",
@@ -1684,14 +1688,18 @@ export const frFR: DeepStringRecord<typeof en> = {
     historyImported: "Importé",
     historyFormat: "Format",
     historyFileSize: "Taille",
-    historyTimestampHint: "Consultez l'horodatage d'analyse comme le moment où Luminous a détecté la modification sur le disque, car les éditeurs externes peuvent conserver l'heure de modification du fichier.",
+    historyTimestampHint: "Horodatage et sources des modifications d'étiquettes. Les modifications externes sont détectées grâce à l'horodatage des fichiers lors des analyses ; lancez une réanalyse complète pour détecter celles qui ont conservé la date du fichier.",
     clearHistoryBtn: "Effacer l'historique",
     historyEmptyValue: "(vide)",
-    historyActorScan: "Modification externe",
+    historyActorScan: "Détecté lors de l'analyse",
     historyActorLuminous: "Luminous",
     historyBatchNote: "modifié avec {count} autres chansons",
     historyEmptySince: "Aucune modification enregistrée depuis le {date}.",
     historyEmpty: "Aucune modification enregistrée.",
+    historyFilterLabel: "Filtrer l'historique",
+    historyFilterAll: "Tout ({count})",
+    historyFilterScan: "Détecté lors de l'analyse ({count})",
+    historyFilterEmpty: "Aucune modification détectée lors de l'analyse.",
     restoreAction: "Rétablir",
     restoreBatchBtn: "Tout rétablir",
     restoreBatchTooltip: "Rétablir toutes les chansons modifiées lors de cette modification",

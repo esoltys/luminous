@@ -531,6 +531,12 @@ export const uk = {
     text: "Цю бібліотеку востаннє відкривала новіша версія Luminous (база даних v{dbVersion}, цей застосунок підтримує v{appVersion}). Ваші папки й пісні нікуди не зникли — оновіть Luminous, щоб знову їх побачити."
   },
   collection: {
+    externalChangesToast: {
+      one: "{name}: {count} трек змінено поза Luminous",
+      few: "{name}: {count} треки змінено поза Luminous",
+      many: "{name}: {count} треків змінено поза Luminous",
+      other: "{name}: {count} треків змінено поза Luminous"
+    },
     alphabetScrubberLabel: "Алфавітний покажчик",
     jumpToLetter: "Перейти до літери {letter}",
     columnSelectorVisible: "Видимі",
@@ -1728,14 +1734,18 @@ export const uk = {
     historyImported: "Імпортовано",
     historyFormat: "Формат",
     historyFileSize: "Розмір",
-    historyTimestampHint: "Враховуйте час сканування як момент виявлення змін Luminous на диску, оскільки сторонні редактори тегів можуть зберігати початковий час змінення файлу.",
+    historyTimestampHint: "Часові мітки та джерела змін тегів. Зовнішні зміни виявляються за датою зміни файлів під час сканування; запустіть повне сканування для виявлення редагувань зі збереженою датою.",
     clearHistoryBtn: "Очистити історію",
     historyEmptyValue: "(порожньо)",
-    historyActorScan: "Зовнішня зміна",
+    historyActorScan: "Виявлено під час сканування",
     historyActorLuminous: "Luminous",
     historyBatchNote: "відредаговано разом із {count} іншими піснями",
     historyEmptySince: "Немає записаних змін з {date}.",
     historyEmpty: "Немає записаних змін.",
+    historyFilterLabel: "Фільтр історії",
+    historyFilterAll: "Усі ({count})",
+    historyFilterScan: "Виявлено під час сканування ({count})",
+    historyFilterEmpty: "Під час сканування змін не виявлено.",
     restoreAction: "Відновити",
     restoreBatchBtn: "Відновити все",
     restoreBatchTooltip: "Відновити всі пісні, змінені в цьому редагуванні",

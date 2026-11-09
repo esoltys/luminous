@@ -467,6 +467,10 @@ export const de = {
     text: "Diese Mediathek wurde zuletzt mit einer neueren Version von Luminous geöffnet (Datenbank v{dbVersion}, diese App unterstützt v{appVersion}). Ordner und Titel sind weiterhin vorhanden – aktualisiere Luminous, um sie wieder zu sehen."
   },
   collection: {
+    externalChangesToast: {
+      one: "{name}: {count} Titel außerhalb von Luminous geändert",
+      other: "{name}: {count} Titel außerhalb von Luminous geändert"
+    },
     alphabetScrubberLabel: "Alphabetischer Index",
     jumpToLetter: "Zu Buchstabe {letter} springen",
     columnSelectorVisible: "Sichtbar",
@@ -1608,14 +1612,18 @@ export const de = {
     historyImported: "Importiert",
     historyFormat: "Format",
     historyFileSize: "Größe",
-    historyTimestampHint: "Betrachten Sie Scan-Zeitstempel als den Moment, in dem Luminous Änderungen auf dem Datenträger erkannt hat, da externe Tagger die Dateiänderungszeit möglicherweise beibehalten.",
+    historyTimestampHint: "Zeitstempel und Quellen für Tag-Änderungen. Externe Bearbeitungen werden beim Scannen anhand der Änderungszeit erkannt; führen Sie einen vollständigen Rescan durch, um Änderungen mit unverändertem Zeitstempel zu erkennen.",
     clearHistoryBtn: "Verlauf löschen",
     historyEmptyValue: "(leer)",
-    historyActorScan: "Externe Änderung",
+    historyActorScan: "Beim Scannen erkannt",
     historyActorLuminous: "Luminous",
     historyBatchNote: "mit {count} weiteren Titeln bearbeitet",
     historyEmptySince: "Keine erfassten Änderungen seit {date}.",
     historyEmpty: "Keine erfassten Änderungen.",
+    historyFilterLabel: "Verlauf filtern",
+    historyFilterAll: "Alle ({count})",
+    historyFilterScan: "Beim Scannen erkannt ({count})",
+    historyFilterEmpty: "Keine beim Scannen erkannten Änderungen.",
     restoreAction: "Wiederherstellen",
     restoreBatchBtn: "Alle wiederherstellen",
     restoreBatchTooltip: "Alle bei dieser Bearbeitung geänderten Titel wiederherstellen",

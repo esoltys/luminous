@@ -467,6 +467,10 @@ export const en = {
     text: "This library was last opened by a newer version of Luminous (database v{dbVersion}, this app supports v{appVersion}). Your folders and songs are still there — update Luminous to see them again."
   },
   collection: {
+    externalChangesToast: {
+      one: "{name}: {count} track changed outside Luminous",
+      other: "{name}: {count} tracks changed outside Luminous"
+    },
     alphabetScrubberLabel: "Alphabet index",
     jumpToLetter: "Jump to {letter}",
     columnSelectorVisible: "Visible",
@@ -1608,14 +1612,18 @@ export const en = {
     historyImported: "Imported",
     historyFormat: "Format",
     historyFileSize: "Size",
-    historyTimestampHint: "View scan timestamps as the moment Luminous detected changes on disk, as external taggers may preserve original file modification times.",
+    historyTimestampHint: "Tag change timestamps and sources. External edits are detected via file modification time during scans; run a full rescan to detect edits that preserved file timestamps.",
     clearHistoryBtn: "Clear History",
     historyEmptyValue: "(empty)",
-    historyActorScan: "External change",
+    historyActorScan: "Detected on scan",
     historyActorLuminous: "Luminous",
     historyBatchNote: "edited with {count} other songs",
     historyEmptySince: "No recorded changes since {date}.",
     historyEmpty: "No recorded changes.",
+    historyFilterLabel: "Filter history",
+    historyFilterAll: "All ({count})",
+    historyFilterScan: "Detected on scan ({count})",
+    historyFilterEmpty: "No changes detected on scan.",
     restoreAction: "Restore",
     restoreBatchBtn: "Restore All",
     restoreBatchTooltip: "Restore all songs changed in this edit",
