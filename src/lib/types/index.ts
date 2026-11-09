@@ -871,6 +871,7 @@ export interface ScanProgress {
   silent: boolean;
   directory_name?: string;
   directory_id?: number;
+  external_changes?: number;
 }
 
 export type BatchPhase = "removing" | "adding" | "done";

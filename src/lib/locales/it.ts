@@ -467,6 +467,10 @@ export const it = {
     text: "Questa libreria è stata aperta l'ultima volta da una versione più recente di Luminous (database v{dbVersion}, questa app supporta la v{appVersion}). Le tue cartelle e i tuoi brani sono ancora al loro posto: aggiorna Luminous per rivederli."
   },
   collection: {
+    externalChangesToast: {
+      one: "{name}: {count} traccia modificata all'esterno di Luminous",
+      other: "{name}: {count} tracce modificate all'esterno di Luminous"
+    },
     alphabetScrubberLabel: "Indice alfabetico",
     jumpToLetter: "Vai alla lettera {letter}",
     columnSelectorVisible: "Visibili",
@@ -1608,14 +1612,18 @@ export const it = {
     historyImported: "Importato",
     historyFormat: "Formato",
     historyFileSize: "Dimensione",
-    historyTimestampHint: "Considera i timestamp di scansione come il momento in cui Luminous ha rilevato le modifiche sul disco, poiché i tagger esterni potrebbero preservare l'ora di modifica originale del file.",
+    historyTimestampHint: "Timestamp e origini delle modifiche ai tag. Le modifiche esterne vengono rilevate tramite la data di modifica del file durante la scansione; esegui una scansione completa per rilevare le modifiche che hanno mantenuto la data del file.",
     clearHistoryBtn: "Cancella cronologia",
     historyEmptyValue: "(vuoto)",
-    historyActorScan: "Modifica esterna",
+    historyActorScan: "Rilevato durante la scansione",
     historyActorLuminous: "Luminous",
     historyBatchNote: "modificato con altri {count} brani",
     historyEmptySince: "Nessuna modifica registrata dal {date}.",
     historyEmpty: "Nessuna modifica registrata.",
+    historyFilterLabel: "Filtra cronologia",
+    historyFilterAll: "Tutto ({count})",
+    historyFilterScan: "Rilevato durante la scansione ({count})",
+    historyFilterEmpty: "Nessuna modifica rilevata durante la scansione.",
     restoreAction: "Ripristina",
     restoreBatchBtn: "Ripristina tutto",
     restoreBatchTooltip: "Ripristina tutti i brani modificati in questa modifica",

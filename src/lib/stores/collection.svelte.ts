@@ -474,6 +474,16 @@ class CollectionStore {
               toastStore.show(text, "success");
             }
 
+            const externalChanges = event.payload.external_changes ?? 0;
+            if (externalChanges > 0 && !event.payload.silent) {
+              const externalText = i18n.plural(
+                "collection.externalChangesToast",
+                externalChanges,
+                { name: libraryName }
+              );
+              toastStore.show(externalText, "info");
+            }
+
             // Milestone detection (#182): check if total_songs just crossed a
             // threshold. Only fire the highest one crossed (don't stack multiple
             // milestone toasts if an import jumps past several at once).

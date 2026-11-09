@@ -1060,6 +1060,8 @@ pub struct ScanProgress {
     pub directory_name: Option<String>,
     #[serde(default)]
     pub directory_id: Option<i64>,
+    #[serde(default)]
+    pub external_changes: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

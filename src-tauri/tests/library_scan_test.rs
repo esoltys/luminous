@@ -32,6 +32,10 @@ impl ScanTestEnv {
     }
 
     async fn run_scan(&self, force: bool) {
+        self.run_scan_report(force).await;
+    }
+
+    async fn run_scan_report(&self, force: bool) -> luminous_lib::collection::ScanReport {
         self.scanner
             .scan_all_core(
                 self.app_data_dir.clone(),
@@ -41,7 +45,7 @@ impl ScanTestEnv {
                 |_progress| {},
             )
             .await
-            .expect("scan_all_core failed");
+            .expect("scan_all_core failed")
     }
 
     fn copy_fixture(&self, fixture_name: &str, relative_folder: &str) {
@@ -270,5 +274,119 @@ async fn test_reserved_folders_never_scanned() {
     assert!(
         !titles.contains(&"Song Beta".to_string()),
         "Song Beta in Duplicates should not be indexed"
+    );
+}
+
+#[tokio::test]
+async fn test_scan_reports_external_tag_changes() {
+    let env = ScanTestEnv::new();
+    env.scanner
+        .add_directory(&env.scan_dir.to_string_lossy())
+        .expect("failed to add watched directory");
+
+    env.copy_fixture("song_alpha.mp3", "");
+    env.copy_fixture("song_gamma.flac", "");
+
+    // 1. Initial scan of a newly added folder reports 0 external changes
+    let report_initial = env.run_scan_report(false).await;
+    assert_eq!(
+        report_initial.external_changes, 0,
+        "first scan of newly added folder must report 0 external changes"
+    );
+
+    // 2. Scan when no files have changed reports 0 external changes
+    let report_unchanged = env.run_scan_report(false).await;
+    assert_eq!(
+        report_unchanged.external_changes, 0,
+        "scan with no changed files must report 0 external changes"
+    );
+
+    // 3. Edit 2 files externally on disk
+    let alpha_path = env.scan_dir.join("song_alpha.mp3");
+    let gamma_path = env.scan_dir.join("song_gamma.flac");
+
+    luminous_metadata::audio::write_tags(
+        &alpha_path,
+        &luminous_metadata::audio::TagWriteRequest {
+            title: "Externally Edited Alpha",
+            artist: "External Artist Alpha",
+            album: "External Album Alpha",
+            ..Default::default()
+        },
+    )
+    .expect("failed to write tags to alpha");
+    let alpha_mtime = std::fs::metadata(&alpha_path).unwrap().modified().unwrap()
+        + std::time::Duration::from_secs(5);
+    std::fs::File::options()
+        .write(true)
+        .open(&alpha_path)
+        .unwrap()
+        .set_modified(alpha_mtime)
+        .expect("set modified alpha");
+
+    luminous_metadata::audio::write_tags(
+        &gamma_path,
+        &luminous_metadata::audio::TagWriteRequest {
+            title: "Externally Edited Gamma",
+            artist: "External Artist Gamma",
+            album: "External Album Gamma",
+            ..Default::default()
+        },
+    )
+    .expect("failed to write tags to gamma");
+    let gamma_mtime = std::fs::metadata(&gamma_path).unwrap().modified().unwrap()
+        + std::time::Duration::from_secs(5);
+    std::fs::File::options()
+        .write(true)
+        .open(&gamma_path)
+        .unwrap()
+        .set_modified(gamma_mtime)
+        .expect("set modified gamma");
+
+    // Scan detects the 2 externally edited files
+    let report_edited = env.run_scan_report(false).await;
+    assert_eq!(
+        report_edited.external_changes, 2,
+        "scan after 2 external edits must report 2 external changes"
+    );
+
+    let conn = env.db.pool.get().expect("db conn failed");
+    assert_eq!(
+        luminous_lib::tag_history::count_songs_with_scan_history(&conn).unwrap(),
+        2
+    );
+
+    // 4. Forced rescan after an mtime-preserving external edit reports the track
+    let mtime_before = std::fs::metadata(&alpha_path).unwrap().modified().unwrap();
+    luminous_metadata::audio::write_tags(
+        &alpha_path,
+        &luminous_metadata::audio::TagWriteRequest {
+            title: "Preserved Mtime Title Alpha",
+            artist: "External Artist Alpha",
+            album: "External Album Alpha",
+            ..Default::default()
+        },
+    )
+    .expect("failed to write tags to alpha second time");
+    // Restore mtime to what it was before writing
+    std::fs::File::options()
+        .write(true)
+        .open(&alpha_path)
+        .unwrap()
+        .set_modified(mtime_before)
+        .expect("failed to set mtime");
+
+    // A normal (non-force) scan skips unchanged mtime
+    let report_normal = env.run_scan_report(false).await;
+    assert_eq!(
+        report_normal.external_changes, 0,
+        "normal scan skips mtime-preserving external edit"
+    );
+
+    // A forced rescan re-reads every file and reports the track
+    let report_forced = env.run_scan_report(true).await;
+    assert_eq!(
+        report_forced.external_changes, 1,
+        "forced rescan after mtime-preserving edit must detect and report the change"
     );
 }

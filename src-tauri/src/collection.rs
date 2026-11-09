@@ -124,6 +124,9 @@ pub struct ScanReport {
     pub reread: usize,
     pub failed: usize,
     pub marked_unavailable: usize,
+    /// Number of tracks whose metadata changed outside Luminous and was
+    /// recorded as `HistoryActor::Scan` tag history during this scan.
+    pub external_changes: usize,
     /// Paths whose rows this scan wrote (new or re-read files), so a caller can
     /// act on exactly what the scan picked up — e.g. auto-organize.
     pub upserted_paths: Vec<String>,
@@ -143,7 +146,7 @@ impl ScanReport {
     pub fn summary(&self, trigger: ScanTrigger) -> String {
         format!(
             "scan ({}{}): total {} ms | {} dir(s), {} file(s) found, {} CUE sheet(s), \
-             {} unchanged, {} re-read, {} failed, {} marked unavailable | \
+             {} unchanged, {} re-read, {} failed, {} marked unavailable, {} external change(s) | \
              discovery {} ms, moved-file reconcile + mtime check {} ms, tag read+write {} ms, missing check {} ms, \
              DR logs {} ms, artwork {} ms ({} album(s), {} remote fetch(es))",
             trigger.label(),
@@ -156,6 +159,7 @@ impl ScanReport {
             self.reread,
             self.failed,
             self.marked_unavailable,
+            self.external_changes,
             self.discovery_ms,
             self.partition_ms,
             self.tag_read_ms,
@@ -955,13 +959,17 @@ impl CollectionScanner {
             .map(|conn| crate::commands::context::is_online_enabled(&conn))
             .unwrap_or(true);
         let app_for_incidents = app.clone();
-        let report = self
+        let is_folder_added = matches!(trigger, ScanTrigger::FolderAdded);
+        let mut report = self
             .scan_all_core_ext(
                 app_data_dir,
                 force,
                 silent,
                 resolve_remote_art,
-                move |progress| {
+                move |mut progress| {
+                    if is_folder_added {
+                        progress.external_changes = 0;
+                    }
                     let _ = app_for_progress.emit("scan-progress", progress);
                 },
                 move |incident, ids| {
@@ -975,6 +983,9 @@ impl CollectionScanner {
                 },
             )
             .await?;
+        if is_folder_added {
+            report.external_changes = 0;
+        }
         let summary = report.summary(trigger);
         log::info!("{summary}");
         crate::diagnostics::record_operation(&summary);
@@ -1106,6 +1117,7 @@ impl CollectionScanner {
                 silent,
                 directory_name: None,
                 directory_id: None,
+                external_changes: 0,
             });
             return Ok(report);
         }
@@ -1125,6 +1137,7 @@ impl CollectionScanner {
             silent,
             directory_name: default_dir_context.1.clone(),
             directory_id: default_dir_context.0,
+            external_changes: 0,
         });
 
         let discovery_started = Instant::now();
@@ -1140,6 +1153,7 @@ impl CollectionScanner {
                 silent,
                 directory_name: Some(dir_name),
                 directory_id: Some(dir.id),
+                external_changes: 0,
             });
             let walker = WalkDir::new(&walk_root)
                 .follow_links(true)
@@ -1188,6 +1202,7 @@ impl CollectionScanner {
             silent,
             directory_name: default_dir_context.1.clone(),
             directory_id: default_dir_context.0,
+            external_changes: 0,
         });
 
         let mut scanned = 0u64;
@@ -1249,6 +1264,7 @@ impl CollectionScanner {
                                 silent,
                                 directory_name: dir_name,
                                 directory_id: dir_id,
+                                external_changes: 0,
                             });
                         }
                         continue;
@@ -1322,15 +1338,21 @@ impl CollectionScanner {
                         silent,
                         directory_name: dir_name,
                         directory_id: dir_id,
+                        external_changes: 0,
                     });
                 }
 
                 let tx = conn.unchecked_transaction()?;
                 for (path, song) in &songs {
                     match upsert_song(&tx, song) {
-                        Ok(()) => report
-                            .upserted_paths
-                            .push(path.to_string_lossy().to_string()),
+                        Ok(changed) => {
+                            report
+                                .upserted_paths
+                                .push(path.to_string_lossy().to_string());
+                            if changed {
+                                report.external_changes += 1;
+                            }
+                        }
                         Err(e) => log::warn!("Failed to save tags for {}: {e}", path.display()),
                     }
                 }
@@ -1377,6 +1399,7 @@ impl CollectionScanner {
                             silent,
                             directory_name: cue_dir_name,
                             directory_id: cue_dir_id,
+                            external_changes: 0,
                         });
                     }
                 }
@@ -1386,8 +1409,13 @@ impl CollectionScanner {
                 }
                 let tx = conn.unchecked_transaction()?;
                 for (job, songs) in &built {
-                    if let Err(e) = write_cue_tracks(&tx, job, songs) {
-                        log::warn!("Failed to save CUE sheet {}: {e}", job.cue_path.display())
+                    match write_cue_tracks(&tx, job, songs) {
+                        Ok(changed_tracks) => {
+                            report.external_changes += changed_tracks;
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to save CUE sheet {}: {e}", job.cue_path.display())
+                        }
                     }
                 }
                 tx.commit()?;
@@ -1411,6 +1439,7 @@ impl CollectionScanner {
             silent,
             directory_name: default_dir_context.1.clone(),
             directory_id: default_dir_context.0,
+            external_changes: 0,
         });
 
         // Mark songs from these directories that no longer exist as unavailable.
@@ -1510,6 +1539,7 @@ impl CollectionScanner {
                 silent,
                 directory_name: art_dir_name,
                 directory_id: art_dir_id,
+                external_changes: 0,
             });
 
             let path = Path::new(&path_str);
@@ -1602,6 +1632,7 @@ impl CollectionScanner {
             silent,
             directory_name: default_dir_context.1,
             directory_id: default_dir_context.0,
+            external_changes: report.external_changes,
         });
 
         report.total_ms = scan_started.elapsed().as_millis();
@@ -2071,7 +2102,8 @@ fn build_cue_songs(cover_manager: &CoverManager, job: &CueJob, mtime: i64) -> Re
 /// previously-stored CUE track for this (media file, CUE sheet) pair whose
 /// start offset no longer appears in the freshly parsed sheet — e.g. the CUE
 /// was hand-edited to merge or drop a track since the last scan.
-fn write_cue_tracks(conn: &rusqlite::Connection, job: &CueJob, songs: &[Song]) -> Result<()> {
+/// Returns the number of CUE tracks whose tags were updated from external changes.
+fn write_cue_tracks(conn: &rusqlite::Connection, job: &CueJob, songs: &[Song]) -> Result<usize> {
     let path_str = job.media_path.to_string_lossy().to_string();
     let cue_path_str = job.cue_path.to_string_lossy().to_string();
 
@@ -2088,10 +2120,13 @@ fn write_cue_tracks(conn: &rusqlite::Connection, job: &CueJob, songs: &[Song]) -
         conn.execute(&sql, sql_params.as_slice())?;
     }
 
+    let mut changed_count = 0;
     for song in songs {
-        upsert_song(conn, song)?;
+        if upsert_song(conn, song)? {
+            changed_count += 1;
+        }
     }
-    Ok(())
+    Ok(changed_count)
 }
 
 /// The watched music folders, loaded once so a caller classifying many paths
@@ -2128,7 +2163,7 @@ pub(crate) fn read_and_upsert_song(
     conn: &rusqlite::Connection,
     cover_manager: &CoverManager,
     path: &Path,
-) -> Result<()> {
+) -> Result<bool> {
     let song = read_and_prepare_song(cover_manager, path)?;
     upsert_song(conn, &song)
 }
@@ -2139,6 +2174,8 @@ pub(crate) fn read_and_upsert_song(
 
 /// Inserts `song`, or refreshes the row already stored for its path (and CUE
 /// offset) from it, keeping play stats, ratings and playlist membership.
+/// Returns whether the row already existed and had tag changes recorded as
+/// [`HistoryActor::Scan`] history events (i.e. external changes detected).
 ///
 /// `song.source` is taken as the truth about library membership (#1842): any
 /// source other than `OpenedFile` promotes an existing opened-file row into the
@@ -2146,7 +2183,7 @@ pub(crate) fn read_and_upsert_song(
 /// a library row. So a caller upserting a path that didn't come from a
 /// watched-folder scan must classify it with [`WatchedFolders::source_for`]
 /// first, or it would add the file to the library.
-pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
+pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<bool> {
     let before = if let Some(path) = song.path.as_deref() {
         crate::tag_history::snapshot_by_path(conn, path, song.beginning_nanosec)?
     } else {
@@ -2291,14 +2328,14 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
         ],
     )?;
 
-    crate::tag_history::record_diff_after_update(
+    let changed = crate::tag_history::record_diff_after_update(
         conn,
         before.as_ref(),
         crate::tag_history::HistoryActor::Scan,
         None,
-    )?;
+    )? > 0;
 
-    Ok(())
+    Ok(changed)
 }
 
 // ---------------------------------------------------------------------------

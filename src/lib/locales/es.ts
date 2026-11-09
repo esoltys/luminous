@@ -467,6 +467,10 @@ export const es = {
     text: "Esta biblioteca se abrió por última vez con una versión más reciente de Luminous (base de datos v{dbVersion}; esta aplicación admite v{appVersion}). Tus carpetas y canciones siguen ahí: actualiza Luminous para volver a verlas."
   },
   collection: {
+    externalChangesToast: {
+      one: "{name}: {count} pista modificada fuera de Luminous",
+      other: "{name}: {count} pistas modificadas fuera de Luminous"
+    },
     alphabetScrubberLabel: "Índice alfabético",
     jumpToLetter: "Ir a la letra {letter}",
     columnSelectorVisible: "Visibles",
@@ -1608,14 +1612,18 @@ export const es = {
     historyImported: "Importado",
     historyFormat: "Formato",
     historyFileSize: "Tamaño",
-    historyTimestampHint: "Consulte las marcas de tiempo de análisis como el momento en que Luminous detectó los cambios en el disco, ya que los editores externos pueden conservar la fecha de modificación original del archivo.",
+    historyTimestampHint: "Marcas temporales y fuentes de los cambios de etiquetas. Las modificaciones externas se detectan por la fecha de modificación del archivo durante el análisis; ejecuta un reanálisis completo para detectar ediciones que preservaron la fecha.",
     clearHistoryBtn: "Borrar historial",
     historyEmptyValue: "(vacío)",
-    historyActorScan: "Cambio externo",
+    historyActorScan: "Detectado en análisis",
     historyActorLuminous: "Luminous",
     historyBatchNote: "editado con {count} canciones más",
     historyEmptySince: "Sin cambios registrados desde el {date}.",
     historyEmpty: "Sin cambios registrados.",
+    historyFilterLabel: "Filtrar historial",
+    historyFilterAll: "Todo ({count})",
+    historyFilterScan: "Detectado en análisis ({count})",
+    historyFilterEmpty: "No se detectaron cambios en el análisis.",
     restoreAction: "Restaurar",
     restoreBatchBtn: "Restaurar todo",
     restoreBatchTooltip: "Restaurar todas las canciones modificadas en esta edición",
