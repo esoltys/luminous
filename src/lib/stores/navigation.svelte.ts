@@ -29,18 +29,20 @@ export interface AutoPlaylistRef {
     | "artist_tag"
     | "missing_metadata"
     | "missing_musicbrainz"
-    | "daypart";
+    | "daypart"
+    | "language";
   /** For kind "genre": the curated tag's plain name (#548) — a top-level
    * card name or a sub-genre chip name, resolved the same way either way
    * (see `viewGenreTag`). */
   genre?: string;
   artistTag?: string;
   decade?: string;
+  language?: string;
   /** For kind "bpm": the bucket's dynamic_spec suffix, e.g. "60-90" or the open-ended "150-". */
   bpm?: string;
-  /** For kind "genre", "decade", "bpm" or "artist_tag": the materialized (dynamic_enabled) playlist row backing it. */
+  /** For kind "genre", "decade", "bpm", "artist_tag", or "language": the materialized (dynamic_enabled) playlist row backing it. */
   playlistId?: number;
-  /** For kind "genre", "decade", "bpm" or "artist_tag": when this playlist's songs were last (re)generated. */
+  /** For kind "genre", "decade", "bpm", "artist_tag", or "language": when this playlist's songs were last (re)generated. */
   updated?: number;
 }
 
@@ -457,6 +459,27 @@ class NavigationStore {
     this.viewAutoPlaylist({
       kind: "artist_tag",
       artistTag: tag,
+      playlistId: playlist?.id,
+      updated: playlist?.updated,
+    });
+  }
+
+  /** Opens a language's auto-playlist detail view. Resolves the language's
+   * materialized playlist row if one exists (`dynamic_spec === "language:"+code`);
+   * below the auto-playlist song threshold it has none yet, so `playlistId`
+   * stays undefined and AutoPlaylistDetailView falls back to a direct
+   * `get_songs_by_language` query. */
+  viewLanguage(code: string) {
+    collectionStore.searchQuery = "";
+    collectionStore.searchResults = [];
+    this.selectedArtistName = null;
+    this.selectedAlbumName = null;
+    const playlist = playlistsStore.playlists.find(
+      (p) => p.dynamic_enabled && p.dynamic_spec === `language:${code}`
+    );
+    this.viewAutoPlaylist({
+      kind: "language",
+      language: code,
       playlistId: playlist?.id,
       updated: playlist?.updated,
     });

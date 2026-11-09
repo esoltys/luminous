@@ -3,7 +3,7 @@ import { getPlaylistCardTheme, type PlaylistCardThemeKind } from "./playlistCard
 
 const KINDS: PlaylistCardThemeKind[] = [
   "queue", "genre", "decade", "smart", "bpm", "artist_tag", "favourites", "recently_added",
-  "most_played", "history", "missing_metadata", "missing_musicbrainz", "daypart",
+  "most_played", "history", "missing_metadata", "missing_musicbrainz", "daypart", "language",
 ];
 
 describe("playlistCardTheme", () => {

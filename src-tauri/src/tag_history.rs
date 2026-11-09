@@ -87,9 +87,9 @@ pub struct SongTagHistory {
 }
 
 /// Total count of metadata fields tracked for change history.
-pub const TRACKED_FIELD_COUNT: usize = 22;
+pub const TRACKED_FIELD_COUNT: usize = 23;
 
-/// 22 tracked tag fields in stable order.
+/// 23 tracked tag fields in stable order.
 pub const TRACKED_FIELDS: [&str; TRACKED_FIELD_COUNT] = [
     "title",
     "titlesort",
@@ -113,6 +113,7 @@ pub const TRACKED_FIELDS: [&str; TRACKED_FIELD_COUNT] = [
     "initial_key",
     "compilation",
     "comment",
+    "language",
 ];
 
 fn canonicalize_free_text(val: Option<&str>) -> Option<String> {
@@ -228,6 +229,7 @@ fn row_to_snapshot(row: &rusqlite::Row) -> rusqlite::Result<Option<TagSnapshot>>
     let initial_key: Option<String> = row.get(22)?;
     let compilation: Option<bool> = row.get(23)?;
     let comment: Option<String> = row.get(24)?;
+    let language: Option<String> = row.get(25)?;
 
     let compilation_bool = compilation.unwrap_or(false);
 
@@ -254,6 +256,7 @@ fn row_to_snapshot(row: &rusqlite::Row) -> rusqlite::Result<Option<TagSnapshot>>
         canonicalize_free_text(initial_key.as_deref()),
         canonicalize_compilation(compilation_bool),
         canonicalize_free_text(comment.as_deref()),
+        canonicalize_free_text(language.as_deref()),
     ];
 
     Ok(Some(TagSnapshot { song_id, values }))
@@ -264,7 +267,7 @@ const SNAPSHOT_COLS: &str = "id, source, cue_path, \
      album, albumsort, album_artist, album_artist_sort, \
      composer, composersort, genre, genresort, \
      track, disc, disc_subtitle, year, originalyear, \
-     grouping, bpm, initial_key, compilation, comment";
+     grouping, bpm, initial_key, compilation, comment, language";
 
 /// Captures a [`TagSnapshot`] of current tracked tags for `song_id`.
 ///
@@ -631,7 +634,8 @@ pub fn restore_song_tags(
                 bpm,
                 COALESCE(initial_key, ''),
                 compilation,
-                comment
+                comment,
+                language
          FROM songs WHERE id = ?1",
         params![song_id],
         |row| {
@@ -661,6 +665,7 @@ pub fn restore_song_tags(
                 row.get::<_, String>(22)?,
                 row.get::<_, Option<bool>>(23)?,
                 row.get::<_, Option<String>>(24)?,
+                row.get::<_, Option<String>>(25)?,
             ))
         },
     );
@@ -691,6 +696,7 @@ pub fn restore_song_tags(
         mut initial_key,
         compilation_opt,
         mut comment,
+        mut language,
     ) = match query_res {
         Ok(vals) => vals,
         Err(rusqlite::Error::QueryReturnedNoRows) => {
@@ -895,6 +901,13 @@ pub fn restore_song_tags(
                 comment = canonicalize_free_text(target_str);
                 has_changes = true;
             }
+            "language"
+                if canonicalize_free_text(language.as_deref())
+                    != canonicalize_free_text(target_str) =>
+            {
+                language = canonicalize_free_text(target_str);
+                has_changes = true;
+            }
             _ => {}
         }
     }
@@ -926,6 +939,7 @@ pub fn restore_song_tags(
             bpm: bpm.map(|b| b as f32),
             initial_key: &initial_key,
             compilation,
+            language: language.as_deref(),
         };
 
         if let Err(e) = luminous_metadata::audio::write_tags(file_path, &tag_req) {
@@ -987,9 +1001,10 @@ pub fn restore_song_tags(
             compilation = ?21,
             comment = ?22,
             album_key = ?23,
-            mtime = COALESCE(?24, mtime),
-            filesize = COALESCE(?25, filesize)
-         WHERE id = ?26",
+            language = ?24,
+            mtime = COALESCE(?25, mtime),
+            filesize = COALESCE(?26, filesize)
+         WHERE id = ?27",
         rusqlite::params![
             title,
             titlesort,
@@ -1014,6 +1029,7 @@ pub fn restore_song_tags(
             compilation,
             comment,
             album_key,
+            language,
             new_mtime,
             new_filesize,
             song_id,

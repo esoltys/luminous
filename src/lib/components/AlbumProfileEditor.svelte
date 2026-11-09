@@ -405,6 +405,18 @@
             />
           </FormField>
 
+          <FormField label={i18n.t('albumTagEditor.languageField')} for="album-tag-language" tooltip={i18n.t('albumTagEditor.languageTooltip')}>
+            <Input
+              id="album-tag-language"
+              value={fields.language.value ?? ""}
+              disabled={isSaving}
+              placeholder={mixedOr(fields.language.showsMixed, i18n.t('albumTagEditor.languagePlaceholder'))}
+              oninput={(e) => fields.language.set(e.currentTarget.value)}
+              size="sm"
+              class="w-full"
+            />
+          </FormField>
+
           <DiscFields disc={fields.disc} subtitle={fields.discSubtitle} disabled={isSaving} />
 
           <!-- Sort Overrides ("Sort As") -->

@@ -119,6 +119,7 @@ pub struct AudioFileMetadata {
     pub composer: Option<String>,
     pub composersort: Option<String>,
     pub genre: Option<String>,
+    pub language: Option<String>,
     pub comment: Option<String>,
     pub year: Option<i32>,
     pub originalyear: Option<i32>,
@@ -167,6 +168,7 @@ pub struct TagWriteRequest<'a> {
     pub composer: &'a str,
     pub composersort: Option<&'a str>,
     pub genre: &'a str,
+    pub language: Option<&'a str>,
     pub track: Option<u32>,
     pub disc: Option<u32>,
     /// Blank or `None` removes the disc subtitle frame.
@@ -246,6 +248,9 @@ pub fn read_tags(path: &Path) -> Result<AudioFileMetadata> {
         }
         if meta.genre.is_none() {
             meta.genre = read_multi_value(tag, ItemKey::Genre);
+        }
+        if meta.language.is_none() {
+            meta.language = read_language(tag);
         }
         // Only a comment with no description is the user-facing comment: ID3v2
         // `COMM` frames with a description (iTunes' `iTunNORM`/`iTunSMPB` hex
@@ -427,6 +432,23 @@ pub fn read_multi_value(tag: &Tag, key: ItemKey) -> Option<String> {
         .get_strings(key)
         .flat_map(crate::values::parse_multi_value)
         .filter(|v| seen.insert(v.to_lowercase()))
+        .collect();
+
+    if values.is_empty() {
+        None
+    } else {
+        Some(crate::values::join_multi_value(&values))
+    }
+}
+
+/// Reads all language tags from `tag`, normalized to lowercase and joined with `; `.
+pub fn read_language(tag: &Tag) -> Option<String> {
+    let mut seen = HashSet::new();
+    let values: Vec<String> = tag
+        .get_strings(ItemKey::Language)
+        .flat_map(crate::values::parse_multi_value)
+        .map(|v| v.trim().to_lowercase())
+        .filter(|v| !v.is_empty() && seen.insert(v.clone()))
         .collect();
 
     if values.is_empty() {
@@ -666,6 +688,7 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
         bpm,
         initial_key,
         compilation,
+        language,
     } = *req;
 
     let (mut tagged_file, _) = open_tagged(path, ParseOptions::new())
@@ -716,6 +739,19 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
             lofty::tag::ItemKey::Genre,
             lofty::tag::ItemValue::Text(g),
         ));
+    }
+
+    tag.remove_key(lofty::tag::ItemKey::Language);
+    if let Some(l) = language {
+        for lang in crate::values::parse_multi_value(l) {
+            let normalized = lang.trim().to_lowercase();
+            if !normalized.is_empty() {
+                tag.push(lofty::tag::TagItem::new(
+                    lofty::tag::ItemKey::Language,
+                    lofty::tag::ItemValue::Text(normalized),
+                ));
+            }
+        }
     }
 
     tag.remove_key(lofty::tag::ItemKey::AlbumArtist);
@@ -1026,6 +1062,46 @@ mod tests {
         write_test_wav(&path);
 
         clear_embedded_art(&path).expect("clearing an untagged file should not error");
+    }
+
+    #[test]
+    fn test_write_and_read_tags_round_trips_language() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path,
+            &TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Rock",
+                language: Some("ENG; JPN"),
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+
+        let meta = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(meta.language.as_deref(), Some("eng; jpn"));
+
+        // Clear language
+        write_tags(
+            &path,
+            &TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Rock",
+                language: None,
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+
+        let meta2 = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(meta2.language, None);
     }
 
     #[test]

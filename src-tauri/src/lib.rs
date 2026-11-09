@@ -1588,6 +1588,8 @@ pub fn run() {
             commands::tags::get_tags_overview,
             commands::tags::get_songs_by_curated_tag,
             commands::tags::get_songs_without_genre,
+            commands::tags::get_languages_overview,
+            commands::tags::get_songs_by_language,
             // Persisted Genres curation hierarchy (#545)
             commands::tags::get_tag_hierarchy,
             commands::tags::set_tag_group_color,

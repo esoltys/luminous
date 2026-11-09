@@ -20,6 +20,7 @@ describe("TagEditor.svelte", () => {
     album_artist: "Original Album Artist",
     composer: "Original Composer",
     genre: "Rock",
+    language: "en",
     track: 3,
     disc: 1,
     year: 2020,
@@ -64,6 +65,7 @@ describe("TagEditor.svelte", () => {
     // input) labeled text field.
     expect(getByText("Original Artist")).toBeInTheDocument();
     expect(getByText("Original Composer")).toBeInTheDocument();
+    expect((getByLabelText("Language") as HTMLInputElement).value).toBe("en");
   });
 
   it("shows a remote-source note for a WebDAV song and not for a local one (#682)", async () => {

@@ -173,6 +173,21 @@ describe("playlist utils", () => {
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Missing Metadata");
   });
+
+  it("resolves language code to localized display name", () => {
+    const playlist: Playlist = {
+      id: 12,
+      name: "jpn",
+      dynamic_spec: "language:jpn",
+      population_mode: "all",
+      created: 100,
+      updated: 100,
+      track_count: 10,
+      dynamic_enabled: true,
+      is_queue: false,
+    };
+    expect(getPlaylistDisplayName(playlist)).toBe("Japanese");
+  });
 });
 
 describe("Auto Continue rows (#1235)", () => {

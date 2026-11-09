@@ -170,8 +170,11 @@ export function parseSearchRules(query: string): Rule[] {
           "initial_key",
           "tag",
           "tags",
+          "language",
+          "lang",
         ].includes(field)
       ) {
+        if (field === "lang") normalizedField = "language";
         if (!hasExplicitOp) op = "contains";
       }
 
@@ -206,6 +209,7 @@ export function isSmartPlaylistSpec(spec: string | null | undefined): boolean {
     !spec.startsWith("bpmrange:") &&
     !spec.startsWith("tag:") &&
     !spec.startsWith("artisttag:") &&
-    !spec.startsWith("daypart:")
+    !spec.startsWith("daypart:") &&
+    !spec.startsWith("language:")
   );
 }

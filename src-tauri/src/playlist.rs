@@ -179,6 +179,8 @@ async fn sync_all_auto_playlists_cooperative(
     with_playlists(playlists, |pm| pm.sync_missing_musicbrainz_auto_playlist()).await?;
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     with_playlists(playlists, |pm| pm.sync_daypart_auto_playlist()).await?;
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    with_playlists(playlists, |pm| pm.sync_language_auto_playlists()).await?;
     Ok(())
 }
 

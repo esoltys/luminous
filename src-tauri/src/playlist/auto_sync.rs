@@ -104,6 +104,7 @@ impl PlaylistManager {
         self.sync_decade_auto_playlists()?;
         self.sync_bpm_auto_playlists()?;
         self.sync_artist_tag_auto_playlists()?;
+        self.sync_language_auto_playlists()?;
         self.sync_missing_metadata_auto_playlist()?;
         self.sync_missing_musicbrainz_auto_playlist()?;
         self.sync_daypart_auto_playlist()?;
@@ -537,6 +538,99 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Regenerates each language "auto-playlist" — a system-managed `playlists` row
+    /// with `dynamic_enabled = 1` and `dynamic_spec` set to `language:<code>` (e.g. `language:ja`) — if
+    /// it's missing or its `updated` timestamp is more than 24h old, and prunes
+    /// rows for languages no longer present in the library.
+    pub fn sync_language_auto_playlists(&self) -> Result<()> {
+        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+
+        let tag_manager = crate::tags::TagManager::new(self.db.clone());
+        let languages = tag_manager.get_languages_overview()?;
+        let valid_codes: HashSet<String> = languages.iter().map(|l| l.code.clone()).collect();
+        let mut conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+
+        let mut stmt = conn.prepare(
+            "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'language:%'",
+        )?;
+        let existing: Vec<(i64, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+        drop(stmt);
+        for (id, spec) in &existing {
+            let code = spec.strip_prefix("language:").unwrap_or(spec);
+            if !valid_codes.contains(code) {
+                conn.execute(
+                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                    params![id],
+                )?;
+                conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+            }
+        }
+
+        for lang in &languages {
+            let spec = format!("language:{}", lang.code);
+            let existing_row: Option<(i64, i64, i64, String)> = conn
+                .query_row(
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
+                    params![spec],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                )
+                .ok();
+            let mode = existing_row
+                .as_ref()
+                .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
+                .unwrap_or_default();
+
+            if existing_row.is_none() && lang.song_count < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST {
+                continue;
+            }
+            if existing_row.is_some() && lang.song_count == 0 {
+                if let Some((id, _, _, _)) = existing_row {
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                        params![id],
+                    )?;
+                    conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+                }
+                continue;
+            }
+
+            let songs = tag_manager.get_songs_by_language(&lang.code, NO_SONG_LIMIT, mode)?;
+
+            let needs_generation = match existing_row {
+                None => true,
+                Some((_, updated, _, _)) => now - updated > STALE_AFTER_SECS,
+            };
+            if !needs_generation {
+                continue;
+            }
+
+            let playlist_id = match existing_row {
+                Some((id, _, _, _)) => {
+                    conn.execute(
+                        "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
+                        params![lang.code, now, id],
+                    )?;
+                    id
+                }
+                None => {
+                    conn.execute(
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                        params![lang.code, spec, now],
+                    )?;
+                    conn.last_insert_rowid()
+                }
+            };
+
+            replace_playlist_items(&mut conn, playlist_id, &songs)?;
+        }
+
+        Ok(())
+    }
+
     /// Regenerates the single "Missing Metadata" auto-playlist (#367) — a
     /// system-managed `playlists` row with `dynamic_enabled = 1` and
     /// `dynamic_spec = "missingmeta"` — if missing or its `updated`
@@ -926,6 +1020,63 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap().keep();
         let db = Database::new(temp_dir.clone()).unwrap();
         (db, temp_dir)
+    }
+
+    #[test]
+    fn test_sync_language_auto_playlists() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 0..25 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, language, source, unavailable) VALUES ('Track {}', 'ja', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+            // Below threshold (24 songs)
+            for i in 0..24 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, language, source, unavailable) VALUES ('French Track {}', 'fr', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_language_auto_playlists().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let ja_pl = playlists
+            .iter()
+            .find(|p| p.dynamic_enabled && p.dynamic_spec.as_deref() == Some("language:ja"));
+        assert!(
+            ja_pl.is_some(),
+            "expected language:ja playlist to be created"
+        );
+        assert_eq!(ja_pl.unwrap().name, "ja");
+
+        let fr_pl = playlists
+            .iter()
+            .find(|p| p.dynamic_enabled && p.dynamic_spec.as_deref() == Some("language:fr"));
+        assert!(
+            fr_pl.is_none(),
+            "expected language:fr playlist NOT to be created (below 25 threshold)"
+        );
+
+        let tracks = manager.get_playlist_tracks(ja_pl.unwrap().id).unwrap();
+        assert_eq!(tracks.len(), 25);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[test]

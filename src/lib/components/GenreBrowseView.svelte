@@ -16,6 +16,7 @@
   import Button from "./Button.svelte";
   import GenreCards from "./GenreCards.svelte";
   import ArtistTagCards from "./ArtistTagCards.svelte";
+  import LanguageCards from "./LanguageCards.svelte";
   import CreateArtistTagGroupDialog from "./CreateArtistTagGroupDialog.svelte";
 
   let showNewGroupDialog = $state(false);
@@ -68,11 +69,17 @@
     tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
     tagsStore.loadArtistTags().catch((e) => console.error("Failed to load artist tags:", e));
     tagsStore.loadArtistHierarchy().catch((e) => console.error("Failed to load artist tag hierarchy:", e));
+    tagsStore.loadLanguages().catch((e) => console.error("Failed to load languages:", e));
     return () => {
       unlistenHierarchy?.();
       unlistenArtistHierarchy?.();
     };
   });
+
+  /** Language card click. */
+  function openLanguage(code: string) {
+    navigationStore.viewLanguage(code);
+  }
 
   /** Artist tag card click. */
   function openArtistTag(tagName: string) {
@@ -150,7 +157,21 @@
       </div>
     {/if}
 
-    {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0 && tagsStore.artistTags.length === 0}
+    {#if tagsStore.languages.length > 0}
+      <div class="mb-6">
+        <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
+          {i18n.t("collection.languages", {}, "Languages")}
+        </h2>
+        <LanguageCards
+          onOpenLanguage={openLanguage}
+          sortField={prefs.genreSortField}
+          sortAsc={prefs.genreSortAsc}
+          compact={prefs.genreCardsViewMode === "rows"}
+        />
+      </div>
+    {/if}
+
+    {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0 && tagsStore.artistTags.length === 0 && tagsStore.languages.length === 0}
       <div class="py-16">
         <EmptyState
           icon={TagIcon}

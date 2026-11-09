@@ -147,6 +147,17 @@ impl FieldFilter {
                 self.op.to_sql(),
                 param_idx
             )
+        } else if self.sql_column == "language" {
+            match self.op {
+                Op::Eq => format!(
+                    "(language = ?{param_idx} OR language LIKE ?{param_idx} || '; %' OR language LIKE '%; ' || ?{param_idx} || '; %' OR language LIKE '%; ' || ?{param_idx})"
+                ),
+                Op::Neq => format!(
+                    "NOT (language = ?{param_idx} OR language LIKE ?{param_idx} || '; %' OR language LIKE '%; ' || ?{param_idx} || '; %' OR language LIKE '%; ' || ?{param_idx})"
+                ),
+                Op::Contains => format!("language LIKE ?{param_idx}"),
+                _ => format!("language {} ?{param_idx}", self.op.to_sql()),
+            }
         } else if self.sql_column == "path" {
             match self.op {
                 Op::Eq => format!(
@@ -368,6 +379,7 @@ fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> 
         "artist_tag" | "artist-tag" | "artisttag" | "artist_tags" | "tag" | "tags" => {
             ("artist_tag", false)
         }
+        "language" | "lang" => ("language", false),
         "lyrics" | "lyric" => ("lyrics", false),
         "folder" | "subfolder" | "directory" | "path" => ("path", false),
         _ => return None,

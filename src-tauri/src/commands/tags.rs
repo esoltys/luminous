@@ -1,6 +1,6 @@
 use crate::{
     collection::{SelfWriteTracker, WatcherPauseGuard},
-    models::{GenreGroup, QueuePopulationMode, Song, Tag, TagGroup},
+    models::{GenreGroup, LanguageSummary, QueuePopulationMode, Song, Tag, TagGroup},
     tags::TagManager,
     AppState,
 };
@@ -59,6 +59,31 @@ pub async fn get_songs_by_tag(
     let mode = mode.unwrap_or_default();
     crate::tags::with_tag_manager(state.db.clone(), move |manager| {
         manager.get_songs_by_tag(&tag_name, limit, mode)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_languages_overview(
+    state: State<'_, AppState>,
+) -> Result<Vec<LanguageSummary>, String> {
+    crate::tags::with_tag_manager(state.db.clone(), |manager| manager.get_languages_overview())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_songs_by_language(
+    language: String,
+    limit: Option<i64>,
+    mode: Option<QueuePopulationMode>,
+    state: State<'_, AppState>,
+) -> Result<Vec<Song>, String> {
+    let limit = limit.unwrap_or(50);
+    let mode = mode.unwrap_or_default();
+    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.get_songs_by_language(&language, limit, mode)
     })
     .await
     .map_err(|e| e.to_string())
@@ -353,6 +378,7 @@ struct SongFullMetadata {
     initial_key: String,
     compilation: bool,
     cue_path: Option<String>,
+    language: Option<String>,
 }
 
 /// Reads each song via the canonical `SONG_SELECT_COLS`/`row_to_song` mapping
@@ -393,6 +419,7 @@ fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<Song
                 initial_key: song.initial_key.unwrap_or_default(),
                 compilation: song.compilation,
                 cue_path: song.cue_path,
+                language: song.language,
             });
         }
     }
@@ -473,6 +500,7 @@ async fn rewrite_genre_and_persist(
                         bpm: item.bpm,
                         initial_key: &item.initial_key,
                         compilation: item.compilation,
+                        language: item.language.as_deref(),
                     },
                 );
                 match write_res {

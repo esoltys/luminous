@@ -100,7 +100,7 @@
         const cleanVal = val.replace(/[\\/]+$/, "");
         const baseName = cleanVal.split(/[\\/]/).pop() || cleanVal;
         parts.push(baseName);
-      } else if (r.field === "genre" || r.field === "artist_tag" || r.field === "artist-tag") {
+      } else if (r.field === "genre" || r.field === "artist_tag" || r.field === "artist-tag" || r.field === "language") {
         parts.push(val.charAt(0).toUpperCase() + val.slice(1));
       } else if (r.field === "artist") {
         parts.push(val);
@@ -128,7 +128,7 @@
       const firstNonYear = activeRules.find((r) => r.field !== "year");
       const firstField = firstNonYear?.field ?? activeRules[0].field;
       if (["folder", "subfolder", "directory", "path"].includes(firstField)) return single;
-      if (firstField === "genre" || firstField === "artist_tag" || firstField === "artist-tag") return `${single} ${mixWord}`;
+      if (firstField === "genre" || firstField === "artist_tag" || firstField === "artist-tag" || firstField === "language") return `${single} ${mixWord}`;
       if (firstField === "artist") return `${single} ${i18n.t("smartPlaylistBuilder.selectionWord", {}, "Selection")}`;
       if (DATE_FIELDS.has(firstField)) return single;
       if (firstField === "rating") return `${single} ${i18n.t("smartPlaylistBuilder.songsWord", {}, "Songs")}`;
@@ -183,6 +183,7 @@
     { key: "album", label: i18n.t("smartPlaylistBuilder.fieldAlbum", {}, "Album"), type: "text" },
     { key: "title", label: i18n.t("smartPlaylistBuilder.fieldTitle", {}, "Title"), type: "text" },
     { key: "genre", label: i18n.t("smartPlaylistBuilder.fieldGenre", {}, "Genre"), type: "text" },
+    { key: "language", label: i18n.t("smartPlaylistBuilder.fieldLanguage", {}, "Language"), type: "text" },
     { key: "folder", label: i18n.t("smartPlaylistBuilder.fieldFolder", {}, "Folder / Path"), type: "text" },
     { key: "composer", label: i18n.t("smartPlaylistBuilder.fieldComposer", {}, "Composer"), type: "text" },
     { key: "key", label: i18n.t("smartPlaylistBuilder.fieldKey", {}, "Key"), type: "text" },

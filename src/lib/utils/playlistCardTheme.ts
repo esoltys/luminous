@@ -9,6 +9,7 @@ import {
   StackIcon,
   SunHorizonIcon,
   TagIcon,
+  TranslateIcon,
   TrendUpIcon,
   WarningIcon,
 } from "phosphor-svelte";
@@ -26,7 +27,8 @@ export type PlaylistCardThemeKind =
   | "history"
   | "missing_metadata"
   | "missing_musicbrainz"
-  | "daypart";
+  | "daypart"
+  | "language";
 
 /**
  * One entry per playlist kind: the single owner of that kind's icon and colour. Every surface that
@@ -135,6 +137,13 @@ const THEMES: Record<PlaylistCardThemeKind, PlaylistCardTheme> = {
     gradientClass: "from-[#3A45B0]/25 to-[#626FE8]/15 border-[#626FE8]/30 shadow-[0_0_20px_2px_rgba(98,111,232,0.35)]",
     iconColorClass: "text-[#4F5BD5]",
     badgeColorClass: "bg-[#4F5BD5] text-white",
+  },
+  language: {
+    icon: TranslateIcon,
+    tintClass: "bg-[#14B8A6]/15 border-[#14B8A6]/30",
+    gradientClass: "from-[#0D9488]/25 to-[#14B8A6]/15 border-[#14B8A6]/30 shadow-[0_0_20px_2px_rgba(20,184,166,0.35)]",
+    iconColorClass: "text-[#14B8A6]",
+    badgeColorClass: "bg-[#0D9488] text-white",
   },
 };
 

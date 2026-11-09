@@ -146,4 +146,41 @@ describe("AlbumProfileEditor.svelte", () => {
     expect(queryByText("Rock")).not.toBeInTheDocument();
     finishTagSave();
   });
+
+  it("edits and saves album language tag", async () => {
+    const tracks = [
+      { id: 1, path: "/m/a.flac", title: "A", artist: "Artist", album: "Album", language: "eng" } as Song,
+      { id: 2, path: "/m/b.flac", title: "B", artist: "Artist", album: "Album", language: "eng" } as Song,
+    ];
+    collectionStore.songs = tracks;
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === "set_album_profile") return args.profile;
+      if (cmd === "save_album_tags") return null;
+      return null;
+    });
+
+    const { getByLabelText, getByRole } = render(AlbumProfileEditor, {
+      albumName: "Album",
+      artistName: "Artist",
+      songIds: [1, 2],
+      initialTracks: tracks,
+      onClose: vi.fn(),
+    });
+
+    const langInput = getByLabelText("Language") as HTMLInputElement;
+    expect(langInput.value).toBe("eng");
+
+    await fireEvent.input(langInput, { target: { value: "dan" } });
+    await fireEvent.click(getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+        songIds: [1, 2],
+        edit: expect.objectContaining({
+          language: { mode: "set", value: "dan" },
+        }),
+      });
+    });
+  });
 });

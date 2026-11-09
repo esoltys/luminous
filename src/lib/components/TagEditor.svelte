@@ -64,6 +64,7 @@
   let albumArtist = $state("");
   let composer = $state("");
   let genre = $state("");
+  let language = $state("");
   let track = $state<number | null>(null);
   let disc = $state<number | null>(null);
   let discSubtitle = $state("");
@@ -136,6 +137,7 @@
     composersort: string | null;
     genre: string;
     genresort: string | null;
+    language: string | null;
     track: number | null;
     disc: number | null;
     disc_subtitle: string | null;
@@ -182,6 +184,7 @@
       composersort = details.composersort ?? "";
       genre = details.genre;
       genresort = details.genresort ?? "";
+      language = details.language ?? "";
       track = details.track;
       disc = details.disc;
       discSubtitle = details.disc_subtitle ?? "";
@@ -240,6 +243,7 @@
       case "composersort": return i18n.t("sortOverrides.composer");
       case "genre": return i18n.t("tagEditor.genreField");
       case "genresort": return i18n.t("sortOverrides.genre");
+      case "language": return i18n.t("tagEditor.languageField");
       case "track": return i18n.t("tagEditor.trackField");
       case "disc": return i18n.t("tagEditor.discField");
       case "disc_subtitle": return i18n.t("tagEditor.discSubtitleField");
@@ -275,6 +279,7 @@
       case "composersort": return composersort.trim() || null;
       case "genre": return genre.trim() || null;
       case "genresort": return genresort.trim() || null;
+      case "language": return language.trim() || null;
       case "track": return track != null ? String(track) : null;
       case "disc": return disc != null ? String(disc) : null;
       case "disc_subtitle": return discSubtitle.trim() || null;
@@ -405,6 +410,7 @@
           composersort: composersort.trim() || null,
           genre,
           genresort: genresort.trim() || null,
+          language: language.trim() || null,
           track,
           disc,
           discSubtitle,
@@ -437,6 +443,7 @@
           composersort: composersort.trim() || null,
           genre,
           genresort: genresort.trim() || null,
+          language: language.trim() || null,
           track,
           disc,
           discSubtitle,
@@ -764,6 +771,10 @@
 
             <FormField label={i18n.t('tagEditor.groupingField')} for="tag-grouping" tooltip={i18n.t('tagEditor.groupingTooltip')}>
               <Input id="tag-grouping" bind:value={grouping} disabled={isSaving} size="sm" class="w-full" />
+            </FormField>
+
+            <FormField label={i18n.t('tagEditor.languageField')} for="tag-language" tooltip={i18n.t('tagEditor.languageTooltip')}>
+              <Input id="tag-language" bind:value={language} disabled={isSaving} size="sm" class="w-full" placeholder={i18n.t('tagEditor.languagePlaceholder')} />
             </FormField>
 
             <FormField label={i18n.t('tagEditor.bpmField')} for="tag-bpm" tooltip={i18n.t('tagEditor.bpmTooltip')}>

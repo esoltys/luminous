@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 77;
+pub const CURRENT_SCHEMA_VERSION: i32 = 78;
 
 struct Migration {
     version: i32,
@@ -742,6 +742,22 @@ const MIGRATIONS: &[Migration] = &[
                 );
                 CREATE INDEX IF NOT EXISTS idx_song_integrity_status ON song_integrity(status);",
             )?;
+            Ok(())
+        },
+    },
+    Migration {
+        version: 78,
+        description: "add language column and index to songs table (#1084)",
+        apply: |conn| {
+            let has_language: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'language'")?
+                .exists([])?;
+            if !has_language {
+                conn.execute_batch(
+                    "ALTER TABLE songs ADD COLUMN language TEXT;
+                    CREATE INDEX IF NOT EXISTS idx_songs_language ON songs(language COLLATE NOCASE);",
+                )?;
+            }
             Ok(())
         },
     },
