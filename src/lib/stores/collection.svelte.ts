@@ -1441,7 +1441,7 @@ class CollectionStore {
     this.searchLoading = true;
     try {
       const [results, folders] = await Promise.all([
-        invoke<Song[]>("search_songs", { query, limit: 500 }),
+        invoke<Song[]>("search_songs", { query }),
         invoke<FolderSearchResult[]>("search_source_folders", {
           query,
           limit: MAX_SEARCH_SUGGESTIONS_PER_CATEGORY,
