@@ -478,15 +478,13 @@ pub async fn save_song_tags(
     )
     .map_err(|e| e.to_string())?;
 
-    if let Some(before) = before {
-        crate::tag_history::record_diff_after_update(
-            &conn,
-            &before,
-            crate::tag_history::HistoryActor::Luminous,
-            None,
-        )
-        .map_err(|e| e.to_string())?;
-    }
+    crate::tag_history::record_diff_after_update(
+        &conn,
+        before.as_ref(),
+        crate::tag_history::HistoryActor::Luminous,
+        None,
+    )
+    .map_err(|e| e.to_string())?;
 
     // Continuous auto-organization hook (#1468)
     if let Ok(auto_res) = crate::organizer::auto_organize_song_ids(
@@ -679,14 +677,12 @@ pub async fn save_file_tags(
             ],
         );
 
-        if let Some(before) = before {
-            let _ = crate::tag_history::record_diff_after_update(
-                &conn,
-                &before,
-                crate::tag_history::HistoryActor::Luminous,
-                None,
-            );
-        }
+        let _ = crate::tag_history::record_diff_after_update(
+            &conn,
+            before.as_ref(),
+            crate::tag_history::HistoryActor::Luminous,
+            None,
+        );
     }
 
     Ok(())
@@ -824,15 +820,13 @@ pub async fn save_album_tags(
         )
         .map_err(|e| e.to_string())?;
 
-        if let Some(before) = before {
-            crate::tag_history::record_diff_after_update(
-                &tx,
-                &before,
-                crate::tag_history::HistoryActor::Luminous,
-                Some(&batch_id),
-            )
-            .map_err(|e| e.to_string())?;
-        }
+        crate::tag_history::record_diff_after_update(
+            &tx,
+            before.as_ref(),
+            crate::tag_history::HistoryActor::Luminous,
+            Some(&batch_id),
+        )
+        .map_err(|e| e.to_string())?;
     }
     tx.commit().map_err(|e| e.to_string())?;
 
@@ -969,14 +963,12 @@ pub async fn save_batch_file_tags(
                 ],
             );
 
-            if let Some(before) = before {
-                let _ = crate::tag_history::record_diff_after_update(
-                    &conn,
-                    &before,
-                    crate::tag_history::HistoryActor::Luminous,
-                    Some(&batch_id),
-                );
-            }
+            let _ = crate::tag_history::record_diff_after_update(
+                &conn,
+                before.as_ref(),
+                crate::tag_history::HistoryActor::Luminous,
+                Some(&batch_id),
+            );
         }
     }
 

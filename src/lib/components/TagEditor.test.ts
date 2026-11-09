@@ -302,7 +302,7 @@ describe("TagEditor.svelte", () => {
       source: {
         path: "/music/rock/song.flac",
         filesize: 12582912,
-        format: "flac",
+        format: "FLAC",
         added: 1700000000,
         isRemote: false,
         isCueTrack: false,
@@ -332,7 +332,7 @@ describe("TagEditor.svelte", () => {
       source: {
         path: "/music/rock/song.flac",
         filesize: 12582912,
-        format: "flac",
+        format: "FLAC",
         added: 1700000000,
         isRemote: false,
         isCueTrack: false,
@@ -389,7 +389,7 @@ describe("TagEditor.svelte", () => {
       source: {
         path: "/music/rock/song.flac",
         filesize: 12582912,
-        format: "flac",
+        format: "FLAC",
         added: 1700000000,
         isRemote: false,
         isCueTrack: false,
@@ -459,5 +459,69 @@ describe("TagEditor.svelte", () => {
     const cueRender = render(TagEditor, { songId: 10, onClose: vi.fn() });
     await cueRender.findByText(/cue sheet/i);
     expect(cueRender.queryByText("History")).not.toBeInTheDocument();
+  });
+
+  it("refreshes tag history when Tag Clean-Up sub-dialog is closed", async () => {
+    let historyCallCount = 0;
+    const initialHistory: SongTagHistory = {
+      songId: 10,
+      source: {
+        path: "/music/rock/song.flac",
+        filesize: 12582912,
+        format: "FLAC",
+        added: 1700000000,
+        isRemote: false,
+        isCueTrack: false,
+      },
+      entries: [],
+    };
+
+    const updatedHistory: SongTagHistory = {
+      ...initialHistory,
+      entries: [
+        {
+          id: 99,
+          songId: 10,
+          at: 1700002000,
+          actor: "luminous",
+          field: "comment",
+          oldValue: "promo spam",
+          newValue: null,
+          batchId: null,
+          batchOtherTracks: 0,
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return mockSongDetails;
+      if (cmd === "get_song_tag_history") {
+        historyCallCount++;
+        return historyCallCount === 1 ? initialHistory : updatedHistory;
+      }
+      if (cmd === "preview_tag_cleanup") {
+        return { songs: [], skipped: 0 };
+      }
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const { getByText, findByText, getAllByRole } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await findByText("History");
+    expect(historyCallCount).toBe(1);
+
+    // Open Tag Clean-up sub-dialog
+    const cleanUpBtn = getByText("Clean Up Tags…");
+    await fireEvent.click(cleanUpBtn);
+
+    // Close the sub-dialog via its close button
+    await findByText("No tag clutter found.");
+    const closeButtons = getAllByRole("button", { name: "Close" });
+    await fireEvent.click(closeButtons[0]);
+
+    await waitFor(() => {
+      expect(historyCallCount).toBe(2);
+    });
+    expect(await findByText("promo spam")).toBeInTheDocument();
   });
 });

@@ -111,69 +111,53 @@
   let isSaving = $state(false);
   let errorMsg = $state("");
 
+  interface SongDetailsPayload {
+    id: number;
+    path: string;
+    title: string;
+    titlesort: string | null;
+    artist: string;
+    artistsort: string | null;
+    album: string;
+    albumsort: string | null;
+    album_artist: string;
+    album_artist_sort: string | null;
+    composer: string;
+    composersort: string | null;
+    genre: string;
+    genresort: string | null;
+    track: number | null;
+    disc: number | null;
+    disc_subtitle: string | null;
+    year: number | null;
+    originalyear: number | null;
+    grouping: string;
+    bpm: number | null;
+    initial_key: string;
+    rating: number;
+    loved: number;
+    compilation: boolean;
+    art_embedded: boolean;
+    is_cue_track: boolean;
+  }
+
+  async function loadTagHistory(id: number) {
+    try {
+      const history = await invoke<SongTagHistory>("get_song_tag_history", { songId: id });
+      tagHistory = history ?? null;
+    } catch (e) {
+      console.warn("Failed to load tag history:", e);
+      tagHistory = null;
+    }
+  }
+
   async function loadMetadata() {
     isLoading = true;
     errorMsg = "";
     try {
       const details = songId != null
-        ? await invoke<{
-            id: number;
-            path: string;
-            title: string;
-            titlesort: string | null;
-            artist: string;
-            artistsort: string | null;
-            album: string;
-            albumsort: string | null;
-            album_artist: string;
-            album_artist_sort: string | null;
-            composer: string;
-            composersort: string | null;
-            genre: string;
-            genresort: string | null;
-            track: number | null;
-            disc: number | null;
-            disc_subtitle: string | null;
-            year: number | null;
-            originalyear: number | null;
-            grouping: string;
-            bpm: number | null;
-            initial_key: string;
-            rating: number;
-            loved: number;
-            compilation: boolean;
-            art_embedded: boolean;
-            is_cue_track: boolean;
-          }>("get_song_details", { songId })
-        : await invoke<{
-            id: number;
-            path: string;
-            title: string;
-            titlesort: string | null;
-            artist: string;
-            artistsort: string | null;
-            album: string;
-            albumsort: string | null;
-            album_artist: string;
-            album_artist_sort: string | null;
-            composer: string;
-            composersort: string | null;
-            genre: string;
-            genresort: string | null;
-            track: number | null;
-            disc: number | null;
-            disc_subtitle: string | null;
-            year: number | null;
-            originalyear: number | null;
-            grouping: string;
-            bpm: number | null;
-            initial_key: string;
-            rating: number;
-            loved: number;
-            compilation: boolean;
-            art_embedded: boolean;
-            is_cue_track: boolean;
-          }>("get_file_song_details", { path: filePath });
+        ? await invoke<SongDetailsPayload>("get_song_details", { songId })
+        : await invoke<SongDetailsPayload>("get_file_song_details", { path: filePath });
 
       title = details.title;
       titlesort = details.titlesort ?? "";
@@ -203,13 +187,7 @@
       isCueTrack = details.is_cue_track;
 
       if (songId != null && !isRemotePath(details.path) && !details.is_cue_track) {
-        try {
-          const history = await invoke<SongTagHistory>("get_song_tag_history", { songId });
-          tagHistory = history ?? null;
-        } catch (e) {
-          console.warn("Failed to load tag history:", e);
-          tagHistory = null;
-        }
+        await loadTagHistory(songId);
       } else {
         tagHistory = null;
       }
@@ -739,7 +717,7 @@
                       {#if tagHistory.source.format}
                         <div>
                           <span class="text-brand-text-secondary">{i18n.t("tagEditor.historyFormat")}:</span>
-                          <span class="ml-1 text-brand-text-primary uppercase">{tagHistory.source.format.toUpperCase()}</span>
+                          <span class="ml-1 text-brand-text-primary">{tagHistory.source.format}</span>
                         </div>
                       {/if}
                       <div>
@@ -848,7 +826,10 @@
 {#if showTagCleanup && songId != null}
   <TagCleanupDialog
     songIds={[songId]}
-    onClose={() => { showTagCleanup = false; }}
+    onClose={() => {
+      showTagCleanup = false;
+      if (songId != null && !isRemoteSource && !isCueTrack) void loadTagHistory(songId);
+    }}
   />
 {/if}
 

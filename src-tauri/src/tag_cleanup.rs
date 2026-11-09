@@ -150,10 +150,10 @@ pub fn apply(
                     rusqlite::params![comment, new_mtime, new_filesize, song.id],
                 ) {
                     log::warn!("tag clean-up: cannot update comment for {}: {e}", song.id);
-                } else if let Some(before) = before {
+                } else {
                     let _ = crate::tag_history::record_diff_after_update(
                         &conn,
-                        &before,
+                        before.as_ref(),
                         crate::tag_history::HistoryActor::Luminous,
                         None,
                     );

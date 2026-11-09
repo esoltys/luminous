@@ -5,21 +5,25 @@
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// Maximum number of tag change events retained per song in `song_history`.
 pub const MAX_EVENTS_PER_SONG: usize = 100;
 
+/// Identifies the originator of a tag modification event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum HistoryActor {
+    /// Edit performed explicitly within Luminous (Tag Editor, Album Editor, Clean-Up, etc.).
     Luminous,
+    /// Change detected during a library scan or file watcher refresh.
     Scan,
 }
 
 impl HistoryActor {
+    /// Returns the database representation of this actor string (`"luminous"` or `"scan"`).
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Luminous => "luminous",
@@ -28,41 +32,65 @@ impl HistoryActor {
     }
 }
 
+/// File metadata snapshot providing provenance and context for tag history entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SongHistorySource {
+    /// Canonical filesystem path or remote URL.
     pub path: String,
+    /// File size in bytes, or `None` if unreachable or unindexed.
     pub filesize: Option<i64>,
+    /// Human-readable audio container/codec format display name.
     pub format: String,
+    /// Unix timestamp (seconds) when the song was originally added to the library.
     pub added: Option<i64>,
+    /// True if this track is hosted on a remote source (e.g. WebDAV, Subsonic).
     pub is_remote: bool,
+    /// True if this track belongs to a multi-track CUE sheet.
     pub is_cue_track: bool,
 }
 
+/// A single recorded field-level tag modification event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SongHistoryEntry {
+    /// Primary key ID in `song_history`.
     pub id: i64,
+    /// Foreign key to `songs.id`.
     pub song_id: i64,
+    /// Unix timestamp (seconds) when the change was recorded.
     pub at: i64,
+    /// Entity that initiated the modification.
     pub actor: HistoryActor,
+    /// Tracked tag field name (matches [`TRACKED_FIELDS`]).
     pub field: String,
+    /// Normalized value before the edit, or `None` if previously unset.
     pub old_value: Option<String>,
+    /// Normalized value after the edit, or `None` if cleared.
     pub new_value: Option<String>,
+    /// Shared identifier correlating multiple tracks modified in the same batch operation.
     pub batch_id: Option<String>,
+    /// Count of distinct other tracks changed in the same batch.
     pub batch_other_tracks: usize,
 }
 
+/// Full tag history payload returned to the frontend for a single track.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SongTagHistory {
+    /// Database ID of the song.
     pub song_id: i64,
+    /// Source and file details for the track.
     pub source: SongHistorySource,
+    /// Ordered history entries, newest first.
     pub entries: Vec<SongHistoryEntry>,
 }
 
+/// Total count of metadata fields tracked for change history.
+pub const TRACKED_FIELD_COUNT: usize = 22;
+
 /// 22 tracked tag fields in stable order.
-pub const TRACKED_FIELDS: &[&str] = &[
+pub const TRACKED_FIELDS: [&str; TRACKED_FIELD_COUNT] = [
     "title",
     "titlesort",
     "artist",
@@ -87,13 +115,13 @@ pub const TRACKED_FIELDS: &[&str] = &[
     "comment",
 ];
 
-pub fn canonicalize_free_text(val: Option<&str>) -> Option<String> {
+fn canonicalize_free_text(val: Option<&str>) -> Option<String> {
     val.map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
 }
 
-pub fn canonicalize_multi_value(val: Option<&str>) -> Option<String> {
+fn canonicalize_multi_value(val: Option<&str>) -> Option<String> {
     let val = val.unwrap_or_default();
     let parsed = crate::models::parse_multi_value(val);
     if parsed.is_empty() {
@@ -109,11 +137,11 @@ pub fn canonicalize_multi_value(val: Option<&str>) -> Option<String> {
     }
 }
 
-pub fn canonicalize_int(val: Option<i64>) -> Option<String> {
+fn canonicalize_int(val: Option<i64>) -> Option<String> {
     val.filter(|&n| n > 0).map(|n| n.to_string())
 }
 
-pub fn canonicalize_bpm(val: Option<f64>) -> Option<String> {
+fn canonicalize_bpm(val: Option<f64>) -> Option<String> {
     val.filter(|&b| b > 0.0 && b.is_finite()).map(|b| {
         let r = (b * 100.0).round() / 100.0;
         if (r - r.round()).abs() < 1e-4 {
@@ -124,7 +152,7 @@ pub fn canonicalize_bpm(val: Option<f64>) -> Option<String> {
     })
 }
 
-pub fn canonicalize_compilation(c: bool) -> Option<String> {
+fn canonicalize_compilation(c: bool) -> Option<String> {
     Some(if c {
         "true".to_string()
     } else {
@@ -132,28 +160,37 @@ pub fn canonicalize_compilation(c: bool) -> Option<String> {
     })
 }
 
+/// Pre-update or post-update snapshot of tracked tag values for a local library track.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TagSnapshot {
-    pub song_id: i64,
-    pub fields: HashMap<&'static str, Option<String>>,
+    song_id: i64,
+    values: [Option<String>; TRACKED_FIELD_COUNT],
 }
 
 impl TagSnapshot {
+    /// Returns the database ID of the song captured in this snapshot.
+    pub fn song_id(&self) -> i64 {
+        self.song_id
+    }
+
+    /// Looks up the canonicalized tag value for a tracked field name, returning `None` if
+    /// unset, empty, or if `field` is not in [`TRACKED_FIELDS`].
     pub fn get(&self, field: &str) -> Option<&str> {
-        self.fields.get(field).and_then(|v| v.as_deref())
+        let idx = TRACKED_FIELDS.iter().position(|&f| f == field)?;
+        self.values[idx].as_deref()
     }
 }
 
-pub fn diff_snapshots(
+fn diff_snapshots(
     before: &TagSnapshot,
     after: &TagSnapshot,
 ) -> Vec<(&'static str, Option<String>, Option<String>)> {
     let mut diffs = Vec::new();
-    for &field in TRACKED_FIELDS {
-        let old_val = before.fields.get(field).cloned().flatten();
-        let new_val = after.fields.get(field).cloned().flatten();
+    for (idx, &field) in TRACKED_FIELDS.iter().enumerate() {
+        let old_val = &before.values[idx];
+        let new_val = &after.values[idx];
         if old_val != new_val {
-            diffs.push((field, old_val, new_val));
+            diffs.push((field, old_val.clone(), new_val.clone()));
         }
     }
     diffs
@@ -194,46 +231,32 @@ fn row_to_snapshot(row: &rusqlite::Row) -> rusqlite::Result<Option<TagSnapshot>>
 
     let compilation_bool = compilation.unwrap_or(false);
 
-    let mut fields = HashMap::with_capacity(22);
-    fields.insert("title", canonicalize_free_text(title.as_deref()));
-    fields.insert("titlesort", canonicalize_free_text(titlesort.as_deref()));
-    fields.insert("artist", canonicalize_multi_value(artist.as_deref()));
-    fields.insert("artistsort", canonicalize_free_text(artistsort.as_deref()));
-    fields.insert("album", canonicalize_free_text(album.as_deref()));
-    fields.insert("albumsort", canonicalize_free_text(albumsort.as_deref()));
-    fields.insert(
-        "album_artist",
+    let values: [Option<String>; TRACKED_FIELD_COUNT] = [
+        canonicalize_free_text(title.as_deref()),
+        canonicalize_free_text(titlesort.as_deref()),
+        canonicalize_multi_value(artist.as_deref()),
+        canonicalize_free_text(artistsort.as_deref()),
+        canonicalize_free_text(album.as_deref()),
+        canonicalize_free_text(albumsort.as_deref()),
         canonicalize_multi_value(album_artist.as_deref()),
-    );
-    fields.insert(
-        "album_artist_sort",
         canonicalize_free_text(album_artist_sort.as_deref()),
-    );
-    fields.insert("composer", canonicalize_multi_value(composer.as_deref()));
-    fields.insert(
-        "composersort",
+        canonicalize_multi_value(composer.as_deref()),
         canonicalize_free_text(composersort.as_deref()),
-    );
-    fields.insert("genre", canonicalize_multi_value(genre.as_deref()));
-    fields.insert("genresort", canonicalize_free_text(genresort.as_deref()));
-    fields.insert("track", canonicalize_int(track));
-    fields.insert("disc", canonicalize_int(disc));
-    fields.insert(
-        "disc_subtitle",
+        canonicalize_multi_value(genre.as_deref()),
+        canonicalize_free_text(genresort.as_deref()),
+        canonicalize_int(track),
+        canonicalize_int(disc),
         canonicalize_free_text(disc_subtitle.as_deref()),
-    );
-    fields.insert("year", canonicalize_int(year));
-    fields.insert("originalyear", canonicalize_int(originalyear));
-    fields.insert("grouping", canonicalize_free_text(grouping.as_deref()));
-    fields.insert("bpm", canonicalize_bpm(bpm));
-    fields.insert(
-        "initial_key",
+        canonicalize_int(year),
+        canonicalize_int(originalyear),
+        canonicalize_free_text(grouping.as_deref()),
+        canonicalize_bpm(bpm),
         canonicalize_free_text(initial_key.as_deref()),
-    );
-    fields.insert("compilation", canonicalize_compilation(compilation_bool));
-    fields.insert("comment", canonicalize_free_text(comment.as_deref()));
+        canonicalize_compilation(compilation_bool),
+        canonicalize_free_text(comment.as_deref()),
+    ];
 
-    Ok(Some(TagSnapshot { song_id, fields }))
+    Ok(Some(TagSnapshot { song_id, values }))
 }
 
 const SNAPSHOT_COLS: &str = "id, source, cue_path, \
@@ -243,6 +266,9 @@ const SNAPSHOT_COLS: &str = "id, source, cue_path, \
      track, disc, disc_subtitle, year, originalyear, \
      grouping, bpm, initial_key, compilation, comment";
 
+/// Captures a [`TagSnapshot`] of current tracked tags for `song_id`.
+///
+/// Returns `Ok(None)` if the song does not exist, is a remote track, or is a CUE sheet slice.
 pub fn snapshot_by_id(
     conn: &rusqlite::Connection,
     song_id: i64,
@@ -256,6 +282,9 @@ pub fn snapshot_by_id(
     }
 }
 
+/// Captures a [`TagSnapshot`] of current tracked tags for `path` and `beginning_nanosec`.
+///
+/// Returns `Ok(None)` if no matching row exists, is a remote track, or is a CUE sheet slice.
 pub fn snapshot_by_path(
     conn: &rusqlite::Connection,
     path: &str,
@@ -271,13 +300,21 @@ pub fn snapshot_by_path(
     }
 }
 
+/// Diffs `before` against the song's current row in `songs` (after an UPDATE/upsert),
+/// inserts `song_history` rows for any changed tracked tag fields, and prunes beyond
+/// [`MAX_EVENTS_PER_SONG`]. Passing `None` (e.g. for a newly inserted, remote, or CUE track)
+/// is a valid no-op returning `Ok(0)`.
 pub fn record_diff_after_update(
     conn: &rusqlite::Connection,
-    before: &TagSnapshot,
+    before: Option<&TagSnapshot>,
     actor: HistoryActor,
     batch_id: Option<&str>,
 ) -> rusqlite::Result<usize> {
-    let Some(after) = snapshot_by_id(conn, before.song_id)? else {
+    let Some(before) = before else {
+        return Ok(0);
+    };
+
+    let Some(after) = snapshot_by_id(conn, before.song_id())? else {
         return Ok(0);
     };
 
@@ -298,7 +335,7 @@ pub fn record_diff_after_update(
 
     for (field, old_val, new_val) in &diffs {
         stmt.execute(params![
-            before.song_id,
+            before.song_id(),
             now,
             actor.as_str(),
             field,
@@ -317,12 +354,14 @@ pub fn record_diff_after_update(
                ORDER BY at DESC, id DESC
                LIMIT ?2
            )",
-        params![before.song_id, MAX_EVENTS_PER_SONG as i64],
+        params![before.song_id(), MAX_EVENTS_PER_SONG as i64],
     )?;
 
     Ok(diffs.len())
 }
 
+/// Inspects the file at `path` and returns its modification time (seconds since epoch)
+/// and file size (bytes), or `None` for each if filesystem metadata cannot be read.
 pub fn file_mtime_and_size(path: &Path) -> (Option<i64>, Option<i64>) {
     let Ok(meta) = std::fs::metadata(path) else {
         return (None, None);
@@ -338,6 +377,7 @@ pub fn file_mtime_and_size(path: &Path) -> (Option<i64>, Option<i64>) {
 
 static BATCH_COUNTER: AtomicU64 = AtomicU64::new(1);
 
+/// Generates a unique correlation ID for grouping multi-track tag edits performed together.
 pub fn new_batch_id() -> String {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -347,6 +387,7 @@ pub fn new_batch_id() -> String {
     format!("{now:x}-{seq}")
 }
 
+/// Retrieves the tag change history and file provenance for `song_id`.
 pub fn get_song_history(
     conn: &rusqlite::Connection,
     song_id: i64,
@@ -427,6 +468,7 @@ pub fn get_song_history(
     })
 }
 
+/// Deletes all recorded `song_history` rows for `song_id`.
 pub fn clear_song_history(conn: &rusqlite::Connection, song_id: i64) -> Result<(), String> {
     conn.execute(
         "DELETE FROM song_history WHERE song_id = ?1",
@@ -490,6 +532,19 @@ mod tests {
     }
 
     #[test]
+    fn test_tracked_fields_consistency() {
+        assert_eq!(TRACKED_FIELDS.len(), TRACKED_FIELD_COUNT);
+    }
+
+    #[test]
+    fn test_none_snapshot_is_noop() {
+        let (_dir, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+        let result = record_diff_after_update(&conn, None, HistoryActor::Luminous, None).unwrap();
+        assert_eq!(result, 0);
+    }
+
+    #[test]
     fn test_unchanged_fields_write_nothing_and_first_change_stores_old_and_new() {
         let (_dir, db) = setup_test_db();
         let conn = db.pool.get().unwrap();
@@ -505,10 +560,14 @@ mod tests {
         let before = snapshot_by_id(&conn, song_id)
             .unwrap()
             .expect("snapshot exists");
+        assert_eq!(before.song_id(), song_id);
+        assert_eq!(before.get("title"), Some("Old Title"));
+        assert_eq!(before.get("artist"), Some("Artist A"));
+        assert_eq!(before.get("nonexistent_field"), None);
 
         // No DB update yet -> diff is empty, nothing recorded
         let diff_count =
-            record_diff_after_update(&conn, &before, HistoryActor::Luminous, None).unwrap();
+            record_diff_after_update(&conn, Some(&before), HistoryActor::Luminous, None).unwrap();
         assert_eq!(diff_count, 0);
 
         let history = get_song_history(&conn, song_id).unwrap();
@@ -522,7 +581,7 @@ mod tests {
         .unwrap();
 
         let diff_count =
-            record_diff_after_update(&conn, &before, HistoryActor::Luminous, None).unwrap();
+            record_diff_after_update(&conn, Some(&before), HistoryActor::Luminous, None).unwrap();
         assert_eq!(diff_count, 1);
 
         let history = get_song_history(&conn, song_id).unwrap();
@@ -538,7 +597,8 @@ mod tests {
         // Recording again with updated before snapshot produces 0 diffs
         let before_new = snapshot_by_id(&conn, song_id).unwrap().unwrap();
         let diff_count2 =
-            record_diff_after_update(&conn, &before_new, HistoryActor::Luminous, None).unwrap();
+            record_diff_after_update(&conn, Some(&before_new), HistoryActor::Luminous, None)
+                .unwrap();
         assert_eq!(diff_count2, 0);
         assert_eq!(get_song_history(&conn, song_id).unwrap().entries.len(), 1);
     }
@@ -580,7 +640,8 @@ mod tests {
             params![song_id],
         )
         .unwrap();
-        let recorded = record_diff_after_update(&conn, &before, HistoryActor::Scan, None).unwrap();
+        let recorded =
+            record_diff_after_update(&conn, Some(&before), HistoryActor::Scan, None).unwrap();
         assert_eq!(
             recorded, 0,
             "normalized equivalent multi-value should not log changes"
@@ -592,7 +653,8 @@ mod tests {
             params![song_id],
         )
         .unwrap();
-        let recorded = record_diff_after_update(&conn, &before, HistoryActor::Scan, None).unwrap();
+        let recorded =
+            record_diff_after_update(&conn, Some(&before), HistoryActor::Scan, None).unwrap();
         assert_eq!(recorded, 1);
 
         let history = get_song_history(&conn, song_id).unwrap();
@@ -646,9 +708,12 @@ mod tests {
             .unwrap();
         }
 
-        record_diff_after_update(&conn, &b1, HistoryActor::Luminous, Some(&batch_id)).unwrap();
-        record_diff_after_update(&conn, &b2, HistoryActor::Luminous, Some(&batch_id)).unwrap();
-        record_diff_after_update(&conn, &b3, HistoryActor::Luminous, Some(&batch_id)).unwrap();
+        record_diff_after_update(&conn, Some(&b1), HistoryActor::Luminous, Some(&batch_id))
+            .unwrap();
+        record_diff_after_update(&conn, Some(&b2), HistoryActor::Luminous, Some(&batch_id))
+            .unwrap();
+        record_diff_after_update(&conn, Some(&b3), HistoryActor::Luminous, Some(&batch_id))
+            .unwrap();
 
         let h1 = get_song_history(&conn, s1).unwrap();
         assert_eq!(h1.entries.len(), 1);
@@ -727,7 +792,7 @@ mod tests {
             params![song_id],
         )
         .unwrap();
-        record_diff_after_update(&conn, &before, HistoryActor::Luminous, None).unwrap();
+        record_diff_after_update(&conn, Some(&before), HistoryActor::Luminous, None).unwrap();
 
         let count_after: i64 = conn
             .query_row(
@@ -860,7 +925,7 @@ mod tests {
         )
         .unwrap();
         let recorded =
-            record_diff_after_update(&conn, &before, HistoryActor::Luminous, None).unwrap();
+            record_diff_after_update(&conn, Some(&before), HistoryActor::Luminous, None).unwrap();
         assert_eq!(recorded, 1);
 
         let history = get_song_history(&conn, song_id).unwrap();

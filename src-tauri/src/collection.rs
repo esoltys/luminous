@@ -2291,14 +2291,12 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
         ],
     )?;
 
-    if let Some(before) = before {
-        crate::tag_history::record_diff_after_update(
-            conn,
-            &before,
-            crate::tag_history::HistoryActor::Scan,
-            None,
-        )?;
-    }
+    crate::tag_history::record_diff_after_update(
+        conn,
+        before.as_ref(),
+        crate::tag_history::HistoryActor::Scan,
+        None,
+    )?;
 
     Ok(())
 }
