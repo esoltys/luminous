@@ -22,6 +22,7 @@ describe("CurationShelf.svelte", () => {
     missing_core_tags_count: 0,
     suspected_provenance_songs: [],
     duplicate_groups: [],
+    corrupt_songs: [],
   };
 
   beforeEach(() => {
@@ -85,6 +86,7 @@ describe("CurationShelf.svelte", () => {
     expect(queryByTestId("curation-missing-core-section")).toBeNull();
     expect(queryByTestId("curation-duplicates-section")).toBeNull();
     expect(queryByTestId("curation-provenance-section")).toBeNull();
+    expect(queryByTestId("curation-corrupt-section")).toBeNull();
   });
 
   it("renders incomplete albums with unnumbered badge and triggers navigation & picard handoff", async () => {
@@ -306,5 +308,49 @@ describe("CurationShelf.svelte", () => {
     await fireEvent.click(showLessBtn);
 
     expect(queryByText("Album 7")).toBeNull();
+  });
+
+  it("renders corrupt audio tracks and triggers view in files handoff", async () => {
+    const openInFilesSpy = vi.spyOn(navigationStore, "openInFiles").mockImplementation(() => {});
+    const mockTarget = { folder_id: 1, relative_path: "Broken Track.flac" };
+
+    const overviewCorrupt: CurationOverview = {
+      ...emptyOverview,
+      corrupt_songs: [
+        {
+          id: 77,
+          title: "Broken Track",
+          artist: "Corrupt Artist",
+          album: "Glitchy Album",
+          path: "/music/Corrupt Artist/Glitchy Album/Broken Track.flac",
+          format: "FLAC",
+          error_detail: "FLAC stream checksum mismatch (corrupted audio frame)",
+          verified_at: 1700000000,
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation((cmd: string, args: any) => {
+      if (cmd === "get_curation_overview") {
+        return Promise.resolve(overviewCorrupt);
+      }
+      if (cmd === "locate_song_in_files" && args?.songId === 77) {
+        return Promise.resolve(mockTarget);
+      }
+      return Promise.resolve(null);
+    });
+
+    const { findByTestId, findByText } = render(CurationShelf);
+
+    expect(await findByTestId("curation-corrupt-section")).toBeInTheDocument();
+    expect(await findByText("Broken Track")).toBeInTheDocument();
+    expect(await findByText("FLAC stream checksum mismatch (corrupted audio frame)")).toBeInTheDocument();
+
+    const viewFilesBtn = await findByText("View in Files");
+    await fireEvent.click(viewFilesBtn);
+
+    await waitFor(() => {
+      expect(openInFilesSpy).toHaveBeenCalledWith(mockTarget);
+    });
   });
 });

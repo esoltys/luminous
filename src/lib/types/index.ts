@@ -1430,12 +1430,24 @@ export interface DuplicateTrackGroup {
   candidates: DuplicateCandidate[];
 }
 
+export interface CorruptSongItem {
+  id: number;
+  title: string | null;
+  artist: string | null;
+  album: string | null;
+  path: string;
+  format: string;
+  error_detail: string;
+  verified_at: number;
+}
+
 export interface CurationOverview {
   unillustrated_albums: CurationAlbumItem[];
   incomplete_albums: IncompleteAlbumItem[];
   missing_core_tags_count: number;
   suspected_provenance_songs: Song[];
   duplicate_groups: DuplicateTrackGroup[];
+  corrupt_songs: CorruptSongItem[];
 }
 
 

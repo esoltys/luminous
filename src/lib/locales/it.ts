@@ -2248,6 +2248,7 @@ export const it = {
     filterReady: "Pronti da spostare ({count})",
     filterNeedsTags: "Tag mancanti ({count})",
     filterDuplicates: "Copie duplicate ({count})",
+    collisionDiskNotice: "Il file di destinazione esiste già sul disco. Questo brano verrà indirizzato alla cartella Duplicates per evitarne la sovrascrittura.",
     filterErrors: "Errori ({count})",
     includeMissingTagsToggle: "Includi brani con tag mancanti",
     customizeSummaryBtn: "Personalizza…",
@@ -2781,6 +2782,8 @@ export const it = {
     shelfProvenanceTitle: "Avvisi di provenienza audio",
     shelfProvenanceHint: "Tracce lossless segnalate per sospetta transcodifica con perdita o sovracampionamento.",
     shelfProvenanceBadge: "Sospetta transcodifica",
+    shelfCorruptTitle: "File audio corrotti o illeggibili",
+    shelfCorruptHint: "Tracce con errori di decodifica del flusso, verifica del contenitore o convalida del checksum",
     showAllWithCount: "Mostra tutto ({count})",
     showLess: "Mostra meno"
   }

@@ -2410,6 +2410,7 @@ export const ru = {
     filterReady: "Готовы к перемещению ({count})",
     filterNeedsTags: "Требуются теги ({count})",
     filterDuplicates: "Дубликаты ({count})",
+    collisionDiskNotice: "Целевой файл уже существует на диске. Этот трек будет направлен в папку Duplicates во избежание перезаписи.",
     filterErrors: "Ошибки ({count})",
     includeMissingTagsToggle: "Включить песни с отсутствующими тегами",
     customizeSummaryBtn: "Настроить…",
@@ -2981,6 +2982,8 @@ export const ru = {
     shelfProvenanceTitle: "Уведомления о подлинности аудио",
     shelfProvenanceHint: "Lossless-треки с подозрением на пережатие из сжатых форматов или искусственный апсемплинг.",
     shelfProvenanceBadge: "Подозрение на пережатие",
+    shelfCorruptTitle: "Поврежденные и нечитаемые аудиофайлы",
+    shelfCorruptHint: "Треки с ошибками декодирования потока, проверки контейнера или контрольной суммы",
     showAllWithCount: "Показать все ({count})",
     showLess: "Показать меньше"
   }

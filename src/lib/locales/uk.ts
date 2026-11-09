@@ -2410,6 +2410,7 @@ export const uk = {
     filterReady: "Готові до переміщення ({count})",
     filterNeedsTags: "Потрібні теги ({count})",
     filterDuplicates: "Дублікати ({count})",
+    collisionDiskNotice: "Цільовий файл уже існує на диску. Цей трек буде спрямовано до папки Duplicates, щоб уникнути перезапису.",
     filterErrors: "Помилки ({count})",
     includeMissingTagsToggle: "Включити пісні з відсутніми тегами",
     customizeSummaryBtn: "Налаштувати…",
@@ -2981,6 +2982,8 @@ export const uk = {
     shelfProvenanceTitle: "Повідомлення про автентичність аудіо",
     shelfProvenanceHint: "Lossless-треки з підозрою на перетиснення зі стиснених форматів або штучний апсемплінг.",
     shelfProvenanceBadge: "Підозра на перетиснення",
+    shelfCorruptTitle: "Пошкоджені та нечитабельні аудіофайли",
+    shelfCorruptHint: "Треки з помилками декодування потоку, перевірки контейнера або контрольної суми",
     showAllWithCount: "Показати всі ({count})",
     showLess: "Показати менше"
   }

@@ -2256,6 +2256,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     filterReady: "Prêts à déplacer ({count})",
     filterNeedsTags: "Balises requises ({count})",
     filterDuplicates: "Doublons ({count})",
+    collisionDiskNotice: "Le fichier de destination existe déjà sur le disque. Cette piste sera acheminée vers le dossier Duplicates pour éviter de l'écraser.",
     filterErrors: "Erreurs ({count})",
     includeMissingTagsToggle: "Inclure les morceaux aux balises manquantes",
     customizeSummaryBtn: "Personnaliser…",
@@ -2789,6 +2790,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     shelfProvenanceTitle: "Avis sur la provenance audio",
     shelfProvenanceHint: "Pistes sans perte signalées pour transcodage avec perte ou suréchantillonnage suspect.",
     shelfProvenanceBadge: "Transcodage suspect",
+    shelfCorruptTitle: "Fichiers audio corrompus ou illisibles",
+    shelfCorruptHint: "Pistes échouant au décodage du flux, à la vérification du conteneur ou à la validation de la somme de contrôle",
     showAllWithCount: "Tout afficher ({count})",
     showLess: "Afficher moins"
   }

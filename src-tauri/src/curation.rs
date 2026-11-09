@@ -5,12 +5,19 @@
 //! - Multi-track albums with incomplete or colliding track numbering
 //! - Tracks missing core identity metadata (title, artist, or album)
 //! - Lossless tracks with suspected lossy transcode or upsampling provenance warnings
+//! - Corrupted, truncated, or bit-rotted tracks failing physical audio integrity checks (#1938)
 
-use crate::models::{Playlist, Song, LOCAL_SOURCES_SQL};
-use anyhow::Result;
+use crate::db::Database;
+use crate::models::{Playlist, Song, SongSource, LOCAL_SOURCES_SQL};
+use anyhow::{Context, Result};
+use luminous_analysis::IntegrityVerdict;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter};
 
 /// Summary of an album surfaced during curation audit.
 ///
@@ -61,6 +68,19 @@ pub struct DuplicateTrackGroup {
     pub candidates: Vec<DuplicateCandidate>,
 }
 
+/// A local library track identified with structural, container, or checksum corruption (#1938).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CorruptSongItem {
+    pub id: i64,
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub path: String,
+    pub format: String,
+    pub error_detail: String,
+    pub verified_at: i64,
+}
+
 /// Comprehensive overview of collection health and curation candidates across local library tracks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CurationOverview {
@@ -69,6 +89,7 @@ pub struct CurationOverview {
     pub missing_core_tags_count: usize,
     pub suspected_provenance_songs: Vec<Song>,
     pub duplicate_groups: Vec<DuplicateTrackGroup>,
+    pub corrupt_songs: Vec<CorruptSongItem>,
 }
 
 /// Common CTEs computing top genres per album and pre-ordering tracks for album aggregation.
@@ -861,6 +882,211 @@ pub fn resolve_duplicate_group_in_db(
     Ok(deleted_paths)
 }
 
+/// Safely queries SQLite for corrupt tracks detected across the local library (#1938).
+pub(crate) fn query_corrupt_songs(conn: &Connection) -> Result<Vec<CorruptSongItem>> {
+    let has_table: bool = conn
+        .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'song_integrity'")?
+        .exists([])?;
+    if !has_table {
+        return Ok(Vec::new());
+    }
+
+    let mut stmt = conn.prepare(&format!(
+        "SELECT s.id, s.title, s.artist, s.album, s.path, s.filetype, i.error_detail, i.verified_at
+         FROM song_integrity i
+         JOIN songs s ON s.id = i.song_id
+         WHERE s.source IN ({local_sources})
+           AND s.unavailable = 0
+           AND i.status = 'corrupt'
+           AND i.mtime = s.mtime
+         ORDER BY s.added DESC, s.id DESC",
+        local_sources = *LOCAL_SOURCES_SQL
+    ))?;
+
+    let rows = stmt.query_map([], |row| {
+        let ft_num: i64 = row.get(5).unwrap_or(0);
+        let format = crate::models::FileType::from(ft_num)
+            .display_name()
+            .to_string();
+        Ok(CorruptSongItem {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            artist: row.get(2)?,
+            album: row.get(3)?,
+            path: row.get::<_, Option<String>>(4)?.unwrap_or_default(),
+            format,
+            error_detail: row
+                .get::<_, Option<String>>(6)?
+                .unwrap_or_else(|| "Corrupted file".to_string()),
+            verified_at: row.get(7)?,
+        })
+    })?;
+
+    let mut items = Vec::new();
+    for r in rows {
+        items.push(r?);
+    }
+    Ok(items)
+}
+
+/// Verify a single song's file integrity, saving the result to `song_integrity`.
+pub fn verify_song_integrity(db: &Database, song_id: i64) -> Result<Option<CorruptSongItem>> {
+    let conn = db.pool.get().context("failed to get db connection")?;
+
+    let row = conn.query_row(
+        "SELECT path, source, mtime, title, artist, album, format FROM songs WHERE id = ?1",
+        params![song_id],
+        |row| {
+            Ok((
+                row.get::<_, Option<String>>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, Option<i64>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, Option<String>>(6)?,
+            ))
+        },
+    );
+
+    let (path_str, source_raw, mtime_val, title, artist, album, format_str) = match row {
+        Ok(vals) => vals,
+        Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+
+    let source = SongSource::from(source_raw);
+    if !source.is_local() {
+        return Ok(None);
+    }
+
+    let Some(path) = path_str else {
+        return Ok(None);
+    };
+
+    let mtime = mtime_val.unwrap_or(0);
+    let p = Path::new(&path);
+
+    let verdict = luminous_analysis::verify_audio_file(p);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    match verdict {
+        IntegrityVerdict::Valid => {
+            conn.execute(
+                "INSERT INTO song_integrity (song_id, mtime, status, error_detail, verified_at)
+                 VALUES (?1, ?2, 'valid', NULL, ?3)
+                 ON CONFLICT(song_id) DO UPDATE SET
+                    mtime = excluded.mtime,
+                    status = excluded.status,
+                    error_detail = excluded.error_detail,
+                    verified_at = excluded.verified_at",
+                params![song_id, mtime, now],
+            )?;
+            Ok(None)
+        }
+        IntegrityVerdict::Corrupt { reason } => {
+            conn.execute(
+                "INSERT INTO song_integrity (song_id, mtime, status, error_detail, verified_at)
+                 VALUES (?1, ?2, 'corrupt', ?3, ?4)
+                 ON CONFLICT(song_id) DO UPDATE SET
+                    mtime = excluded.mtime,
+                    status = excluded.status,
+                    error_detail = excluded.error_detail,
+                    verified_at = excluded.verified_at",
+                params![song_id, mtime, reason, now],
+            )?;
+            Ok(Some(CorruptSongItem {
+                id: song_id,
+                title,
+                artist,
+                album,
+                path,
+                format: format_str.unwrap_or_else(|| "Unknown".to_string()),
+                error_detail: reason,
+                verified_at: now,
+            }))
+        }
+        IntegrityVerdict::Unverified => Ok(None),
+    }
+}
+
+/// Spawn a low-priority background thread that checks unverified local tracks (#1938, epic #1441).
+/// Throttles between tracks so it never interferes with playback or UI responsiveness.
+pub fn spawn_background_integrity_checker(app: AppHandle, db: Arc<Database>) {
+    std::thread::Builder::new()
+        .name("luminous-integrity".to_string())
+        .spawn(move || {
+            loop {
+                let next: Option<(i64, String)> = match db.pool.get() {
+                    Ok(conn) => conn
+                        .query_row(
+                            &format!(
+                                "SELECT s.id, s.path FROM songs s
+                                 LEFT JOIN song_integrity i ON s.id = i.song_id
+                                 WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+                                   AND (i.song_id IS NULL OR i.mtime != s.mtime)
+                                 ORDER BY s.added DESC, s.id DESC LIMIT 1",
+                                lib = *LOCAL_SOURCES_SQL
+                            ),
+                            [],
+                            |row| Ok((row.get(0)?, row.get(1)?)),
+                        )
+                        .optional()
+                        .unwrap_or(None),
+                    Err(_) => None,
+                };
+
+                let Some((song_id, _path)) = next else {
+                    std::thread::sleep(Duration::from_secs(20));
+                    continue;
+                };
+
+                match verify_song_integrity(&db, song_id) {
+                    Ok(Some(corrupt_item)) => {
+                        let _ = app.emit("song-integrity-changed", &corrupt_item);
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        log::debug!("Background integrity checker skipped song {song_id}: {e}");
+                    }
+                }
+
+                // Throttle between tracks to keep CPU/disk gentle
+                std::thread::sleep(Duration::from_millis(300));
+            }
+        })
+        .expect("failed to spawn integrity checker thread");
+}
+
+/// Triggers verification of all unverified local songs across the library (#1938).
+pub fn verify_library_integrity(app: &AppHandle, db: &Database) -> Result<usize> {
+    let conn = db.pool.get().context("failed to get db connection")?;
+    let mut stmt = conn.prepare(&format!(
+        "SELECT s.id FROM songs s
+         LEFT JOIN song_integrity i ON s.id = i.song_id
+         WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+           AND (i.song_id IS NULL OR i.mtime != s.mtime)
+         ORDER BY s.added DESC, s.id DESC",
+        lib = *LOCAL_SOURCES_SQL
+    ))?;
+
+    let song_ids: Vec<i64> = stmt
+        .query_map([], |row| row.get(0))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let count = song_ids.len();
+    for id in song_ids {
+        if let Ok(Some(corrupt_item)) = verify_song_integrity(db, id) {
+            let _ = app.emit("song-integrity-changed", &corrupt_item);
+        }
+    }
+    Ok(count)
+}
+
 /// Computes the overall collection curation overview across local library files.
 ///
 /// Ensures album keys are up to date via `repair_album_keys` before executing groupings.
@@ -872,6 +1098,7 @@ pub fn compute_curation_overview(conn: &Connection) -> Result<CurationOverview> 
     let missing_core_tags_count = query_missing_core_tags_count(conn)?;
     let suspected_provenance_songs = query_suspected_provenance_songs(conn)?;
     let duplicate_groups = query_duplicate_track_groups(conn)?;
+    let corrupt_songs = query_corrupt_songs(conn)?;
 
     Ok(CurationOverview {
         unillustrated_albums,
@@ -879,6 +1106,7 @@ pub fn compute_curation_overview(conn: &Connection) -> Result<CurationOverview> 
         missing_core_tags_count,
         suspected_provenance_songs,
         duplicate_groups,
+        corrupt_songs,
     })
 }
 
@@ -910,6 +1138,7 @@ mod tests {
         assert_eq!(overview.missing_core_tags_count, 0);
         assert!(overview.suspected_provenance_songs.is_empty());
         assert!(overview.duplicate_groups.is_empty());
+        assert!(overview.corrupt_songs.is_empty());
     }
 
     #[test]
@@ -1688,5 +1917,56 @@ mod tests {
             )
             .unwrap();
         assert_eq!(playcount, 25);
+    }
+
+    #[test]
+    fn test_corrupt_songs_query_and_mtime_invalidation() {
+        let (_temp, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        // Initially no corrupt songs
+        let initial = query_corrupt_songs(&conn).unwrap();
+        assert!(initial.is_empty());
+
+        // Insert local song
+        conn.execute(
+            "INSERT INTO songs (path, title, artist, album, filetype, source, mtime)
+             VALUES ('/music/corrupt.mp3', 'Broken', 'Artist', 'Album', 1, 2, 1000)",
+            [],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+
+        // Mark as corrupt in song_integrity
+        conn.execute(
+            "INSERT INTO song_integrity (song_id, mtime, status, error_detail, verified_at)
+             VALUES (?1, 1000, 'corrupt', 'Truncated audio stream', 123456)",
+            params![song_id],
+        )
+        .unwrap();
+
+        let corrupt_list = query_corrupt_songs(&conn).unwrap();
+        assert_eq!(corrupt_list.len(), 1);
+        assert_eq!(corrupt_list[0].id, song_id);
+        assert_eq!(corrupt_list[0].title.as_deref(), Some("Broken"));
+        assert_eq!(corrupt_list[0].error_detail, "Truncated audio stream");
+
+        // Verify overview includes the corrupt song
+        let overview = compute_curation_overview(&conn).unwrap();
+        assert_eq!(overview.corrupt_songs.len(), 1);
+        assert_eq!(overview.corrupt_songs[0].id, song_id);
+
+        // When the file is updated on disk (mtime changes in songs table), the cached corrupt status becomes stale and is omitted
+        conn.execute(
+            "UPDATE songs SET mtime = 2000 WHERE id = ?1",
+            params![song_id],
+        )
+        .unwrap();
+
+        let after_update = query_corrupt_songs(&conn).unwrap();
+        assert!(
+            after_update.is_empty(),
+            "stale corrupt record with mismatched mtime must be excluded"
+        );
     }
 }

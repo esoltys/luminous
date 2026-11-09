@@ -657,7 +657,7 @@ fn resolve_duplicate_path(dup_path: &Path, source_path: &Path) -> (PathBuf, bool
     let mut final_dup_path = dup_path.to_path_buf();
 
     while final_dup_path.exists() {
-        if final_dup_path == source_path {
+        if normalize_path_cmp(&final_dup_path, source_path) || final_dup_path == source_path {
             return (final_dup_path, true);
         }
         if let Some(ext) = dup_path.extension().map(|s| s.to_owned()) {
@@ -871,7 +871,16 @@ pub fn compute_preview(
                 }
 
                 // If these are duplicate database records pointing to the exact same physical file
-                // (e.g. case-only differences on Windows), ignore the collision for this extra record.
+                // (e.g. case-only differences on Windows or CIFS), ignore the collision for this extra record.
+                if normalize_path_cmp(
+                    Path::new(&preview_items[idx].from_path),
+                    Path::new(&preview_items[canonical_idx].from_path),
+                ) {
+                    preview_items[idx].status = OrganizePreviewStatus::Unchanged;
+                    preview_items[idx].to_path = preview_items[idx].from_path.clone();
+                    preview_items[idx].error_message = None;
+                    continue;
+                }
                 if let (Ok(canon_curr), Ok(canon_base)) = (
                     Path::new(&preview_items[idx].from_path).canonicalize(),
                     Path::new(&preview_items[canonical_idx].from_path).canonicalize(),
@@ -931,7 +940,10 @@ pub fn compute_preview(
         let source_path = Path::new(&item.from_path);
 
         if current_target.exists() {
-            // Check if they are actually the exact same physical file (e.g. a case-only rename on Windows)
+            // Check if they are actually the exact same physical file (e.g. a case-only rename on Windows or CIFS)
+            if normalize_path_cmp(&current_target, source_path) {
+                continue;
+            }
             if let (Ok(canon_from), Ok(canon_to)) =
                 (source_path.canonicalize(), current_target.canonicalize())
             {

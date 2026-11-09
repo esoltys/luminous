@@ -1209,6 +1209,12 @@ pub fn run() {
                 Arc::clone(&state.db),
             );
 
+            // Start background audio integrity checker (#1938, epic #1441)
+            crate::curation::spawn_background_integrity_checker(
+                app.handle().clone(),
+                Arc::clone(&state.db),
+            );
+
             // Correct the codec of tracks scanned when it came from the extension (#1866).
             crate::collection::spawn_codec_reprobe(app.handle().clone(), Arc::clone(&state.db));
 
@@ -1439,10 +1445,12 @@ pub fn run() {
             commands::collection::set_songs_not_included,
             commands::collection::get_songs_missing_musicbrainz_id,
             commands::collection::get_songs_missing_metadata,
-            // Curation commands (#1586, #1678)
+            // Curation commands (#1586, #1678, #1938)
             commands::curation::get_curation_overview,
             commands::curation::get_duplicate_track_groups,
             commands::curation::resolve_duplicate_group,
+            commands::curation::get_corrupt_tracks,
+            commands::curation::verify_library_integrity,
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,

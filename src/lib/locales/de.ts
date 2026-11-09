@@ -2248,6 +2248,7 @@ export const de = {
     filterReady: "Bereit zum Verschieben ({count})",
     filterNeedsTags: "Tags fehlen ({count})",
     filterDuplicates: "Duplikate ({count})",
+    collisionDiskNotice: "Zieldatei existiert bereits auf dem Datenträger. Dieser Titel wird in den Ordner Duplicates geleitet, um ein Überschreiben zu verhindern.",
     filterErrors: "Fehler ({count})",
     includeMissingTagsToggle: "Titel mit fehlenden Tags einschließen",
     customizeSummaryBtn: "Anpassen…",
@@ -2781,6 +2782,8 @@ export const de = {
     shelfProvenanceTitle: "Hinweise zur Audio-Herkunft",
     shelfProvenanceHint: "Verlustfreie Titel mit Verdacht auf verlustbehaftete Transkodierung oder Upsampling.",
     shelfProvenanceBadge: "Verdacht auf Transkodierung",
+    shelfCorruptTitle: "Beschädigte und unlesbare Audiodateien",
+    shelfCorruptHint: "Titel mit Fehlern bei der Stream-Dekodierung, Container-Überprüfung oder Prüfsummenvalidierung",
     showAllWithCount: "Alle anzeigen ({count})",
     showLess: "Weniger anzeigen"
   }
