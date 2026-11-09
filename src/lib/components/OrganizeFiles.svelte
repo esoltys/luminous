@@ -9,6 +9,7 @@
   import { openInPicard } from "../utils/picard";
   import { slide } from "../utils/motion";
   import { organizeStore, computeOrganizeConsequences, type OrganizeConsequences } from "../stores/organizer.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import { TOAST_DURATION_MS } from "../constants";
   import { portal } from "../utils/portal";
@@ -424,10 +425,31 @@
   let isConfigExpanded = $state(false);
   let editingSongId = $state<number | null>(null);
   let reviewDuplicateSongId = $state<number | null>(null);
+  let duplicateSongIds = $state<Set<number>>(new Set());
   let contextMenu = $state<{ x: number; y: number; item: OrganizePreviewItem } | null>(null);
 
   function openTagEditor(songId: number) {
     editingSongId = songId;
+  }
+
+  async function loadDuplicateSongIds() {
+    try {
+      const groups = await invoke<import("../types").DuplicateTrackGroup[]>("get_duplicate_track_groups");
+      duplicateSongIds = new Set(groups.flatMap((g) => g.candidates.map((c) => c.song.id)));
+    } catch {
+      duplicateSongIds = new Set();
+    }
+  }
+
+  async function locateInFiles(songId: number) {
+    try {
+      const target = await invoke<import("../types").FileNavigationTarget | null>("locate_song_in_files", { songId });
+      if (target) {
+        navigationStore.openInFiles(target);
+      }
+    } catch (e) {
+      console.error("Failed to locate song in Files view:", e);
+    }
   }
 
   async function handleReviewDuplicate(songId: number) {
@@ -565,6 +587,7 @@
         },
       });
       items = res;
+      await loadDuplicateSongIds();
     } catch (err: any) {
       console.error("Preview failed:", err);
       errorMessage = typeof err === "string" ? err : err.message || i18n.t("organizer.previewFailed");
@@ -1113,15 +1136,27 @@
                     <!-- Hover quick actions -->
                     <div class="ml-auto shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pl-2">
                       {#if st === "duplicate"}
-                        <button
-                          type="button"
-                          onclick={(e) => { e.stopPropagation(); handleReviewDuplicate(item.song_id); }}
-                          class="px-2 py-1 rounded bg-brand-sidebar hover:bg-brand-main text-brand-text-primary text-[10px] font-semibold border border-brand-border/60 transition-colors flex items-center gap-1 shadow-sm"
-                          title={i18n.t("curation.compareDuplicatesBtn")}
-                        >
-                          <Duplicate class="w-3 h-3" />
-                          <span>{i18n.t("curation.compareDuplicatesBtn")}</span>
-                        </button>
+                        {#if duplicateSongIds.has(item.song_id)}
+                          <button
+                            type="button"
+                            onclick={(e) => { e.stopPropagation(); handleReviewDuplicate(item.song_id); }}
+                            class="px-2 py-1 rounded bg-brand-sidebar hover:bg-brand-main text-brand-text-primary text-[10px] font-semibold border border-brand-border/60 transition-colors flex items-center gap-1 shadow-sm"
+                            title={i18n.t("curation.compareDuplicatesBtn")}
+                          >
+                            <Duplicate class="w-3 h-3" />
+                            <span>{i18n.t("curation.compareDuplicatesBtn")}</span>
+                          </button>
+                        {:else}
+                          <button
+                            type="button"
+                            onclick={(e) => { e.stopPropagation(); locateInFiles(item.song_id); }}
+                            class="px-2 py-1 rounded bg-brand-sidebar hover:bg-brand-main text-brand-text-primary text-[10px] font-semibold border border-brand-border/60 transition-colors flex items-center gap-1 shadow-sm"
+                            title={i18n.t("curation.viewInFiles")}
+                          >
+                            <Folder class="w-3 h-3" />
+                            <span>{i18n.t("curation.viewInFiles")}</span>
+                          </button>
+                        {/if}
                       {/if}
                       <button
                         type="button"
@@ -1333,7 +1368,7 @@
 
   {#if contextMenu}
     <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => { contextMenu = null; }}>
-      {#if getItemStatus(contextMenu.item) === "duplicate"}
+      {#if getItemStatus(contextMenu.item) === "duplicate" && duplicateSongIds.has(contextMenu.item.song_id)}
         <ContextMenuItem
           icon={Duplicate}
           label={i18n.t("curation.compareDuplicatesBtn")}
