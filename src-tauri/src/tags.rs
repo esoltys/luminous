@@ -14,8 +14,8 @@ use crate::{
     collection::{mode_query_fragments, row_to_song, SONG_SELECT_COLS},
     db::Database,
     models::{
-        join_multi_value, parse_multi_value, GenreGroup, QueuePopulationMode, Song, Tag, TagCount,
-        TagGroup, TagGroupChild, LIBRARY_SOURCES_SQL,
+        join_multi_value, parse_multi_value, GenreGroup, LanguageSummary, QueuePopulationMode,
+        Song, Tag, TagCount, TagGroup, TagGroupChild, LIBRARY_SOURCES_SQL,
     },
 };
 use anyhow::Result;
@@ -328,6 +328,118 @@ impl TagManager {
                         parse_multi_value(g)
                             .iter()
                             .any(|v| v.to_lowercase() == target)
+                    })
+                    .unwrap_or(false)
+            })
+            .take(take_limit(limit))
+            .collect();
+        Ok(songs)
+    }
+
+    /// Returns summaries of all distinct languages present across library tracks,
+    /// ordered by track count descending.
+    pub fn get_languages_overview(&self) -> Result<Vec<LanguageSummary>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT language, album_key FROM songs
+             WHERE source IN ({lib})
+               AND unavailable = 0
+               AND not_included = 0
+               AND language IS NOT NULL
+               AND language != ''",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], |row| {
+            let lang: String = row.get(0)?;
+            let album_key: Option<String> = row.get(1)?;
+            Ok((lang, album_key))
+        })?;
+
+        struct LangStats {
+            song_count: i64,
+            albums: HashSet<String>,
+        }
+
+        let mut map: HashMap<String, LangStats> = HashMap::new();
+        for row in rows.flatten() {
+            let (lang_str, album_key) = row;
+            let codes = parse_multi_value(&lang_str);
+            let mut seen_in_song = HashSet::new();
+            for code in codes {
+                let norm = code.trim().to_lowercase();
+                if norm.is_empty() || !seen_in_song.insert(norm.clone()) {
+                    continue;
+                }
+                let stats = map.entry(norm).or_insert_with(|| LangStats {
+                    song_count: 0,
+                    albums: HashSet::new(),
+                });
+                stats.song_count += 1;
+                if let Some(ref ak) = album_key {
+                    if !ak.is_empty() {
+                        stats.albums.insert(ak.clone());
+                    }
+                }
+            }
+        }
+
+        let mut result: Vec<LanguageSummary> = map
+            .into_iter()
+            .map(|(code, stats)| LanguageSummary {
+                code,
+                song_count: stats.song_count,
+                album_count: stats.albums.len() as i64,
+            })
+            .collect();
+
+        result.sort_by(|a, b| {
+            b.song_count
+                .cmp(&a.song_count)
+                .then_with(|| a.code.cmp(&b.code))
+        });
+
+        Ok(result)
+    }
+
+    /// Songs whose language tag contains `language` at any position
+    /// (case-insensitive, exact component match).
+    pub fn get_songs_by_language(
+        &self,
+        language: &str,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let (extra_where, order_by) = mode_query_fragments(mode);
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE language LIKE '%' || ?1 || '%'
+               AND source IN ({lib})
+               AND unavailable = 0
+               AND not_included = 0
+               AND loved != -1
+               {extra_where}
+             ORDER BY {order_by}",
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let candidates: Vec<Song> = stmt
+            .query_map(params![language], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let target = language.trim().to_lowercase();
+        let songs = candidates
+            .into_iter()
+            .filter(|song| {
+                song.language
+                    .as_deref()
+                    .map(|l| {
+                        parse_multi_value(l)
+                            .iter()
+                            .any(|v| v.trim().to_lowercase() == target)
                     })
                     .unwrap_or(false)
             })

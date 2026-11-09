@@ -108,6 +108,7 @@ export interface Song {
   originalyear?: number;
   genre?: string;
   genresort?: string;
+  language?: string | null;
   compilation: boolean;
 
   // Extended tags
@@ -1276,17 +1277,24 @@ export type HomeItem =
  * browsable entity types. */
 export type PinnedItemType = "song" | "album" | "artist" | "playlist" | "auto_playlist";
 
+export interface LanguageSummary {
+  code: string;
+  song_count: number;
+  album_count: number;
+}
+
 /** A pinned auto-playlist (genre/decade/BPM/artist-tag/Favourites/Recently
  * Added/Most Played/History) — enough of {@link AutoPlaylistRef}'s shape for
  * `AutoPlaylistCard` to render it directly. Favourites/Recently Added/Most
  * Played/History have no backing playlist row, so `playlistId`/`updated` are
  * absent for those kinds. */
 export interface AutoPlaylistItem {
-  kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart";
+  kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart" | "language";
   genre?: string;
   artistTag?: string;
   decade?: string;
   bpm?: string;
+  language?: string;
   playlistId?: number;
   updated?: number;
   trackCount: number;
@@ -1311,6 +1319,7 @@ export function autoPlaylistRefKeyFor(ref: {
   decade?: string;
   bpm?: string;
   artistTag?: string;
+  language?: string;
 }): string {
   switch (ref.kind) {
     case "genre":
@@ -1321,6 +1330,8 @@ export function autoPlaylistRefKeyFor(ref: {
       return `bpm:${ref.bpm ?? ""}`;
     case "artist_tag":
       return `artist_tag:${ref.artistTag ?? ""}`;
+    case "language":
+      return `language:${ref.language ?? ""}`;
     default:
       return ref.kind;
   }

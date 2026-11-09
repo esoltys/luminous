@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AlbumItem, AutoPlaylistItem, Playlist, PlaylistItem, QueuePopulationMode, Song } from "../types";
 import { i18n } from "../stores/i18n.svelte";
 import { isSmartPlaylistSpec } from "./filterParser";
+import { getLanguageDisplayName } from "./language";
 import { collectionStore } from "../stores/collection.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
@@ -92,7 +93,11 @@ export function getPlaylistDisplayName(
   // derivation needed here the way the old bare-genre-string convention
   // required (a chip's own card already exists separately, so there's
   // nothing to strip a parent's name out of).
-  const baseName = getDaypartMixLabel(playlist.dynamic_spec, getBpmBucketLabel(playlist.dynamic_spec, playlist.name));
+  let baseName = getDaypartMixLabel(playlist.dynamic_spec, getBpmBucketLabel(playlist.dynamic_spec, playlist.name));
+  if (playlist.dynamic_spec?.startsWith("language:")) {
+    const code = playlist.dynamic_spec.replace(/^language:/, "");
+    baseName = getLanguageDisplayName(code) || playlist.name;
+  }
   // Missing Metadata (#367) is a diagnostic singleton, not a library-data
   // category — a population-mode suffix ("Missing Metadata (Favourites)")
   // wouldn't mean anything useful, so it's excluded the same way Smart

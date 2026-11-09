@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createEventScope } from "../utils/eventScope";
-import type { GenreGroup, QueuePopulationMode, Song, Tag, TagGroup, TagGroupChild } from "../types";
+import type { GenreGroup, LanguageSummary, QueuePopulationMode, Song, Tag, TagGroup, TagGroupChild } from "../types";
 export type { TagGroup, TagGroupChild };
 
 /**
@@ -16,6 +16,8 @@ class TagsStore {
   private events = createEventScope(import.meta.hot);
   allTags = $state<Tag[]>([]);
   genreGraph = $state<GenreGroup[]>([]);
+  languages = $state<LanguageSummary[]>([]);
+  private languagesLoadStarted = false;
   /** Songs with no genre value at all — excluded from allTags/genreGraph
    * entirely (there's nothing to group them by), tracked separately so the
    * Genres tab can still surface them as their own browsable group. */
@@ -177,15 +179,31 @@ class TagsStore {
     return count;
   }
 
+  async loadLanguages() {
+    const result = await invoke<LanguageSummary[]>("get_languages_overview");
+    this.languages = Array.isArray(result) ? result : [];
+  }
+
+  ensureLanguagesLoaded() {
+    if (this.languagesLoadStarted) return;
+    this.languagesLoadStarted = true;
+    this.loadLanguages().catch((e) => console.error("Failed to load languages:", e));
+  }
+
   async load() {
     // One combined call — list_all_tags/get_genre_graph each independently
     // rescan every song's genre column backend-side, and this pair is always
     // needed together whenever the Genres tab opens.
-    const { tags, graph, no_genre_count } = await invoke<{
-      tags: Tag[];
-      graph: GenreGroup[];
-      no_genre_count: number;
-    }>("get_tags_overview");
+    const [{ tags, graph, no_genre_count }] = await Promise.all([
+      invoke<{
+        tags: Tag[];
+        graph: GenreGroup[];
+        no_genre_count: number;
+      }>("get_tags_overview"),
+      this.loadLanguages().catch((e) => {
+        console.error("Failed to load languages:", e);
+      }),
+    ]);
     this.allTags = tags;
     this.genreGraph = graph;
     this.noGenreCount = no_genre_count;
@@ -194,6 +212,10 @@ class TagsStore {
 
   async getSongsWithoutGenre(limit?: number, mode?: QueuePopulationMode): Promise<Song[]> {
     return invoke<Song[]>("get_songs_without_genre", { limit, mode });
+  }
+
+  async getSongsByLanguage(language: string, limit?: number, mode?: QueuePopulationMode): Promise<Song[]> {
+    return invoke<Song[]>("get_songs_by_language", { language, limit, mode });
   }
 
   /** Any-position match — used by the flat Tags view, where a tag click is a

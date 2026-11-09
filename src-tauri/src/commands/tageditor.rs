@@ -72,6 +72,7 @@ struct SharedTags {
     disc: Option<u32>,
     disc_subtitle: Option<String>,
     compilation: bool,
+    language: Option<String>,
 }
 
 impl SharedTags {
@@ -87,6 +88,7 @@ impl SharedTags {
             disc: song.disc.map(|d| d as u32),
             disc_subtitle: song.disc_subtitle.clone(),
             compilation: song.compilation,
+            language: song.language.clone(),
         }
     }
 }
@@ -107,6 +109,7 @@ pub struct SharedTagEdit {
     pub disc: FieldEdit<u32>,
     pub disc_subtitle: FieldEdit<String>,
     pub compilation: FieldEdit<bool>,
+    pub language: FieldEdit<String>,
 }
 
 impl SharedTagEdit {
@@ -140,6 +143,7 @@ impl SharedTagEdit {
                 .compilation
                 .resolve(Some(current.compilation))
                 .unwrap_or(false),
+            language: text(&self.language, current.language),
         }
     }
 }
@@ -181,6 +185,7 @@ pub struct SongDetails {
     /// tag editor should present it read-only rather than let a save silently
     /// overwrite every other track cut from the same file.
     pub is_cue_track: bool,
+    pub language: Option<String>,
 }
 
 #[tauri::command]
@@ -192,7 +197,7 @@ pub async fn get_song_details(
     conn.query_row(
         "SELECT id, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, genresort, track, disc, year,
                 originalyear, grouping, bpm, initial_key, rating, loved, compilation, art_embedded, cue_path,
-                disc_subtitle
+                disc_subtitle, language
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -224,6 +229,7 @@ pub async fn get_song_details(
                 art_embedded: row.get(24).unwrap_or(false),
                 is_cue_track: row.get::<_, Option<String>>(25)?.is_some(),
                 disc_subtitle: row.get(26)?,
+                language: row.get(27)?,
             })
         },
     )
@@ -271,6 +277,7 @@ pub async fn get_file_song_details(path: String) -> Result<SongDetails, String> 
         compilation: song.compilation,
         art_embedded: song.art_embedded,
         is_cue_track: false,
+        language: song.language,
     })
 }
 
@@ -300,6 +307,7 @@ pub async fn save_song_tags(
     grouping: String,
     bpm: Option<f32>,
     initial_key: String,
+    language: Option<String>,
 ) -> Result<(), String> {
     // Written tags are an app-driven change Luminous already knows about, not
     // an external addition — without this, the realtime watcher would pick up
@@ -367,6 +375,8 @@ pub async fn save_song_tags(
     let disc_subtitle_c = disc_subtitle.clone();
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
+    let language = non_blank(language);
+    let language_c = language.clone();
 
     if !is_remote {
         tauri::async_runtime::spawn_blocking(move || {
@@ -393,6 +403,7 @@ pub async fn save_song_tags(
                     bpm,
                     initial_key: &initial_key_c,
                     compilation,
+                    language: language_c.as_deref(),
                 },
             )
         })
@@ -433,8 +444,9 @@ pub async fn save_song_tags(
             initial_key = ?19,
             album_key = ?21,
             disc_subtitle = ?22,
-            mtime = COALESCE(?23, mtime),
-            filesize = COALESCE(?24, filesize)
+            language = ?23,
+            mtime = COALESCE(?24, mtime),
+            filesize = COALESCE(?25, filesize)
          WHERE id = ?20",
         rusqlite::params![
             title,
@@ -472,6 +484,7 @@ pub async fn save_song_tags(
                 compilation,
             ),
             disc_subtitle,
+            language,
             new_mtime,
             new_filesize,
         ],
@@ -533,6 +546,7 @@ pub async fn save_file_tags(
     grouping: String,
     bpm: Option<f32>,
     initial_key: String,
+    language: Option<String>,
 ) -> Result<(), String> {
     let p = std::path::PathBuf::from(&path);
     if !p.exists() {
@@ -568,6 +582,8 @@ pub async fn save_file_tags(
     let disc_subtitle_c = disc_subtitle.clone();
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
+    let language = non_blank(language);
+    let language_c = language.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
         audio::write_tags(
@@ -593,6 +609,7 @@ pub async fn save_file_tags(
                 bpm,
                 initial_key: &initial_key_c,
                 compilation,
+                language: language_c.as_deref(),
             },
         )
     })
@@ -629,6 +646,7 @@ pub async fn save_file_tags(
                 bpm = ?18,
                 initial_key = ?19,
                 disc_subtitle = ?21,
+                language = ?24,
                 mtime = COALESCE(?22, mtime),
                 filesize = COALESCE(?23, filesize)
              WHERE path = ?20",
@@ -674,6 +692,7 @@ pub async fn save_file_tags(
                 disc_subtitle,
                 new_mtime,
                 new_filesize,
+                language,
             ],
         );
 
@@ -798,8 +817,9 @@ pub async fn save_album_tags(
                 compilation = ?9,
                 album_key = ?11,
                 disc_subtitle = ?12,
-                mtime = COALESCE(?13, mtime),
-                filesize = COALESCE(?14, filesize)
+                language = ?13,
+                mtime = COALESCE(?14, mtime),
+                filesize = COALESCE(?15, filesize)
              WHERE id = ?10",
             rusqlite::params![
                 tags.album,
@@ -814,6 +834,7 @@ pub async fn save_album_tags(
                 song.id,
                 key,
                 tags.disc_subtitle,
+                tags.language,
                 new_mtime,
                 new_filesize,
             ],
@@ -1015,6 +1036,7 @@ fn write_shared_tags(
             bpm: song.bpm,
             initial_key: song.initial_key.as_deref().unwrap_or_default(),
             compilation: tags.compilation,
+            language: tags.language.as_deref(),
         },
     )
 }

@@ -57,6 +57,10 @@ describe("isSmartPlaylistSpec", () => {
     expect(isSmartPlaylistSpec("artisttag:canadian")).toBe(false);
   });
 
+  it("returns false for a language auto-playlist spec", () => {
+    expect(isSmartPlaylistSpec("language:eng")).toBe(false);
+  });
+
   it("returns false for the Moment Mix (daypart) auto-playlist spec (#223)", () => {
     expect(isSmartPlaylistSpec("daypart:afternoon:2026-09-09:Indie")).toBe(false);
     expect(isSmartPlaylistSpec("daypart:morning:2026-09-09:")).toBe(false);
@@ -82,6 +86,15 @@ describe("parseSearchRules", () => {
     const rules = parseSearchRules("artist-tag:canadian");
     expect(rules).toEqual([
       { field: "artist_tag", op: "contains", value: "canadian" },
+    ]);
+  });
+
+  it("normalizes lang alias to language with contains or explicit operator", () => {
+    expect(parseSearchRules("lang:jpn")).toEqual([
+      { field: "language", op: "contains", value: "jpn" },
+    ]);
+    expect(parseSearchRules("language:=eng")).toEqual([
+      { field: "language", op: "=", value: "eng" },
     ]);
   });
 

@@ -47,6 +47,7 @@ describe("autoPlaylistRefKeyFor", () => {
     expect(autoPlaylistRefKeyFor({ kind: "artist_tag", artistTag: "Progressive Metal" })).toBe(
       "artist_tag:Progressive Metal"
     );
+    expect(autoPlaylistRefKeyFor({ kind: "language", language: "eng" })).toBe("language:eng");
   });
 });
 

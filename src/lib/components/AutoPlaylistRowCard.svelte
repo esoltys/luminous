@@ -5,15 +5,17 @@
   import { formatRelativeDate } from "../utils/date";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
+  import { getLanguageDisplayName } from "../utils/language";
   import { toTitleCase } from "../utils/formatters";
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart" | "language";
     genre?: string;
     artistTag?: string;
     decade?: string;
     bpm?: string;
+    language?: string;
     playlistId?: number;
     updated?: number;
     trackCount: number;
@@ -21,16 +23,17 @@
     oncontextmenu?: (e: MouseEvent) => void;
   }
 
-  let { label, kind, genre, artistTag, decade, bpm, playlistId, updated, trackCount, onClick, oncontextmenu }: Props = $props();
+  let { label, kind, genre, artistTag, decade, bpm, language, playlistId, updated, trackCount, onClick, oncontextmenu }: Props = $props();
 
   let displayLabel = $derived.by(() => {
     if (
-      (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") &&
+      (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart" || kind === "language") &&
       playlistId !== undefined
     ) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
+    if (kind === "language") return getLanguageDisplayName(language || label);
     return kind === "artist_tag" ? toTitleCase(label) : label;
   });
 
@@ -38,6 +41,7 @@
     if (kind === "missing_metadata") return i18n.t("playlists.missingMetadataAutoPlaylist");
     if (kind === "missing_musicbrainz") return i18n.t("playlists.missingMusicBrainzAutoPlaylist");
     if (kind === "daypart") return i18n.t("playlists.daypartAutoPlaylist");
+    if (kind === "language" || language) return i18n.t("playlists.languageAutoPlaylist");
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
     if (kind === "bpm") return i18n.t("playlists.bpmAutoPlaylist");
     if (kind === "artist_tag" || artistTag) return i18n.t("playlists.artistTagAutoPlaylist");
@@ -51,7 +55,7 @@
 
   let updatedLabel = $derived.by(() => {
     if (
-      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "missing_musicbrainz" && kind !== "daypart") ||
+      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "missing_musicbrainz" && kind !== "daypart" && kind !== "language") ||
       updated === undefined
     )
       return null;

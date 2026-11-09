@@ -298,6 +298,7 @@ pub struct Song {
     pub originalyear: Option<i32>,
     pub genre: Option<String>,
     pub genresort: Option<String>,
+    pub language: Option<String>,
     pub compilation: bool,
 
     // Extended tags
@@ -1433,6 +1434,14 @@ pub struct AlbumProfile {
     /// Whether fanart.tv has been asked for this album's disc art (#1277).
     #[serde(default)]
     pub disc_fetched: bool,
+}
+
+/// Summary of a distinct language across library songs, with song and album counts.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct LanguageSummary {
+    pub code: String,
+    pub song_count: i64,
+    pub album_count: i64,
 }
 
 /// A Luminous-native song tag (#224), independent of the embedded

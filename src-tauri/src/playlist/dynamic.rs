@@ -241,6 +241,9 @@ fn spec_songs(db: &Arc<Database>, spec: &str, mode: QueuePopulationMode) -> Resu
         matched(scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)?)
     } else if spec == "missingmbid" {
         matched(scanner.get_songs_missing_musicbrainz_id(NO_SONG_LIMIT, mode)?)
+    } else if let Some(lang) = spec.strip_prefix("language:") {
+        let tag_manager = TagManager::new(db.clone());
+        matched(tag_manager.get_songs_by_language(lang, NO_SONG_LIMIT, mode)?)
     } else if let Some(name) = spec.strip_prefix("tag:") {
         // A system genre auto-playlist, keyed on a curated tag name (#548)
         // rather than a Smart Playlist rule spec (which always contains a

@@ -12,6 +12,7 @@ export type SharedTagValues = Pick<
   | "album_artist_sort"
   | "genre"
   | "genresort"
+  | "language"
   | "year"
   | "disc"
   | "disc_subtitle"
@@ -27,6 +28,7 @@ export interface SharedTagEdit {
   albumArtistSort: FieldEdit<string>;
   genre: FieldEdit<string>;
   genresort: FieldEdit<string>;
+  language: FieldEdit<string>;
   year: FieldEdit<number>;
   disc: FieldEdit<number>;
   discSubtitle: FieldEdit<string>;
@@ -46,6 +48,7 @@ export class SharedTagFields {
   albumArtistSort = new MixedField<string>();
   genre = new MixedField<string>();
   genresort = new MixedField<string>();
+  language = new MixedField<string>();
   year = new MixedField<number>();
   disc = new MixedField<number>();
   discSubtitle = new MixedField<string>();
@@ -60,6 +63,7 @@ export class SharedTagFields {
     this.albumArtistSort.reset(tracks.map((t) => t.album_artist_sort));
     this.genre.reset(tracks.map((t) => t.genre));
     this.genresort.reset(tracks.map((t) => t.genresort));
+    this.language.reset(tracks.map((t) => t.language));
     this.year.reset(tracks.map((t) => t.year));
     this.disc.reset(tracks.map((t) => t.disc));
     this.discSubtitle.reset(tracks.map((t) => t.disc_subtitle));
@@ -74,6 +78,7 @@ export class SharedTagFields {
       albumArtistSort: this.albumArtistSort.edit,
       genre: this.genre.edit,
       genresort: this.genresort.edit,
+      language: this.language.edit,
       year: this.year.edit,
       disc: this.disc.edit,
       discSubtitle: this.discSubtitle.edit,

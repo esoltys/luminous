@@ -37,11 +37,12 @@
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart" | "language";
     genre?: string;
     artistTag?: string;
     decade?: string;
     bpm?: string;
+    language?: string;
     label: string;
     playlistId?: number;
     updated?: number;
@@ -96,6 +97,9 @@
   );
   let artistTagAutoPlaylists = $derived(
     playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("artisttag:"))
+  );
+  let languageAutoPlaylists = $derived(
+    playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("language:"))
   );
   let decadeAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:")));
   let bpmAutoPlaylists = $derived(
@@ -245,6 +249,19 @@
         });
       }
     }
+    for (const p of languageAutoPlaylists) {
+      if (p.track_count > 0) {
+        defs.push({
+          id: `auto:language:${p.id}`,
+          kind: "language",
+          language: p.dynamic_spec?.replace(/^language:/, "") ?? "",
+          label: getPlaylistDisplayName(p),
+          playlistId: p.id,
+          updated: p.updated,
+          trackCount: p.track_count,
+        });
+      }
+    }
     return defs;
   });
 
@@ -267,9 +284,9 @@
   let sortedAutoDefs = $derived.by(() => {
     const field = autoSortField;
     const asc = autoSortAsc;
-    const pinned = autoDefs.filter((d) => d.kind !== "genre" && d.kind !== "decade" && d.kind !== "artist_tag" && d.kind !== "bpm");
+    const pinned = autoDefs.filter((d) => d.kind !== "genre" && d.kind !== "decade" && d.kind !== "artist_tag" && d.kind !== "bpm" && d.kind !== "language");
     const rest = autoDefs
-      .filter((d) => d.kind === "genre" || d.kind === "decade" || d.kind === "artist_tag")
+      .filter((d) => d.kind === "genre" || d.kind === "decade" || d.kind === "artist_tag" || d.kind === "language")
       .sort((a, b) => {
         if (field === "name") {
           return asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label);
@@ -356,7 +373,9 @@
             ? { kind: "decade", decade: def.decade, playlistId: def.playlistId, updated: def.updated }
             : def.kind === "bpm"
               ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
-              : def.kind === "missing_metadata"
+              : def.kind === "language"
+                ? { kind: "language", language: def.language, playlistId: def.playlistId, updated: def.updated }
+                : def.kind === "missing_metadata"
                 ? { kind: "missing_metadata", playlistId: def.playlistId, updated: def.updated }
                 : def.kind === "missing_musicbrainz"
                   ? { kind: "missing_musicbrainz", playlistId: def.playlistId, updated: def.updated }
@@ -499,6 +518,7 @@
                   artistTag={def.artistTag}
                   decade={def.decade}
                   bpm={def.bpm}
+                  language={def.language}
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
@@ -513,6 +533,7 @@
                   artistTag={def.artistTag}
                   decade={def.decade}
                   bpm={def.bpm}
+                  language={def.language}
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
