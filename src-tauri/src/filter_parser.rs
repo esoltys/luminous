@@ -471,28 +471,31 @@ fn parse_quantity(raw: &str, sql_column: &str) -> Option<i64> {
     Some(scaled.round() as i64)
 }
 
-/// Resolve a `format:` / `lossless:` value to the `filetype` codes it
-/// selects and whether the filter should negate (`lossless:false`).
+/// Resolve a `format:` / `lossless:` value to an `IN` / `NOT IN` over the
+/// `filetype` codes it selects (`lossless:false` is the lossless set negated).
 fn parse_filetype_filter(field: &str, raw: &str, op: &Op) -> Option<(Op, FilterValue)> {
-    let (types, negate) = if field == "lossless" {
-        let lossless = match raw.to_lowercase().as_str() {
+    if !matches!(op, Op::Eq | Op::Neq | Op::Contains) {
+        return None;
+    }
+    let (types, mut negated) = if field == "lossless" {
+        let wanted = match raw.to_lowercase().as_str() {
             "true" | "yes" | "1" => true,
             "false" | "no" | "0" => false,
             _ => return None,
         };
-        (FileType::lossless_types(), !lossless)
+        (FileType::lossless_types(), !wanted)
     } else {
         (FileType::from_token(raw), false)
     };
-    if types.is_empty() || !matches!(op, Op::Eq | Op::Neq | Op::Contains) {
+    if types.is_empty() {
         return None;
     }
-    let negate = negate != (*op == Op::Neq);
+    if *op == Op::Neq {
+        negated = !negated;
+    }
     let codes = types.into_iter().map(|t| t as i64).collect();
-    Some((
-        if negate { Op::Neq } else { Op::Eq },
-        FilterValue::IntSet(codes),
-    ))
+    let op = if negated { Op::Neq } else { Op::Eq };
+    Some((op, FilterValue::IntSet(codes)))
 }
 
 fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> {

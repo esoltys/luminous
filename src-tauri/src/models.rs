@@ -254,12 +254,18 @@ impl FileType {
             .unwrap_or_default()
     }
 
-    /// Every type for which [`FileType::is_lossless`] holds.
+    /// Every type nameable by a `format:` token for which
+    /// [`FileType::is_lossless`] holds. Derived from the token table so the
+    /// two cannot drift; a type with no token can't be searched by format
+    /// anyway.
     pub fn lossless_types() -> Vec<FileType> {
-        (1..=18)
-            .map(FileType::from)
-            .filter(FileType::is_lossless)
-            .collect()
+        let mut types: Vec<FileType> = Vec::new();
+        for &t in Self::TOKENS.iter().flat_map(|(_, types)| types.iter()) {
+            if t.is_lossless() && !types.contains(&t) {
+                types.push(t);
+            }
+        }
+        types
     }
 
     pub fn is_lossless(&self) -> bool {
