@@ -897,7 +897,7 @@
                         </Button>
                       </div>
 
-                      <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      <div class="space-y-2">
                         {#each tagHistory.entries as entry (entry.id)}
                           <div class="p-2 rounded bg-brand-surface/40 border border-brand-border/40 text-xs flex flex-col gap-1.5">
                             <div class="flex items-center justify-between text-brand-text-secondary text-[11px]">
