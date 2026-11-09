@@ -30,7 +30,9 @@
   import Input from "./Input.svelte";
   import ChipInput from "./ChipInput.svelte";
   import PlainChipInput from "./PlainChipInput.svelte";
-  import type { FileSource } from "../types";
+  import HelpTip from "./HelpTip.svelte";
+  import { formatDate, formatFileSize } from "../utils/formatters";
+  import type { FileSource, SongTagHistory } from "../types";
   import { filesStore } from "../stores/files.svelte";
   import { scanFolder } from "./files/folderActions";
 
@@ -101,6 +103,9 @@
   let albumArtistSort = $state("");
   let composersort = $state("");
   let genresort = $state("");
+
+  let tagHistory = $state<SongTagHistory | null>(null);
+  let isClearingHistory = $state(false);
 
   let isLoading = $state(false);
   let isSaving = $state(false);
@@ -196,12 +201,75 @@
       compilation = details.compilation;
       artEmbedded = details.art_embedded;
       isCueTrack = details.is_cue_track;
+
+      if (songId != null && !isRemotePath(details.path) && !details.is_cue_track) {
+        try {
+          const history = await invoke<SongTagHistory>("get_song_tag_history", { songId });
+          tagHistory = history ?? null;
+        } catch (e) {
+          console.warn("Failed to load tag history:", e);
+          tagHistory = null;
+        }
+      } else {
+        tagHistory = null;
+      }
     } catch (e: any) {
       console.error("Failed to load metadata:", e);
       errorMsg = e.toString();
     } finally {
       isLoading = false;
     }
+  }
+
+  async function handleClearHistory() {
+    if (songId == null) return;
+    isClearingHistory = true;
+    try {
+      await invoke("clear_song_tag_history", { songId });
+      if (tagHistory) {
+        tagHistory = { ...tagHistory, entries: [] };
+      }
+    } catch (e: any) {
+      console.error("Failed to clear tag history:", e);
+      toastStore.show(e.toString(), "error");
+    } finally {
+      isClearingHistory = false;
+    }
+  }
+
+  function getFieldLabel(field: string): string {
+    switch (field) {
+      case "title": return i18n.t("tagEditor.titleField");
+      case "titlesort": return i18n.t("sortOverrides.title");
+      case "artist": return i18n.t("tagEditor.artistField");
+      case "artistsort": return i18n.t("sortOverrides.artist");
+      case "album": return i18n.t("tagEditor.albumField");
+      case "albumsort": return i18n.t("sortOverrides.album");
+      case "album_artist": return i18n.t("tagEditor.albumArtistField");
+      case "album_artist_sort": return i18n.t("sortOverrides.albumArtist");
+      case "composer": return i18n.t("tagEditor.composerField");
+      case "composersort": return i18n.t("sortOverrides.composer");
+      case "genre": return i18n.t("tagEditor.genreField");
+      case "genresort": return i18n.t("sortOverrides.genre");
+      case "track": return i18n.t("tagEditor.trackField");
+      case "disc": return i18n.t("tagEditor.discField");
+      case "disc_subtitle": return i18n.t("tagEditor.discSubtitleField");
+      case "year": return i18n.t("tagEditor.yearField");
+      case "originalyear": return i18n.t("tagEditor.originalYearField");
+      case "grouping": return i18n.t("tagEditor.groupingField");
+      case "bpm": return i18n.t("tagEditor.bpmField");
+      case "initial_key": return i18n.t("tagEditor.initialKeyField");
+      case "compilation": return i18n.t("tagEditor.compilationField");
+      case "comment": return i18n.t("tagEditor.commentField");
+      default: return field;
+    }
+  }
+
+  function formatHistoryValue(val: string | null | undefined): string {
+    if (val === null || val === undefined || val === "") {
+      return i18n.t("tagEditor.historyEmptyValue");
+    }
+    return val;
   }
 
   async function handleSave() {
@@ -642,6 +710,104 @@
                 </FormField>
               </div>
             </details>
+
+            <!-- Tag History -->
+            {#if songId != null && !isRemoteSource && !isCueTrack && tagHistory !== null}
+              <details class="col-span-2 group border border-brand-border rounded-lg bg-brand-sidebar/40 overflow-hidden mt-1">
+                <summary class="flex items-center justify-between px-3 py-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
+                  <div class="flex items-center gap-2">
+                    <span>{i18n.t("tagEditor.historyHeading")}</span>
+                    {#if tagHistory.entries.length > 0}
+                      <span class="px-1.5 py-0.5 text-[10px] rounded-full bg-brand-surface text-brand-text-secondary font-normal">
+                        {tagHistory.entries.length}
+                      </span>
+                    {/if}
+                  </div>
+                  <span class="text-[10px] text-brand-text-secondary/70 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div class="p-3 pt-2 space-y-3 border-t border-brand-border/60 text-xs">
+                  <!-- Source Block -->
+                  <div class="space-y-1.5">
+                    <div class="font-semibold text-brand-text-primary text-[11px] uppercase tracking-wider">
+                      {i18n.t("tagEditor.historySourceHeading")}
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs bg-brand-surface/50 p-2.5 rounded border border-brand-border/40">
+                      <div>
+                        <span class="text-brand-text-secondary">{i18n.t("tagEditor.historyImported")}:</span>
+                        <span class="ml-1 text-brand-text-primary">{tagHistory.source.added ? formatDate(tagHistory.source.added) : "—"}</span>
+                      </div>
+                      {#if tagHistory.source.format}
+                        <div>
+                          <span class="text-brand-text-secondary">{i18n.t("tagEditor.historyFormat")}:</span>
+                          <span class="ml-1 text-brand-text-primary uppercase">{tagHistory.source.format.toUpperCase()}</span>
+                        </div>
+                      {/if}
+                      <div>
+                        <span class="text-brand-text-secondary">{i18n.t("tagEditor.historyFileSize")}:</span>
+                        <span class="ml-1 text-brand-text-primary">{tagHistory.source.filesize != null ? formatFileSize(tagHistory.source.filesize) : "—"}</span>
+                      </div>
+                      <div class="col-span-2 break-all">
+                        <span class="text-brand-text-secondary">{i18n.t("tagEditor.locationField")}:</span>
+                        <span class="ml-1 text-brand-text-primary font-mono text-[11px]">{tagHistory.source.path}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Changes Header, Clear Action & Entries or Empty State -->
+                  {#if tagHistory.entries.length === 0}
+                    <div class="pt-2 border-t border-brand-border/40 text-brand-text-secondary text-xs italic">
+                      {tagHistory.source.added
+                        ? i18n.t("tagEditor.historyEmptySince", { date: formatDate(tagHistory.source.added) })
+                        : i18n.t("tagEditor.historyEmpty")}
+                    </div>
+                  {:else}
+                    <div class="space-y-2 pt-2 border-t border-brand-border/40">
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5 text-brand-text-secondary text-xs">
+                          <HelpTip
+                            text={i18n.t("tagEditor.historyTimestampHint")}
+                            label={i18n.t("tagEditor.historyTimestampHint")}
+                          />
+                        </div>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={isClearingHistory || isSaving}
+                          onclick={handleClearHistory}
+                          class="text-xs h-7 px-2.5"
+                        >
+                          {i18n.t("tagEditor.clearHistoryBtn")}
+                        </Button>
+                      </div>
+
+                      <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        {#each tagHistory.entries as entry (entry.id)}
+                          <div class="p-2 rounded bg-brand-surface/40 border border-brand-border/40 text-xs flex flex-col gap-1">
+                            <div class="flex items-center justify-between text-brand-text-secondary text-[11px]">
+                              <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="font-medium text-brand-text-primary">{getFieldLabel(entry.field)}</span>
+                                <span class="text-brand-text-secondary/60">•</span>
+                                <span>{entry.actor === "scan" ? i18n.t("tagEditor.historyActorScan") : i18n.t("tagEditor.historyActorLuminous")}</span>
+                                {#if entry.batchOtherTracks > 0}
+                                  <span class="text-brand-text-secondary/60">•</span>
+                                  <span>{i18n.t("tagEditor.historyBatchNote", { count: entry.batchOtherTracks })}</span>
+                                {/if}
+                              </div>
+                              <span class="shrink-0 text-brand-text-secondary">{formatDate(entry.at)}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 text-brand-text-primary break-all">
+                              <span class="text-brand-text-secondary line-through opacity-80">{formatHistoryValue(entry.oldValue)}</span>
+                              <span class="text-brand-text-secondary/70">→</span>
+                              <span class="font-medium">{formatHistoryValue(entry.newValue)}</span>
+                            </div>
+                          </div>
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
+                </div>
+              </details>
+            {/if}
           </div>
         </div>
       {/if}

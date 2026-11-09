@@ -141,11 +141,22 @@ pub fn apply(
                 result.cleaned_songs += 1;
                 result.removed_fields += removed;
                 let comment = audio::read_tags(&path).ok().and_then(|m| m.comment);
+                let before = crate::tag_history::snapshot_by_id(&conn, song.id)
+                    .ok()
+                    .flatten();
+                let (new_mtime, new_filesize) = crate::tag_history::file_mtime_and_size(&path);
                 if let Err(e) = conn.execute(
-                    "UPDATE songs SET comment = ?1 WHERE id = ?2",
-                    rusqlite::params![comment, song.id],
+                    "UPDATE songs SET comment = ?1, mtime = COALESCE(?2, mtime), filesize = COALESCE(?3, filesize) WHERE id = ?4",
+                    rusqlite::params![comment, new_mtime, new_filesize, song.id],
                 ) {
                     log::warn!("tag clean-up: cannot update comment for {}: {e}", song.id);
+                } else if let Some(before) = before {
+                    let _ = crate::tag_history::record_diff_after_update(
+                        &conn,
+                        &before,
+                        crate::tag_history::HistoryActor::Luminous,
+                        None,
+                    );
                 }
             }
             Err(e) => result.errors.push(format!("{}: {e:#}", song.path)),
@@ -194,4 +205,76 @@ fn load_songs(db: &Database, song_ids: &[i64]) -> Result<Vec<SongFile>, String> 
         }
     }
     Ok(songs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collection::SelfWriteTracker;
+    use crate::db::Database;
+    use std::path::Path;
+    use tempfile::Builder;
+
+    #[test]
+    fn test_apply_records_tag_history() {
+        let temp_dir = Builder::new()
+            .prefix("luminous_tag_cleanup_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        let self_writes = SelfWriteTracker::default();
+
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/audio/song_alpha.mp3");
+        let dest = temp_dir.path().join("song_alpha.mp3");
+        std::fs::copy(&src, &dest).expect("copy fixture");
+
+        use lofty::config::WriteOptions;
+        use lofty::id3::v2::{CommentFrame, Frame, Id3v2Tag};
+        use lofty::tag::TagExt;
+        use lofty::TextEncoding;
+
+        let promo = "Visit FreeMusicSite.com for more free music!!!";
+        let mut tag = Id3v2Tag::new();
+        tag.insert(Frame::Comment(CommentFrame::new(
+            TextEncoding::UTF8,
+            [b'e', b'n', b'g'],
+            "".to_string(),
+            promo.to_string(),
+        )));
+        tag.save_to_path(&dest, WriteOptions::default()).unwrap();
+
+        let mut initial_song = crate::collection::read_tags(&dest).unwrap();
+        initial_song.source = crate::models::SongSource::LocalFile;
+        crate::collection::upsert_song(&conn, &initial_song).unwrap();
+
+        let song_id: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                rusqlite::params![dest.to_string_lossy().to_string()],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        let cruft = find_cruft(&dest).unwrap();
+        assert!(!cruft.is_empty(), "should have found cruft");
+
+        let selections = vec![TagCleanupSelection {
+            song_id,
+            fields: cruft,
+        }];
+
+        let result = apply(&db, &self_writes, &selections, |_, _| {}).unwrap();
+        assert_eq!(result.cleaned_songs, 1);
+
+        let history = crate::tag_history::get_song_history(&conn, song_id).unwrap();
+        assert_eq!(history.entries.len(), 1);
+        assert_eq!(
+            history.entries[0].actor,
+            crate::tag_history::HistoryActor::Luminous
+        );
+        assert_eq!(history.entries[0].field, "comment");
+        assert_eq!(history.entries[0].old_value.as_deref(), Some(promo));
+        assert_eq!(history.entries[0].new_value, None);
+    }
 }

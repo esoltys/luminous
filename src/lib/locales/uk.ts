@@ -1722,7 +1722,22 @@ export const uk = {
     clearArtConfirmTitle: "Прибрати вбудовану обкладинку?",
     clearArtConfirmMessage: "Це вилучить вбудовану обкладинку з самого файлу. Для пісні буде використано зображення з папки або заглушку.",
     clearArtSuccess: "Вбудовану обкладинку прибрано",
-    clearArtFailedPrefix: "Не вдалося прибрати обкладинку: "
+    clearArtFailedPrefix: "Не вдалося прибрати обкладинку: ",
+    historyHeading: "Історія",
+    historySourceHeading: "Джерело",
+    historyImported: "Імпортовано",
+    historyFormat: "Формат",
+    historyFileSize: "Розмір",
+    historyTimestampHint: "Враховуйте час сканування як момент виявлення змін Luminous на диску, оскільки сторонні редактори тегів можуть зберігати початковий час змінення файлу.",
+    clearHistoryBtn: "Очистити історію",
+    historyEmptyValue: "(порожньо)",
+    historyActorScan: "Виявлено під час сканування",
+    historyActorLuminous: "Luminous",
+    historyBatchNote: "відредаговано разом із {count} іншими треками",
+    historyEmptySince: "Немає записаних змін з {date}.",
+    historyEmpty: "Немає записаних змін.",
+    compilationField: "Збірка",
+    commentField: "Коментар"
   },
   albumTagEditor: {
     title: "Редагування тегів альбому",

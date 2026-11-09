@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import TagEditor from "./TagEditor.svelte";
 import { invoke } from "@tauri-apps/api/core";
+import type { SongTagHistory } from "../types";
+import { formatDate } from "../utils/formatters";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -292,5 +294,170 @@ describe("TagEditor.svelte", () => {
       path: ["Music"],
     });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("renders History section with source facts and empty state when entries is empty", async () => {
+    const mockHistory: SongTagHistory = {
+      songId: 10,
+      source: {
+        path: "/music/rock/song.flac",
+        filesize: 12582912,
+        format: "flac",
+        added: 1700000000,
+        isRemote: false,
+        isCueTrack: false,
+      },
+      entries: [],
+    };
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return mockSongDetails;
+      if (cmd === "get_song_tag_history") return mockHistory;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const { getByText, findByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+
+    await findByText("History");
+    expect(getByText("Source")).toBeInTheDocument();
+    expect(getByText("FLAC")).toBeInTheDocument();
+    expect(getByText("12.0 MB")).toBeInTheDocument();
+    expect(getByText(new RegExp(`No recorded changes since ${formatDate(1700000000)}`))).toBeInTheDocument();
+  });
+
+  it("renders luminous and scan change events with old_value → new_value and batch note", async () => {
+    const mockHistory: SongTagHistory = {
+      songId: 10,
+      source: {
+        path: "/music/rock/song.flac",
+        filesize: 12582912,
+        format: "flac",
+        added: 1700000000,
+        isRemote: false,
+        isCueTrack: false,
+      },
+      entries: [
+        {
+          id: 1,
+          songId: 10,
+          at: 1700001000,
+          actor: "luminous",
+          field: "genre",
+          oldValue: "Classic Rock",
+          newValue: "Hard Rock",
+          batchId: "batch-1",
+          batchOtherTracks: 2,
+        },
+        {
+          id: 2,
+          songId: 10,
+          at: 1700002000,
+          actor: "scan",
+          field: "title",
+          oldValue: null,
+          newValue: "New Song Title",
+          batchId: null,
+          batchOtherTracks: 0,
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return mockSongDetails;
+      if (cmd === "get_song_tag_history") return mockHistory;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const { getByText, findByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+
+    await findByText("History");
+    expect(getByText("Luminous")).toBeInTheDocument();
+    expect(getByText("Detected on scan")).toBeInTheDocument();
+    expect(getByText("Classic Rock")).toBeInTheDocument();
+    expect(getByText("Hard Rock")).toBeInTheDocument();
+    expect(getByText("(empty)")).toBeInTheDocument();
+    expect(getByText("New Song Title")).toBeInTheDocument();
+    expect(getByText("edited with 2 other tracks")).toBeInTheDocument();
+    expect(getByText("Clear History")).toBeInTheDocument();
+  });
+
+  it("invokes clear_song_tag_history on Clear History click and transitions to empty state", async () => {
+    const mockHistory: SongTagHistory = {
+      songId: 10,
+      source: {
+        path: "/music/rock/song.flac",
+        filesize: 12582912,
+        format: "flac",
+        added: 1700000000,
+        isRemote: false,
+        isCueTrack: false,
+      },
+      entries: [
+        {
+          id: 1,
+          songId: 10,
+          at: 1700001000,
+          actor: "luminous",
+          field: "genre",
+          oldValue: "Rock",
+          newValue: "Hard Rock",
+          batchId: null,
+          batchOtherTracks: 0,
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return mockSongDetails;
+      if (cmd === "get_song_tag_history") return mockHistory;
+      if (cmd === "clear_song_tag_history") return null;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const { getByText, findByText, queryByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+
+    await findByText("History");
+    expect(getByText("Clear History")).toBeInTheDocument();
+
+    await fireEvent.click(getByText("Clear History"));
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("clear_song_tag_history", { songId: 10 });
+    });
+
+    await waitFor(() => {
+      expect(getByText(new RegExp(`No recorded changes since ${formatDate(1700000000)}`))).toBeInTheDocument();
+    });
+    expect(queryByText("Clear History")).not.toBeInTheDocument();
+  });
+
+  it("hides History section for remote (WebDAV/Subsonic) and CUE tracks", async () => {
+    // 1. Remote track
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") {
+        return { ...mockSongDetails, path: "http://user:pass@127.0.0.1:8080/Music/song.mp3" };
+      }
+      return null;
+    });
+
+    const { queryByText, findByText, unmount } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await findByText(/changes are saved in Luminous only/i);
+    expect(queryByText("History")).not.toBeInTheDocument();
+    unmount();
+
+    // 2. CUE track
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") {
+        return { ...mockSongDetails, is_cue_track: true };
+      }
+      return null;
+    });
+
+    const cueRender = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await cueRender.findByText(/cue sheet/i);
+    expect(cueRender.queryByText("History")).not.toBeInTheDocument();
   });
 });

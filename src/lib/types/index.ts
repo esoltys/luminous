@@ -1479,3 +1479,31 @@ export interface TagCleanupResult {
   removed_fields: number;
   errors: string[];
 }
+
+export interface SongHistorySource {
+  path: string;
+  filesize: number | null;
+  format: string;
+  added: number | null;
+  isRemote: boolean;
+  isCueTrack: boolean;
+}
+
+export interface SongHistoryEntry {
+  id: number;
+  songId: number;
+  at: number; // unix timestamp in seconds
+  actor: "luminous" | "scan";
+  field: string; // one of the 22 tracked field names, e.g. "title", "artist", "album_artist", "disc_subtitle", etc.
+  oldValue: string | null;
+  newValue: string | null;
+  batchId: string | null;
+  batchOtherTracks: number;
+}
+
+export interface SongTagHistory {
+  songId: number;
+  source: SongHistorySource;
+  entries: SongHistoryEntry[];
+}
+

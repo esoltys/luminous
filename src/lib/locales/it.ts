@@ -1602,7 +1602,22 @@ export const it = {
     clearArtConfirmTitle: "Rimuovere la copertina incorporata?",
     clearArtConfirmMessage: "Questa operazione rimuove la copertina incorporata dal file stesso. Il brano ripiegherà sull'immagine della cartella o su un segnaposto.",
     clearArtSuccess: "Copertina incorporata rimossa",
-    clearArtFailedPrefix: "Rimozione della copertina non riuscita: "
+    clearArtFailedPrefix: "Rimozione della copertina non riuscita: ",
+    historyHeading: "Cronologia",
+    historySourceHeading: "Sorgente",
+    historyImported: "Importato",
+    historyFormat: "Formato",
+    historyFileSize: "Dimensione",
+    historyTimestampHint: "Considera i timestamp di scansione come il momento in cui Luminous ha rilevato le modifiche sul disco, poiché i tagger esterni potrebbero preservare l'ora di modifica originale del file.",
+    clearHistoryBtn: "Cancella cronologia",
+    historyEmptyValue: "(vuoto)",
+    historyActorScan: "Rilevato durante la scansione",
+    historyActorLuminous: "Luminous",
+    historyBatchNote: "modificato con altri {count} brani",
+    historyEmptySince: "Nessuna modifica registrata dal {date}.",
+    historyEmpty: "Nessuna modifica registrata.",
+    compilationField: "Raccolta",
+    commentField: "Commento"
   },
   albumTagEditor: {
     title: "Modifica tag dell'album",

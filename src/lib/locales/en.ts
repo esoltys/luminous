@@ -1602,7 +1602,22 @@ export const en = {
     clearArtConfirmTitle: "Clear Embedded Artwork?",
     clearArtConfirmMessage: "This removes the embedded cover art from the file itself. The song will fall back to folder art or a placeholder.",
     clearArtSuccess: "Embedded artwork cleared",
-    clearArtFailedPrefix: "Failed to clear artwork: "
+    clearArtFailedPrefix: "Failed to clear artwork: ",
+    historyHeading: "History",
+    historySourceHeading: "Source",
+    historyImported: "Imported",
+    historyFormat: "Format",
+    historyFileSize: "Size",
+    historyTimestampHint: "View scan timestamps as the moment Luminous detected changes on disk, as external taggers may preserve original file modification times.",
+    clearHistoryBtn: "Clear History",
+    historyEmptyValue: "(empty)",
+    historyActorScan: "Detected on scan",
+    historyActorLuminous: "Luminous",
+    historyBatchNote: "edited with {count} other tracks",
+    historyEmptySince: "No recorded changes since {date}.",
+    historyEmpty: "No recorded changes.",
+    compilationField: "Compilation",
+    commentField: "Comment"
   },
   albumTagEditor: {
     title: "Edit Album Tags",

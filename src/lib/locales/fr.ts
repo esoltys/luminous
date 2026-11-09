@@ -1678,7 +1678,22 @@ export const fr: DeepStringRecord<typeof en> = {
     clearArtConfirmTitle: "Effacer la pochette intégrée?",
     clearArtConfirmMessage: "Ceci supprime la pochette intégrée du fichier lui-même. La chanson utilisera alors la pochette du dossier ou un espace réservé.",
     clearArtSuccess: "Pochette intégrée effacée",
-    clearArtFailedPrefix: "Échec de l'effacement de la pochette : "
+    clearArtFailedPrefix: "Échec de l'effacement de la pochette : ",
+    historyHeading: "Historique",
+    historySourceHeading: "Source",
+    historyImported: "Importé",
+    historyFormat: "Format",
+    historyFileSize: "Taille",
+    historyTimestampHint: "Consultez l'horodatage de balayage comme le moment où Luminous a détecté la modification sur le disque, car les éditeurs externes peuvent conserver l'heure de modification du fichier.",
+    clearHistoryBtn: "Effacer l'historique",
+    historyEmptyValue: "(vide)",
+    historyActorScan: "Détecté lors du balayage",
+    historyActorLuminous: "Luminous",
+    historyBatchNote: "modifié avec {count} autres pistes",
+    historyEmptySince: "Aucune modification enregistrée depuis le {date}.",
+    historyEmpty: "Aucune modification enregistrée.",
+    compilationField: "Compilation",
+    commentField: "Commentaire"
   },
   albumTagEditor: {
     title: "Modifier les étiquettes de l'album",
