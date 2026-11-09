@@ -238,7 +238,7 @@ mod tests {
         let mut tag = Id3v2Tag::new();
         tag.insert(Frame::Comment(CommentFrame::new(
             TextEncoding::UTF8,
-            [b'e', b'n', b'g'],
+            *b"eng",
             "".to_string(),
             promo.to_string(),
         )));
