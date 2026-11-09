@@ -32,7 +32,7 @@
   import PlainChipInput from "./PlainChipInput.svelte";
   import HelpTip from "./HelpTip.svelte";
   import { formatDate, formatFileSize } from "../utils/formatters";
-  import type { FileSource, SongTagHistory } from "../types";
+  import type { FileSource, SongTagHistory, SongHistoryEntry, RestoreTagHistoryResult } from "../types";
   import { filesStore } from "../stores/files.svelte";
   import { scanFolder } from "./files/folderActions";
 
@@ -106,6 +106,7 @@
 
   let tagHistory = $state<SongTagHistory | null>(null);
   let isClearingHistory = $state(false);
+  let isRestoring = $state(false);
 
   let isLoading = $state(false);
   let isSaving = $state(false);
@@ -248,6 +249,132 @@
       return i18n.t("tagEditor.historyEmptyValue");
     }
     return val;
+  }
+
+  function getCurrentFieldValue(field: string): string | null {
+    switch (field) {
+      case "title": return title.trim() || null;
+      case "titlesort": return titlesort.trim() || null;
+      case "artist": return artist.trim() || null;
+      case "artistsort": return artistsort.trim() || null;
+      case "album": return album.trim() || null;
+      case "albumsort": return albumsort.trim() || null;
+      case "album_artist": return albumArtist.trim() || null;
+      case "album_artist_sort": return albumArtistSort.trim() || null;
+      case "composer": return composer.trim() || null;
+      case "composersort": return composersort.trim() || null;
+      case "genre": return genre.trim() || null;
+      case "genresort": return genresort.trim() || null;
+      case "track": return track != null ? String(track) : null;
+      case "disc": return disc != null ? String(disc) : null;
+      case "disc_subtitle": return discSubtitle.trim() || null;
+      case "year": return year != null ? String(year) : null;
+      case "originalyear": return originalYear != null ? String(originalYear) : null;
+      case "grouping": return grouping.trim() || null;
+      case "bpm": return bpm != null ? String(bpm) : null;
+      case "initial_key": return initialKey.trim() || null;
+      case "compilation": return compilation ? "true" : "false";
+      case "comment": return null;
+      default: return null;
+    }
+  }
+
+  function isValueCurrent(field: string, targetValue: string | null | undefined): boolean {
+    const current = getCurrentFieldValue(field);
+    const normTarget = (targetValue ?? "").trim();
+    const normCurrent = (current ?? "").trim();
+    if (!normTarget && !normCurrent) return true;
+    if (["artist", "album_artist", "composer", "genre"].includes(field)) {
+      const splitNorm = (s: string) =>
+        s.split(";").map((p) => p.trim()).filter(Boolean).sort().join("; ");
+      return splitNorm(normCurrent).toLowerCase() === splitNorm(normTarget).toLowerCase();
+    }
+    return normCurrent.toLowerCase() === normTarget.toLowerCase();
+  }
+
+  async function handleRestoreEntry(entry: SongHistoryEntry) {
+    if (isRestoring || isSaving || songId == null) return;
+    isRestoring = true;
+    try {
+      const result = await invoke<RestoreTagHistoryResult>("restore_tag_history", {
+        target: { type: "entry", historyId: entry.id }
+      });
+
+      if (result.restoredTracks > 0) {
+        toastStore.show(
+          i18n.t("tagEditor.restoreSuccess", {
+            field: getFieldLabel(entry.field),
+            value: formatHistoryValue(entry.oldValue)
+          }),
+          "success"
+        );
+        await loadMetadata();
+        await collectionStore.refreshStats();
+        await collectionStore.refreshLibrary();
+        if (playlistsStore.activePlaylistId != null) {
+          await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+        }
+        await playerStore.refreshPlaybackState();
+      } else if (result.unchangedTracks > 0) {
+        toastStore.show(i18n.t("tagEditor.restoreNoOp"), "info");
+      } else if (result.skippedTracks > 0) {
+        toastStore.show(
+          result.errors.length > 0 ? result.errors[0] : i18n.t("tagEditor.restoreFailed"),
+          "error"
+        );
+      }
+    } catch (e: any) {
+      console.error("Failed to restore tag history entry:", e);
+      toastStore.show(e.toString(), "error");
+    } finally {
+      isRestoring = false;
+    }
+  }
+
+  async function handleRestoreBatch(batchId: string) {
+    if (isRestoring || isSaving || songId == null) return;
+    isRestoring = true;
+    try {
+      const result = await invoke<RestoreTagHistoryResult>("restore_tag_history", {
+        target: { type: "batch", batchId }
+      });
+
+      if (result.restoredTracks > 0) {
+        if (result.skippedTracks > 0) {
+          toastStore.show(
+            i18n.t("tagEditor.restoreBatchPartial", {
+              restored: result.restoredTracks,
+              skipped: result.skippedTracks
+            }),
+            "warning"
+          );
+        } else {
+          toastStore.show(
+            i18n.t("tagEditor.restoreBatchSuccess", { count: result.restoredTracks }),
+            "success"
+          );
+        }
+        await loadMetadata();
+        await collectionStore.refreshStats();
+        await collectionStore.refreshLibrary();
+        if (playlistsStore.activePlaylistId != null) {
+          await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+        }
+        await playerStore.refreshPlaybackState();
+      } else if (result.unchangedTracks > 0 && result.skippedTracks === 0) {
+        toastStore.show(i18n.t("tagEditor.restoreNoOp"), "info");
+      } else if (result.skippedTracks > 0) {
+        toastStore.show(
+          result.errors.length > 0 ? result.errors.join("; ") : i18n.t("tagEditor.restoreFailed"),
+          "error"
+        );
+      }
+    } catch (e: any) {
+      console.error("Failed to restore tag history batch:", e);
+      toastStore.show(e.toString(), "error");
+    } finally {
+      isRestoring = false;
+    }
   }
 
   async function handleSave() {
@@ -750,7 +877,7 @@
                         <Button
                           variant="secondary"
                           size="sm"
-                          disabled={isClearingHistory || isSaving}
+                          disabled={isClearingHistory || isSaving || isRestoring}
                           onclick={handleClearHistory}
                           class="text-xs h-7 px-2.5"
                         >
@@ -758,25 +885,50 @@
                         </Button>
                       </div>
 
-                      <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      <div class="space-y-2">
                         {#each tagHistory.entries as entry (entry.id)}
-                          <div class="p-2 rounded bg-brand-surface/40 border border-brand-border/40 text-xs flex flex-col gap-1">
+                          <div class="p-2 rounded bg-brand-surface/40 border border-brand-border/40 text-xs flex flex-col gap-1.5">
                             <div class="flex items-center justify-between text-brand-text-secondary text-[11px]">
                               <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="font-medium text-brand-text-primary">{getFieldLabel(entry.field)}</span>
-                                <span class="text-brand-text-secondary/60">•</span>
                                 <span>{entry.actor === "scan" ? i18n.t("tagEditor.historyActorScan") : i18n.t("tagEditor.historyActorLuminous")}</span>
                                 {#if entry.batchOtherTracks > 0}
                                   <span class="text-brand-text-secondary/60">•</span>
                                   <span>{i18n.t("tagEditor.historyBatchNote", { count: entry.batchOtherTracks })}</span>
                                 {/if}
                               </div>
-                              <span class="shrink-0 text-brand-text-secondary">{formatDate(entry.at)}</span>
+                              <div class="flex items-center gap-2 shrink-0">
+                                <span class="text-brand-text-secondary">{formatDate(entry.at)}</span>
+                                {#if entry.batchId && entry.batchOtherTracks > 0}
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    disabled={isRestoring || isSaving}
+                                    onclick={() => handleRestoreBatch(entry.batchId!)}
+                                    class="text-[10px] h-5 px-1.5 py-0"
+                                    title={i18n.t("tagEditor.restoreBatchTooltip")}
+                                  >
+                                    {i18n.t("tagEditor.restoreBatchBtn")}
+                                  </Button>
+                                {/if}
+                              </div>
                             </div>
-                            <div class="flex items-center gap-1.5 text-brand-text-primary break-all">
-                              <span class="text-brand-text-secondary line-through opacity-80">{formatHistoryValue(entry.oldValue)}</span>
-                              <span class="text-brand-text-secondary/70">→</span>
-                              <span class="font-medium">{formatHistoryValue(entry.newValue)}</span>
+                            <div class="flex items-center justify-between gap-2">
+                              <div class="flex items-center gap-1.5 text-brand-text-primary break-all flex-wrap">
+                                <span class="font-medium text-brand-text-primary">{getFieldLabel(entry.field)}:</span>
+                                <span class="text-brand-text-secondary line-through opacity-80">{formatHistoryValue(entry.oldValue)}</span>
+                                <span class="text-brand-text-secondary/70">→</span>
+                                <span class="font-medium">{formatHistoryValue(entry.newValue)}</span>
+                              </div>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                disabled={isRestoring || isSaving || isValueCurrent(entry.field, entry.oldValue)}
+                                onclick={() => handleRestoreEntry(entry)}
+                                class="text-xs h-6 px-2 shrink-0"
+                                title={isValueCurrent(entry.field, entry.oldValue) ? i18n.t("tagEditor.restoreAlreadyCurrent") : undefined}
+                              >
+                                {i18n.t("tagEditor.restoreAction")}
+                              </Button>
                             </div>
                           </div>
                         {/each}
@@ -796,7 +948,7 @@
         {#if songId != null && !isRemoteSource && !isCueTrack}
           <Button
             onclick={() => { showTagCleanup = true; }}
-            disabled={isLoading || !!errorMsg || isSaving}
+            disabled={isLoading || !!errorMsg || isSaving || isRestoring}
             variant="secondary"
             size="sm"
           >
@@ -807,10 +959,10 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <Button onclick={onClose} disabled={isSaving} variant="secondary" size="sm">
+        <Button onclick={onClose} disabled={isSaving || isRestoring} variant="secondary" size="sm">
           {i18n.t('tagEditor.cancelBtn')}
         </Button>
-        <Button onclick={handleSave} disabled={isLoading || !!errorMsg || isSaving || isCueTrack} variant="primary" size="sm">
+        <Button onclick={handleSave} disabled={isLoading || !!errorMsg || isSaving || isRestoring || isCueTrack} variant="primary" size="sm">
           {#if isSaving}
             <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
             {i18n.t('tagEditor.updatingTags')}

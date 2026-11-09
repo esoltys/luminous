@@ -478,6 +478,550 @@ pub fn clear_song_history(conn: &rusqlite::Connection, song_id: i64) -> Result<(
     Ok(())
 }
 
+/// Target specifying what history to restore: either a single history entry row,
+/// or all entries sharing a batch ID.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum RestoreTarget {
+    Entry {
+        #[serde(rename = "historyId")]
+        history_id: i64,
+    },
+    Batch {
+        #[serde(rename = "batchId")]
+        batch_id: String,
+    },
+}
+
+/// Result summary of a history restore operation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreTagHistoryResult {
+    /// Number of distinct tracks successfully restored (wrote file tags and updated DB).
+    pub restored_tracks: usize,
+    /// Number of tracks skipped because target values already matched (no-op).
+    pub unchanged_tracks: usize,
+    /// Number of tracks skipped due to errors (e.g. missing file, unreadable, remote/CUE).
+    pub skipped_tracks: usize,
+    /// Human-readable diagnostic messages for any skipped tracks.
+    pub errors: Vec<String>,
+}
+
+/// Outcome of attempting to restore tag values on an individual track.
+#[derive(Debug, PartialEq, Eq)]
+pub enum RestoreSongOutcome {
+    Restored,
+    Unchanged,
+    Skipped(String),
+}
+
+/// Field name and restored target value pair.
+pub type RestoredField = (String, Option<String>);
+/// Planned restore action mapping a song ID to its fields to restore.
+pub type SongRestorePlan = (i64, Vec<RestoredField>);
+
+/// Resolves a [`RestoreTarget`] against `song_history`, returning a list of `(song_id, fields_to_restore)`
+/// where each field to restore is `(field_name, target_old_value)`.
+pub fn resolve_restore_plan(
+    conn: &rusqlite::Connection,
+    target: &RestoreTarget,
+) -> Result<Vec<SongRestorePlan>, String> {
+    match target {
+        RestoreTarget::Entry { history_id } => {
+            let mut stmt = conn
+                .prepare("SELECT song_id, field, old_value FROM song_history WHERE id = ?1")
+                .map_err(|e| e.to_string())?;
+            let row = stmt
+                .query_row(params![history_id], |r| {
+                    Ok((
+                        r.get::<_, i64>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, Option<String>>(2)?,
+                    ))
+                })
+                .map_err(|_| format!("History entry {history_id} not found"))?;
+            Ok(vec![(row.0, vec![(row.1, row.2)])])
+        }
+        RestoreTarget::Batch { batch_id } => {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT song_id, field, old_value
+                     FROM song_history
+                     WHERE batch_id = ?1
+                     ORDER BY at ASC, id ASC",
+                )
+                .map_err(|e| e.to_string())?;
+            let rows = stmt
+                .query_map(params![batch_id], |r| {
+                    Ok((
+                        r.get::<_, i64>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, Option<String>>(2)?,
+                    ))
+                })
+                .map_err(|e| e.to_string())?
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(|e| e.to_string())?;
+
+            if rows.is_empty() {
+                return Err(format!("Batch {batch_id} not found in history"));
+            }
+
+            // Group by song_id, preserving the earliest old_value for each field in this batch
+            let mut plan: Vec<SongRestorePlan> = Vec::new();
+            for (song_id, field, old_val) in rows {
+                if let Some(entry) = plan.iter_mut().find(|(sid, _)| *sid == song_id) {
+                    if !entry.1.iter().any(|(f, _)| f == &field) {
+                        entry.1.push((field, old_val));
+                    }
+                } else {
+                    plan.push((song_id, vec![(field, old_val)]));
+                }
+            }
+            Ok(plan)
+        }
+    }
+}
+
+/// Restores the specified fields on `song_id` to their target old values.
+///
+/// If `on_disk` is true, writes file tags using `luminous_metadata::audio::write_tags` and
+/// refreshes `mtime`/`filesize`. If `on_disk` is false (e.g. in test harness without real audio files),
+/// updates SQLite directly and appends history.
+///
+/// Returns:
+/// - [`RestoreSongOutcome::Restored`]: at least one field differed, successfully written to disk & DB,
+///   and logged as a new `HistoryActor::Luminous` event.
+/// - [`RestoreSongOutcome::Unchanged`]: all fields already matched current values (clean no-op, 0 writes).
+/// - [`RestoreSongOutcome::Skipped`]: track is remote, CUE sheet, missing file, or write failed.
+pub fn restore_song_tags(
+    conn: &rusqlite::Connection,
+    song_id: i64,
+    fields_to_restore: &[(String, Option<String>)],
+    restore_batch_id: Option<&str>,
+    on_disk: bool,
+) -> Result<RestoreSongOutcome, String> {
+    if fields_to_restore.is_empty() {
+        return Ok(RestoreSongOutcome::Unchanged);
+    }
+
+    // 1. Query current song state from `songs`
+    let query_res = conn.query_row(
+        "SELECT path, source, cue_path,
+                COALESCE(title, ''), titlesort,
+                COALESCE(artist, ''), artistsort,
+                COALESCE(album, ''), albumsort,
+                COALESCE(album_artist, ''), album_artist_sort,
+                COALESCE(composer, ''), composersort,
+                COALESCE(genre, ''), genresort,
+                track, disc, disc_subtitle,
+                year, originalyear,
+                COALESCE(grouping, ''),
+                bpm,
+                COALESCE(initial_key, ''),
+                compilation,
+                comment
+         FROM songs WHERE id = ?1",
+        params![song_id],
+        |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, String>(7)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, String>(9)?,
+                row.get::<_, Option<String>>(10)?,
+                row.get::<_, String>(11)?,
+                row.get::<_, Option<String>>(12)?,
+                row.get::<_, String>(13)?,
+                row.get::<_, Option<String>>(14)?,
+                row.get::<_, Option<i64>>(15)?,
+                row.get::<_, Option<i64>>(16)?,
+                row.get::<_, Option<String>>(17)?,
+                row.get::<_, Option<i64>>(18)?,
+                row.get::<_, Option<i64>>(19)?,
+                row.get::<_, String>(20)?,
+                row.get::<_, Option<f64>>(21)?,
+                row.get::<_, String>(22)?,
+                row.get::<_, Option<bool>>(23)?,
+                row.get::<_, Option<String>>(24)?,
+            ))
+        },
+    );
+
+    let (
+        path_str,
+        source_val,
+        cue_path,
+        mut title,
+        mut titlesort,
+        mut artist,
+        mut artistsort,
+        mut album,
+        mut albumsort,
+        mut album_artist,
+        mut album_artist_sort,
+        mut composer,
+        mut composersort,
+        mut genre,
+        mut genresort,
+        mut track,
+        mut disc,
+        mut disc_subtitle,
+        mut year,
+        mut originalyear,
+        mut grouping,
+        mut bpm,
+        mut initial_key,
+        compilation_opt,
+        mut comment,
+    ) = match query_res {
+        Ok(vals) => vals,
+        Err(rusqlite::Error::QueryReturnedNoRows) => {
+            return Ok(RestoreSongOutcome::Skipped(format!(
+                "Song {song_id} not found"
+            )));
+        }
+        Err(e) => return Err(e.to_string()),
+    };
+
+    let song_source = crate::models::SongSource::from(source_val);
+    if !song_source.is_local() || cue_path.is_some() {
+        return Ok(RestoreSongOutcome::Skipped(format!(
+            "Song {song_id} is remote or part of a CUE sheet and cannot be modified"
+        )));
+    }
+
+    let file_path = Path::new(&path_str);
+    if on_disk && !file_path.exists() {
+        return Ok(RestoreSongOutcome::Skipped(format!(
+            "File not found on disk: {path_str}"
+        )));
+    }
+
+    let mut compilation = compilation_opt.unwrap_or(false);
+    let mut has_changes = false;
+
+    // 2. Diff and apply requested field values
+    for (field, target_val) in fields_to_restore {
+        let target_str = target_val.as_deref();
+        match field.as_str() {
+            "title" => {
+                if canonicalize_free_text(Some(&title)) != canonicalize_free_text(target_str) {
+                    title = target_str.map(|s| s.trim().to_string()).unwrap_or_default();
+                    has_changes = true;
+                }
+            }
+            "titlesort" => {
+                if canonicalize_free_text(titlesort.as_deref())
+                    != canonicalize_free_text(target_str)
+                {
+                    titlesort = canonicalize_free_text(target_str);
+                    has_changes = true;
+                }
+            }
+            "artist" => {
+                if canonicalize_multi_value(Some(&artist)) != canonicalize_multi_value(target_str) {
+                    artist = target_str
+                        .map(|s| {
+                            crate::models::join_multi_value(&crate::models::parse_multi_value(s))
+                        })
+                        .unwrap_or_default();
+                    has_changes = true;
+                }
+            }
+            "artistsort" => {
+                if canonicalize_free_text(artistsort.as_deref())
+                    != canonicalize_free_text(target_str)
+                {
+                    artistsort = canonicalize_free_text(target_str);
+                    has_changes = true;
+                }
+            }
+            "album" => {
+                if canonicalize_free_text(Some(&album)) != canonicalize_free_text(target_str) {
+                    album = target_str.map(|s| s.trim().to_string()).unwrap_or_default();
+                    has_changes = true;
+                }
+            }
+            "albumsort" => {
+                if canonicalize_free_text(albumsort.as_deref())
+                    != canonicalize_free_text(target_str)
+                {
+                    albumsort = canonicalize_free_text(target_str);
+                    has_changes = true;
+                }
+            }
+            "album_artist" => {
+                if canonicalize_multi_value(Some(&album_artist))
+                    != canonicalize_multi_value(target_str)
+                {
+                    album_artist = target_str
+                        .map(|s| {
+                            crate::models::join_multi_value(&crate::models::parse_multi_value(s))
+                        })
+                        .unwrap_or_default();
+                    has_changes = true;
+                }
+            }
+            "album_artist_sort" => {
+                if canonicalize_free_text(album_artist_sort.as_deref())
+                    != canonicalize_free_text(target_str)
+                {
+                    album_artist_sort = canonicalize_free_text(target_str);
+                    has_changes = true;
+                }
+            }
+            "composer" => {
+                if canonicalize_multi_value(Some(&composer)) != canonicalize_multi_value(target_str)
+                {
+                    composer = target_str
+                        .map(|s| {
+                            crate::models::join_multi_value(&crate::models::parse_multi_value(s))
+                        })
+                        .unwrap_or_default();
+                    has_changes = true;
+                }
+            }
+            "composersort" => {
+                if canonicalize_free_text(composersort.as_deref())
+                    != canonicalize_free_text(target_str)
+                {
+                    composersort = canonicalize_free_text(target_str);
+                    has_changes = true;
+                }
+            }
+            "genre" => {
+                if canonicalize_multi_value(Some(&genre)) != canonicalize_multi_value(target_str) {
+                    genre = target_str
+                        .map(|s| {
+                            crate::models::join_multi_value(&crate::models::parse_multi_value(s))
+                        })
+                        .unwrap_or_default();
+                    has_changes = true;
+                }
+            }
+            "genresort" => {
+                if canonicalize_free_text(genresort.as_deref())
+                    != canonicalize_free_text(target_str)
+                {
+                    genresort = canonicalize_free_text(target_str);
+                    has_changes = true;
+                }
+            }
+            "track" => {
+                let target_int = target_str.and_then(|s| s.parse::<i64>().ok());
+                if canonicalize_int(track) != canonicalize_int(target_int) {
+                    track = target_int;
+                    has_changes = true;
+                }
+            }
+            "disc" => {
+                let target_int = target_str.and_then(|s| s.parse::<i64>().ok());
+                if canonicalize_int(disc) != canonicalize_int(target_int) {
+                    disc = target_int;
+                    has_changes = true;
+                }
+            }
+            "disc_subtitle" => {
+                if canonicalize_free_text(disc_subtitle.as_deref())
+                    != canonicalize_free_text(target_str)
+                {
+                    disc_subtitle = canonicalize_free_text(target_str);
+                    has_changes = true;
+                }
+            }
+            "year" => {
+                let target_int = target_str.and_then(|s| s.parse::<i64>().ok());
+                if canonicalize_int(year) != canonicalize_int(target_int) {
+                    year = target_int;
+                    has_changes = true;
+                }
+            }
+            "originalyear" => {
+                let target_int = target_str.and_then(|s| s.parse::<i64>().ok());
+                if canonicalize_int(originalyear) != canonicalize_int(target_int) {
+                    originalyear = target_int;
+                    has_changes = true;
+                }
+            }
+            "grouping" => {
+                if canonicalize_free_text(Some(&grouping)) != canonicalize_free_text(target_str) {
+                    grouping = target_str.map(|s| s.trim().to_string()).unwrap_or_default();
+                    has_changes = true;
+                }
+            }
+            "bpm" => {
+                let target_bpm = target_str.and_then(|s| s.parse::<f64>().ok());
+                if canonicalize_bpm(bpm) != canonicalize_bpm(target_bpm) {
+                    bpm = target_bpm;
+                    has_changes = true;
+                }
+            }
+            "initial_key" => {
+                if canonicalize_free_text(Some(&initial_key)) != canonicalize_free_text(target_str)
+                {
+                    initial_key = target_str.map(|s| s.trim().to_string()).unwrap_or_default();
+                    has_changes = true;
+                }
+            }
+            "compilation" => {
+                let target_bool = target_str.map(|s| s == "true" || s == "1").unwrap_or(false);
+                if compilation != target_bool {
+                    compilation = target_bool;
+                    has_changes = true;
+                }
+            }
+            "comment"
+                if canonicalize_free_text(comment.as_deref())
+                    != canonicalize_free_text(target_str) =>
+            {
+                comment = canonicalize_free_text(target_str);
+                has_changes = true;
+            }
+            _ => {}
+        }
+    }
+
+    if !has_changes {
+        return Ok(RestoreSongOutcome::Unchanged);
+    }
+
+    // 3. Write metadata to file on disk if requested
+    if on_disk {
+        let tag_req = luminous_metadata::audio::TagWriteRequest {
+            title: &title,
+            titlesort: titlesort.as_deref(),
+            artist: &artist,
+            artistsort: artistsort.as_deref(),
+            album: &album,
+            albumsort: albumsort.as_deref(),
+            album_artist: &album_artist,
+            album_artist_sort: album_artist_sort.as_deref(),
+            composer: &composer,
+            composersort: composersort.as_deref(),
+            genre: &genre,
+            track: track.and_then(|t| u32::try_from(t).ok()),
+            disc: disc.and_then(|d| u32::try_from(d).ok()),
+            disc_subtitle: disc_subtitle.as_deref(),
+            year: year.and_then(|y| u32::try_from(y).ok()),
+            originalyear: originalyear.and_then(|y| u32::try_from(y).ok()),
+            grouping: &grouping,
+            bpm: bpm.map(|b| b as f32),
+            initial_key: &initial_key,
+            compilation,
+        };
+
+        if let Err(e) = luminous_metadata::audio::write_tags(file_path, &tag_req) {
+            return Ok(RestoreSongOutcome::Skipped(format!(
+                "Failed to write tags to {path_str}: {e:#}"
+            )));
+        }
+    }
+
+    // 4. Capture snapshot before updating SQLite
+    let before = snapshot_by_id(conn, song_id).map_err(|e| e.to_string())?;
+
+    let (new_mtime, new_filesize) = if on_disk {
+        file_mtime_and_size(file_path)
+    } else {
+        (None, None)
+    };
+
+    let album_artist_trimmed = album_artist.trim();
+    let artist_trimmed = artist.trim();
+    let album_key = crate::album_key::album_key_for(
+        &album,
+        if album_artist_trimmed.is_empty() {
+            None
+        } else {
+            Some(album_artist_trimmed)
+        },
+        if artist_trimmed.is_empty() {
+            None
+        } else {
+            Some(artist_trimmed)
+        },
+        compilation,
+    );
+
+    // 5. Update SQLite database
+    conn.execute(
+        "UPDATE songs SET
+            title = ?1,
+            titlesort = ?2,
+            artist = ?3,
+            artistsort = ?4,
+            album = ?5,
+            albumsort = ?6,
+            album_artist = ?7,
+            album_artist_sort = ?8,
+            composer = ?9,
+            composersort = ?10,
+            genre = ?11,
+            genresort = ?12,
+            track = ?13,
+            disc = ?14,
+            disc_subtitle = ?15,
+            year = ?16,
+            originalyear = ?17,
+            grouping = ?18,
+            bpm = ?19,
+            initial_key = ?20,
+            compilation = ?21,
+            comment = ?22,
+            album_key = ?23,
+            mtime = COALESCE(?24, mtime),
+            filesize = COALESCE(?25, filesize)
+         WHERE id = ?26",
+        rusqlite::params![
+            title,
+            titlesort,
+            artist,
+            artistsort,
+            album,
+            albumsort,
+            album_artist,
+            album_artist_sort,
+            composer,
+            composersort,
+            genre,
+            genresort,
+            track,
+            disc,
+            disc_subtitle,
+            year,
+            originalyear,
+            grouping,
+            bpm,
+            initial_key,
+            compilation,
+            comment,
+            album_key,
+            new_mtime,
+            new_filesize,
+            song_id,
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // 6. Record history event as actor `luminous`
+    record_diff_after_update(
+        conn,
+        before.as_ref(),
+        HistoryActor::Luminous,
+        restore_batch_id,
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(RestoreSongOutcome::Restored)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1007,5 +1551,237 @@ mod tests {
             history_after_forced.entries[0].new_value.as_deref(),
             Some("Forced Rescan Title")
         );
+    }
+
+    #[test]
+    fn test_restore_single_field_writes_to_file_and_db_and_appends_luminous_event() {
+        let (temp_dir, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        let path = temp_dir.path().join("restore_song.wav");
+        write_test_wav(&path);
+
+        luminous_metadata::audio::write_tags(
+            &path,
+            &luminous_metadata::audio::TagWriteRequest {
+                title: "Original Title",
+                artist: "Original Artist",
+                album: "Original Album",
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let mut song = crate::collection::read_tags(&path).unwrap();
+        song.source = crate::models::SongSource::LocalFile;
+        crate::collection::upsert_song(&conn, &song).unwrap();
+
+        let song_id: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![path.to_string_lossy().to_string()],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        // Perform edit to "Modified Title"
+        let before = snapshot_by_id(&conn, song_id).unwrap().unwrap();
+        luminous_metadata::audio::write_tags(
+            &path,
+            &luminous_metadata::audio::TagWriteRequest {
+                title: "Modified Title",
+                artist: "Original Artist",
+                album: "Original Album",
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let (new_mtime, new_filesize) = file_mtime_and_size(&path);
+        conn.execute(
+            "UPDATE songs SET title = 'Modified Title', mtime = ?1, filesize = ?2 WHERE id = ?3",
+            params![new_mtime, new_filesize, song_id],
+        )
+        .unwrap();
+        record_diff_after_update(&conn, Some(&before), HistoryActor::Luminous, None).unwrap();
+
+        let history = get_song_history(&conn, song_id).unwrap();
+        assert_eq!(history.entries.len(), 1);
+        let entry = &history.entries[0];
+        assert_eq!(entry.field, "title");
+        assert_eq!(entry.old_value.as_deref(), Some("Original Title"));
+        assert_eq!(entry.new_value.as_deref(), Some("Modified Title"));
+        let history_id = entry.id;
+
+        // Resolve plan for this entry
+        let plan = resolve_restore_plan(&conn, &RestoreTarget::Entry { history_id }).unwrap();
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan[0].0, song_id);
+        assert_eq!(plan[0].1.len(), 1);
+        assert_eq!(plan[0].1[0].0, "title");
+        assert_eq!(plan[0].1[0].1.as_deref(), Some("Original Title"));
+
+        // Execute restore
+        let outcome =
+            restore_song_tags(&conn, song_id, &plan[0].1, Some("restore-batch-1"), true).unwrap();
+        assert_eq!(outcome, RestoreSongOutcome::Restored);
+
+        // Verify DB value
+        let db_title: String = conn
+            .query_row(
+                "SELECT title FROM songs WHERE id = ?1",
+                params![song_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(db_title, "Original Title");
+
+        // Verify file value on disk
+        let disk_tags = crate::collection::read_tags(&path).unwrap();
+        assert_eq!(disk_tags.title.as_deref(), Some("Original Title"));
+
+        // Verify history is append-only: original row remains, new row added
+        let history_after = get_song_history(&conn, song_id).unwrap();
+        assert_eq!(history_after.entries.len(), 2);
+        assert_eq!(history_after.entries[0].actor, HistoryActor::Luminous);
+        assert_eq!(history_after.entries[0].field, "title");
+        assert_eq!(
+            history_after.entries[0].old_value.as_deref(),
+            Some("Modified Title")
+        );
+        assert_eq!(
+            history_after.entries[0].new_value.as_deref(),
+            Some("Original Title")
+        );
+        assert_eq!(
+            history_after.entries[0].batch_id.as_deref(),
+            Some("restore-batch-1")
+        );
+        assert_eq!(history_after.entries[1].id, history_id);
+
+        // Verify rescan produces 0 scan events
+        let scanned = crate::collection::read_tags(&path).unwrap();
+        crate::collection::upsert_song(&conn, &scanned).unwrap();
+        let history_after_scan = get_song_history(&conn, song_id).unwrap();
+        assert_eq!(
+            history_after_scan.entries.len(),
+            2,
+            "rescan after restore must log 0 scan events"
+        );
+    }
+
+    #[test]
+    fn test_restore_noop_when_value_already_current() {
+        let (temp_dir, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        let path = temp_dir.path().join("noop_song.wav");
+        write_test_wav(&path);
+
+        conn.execute(
+            "INSERT INTO songs (path, title, artist, album, source, mtime)
+             VALUES (?1, 'Current Title', 'Artist A', 'Album X', 2, 1000)",
+            params![path.to_string_lossy().to_string()],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+
+        // Attempt to restore field "title" to "Current Title" (already matching)
+        let fields = vec![("title".to_string(), Some("Current Title".to_string()))];
+        let outcome = restore_song_tags(&conn, song_id, &fields, None, false).unwrap();
+        assert_eq!(outcome, RestoreSongOutcome::Unchanged);
+
+        let history = get_song_history(&conn, song_id).unwrap();
+        assert_eq!(
+            history.entries.len(),
+            0,
+            "no-op restore must record 0 history rows"
+        );
+    }
+
+    #[test]
+    fn test_restore_batch_across_multiple_tracks_with_one_unavailable() {
+        let (temp_dir, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        let path1 = temp_dir.path().join("track1.wav");
+        write_test_wav(&path1);
+        let path2 = temp_dir.path().join("track2_missing.wav");
+        write_test_wav(&path2);
+
+        // Insert track 1
+        conn.execute(
+            "INSERT INTO songs (path, title, artist, album, source, mtime)
+             VALUES (?1, 'New Album 1', 'Artist', 'New Album', 2, 1000)",
+            params![path1.to_string_lossy().to_string()],
+        )
+        .unwrap();
+        let song1_id = conn.last_insert_rowid();
+
+        // Insert track 2
+        conn.execute(
+            "INSERT INTO songs (path, title, artist, album, source, mtime)
+             VALUES (?1, 'New Album 2', 'Artist', 'New Album', 2, 1000)",
+            params![path2.to_string_lossy().to_string()],
+        )
+        .unwrap();
+        let song2_id = conn.last_insert_rowid();
+
+        // Record batch edit on both tracks
+        conn.execute(
+            "INSERT INTO song_history (song_id, at, actor, field, old_value, new_value, batch_id)
+             VALUES (?1, 1000, 'luminous', 'album', 'Old Album', 'New Album', 'batch-test-1')",
+            params![song1_id],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO song_history (song_id, at, actor, field, old_value, new_value, batch_id)
+             VALUES (?1, 1000, 'luminous', 'album', 'Old Album', 'New Album', 'batch-test-1')",
+            params![song2_id],
+        )
+        .unwrap();
+
+        // Delete track 2 file so it is unavailable
+        let _ = std::fs::remove_file(&path2);
+
+        // Resolve batch plan
+        let plan = resolve_restore_plan(
+            &conn,
+            &RestoreTarget::Batch {
+                batch_id: "batch-test-1".to_string(),
+            },
+        )
+        .unwrap();
+        assert_eq!(plan.len(), 2);
+
+        let mut restored = 0;
+        let mut skipped = 0;
+        let mut errors = Vec::new();
+
+        for (sid, fields) in plan {
+            match restore_song_tags(&conn, sid, &fields, Some("restore-batch-2"), true).unwrap() {
+                RestoreSongOutcome::Restored => restored += 1,
+                RestoreSongOutcome::Unchanged => {}
+                RestoreSongOutcome::Skipped(err) => {
+                    skipped += 1;
+                    errors.push(err);
+                }
+            }
+        }
+
+        assert_eq!(restored, 1);
+        assert_eq!(skipped, 1);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("File not found on disk"));
+
+        // Check track 1 was restored
+        let track1_album: String = conn
+            .query_row(
+                "SELECT album FROM songs WHERE id = ?1",
+                params![song1_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(track1_album, "Old Album");
     }
 }

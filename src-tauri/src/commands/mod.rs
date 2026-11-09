@@ -22,7 +22,7 @@ pub mod share;
 pub mod stats;
 pub mod subsonic;
 pub mod tageditor;
-pub use tageditor::{clear_song_tag_history, get_song_tag_history};
+pub use tageditor::{clear_song_tag_history, get_song_tag_history, restore_tag_history};
 pub mod tags;
 pub mod theme;
 pub mod visualizer;

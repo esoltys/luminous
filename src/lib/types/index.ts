@@ -1507,3 +1507,15 @@ export interface SongTagHistory {
   entries: SongHistoryEntry[];
 }
 
+export type RestoreTarget =
+  | { type: "entry"; historyId: number }
+  | { type: "batch"; batchId: string };
+
+export interface RestoreTagHistoryResult {
+  restoredTracks: number;
+  unchangedTracks: number;
+  skippedTracks: number;
+  errors: string[];
+}
+
+

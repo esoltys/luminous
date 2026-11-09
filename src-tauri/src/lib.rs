@@ -1563,6 +1563,7 @@ pub fn run() {
             commands::tageditor::save_batch_file_tags,
             commands::tageditor::get_song_tag_history,
             commands::tageditor::clear_song_tag_history,
+            commands::tageditor::restore_tag_history,
             commands::tageditor::clear_song_cover_art,
             commands::tageditor::clear_album_cover_art,
             commands::tageditor::open_song_folder,
