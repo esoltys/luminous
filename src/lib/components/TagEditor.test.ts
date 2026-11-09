@@ -448,6 +448,56 @@ describe("TagEditor.svelte", () => {
     expect(getByText("New Song Title")).toBeInTheDocument();
   });
 
+  it("shows filter empty message when Detected on scan (0) is selected and allows switching back", async () => {
+    const mockHistory: SongTagHistory = {
+      songId: 10,
+      source: {
+        path: "/music/rock/song.flac",
+        filesize: 12582912,
+        format: "FLAC",
+        added: 1700000000,
+        isRemote: false,
+        isCueTrack: false,
+      },
+      entries: [
+        {
+          id: 1,
+          songId: 10,
+          at: 1700001000,
+          actor: "luminous",
+          field: "genre",
+          oldValue: "Classic Rock",
+          newValue: "Hard Rock",
+          batchId: null,
+          batchOtherTracks: 0,
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return mockSongDetails;
+      if (cmd === "get_song_tag_history") return mockHistory;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const { getByText, findByText, queryByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+
+    await findByText("History");
+    expect(getByText("All (1)")).toBeInTheDocument();
+    expect(getByText("Detected on scan (0)")).toBeInTheDocument();
+    expect(getByText("Hard Rock")).toBeInTheDocument();
+
+    // Click "Detected on scan (0)" filter
+    await fireEvent.click(getByText("Detected on scan (0)"));
+    expect(queryByText("Hard Rock")).not.toBeInTheDocument();
+    expect(getByText("No changes detected on scan.")).toBeInTheDocument();
+
+    // Click "All (1)" filter to return
+    await fireEvent.click(getByText("All (1)"));
+    expect(getByText("Hard Rock")).toBeInTheDocument();
+  });
+
   it("invokes clear_song_tag_history on Clear History click and transitions to empty state", async () => {
     const mockHistory: SongTagHistory = {
       songId: 10,

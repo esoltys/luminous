@@ -489,19 +489,6 @@ pub fn count_songs_with_scan_history(conn: &rusqlite::Connection) -> rusqlite::R
     Ok(count.max(0) as usize)
 }
 
-/// Returns the number of `HistoryActor::Scan` events recorded for `song_id`.
-pub fn count_song_scan_history(
-    conn: &rusqlite::Connection,
-    song_id: i64,
-) -> rusqlite::Result<usize> {
-    let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM song_history WHERE song_id = ?1 AND actor = 'scan'",
-        params![song_id],
-        |row| row.get(0),
-    )?;
-    Ok(count.max(0) as usize)
-}
-
 /// Target specifying what history to restore: either a single history entry row,
 /// or all entries sharing a batch ID.
 #[derive(Debug, Clone, Deserialize)]

@@ -109,13 +109,12 @@
   let isRestoring = $state(false);
   let historyFilter = $state<"all" | "scan">("all");
 
-  let scanEntryCount = $derived(
-    tagHistory?.entries.filter((e) => e.actor === "scan").length ?? 0
+  let scanEntries = $derived(
+    tagHistory?.entries.filter((e) => e.actor === "scan") ?? []
   );
+  let scanEntryCount = $derived(scanEntries.length);
   let displayedEntries = $derived(
-    historyFilter === "scan"
-      ? (tagHistory?.entries.filter((e) => e.actor === "scan") ?? [])
-      : (tagHistory?.entries ?? [])
+    historyFilter === "scan" ? scanEntries : (tagHistory?.entries ?? [])
   );
 
   let isLoading = $state(false);
@@ -153,6 +152,7 @@
   }
 
   async function loadTagHistory(id: number) {
+    historyFilter = "all";
     try {
       const history = await invoke<SongTagHistory>("get_song_tag_history", { songId: id });
       tagHistory = history ?? null;
@@ -883,24 +883,22 @@
                             text={i18n.t("tagEditor.historyTimestampHint")}
                             label={i18n.t("tagEditor.historyTimestampHint")}
                           />
-                          {#if scanEntryCount > 0}
-                            <div class="flex items-center gap-1 bg-brand-surface/60 p-0.5 rounded border border-brand-border/40 text-[11px]" role="radiogroup" aria-label={i18n.t("tagEditor.historyFilterLabel")}>
-                              <button
-                                type="button"
-                                class="px-2 py-0.5 rounded transition-colors {historyFilter === 'all' ? 'bg-brand-primary text-white font-medium' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-                                onclick={() => { historyFilter = 'all'; }}
-                              >
-                                {i18n.t("tagEditor.historyFilterAll", { count: tagHistory.entries.length })}
-                              </button>
-                              <button
-                                type="button"
-                                class="px-2 py-0.5 rounded transition-colors {historyFilter === 'scan' ? 'bg-brand-primary text-white font-medium' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-                                onclick={() => { historyFilter = 'scan'; }}
-                              >
-                                {i18n.t("tagEditor.historyFilterScan", { count: scanEntryCount })}
-                              </button>
-                            </div>
-                          {/if}
+                          <div class="flex items-center gap-1 bg-brand-surface/60 p-0.5 rounded border border-brand-border/40 text-[11px]" role="radiogroup" aria-label={i18n.t("tagEditor.historyFilterLabel")}>
+                            <button
+                              type="button"
+                              class="px-2 py-0.5 rounded transition-colors {historyFilter === 'all' ? 'bg-brand-primary text-white font-medium' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                              onclick={() => { historyFilter = 'all'; }}
+                            >
+                              {i18n.t("tagEditor.historyFilterAll", { count: tagHistory.entries.length })}
+                            </button>
+                            <button
+                              type="button"
+                              class="px-2 py-0.5 rounded transition-colors {historyFilter === 'scan' ? 'bg-brand-primary text-white font-medium' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                              onclick={() => { historyFilter = 'scan'; }}
+                            >
+                              {i18n.t("tagEditor.historyFilterScan", { count: scanEntryCount })}
+                            </button>
+                          </div>
                         </div>
                         <Button
                           variant="secondary"
