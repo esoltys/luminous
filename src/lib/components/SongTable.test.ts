@@ -298,7 +298,7 @@ describe("SongTable.svelte — windowing (#1898)", () => {
     document.body.innerHTML = "";
   });
 
-  it("draws only a window of a long list, with spacers holding its full height", () => {
+  it("draws only a window of a long list, inside a sizer holding its full height (#1992)", () => {
     const rows = Array.from({ length: 5000 }, (_, i) => ({ key: String(i), song: song(i) }));
     const { container } = renderInScroller(rows);
 
@@ -306,11 +306,12 @@ describe("SongTable.svelte — windowing (#1898)", () => {
     expect(drawn.length).toBeGreaterThan(0);
     expect(drawn.length).toBeLessThan(100);
 
-    const body = drawn[0].parentElement!;
-    const spacers = [body.firstElementChild as HTMLElement, body.lastElementChild as HTMLElement];
+    const block = drawn[0].parentElement!;
+    const sizer = block.parentElement!;
     const rowHeight = parseFloat((drawn[0] as HTMLElement).style.height);
-    const spacerTotal = spacers.reduce((sum, el) => sum + parseFloat(el.style.height), 0);
-    expect(spacerTotal + drawn.length * rowHeight).toBe(5000 * rowHeight);
+    // The sizer's height is the whole list, whatever window is drawn, so a window swap can't shrink the page.
+    expect(parseFloat(sizer.style.height)).toBe(5000 * rowHeight);
+    expect(parseFloat(block.style.top)).toBe(Number((drawn[0] as HTMLElement).dataset.key) * rowHeight);
   });
 
   it("moves the window when its scrolling ancestor scrolls", async () => {
