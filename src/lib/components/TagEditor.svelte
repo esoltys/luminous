@@ -292,18 +292,6 @@
     return normCurrent.toLowerCase() === normTarget.toLowerCase();
   }
 
-  function hasChangedSince(entry: SongHistoryEntry): boolean {
-    const current = getCurrentFieldValue(entry.field);
-    const normNew = (entry.newValue ?? "").trim();
-    const normCurrent = (current ?? "").trim();
-    if (["artist", "album_artist", "composer", "genre"].includes(entry.field)) {
-      const splitNorm = (s: string) =>
-        s.split(";").map((p) => p.trim()).filter(Boolean).sort().join("; ");
-      return splitNorm(normCurrent).toLowerCase() !== splitNorm(normNew).toLowerCase();
-    }
-    return normCurrent.toLowerCase() !== normNew.toLowerCase();
-  }
-
   async function handleRestoreEntry(entry: SongHistoryEntry) {
     if (isRestoring || isSaving || songId == null) return;
     isRestoring = true;
@@ -910,7 +898,7 @@
                               </div>
                               <div class="flex items-center gap-2 shrink-0">
                                 <span class="text-brand-text-secondary">{formatDate(entry.at)}</span>
-                                {#if entry.batchId}
+                                {#if entry.batchId && entry.batchOtherTracks > 0}
                                   <Button
                                     variant="secondary"
                                     size="sm"
@@ -930,11 +918,6 @@
                                 <span class="text-brand-text-secondary line-through opacity-80">{formatHistoryValue(entry.oldValue)}</span>
                                 <span class="text-brand-text-secondary/70">→</span>
                                 <span class="font-medium">{formatHistoryValue(entry.newValue)}</span>
-                                {#if hasChangedSince(entry)}
-                                  <span class="text-[10px] text-brand-accent px-1.5 py-0.2 rounded bg-brand-accent/10 border border-brand-accent/20">
-                                    {i18n.t("tagEditor.currentValuePrefix")}: {formatHistoryValue(getCurrentFieldValue(entry.field))}
-                                  </span>
-                                {/if}
                               </div>
                               <Button
                                 variant="secondary"

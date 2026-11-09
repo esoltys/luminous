@@ -662,9 +662,8 @@ describe("TagEditor.svelte", () => {
     });
   });
 
-  it("shows current value indicator when field has changed since that edit", async () => {
-    // Current album is "Original Album". Entry changed album from "Initial Album" to "Intermediate Album"
-    const historyEntry: SongTagHistory = {
+  it("does not show Restore Batch button when batchOtherTracks is 0", async () => {
+    const singleHistory: SongTagHistory = {
       songId: 10,
       source: {
         path: "/music/rock/song.flac",
@@ -683,7 +682,7 @@ describe("TagEditor.svelte", () => {
           field: "album",
           oldValue: "Initial Album",
           newValue: "Intermediate Album",
-          batchId: null,
+          batchId: "single-track-batch",
           batchOtherTracks: 0,
         },
       ],
@@ -691,14 +690,15 @@ describe("TagEditor.svelte", () => {
 
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_song_details") return mockSongDetails;
-      if (cmd === "get_song_tag_history") return historyEntry;
+      if (cmd === "get_song_tag_history") return singleHistory;
       if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
       return null;
     });
 
-    const { findByText, getByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    const { findByText, queryByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
     await findByText("History");
-    expect(getByText(/Current: Original Album/)).toBeInTheDocument();
+    expect(queryByText("Restore Batch")).not.toBeInTheDocument();
+    expect(queryByText("Restore")).toBeInTheDocument();
   });
 
   it("disables Restore button when field already holds the oldValue", async () => {
