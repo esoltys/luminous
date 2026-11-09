@@ -151,6 +151,11 @@ pub async fn rescan_songs(
     song_ids: Vec<i64>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    if let Err(e) = scanner.merge_duplicate_songs() {
+        log::warn!("Failed to merge duplicate songs during rescan_songs: {e}");
+    }
+
     let paths: Vec<std::path::PathBuf> = crate::db::run_blocking(&state.db, move |conn| {
         let sql = format!(
             "SELECT {} FROM songs WHERE id = ?1",

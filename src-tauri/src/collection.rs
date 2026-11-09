@@ -770,7 +770,14 @@ impl CollectionScanner {
     /// hence this cleanup.
     pub fn merge_duplicate_songs(&self) -> Result<usize> {
         let conn = self.db.pool.get()?;
+        Self::merge_duplicate_songs_conn(&conn)
+    }
 
+    /// Finds any pairs of rows that point to the exact same file path
+    /// (compared case-insensitively, e.g. from an out-of-band case rename
+    /// that bypassed `reconcile_moved_songs`) and folds them together via
+    /// `merge_song_rows`.
+    pub fn merge_duplicate_songs_conn(conn: &rusqlite::Connection) -> Result<usize> {
         let mut stmt =
             conn.prepare("SELECT id, path, beginning_nanosec FROM songs WHERE path IS NOT NULL")?;
         let rows: Vec<(i64, String, i64)> = stmt
@@ -779,24 +786,52 @@ impl CollectionScanner {
             .collect();
         drop(stmt);
 
-        let mut groups: std::collections::HashMap<(String, i64), Vec<i64>> =
+        let mut groups: std::collections::HashMap<(String, i64), Vec<(i64, String)>> =
             std::collections::HashMap::new();
         for (id, path, beginning_nanosec) in rows {
             groups
                 .entry((path.to_lowercase(), beginning_nanosec))
                 .or_default()
-                .push(id);
+                .push((id, path));
         }
 
         let mut merged = 0usize;
         let tx = conn.unchecked_transaction()?;
-        for mut ids in groups.into_values() {
-            if ids.len() < 2 {
+        for mut entries in groups.into_values() {
+            if entries.len() < 2 {
                 continue;
             }
-            ids.sort_unstable();
-            let survivor = ids.pop().expect("len >= 2 checked above");
-            for dup_id in ids {
+            // Resolve the true on-disk path casing via directory walk.
+            let real_path =
+                reconcile::resolve_case_insensitive_path(std::path::Path::new(&entries[0].1));
+            let real_path_str = real_path.as_ref().map(|p| p.to_string_lossy().to_string());
+
+            // If an entry already matches the real on-disk casing exactly, prefer it as the survivor.
+            // Otherwise, pick the entry with the highest ID (most recently scanned/inserted).
+            let exact_match_idx = if let Some(ref real_str) = real_path_str {
+                entries.iter().position(|(_, p)| p == real_str)
+            } else {
+                None
+            };
+
+            let survivor_entry = if let Some(idx) = exact_match_idx {
+                entries.remove(idx)
+            } else {
+                entries.sort_by_key(|(id, _)| *id);
+                entries.pop().expect("len >= 2 checked above")
+            };
+
+            let survivor = survivor_entry.0;
+            if let Some(ref real_str) = real_path_str {
+                if real_str != &survivor_entry.1 {
+                    tx.execute(
+                        "UPDATE songs SET path = ?1 WHERE id = ?2",
+                        rusqlite::params![real_str, survivor],
+                    )?;
+                }
+            }
+
+            for (dup_id, _) in entries {
                 reconcile::merge_song_rows(&tx, survivor, dup_id)?;
                 merged += 1;
             }
@@ -1057,6 +1092,11 @@ impl CollectionScanner {
             }
         }
         tx.commit()?;
+        drop(conn);
+
+        if let Err(e) = self.merge_duplicate_songs() {
+            log::warn!("Failed to merge duplicates after rescanning paths: {e}");
+        }
 
         Ok(())
     }
@@ -1222,6 +1262,12 @@ impl CollectionScanner {
                 Ok(0) => {}
                 Ok(n) => log::info!("Reconciled {n} moved song(s) to their new path"),
                 Err(e) => log::warn!("Failed to reconcile moved songs during scan: {e}"),
+            }
+
+            match Self::merge_duplicate_songs_conn(&conn) {
+                Ok(0) => {}
+                Ok(n) => log::info!("Merged {n} duplicate song(s) during scan"),
+                Err(e) => log::warn!("Failed to merge duplicate songs during scan: {e}"),
             }
 
             // Load every known (path -> mtime) pair in one query instead of
