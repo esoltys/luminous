@@ -15,6 +15,12 @@ export function stripEnclosingQuotes(str: string): string {
   return s;
 }
 
+/** Numeric and date fields whose value may be written as a `a..b` range. */
+const RANGE_FIELDS: ReadonlySet<string> = new Set([
+  "year", "originalyear", "bitrate", "samplerate", "sample_rate", "bitdepth", "bit_depth",
+  "bpm", "rating", "playcount", "skipcount", "added", "lastplayed", "duration", "channels",
+]);
+
 export function parseSearchRules(query: string): Rule[] {
   const rules: Rule[] = [];
   if (!query.trim()) return rules;
@@ -178,7 +184,12 @@ export function parseSearchRules(query: string): Rule[] {
         if (!hasExplicitOp) op = "contains";
       }
 
-      if (normalizedField && rawVal) {
+      const range = RANGE_FIELDS.has(normalizedField) && !hasExplicitOp ? rawVal.split("..") : [];
+      if (range.length === 2 && (range[0].trim() || range[1].trim())) {
+        // `a..b` is shorthand for `>=a` and `<=b`; either end may be open.
+        if (range[0].trim()) rules.push({ field: normalizedField, op: ">=", value: range[0].trim() });
+        if (range[1].trim()) rules.push({ field: normalizedField, op: "<=", value: range[1].trim() });
+      } else if (normalizedField && rawVal) {
         rules.push({ field: normalizedField, op, value: rawVal });
       }
     }

@@ -8,8 +8,14 @@
 //! `plays`/`play_count` both mean `playcount`). `value` may be prefixed with
 //! a comparator (`>`, `>=`, `<`, `<=`, `!=`, `=`); if omitted, the default is
 //! `=` for numeric fields and a substring `LIKE` match for text fields.
-//! Ranges aren't a single-token construct — `bpm:>=120 bpm:<=130` is two
-//! filters ANDed together, same as any two field filters. Unrecognized
+//! A numeric or date value may also be a range, `bpm:120..130`, either end
+//! optional (`added:-30d..`); it expands to the two ANDed filters
+//! `bpm:>=120 bpm:<=130`, so an inverted range simply matches nothing.
+//! `bitrate` and `samplerate` take unit suffixes: `bitrate:>=320k` (the
+//! column is kbps, and a bare value of 10000 or more is read as bps),
+//! `samplerate:96k` (96000 Hz). `format:flac` matches a container family
+//! (see [`FileType::from_token`]) and `lossless:true|false` its lossless-ness.
+//! Unrecognized
 //! fields are silently dropped (not an error) rather than falling back to a
 //! bare-term match.
 //!
@@ -26,6 +32,8 @@
 use chrono::{DateTime, Duration, Local, Months, NaiveDate, TimeZone};
 use rusqlite::types::{ToSqlOutput, Value as SqlValue};
 use rusqlite::ToSql;
+
+use crate::models::FileType;
 
 /// SQL comparison operator for a field filter. `Contains` always renders as
 /// `LIKE` — the caller is responsible for wrapping the value in `%...%`
@@ -70,6 +78,10 @@ pub enum FilterValue {
         start: i64,
         end: i64,
     },
+    /// A set of integers for `IN (...)`, e.g. the `filetype` codes of a
+    /// format family. Binds one parameter per member; go through
+    /// [`FieldFilter::push_clause`].
+    IntSet(Vec<i64>),
 }
 
 impl ToSql for FilterValue {
@@ -78,9 +90,11 @@ impl ToSql for FilterValue {
             FilterValue::Text(s) => Ok(ToSqlOutput::Owned(SqlValue::Text(s.clone()))),
             FilterValue::Int(i) => Ok(ToSqlOutput::Owned(SqlValue::Integer(*i))),
             FilterValue::Float(f) => Ok(ToSqlOutput::Owned(SqlValue::Real(*f))),
-            FilterValue::DayRange { .. } => Err(rusqlite::Error::ToSqlConversionFailure(
-                "a day range binds as two parameters; use FieldFilter::push_clause".into(),
-            )),
+            FilterValue::DayRange { .. } | FilterValue::IntSet(_) => {
+                Err(rusqlite::Error::ToSqlConversionFailure(
+                    "a multi-parameter value binds through FieldFilter::push_clause".into(),
+                ))
+            }
         }
     }
 }
@@ -114,6 +128,11 @@ impl FieldFilter {
                 params.push(Box::new(start));
                 params.push(Box::new(end));
             }
+            FilterValue::IntSet(members) => {
+                for member in members {
+                    params.push(Box::new(member));
+                }
+            }
             value => params.push(Box::new(value)),
         }
         clause
@@ -122,6 +141,13 @@ impl FieldFilter {
     /// The clause for this filter with its first parameter at `?{param_idx}`
     /// (a [`FilterValue::DayRange`] takes `param_idx` and `param_idx + 1`).
     pub fn to_sql_clause(&self, param_idx: usize) -> String {
+        if let FilterValue::IntSet(members) = &self.value {
+            let placeholders: Vec<String> = (0..members.len())
+                .map(|i| format!("?{}", param_idx + i))
+                .collect();
+            let not = if self.op == Op::Neq { "NOT " } else { "" };
+            return format!("{} {not}IN ({})", self.sql_column, placeholders.join(", "));
+        }
         if let FilterValue::DayRange { .. } = self.value {
             let col = self.sql_column;
             let inside = format!("{col} >= ?{param_idx} AND {col} < ?{}", param_idx + 1);
@@ -201,6 +227,16 @@ pub fn parse_query_at(raw_query: &str, now: DateTime<Local>) -> ParsedQuery {
     let tokens = tokenize(raw_query);
 
     for token in tokens {
+        if let Some(bounds) = expand_range(&token) {
+            let filters: Vec<FieldFilter> = bounds
+                .iter()
+                .filter_map(|bound| parse_field_filter(bound, now))
+                .collect();
+            if filters.len() == bounds.len() {
+                parsed.field_filters.extend(filters);
+                continue;
+            }
+        }
         if let Some(filter) = parse_field_filter(&token, now) {
             parsed.field_filters.push(filter);
         } else {
@@ -344,15 +380,10 @@ fn parse_op_and_raw_value(raw: &str, is_numeric: bool) -> (Op, String) {
     (op, clean.to_string())
 }
 
-fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> {
-    let colon_idx = token.find(':')?;
-    let (field_part, val_part) = token.split_at(colon_idx);
-    let field_clean = field_part.trim().to_lowercase();
-    if field_clean.is_empty() {
-        return None;
-    }
-
-    let (sql_column, is_numeric) = match field_clean.as_str() {
+/// Map a user-facing field alias to its SQL column and whether it compares
+/// numerically; `None` for anything that isn't a filterable field.
+fn resolve_field(field: &str) -> Option<(&'static str, bool)> {
+    Some(match field {
         "artist" => ("COALESCE(NULLIF(album_artist, ''), artist)", false),
         "album_artist" => ("album_artist", false),
         "album" => ("album", false),
@@ -382,12 +413,112 @@ fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> 
         "language" | "lang" => ("language", false),
         "lyrics" | "lyric" => ("lyrics", false),
         "folder" | "subfolder" | "directory" | "path" => ("path", false),
+        "format" | "codec" => ("filetype", false),
+        "lossless" => ("filetype", false),
         _ => return None,
+    })
+}
+
+/// Split a `field:a..b` range token on a numeric or date field into
+/// `field:>=a` and `field:<=b` (an empty end is dropped). `None` if the
+/// token isn't a range.
+fn expand_range(token: &str) -> Option<Vec<String>> {
+    let (field_part, val_part) = token.split_at(token.find(':')?);
+    let field = field_part.trim().to_lowercase();
+    let (column, is_numeric) = resolve_field(&field)?;
+    if !is_numeric && !is_date_column(column) {
+        return None;
+    }
+    let val = strip_enclosing_quotes(&val_part[1..]);
+    if val.starts_with(['>', '<', '=', '!']) {
+        return None;
+    }
+    let (lo, hi) = val.split_once("..")?;
+    let (lo, hi) = (lo.trim(), hi.trim());
+    let mut bounds = Vec::new();
+    if !lo.is_empty() {
+        bounds.push(format!("{field}:>={lo}"));
+    }
+    if !hi.is_empty() {
+        bounds.push(format!("{field}:<={hi}"));
+    }
+    (!bounds.is_empty()).then_some(bounds)
+}
+
+/// Read a `bitrate`/`samplerate` value with an optional unit. `bitrate` is
+/// stored in kbps (`320`, `320k`, `320 kbps`; a bare value of 10000 or more
+/// is taken as bps), `samplerate` in Hz (`96000`, `96k`, `44.1khz`, `48000hz`).
+fn parse_quantity(raw: &str, sql_column: &str) -> Option<i64> {
+    let lower = raw.trim().to_lowercase();
+    let (number, kilo) = if let Some(n) = lower.strip_suffix("kbps").or(lower.strip_suffix("khz")) {
+        (n, true)
+    } else if let Some(n) = lower.strip_suffix("hz") {
+        (n, false)
+    } else if let Some(n) = lower.strip_suffix('k') {
+        (n, true)
+    } else {
+        (lower.as_str(), false)
     };
+    let value: f64 = number.trim().parse().ok()?;
+    if !value.is_finite() || value < 0.0 {
+        return None;
+    }
+    let scaled = match (sql_column, kilo) {
+        ("samplerate", true) => value * 1000.0,
+        ("bitrate", false) if value >= 10_000.0 => value / 1000.0,
+        _ => value,
+    };
+    Some(scaled.round() as i64)
+}
+
+/// Resolve a `format:` / `lossless:` value to the `filetype` codes it
+/// selects and whether the filter should negate (`lossless:false`).
+fn parse_filetype_filter(field: &str, raw: &str, op: &Op) -> Option<(Op, FilterValue)> {
+    let (types, negate) = if field == "lossless" {
+        let lossless = match raw.to_lowercase().as_str() {
+            "true" | "yes" | "1" => true,
+            "false" | "no" | "0" => false,
+            _ => return None,
+        };
+        (FileType::lossless_types(), !lossless)
+    } else {
+        (FileType::from_token(raw), false)
+    };
+    if types.is_empty() || !matches!(op, Op::Eq | Op::Neq | Op::Contains) {
+        return None;
+    }
+    let negate = negate != (*op == Op::Neq);
+    let codes = types.into_iter().map(|t| t as i64).collect();
+    Some((
+        if negate { Op::Neq } else { Op::Eq },
+        FilterValue::IntSet(codes),
+    ))
+}
+
+fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> {
+    let colon_idx = token.find(':')?;
+    let (field_part, val_part) = token.split_at(colon_idx);
+    let field_clean = field_part.trim().to_lowercase();
+    if field_clean.is_empty() {
+        return None;
+    }
+
+    let (sql_column, is_numeric) = resolve_field(&field_clean)?;
 
     let (op, raw_val) = parse_op_and_raw_value(val_part[1..].trim(), is_numeric);
     if raw_val.is_empty() {
         return None;
+    }
+
+    if sql_column == "filetype" {
+        let (op, value) = parse_filetype_filter(&field_clean, &raw_val, &op)?;
+        return Some(FieldFilter {
+            field: field_clean,
+            sql_column,
+            is_numeric,
+            op,
+            value,
+        });
     }
 
     if is_date_column(sql_column) {
@@ -417,6 +548,8 @@ fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> 
         }
     } else if sql_column == "length_nanosec" {
         FilterValue::Int(parse_duration_ns(&raw_val)?)
+    } else if matches!(sql_column, "bitrate" | "samplerate") {
+        FilterValue::Int(parse_quantity(&raw_val, sql_column)?)
     } else if is_numeric {
         if let Ok(i) = raw_val.parse::<i64>() {
             FilterValue::Int(i)
@@ -867,6 +1000,90 @@ mod tests {
         assert_eq!(
             ids("lastplayed:>=2026-06-01 lastplayed:<=2026-06-10"),
             vec![3]
+        );
+    }
+
+    fn technical_ids(query: &str) -> Vec<i64> {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE songs (id INTEGER, filetype INTEGER, bitrate INTEGER, samplerate INTEGER, year INTEGER, added INTEGER)",
+            [],
+        )
+        .unwrap();
+        let now = at(2026, 6, 15, 12);
+        let day = |y, m, d| day_start(y, m, d) + 60;
+        // 1: MP3 320k, 2: FLAC 96k, 3: ALAC 44.1k, 4: Opus 128k, 5: WAV
+        for (id, ft, br, sr, yr, added) in [
+            (1, 1, 320, 44100, 1975, day(2026, 6, 10)),
+            (2, 2, 2400, 96000, 1985, day(2025, 12, 1)),
+            (3, 8, 900, 44100, 1979, day(2026, 1, 1)),
+            (4, 5, 128, 48000, 2020, day(2026, 6, 14)),
+            (5, 10, 1411, 44100, 1970, day(2024, 1, 1)),
+        ] {
+            conn.execute(
+                "INSERT INTO songs VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                rusqlite::params![id, ft, br, sr, yr, added],
+            )
+            .unwrap();
+        }
+        let mut params: Vec<Box<dyn ToSql>> = Vec::new();
+        let clauses: Vec<String> = parse_query_at(query, now)
+            .field_filters
+            .into_iter()
+            .map(|f| f.push_clause(&mut params))
+            .collect();
+        let sql = format!(
+            "SELECT id FROM songs WHERE {} ORDER BY id",
+            clauses.join(" AND ")
+        );
+        let refs: Vec<&dyn ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let mut stmt = conn.prepare(&sql).unwrap();
+        let rows = stmt.query_map(refs.as_slice(), |r| r.get(0)).unwrap();
+        rows.map(|r| r.unwrap()).collect()
+    }
+
+    #[test]
+    fn format_and_lossless_select_filetypes() {
+        assert_eq!(technical_ids("format:flac"), vec![2]);
+        assert_eq!(technical_ids("format:FLAC"), vec![2]);
+        assert_eq!(technical_ids("format:m4a"), vec![3]);
+        assert_eq!(technical_ids("format:!=mp3"), vec![2, 3, 4, 5]);
+        assert_eq!(technical_ids("lossless:true"), vec![2, 3, 5]);
+        assert_eq!(technical_ids("lossless:false"), vec![1, 4]);
+        // An unknown format is not a filter; it degrades to a bare term.
+        let q = parse_query("format:nonsense");
+        assert!(q.field_filters.is_empty());
+        assert_eq!(q.bare_terms, vec!["format:nonsense"]);
+        assert!(parse_query("lossless:maybe").field_filters.is_empty());
+    }
+
+    #[test]
+    fn bitrate_and_samplerate_accept_units() {
+        assert_eq!(technical_ids("bitrate:>=320k"), vec![1, 2, 3, 5]);
+        assert_eq!(technical_ids("bitrate:\"<=192 kbps\""), vec![4]);
+        assert_eq!(technical_ids("bitrate:320000"), vec![1]);
+        assert_eq!(technical_ids("bitrate:128"), vec![4]);
+        assert_eq!(technical_ids("samplerate:>=96k"), vec![2]);
+        assert_eq!(technical_ids("samplerate:44.1k"), vec![1, 3, 5]);
+        assert_eq!(technical_ids("samplerate:48000hz"), vec![4]);
+        assert!(parse_query("bitrate:fast").field_filters.is_empty());
+    }
+
+    #[test]
+    fn ranges_expand_to_bounds() {
+        assert_eq!(technical_ids("year:1970..1979"), vec![1, 3, 5]);
+        assert_eq!(technical_ids("year:1980.."), vec![2, 4]);
+        assert_eq!(technical_ids("year:..1975"), vec![1, 5]);
+        assert_eq!(technical_ids("bitrate:128k..320k"), vec![1, 4]);
+        assert_eq!(technical_ids("added:-30d.."), vec![1, 4]);
+        assert_eq!(technical_ids("added:-1y..-6m"), vec![2]);
+        assert!(technical_ids("year:1990..1980").is_empty());
+        // Text fields never read `..` as a range.
+        let q = parse_query("album:Wait..Now");
+        assert_eq!(q.field_filters.len(), 1);
+        assert_eq!(
+            q.field_filters[0].value,
+            FilterValue::Text("%Wait..Now%".to_string())
         );
     }
 }

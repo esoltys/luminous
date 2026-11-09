@@ -2632,6 +2632,8 @@ export const ru = {
     fieldKey: "Тональность",
     fieldSampleRate: "Частота дискретизации (Гц)",
     fieldBitDepth: "Разрядность",
+    fieldFormat: "Формат",
+    fieldLossless: "Без потерь",
     fieldChannels: "Каналы",
     fieldAdded: "Дата добавления",
     fieldOriginalYear: "Исходный год",

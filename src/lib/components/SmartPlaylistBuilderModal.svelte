@@ -200,6 +200,8 @@
     { key: "bitrate", label: i18n.t("smartPlaylistBuilder.fieldBitrate", {}, "Bitrate"), type: "number" },
     { key: "samplerate", label: i18n.t("smartPlaylistBuilder.fieldSampleRate", {}, "Sample Rate (Hz)"), type: "number" },
     { key: "bitdepth", label: i18n.t("smartPlaylistBuilder.fieldBitDepth", {}, "Bit Depth"), type: "number" },
+    { key: "format", label: i18n.t("smartPlaylistBuilder.fieldFormat", {}, "Format"), type: "text" },
+    { key: "lossless", label: i18n.t("smartPlaylistBuilder.fieldLossless", {}, "Lossless"), type: "boolean" },
     { key: "channels", label: i18n.t("smartPlaylistBuilder.fieldChannels", {}, "Channels"), type: "number" },
     { key: "compilation", label: i18n.t("smartPlaylistBuilder.fieldCompilation", {}, "Compilation"), type: "boolean" },
     { key: "duration", label: i18n.t("smartPlaylistBuilder.fieldDuration", {}, "Duration (MM:SS or Sec)"), type: "text" },
@@ -461,7 +463,7 @@
                     id="rule-toggle-{rule.id}"
                     checked={rule.value.trim() === "1"}
                     onchange={(checked) => { rule.value = checked ? "1" : "0"; }}
-                    label={i18n.t("smartPlaylistBuilder.fieldCompilation", {}, "Compilation")}
+                    label={availableFields.find((f) => f.key === rule.field)?.label ?? ""}
                   />
                 </div>
               {:else if fieldType === "date"}

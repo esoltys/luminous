@@ -2454,6 +2454,8 @@ export const de = {
     fieldKey: "Tonart",
     fieldSampleRate: "Abtastrate (Hz)",
     fieldBitDepth: "Bittiefe",
+    fieldFormat: "Format",
+    fieldLossless: "Verlustfrei",
     fieldChannels: "Kanäle",
     fieldAdded: "Hinzugefügt am",
     fieldOriginalYear: "Originaljahr",
