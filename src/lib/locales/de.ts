@@ -2773,6 +2773,8 @@ export const de = {
     shelfProvenanceTitle: "Hinweise zur Audio-Herkunft",
     shelfProvenanceHint: "Verlustfreie Titel mit Verdacht auf verlustbehaftete Transkodierung oder Upsampling.",
     shelfProvenanceBadge: "Verdacht auf Transkodierung",
+    shelfCorruptTitle: "Beschädigte und unlesbare Audiodateien",
+    shelfCorruptHint: "Titel mit Fehlern bei der Stream-Dekodierung, Container-Überprüfung oder Prüfsummenvalidierung",
     showAllWithCount: "Alle anzeigen ({count})",
     showLess: "Weniger anzeigen"
   }

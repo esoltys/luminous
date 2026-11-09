@@ -2773,6 +2773,8 @@ export const it = {
     shelfProvenanceTitle: "Avvisi di provenienza audio",
     shelfProvenanceHint: "Tracce lossless segnalate per sospetta transcodifica con perdita o sovracampionamento.",
     shelfProvenanceBadge: "Sospetta transcodifica",
+    shelfCorruptTitle: "File audio corrotti o illeggibili",
+    shelfCorruptHint: "Tracce con errori di decodifica del flusso, verifica del contenitore o convalida del checksum",
     showAllWithCount: "Mostra tutto ({count})",
     showLess: "Mostra meno"
   }

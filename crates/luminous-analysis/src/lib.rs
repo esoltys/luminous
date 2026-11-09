@@ -3,9 +3,12 @@
 //!
 //! Must never depend on Tauri, SQLite, reqwest, or Tokio (#1765, epic #1762).
 
+pub mod integrity;
 pub mod loudness;
 pub mod provenance;
 pub mod visualizer;
+
+pub use integrity::{verify_audio_file, IntegrityVerdict};
 
 pub use loudness::{
     analyze_integrated_loudness, analyze_integrated_loudness_file, compute_gain, GainResult,

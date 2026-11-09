@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 76;
+pub const CURRENT_SCHEMA_VERSION: i32 = 77;
 
 struct Migration {
     version: i32,
@@ -724,6 +724,23 @@ const MIGRATIONS: &[Migration] = &[
                     batch_id TEXT
                 );
                 CREATE INDEX IF NOT EXISTS idx_song_history_song_at ON song_history(song_id, at);",
+            )?;
+            Ok(())
+        },
+    },
+    Migration {
+        version: 77,
+        description: "song_integrity: structural and container audio verification results (#1938)",
+        apply: |conn| {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS song_integrity (
+                    song_id      INTEGER PRIMARY KEY REFERENCES songs(id) ON DELETE CASCADE,
+                    mtime        INTEGER NOT NULL,
+                    status       TEXT NOT NULL,
+                    error_detail TEXT,
+                    verified_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_song_integrity_status ON song_integrity(status);",
             )?;
             Ok(())
         },
@@ -4686,6 +4703,69 @@ mod tests {
         assert_eq!(
             count_after, 0,
             "cascade delete should remove song_history records"
+        );
+    }
+
+    #[test]
+    fn test_migration_77_creates_song_integrity_table() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration77_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        let has_table: bool = conn
+            .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'song_integrity'")
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(has_table, "song_integrity table should exist");
+
+        let has_index: bool = conn
+            .prepare(
+                "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_song_integrity_status'",
+            )
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(has_index, "idx_song_integrity_status index should exist");
+
+        // Verify foreign key cascade delete
+        conn.execute(
+            "INSERT INTO songs (path, title, source, mtime) VALUES ('/integrity.flac', 'Integrity Test', 2, 1000)",
+            [],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO song_integrity (song_id, mtime, status, error_detail)
+             VALUES (?1, 1000, 'corrupt', 'Truncated stream')",
+            params![song_id],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM song_integrity WHERE song_id = ?1",
+                params![song_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+
+        conn.execute("DELETE FROM songs WHERE id = ?1", params![song_id])
+            .unwrap();
+        let count_after: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM song_integrity WHERE song_id = ?1",
+                params![song_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            count_after, 0,
+            "cascade delete should remove song_integrity records"
         );
     }
 

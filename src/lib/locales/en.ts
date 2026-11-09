@@ -2773,6 +2773,8 @@ export const en = {
     shelfProvenanceTitle: "Audio Provenance Notices",
     shelfProvenanceHint: "Lossless tracks flagged with suspected lossy transcode or upsampling characteristics.",
     shelfProvenanceBadge: "Suspected Transcode",
+    shelfCorruptTitle: "Corrupted & Unreadable Audio",
+    shelfCorruptHint: "Tracks failing stream decoding, container verification, or checksum validation",
     showAllWithCount: "Show all ({count})",
     showLess: "Show less"
   }

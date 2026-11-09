@@ -2971,6 +2971,8 @@ export const ru = {
     shelfProvenanceTitle: "Уведомления о подлинности аудио",
     shelfProvenanceHint: "Lossless-треки с подозрением на пережатие из сжатых форматов или искусственный апсемплинг.",
     shelfProvenanceBadge: "Подозрение на пережатие",
+    shelfCorruptTitle: "Поврежденные и нечитаемые аудиофайлы",
+    shelfCorruptHint: "Треки с ошибками декодирования потока, проверки контейнера или контрольной суммы",
     showAllWithCount: "Показать все ({count})",
     showLess: "Показать меньше"
   }

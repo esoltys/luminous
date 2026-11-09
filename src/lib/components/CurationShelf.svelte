@@ -81,20 +81,24 @@
     fetchOverview();
   });
 
-  // Listen for backend library updates (file scan, retagging, pruning)
+  // Listen for backend library updates (file scan, retagging, pruning, integrity changes)
   $effect(() => {
     events.listen("library-changed", () => {
       fetchOverview();
     });
+    events.listen("song-integrity-changed", () => {
+      fetchOverview();
+    });
   });
 
-  // Derived total attention count across all 5 curation categories
+  // Derived total attention count across all 6 curation categories
   let totalCount = $derived(
     (overview?.unillustrated_albums.length ?? 0) +
       (overview?.incomplete_albums.length ?? 0) +
       (overview?.missing_core_tags_count ?? 0) +
       (overview?.duplicate_groups.length ?? 0) +
-      (overview?.suspected_provenance_songs.length ?? 0)
+      (overview?.suspected_provenance_songs.length ?? 0) +
+      (overview?.corrupt_songs?.length ?? 0)
   );
 
   // Sync bindable totalCurationCount to parent OrganizeView
@@ -369,6 +373,58 @@
                   </span>
                   <span class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap">
                     {song.provenance || i18n.t("curation.shelfProvenanceBadge")}
+                  </span>
+                </div>
+                <p class="text-xs text-brand-text-secondary truncate mt-0.5">
+                  {song.artist || i18n.t("collection.unknownArtist")}
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onclick={() => locateInFiles(song.id)}
+              >
+                <Folder class="w-3.5 h-3.5" />
+                <span>{i18n.t("curation.viewInFiles")}</span>
+              </Button>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    <!-- Category 6: Corrupted / Unreadable Audio (#1938) -->
+    {#if overview.corrupt_songs && overview.corrupt_songs.length > 0}
+      <div
+        class="bg-brand-sidebar/40 border border-brand-border/60 rounded-xl p-4 space-y-3"
+        data-testid="curation-corrupt-section"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-bold text-brand-text-primary">
+                {i18n.t("curation.shelfCorruptTitle")}
+              </h3>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text font-semibold">
+                {overview.corrupt_songs.length}
+              </span>
+            </div>
+            <p class="text-xs text-brand-text-secondary mt-0.5">
+              {i18n.t("curation.shelfCorruptHint")}
+            </p>
+          </div>
+        </div>
+
+        <div class="divide-y divide-brand-border/40">
+          {#each overview.corrupt_songs as song (song.id)}
+            <div class="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium text-brand-text-primary truncate">
+                    {song.title || i18n.t("collection.unknownTitle")}
+                  </span>
+                  <span class="text-xs px-2 py-0.5 rounded-full border border-red-500/30 bg-red-500/10 text-red-400 font-medium whitespace-nowrap">
+                    {song.error_detail}
                   </span>
                 </div>
                 <p class="text-xs text-brand-text-secondary truncate mt-0.5">
