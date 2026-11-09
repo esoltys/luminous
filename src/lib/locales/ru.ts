@@ -1740,7 +1740,6 @@ export const ru = {
     restoreBatchBtn: "Восстановить всё",
     restoreBatchTooltip: "Восстановить все песни, изменённые в этом редактировании",
     restoreAlreadyCurrent: "Значение тега уже актуально",
-    currentValuePrefix: "Текущее",
     restoreSuccess: '«{field}» восстановлено до «{value}»',
     restoreBatchSuccess: "Восстановлены теги для {count} песен",
     restoreBatchPartial: "Восстановлено {restored} песен, пропущено {skipped} недоступных",

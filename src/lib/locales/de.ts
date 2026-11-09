@@ -1620,7 +1620,6 @@ export const de = {
     restoreBatchBtn: "Alle wiederherstellen",
     restoreBatchTooltip: "Alle bei dieser Bearbeitung geänderten Titel wiederherstellen",
     restoreAlreadyCurrent: "Tag-Wert ist bereits aktuell",
-    currentValuePrefix: "Aktuell",
     restoreSuccess: '„{field}“ auf „{value}“ wiederhergestellt',
     restoreBatchSuccess: "Tags für {count} Titel wiederhergestellt",
     restoreBatchPartial: "{restored} Titel wiederhergestellt, {skipped} nicht verfügbare übersprungen",

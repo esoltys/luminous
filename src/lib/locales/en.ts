@@ -1620,7 +1620,6 @@ export const en = {
     restoreBatchBtn: "Restore All",
     restoreBatchTooltip: "Restore all songs changed in this edit",
     restoreAlreadyCurrent: "Tag value is already current",
-    currentValuePrefix: "Current",
     restoreSuccess: 'Restored {field} to "{value}"',
     restoreBatchSuccess: "Restored tags for {count} songs",
     restoreBatchPartial: "Restored {restored} songs, skipped {skipped} unavailable",

@@ -1506,9 +1506,6 @@ pub async fn restore_tag_history(
             {
                 let _ = app.emit("auto-organize-result", &auto_res);
             }
-            if auto_res.moved_count > 0 {
-                let _ = app.emit("library-changed", ());
-            }
         }
         let _ = app.emit("library-changed", ());
     }

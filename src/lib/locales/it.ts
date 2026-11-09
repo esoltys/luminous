@@ -1620,7 +1620,6 @@ export const it = {
     restoreBatchBtn: "Ripristina tutto",
     restoreBatchTooltip: "Ripristina tutti i brani modificati in questa modifica",
     restoreAlreadyCurrent: "Il valore del tag è già attuale",
-    currentValuePrefix: "Attuale",
     restoreSuccess: '«{field}» ripristinato a «{value}»',
     restoreBatchSuccess: "Tag ripristinati per {count} brani",
     restoreBatchPartial: "{restored} brani ripristinati, {skipped} non disponibili saltati",

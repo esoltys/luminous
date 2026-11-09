@@ -1740,7 +1740,6 @@ export const uk = {
     restoreBatchBtn: "Відновити все",
     restoreBatchTooltip: "Відновити всі пісні, змінені в цьому редагуванні",
     restoreAlreadyCurrent: "Значення тегу вже актуальне",
-    currentValuePrefix: "Поточне",
     restoreSuccess: '«{field}» відновлено до «{value}»',
     restoreBatchSuccess: "Відновлено теги для {count} пісень",
     restoreBatchPartial: "Відновлено {restored} пісень, пропущено {skipped} недоступних",

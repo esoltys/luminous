@@ -1620,7 +1620,6 @@ export const es = {
     restoreBatchBtn: "Restaurar todo",
     restoreBatchTooltip: "Restaurar todas las canciones modificadas en esta edición",
     restoreAlreadyCurrent: "El valor de la etiqueta ya es el actual",
-    currentValuePrefix: "Actual",
     restoreSuccess: '«{field}» restaurado a «{value}»',
     restoreBatchSuccess: "Etiquetas restauradas para {count} canciones",
     restoreBatchPartial: "{restored} canciones restauradas, {skipped} no disponibles omitidas",

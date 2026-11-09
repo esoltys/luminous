@@ -1696,7 +1696,6 @@ export const fr: DeepStringRecord<typeof en> = {
     restoreBatchBtn: "Tout rétablir",
     restoreBatchTooltip: "Rétablir toutes les chansons modifiées lors de cette édition",
     restoreAlreadyCurrent: "La valeur de l'étiquette est déjà actuelle",
-    currentValuePrefix: "Actuelle",
     restoreSuccess: '« {field} » rétabli à « {value} »',
     restoreBatchSuccess: "Étiquettes rétablies pour {count} chansons",
     restoreBatchPartial: "{restored} chansons rétablies, {skipped} non disponibles ignorées",
