@@ -129,6 +129,10 @@ async fn test_rescan_folders_indexes_audio_files() {
     );
     assert_eq!(results_alpha[0].title.as_deref(), Some("Song Alpha"));
 
+    // A negative limit means "no limit" (the search command's default).
+    let unlimited = env.scanner.search_songs("", -1).expect("search failed");
+    assert_eq!(unlimited.len(), 2, "limit -1 must return every song");
+
     let results_silver = env
         .scanner
         .search_songs("Silver", 10)

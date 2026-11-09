@@ -2462,6 +2462,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     fieldKey: "Tonalité",
     fieldSampleRate: "Fréquence d'échantillonnage (Hz)",
     fieldBitDepth: "Profondeur de bits",
+    fieldFormat: "Format",
+    fieldLossless: "Sans perte",
     fieldChannels: "Canaux",
     fieldAdded: "Date d'ajout",
     fieldOriginalYear: "Année d'origine",

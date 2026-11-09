@@ -149,3 +149,31 @@ describe("parseSearchRules", () => {
     ]);
   });
 });
+
+describe("technical predicates", () => {
+  it("passes format and lossless through as rules", () => {
+    expect(parseSearchRules("format:flac lossless:true")).toEqual([
+      { field: "format", op: "=", value: "flac" },
+      { field: "lossless", op: "=", value: "true" },
+    ]);
+  });
+
+  it("expands a..b ranges into two bounds, either end optional", () => {
+    expect(parseSearchRules("year:1970..1979")).toEqual([
+      { field: "year", op: ">=", value: "1970" },
+      { field: "year", op: "<=", value: "1979" },
+    ]);
+    expect(parseSearchRules("added:-30d..")).toEqual([
+      { field: "added", op: ">=", value: "-30d" },
+    ]);
+    expect(parseSearchRules("bitrate:..192k")).toEqual([
+      { field: "bitrate", op: "<=", value: "192k" },
+    ]);
+  });
+
+  it("leaves text fields and explicit comparators alone", () => {
+    expect(parseSearchRules("album:Wait..Now")).toEqual([
+      { field: "album", op: "contains", value: "Wait..Now" },
+    ]);
+  });
+});

@@ -301,7 +301,9 @@ pub async fn search_songs(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let limit = limit.unwrap_or(500);
+    // No limit unless the caller asks for one: a capped result silently drops
+    // matches of broad queries like `lossless:true` (SQLite: LIMIT -1 = all).
+    let limit = limit.unwrap_or(-1);
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
         scanner.search_songs(&query, limit)
     })

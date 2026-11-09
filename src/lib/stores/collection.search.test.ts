@@ -37,7 +37,7 @@ describe("CollectionStore - search and tag filtering", () => {
 
   it("executes FTS search and updates search results and loading state", async () => {
     await collectionStore.search("Rock");
-    expect(invoke).toHaveBeenCalledWith("search_songs", { query: "Rock", limit: 500 });
+    expect(invoke).toHaveBeenCalledWith("search_songs", { query: "Rock" });
     expect(collectionStore.searchQuery).toBe("Rock");
     expect(collectionStore.searchResults).toHaveLength(1);
     expect(collectionStore.searchResults[0].title).toBe("Rock Track 1");

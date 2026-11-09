@@ -205,6 +205,69 @@ impl From<i64> for FileType {
 }
 
 impl FileType {
+    /// Every container family `format:` can name, as the file extensions and
+    /// codec names a person would type, in lowercase. One token can select
+    /// several types (`m4a` is AAC and ALAC, `flac` includes Ogg FLAC).
+    const TOKENS: &'static [(&'static str, &'static [FileType])] = &[
+        ("mp3", &[FileType::Mp3]),
+        ("flac", &[FileType::Flac, FileType::OggFlac]),
+        (
+            "ogg",
+            &[
+                FileType::OggVorbis,
+                FileType::OggOpus,
+                FileType::OggFlac,
+                FileType::OggSpeex,
+            ],
+        ),
+        ("vorbis", &[FileType::OggVorbis]),
+        ("opus", &[FileType::OggOpus]),
+        ("speex", &[FileType::OggSpeex]),
+        ("aac", &[FileType::Aac]),
+        ("m4a", &[FileType::Aac, FileType::Alac]),
+        ("alac", &[FileType::Alac]),
+        ("aiff", &[FileType::Aiff]),
+        ("aif", &[FileType::Aiff]),
+        ("wav", &[FileType::Wav]),
+        ("wavpack", &[FileType::WavPack]),
+        ("wv", &[FileType::WavPack]),
+        ("mpc", &[FileType::Mpc]),
+        ("musepack", &[FileType::Mpc]),
+        ("tta", &[FileType::TrueAudio]),
+        ("ape", &[FileType::Ape]),
+        ("dsf", &[FileType::Dsf]),
+        ("dff", &[FileType::Dsdiff]),
+        ("dsdiff", &[FileType::Dsdiff]),
+        ("dsd", &[FileType::Dsf, FileType::Dsdiff]),
+        ("wma", &[FileType::Asf]),
+        ("asf", &[FileType::Asf]),
+    ];
+
+    /// The file types a `format:` token selects (case-insensitive); empty
+    /// when the token names nothing.
+    pub fn from_token(token: &str) -> Vec<FileType> {
+        let token = token.trim().to_lowercase();
+        Self::TOKENS
+            .iter()
+            .find(|(name, _)| *name == token)
+            .map(|(_, types)| types.to_vec())
+            .unwrap_or_default()
+    }
+
+    /// Every type nameable by a `format:` token for which
+    /// [`FileType::is_lossless`] holds. Derived from the token table so the
+    /// two cannot drift; a type with no token can't be searched by format
+    /// anyway.
+    pub fn lossless_types() -> Vec<FileType> {
+        let mut types: Vec<FileType> = Vec::new();
+        for &t in Self::TOKENS.iter().flat_map(|(_, types)| types.iter()) {
+            if t.is_lossless() && !types.contains(&t) {
+                types.push(t);
+            }
+        }
+        types
+    }
+
     pub fn is_lossless(&self) -> bool {
         matches!(
             self,

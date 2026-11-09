@@ -2632,6 +2632,8 @@ export const uk = {
     fieldKey: "Тональність",
     fieldSampleRate: "Частота дискретизації (Гц)",
     fieldBitDepth: "Розрядність",
+    fieldFormat: "Формат",
+    fieldLossless: "Без втрат",
     fieldChannels: "Канали",
     fieldAdded: "Дата додавання",
     fieldOriginalYear: "Рік оригіналу",

@@ -2454,6 +2454,8 @@ export const it = {
     fieldKey: "Tonalità",
     fieldSampleRate: "Frequenza di campionamento (Hz)",
     fieldBitDepth: "Profondità di bit",
+    fieldFormat: "Formato",
+    fieldLossless: "Senza perdita",
     fieldChannels: "Canali",
     fieldAdded: "Data di aggiunta",
     fieldOriginalYear: "Anno originale",

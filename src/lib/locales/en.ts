@@ -2454,6 +2454,8 @@ export const en = {
     fieldKey: "Key",
     fieldSampleRate: "Sample Rate (Hz)",
     fieldBitDepth: "Bit Depth",
+    fieldFormat: "Format",
+    fieldLossless: "Lossless",
     fieldChannels: "Channels",
     fieldAdded: "Date Added",
     fieldOriginalYear: "Original Year",

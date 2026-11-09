@@ -378,11 +378,14 @@
         <div class="tr"><code>samplerate / sample_rate</code><div>nombre</div><div>Fréquence d'échantillonnage (Hz)</div></div>
         <div class="tr"><code>bitdepth / bit_depth</code><div>nombre</div><div>Profondeur de bits</div></div>
         <div class="tr"><code>channels</code><div>nombre</div><div>Nombre de canaux</div></div>
+        <div class="tr"><code>format</code><div>texte</div><div>Format audio (p. ex. <code>flac</code>, <code>mp3</code>, <code>m4a</code>, <code>opus</code>)</div></div>
+        <div class="tr"><code>lossless</code><div>true/false</div><div>Formats sans perte seulement (<code>true</code>) ou avec perte seulement (<code>false</code>)</div></div>
         <div class="tr"><code>compilation</code><div>0/1</div><div>Indicateur de compilation</div></div>
         <div class="tr"><code>duration / length</code><div>durée</div><div>Longueur de la piste — voir ci-dessous</div></div>
       </div>
       <p class="mb-28"><code>duration</code> accepte des secondes (<code>duration:&gt;180</code>), <code>MM:SS</code> (<code>duration:&gt;3:30</code>) ou <code>H:MM:SS</code> (<code>duration:&lt;1:02:03</code>).</p>
       <p class="mb-28"><code>added</code> et <code>lastplayed</code> acceptent une date (<code>added:&gt;=2026-01-31</code>) ou une durée comptée à rebours à partir d'aujourd'hui : <code>-30d</code>, <code>-2w</code>, <code>-6m</code>, <code>-1y</code> (jours, semaines, mois, ans). <code>&gt;=</code> commence au début de la journée, <code>&lt;=</code> va jusqu'à la fin de celle-ci, et <code>=</code> correspond à n'importe quel moment de cette journée. <code>added:&gt;=-30d</code> signifie toujours les 30 derniers jours. Une chanson jamais écoutée est considérée comme plus ancienne que n'importe quelle date; <code>lastplayed:&lt;-1y</code> l'inclut donc.</p>
+      <p class="mb-28"><code>bitrate</code> et <code>samplerate</code> acceptent des unités : <code>bitrate:&gt;=320k</code> (kb/s), <code>samplerate:&gt;=96k</code> (96 000 Hz). Tout champ numérique ou de date accepte aussi une plage, dont l’une des bornes est facultative : <code>year:1970..1979</code>, <code>bitrate:128k..256k</code>, <code>added:-30d..</code>. Une plage dont le début dépasse la fin ne correspond à rien.</p>
       <h2>Enregistrer une recherche comme liste intelligente</h2>
       <p class="mb-28">Dès que votre recherche contient un terme <code>field:value</code>, cliquez sur <b>Ouvrir le créateur →</b> dans le menu. Chaque terme devient une règle; ajoutez-en d'autres, nommez la liste et enregistrez-la.</p>
       <h2>Exemples</h2>
@@ -396,6 +399,8 @@
         <div class="tr"><div>Pistes de plus de 3:30</div><code>duration:&gt;3:30</code></div>
         <div class="tr"><div>Ajoutées dans les 30 derniers jours</div><code>added:&gt;=-30d</code></div>
         <div class="tr"><div>Non écoutées depuis un an (ou jamais)</div><code>lastplayed:&lt;-1y</code></div>
+        <div class="tr"><div>Fichiers sans perte à 96 kHz ou plus</div><code>lossless:true samplerate:&gt;=96k</code></div>
+        <div class="tr"><div>Pistes des années 1970</div><code>year:1970..1979</code></div>
       </div>
     </section>
 
