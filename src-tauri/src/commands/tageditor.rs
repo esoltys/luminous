@@ -1420,3 +1420,98 @@ pub async fn clear_song_tag_history(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     crate::tag_history::clear_song_history(&conn, song_id)
 }
+
+#[tauri::command]
+pub async fn restore_tag_history(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    target: crate::tag_history::RestoreTarget,
+) -> Result<crate::tag_history::RestoreTagHistoryResult, String> {
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+
+    let db = Arc::clone(&state.db);
+    let self_writes = Arc::clone(&state.self_writes);
+    let cover_manager = Arc::clone(&state.cover_manager);
+    let watcher_paused = Arc::clone(&state.watcher_paused);
+
+    let (result, restored_ids) = tauri::async_runtime::spawn_blocking(move || {
+        let conn = db.pool.get().map_err(|e| e.to_string())?;
+        let plan = crate::tag_history::resolve_restore_plan(&conn, &target)?;
+
+        let restore_batch_id = crate::tag_history::new_batch_id();
+        let mut restored_tracks = 0;
+        let mut unchanged_tracks = 0;
+        let mut skipped_tracks = 0;
+        let mut errors = Vec::new();
+        let mut restored_ids = Vec::new();
+
+        for (song_id, fields) in plan {
+            if let Ok(path_str) = conn.query_row(
+                "SELECT path FROM songs WHERE id = ?1",
+                rusqlite::params![song_id],
+                |r| r.get::<_, String>(0),
+            ) {
+                self_writes.mark_written(std::iter::once(std::path::PathBuf::from(&path_str)));
+            }
+
+            match crate::tag_history::restore_song_tags(
+                &conn,
+                song_id,
+                &fields,
+                Some(&restore_batch_id),
+                true,
+            ) {
+                Ok(crate::tag_history::RestoreSongOutcome::Restored) => {
+                    restored_tracks += 1;
+                    restored_ids.push(song_id);
+                }
+                Ok(crate::tag_history::RestoreSongOutcome::Unchanged) => {
+                    unchanged_tracks += 1;
+                }
+                Ok(crate::tag_history::RestoreSongOutcome::Skipped(reason)) => {
+                    skipped_tracks += 1;
+                    errors.push(reason);
+                }
+                Err(e) => {
+                    skipped_tracks += 1;
+                    errors.push(e);
+                }
+            }
+        }
+
+        Ok::<_, String>((
+            crate::tag_history::RestoreTagHistoryResult {
+                restored_tracks,
+                unchanged_tracks,
+                skipped_tracks,
+                errors,
+            },
+            restored_ids,
+        ))
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+
+    if !restored_ids.is_empty() {
+        if let Ok(auto_res) = crate::organizer::auto_organize_song_ids(
+            &state.db,
+            &watcher_paused,
+            &state.self_writes,
+            Some(&cover_manager),
+            &restored_ids,
+        ) {
+            if auto_res.moved_count > 0
+                || auto_res.duplicates_count > 0
+                || !auto_res.errors.is_empty()
+            {
+                let _ = app.emit("auto-organize-result", &auto_res);
+            }
+            if auto_res.moved_count > 0 {
+                let _ = app.emit("library-changed", ());
+            }
+        }
+        let _ = app.emit("library-changed", ());
+    }
+
+    Ok(result)
+}

@@ -524,4 +524,222 @@ describe("TagEditor.svelte", () => {
     });
     expect(await findByText("promo spam")).toBeInTheDocument();
   });
+
+  it("renders Restore button on entries and Restore Batch button on batch entries", async () => {
+    const historyWithBatch: SongTagHistory = {
+      songId: 10,
+      source: {
+        path: "/music/rock/song.flac",
+        filesize: 12582912,
+        format: "FLAC",
+        added: 1700000000,
+        isRemote: false,
+        isCueTrack: false,
+      },
+      entries: [
+        {
+          id: 101,
+          songId: 10,
+          at: 1700001000,
+          actor: "luminous",
+          field: "album",
+          oldValue: "Old Album",
+          newValue: "Original Album",
+          batchId: "batch-42",
+          batchOtherTracks: 3,
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return mockSongDetails;
+      if (cmd === "get_song_tag_history") return historyWithBatch;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const { findByText, getByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await findByText("History");
+    expect(getByText("Restore")).toBeInTheDocument();
+    expect(getByText("Restore Batch")).toBeInTheDocument();
+  });
+
+  it("invokes restore_tag_history when Restore button is clicked", async () => {
+    const historyEntry: SongTagHistory = {
+      songId: 10,
+      source: {
+        path: "/music/rock/song.flac",
+        filesize: 12582912,
+        format: "FLAC",
+        added: 1700000000,
+        isRemote: false,
+        isCueTrack: false,
+      },
+      entries: [
+        {
+          id: 102,
+          songId: 10,
+          at: 1700001000,
+          actor: "luminous",
+          field: "album",
+          oldValue: "Previous Album",
+          newValue: "Original Album",
+          batchId: null,
+          batchOtherTracks: 0,
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return mockSongDetails;
+      if (cmd === "get_song_tag_history") return historyEntry;
+      if (cmd === "restore_tag_history") {
+        return { restoredTracks: 1, unchangedTracks: 0, skippedTracks: 0, errors: [] };
+      }
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const { findByText, getByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await findByText("History");
+
+    const restoreBtn = getByText("Restore");
+    await fireEvent.click(restoreBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("restore_tag_history", {
+        target: { type: "entry", historyId: 102 },
+      });
+    });
+  });
+
+  it("invokes restore_tag_history when Restore Batch button is clicked", async () => {
+    const historyWithBatch: SongTagHistory = {
+      songId: 10,
+      source: {
+        path: "/music/rock/song.flac",
+        filesize: 12582912,
+        format: "FLAC",
+        added: 1700000000,
+        isRemote: false,
+        isCueTrack: false,
+      },
+      entries: [
+        {
+          id: 103,
+          songId: 10,
+          at: 1700001000,
+          actor: "luminous",
+          field: "album",
+          oldValue: "Previous Album",
+          newValue: "Original Album",
+          batchId: "batch-xyz",
+          batchOtherTracks: 2,
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return mockSongDetails;
+      if (cmd === "get_song_tag_history") return historyWithBatch;
+      if (cmd === "restore_tag_history") {
+        return { restoredTracks: 3, unchangedTracks: 0, skippedTracks: 0, errors: [] };
+      }
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const { findByText, getByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await findByText("History");
+
+    const restoreBatchBtn = getByText("Restore Batch");
+    await fireEvent.click(restoreBatchBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("restore_tag_history", {
+        target: { type: "batch", batchId: "batch-xyz" },
+      });
+    });
+  });
+
+  it("shows current value indicator when field has changed since that edit", async () => {
+    // Current album is "Original Album". Entry changed album from "Initial Album" to "Intermediate Album"
+    const historyEntry: SongTagHistory = {
+      songId: 10,
+      source: {
+        path: "/music/rock/song.flac",
+        filesize: 12582912,
+        format: "FLAC",
+        added: 1700000000,
+        isRemote: false,
+        isCueTrack: false,
+      },
+      entries: [
+        {
+          id: 104,
+          songId: 10,
+          at: 1700001000,
+          actor: "luminous",
+          field: "album",
+          oldValue: "Initial Album",
+          newValue: "Intermediate Album",
+          batchId: null,
+          batchOtherTracks: 0,
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return mockSongDetails;
+      if (cmd === "get_song_tag_history") return historyEntry;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const { findByText, getByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await findByText("History");
+    expect(getByText(/Current: Original Album/)).toBeInTheDocument();
+  });
+
+  it("disables Restore button when field already holds the oldValue", async () => {
+    // Current album is "Original Album". Entry has oldValue "Original Album"
+    const historyEntry: SongTagHistory = {
+      songId: 10,
+      source: {
+        path: "/music/rock/song.flac",
+        filesize: 12582912,
+        format: "FLAC",
+        added: 1700000000,
+        isRemote: false,
+        isCueTrack: false,
+      },
+      entries: [
+        {
+          id: 105,
+          songId: 10,
+          at: 1700001000,
+          actor: "luminous",
+          field: "album",
+          oldValue: "Original Album",
+          newValue: "Another Album",
+          batchId: null,
+          batchOtherTracks: 0,
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return mockSongDetails;
+      if (cmd === "get_song_tag_history") return historyEntry;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const { findByText, getByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await findByText("History");
+
+    const restoreBtn = getByText("Restore").closest("button");
+    expect(restoreBtn).toBeDisabled();
+    expect(restoreBtn).toHaveAttribute("title", "Tag value is already current");
+  });
 });
