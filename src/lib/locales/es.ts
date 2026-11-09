@@ -1602,7 +1602,22 @@ export const es = {
     clearArtConfirmTitle: "¿Quitar la carátula incrustada?",
     clearArtConfirmMessage: "Esto quita del propio archivo la carátula incrustada. La canción usará la imagen de la carpeta o una imagen de marcador de posición.",
     clearArtSuccess: "Carátula incrustada quitada",
-    clearArtFailedPrefix: "No se pudo quitar la carátula: "
+    clearArtFailedPrefix: "No se pudo quitar la carátula: ",
+    historyHeading: "Historial",
+    historySourceHeading: "Origen",
+    historyImported: "Importado",
+    historyFormat: "Formato",
+    historyFileSize: "Tamaño",
+    historyTimestampHint: "Consulte las marcas de tiempo de análisis como el momento en que Luminous detectó los cambios en el disco, ya que los editores externos pueden conservar la fecha de modificación original del archivo.",
+    clearHistoryBtn: "Borrar historial",
+    historyEmptyValue: "(vacío)",
+    historyActorScan: "Detectado en el análisis",
+    historyActorLuminous: "Luminous",
+    historyBatchNote: "editado con {count} pistas más",
+    historyEmptySince: "Sin cambios registrados desde el {date}.",
+    historyEmpty: "Sin cambios registrados.",
+    compilationField: "Recopilación",
+    commentField: "Comentario"
   },
   albumTagEditor: {
     title: "Editar etiquetas del álbum",

@@ -180,7 +180,11 @@ const IDENTICAL_OK_FR = new Set([
   "stats.minuteUnderOne", // "< 1 min"
   "tagEditor.albumField", // "Album"
   "tagEditor.bpmField", // "BPM"
+  "tagEditor.compilationField", // "Compilation"
   "tagEditor.genreField", // "Genre"
+  "tagEditor.historyActorLuminous", // "Luminous"
+  "tagEditor.historyFormat", // "Format"
+  "tagEditor.historySourceHeading", // "Source"
   "themes.dynamic-artwork", // "✨ Luminous"
   "themes.sabrina", // "Sabrina"
   "topNav.searchSuggestions", // "Suggestions"
@@ -285,6 +289,7 @@ const IDENTICAL_OK_IT = new Set<string>([
   "audioPipeline.volumeHardware", // "Hardware (bit-perfect)"
   "audioPipeline.volumeSoftware", // "Software"
   "auth.scrobbling", // "Scrobbling"
+  "tagEditor.historyActorLuminous", // "Luminous"
 ]);
 
 const IDENTICAL_OK_ES = new Set<string>([
@@ -348,6 +353,7 @@ const IDENTICAL_OK_ES = new Set<string>([
   "audioPipeline.bitPerfect", // "Bit-perfect, a term of art"
   "audioPipeline.volumeSoftware", // "Software"
   "auth.scrobbling", // "Scrobbling"
+  "tagEditor.historyActorLuminous", // "Luminous"
 ]);
 
 // Cognates, loanwords and technical terms Windows and the field also leave in English, plus brands, acronyms and symbols.
@@ -482,6 +488,8 @@ const IDENTICAL_OK_DE = new Set<string>([
   "audioPipeline.bitPerfect",
   "audioPipeline.volumeSoftware",
   "auth.scrobbling",
+  "tagEditor.historyActorLuminous",
+  "tagEditor.historyFormat",
 ]);
 
 // Brands, acronyms, units, symbols and example URLs or paths that Ukrainian leaves as they are.
@@ -523,6 +531,7 @@ const IDENTICAL_OK_UK = new Set<string>([
   "smartPlaylistBuilder.opLt", // "<"
   "audioPipeline.tierHiRes", // Hi-Res Audio
   "audioPipeline.bitPerfect", // Bit-perfect
+  "tagEditor.historyActorLuminous", // Luminous
 ]);
 
 // Brands, acronyms, units, symbols and example URLs or paths that Russian leaves as they are.
@@ -564,6 +573,7 @@ const IDENTICAL_OK_RU = new Set<string>([
   "smartPlaylistBuilder.opLt", // "<"
   "audioPipeline.tierHiRes", // Hi-Res Audio
   "audioPipeline.bitPerfect", // Bit-perfect
+  "tagEditor.historyActorLuminous", // Luminous
 ]);
 
 const CATALOGS = [

@@ -1722,7 +1722,22 @@ export const ru = {
     clearArtConfirmTitle: "Удалить встроенную обложку?",
     clearArtConfirmMessage: "Встроенная обложка будет удалена из самого файла. Для песни будет использоваться изображение из папки или заглушка.",
     clearArtSuccess: "Встроенная обложка удалена",
-    clearArtFailedPrefix: "Не удалось удалить обложку: "
+    clearArtFailedPrefix: "Не удалось удалить обложку: ",
+    historyHeading: "История",
+    historySourceHeading: "Источник",
+    historyImported: "Импортировано",
+    historyFormat: "Формат",
+    historyFileSize: "Размер",
+    historyTimestampHint: "Учитывайте время сканирования как момент обнаружения изменений Luminous на диске, поскольку сторонние редакторы тегов могут сохранять исходное время изменения файла.",
+    clearHistoryBtn: "Очистить историю",
+    historyEmptyValue: "(пусто)",
+    historyActorScan: "Обнаружено при сканировании",
+    historyActorLuminous: "Luminous",
+    historyBatchNote: "отредактировано вместе с {count} другими треками",
+    historyEmptySince: "Нет записанных изменений с {date}.",
+    historyEmpty: "Нет записанных изменений.",
+    compilationField: "Сборник",
+    commentField: "Комментарий"
   },
   albumTagEditor: {
     title: "Изменение тегов альбома",

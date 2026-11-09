@@ -58,6 +58,7 @@ pub mod stats;
 pub mod stats_summary;
 pub mod subsonic;
 pub mod tag_cleanup;
+pub mod tag_history;
 pub mod tags;
 #[cfg(target_os = "windows")]
 pub mod taskbar;
@@ -1560,6 +1561,8 @@ pub fn run() {
             commands::tageditor::save_file_tags,
             commands::tageditor::save_album_tags,
             commands::tageditor::save_batch_file_tags,
+            commands::tageditor::get_song_tag_history,
+            commands::tageditor::clear_song_tag_history,
             commands::tageditor::clear_song_cover_art,
             commands::tageditor::clear_album_cover_art,
             commands::tageditor::open_song_folder,

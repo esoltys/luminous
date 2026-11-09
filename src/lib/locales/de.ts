@@ -1602,7 +1602,22 @@ export const de = {
     clearArtConfirmTitle: "Eingebettetes Cover entfernen?",
     clearArtConfirmMessage: "Dadurch wird das eingebettete Cover aus der Datei selbst entfernt. Für den Titel wird dann das Ordnercover oder ein Platzhalter verwendet.",
     clearArtSuccess: "Eingebettetes Cover entfernt",
-    clearArtFailedPrefix: "Das Cover konnte nicht entfernt werden: "
+    clearArtFailedPrefix: "Das Cover konnte nicht entfernt werden: ",
+    historyHeading: "Verlauf",
+    historySourceHeading: "Quelle",
+    historyImported: "Importiert",
+    historyFormat: "Format",
+    historyFileSize: "Größe",
+    historyTimestampHint: "Betrachten Sie Scan-Zeitstempel als den Moment, in dem Luminous Änderungen auf dem Datenträger erkannt hat, da externe Tagger die Dateiänderungszeit möglicherweise beibehalten.",
+    clearHistoryBtn: "Verlauf löschen",
+    historyEmptyValue: "(leer)",
+    historyActorScan: "Beim Scan erkannt",
+    historyActorLuminous: "Luminous",
+    historyBatchNote: "mit {count} weiteren Titeln bearbeitet",
+    historyEmptySince: "Keine erfassten Änderungen seit {date}.",
+    historyEmpty: "Keine erfassten Änderungen.",
+    compilationField: "Kompilation",
+    commentField: "Kommentar"
   },
   albumTagEditor: {
     title: "Album-Tags bearbeiten",

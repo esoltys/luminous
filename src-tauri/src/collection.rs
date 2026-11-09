@@ -2147,6 +2147,12 @@ pub(crate) fn read_and_upsert_song(
 /// watched-folder scan must classify it with [`WatchedFolders::source_for`]
 /// first, or it would add the file to the library.
 pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
+    let before = if let Some(path) = song.path.as_deref() {
+        crate::tag_history::snapshot_by_path(conn, path, song.beginning_nanosec)?
+    } else {
+        None
+    };
+
     conn.execute(
         &format!(
             "INSERT INTO songs ({}) VALUES ({})
@@ -2284,6 +2290,14 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.disc_subtitle.as_deref(),
         ],
     )?;
+
+    crate::tag_history::record_diff_after_update(
+        conn,
+        before.as_ref(),
+        crate::tag_history::HistoryActor::Scan,
+        None,
+    )?;
+
     Ok(())
 }
 

@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 75;
+pub const CURRENT_SCHEMA_VERSION: i32 = 76;
 
 struct Migration {
     version: i32,
@@ -704,6 +704,26 @@ const MIGRATIONS: &[Migration] = &[
                     details               TEXT,
                     analyzed_at           INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
                 );",
+            )?;
+            Ok(())
+        },
+    },
+    Migration {
+        version: 76,
+        description: "song_history: per-track tag change history (#1442)",
+        apply: |conn| {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS song_history (
+                    id INTEGER PRIMARY KEY,
+                    song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+                    at INTEGER NOT NULL,
+                    actor TEXT NOT NULL,
+                    field TEXT NOT NULL,
+                    old_value TEXT,
+                    new_value TEXT,
+                    batch_id TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_song_history_song_at ON song_history(song_id, at);",
             )?;
             Ok(())
         },
@@ -4603,6 +4623,69 @@ mod tests {
         assert_eq!(
             count_after, 0,
             "cascade delete should remove provenance record"
+        );
+    }
+
+    #[test]
+    fn test_migration_76_creates_song_history_table() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration76_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        let has_table: bool = conn
+            .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'song_history'")
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(has_table, "song_history table should exist");
+
+        let has_index: bool = conn
+            .prepare(
+                "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_song_history_song_at'",
+            )
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(has_index, "idx_song_history_song_at index should exist");
+
+        // Verify foreign key cascade delete
+        conn.execute(
+            "INSERT INTO songs (path, title, source, mtime) VALUES ('/history.flac', 'History Test', 2, 1000)",
+            [],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO song_history (song_id, at, actor, field, old_value, new_value, batch_id)
+             VALUES (?1, 1000, 'luminous', 'title', 'Old', 'New', NULL)",
+            params![song_id],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM song_history WHERE song_id = ?1",
+                params![song_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+
+        conn.execute("DELETE FROM songs WHERE id = ?1", params![song_id])
+            .unwrap();
+        let count_after: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM song_history WHERE song_id = ?1",
+                params![song_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            count_after, 0,
+            "cascade delete should remove song_history records"
         );
     }
 
