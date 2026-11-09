@@ -390,3 +390,55 @@ async fn test_scan_reports_external_tag_changes() {
         "forced rescan after mtime-preserving edit must detect and report the change"
     );
 }
+
+#[tokio::test]
+async fn test_scan_automatically_merges_duplicate_case_variant_songs() {
+    let env = ScanTestEnv::new();
+    env.scanner
+        .add_directory(&env.scan_dir.to_string_lossy())
+        .expect("failed to add watched directory");
+    env.copy_fixture("song_alpha.mp3", "Metallica");
+    env.run_scan(false).await;
+
+    let titles = env.available_titles();
+    assert_eq!(titles.len(), 1);
+
+    // Simulate an existing duplicate in the database with different path casing
+    let conn = env.db.pool.get().unwrap();
+    let real_path = env.scan_dir.join("Metallica/song_alpha.mp3");
+    let duplicate_path = env.scan_dir.join("Metallica/SONG_ALPHA.MP3");
+    conn.execute(
+        "INSERT INTO songs (source, path, title, artist, album, beginning_nanosec) VALUES (1, ?1, 'Song Alpha', 'Artist Alpha', 'Album Alpha', 0)",
+        [duplicate_path.to_string_lossy().to_string()],
+    ).unwrap();
+
+    let song_count_before: i64 = conn
+        .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        song_count_before, 2,
+        "sanity check: 2 duplicate rows exist before scan"
+    );
+    drop(conn);
+
+    // Running a scan (or a scoped folder scan) must automatically merge the duplicate rows
+    env.run_scan(false).await;
+
+    let conn = env.db.pool.get().unwrap();
+    let song_count_after: i64 = conn
+        .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        song_count_after, 1,
+        "scan must collapse duplicate case-variant rows into 1"
+    );
+
+    let surviving_path: String = conn
+        .query_row("SELECT path FROM songs", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        surviving_path,
+        real_path.to_string_lossy().to_string(),
+        "survivor must reflect real on-disk casing"
+    );
+}

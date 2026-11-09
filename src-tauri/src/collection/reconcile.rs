@@ -91,23 +91,31 @@ pub(crate) fn reconcile_moved_songs(
 
     let mut candidates: std::collections::HashMap<(String, i64), Vec<&PathBuf>> =
         std::collections::HashMap::new();
+    let mut candidates_by_case_insensitive_path: std::collections::HashMap<String, Vec<&PathBuf>> =
+        std::collections::HashMap::new();
+
     for path in all_paths {
-        if existing_paths.contains(&path.to_string_lossy().to_string()) {
+        let path_str = path.to_string_lossy().to_string();
+        if existing_paths.contains(&path_str) {
             continue;
         }
-        let (Some(filename), Ok(metadata)) = (
-            path.file_name().map(|f| f.to_string_lossy().to_lowercase()),
-            std::fs::metadata(path),
-        ) else {
-            continue;
-        };
-        candidates
-            .entry((filename, metadata.len() as i64))
+        candidates_by_case_insensitive_path
+            .entry(path_str.to_lowercase())
             .or_default()
             .push(path);
+
+        if let (Some(filename), Ok(metadata)) = (
+            path.file_name().map(|f| f.to_string_lossy().to_lowercase()),
+            std::fs::metadata(path),
+        ) {
+            candidates
+                .entry((filename, metadata.len() as i64))
+                .or_default()
+                .push(path);
+        }
     }
 
-    if candidates.is_empty() {
+    if candidates_by_case_insensitive_path.is_empty() && candidates.is_empty() {
         return Ok(0);
     }
 
@@ -126,28 +134,98 @@ pub(crate) fn reconcile_moved_songs(
         ))
     })?;
 
+    struct RawOrphan {
+        id: i64,
+        path: String,
+        filesize: Option<i64>,
+        art_automatic: Option<String>,
+    }
+
+    let mut raw_orphans: Vec<RawOrphan> = Vec::new();
+    for (id, path, filesize, art_automatic) in rows.flatten() {
+        if disk_paths.contains(&path) {
+            continue;
+        }
+        raw_orphans.push(RawOrphan {
+            id,
+            path,
+            filesize,
+            art_automatic,
+        });
+    }
+
+    let mut reconciled = 0usize;
+    let mut update_stmt =
+        conn.prepare("UPDATE songs SET path = ?1, mtime = ?2, art_automatic = ?3 WHERE id = ?4")?;
+
+    // Phase 1: Case-only rename in the same directory.
+    // If a file at the exact same path changed only in letter case, it is
+    // undeniably the same file even if its byte size shifted due to tag editing,
+    // transcoding, or padding. Match these before falling back to filename+size.
+    let mut orphans_by_case_insensitive_path: std::collections::HashMap<String, Vec<usize>> =
+        std::collections::HashMap::new();
+    for (idx, item) in raw_orphans.iter().enumerate() {
+        orphans_by_case_insensitive_path
+            .entry(item.path.to_lowercase())
+            .or_default()
+            .push(idx);
+    }
+
+    let mut matched_orphan_indices = std::collections::HashSet::new();
+    let mut matched_candidate_paths: std::collections::HashSet<PathBuf> =
+        std::collections::HashSet::new();
+
+    for (lower_path, orphan_indices) in orphans_by_case_insensitive_path {
+        if orphan_indices.len() != 1 {
+            continue; // ambiguous — multiple missing songs share this case-insensitive path
+        }
+        let Some(candidate_paths) = candidates_by_case_insensitive_path.get(&lower_path) else {
+            continue;
+        };
+        if candidate_paths.len() != 1 {
+            continue; // ambiguous — multiple candidates share this case-insensitive path
+        }
+
+        let orphan_idx = orphan_indices[0];
+        let orphan = &raw_orphans[orphan_idx];
+        let new_path = candidate_paths[0];
+        let new_path_str = new_path.to_string_lossy().to_string();
+        let mtime = super::get_mtime(new_path).unwrap_or(0);
+
+        let new_art_automatic = match orphan.art_automatic.as_deref() {
+            Some(auto) if auto.starts_with("album-") => Some(auto.to_string()),
+            _ => crate::covermanager::CoverManager::scan_folder_art_static(new_path)
+                .map(|p| p.to_string_lossy().to_string()),
+        };
+
+        update_stmt.execute(params![new_path_str, mtime, new_art_automatic, orphan.id])?;
+        reconciled += 1;
+        matched_orphan_indices.insert(orphan_idx);
+        matched_candidate_paths.insert(new_path.clone());
+    }
+
+    // Phase 2: Cross-folder move heuristic by filename + filesize.
     type OrphanKey = (String, i64);
     type OrphanRecord = (i64, Option<String>);
     let mut orphans: std::collections::HashMap<OrphanKey, Vec<OrphanRecord>> =
         std::collections::HashMap::new();
-    for (id, path, filesize, art_automatic) in rows.flatten() {
-        let Some(filesize) = filesize else { continue };
-        let p = Path::new(&path);
-        if disk_paths.contains(&path) {
+    for (idx, item) in raw_orphans.iter().enumerate() {
+        if matched_orphan_indices.contains(&idx) {
             continue;
         }
+        let Some(filesize) = item.filesize else {
+            continue;
+        };
+        let p = Path::new(&item.path);
         let Some(filename) = p.file_name().map(|f| f.to_string_lossy().to_lowercase()) else {
             continue;
         };
         orphans
             .entry((filename, filesize))
             .or_default()
-            .push((id, art_automatic));
+            .push((item.id, item.art_automatic.clone()));
     }
 
-    let mut reconciled = 0usize;
-    let mut update_stmt =
-        conn.prepare("UPDATE songs SET path = ?1, mtime = ?2, art_automatic = ?3 WHERE id = ?4")?;
     for (key, orphan_records) in orphans {
         if orphan_records.len() != 1 {
             continue; // ambiguous — multiple missing songs share this filename+size
@@ -155,12 +233,16 @@ pub(crate) fn reconcile_moved_songs(
         let Some(candidate_paths) = candidates.get(&key) else {
             continue;
         };
-        if candidate_paths.len() != 1 {
+        let available_candidates: Vec<&&PathBuf> = candidate_paths
+            .iter()
+            .filter(|p| !matched_candidate_paths.contains(**p))
+            .collect();
+        if available_candidates.len() != 1 {
             continue; // ambiguous — multiple new files share this filename+size
         }
 
         let (orphan_id, old_art_automatic) = &orphan_records[0];
-        let new_path = candidate_paths[0];
+        let new_path = *available_candidates[0];
         let new_path_str = new_path.to_string_lossy().to_string();
         let mtime = super::get_mtime(new_path).unwrap_or(0);
 
@@ -283,7 +365,59 @@ pub(crate) fn merge_song_rows(conn: &rusqlite::Connection, survivor: i64, dup: i
         }
     }
 
-    // 5. Delete retired song row:
+    // 5. Reparent song audit history:
+    conn.execute(
+        "UPDATE song_history SET song_id = ?1 WHERE song_id = ?2",
+        params![survivor, dup],
+    )?;
+
+    // 6. Preserve provenance analysis:
+    conn.execute(
+        "UPDATE OR IGNORE song_provenance SET song_id = ?1 WHERE song_id = ?2",
+        params![survivor, dup],
+    )?;
+    conn.execute(
+        "DELETE FROM song_provenance WHERE song_id = ?1",
+        params![dup],
+    )?;
+
+    // 7. Preserve waveforms:
+    conn.execute(
+        "UPDATE OR IGNORE waveforms SET song_id = ?1 WHERE song_id = ?2",
+        params![survivor, dup],
+    )?;
+    conn.execute("DELETE FROM waveforms WHERE song_id = ?1", params![dup])?;
+
+    conn.execute(
+        "UPDATE OR IGNORE band_waveforms SET song_id = ?1 WHERE song_id = ?2",
+        params![survivor, dup],
+    )?;
+    conn.execute(
+        "DELETE FROM band_waveforms WHERE song_id = ?1",
+        params![dup],
+    )?;
+
+    // 8. Preserve lyrics offsets:
+    conn.execute(
+        "UPDATE OR IGNORE song_lyrics_offsets SET song_id = ?1 WHERE song_id = ?2",
+        params![survivor, dup],
+    )?;
+    conn.execute(
+        "DELETE FROM song_lyrics_offsets WHERE song_id = ?1",
+        params![dup],
+    )?;
+
+    // 9. Remote cache references:
+    conn.execute(
+        "UPDATE OR IGNORE subsonic_cache SET song_id = ?1 WHERE song_id = ?2",
+        params![survivor, dup],
+    )?;
+    conn.execute(
+        "UPDATE OR IGNORE webdav_cache SET song_id = ?1 WHERE song_id = ?2",
+        params![survivor, dup],
+    )?;
+
+    // 10. Delete retired song row:
     conn.execute("DELETE FROM songs WHERE id = ?1", params![dup])?;
     Ok(())
 }
@@ -794,6 +928,25 @@ mod tests {
             params![dup_id],
         ).unwrap();
 
+        // Setup song history for dup
+        conn.execute(
+            "INSERT INTO song_history (song_id, at, actor, field, old_value, new_value) VALUES (?1, 5000, 'tag_editor', 'title', 'Old', 'New')",
+            params![dup_id],
+        ).unwrap();
+
+        // Setup song provenance for dup (survivor has none yet)
+        conn.execute(
+            "INSERT INTO song_provenance (song_id, mtime, verdict) VALUES (?1, 12345, 'authentic_lossless')",
+            params![dup_id],
+        ).unwrap();
+
+        // Setup waveform for dup (survivor has none yet)
+        conn.execute(
+            "INSERT INTO waveforms (song_id, data) VALUES (?1, X'010203')",
+            params![dup_id],
+        )
+        .unwrap();
+
         // Execute merge
         merge_song_rows(&conn, survivor_id, dup_id).unwrap();
 
@@ -853,6 +1006,85 @@ mod tests {
             )
             .unwrap();
         assert_eq!(ph_song_id, survivor_id);
+
+        // Song history should be reparented to survivor
+        let sh_song_id: i64 = conn
+            .query_row(
+                "SELECT song_id FROM song_history WHERE at = 5000",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(sh_song_id, survivor_id);
+
+        // Provenance should be preserved for survivor
+        let prov_verdict: String = conn
+            .query_row(
+                "SELECT verdict FROM song_provenance WHERE song_id = ?1",
+                params![survivor_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(prov_verdict, "authentic_lossless");
+
+        // Waveform should be preserved for survivor
+        let wf_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM waveforms WHERE song_id = ?1",
+                params![survivor_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(wf_count, 1);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_reconcile_moved_songs_case_only_rename_with_changed_filesize() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_reconcile_case_filesize_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let album_dir = temp_dir.join("Metallica");
+        std::fs::create_dir_all(&album_dir).unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // The file on disk has uppercase casing and 250 bytes
+        let real_path = album_dir.join("1-01 Fight Fire With Fire.flac");
+        let new_content = vec![0x42u8; 250];
+        std::fs::write(&real_path, &new_content).unwrap();
+
+        // Stale path in DB with lowercase casing and 100 bytes (e.g. from prior tag edit)
+        let stale_path = album_dir.join("1-01 Fight Fire with Fire.flac");
+        let song = Song {
+            path: Some(stale_path.to_string_lossy().to_string()),
+            title: Some("Fight Fire with Fire".to_string()),
+            source: SongSource::LocalFile,
+            filesize: Some(100),
+            ..Default::default()
+        };
+        super::super::upsert_song(&conn, &song).unwrap();
+        let original_id: i64 = conn
+            .query_row("SELECT id FROM songs", [], |r| r.get(0))
+            .unwrap();
+
+        let reconciled = reconcile_moved_songs(&conn, std::slice::from_ref(&real_path)).unwrap();
+        assert_eq!(
+            reconciled, 1,
+            "case-only rename must reconcile even when filesize changed"
+        );
+
+        let (id, path): (i64, String) = conn
+            .query_row("SELECT id, path FROM songs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(id, original_id, "reconcile must keep original song id");
+        assert_eq!(path, real_path.to_string_lossy().to_string());
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
