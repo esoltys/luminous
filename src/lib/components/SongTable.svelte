@@ -186,7 +186,7 @@
 
   // --- Windowing (#1898) ---
   // Only the rows near the visible part of the nearest scrolling ancestor are
-  // drawn, between two spacers that keep the full list's height, so opening a
+  // drawn, inside a sizer that keeps the full list's height, so opening a
   // view costs the same at 50 rows or 50,000. Every height is fixed by the
   // template (`style:height` below), which is what lets the layout be computed
   // without measuring the DOM.
@@ -927,11 +927,17 @@
       {/if}
     </div>
   {:else}
-    <div style:height="{tops[windowStart]}px"></div>
-    {#each windowRows as row, i (row.key)}
-      {@render row_(row, windowStart + i)}
-    {/each}
-    <div style:height="{tops[rows.length] - tops[windowEnd]}px"></div>
+    <!-- The sizer is the full list's height and never changes with the drawn window: moving the
+         window swaps rows inside it. (With spacers in flow, a long jump briefly leaves the page
+         shorter than its real height; a layout then clamps scrollTop and a jump near the end of
+         the list lands short, #1992.) -->
+    <div class="relative" style:height="{tops[rows.length]}px">
+      <div class="absolute inset-x-0" style:top="{tops[windowStart]}px">
+        {#each windowRows as row, i (row.key)}
+          {@render row_(row, windowStart + i)}
+        {/each}
+      </div>
+    </div>
   {/if}
 </div>
 
