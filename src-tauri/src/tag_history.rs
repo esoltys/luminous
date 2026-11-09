@@ -515,12 +515,17 @@ pub enum RestoreSongOutcome {
     Skipped(String),
 }
 
+/// Field name and restored target value pair.
+pub type RestoredField = (String, Option<String>);
+/// Planned restore action mapping a song ID to its fields to restore.
+pub type SongRestorePlan = (i64, Vec<RestoredField>);
+
 /// Resolves a [`RestoreTarget`] against `song_history`, returning a list of `(song_id, fields_to_restore)`
 /// where each field to restore is `(field_name, target_old_value)`.
 pub fn resolve_restore_plan(
     conn: &rusqlite::Connection,
     target: &RestoreTarget,
-) -> Result<Vec<(i64, Vec<(String, Option<String>)>)>, String> {
+) -> Result<Vec<SongRestorePlan>, String> {
     match target {
         RestoreTarget::Entry { history_id } => {
             let mut stmt = conn
@@ -563,7 +568,7 @@ pub fn resolve_restore_plan(
             }
 
             // Group by song_id, preserving the earliest old_value for each field in this batch
-            let mut plan: Vec<(i64, Vec<(String, Option<String>)>)> = Vec::new();
+            let mut plan: Vec<SongRestorePlan> = Vec::new();
             for (song_id, field, old_val) in rows {
                 if let Some(entry) = plan.iter_mut().find(|(sid, _)| *sid == song_id) {
                     if !entry.1.iter().any(|(f, _)| f == &field) {
@@ -872,12 +877,12 @@ pub fn restore_song_tags(
                     has_changes = true;
                 }
             }
-            "comment" => {
-                if canonicalize_free_text(comment.as_deref()) != canonicalize_free_text(target_str)
-                {
-                    comment = canonicalize_free_text(target_str);
-                    has_changes = true;
-                }
+            "comment"
+                if canonicalize_free_text(comment.as_deref())
+                    != canonicalize_free_text(target_str) =>
+            {
+                comment = canonicalize_free_text(target_str);
+                has_changes = true;
             }
             _ => {}
         }
