@@ -379,7 +379,7 @@ describe("TagEditor.svelte", () => {
     expect(getByText("Hard Rock")).toBeInTheDocument();
     expect(getByText("(empty)")).toBeInTheDocument();
     expect(getByText("New Song Title")).toBeInTheDocument();
-    expect(getByText("edited with 2 other tracks")).toBeInTheDocument();
+    expect(getByText("edited with 2 other songs")).toBeInTheDocument();
     expect(getByText("Clear History")).toBeInTheDocument();
   });
 
@@ -525,7 +525,7 @@ describe("TagEditor.svelte", () => {
     expect(await findByText("promo spam")).toBeInTheDocument();
   });
 
-  it("renders Restore button on entries and Restore Batch button on batch entries", async () => {
+  it("renders Restore button on entries and Restore All button on batch entries", async () => {
     const historyWithBatch: SongTagHistory = {
       songId: 10,
       source: {
@@ -561,7 +561,7 @@ describe("TagEditor.svelte", () => {
     const { findByText, getByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
     await findByText("History");
     expect(getByText("Restore")).toBeInTheDocument();
-    expect(getByText("Restore Batch")).toBeInTheDocument();
+    expect(getByText("Restore All")).toBeInTheDocument();
   });
 
   it("invokes restore_tag_history when Restore button is clicked", async () => {
@@ -613,7 +613,7 @@ describe("TagEditor.svelte", () => {
     });
   });
 
-  it("invokes restore_tag_history when Restore Batch button is clicked", async () => {
+  it("invokes restore_tag_history when Restore All button is clicked", async () => {
     const historyWithBatch: SongTagHistory = {
       songId: 10,
       source: {
@@ -652,7 +652,7 @@ describe("TagEditor.svelte", () => {
     const { findByText, getByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
     await findByText("History");
 
-    const restoreBatchBtn = getByText("Restore Batch");
+    const restoreBatchBtn = getByText("Restore All");
     await fireEvent.click(restoreBatchBtn);
 
     await waitFor(() => {
@@ -662,7 +662,7 @@ describe("TagEditor.svelte", () => {
     });
   });
 
-  it("does not show Restore Batch button when batchOtherTracks is 0", async () => {
+  it("does not show Restore All button when batchOtherTracks is 0", async () => {
     const singleHistory: SongTagHistory = {
       songId: 10,
       source: {
@@ -697,7 +697,7 @@ describe("TagEditor.svelte", () => {
 
     const { findByText, queryByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
     await findByText("History");
-    expect(queryByText("Restore Batch")).not.toBeInTheDocument();
+    expect(queryByText("Restore All")).not.toBeInTheDocument();
     expect(queryByText("Restore")).toBeInTheDocument();
   });
 
