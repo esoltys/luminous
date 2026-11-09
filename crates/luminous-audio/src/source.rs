@@ -303,9 +303,8 @@ impl OfflineDecoder {
                 {
                     if total_time.as_secs() > 4 {
                         let target_secs = total_time.as_secs().saturating_sub(2);
-                        let target_time = symphonia::core::units::Time::from_nanos(
-                            (target_secs as i64) * 1_000_000_000,
-                        );
+                        let target_time =
+                            symphonia::core::units::Time::from_nanos(target_secs * 1_000_000_000);
                         if self
                             .track
                             .format
