@@ -26,6 +26,15 @@
     tagsStore.loadGenreAliases().catch((e) => console.error("Failed to load genre aliases:", e));
   });
 
+  /** Genre suggestions for one field, leaving out what's typed in the other:
+   * a genre can't be an alias of itself. */
+  function suggestionsExcluding(other: string) {
+    const skip = other.trim().toLowerCase();
+    return tagsStore.allTags.filter((t) => t.name.toLowerCase() !== skip);
+  }
+  let aliasOptions = $derived(suggestionsExcluding(canonical));
+  let canonicalOptions = $derived(suggestionsExcluding(alias));
+
   let canSubmit = $derived(alias.trim() !== "" && canonical.trim() !== "" && !busy);
 
   async function handleSubmit() {
@@ -103,7 +112,7 @@
           id="genre-alias-canonical"
           bind:value={canonical}
           onkeydown={handleKeyDown}
-          list="genre-alias-options"
+          list="genre-canonical-options"
           class="w-full bg-brand-sidebar border border-brand-border focus:border-brand-accent rounded-lg px-3 py-2 text-sm text-brand-text-primary focus:outline-none transition-colors"
         />
       </div>
@@ -112,7 +121,12 @@
       </Button>
     </div>
     <datalist id="genre-alias-options">
-      {#each tagsStore.allTags as tag (tag.name)}
+      {#each aliasOptions as tag (tag.name)}
+        <option value={tag.name}></option>
+      {/each}
+    </datalist>
+    <datalist id="genre-canonical-options">
+      {#each canonicalOptions as tag (tag.name)}
         <option value={tag.name}></option>
       {/each}
     </datalist>
