@@ -13,6 +13,7 @@
 use crate::{
     collection::{mode_query_fragments, row_to_song, SONG_SELECT_COLS},
     db::Database,
+    genre_aliases::GenreAliases,
     models::{
         join_multi_value, parse_multi_value, GenreGroup, LanguageSummary, QueuePopulationMode,
         Song, Tag, TagCount, TagGroup, TagGroupChild, LIBRARY_SOURCES_SQL,
@@ -128,7 +129,8 @@ impl TagManager {
     }
 
     /// Every non-empty `songs.genre` value in the library, in storage order,
-    /// for scanned/local songs that are currently available.
+    /// for scanned/local songs that are currently available, read through
+    /// the genre aliases (#1942) so every browse view sees canonical names.
     fn all_song_genre_lists(&self) -> Result<Vec<Vec<String>>> {
         let conn = self.db.pool.get()?;
         let sql = format!(
@@ -139,11 +141,12 @@ impl TagManager {
                AND genre != ''",
             lib = *LIBRARY_SOURCES_SQL
         );
+        let aliases = GenreAliases::load(&conn)?;
         let mut stmt = conn.prepare(&sql)?;
         let lists = stmt
             .query_map([], |row| row.get::<_, String>(0))?
             .filter_map(|r| r.ok())
-            .map(|raw| parse_multi_value(&raw))
+            .map(|raw| aliases.canonical_genres(&raw))
             .filter(|values| !values.is_empty())
             .collect();
         Ok(lists)
@@ -289,6 +292,8 @@ impl TagManager {
 
     /// Songs whose genre list contains `tag_name` at any position
     /// (case-insensitive, exact component match — not a substring match).
+    /// Aliases (#1942) are transparent: a canonical genre also matches songs
+    /// tagged with any of its aliases, and an alias resolves to the same set.
     pub fn get_songs_by_tag(
         &self,
         tag_name: &str,
@@ -297,12 +302,20 @@ impl TagManager {
     ) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let (extra_where, order_by) = mode_query_fragments(mode);
+        let members: Vec<String> = GenreAliases::load(&conn)?
+            .members_of(tag_name)
+            .into_iter()
+            .collect();
         // LIKE is just a cheap index-assisted pre-filter (genre is indexed);
         // the real match is the exact, case-insensitive component check
         // below, which is what avoids "Rock" incorrectly matching "Prog Rock".
+        let like_any = (1..=members.len())
+            .map(|i| format!("genre LIKE '%' || ?{i} || '%'"))
+            .collect::<Vec<_>>()
+            .join(" OR ");
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE genre LIKE '%' || ?1 || '%'
+             WHERE ({like_any})
                AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
@@ -314,11 +327,10 @@ impl TagManager {
         );
         let mut stmt = conn.prepare(&sql)?;
         let candidates: Vec<Song> = stmt
-            .query_map(params![tag_name], row_to_song)?
+            .query_map(rusqlite::params_from_iter(members.iter()), row_to_song)?
             .filter_map(|r| r.ok())
             .collect();
 
-        let target = tag_name.to_lowercase();
         let songs = candidates
             .into_iter()
             .filter(|song| {
@@ -327,7 +339,7 @@ impl TagManager {
                     .map(|g| {
                         parse_multi_value(g)
                             .iter()
-                            .any(|v| v.to_lowercase() == target)
+                            .any(|v| members.contains(&v.to_lowercase()))
                     })
                     .unwrap_or(false)
             })
@@ -522,7 +534,7 @@ impl TagManager {
             .map(|s| s.to_lowercase())
             .collect();
         targets.insert(group_name.to_lowercase());
-        Ok(targets)
+        Ok(GenreAliases::load(conn)?.expand(&targets))
     }
 
     /// How many library songs [`Self::get_songs_by_curated_tag`] would return
@@ -539,7 +551,7 @@ impl TagManager {
         let targets = if is_group {
             Self::curated_group_targets(&conn, name)?
         } else {
-            HashSet::from([name.to_lowercase()])
+            GenreAliases::load(&conn)?.members_of(name)
         };
         let sql = format!(
             "SELECT genre FROM songs
@@ -1724,6 +1736,72 @@ mod tests {
         )
         .unwrap();
         conn.last_insert_rowid()
+    }
+
+    fn alias(db: &Database, from: &str, to: &str) {
+        let mut conn = db.pool.get().unwrap();
+        crate::genre_aliases::set_alias(&mut conn, from, to).unwrap();
+    }
+
+    #[test]
+    fn test_aliases_roll_up_tags_and_song_lookups_without_touching_genre_column() {
+        let (_dir, db) = test_db();
+        insert_song(&db, "/a.mp3", "Prog Rock; Art Rock");
+        insert_song(&db, "/b.mp3", "Progressive Rock");
+        insert_song(&db, "/c.mp3", "prog rock; Progressive Rock");
+        insert_song(&db, "/d.mp3", "Jazz");
+        alias(&db, "Prog Rock", "Progressive Rock");
+
+        let manager = TagManager::new(db.clone());
+        let tags: Vec<(String, i64)> = manager
+            .list_all_tags()
+            .unwrap()
+            .into_iter()
+            .map(|t| (t.name, t.song_count))
+            .collect();
+        assert_eq!(
+            tags,
+            vec![
+                ("Art Rock".to_string(), 1),
+                ("Jazz".to_string(), 1),
+                ("Progressive Rock".to_string(), 3),
+            ]
+        );
+
+        // Canonical and alias lookups return the same three songs.
+        for name in ["Progressive Rock", "prog rock"] {
+            let songs = manager
+                .get_songs_by_tag(name, -1, QueuePopulationMode::default())
+                .unwrap();
+            assert_eq!(songs.len(), 3, "lookup of {name}");
+        }
+        assert_eq!(
+            manager
+                .count_songs_by_curated_tag("Progressive Rock", 100)
+                .unwrap(),
+            3
+        );
+
+        // The stored genre text is never rewritten.
+        let raw: String = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row("SELECT genre FROM songs WHERE path = '/a.mp3'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(raw, "Prog Rock; Art Rock");
+
+        // Removing the alias brings the raw spelling back.
+        crate::genre_aliases::remove_alias(&db.pool.get().unwrap(), "Prog Rock").unwrap();
+        let names: Vec<String> = manager
+            .list_all_tags()
+            .unwrap()
+            .into_iter()
+            .map(|t| t.name)
+            .collect();
+        assert!(names.contains(&"Prog Rock".to_string()));
     }
 
     #[test]

@@ -8,6 +8,7 @@
 //! filtering (when online and available) with local metadata (genres, artist tags from
 //! `artist_profiles`, era/decade proximity, BPM/tempo matching, and loved/rating boosts).
 
+use crate::genre_aliases::GenreAliases;
 use crate::models::{parse_multi_value, PlayContext, ShuffleMode, LIBRARY_SOURCES_SQL};
 use crate::AppState;
 use anyhow::Result;
@@ -280,7 +281,7 @@ pub fn pick_radio_songs(
     picked
 }
 
-fn row_to_candidate(row: &rusqlite::Row) -> rusqlite::Result<Candidate> {
+fn row_to_candidate(row: &rusqlite::Row, aliases: &GenreAliases) -> rusqlite::Result<Candidate> {
     let artist: Option<String> = row.get(2)?;
     let album_artist: Option<String> = row.get(3)?;
     let genre: Option<String> = row.get(5)?;
@@ -300,10 +301,8 @@ fn row_to_candidate(row: &rusqlite::Row) -> rusqlite::Result<Candidate> {
         artist_key,
         artists,
         album: lower_opt(row.get(4)?),
-        genres: genre
-            .as_deref()
-            .map(parse_multi_value)
-            .unwrap_or_default()
+        genres: aliases
+            .canonical_genres(genre.as_deref().unwrap_or(""))
             .into_iter()
             .map(|g| g.to_lowercase())
             .collect(),
@@ -330,8 +329,9 @@ fn load_library(conn: &Connection) -> Result<Vec<Candidate>> {
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
+    let aliases = GenreAliases::load(conn)?;
     let rows = stmt
-        .query_map([], row_to_candidate)?
+        .query_map([], |r| row_to_candidate(r, &aliases))?
         .filter_map(|r| r.ok())
         .collect();
     Ok(rows)
@@ -340,7 +340,8 @@ fn load_library(conn: &Connection) -> Result<Vec<Candidate>> {
 fn load_by_id(conn: &Connection, id: i64) -> Result<Option<Candidate>> {
     let sql = format!("SELECT {CANDIDATE_SELECT} FROM songs WHERE id = ?1");
     let mut stmt = conn.prepare(&sql)?;
-    let mut rows = stmt.query_map(params![id], row_to_candidate)?;
+    let aliases = GenreAliases::load(conn)?;
+    let mut rows = stmt.query_map(params![id], |r| row_to_candidate(r, &aliases))?;
     if let Some(r) = rows.next() {
         Ok(r.ok())
     } else {
@@ -357,7 +358,8 @@ fn load_artist_seed_song(conn: &Connection, artist: &str) -> Result<Option<Candi
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
-    let mut rows = stmt.query_map(params![artist], row_to_candidate)?;
+    let aliases = GenreAliases::load(conn)?;
+    let mut rows = stmt.query_map(params![artist], |r| row_to_candidate(r, &aliases))?;
     if let Some(r) = rows.next() {
         Ok(r.ok())
     } else {
@@ -431,6 +433,7 @@ fn load_exclusions(conn: &Connection) -> Result<Exclusions> {
             _ => {}
         }
     }
+    ex.genres = GenreAliases::load(conn)?.expand(&ex.genres);
     Ok(ex)
 }
 

@@ -9,6 +9,7 @@
 //! half (`select_songs`) and the async orchestration (`maybe_extend`) so it
 //! can be unit-tested without a database or an app handle.
 
+use crate::genre_aliases::GenreAliases;
 use crate::models::{parse_multi_value, LIBRARY_SOURCES_SQL};
 use crate::AppState;
 use anyhow::Result;
@@ -241,7 +242,7 @@ fn lower_opt(s: Option<String>) -> Option<String> {
     s.map(|v| v.trim().to_lowercase()).filter(|v| !v.is_empty())
 }
 
-fn row_to_candidate(row: &rusqlite::Row) -> rusqlite::Result<Candidate> {
+fn row_to_candidate(row: &rusqlite::Row, aliases: &GenreAliases) -> rusqlite::Result<Candidate> {
     let artist: Option<String> = row.get(1)?;
     let album_artist: Option<String> = row.get(2)?;
     let genre: Option<String> = row.get(4)?;
@@ -260,10 +261,8 @@ fn row_to_candidate(row: &rusqlite::Row) -> rusqlite::Result<Candidate> {
         artist_key,
         artists,
         album: lower_opt(row.get(3)?),
-        genres: genre
-            .as_deref()
-            .map(parse_multi_value)
-            .unwrap_or_default()
+        genres: aliases
+            .canonical_genres(genre.as_deref().unwrap_or(""))
             .into_iter()
             .map(|g| g.to_lowercase())
             .collect(),
@@ -287,8 +286,9 @@ fn load_library(conn: &Connection) -> Result<Vec<Candidate>> {
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
+    let aliases = GenreAliases::load(conn)?;
     let rows = stmt
-        .query_map([], row_to_candidate)?
+        .query_map([], |r| row_to_candidate(r, &aliases))?
         .filter_map(|r| r.ok())
         .collect();
     Ok(rows)
@@ -301,8 +301,11 @@ fn load_by_ids(conn: &Connection, ids: &[i64]) -> Result<Vec<Candidate>> {
     let placeholders = vec!["?"; ids.len()].join(",");
     let sql = format!("SELECT {CANDIDATE_COLS} FROM songs WHERE id IN ({placeholders})");
     let mut stmt = conn.prepare(&sql)?;
+    let aliases = GenreAliases::load(conn)?;
     let rows = stmt
-        .query_map(params_from_iter(ids.iter()), row_to_candidate)?
+        .query_map(params_from_iter(ids.iter()), |r| {
+            row_to_candidate(r, &aliases)
+        })?
         .filter_map(|r| r.ok())
         .collect();
     Ok(rows)
@@ -352,6 +355,7 @@ fn load_exclusions(conn: &Connection) -> Result<Exclusions> {
             _ => {}
         }
     }
+    ex.genres = GenreAliases::load(conn)?.expand(&ex.genres);
     Ok(ex)
 }
 
