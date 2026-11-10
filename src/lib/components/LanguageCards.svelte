@@ -46,7 +46,7 @@
     >
       {#if compact}
         <div class="flex items-center gap-3 px-3 py-2.5">
-          <div class="shrink-0 w-9 h-9 rounded-md flex items-center justify-center bg-gradient-to-br from-teal-600/30 to-emerald-600/30 text-teal-400 border border-teal-500/20">
+          <div class="shrink-0 w-9 h-9 rounded-md flex items-center justify-center bg-gradient-to-br from-teal-600/30 to-emerald-600/30 text-brand-text-primary border border-teal-500/20">
             <Translate class="w-4 h-4" />
           </div>
           <div class="min-w-0 flex-1">
@@ -68,7 +68,7 @@
       {:else}
         <div class="p-4 flex flex-col justify-between h-28 bg-gradient-to-br from-teal-600/10 via-transparent to-transparent">
           <div class="flex items-start justify-between gap-2">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-teal-600/30 to-emerald-600/30 text-teal-400 border border-teal-500/20 shadow-sm">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-teal-600/30 to-emerald-600/30 text-brand-text-primary border border-teal-500/20 shadow-sm">
               <Translate class="w-5 h-5" />
             </div>
             <span class="text-[11px] uppercase font-mono font-bold px-2 py-0.5 rounded-full bg-brand-main/80 text-brand-text-secondary border border-brand-border/60">
