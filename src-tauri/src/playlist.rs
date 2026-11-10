@@ -14,6 +14,7 @@ mod import_export;
 mod mutation_undo;
 mod size_limit;
 mod sort;
+pub mod tempo_buckets;
 
 pub use dynamic::{reconcile_and_sync, reconcile_each_day, DynamicPlaylistDelta};
 pub use size_limit::{fit_to_limit, PlaylistSizeFit, SizeFit, SizeLimitInput};

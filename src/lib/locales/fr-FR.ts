@@ -1193,6 +1193,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     daypartAfternoon: "Mix de l'après-midi",
     daypartEvening: "Mix du soir",
     daypartLateNight: "Mix de fin de nuit",
+    bpmSlow: "Tempo très lent BPM",
     bpmDownTempo: "Tempo lent BPM",
     bpmMidTempo: "Tempo moyen BPM",
     bpmUptempo: "Tempo enlevé BPM",

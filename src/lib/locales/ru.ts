@@ -1283,6 +1283,7 @@ export const ru = {
     daypartAfternoon: "Дневной микс",
     daypartEvening: "Вечерний микс",
     daypartLateNight: "Ночной микс",
+    bpmSlow: "Очень медленный BPM",
     bpmDownTempo: "Медленный BPM",
     bpmMidTempo: "Средний BPM",
     bpmUptempo: "Быстрый BPM",

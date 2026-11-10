@@ -575,9 +575,11 @@ impl CollectionScanner {
         Ok(songs)
     }
 
-    /// Songs whose BPM falls within `[min, max]` (an unbounded `max` means "or
+    /// Songs whose BPM falls within `[min, max)` (an unbounded `max` means "or
     /// higher"), selected per `mode`'s bias (see #120), for the fixed-bucket
-    /// BPM auto-playlists (Down-Tempo, Mid-Tempo, Uptempo, High Energy, Extreme).
+    /// BPM auto-playlists (see `playlist::tempo_buckets`). The upper bound is
+    /// exclusive so adjacent buckets never share a boundary track, and a BPM of
+    /// 0 (unknown) is never matched.
     pub fn get_songs_by_bpm_range(
         &self,
         min: f64,
@@ -588,12 +590,13 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let (extra_where, order_by) = mode_query_fragments(mode);
         let upper_bound = match max {
-            Some(_) => "AND bpm <= ?2",
+            Some(_) => "AND bpm < ?2",
             None => "",
         };
         let sql = format!(
             "SELECT {} FROM songs
              WHERE bpm >= ?1
+               AND bpm > 0
                {upper_bound}
                AND source IN ({lib})
                AND unavailable = 0

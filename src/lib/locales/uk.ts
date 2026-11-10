@@ -1283,6 +1283,7 @@ export const uk = {
     daypartAfternoon: "Денний мікс",
     daypartEvening: "Вечірній мікс",
     daypartLateNight: "Нічний мікс",
+    bpmSlow: "Дуже повільний BPM",
     bpmDownTempo: "Повільний BPM",
     bpmMidTempo: "Середній BPM",
     bpmUptempo: "Швидкий BPM",

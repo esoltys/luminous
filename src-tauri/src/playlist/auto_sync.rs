@@ -2,6 +2,7 @@
 //! of `playlist.rs` (#577 item 18) — a second `impl PlaylistManager` block
 //! alongside the one in `playlist.rs` that owns CRUD/dynamic-playlist logic.
 
+use super::tempo_buckets::TEMPO_BUCKETS;
 use super::{PlaylistManager, NO_SONG_LIMIT};
 use crate::collection::CollectionScanner;
 use crate::models::{QueuePopulationMode, Song, LIBRARY_SOURCES_SQL};
@@ -17,28 +18,6 @@ use uuid::Uuid;
 /// auto-playlist is created. Once created, an auto-playlist is populated
 /// with every matching song (see [`NO_SONG_LIMIT`]), not just this many.
 pub(super) const MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST: i64 = 25;
-
-/// Fixed BPM buckets for the BPM auto-playlist category: (display name, min
-/// BPM inclusive, max BPM inclusive — `None` means "or higher"). Unlike
-/// genre/decade auto-playlists (one per distinct library value), BPM
-/// auto-playlists are always this same set of five, each created only if it
-/// clears [`MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST`].
-const BPM_BUCKETS: [(&str, f64, Option<f64>); 5] = [
-    ("Down-Tempo BPM", 60.0, Some(90.0)),
-    ("Mid-Tempo BPM", 90.0, Some(115.0)),
-    ("Uptempo BPM", 115.0, Some(130.0)),
-    ("High Energy BPM", 130.0, Some(150.0)),
-    ("Extreme BPM", 150.0, None),
-];
-
-/// Formats a BPM bucket's `(min, max)` into its `dynamic_spec` suffix, e.g.
-/// `"60-90"` or the open-ended `"150-"`.
-fn format_bpm_range_spec(min: f64, max: Option<f64>) -> String {
-    match max {
-        Some(max) => format!("bpmrange:{}-{}", min, max),
-        None => format!("bpmrange:{}-", min),
-    }
-}
 
 /// The four fixed Daypart Mix buckets (#223): local-hour ranges deliberately
 /// mirror `HomeView.svelte`'s `getTimeOfDayGreeting()` (05-11 / 12-16 /
@@ -353,7 +332,7 @@ impl PlaylistManager {
     /// `bpmrange:<min>-<max>` (e.g. `bpmrange:60-90`, or `bpmrange:150-` for
     /// the open-ended top bucket) — if it's missing or its `updated`
     /// timestamp is more than 24h old. Unlike genre/decade, the bucket set
-    /// is fixed (see [`BPM_BUCKETS`]), not derived from distinct library
+    /// is fixed (see [`TEMPO_BUCKETS`]), not derived from distinct library
     /// values, so there is no pruning pass for "buckets no longer present".
     pub fn sync_bpm_auto_playlists(&self) -> Result<()> {
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
@@ -362,8 +341,9 @@ impl PlaylistManager {
         let mut conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
-        for (name, min, max) in BPM_BUCKETS {
-            let spec = format_bpm_range_spec(min, max);
+        for bucket in TEMPO_BUCKETS.iter() {
+            let (name, min, max) = (bucket.name, bucket.min, bucket.max);
+            let spec = format!("bpmrange:{}", bucket.spec_suffix());
             let existing_row: Option<(i64, i64, i64, String)> = conn
                 .query_row(
                     "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
@@ -1200,6 +1180,64 @@ mod tests {
 
         let tracks = manager.get_playlist_tracks(bpm_playlists[0].id).unwrap();
         assert_eq!(tracks.len(), 25);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_bpm_buckets_partition_every_bpm_with_exclusive_upper_bound() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        let bpms = [
+            0.0, 0.5, 55.0, 59.9, 60.0, 89.9, 90.0, 115.0, 129.9, 130.0, 150.0, 200.0,
+        ];
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for bpm in bpms {
+                conn.execute(
+                    "INSERT INTO songs (title, bpm, source, unavailable) VALUES (?1, ?2, 1, 0)",
+                    rusqlite::params![format!("bpm {bpm}"), bpm],
+                )
+                .unwrap();
+            }
+        }
+
+        let scanner = CollectionScanner::new(db_arc.clone());
+        let mut seen: Vec<(String, &str)> = Vec::new();
+        for bucket in TEMPO_BUCKETS.iter() {
+            let songs = scanner
+                .get_songs_by_bpm_range(
+                    bucket.min,
+                    bucket.max,
+                    NO_SONG_LIMIT,
+                    QueuePopulationMode::All,
+                )
+                .unwrap();
+            for song in songs {
+                seen.push((song.title.unwrap(), bucket.token));
+            }
+        }
+
+        // Every BPM above zero is in exactly one bucket; the unknown (0) in none.
+        for bpm in bpms.iter().filter(|b| **b > 0.0) {
+            let title = format!("bpm {bpm}");
+            let buckets: Vec<&str> = seen
+                .iter()
+                .filter(|(t, _)| *t == title)
+                .map(|(_, b)| *b)
+                .collect();
+            assert_eq!(buckets.len(), 1, "{title} in {buckets:?}");
+        }
+        assert!(!seen.iter().any(|(t, _)| t == "bpm 0"));
+
+        let bucket_of = |title: &str| seen.iter().find(|(t, _)| t == title).unwrap().1;
+        assert_eq!(bucket_of("bpm 59.9"), "slow");
+        assert_eq!(bucket_of("bpm 60"), "down-tempo");
+        assert_eq!(bucket_of("bpm 90"), "mid-tempo");
+        assert_eq!(bucket_of("bpm 115"), "uptempo");
+        assert_eq!(bucket_of("bpm 130"), "high-energy");
+        assert_eq!(bucket_of("bpm 150"), "extreme");
+        assert_eq!(bucket_of("bpm 55"), "slow");
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
