@@ -13,6 +13,7 @@
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import Toggle from "./Toggle.svelte";
+  import InlineMessage from "./InlineMessage.svelte";
   import {
     CheckIcon as Check,
     EyeIcon as Eye,
@@ -356,10 +357,7 @@
       </div>
 
       {#if scrobblerStore.validationError}
-        <div class="flex items-start gap-2 text-xs text-brand-text-primary pt-1">
-          <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
-          <span>{scrobblerStore.validationError}</span>
-        </div>
+        <InlineMessage class="pt-1">{scrobblerStore.validationError}</InlineMessage>
       {/if}
     </div>
   {:else}
@@ -390,10 +388,7 @@
             {/if}
           </div>
           {#if scrobblerStore.lastError}
-            <span class="flex items-start gap-1.5 text-[11px] text-brand-text-primary wrap-anywhere">
-              <AlertTriangle class="w-3 h-3 shrink-0 mt-px" />
-
-            </span>
+            <InlineMessage class="text-[11px]">{scrobblerStore.lastError}</InlineMessage>
           {:else}
             <p class="text-[11px] text-brand-text-secondary">
               {i18n.t('listenbrainz.cacheDesc')}
@@ -567,10 +562,7 @@
     {/if}
 
     {#if scrobblerStore.lastfmAuthError}
-      <div class="flex items-start gap-2 text-xs text-brand-text-primary pt-1">
-        <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
-        <span>{scrobblerStore.lastfmAuthError}</span>
-      </div>
+      <InlineMessage class="pt-1">{scrobblerStore.lastfmAuthError}</InlineMessage>
     {/if}
   {:else}
     <div class="flex items-center justify-between gap-4 py-1 pt-2 border-t border-brand-border/60">
@@ -600,10 +592,7 @@
             {/if}
           </div>
           {#if scrobblerStore.lastError}
-            <span class="flex items-start gap-1.5 text-[11px] text-brand-text-primary wrap-anywhere">
-              <AlertTriangle class="w-3 h-3 shrink-0 mt-px" />
-
-            </span>
+            <InlineMessage class="text-[11px]">{scrobblerStore.lastError}</InlineMessage>
           {:else}
             <p class="text-[11px] text-brand-text-secondary">
               {i18n.t('lastfm.cacheDesc')}
@@ -858,10 +847,7 @@
     </div>
 
     {#if fanartValidationError}
-      <div class="flex items-start gap-2 text-xs text-brand-text-primary pt-1">
-        <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
-        <span>{fanartValidationError}</span>
-      </div>
+      <InlineMessage class="pt-1">{fanartValidationError}</InlineMessage>
     {/if}
   </div>
 

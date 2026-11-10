@@ -11,14 +11,14 @@
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import Toggle from "./Toggle.svelte";
+  import InlineMessage from "./InlineMessage.svelte";
   import {
     XIcon as X,
     ArrowUpRightIcon as ArrowUpRight,
     ArrowRightIcon as ArrowRight,
     CircleNotchIcon as LoaderCircle,
     CheckIcon as Check,
-    PauseIcon as Pause,
-    WarningIcon as AlertTriangle
+    PauseIcon as Pause
   } from "phosphor-svelte";
 
   interface Props {
@@ -239,7 +239,7 @@
           </button>
 
           {#if lbConnectError}
-            <p class="flex items-start gap-1.5 text-[11px] text-brand-text-primary pt-0.5"><AlertTriangle class="w-3 h-3 shrink-0 mt-px" />{lbConnectError}</p>
+            <InlineMessage class="text-[11px] pt-0.5">{lbConnectError}</InlineMessage>
           {/if}
         </div>
       {/if}

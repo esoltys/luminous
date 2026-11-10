@@ -15,10 +15,10 @@
     FolderOpenIcon as FileImport,
     ExportIcon as FileExport,
     PencilSimpleIcon as Pencil,
-    TrashIcon as Trash2,
-    WarningIcon as AlertTriangle
+    TrashIcon as Trash2
   } from "phosphor-svelte";
   import Toggle from "./Toggle.svelte";
+  import InlineMessage from "./InlineMessage.svelte";
   import Select from "./Select.svelte";
   import Knob from "./Knob.svelte";
   import ParametricGraph from "./ParametricGraph.svelte";
@@ -793,7 +793,7 @@
           </button>
         </div>
         {#if nameError}
-          <p id="eq-preset-name-error" class="flex items-start gap-1.5 text-xs text-brand-text-primary" role="alert"><AlertTriangle class="w-3.5 h-3.5 shrink-0" />{nameError}</p>
+          <InlineMessage id="eq-preset-name-error" role="alert">{nameError}</InlineMessage>
         {/if}
       </form>
     {/if}
@@ -862,7 +862,7 @@
           </button>
         </div>
         {#if importError}
-          <p id="eq-import-error" class="flex items-start gap-1.5 text-xs text-brand-text-primary" role="alert"><AlertTriangle class="w-3.5 h-3.5 shrink-0" />{importError}</p>
+          <InlineMessage id="eq-import-error" role="alert">{importError}</InlineMessage>
         {/if}
       </form>
     {/if}

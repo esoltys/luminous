@@ -11,6 +11,7 @@
   import { organizeStore } from "../stores/organizer.svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import Toggle from "./Toggle.svelte";
+  import InlineMessage from "./InlineMessage.svelte";
   import Select from "./Select.svelte";
   import HelpTip from "./HelpTip.svelte";
   import Button from "./Button.svelte";
@@ -479,7 +480,7 @@
           <label for="default-library-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.defaultLibraryLabel')}</label>
           <p class="text-xs text-brand-text-secondary">{i18n.t('settings.defaultLibraryHint')}</p>
           {#if defaultLibraryError}
-            <p class="flex items-start gap-1.5 text-xs text-brand-text-primary break-words" role="alert"><AlertTriangle class="w-3.5 h-3.5 shrink-0" />{defaultLibraryError}</p>
+            <InlineMessage role="alert">{defaultLibraryError}</InlineMessage>
           {/if}
         </div>
         <Select
