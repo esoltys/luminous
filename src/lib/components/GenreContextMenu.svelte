@@ -39,12 +39,6 @@
     {name}
   </div>
 
-  <ContextMenuItem
-    icon={Pencil}
-    label={i18n.t("songTags.renameTag", {}, "Rename")}
-    onclick={() => { onRename(); onClose(); }}
-  />
-
   {#if !isRoot && onPromote}
     <ContextMenuItem
       icon={ArrowUpToLine}
@@ -54,10 +48,18 @@
   {/if}
 
   <ContextMenuItem
+    icon={Pencil}
+    label={i18n.t("songTags.renameTag", {}, "Rename")}
+    onclick={() => { onRename(); onClose(); }}
+  />
+
+  <ContextMenuItem
     icon={GitMerge}
     label={i18n.t("songTags.aliasToMenu", {}, "Alias to…")}
     onclick={() => { onAlias(); onClose(); }}
   />
+
+  <ContextMenuDivider />
 
   <ContextMenuItem
     icon={BarChart2}
