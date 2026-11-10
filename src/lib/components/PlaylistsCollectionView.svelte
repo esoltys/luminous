@@ -16,6 +16,7 @@
   import AutoPlaylistRowCard from "./AutoPlaylistRowCard.svelte";
   import PlaylistView from "./PlaylistView.svelte";
   import AutoPlaylistDetailView from "./AutoPlaylistDetailView.svelte";
+  import GenreAliasesDialogHost from "./GenreAliasesDialogHost.svelte";
   import SmartPlaylistBuilderModal from "./SmartPlaylistBuilderModal.svelte";
   import PlaylistCardContextMenu from "./PlaylistCardContextMenu.svelte";
   import AutoPlaylistContextMenu from "./AutoPlaylistContextMenu.svelte";
@@ -424,6 +425,7 @@
   <PlaylistView />
 {:else if navigationStore.selectedAutoPlaylist !== null}
   <AutoPlaylistDetailView view={navigationStore.selectedAutoPlaylist} />
+  <GenreAliasesDialogHost />
 {:else}
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
     <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`playlists:${navigationStore.playlistsSubTab}`}>

@@ -243,6 +243,16 @@
     }
   });
 
+  // Genre aliases (#1942): the spellings rolled up into this genre, or the
+  // canonical genre this name is read as when it is itself an alias.
+  let aliasGenre = $derived(kind === "genre" && genre ? genre : undefined);
+  let includedAliases = $derived(aliasGenre ? tagsStore.aliasesOf(aliasGenre) : []);
+  let readAsGenre = $derived(aliasGenre ? tagsStore.canonicalOf(aliasGenre) : undefined);
+
+  $effect(() => {
+    if (kind === "genre") return tagsStore.watchGenreAliases();
+  });
+
   let updatedLabel = $derived.by(() => {
     if (
       (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "missing_musicbrainz" && kind !== "daypart" && kind !== "language") ||
@@ -696,6 +706,29 @@
             <span>{sizeLimit.status}</span>
           {/if}
         </div>
+
+        {#if readAsGenre}
+          <div class="flex flex-wrap items-center gap-1.5 text-xs text-brand-text-primary">
+            <span>{i18n.t("songTags.aliasReadAs", {}, "Read as")}</span>
+            <button
+              type="button"
+              class="px-2 py-0.5 rounded-full border border-brand-border bg-brand-sidebar hover:text-brand-accent-text transition-colors cursor-pointer"
+              onclick={() => navigationStore.viewGenreTag(readAsGenre)}
+            >{readAsGenre}</button>
+          </div>
+        {:else if includedAliases.length > 0}
+          <div class="flex flex-wrap items-center gap-1.5 text-xs text-brand-text-primary">
+            <span>{i18n.t("songTags.aliasesIncluded", {}, "Also includes")}</span>
+            {#each includedAliases as entry (entry.alias)}
+              <button
+                type="button"
+                class="px-2 py-0.5 rounded-full border border-brand-border bg-brand-sidebar hover:text-brand-accent-text transition-colors cursor-pointer"
+                aria-label={i18n.t("songTags.manageAliasNamed", { alias: entry.alias }, "Manage alias {alias}")}
+                onclick={() => tagsStore.openAliasDialog(entry.alias)}
+              >{entry.alias} · {entry.song_count}</button>
+            {/each}
+          </div>
+        {/if}
 
         <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
           <PlayShuffleButtons

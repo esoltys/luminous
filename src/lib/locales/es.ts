@@ -2175,6 +2175,9 @@ export const es = {
     removeAliasBtn: "Quitar alias",
     aliasToMenu: "Alias de…",
     manageAliases: "Gestionar alias",
+    aliasesIncluded: "Incluye alias",
+    aliasReadAs: "Se lee como",
+    manageAliasNamed: "Gestionar alias {alias}",
     aliasSongCount: {
       one: "{count} canción",
       other: "{count} canciones"

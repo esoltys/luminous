@@ -19,7 +19,7 @@
   import ArtistTagCards from "./ArtistTagCards.svelte";
   import LanguageCards from "./LanguageCards.svelte";
   import CreateArtistTagGroupDialog from "./CreateArtistTagGroupDialog.svelte";
-  import GenreAliasesDialog from "./GenreAliasesDialog.svelte";
+  import GenreAliasesDialogHost from "./GenreAliasesDialogHost.svelte";
 
   let showNewGroupDialog = $state(false);
 
@@ -212,9 +212,4 @@
   />
 {/if}
 
-{#if tagsStore.aliasDialogPrefill !== null}
-  <GenreAliasesDialog
-    initialAlias={tagsStore.aliasDialogPrefill}
-    onClose={() => tagsStore.closeAliasDialog()}
-  />
-{/if}
+<GenreAliasesDialogHost />

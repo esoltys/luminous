@@ -135,6 +135,36 @@ class TagsStore {
     this.aliasDialogPrefill = null;
   }
 
+  /** Aliases that roll up into `genre`, case-insensitively (empty for an alias). */
+  aliasesOf(genre: string): GenreAlias[] {
+    const key = genre.toLowerCase();
+    return this.genreAliases.filter((a) => a.canonical.toLowerCase() === key);
+  }
+
+  /** The canonical genre `name` is read as, or `undefined` when it isn't an alias. */
+  canonicalOf(name: string): string | undefined {
+    const key = name.toLowerCase();
+    return this.genreAliases.find((a) => a.alias.toLowerCase() === key)?.canonical;
+  }
+
+  /** Loads `genreAliases` and keeps them fresh until the returned function is
+   * called, for a view that shows aliases without owning the Genres tab. */
+  watchGenreAliases(): () => void {
+    const reload = () =>
+      this.loadGenreAliases().catch((e) => console.error("Failed to load genre aliases:", e));
+    reload();
+    let unlisten: (() => void) | undefined;
+    let stopped = false;
+    this.events.listen("tags-changed", reload).then((fn) => {
+      if (stopped) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      stopped = true;
+      unlisten?.();
+    };
+  }
+
   async loadGenreAliases() {
     const result = await invoke<GenreAlias[]>("get_genre_aliases");
     this.genreAliases = Array.isArray(result) ? result : [];

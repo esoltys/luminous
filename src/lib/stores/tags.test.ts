@@ -110,3 +110,30 @@ describe("TagsStore", () => {
     expect(count).toBe(3);
   });
 });
+
+describe("TagsStore genre alias lookups (#1994)", () => {
+  beforeEach(() => {
+    tagsStore.genreAliases = [
+      { alias: "Prog Rock", canonical: "Progressive Rock", song_count: 2 },
+      { alias: "prog-rock", canonical: "Progressive Rock", song_count: 1 },
+      { alias: "Hip Hop", canonical: "Hip-Hop", song_count: 4 },
+    ];
+  });
+
+  it("lists the aliases of a canonical genre regardless of case", () => {
+    expect(tagsStore.aliasesOf("progressive rock").map((a) => a.alias)).toEqual(["Prog Rock", "prog-rock"]);
+  });
+
+  it("has no aliases for an unaliased genre or for an alias itself", () => {
+    expect(tagsStore.aliasesOf("Jazz")).toEqual([]);
+    expect(tagsStore.aliasesOf("Prog Rock")).toEqual([]);
+  });
+
+  it("resolves an alias to its canonical genre regardless of case", () => {
+    expect(tagsStore.canonicalOf("PROG ROCK")).toBe("Progressive Rock");
+  });
+
+  it("returns undefined for a name that is not an alias", () => {
+    expect(tagsStore.canonicalOf("Progressive Rock")).toBeUndefined();
+  });
+});
