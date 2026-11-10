@@ -1,5 +1,6 @@
 //! Waveform peak envelope and 3-band FFT visualizer calculation.
 
+use crate::musical::{analyze_musical_properties, MusicalAnalysis};
 use rustfft::{num_complex::Complex, FftPlanner};
 
 /// Point resolution for the cached waveform peak envelope.
@@ -43,13 +44,16 @@ pub const BAND_WAVEFORM_STYLE_VERSION: i64 = 3;
 /// resolution than the waveform's coarser peak envelope needs.
 pub const BAND_WAVEFORM_POINTS: usize = 512;
 
-/// Combined visualizer outputs computed from a single audio decode pass.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Everything computed from a single audio decode pass: the waveform displays, plus the tempo
+/// and key estimates that share the same mono downmix (#1943).
+#[derive(Debug, Clone, PartialEq)]
 pub struct VisualizerAnalysis {
     /// 150-point RMS peak envelope (0..255).
     pub waveform_peaks: Vec<u8>,
     /// 512-point layered low/mid/high frequency band amplitudes (byte triples).
     pub band_waveform_data: Vec<u8>,
+    /// Estimated tempo and key; each field is `None` when not confidently detected.
+    pub musical: MusicalAnalysis,
 }
 
 /// Compute waveform amplitude envelope (0..255) for a sample buffer, normalized
@@ -228,15 +232,18 @@ pub fn decode_mono(decoder: luminous_audio::OfflineDecoder) -> (Vec<f32>, u32) {
     (mono, sample_rate)
 }
 
-/// Decodes audio file once and generates both waveform and band waveform data in one pass.
+/// Decodes the audio file once and derives the waveform, band waveform and tempo/key estimates
+/// from that single pass.
 pub fn analyze_visualizer(decoder: luminous_audio::OfflineDecoder) -> VisualizerAnalysis {
     let (samples, sample_rate) = decode_mono(decoder);
     let waveform_peaks = compute_waveform_peaks(&samples, WAVEFORM_POINTS);
     let band_waveform_data =
         compute_band_waveform_data(&samples, sample_rate, BAND_WAVEFORM_POINTS);
+    let musical = analyze_musical_properties(&samples, sample_rate);
     VisualizerAnalysis {
         waveform_peaks,
         band_waveform_data,
+        musical,
     }
 }
 

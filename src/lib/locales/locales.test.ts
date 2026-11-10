@@ -181,6 +181,7 @@ const IDENTICAL_OK_FR = new Set([
   "stats.minuteUnderOne", // "< 1 min"
   "tagEditor.albumField", // "Album"
   "tagEditor.bpmField", // "BPM"
+  "tagEditor.camelotHint", // "Camelot {code}"
   "tagEditor.compilationField", // "Compilation"
   "tagEditor.genreField", // "Genre"
   "tagEditor.historyActorLuminous", // "Luminous"
@@ -246,6 +247,7 @@ const IDENTICAL_OK_IT = new Set<string>([
   "miniplayer.title", // "Miniplayer"
   "tagEditor.albumField", // "Album"
   "tagEditor.bpmField", // "BPM"
+  "tagEditor.camelotHint", // "Camelot {code}"
   "equalizer.presetLabel", // "Preset"
   "equalizer.popPreset", // "Pop"
   "equalizer.rockPreset", // "Rock"
@@ -324,6 +326,7 @@ const IDENTICAL_OK_ES = new Set<string>([
   "playerBar.critiquebrainzSectionLabel", // "CritiqueBrainz"
   "playerBar.listenbrainzSectionLabel", // "ListenBrainz"
   "tagEditor.bpmField", // "BPM"
+  "tagEditor.camelotHint", // "Camelot {code}"
   "equalizer.popPreset", // "Pop"
   "equalizer.rockPreset", // "Rock"
   "equalizer.jazzPreset", // "Jazz"
@@ -435,6 +438,7 @@ const IDENTICAL_OK_DE = new Set<string>([
   "albumDetail.discHeading", // "Disc {disc}"
   "albumDetail.discHeadingWithSubtitle", // "Disc {disc} — {subtitle}"
   "tagEditor.bpmField",
+  "tagEditor.camelotHint", // "Camelot {code}"
   "albumTagEditor.genreField",
   "equalizer.popPreset",
   "equalizer.rockPreset",
@@ -512,6 +516,7 @@ const IDENTICAL_OK_UK = new Set<string>([
   "playerBar.critiquebrainzSectionLabel", // CritiqueBrainz
   "playerBar.listenbrainzSectionLabel", // ListenBrainz
   "tagEditor.bpmField", // BPM
+  "tagEditor.camelotHint", // "Camelot {code}"
   "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "equalizer.qFactor", // Q
   "equalizer.isoStandard", // ISO 266:1997
@@ -554,6 +559,7 @@ const IDENTICAL_OK_RU = new Set<string>([
   "playerBar.critiquebrainzSectionLabel", // CritiqueBrainz
   "playerBar.listenbrainzSectionLabel", // ListenBrainz
   "tagEditor.bpmField", // BPM
+  "tagEditor.camelotHint", // "Camelot {code}"
   "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "equalizer.qFactor", // Q
   "equalizer.isoStandard", // ISO 266:1997

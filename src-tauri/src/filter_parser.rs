@@ -87,6 +87,11 @@ pub enum FilterValue {
     /// format family. Binds one parameter per member; go through
     /// [`FieldFilter::push_clause`].
     IntSet(Vec<i64>),
+    /// The spellings a `key:` value stands for (#1943): every standard,
+    /// enharmonic, long-form and Camelot way a tag could write the same key,
+    /// so `key:8A` and `key:Am` find the same songs. Binds one parameter per
+    /// spelling; go through [`FieldFilter::push_clause`].
+    KeySet(Vec<String>),
     /// A `genre:` value (#1995). `text` is what the user typed; `spellings`
     /// are the lowercased names that count as it (itself, its canonical genre
     /// and every alias of that), filled in by
@@ -106,11 +111,12 @@ impl ToSql for FilterValue {
             FilterValue::Text(s) => Ok(ToSqlOutput::Owned(SqlValue::Text(s.clone()))),
             FilterValue::Int(i) => Ok(ToSqlOutput::Owned(SqlValue::Integer(*i))),
             FilterValue::Float(f) => Ok(ToSqlOutput::Owned(SqlValue::Real(*f))),
-            FilterValue::DayRange { .. } | FilterValue::IntSet(_) | FilterValue::Genre { .. } => {
-                Err(rusqlite::Error::ToSqlConversionFailure(
-                    "a multi-parameter value binds through FieldFilter::push_clause".into(),
-                ))
-            }
+            FilterValue::DayRange { .. }
+            | FilterValue::IntSet(_)
+            | FilterValue::KeySet(_)
+            | FilterValue::Genre { .. } => Err(rusqlite::Error::ToSqlConversionFailure(
+                "a multi-parameter value binds through FieldFilter::push_clause".into(),
+            )),
         }
     }
 }
@@ -149,6 +155,11 @@ impl FieldFilter {
                     params.push(Box::new(member));
                 }
             }
+            FilterValue::KeySet(spellings) => {
+                for spelling in spellings {
+                    params.push(Box::new(spelling));
+                }
+            }
             FilterValue::Genre { text, spellings } => {
                 if self.op == Op::Contains {
                     params.push(Box::new(format!("%{text}%")));
@@ -171,6 +182,16 @@ impl FieldFilter {
                 .collect();
             let not = if self.op == Op::Neq { "NOT " } else { "" };
             return format!("{} {not}IN ({})", self.sql_column, placeholders.join(", "));
+        }
+        if let FilterValue::KeySet(spellings) = &self.value {
+            let placeholders: Vec<String> = (0..spellings.len())
+                .map(|i| format!("?{}", param_idx + i))
+                .collect();
+            let not = if self.op == Op::Neq { "NOT " } else { "" };
+            return format!(
+                "initial_key COLLATE NOCASE {not}IN ({})",
+                placeholders.join(", ")
+            );
         }
         if let FilterValue::Genre { spellings, .. } = &self.value {
             return genre_clause(&self.op, param_idx, spellings.len());
@@ -635,6 +656,13 @@ fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> 
             spellings: vec![raw_val.trim().to_lowercase()],
             text: raw_val,
         }
+    } else if let Some(key) = (sql_column == "initial_key"
+        && matches!(op, Op::Contains | Op::Eq | Op::Neq))
+    .then(|| luminous_analysis::KeySignature::parse(&raw_val))
+    .flatten()
+    {
+        // A recognisable key matches that key however a tag spells it, not as a substring.
+        FilterValue::KeySet(key.spellings())
     } else if sql_column == "path" {
         let clean_path = strip_enclosing_quotes(&raw_val);
         let mut normalized_val = clean_path.replace('\\', "/");
@@ -777,6 +805,44 @@ mod tests {
     }
 
     #[test]
+    fn test_key_filter_is_spelling_independent() {
+        let spellings = |query: &str| match parse_query(query).field_filters.remove(0).value {
+            FilterValue::KeySet(s) => s,
+            other => panic!("expected a key set for {query}, got {other:?}"),
+        };
+        let mut camelot = spellings("key:8A");
+        let mut standard = spellings("key:Am");
+        camelot.sort();
+        standard.sort();
+        assert_eq!(camelot, standard);
+        // Enharmonic spellings are the same key.
+        let mut sharp = spellings("key:C#");
+        let mut flat = spellings("key:Db");
+        sharp.sort();
+        flat.sort();
+        assert_eq!(sharp, flat);
+
+        // Anything that isn't a key keeps the plain substring behaviour.
+        assert_eq!(
+            parse_query("key:xyz").field_filters[0].value,
+            FilterValue::Text("%xyz%".to_string())
+        );
+    }
+
+    #[test]
+    fn test_key_filter_sql_clause() {
+        let filter = parse_query("key:8A").field_filters.remove(0);
+        let n = match &filter.value {
+            FilterValue::KeySet(s) => s.len(),
+            _ => unreachable!(),
+        };
+        let mut params: Vec<Box<dyn ToSql>> = Vec::new();
+        let clause = filter.push_clause(&mut params);
+        assert!(clause.starts_with("initial_key COLLATE NOCASE IN (?1"));
+        assert_eq!(params.len(), n);
+    }
+
+    #[test]
     fn test_parse_extended_tag_fields() {
         // Ranges aren't a single-token construct — the Smart Playlist builder
         // composes them as two separate >=/<= filters on the same field.
@@ -791,10 +857,10 @@ mod tests {
         assert_eq!(q.field_filters[2].field, "key");
         assert_eq!(q.field_filters[2].sql_column, "initial_key");
         assert_eq!(q.field_filters[2].op, Op::Contains);
-        assert_eq!(
-            q.field_filters[2].value,
-            FilterValue::Text("%Am%".to_string())
-        );
+        match &q.field_filters[2].value {
+            FilterValue::KeySet(spellings) => assert!(spellings.contains(&"8A".to_string())),
+            other => panic!("expected a key set, got {other:?}"),
+        }
 
         assert_eq!(q.field_filters[3].field, "album_artist");
         assert_eq!(q.field_filters[3].sql_column, "album_artist");

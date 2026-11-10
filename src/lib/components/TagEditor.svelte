@@ -32,6 +32,7 @@
   import PlainChipInput from "./PlainChipInput.svelte";
   import HelpTip from "./HelpTip.svelte";
   import { formatDate, formatFileSize } from "../utils/formatters";
+  import { registerTap } from "../utils/tapTempo";
   import type { FileSource, SongTagHistory, SongHistoryEntry, RestoreTagHistoryResult } from "../types";
   import { filesStore } from "../stores/files.svelte";
   import { scanFolder } from "./files/folderActions";
@@ -73,6 +74,11 @@
   let grouping = $state("");
   let bpm = $state<number | null>(null);
   let initialKey = $state("");
+  // The loaded tempo/key came from audio analysis rather than a tag (#1943); editing clears it.
+  let bpmDetected = $state(false);
+  let keyDetected = $state(false);
+  let keyCamelot = $state<string | null>(null);
+  let tapTimes: number[] = [];
   let path = $state("");
   let rating = $state(-1);
   let loved = $state<number | undefined>(undefined);
@@ -146,11 +152,36 @@
     grouping: string;
     bpm: number | null;
     initial_key: string;
+    bpm_detected?: boolean;
+    key_detected?: boolean;
     rating: number;
     loved: number;
     compilation: boolean;
     art_embedded: boolean;
     is_cue_track: boolean;
+  }
+
+  // The Camelot code beside the key field comes from the backend, which owns the wheel.
+  $effect(() => {
+    const text = initialKey.trim();
+    if (!text) {
+      keyCamelot = null;
+      return;
+    }
+    let stale = false;
+    invoke<{ standard: string; camelot: string } | null>("describe_musical_key", { text })
+      .then((info) => { if (!stale) keyCamelot = info?.camelot ?? null; })
+      .catch(() => { if (!stale) keyCamelot = null; });
+    return () => { stale = true; };
+  });
+
+  function handleTapTempo() {
+    const result = registerTap(tapTimes, performance.now());
+    tapTimes = result.taps;
+    if (result.bpm !== null) {
+      bpm = result.bpm;
+      bpmDetected = false;
+    }
   }
 
   async function loadTagHistory(id: number) {
@@ -192,7 +223,9 @@
       originalYear = details.originalyear;
       grouping = details.grouping;
       bpm = details.bpm;
-      initialKey = details.initial_key;
+      initialKey = details.initial_key ?? "";
+      bpmDetected = details.bpm_detected ?? false;
+      keyDetected = details.key_detected ?? false;
       path = details.path;
       rating = details.rating;
       loved = details.loved;
@@ -778,22 +811,36 @@
             </FormField>
 
             <FormField label={i18n.t('tagEditor.bpmField')} for="tag-bpm" tooltip={i18n.t('tagEditor.bpmTooltip')}>
-              <Input
-                id="tag-bpm"
-                type="number"
-                value={bpm ?? ""}
-                disabled={isSaving}
-                oninput={(e) => {
-                  const val = parseFloat(e.currentTarget.value);
-                  bpm = isNaN(val) ? null : val;
-                }}
-                size="sm"
-                class="w-full"
-              />
+              <div class="flex gap-2">
+                <Input
+                  id="tag-bpm"
+                  type="number"
+                  value={bpm ?? ""}
+                  disabled={isSaving}
+                  oninput={(e) => {
+                    const val = parseFloat(e.currentTarget.value);
+                    bpm = isNaN(val) ? null : val;
+                    bpmDetected = false;
+                  }}
+                  size="sm"
+                  class="w-full"
+                />
+                <Button onclick={handleTapTempo} disabled={isSaving} variant="secondary" size="sm" class="shrink-0">
+                  {i18n.t('tagEditor.tapTempoBtn')}
+                </Button>
+              </div>
+              {#if bpmDetected}
+                <span class="text-[11px] text-brand-text-secondary">{i18n.t('tagEditor.detectedValueHint')}</span>
+              {/if}
             </FormField>
 
             <FormField label={i18n.t('tagEditor.initialKeyField')} for="tag-initialkey" tooltip={i18n.t('tagEditor.initialKeyTooltip')}>
-              <Input id="tag-initialkey" bind:value={initialKey} disabled={isSaving} size="sm" class="w-full" />
+              <Input id="tag-initialkey" bind:value={initialKey} oninput={() => (keyDetected = false)} disabled={isSaving} size="sm" class="w-full" />
+              {#if keyCamelot || keyDetected}
+                <span class="text-[11px] text-brand-text-secondary">
+                  {#if keyCamelot}{i18n.t('tagEditor.camelotHint', { code: keyCamelot })}{/if}{#if keyCamelot && keyDetected} · {/if}{#if keyDetected}{i18n.t('tagEditor.detectedValueHint')}{/if}
+                </span>
+              {/if}
             </FormField>
 
             <!-- Rating (library-only, saves immediately) -->
