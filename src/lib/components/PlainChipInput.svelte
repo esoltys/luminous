@@ -65,7 +65,7 @@
             type="button"
             onclick={() => handleRemove(idx)}
             disabled={disabled}
-            class="hover:text-red-400 focus:outline-none cursor-pointer disabled:opacity-40"
+            class="hover:text-brand-text-primary focus:outline-none cursor-pointer disabled:opacity-40"
             title={i18n.t("chipInput.removeItem", { value: chip })}
           >
             <X class="w-3 h-3" />

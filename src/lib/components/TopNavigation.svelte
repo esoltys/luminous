@@ -934,7 +934,7 @@
                     e.stopPropagation();
                     collectionStore.removeRecentSearch(item.id);
                   }}
-                  class="p-1.5 opacity-0 group-hover:opacity-100 hover:text-red-400 text-brand-text-secondary/60 transition-all rounded"
+                  class="p-1.5 opacity-0 group-hover:opacity-100 hover:text-brand-text-primary text-brand-text-secondary/60 transition-all rounded"
                   title={i18n.t('topNav.removeRecentSearchTooltip')}
                 >
                   <X class="w-3.5 h-3.5" />

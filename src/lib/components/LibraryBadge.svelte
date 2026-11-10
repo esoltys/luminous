@@ -64,13 +64,13 @@
     {size === 'xs' ? 'text-[10px] px-2 py-0.5 gap-1' : ''}
     {size === 'sm' ? 'text-xs px-2.5 py-0.5 gap-1.5' : ''}
     {size === 'md' ? 'text-xs px-3 py-1 gap-2' : ''}
-    {isUnavailable ? 'opacity-70 border-dashed border-red-400/60' : ''}
+    {isUnavailable ? 'opacity-70 border-dashed border-brand-border' : ''}
     {className}"
   style={badgeStyle}
   title={isUnavailable ? `${displayName} (Disconnected) — ${directory.path}` : `${displayName} — ${directory.path}`}
 >
   {#if isUnavailable}
-    <WarningIcon class="{size === 'xs' ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} text-red-400 shrink-0" />
+    <WarningIcon class="{size === 'xs' ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} text-brand-text-primary shrink-0" />
   {:else}
     <IconComponent class="{size === 'xs' ? 'w-2.5 h-2.5' : size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} shrink-0" />
   {/if}

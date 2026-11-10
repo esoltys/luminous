@@ -423,7 +423,7 @@
                   <span class="text-sm font-medium text-brand-text-primary truncate">
                     {song.title || i18n.t("collection.unknownTitle")}
                   </span>
-                  <span class="text-xs px-2 py-0.5 rounded-full border border-red-500/30 bg-red-500/10 text-red-400 font-medium whitespace-nowrap">
+                  <span class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-text-primary/10 text-brand-text-primary font-medium whitespace-nowrap">
                     {song.error_detail}
                   </span>
                 </div>

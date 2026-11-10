@@ -83,7 +83,7 @@
     </div>
 
     {#if musicbrainzStore.authError}
-      <div class="flex items-start gap-2.5 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+      <div class="flex items-start gap-2.5 p-3 rounded-lg bg-brand-text-primary/10 border border-brand-border text-brand-text-primary text-xs">
         <AlertTriangle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
         <span class="flex-1 leading-relaxed">{musicbrainzStore.authError}</span>
       </div>
@@ -139,7 +139,7 @@
       <!-- Initial State -->
       <div class="space-y-4">
         <div class="flex items-start gap-2.5 p-3 rounded-xl bg-white/[0.03] border border-brand-border/60 text-xs text-brand-text-secondary leading-relaxed">
-          <ShieldCheck class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <ShieldCheck class="w-4 h-4 text-brand-text-primary shrink-0 mt-0.5" />
           <p class="flex-1">
             {i18n.t('auth.privacyNotice', {}, 'Luminous only uses this connection to communicate with official MusicBrainz and ListenBrainz APIs. Your credentials and tokens remain strictly on your device, and your personal data is never tracked, collected, or shared.')}
           </p>

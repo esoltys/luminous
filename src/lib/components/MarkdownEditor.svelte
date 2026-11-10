@@ -225,16 +225,16 @@
 
       <!-- Conflict Banner if File Changed on Disk -->
       {#if hasConflict}
-        <div class="px-4 py-2.5 bg-amber-500/15 border-b border-amber-500/30 flex items-center justify-between gap-3 text-xs text-amber-300 shrink-0">
+        <div class="px-4 py-2.5 bg-brand-text-primary/10 border-b border-brand-border flex items-center justify-between gap-3 text-xs text-brand-text-primary shrink-0">
           <div class="flex items-center gap-2 min-w-0">
-            <Warning class="w-4 h-4 text-amber-400 shrink-0" />
+            <Warning class="w-4 h-4 text-brand-text-primary shrink-0" />
             <span class="truncate">{i18n.t("markdownEditor.conflictDetected", {}, "This file was modified on disk by an external editor.")}</span>
           </div>
           <div class="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onclick={handleReloadFromDisk}
-              class="flex items-center gap-1 px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-medium cursor-pointer transition-colors"
+              class="flex items-center gap-1 px-2 py-1 rounded bg-brand-text-primary/10 hover:bg-brand-text-primary/15 text-brand-text-primary border border-brand-border font-medium cursor-pointer transition-colors"
             >
               <Reload class="w-3 h-3" />
               <span>{i18n.t("markdownEditor.reloadFromDisk", {}, "Reload from disk")}</span>

@@ -221,7 +221,7 @@
     </header>
 
     <div>
-      <p class="text-4xl font-heading font-bold leading-tight {storage.fits ? 'text-brand-text-primary' : 'text-amber-400'}" data-testid="sync-verdict">{headline}</p>
+      <p class="text-4xl font-heading font-bold leading-tight text-brand-text-primary" data-testid="sync-verdict">{headline}</p>
       {#if summary}<p class="mt-2 text-sm text-brand-text-secondary">{summary}</p>{/if}
     </div>
 

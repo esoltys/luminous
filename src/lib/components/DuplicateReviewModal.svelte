@@ -446,8 +446,8 @@
                       {i18n.t("curation.sectionHistory")}
                     </span>
                     {#if candidate.song.loved === 1}
-                      <span class="flex items-center gap-1 text-[11px] text-rose-400 font-medium">
-                        <Heart class="w-3.5 h-3.5 fill-rose-400 text-rose-400" />
+                      <span class="flex items-center gap-1 text-[11px] text-brand-text-primary font-medium">
+                        <Heart class="w-3.5 h-3.5 fill-brand-accent-text text-brand-accent-text" />
                         <span>{i18n.t("curation.favouriteLabel")}</span>
                       </span>
                     {/if}
@@ -465,7 +465,7 @@
                       <span class="text-[10px] text-brand-text-secondary block">{i18n.t("curation.ratingLabel")}</span>
                       <span class="font-medium text-brand-text-primary flex items-center gap-0.5">
                         {#if candidate.song.rating && candidate.song.rating > 0}
-                          <Star class="w-3 h-3 text-amber-400 fill-amber-400" />
+                          <Star class="w-3 h-3 text-brand-accent-text fill-brand-accent-text" />
                           <span>{formatNumber(candidate.song.rating * 5, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
                         {:else}
                           <span class="text-brand-text-secondary">—</span>

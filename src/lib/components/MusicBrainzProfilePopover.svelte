@@ -17,7 +17,8 @@
     ArrowRightIcon as ArrowRight,
     CircleNotchIcon as LoaderCircle,
     CheckIcon as Check,
-    PauseIcon as Pause
+    PauseIcon as Pause,
+    WarningIcon as AlertTriangle
   } from "phosphor-svelte";
 
   interface Props {
@@ -148,12 +149,12 @@
           </span>
         {/if}
         {#if scrobblerStore.status === 'paused'}
-          <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
+          <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-brand-text-primary/10 text-brand-text-primary font-medium">
             <Pause class="w-2.5 h-2.5" />
             {i18n.t('common.paused', {}, 'Paused')}
           </span>
         {:else if scrobblerStore.status === 'active'}
-          <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">
+          <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-brand-text-primary/10 text-brand-text-primary font-medium">
             <Check class="w-2.5 h-2.5" />
             {i18n.t('common.active', {}, 'Active')}
           </span>
@@ -238,7 +239,7 @@
           </button>
 
           {#if lbConnectError}
-            <p class="text-[11px] text-amber-500 pt-0.5">{lbConnectError}</p>
+            <p class="flex items-start gap-1.5 text-[11px] text-brand-text-primary pt-0.5"><AlertTriangle class="w-3 h-3 shrink-0 mt-px" />{lbConnectError}</p>
           {/if}
         </div>
       {/if}

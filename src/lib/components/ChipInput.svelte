@@ -156,7 +156,7 @@
         <button
           type="button"
           onclick={() => removeChip(i)}
-          class="text-brand-text-secondary hover:text-red-400 transition-colors"
+          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
           aria-label={i18n.t('chipInput.removeItem', { value: chip })}
         >
           <X class="w-3 h-3" />

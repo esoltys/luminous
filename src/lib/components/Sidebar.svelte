@@ -442,7 +442,7 @@
           <div class="relative flex items-center justify-center">
             <Lightning class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0" />
             <span
-              class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-brand-sidebar {scrobblingPaused ? 'bg-amber-500' : 'bg-emerald-500'}"
+              class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border {scrobblingPaused ? 'bg-transparent border-brand-text-primary' : 'bg-brand-text-primary border-brand-sidebar'}"
               data-testid="musicbrainz-status-dot"
               role={pausedLabel ? 'img' : undefined}
               aria-label={pausedLabel}

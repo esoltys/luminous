@@ -563,8 +563,8 @@
         </div>
       {:else if errorMsg}
         <div class="w-full py-12 flex flex-col items-center justify-center gap-3 text-center">
-          <AlertTriangle class="w-8 h-8 text-red-500" />
-          <p class="text-sm font-semibold text-red-400">{i18n.t('tagEditor.readFailed')}</p>
+          <AlertTriangle class="w-8 h-8 text-brand-text-primary" />
+          <p class="text-sm font-semibold text-brand-text-primary">{i18n.t('tagEditor.readFailed')}</p>
           <p class="text-xs text-brand-text-secondary/65 max-w-xs">{errorMsg}</p>
         </div>
       {:else}
@@ -933,7 +933,7 @@
                               <div class="flex items-center justify-between text-brand-text-secondary text-[11px]">
                                 <div class="flex items-center gap-1.5 flex-wrap">
                                   {#if entry.actor === "scan"}
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-text-primary/10 text-brand-text-primary border border-brand-border">
                                       {i18n.t("tagEditor.historyActorScan")}
                                     </span>
                                   {:else}

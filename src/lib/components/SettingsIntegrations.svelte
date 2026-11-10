@@ -253,7 +253,7 @@
           {i18n.t('picard.foundAt', { path: picardStore.path ?? '' })}
         </span>
       {:else}
-        <AlertTriangle class="w-3.5 h-3.5 text-amber-500 shrink-0" />
+        <AlertTriangle class="w-3.5 h-3.5 text-brand-text-primary shrink-0" />
         <span class="text-brand-text-secondary">{i18n.t('picard.notFound')}</span>
       {/if}
       <button
@@ -356,7 +356,7 @@
       </div>
 
       {#if scrobblerStore.validationError}
-        <div class="flex items-start gap-2 text-xs text-amber-500 pt-1">
+        <div class="flex items-start gap-2 text-xs text-brand-text-primary pt-1">
           <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
           <span>{scrobblerStore.validationError}</span>
         </div>
@@ -390,8 +390,9 @@
             {/if}
           </div>
           {#if scrobblerStore.lastError}
-            <span class="text-[11px] text-amber-500 wrap-anywhere">
-              {scrobblerStore.lastError}
+            <span class="flex items-start gap-1.5 text-[11px] text-brand-text-primary wrap-anywhere">
+              <AlertTriangle class="w-3 h-3 shrink-0 mt-px" />
+
             </span>
           {:else}
             <p class="text-[11px] text-brand-text-secondary">
@@ -471,7 +472,7 @@
                   <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
                   <span>{i18n.t('listenbrainz.syncingRatingsBtn')}</span>
                 {:else}
-                  <Heart weight="fill" class="w-3.5 h-3.5 text-rose-400" />
+                  <Heart weight="fill" class="w-3.5 h-3.5 text-brand-accent-text" />
                   <span>{i18n.t('listenbrainz.syncRatingsBtn')}</span>
                 {/if}
               </Button>
@@ -566,7 +567,7 @@
     {/if}
 
     {#if scrobblerStore.lastfmAuthError}
-      <div class="flex items-start gap-2 text-xs text-amber-500 pt-1">
+      <div class="flex items-start gap-2 text-xs text-brand-text-primary pt-1">
         <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
         <span>{scrobblerStore.lastfmAuthError}</span>
       </div>
@@ -599,8 +600,9 @@
             {/if}
           </div>
           {#if scrobblerStore.lastError}
-            <span class="text-[11px] text-amber-500 wrap-anywhere">
-              {scrobblerStore.lastError}
+            <span class="flex items-start gap-1.5 text-[11px] text-brand-text-primary wrap-anywhere">
+              <AlertTriangle class="w-3 h-3 shrink-0 mt-px" />
+
             </span>
           {:else}
             <p class="text-[11px] text-brand-text-secondary">
@@ -661,7 +663,7 @@
                 <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
                 <span>{i18n.t('lastfm.syncingLovedBtn')}</span>
               {:else}
-                <Heart weight="fill" class="w-3.5 h-3.5 text-rose-400" />
+                <Heart weight="fill" class="w-3.5 h-3.5 text-brand-accent-text" />
                 <span>{i18n.t('lastfm.syncLovedBtn')}</span>
               {/if}
             </Button>
@@ -695,7 +697,7 @@
             {i18n.t('discord.statusConnected')}
           </span>
         {:else if scrobblerStore.discordStatus === 'not_running'}
-          <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 font-medium shrink-0">
+          <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-text-primary/10 text-brand-text-primary border border-brand-border font-medium shrink-0">
             <AlertTriangle class="w-3 h-3" />
             {i18n.t('discord.statusNotRunning')}
           </span>
@@ -856,7 +858,7 @@
     </div>
 
     {#if fanartValidationError}
-      <div class="flex items-start gap-2 text-xs text-amber-500 pt-1">
+      <div class="flex items-start gap-2 text-xs text-brand-text-primary pt-1">
         <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
         <span>{fanartValidationError}</span>
       </div>

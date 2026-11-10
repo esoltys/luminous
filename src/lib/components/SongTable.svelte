@@ -575,7 +575,7 @@
       />
       {#if rowDisabled(row)}
         <span title={row.disabledTooltip} role="img" aria-label={row.disabledTooltip}>
-          <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" />
+          <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-brand-text-primary" />
         </span>
       {/if}
       {#if row.isDuplicate}
@@ -787,7 +787,7 @@
       {#if onRemoveFromPlaylist}
         <button
           onclick={() => onRemoveFromPlaylist?.(row)}
-          class="text-brand-text-secondary hover:text-red-400 transition-colors"
+          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
           title={i18n.t("playlists.removeFromPlaylist")}
         >
           <Trash2 class="w-4 h-4" />

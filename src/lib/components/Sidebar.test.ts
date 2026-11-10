@@ -149,17 +149,17 @@ describe("Sidebar.svelte", () => {
       scrobblerStore.paused = false;
     });
 
-    it("shows a green dot and Connected title while scrobbling is active", () => {
+    it("shows a filled dot and Connected title while scrobbling is active", () => {
       const { getByTestId, getByTitle } = render(Sidebar, { props: { width: 256 } });
-      expect(getByTestId("musicbrainz-status-dot")).toHaveClass("bg-emerald-500");
+      expect(getByTestId("musicbrainz-status-dot")).toHaveClass("bg-brand-text-primary");
       expect(getByTitle("Connected")).toBeInTheDocument();
     });
 
-    it("shows an amber dot, title suffix and label while scrobbling is paused", () => {
+    it("shows a hollow dot, title suffix and label while scrobbling is paused", () => {
       scrobblerStore.paused = true;
       const { getByTestId, getByTitle } = render(Sidebar, { props: { width: 256 } });
       const dot = getByTestId("musicbrainz-status-dot");
-      expect(dot).toHaveClass("bg-amber-500");
+      expect(dot).toHaveClass("bg-transparent");
       expect(dot).toHaveAttribute("aria-label", "Scrobbling paused");
       expect(getByTitle("Connected – Scrobbling paused")).toBeInTheDocument();
     });
@@ -168,7 +168,7 @@ describe("Sidebar.svelte", () => {
       scrobblerStore.enabled = false;
       scrobblerStore.paused = true;
       const { getByTestId } = render(Sidebar, { props: { width: 256 } });
-      expect(getByTestId("musicbrainz-status-dot")).toHaveClass("bg-emerald-500");
+      expect(getByTestId("musicbrainz-status-dot")).toHaveClass("bg-brand-text-primary");
     });
 
     it("shows Connect... when not connected and opens integrations settings on click", async () => {
