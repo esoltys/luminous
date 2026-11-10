@@ -2333,7 +2333,7 @@ export const uk = {
     removeAliasBtn: "Видалити псевдонім",
     aliasToMenu: "Псевдонім для…",
     manageAliases: "Керування псевдонімами",
-    aliasesIncluded: "Також містить",
+    aliasesIncluded: "Включає псевдоніми",
     aliasReadAs: "Читається як",
     manageAliasNamed: "Керування псевдонімом {alias}",
     aliasSongCount: {

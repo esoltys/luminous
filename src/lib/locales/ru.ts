@@ -2333,7 +2333,7 @@ export const ru = {
     removeAliasBtn: "Удалить псевдоним",
     aliasToMenu: "Псевдоним для…",
     manageAliases: "Управление псевдонимами",
-    aliasesIncluded: "Также включает",
+    aliasesIncluded: "Включает псевдонимы",
     aliasReadAs: "Читается как",
     manageAliasNamed: "Управление псевдонимом {alias}",
     aliasSongCount: {

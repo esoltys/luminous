@@ -2175,7 +2175,7 @@ export const en = {
     removeAliasBtn: "Remove alias",
     aliasToMenu: "Alias to…",
     manageAliases: "Manage Aliases",
-    aliasesIncluded: "Also includes",
+    aliasesIncluded: "Includes aliases",
     aliasReadAs: "Read as",
     manageAliasNamed: "Manage alias {alias}",
     aliasSongCount: {

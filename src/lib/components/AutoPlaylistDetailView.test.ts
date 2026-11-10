@@ -166,7 +166,7 @@ describe("AutoPlaylistDetailView genre aliases (#1994)", () => {
       view: { kind: "genre" as const, genre: "Synthwave", playlistId: 5 },
     });
     await findByText("Track Three");
-    expect(queryByText("Also includes")).toBeNull();
+    expect(queryByText("Includes aliases")).toBeNull();
   });
 
   it("names the canonical genre when the viewed genre is an alias", async () => {
@@ -174,6 +174,6 @@ describe("AutoPlaylistDetailView genre aliases (#1994)", () => {
       view: { kind: "genre" as const, genre: "Syn Wave", playlistId: 5 },
     });
     expect(await findByRole("button", { name: "Synthwave" })).toBeInTheDocument();
-    expect(queryByText("Also includes")).toBeNull();
+    expect(queryByText("Includes aliases")).toBeNull();
   });
 });

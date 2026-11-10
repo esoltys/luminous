@@ -1645,7 +1645,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     removeAliasBtn: "Retirer l'alias",
     aliasToMenu: "Alias de…",
     manageAliases: "Gérer les alias",
-    aliasesIncluded: "Inclut aussi",
+    aliasesIncluded: "Inclut les alias",
     aliasReadAs: "Lu comme",
     manageAliasNamed: "Gérer l'alias {alias}",
     aliasSongCount: {
