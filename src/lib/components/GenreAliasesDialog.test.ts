@@ -15,6 +15,7 @@ describe("GenreAliasesDialog", () => {
     tagsStore.genreAliases = [];
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "get_genre_aliases") return aliases;
+      if (cmd === "get_tags_overview") return { tags: [], graph: [], no_genre_count: 0 };
       if (cmd === "set_genre_alias") {
         aliases = [...aliases, { alias: args.alias, canonical: args.canonical, song_count: 0 }];
       }

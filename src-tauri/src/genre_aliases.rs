@@ -10,7 +10,7 @@
 
 use crate::models::{parse_multi_value, LIBRARY_SOURCES_SQL};
 use anyhow::Result;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -105,7 +105,7 @@ pub fn set_alias(conn: &mut Connection, alias: &str, canonical: &str) -> Result<
     if alias.is_empty() {
         return Ok(());
     }
-    if canonical.is_empty() || alias.eq_ignore_ascii_case(canonical) {
+    if canonical.is_empty() || same_genre(alias, canonical) {
         tx.execute(
             "DELETE FROM genre_aliases WHERE alias_name = ?1",
             params![alias],
@@ -113,10 +113,7 @@ pub fn set_alias(conn: &mut Connection, alias: &str, canonical: &str) -> Result<
         return Ok(tx.commit()?);
     }
     let mut target = lookup(&tx, canonical)?;
-    if target
-        .as_deref()
-        .is_some_and(|t| t.eq_ignore_ascii_case(alias))
-    {
+    if target.as_deref().is_some_and(|t| same_genre(t, alias)) {
         // `canonical` is currently an alias of `alias`: promote it to root.
         tx.execute(
             "DELETE FROM genre_aliases WHERE alias_name = ?1",
@@ -126,7 +123,7 @@ pub fn set_alias(conn: &mut Connection, alias: &str, canonical: &str) -> Result<
     }
     let target = target.unwrap_or_else(|| canonical.to_string());
     tx.execute(
-        "UPDATE genre_aliases SET canonical_name = ?2 WHERE canonical_name = ?1",
+        "UPDATE genre_aliases SET canonical_name = ?2 WHERE canonical_name = ?1 COLLATE NOCASE",
         params![alias, target],
     )?;
     tx.execute(
@@ -153,11 +150,13 @@ fn lookup(conn: &Connection, name: &str) -> Result<Option<String>> {
             params![name],
             |r| r.get(0),
         )
-        .map(Some)
-        .or_else(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => Ok(None),
-            e => Err(e),
-        })?)
+        .optional()?)
+}
+
+/// Genre names compare case-insensitively everywhere else in the app
+/// (`to_lowercase`), so compare the same way here rather than ASCII-only.
+fn same_genre(a: &str, b: &str) -> bool {
+    a.to_lowercase() == b.to_lowercase()
 }
 
 /// All mappings, ordered by canonical then alias, each with the number of
@@ -262,6 +261,23 @@ mod tests {
         // Aliasing onto an alias lands on its root.
         set_alias(&mut c, "D", "A").unwrap();
         assert!(pairs(&c).contains(&("D".into(), "C".into())));
+    }
+
+    #[test]
+    fn repointing_matches_canonical_names_case_insensitively() {
+        let (_d, mut c) = conn();
+        set_alias(&mut c, "A", "Prog").unwrap();
+        set_alias(&mut c, "prog", "Progressive").unwrap();
+        assert_eq!(
+            pairs(&c),
+            vec![
+                ("A".into(), "Progressive".into()),
+                ("prog".into(), "Progressive".into())
+            ]
+        );
+        // Non-ASCII names fold the same way.
+        set_alias(&mut c, "électro", "Électro").unwrap();
+        assert_eq!(pairs(&c).len(), 2);
     }
 
     #[test]

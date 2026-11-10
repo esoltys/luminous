@@ -114,7 +114,6 @@ class TagsStore {
   async listenForHierarchyChanges(): Promise<() => void> {
     return this.events.listen("tags-changed", () => {
       this.loadHierarchy();
-      this.load().catch((e) => console.error("Failed to reload tags:", e));
       this.loadGenreAliases().catch((e) => console.error("Failed to load genre aliases:", e));
     });
   }
@@ -143,12 +142,12 @@ class TagsStore {
 
   async setGenreAlias(alias: string, canonical: string) {
     await invoke("set_genre_alias", { alias, canonical });
-    await this.loadGenreAliases();
+    await Promise.all([this.loadGenreAliases(), this.load()]);
   }
 
   async removeGenreAlias(alias: string) {
     await invoke("remove_genre_alias", { alias });
-    await this.loadGenreAliases();
+    await Promise.all([this.loadGenreAliases(), this.load()]);
   }
 
   async loadHierarchy() {

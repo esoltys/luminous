@@ -20,8 +20,8 @@
   let canonical = $state("");
   let busy = $state(false);
 
-  // Only the first genre-browse mount needs the list; later changes arrive
-  // through the store's "tags-changed" listener.
+  // Load on open so the list is current even if the Genres tab's
+  // "tags-changed" listener isn't mounted.
   $effect(() => {
     tagsStore.loadGenreAliases().catch((e) => console.error("Failed to load genre aliases:", e));
   });
