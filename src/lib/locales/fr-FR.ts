@@ -1635,7 +1635,20 @@ export const frFR: DeepStringRecord<typeof en> = {
       other: "Supprimer {count} balises de tous les artistes qui les portent ? Cette action est irréversible."
     },
     deleteBtn: "Supprimer",
-    cancelBtn: "Annuler"
+    cancelBtn: "Annuler",
+    aliasesTitle: "Alias de genre",
+    aliasesHint: "Lisez une graphie de genre comme une autre. Les étiquettes de vos fichiers restent inchangées.",
+    aliasLabel: "Variante",
+    canonicalLabel: "Traiter comme",
+    addAliasBtn: "Ajouter",
+    aliasesEmpty: "Aucun alias pour l'instant.",
+    removeAliasBtn: "Retirer l'alias",
+    aliasToMenu: "Alias de…",
+    manageAliases: "Gérer les alias",
+    aliasSongCount: {
+      one: "{count} chanson",
+      other: "{count} chansons"
+    }
   },
 
   tagEditor: {

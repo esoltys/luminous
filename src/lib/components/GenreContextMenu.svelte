@@ -3,7 +3,8 @@
     PencilSimpleIcon as Pencil,
     ArrowLineUpIcon as ArrowUpToLine,
     TrashIcon as Trash2,
-    ChartBarIcon as BarChart2
+    ChartBarIcon as BarChart2,
+    GitMergeIcon as GitMerge
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
@@ -21,11 +22,12 @@
     isRoot: boolean;
     onRename: () => void;
     onPromote?: () => void;
+    onAlias: () => void;
     onDelete: () => void;
     onClose: () => void;
   }
 
-  let { x, y, name, isRoot, onRename, onPromote, onDelete, onClose }: Props = $props();
+  let { x, y, name, isRoot, onRename, onPromote, onAlias, onDelete, onClose }: Props = $props();
 
   async function handleToggleStatsExcluded() {
     await statsExclusionsStore.toggleWithToast("genre", name);
@@ -50,6 +52,12 @@
       onclick={() => { onPromote?.(); onClose(); }}
     />
   {/if}
+
+  <ContextMenuItem
+    icon={GitMerge}
+    label={i18n.t("songTags.aliasToMenu", {}, "Alias to…")}
+    onclick={() => { onAlias(); onClose(); }}
+  />
 
   <ContextMenuItem
     icon={BarChart2}

@@ -449,6 +449,7 @@
     isRoot={contextMenuTarget.isRoot}
     onRename={() => startRename(contextMenuTarget!.name)}
     onPromote={contextMenuTarget.isRoot ? undefined : () => tagsStore.promoteTag(contextMenuTarget!.name)}
+    onAlias={() => tagsStore.openAliasDialog(contextMenuTarget!.name)}
     onDelete={() => { deleteConfirmName = contextMenuTarget!.name; }}
     onClose={() => { contextMenuTarget = null; }}
   />

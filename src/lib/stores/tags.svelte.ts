@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createEventScope } from "../utils/eventScope";
-import type { GenreGroup, LanguageSummary, QueuePopulationMode, Song, Tag, TagGroup, TagGroupChild } from "../types";
+import type { GenreAlias, GenreGroup, LanguageSummary, QueuePopulationMode, Song, Tag, TagGroup, TagGroupChild } from "../types";
 export type { TagGroup, TagGroupChild };
 
 /**
@@ -114,7 +114,41 @@ class TagsStore {
   async listenForHierarchyChanges(): Promise<() => void> {
     return this.events.listen("tags-changed", () => {
       this.loadHierarchy();
+      this.load().catch((e) => console.error("Failed to reload tags:", e));
+      this.loadGenreAliases().catch((e) => console.error("Failed to load genre aliases:", e));
     });
+  }
+
+  /** Non-destructive genre aliases (#1942). The backend resolves them in
+   * every genre read; this list only feeds the management dialog. */
+  genreAliases = $state<GenreAlias[]>([]);
+
+  /** Where the alias dialog is open: `null` closed, otherwise the alias
+   * spelling to prefill ("" from the toolbar). One mount point in
+   * GenreBrowseView serves both the context menu and the toolbar. */
+  aliasDialogPrefill = $state<string | null>(null);
+
+  openAliasDialog(alias = "") {
+    this.aliasDialogPrefill = alias;
+  }
+
+  closeAliasDialog() {
+    this.aliasDialogPrefill = null;
+  }
+
+  async loadGenreAliases() {
+    const result = await invoke<GenreAlias[]>("get_genre_aliases");
+    this.genreAliases = Array.isArray(result) ? result : [];
+  }
+
+  async setGenreAlias(alias: string, canonical: string) {
+    await invoke("set_genre_alias", { alias, canonical });
+    await this.loadGenreAliases();
+  }
+
+  async removeGenreAlias(alias: string) {
+    await invoke("remove_genre_alias", { alias });
+    await this.loadGenreAliases();
   }
 
   async loadHierarchy() {

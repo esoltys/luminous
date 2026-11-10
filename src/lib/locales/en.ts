@@ -2165,7 +2165,20 @@ export const en = {
       other: "Remove {count} tags from every artist that carries them? This can't be undone."
     },
     deleteBtn: "Delete",
-    cancelBtn: "Cancel"
+    cancelBtn: "Cancel",
+    aliasesTitle: "Genre Aliases",
+    aliasesHint: "Read one genre spelling as another. Your files' tags stay unchanged.",
+    aliasLabel: "Alias",
+    canonicalLabel: "Treat as",
+    addAliasBtn: "Add",
+    aliasesEmpty: "No aliases yet.",
+    removeAliasBtn: "Remove alias",
+    aliasToMenu: "Alias to…",
+    manageAliases: "Manage Aliases",
+    aliasSongCount: {
+      one: "{count} song",
+      other: "{count} songs"
+    }
   },
   tagCleanup: {
     action: "Clean Up Tags…",

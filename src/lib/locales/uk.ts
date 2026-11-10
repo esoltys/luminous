@@ -2323,7 +2323,22 @@ export const uk = {
       other: "Вилучити {count} тегу у кожного виконавця, який його має? Цю дію не можна скасувати."
     },
     deleteBtn: "Видалити",
-    cancelBtn: "Скасувати"
+    cancelBtn: "Скасувати",
+    aliasesTitle: "Псевдоніми жанрів",
+    aliasesHint: "Читайте одне написання жанру як інше. Теги у ваших файлах не змінюються.",
+    aliasLabel: "Псевдонім",
+    canonicalLabel: "Вважати",
+    addAliasBtn: "Додати",
+    aliasesEmpty: "Псевдонімів ще немає.",
+    removeAliasBtn: "Видалити псевдонім",
+    aliasToMenu: "Псевдонім для…",
+    manageAliases: "Керування псевдонімами",
+    aliasSongCount: {
+      one: "{count} трек",
+      few: "{count} треки",
+      many: "{count} треків",
+      other: "{count} треку"
+    }
   },
   tagCleanup: {
     action: "Очистити теги…",

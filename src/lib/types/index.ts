@@ -1191,6 +1191,15 @@ export interface TagGroupChild {
 
 /** One primary-genre "card" in the persisted Genres curation hierarchy
  * (#545) — distinct from the emergent, per-song-order {@link GenreGroup}. */
+/** One non-destructive genre alias (#1942): `alias` is read as `canonical`
+ * everywhere in the app; no file tag is touched. `song_count` is how many
+ * library songs carry the alias spelling in their raw genre tag. */
+export interface GenreAlias {
+  alias: string;
+  canonical: string;
+  song_count: number;
+}
+
 export interface TagGroup {
   name: string;
   color_index: number;
