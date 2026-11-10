@@ -245,22 +245,12 @@
 
   // Genre aliases (#1942): the spellings rolled up into this genre, or the
   // canonical genre this name is read as when it is itself an alias.
-  let genreAliases = $derived(kind === "genre" && genre ? tagsStore.aliasesOf(genre) : []);
-  let readAsGenre = $derived(kind === "genre" && genre ? tagsStore.canonicalOf(genre) : undefined);
+  let aliasGenre = $derived(kind === "genre" && genre ? genre : undefined);
+  let includedAliases = $derived(aliasGenre ? tagsStore.aliasesOf(aliasGenre) : []);
+  let readAsGenre = $derived(aliasGenre ? tagsStore.canonicalOf(aliasGenre) : undefined);
 
   $effect(() => {
-    if (kind !== "genre") return;
-    tagsStore.loadGenreAliases().catch((e) => console.error("Failed to load genre aliases:", e));
-    let unlisten: (() => void) | undefined;
-    let disposed = false;
-    tagsStore.listenForAliasChanges().then((fn) => {
-      if (disposed) fn();
-      else unlisten = fn;
-    });
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
+    if (kind === "genre") return tagsStore.watchGenreAliases();
   });
 
   let updatedLabel = $derived.by(() => {
@@ -726,10 +716,10 @@
               onclick={() => navigationStore.viewGenreTag(readAsGenre)}
             >{readAsGenre}</button>
           </div>
-        {:else if genreAliases.length > 0}
+        {:else if includedAliases.length > 0}
           <div class="flex flex-wrap items-center gap-1.5 text-xs text-brand-text-primary">
             <span>{i18n.t("songTags.aliasesIncluded", {}, "Also includes")}</span>
-            {#each genreAliases as entry (entry.alias)}
+            {#each includedAliases as entry (entry.alias)}
               <button
                 type="button"
                 class="px-2 py-0.5 rounded-full border border-brand-border bg-brand-sidebar hover:text-brand-accent-text transition-colors cursor-pointer"

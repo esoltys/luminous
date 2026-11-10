@@ -147,12 +147,22 @@ class TagsStore {
     return this.genreAliases.find((a) => a.alias.toLowerCase() === key)?.canonical;
   }
 
-  /** Keeps `genreAliases` fresh for a view that shows them without owning the
-   * Genres tab. Call on mount and unlisten on unmount. */
-  async listenForAliasChanges(): Promise<() => void> {
-    return this.events.listen("tags-changed", () => {
+  /** Loads `genreAliases` and keeps them fresh until the returned function is
+   * called, for a view that shows aliases without owning the Genres tab. */
+  watchGenreAliases(): () => void {
+    const reload = () =>
       this.loadGenreAliases().catch((e) => console.error("Failed to load genre aliases:", e));
+    reload();
+    let unlisten: (() => void) | undefined;
+    let stopped = false;
+    this.events.listen("tags-changed", reload).then((fn) => {
+      if (stopped) fn();
+      else unlisten = fn;
     });
+    return () => {
+      stopped = true;
+      unlisten?.();
+    };
   }
 
   async loadGenreAliases() {
