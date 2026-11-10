@@ -35,16 +35,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 - Shared TypeScript types in `src/lib/types/`; Svelte 5 stores (Runes) in `src/lib/stores/`
 - No dedicated IPC wrapper layer — components and stores call Tauri commands directly via `invoke()` from `@tauri-apps/api/core`
 
-**Engine crates** (`crates/`):
-
-- `crates/luminous-addons` — add-on theme runtime: Ed25519 bundle verification, ChaCha20 decryption, Store entitlement, key cache (DPAPI), in-memory URI scheme asset serving. No `tauri` or `rusqlite` (CI-checked); `commands/addons.rs` maps IPC and events at the edge.
-- `crates/luminous-analysis` — offline audio analysis DSP: EBU R128 integrated loudness & true-peak calculation, mono downmixing, RMS waveforms, and 3-band FFT waveform extraction. No `tauri`, `rusqlite`, `reqwest`, or `tokio` (CI-checked); edge modules in `src-tauri` (`loudness.rs`, `waveform.rs`, `band_waveform.rs`) handle SQLite persistence and background worker threads.
-- `crates/luminous-audio` — the playback engine: Symphonia decode, CPAL output, gapless/crossfade handover, gain chain, spectrum. No `tauri`, `rusqlite`, `reqwest`, or `tokio` (CI-checked); remote sources come in through the opener `media_source.rs` injects, and `audio.rs` maps `Song`/`PlayState`/pipeline info at the edge.
-- `crates/luminous-devices` — portable players and removable drives: removable-volume detection (Win32 / udisks2), MTP devices (Windows Portable Devices; gvfs or kio-mtp on Linux), default device names, device profiles and the `.luminous-device.json` marker, safe eject. No `tauri`, `rusqlite` or `reqwest` (CI-checked); `devices/` owns the poll thread, `device_profiles` table and `devices-changed` event.
-- `crates/luminous-equalizer` — biquad DSP filters (10-band graphic, up-to-20-band parametric with peak/shelf types), and Equalizer APO profile parser/importer. No `tauri`, `rusqlite`, `reqwest`, or `tokio` (CI-checked); presets and persistence stay in `eq_store.rs`.
-- `crates/luminous-metadata` — local audio metadata and sidecar parsers: Lofty audio tag read/write, CUE sheet parsing, Dynamic Range meter log parsing, and playlist format import/export (M3U, M3U8, PLS, XSPF). No `tauri`, `rusqlite`, `reqwest`, or `tokio` (CI-checked); `collection/` and `tageditor.rs` adapt to the app's SQLite models.
-- `crates/luminous-transcode` — converting library files for portable players: the "can't play" rule against a `DeviceProfile`, size estimates, decode/resample/encode (Opus via vendored libopus; AAC/MP3 via Media Foundation on Windows, `ffmpeg` on `PATH` elsewhere), art downscaling and the host-side transcode cache. No `tauri`, `rusqlite` or `reqwest` (CI-checked); `src-tauri` passes in the cache directory and exposes the encoder capabilities.
-- `crates/luminous-remote` — remote wire-protocol clients: Subsonic, WebDAV, ListenBrainz, CritiqueBrainz, Lyrics (LRCLIB/NetEase/Lyrics.ovh), MusicBrainz OAuth. No `tauri` or `rusqlite` (CI-checked); edge modules in `src-tauri` (`subsonic/`, `webdav/`, `scrobbler.rs`, `lyrics.rs`, `musicbrainz.rs`) handle SQLite caching, token persistence, and Tauri events.
+**Engine crates** (`crates/`): `luminous-addons`, `-analysis`, `-audio`, `-devices`, `-equalizer`, `-metadata`, `-transcode` and `-remote`. Each is an engine with no Tauri or SQLite dependency, enforced in CI; `src-tauri` supplies the edge modules. Per-crate scope: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 **Core Rust modules** (`src-tauri/src/`):
 
@@ -130,104 +121,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 
 ## UI/UX Design Conventions
 
-- **Responsive breakpoints: viewport for the shell, container for what lives inside it.** Window-size
-  tiers are declared once as `--breakpoint-*` in `src/app.css` and mirrored by `BREAKPOINT_*_PX` in
-  `src/lib/constants.ts` (`breakpoints.test.ts` fails if they drift): `xs` 420, `sm` 640 (compact to medium),
-  `md` 768 (right panel), `lg` 1024 (sidebar). Height tiers are `HEIGHT_BREAKPOINT_*_PX` (JS-only, 160/600).
-  Use them for app-shell decisions only. Anything that depends on the space a component actually gets (it
-  moves with the sidebar and right panel) uses a container query with Tailwind's named sizes (`@sm`, `@3xl`),
-  never a viewport prefix or an arbitrary `min-[Npx]` / `@min-[Npx]` value. Structural show/hide goes through
-  `windowLayoutStore`; pure styling goes through CSS. Never both for one decision.
-
-- **Toast persistence**: Toasts must never auto-dismiss unless an explicit `durationMs` is passed by the
-  caller. By default, toasts stay visible until the user clicks the `X` button.
-
-- **Explicit-action-only celebrations**: Micro-animations (heart pulse, confetti, etc.) must fire only in
-  response to a deliberate user interaction (e.g., a click handler). Never trigger them from a reactive
-  `$effect` or a prop-change watcher — doing so causes false positives when the track changes and a
-  different (already-favourited) song loads. Enforced by `celebration-in-effect`.
-
-- **Motion budget**: every animation must name its purpose — feedback, spatial continuity, state
-  legibility, bridging a jarring change, first-run explanation, or rare delight. If it has none,
-  don't build it.
-  - **Frequency decides whether it animates.** 100+/day (seek, volume drag, scroll, column resize,
-    row selection): none. Tens/day (panel toggle, view switch): near-imperceptible. Occasional
-    (dialogs, theme switch): standard. Rare/first-run (welcome, celebrations): the only place for delight.
-  - **Keyboard shortcuts snap.** The key asks for the result, not the journey — wrap layout changes
-    triggered from a hotkey in `instantly()` in `+layout.svelte`.
-  - **Durations**: press/toggle 100–160 ms, tooltip/popover 125–200 ms, menu/list 150–250 ms,
-    panel/drawer/dialog 200–300 ms. Nothing ordinary exceeds 300 ms; only rare-tier
-    `animations.css` celebrations may.
-  - **Easing**: ease-out for entrances *and* exits (`cubicOut` on `out:` too — Svelte eases the
-    outro's progress, so `cubicIn` there is an ease-in exit), ease-in-out for movement, `ease` for
-    hover/colour. Never ease-in.
-  - **Retriggerable effects use CSS transitions, not keyframes**, so a re-trigger continues from
-    where the element is instead of restarting.
-  - **Visualisers are signal.** Decorative chrome must never pulse, breathe or drift in a way that
-    could be mistaken for the spectrum or waveform.
-
-- **Reduced motion**: import `fly`/`slide`/`scale`/`fade` from `src/lib/utils/motion.ts`, never from
-  `svelte/transition` — the wrappers drop transforms (and make `slide` instant) under
-  `prefers-reduced-motion`, which CSS can't do for JS transitions. CSS transitions are covered by the
-  `!important` reduce block at the end of `animations.css`. Reduced means fewer and gentler, never zero: keep opacity/colour.
-
-- **No hover-only information**: a native `title=` is fine when it repeats something already visible
-  (a button's own text/`aria-label`, truncated text whose full value is shown elsewhere). When the hint
-  is the only place that information appears, use `HelpTip.svelte` (focusable, opens on hover *and*
-  keyboard focus, closes on Escape/press/wheel, read as a description) or show the text inline — a
-  `title` on a non-focusable element never appears for keyboard users.
-
-- **Context-aware completion messages**: End-of-queue or completion toasts must include the name of what
-  finished (e.g., "Jazz Classics complete"), not generic text. The `playerStore.activeContextName` field
-  carries this name; auto-playlists (Favourites, Recently Added, etc.) must pass their `displayName` to
-  `playerStore.playSongs()` so the context propagates correctly.
-
-- **The UI never re-derives a law the backend owns**: show the backend's own value or call its
-  accessor — never reimplement its formula in a component. A copy drifts, and is usually right only
-  at the endpoints nobody spot-checks (e.g. the EQ curve drew shelf bands as bells, #1248). Slider
-  bounds are part of the law: read them from the backend rather than retyping them.
-
-- **A cached verdict is shown only next to what it answered**: if a control's label or enabled state
-  depends on an expensive check, key the result on its inputs, re-check the key on each read, and
-  show "stale" or disable the control when it no longer matches.
-
-- **`<select>`: assignment or reload?** Re-picking the selected option fires no `change`. If picking
-  re-applies something, give a second path — a reload button, or a "Custom" state that makes
-  re-picking a real change (as the EQ preset picker does).
-
-- **No hand-typed versions, counts or dates in the UI**: derive them from one constant or the build.
-
-- **A disabled or inert control is a defect**: don't ship a control whose value nothing consumes.
-
-- **Icon semantics**: Avoid icons that imply system-level tracking or achievement recording (e.g.,
-  `<Trophy>`). For milestone/completion moments, prefer neutral icons like `<Star>` that convey
-  "special" without implying a leaderboard or achievement system.
-
-- **Instructive, not descriptive, copy voice**: Hint/help text under a toggle, button, or tab should
-  tell the user what to do or what happens when they act ("Scan watched folders for new files"), not
-  describe the feature in third person ("Scans watched folders for new files") or lead with an adverb
-  ("Automatically scans..."). Match the imperative voice of the control's own label. This applies to
-  `src/lib/locales/en.ts` hint/tooltip strings specifically — section headings and status/value labels
-  are fine as descriptive text.
-
-- **i18n is not optional**: every new user-facing string key added to `src/lib/locales/en.ts` must be
-  added to every other base locale file in `src/lib/locales/` (`fr`, `de`, `es`, `it`, `ru`, `uk`;
-  list the directory, since the set grows), including the full-file `fr-FR`, with an actual translation,
-  not a copy of the English text, in the same change. The partial `en-US` / `en-GB` variants fall back
-  to their base and only carry keys that differ. `i18n.t()` falls back to English when a key is missing,
-  but this is strictly a runtime fallback for safety — never a substitute for translating. Completeness
-  (no missing keys, no stale keys), placeholder token matching, and non-identical translations (unless
-  explicitly allowlisted in `IDENTICAL_OK`) are enforced in CI by `src/lib/locales/locales.test.ts`.
-
-- **Translation guidelines**: adding a locale, per-language terminology authorities, register and
-  placeholder/`{count}` conventions live in [docs/TRANSLATIONS.md](docs/TRANSLATIONS.md).
-
-- **French is Canadian French**: for `src/lib/locales/fr.ts` and the French user guide, check terms in
-  the OQLF's Grand dictionnaire terminologique (vitrinelinguistique.oqlf.gouv.qc.ca) first, then
-  TERMIUM Plus. Established terms: *étiquette* (tag), *diffusion en continu* (streaming), *bogue*
-  (bug), *liste de lecture* (playlist), *simple* (single), *zone de notification* (system tray),
-  *palmarès* (chart), *image dans l'image* (picture-in-picture). Typography: a space before `:` and
-  inside « », none before `?`, `!` or `;`.
+Read [docs/UI_CONVENTIONS.md](docs/UI_CONVENTIONS.md) before any UI, animation, copy or locale change: breakpoints, toast persistence, motion budget, reduced motion, hover-only information, copy voice, i18n and Canadian French. The `celebration-in-effect` lint enforces one of them.
 
 ## Code Conventions
 
@@ -270,7 +164,7 @@ doc, a misconfigured or missing dependency, a UI bug spotted while testing somet
 failure unrelated to the change at hand — don't silently label it "pre-existing" or "unrelated" and
 move on without telling the user. Surface it plainly (what's broken, what you observed, why you
 think it's unrelated to the current change) and ask whether they want it fixed now or filed as a
-tracked issue (`gh issue create`, following the Version Control section's issue-creation steps).
+tracked issue (`gh issue create`, following [docs/ISSUES_AND_PRS.md](docs/ISSUES_AND_PRS.md)).
 Only proceed without asking if the user has already given standing instructions for this exact
 situation. This applies even when the defect seems clearly out of scope — "unrelated" is a claim to
 verify with the user, not a reason to skip telling them.
@@ -331,27 +225,7 @@ verify with the user, not a reason to skip telling them.
 
 ### Creating Issues & Pull Requests
 
-1. **Inspect templates**: Inspect the relevant templates under `.github/ISSUE_TEMPLATE/` (`bug_report.md`, `feature_request.md`, `epic.md`) and `.github/PULL_REQUEST_TEMPLATE.md`.
-   - **MANDATORY**: Always use the Markdown internal/dev templates (`.github/ISSUE_TEMPLATE/feature_request.md`, `.github/ISSUE_TEMPLATE/bug_report.md`, `.github/ISSUE_TEMPLATE/epic.md`), **NEVER** the YAML forms (`feature_request.yml` / `bug_report.yml`).
-   - The `.md` templates are internal developer templates tailored for engineering architecture, root cause analysis, and affected component tracking.
-   - The `.yml` files are public GitHub Issue Forms intended exclusively for external user submissions. Agents must NEVER use `.yml` templates or assign the `user request` label.
-2. **Analysis**: Perform codebase search or analysis to fill out the template's sections accurately:
-   - For features (`feature_request.md`): `## 💡 Description`, `## 🔍 Implementation Design / Strategy`, `## 🛠️ Affected Components & Code Locations`.
-   - For bugs (`bug_report.md`): `## 🔴 Description`, `## 🔍 Root Cause Analysis`, `## 🛠️ Affected Components & Code Locations`, `## 💡 Proposed Solution`.
-3. **Format bodies**:
-   - Write paragraphs and bullet points as single unwrapped lines. Never hand-wrap lines at ~80–100 columns — GitHub renders single newlines as hard breaks.
-   - Write the issue or PR body to a temporary scratch file in the workspace or the artifacts scratch directory.
-4. **Milestone selection**:
-   - Never file a new issue against a Closed milestone.
-   - Unless the user specifies one, default to the lowest open milestone that hasn't been released (no `vX.Y.0` in `gh release list`; open milestones via `gh api repos/esoltys/luminous/milestones -q '.[].title'`), rather than asking which milestone to use each time.
-   - **Never attach a milestone to a Pull Request** — milestones track issues only.
-5. **Create the issue**:
-   - Bugs: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "bug" --milestone "<Milestone>"`
-   - Features: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --milestone "<Milestone>"` (no label needed; never add "user request")
-   - Epics: `gh issue create --title "Epic: <Title>" --body-file "<PathToScratchFile>" --milestone "<Milestone>"` (no label needed). After creating the epic, link its sub-issues with `gh issue edit <epic-id> --add-sub-issue <id1>,<id2>...`. Never list sub-issues in the description body — GitHub renders them below automatically. If there are no related issues, leave the `## Related` section out entirely. Epic sub-issue order is manual: order them with the GraphQL `reprioritizeSubIssue` mutation (`issueId`, `subIssueId`, and `afterId`/`beforeId`), then re-read `subIssues` to confirm.
-6. **Project Priority & Status**:
-   - **NEVER apply a `P1`/`P2`/`P3`/`P4` label to an issue, and never pass `--label P1` (or P2–P4) to `gh issue create` or `gh issue edit`.** Priority is not a label; it is tracked exclusively on the "Luminous Music Player" GitHub Project.
-   - Add the issue to the "Luminous Music Player" Project board, set Status to "Todo", and assign a Priority using the scheme in [docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) (which details `gh project item-add` / `item-edit` commands and field/option IDs).
+Follow [docs/ISSUES_AND_PRS.md](docs/ISSUES_AND_PRS.md) before creating an issue, epic or PR. The costly mistakes, inline: use the Markdown `.md` templates, never the YAML forms; never apply `P1`–`P4` labels (priority lives on the Project board); never attach a milestone to a PR.
 
 ## Git Hooks
 
@@ -365,12 +239,7 @@ verify with the user, not a reason to skip telling them.
 
 ## User Guide
 
-- The in-app Help view loads the user manual from `docs/user-guide/`: one `luminous-user-guide-{EN,FR,DE,ES,IT,RU,UK}.html` per UI language plus shared `guide.css` / `guide.js`. It is plain HTML/CSS/JS maintained in this repo — edit it directly.
-- Update every guide together in the same change, like locale strings.
-- It must work offline: no CDN scripts, web fonts or other remote requests. Colours come from the app's theme variables (`guide.js` mirrors them from the parent window), so don't hard-code a palette.
-- `bun run sync-docs` copies it into `static/` (generated, gitignored), along with the app's fonts from `src/lib/fonts/` into `static/fonts/` — the guide keeps no font files of its own. Preview from `static/`; opened straight from `docs/user-guide/` it falls back to the system font.
-- Screenshots: `docs/user-guide/assets/**.png` are the captures, kept as PNG for the Microsoft Store listing and the landing page. The guides reference a lossy WebP copy (`<name>.webp`, committed next to each PNG) and only those referenced copies are synced into the app, since everything synced is embedded in the exe. The capture scripts refresh the copies automatically; after replacing a PNG by hand run `bun run guide-webp` (needs ImageMagick). `scripts/guide-assets.test.ts` fails if the embedded set exceeds its size budget (#1647).
-- Guide image contract: `docs/user-guide/assets/manifest.json` defines every screenshot and expected pixel dimensions per language. `bun run sync-docs` and `src/lib/locales/guide-manifest.test.ts` validate complete parity between the guide HTML, manifest, and disk files (WebP and PNG masters) before build, failing on missing files or dimension mismatches. Run `bun scripts/guide-manifest.ts` to validate manually, or `bun scripts/guide-manifest.ts --generate` to update the manifest.
+The in-app Help manual lives in `docs/user-guide/`, one HTML file per UI language. Read [docs/USER_GUIDE.md](docs/USER_GUIDE.md) before editing it. Update every language together in the same change; it must work offline.
 
 ## Troubleshooting
 

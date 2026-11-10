@@ -3,7 +3,7 @@ language: TypeScript
 severity: error
 message: Celebrations fire only from an explicit user action, never inside $effect.
 note: |
-  AGENTS.md "Explicit-action-only celebrations": set the `just*` flag or apply
+  docs/UI_CONVENTIONS.md "Explicit-action-only celebrations": set the `just*` flag or apply
   the `anim-*` class from the click handler, not a reactive effect, so a
   track change to an already-favourited song doesn't celebrate.
 rule:
