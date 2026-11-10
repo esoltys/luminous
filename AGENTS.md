@@ -22,13 +22,6 @@ Metal, or Symphonic Metal — genre is often too broad and any subgenre taxonomy
 personal/subjective. A user-defined tag system for exactly this (see #224) isn't scope creep
 into Picard's territory; it's a different, complementary axis Picard was never meant to cover.
 
-## Tech Stack
-
-- **Frontend**: SvelteKit + Svelte 5 (Runes) + TypeScript + Tailwind CSS v4
-- **Backend**: Rust (edition 2021) + Tauri v2
-- **Database**: SQLite via rusqlite + r2d2
-- **Audio**: Symphonia (decode) + CPAL (output)
-
 ## Project Structure
 
 - Rust source lives in `src-tauri/src/` (the app crate) and `crates/` (engine crates with no Tauri or SQLite dependency, epics #1553 and #1762); Svelte source in `src/`
@@ -36,34 +29,6 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 - No dedicated IPC wrapper layer — components and stores call Tauri commands directly via `invoke()` from `@tauri-apps/api/core`
 
 **Engine crates** (`crates/`): `luminous-addons`, `-analysis`, `-audio`, `-devices`, `-equalizer`, `-metadata`, `-transcode` and `-remote`. Each is an engine with no Tauri or SQLite dependency, enforced in CI; `src-tauri` supplies the edge modules. Per-crate scope: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-**Core Rust modules** (`src-tauri/src/`):
-
-- `collection/` & `collection.rs` — library scanner (incremental; respects file mod times), search index, and file watcher
-- `player/` & `player.rs` — playback state machine (shuffle, repeat, queue control)
-- `playlist/` & `playlist.rs` — playlist CRUD, smart playlists, and undo/redo command stack
-- `devices/` — portable device detection, MTP device management, and storage sync
-- `db.rs` — SQLite schema, connection pool (r2d2), migrations
-- `eq_store.rs` — equalizer presets and persistence
-- `covermanager.rs` — embedded art extraction + iTunes API fallback
-- `organizer.rs` — file organization and tag-based renaming
-- `tags.rs` — user-defined tag taxonomy and track metadata editing
-- `files.rs` — filesystem browsing and folder management
-- `media_source.rs` — audio source dispatcher (local files, memory streams, remote streams)
-- `commands/` — all `#[tauri::command]` IPC handlers (registry in `commands/mod.rs`)
-
-**Key frontend stores** (`src/lib/stores/*.svelte.ts`):
-
-- `player.svelte.ts` — playback state, queue, volume, shuffle/repeat
-- `collection.svelte.ts` — library metadata, folder list, search
-- `playlists.svelte.ts` — playlist CRUD, undo/redo
-- `theme.svelte.ts` — color schemes, artwork extraction
-- `devices.svelte.ts` — portable player detection, storage view, transcode sync progress
-- `navigation.svelte.ts` — active views, tabs, back/forward history
-- `prefs.svelte.ts` — persistent application preferences
-- `tags.svelte.ts` — user tag hierarchy and song assignments
-- `context.svelte.ts` — active context for playback toasts and queue completions
-- `toast.svelte.ts` — notification toasts
 
 ## Package Manager
 
