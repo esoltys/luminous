@@ -337,6 +337,7 @@
       <h2>Sintaxis</h2>
       <div class="list">
         <div class="row"><div class="mk">•</div><div>Un campo de texto sin operador significa <b>contiene</b>: <code>genre:rock</code> coincide con cualquier género que contenga «rock».</div></div>
+        <div class="row"><div class="mk">•</div><div>Los alias de género se aplican: si <i>Prog Rock</i> es un alias de <i>Progressive Rock</i>, <code>genre:"Progressive Rock"</code> también encuentra las canciones etiquetadas como <i>Prog Rock</i>, tanto en la búsqueda como en las listas inteligentes. Usa <code>genre:=Rock</code> para encontrar solo el género completo <i>Rock</i> (no <i>Prog Rock</i>).</div></div>
         <div class="row"><div class="mk">•</div><div>Un campo numérico sin operador significa <b>exactamente</b>: <code>year:1994</code> coincide solo con 1994.</div></div>
         <div class="row"><div class="mk">•</div><div>Si hay varios términos, todos deben cumplirse: <code>rating:&gt;=4 year:&lt;2000 genre:rock</code>.</div></div>
         <div class="row"><div class="mk">•</div><div>Las palabras sin dos puntos buscan en el título, el artista y el álbum: <code>rating:&gt;=4 "tom cochrane"</code>.</div></div>

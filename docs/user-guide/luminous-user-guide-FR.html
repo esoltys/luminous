@@ -337,6 +337,7 @@
       <h2>Syntaxe</h2>
       <div class="list">
         <div class="row"><div class="mk">•</div><div>Un champ texte sans opérateur signifie <b>contient</b> : <code>genre:rock</code> trouve tout genre contenant « rock ».</div></div>
+        <div class="row"><div class="mk">•</div><div>Les alias de genre s'appliquent : si <i>Prog Rock</i> est un alias de <i>Progressive Rock</i>, <code>genre:"Progressive Rock"</code> trouve aussi les chansons étiquetées <i>Prog Rock</i>, dans la recherche comme dans les listes de lecture intelligentes. Utilisez <code>genre:=Rock</code> pour ne trouver que le genre complet <i>Rock</i> (et non <i>Prog Rock</i>).</div></div>
         <div class="row"><div class="mk">•</div><div>Un champ numérique sans opérateur signifie <b>exactement</b> : <code>year:1994</code> ne trouve que 1994.</div></div>
         <div class="row"><div class="mk">•</div><div>Tous les termes doivent correspondre : <code>rating:&gt;=4 year:&lt;2000 genre:rock</code>.</div></div>
         <div class="row"><div class="mk">•</div><div>Les mots sans deux-points cherchent dans le titre, l'artiste et l'album : <code>rating:&gt;=4 "tom cochrane"</code>.</div></div>

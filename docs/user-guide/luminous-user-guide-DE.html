@@ -337,6 +337,7 @@
       <h2>Syntax</h2>
       <div class="list">
         <div class="row"><div class="mk">•</div><div>Ein Textfeld ohne Operator bedeutet <b>enthält</b>: <code>genre:rock</code> trifft auf jedes Genre zu, das „rock“ enthält.</div></div>
+        <div class="row"><div class="mk">•</div><div>Genre-Aliasse gelten mit: Ist <i>Prog Rock</i> ein Alias von <i>Progressive Rock</i>, findet <code>genre:"Progressive Rock"</code> auch Titel mit dem Genre <i>Prog Rock</i> – in der Suche wie in Smart-Playlists. Mit <code>genre:=Rock</code> wird nur das vollständige Genre <i>Rock</i> gefunden (nicht <i>Prog Rock</i>).</div></div>
         <div class="row"><div class="mk">•</div><div>Ein Zahlenfeld ohne Operator bedeutet <b>genau</b>: <code>year:1994</code> trifft nur auf 1994 zu.</div></div>
         <div class="row"><div class="mk">•</div><div>Mehrere Begriffe müssen alle zutreffen: <code>rating:&gt;=4 year:&lt;2000 genre:rock</code>.</div></div>
         <div class="row"><div class="mk">•</div><div>Wörter ohne Doppelpunkt durchsuchen Titel, Interpret und Album: <code>rating:&gt;=4 "tom cochrane"</code>.</div></div>
