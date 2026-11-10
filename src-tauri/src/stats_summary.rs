@@ -9,9 +9,7 @@
 //! Counts everything listened to, including files opened from outside the
 //! library (`LISTENED_SOURCES_SQL`, #1842).
 
-use crate::models::{
-    parse_multi_value, ListenEvent, StatsSummary, StatsTopItem, LISTENED_SOURCES_SQL,
-};
+use crate::models::{ListenEvent, StatsSummary, StatsTopItem, LISTENED_SOURCES_SQL};
 use anyhow::Result;
 use rusqlite::{params, Connection};
 
@@ -308,7 +306,8 @@ fn top_genres(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
         .filter_map(|r| r.ok())
         .collect();
 
-    let excluded_genres = excluded_keys(conn, "genre")?;
+    let aliases = crate::genre_aliases::GenreAliases::load(conn)?;
+    let excluded_genres = aliases.expand(&excluded_keys(conn, "genre")?);
 
     #[derive(Default)]
     struct GenreAccumulator {
@@ -319,7 +318,7 @@ fn top_genres(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
     let mut counts: std::collections::HashMap<String, GenreAccumulator> =
         std::collections::HashMap::new();
     for (raw, duration_secs) in genre_rows {
-        for genre in parse_multi_value(&raw) {
+        for genre in aliases.canonical_genres(&raw) {
             if excluded_genres.contains(&genre.to_lowercase()) {
                 continue;
             }

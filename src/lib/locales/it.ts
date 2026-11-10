@@ -2165,7 +2165,20 @@ export const it = {
       other: "Rimuovere {count} tag da ogni artista che li contiene? L'operazione non può essere annullata."
     },
     deleteBtn: "Elimina",
-    cancelBtn: "Annulla"
+    cancelBtn: "Annulla",
+    aliasesTitle: "Alias dei generi",
+    aliasesHint: "Leggi una grafia di genere come un'altra. I tag dei tuoi file restano invariati.",
+    aliasLabel: "Variante",
+    canonicalLabel: "Tratta come",
+    addAliasBtn: "Aggiungi",
+    aliasesEmpty: "Ancora nessun alias.",
+    removeAliasBtn: "Rimuovi alias",
+    aliasToMenu: "Alias per…",
+    manageAliases: "Gestisci alias",
+    aliasSongCount: {
+      one: "{count} brano",
+      other: "{count} brani"
+    }
   },
   tagCleanup: {
     action: "Ripulisci i tag…",

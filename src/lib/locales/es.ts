@@ -2165,7 +2165,20 @@ export const es = {
       other: "¿Quitar las etiquetas seleccionadas ({count}) de todos los artistas que las tienen? Esta acción no se puede deshacer."
     },
     deleteBtn: "Eliminar",
-    cancelBtn: "Cancelar"
+    cancelBtn: "Cancelar",
+    aliasesTitle: "Alias de género",
+    aliasesHint: "Lee una grafía de género como otra. Las etiquetas de tus archivos no cambian.",
+    aliasLabel: "Variante",
+    canonicalLabel: "Tratar como",
+    addAliasBtn: "Añadir",
+    aliasesEmpty: "Aún no hay alias.",
+    removeAliasBtn: "Quitar alias",
+    aliasToMenu: "Alias de…",
+    manageAliases: "Gestionar alias",
+    aliasSongCount: {
+      one: "{count} canción",
+      other: "{count} canciones"
+    }
   },
   tagCleanup: {
     action: "Limpiar etiquetas…",

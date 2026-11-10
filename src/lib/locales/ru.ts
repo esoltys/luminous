@@ -2323,7 +2323,22 @@ export const ru = {
       other: "Удалить {count} тега у каждого исполнителя, у которого они есть? Это действие нельзя отменить."
     },
     deleteBtn: "Удалить",
-    cancelBtn: "Отмена"
+    cancelBtn: "Отмена",
+    aliasesTitle: "Псевдонимы жанров",
+    aliasesHint: "Читайте одно написание жанра как другое. Теги в ваших файлах не меняются.",
+    aliasLabel: "Псевдоним",
+    canonicalLabel: "Считать",
+    addAliasBtn: "Добавить",
+    aliasesEmpty: "Псевдонимов пока нет.",
+    removeAliasBtn: "Удалить псевдоним",
+    aliasToMenu: "Псевдоним для…",
+    manageAliases: "Управление псевдонимами",
+    aliasSongCount: {
+      one: "{count} трек",
+      few: "{count} трека",
+      many: "{count} треков",
+      other: "{count} трека"
+    }
   },
   tagCleanup: {
     action: "Очистить теги…",

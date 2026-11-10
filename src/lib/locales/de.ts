@@ -2165,7 +2165,20 @@ export const de = {
       other: "{count} Tags von jedem Interpreten entfernen, der sie trägt? Dies kann nicht rückgängig gemacht werden."
     },
     deleteBtn: "Löschen",
-    cancelBtn: "Abbrechen"
+    cancelBtn: "Abbrechen",
+    aliasesTitle: "Genre-Aliasse",
+    aliasesHint: "Lies eine Genre-Schreibweise als eine andere. Die Tags deiner Dateien bleiben unverändert.",
+    aliasLabel: "Alternativname",
+    canonicalLabel: "Behandeln als",
+    addAliasBtn: "Hinzufügen",
+    aliasesEmpty: "Noch keine Aliasse.",
+    removeAliasBtn: "Alias entfernen",
+    aliasToMenu: "Alias für…",
+    manageAliases: "Aliasse verwalten",
+    aliasSongCount: {
+      one: "{count} Titel",
+      other: "{count} Titel"
+    }
   },
   tagCleanup: {
     action: "Tags bereinigen…",

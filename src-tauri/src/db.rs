@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 78;
+pub const CURRENT_SCHEMA_VERSION: i32 = 79;
 
 struct Migration {
     version: i32,
@@ -758,6 +758,21 @@ const MIGRATIONS: &[Migration] = &[
                     CREATE INDEX IF NOT EXISTS idx_songs_language ON songs(language COLLATE NOCASE);",
                 )?;
             }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 79,
+        description: "add genre_aliases for non-destructive genre normalization (#1942)",
+        apply: |conn| {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS genre_aliases (
+                    alias_name     TEXT PRIMARY KEY NOT NULL COLLATE NOCASE,
+                    canonical_name TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_genre_aliases_canonical
+                    ON genre_aliases(canonical_name COLLATE NOCASE);",
+            )?;
             Ok(())
         },
     },

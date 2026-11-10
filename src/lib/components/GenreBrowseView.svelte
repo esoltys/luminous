@@ -2,7 +2,8 @@
   import ViewModeToggle from "./ViewModeToggle.svelte";
   import {
     TagIcon,
-    PlusIcon as Plus
+    PlusIcon as Plus,
+    GitMergeIcon as GitMerge
   } from "phosphor-svelte";
   import { onMount } from "svelte";
   import { tagsStore } from "../stores/tags.svelte";
@@ -18,6 +19,7 @@
   import ArtistTagCards from "./ArtistTagCards.svelte";
   import LanguageCards from "./LanguageCards.svelte";
   import CreateArtistTagGroupDialog from "./CreateArtistTagGroupDialog.svelte";
+  import GenreAliasesDialog from "./GenreAliasesDialog.svelte";
 
   let showNewGroupDialog = $state(false);
 
@@ -119,6 +121,10 @@
           <div></div>
         {/if}
         <div class="flex items-center gap-2">
+          <Button onclick={() => tagsStore.openAliasDialog()} variant="secondary" title={i18n.t('songTags.manageAliases', {}, 'Manage Aliases')}>
+            <GitMerge class="w-4 h-4" />
+            <span>{i18n.t('songTags.manageAliases', {}, 'Manage Aliases')}</span>
+          </Button>
           <!-- Cards / rows toggle -->
           <ViewModeToggle mode={prefs.genreCardsViewMode} onChange={(m) => prefs.setGenreCardsViewMode(m)} />
           <!-- Sort dropdown -->
@@ -203,5 +209,12 @@
   <CreateArtistTagGroupDialog
     onConfirm={(name) => handleCreateGroup(name, [])}
     onCancel={() => { showNewGroupDialog = false; }}
+  />
+{/if}
+
+{#if tagsStore.aliasDialogPrefill !== null}
+  <GenreAliasesDialog
+    initialAlias={tagsStore.aliasDialogPrefill}
+    onClose={() => tagsStore.closeAliasDialog()}
   />
 {/if}

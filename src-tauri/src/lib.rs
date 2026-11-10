@@ -30,6 +30,7 @@ pub mod eq_store;
 pub mod fade;
 pub mod files;
 pub mod filter_parser;
+pub mod genre_aliases;
 pub mod hierarchy_sidecar;
 pub mod install_format;
 pub mod library_paths;
@@ -1592,6 +1593,9 @@ pub fn run() {
             commands::tags::get_songs_by_language,
             // Persisted Genres curation hierarchy (#545)
             commands::tags::get_tag_hierarchy,
+            commands::tags::get_genre_aliases,
+            commands::tags::set_genre_alias,
+            commands::tags::remove_genre_alias,
             commands::tags::set_tag_group_color,
             commands::tags::reparent_tag,
             commands::tags::promote_tag,

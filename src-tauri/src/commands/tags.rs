@@ -1,5 +1,6 @@
 use crate::{
     collection::{SelfWriteTracker, WatcherPauseGuard},
+    genre_aliases::GenreAlias,
     models::{GenreGroup, LanguageSummary, QueuePopulationMode, Song, Tag, TagGroup},
     tags::TagManager,
     AppState,
@@ -634,4 +635,64 @@ pub async fn delete_tags(
     let _ = app.emit("library-changed", ());
 
     Ok(updated_count)
+}
+
+// ---------------------------------------------------------------------------
+// Non-destructive genre aliases (#1942)
+// ---------------------------------------------------------------------------
+
+/// Runs a blocking alias-table operation off the async runtime.
+async fn with_alias_conn<T: Send + 'static>(
+    state: &State<'_, AppState>,
+    f: impl FnOnce(&mut rusqlite::Connection) -> anyhow::Result<T> + Send + 'static,
+) -> Result<T, String> {
+    let db = state.db.clone();
+    tokio::task::spawn_blocking(move || f(&mut *db.pool.get()?))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_genre_aliases(state: State<'_, AppState>) -> Result<Vec<GenreAlias>, String> {
+    with_alias_conn(&state, |conn| crate::genre_aliases::list_aliases(conn)).await
+}
+
+/// Treats `alias` as another spelling of `canonical`. No file is touched;
+/// `library-changed` makes genre auto-playlists pick up the new membership
+/// right away.
+#[tauri::command]
+pub async fn set_genre_alias(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    alias: String,
+    canonical: String,
+) -> Result<(), String> {
+    with_alias_conn(&state, move |conn| {
+        crate::genre_aliases::set_alias(conn, &alias, &canonical)
+    })
+    .await?;
+    notify_aliases_changed(&app);
+    Ok(())
+}
+
+/// Removes an alias, restoring the raw genre spelling everywhere. Removing
+/// one that doesn't exist succeeds.
+#[tauri::command]
+pub async fn remove_genre_alias(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    alias: String,
+) -> Result<(), String> {
+    with_alias_conn(&state, move |conn| {
+        crate::genre_aliases::remove_alias(conn, &alias)
+    })
+    .await?;
+    notify_aliases_changed(&app);
+    Ok(())
+}
+
+fn notify_aliases_changed(app: &AppHandle) {
+    let _ = app.emit("tags-changed", ());
+    let _ = app.emit("library-changed", ());
 }
