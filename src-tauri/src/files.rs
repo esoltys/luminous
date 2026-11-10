@@ -1386,7 +1386,7 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
         let conn = db.pool.get().unwrap();
         conn.execute(
-            "INSERT INTO directories (id, path, subdirs) VALUES (1, ?1, 1)",
+            "INSERT INTO directories (id, path) VALUES (1, ?1)",
             params![root.to_string_lossy()],
         )
         .unwrap();
@@ -1775,7 +1775,7 @@ mod tests {
             .get()
             .unwrap()
             .execute(
-                "INSERT INTO directories (id, path, subdirs) VALUES (2, ?1, 1)",
+                "INSERT INTO directories (id, path) VALUES (2, ?1)",
                 params![f.root.join("A").to_string_lossy()],
             )
             .unwrap();

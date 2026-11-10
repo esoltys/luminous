@@ -197,18 +197,18 @@ describe("SettingsSources.svelte - Default library", () => {
   it("offers the watched folders and shows why a link was refused, keeping the picker on None", async () => {
     const { collectionStore } = await import("../stores/collection.svelte");
     collectionStore.directories = [
-      { id: 1, path: "D:\Music", nickname: "", subdirs: true } as never,
+      { id: 1, path: "D:\\Music", nickname: "" } as never,
     ];
     const { findByLabelText, findByRole } = render(SettingsSources);
 
     const select = (await findByLabelText("Default Library")) as HTMLSelectElement;
-    expect([...select.options].map((o) => o.text)).toEqual(["None", "D:\Music"]);
+    expect([...select.options].map((o) => o.text)).toEqual(["None", "Music"]);
 
-    await fireEvent.change(select, { target: { value: "D:\Music" } });
+    await fireEvent.change(select, { target: { value: "D:\\Music" } });
 
-    expect(invoke).toHaveBeenCalledWith("set_default_library", { path: "D:\Music" });
+    expect(invoke).toHaveBeenCalledWith("set_default_library", { path: "D:\\Music" });
     expect(await findByRole("alert")).toHaveTextContent(
-      "The genre hierarchy file in D:\Music is broken."
+      "The genre hierarchy file in D:\\Music is broken."
     );
     expect(select.value).toBe("");
   });

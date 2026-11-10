@@ -390,14 +390,13 @@ impl CollectionScanner {
     pub fn add_directory(&self, path: &str) -> Result<MusicDirectory> {
         let conn = self.db.pool.get()?;
         conn.execute(
-            "INSERT OR IGNORE INTO directories (path, subdirs) VALUES (?1, 1)",
+            "INSERT OR IGNORE INTO directories (path) VALUES (?1)",
             params![path],
         )?;
         let id = conn.last_insert_rowid();
         Ok(MusicDirectory {
             id,
             path: path.to_string(),
-            subdirs: true,
             is_available: std::path::Path::new(path).exists(),
             nickname: None,
             icon: None,
@@ -447,9 +446,8 @@ impl CollectionScanner {
     /// List all watched directories.
     pub fn get_directories(&self) -> Result<Vec<MusicDirectory>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
-            "SELECT id, path, subdirs, nickname, icon, color FROM directories ORDER BY path",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT id, path, nickname, icon, color FROM directories ORDER BY path")?;
         let dirs = stmt
             .query_map([], |row| {
                 let path: String = row.get(1)?;
@@ -457,11 +455,10 @@ impl CollectionScanner {
                 Ok(MusicDirectory {
                     id: row.get(0)?,
                     path,
-                    subdirs: row.get(2)?,
                     is_available,
-                    nickname: row.get(3)?,
-                    icon: row.get(4)?,
-                    color: row.get(5)?,
+                    nickname: row.get(2)?,
+                    icon: row.get(3)?,
+                    color: row.get(4)?,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -3279,7 +3276,6 @@ mod tests {
         let dir_with_nickname = MusicDirectory {
             id: 1,
             path: "/path/to/my_music".to_string(),
-            subdirs: true,
             is_available: true,
             nickname: Some("Fast SSD".to_string()),
             icon: None,
@@ -3290,7 +3286,6 @@ mod tests {
         let dir_with_empty_nickname = MusicDirectory {
             id: 2,
             path: "/path/to/ambient".to_string(),
-            subdirs: true,
             is_available: true,
             nickname: Some("   ".to_string()),
             icon: None,
@@ -3301,7 +3296,6 @@ mod tests {
         let dir_without_nickname = MusicDirectory {
             id: 3,
             path: "/path/to/nas_storage".to_string(),
-            subdirs: true,
             is_available: true,
             nickname: None,
             icon: None,
