@@ -17,6 +17,8 @@
 //! (see [`FileType::from_token`]) and `lossless:true|false` its lossless-ness.
 //! `genre:` reads through the user's genre aliases (#1995), so `genre:Prog Rock`
 //! and `genre:Progressive Rock` select the same songs (see [`FilterValue::Genre`]).
+//! Unlike other text fields, `genre:=X` / `genre:!=X` compare whole `;`-separated
+//! genres, not the whole column: `genre:=Rock` matches `Rock; Pop`.
 //! Unrecognized
 //! fields are silently dropped (not an error) rather than falling back to a
 //! bare-term match.
