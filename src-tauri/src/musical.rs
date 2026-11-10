@@ -193,9 +193,9 @@ pub fn needs_analysis(conn: &Connection, song_id: i64) -> rusqlite::Result<bool>
 }
 
 /// Longest track the background worker decodes. Decoding buffers the whole file as mono PCM, so
-/// hour-long mixes and audiobooks are left alone (they are still analysed if played, like
+/// long mixes, live sets and audiobooks are left alone (they are still analysed if played, like
 /// their waveforms).
-const MAX_BACKGROUND_TRACK_SECONDS: i64 = 30 * 60;
+const MAX_BACKGROUND_TRACK_SECONDS: i64 = 10 * 60;
 
 /// The songs worth decoding for tempo/key: local songs missing a tempo or key that are not yet
 /// analysed, and short enough to decode in the background. Songs that already carry both tags are
@@ -504,7 +504,7 @@ mod tests {
         let conn = db.pool.get().unwrap();
         conn.execute(
             "UPDATE songs SET length_nanosec = ?2 WHERE id = ?1",
-            params![long, 2 * 3600 * 1_000_000_000i64],
+            params![long, 11 * 60 * 1_000_000_000i64],
         )
         .unwrap();
         conn.execute(
