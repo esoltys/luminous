@@ -1496,6 +1496,8 @@ END;
 CREATE TABLE IF NOT EXISTS directories (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     path    TEXT UNIQUE NOT NULL,
+    -- Vestigial (#1874): never read or written; every folder is scanned
+    -- recursively. Kept (with its default) so older builds stay compatible.
     subdirs BOOLEAN NOT NULL DEFAULT 1
 );
 
@@ -3104,7 +3106,7 @@ mod tests {
 
         let conn = db.pool.get().unwrap();
         conn.execute(
-            "INSERT INTO directories (path, subdirs, nickname, icon, color) VALUES (?1, 1, ?2, ?3, ?4)",
+            "INSERT INTO directories (path, nickname, icon, color) VALUES (?1, ?2, ?3, ?4)",
             params!["/test/music", "My Library", "hard-drive", "#3b82f6"],
         )
         .unwrap();

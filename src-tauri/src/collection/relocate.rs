@@ -473,7 +473,7 @@ mod tests {
 
     fn watch(conn: &rusqlite::Connection, dir: &Path) {
         conn.execute(
-            "INSERT INTO directories (path, subdirs) VALUES (?1, 1)",
+            "INSERT INTO directories (path) VALUES (?1)",
             params![dir.to_string_lossy()],
         )
         .unwrap();

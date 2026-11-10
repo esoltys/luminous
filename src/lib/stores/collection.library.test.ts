@@ -365,7 +365,6 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     const dirWithNickname = {
       id: 1,
       path: "/media/music/flac",
-      subdirs: true,
       is_available: true,
       nickname: "Main Vault",
     };
@@ -374,7 +373,6 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     const dirWithEmptyNickname = {
       id: 2,
       path: "/media/music/lossy",
-      subdirs: true,
       is_available: true,
       nickname: "   ",
     };
@@ -383,7 +381,6 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     const dirWithoutNickname = {
       id: 3,
       path: "D:\\Audio\\Soundtracks",
-      subdirs: true,
       is_available: true,
     };
     expect(getDirectoryDisplayName(dirWithoutNickname)).toBe("Soundtracks");

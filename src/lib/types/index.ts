@@ -731,7 +731,6 @@ export interface BadgeSource {
 
 export interface MusicDirectory extends BadgeSource {
   id: number;
-  subdirs: boolean;
 }
 
 export interface MassRemovalIncident {

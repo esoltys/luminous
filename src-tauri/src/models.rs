@@ -983,7 +983,6 @@ impl Default for FadeSettings {
 pub struct MusicDirectory {
     pub id: i64,
     pub path: String,
-    pub subdirs: bool,
     #[serde(default)]
     pub is_available: bool,
     pub nickname: Option<String>,

@@ -811,7 +811,6 @@ class CollectionStore {
     return {
       id: -1_000_000 - server.id,
       path: server.url,
-      subdirs: true,
       nickname: server.nickname || server.name,
       icon: server.icon || "cloud",
       color: server.color ?? null,
@@ -846,7 +845,6 @@ class CollectionStore {
     return {
       id: -server.id,
       path: base,
-      subdirs: true,
       nickname: server.nickname?.trim() || server.name,
       icon: server.icon || "cloud",
       color: server.color ?? null,

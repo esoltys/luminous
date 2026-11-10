@@ -555,7 +555,7 @@ mod tests {
         let device_dir = tempfile::tempdir().unwrap();
         let library = device_dir.path().join("Library");
         conn.execute(
-            "INSERT INTO directories (path, subdirs) VALUES (?1, 1)",
+            "INSERT INTO directories (path) VALUES (?1)",
             [library.to_string_lossy()],
         )
         .unwrap();
