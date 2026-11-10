@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
-The imported `AGENTS.md` above is the canonical instructions file for this repo (commands, architecture, invariants, workflow, design conventions) — it is kept up to date and applies to Claude Code equally. Everything below is Claude-Code-specific and supplements it.
+The imported `AGENTS.md` above is the canonical instructions file for this repo (commands, architecture, invariants, workflow; UI design conventions live in `docs/UI_CONVENTIONS.md`) — it is kept up to date and applies to Claude Code equally. Everything below is Claude-Code-specific and supplements it.
 
 ## Release Process
 - If a release is being initiated from a Cloud Environment (not the user's local machine), STOP immediately and notify the user — cutting a release must be done from a local environment.
