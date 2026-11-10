@@ -388,7 +388,7 @@
             {/if}
           </div>
           {#if scrobblerStore.lastError}
-            <InlineMessage class="text-[11px]">{scrobblerStore.lastError}</InlineMessage>
+            <InlineMessage size="compact">{scrobblerStore.lastError}</InlineMessage>
           {:else}
             <p class="text-[11px] text-brand-text-secondary">
               {i18n.t('listenbrainz.cacheDesc')}
@@ -592,7 +592,7 @@
             {/if}
           </div>
           {#if scrobblerStore.lastError}
-            <InlineMessage class="text-[11px]">{scrobblerStore.lastError}</InlineMessage>
+            <InlineMessage size="compact">{scrobblerStore.lastError}</InlineMessage>
           {:else}
             <p class="text-[11px] text-brand-text-secondary">
               {i18n.t('lastfm.cacheDesc')}

@@ -239,7 +239,7 @@
           </button>
 
           {#if lbConnectError}
-            <InlineMessage class="text-[11px] pt-0.5">{lbConnectError}</InlineMessage>
+            <InlineMessage size="compact" class="pt-0.5">{lbConnectError}</InlineMessage>
           {/if}
         </div>
       {/if}

@@ -10,18 +10,18 @@
 
   interface Props {
     children: Snippet;
-    /** Text size utility; the icon scales with it. */
-    size?: "xs" | "sm";
+    /** `compact` is 11px (dense rows); the icon scales with the text. */
+    size?: "default" | "compact";
     /** Pass "alert" for errors that appear in response to a user action. */
-    role?: "alert" | "status";
+    role?: "alert";
     id?: string;
     class?: string;
   }
 
-  let { children, size = "xs", role, id, class: className = "" }: Props = $props();
+  let { children, size = "default", role, id, class: className = "" }: Props = $props();
 </script>
 
-<div {id} {role} class="flex items-start gap-1.5 text-brand-text-primary {size === 'sm' ? 'text-sm' : 'text-xs'} {className}">
+<div {id} {role} class="flex items-start gap-1.5 text-brand-text-primary {size === 'compact' ? 'text-[11px]' : 'text-xs'} {className}">
   <WarningIcon class="w-[1.1em] h-[1.1em] shrink-0 translate-y-[calc((1lh-1.1em)/2)]" />
   <span class="min-w-0 wrap-anywhere">{@render children()}</span>
 </div>
