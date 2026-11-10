@@ -136,7 +136,7 @@
         {i18n.t("songTags.aliasesEmpty", {}, "No aliases yet.")}
       </p>
     {:else}
-      <ul class="flex flex-col divide-y divide-brand-border/40 max-h-64 overflow-y-auto">
+      <ul class="flex flex-col divide-y divide-brand-border/40 max-h-64 overflow-y-auto pr-3">
         {#each tagsStore.genreAliases as entry (entry.alias)}
           <li class="flex items-center gap-2 py-2 text-sm">
             <span class="truncate text-brand-text-primary">{entry.alias}</span>
