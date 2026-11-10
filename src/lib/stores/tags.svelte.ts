@@ -135,6 +135,26 @@ class TagsStore {
     this.aliasDialogPrefill = null;
   }
 
+  /** Aliases that roll up into `genre`, case-insensitively (empty for an alias). */
+  aliasesOf(genre: string): GenreAlias[] {
+    const key = genre.toLowerCase();
+    return this.genreAliases.filter((a) => a.canonical.toLowerCase() === key);
+  }
+
+  /** The canonical genre `name` is read as, or `undefined` when it isn't an alias. */
+  canonicalOf(name: string): string | undefined {
+    const key = name.toLowerCase();
+    return this.genreAliases.find((a) => a.alias.toLowerCase() === key)?.canonical;
+  }
+
+  /** Keeps `genreAliases` fresh for a view that shows them without owning the
+   * Genres tab. Call on mount and unlisten on unmount. */
+  async listenForAliasChanges(): Promise<() => void> {
+    return this.events.listen("tags-changed", () => {
+      this.loadGenreAliases().catch((e) => console.error("Failed to load genre aliases:", e));
+    });
+  }
+
   async loadGenreAliases() {
     const result = await invoke<GenreAlias[]>("get_genre_aliases");
     this.genreAliases = Array.isArray(result) ? result : [];

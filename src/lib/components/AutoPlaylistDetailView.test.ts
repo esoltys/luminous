@@ -4,6 +4,7 @@ import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import AutoPlaylistDetailView from "./AutoPlaylistDetailView.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { tagsStore } from "../stores/tags.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { Playlist, PlaylistItem, PlaylistSizeFit, Song } from "../types";
 
@@ -130,5 +131,49 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
         "Track One",
       ])
     );
+  });
+});
+
+describe("AutoPlaylistDetailView genre aliases (#1994)", () => {
+  let aliases: { alias: string; canonical: string; song_count: number }[];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    collectionStore.searchQuery = "";
+    collectionStore.directories = [];
+    playlistsStore.playlists = [genrePlaylist];
+    tagsStore.genreAliases = [];
+    aliases = [{ alias: "Syn Wave", canonical: "Synthwave", song_count: 2 }];
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_playlist_tracks") return items;
+      if (cmd === "get_genre_aliases") return aliases;
+      return [];
+    });
+  });
+
+  it("lists the aliases rolled into the viewed genre and opens the dialog from a chip", async () => {
+    const openSpy = vi.spyOn(tagsStore, "openAliasDialog").mockImplementation(() => {});
+    const { findByRole } = render(AutoPlaylistDetailView, {
+      view: { kind: "genre" as const, genre: "Synthwave", playlistId: 5 },
+    });
+    await fireEvent.click(await findByRole("button", { name: "Manage alias Syn Wave" }));
+    expect(openSpy).toHaveBeenCalledWith("Syn Wave");
+  });
+
+  it("omits the row when the genre has no aliases", async () => {
+    aliases = [];
+    const { findByText, queryByText } = render(AutoPlaylistDetailView, {
+      view: { kind: "genre" as const, genre: "Synthwave", playlistId: 5 },
+    });
+    await findByText("Track Three");
+    expect(queryByText("Also includes")).toBeNull();
+  });
+
+  it("names the canonical genre when the viewed genre is an alias", async () => {
+    const { findByRole, queryByText } = render(AutoPlaylistDetailView, {
+      view: { kind: "genre" as const, genre: "Syn Wave", playlistId: 5 },
+    });
+    expect(await findByRole("button", { name: "Synthwave" })).toBeInTheDocument();
+    expect(queryByText("Also includes")).toBeNull();
   });
 });
