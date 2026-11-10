@@ -11,6 +11,7 @@
   import { organizeStore } from "../stores/organizer.svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import Toggle from "./Toggle.svelte";
+  import InlineMessage from "./InlineMessage.svelte";
   import Select from "./Select.svelte";
   import HelpTip from "./HelpTip.svelte";
   import Button from "./Button.svelte";
@@ -414,7 +415,7 @@
               <LibraryBadge directory={dir} size="sm" />
               <p class="text-xs text-brand-text-secondary truncate" title={dir.path}>{dir.path}</p>
             </div>
-            <p class="text-xs" class:text-brand-text-secondary={dir.is_available !== false} class:text-red-400={dir.is_available === false}>
+            <p class="text-xs" class:text-brand-text-secondary={dir.is_available !== false} class:text-brand-text-primary={dir.is_available === false}>
               {#if dir.is_available === false}
                 <span class="flex items-center gap-1">
                   <AlertTriangle class="w-3 h-3" />
@@ -464,7 +465,7 @@
           </button>
           <button
             onclick={() => handleRemoveDirectory(dir.path)}
-            class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-text-primary/10 text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-text-secondary transition-colors"
             title={i18n.t('settings.folderItemStopWatch')}
           >
             <Trash2 class="w-4 h-4 text-brand-accent-text" />
@@ -479,7 +480,7 @@
           <label for="default-library-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.defaultLibraryLabel')}</label>
           <p class="text-xs text-brand-text-secondary">{i18n.t('settings.defaultLibraryHint')}</p>
           {#if defaultLibraryError}
-            <p class="text-xs text-red-400 break-words" role="alert">{defaultLibraryError}</p>
+            <InlineMessage role="alert">{defaultLibraryError}</InlineMessage>
           {/if}
         </div>
         <Select
@@ -569,7 +570,7 @@
                 {combineWebdavPath(server.url, server.remotePath)}
               </p>
             </div>
-            <p class="text-xs" class:text-brand-text-secondary={webdavConnected[server.id] !== false} class:text-red-400={webdavConnected[server.id] === false}>
+            <p class="text-xs" class:text-brand-text-secondary={webdavConnected[server.id] !== false} class:text-brand-text-primary={webdavConnected[server.id] === false}>
               {#if webdavConnected[server.id] === false}
                 <span class="flex items-center gap-1">
                   <AlertTriangle class="w-3 h-3" />
@@ -615,7 +616,7 @@
           </button>
           <button
             onclick={() => handleRemoveWebdavServer(server)}
-            class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-text-primary/10 text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-text-secondary transition-colors"
             title={i18n.t('settings.confirmRemoveWebdavServer', { name: server.name })}
           >
             <Trash2 class="w-4 h-4 text-brand-accent-text" />
@@ -701,7 +702,7 @@
                 {getSubsonicServerLabel(server)}
               </p>
             </div>
-            <p class="text-xs" class:text-brand-text-secondary={subsonicConnected[server.id] !== false} class:text-red-400={subsonicConnected[server.id] === false}>
+            <p class="text-xs" class:text-brand-text-secondary={subsonicConnected[server.id] !== false} class:text-brand-text-primary={subsonicConnected[server.id] === false}>
               {#if subsonicConnected[server.id] === false}
                 <span class="flex items-center gap-1">
                   <AlertTriangle class="w-3 h-3" />
@@ -749,7 +750,7 @@
           </button>
           <button
             onclick={() => handleRemoveSubsonicServer(server)}
-            class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-text-primary/10 text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-text-secondary transition-colors"
             title={i18n.t('settings.removeSubsonicServer')}
             aria-label={i18n.t('settings.removeSubsonicServer')}
           >

@@ -2,6 +2,7 @@
   import { fly, fade } from "../utils/motion";
   import {
     WarningIcon as AlertTriangle,
+    XCircleIcon as XCircle,
     CheckCircleIcon as CheckCircle2,
     InfoIcon as Info,
     ChecksIcon as CheckCheck,
@@ -90,9 +91,9 @@
       out:fade={{ duration: 150 }}
       class="pointer-events-auto flex items-start gap-2.5 px-4 py-2.5 rounded-lg border shadow-2xl text-sm font-semibold max-w-md
         {toast.variant === 'error'
-          ? 'bg-[#1f1013] border-red-500/50 text-red-400 anim-warn-shake'
+          ? 'bg-brand-sidebar border-brand-text-primary text-brand-text-primary anim-warn-shake'
           : toast.variant === 'warning'
-            ? 'bg-[#1f1a10] border-amber-500/50 text-amber-400 anim-warn-shake'
+            ? 'bg-brand-sidebar border-brand-text-primary/50 text-brand-text-primary anim-warn-shake'
             : toast.variant === 'milestone'
               ? 'bg-[#1f1a12] border-brand-gold/50 text-brand-gold'
               : 'bg-brand-sidebar border-brand-border text-brand-text-primary'}"
@@ -143,7 +144,9 @@
             <AlertTriangle class="w-4 h-4 shrink-0 text-brand-text-secondary" />
           {/if}
         </div>
-      {:else if toast.variant === "error" || toast.variant === "warning"}
+      {:else if toast.variant === "error"}
+        <XCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
+      {:else if toast.variant === "warning"}
         <AlertTriangle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
       {:else if toast.variant === "success"}
         <span class="relative inline-flex w-4 h-4 shrink-0 items-center justify-center translate-y-[calc((1lh-1rem)/2)]">

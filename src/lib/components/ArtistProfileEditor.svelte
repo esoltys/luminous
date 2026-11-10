@@ -233,7 +233,7 @@
                   <button
                     type="button"
                     onclick={() => handleRemoveTag(idx)}
-                    class="hover:text-red-400 focus:outline-none"
+                    class="hover:text-brand-text-primary focus:outline-none"
                     title={i18n.t("artistProfileEditor.removeTagTooltip", { tag }, `Remove tag ${tag}`)}
                   >
                     <X class="w-3 h-3" />
@@ -334,7 +334,7 @@
                     <button
                       type="button"
                       onclick={() => handleRemoveSocialLink(idx)}
-                      class="p-1.5 text-brand-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors shrink-0"
+                      class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-text-primary/10 rounded-md transition-colors shrink-0"
                       title={i18n.t("artistProfileEditor.removeLinkTooltip", {}, "Remove link")}
                     >
                       <Trash2 class="w-3.5 h-3.5" />

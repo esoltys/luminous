@@ -255,7 +255,7 @@
                   {/if}
                   {#if event.cancelled}
                     <span
-                      class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400 uppercase tracking-wider select-none"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-text-primary/10 border border-dashed border-brand-border text-brand-text-primary uppercase tracking-wider select-none"
                     >
                       {i18n.t("artistEvents.cancelled", {}, "Cancelled")}
                     </span>

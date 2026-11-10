@@ -52,7 +52,7 @@
     <span class="min-w-0 text-xs text-brand-text-secondary">
       {target ? i18n.t("devices.syncingTo", { storage: storageName(device, target) }) : ""}
     </span>
-    <span class="text-xs font-semibold {plan && !plan.storage.fits ? 'text-amber-400' : plan ? 'text-brand-text-primary' : 'text-brand-text-secondary'}">
+    <span class="text-xs font-semibold {plan ? 'text-brand-text-primary' : 'text-brand-text-secondary'}">
       {#if plan}
         {verdict}
       {:else if failed}

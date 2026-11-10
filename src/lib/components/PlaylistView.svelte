@@ -904,7 +904,7 @@
         </button>
         <button
           onclick={removeSelected}
-          class="flex items-center gap-1.5 text-red-400 hover:text-red-300 transition-colors"
+          class="flex items-center gap-1.5 text-brand-text-primary hover:text-brand-text-secondary transition-colors"
         >
           <Trash2 class="w-3.5 h-3.5" />
           <span>{i18n.t("playlists.removeSelected")}</span>

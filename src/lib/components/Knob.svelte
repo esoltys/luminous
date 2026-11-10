@@ -165,7 +165,7 @@
     {#if label}
       <span class="text-[10px] font-bold text-brand-text-secondary uppercase tracking-wider">{label}</span>
     {/if}
-    <span class="text-xs font-mono font-medium {value > 0 ? 'text-green-400' : value < 0 ? 'text-red-400' : 'text-brand-text-primary'}">
+    <span class="text-xs font-mono font-medium text-brand-text-primary">
       {value > 0 ? "+" : ""}{format(value)}{suffix ? ` ${suffix}` : ""}
     </span>
   </div>

@@ -532,7 +532,7 @@
                 <button
                   type="button"
                   onclick={() => removeRule(rule.id)}
-                  class="text-brand-text-secondary/60 hover:text-rose-400 p-1 rounded-lg transition-colors"
+                  class="text-brand-text-secondary/60 hover:text-brand-text-primary p-1 rounded-lg transition-colors"
                   title={i18n.t("smartPlaylistBuilder.removeRuleTooltip")}
                 >
                   <X class="w-4 h-4" />

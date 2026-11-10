@@ -18,6 +18,7 @@
     TrashIcon as Trash2
   } from "phosphor-svelte";
   import Toggle from "./Toggle.svelte";
+  import InlineMessage from "./InlineMessage.svelte";
   import Select from "./Select.svelte";
   import Knob from "./Knob.svelte";
   import ParametricGraph from "./ParametricGraph.svelte";
@@ -703,7 +704,7 @@
             </div>
           </div>
         {/if}
-        <span class="text-xs font-mono font-medium w-16 text-right {preamp > 0 ? 'text-green-400' : preamp < 0 ? 'text-red-400' : 'text-brand-text-primary'}">
+        <span class="text-xs font-mono font-medium w-16 text-right text-brand-text-primary">
           {preamp > 0 ? "+" : ""}{formatNumber(preamp, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} {i18n.t("units.db")}
         </span>
       </div>
@@ -792,7 +793,7 @@
           </button>
         </div>
         {#if nameError}
-          <p id="eq-preset-name-error" class="text-xs text-red-400" role="alert">{nameError}</p>
+          <InlineMessage id="eq-preset-name-error" role="alert">{nameError}</InlineMessage>
         {/if}
       </form>
     {/if}
@@ -861,7 +862,7 @@
           </button>
         </div>
         {#if importError}
-          <p id="eq-import-error" class="text-xs text-red-400" role="alert">{importError}</p>
+          <InlineMessage id="eq-import-error" role="alert">{importError}</InlineMessage>
         {/if}
       </form>
     {/if}
@@ -872,7 +873,7 @@
       <div class="grid grid-cols-5 @3xl:grid-cols-10 gap-3 @3xl:gap-5 min-h-64 h-auto @3xl:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-4 @3xl:p-6">
         {#each gains as gain, idx}
           <div class="flex flex-col items-center justify-between h-full group">
-            <span class="text-[10px] font-bold w-full text-center transition-colors {gain > 0 ? 'text-green-400/80' : gain < 0 ? 'text-red-400/80' : 'text-brand-text-secondary/70'}">
+            <span class="text-[10px] font-bold w-full text-center transition-colors {gain === 0 ? 'text-brand-text-secondary/70' : 'text-brand-text-primary'}">
               {gain > 0 ? "+" : ""}{formatNumber(gain, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
             </span>
 

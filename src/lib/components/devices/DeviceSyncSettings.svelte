@@ -476,7 +476,7 @@
                 </Select>
               </div>
             {/if}
-            <p class="text-xs flex gap-1.5 {convertWarns ? 'text-amber-400' : 'text-brand-text-secondary'}">
+            <p class="text-xs flex gap-1.5 {convertWarns ? 'text-brand-text-primary' : 'text-brand-text-secondary'}">
               {#if convertWarns}<WarningIcon class="w-3.5 h-3.5 shrink-0 mt-px" />{/if}
               <span>{convertHint}</span>
             </p>

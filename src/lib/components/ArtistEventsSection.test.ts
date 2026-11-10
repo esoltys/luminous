@@ -205,8 +205,8 @@ describe("ArtistEventsSection", () => {
     expect(typeBadge.className).toContain("border-brand-border");
 
     const cancelledBadge = screen.getByText("Cancelled");
-    expect(cancelledBadge.className).toContain("text-red-600");
-    expect(cancelledBadge.className).toContain("dark:text-red-400");
+    expect(cancelledBadge.className).toContain("text-brand-text-primary");
+    expect(cancelledBadge.className).toContain("border-dashed");
   });
 
   it("renders TBA calendar badge for undated events and sorts them after dated concerts", () => {

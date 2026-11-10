@@ -314,7 +314,7 @@
               </button>
               <button
                 onclick={(e) => { e.stopPropagation(); themeStore.deleteCustomTheme(theme.id); }}
-                class="p-1 shrink-0 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors flex items-center justify-center"
+                class="p-1 shrink-0 rounded bg-brand-main hover:bg-brand-text-primary/10 text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-text-secondary transition-colors flex items-center justify-center"
                 title={i18n.t('settings.deleteTheme')}
                 aria-label={i18n.t('settings.deleteTheme')}
               >

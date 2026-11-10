@@ -49,6 +49,12 @@ Moved out of `AGENTS.md`; read this before any UI, animation, copy or locale cha
   keyboard focus, closes on Escape/press/wheel, read as a description) or show the text inline — a
   `title` on a non-focusable element never appears for keyboard users.
 
+- **State is never colour-only**: warnings, errors, status and destructive actions use
+  `text-brand-text-primary`/`-secondary` (never `text-red-*`, `bg-amber-*`, `border-emerald-*` and the
+  like — a theme can share that colour, and palette values ignore the theme's contrast) and say what
+  they mean with an icon, wording, a sign or a shape change (filled vs hollow). Enforced by
+  `bun run lint:state-colours`, with no allowlist (#1878).
+
 - **Context-aware completion messages**: End-of-queue or completion toasts must include the name of what
   finished (e.g., "Jazz Classics complete"), not generic text. The `playerStore.activeContextName` field
   carries this name; auto-playlists (Favourites, Recently Added, etc.) must pass their `displayName` to

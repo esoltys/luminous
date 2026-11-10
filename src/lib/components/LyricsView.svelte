@@ -448,7 +448,7 @@
           </div>
         {:else}
           <div class="mb-8 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-border bg-brand-sidebar text-[11px] font-semibold text-brand-text-secondary/60 select-none shadow-sm">
-            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-brand-accent animate-pulse"></span>
             {i18n.t('lyrics.plainTextNotice', {}, "Synced lyrics not available. Showing plain text.")}
           </div>
           <div dir="auto" class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary/80 select-text pb-20 font-medium font-sans text-pretty">
@@ -460,7 +460,7 @@
       </div>
     {:else if errorMsg}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
-        <p class="text-sm font-semibold text-rose-400">{i18n.t('lyrics.lyricsNotFound')}</p>
+        <p class="text-sm font-semibold text-brand-text-primary">{i18n.t('lyrics.lyricsNotFound')}</p>
         <p class="text-xs text-brand-text-secondary/50 max-w-sm">{errorMsg}</p>
         <div class="flex items-center gap-2 mt-2">
           {#if prefs.onlineEnabled}

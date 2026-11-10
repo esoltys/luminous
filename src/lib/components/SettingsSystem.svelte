@@ -584,7 +584,7 @@
   <div class="pb-4 border-b border-brand-border/50 flex items-center justify-between gap-4">
     <div class="flex items-center gap-3 min-w-0">
       <div class="relative w-9 h-9 rounded-full shrink-0 flex items-center justify-center {
-        updaterStore.checkStatus === 'error' ? 'bg-red-950/30 text-red-400 border border-red-900/30'
+        updaterStore.checkStatus === 'error' ? 'bg-brand-text-primary/10 text-brand-text-primary border border-brand-border'
         : updaterStore.checkStatus === 'available' ? 'bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30'
         : 'bg-brand-accent/15 text-brand-accent-text'
       }">

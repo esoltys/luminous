@@ -39,7 +39,7 @@
     "accent-soft":
       "border border-brand-accent/60 bg-brand-accent/10 hover:bg-brand-accent text-brand-accent-text hover:text-brand-accent-contrast shadow-sm",
     info: "bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:text-purple-300",
-    warning: "bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300",
+    warning: "bg-brand-text-primary/10 hover:bg-brand-text-primary/15 border border-brand-border text-brand-text-primary hover:text-brand-text-secondary",
     destructive:
       "border border-brand-accent/60 bg-brand-accent/10 hover:bg-brand-accent text-brand-accent-text hover:text-brand-accent-contrast shadow-sm",
   };

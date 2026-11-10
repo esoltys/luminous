@@ -536,7 +536,7 @@
                   <button
                     type="button"
                     onclick={() => handleRemoveLink(idx)}
-                    class="p-1.5 text-brand-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors shrink-0 cursor-pointer"
+                    class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-text-primary/10 rounded-md transition-colors shrink-0 cursor-pointer"
                     title={i18n.t("albumProfileEditor.removeLinkTooltip", {}, "Remove link")}
                   >
                     <Trash2 class="w-3.5 h-3.5" />

@@ -209,9 +209,9 @@
 {#snippet movementSnippet(item: StatsTopItem)}
   <HelpTip text={movementTooltip(item)} class="w-5 shrink-0">
     {#if item.movement === "rising"}
-      <TrendUpIcon class="w-4 h-4 text-green-400" weight="bold" />
+      <TrendUpIcon class="w-4 h-4 text-brand-text-primary" weight="bold" />
     {:else if item.movement === "falling"}
-      <TrendDownIcon class="w-4 h-4 text-red-400" weight="bold" />
+      <TrendDownIcon class="w-4 h-4 text-brand-text-primary" weight="bold" />
     {:else if item.movement === "new"}
       <AsteriskIcon class="w-4 h-4 text-brand-accent-text" weight="bold" />
     {:else if item.movement === "reentry"}
