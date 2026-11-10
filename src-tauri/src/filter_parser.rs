@@ -15,6 +15,8 @@
 //! column is kbps, and a bare value of 10000 or more is read as bps),
 //! `samplerate:96k` (96000 Hz). `format:flac` matches a container family
 //! (see [`FileType::from_token`]) and `lossless:true|false` its lossless-ness.
+//! `genre:` reads through the user's genre aliases (#1995), so `genre:Prog Rock`
+//! and `genre:Progressive Rock` select the same songs (see [`FilterValue::Genre`]).
 //! Unrecognized
 //! fields are silently dropped (not an error) rather than falling back to a
 //! bare-term match.
@@ -33,6 +35,7 @@ use chrono::{DateTime, Duration, Local, Months, NaiveDate, TimeZone};
 use rusqlite::types::{ToSqlOutput, Value as SqlValue};
 use rusqlite::ToSql;
 
+use crate::genre_aliases::GenreAliases;
 use crate::models::FileType;
 
 /// SQL comparison operator for a field filter. `Contains` always renders as
@@ -82,6 +85,17 @@ pub enum FilterValue {
     /// format family. Binds one parameter per member; go through
     /// [`FieldFilter::push_clause`].
     IntSet(Vec<i64>),
+    /// A `genre:` value (#1995). `text` is what the user typed; `spellings`
+    /// are the lowercased names that count as it (itself, its canonical genre
+    /// and every alias of that), filled in by
+    /// [`ParsedQuery::resolve_genre_aliases`] — until then just `text`, i.e.
+    /// the unaliased behaviour. Binds one parameter per component pattern, plus
+    /// a leading substring pattern for `Contains`; go through
+    /// [`FieldFilter::push_clause`].
+    Genre {
+        text: String,
+        spellings: Vec<String>,
+    },
 }
 
 impl ToSql for FilterValue {
@@ -90,7 +104,7 @@ impl ToSql for FilterValue {
             FilterValue::Text(s) => Ok(ToSqlOutput::Owned(SqlValue::Text(s.clone()))),
             FilterValue::Int(i) => Ok(ToSqlOutput::Owned(SqlValue::Integer(*i))),
             FilterValue::Float(f) => Ok(ToSqlOutput::Owned(SqlValue::Real(*f))),
-            FilterValue::DayRange { .. } | FilterValue::IntSet(_) => {
+            FilterValue::DayRange { .. } | FilterValue::IntSet(_) | FilterValue::Genre { .. } => {
                 Err(rusqlite::Error::ToSqlConversionFailure(
                     "a multi-parameter value binds through FieldFilter::push_clause".into(),
                 ))
@@ -133,6 +147,14 @@ impl FieldFilter {
                     params.push(Box::new(member));
                 }
             }
+            FilterValue::Genre { text, spellings } => {
+                if self.op == Op::Contains {
+                    params.push(Box::new(format!("%{text}%")));
+                }
+                for spelling in &spellings {
+                    params.push(Box::new(genre_component_pattern(spelling)));
+                }
+            }
             value => params.push(Box::new(value)),
         }
         clause
@@ -147,6 +169,9 @@ impl FieldFilter {
                 .collect();
             let not = if self.op == Op::Neq { "NOT " } else { "" };
             return format!("{} {not}IN ({})", self.sql_column, placeholders.join(", "));
+        }
+        if let FilterValue::Genre { spellings, .. } = &self.value {
+            return genre_clause(&self.op, param_idx, spellings.len());
         }
         if let FilterValue::DayRange { .. } = self.value {
             let col = self.sql_column;
@@ -201,6 +226,48 @@ impl FieldFilter {
     }
 }
 
+/// `LIKE` pattern (for `ESCAPE '\'`) matching `spelling` as one whole
+/// `;`-delimited component of a padded genre column, see [`genre_clause`].
+fn genre_component_pattern(spelling: &str) -> String {
+    let mut pattern = String::with_capacity(spelling.len() + 4);
+    pattern.push_str("%;");
+    for ch in spelling.chars() {
+        if matches!(ch, '%' | '_' | '\\') {
+            pattern.push('\\');
+        }
+        pattern.push(ch);
+    }
+    pattern.push_str(";%");
+    pattern
+}
+
+/// The clause for a `genre:` filter whose parameters start at `?{first}`:
+/// `Contains` binds a substring pattern first, then every op binds one
+/// component pattern per spelling (see [`genre_component_pattern`]). The
+/// column is padded with `;` and its `; ` separators normalised so a spelling
+/// matches only a whole component, as `parse_multi_value` would split it —
+/// `Rock` must not match `Prog Rock`. `!=` also selects songs with no genre.
+fn genre_clause(op: &Op, first: usize, spellings: usize) -> String {
+    let substring = *op == Op::Contains;
+    let first_component = first + usize::from(substring);
+    let components = (first_component..first_component + spellings).map(|i| {
+        format!(
+            "(';' || REPLACE(REPLACE(genre, '; ', ';'), ' ;', ';') || ';') LIKE ?{i} ESCAPE '\\'"
+        )
+    });
+    let any = substring
+        .then(|| format!("genre LIKE ?{first}"))
+        .into_iter()
+        .chain(components)
+        .collect::<Vec<_>>()
+        .join(" OR ");
+    if *op == Op::Neq {
+        format!("COALESCE(NOT ({any}), 1)")
+    } else {
+        format!("({any})")
+    }
+}
+
 /// A query split into its two independent match modes: `bare_terms` (ANDed
 /// full-text substring matches against title/artist/album) and
 /// `field_filters` (ANDed structured comparisons). Both lists apply
@@ -209,6 +276,29 @@ impl FieldFilter {
 pub struct ParsedQuery {
     pub bare_terms: Vec<String>,
     pub field_filters: Vec<FieldFilter>,
+}
+
+impl ParsedQuery {
+    /// Whether any filter reads the genre column and so needs
+    /// [`Self::resolve_genre_aliases`] to see the alias table.
+    pub fn has_genre_filter(&self) -> bool {
+        self.field_filters
+            .iter()
+            .any(|f| matches!(f.value, FilterValue::Genre { .. }))
+    }
+
+    /// Widens every `genre:` filter to the aliases of the genre it names
+    /// (#1995), so a smart playlist or search agrees with the genre browser.
+    /// Parsing stays database-free; callers pass the alias table they loaded.
+    pub fn resolve_genre_aliases(&mut self, aliases: &GenreAliases) {
+        for filter in &mut self.field_filters {
+            if let FilterValue::Genre { text, spellings } = &mut filter.value {
+                let mut members: Vec<String> = aliases.members_of(text).into_iter().collect();
+                members.sort();
+                *spellings = members;
+            }
+        }
+    }
 }
 
 /// Parse a raw search-box or smart-playlist-rule string per the grammar
@@ -538,7 +628,12 @@ fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> 
         }
     }
 
-    let value = if sql_column == "path" {
+    let value = if sql_column == "genre" && matches!(op, Op::Contains | Op::Eq | Op::Neq) {
+        FilterValue::Genre {
+            spellings: vec![raw_val.trim().to_lowercase()],
+            text: raw_val,
+        }
+    } else if sql_column == "path" {
         let clean_path = strip_enclosing_quotes(&raw_val);
         let mut normalized_val = clean_path.replace('\\', "/");
         if normalized_val.len() > 1 && normalized_val.ends_with('/') {
@@ -672,7 +767,10 @@ mod tests {
         assert_eq!(q.field_filters[2].op, Op::Contains);
         assert_eq!(
             q.field_filters[2].value,
-            FilterValue::Text("%jazz%".to_string())
+            FilterValue::Genre {
+                text: "jazz".to_string(),
+                spellings: vec!["jazz".to_string()],
+            }
         );
     }
 
@@ -1088,5 +1186,117 @@ mod tests {
             q.field_filters[0].value,
             FilterValue::Text("%Wait..Now%".to_string())
         );
+    }
+
+    /// Ids of the songs a genre query selects, over a fixed set of genres
+    /// and the alias `Prog Rock` → `Progressive Rock`.
+    fn genre_ids(query: &str, with_aliases: bool) -> Vec<i64> {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute("CREATE TABLE songs (id INTEGER, genre TEXT)", [])
+            .unwrap();
+        conn.execute(
+            "CREATE TABLE genre_aliases (alias_name TEXT, canonical_name TEXT)",
+            [],
+        )
+        .unwrap();
+        if with_aliases {
+            conn.execute(
+                "INSERT INTO genre_aliases VALUES ('Prog Rock', 'Progressive Rock')",
+                [],
+            )
+            .unwrap();
+        }
+        let genres: [Option<&str>; 8] = [
+            Some("Progressive Rock"),
+            Some("Prog Rock"),
+            Some("Rock; Prog Rock"),
+            Some("Rock"),
+            Some("Rock;Pop"),
+            None,
+            Some("Jazz"),
+            Some("100% Rock_n_Roll"),
+        ];
+        for (i, genre) in genres.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO songs VALUES (?1, ?2)",
+                rusqlite::params![i as i64 + 1, genre],
+            )
+            .unwrap();
+        }
+        let mut parsed = parse_query(query);
+        if parsed.has_genre_filter() {
+            parsed.resolve_genre_aliases(&GenreAliases::load(&conn).unwrap());
+        }
+        let mut params: Vec<Box<dyn ToSql>> = Vec::new();
+        let clauses: Vec<String> = parsed
+            .field_filters
+            .into_iter()
+            .map(|f| f.push_clause(&mut params))
+            .collect();
+        let sql = format!(
+            "SELECT id FROM songs WHERE {} ORDER BY id",
+            clauses.join(" AND ")
+        );
+        let refs: Vec<&dyn ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let mut stmt = conn.prepare(&sql).unwrap();
+        let rows = stmt.query_map(refs.as_slice(), |r| r.get(0)).unwrap();
+        rows.map(|r| r.unwrap()).collect()
+    }
+
+    #[test]
+    fn genre_filter_without_aliases_keeps_substring_semantics() {
+        assert_eq!(genre_ids("genre:rock", false), vec![1, 2, 3, 4, 5, 8]);
+        assert_eq!(genre_ids("genre:\"Prog Rock\"", false), vec![2, 3]);
+    }
+
+    #[test]
+    fn genre_filter_reads_through_aliases() {
+        // The canonical name and its alias select the same songs.
+        let expected = vec![1, 2, 3];
+        assert_eq!(genre_ids("genre:\"Progressive Rock\"", true), expected);
+        assert_eq!(genre_ids("genre:\"Prog Rock\"", true), expected);
+        assert_eq!(genre_ids("genre:\"prog rock\"", true), expected);
+        // Without the alias the canonical name misses the alias-tagged songs.
+        assert_eq!(genre_ids("genre:\"Progressive Rock\"", false), vec![1]);
+        // A partial name is still a raw substring match, not an alias lookup.
+        assert_eq!(genre_ids("genre:progress", true), vec![1]);
+    }
+
+    #[test]
+    fn genre_equals_matches_whole_components() {
+        // `=` is a component match: "Rock" is not "Prog Rock", but is one
+        // value of "Rock; Prog Rock" and of "Rock;Pop".
+        assert_eq!(genre_ids("genre:=Rock", true), vec![3, 4, 5]);
+        assert_eq!(
+            genre_ids("genre:=\"Progressive Rock\"", true),
+            vec![1, 2, 3]
+        );
+        assert_eq!(genre_ids("genre:=\"Prog Rock\"", false), vec![2, 3]);
+    }
+
+    #[test]
+    fn genre_not_equals_includes_songs_without_a_genre() {
+        assert_eq!(
+            genre_ids("genre:!=\"Progressive Rock\"", true),
+            vec![4, 5, 6, 7, 8]
+        );
+        assert_eq!(
+            genre_ids("genre:!=\"Progressive Rock\"", false),
+            vec![2, 3, 4, 5, 6, 7, 8]
+        );
+    }
+
+    #[test]
+    fn genre_spellings_escape_like_wildcards() {
+        // `_` and `%` in an exact value are literal, not wildcards.
+        assert_eq!(genre_ids("genre:=\"100% Rock_n_Roll\"", true), vec![8]);
+        assert!(genre_ids("genre:=\"100% Rock-n-Roll\"", true).is_empty());
+    }
+
+    #[test]
+    fn genre_ordering_operators_stay_plain_text_comparisons() {
+        let q = parse_query("genre:>=Rock");
+        assert_eq!(q.field_filters[0].value, FilterValue::Text("Rock".into()));
+        assert!(!q.has_genre_filter());
     }
 }
