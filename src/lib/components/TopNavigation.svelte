@@ -35,6 +35,7 @@
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "../utils/motion";
+  import { formatBpmRange } from "../utils/formatters";
   import { MAX_SEARCH_SUGGESTIONS_PER_CATEGORY } from "../constants";
 
   let searchInput: HTMLInputElement | undefined;
@@ -200,7 +201,7 @@
               type: "auto",
               id: `auto:bpm:${p.id}`,
               label: getPlaylistDisplayName(p),
-              subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${i18n.t("playlists.bpmAutoPlaylist")}`,
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${formatBpmRange(bpm) ?? i18n.t("playlists.bpmAutoPlaylist")}`,
               ref: { kind: "bpm", bpm, playlistId: p.id, updated: p.updated }
             });
           } else if (p.dynamic_spec?.startsWith("artisttag:")) {

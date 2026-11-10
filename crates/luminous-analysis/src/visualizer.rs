@@ -52,8 +52,9 @@ pub struct VisualizerAnalysis {
     pub waveform_peaks: Vec<u8>,
     /// 512-point layered low/mid/high frequency band amplitudes (byte triples).
     pub band_waveform_data: Vec<u8>,
-    /// Estimated tempo and key; each field is `None` when not confidently detected.
-    pub musical: MusicalAnalysis,
+    /// Tempo and key estimates; `None` when the caller did not ask for them, `Some` with `None`
+    /// fields when they were asked for but not confidently detected.
+    pub musical: Option<MusicalAnalysis>,
 }
 
 /// Compute waveform amplitude envelope (0..255) for a sample buffer, normalized
@@ -232,14 +233,18 @@ pub fn decode_mono(decoder: luminous_audio::OfflineDecoder) -> (Vec<f32>, u32) {
     (mono, sample_rate)
 }
 
-/// Decodes the audio file once and derives the waveform, band waveform and tempo/key estimates
-/// from that single pass.
-pub fn analyze_visualizer(decoder: luminous_audio::OfflineDecoder) -> VisualizerAnalysis {
+/// Decodes the audio file once and derives the waveform and band waveform from that single pass,
+/// plus the tempo/key estimates when `detect_musical` is set (they cost extra CPU, so callers that
+/// don't want them don't pay for them).
+pub fn analyze_visualizer(
+    decoder: luminous_audio::OfflineDecoder,
+    detect_musical: bool,
+) -> VisualizerAnalysis {
     let (samples, sample_rate) = decode_mono(decoder);
     let waveform_peaks = compute_waveform_peaks(&samples, WAVEFORM_POINTS);
     let band_waveform_data =
         compute_band_waveform_data(&samples, sample_rate, BAND_WAVEFORM_POINTS);
-    let musical = analyze_musical_properties(&samples, sample_rate);
+    let musical = detect_musical.then(|| analyze_musical_properties(&samples, sample_rate));
     VisualizerAnalysis {
         waveform_peaks,
         band_waveform_data,
@@ -344,9 +349,25 @@ mod tests {
         luminous_audio::write_test_pcm16_wav(&path, 8000, &[samples]);
 
         let decoder = luminous_audio::OfflineDecoder::open_file(&path).expect("open");
-        let analysis = analyze_visualizer(decoder);
+        let analysis = analyze_visualizer(decoder, false);
 
         assert_eq!(analysis.waveform_peaks.len(), WAVEFORM_POINTS);
         assert_eq!(analysis.band_waveform_data.len(), BAND_WAVEFORM_POINTS * 3);
+        assert_eq!(analysis.musical, None);
+    }
+
+    #[test]
+    fn test_analyze_visualizer_detects_musical_only_when_asked() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("test.wav");
+        let samples: Vec<i16> = (0..8000)
+            .map(|i| (0.5 * (i as f32 * 0.1).sin() * 32_767.0) as i16)
+            .collect();
+        luminous_audio::write_test_pcm16_wav(&path, 8000, &[samples]);
+
+        let decoder = luminous_audio::OfflineDecoder::open_file(&path).expect("open");
+        // One second of audio is too short to judge, but it was asked for.
+        let analysis = analyze_visualizer(decoder, true);
+        assert!(analysis.musical.is_some());
     }
 }

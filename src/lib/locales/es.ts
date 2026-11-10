@@ -807,6 +807,12 @@ export const es = {
       one: "La normalización de sonoridad está analizando en segundo plano las canciones pendientes: {count}. Puede parecer un análisis de la biblioteca aunque la supervisión de carpetas esté desactivada. Desactívala en la pestaña Ecualizador para detenerla.",
       other: "La normalización de sonoridad está analizando en segundo plano las canciones pendientes: {count}. Puede parecer un análisis de la biblioteca aunque la supervisión de carpetas esté desactivada. Desactívala en la pestaña Ecualizador para detenerla."
     },
+    musicalAnalysisActive: {
+      one: "Detectando el tempo y la tonalidad en segundo plano de las canciones pendientes: {count}. Puede parecer un análisis de la biblioteca aunque la supervisión de carpetas esté desactivada. Solo completa etiquetas de BPM y tonalidad vacías. Desactiva «Detectar tempo y tonalidad» para detenerlo.",
+      other: "Detectando el tempo y la tonalidad en segundo plano de las canciones pendientes: {count}. Puede parecer un análisis de la biblioteca aunque la supervisión de carpetas esté desactivada. Solo completa etiquetas de BPM y tonalidad vacías. Desactiva «Detectar tempo y tonalidad» para detenerlo."
+    },
+    detectTempoKeyLabel: "Detectar tempo y tonalidad",
+    detectTempoKeyHint: "Completa las etiquetas de BPM y tonalidad que faltan analizando las canciones en segundo plano. Lee cada canción una vez, lo que puede tardar en bibliotecas grandes o unidades de red.",
     noFoldersTitle: "No hay carpetas supervisadas",
     noFoldersText: "Haz clic en «Agregar carpeta» para agregar tu directorio de música.",
     dynamicThemes: "Temas dinámicos",

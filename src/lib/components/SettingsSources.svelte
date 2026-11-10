@@ -4,6 +4,7 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { loudnessStore } from "../stores/loudness.svelte";
+  import { musicalAnalysisStore } from "../stores/musicalAnalysis.svelte";
   import { tasksStore } from "../stores/tasks.svelte";
   import { onMount } from "svelte";
   import { hierarchySidecarStore } from "../stores/hierarchySidecar.svelte";
@@ -296,6 +297,7 @@
 
   onMount(() => {
     loudnessStore.init();
+    musicalAnalysisStore.init();
     loadWebdavServers();
     loadSubsonicServers();
     hierarchySidecarStore.refresh().catch((e) => console.error("Failed to load the default library:", e));
@@ -402,6 +404,13 @@
     <div class="flex items-center gap-2.5 bg-brand-accent/10 border border-brand-accent/30 rounded-xl px-4 py-2.5 text-xs text-brand-text-secondary">
       <Activity class="w-4 h-4 text-brand-accent-text shrink-0" />
       <span>{i18n.plural('settings.loudnessAnalysisActive', loudnessStore.analysisRemaining)}</span>
+    </div>
+  {/if}
+
+  {#if prefs.detectTempoAndKey && musicalAnalysisStore.remaining > 0}
+    <div class="flex items-center gap-2.5 bg-brand-accent/10 border border-brand-accent/30 rounded-xl px-4 py-2.5 text-xs text-brand-text-secondary">
+      <Activity class="w-4 h-4 text-brand-accent-text shrink-0" />
+      <span>{i18n.plural('settings.musicalAnalysisActive', musicalAnalysisStore.remaining)}</span>
     </div>
   {/if}
 
@@ -883,6 +892,18 @@
         onchange={handleToggleSaveArtwork}
         disabled={isSweepingArtwork}
         label={i18n.t('settings.saveArtworkToFoldersLabel')}
+      />
+    </div>
+
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.detectTempoKeyLabel')}</span>
+        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.detectTempoKeyHint')}</p>
+      </div>
+      <Toggle
+        checked={prefs.detectTempoAndKey}
+        onchange={(v) => prefs.setDetectTempoAndKey(v)}
+        label={i18n.t('settings.detectTempoKeyLabel')}
       />
     </div>
   </div>

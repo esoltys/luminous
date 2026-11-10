@@ -1,5 +1,9 @@
 //! Detected tempo and key: storage rules and the background worker (#1943).
 //!
+//! Detection is opt-in (`detect_tempo_and_key`, off by default): neither the background worker nor
+//! the waveform decode computes anything for it until the user turns it on. Turning it off stops
+//! new detection but keeps values already filled in.
+//!
 //! `songs.bpm` and `songs.initial_key` hold whatever the file's tags say. Detection only ever
 //! *fills gaps*: a value a tag (or the user) supplied is never overwritten. The
 //! `song_musical_analysis` table remembers which values were detected, so the Tag Editor can show
@@ -15,6 +19,12 @@ use rusqlite::{params, Connection, OptionalExtension};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
+
+/// Whether the user has turned on tempo/key detection (Settings → Sources). Off by default, since
+/// it reads every song missing those tags once.
+pub fn detection_enabled(conn: &Connection) -> bool {
+    crate::commands::settings::load_ui_preferences(conn).detect_tempo_and_key
+}
 
 /// Bump when the estimators change enough that earlier results should be recomputed.
 pub const MUSICAL_ANALYSIS_VERSION: i64 = 1;
@@ -182,25 +192,45 @@ pub fn needs_analysis(conn: &Connection, song_id: i64) -> rusqlite::Result<bool>
     )
 }
 
-/// The next local song worth decoding: one missing a tempo or key and not yet analysed.
-/// Songs that already carry both tags are never decoded for this.
+/// The songs worth decoding for tempo/key: local songs missing a tempo or key that are not yet
+/// analysed. Songs that already carry both tags are never decoded for this. Shared by the worker's
+/// queue and the remaining-count shown in Settings, so the two cannot disagree.
+fn candidates_sql(select: &str, tail: &str) -> String {
+    format!(
+        "SELECT {select} FROM songs s
+         LEFT JOIN song_musical_analysis a ON a.song_id = s.id
+         WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+           AND (s.bpm IS NULL OR s.bpm <= 0
+                OR s.initial_key IS NULL OR TRIM(s.initial_key) = '')
+           AND {needs} {tail}",
+        lib = *LOCAL_SOURCES_SQL,
+        needs = NEEDS_ANALYSIS_SQL
+    )
+}
+
 fn next_song_to_analyze(conn: &Connection) -> rusqlite::Result<Option<(i64, String)>> {
     conn.query_row(
-        &format!(
-            "SELECT s.id, s.path FROM songs s
-             LEFT JOIN song_musical_analysis a ON a.song_id = s.id
-             WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
-               AND (s.bpm IS NULL OR s.bpm <= 0
-                    OR s.initial_key IS NULL OR TRIM(s.initial_key) = '')
-               AND {needs}
-             ORDER BY s.added DESC, s.id DESC LIMIT 1",
-            lib = *LOCAL_SOURCES_SQL,
-            needs = NEEDS_ANALYSIS_SQL
-        ),
+        &candidates_sql("s.id, s.path", "ORDER BY s.added DESC, s.id DESC LIMIT 1"),
         params![MUSICAL_ANALYSIS_VERSION],
         |row| Ok((row.get(0)?, row.get(1)?)),
     )
     .optional()
+}
+
+/// How many songs are still waiting for tempo/key detection.
+pub fn remaining(conn: &Connection) -> rusqlite::Result<u64> {
+    conn.query_row(
+        &candidates_sql("COUNT(*)", ""),
+        params![MUSICAL_ANALYSIS_VERSION],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|n| n.max(0) as u64)
+}
+
+/// Background detection progress, emitted as `musical-analysis-progress`.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct MusicalAnalysisProgress {
+    pub remaining: u64,
 }
 
 /// How often the library views are told about detected values while the worker is busy.
@@ -216,11 +246,14 @@ pub fn spawn_background_analyzer(app: AppHandle, db: Arc<Database>) {
             let mut unannounced = false;
             let mut last_announce = Instant::now();
             loop {
-                let next = db
-                    .pool
-                    .get()
-                    .ok()
-                    .and_then(|conn| next_song_to_analyze(&conn).unwrap_or(None));
+                // Only grind through the backlog while the user has opted in.
+                let next = db.pool.get().ok().and_then(|conn| {
+                    if detection_enabled(&conn) {
+                        next_song_to_analyze(&conn).unwrap_or(None)
+                    } else {
+                        None
+                    }
+                });
 
                 let Some((song_id, path_str)) = next else {
                     if std::mem::take(&mut unannounced) {
@@ -247,6 +280,12 @@ pub fn spawn_background_analyzer(app: AppHandle, db: Arc<Database>) {
                     }
                 }
                 unannounced = true;
+                if let Some(left) = db.pool.get().ok().and_then(|c| remaining(&c).ok()) {
+                    let _ = app.emit(
+                        "musical-analysis-progress",
+                        MusicalAnalysisProgress { remaining: left },
+                    );
+                }
 
                 if last_announce.elapsed() >= LIBRARY_REFRESH_INTERVAL {
                     let _ = app.emit("library-changed", ());
@@ -306,6 +345,19 @@ mod tests {
             bpm: Some(bpm),
             key: KeySignature::parse(key),
         }
+    }
+
+    #[test]
+    fn detection_is_off_until_the_user_turns_it_on() {
+        let (_dir, db) = setup();
+        let conn = db.pool.get().unwrap();
+        assert!(!detection_enabled(&conn));
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('detect_tempo_and_key', 'true')",
+            [],
+        )
+        .unwrap();
+        assert!(detection_enabled(&conn));
     }
 
     #[test]
@@ -419,6 +471,19 @@ mod tests {
         conn.execute("UPDATE songs SET mtime = 99 WHERE id = ?1", params![id])
             .unwrap();
         assert_eq!(next_song_to_analyze(&conn).unwrap().map(|s| s.0), Some(id));
+    }
+
+    #[test]
+    fn remaining_counts_only_what_the_worker_would_analyse() {
+        let (_dir, db) = setup();
+        add_song(&db, Some(100.0), Some("Am"), 10); // fully tagged: never queued
+        let a = add_song(&db, None, None, 11);
+        add_song(&db, Some(100.0), None, 12);
+        let conn = db.pool.get().unwrap();
+        assert_eq!(remaining(&conn).unwrap(), 2);
+
+        record_analysis(&conn, a, &found(120.0, "Am")).unwrap();
+        assert_eq!(remaining(&conn).unwrap(), 1);
     }
 
     #[test]

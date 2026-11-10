@@ -20,6 +20,7 @@ interface UiPreferences {
   fanart_fetch_album_cover: boolean;
   fanart_fetch_disc_art: boolean;
   save_artwork_to_folders: boolean;
+  detect_tempo_and_key: boolean;
   albums_view_mode: CollectionViewMode;
   artists_view_mode: CollectionViewMode;
   playlists_auto_view_mode: CollectionViewMode;
@@ -49,6 +50,8 @@ class PrefsStore {
   fanartFetchDiscArt = $state<boolean>(true);
   /** Save album covers and artist portraits into music folders as cover.jpg/artist.jpg (#1274). Off by default. */
   saveArtworkToFolders = $state<boolean>(false);
+  /** Estimate BPM and key for songs missing those tags by analysing audio in the background (#1943). Off by default. */
+  detectTempoAndKey = $state<boolean>(false);
   albumsViewMode = $state<CollectionViewMode>("cards");
   artistsViewMode = $state<CollectionViewMode>("cards");
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
@@ -92,6 +95,7 @@ class PrefsStore {
     this.fanartFetchAlbumCover = prefs.fanart_fetch_album_cover;
     this.fanartFetchDiscArt = prefs.fanart_fetch_disc_art;
     this.saveArtworkToFolders = prefs.save_artwork_to_folders;
+    this.detectTempoAndKey = prefs.detect_tempo_and_key ?? false;
     this.albumsViewMode = prefs.albums_view_mode;
     this.artistsViewMode = prefs.artists_view_mode;
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
@@ -153,6 +157,7 @@ class PrefsStore {
       fanart_fetch_album_cover: this.fanartFetchAlbumCover,
       fanart_fetch_disc_art: this.fanartFetchDiscArt,
       save_artwork_to_folders: this.saveArtworkToFolders,
+      detect_tempo_and_key: this.detectTempoAndKey,
       albums_view_mode: this.albumsViewMode,
       artists_view_mode: this.artistsViewMode,
       playlists_auto_view_mode: this.playlistsAutoViewMode,
@@ -205,6 +210,11 @@ class PrefsStore {
 
   setSaveArtworkToFolders(enabled: boolean) {
     this.saveArtworkToFolders = enabled;
+    this.save();
+  }
+
+  setDetectTempoAndKey(enabled: boolean) {
+    this.detectTempoAndKey = enabled;
     this.save();
   }
 

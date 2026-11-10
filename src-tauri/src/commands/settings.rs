@@ -64,6 +64,10 @@ pub struct UiPreferences {
     /// Save album covers and artist portraits directly into music folders as
     /// sidecar files (`cover.jpg`/`artist.jpg`, #1274). Off by default.
     pub save_artwork_to_folders: bool,
+    /// Estimate BPM and key for songs missing those tags by analysing the audio in the
+    /// background (#1943). Off by default: it reads every such song once, which is costly on
+    /// large libraries and network drives.
+    pub detect_tempo_and_key: bool,
 }
 
 impl Default for UiPreferences {
@@ -89,6 +93,7 @@ impl Default for UiPreferences {
             fanart_fetch_album_cover: true,
             fanart_fetch_disc_art: true,
             save_artwork_to_folders: false,
+            detect_tempo_and_key: false,
         }
     }
 }
@@ -140,7 +145,7 @@ impl UiPreferences {
     /// Bool fields, persisted as a literal "true"/"false" string the same
     /// way the FadeSettings bools are — not part of `fields()` since they
     /// aren't domain-checked Strings.
-    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 7] {
+    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 8] {
         [
             ("genre_sort_asc", &mut self.genre_sort_asc),
             ("fanart_fetch_photo", &mut self.fanart_fetch_photo),
@@ -152,6 +157,7 @@ impl UiPreferences {
             ),
             ("fanart_fetch_disc_art", &mut self.fanart_fetch_disc_art),
             ("save_artwork_to_folders", &mut self.save_artwork_to_folders),
+            ("detect_tempo_and_key", &mut self.detect_tempo_and_key),
         ]
     }
 }

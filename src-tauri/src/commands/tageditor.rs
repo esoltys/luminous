@@ -212,6 +212,16 @@ pub async fn describe_musical_key(text: String) -> Option<MusicalKeyInfo> {
     })
 }
 
+/// Songs still waiting for background tempo/key detection, for the Settings activity notice.
+#[tauri::command]
+pub async fn get_musical_analysis_remaining(state: State<'_, AppState>) -> Result<u64, String> {
+    crate::db::run_blocking(&state.db, |conn| {
+        crate::musical::remaining(conn).map_err(anyhow::Error::from)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn get_song_details(
     state: State<'_, AppState>,

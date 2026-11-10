@@ -130,6 +130,7 @@
         <div class="row"><div class="mk">•</div><div>Click a track's pencil to open <b>Edit Song Tags</b>.</div></div>
         <div class="row"><div class="mk">•</div><div>Artist, Album Artist, Composer and Genre accept several values. Press Enter after each one.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Clear Artwork</b> removes the track's embedded cover.</div></div>
+        <div class="row"><div class="mk">•</div><div>A BPM or key detected from the audio says so under its field; edit it to keep your own value. Click <b>Tap tempo</b> in time with the music to set the BPM by hand. A Camelot code appears beside the key.</div></div>
         <div class="row"><div class="mk">•</div><div>Expand <b>History</b> to view the song's source details and recorded tag changes from Luminous or external tools detected during scans. Filter by scan detections, click <b>Restore</b> on any entry to revert that field to its previous value, <b>Restore All</b> to roll back an entire edit session across songs, or <b>Clear History</b> to reset its change log.</div></div>
       </div>
       <figure class="shot mw-700 mb-28">
@@ -261,7 +262,7 @@
         <img src="assets/en-CA/screenshots/dark/playlist-smart-edit.webp" alt="Editing smart playlist rules" width="1440" height="900" loading="lazy">
       </figure>
       <h2>BPM playlists</h2>
-      <p class="mb-16">BPM playlists use each song's BPM tag. Luminous doesn't measure tempo, so songs without a BPM tag aren't included. Make your own ranges with a smart playlist.</p>
+      <p class="mb-16">BPM playlists use each song's BPM. Turn on <b>Detect tempo and key</b> in <b>Settings → Sources</b> and Luminous works out the tempo of songs without a BPM tag, and never replaces a BPM you've tagged yourself. Make your own ranges with a smart playlist.</p>
       <div class="table mw-460 mb-20" style="--cols: 1fr 1fr">
         <div class="tr th"><div>Category</div><div>BPM range</div></div>
         <div class="tr"><div>Down-Tempo BPM</div><div>60–90</div></div>
@@ -365,7 +366,7 @@
         <div class="tr"><code>title</code><div>text</div><div>Track title</div></div>
         <div class="tr"><code>genre</code><div>text</div><div>Genre</div></div>
         <div class="tr"><code>composer</code><div>text</div><div>Composer</div></div>
-        <div class="tr"><code>key / initial_key</code><div>text</div><div>Musical key (e.g. "D", "Am", "D♭")</div></div>
+        <div class="tr"><code>key / initial_key</code><div>text</div><div>Musical key (e.g. "D", "Am", "D♭" or a Camelot code like "8A")</div></div>
         <div class="tr"><code>bpm</code><div>number</div><div>Beats per minute</div></div>
         <div class="tr"><code>year</code><div>number</div><div>Release year</div></div>
         <div class="tr"><code>originalyear / original_year</code><div>number</div><div>Original release year (vs. reissue)</div></div>
@@ -483,6 +484,7 @@
       <div class="list">
         <div class="row"><div class="mk">•</div><div>Click <b>Add Folder</b> to add a music folder. New and changed files appear on their own.</div></div>
         <div class="row"><div class="mk">•</div><div>Turn off <b>Real-Time Folder Watching</b> to check for changes only when you rescan.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Detect tempo and key</b> (off by default): fills in missing BPM and key tags by analyzing your songs in the background. It reads each song once, which can take a while on large libraries or network drives, and disk activity can continue after a scan. A notice here shows how many songs are left. It only fills in empty tags and doesn't change your files.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Rescan Library on Startup</b> checks your folders each time Luminous opens.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Rescan Library</b> looks for changes; <b>Force Full Re-Scan</b> rereads everything. When a scan finishes, a notification reports any tracks whose tags changed outside Luminous.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Save artwork next to your music</b> saves covers as <code>cover.jpg</code> in album folders and artist photos as <code>artist.jpg</code>. Existing folder art is never overwritten.</div></div>

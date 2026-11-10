@@ -807,6 +807,12 @@ export const it = {
       one: "La normalizzazione del volume sta analizzando in background {count} brano: può sembrare una scansione anche quando il monitoraggio delle cartelle è disattivato. Disattivala nella scheda Equalizzatore per interromperla.",
       other: "La normalizzazione del volume sta analizzando in background {count} brani: può sembrare una scansione anche quando il monitoraggio delle cartelle è disattivato. Disattivala nella scheda Equalizzatore per interromperla."
     },
+    musicalAnalysisActive: {
+      one: "Rilevamento di tempo e tonalità per {count} brano in background: può sembrare una scansione anche quando il monitoraggio delle cartelle è disattivato. Compila solo i tag BPM e tonalità vuoti. Disattiva «Rileva tempo e tonalità» per interromperlo.",
+      other: "Rilevamento di tempo e tonalità per {count} brani in background: può sembrare una scansione anche quando il monitoraggio delle cartelle è disattivato. Compila solo i tag BPM e tonalità vuoti. Disattiva «Rileva tempo e tonalità» per interromperlo."
+    },
+    detectTempoKeyLabel: "Rileva tempo e tonalità",
+    detectTempoKeyHint: "Compila i tag BPM e tonalità mancanti analizzando i brani in background. Legge ogni brano una volta, e può richiedere tempo con raccolte grandi o unità di rete.",
     noFoldersTitle: "Nessuna cartella monitorata",
     noFoldersText: "Fai clic su «Aggiungi cartella» qui sopra per aggiungere la tua cartella musicale.",
     dynamicThemes: "Temi dinamici",

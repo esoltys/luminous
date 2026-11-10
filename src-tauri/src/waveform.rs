@@ -71,7 +71,13 @@ fn decode_and_cache(
             song_id, path
         )
     })?;
-    let analysis = luminous_analysis::analyze_visualizer(decoder);
+    // Tempo/key detection is opt-in (#1943): without it this pass is the plain waveform decode.
+    let detect = db
+        .pool
+        .get()
+        .map(|conn| crate::musical::detection_enabled(&conn))
+        .unwrap_or(false);
+    let analysis = luminous_analysis::analyze_visualizer(decoder, detect);
 
     let mut conn = db.pool.get()?;
     let tx = conn.transaction()?;
@@ -90,7 +96,9 @@ fn decode_and_cache(
         ],
     )?;
 
-    crate::musical::record_analysis(&tx, song_id, &analysis.musical)?;
+    if let Some(musical) = &analysis.musical {
+        crate::musical::record_analysis(&tx, song_id, musical)?;
+    }
 
     tx.commit()?;
 

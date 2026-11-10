@@ -1570,6 +1570,7 @@ pub fn run() {
             // Tag Editor commands
             commands::tageditor::get_song_details,
             commands::tageditor::describe_musical_key,
+            commands::tageditor::get_musical_analysis_remaining,
             commands::tageditor::get_file_song_details,
             commands::tageditor::save_song_tags,
             commands::tageditor::save_file_tags,

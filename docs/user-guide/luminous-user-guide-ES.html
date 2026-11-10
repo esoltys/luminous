@@ -130,6 +130,7 @@
         <div class="row"><div class="mk">•</div><div>Haz clic en el lápiz de una pista para abrir <b>Editar etiquetas de la canción</b>.</div></div>
         <div class="row"><div class="mk">•</div><div>Artista, Artista del álbum, Compositor y Género admiten varios valores. Presiona Intro después de cada uno.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Quitar carátula</b> elimina la portada incrustada de la pista.</div></div>
+        <div class="row"><div class="mk">•</div><div>Un BPM o una tonalidad detectados a partir del audio se indican bajo su campo; edítalos para conservar tu propio valor. Haz clic en <b>Marcar tempo</b> al ritmo de la música para fijar el BPM a mano. Junto a la tonalidad aparece un código Camelot.</div></div>
         <div class="row"><div class="mk">•</div><div>Despliega <b>Historial</b> para consultar los detalles del archivo de origen y los cambios de etiquetas registrados por Luminous o cambios externos, haz clic en <b>Restaurar</b> para revertir un campo a su valor anterior, en <b>Restaurar todo</b> para revertir una sesión de edición completa en varias canciones, o en <b>Borrar historial</b> para reiniciar el registro de cambios.</div></div>
       </div>
       <figure class="shot mw-700 mb-28">
@@ -261,7 +262,7 @@
         <img src="assets/es/screenshots/dark/playlist-smart-edit.webp" alt="Edición de las reglas de una lista inteligente" width="1440" height="900" loading="lazy">
       </figure>
       <h2>Listas por BPM</h2>
-      <p class="mb-16">Las listas por BPM usan la etiqueta BPM de cada canción. Luminous no mide el tempo, por lo que las canciones sin etiqueta BPM no se incluyen. Crea tus propios rangos con una lista inteligente.</p>
+      <p class="mb-16">Las listas por BPM usan el BPM de cada canción. Activa <b>Detectar tempo y tonalidad</b> en <b>Configuración → Fuentes</b> y Luminous calcula el tempo de las canciones sin etiqueta BPM, sin reemplazar nunca un BPM que hayas etiquetado tú. Crea tus propios rangos con una lista inteligente.</p>
       <div class="table mw-460 mb-20" style="--cols: 1fr 1fr">
         <div class="tr th"><div>Categoría</div><div>Rango de BPM</div></div>
         <div class="tr"><div>BPM lento</div><div>60–90</div></div>
@@ -365,7 +366,7 @@
         <div class="tr"><code>title</code><div>texto</div><div>Título de la pista</div></div>
         <div class="tr"><code>genre</code><div>texto</div><div>Género</div></div>
         <div class="tr"><code>composer</code><div>texto</div><div>Compositor</div></div>
-        <div class="tr"><code>key / initial_key</code><div>texto</div><div>Tonalidad (p. ej., «D», «Am», «D♭»)</div></div>
+        <div class="tr"><code>key / initial_key</code><div>texto</div><div>Tonalidad (p. ej., «D», «Am», «D♭» o un código Camelot como «8A»)</div></div>
         <div class="tr"><code>bpm</code><div>número</div><div>Pulsos por minuto</div></div>
         <div class="tr"><code>year</code><div>número</div><div>Año de lanzamiento</div></div>
         <div class="tr"><code>originalyear / original_year</code><div>número</div><div>Año de lanzamiento original (frente a la reedición)</div></div>
@@ -483,6 +484,7 @@
       <div class="list">
         <div class="row"><div class="mk">•</div><div>Haz clic en <b>Agregar carpeta a la biblioteca</b> para agregar una carpeta de música. Los archivos nuevos y modificados aparecen solos.</div></div>
         <div class="row"><div class="mk">•</div><div>Desactiva <b>Supervisión de carpetas en tiempo real</b> para buscar cambios solo cuando vuelvas a analizar.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Detectar tempo y tonalidad</b> (desactivado por defecto): completa las etiquetas de BPM y tonalidad que faltan analizando tus canciones en segundo plano. Lee cada canción una vez, lo que puede tardar en bibliotecas grandes o unidades de red, y la actividad del disco puede continuar tras un análisis. Un aviso aquí indica cuántas canciones quedan. Solo completa etiquetas vacías y no modifica tus archivos.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Volver a analizar la biblioteca al iniciar</b> revisa tus carpetas cada vez que se abre Luminous.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Volver a analizar la biblioteca</b> busca cambios; <b>Forzar análisis completo</b> vuelve a leerlo todo.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Guardar las carátulas junto a tu música</b> guarda las portadas como <code>cover.jpg</code> en las carpetas de álbumes y las fotos de artistas como <code>artist.jpg</code>. Nunca se sobrescribe el arte que ya está en una carpeta.</div></div>
