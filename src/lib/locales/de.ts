@@ -807,6 +807,12 @@ export const de = {
       one: "Die Lautheitsnormalisierung analysiert im Hintergrund noch {count} Titel. Das kann wie eine Suche aussehen, auch wenn die Ordnerüberwachung aus ist. Zum Beenden auf der Registerkarte „Equalizer“ deaktivieren.",
       other: "Die Lautheitsnormalisierung analysiert im Hintergrund noch {count} Titel. Das kann wie eine Suche aussehen, auch wenn die Ordnerüberwachung aus ist. Zum Beenden auf der Registerkarte „Equalizer“ deaktivieren."
     },
+    musicalAnalysisActive: {
+      one: "Tempo und Tonart werden im Hintergrund für noch {count} Titel erkannt. Das kann wie eine Suche aussehen, auch wenn die Ordnerüberwachung aus ist. Es werden nur leere BPM- und Tonart-Tags ergänzt. Zum Beenden „Tempo und Tonart erkennen“ deaktivieren.",
+      other: "Tempo und Tonart werden im Hintergrund für noch {count} Titel erkannt. Das kann wie eine Suche aussehen, auch wenn die Ordnerüberwachung aus ist. Es werden nur leere BPM- und Tonart-Tags ergänzt. Zum Beenden „Tempo und Tonart erkennen“ deaktivieren."
+    },
+    detectTempoKeyLabel: "Tempo und Tonart erkennen",
+    detectTempoKeyHint: "Fehlende BPM- und Tonart-Tags durch eine Analyse der Titel im Hintergrund ergänzen. Jeder Titel wird einmal gelesen, das kann bei großen Bibliotheken oder Netzlaufwerken dauern.",
     noFoldersTitle: "Keine überwachten Ordner",
     noFoldersText: "Oben auf „Ordner hinzufügen“ klicken, um dein Musikverzeichnis hinzuzufügen.",
     dynamicThemes: "Dynamische Designs",
@@ -1603,6 +1609,9 @@ export const de = {
     bpmTooltip: "Schläge pro Minute (Tempo)",
     initialKeyField: "Ursprüngliche Tonart",
     initialKeyTooltip: "Musikalische Tonart, von DJ-Software für harmonisches Mixen verwendet",
+    tapTempoBtn: "Tempo tippen",
+    detectedValueHint: "Aus dem Audio geschätzt. Bearbeiten, um einen eigenen Wert zu behalten.",
+    camelotHint: "Camelot {code}",
     saveFailedPrefix: "Die Tags konnten nicht gespeichert werden: ",
     artworkField: "Cover",
     artworkEmbedded: "Eingebettetes Cover",

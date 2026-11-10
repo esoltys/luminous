@@ -1,10 +1,11 @@
 //! Offline audio analysis DSP: ITU-R BS.1770 loudness, ReplayGain/DR gain law,
-//! RMS waveform envelopes, and 3-band FFT visualizers.
+//! RMS waveform envelopes, 3-band FFT visualizers, and tempo/key estimation.
 //!
 //! Must never depend on Tauri, SQLite, reqwest, or Tokio (#1765, epic #1762).
 
 pub mod integrity;
 pub mod loudness;
+pub mod musical;
 pub mod provenance;
 pub mod visualizer;
 
@@ -15,6 +16,7 @@ pub use loudness::{
     LoudnessGainSource, LoudnessMode, LoudnessSettings, SettingRange, ANALYSIS_FAILED_SENTINEL,
     FALLBACK_GAIN_DB_RANGE, PLAUSIBLE_LUFS_RANGE, TARGET_LUFS_RANGE,
 };
+pub use musical::{analyze_musical_properties, KeySignature, MusicalAnalysis};
 pub use provenance::{
     analyze_provenance, analyze_provenance_from_samples, ProvenanceAnalysis, ProvenanceVerdict,
 };

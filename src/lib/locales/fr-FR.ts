@@ -813,6 +813,12 @@ export const frFR: DeepStringRecord<typeof en> = {
       one: "La normalisation du volume analyse {count} chanson en arrière-plan — cela peut ressembler à une analyse même lorsque la surveillance des dossiers est désactivée. Désactivez-la dans l'onglet Égaliseur pour l'arrêter.",
       other: "La normalisation du volume analyse {count} chansons en arrière-plan — cela peut ressembler à une analyse même lorsque la surveillance des dossiers est désactivée. Désactivez-la dans l'onglet Égaliseur pour l'arrêter."
     },
+    musicalAnalysisActive: {
+      one: "Détection du tempo et de la tonalité de {count} chanson en arrière-plan — cela peut ressembler à une analyse même lorsque la surveillance des dossiers est désactivée. Seules les étiquettes BPM et tonalité vides sont remplies. Désactivez « Détecter le tempo et la tonalité » pour l'arrêter.",
+      other: "Détection du tempo et de la tonalité de {count} chansons en arrière-plan — cela peut ressembler à une analyse même lorsque la surveillance des dossiers est désactivée. Seules les étiquettes BPM et tonalité vides sont remplies. Désactivez « Détecter le tempo et la tonalité » pour l'arrêter."
+    },
+    detectTempoKeyLabel: "Détecter le tempo et la tonalité",
+    detectTempoKeyHint: "Complète les étiquettes BPM et tonalité manquantes en analysant vos chansons en arrière-plan. Chaque chanson est lue une fois, ce qui peut prendre du temps sur une grande bibliothèque ou un lecteur réseau.",
     noFoldersTitle: "Aucun dossier surveillé",
     noFoldersText: "Cliquez sur « Ajouter un dossier » ci-dessus pour ajouter votre répertoire musical.",
     dynamicThemes: "Thèmes dynamiques",
@@ -1695,6 +1701,9 @@ export const frFR: DeepStringRecord<typeof en> = {
     bpmTooltip: "Battements par minute (tempo)",
     initialKeyField: "Tonalité initiale",
     initialKeyTooltip: "Tonalité musicale, utilisée par les logiciels DJ pour le mixage harmonique",
+    tapTempoBtn: "Marquer le tempo",
+    detectedValueHint: "Estimé à partir de l'audio. Modifiez-le pour conserver votre propre valeur.",
+    camelotHint: "Camelot {code}",
     saveFailedPrefix: "Échec de l'enregistrement des balises : ",
     artworkField: "Pochette",
     artworkEmbedded: "Pochette intégrée",

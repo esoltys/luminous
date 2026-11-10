@@ -130,6 +130,7 @@
         <div class="row"><div class="mk">•</div><div>Fai clic sulla matita di una traccia per aprire <b>Modifica tag del brano</b>.</div></div>
         <div class="row"><div class="mk">•</div><div>Artista, Artista album, Compositore e Genere accettano più valori. Premi Invio dopo ciascuno.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Rimuovi copertina</b> elimina la copertina incorporata della traccia.</div></div>
+        <div class="row"><div class="mk">•</div><div>Un BPM o una tonalità rilevati dall'audio sono segnalati sotto il campo; modificali per mantenere il tuo valore. Fai clic su <b>Tocca il tempo</b> a ritmo con la musica per impostare il BPM a mano. Accanto alla tonalità compare un codice Camelot.</div></div>
         <div class="row"><div class="mk">•</div><div>Espandi <b>Cronologia</b> per visualizzare i dettagli del file sorgente e le modifiche ai tag registrate da Luminous o da modifiche esterne, fai clic su <b>Ripristina</b> per riportare un campo al suo valore precedente, su <b>Ripristina tutto</b> per annullare un'intera sessione di modifica tra più brani, oppure su <b>Cancella cronologia</b> per azzerare il registro delle modifiche.</div></div>
       </div>
       <figure class="shot mw-700 mb-28">
@@ -261,7 +262,7 @@
         <img src="assets/it/screenshots/dark/playlist-smart-edit.webp" alt="Modifica delle regole di una playlist intelligente" width="1440" height="900" loading="lazy">
       </figure>
       <h2>Playlist per BPM</h2>
-      <p class="mb-16">Le playlist per BPM usano il tag BPM di ogni brano. Luminous non misura il tempo, quindi i brani senza tag BPM non sono inclusi. Crea i tuoi intervalli con una playlist intelligente.</p>
+      <p class="mb-16">Le playlist per BPM usano il BPM di ogni brano. Attiva <b>Rileva tempo e tonalità</b> in <b>Impostazioni → Sorgenti</b> e Luminous calcola il tempo dei brani senza tag BPM, senza mai sostituire un BPM che hai taggato tu. Crea i tuoi intervalli con una playlist intelligente.</p>
       <div class="table mw-460 mb-20" style="--cols: 1fr 1fr">
         <div class="tr th"><div>Categoria</div><div>Intervallo di BPM</div></div>
         <div class="tr"><div>BPM tempo lento</div><div>60–90</div></div>
@@ -365,7 +366,7 @@
         <div class="tr"><code>title</code><div>testo</div><div>Titolo della traccia</div></div>
         <div class="tr"><code>genre</code><div>testo</div><div>Genere</div></div>
         <div class="tr"><code>composer</code><div>testo</div><div>Compositore</div></div>
-        <div class="tr"><code>key / initial_key</code><div>testo</div><div>Tonalità (ad es. «D», «Am», «D♭»)</div></div>
+        <div class="tr"><code>key / initial_key</code><div>testo</div><div>Tonalità (ad es. «D», «Am», «D♭» o un codice Camelot come «8A»)</div></div>
         <div class="tr"><code>bpm</code><div>numero</div><div>Battiti al minuto</div></div>
         <div class="tr"><code>year</code><div>numero</div><div>Anno di uscita</div></div>
         <div class="tr"><code>originalyear / original_year</code><div>numero</div><div>Anno di uscita originale (rispetto alla ristampa)</div></div>
@@ -483,6 +484,7 @@
       <div class="list">
         <div class="row"><div class="mk">•</div><div>Fai clic su <b>Aggiungi cartella alla libreria</b> per aggiungere una cartella di musica. I file nuovi e modificati compaiono da soli.</div></div>
         <div class="row"><div class="mk">•</div><div>Disattiva <b>Monitoraggio delle cartelle in tempo reale</b> per cercare le modifiche solo quando riesegui la scansione.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Rileva tempo e tonalità</b> (disattivato per impostazione predefinita): compila i tag BPM e tonalità mancanti analizzando i brani in background. Legge ogni brano una volta, e può richiedere tempo con raccolte grandi o unità di rete; l'attività del disco può continuare dopo una scansione. Un avviso qui indica quanti brani restano. Compila solo i tag vuoti e non modifica i tuoi file.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Riesegui scansione libreria all'avvio</b> controlla le cartelle ogni volta che si apre Luminous.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Riesegui scansione libreria</b> cerca le modifiche; <b>Forza scansione completa</b> rilegge tutto.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Salva le copertine accanto alla musica</b> salva le copertine come <code>cover.jpg</code> nelle cartelle degli album e le foto degli artisti come <code>artist.jpg</code>. Le immagini già presenti nelle cartelle non vengono mai sovrascritte.</div></div>

@@ -130,6 +130,7 @@
         <div class="row"><div class="mk">•</div><div>Cliquez sur le crayon d'une piste pour ouvrir <b>Modifier les étiquettes de la chanson</b>.</div></div>
         <div class="row"><div class="mk">•</div><div>Artiste, Artiste de l'album, Compositeur et Genre acceptent plusieurs valeurs. Appuyez sur Entrée après chacune.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Effacer la pochette</b> retire la pochette intégrée à la piste.</div></div>
+        <div class="row"><div class="mk">•</div><div>Un BPM ou une tonalité détectés à partir de l'audio sont signalés sous leur champ ; modifiez-les pour conserver votre propre valeur. Cliquez sur <b>Marquer le tempo</b> en rythme avec la musique pour régler le BPM à la main. Un code Camelot apparaît à côté de la tonalité.</div></div>
         <div class="row"><div class="mk">•</div><div>Développez <b>Historique</b> pour consulter les détails du fichier source et les modifications d'étiquettes enregistrées par Luminous ou les modifications externes détectées lors des analyses. Filtrez par détections d'analyse, cliquez sur <b>Rétablir</b> pour ramener un champ à sa valeur précédente, sur <b>Tout rétablir</b> pour annuler une séance de modification sur toutes les chansons touchées, ou sur <b>Effacer l'historique</b> pour réinitialiser le journal des modifications.</div></div>
       </div>
       <figure class="shot mw-700 mb-28">
@@ -261,7 +262,7 @@
         <img src="assets/fr-CA/screenshots/dark/playlist-smart-edit.webp" alt="Modification des règles d'une liste intelligente" width="1440" height="900" loading="lazy">
       </figure>
       <h2>Listes par BPM</h2>
-      <p class="mb-16">Les listes par BPM utilisent l'étiquette BPM de chaque chanson. Luminous ne mesure pas le tempo : les chansons sans étiquette BPM n'y figurent pas. Créez vos propres plages avec une liste intelligente.</p>
+      <p class="mb-16">Les listes par BPM utilisent le BPM de chaque chanson. Activez <b>Détecter le tempo et la tonalité</b> dans <b>Paramètres → Sources</b> et Luminous détermine le tempo des chansons sans étiquette BPM, sans jamais remplacer un BPM que vous avez étiqueté vous-même. Créez vos propres plages avec une liste intelligente.</p>
       <div class="table mw-460 mb-20" style="--cols: 1fr 1fr">
         <div class="tr th"><div>Catégorie</div><div>Plage BPM</div></div>
         <div class="tr"><div>Tempo lent BPM</div><div>60–90</div></div>
@@ -365,7 +366,7 @@
         <div class="tr"><code>title</code><div>texte</div><div>Titre de la piste</div></div>
         <div class="tr"><code>genre</code><div>texte</div><div>Genre</div></div>
         <div class="tr"><code>composer</code><div>texte</div><div>Compositeur</div></div>
-        <div class="tr"><code>key / initial_key</code><div>texte</div><div>Tonalité (ex. « D », « Am », « D♭ »)</div></div>
+        <div class="tr"><code>key / initial_key</code><div>texte</div><div>Tonalité (ex. « D », « Am », « D♭ » ou un code Camelot comme « 8A »)</div></div>
         <div class="tr"><code>bpm</code><div>nombre</div><div>Battements par minute</div></div>
         <div class="tr"><code>year</code><div>nombre</div><div>Année de sortie</div></div>
         <div class="tr"><code>originalyear / original_year</code><div>nombre</div><div>Année de sortie originale (vs. réédition)</div></div>
@@ -483,6 +484,7 @@
       <div class="list">
         <div class="row"><div class="mk">•</div><div>Cliquez sur <b>Ajouter un dossier</b> pour ajouter un dossier de musique. Les fichiers ajoutés ou modifiés apparaissent d'eux-mêmes.</div></div>
         <div class="row"><div class="mk">•</div><div>Désactivez <b>Surveillance en temps réel des dossiers</b> pour ne vérifier les changements que lors d'une réanalyse.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Détecter le tempo et la tonalité</b> (désactivé par défaut) : complète les étiquettes BPM et tonalité manquantes en analysant vos chansons en arrière-plan. Chaque chanson est lue une fois, ce qui peut prendre du temps sur une grande bibliothèque ou un lecteur réseau, et l'activité du disque peut se poursuivre après une analyse. Un avis ici indique combien de chansons restent. Seules les étiquettes vides sont remplies, vos fichiers ne sont pas modifiés.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Analyser la bibliothèque au démarrage</b> vérifie vos dossiers à chaque ouverture de Luminous.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Réanalyser la bibliothèque</b> cherche les changements; <b>Forcer la réanalyse complète</b> relit tout. Lorsqu'une analyse se termine, une notification signale les pistes dont les étiquettes ont été modifiées en dehors de Luminous.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Enregistrer les illustrations dans les dossiers de musique</b> enregistre les pochettes en <code>cover.jpg</code> dans les dossiers d'albums et les photos d'artistes en <code>artist.jpg</code>. Les illustrations déjà présentes ne sont jamais écrasées.</div></div>

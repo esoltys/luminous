@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+  formatBpm,
+  formatBpmRange,
   toTitleCase,
   formatDuration,
   formatFileSize,
@@ -126,5 +128,34 @@ describe("formatHoursMinutes", () => {
     expect(formatSampleRate(44100)).toBe("44.1 kHz");
     i18n.currentLocale = "ru";
     expect(formatSampleRate(44100)).toBe("44,1 кГц");
+  });
+});
+
+describe("formatBpm", () => {
+  it("rounds to whole beats per minute", () => {
+    expect(formatBpm(98.91)).toBe("99");
+    expect(formatBpm(120)).toBe("120");
+    expect(formatBpm(133.5)).toBe("134");
+  });
+
+  it("has nothing to show without a usable tempo", () => {
+    expect(formatBpm(null)).toBeNull();
+    expect(formatBpm(undefined)).toBeNull();
+    expect(formatBpm(0)).toBeNull();
+    expect(formatBpm(0.4)).toBeNull();
+    expect(formatBpm(NaN)).toBeNull();
+  });
+});
+
+describe("formatBpmRange", () => {
+  it("formats bounded and open-ended ranges", () => {
+    expect(formatBpmRange("60-90")).toBe("60–90 BPM");
+    expect(formatBpmRange("150-")).toBe("150+ BPM");
+  });
+
+  it("returns null for anything that is not a range", () => {
+    expect(formatBpmRange("")).toBeNull();
+    expect(formatBpmRange(undefined)).toBeNull();
+    expect(formatBpmRange("fast")).toBeNull();
   });
 });

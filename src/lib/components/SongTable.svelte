@@ -33,7 +33,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { songDrag, songsPayload } from "../stores/songDrag.svelte";
   import { isLosslessFileType } from "../types";
-  import { formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
+  import { formatBpm, formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { formatTrackNumber } from "../utils/artist";
   import { parseMultiValue } from "../utils/multiValue";
@@ -682,7 +682,7 @@
     </div>
   {:else if col.key === "bpm"}
     <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
-      {song.bpm || "—"}
+      {formatBpm(song.bpm) ?? "—"}
     </div>
   {:else if col.key === "initial_key"}
     <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">

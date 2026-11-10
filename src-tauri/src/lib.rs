@@ -39,6 +39,7 @@ pub mod lyrics;
 pub mod media_session;
 pub mod media_source;
 pub mod models;
+pub mod musical;
 pub mod musicbrainz;
 pub mod native_labels;
 pub mod organizer;
@@ -1204,6 +1205,9 @@ pub fn run() {
             // Start background EBU R128 loudness analyzer (#77)
             crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
 
+            // Start background tempo/key detection for tracks lacking those tags (#1943)
+            crate::musical::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
+
             // Start background lossless audio provenance analyzer (#1373, epic #1441)
             crate::provenance::spawn_background_analyzer(
                 app.handle().clone(),
@@ -1565,6 +1569,8 @@ pub fn run() {
             commands::context::set_online_enabled,
             // Tag Editor commands
             commands::tageditor::get_song_details,
+            commands::tageditor::describe_musical_key,
+            commands::tageditor::get_musical_analysis_remaining,
             commands::tageditor::get_file_song_details,
             commands::tageditor::save_song_tags,
             commands::tageditor::save_file_tags,

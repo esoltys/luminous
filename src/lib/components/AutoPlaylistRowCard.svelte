@@ -6,7 +6,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import { getLanguageDisplayName } from "../utils/language";
-  import { toTitleCase } from "../utils/formatters";
+  import { formatBpmRange, toTitleCase } from "../utils/formatters";
 
   interface Props {
     label: string;
@@ -43,7 +43,7 @@
     if (kind === "daypart") return i18n.t("playlists.daypartAutoPlaylist");
     if (kind === "language" || language) return i18n.t("playlists.languageAutoPlaylist");
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
-    if (kind === "bpm") return i18n.t("playlists.bpmAutoPlaylist");
+    if (kind === "bpm") return formatBpmRange(bpm) ?? i18n.t("playlists.bpmAutoPlaylist");
     if (kind === "artist_tag" || artistTag) return i18n.t("playlists.artistTagAutoPlaylist");
     if (kind === "genre" || genre) return i18n.t("playlists.genreAutoPlaylist");
     if (kind === "favourites") return i18n.t("playlists.favouritesAutoPlaylist");

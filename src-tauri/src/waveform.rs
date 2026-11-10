@@ -9,26 +9,50 @@ use std::path::Path;
 
 static VISUALIZER_GEN_LOCK: Mutex<()> = Mutex::new(());
 
-/// Decodes audio file once and generates/caches both waveform and band waveform data.
+/// Decodes audio file once and generates/caches both waveform and band waveform data, along with
+/// the tempo/key estimates from the same pass (#1943). Cached waveforms are returned without
+/// decoding.
 pub fn generate_visualizer_data(
     db: &Database,
     song_id: i64,
     path: &Path,
 ) -> Result<(Vec<u8>, Vec<u8>)> {
-    if let (Ok(Some(w)), Ok(Some(m))) = (
-        get_cached_waveform(db, song_id),
-        crate::band_waveform::get_cached_band_waveform(db, song_id),
-    ) {
-        return Ok((w, m));
+    decode_and_cache(db, song_id, path, false)
+}
+
+/// Makes sure the song has a current tempo/key analysis, decoding it (and caching its waveforms
+/// in the same pass) if it doesn't. Used by the background analyzer.
+pub fn analyze_song(db: &Database, song_id: i64, path: &Path) -> Result<()> {
+    decode_and_cache(db, song_id, path, true).map(|_| ())
+}
+
+fn decode_and_cache(
+    db: &Database,
+    song_id: i64,
+    path: &Path,
+    require_musical: bool,
+) -> Result<(Vec<u8>, Vec<u8>)> {
+    let cached = || -> Result<Option<(Vec<u8>, Vec<u8>)>> {
+        let (Some(w), Some(m)) = (
+            get_cached_waveform(db, song_id)?,
+            crate::band_waveform::get_cached_band_waveform(db, song_id)?,
+        ) else {
+            return Ok(None);
+        };
+        if require_musical && crate::musical::needs_analysis(&*db.pool.get()?, song_id)? {
+            return Ok(None);
+        }
+        Ok(Some((w, m)))
+    };
+
+    if let Ok(Some(hit)) = cached() {
+        return Ok(hit);
     }
 
     let _guard = VISUALIZER_GEN_LOCK.lock();
 
-    if let (Ok(Some(w)), Ok(Some(m))) = (
-        get_cached_waveform(db, song_id),
-        crate::band_waveform::get_cached_band_waveform(db, song_id),
-    ) {
-        return Ok((w, m));
+    if let Ok(Some(hit)) = cached() {
+        return Ok(hit);
     }
 
     // Defense-in-depth: remote streams (WebDAV, Subsonic) must not be decoded offline
@@ -47,7 +71,13 @@ pub fn generate_visualizer_data(
             song_id, path
         )
     })?;
-    let analysis = luminous_analysis::analyze_visualizer(decoder);
+    // Tempo/key detection is opt-in (#1943): without it this pass is the plain waveform decode.
+    let detect = db
+        .pool
+        .get()
+        .map(|conn| crate::musical::detection_enabled(&conn))
+        .unwrap_or(false);
+    let analysis = luminous_analysis::analyze_visualizer(decoder, detect);
 
     let mut conn = db.pool.get()?;
     let tx = conn.transaction()?;
@@ -65,6 +95,10 @@ pub fn generate_visualizer_data(
             crate::band_waveform::BAND_WAVEFORM_STYLE_VERSION
         ],
     )?;
+
+    if let Some(musical) = &analysis.musical {
+        crate::musical::record_analysis(&tx, song_id, musical)?;
+    }
 
     tx.commit()?;
 

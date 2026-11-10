@@ -130,6 +130,7 @@
         <div class="row"><div class="mk">•</div><div>Auf den Stift eines Titels klicken, um <b>Titel-Tags bearbeiten</b> zu öffnen.</div></div>
         <div class="row"><div class="mk">•</div><div>Interpret, Albuminterpret, Komponist und Genre nehmen mehrere Werte an. Nach jedem Wert die Eingabetaste drücken.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Cover entfernen</b> löscht das eingebettete Cover des Titels.</div></div>
+        <div class="row"><div class="mk">•</div><div>Ein aus dem Audio erkannter BPM-Wert oder eine erkannte Tonart wird unter dem Feld als solche gekennzeichnet; bearbeite sie, um deinen eigenen Wert zu behalten. Mit <b>Tempo tippen</b> im Takt der Musik stellst du den BPM-Wert von Hand ein. Neben der Tonart erscheint ein Camelot-Code.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Verlauf</b> aufklappen, um Quelldetails des Titels und erfasste Tag-Änderungen von Luminous oder externe Änderungen einzusehen, auf <b>Wiederherstellen</b> klicken, um ein Feld auf seinen vorherigen Wert zurückzusetzen, auf <b>Alle wiederherstellen</b>, um eine gesamte Bearbeitungssitzung über mehrere Titel zurückzurollen, oder auf <b>Verlauf löschen</b>, um das Änderungsprotokoll zurückzusetzen.</div></div>
       </div>
       <figure class="shot mw-700 mb-28">
@@ -261,7 +262,7 @@
         <img src="assets/de/screenshots/dark/playlist-smart-edit.webp" alt="Regeln einer intelligenten Wiedergabeliste bearbeiten" width="1440" height="900" loading="lazy">
       </figure>
       <h2>BPM-Wiedergabelisten</h2>
-      <p class="mb-16">BPM-Wiedergabelisten nutzen den BPM-Tag jedes Titels. Luminous misst das Tempo nicht, daher werden Titel ohne BPM-Tag nicht aufgenommen. Eigene Bereiche lassen sich mit einer intelligenten Wiedergabeliste erstellen.</p>
+      <p class="mb-16">BPM-Wiedergabelisten nutzen den BPM-Wert jedes Titels. Aktiviere <b>Tempo und Tonart erkennen</b> unter <b>Einstellungen → Quellen</b>, dann ermittelt Luminous das Tempo von Titeln ohne BPM-Tag und ersetzt nie einen BPM-Wert, den du selbst getaggt hast. Eigene Bereiche lassen sich mit einer intelligenten Wiedergabeliste erstellen.</p>
       <div class="table mw-460 mb-20" style="--cols: 1fr 1fr">
         <div class="tr th"><div>Kategorie</div><div>BPM-Bereich</div></div>
         <div class="tr"><div>Ruhig (BPM)</div><div>60–90</div></div>
@@ -365,7 +366,7 @@
         <div class="tr"><code>title</code><div>Text</div><div>Titelname</div></div>
         <div class="tr"><code>genre</code><div>Text</div><div>Genre</div></div>
         <div class="tr"><code>composer</code><div>Text</div><div>Komponist</div></div>
-        <div class="tr"><code>key / initial_key</code><div>Text</div><div>Tonart (z. B. „D“, „Am“, „D♭“)</div></div>
+        <div class="tr"><code>key / initial_key</code><div>Text</div><div>Tonart (z. B. „D“, „Am“, „D♭“ oder ein Camelot-Code wie „8A“)</div></div>
         <div class="tr"><code>bpm</code><div>Zahl</div><div>Schläge pro Minute</div></div>
         <div class="tr"><code>year</code><div>Zahl</div><div>Erscheinungsjahr</div></div>
         <div class="tr"><code>originalyear / original_year</code><div>Zahl</div><div>Ursprüngliches Erscheinungsjahr (im Unterschied zur Neuauflage)</div></div>
@@ -483,6 +484,7 @@
       <div class="list">
         <div class="row"><div class="mk">•</div><div>Auf <b>Ordner hinzufügen</b> klicken, um einen Musikordner hinzuzufügen. Neue und geänderte Dateien erscheinen automatisch.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Echtzeitüberwachung von Ordnern</b> ausschalten, um nur beim erneuten Durchsuchen nach Änderungen zu suchen.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Tempo und Tonart erkennen</b> (standardmäßig aus): ergänzt fehlende BPM- und Tonart-Tags, indem die Titel im Hintergrund analysiert werden. Jeder Titel wird einmal gelesen, das kann bei großen Bibliotheken oder Netzlaufwerken dauern, und die Festplattenaktivität kann nach einem Durchsuchen weitergehen. Ein Hinweis hier zeigt, wie viele Titel noch übrig sind. Es werden nur leere Tags ergänzt, deine Dateien bleiben unverändert.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Mediathek beim Start erneut durchsuchen</b> prüft die Ordner bei jedem Start von Luminous.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Mediathek erneut durchsuchen</b> sucht nach Änderungen; <b>Vollständige Suche erzwingen</b> liest alles neu ein.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Cover neben der Musik speichern</b> speichert Cover als <code>cover.jpg</code> in Albumordnern und Interpretenfotos als <code>artist.jpg</code>. Vorhandene Ordnergrafiken werden nie überschrieben.</div></div>

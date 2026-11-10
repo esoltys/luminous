@@ -807,6 +807,12 @@ export const en = {
       one: "Loudness Normalization is analyzing {count} song in the background — this can look like scanning even when folder watching is off. Disable it in the Equalizer tab to stop.",
       other: "Loudness Normalization is analyzing {count} songs in the background — this can look like scanning even when folder watching is off. Disable it in the Equalizer tab to stop."
     },
+    musicalAnalysisActive: {
+      one: "Detecting tempo and key for {count} song in the background — this can look like scanning even when folder watching is off. It only fills in empty BPM and key tags. Turn off Detect tempo and key to stop.",
+      other: "Detecting tempo and key for {count} songs in the background — this can look like scanning even when folder watching is off. It only fills in empty BPM and key tags. Turn off Detect tempo and key to stop."
+    },
+    detectTempoKeyLabel: "Detect tempo and key",
+    detectTempoKeyHint: "Fill in missing BPM and key tags by analyzing your songs in the background. Reads each song once, which can take a while on large libraries or network drives.",
     noFoldersTitle: "No Watched Folders",
     noFoldersText: "Click \"Add Folder\" above to add your music directory.",
     dynamicThemes: "Dynamic Themes",
@@ -1603,6 +1609,9 @@ export const en = {
     bpmTooltip: "Beats per minute (tempo)",
     initialKeyField: "Initial Key",
     initialKeyTooltip: "Musical key, used by DJ software for harmonic mixing",
+    tapTempoBtn: "Tap tempo",
+    detectedValueHint: "Estimated from the audio. Edit it to keep your own value.",
+    camelotHint: "Camelot {code}",
     saveFailedPrefix: "Failed to save tags: ",
     artworkField: "Artwork",
     artworkEmbedded: "Embedded cover art",

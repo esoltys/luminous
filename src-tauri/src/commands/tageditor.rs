@@ -186,6 +186,40 @@ pub struct SongDetails {
     /// overwrite every other track cut from the same file.
     pub is_cue_track: bool,
     pub language: Option<String>,
+    /// `bpm` / `initial_key` hold a value detected from the audio rather than read from a tag
+    /// (#1943), so the editor can present them as estimates.
+    pub bpm_detected: bool,
+    pub key_detected: bool,
+}
+
+/// A key in the two notations DJ tools use.
+#[derive(serde::Serialize)]
+pub struct MusicalKeyInfo {
+    /// Standard notation, e.g. `Am` or `Eb`.
+    pub standard: String,
+    /// Camelot wheel code, e.g. `8A`.
+    pub camelot: String,
+}
+
+/// Reads a key typed in any common spelling (`Am`, `A minor`, `8A`) and returns its standard and
+/// Camelot notations, or `None` if the text isn't a recognisable key. The Tag Editor shows the
+/// Camelot code beside the key field; the wheel itself lives only in `luminous-analysis`.
+#[tauri::command]
+pub async fn describe_musical_key(text: String) -> Option<MusicalKeyInfo> {
+    luminous_analysis::KeySignature::parse(&text).map(|key| MusicalKeyInfo {
+        standard: key.standard(),
+        camelot: key.camelot(),
+    })
+}
+
+/// Songs still waiting for background tempo/key detection, for the Settings activity notice.
+#[tauri::command]
+pub async fn get_musical_analysis_remaining(state: State<'_, AppState>) -> Result<u64, String> {
+    crate::db::run_blocking(&state.db, |conn| {
+        crate::musical::remaining(conn).map_err(anyhow::Error::from)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -194,6 +228,7 @@ pub async fn get_song_details(
     song_id: i64,
 ) -> Result<SongDetails, String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let detected = crate::musical::detected_flags(&conn, song_id).unwrap_or_default();
     conn.query_row(
         "SELECT id, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, genresort, track, disc, year,
                 originalyear, grouping, bpm, initial_key, rating, loved, compilation, art_embedded, cue_path,
@@ -230,6 +265,8 @@ pub async fn get_song_details(
                 is_cue_track: row.get::<_, Option<String>>(25)?.is_some(),
                 disc_subtitle: row.get(26)?,
                 language: row.get(27)?,
+                bpm_detected: detected.bpm,
+                key_detected: detected.key,
             })
         },
     )
@@ -278,6 +315,8 @@ pub async fn get_file_song_details(path: String) -> Result<SongDetails, String> 
         art_embedded: song.art_embedded,
         is_cue_track: false,
         language: song.language,
+        bpm_detected: false,
+        key_detected: false,
     })
 }
 
@@ -499,6 +538,12 @@ pub async fn save_song_tags(
     )
     .map_err(|e| e.to_string())?;
 
+    // The values just saved are the user's: detection must not fill or replace them (#1943).
+    // Best effort: the save itself has already succeeded, so a failed marker must not report it as failed.
+    if let Err(e) = crate::musical::mark_user_curated(&conn, song_id) {
+        log::warn!("Failed to mark song {song_id} as user-curated for tempo/key detection: {e}");
+    }
+
     // Continuous auto-organization hook (#1468)
     if let Ok(auto_res) = crate::organizer::auto_organize_song_ids(
         &state.db,
@@ -702,6 +747,7 @@ pub async fn save_file_tags(
             crate::tag_history::HistoryActor::Luminous,
             None,
         );
+        crate::musical::mark_user_curated_by_path(&conn, &path);
     }
 
     Ok(())
@@ -737,7 +783,9 @@ pub async fn save_album_tags(
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         for &song_id in &song_ids {
-            if let Ok(song) = stmt.query_row([song_id], crate::collection::row_to_song) {
+            if let Ok(mut song) = stmt.query_row([song_id], crate::collection::row_to_song) {
+                // Detected tempo/key live only in the database; never write them into the file.
+                crate::musical::strip_detected(&conn, &mut song);
                 let tags = edit.apply(SharedTags::of(&song));
                 edited.push((song, tags));
             }

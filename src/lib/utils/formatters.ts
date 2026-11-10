@@ -28,6 +28,23 @@ export function formatDate(timestamp?: number): string {
   return new Date(timestamp * 1000).toLocaleDateString();
 }
 
+/** A tempo for display: whole beats per minute (98.91 shows as 99). `null` when there is none. */
+export function formatBpm(bpm?: number | null): string | null {
+  if (bpm == null || !Number.isFinite(bpm)) return null;
+  const rounded = Math.round(bpm);
+  return rounded > 0 ? String(rounded) : null;
+}
+
+/**
+ * A BPM auto-playlist's range for display, from its spec suffix: "60-90" shows as "60–90 BPM" and
+ * the open-ended "150-" as "150+ BPM". `null` when the spec isn't a range.
+ */
+export function formatBpmRange(spec?: string | null): string | null {
+  const match = /^(\d+)-(\d*)$/.exec(spec ?? "");
+  if (!match) return null;
+  return match[2] ? `${match[1]}–${match[2]} BPM` : `${match[1]}+ BPM`;
+}
+
 export function formatFileSize(bytes?: number): string {
   if (!bytes) return "—";
   if (bytes >= 1073741824) {
