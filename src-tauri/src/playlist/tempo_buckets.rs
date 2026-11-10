@@ -34,7 +34,7 @@ impl TempoBucket {
 pub const TEMPO_BUCKETS: [TempoBucket; 6] = [
     TempoBucket {
         token: "slow",
-        name: "Slow BPM",
+        name: "Very Slow BPM",
         i18n_key: "bpmSlow",
         min: 0.0,
         max: Some(60.0),

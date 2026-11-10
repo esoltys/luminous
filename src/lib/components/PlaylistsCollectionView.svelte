@@ -53,7 +53,7 @@
   // Fixed intensity order for the BPM auto-playlist bucket names (mirrors
   // src-tauri/src/playlist/tempo_buckets.rs's TEMPO_BUCKETS) — alphabetical sort would
   // scramble Down-Tempo/Mid-Tempo/Uptempo/High Energy/Extreme.
-  const BPM_BUCKET_ORDER = ["Slow BPM", "Down-Tempo BPM", "Mid-Tempo BPM", "Uptempo BPM", "High Energy BPM", "Extreme BPM"];
+  const BPM_BUCKET_ORDER = ["Very Slow BPM", "Down-Tempo BPM", "Mid-Tempo BPM", "Uptempo BPM", "High Energy BPM", "Extreme BPM"];
 
   onMount(async () => {
     try {
