@@ -606,6 +606,56 @@ mod tests {
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
+    /// #1995: a `genre:` smart playlist follows genre aliases — it gains the
+    /// alias-tagged songs once the alias exists and drops them when it is
+    /// removed, with no change to the songs' own tags.
+    #[test]
+    fn test_reconcile_genre_smart_playlist_follows_aliases() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for (i, genre) in ["Progressive Rock", "Prog Rock", "Jazz"].iter().enumerate() {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, genre, path) VALUES (?1, 'A', ?2, ?3)",
+                    params![format!("Song {}", i + 1), genre, format!("/s{}.mp3", i + 1)],
+                )
+                .unwrap();
+            }
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Prog Smart").unwrap();
+        manager
+            .set_playlist_dynamic_spec(pl.id, "genre:\"Progressive Rock\"")
+            .unwrap();
+        assert_eq!(manager.get_playlist_tracks(pl.id).unwrap().len(), 1);
+
+        {
+            let mut conn = db_arc.pool.get().unwrap();
+            crate::genre_aliases::set_alias(&mut conn, "Prog Rock", "Progressive Rock").unwrap();
+        }
+        let deltas = manager.reconcile_dynamic_playlists().unwrap();
+        assert_eq!(deltas.len(), 1);
+        assert_eq!(deltas[0].added.len(), 1);
+        assert_eq!(
+            deltas[0].added[0].song.as_ref().unwrap().title.as_deref(),
+            Some("Song 2")
+        );
+        assert_eq!(manager.get_playlist_tracks(pl.id).unwrap().len(), 2);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            crate::genre_aliases::remove_alias(&conn, "Prog Rock").unwrap();
+        }
+        let deltas = manager.reconcile_dynamic_playlists().unwrap();
+        assert_eq!(deltas.len(), 1);
+        assert_eq!(deltas[0].removed_uuids.len(), 1);
+        assert_eq!(manager.get_playlist_tracks(pl.id).unwrap().len(), 1);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
     #[test]
     fn test_reconcile_appends_new_matches_and_evicts_stale_without_reordering() {
         let (db, temp_dir) = setup_test_db();

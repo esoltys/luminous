@@ -9,17 +9,55 @@ use super::{
     SONG_SELECT_COLS_QUALIFIED, SONG_SELECT_COL_COUNT,
 };
 use crate::album_key::{album_display_sql, album_key};
+use crate::filter_parser::ParsedQuery;
+use crate::genre_aliases::GenreAliases;
 use crate::models::{
     AlbumItem, AlbumLink, AlbumProfile, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats,
     Playlist, QueuePopulationMode, Song, Tag, TopAlbumItem, LIBRARY_SOURCES_SQL,
     LISTENED_SOURCES_SQL,
 };
 use anyhow::Result;
-use rusqlite::{params, OptionalExtension, ToSql};
+use rusqlite::{params, Connection, OptionalExtension, ToSql};
 
 /// SQL predicate identifying tracks missing any core identity tag (title, artist, or album).
 /// Shared between `get_songs_missing_core_tags` and curation health queries (`curation.rs`).
 pub(crate) const MISSING_CORE_TAGS_SQL: &str = "(title IS NULL OR TRIM(title) = '' OR artist IS NULL OR TRIM(artist) = '' OR album IS NULL OR TRIM(album) = '')";
+
+/// Appends the `WHERE` clauses (and their bound parameters) for a parsed
+/// search/smart-playlist query: bare terms against FTS5 or `LIKE`, then each
+/// qualified field filter. The one place both `search_songs` and
+/// `search_songs_by_mode` build them, so a smart playlist and the search box
+/// always read a query the same way. `genre:` filters see the user's genre
+/// aliases (#1995); the alias table is read only when the query has one.
+fn push_query_clauses(
+    conn: &Connection,
+    mut parsed: ParsedQuery,
+    where_clauses: &mut Vec<String>,
+    query_params: &mut Vec<Box<dyn ToSql>>,
+) -> Result<()> {
+    if !parsed.bare_terms.is_empty() {
+        let bare_str = parsed.bare_terms.join(" ");
+        let fts_query = format!("{bare_str}*");
+        let like_query = format!("%{bare_str}%");
+
+        query_params.push(Box::new(fts_query));
+        let fts_param_idx = query_params.len();
+        query_params.push(Box::new(like_query));
+        let like_param_idx = query_params.len();
+
+        where_clauses.push(format!(
+            "(id IN (SELECT rowid FROM songs_fts WHERE songs_fts MATCH ?{fts_param_idx}) OR (title LIKE ?{like_param_idx} OR artist LIKE ?{like_param_idx} OR album LIKE ?{like_param_idx}))"
+        ));
+    }
+
+    if parsed.has_genre_filter() {
+        parsed.resolve_genre_aliases(&GenreAliases::load(conn)?);
+    }
+    for filter in parsed.field_filters {
+        where_clauses.push(filter.push_clause(query_params));
+    }
+    Ok(())
+}
 
 impl CollectionScanner {
     /// Full-text + field search across the library.
@@ -44,27 +82,7 @@ impl CollectionScanner {
         let mut where_clauses = vec!["unavailable = 0".to_string()];
         let mut query_params: Vec<Box<dyn ToSql>> = Vec::new();
 
-        // If bare terms exist, match against FTS5 or LIKE
-        if !parsed.bare_terms.is_empty() {
-            let bare_str = parsed.bare_terms.join(" ");
-            let fts_query = format!("{bare_str}*");
-            let like_query = format!("%{bare_str}%");
-
-            query_params.push(Box::new(fts_query));
-            let fts_param_idx = query_params.len();
-            query_params.push(Box::new(like_query));
-            let like_param_idx = query_params.len();
-
-            let bare_sql = format!(
-                "(id IN (SELECT rowid FROM songs_fts WHERE songs_fts MATCH ?{fts_param_idx}) OR (title LIKE ?{like_param_idx} OR artist LIKE ?{like_param_idx} OR album LIKE ?{like_param_idx}))"
-            );
-            where_clauses.push(bare_sql);
-        }
-
-        // Add qualified field filter clauses
-        for filter in parsed.field_filters {
-            where_clauses.push(filter.push_clause(&mut query_params));
-        }
+        push_query_clauses(&conn, parsed, &mut where_clauses, &mut query_params)?;
 
         query_params.push(Box::new(limit));
         let limit_param_idx = query_params.len();
@@ -112,25 +130,7 @@ impl CollectionScanner {
         }
         let mut query_params: Vec<Box<dyn ToSql>> = Vec::new();
 
-        if !parsed.bare_terms.is_empty() {
-            let bare_str = parsed.bare_terms.join(" ");
-            let fts_query = format!("{bare_str}*");
-            let like_query = format!("%{bare_str}%");
-
-            query_params.push(Box::new(fts_query));
-            let fts_param_idx = query_params.len();
-            query_params.push(Box::new(like_query));
-            let like_param_idx = query_params.len();
-
-            let bare_sql = format!(
-                "(id IN (SELECT rowid FROM songs_fts WHERE songs_fts MATCH ?{fts_param_idx}) OR (title LIKE ?{like_param_idx} OR artist LIKE ?{like_param_idx} OR album LIKE ?{like_param_idx}))"
-            );
-            where_clauses.push(bare_sql);
-        }
-
-        for filter in parsed.field_filters {
-            where_clauses.push(filter.push_clause(&mut query_params));
-        }
+        push_query_clauses(&conn, parsed, &mut where_clauses, &mut query_params)?;
 
         query_params.push(Box::new(limit));
         let limit_param_idx = query_params.len();
@@ -4687,6 +4687,59 @@ mod tests {
         assert_eq!(smart_songs[0].title.as_deref(), Some("Normal Song"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// #1995: the search box's `genre:` filter reads through genre aliases,
+    /// the same way the genre browser counts them.
+    #[test]
+    fn test_search_genre_filter_follows_aliases() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_genre_search_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        {
+            let conn = db.pool.get().unwrap();
+            for (i, genre) in ["Progressive Rock", "Prog Rock", "Jazz"].iter().enumerate() {
+                let song = Song {
+                    path: Some(format!("/s{i}.mp3")),
+                    title: Some(format!("Track {i}")),
+                    artist: Some("Mariner".to_string()),
+                    genre: Some(genre.to_string()),
+                    source: SongSource::LocalFile,
+                    filetype: FileType::Mp3,
+                    ..Default::default()
+                };
+                upsert_song(&conn, &song).unwrap();
+            }
+        }
+        let titles = |query: &str| -> Vec<String> {
+            let mut t: Vec<String> = scanner
+                .search_songs(query, 10)
+                .unwrap()
+                .into_iter()
+                .filter_map(|s| s.title)
+                .collect();
+            t.sort();
+            t
+        };
+        assert_eq!(titles("genre:=\"Progressive Rock\""), vec!["Track 0"]);
+
+        {
+            let mut conn = db.pool.get().unwrap();
+            crate::genre_aliases::set_alias(&mut conn, "Prog Rock", "Progressive Rock").unwrap();
+        }
+        assert_eq!(
+            titles("genre:=\"Progressive Rock\""),
+            vec!["Track 0", "Track 1"]
+        );
+        assert_eq!(titles("genre:\"Prog Rock\""), vec!["Track 0", "Track 1"]);
+        // A bare term alongside the genre filter keeps its parameter slots.
+        assert_eq!(
+            titles("genre:\"Prog Rock\" Track"),
+            vec!["Track 0", "Track 1"]
+        );
     }
 
     /// #1752: tracks whose album tag differs only in letter case or

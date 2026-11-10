@@ -337,6 +337,7 @@
       <h2>Синтаксис</h2>
       <div class="list">
         <div class="row"><div class="mk">•</div><div>Текстове поле без оператора означає <b>містить</b>: <code>genre:rock</code> збігається з будь-яким жанром, що містить «rock».</div></div>
+        <div class="row"><div class="mk">•</div><div>Псевдоніми жанрів враховуються: якщо <i>Prog Rock</i> — псевдонім <i>Progressive Rock</i>, то <code>genre:"Progressive Rock"</code> знаходить і пісні з жанром <i>Prog Rock</i> — як у пошуку, так і в розумних плейлістах. Використовуйте <code>genre:=Rock</code>, щоб знайти лише жанр <i>Rock</i> повністю (без <i>Prog Rock</i>).</div></div>
         <div class="row"><div class="mk">•</div><div>Числове поле без оператора означає <b>точно</b>: <code>year:1994</code> збігається лише з 1994.</div></div>
         <div class="row"><div class="mk">•</div><div>Кілька термінів мають збігатися одночасно: <code>rating:&gt;=4 year:&lt;2000 genre:rock</code>.</div></div>
         <div class="row"><div class="mk">•</div><div>Слова без двокрапки шукаються в назві, виконавцеві й альбомі: <code>rating:&gt;=4 "tom cochrane"</code>.</div></div>
