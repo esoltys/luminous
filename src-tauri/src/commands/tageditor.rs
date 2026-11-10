@@ -539,7 +539,10 @@ pub async fn save_song_tags(
     .map_err(|e| e.to_string())?;
 
     // The values just saved are the user's: detection must not fill or replace them (#1943).
-    crate::musical::mark_user_curated(&conn, song_id).map_err(|e| e.to_string())?;
+    // Best effort: the save itself has already succeeded, so a failed marker must not report it as failed.
+    if let Err(e) = crate::musical::mark_user_curated(&conn, song_id) {
+        log::warn!("Failed to mark song {song_id} as user-curated for tempo/key detection: {e}");
+    }
 
     // Continuous auto-organization hook (#1468)
     if let Ok(auto_res) = crate::organizer::auto_organize_song_ids(

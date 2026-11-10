@@ -192,9 +192,15 @@ pub fn needs_analysis(conn: &Connection, song_id: i64) -> rusqlite::Result<bool>
     )
 }
 
+/// Longest track the background worker decodes. Decoding buffers the whole file as mono PCM, so
+/// hour-long mixes and audiobooks are left alone (they are still analysed if played, like
+/// their waveforms).
+const MAX_BACKGROUND_TRACK_SECONDS: i64 = 30 * 60;
+
 /// The songs worth decoding for tempo/key: local songs missing a tempo or key that are not yet
-/// analysed. Songs that already carry both tags are never decoded for this. Shared by the worker's
-/// queue and the remaining-count shown in Settings, so the two cannot disagree.
+/// analysed, and short enough to decode in the background. Songs that already carry both tags are
+/// never decoded for this. Shared by the worker's queue and the remaining-count shown in Settings,
+/// so the two cannot disagree.
 fn candidates_sql(select: &str, tail: &str) -> String {
     format!(
         "SELECT {select} FROM songs s
@@ -202,8 +208,10 @@ fn candidates_sql(select: &str, tail: &str) -> String {
          WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
            AND (s.bpm IS NULL OR s.bpm <= 0
                 OR s.initial_key IS NULL OR TRIM(s.initial_key) = '')
+           AND (s.length_nanosec IS NULL OR s.length_nanosec <= {max_nanos})
            AND {needs} {tail}",
         lib = *LOCAL_SOURCES_SQL,
+        max_nanos = MAX_BACKGROUND_TRACK_SECONDS * 1_000_000_000,
         needs = NEEDS_ANALYSIS_SQL
     )
 }
@@ -233,8 +241,10 @@ pub struct MusicalAnalysisProgress {
     pub remaining: u64,
 }
 
-/// How often the library views are told about detected values while the worker is busy.
-const LIBRARY_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
+/// How often the library views are told about detected values while the worker is busy. Each
+/// notice makes the UI reload the library, so this is deliberately infrequent; the final notice
+/// when the backlog drains brings everything up to date.
+const LIBRARY_REFRESH_INTERVAL: Duration = Duration::from_secs(120);
 
 /// Spawn the low-priority background worker that fills in tempo and key for tracks lacking them.
 /// One track at a time, throttled, and decoded through the same pass that caches the waveforms,
@@ -484,6 +494,47 @@ mod tests {
 
         record_analysis(&conn, a, &found(120.0, "Am")).unwrap();
         assert_eq!(remaining(&conn).unwrap(), 1);
+    }
+
+    #[test]
+    fn very_long_tracks_are_not_decoded_in_the_background() {
+        let (_dir, db) = setup();
+        let long = add_song(&db, None, None, 10);
+        let short = add_song(&db, None, None, 11);
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "UPDATE songs SET length_nanosec = ?2 WHERE id = ?1",
+            params![long, 2 * 3600 * 1_000_000_000i64],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE songs SET length_nanosec = ?2 WHERE id = ?1",
+            params![short, 200 * 1_000_000_000i64],
+        )
+        .unwrap();
+
+        assert_eq!(
+            next_song_to_analyze(&conn).unwrap().map(|s| s.0),
+            Some(short)
+        );
+        assert_eq!(remaining(&conn).unwrap(), 1);
+    }
+
+    #[test]
+    fn saving_tags_by_path_makes_the_song_user_curated() {
+        let (_dir, db) = setup();
+        let id = add_song(&db, None, None, 10);
+        let conn = db.pool.get().unwrap();
+        let path: String = conn
+            .query_row("SELECT path FROM songs WHERE id = ?1", params![id], |r| {
+                r.get(0)
+            })
+            .unwrap();
+
+        mark_user_curated_by_path(&conn, &path);
+        assert_eq!(next_song_to_analyze(&conn).unwrap(), None);
+        // An unknown path is a no-op, not an error.
+        mark_user_curated_by_path(&conn, "/not/in/the/library.flac");
     }
 
     #[test]
