@@ -57,6 +57,15 @@ pub async fn reject_song_lyrics(
     }
 }
 
+#[derive(Default)]
+struct SongCoverInfo {
+    artist: Option<String>,
+    album: Option<String>,
+    album_artist: Option<String>,
+    album_key: Option<String>,
+    art_automatic: Option<String>,
+}
+
 /// Rejects the auto-downloaded cover art for the album containing `song_id`,
 /// records the rejection in the blocklist, removes cached image files, and
 /// sets `art_unset = 1` so automated lookups do not re-fetch the rejected art.
@@ -64,33 +73,27 @@ pub async fn reject_song_lyrics(
 pub async fn reject_album_cover(state: State<'_, AppState>, song_id: i64) -> Result<(), String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
 
-    let (artist, album, album_artist, album_key, art_automatic): (
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-    ) = conn
+    let info = conn
         .query_row(
             "SELECT artist, album, album_artist, album_key, art_automatic FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
             |row| {
-                Ok((
-                    row.get(0)?,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get(4)?,
-                ))
+                Ok(SongCoverInfo {
+                    artist: row.get(0)?,
+                    album: row.get(1)?,
+                    album_artist: row.get(2)?,
+                    album_key: row.get(3)?,
+                    art_automatic: row.get(4)?,
+                })
             },
         )
         .map_err(|e| e.to_string())?;
 
-    let key = album_key.unwrap_or_else(|| {
+    let key = info.album_key.unwrap_or_else(|| {
         crate::album_key::album_key_for(
-            album.as_deref().unwrap_or(""),
-            album_artist.as_deref(),
-            artist.as_deref(),
+            info.album.as_deref().unwrap_or(""),
+            info.album_artist.as_deref(),
+            info.artist.as_deref(),
             false,
         )
     });
@@ -111,7 +114,7 @@ pub async fn reject_album_cover(state: State<'_, AppState>, song_id: i64) -> Res
     .map_err(|e| e.to_string())?;
 
     // If art_automatic was a cached album-* file in covers_dir, remove it from disk
-    if let Some(ref auto) = art_automatic {
+    if let Some(ref auto) = info.art_automatic {
         if auto.starts_with("album-") {
             let cover_path = state.cover_manager.covers_dir().join(auto);
             if cover_path.is_file() {
@@ -121,8 +124,8 @@ pub async fn reject_album_cover(state: State<'_, AppState>, song_id: i64) -> Res
     }
 
     // Clear art_automatic and set art_unset = 1 across sibling songs of this album
-    let query_artist = artist.unwrap_or_default();
-    let query_album = album.unwrap_or_default();
+    let query_artist = info.artist.unwrap_or_default();
+    let query_album = info.album.unwrap_or_default();
     conn.execute(
         "UPDATE songs SET art_automatic = NULL, art_unset = 1
          WHERE (album_key = ?1 OR (artist = ?2 COLLATE NOCASE AND album = ?3 COLLATE NOCASE))
