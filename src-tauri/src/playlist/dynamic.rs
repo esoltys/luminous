@@ -1028,6 +1028,7 @@ mod tests {
                 ))
                 .unwrap(),
             schema_version: db.schema_version,
+            scan_gate: Default::default(),
         });
         drop(db);
 

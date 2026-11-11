@@ -49,6 +49,7 @@ mod query;
 pub(crate) mod reconcile;
 pub mod relocate;
 pub mod safeguard;
+mod scan_gate;
 mod watcher;
 pub(crate) use query::get_artist_profile_conn;
 #[cfg(test)]
@@ -56,6 +57,7 @@ pub(crate) use query::set_artist_profile_conn;
 pub(crate) use query::MISSING_CORE_TAGS_SQL;
 pub(crate) use reconcile::resolve_case_insensitive_path;
 pub use safeguard::{MassRemovalIncident, MassRemovalRegistry, SafeguardVerdict};
+pub use scan_gate::ScanGate;
 pub use watcher::{start_watcher, SelfWriteTracker, WatcherPauseGuard};
 
 /// What started a library scan — recorded with its timings so repeated
@@ -117,6 +119,9 @@ impl ScanTrigger {
 #[derive(Debug, Default, Clone)]
 pub struct ScanReport {
     pub force: bool,
+    /// The scan did nothing because a running full scan already covers it
+    /// (see `ScanGate`); every count below is zero.
+    pub skipped: bool,
     pub directories: usize,
     pub files_found: usize,
     pub cue_sheets: usize,
@@ -144,6 +149,12 @@ pub struct ScanReport {
 impl ScanReport {
     /// One line for the log and the diagnostics export.
     pub fn summary(&self, trigger: ScanTrigger) -> String {
+        if self.skipped {
+            return format!(
+                "scan ({}): skipped, a running full scan already covers it",
+                trigger.label()
+            );
+        }
         format!(
             "scan ({}{}): total {} ms | {} dir(s), {} file(s) found, {} CUE sheet(s), \
              {} unchanged, {} re-read, {} failed, {} marked unavailable, {} external change(s) | \
@@ -969,7 +980,9 @@ impl CollectionScanner {
     /// `silent` marks this as a watcher-triggered catch-up scan rather than an
     /// explicit user action — see `ScanProgress::silent` (#233). Thin
     /// Tauri-facing wrapper around `scan_all_core` — see that method for the
-    /// actual scan logic.
+    /// actual scan logic. Only one scan runs at a time: this waits for a running
+    /// scan, or returns a `ScanReport` with `skipped` set when a running full
+    /// scan already covers a scoped request (see `ScanGate`).
     pub async fn scan_all(
         &self,
         app: AppHandle,
@@ -1135,6 +1148,17 @@ impl CollectionScanner {
         mut on_progress: impl FnMut(ScanProgress),
         on_incident: impl FnMut(MassRemovalIncident, Vec<i64>) + Send,
     ) -> Result<ScanReport> {
+        // One scan at a time, library-wide (#1873). Held to the end of the
+        // function. A skipped scan emits no `scan-progress` event: a stray
+        // `done` would clear the UI's scanning state while the scan that made
+        // this one redundant is still running.
+        let Some(_scan_permit) = self.db.scan_gate.acquire(self.scope.is_none()).await else {
+            return Ok(ScanReport {
+                force,
+                skipped: true,
+                ..ScanReport::default()
+            });
+        };
         let scan_started = Instant::now();
         let dirs = self.get_directories()?;
         let mut report = ScanReport {
@@ -3209,6 +3233,73 @@ mod tests {
                 .iter()
                 .any(|p| p.directory_name.as_deref() == Some("music")));
         }
+    }
+
+    /// #1873: two scans started together must not interleave, and a scoped
+    /// scan inside a running full scan is skipped without emitting events.
+    #[tokio::test]
+    async fn test_scans_never_overlap() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let music_dir = temp_dir.path().join("music");
+        std::fs::create_dir_all(&music_dir).unwrap();
+        for i in 0..20 {
+            write_test_wav(&music_dir.join(format!("song{i}.wav")));
+        }
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&music_dir.to_string_lossy()).unwrap();
+
+        // Every event from both scans lands in one log, tagged by scan.
+        let log = Arc::new(parking_lot::Mutex::new(Vec::<(u8, ScanPhase)>::new()));
+        let run = |id: u8, scanner: CollectionScanner, scoped: bool| {
+            let log = Arc::clone(&log);
+            let app_data = temp_dir.path().to_path_buf();
+            let music = music_dir.clone();
+            async move {
+                let scanner = if scoped {
+                    scanner.scoped_to(music)
+                } else {
+                    scanner
+                };
+                scanner
+                    .scan_all_core(app_data, false, false, false, move |p| {
+                        log.lock().push((id, p.phase))
+                    })
+                    .await
+                    .unwrap()
+            }
+        };
+
+        let (a, b) = tokio::join!(
+            run(1, CollectionScanner::new(Arc::clone(&db)), false),
+            run(2, CollectionScanner::new(Arc::clone(&db)), false),
+        );
+        assert!(!a.skipped && !b.skipped, "full scans wait, never skip");
+        let events = log.lock().clone();
+        let last_of_first = events
+            .iter()
+            .rposition(|(id, _)| *id == events[0].0)
+            .unwrap();
+        let first_of_second = events
+            .iter()
+            .position(|(id, _)| *id != events[0].0)
+            .unwrap();
+        assert!(
+            last_of_first < first_of_second,
+            "scans interleaved: {events:?}"
+        );
+        assert_eq!(events[last_of_first].1, ScanPhase::Done);
+
+        // A scoped scan requested while a full scan runs is skipped.
+        log.lock().clear();
+        let (full, scoped) = tokio::join!(
+            run(1, CollectionScanner::new(Arc::clone(&db)), false),
+            run(2, CollectionScanner::new(Arc::clone(&db)), true),
+        );
+        assert!(!full.skipped);
+        assert!(scoped.skipped);
+        assert!(log.lock().iter().all(|(id, _)| *id == 1));
     }
 
     #[tokio::test]

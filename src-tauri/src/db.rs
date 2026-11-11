@@ -1214,6 +1214,8 @@ pub struct Database {
     /// higher if this database was last opened by a newer build of the app (older
     /// builds only ever migrate upward, never down) — see `is_newer_than_app`.
     pub schema_version: i32,
+    /// Serializes library scans — see `collection::ScanGate` (#1873).
+    pub scan_gate: crate::collection::ScanGate,
 }
 
 const POOL_SIZE: u32 = 8;
@@ -1277,6 +1279,7 @@ impl Database {
         let db = Self {
             pool,
             schema_version: 0,
+            scan_gate: Default::default(),
         };
         let schema_version = db.run_migrations()?;
         db.reset_stale_sync_status();

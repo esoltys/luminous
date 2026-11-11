@@ -2081,6 +2081,7 @@ mod tests {
                 ))
                 .unwrap(),
             schema_version: db.schema_version,
+            scan_gate: Default::default(),
         });
 
         let manager = TagManager::new(single);
