@@ -238,8 +238,11 @@ pub fn is_prohibited_library_write_path(path: &Path) -> bool {
     }
 
     // In tests, also prevent mutating test fixtures within CARGO_MANIFEST_DIR
-    if let Some(manifest) = std::env::var_os("CARGO_MANIFEST_DIR") {
-        let manifest_dir = PathBuf::from(manifest);
+    let manifest_opt = std::env::var_os("CARGO_MANIFEST_DIR")
+        .map(PathBuf::from)
+        .or_else(|| option_env!("CARGO_MANIFEST_DIR").map(PathBuf::from));
+
+    if let Some(manifest_dir) = manifest_opt {
         // If path is inside CARGO_MANIFEST_DIR, but NOT inside target/, reject it
         let norm_path = normalize_path(path);
         let norm_manifest = normalize_path(&manifest_dir);

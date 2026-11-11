@@ -77,9 +77,7 @@ pub fn is_eligible_portable_dir(base_dir: &Path) -> bool {
 pub fn resolve_app_data_dir_info<R: Runtime>(app: &impl Manager<R>) -> AppDataDirInfo {
     if let Ok(dir) = std::env::var("LUMINOUS_DATA_DIR") {
         let path = PathBuf::from(dir);
-        if crate::test_guard::is_test_mode() {
-            crate::test_guard::assert_safe_profile_path(&path);
-        }
+        crate::test_guard::assert_safe_profile_path(&path);
         return AppDataDirInfo {
             path,
             is_portable: false,
@@ -96,9 +94,7 @@ pub fn resolve_app_data_dir_info<R: Runtime>(app: &impl Manager<R>) -> AppDataDi
     }
 
     let default_path = app.path().app_data_dir().expect("no app data dir");
-    if crate::test_guard::is_test_mode() {
-        crate::test_guard::assert_safe_profile_path(&default_path);
-    }
+    crate::test_guard::assert_safe_profile_path(&default_path);
 
     AppDataDirInfo {
         path: default_path,
