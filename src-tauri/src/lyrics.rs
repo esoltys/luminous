@@ -641,12 +641,38 @@ pub async fn get_lyrics_for_song(
         };
     }
 
-    // 3. Query online APIs (LRCLIB -> NetEase -> Lyrics.ovh)
+    // 3. Query online APIs (LRCLIB -> NetEase -> Lyrics.ovh), skipping any blocklisted providers (#1581)
+    let rejected_providers = crate::metadata_blocklist::MetadataBlocklist::get_rejected_providers(
+        &conn,
+        "song",
+        &song_id.to_string(),
+        "lyrics",
+    )
+    .unwrap_or_default();
+
+    let mut excluded = Vec::new();
+    for p in &rejected_providers {
+        match p.as_str() {
+            "lrclib" => excluded.push(LyricsProvider::LrcLib),
+            "netease" => excluded.push(LyricsProvider::NetEase),
+            "lyrics_ovh" => excluded.push(LyricsProvider::LyricsOvh),
+            "*" => {
+                excluded.push(LyricsProvider::LrcLib);
+                excluded.push(LyricsProvider::NetEase);
+                excluded.push(LyricsProvider::LyricsOvh);
+            }
+            _ => {}
+        }
+    }
+
     let query = LyricsQuery::new(&artist, &title)
         .with_album(&album)
         .with_duration(duration_sec);
 
-    match lyrics_manager.fetch_with_fallback(&query).await {
+    match lyrics_manager
+        .fetch_with_fallback_excluding(&query, &excluded)
+        .await
+    {
         Ok(result) => {
             let final_lyrics = if result.is_synced {
                 result.text

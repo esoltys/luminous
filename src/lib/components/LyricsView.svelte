@@ -8,7 +8,8 @@
     XIcon as X,
     ArrowsClockwiseIcon as RefreshCw,
     MusicNotesIcon as Music2,
-    SubtitlesIcon as Lyrics
+    SubtitlesIcon as Lyrics,
+    ProhibitIcon as Prohibit
   } from "phosphor-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Button from "./Button.svelte";
@@ -219,6 +220,42 @@
     }
   }
 
+  let isRejecting = $state(false);
+  let isOnlineSource = $derived(
+    lyricsSource === "lrclib" || lyricsSource === "netease" || lyricsSource === "lyrics_ovh"
+  );
+
+  async function rejectMatch() {
+    if (!playerStore.currentSong) return;
+    const songId = playerStore.currentSong.id;
+    isRejecting = true;
+    try {
+      console.log(`[LyricsView] Rejecting online lyrics for songId: ${songId}`);
+      const nextPayload = await invoke<LyricsPayload | null>("reject_song_lyrics", { songId });
+      if (nextPayload) {
+        lyricsText = nextPayload.text;
+        lyricsSource = nextPayload.source;
+        if (playerStore.currentSong && playerStore.currentSong.id === songId) {
+          playerStore.currentSong.lyrics = nextPayload.text;
+          playerStore.currentSong.lyrics_source = nextPayload.source;
+        }
+      } else {
+        lyricsText = "";
+        lyricsSource = null;
+        if (playerStore.currentSong && playerStore.currentSong.id === songId) {
+          playerStore.currentSong.lyrics = undefined;
+          playerStore.currentSong.lyrics_source = undefined;
+        }
+      }
+      toastStore.show(i18n.t("lyrics.rejectMatchSuccess"), "success");
+    } catch (e: any) {
+      console.error("[LyricsView] Failed to reject lyrics match:", e);
+      toastStore.show(e.toString(), "error");
+    } finally {
+      isRejecting = false;
+    }
+  }
+
   async function loadOffset(songId: number | undefined) {
     // Reset immediately so the previous song's offset never applies to this
     // one while the lookup is in flight.
@@ -374,6 +411,17 @@
             <Button onclick={() => loadLyrics(playerStore.currentSong?.id, true)} variant="secondary" size="sm" title={i18n.t('lyrics.refetchTooltip', {}, "Refetch lyrics online")}>
               <RefreshCw class="w-3.5 h-3.5" /> {i18n.t('lyrics.refetchBtn', {}, "Refetch")}
             </Button>
+            {#if isOnlineSource}
+              <Button
+                onclick={rejectMatch}
+                disabled={isRejecting}
+                variant="secondary"
+                size="sm"
+                title={i18n.t('lyrics.rejectMatchTooltip', {}, "Reject incorrect online lyrics and prevent this match in future")}
+              >
+                <Prohibit class="w-3.5 h-3.5" /> {i18n.t('lyrics.rejectMatch', {}, "Reject Match")}
+              </Button>
+            {/if}
           {/if}
           <Button onclick={startEditing} variant="primary" size="sm">
             <Edit3 class="w-3.5 h-3.5" /> {i18n.t('settings.editThemeShort')}

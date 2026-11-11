@@ -1755,6 +1755,40 @@ impl CoverManager {
             }
         };
 
+        // Check metadata blocklist to prevent re-fetching rejected artwork (#1581)
+        let is_blocked = crate::db::run_blocking(&self.db, {
+            let q_art = query_artist.clone();
+            let q_alb = query_album.clone();
+            move |conn| {
+                let album_key = crate::album_key::album_key_for(&q_alb, None, Some(&q_art), false);
+                let album_blocked =
+                    crate::metadata_blocklist::MetadataBlocklist::is_provider_rejected(
+                        conn,
+                        "album",
+                        &album_key,
+                        "cover_art",
+                        "itunes",
+                    )?;
+                if album_blocked {
+                    return Ok(true);
+                }
+                let song_blocked =
+                    crate::metadata_blocklist::MetadataBlocklist::is_provider_rejected(
+                        conn,
+                        "song",
+                        &song_id.to_string(),
+                        "cover_art",
+                        "itunes",
+                    )?;
+                Ok(song_blocked)
+            }
+        })
+        .await?;
+
+        if is_blocked {
+            return Ok(None);
+        }
+
         let hash_name = self.get_album_hash(&query_artist, &query_album);
 
         // Fast-path: if the artwork has already been cached on disk by an earlier

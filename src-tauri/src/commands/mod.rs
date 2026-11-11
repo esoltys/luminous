@@ -9,6 +9,7 @@ pub mod equalizer;
 pub mod files;
 pub mod loudness;
 pub mod lyrics;
+pub mod metadata_blocklist;
 pub mod musicbrainz;
 pub mod organizer;
 pub mod picard;

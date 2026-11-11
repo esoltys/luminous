@@ -182,3 +182,45 @@ async fn test_fetch_remote_cover_art_fallback() {
         "cached file content doesn't match the bytes served by the mock artwork endpoint"
     );
 }
+
+#[tokio::test]
+async fn test_blocked_remote_cover_is_not_fetched() {
+    use luminous_lib::metadata_blocklist::MetadataBlocklist;
+
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).expect("failed to init db"));
+    let song_id = 99i64;
+
+    let mock_server = MockServer::start().await;
+    // Mock server should NEVER receive any requests
+    Mock::given(method("GET"))
+        .and(path("/search"))
+        .respond_with(ResponseTemplate::new(500))
+        .expect(0)
+        .mount(&mock_server)
+        .await;
+
+    let conn = db.pool.get().expect("db conn failed");
+    conn.execute(
+        "INSERT OR REPLACE INTO songs (id, title, artist, album, art_embedded, art_unset, source, filetype, unavailable)
+         VALUES (?1, 'Track', 'Artist Reject', 'Album Reject', 0, 0, 1, 1, 0)",
+        rusqlite::params![song_id],
+    )
+    .unwrap();
+
+    let album_key =
+        luminous_lib::album_key::album_key_for("Album Reject", None, Some("Artist Reject"), false);
+    MetadataBlocklist::reject(&conn, "album", &album_key, "cover_art", "itunes", "*").unwrap();
+    drop(conn);
+
+    let cover_manager = CoverManager::new(Arc::clone(&db), temp_dir.path().to_path_buf())
+        .with_itunes_base_url(mock_server.uri());
+
+    let result = cover_manager
+        .fetch_remote_cover(song_id)
+        .await
+        .expect("fetch_remote_cover failed");
+
+    assert_eq!(result, None);
+    mock_server.verify().await;
+}

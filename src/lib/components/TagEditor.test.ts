@@ -859,4 +859,26 @@ describe("TagEditor.svelte", () => {
     expect(restoreBtn).toBeDisabled();
     expect(restoreBtn).toHaveAttribute("title", "Tag value is already current");
   });
+
+  it("renders Reject Remote Cover button when art_automatic is remote and invokes reject_album_cover", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") {
+        return {
+          ...mockSongDetails,
+          art_automatic: "album-cachedhash.jpg",
+          art_embedded: false,
+        };
+      }
+      if (cmd === "reject_album_cover") return null;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const { findByText, getByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    const rejectBtn = await findByText("Reject Remote Cover");
+    expect(rejectBtn).toBeInTheDocument();
+
+    await fireEvent.click(rejectBtn);
+    expect(invoke).toHaveBeenCalledWith("reject_album_cover", { songId: 10 });
+  });
 });

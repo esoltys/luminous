@@ -12,7 +12,8 @@
     ImageBrokenIcon as ImageOff,
     CloudIcon,
     FolderOpenIcon as FolderOpen,
-    BroomIcon as Broom
+    BroomIcon as Broom,
+    ProhibitIcon as Prohibit
   } from "phosphor-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -99,6 +100,8 @@
   // editable field that would suggest a per-track override is meaningful.
   let compilation = $state(false);
   let artEmbedded = $state(false);
+  let artAutomatic = $state<string | null>(null);
+  let isRejectingCover = $state(false);
   let coverArtVersion = $state(0);
   let showClearArtConfirm = $state(false);
   let isClearingArt = $state(false);
@@ -158,6 +161,8 @@
     loved: number;
     compilation: boolean;
     art_embedded: boolean;
+    art_automatic?: string | null;
+    lyrics_source?: string | null;
     is_cue_track: boolean;
   }
 
@@ -231,6 +236,7 @@
       loved = details.loved;
       compilation = details.compilation;
       artEmbedded = details.art_embedded;
+      artAutomatic = details.art_automatic ?? null;
       isCueTrack = details.is_cue_track;
 
       if (songId != null && !isRemotePath(details.path) && !details.is_cue_track) {
@@ -563,6 +569,23 @@
     }
   }
 
+  async function handleRejectRemoteCover() {
+    if (songId == null) return;
+    isRejectingCover = true;
+    try {
+      await invoke("reject_album_cover", { songId });
+      artAutomatic = null;
+      coverArtVersion++;
+      await collectionStore.refreshLibrary();
+      toastStore.show(i18n.t("tagEditor.rejectRemoteCoverSuccess", {}, "Remote cover rejected and blocklisted"), "success");
+    } catch (e: any) {
+      console.error("Failed to reject remote cover:", e);
+      toastStore.show(e.toString(), "error");
+    } finally {
+      isRejectingCover = false;
+    }
+  }
+
   onMount(loadMetadata);
 
   function handleKeydown(e: KeyboardEvent) {
@@ -654,6 +677,18 @@
                 <ImageOff class="w-3.5 h-3.5" />
                 {i18n.t('tagEditor.clearArtBtn')}
               </Button>
+              {#if artAutomatic && artAutomatic.startsWith("album-")}
+                <Button
+                  onclick={handleRejectRemoteCover}
+                  disabled={isSaving || isRejectingCover}
+                  variant="secondary"
+                  size="sm"
+                  title={i18n.t('tagEditor.rejectRemoteCoverTooltip', {}, "Reject this online cover match and prevent it from being downloaded again")}
+                >
+                  <Prohibit class="w-3.5 h-3.5" />
+                  {i18n.t('tagEditor.rejectRemoteCoverBtn', {}, "Reject Remote Cover")}
+                </Button>
+              {/if}
             {/if}
           </div>
 

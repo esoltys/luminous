@@ -22,7 +22,8 @@
     XIcon as X,
     HeartIcon,
     HeartBreakIcon,
-    ShieldCheckIcon as ShieldCheck
+    ShieldCheckIcon as ShieldCheck,
+    ProhibitIcon as Prohibit
   } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import type { Snippet } from "svelte";
@@ -546,6 +547,25 @@
         if (selectedCount === 1) onEditTags?.();
         else onEditBatchTags?.();
         onClose();
+      }}
+    />
+  {/if}
+
+  {#if selectedCount === 1 && (song.lyrics_source === 'lrclib' || song.lyrics_source === 'netease' || song.lyrics_source === 'lyrics_ovh')}
+    <ContextMenuItem
+      icon={Prohibit}
+      label={i18n.t("lyrics.rejectMatch", {}, "Reject Online Lyrics")}
+      onmouseenter={closeSubmenuImmediately}
+      onclick={async () => {
+        onClose();
+        try {
+          await invoke("reject_song_lyrics", { songId: song.id });
+          song.lyrics = undefined;
+          song.lyrics_source = undefined;
+          toastStore.show(i18n.t("lyrics.rejectMatchSuccess", {}, "Lyrics match rejected and blocklisted"), "success");
+        } catch (e: any) {
+          toastStore.show(e.toString(), "error");
+        }
       }}
     />
   {/if}

@@ -1409,6 +1409,16 @@ export interface LyricsPayload {
   source: LyricsSource;
 }
 
+export interface MetadataRejection {
+  id: number;
+  entity_type: string;
+  entity_id: string;
+  category: string;
+  provider: string;
+  rejected_identifier: string;
+  created_at: string;
+}
+
 // ---------------------------------------------------------------------------
 // Curation & Duplicate Resolution (#1586, #1678)
 // ---------------------------------------------------------------------------

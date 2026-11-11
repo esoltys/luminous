@@ -5,6 +5,7 @@
   import { musicbrainzStore } from "../stores/musicbrainz.svelte";
   import { scrobblerStore } from "../stores/scrobbler.svelte";
   import MusicBrainzLoginModal from "./MusicBrainzLoginModal.svelte";
+  import BlockedMetadataModal from "./BlockedMetadataModal.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
@@ -26,7 +27,8 @@
     HeartIcon as Heart,
     WifiHighIcon as WifiHigh,
     WifiSlashIcon as WifiSlash,
-    DiscordLogoIcon as DiscordLogo
+    DiscordLogoIcon as DiscordLogo,
+    ProhibitIcon as Prohibit
   } from "phosphor-svelte";
 
   let showListenBrainzToken = $state(false);
@@ -43,6 +45,7 @@
   let picardCustomPath = $state("");
   let isRecheckingPicard = $state(false);
   let showMusicBrainzLoginModal = $state(false);
+  let showBlockedMetadataModal = $state(false);
 
   async function refreshFanartKeyStatus() {
     try {
@@ -874,5 +877,30 @@
       </div>
     {/each}
   </div>
+
+  <div class="space-y-3 pt-2 border-t border-brand-border/60">
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <span class="text-sm font-semibold text-brand-text-primary flex items-center gap-2">
+          <Prohibit class="w-4 h-4 text-brand-accent-text" />
+          {i18n.t('settings.blockedMetadataTitle', {}, 'Blocked Online Metadata')}
+        </span>
+        <p class="text-xs text-brand-text-secondary">
+          {i18n.t('settings.blockedMetadataSubtitle', {}, 'Online matches you previously rejected. Unblocking allows the engine to associate them again.')}
+        </p>
+      </div>
+      <Button
+        onclick={() => { showBlockedMetadataModal = true; }}
+        variant="secondary"
+        size="sm"
+      >
+        {i18n.t('settings.manageBlockedMetadataBtn', {}, 'Manage Blocklist')}
+      </Button>
+    </div>
+  </div>
 </div>
+
+{#if showBlockedMetadataModal}
+  <BlockedMetadataModal onClose={() => { showBlockedMetadataModal = false; }} />
+{/if}
 {/if}
