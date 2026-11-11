@@ -78,6 +78,7 @@ function extractPlaceholders(str: string): string[] {
  * (e.g. loanwords, shared musical terminology, technical acronyms, brand names, or symbols).
  */
 const IDENTICAL_OK_FR = new Set([
+  "smartPlaylistBuilder.fieldTempo", // "Tempo"
   "smartPlaylistBuilder.fieldFormat", // "Format"
   "organizer.activeDestinationLabel", // "Destination"
   "organizer.chipAlbum", // Same word in this language
@@ -193,6 +194,7 @@ const IDENTICAL_OK_FR = new Set([
 ]);
 
 const IDENTICAL_OK_IT = new Set<string>([
+  "smartPlaylistBuilder.fieldTempo", // "Tempo"
   "settings.onlineLabel", // "Online" is the usual word in this language
   "settings.offlineLabel", // "Offline" is the usual word in this language
   "organizer.chipAlbum", // Same word in this language
@@ -296,6 +298,7 @@ const IDENTICAL_OK_IT = new Set<string>([
 ]);
 
 const IDENTICAL_OK_ES = new Set<string>([
+  "smartPlaylistBuilder.fieldTempo", // "Tempo"
   "units.hz", // SI unit symbols are the same in this language
   "units.khz",
   "units.db",
@@ -362,6 +365,7 @@ const IDENTICAL_OK_ES = new Set<string>([
 
 // Cognates, loanwords and technical terms Windows and the field also leave in English, plus brands, acronyms and symbols.
 const IDENTICAL_OK_DE = new Set<string>([
+  "smartPlaylistBuilder.fieldTempo", // "Tempo"
   "smartPlaylistBuilder.fieldFormat", // "Format"
   "devices.groupPlaylists", // Same word in this language
   "devices.playlistsRow", // Same word in this language
