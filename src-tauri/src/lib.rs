@@ -64,6 +64,7 @@ pub mod tag_history;
 pub mod tags;
 #[cfg(target_os = "windows")]
 pub mod taskbar;
+pub mod test_guard;
 pub mod tray;
 pub mod waveform;
 pub mod webdav;

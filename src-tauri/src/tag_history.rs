@@ -942,6 +942,12 @@ pub fn restore_song_tags(
             language: language.as_deref(),
         };
 
+        if let Err(e) = crate::test_guard::check_library_write_path(file_path) {
+            return Ok(RestoreSongOutcome::Skipped(format!(
+                "Test-mode guard refused writing tags to {path_str}: {e:#}"
+            )));
+        }
+
         if let Err(e) = luminous_metadata::audio::write_tags(file_path, &tag_req) {
             return Ok(RestoreSongOutcome::Skipped(format!(
                 "Failed to write tags to {path_str}: {e:#}"

@@ -1076,6 +1076,7 @@ impl Drop for InflightGuard {
 
 impl CoverManager {
     pub fn new(db: Arc<Database>, app_data_dir: PathBuf) -> Self {
+        crate::test_guard::assert_safe_profile_path(&app_data_dir);
         let covers_dir = app_data_dir.join("covers");
         if !covers_dir.exists() {
             let _ = std::fs::create_dir_all(&covers_dir);
@@ -1327,6 +1328,14 @@ impl CoverManager {
         }
 
         let cover_path = album_dir.join("cover.jpg");
+        if let Err(e) = crate::test_guard::check_library_write_path(&cover_path) {
+            log::warn!(
+                "Test guard prevented writing sidecar cover to {:?}: {}",
+                cover_path,
+                e
+            );
+            return None;
+        }
         if let Some(tracker) = &self.self_writes {
             tracker.mark_written([cover_path.clone()]);
         }
@@ -1375,6 +1384,14 @@ impl CoverManager {
         }
 
         let artist_path = artist_dir.join("artist.jpg");
+        if let Err(e) = crate::test_guard::check_library_write_path(&artist_path) {
+            log::warn!(
+                "Test guard prevented writing sidecar artist to {:?}: {}",
+                artist_path,
+                e
+            );
+            return None;
+        }
         if let Some(tracker) = &self.self_writes {
             tracker.mark_written([artist_path.clone()]);
         }
@@ -1426,6 +1443,14 @@ impl CoverManager {
         let (cleaned, _mime, ext) = detect_image_format_and_clean(raw_data);
         let filename = format!("logo.{ext}");
         let logo_path = artist_dir.join(&filename);
+        if let Err(e) = crate::test_guard::check_library_write_path(&logo_path) {
+            log::warn!(
+                "Test guard prevented writing sidecar logo to {:?}: {}",
+                logo_path,
+                e
+            );
+            return None;
+        }
         if let Some(tracker) = &self.self_writes {
             tracker.mark_written([logo_path.clone()]);
         }
@@ -1473,6 +1498,14 @@ impl CoverManager {
         let (cleaned, _mime, ext) = detect_image_format_and_clean(raw_data);
         let filename = format!("banner.{ext}");
         let banner_path = artist_dir.join(&filename);
+        if let Err(e) = crate::test_guard::check_library_write_path(&banner_path) {
+            log::warn!(
+                "Test guard prevented writing sidecar fanart banner to {:?}: {}",
+                banner_path,
+                e
+            );
+            return None;
+        }
         if let Some(tracker) = &self.self_writes {
             tracker.mark_written([banner_path.clone()]);
         }

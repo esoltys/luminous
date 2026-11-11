@@ -387,7 +387,9 @@ impl HierarchySidecar {
         if inner.blocked || inner.last_hash == Some(hash) {
             return Ok(());
         }
-        write_atomic(&sidecar_path(&dir), &content)?;
+        let target = sidecar_path(&dir);
+        crate::test_guard::check_library_write_path(&target).map_err(|e| anyhow::anyhow!("{e}"))?;
+        write_atomic(&target, &content)?;
         inner.last_hash = Some(hash);
         Ok(())
     }

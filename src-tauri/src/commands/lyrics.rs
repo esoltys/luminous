@@ -52,7 +52,9 @@ pub async fn save_lyrics(
                 } else {
                     &lyrics
                 };
-                let _ = std::fs::write(&lrc_path, clean_lyrics);
+                if crate::test_guard::check_library_write_path(&lrc_path).is_ok() {
+                    let _ = std::fs::write(&lrc_path, clean_lyrics);
+                }
             }
         }
 

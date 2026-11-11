@@ -478,6 +478,10 @@ async fn rewrite_genre_and_persist(
                     continue;
                 }
                 let path = std::path::PathBuf::from(&item.path);
+                if let Err(e) = crate::test_guard::check_library_write_path(&path) {
+                    log::warn!("Test guard prevented writing tags to {}: {e:#}", item.path);
+                    continue;
+                }
                 let write_res = audio::write_tags(
                     &path,
                     &audio::TagWriteRequest {

@@ -390,6 +390,7 @@ export class AppProfile {
       env: {
         ...process.env,
         LUMINOUS_DATA_DIR: this.dataDir,
+        LUMINOUS_TEST: "1",
         LUMINOUS_REMOTE_DEVTOOLS_PORT: String(this.port),
         WEBVIEW2_USER_DATA_FOLDER: this.webviewDir,
         WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `${existing} --remote-debugging-port=${this.port}`.trim(),
