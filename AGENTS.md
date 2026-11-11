@@ -176,6 +176,7 @@ verify with the user, not a reason to skip telling them.
 - NEVER edit files in the main checkout while a worktree exists for that branch.
 - Before any Edit/Write, run `pwd` and confirm the path is the intended worktree.
 - Never run `bun install` or `cargo build` in the main checkout during worktree work — it dirties `bun.lock`/lockfiles.
+- After creating a worktree, run `bun install --frozen-lockfile` inside the worktree so `node_modules` is populated for the Vite dev server (`bun run dev` / `bun run tauri dev`) without dirtying lockfiles.
 - Do not delete the worktree until the changes have been reviewed, merged, and approved for cleanup by the user.
 - On Windows, `git worktree remove` fails with "Permission denied" on the worktree the active terminal session is running from (open file handles keep it locked) — hand the `git worktree remove` / `git branch -d` commands to the user to run themselves in that case instead of retrying.
 
