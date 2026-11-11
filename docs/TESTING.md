@@ -80,6 +80,15 @@ To test fresh install onboarding, default pins, and first-run experiences withou
 
 This causes Luminous to initialize a brand new `luminous.db`, `covers/`, and `logs/` directory in that location while leaving your primary database completely untouched. To reset between test runs, simply remove that temporary folder or point to a new path.
 
+### Test-mode safety guard (`LUMINOUS_TEST=1`)
+
+To prevent automated test runs (`cargo test`, BDD suites, CDP benchmarks, e2e harnesses) from ever reading or mutating a user's real Luminous profile or real music collection, Luminous enforces a test-mode safety guard (`test_guard.rs`).
+
+The guard activates automatically under `cfg(test)` and whenever `LUMINOUS_TEST=1` is present in the environment:
+- **Profile Directory Protection**: `Database::new` and `resolve_app_data_dir` refuse to initialize or open any directory matching the default operating system profile path (such as `~/.local/share/org.luminous.music` on Linux or `%APPDATA%\org.luminous.music` on Windows). If a test process attempts to resolve or open the real profile, it fails fast (panicking under `cfg(test)` and returning an error under `LUMINOUS_TEST=1`).
+- **Music Library Protection**: Tag writers (`save_song_tags`, `save_file_tags`), lyrics saves, and folder cover artwork sidecar writers refuse write operations targeting files inside the user's real music directories (`~/Music`, `%USERPROFILE%\Music`) or repository fixtures.
+- **Allowed Locations**: Tests and scripts must use isolated directories (such as `tempfile::tempdir()` or a designated `LUMINOUS_DATA_DIR`), which operate without restriction.
+
 > [!NOTE]
 > On Windows, WebView2 persists `localStorage` (such as last-viewed tabs or navigation state) across sessions in its User Data Directory (`%LOCALAPPDATA%\com.luminous.app\EBWebView`). When testing a genuinely pristine first launch, you can clear `localStorage` via the DevTools console (`Ctrl+Shift+I` -> `localStorage.clear(); location.reload()`) in addition to setting `LUMINOUS_DATA_DIR`.
 

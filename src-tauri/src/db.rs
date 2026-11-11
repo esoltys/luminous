@@ -1244,6 +1244,8 @@ impl Database {
 
     /// Create (or open) the Luminous database in `app_data_dir/luminous.db`.
     pub fn new(app_data_dir: PathBuf) -> Result<Self> {
+        crate::test_guard::assert_safe_profile_path(&app_data_dir);
+
         std::fs::create_dir_all(&app_data_dir).context("failed to create app data directory")?;
 
         let db_path = app_data_dir.join("luminous.db");

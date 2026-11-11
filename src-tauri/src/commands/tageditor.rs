@@ -379,6 +379,9 @@ pub async fn save_song_tags(
     let is_remote = models::SongSource::from(source as i64).is_remote();
 
     let path = std::path::PathBuf::from(path_str);
+    if !is_remote {
+        crate::test_guard::check_library_write_path(&path).map_err(|e| e.to_string())?;
+    }
     // Close the timing race the coarse guard above can't (#514): the OS's own
     // change notification for this write may arrive after the guard's grace
     // window elapses, so track the exact path too.
@@ -597,6 +600,7 @@ pub async fn save_file_tags(
     if !p.exists() {
         return Err(format!("File not found: {path}"));
     }
+    crate::test_guard::check_library_write_path(&p).map_err(|e| e.to_string())?;
 
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
     state.self_writes.mark_written(std::iter::once(p.clone()));
@@ -1061,6 +1065,8 @@ fn write_shared_tags(
     song: &models::Song,
     tags: &SharedTags,
 ) -> anyhow::Result<()> {
+    crate::test_guard::check_library_write_path(path).map_err(|e| anyhow::anyhow!("{e}"))?;
+
     audio::write_tags(
         path,
         &audio::TagWriteRequest {
