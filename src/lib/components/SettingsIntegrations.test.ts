@@ -310,14 +310,4 @@ describe("SettingsIntegrations.svelte", () => {
     expect(getByRole("button", { name: "Disconnect" })).toBeInTheDocument();
     expect(getByRole("switch", { name: "Enable Last.fm scrobbling" })).toBeInTheDocument();
   });
-
-  it("opens the Blocked Online Metadata modal when clicking Manage Blocklist", async () => {
-    prefs.onlineEnabled = true;
-    const { findByText } = render(SettingsIntegrations);
-
-    const manageBtn = await findByText("Manage Blocklist");
-    await fireEvent.click(manageBtn);
-
-    expect(await findByText("No blocked metadata matches.")).toBeInTheDocument();
-  });
 });

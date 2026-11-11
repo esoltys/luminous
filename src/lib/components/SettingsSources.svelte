@@ -21,6 +21,7 @@
   import WebDavModal from "./WebDavModal.svelte";
   import SubsonicModal from "./SubsonicModal.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import BlockedMetadataModal from "./BlockedMetadataModal.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import type { MusicDirectory, SubsonicServer, SubsonicSyncStats, WebDavServer } from "../types";
   import { combineWebdavPath } from "../webdavDisplay";
@@ -41,9 +42,11 @@
     CloudIcon as Cloud,
     CircleNotchIcon as LoaderCircle,
     PlaylistIcon as ListMusic,
+    ProhibitIcon as Prohibit
   } from "phosphor-svelte";
 
   let editingDirectory = $state<MusicDirectory | null>(null);
+  let showBlockedMetadataModal = $state(false);
   let isWebdavModalOpen = $state(false);
   let editingWebdavServer = $state<WebDavServer | null>(null);
   let syncingServerId = $state<number | null>(null);
@@ -945,6 +948,31 @@
   </div>
 </div>
 </div>
+
+<div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 space-y-4">
+  <div class="flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-9 h-9 rounded-xl bg-brand-main border border-brand-border flex items-center justify-center shrink-0">
+        <Prohibit class="w-4 h-4 text-brand-accent-text" />
+      </div>
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.blockedMetadataTitle', {}, 'Blocked Online Metadata')}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.blockedMetadataSubtitle', {}, 'Online matches you previously rejected. Unblocking allows the engine to associate them again.')}</p>
+      </div>
+    </div>
+    <Button
+      onclick={() => { showBlockedMetadataModal = true; }}
+      variant="secondary"
+      size="sm"
+    >
+      {i18n.t('settings.manageBlockedMetadataBtn', {}, 'Manage Blocklist')}
+    </Button>
+  </div>
+</div>
+
+{#if showBlockedMetadataModal}
+  <BlockedMetadataModal onClose={() => { showBlockedMetadataModal = false; }} />
+{/if}
 
 {#if showSidecarConfirmModal}
   <ConfirmDialog
