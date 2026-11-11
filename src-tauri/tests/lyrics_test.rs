@@ -194,3 +194,69 @@ async fn test_embedded_synced_lyrics_returned_without_network() {
     let payload = result.expect("get_lyrics_for_song failed");
     assert_eq!(payload.text, expected_lyrics);
 }
+
+#[tokio::test]
+async fn test_blocked_lyrics_provider_is_skipped() {
+    use luminous_lib::lyrics::{LyricsClient, LyricsEndpoints, LyricsSource};
+    use luminous_lib::metadata_blocklist::MetadataBlocklist;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).expect("failed to init db"));
+    let song_id = 100i64;
+
+    let server = MockServer::start().await;
+    // LRCLIB server mock
+    Mock::given(method("GET"))
+        .and(path("/api/get"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "syncedLyrics": "[00:01.00] Incorrect LRCLIB lyrics"
+        })))
+        .mount(&server)
+        .await;
+
+    // NetEase server mock
+    Mock::given(method("POST"))
+        .and(path("/api/cloudsearch/pc"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "result": {
+                "songs": [{ "id": 9999, "name": "Song Title", "dt": 180000 }]
+            }
+        })))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/api/song/lyric"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "lrc": { "lyric": "[00:01.00] Correct NetEase lyrics" }
+        })))
+        .mount(&server)
+        .await;
+
+    let lyrics_manager = LyricsClient::with_endpoints(LyricsEndpoints {
+        lrclib_base_url: server.uri(),
+        netease_base_url: server.uri(),
+        lyrics_ovh_base_url: server.uri(),
+    });
+
+    let conn = db.pool.get().expect("db conn failed");
+    conn.execute(
+        "INSERT INTO songs (id, title, artist, source, filetype, unavailable, length_nanosec)
+         VALUES (?1, 'Song Title', 'Band', 1, 1, 0, 180000000000)",
+        rusqlite::params![song_id],
+    )
+    .unwrap();
+
+    // Block lrclib for this song
+    MetadataBlocklist::reject(&conn, "song", &song_id.to_string(), "lyrics", "lrclib", "*")
+        .unwrap();
+    drop(conn);
+
+    let result = get_lyrics_for_song(&db, &lyrics_manager, song_id, true)
+        .await
+        .unwrap();
+    assert_eq!(result.source, LyricsSource::Netease);
+    assert_eq!(result.text, "[00:01.00] Correct NetEase lyrics");
+}

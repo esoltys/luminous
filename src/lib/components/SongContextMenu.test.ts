@@ -572,4 +572,23 @@ describe("SongContextMenu.svelte", () => {
     await fireEvent.click(item);
     expect(onEditBatchTags).toHaveBeenCalled();
   });
+
+  it("renders Reject Match when song has online lyrics source and invokes reject_song_lyrics", async () => {
+    const songWithOnlineLyrics = { ...localSong, lyrics_source: "lrclib" as const };
+    const onClose = vi.fn();
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: songWithOnlineLyrics,
+      selectedCount: 1,
+      onPlay: () => {},
+      onClose,
+    });
+
+    const item = await screen.findByText("Reject Match");
+    await fireEvent.click(item);
+
+    expect(invoke).toHaveBeenCalledWith("reject_song_lyrics", { songId: songWithOnlineLyrics.id });
+    expect(onClose).toHaveBeenCalled();
+  });
 });

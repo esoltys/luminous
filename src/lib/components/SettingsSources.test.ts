@@ -307,5 +307,14 @@ describe("SettingsSources.svelte - Save artwork to folders", () => {
     });
     expect(setAutoOrganizeSpy).toHaveBeenCalledWith(true);
   });
+
+  it("opens the Blocked Online Metadata modal when clicking Manage Blocklist", async () => {
+    const { findByText } = render(SettingsSources);
+
+    const manageBtn = await findByText("Manage Blocklist");
+    await fireEvent.click(manageBtn);
+
+    expect(await findByText("No blocked metadata matches.")).toBeInTheDocument();
+  });
 });
 

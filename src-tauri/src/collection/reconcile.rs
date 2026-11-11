@@ -407,6 +407,16 @@ pub(crate) fn merge_song_rows(conn: &rusqlite::Connection, survivor: i64, dup: i
         params![dup],
     )?;
 
+    // 8b. Preserve metadata rejections (#1581):
+    conn.execute(
+        "UPDATE OR IGNORE metadata_rejections SET entity_id = ?1 WHERE entity_type = 'song' AND entity_id = ?2",
+        params![survivor.to_string(), dup.to_string()],
+    )?;
+    conn.execute(
+        "DELETE FROM metadata_rejections WHERE entity_type = 'song' AND entity_id = ?1",
+        params![dup.to_string()],
+    )?;
+
     // 9. Remote cache references:
     conn.execute(
         "UPDATE OR IGNORE subsonic_cache SET song_id = ?1 WHERE song_id = ?2",

@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub use luminous_remote::lyrics::{
-    clean_featured_title, is_synced_lrc, LyricsClient, LyricsEndpoints, LyricsManager,
-    LyricsProvider, LyricsQuery, LyricsResult,
+    clean_featured_artist, clean_featured_title, is_synced_lrc, LyricsClient, LyricsEndpoints,
+    LyricsManager, LyricsProvider, LyricsQuery, LyricsResult,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,6 +33,19 @@ impl LyricsSource {
             Self::LyricsOvh => "lyrics_ovh",
             Self::Manual => "manual",
             Self::Unknown => "unknown",
+        }
+    }
+
+    pub fn is_online(&self) -> bool {
+        matches!(self, Self::Lrclib | Self::Netease | Self::LyricsOvh)
+    }
+
+    pub fn to_remote_provider(&self) -> Option<LyricsProvider> {
+        match self {
+            Self::Lrclib => Some(LyricsProvider::LrcLib),
+            Self::Netease => Some(LyricsProvider::NetEase),
+            Self::LyricsOvh => Some(LyricsProvider::LyricsOvh),
+            _ => None,
         }
     }
 }
@@ -641,12 +654,34 @@ pub async fn get_lyrics_for_song(
         };
     }
 
-    // 3. Query online APIs (LRCLIB -> NetEase -> Lyrics.ovh)
+    // 3. Query online APIs (LRCLIB -> NetEase -> Lyrics.ovh), skipping any blocklisted providers (#1581)
+    let rejected_providers = crate::metadata_blocklist::MetadataBlocklist::get_rejected_providers(
+        &conn,
+        "song",
+        &song_id.to_string(),
+        "lyrics",
+    )
+    .unwrap_or_default();
+
+    let mut excluded = Vec::new();
+    for p in &rejected_providers {
+        if p == "*" {
+            excluded.push(LyricsProvider::LrcLib);
+            excluded.push(LyricsProvider::NetEase);
+            excluded.push(LyricsProvider::LyricsOvh);
+        } else if let Some(provider) = LyricsSource::from(p.as_str()).to_remote_provider() {
+            excluded.push(provider);
+        }
+    }
+
     let query = LyricsQuery::new(&artist, &title)
         .with_album(&album)
         .with_duration(duration_sec);
 
-    match lyrics_manager.fetch_with_fallback(&query).await {
+    match lyrics_manager
+        .fetch_with_fallback_excluding(&query, &excluded)
+        .await
+    {
         Ok(result) => {
             let final_lyrics = if result.is_synced {
                 result.text
@@ -706,6 +741,16 @@ mod tests {
         );
         assert_eq!(clean_featured_title("Song Title ft. Artist"), "Song Title");
         assert_eq!(clean_featured_title("Plain Song Title"), "Plain Song Title");
+    }
+
+    #[test]
+    fn test_clean_featured_artist() {
+        assert_eq!(
+            clean_featured_artist("Nickelback feat. John 5"),
+            "Nickelback"
+        );
+        assert_eq!(clean_featured_artist("Nickelback ft. John 5"), "Nickelback");
+        assert_eq!(clean_featured_artist("Plain Artist"), "Plain Artist");
     }
 
     #[test]

@@ -190,6 +190,8 @@ pub struct SongDetails {
     /// (#1943), so the editor can present them as estimates.
     pub bpm_detected: bool,
     pub key_detected: bool,
+    pub art_automatic: Option<String>,
+    pub lyrics_source: Option<String>,
 }
 
 /// A key in the two notations DJ tools use.
@@ -232,7 +234,7 @@ pub async fn get_song_details(
     conn.query_row(
         "SELECT id, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, genresort, track, disc, year,
                 originalyear, grouping, bpm, initial_key, rating, loved, compilation, art_embedded, cue_path,
-                disc_subtitle, language
+                disc_subtitle, language, art_automatic, lyrics_source
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -267,6 +269,8 @@ pub async fn get_song_details(
                 language: row.get(27)?,
                 bpm_detected: detected.bpm,
                 key_detected: detected.key,
+                art_automatic: row.get(28)?,
+                lyrics_source: row.get(29)?,
             })
         },
     )
@@ -317,6 +321,8 @@ pub async fn get_file_song_details(path: String) -> Result<SongDetails, String> 
         language: song.language,
         bpm_detected: false,
         key_detected: false,
+        art_automatic: None,
+        lyrics_source: None,
     })
 }
 

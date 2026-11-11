@@ -1404,9 +1404,24 @@ export type LyricsSource =
   | 'manual'
   | 'unknown';
 
+export function isOnlineLyricsSource(source?: LyricsSource | string | null): boolean {
+  return source === 'lrclib' || source === 'netease' || source === 'lyrics_ovh';
+}
+
 export interface LyricsPayload {
   text: string;
   source: LyricsSource;
+}
+
+export interface MetadataRejection {
+  id: number;
+  entity_type: string;
+  entity_id: string;
+  entity_label?: string | null;
+  category: string;
+  provider: string;
+  rejected_identifier: string;
+  created_at: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -38,6 +38,7 @@ pub mod loudness;
 pub mod lyrics;
 pub mod media_session;
 pub mod media_source;
+pub mod metadata_blocklist;
 pub mod models;
 pub mod musical;
 pub mod musicbrainz;
@@ -1563,6 +1564,12 @@ pub fn run() {
             commands::lyrics::set_instrumental,
             commands::lyrics::get_lyrics_offset,
             commands::lyrics::set_lyrics_offset,
+            // Metadata blocklist commands (#1581)
+            commands::metadata_blocklist::reject_song_lyrics,
+            commands::metadata_blocklist::reject_album_cover,
+            commands::metadata_blocklist::list_metadata_rejections,
+            commands::metadata_blocklist::unblock_metadata_rejection,
+            commands::metadata_blocklist::clear_metadata_rejections,
             // Details pane context enrichment (#23)
             commands::context::get_song_context,
             commands::context::get_artist_events,

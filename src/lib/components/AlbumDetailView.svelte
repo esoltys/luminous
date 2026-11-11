@@ -788,7 +788,7 @@
   />
 {/if}
 
-{#if contextMenuState}
+{#if contextMenuState && contextMenuState.song}
   {@const song = contextMenuState.song}
   {@const selectedSongs = selectedKeys.size > 1 ? songs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
   <SongContextMenu

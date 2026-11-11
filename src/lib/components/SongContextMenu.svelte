@@ -22,7 +22,8 @@
     XIcon as X,
     HeartIcon,
     HeartBreakIcon,
-    ShieldCheckIcon as ShieldCheck
+    ShieldCheckIcon as ShieldCheck,
+    ProhibitIcon as Prohibit
   } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import type { Snippet } from "svelte";
@@ -36,7 +37,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { VIEWPORT_EDGE_PADDING_PX, PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import { startSongRadio } from "../utils/playlist";
-  import { isLosslessFileType, type Song, type Playlist } from "../types";
+  import { isLosslessFileType, isOnlineLyricsSource, type Song, type Playlist, type LyricsPayload } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
@@ -546,6 +547,28 @@
         if (selectedCount === 1) onEditTags?.();
         else onEditBatchTags?.();
         onClose();
+      }}
+    />
+  {/if}
+
+  {#if selectedCount === 1 && isOnlineLyricsSource(song.lyrics_source)}
+    <ContextMenuItem
+      icon={Prohibit}
+      label={i18n.t("lyrics.rejectMatch", {}, "Reject Online Lyrics")}
+      onmouseenter={closeSubmenuImmediately}
+      onclick={async () => {
+        const songId = song.id;
+        onClose();
+        try {
+          const nextLyrics = await invoke<LyricsPayload | null>("reject_song_lyrics", { songId });
+          if (playerStore.currentSong && playerStore.currentSong.id === songId) {
+            playerStore.currentSong.lyrics = nextLyrics?.text;
+            playerStore.currentSong.lyrics_source = nextLyrics?.source;
+          }
+          toastStore.show(i18n.t("lyrics.rejectMatchSuccess", {}, "Lyrics match rejected and blocklisted"), "success");
+        } catch (e: any) {
+          toastStore.show(e.toString(), "error");
+        }
       }}
     />
   {/if}

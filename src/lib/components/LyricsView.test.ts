@@ -4,6 +4,7 @@ import { render, waitFor, fireEvent } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import LyricsView from "./LyricsView.svelte";
 import { playerStore } from "../stores/player.svelte";
+import { prefs } from "../stores/prefs.svelte";
 import { i18n } from "../stores/i18n.svelte";
 import type { Song } from "../types";
 
@@ -266,6 +267,22 @@ describe("LyricsView.svelte", () => {
     await waitFor(() => {
       expect(getByTestId("lyrics-source-badge")).toHaveTextContent("Manual");
     });
+  });
+
+  it("renders Reject Match button for online lyrics and invokes reject_song_lyrics", async () => {
+    getLyricsResult = { text: SYNCED_LYRICS, source: "lrclib" };
+    playerStore.currentSong = mockSong;
+    prefs.onlineEnabled = true;
+
+    const { getByText, queryByText } = render(LyricsView);
+
+    await waitFor(() => {
+      expect(getByText("Reject Match")).toBeInTheDocument();
+    });
+
+    await fireEvent.click(getByText("Reject Match"));
+
+    expect(invoke).toHaveBeenCalledWith("reject_song_lyrics", { songId: mockSong.id });
   });
 });
 

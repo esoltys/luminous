@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 80;
+pub const CURRENT_SCHEMA_VERSION: i32 = 81;
 
 struct Migration {
     version: i32,
@@ -789,6 +789,27 @@ const MIGRATIONS: &[Migration] = &[
                     key_detected INTEGER NOT NULL DEFAULT 0,
                     curated      INTEGER NOT NULL DEFAULT 0
                 );",
+            )?;
+            Ok(())
+        },
+    },
+    Migration {
+        version: 81,
+        description: "metadata_rejections: blocklist to reject incorrect online metadata matches (#1581)",
+        apply: |conn| {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS metadata_rejections (
+                    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    entity_type         TEXT NOT NULL,
+                    entity_id           TEXT NOT NULL,
+                    category            TEXT NOT NULL,
+                    provider            TEXT NOT NULL,
+                    rejected_identifier TEXT NOT NULL,
+                    created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+                    UNIQUE(entity_type, entity_id, category, provider, rejected_identifier)
+                );
+                CREATE INDEX IF NOT EXISTS idx_metadata_rejections_lookup
+                    ON metadata_rejections (entity_type, entity_id, category);",
             )?;
             Ok(())
         },
@@ -4946,5 +4967,28 @@ mod tests {
             .unwrap();
         assert_eq!(etag_b.as_deref(), Some("etag-b"));
         assert_eq!(mod_b.as_deref(), Some("mod-b"));
+    }
+
+    #[test]
+    fn test_migration_81_creates_metadata_rejections() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_m81_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO metadata_rejections (entity_type, entity_id, category, provider, rejected_identifier)
+             VALUES ('song', '123', 'lyrics', 'lrclib', 'remote-id')",
+            [],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM metadata_rejections", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
     }
 }
