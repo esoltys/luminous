@@ -111,23 +111,30 @@ fn ramp_gain_at_step(start_gain: f32, end_gain: f32, steps: u32, i: u32) -> f32 
     start_gain + (end_gain - start_gain) * t
 }
 
-/// Ramp the fade envelope down over `duration_ms`, run `then` (pause or
-/// stop the stream), and restore the envelope for the next start. With no
-/// duration the envelope is never touched, so an instant pause stays
-/// bit-identical to playing up to that point.
-fn fade_out_then(fade_gain: &AtomicU32, duration_ms: u32, then: impl FnOnce()) {
+/// Ramp the fade envelope down from its current level over `duration_ms`,
+/// run `then` (pause or stop the stream), and restore the envelope for the
+/// next start. Bumps `shared.fade_generation` so any in-flight fade-in ramp
+/// is cleanly cancelled. With no duration the envelope is reset to 1.0 at once,
+/// so an instant pause stays bit-identical to playing up to that point.
+fn fade_out_then(shared: &AudioShared, duration_ms: u32, then: impl FnOnce()) {
     if duration_ms == 0 {
+        shared.reset_fade_gain();
         then();
         return;
     }
+    let generation = shared.fade_generation.fetch_add(1, Ordering::AcqRel) + 1;
+    let start = f32::from_bits(shared.fade_gain.load(Ordering::Relaxed));
     let (steps, step_dur) = ramp_steps(duration_ms);
     for i in 0..=steps {
-        let g = ramp_gain_at_step(1.0, 0.0, steps, i);
-        fade_gain.store(g.to_bits(), Ordering::Relaxed);
+        if shared.fade_generation.load(Ordering::Acquire) != generation {
+            break;
+        }
+        let g = ramp_gain_at_step(start, 0.0, steps, i);
+        shared.fade_gain.store(g.to_bits(), Ordering::Relaxed);
         std::thread::sleep(step_dur);
     }
     then();
-    fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
+    shared.reset_fade_gain();
 }
 
 // ---------------------------------------------------------------------------
@@ -139,8 +146,7 @@ enum AudioCommand {
     Cue(PlayRequest),
     /// Fade out over this many ms (0 = at once), then pause.
     Pause(u32),
-    // The fade-in length is accepted but not yet honoured (#1718).
-    #[allow(dead_code)]
+    /// Fade in over this many ms (0 = at once), then resume a paused track (#1718).
     Resume(u32),
     /// Fade out over this many ms (0 = at once), then stop.
     Stop(u32),
@@ -312,6 +318,10 @@ pub(crate) struct AudioShared {
     /// The gain `loudness_switch_at` switches to; written before it.
     pub(crate) loudness_switch_gain: AtomicU32,
     pub(crate) fade_gain: AtomicU32,
+    /// Bumped by every fade-gain write that isn't a ramp step, so an
+    /// in-flight `ramp_fade_gain` stops instead of overwriting it: the
+    /// newest fade write always wins.
+    pub(crate) fade_generation: AtomicU64,
     pub(crate) hardware_volume_active: std::sync::atomic::AtomicBool,
     pub(crate) output_hardware_volume: std::sync::atomic::AtomicBool,
     pub(crate) event_tx: mpsc::Sender<AudioEvent>,
@@ -392,6 +402,54 @@ impl AudioShared {
         self.loudness_switch_at
             .store(NO_LOUDNESS_SWITCH, Ordering::Release);
     }
+
+    /// Immediately set `fade_gain` to `gain`, cancelling any in-flight fade ramp.
+    pub(crate) fn set_fade_gain(&self, gain: f32) {
+        self.fade_generation.fetch_add(1, Ordering::AcqRel);
+        self.fade_gain
+            .store(gain.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
+    }
+
+    /// Reset `fade_gain` to unity (1.0), cancelling any in-flight fade ramp.
+    pub(crate) fn reset_fade_gain(&self) {
+        self.set_fade_gain(1.0);
+    }
+
+    /// Glide `fade_gain` from `start` to `target` over `duration_ms`.
+    /// Immediately sets `fade_gain` to `start` and bumps `fade_generation`.
+    /// If `duration_ms == 0` or `start == target`, stores `target` and returns.
+    /// Otherwise, spawns a dedicated worker thread to step the gain envelope.
+    /// Cancels early if any newer fade write bumps `fade_generation`.
+    pub(crate) fn ramp_fade_gain(self: &Arc<Self>, start: f32, target: f32, duration_ms: u32) {
+        let start = start.clamp(0.0, 1.0);
+        let target = target.clamp(0.0, 1.0);
+        let generation = self.fade_generation.fetch_add(1, Ordering::AcqRel) + 1;
+        self.fade_gain.store(start.to_bits(), Ordering::Relaxed);
+
+        if duration_ms == 0 || (target - start).abs() < f32::EPSILON {
+            self.fade_gain.store(target.to_bits(), Ordering::Relaxed);
+            return;
+        }
+
+        let shared = Arc::clone(self);
+        let spawned = std::thread::Builder::new()
+            .name("luminous-fade-ramp".into())
+            .spawn(move || {
+                let (steps, step_dur) = ramp_steps(duration_ms);
+                for i in 0..=steps {
+                    if shared.fade_generation.load(Ordering::Acquire) != generation {
+                        return;
+                    }
+                    let g = ramp_gain_at_step(start, target, steps, i);
+                    shared.fade_gain.store(g.to_bits(), Ordering::Relaxed);
+                    std::thread::sleep(step_dur);
+                }
+            });
+        if spawned.is_err() {
+            // No thread to ramp on: land on target immediately.
+            self.fade_gain.store(target.to_bits(), Ordering::Relaxed);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -443,6 +501,7 @@ impl AudioEngine {
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
             fade_gain: AtomicU32::new(1.0f32.to_bits()),
+            fade_generation: AtomicU64::new(0),
             hardware_volume_active: std::sync::atomic::AtomicBool::new(false),
             output_hardware_volume: std::sync::atomic::AtomicBool::new(false),
             event_tx: event_tx.clone(),
@@ -528,7 +587,7 @@ impl AudioEngine {
     }
 
     /// Resume a paused or cued track. `fade_ms` is the fade-in length
-    /// (not yet honoured, #1718).
+    /// (0 resumes at once).
     pub fn resume(&self, fade_ms: u32) -> Result<()> {
         self.send_cmd(AudioCommand::Resume(fade_ms))
     }
@@ -1663,13 +1722,13 @@ fn decode_thread(
     let mut paused_req: Option<PlayRequest> = None;
 
     'main: loop {
-        let mut req = match current_req.take() {
-            Some(r) => r,
+        let (mut req, mut resume_fade_ms) = match current_req.take() {
+            Some(r) => (r, 0u32),
             None => {
                 match cmd_rx.recv() {
                     Ok(AudioCommand::Play(r)) => {
                         paused_req = None;
-                        r
+                        (r, 0u32)
                     }
                     Ok(AudioCommand::Cue(r)) => {
                         match start_on_output(
@@ -1717,13 +1776,16 @@ fn decode_thread(
                         }
                         continue;
                     }
-                    Ok(AudioCommand::Resume(_)) => {
+                    Ok(AudioCommand::Resume(fade_ms)) => {
                         if let Some(r) = paused_req.take() {
                             let cur_pos = shared.position.load(Ordering::Relaxed);
-                            PlayRequest {
-                                track: r.track,
-                                start_nanosec: cur_pos,
-                            }
+                            (
+                                PlayRequest {
+                                    track: r.track,
+                                    start_nanosec: cur_pos,
+                                },
+                                fade_ms,
+                            )
                         } else {
                             continue;
                         }
@@ -1788,7 +1850,10 @@ fn decode_thread(
         // one superseded track instead of several in a row.
         loop {
             match cmd_rx.try_recv() {
-                Ok(AudioCommand::Play(newer)) => req = newer,
+                Ok(AudioCommand::Play(newer)) => {
+                    req = newer;
+                    resume_fade_ms = 0;
+                }
                 Ok(AudioCommand::Stop(_)) => {
                     if let Some(out) = output.as_ref() {
                         let _ = out.sink.pause();
@@ -1856,6 +1921,12 @@ fn decode_thread(
         let start_samples = samples_for_ns(current.start_ns, target_sample_rate, target_channels);
         out.played_samples.store(start_samples, Ordering::Relaxed);
         shared.cancel_loudness_switch();
+
+        if resume_fade_ms > 0 {
+            shared.ramp_fade_gain(0.0, 1.0, resume_fade_ms);
+        } else {
+            shared.reset_fade_gain();
+        }
 
         if let Err(e) = out.sink.play() {
             let _ = event_tx.send(AudioEvent::Error {
@@ -2230,11 +2301,10 @@ fn handle_decode_command(
     paused_req: &mut Option<PlayRequest>,
 ) -> CmdOutcome {
     let play_state = &shared.play_state;
-    let fade_gain = &shared.fade_gain;
     let position = &shared.position;
     match cmd {
         Ok(AudioCommand::Pause(dur_ms)) => {
-            fade_out_then(fade_gain, dur_ms, || {
+            fade_out_then(shared, dur_ms, || {
                 let _ = out.sink.pause();
             });
             {
@@ -2253,7 +2323,7 @@ fn handle_decode_command(
             CmdOutcome::BreakDecode
         }
         Ok(AudioCommand::Stop(dur_ms)) => {
-            fade_out_then(fade_gain, dur_ms, || {
+            fade_out_then(shared, dur_ms, || {
                 let _ = out.sink.pause();
             });
             {
@@ -2946,6 +3016,7 @@ mod tests {
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
             fade_gain: AtomicU32::new(1.0f32.to_bits()),
+            fade_generation: AtomicU64::new(0),
             hardware_volume_active: std::sync::atomic::AtomicBool::new(false),
             output_hardware_volume: std::sync::atomic::AtomicBool::new(false),
             event_tx: mpsc::channel().0,
@@ -3312,6 +3383,90 @@ mod tests {
             );
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
+    }
+
+    #[test]
+    fn ramp_fade_gain_lands_on_its_target() {
+        let shared = Arc::new(test_shared());
+        shared.ramp_fade_gain(0.0, 1.0, 30);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)) != 1.0 {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "fade ramp never reached unity"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
+    #[test]
+    fn set_fade_gain_cancels_a_ramp_in_flight() {
+        let shared = Arc::new(test_shared());
+        shared.ramp_fade_gain(0.0, 1.0, 2_000);
+        shared.set_fade_gain(0.4);
+        std::thread::sleep(std::time::Duration::from_millis(60));
+        assert_eq!(
+            f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)),
+            0.4
+        );
+    }
+
+    #[test]
+    fn fade_out_then_ramps_from_current_gain_and_preempts_ramp() {
+        let shared = Arc::new(test_shared());
+        shared.ramp_fade_gain(0.0, 1.0, 2_000);
+        std::thread::sleep(std::time::Duration::from_millis(40));
+        let mid_gain = f32::from_bits(shared.fade_gain.load(Ordering::Relaxed));
+        assert!(mid_gain > 0.0 && mid_gain < 1.0);
+
+        let mut then_called = false;
+        fade_out_then(&shared, 30, || {
+            then_called = true;
+            assert_eq!(
+                f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)),
+                0.0
+            );
+        });
+        assert!(then_called);
+        assert_eq!(
+            f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)),
+            1.0
+        );
+    }
+
+    #[test]
+    fn resume_with_fade_leaves_fade_gain_below_one_at_first_rendered_buffer() {
+        let shared = Arc::new(test_shared());
+        shared.ramp_fade_gain(0.0, 1.0, 300);
+
+        const FRAMES: usize = 256;
+        const CHANNELS: u16 = 2;
+        let len = FRAMES * CHANNELS as usize;
+        let (mut producer, consumer) = HeapRb::<f32>::new(len * 2).split();
+        let mut renderer = OutputRenderer {
+            shared: Arc::clone(&shared),
+            consumer: Arc::new(Mutex::new(consumer)),
+            played_samples: Arc::new(AtomicU64::new(0)),
+            mono_scratch: Vec::with_capacity(len),
+            sample_rate: 48_000,
+            channels: CHANNELS,
+        };
+        let input = vec![1.0f32; len];
+        producer.push_slice(&input);
+
+        let mut output = vec![0.0f32; len];
+        renderer.render(&mut output);
+
+        let current_fade = f32::from_bits(shared.fade_gain.load(Ordering::Relaxed));
+        assert!(
+            current_fade < 1.0,
+            "expected initial fade gain to be below 1.0, got {current_fade}"
+        );
+        assert!(
+            output[0] < 1.0,
+            "expected rendered audio to be attenuated, got {}",
+            output[0]
+        );
     }
 
     #[test]
