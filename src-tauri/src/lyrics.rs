@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub use luminous_remote::lyrics::{
-    clean_featured_title, is_synced_lrc, LyricsClient, LyricsEndpoints, LyricsManager,
-    LyricsProvider, LyricsQuery, LyricsResult,
+    clean_featured_artist, clean_featured_title, is_synced_lrc, LyricsClient, LyricsEndpoints,
+    LyricsManager, LyricsProvider, LyricsQuery, LyricsResult,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -741,6 +741,16 @@ mod tests {
         );
         assert_eq!(clean_featured_title("Song Title ft. Artist"), "Song Title");
         assert_eq!(clean_featured_title("Plain Song Title"), "Plain Song Title");
+    }
+
+    #[test]
+    fn test_clean_featured_artist() {
+        assert_eq!(
+            clean_featured_artist("Nickelback feat. John 5"),
+            "Nickelback"
+        );
+        assert_eq!(clean_featured_artist("Nickelback ft. John 5"), "Nickelback");
+        assert_eq!(clean_featured_artist("Plain Artist"), "Plain Artist");
     }
 
     #[test]
