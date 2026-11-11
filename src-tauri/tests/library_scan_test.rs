@@ -409,8 +409,8 @@ async fn test_scan_automatically_merges_duplicate_case_variant_songs() {
 
     // Simulate an existing duplicate in the database with different path casing
     let conn = env.db.pool.get().unwrap();
-    let real_path = env.scan_dir.join("Metallica/song_alpha.mp3");
-    let duplicate_path = env.scan_dir.join("Metallica/SONG_ALPHA.MP3");
+    let real_path = env.scan_dir.join("Metallica").join("song_alpha.mp3");
+    let duplicate_path = env.scan_dir.join("Metallica").join("SONG_ALPHA.MP3");
     conn.execute(
         "INSERT INTO songs (source, path, title, artist, album, beginning_nanosec) VALUES (1, ?1, 'Song Alpha', 'Artist Alpha', 'Album Alpha', 0)",
         [duplicate_path.to_string_lossy().to_string()],
