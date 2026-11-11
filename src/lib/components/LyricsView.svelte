@@ -19,7 +19,7 @@
   import { prefs } from "../stores/prefs.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { parseLrc } from "../utils/lrc";
-  import type { LyricsPayload, LyricsSource } from "../types";
+  import { type LyricsPayload, type LyricsSource, isOnlineLyricsSource } from "../types";
 
   let lyricsText = $state("");
   let lyricsSource = $state<LyricsSource | null>(null);
@@ -221,9 +221,7 @@
   }
 
   let isRejecting = $state(false);
-  let isOnlineSource = $derived(
-    lyricsSource === "lrclib" || lyricsSource === "netease" || lyricsSource === "lyrics_ovh"
-  );
+  let isOnlineSource = $derived(isOnlineLyricsSource(lyricsSource));
 
   async function rejectMatch() {
     if (!playerStore.currentSong) return;

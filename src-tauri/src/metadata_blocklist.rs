@@ -15,6 +15,8 @@ pub struct MetadataRejection {
     pub entity_type: String,
     /// Local identifier: song ID string, album key, or artist key.
     pub entity_id: String,
+    /// Human-readable label (e.g. "Artist - Track" or "Artist - Album") resolved from library.
+    pub entity_label: Option<String>,
     /// Category of metadata: "lyrics", "cover_art", or "musicbrainz".
     pub category: String,
     /// Provider source: "lrclib", "netease", "lyrics_ovh", "itunes", "musicbrainz", or "*".
@@ -116,22 +118,28 @@ impl MetadataBlocklist {
         entity_id: Option<&str>,
         category: Option<&str>,
     ) -> Result<Vec<MetadataRejection>> {
-        let mut sql = "SELECT id, entity_type, entity_id, category, provider, rejected_identifier, created_at FROM metadata_rejections WHERE 1=1".to_string();
+        let mut sql = "SELECT mr.id, mr.entity_type, mr.entity_id, mr.category, mr.provider, mr.rejected_identifier, mr.created_at,
+                              CASE
+                                WHEN mr.entity_type = 'song' THEN (SELECT printf('%s - %s', s.artist, s.title) FROM songs s WHERE s.id = CAST(mr.entity_id AS INTEGER) LIMIT 1)
+                                WHEN mr.entity_type = 'album' THEN (SELECT printf('%s - %s', s.artist, s.album) FROM songs s WHERE s.album_key = mr.entity_id LIMIT 1)
+                                ELSE NULL
+                              END AS entity_label
+                       FROM metadata_rejections mr WHERE 1=1".to_string();
         let mut param_vals: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
-        if let Some(et) = entity_type {
-            sql.push_str(" AND entity_type = ?");
-            param_vals.push(Box::new(et.to_string()));
+        if let Some(filter_type) = entity_type {
+            sql.push_str(" AND mr.entity_type = ?");
+            param_vals.push(Box::new(filter_type.to_string()));
         }
-        if let Some(eid) = entity_id {
-            sql.push_str(" AND entity_id = ?");
-            param_vals.push(Box::new(eid.to_string()));
+        if let Some(filter_id) = entity_id {
+            sql.push_str(" AND mr.entity_id = ?");
+            param_vals.push(Box::new(filter_id.to_string()));
         }
-        if let Some(cat) = category {
-            sql.push_str(" AND category = ?");
-            param_vals.push(Box::new(cat.to_string()));
+        if let Some(filter_cat) = category {
+            sql.push_str(" AND mr.category = ?");
+            param_vals.push(Box::new(filter_cat.to_string()));
         }
-        sql.push_str(" ORDER BY id DESC");
+        sql.push_str(" ORDER BY mr.id DESC");
 
         let mut stmt = conn.prepare(&sql)?;
         let params_slice: Vec<&dyn rusqlite::ToSql> =
@@ -145,6 +153,7 @@ impl MetadataBlocklist {
                 provider: row.get(4)?,
                 rejected_identifier: row.get(5)?,
                 created_at: row.get(6)?,
+                entity_label: row.get(7)?,
             })
         })?;
 
@@ -195,7 +204,14 @@ mod tests {
                 UNIQUE(entity_type, entity_id, category, provider, rejected_identifier)
             );
             CREATE INDEX idx_metadata_rejections_lookup
-                ON metadata_rejections (entity_type, entity_id, category);",
+                ON metadata_rejections (entity_type, entity_id, category);
+            CREATE TABLE songs (
+                id        INTEGER PRIMARY KEY,
+                title     TEXT,
+                artist    TEXT,
+                album     TEXT,
+                album_key TEXT
+            );",
         )
         .unwrap();
         conn
@@ -252,6 +268,12 @@ mod tests {
     #[test]
     fn test_list_and_unblock() {
         let conn = setup_test_db();
+        conn.execute(
+            "INSERT INTO songs (id, title, artist, album, album_key) VALUES (10, 'Track 10', 'Band', 'Album', 'album_key_1')",
+            [],
+        )
+        .unwrap();
+
         MetadataBlocklist::reject(&conn, "song", "10", "lyrics", "lrclib", "id-1").unwrap();
         MetadataBlocklist::reject(&conn, "song", "10", "lyrics", "netease", "id-2").unwrap();
         MetadataBlocklist::reject(
@@ -268,6 +290,10 @@ mod tests {
             MetadataBlocklist::list_rejections(&conn, Some("song"), Some("10"), Some("lyrics"))
                 .unwrap();
         assert_eq!(song_rejections.len(), 2);
+        assert_eq!(
+            song_rejections[0].entity_label.as_deref(),
+            Some("Band - Track 10")
+        );
 
         let id_to_remove = song_rejections[0].id;
         MetadataBlocklist::unblock(&conn, id_to_remove).unwrap();

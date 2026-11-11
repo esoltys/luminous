@@ -37,7 +37,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { VIEWPORT_EDGE_PADDING_PX, PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import { startSongRadio } from "../utils/playlist";
-  import { isLosslessFileType, type Song, type Playlist } from "../types";
+  import { isLosslessFileType, isOnlineLyricsSource, type Song, type Playlist } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
@@ -551,7 +551,7 @@
     />
   {/if}
 
-  {#if selectedCount === 1 && (song.lyrics_source === 'lrclib' || song.lyrics_source === 'netease' || song.lyrics_source === 'lyrics_ovh')}
+  {#if selectedCount === 1 && isOnlineLyricsSource(song.lyrics_source)}
     <ContextMenuItem
       icon={Prohibit}
       label={i18n.t("lyrics.rejectMatch", {}, "Reject Online Lyrics")}

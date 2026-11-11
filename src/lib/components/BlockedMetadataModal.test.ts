@@ -14,6 +14,7 @@ const mockRejections: MetadataRejection[] = [
     id: 1,
     entity_type: "song",
     entity_id: "42",
+    entity_label: "Radiohead - Paranoid Android",
     category: "lyrics",
     provider: "lrclib",
     rejected_identifier: "*",
@@ -57,6 +58,7 @@ describe("BlockedMetadataModal.svelte", () => {
     await waitFor(() => {
       expect(getByText("lrclib")).toBeInTheDocument();
       expect(getByText("itunes")).toBeInTheDocument();
+      expect(getByText("Radiohead - Paranoid Android")).toBeInTheDocument();
     });
 
     const unblockButtons = getAllByText("Unblock");

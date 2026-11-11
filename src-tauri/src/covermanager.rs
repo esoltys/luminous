@@ -1757,10 +1757,15 @@ impl CoverManager {
 
         // Check metadata blocklist to prevent re-fetching rejected artwork (#1581)
         let is_blocked = crate::db::run_blocking(&self.db, {
-            let q_art = query_artist.clone();
-            let q_alb = query_album.clone();
+            let target_artist = query_artist.clone();
+            let target_album = query_album.clone();
             move |conn| {
-                let album_key = crate::album_key::album_key_for(&q_alb, None, Some(&q_art), false);
+                let album_key = crate::album_key::album_key_for(
+                    &target_album,
+                    None,
+                    Some(&target_artist),
+                    false,
+                );
                 let album_blocked =
                     crate::metadata_blocklist::MetadataBlocklist::is_provider_rejected(
                         conn,

@@ -35,6 +35,19 @@ impl LyricsSource {
             Self::Unknown => "unknown",
         }
     }
+
+    pub fn is_online(&self) -> bool {
+        matches!(self, Self::Lrclib | Self::Netease | Self::LyricsOvh)
+    }
+
+    pub fn to_remote_provider(&self) -> Option<LyricsProvider> {
+        match self {
+            Self::Lrclib => Some(LyricsProvider::LrcLib),
+            Self::Netease => Some(LyricsProvider::NetEase),
+            Self::LyricsOvh => Some(LyricsProvider::LyricsOvh),
+            _ => None,
+        }
+    }
 }
 
 impl std::str::FromStr for LyricsSource {
@@ -652,16 +665,12 @@ pub async fn get_lyrics_for_song(
 
     let mut excluded = Vec::new();
     for p in &rejected_providers {
-        match p.as_str() {
-            "lrclib" => excluded.push(LyricsProvider::LrcLib),
-            "netease" => excluded.push(LyricsProvider::NetEase),
-            "lyrics_ovh" => excluded.push(LyricsProvider::LyricsOvh),
-            "*" => {
-                excluded.push(LyricsProvider::LrcLib);
-                excluded.push(LyricsProvider::NetEase);
-                excluded.push(LyricsProvider::LyricsOvh);
-            }
-            _ => {}
+        if p == "*" {
+            excluded.push(LyricsProvider::LrcLib);
+            excluded.push(LyricsProvider::NetEase);
+            excluded.push(LyricsProvider::LyricsOvh);
+        } else if let Some(provider) = LyricsSource::from(p.as_str()).to_remote_provider() {
+            excluded.push(provider);
         }
     }
 

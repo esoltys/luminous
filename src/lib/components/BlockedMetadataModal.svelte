@@ -90,9 +90,18 @@
                   </span>
                   <span class="text-brand-text-primary font-medium">{r.provider}</span>
                 </div>
-                <div class="text-[11px] text-brand-text-secondary truncate mt-0.5">
-                  {r.entity_type}: {r.entity_id}
-                </div>
+                {#if r.entity_label}
+                  <div class="text-[12px] font-medium text-brand-text-primary truncate mt-0.5">
+                    {r.entity_label}
+                  </div>
+                  <div class="text-[10px] text-brand-text-secondary truncate">
+                    {r.entity_type}: {r.entity_id}
+                  </div>
+                {:else}
+                  <div class="text-[11px] text-brand-text-secondary truncate mt-0.5">
+                    {r.entity_type}: {r.entity_id}
+                  </div>
+                {/if}
               </div>
               <Button
                 onclick={() => handleUnblock(r.id)}

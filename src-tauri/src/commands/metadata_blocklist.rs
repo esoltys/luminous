@@ -24,18 +24,16 @@ pub async fn reject_song_lyrics(
         .map_err(|e| e.to_string())?;
 
     if let Some(ref source) = lyrics_source {
-        let trimmed_source = source.trim().to_lowercase();
+        let parsed_source =
+            crate::lyrics::LyricsSource::from(source.trim().to_lowercase().as_str());
         // Record blocklist rejection for online providers
-        if trimmed_source == "lrclib"
-            || trimmed_source == "netease"
-            || trimmed_source == "lyrics_ovh"
-        {
+        if parsed_source.is_online() {
             MetadataBlocklist::reject(
                 &conn,
                 "song",
                 &song_id.to_string(),
                 "lyrics",
-                &trimmed_source,
+                parsed_source.as_str(),
                 "*",
             )
             .map_err(|e| e.to_string())?;
@@ -123,13 +121,13 @@ pub async fn reject_album_cover(state: State<'_, AppState>, song_id: i64) -> Res
     }
 
     // Clear art_automatic and set art_unset = 1 across sibling songs of this album
-    let q_art = artist.unwrap_or_default();
-    let q_alb = album.unwrap_or_default();
+    let query_artist = artist.unwrap_or_default();
+    let query_album = album.unwrap_or_default();
     conn.execute(
         "UPDATE songs SET art_automatic = NULL, art_unset = 1
          WHERE (album_key = ?1 OR (artist = ?2 COLLATE NOCASE AND album = ?3 COLLATE NOCASE))
            AND art_embedded = 0",
-        rusqlite::params![key, q_art, q_alb],
+        rusqlite::params![key, query_artist, query_album],
     )
     .map_err(|e| e.to_string())?;
 
