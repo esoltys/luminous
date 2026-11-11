@@ -2603,7 +2603,8 @@ pub fn parse_decade_range(decade: &str) -> Option<(i32, i32)> {
 
 /// Parses a `bpmrange:` dynamic-spec suffix (e.g. `"60-90"` or the
 /// open-ended `"150-"`) into a `(min, max)` pair for
-/// [`CollectionScanner::get_songs_by_bpm_range`].
+/// [`CollectionScanner::get_songs_by_bpm_range`], which reads it as the
+/// half-open range `[min, max)`.
 pub fn parse_bpm_range_spec(spec: &str) -> Option<(f64, Option<f64>)> {
     let (min_str, max_str) = spec.split_once('-')?;
     let min: f64 = min_str.trim().parse().ok()?;

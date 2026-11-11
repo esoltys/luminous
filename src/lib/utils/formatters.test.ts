@@ -149,6 +149,7 @@ describe("formatBpm", () => {
 
 describe("formatBpmRange", () => {
   it("formats bounded and open-ended ranges", () => {
+    expect(formatBpmRange("0-60")).toBe("0–60 BPM");
     expect(formatBpmRange("60-90")).toBe("60–90 BPM");
     expect(formatBpmRange("150-")).toBe("150+ BPM");
   });

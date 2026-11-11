@@ -1187,6 +1187,7 @@ export const es = {
     daypartAfternoon: "Mezcla de la tarde",
     daypartEvening: "Mezcla de la noche",
     daypartLateNight: "Mezcla de la madrugada",
+    bpmSlow: "BPM muy lento",
     bpmDownTempo: "BPM tempo lento",
     bpmMidTempo: "BPM tempo medio",
     bpmUptempo: "BPM tempo rápido",

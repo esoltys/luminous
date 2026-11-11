@@ -1187,6 +1187,7 @@ export const de = {
     daypartAfternoon: "Nachmittags-Mix",
     daypartEvening: "Abend-Mix",
     daypartLateNight: "Nacht-Mix",
+    bpmSlow: "Sehr ruhig (BPM)",
     bpmDownTempo: "Ruhig (BPM)",
     bpmMidTempo: "Mittel (BPM)",
     bpmUptempo: "Schnell (BPM)",

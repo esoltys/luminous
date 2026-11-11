@@ -27,8 +27,9 @@ export function getPopulationModeSuffix(mode: QueuePopulationMode | string | und
 // Added/History), not user library data (unlike genre/decade), so their display
 // name must come from i18n rather than the English name the backend stores as
 // dynamic_spec's playlists.name — this maps each bucket's dynamic_spec suffix
-// (e.g. "60-90") to its i18n key. Mirrors src-tauri/src/playlist.rs's BPM_BUCKETS.
+// (e.g. "60-90") to its i18n key. Mirrors src-tauri/src/playlist/tempo_buckets.rs's TEMPO_BUCKETS.
 const BPM_RANGE_TO_I18N_KEY: Record<string, string> = {
+  "0-60": "bpmSlow",
   "60-90": "bpmDownTempo",
   "90-115": "bpmMidTempo",
   "115-130": "bpmUptempo",
