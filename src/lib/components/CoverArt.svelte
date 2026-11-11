@@ -88,7 +88,9 @@
       return;
     }
 
-    if (id === undefined) {
+    // No library song to ask about: either none given, or id 0, which a
+    // playlist item carries when its song left the library (song ids start at 1).
+    if (!id) {
       imgSrc = null;
       hasFailed = false;
       return;
@@ -114,7 +116,7 @@
   }
 
   async function triggerRemoteFetch(targetSongId: number | undefined = songId, token = loadToken) {
-    if (targetSongId === undefined || !prefs.onlineEnabled) return;
+    if (!targetSongId || !prefs.onlineEnabled) return;
     try {
       const uri = await invoke<string | null>("fetch_remote_cover", { songId: targetSongId });
       if (token !== loadToken) return;
