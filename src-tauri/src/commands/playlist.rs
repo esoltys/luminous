@@ -215,7 +215,7 @@ pub async fn deduplicate_playlist(
     Ok(removed_uuids)
 }
 
-/// "Find missing tracks": relinks a playlist's unavailable items to library
+/// "Relink unavailable": relinks a playlist's unavailable items to library
 /// songs matched by path or tags (see `PlaylistManager::relink_missing_items`).
 /// Returns how many were relinked.
 #[tauri::command]

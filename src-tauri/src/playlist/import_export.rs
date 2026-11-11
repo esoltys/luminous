@@ -2,6 +2,7 @@
 //! (#577 item 18) — a second `impl PlaylistManager` block alongside the one
 //! in `playlist.rs` that owns CRUD/auto-playlist-sync/dynamic-playlist logic.
 
+use super::snapshot::{strip_snapshot, TrackSnapshot};
 use super::PlaylistManager;
 use crate::models::Playlist;
 use anyhow::{anyhow, Result};
@@ -55,11 +56,14 @@ fn clean_path<P: AsRef<std::path::Path>>(path: P) -> std::path::PathBuf {
 /// The library song a playlist track refers to, or `None`. Tries each of
 /// `paths` exactly and then separator/case-insensitively, then falls back to
 /// title + artist (case-insensitive), requiring the length to be within 2 s
-/// of `duration_sec` when that is known. Shared by playlist import and
-/// "Find missing tracks", so both resolve a track the same way.
+/// of `duration_sec` when that is known. `beginning_nanosec` narrows a path
+/// match to the CUE track starting there; `None` takes the file's first track
+/// (a playlist file line names a whole file). Shared by playlist import and
+/// "Relink unavailable", so both resolve a track the same way.
 fn match_library_song(
     conn: &rusqlite::Connection,
     paths: &[&str],
+    beginning_nanosec: Option<i64>,
     title: Option<&str>,
     artist: Option<&str>,
     duration_sec: Option<i64>,
@@ -67,8 +71,11 @@ fn match_library_song(
     for path in paths.iter().filter(|p| !p.is_empty()) {
         let by_path = conn
             .query_row(
-                "SELECT id FROM songs WHERE path = ?1 OR LOWER(REPLACE(path, '/', '\\')) = LOWER(?2) LIMIT 1",
-                params![path, path.replace('/', "\\")],
+                "SELECT id FROM songs
+                 WHERE (path = ?1 OR LOWER(REPLACE(path, '/', '\\')) = LOWER(?2))
+                   AND (?3 IS NULL OR beginning_nanosec = ?3)
+                 ORDER BY beginning_nanosec LIMIT 1",
+                params![path, path.replace('/', "\\"), beginning_nanosec],
                 |row| row.get(0),
             )
             .ok();
@@ -91,18 +98,6 @@ fn match_library_song(
     }
     .ok()
 }
-
-/// Keys a missing track's snapshot adds to `additional_metadata` (written by
-/// import for unmatched tracks and by the `songs_bd_playlist_items` trigger,
-/// see `MIGRATION_82` in db.rs). Removed again when the item is relinked.
-const SNAPSHOT_KEYS: &[&str] = &[
-    "title",
-    "artist",
-    "album",
-    "path",
-    "duration_sec",
-    "beginning_nanosec",
-];
 
 impl PlaylistManager {
     /// Parse an `.m3u`/`.pls`/etc. playlist file (format detected from the
@@ -169,6 +164,7 @@ impl PlaylistManager {
             let matched_song_id = match_library_song(
                 &conn,
                 &[&path_str, &track.path_or_url],
+                None,
                 title.as_deref(),
                 artist.as_deref(),
                 track.duration_sec,
@@ -183,18 +179,20 @@ impl PlaylistManager {
                     params![playlist.id, song_id, pos as i32, uuid, path_str],
                 )?;
             } else {
-                // Save unmatched metadata in additional_metadata so track info isn't lost
-                let meta = serde_json::json!({
-                    "title": title,
-                    "artist": artist,
-                    "album": album,
-                    "path": path_str,
-                    "duration_sec": track.duration_sec,
-                });
+                // Keep what the playlist file said about the track, so it still
+                // shows, and can be relinked, although nothing matched.
+                let snapshot = TrackSnapshot {
+                    title,
+                    artist,
+                    album,
+                    path: Some(path_str.clone()),
+                    duration_sec: track.duration_sec,
+                    beginning_nanosec: 0,
+                };
                 conn.execute(
                     "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url, additional_metadata)
                      VALUES (?1, NULL, ?2, ?3, 0, ?4, ?5)",
-                    params![playlist.id, pos as i32, uuid, path_str, meta.to_string()],
+                    params![playlist.id, pos as i32, uuid, path_str, snapshot.to_json()],
                 )?;
             }
         }
@@ -222,29 +220,27 @@ impl PlaylistManager {
 
         let mut relinked = 0;
         for (item_id, url, meta) in missing {
-            let mut meta: serde_json::Map<String, serde_json::Value> = meta
-                .and_then(|m| serde_json::from_str(&m).ok())
+            let snapshot = meta
+                .as_deref()
+                .and_then(TrackSnapshot::parse)
                 .unwrap_or_default();
-            let text = |key: &str| meta.get(key).and_then(|v| v.as_str()).map(str::to_owned);
-            let (title, artist, snapshot_path) = (text("title"), text("artist"), text("path"));
-            let paths: Vec<&str> = [url.as_deref(), snapshot_path.as_deref()]
+            let paths: Vec<&str> = [url.as_deref(), snapshot.path.as_deref()]
                 .into_iter()
                 .flatten()
                 .collect();
-            let duration = meta.get("duration_sec").and_then(|v| v.as_i64());
-
-            let Some(song_id) =
-                match_library_song(&conn, &paths, title.as_deref(), artist.as_deref(), duration)
-            else {
+            let Some(song_id) = match_library_song(
+                &conn,
+                &paths,
+                Some(snapshot.beginning_nanosec),
+                snapshot.title.as_deref(),
+                snapshot.artist.as_deref(),
+                snapshot.duration_sec,
+            ) else {
                 continue;
             };
-            for key in SNAPSHOT_KEYS {
-                meta.remove(*key);
-            }
-            let meta = (!meta.is_empty()).then(|| serde_json::Value::Object(meta).to_string());
             conn.execute(
                 "UPDATE playlist_items SET song_id = ?1, additional_metadata = ?2 WHERE id = ?3",
-                params![song_id, meta, item_id],
+                params![song_id, meta.as_deref().and_then(strip_snapshot), item_id],
             )?;
             relinked += 1;
         }
@@ -389,41 +385,53 @@ mod tests {
                  (2, 'Other', 'Band', 'C:/Music/b.flac', 100000000000);",
         )
         .unwrap();
+        let find = |path: &str, title, artist, dur| {
+            match_library_song(&conn, &[path], None, title, artist, dur)
+        };
         // Separator/case-insensitive path wins over contradicting tags.
         assert_eq!(
-            match_library_song(
-                &conn,
-                &["c:\\music\\B.FLAC"],
-                Some("Song"),
-                Some("Band"),
-                None
-            ),
+            find(r"c:\music\B.FLAC", Some("Song"), Some("Band"), None),
             Some(2)
         );
         assert_eq!(
-            match_library_song(
-                &conn,
-                &["/gone.flac"],
-                Some("song"),
-                Some("BAND"),
-                Some(201)
-            ),
+            find("/gone.flac", Some("song"), Some("BAND"), Some(201)),
             Some(1)
         );
         assert_eq!(
+            find("/gone.flac", Some("Song"), Some("Band"), Some(210)),
+            None
+        );
+        assert_eq!(find("/gone.flac", Some("Song"), None, None), None);
+    }
+
+    #[test]
+    fn test_match_library_song_narrows_a_path_match_to_the_cue_track_offset() {
+        let (_dir, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+        conn.execute_batch(
+            "INSERT INTO songs (id, title, artist, path, beginning_nanosec) VALUES
+                 (1, 'One', 'Band', '/m/disc.flac', 0),
+                 (2, 'Two', 'Band', '/m/disc.flac', 300000000000);",
+        )
+        .unwrap();
+        let find = |offset, title| {
             match_library_song(
                 &conn,
-                &["/gone.flac"],
-                Some("Song"),
+                &["/m/disc.flac"],
+                offset,
+                Some(title),
                 Some("Band"),
-                Some(210)
-            ),
-            None
-        );
+                None,
+            )
+        };
+        assert_eq!(find(Some(300_000_000_000), "Two"), Some(2));
         assert_eq!(
-            match_library_song(&conn, &["/gone.flac"], Some("Song"), None, None),
-            None
+            find(None, "Two"),
+            Some(1),
+            "a whole-file reference takes the first track"
         );
+        // Offsets changed (re-split CUE): fall through to the tags, not the first track.
+        assert_eq!(find(Some(290_000_000_000), "Two"), Some(2));
     }
 
     #[test]

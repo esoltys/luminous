@@ -5,8 +5,9 @@
 //! `reorder_*` methods) push a `PlaylistOp` onto `undo_stack` and clear
 //! `redo_stack`, so `undo`/`redo` can step through them.
 
+use super::snapshot::TrackSnapshot;
 use super::{ClearedItem, PlaylistManager, PlaylistOp};
-use crate::models::{PlaylistItem, PlaylistItemType, Song};
+use crate::models::{PlaylistItem, PlaylistItemType};
 use anyhow::Result;
 use rusqlite::params;
 use std::collections::HashSet;
@@ -52,39 +53,12 @@ impl PlaylistManager {
 
                 let song = if row.get::<_, Option<i64>>(2)?.is_some() {
                     Some(crate::collection::row_to_song_at(row, PI_COLS_LEN)?)
-                } else if let Some(ref meta_json) = additional_meta_str {
-                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(meta_json) {
-                        let title = val
-                            .get("title")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-                        let artist = val
-                            .get("artist")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-                        let album = val
-                            .get("album")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-                        let path = val
-                            .get("path")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-                        let dur_sec = val.get("duration_sec").and_then(|v| v.as_i64());
-                        Some(Song {
-                            title,
-                            artist,
-                            album,
-                            path,
-                            length_nanosec: dur_sec.map(|s| s * 1_000_000_000),
-                            unavailable: true,
-                            ..Default::default()
-                        })
-                    } else {
-                        None
-                    }
                 } else {
-                    None
+                    // Not in the library: show what the item remembers of it.
+                    additional_meta_str
+                        .as_deref()
+                        .and_then(TrackSnapshot::parse)
+                        .map(|snapshot| snapshot.to_song())
                 };
 
                 Ok(PlaylistItem {

@@ -13,6 +13,7 @@ mod dynamic;
 mod import_export;
 mod mutation_undo;
 mod size_limit;
+mod snapshot;
 mod sort;
 pub mod tempo_buckets;
 

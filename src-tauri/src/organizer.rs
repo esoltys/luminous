@@ -2881,6 +2881,66 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 
+    /// #1870: a stale row already at the target path is replaced by the moved
+    /// song, and its playlist items follow the moved song rather than being
+    /// orphaned next to it.
+    #[test]
+    fn test_execute_apply_repoints_playlist_items_of_the_row_it_replaces() {
+        use crate::db::Database;
+
+        let base_guard = tempfile::Builder::new()
+            .prefix("luminous_organizer_repoint_test_")
+            .tempdir()
+            .unwrap();
+        let base = base_guard.path().to_path_buf();
+        fs::create_dir_all(base.join("src")).unwrap();
+        let src = base.join("src").join("track.mp3");
+        let dst = base.join("dst").join("track.mp3");
+        fs::write(&src, b"fake audio").unwrap();
+
+        let db = Arc::new(Database::new(base.join("appdata")).unwrap());
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO songs (id, path, title, source) VALUES (1, ?1, 'Track', 2), (2, ?2, 'Track', 2)",
+            params![src.to_string_lossy(), dst.to_string_lossy()],
+        )
+        .unwrap();
+        conn.execute_batch(
+            "INSERT INTO playlists (id, name, dynamic_enabled) VALUES (1, 'Mine', 0);
+             INSERT INTO playlist_items (playlist_id, song_id, position, uuid) VALUES (1, 2, 0, 'stale');",
+        )
+        .unwrap();
+        drop(conn);
+
+        let items = vec![OrganizeApplyItem {
+            song_id: 1,
+            from_path: src.to_string_lossy().to_string(),
+            to_path: dst.to_string_lossy().to_string(),
+        }];
+        let result = execute_apply(
+            &db,
+            &Arc::new(AtomicU32::new(0)),
+            &Arc::new(crate::collection::SelfWriteTracker::new()),
+            &items,
+            true,
+            true,
+            None,
+        )
+        .unwrap();
+        assert_eq!(result.moved_count, 1, "{:?}", result.errors);
+
+        let conn = db.pool.get().unwrap();
+        let (song_id, meta): (Option<i64>, Option<String>) = conn
+            .query_row(
+                "SELECT song_id, additional_metadata FROM playlist_items WHERE uuid = 'stale'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(song_id, Some(1));
+        assert_eq!(meta, None, "repointed before the delete, so no snapshot");
+    }
+
     /// Regression test for #295: a rename where the only difference is the casing of an
     /// ancestor directory (e.g. `Hero` -> `HERO`) must actually update the on-disk casing,
     /// not silently no-op while the DB is updated to the new casing anyway.

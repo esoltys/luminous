@@ -828,9 +828,9 @@ const MIGRATIONS: &[Migration] = &[
 /// - items in dynamic playlists are deleted, since a dynamic playlist holds
 ///   exactly its matching songs and its reconcile only looks at linked rows;
 /// - every other item keeps its row (the FK then sets `song_id` NULL) and
-///   gets a snapshot merged into `additional_metadata` using the same keys
-///   playlist import writes for unmatched tracks, which
-///   `get_playlist_tracks_from_conn` renders as an unavailable song. `url`
+///   gets a snapshot merged into `additional_metadata`. Its keys are the
+///   ones `playlist::snapshot::TrackSnapshot` owns, so change both together;
+///   the playlist view renders it as an unavailable song. `url`
 ///   takes the song's path so the relink below can find it by index.
 ///   `beginning_nanosec` tells CUE tracks sharing one audio file apart; it
 ///   is omitted when 0 (a NULL member of a merge patch removes the key).
