@@ -15,6 +15,9 @@
 //! column is kbps, and a bare value of 10000 or more is read as bps),
 //! `samplerate:96k` (96000 Hz). `format:flac` matches a container family
 //! (see [`FileType::from_token`]) and `lossless:true|false` its lossless-ness.
+//! `tempo:` selects a named tempo bucket (`tempo:down-tempo`, `tempo:!=extreme`;
+//! see [`crate::playlist::tempo_buckets`]); only `=` and `!=` apply, and songs
+//! with no BPM match neither.
 //! `genre:` reads through the user's genre aliases (#1995), so `genre:Prog Rock`
 //! and `genre:Progressive Rock` select the same songs (see [`FilterValue::Genre`]).
 //! Unlike other text fields, `genre:=X` / `genre:!=X` compare whole `;`-separated
@@ -103,6 +106,15 @@ pub enum FilterValue {
         text: String,
         spellings: Vec<String>,
     },
+    /// A `tempo:` bucket (#2019): the half-open BPM range `[min, max)` of a
+    /// named tempo bucket (`max: None` is open-ended). Songs with no BPM
+    /// (NULL or 0) are in no bucket, so they match neither `=` nor `!=`.
+    /// Binds `min` then `max` when present; go through
+    /// [`FieldFilter::push_clause`].
+    BpmRange {
+        min: f64,
+        max: Option<f64>,
+    },
 }
 
 impl ToSql for FilterValue {
@@ -114,6 +126,7 @@ impl ToSql for FilterValue {
             FilterValue::DayRange { .. }
             | FilterValue::IntSet(_)
             | FilterValue::KeySet(_)
+            | FilterValue::BpmRange { .. }
             | FilterValue::Genre { .. } => Err(rusqlite::Error::ToSqlConversionFailure(
                 "a multi-parameter value binds through FieldFilter::push_clause".into(),
             )),
@@ -160,6 +173,12 @@ impl FieldFilter {
                     params.push(Box::new(spelling));
                 }
             }
+            FilterValue::BpmRange { min, max } => {
+                params.push(Box::new(min));
+                if let Some(max) = max {
+                    params.push(Box::new(max));
+                }
+            }
             FilterValue::Genre { text, spellings } => {
                 if self.op == Op::Contains {
                     params.push(Box::new(format!("%{text}%")));
@@ -192,6 +211,17 @@ impl FieldFilter {
                 "initial_key COLLATE NOCASE {not}IN ({})",
                 placeholders.join(", ")
             );
+        }
+        if let FilterValue::BpmRange { max, .. } = &self.value {
+            let inside = match max {
+                Some(_) => format!("bpm >= ?{param_idx} AND bpm < ?{}", param_idx + 1),
+                None => format!("bpm >= ?{param_idx}"),
+            };
+            return if self.op == Op::Neq {
+                format!("(bpm > 0 AND NOT ({inside}))")
+            } else {
+                format!("(bpm > 0 AND {inside})")
+            };
         }
         if let FilterValue::Genre { spellings, .. } = &self.value {
             return genre_clause(&self.op, param_idx, spellings.len());
@@ -515,6 +545,7 @@ fn resolve_field(field: &str) -> Option<(&'static str, bool)> {
         "added" => ("added", true),
         "duration" | "length" => ("length_nanosec", true),
         "bpm" => ("bpm", true),
+        "tempo" => ("bpm", false),
         "key" | "initial_key" => ("initial_key", false),
         "samplerate" | "sample_rate" => ("samplerate", true),
         "bitdepth" | "bit_depth" => ("bitdepth", true),
@@ -634,6 +665,22 @@ fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> 
             is_numeric,
             op,
             value,
+        });
+    }
+
+    if field_clean == "tempo" {
+        let (min, max) = crate::playlist::tempo_buckets::bpm_range_for_token(&raw_val)?;
+        let op = match op {
+            Op::Eq | Op::Contains => Op::Eq,
+            Op::Neq => Op::Neq,
+            _ => return None,
+        };
+        return Some(FieldFilter {
+            field: field_clean,
+            sql_column,
+            is_numeric,
+            op,
+            value: FilterValue::BpmRange { min, max },
         });
     }
 
@@ -840,6 +887,98 @@ mod tests {
         let clause = filter.push_clause(&mut params);
         assert!(clause.starts_with("initial_key COLLATE NOCASE IN (?1"));
         assert_eq!(params.len(), n);
+    }
+
+    /// Songs (by bpm) that `tempo:{value}` selects, run against real SQLite.
+    fn tempo_matches(value: &str, bpms: &[Option<f64>]) -> Vec<Option<f64>> {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute("CREATE TABLE songs (id INTEGER PRIMARY KEY, bpm REAL)", [])
+            .unwrap();
+        for bpm in bpms {
+            conn.execute("INSERT INTO songs (bpm) VALUES (?1)", [bpm])
+                .unwrap();
+        }
+        let q = parse_query(&format!("tempo:{value}"));
+        assert_eq!(q.field_filters.len(), 1, "tempo:{value} should parse");
+        let mut params: Vec<Box<dyn ToSql>> = Vec::new();
+        let clause = q
+            .field_filters
+            .into_iter()
+            .next()
+            .unwrap()
+            .push_clause(&mut params);
+        let mut stmt = conn
+            .prepare(&format!("SELECT bpm FROM songs WHERE {clause} ORDER BY id"))
+            .unwrap();
+        let refs: Vec<&dyn ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        stmt.query_map(refs.as_slice(), |r| r.get::<_, Option<f64>>(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn test_tempo_filter_selects_exactly_one_bucket_per_song() {
+        let bpms = [
+            None,
+            Some(0.0),
+            Some(55.0),
+            Some(59.9),
+            Some(60.0),
+            Some(90.0),
+            Some(115.0),
+            Some(130.0),
+            Some(149.9),
+            Some(150.0),
+            Some(200.0),
+        ];
+        let with_bpm: Vec<Option<f64>> = bpms
+            .iter()
+            .copied()
+            .filter(|b| b.is_some_and(|v| v > 0.0))
+            .collect();
+        let tokens = [
+            "slow",
+            "down-tempo",
+            "mid-tempo",
+            "uptempo",
+            "high-energy",
+            "extreme",
+        ];
+        let mut seen: Vec<Option<f64>> = Vec::new();
+        for token in tokens {
+            let is = tempo_matches(token, &bpms);
+            let is_not = tempo_matches(&format!("!={token}"), &bpms);
+            // "is not" is the exact complement among songs that have a BPM.
+            assert_eq!(is.len() + is_not.len(), with_bpm.len(), "{token}");
+            seen.extend(is);
+        }
+        seen.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(
+            seen, with_bpm,
+            "every song with a BPM is in exactly one bucket"
+        );
+    }
+
+    #[test]
+    fn test_tempo_filter_boundaries_are_half_open() {
+        let bpms = [Some(59.9), Some(60.0), Some(89.9), Some(90.0)];
+        assert_eq!(
+            tempo_matches("down-tempo", &bpms),
+            vec![Some(60.0), Some(89.9)]
+        );
+        assert_eq!(
+            tempo_matches("Down-Tempo", &bpms),
+            vec![Some(60.0), Some(89.9)]
+        );
+        assert_eq!(tempo_matches("=mid-tempo", &bpms), vec![Some(90.0)]);
+    }
+
+    #[test]
+    fn test_tempo_filter_rejects_unknown_token_and_ordering_ops() {
+        assert!(parse_query("tempo:blistering").field_filters.is_empty());
+        assert!(parse_query("tempo:>=extreme").field_filters.is_empty());
+        assert!(parse_query("tempo:").field_filters.is_empty());
     }
 
     #[test]
