@@ -1234,6 +1234,15 @@ export const uk = {
     removeUnavailableBtn: "Вилучити недоступні: {count}",
     fileNotFoundTooltip: "Файл на диску не знайдено",
     fileNotFoundText: "Файл не знайдено",
+    notInLibraryTooltip: "Композиції більше немає в медіатеці. Повторно прив'яжіть її через меню плейлиста.",
+    relinkMissingBtn: "Повторно прив'язати недоступні: {count}",
+    relinkMissingToast: {
+      one: "Повторно прив'язано {count} композицію.",
+      few: "Повторно прив'язано {count} композиції.",
+      many: "Повторно прив'язано {count} композицій.",
+      other: "Повторно прив'язано {count} композиції."
+    },
+    relinkMissingNone: "У медіатеці не знайдено відповідних композицій.",
     importPlaylistBtn: "Імпортувати список",
     exportPlaylistBtn: "Експортувати список",
     importPlaylistTooltip: "Імпортувати файл списку відтворення (*.m3u, *.m3u8, *.pls, *.xspf)",

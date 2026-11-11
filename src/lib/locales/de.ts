@@ -1142,6 +1142,13 @@ export const de = {
     removeUnavailableBtn: "{count} nicht verfügbare entfernen",
     fileNotFoundTooltip: "Datei auf dem Datenträger nicht gefunden",
     fileNotFoundText: "Datei nicht gefunden",
+    notInLibraryTooltip: "Der Titel ist nicht mehr in deiner Mediathek. Verknüpfe ihn über das Playlist-Menü neu.",
+    relinkMissingBtn: "{count} nicht verfügbare neu verknüpfen",
+    relinkMissingToast: {
+      one: "{count} Titel neu verknüpft.",
+      other: "{count} Titel neu verknüpft."
+    },
+    relinkMissingNone: "Keine passenden Titel in deiner Mediathek gefunden.",
     importPlaylistBtn: "Wiedergabeliste importieren",
     exportPlaylistBtn: "Wiedergabeliste exportieren",
     importPlaylistTooltip: "Wiedergabelistendatei importieren (*.m3u, *.m3u8, *.pls, *.xspf)",

@@ -1234,6 +1234,15 @@ export const ru = {
     removeUnavailableBtn: "Удалить недоступные: {count}",
     fileNotFoundTooltip: "Файл не найден на диске",
     fileNotFoundText: "Файл не найден",
+    notInLibraryTooltip: "Композиции больше нет в медиатеке. Перепривяжите её через меню плейлиста.",
+    relinkMissingBtn: "Перепривязать недоступные: {count}",
+    relinkMissingToast: {
+      one: "Перепривязана {count} композиция.",
+      few: "Перепривязано {count} композиции.",
+      many: "Перепривязано {count} композиций.",
+      other: "Перепривязано {count} композиции."
+    },
+    relinkMissingNone: "В медиатеке не найдено подходящих композиций.",
     importPlaylistBtn: "Импортировать список",
     exportPlaylistBtn: "Экспортировать список",
     importPlaylistTooltip: "Импортировать файл списка воспроизведения (*.m3u, *.m3u8, *.pls, *.xspf)",

@@ -424,6 +424,17 @@ export class PlaylistsStore {
     }
   }
 
+  /** Relinks the playlist's songs that are no longer in the library to
+   * matching library songs (by path, then tags). Returns how many were
+   * relinked; the playlist is refetched when any were. */
+  async relinkMissingItems(playlistId: number): Promise<number> {
+    const relinked = await invoke<number>("relink_missing_playlist_items", { playlistId });
+    if (relinked > 0 && this.activePlaylistId === playlistId) {
+      await this.selectPlaylist(playlistId);
+    }
+    return relinked;
+  }
+
   async clearPlaylist(playlistId: number) {
     // The backend also clears the live playback queue in the same call
     // when playlistId is the Queue.
