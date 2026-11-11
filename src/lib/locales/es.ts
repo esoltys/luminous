@@ -1142,6 +1142,13 @@ export const es = {
     removeUnavailableBtn: "Quitar {count} no disponibles",
     fileNotFoundTooltip: "Archivo no encontrado en el disco",
     fileNotFoundText: "Archivo no encontrado",
+    notInLibraryTooltip: "La canción ya no está en tu biblioteca. Revincúlala desde el menú de la lista.",
+    relinkMissingBtn: "Revincular {count} no disponibles",
+    relinkMissingToast: {
+      one: "Se revinculó {count} canción.",
+      other: "Se revincularon {count} canciones."
+    },
+    relinkMissingNone: "No se encontraron canciones coincidentes en tu biblioteca.",
     importPlaylistBtn: "Importar lista de reproducción",
     exportPlaylistBtn: "Exportar lista de reproducción",
     importPlaylistTooltip: "Importar archivo de lista de reproducción (*.m3u, *.m3u8, *.pls, *.xspf)",

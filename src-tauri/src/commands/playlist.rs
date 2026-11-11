@@ -215,6 +215,17 @@ pub async fn deduplicate_playlist(
     Ok(removed_uuids)
 }
 
+/// "Relink unavailable": relinks a playlist's unavailable items to library
+/// songs matched by path or tags (see `PlaylistManager::relink_missing_items`).
+/// Returns how many were relinked.
+#[tauri::command]
+pub async fn relink_missing_playlist_items(
+    playlist_id: i64,
+    state: State<'_, AppState>,
+) -> Result<usize, String> {
+    with_playlists(&state, |pm| pm.relink_missing_items(playlist_id)).await
+}
+
 /// Brings the live player in line with `playlist_id`'s order after a sort or
 /// move, when it is the playlist being played, and broadcasts the new state.
 async fn sync_playing_order(

@@ -1142,6 +1142,13 @@ export const it = {
     removeUnavailableBtn: "Rimuovi {count} non disponibili",
     fileNotFoundTooltip: "File non trovato sul disco",
     fileNotFoundText: "File non trovato",
+    notInLibraryTooltip: "Il brano non è più nella libreria. Ricollegalo dal menu della playlist.",
+    relinkMissingBtn: "Ricollega {count} non disponibili",
+    relinkMissingToast: {
+      one: "{count} brano ricollegato.",
+      other: "{count} brani ricollegati."
+    },
+    relinkMissingNone: "Nessun brano corrispondente trovato nella libreria.",
     importPlaylistBtn: "Importa playlist",
     exportPlaylistBtn: "Esporta playlist",
     importPlaylistTooltip: "Importa file di playlist (*.m3u, *.m3u8, *.pls, *.xspf)",

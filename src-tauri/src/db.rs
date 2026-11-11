@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 81;
+pub const CURRENT_SCHEMA_VERSION: i32 = 82;
 
 struct Migration {
     version: i32,
@@ -814,7 +814,81 @@ const MIGRATIONS: &[Migration] = &[
             Ok(())
         },
     },
+    Migration {
+        version: 82,
+        description: "playlist items outlive their library song: snapshot on delete, relink on insert (#1870)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_82)?),
+    },
 ];
+
+/// Migration 82 (#1870): a playlist item outlives the library row it points
+/// at. Every hard delete of a song — whichever code path issues it — goes
+/// through `songs_bd_playlist_items`:
+///
+/// - items in dynamic playlists are deleted, since a dynamic playlist holds
+///   exactly its matching songs and its reconcile only looks at linked rows;
+/// - every other item keeps its row (the FK then sets `song_id` NULL) and
+///   gets a snapshot merged into `additional_metadata`. Its keys are the
+///   ones `playlist::snapshot::TrackSnapshot` owns, so change both together;
+///   the playlist view renders it as an unavailable song. `url`
+///   takes the song's path so the relink below can find it by index.
+///   `beginning_nanosec` tells CUE tracks sharing one audio file apart; it
+///   is omitted when 0 (a NULL member of a merge patch removes the key).
+///
+/// `songs_ai_playlist_relink` is the inverse: a newly inserted song re-attaches
+/// orphaned items with the same path and start offset, and drops the snapshot
+/// keys so the row reads like any other. Upserts that hit `ON CONFLICT DO
+/// UPDATE` don't fire it, which is fine: an existing row was never deleted.
+///
+/// Which orphans the Queue keeps is decided in Rust instead
+/// (`playlist::prune_orphaned_queue_items`), because only `Playlist::is_queue_row`
+/// may identify the Queue.
+const MIGRATION_82: &str = "
+CREATE INDEX IF NOT EXISTS idx_playlist_items_song ON playlist_items(song_id);
+CREATE INDEX IF NOT EXISTS idx_playlist_items_orphan_url
+    ON playlist_items(url) WHERE song_id IS NULL;
+
+CREATE TRIGGER IF NOT EXISTS songs_bd_playlist_items BEFORE DELETE ON songs BEGIN
+    DELETE FROM playlist_items
+     WHERE song_id = OLD.id
+       AND playlist_id IN (SELECT id FROM playlists WHERE dynamic_enabled = 1);
+    UPDATE playlist_items SET
+        url = OLD.path,
+        additional_metadata = json_patch(
+            CASE WHEN json_valid(additional_metadata) THEN additional_metadata ELSE '{}' END,
+            json_object(
+                'title', OLD.title,
+                'artist', OLD.artist,
+                'album', OLD.album,
+                'path', OLD.path,
+                'duration_sec', OLD.length_nanosec / 1000000000,
+                'beginning_nanosec', NULLIF(OLD.beginning_nanosec, 0)
+            )
+        )
+     WHERE song_id = OLD.id AND type = 0;
+END;
+
+CREATE TRIGGER IF NOT EXISTS songs_ai_playlist_relink AFTER INSERT ON songs
+WHEN NEW.path IS NOT NULL BEGIN
+    UPDATE playlist_items SET
+        song_id = NEW.id,
+        additional_metadata = NULLIF(
+            json_remove(
+                CASE WHEN json_valid(additional_metadata) THEN additional_metadata ELSE '{}' END,
+                '$.title', '$.artist', '$.album', '$.path', '$.duration_sec', '$.beginning_nanosec'
+            ),
+            '{}'
+        )
+     WHERE song_id IS NULL
+       AND type = 0
+       AND url = NEW.path
+       AND COALESCE(
+               json_extract(CASE WHEN json_valid(additional_metadata) THEN additional_metadata END,
+                            '$.beginning_nanosec'),
+               0
+           ) = NEW.beginning_nanosec;
+END;
+";
 
 /// Migration 62: albums whose titles differ only in case or surrounding
 /// whitespace become one album (#1752, see `album_key`). Adds and backfills
@@ -4993,5 +5067,179 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM metadata_rejections", [], |r| r.get(0))
             .unwrap();
         assert_eq!(count, 1);
+    }
+
+    /// Fresh database with one static and one dynamic playlist, for the
+    /// migration 82 trigger tests.
+    fn m82_db() -> (tempfile::TempDir, Database) {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_m82_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute_batch(
+            "INSERT INTO playlists (id, name, dynamic_enabled) VALUES (1, 'Mine', 0);
+             INSERT INTO playlists (id, name, dynamic_enabled, dynamic_spec) VALUES (2, 'Rock', 1, 'genre:Rock');",
+        )
+        .unwrap();
+        (dir, db)
+    }
+
+    fn m82_item(
+        conn: &rusqlite::Connection,
+        uuid: &str,
+    ) -> (Option<i64>, Option<String>, Option<String>) {
+        conn.query_row(
+            "SELECT song_id, url, additional_metadata FROM playlist_items WHERE uuid = ?1",
+            params![uuid],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_migration_82_snapshots_static_items_and_drops_dynamic_ones_on_song_delete() {
+        let (_dir, db) = m82_db();
+        let conn = db.pool.get().unwrap();
+        conn.execute_batch(
+            "INSERT INTO songs (id, path, title, artist, album, length_nanosec, source)
+                 VALUES (10, '/m/a.flac', 'A', 'Art', 'Alb', 185000000000, 2);
+             INSERT INTO playlist_items (playlist_id, song_id, position, uuid, additional_metadata)
+                 VALUES (1, 10, 0, 'plain', NULL),
+                        (1, 10, 1, 'marked', '{\"autoContinue\":true}'),
+                        (1, 10, 2, 'garbage', 'not json'),
+                        (2, 10, 0, 'dyn', NULL);
+             DELETE FROM songs WHERE id = 10;",
+        )
+        .unwrap();
+
+        for uuid in ["plain", "marked", "garbage"] {
+            let (song_id, url, meta) = m82_item(&conn, uuid);
+            assert_eq!(song_id, None, "{uuid}: FK should null the link");
+            assert_eq!(url.as_deref(), Some("/m/a.flac"));
+            let meta: serde_json::Value = serde_json::from_str(&meta.unwrap()).unwrap();
+            assert_eq!(meta["title"], "A");
+            assert_eq!(meta["artist"], "Art");
+            assert_eq!(meta["album"], "Alb");
+            assert_eq!(meta["path"], "/m/a.flac");
+            assert_eq!(meta["duration_sec"], 185);
+            assert!(
+                meta.get("beginning_nanosec").is_none(),
+                "0 offset is omitted"
+            );
+        }
+        let (_, _, marked) = m82_item(&conn, "marked");
+        assert!(
+            marked.unwrap().contains("\"autoContinue\":true"),
+            "existing keys survive"
+        );
+
+        let dyn_rows: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM playlist_items WHERE playlist_id = 2",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(dyn_rows, 0, "dynamic playlists drop items of deleted songs");
+    }
+
+    #[test]
+    fn test_migration_82_relinks_orphan_when_its_song_is_reinserted() {
+        let (_dir, db) = m82_db();
+        let conn = db.pool.get().unwrap();
+        conn.execute_batch(
+            "INSERT INTO songs (id, path, title, source) VALUES (10, '/m/a.flac', 'A', 2);
+             INSERT INTO playlist_items (playlist_id, song_id, position, uuid, additional_metadata)
+                 VALUES (1, 10, 4, 'item', '{\"autoContinue\":true}');
+             DELETE FROM songs WHERE id = 10;
+             INSERT INTO songs (id, path, title, source) VALUES (11, '/m/other.flac', 'B', 2);",
+        )
+        .unwrap();
+        assert_eq!(
+            m82_item(&conn, "item").0,
+            None,
+            "a different path doesn't relink"
+        );
+
+        conn.execute(
+            "INSERT INTO songs (id, path, title, source) VALUES (12, '/m/a.flac', 'A', 2)",
+            [],
+        )
+        .unwrap();
+        let (song_id, _, meta) = m82_item(&conn, "item");
+        assert_eq!(song_id, Some(12));
+        assert_eq!(
+            meta.as_deref(),
+            Some("{\"autoContinue\":true}"),
+            "snapshot keys removed, others kept"
+        );
+        let pos: i32 = conn
+            .query_row(
+                "SELECT position FROM playlist_items WHERE uuid = 'item'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(pos, 4);
+    }
+
+    #[test]
+    fn test_migration_82_relink_clears_plain_snapshot_to_null() {
+        let (_dir, db) = m82_db();
+        let conn = db.pool.get().unwrap();
+        conn.execute_batch(
+            "INSERT INTO songs (id, path, title, source) VALUES (10, '/m/a.flac', 'A', 2);
+             INSERT INTO playlist_items (playlist_id, song_id, position, uuid) VALUES (1, 10, 0, 'item');
+             DELETE FROM songs WHERE id = 10;
+             INSERT INTO songs (id, path, title, source) VALUES (12, '/m/a.flac', 'A', 2);",
+        )
+        .unwrap();
+        let (song_id, _, meta) = m82_item(&conn, "item");
+        assert_eq!(song_id, Some(12));
+        assert_eq!(meta, None);
+    }
+
+    #[test]
+    fn test_migration_82_relinks_cue_tracks_by_start_offset() {
+        let (_dir, db) = m82_db();
+        let conn = db.pool.get().unwrap();
+        conn.execute_batch(
+            "INSERT INTO songs (id, path, title, beginning_nanosec, source) VALUES
+                 (10, '/m/disc.flac', 'One', 0, 2),
+                 (11, '/m/disc.flac', 'Two', 300000000000, 2);
+             INSERT INTO playlist_items (playlist_id, song_id, position, uuid) VALUES
+                 (1, 11, 0, 'two'), (1, 10, 1, 'one');
+             DELETE FROM songs WHERE path = '/m/disc.flac';
+             INSERT INTO songs (id, path, title, beginning_nanosec, source) VALUES
+                 (20, '/m/disc.flac', 'One', 0, 2),
+                 (21, '/m/disc.flac', 'Two', 300000000000, 2);",
+        )
+        .unwrap();
+        assert_eq!(m82_item(&conn, "one").0, Some(20));
+        assert_eq!(m82_item(&conn, "two").0, Some(21));
+    }
+
+    #[test]
+    fn test_migration_82_relinks_unmatched_import_placeholder() {
+        let (_dir, db) = m82_db();
+        let conn = db.pool.get().unwrap();
+        // The shape `import_playlist` writes for a track it couldn't match.
+        conn.execute(
+            "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url, additional_metadata)
+             VALUES (1, NULL, 0, 'imp', 0, '/m/later.flac',
+                     '{\"title\":\"L\",\"artist\":null,\"album\":null,\"path\":\"/m/later.flac\",\"duration_sec\":null}')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (id, path, title, source) VALUES (30, '/m/later.flac', 'L', 2)",
+            [],
+        )
+        .unwrap();
+        let (song_id, _, meta) = m82_item(&conn, "imp");
+        assert_eq!(song_id, Some(30));
+        assert_eq!(meta, None);
     }
 }

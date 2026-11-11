@@ -1148,6 +1148,13 @@ export const fr: DeepStringRecord<typeof en> = {
     removeUnavailableBtn: "Retirer {count} indisponibles",
     fileNotFoundTooltip: "Fichier introuvable sur le disque",
     fileNotFoundText: "Introuvable",
+    notInLibraryTooltip: "Cette chanson n'est plus dans votre bibliothèque. Reliez-la depuis le menu de la liste de lecture.",
+    relinkMissingBtn: "Relier {count} indisponibles",
+    relinkMissingToast: {
+      one: "{count} chanson reliée.",
+      other: "{count} chansons reliées."
+    },
+    relinkMissingNone: "Aucune chanson correspondante dans votre bibliothèque.",
     importPlaylistBtn: "Importer une liste",
     exportPlaylistBtn: "Exporter la liste",
     importPlaylistTooltip: "Importer un fichier de liste (*.m3u, *.m3u8, *.pls, *.xspf)",

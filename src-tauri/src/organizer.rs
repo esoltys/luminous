@@ -1667,7 +1667,14 @@ pub fn execute_apply(
             Ok(_) => {
                 // Clear any existing row that has this exact path to avoid UNIQUE constraint failure.
                 // This can happen if the target path was previously scanned into the DB, but the file
-                // was overwritten or replaced by this organize operation.
+                // was overwritten or replaced by this organize operation. Its playlist
+                // items now mean the file this song moves into, so repoint them first;
+                // otherwise they'd be orphaned next to a live song at the same path.
+                let _ = tx.execute(
+                    "UPDATE playlist_items SET song_id = ?2
+                     WHERE song_id IN (SELECT id FROM songs WHERE path = ?1 AND id != ?2)",
+                    params![item.to_path, item.song_id],
+                );
                 let _ = tx.execute(
                     "DELETE FROM songs WHERE path = ?1 AND id != ?2",
                     params![item.to_path, item.song_id],
@@ -2872,6 +2879,66 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// #1870: a stale row already at the target path is replaced by the moved
+    /// song, and its playlist items follow the moved song rather than being
+    /// orphaned next to it.
+    #[test]
+    fn test_execute_apply_repoints_playlist_items_of_the_row_it_replaces() {
+        use crate::db::Database;
+
+        let base_guard = tempfile::Builder::new()
+            .prefix("luminous_organizer_repoint_test_")
+            .tempdir()
+            .unwrap();
+        let base = base_guard.path().to_path_buf();
+        fs::create_dir_all(base.join("src")).unwrap();
+        let src = base.join("src").join("track.mp3");
+        let dst = base.join("dst").join("track.mp3");
+        fs::write(&src, b"fake audio").unwrap();
+
+        let db = Arc::new(Database::new(base.join("appdata")).unwrap());
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO songs (id, path, title, source) VALUES (1, ?1, 'Track', 2), (2, ?2, 'Track', 2)",
+            params![src.to_string_lossy(), dst.to_string_lossy()],
+        )
+        .unwrap();
+        conn.execute_batch(
+            "INSERT INTO playlists (id, name, dynamic_enabled) VALUES (1, 'Mine', 0);
+             INSERT INTO playlist_items (playlist_id, song_id, position, uuid) VALUES (1, 2, 0, 'stale');",
+        )
+        .unwrap();
+        drop(conn);
+
+        let items = vec![OrganizeApplyItem {
+            song_id: 1,
+            from_path: src.to_string_lossy().to_string(),
+            to_path: dst.to_string_lossy().to_string(),
+        }];
+        let result = execute_apply(
+            &db,
+            &Arc::new(AtomicU32::new(0)),
+            &Arc::new(crate::collection::SelfWriteTracker::new()),
+            &items,
+            true,
+            true,
+            None,
+        )
+        .unwrap();
+        assert_eq!(result.moved_count, 1, "{:?}", result.errors);
+
+        let conn = db.pool.get().unwrap();
+        let (song_id, meta): (Option<i64>, Option<String>) = conn
+            .query_row(
+                "SELECT song_id, additional_metadata FROM playlist_items WHERE uuid = 'stale'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(song_id, Some(1));
+        assert_eq!(meta, None, "repointed before the delete, so no snapshot");
     }
 
     /// Regression test for #295: a rename where the only difference is the casing of an

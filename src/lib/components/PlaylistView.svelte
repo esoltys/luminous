@@ -33,8 +33,10 @@
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
     ShareNetworkIcon as Share,
-    InfinityIcon as Infinity
+    InfinityIcon as Infinity,
+    LinkIcon as Link
   } from "phosphor-svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem, Song } from "../types";
@@ -379,7 +381,7 @@
       song: item.song,
       disabled: trueUnavailable || disconnected,
       disabledTooltip: trueUnavailable
-        ? i18n.t("playlists.fileNotFoundTooltip")
+        ? i18n.t(isItemMissingFromLibrary(item) ? "playlists.notInLibraryTooltip" : "playlists.fileNotFoundTooltip")
         : disconnected
           ? i18n.t("collection.driveDisconnectedTooltip")
           : undefined,
@@ -449,6 +451,31 @@
   let unavailableCount = $derived(
     playlistsStore.activePlaylistTracks.filter((item) => isItemUnavailable(item)).length
   );
+
+  /** True for a song item whose library song is gone (deleted, or never
+   * matched on import): the backend renders it from a metadata snapshot
+   * with no song id, and only these can be relinked. */
+  function isItemMissingFromLibrary(item: PlaylistItem): boolean {
+    return item.item_type === "song" && !item.song?.id;
+  }
+
+  let missingFromLibraryCount = $derived(
+    playlistsStore.activePlaylistTracks.filter((item) => isItemMissingFromLibrary(item)).length
+  );
+
+  async function relinkMissingTracks() {
+    if (playlistsStore.activePlaylistId === null) return;
+    try {
+      const relinked = await playlistsStore.relinkMissingItems(playlistsStore.activePlaylistId);
+      if (relinked > 0) {
+        toastStore.show(i18n.plural("playlists.relinkMissingToast", relinked), "success");
+      } else {
+        toastStore.show(i18n.t("playlists.relinkMissingNone"), "info");
+      }
+    } catch (e) {
+      toastStore.show(String(e), "error");
+    }
+  }
 
   function handleRemoveItem(uuid: string) {
     if (playlistsStore.activePlaylistId !== null) {
@@ -985,6 +1012,13 @@
           icon={CopyPlus}
           label={i18n.plural("playlists.removeDuplicatesBtn", duplicateCount)}
           onclick={() => { removeDuplicates(); showOverflowMenu = false; }}
+        />
+      {/if}
+      {#if missingFromLibraryCount > 0}
+        <ContextMenuItem
+          icon={Link}
+          label={i18n.t("playlists.relinkMissingBtn", { count: missingFromLibraryCount })}
+          onclick={() => { relinkMissingTracks(); showOverflowMenu = false; }}
         />
       {/if}
       {#if unavailableCount > 0}

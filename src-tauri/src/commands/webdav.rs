@@ -1102,8 +1102,7 @@ fn mark_remote_deletions(
         }
     }
     if result.pruned > 0 {
-        // The queue and playlists reference songs with ON DELETE SET NULL.
-        tx.execute_batch("DELETE FROM playlist_items WHERE song_id IS NULL;")?;
+        crate::playlist::prune_orphaned_queue_items(&tx)?;
     }
     tx.commit()?;
     Ok(result)

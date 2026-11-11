@@ -103,7 +103,7 @@
     positionSortField?: string;
     /** When true, disabled rows stay selectable/right-clickable (PlaylistView, so an unavailable track can still be selected and removed) — only play/double-click and drag stay blocked. */
     interactiveWhenDisabled?: boolean;
-    /** When true, disabled rows show `disabledTooltip` in place of the artist/album cell content instead of the song's real (possibly stale) values (PlaylistView). */
+    /** When true, disabled rows show their artist/album as plain muted text instead of links, since there is nothing in the library to navigate to (PlaylistView). The artist cell falls back to `disabledTooltip` when the artist is unknown; the reason is always on the row's warning icon. */
     disabledPlaceholder?: boolean;
     /**
      * Overrides how a row is identified as "currently playing" — defaults to
@@ -596,7 +596,7 @@
   {:else if col.key === "artist"}
     <div class="{secondaryColor(song)} truncate pr-4 flex items-center min-w-0">
       {#if disabledPlaceholder && rowDisabled(row)}
-        <span class="text-brand-text-secondary italic text-xs">{row.disabledTooltip}</span>
+        <span class="text-brand-text-secondary italic text-xs truncate min-w-0">{song.artist || row.disabledTooltip}</span>
       {:else if song.artist}
         {#each parseMultiValue(song.artist) as name, i (name)}
           {#if i > 0}<span class="{secondaryColor(song)}/50 shrink-0">,&nbsp;</span>{/if}
@@ -615,7 +615,7 @@
   {:else if col.key === "album"}
     <div class="{secondaryColor(song)} truncate pr-4 flex items-center min-w-0">
       {#if disabledPlaceholder && rowDisabled(row)}
-        <span class="text-brand-text-secondary italic text-xs">{song.album ?? ""}</span>
+        <span class="text-brand-text-secondary italic text-xs truncate min-w-0">{song.album ?? ""}</span>
       {:else if song.album}
         <LinkButton
           onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(song.album || "", song.id); }}

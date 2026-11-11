@@ -65,6 +65,15 @@ describe("CoverArt.svelte - fanart.tv cover fallback (#1277)", () => {
     });
     expect(vi.mocked(invoke).mock.calls.some(([c]) => c === "fetch_remote_cover")).toBe(false);
   });
+
+  it("shows the placeholder without asking the backend for a song no longer in the library (#1870)", () => {
+    vi.mocked(invoke).mockResolvedValue(null);
+
+    const { container } = render(CoverArt, { props: { songId: 0 } });
+
+    expect(container.querySelector("img")).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
+  });
 });
 
 describe("CoverArt.svelte - rescanned covers reload (#1755)", () => {

@@ -501,6 +501,55 @@ describe("PlaylistView.svelte", () => {
     expect(dedupeSpy).toHaveBeenCalledWith(1);
   });
 
+  describe("songs no longer in the library", () => {
+    // What the backend sends for an item whose library song was deleted: a
+    // snapshot with no song id (see `get_playlist_tracks_from_conn`).
+    const missing: PlaylistItem = {
+      id: 14,
+      playlist_id: 1,
+      position: 3,
+      item_type: "song",
+      uuid: "uuid-missing",
+      song: { ...mockTracks[0].song!, id: 0, title: "Gone Song", unavailable: true },
+    };
+    // A library song whose file is missing on disk: unavailable, but still linked.
+    const fileMissing: PlaylistItem = {
+      ...missing,
+      uuid: "uuid-file-missing",
+      song: { ...mockTracks[1].song!, unavailable: true },
+    };
+
+    it("explains the row and offers to relink only songs that left the library", async () => {
+      playlistsStore.activePlaylistTracks = [...mockTracks, missing, fileMissing];
+      const { getByText, getByTitle, getAllByTitle, queryByText } = render(PlaylistView);
+
+      const titled = (tip: string) => getAllByTitle(tip).map((el) => el.textContent).join(" ");
+      expect(titled("Song is no longer in your library. Relink it from the playlist menu.")).toContain("Gone Song");
+      expect(titled("File not found on disk")).toContain("Track Two");
+
+      await fireEvent.click(getByTitle("More actions"));
+      expect(getByText("Relink 1 unavailable")).toBeInTheDocument();
+      expect(getByText("Remove 2 unavailable")).toBeInTheDocument();
+      expect(queryByText("Relink 2 unavailable")).not.toBeInTheDocument();
+    });
+
+    it("asks the backend to relink and refetches the playlist when some were", async () => {
+      playlistsStore.activePlaylistTracks = [...mockTracks, missing];
+      vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+        cmd === "relink_missing_playlist_items" ? 1 : answerCommands(cmd)
+      );
+      const selectSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockResolvedValue();
+      const { getByText, getByTitle } = render(PlaylistView);
+
+      await fireEvent.click(getByTitle("More actions"));
+      await fireEvent.click(getByText("Relink 1 unavailable").closest("button")!);
+
+      expect(invoke).toHaveBeenCalledWith("relink_missing_playlist_items", { playlistId: 1 });
+      await vi.waitFor(() => expect(selectSpy).toHaveBeenCalledWith(1));
+      selectSpy.mockRestore();
+    });
+  });
+
   it("handles multi-selection with Shift+Click and shows batch floating bar", async () => {
     const { getByText, queryByText } = render(PlaylistView);
 

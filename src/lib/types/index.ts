@@ -248,6 +248,9 @@ export interface PlaylistItem {
   position: number;
   uuid: string;
   item_type: PlaylistItemType;
+  /** For a song item. When its song is not in the library (deleted, or an
+   * import that matched nothing), this is what the item remembers of it:
+   * `id` 0 (library ids start at 1) and `unavailable` true. */
   song?: Song;
   url?: string;
   stream_url?: string;
