@@ -1513,6 +1513,7 @@ pub fn run() {
             commands::playlist::add_to_playlist,
             commands::playlist::remove_from_playlist,
             commands::playlist::deduplicate_playlist,
+            commands::playlist::relink_missing_playlist_items,
             commands::playlist::clear_playlist,
             commands::playlist::undo_playlist,
             commands::playlist::redo_playlist,

@@ -52,6 +52,58 @@ fn clean_path<P: AsRef<std::path::Path>>(path: P) -> std::path::PathBuf {
     components.iter().collect()
 }
 
+/// The library song a playlist track refers to, or `None`. Tries each of
+/// `paths` exactly and then separator/case-insensitively, then falls back to
+/// title + artist (case-insensitive), requiring the length to be within 2 s
+/// of `duration_sec` when that is known. Shared by playlist import and
+/// "Find missing tracks", so both resolve a track the same way.
+fn match_library_song(
+    conn: &rusqlite::Connection,
+    paths: &[&str],
+    title: Option<&str>,
+    artist: Option<&str>,
+    duration_sec: Option<i64>,
+) -> Option<i64> {
+    for path in paths.iter().filter(|p| !p.is_empty()) {
+        let by_path = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1 OR LOWER(REPLACE(path, '/', '\\')) = LOWER(?2) LIMIT 1",
+                params![path, path.replace('/', "\\")],
+                |row| row.get(0),
+            )
+            .ok();
+        if by_path.is_some() {
+            return by_path;
+        }
+    }
+    let (title, artist) = (title?, artist?);
+    match duration_sec {
+        Some(dur) => conn.query_row(
+            "SELECT id FROM songs WHERE LOWER(title) = LOWER(?1) AND LOWER(artist) = LOWER(?2) AND ABS((length_nanosec / 1000000000) - ?3) <= 2 LIMIT 1",
+            params![title, artist, dur],
+            |row| row.get(0),
+        ),
+        None => conn.query_row(
+            "SELECT id FROM songs WHERE LOWER(title) = LOWER(?1) AND LOWER(artist) = LOWER(?2) LIMIT 1",
+            params![title, artist],
+            |row| row.get(0),
+        ),
+    }
+    .ok()
+}
+
+/// Keys a missing track's snapshot adds to `additional_metadata` (written by
+/// import for unmatched tracks and by the `songs_bd_playlist_items` trigger,
+/// see `MIGRATION_82` in db.rs). Removed again when the item is relinked.
+const SNAPSHOT_KEYS: &[&str] = &[
+    "title",
+    "artist",
+    "album",
+    "path",
+    "duration_sec",
+    "beginning_nanosec",
+];
+
 impl PlaylistManager {
     /// Parse an `.m3u`/`.pls`/etc. playlist file (format detected from the
     /// extension) and create a new playlist from it. Each track is matched
@@ -88,16 +140,6 @@ impl PlaylistManager {
 
             let cleaned_path = clean_path(&resolved_path);
             let path_str = cleaned_path.to_string_lossy().to_string();
-            let normalized_path_str = path_str.replace('/', "\\");
-
-            // 1. Try matching by exact path or normalized path in database
-            let matched_song_id: Option<i64> = conn
-                .query_row(
-                    "SELECT id FROM songs WHERE path = ?1 OR path = ?2 OR LOWER(REPLACE(path, '/', '\\')) = LOWER(?3) LIMIT 1",
-                    params![path_str, track.path_or_url, normalized_path_str],
-                    |row| row.get(0),
-                )
-                .ok();
 
             // Read metadata tags from file if missing from playlist track entry
             let mut title = track.title.clone();
@@ -124,30 +166,13 @@ impl PlaylistManager {
                     .map(|s| s.to_string_lossy().to_string());
             }
 
-            // 2. Fallback matching by metadata (title, artist, duration +/- 2s)
-            let matched_song_id = if matched_song_id.is_some() {
-                matched_song_id
-            } else if let Some(ref t) = title {
-                if let Some(ref a) = artist {
-                    if let Some(dur) = track.duration_sec {
-                        conn.query_row(
-                            "SELECT id FROM songs WHERE LOWER(title) = LOWER(?1) AND LOWER(artist) = LOWER(?2) AND ABS((length_nanosec / 1000000000) - ?3) <= 2 LIMIT 1",
-                            params![t, a, dur],
-                            |row| row.get(0),
-                        ).ok()
-                    } else {
-                        conn.query_row(
-                            "SELECT id FROM songs WHERE LOWER(title) = LOWER(?1) AND LOWER(artist) = LOWER(?2) LIMIT 1",
-                            params![t, a],
-                            |row| row.get(0),
-                        ).ok()
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+            let matched_song_id = match_library_song(
+                &conn,
+                &[&path_str, &track.path_or_url],
+                title.as_deref(),
+                artist.as_deref(),
+                track.duration_sec,
+            );
 
             let uuid = Uuid::new_v4().to_string();
 
@@ -175,6 +200,58 @@ impl PlaylistManager {
         }
 
         Ok(playlist)
+    }
+
+    /// Relinks `playlist_id`'s missing tracks (items whose library song is
+    /// gone, or that import couldn't match) to library songs found by
+    /// `match_library_song` from their stored path and tags. Each relinked
+    /// item keeps its uuid and position and loses its snapshot keys. Returns
+    /// how many were relinked. Items whose path reappears in the library are
+    /// relinked automatically on insert; this covers moved or retagged files.
+    pub fn relink_missing_items(&self, playlist_id: i64) -> Result<usize> {
+        let conn = self.db.pool.get()?;
+        let missing: Vec<(i64, Option<String>, Option<String>)> = conn
+            .prepare(
+                "SELECT id, url, additional_metadata FROM playlist_items
+                 WHERE playlist_id = ?1 AND song_id IS NULL AND type = 0",
+            )?
+            .query_map(params![playlist_id], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+
+        let mut relinked = 0;
+        for (item_id, url, meta) in missing {
+            let mut meta: serde_json::Map<String, serde_json::Value> = meta
+                .and_then(|m| serde_json::from_str(&m).ok())
+                .unwrap_or_default();
+            let text = |key: &str| meta.get(key).and_then(|v| v.as_str()).map(str::to_owned);
+            let (title, artist, snapshot_path) = (text("title"), text("artist"), text("path"));
+            let paths: Vec<&str> = [url.as_deref(), snapshot_path.as_deref()]
+                .into_iter()
+                .flatten()
+                .collect();
+            let duration = meta.get("duration_sec").and_then(|v| v.as_i64());
+
+            let Some(song_id) =
+                match_library_song(&conn, &paths, title.as_deref(), artist.as_deref(), duration)
+            else {
+                continue;
+            };
+            for key in SNAPSHOT_KEYS {
+                meta.remove(*key);
+            }
+            let meta = (!meta.is_empty()).then(|| serde_json::Value::Object(meta).to_string());
+            conn.execute(
+                "UPDATE playlist_items SET song_id = ?1, additional_metadata = ?2 WHERE id = ?3",
+                params![song_id, meta, item_id],
+            )?;
+            relinked += 1;
+        }
+        if relinked > 0 {
+            self.touch_updated(&conn, playlist_id)?;
+        }
+        Ok(relinked)
     }
 
     /// Write the playlist's tracks to `export_path` in the format inferred
@@ -299,6 +376,97 @@ mod tests {
         assert_eq!(
             tracks[0].song.as_ref().unwrap().title.as_deref(),
             Some("Song One")
+        );
+    }
+
+    #[test]
+    fn test_match_library_song_prefers_path_then_tags_within_two_seconds() {
+        let (_dir, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+        conn.execute_batch(
+            "INSERT INTO songs (id, title, artist, path, length_nanosec) VALUES
+                 (1, 'Song', 'Band', 'C:/Music/a.flac', 200000000000),
+                 (2, 'Other', 'Band', 'C:/Music/b.flac', 100000000000);",
+        )
+        .unwrap();
+        // Separator/case-insensitive path wins over contradicting tags.
+        assert_eq!(
+            match_library_song(
+                &conn,
+                &["c:\\music\\B.FLAC"],
+                Some("Song"),
+                Some("Band"),
+                None
+            ),
+            Some(2)
+        );
+        assert_eq!(
+            match_library_song(
+                &conn,
+                &["/gone.flac"],
+                Some("song"),
+                Some("BAND"),
+                Some(201)
+            ),
+            Some(1)
+        );
+        assert_eq!(
+            match_library_song(
+                &conn,
+                &["/gone.flac"],
+                Some("Song"),
+                Some("Band"),
+                Some(210)
+            ),
+            None
+        );
+        assert_eq!(
+            match_library_song(&conn, &["/gone.flac"], Some("Song"), None, None),
+            None
+        );
+    }
+
+    #[test]
+    fn test_relink_missing_items_matches_moved_song_by_tags_and_keeps_other_keys() {
+        let (_dir, db) = setup_test_db();
+        let db = std::sync::Arc::new(db);
+        let manager = PlaylistManager::new(db.clone()).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute_batch(
+            "INSERT INTO playlists (id, name, dynamic_enabled) VALUES (50, 'Mine', 0);
+             INSERT INTO songs (id, title, artist, path, length_nanosec) VALUES
+                 (1, 'Song', 'Band', '/old/a.flac', 200000000000);
+             INSERT INTO playlist_items (playlist_id, song_id, position, uuid) VALUES
+                 (50, 1, 0, 'moved'),
+                 (50, NULL, 1, 'unknown');
+             DELETE FROM songs WHERE id = 1;
+             INSERT INTO songs (id, title, artist, path, length_nanosec) VALUES
+                 (2, 'Song', 'Band', '/new/a.flac', 200000000000);",
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE playlist_items SET additional_metadata = json_set(additional_metadata, '$.autoContinue', json('true'))
+             WHERE uuid = 'moved'",
+            [],
+        )
+        .unwrap();
+
+        assert_eq!(manager.relink_missing_items(50).unwrap(), 1);
+
+        let (song_id, meta, pos): (Option<i64>, Option<String>, i32) = conn
+            .query_row(
+                "SELECT song_id, additional_metadata, position FROM playlist_items WHERE uuid = 'moved'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(song_id, Some(2));
+        assert_eq!(meta.as_deref(), Some("{\"autoContinue\":true}"));
+        assert_eq!(pos, 0);
+        assert_eq!(
+            manager.relink_missing_items(50).unwrap(),
+            0,
+            "nothing left that can match"
         );
     }
 }

@@ -36,6 +36,37 @@ const RESERVED_PLAYLIST_NAMES: &[&str] = &[
     "file d'attente", // fr: playerBar.queueTitle
 ];
 
+/// Removes Queue items whose library song is gone (`song_id` NULL), returning
+/// how many were removed. Call it after hard-deleting songs. The Queue is
+/// transient playback state, so a deleted song simply leaves it. User
+/// playlists keep such items as unavailable tracks that can be relinked, and
+/// dynamic playlists drop them already, via the `songs_bd_playlist_items`
+/// trigger (see `MIGRATION_82` in db.rs). The Queue is handled here rather
+/// than in that trigger because only `Playlist::is_queue_row` may identify it.
+pub fn prune_orphaned_queue_items(conn: &rusqlite::Connection) -> rusqlite::Result<usize> {
+    let mut stmt = conn.prepare("SELECT id, name, dynamic_enabled FROM playlists")?;
+    let queue_ids: Vec<i64> = stmt
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, bool>(2)?,
+            ))
+        })?
+        .filter_map(|r| r.ok())
+        .filter(|(_, name, dynamic)| Playlist::is_queue_row(name, *dynamic))
+        .map(|(id, _, _)| id)
+        .collect();
+    let mut removed = 0;
+    for id in queue_ids {
+        removed += conn.execute(
+            "DELETE FROM playlist_items WHERE playlist_id = ?1 AND song_id IS NULL AND type = 0",
+            params![id],
+        )?;
+    }
+    Ok(removed)
+}
+
 /// Case/whitespace-insensitive check against `RESERVED_PLAYLIST_NAMES`.
 pub fn is_reserved_playlist_name(name: &str) -> bool {
     let trimmed = name.trim().to_lowercase();

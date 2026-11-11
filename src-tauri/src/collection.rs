@@ -952,7 +952,9 @@ impl CollectionScanner {
         })
     }
 
-    /// Hard-deletes songs by ID and cascades cleanup to playlist items and remote caches.
+    /// Hard-deletes songs by ID and cleans up what referenced them: Queue items
+    /// and remote cache rows go, user playlist items stay as unavailable
+    /// tracks (see `MIGRATION_82` in db.rs).
     pub fn delete_songs_by_id(&self, ids: &[i64]) -> Result<usize> {
         if ids.is_empty() {
             return Ok(0);
@@ -964,7 +966,7 @@ impl CollectionScanner {
             for id in ids {
                 del_stmt.execute(params![id])?;
             }
-            tx.execute_batch("DELETE FROM playlist_items WHERE song_id IS NULL;")?;
+            crate::playlist::prune_orphaned_queue_items(&tx)?;
             tx.execute_batch("DELETE FROM webdav_cache WHERE song_id IS NULL OR server_id NOT IN (SELECT id FROM webdav_servers);")?;
             // Forget cache rows for pruned Subsonic songs, so the next sync
             // re-imports the track as new if it's still on the server.
@@ -4068,6 +4070,43 @@ mod tests {
         assert_eq!(remaining_path, real_file.to_string_lossy().to_string());
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_delete_songs_by_id_keeps_user_playlist_items_and_prunes_queue() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_delete_keeps_playlists_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let conn = db.pool.get().unwrap();
+        conn.execute_batch(
+            "INSERT INTO songs (id, path, title, artist, source) VALUES (1, '/m/gone.flac', 'Gone', 'Band', 2);
+             INSERT INTO playlists (id, name, dynamic_enabled) VALUES (1, 'Mine', 0), (2, 'Queue', 0);
+             INSERT INTO playlist_items (playlist_id, song_id, position, uuid) VALUES
+                 (1, 1, 0, 'mine'), (2, 1, 0, 'queued');",
+        )
+        .unwrap();
+
+        CollectionScanner::new(db.clone())
+            .delete_songs_by_id(&[1])
+            .unwrap();
+
+        let uuids: Vec<String> = conn
+            .prepare("SELECT uuid FROM playlist_items")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(uuids, vec!["mine".to_string()]);
+
+        let items =
+            crate::playlist::PlaylistManager::get_playlist_tracks_from_conn(&conn, 1).unwrap();
+        let song = items[0].song.as_ref().expect("snapshot renders as a song");
+        assert_eq!(song.title.as_deref(), Some("Gone"));
+        assert_eq!(song.artist.as_deref(), Some("Band"));
+        assert!(song.unavailable);
     }
 
     #[test]

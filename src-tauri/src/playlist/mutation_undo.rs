@@ -271,7 +271,11 @@ impl PlaylistManager {
 
     /// Bumps a playlist's `updated` timestamp to now — called whenever its
     /// contents or name change, so "Updated" sort/display stays accurate.
-    fn touch_updated(&self, conn: &rusqlite::Connection, playlist_id: i64) -> Result<()> {
+    pub(super) fn touch_updated(
+        &self,
+        conn: &rusqlite::Connection,
+        playlist_id: i64,
+    ) -> Result<()> {
         conn.execute(
             "UPDATE playlists SET updated = ?1 WHERE id = ?2",
             params![chrono::Utc::now().timestamp(), playlist_id],

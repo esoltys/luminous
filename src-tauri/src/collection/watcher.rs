@@ -245,7 +245,7 @@ pub fn delete_path_and_subpaths(db: &Database, path_str: &str) -> Result<usize> 
         params![path_fw, path_bw],
     )?;
     if deleted > 0 {
-        let _ = conn.execute("DELETE FROM playlist_items WHERE song_id IS NULL", []);
+        let _ = crate::playlist::prune_orphaned_queue_items(&conn);
     }
     Ok(deleted)
 }

@@ -1667,7 +1667,14 @@ pub fn execute_apply(
             Ok(_) => {
                 // Clear any existing row that has this exact path to avoid UNIQUE constraint failure.
                 // This can happen if the target path was previously scanned into the DB, but the file
-                // was overwritten or replaced by this organize operation.
+                // was overwritten or replaced by this organize operation. Its playlist
+                // items now mean the file this song moves into, so repoint them first;
+                // otherwise they'd be orphaned next to a live song at the same path.
+                let _ = tx.execute(
+                    "UPDATE playlist_items SET song_id = ?2
+                     WHERE song_id IN (SELECT id FROM songs WHERE path = ?1 AND id != ?2)",
+                    params![item.to_path, item.song_id],
+                );
                 let _ = tx.execute(
                     "DELETE FROM songs WHERE path = ?1 AND id != ?2",
                     params![item.to_path, item.song_id],
