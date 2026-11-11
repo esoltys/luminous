@@ -200,8 +200,12 @@ Then, from a browser (e.g. Claude's Browser pane — `mcp__Claude_Browser__navig
 
 - **Linux (WebKitGTK)**: this lists inspectable views; open one to get the full Web Inspector
   (Console/DOM/Network) as a normal webpage.
-- **Windows (WebView2)**: `http://127.0.0.1:9222/json` lists Chrome DevTools Protocol targets;
-  each has a `devtoolsFrontendUrl` that serves the Chrome DevTools UI over plain http.
+- **Windows (WebView2)**: `http://127.0.0.1:9222/json` lists Chrome DevTools Protocol targets.
+  Each `devtoolsFrontendUrl` points at an `aka.ms` landing page, **not** a working DevTools UI,
+  and the Browser pane can't "attach" to a target: it only loads the endpoint as a plain page.
+  Instead, navigate the pane to `http://127.0.0.1:9222/json`, then paste
+  `scripts/cdp-pane-client.js` into `javascript_tool`. It opens the target's websocket from page
+  JS and exposes `cdp.eval(expr)`, `cdp.screenshot()` and raw `cdp.send(method, params)`.
 
 Nothing is exposed unless the env var is set, and it's a no-op in release builds regardless
 (`remote_devtools_enabled()` in `src-tauri/src/lib.rs`).

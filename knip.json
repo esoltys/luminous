@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": ["scripts/throwaway-profile.ts"],
-  "ignore": ["docs/**"],
+  "ignore": ["docs/**", "scripts/cdp-pane-client.js"],
   "ignoreDependencies": ["@typescript/native-preview"],
   "ignoreBinaries": ["pgrep", "magick", "zsyncmake"]
 }
