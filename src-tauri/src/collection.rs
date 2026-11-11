@@ -3291,15 +3291,18 @@ mod tests {
         );
         assert_eq!(events[last_of_first].1, ScanPhase::Done);
 
-        // A scoped scan requested while a full scan runs is skipped.
+        // A scoped scan requested while a full scan runs is skipped, without
+        // events. The test holds the full scan's permit itself: racing a real
+        // full scan with `join!` only overlaps when the scan happens to yield
+        // before finishing, which depends on thread timing.
         log.lock().clear();
-        let (full, scoped) = tokio::join!(
-            run(1, CollectionScanner::new(Arc::clone(&db)), false),
-            run(2, CollectionScanner::new(Arc::clone(&db)), true),
-        );
-        assert!(!full.skipped);
+        let full_scan = db.scan_gate.acquire(true).await.unwrap();
+        let scoped = run(2, CollectionScanner::new(Arc::clone(&db)), true).await;
         assert!(scoped.skipped);
-        assert!(log.lock().iter().all(|(id, _)| *id == 1));
+        assert!(log.lock().is_empty(), "a skipped scan emits nothing");
+        drop(full_scan);
+        let scoped = run(2, CollectionScanner::new(Arc::clone(&db)), true).await;
+        assert!(!scoped.skipped, "runs once no full scan holds the gate");
     }
 
     #[tokio::test]
