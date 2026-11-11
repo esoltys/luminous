@@ -33,6 +33,7 @@
     type DateOpChoice,
     type RelativeUnit,
   } from "../utils/dateRule";
+  import { TEMPO_BUCKET_OPTIONS, normalizeTempoToken } from "../utils/tempoRule";
 
   interface Props {
     initialRules?: Rule[];
@@ -61,6 +62,12 @@
       ? i18n.t("smartPlaylistBuilder.fieldAdded", {}, "Date Added")
       : i18n.t("smartPlaylistBuilder.fieldLastPlayed", {}, "Last Played");
     return `${label} ${r.value}`;
+  }
+
+  /** Display name of a tempo bucket token, e.g. "down-tempo" → "Down-Tempo BPM". */
+  function tempoLabel(token: string): string {
+    const option = TEMPO_BUCKET_OPTIONS.find((o) => o.token === token.toLowerCase());
+    return option ? i18n.t(option.labelKey) : token;
   }
 
   function generateSuggestedName(ruleList: Array<{ field: string; op: string; value: string }>): string {
@@ -110,6 +117,9 @@
         if (r.op === ">=" || r.op === ">") parts.push(`${val}+`);
         else if (r.op === "<=" || r.op === "<") parts.push(i18n.t("smartPlaylistBuilder.yearPrefixPre", { value: val }));
         else parts.push(val);
+      } else if (r.field === "tempo") {
+        const name = tempoLabel(val);
+        parts.push(r.op === "!=" ? i18n.t("smartPlaylistBuilder.nameNotTempo", { name }) : name);
       } else if (r.field === "rating") {
         parts.push(r.op === ">=" || r.op === ">" ? `${val}★+` : `${val}★`);
       } else if (DATE_FIELDS.has(r.field)) {
@@ -128,7 +138,7 @@
       const firstNonYear = activeRules.find((r) => r.field !== "year");
       const firstField = firstNonYear?.field ?? activeRules[0].field;
       if (["folder", "subfolder", "directory", "path"].includes(firstField)) return single;
-      if (firstField === "genre" || firstField === "artist_tag" || firstField === "artist-tag" || firstField === "language") return `${single} ${mixWord}`;
+      if (firstField === "genre" || firstField === "artist_tag" || firstField === "artist-tag" || firstField === "language" || firstField === "tempo") return `${single} ${mixWord}`;
       if (firstField === "artist") return `${single} ${i18n.t("smartPlaylistBuilder.selectionWord", {}, "Selection")}`;
       if (DATE_FIELDS.has(firstField)) return single;
       if (firstField === "rating") return `${single} ${i18n.t("smartPlaylistBuilder.songsWord", {}, "Songs")}`;
@@ -188,6 +198,7 @@
     { key: "composer", label: i18n.t("smartPlaylistBuilder.fieldComposer", {}, "Composer"), type: "text" },
     { key: "key", label: i18n.t("smartPlaylistBuilder.fieldKey", {}, "Key"), type: "text" },
     { key: "bpm", label: i18n.t("smartPlaylistBuilder.fieldBpm", {}, "BPM"), type: "number" },
+    { key: "tempo", label: i18n.t("smartPlaylistBuilder.fieldTempo", {}, "Tempo"), type: "tempo" },
     { key: "year", label: i18n.t("smartPlaylistBuilder.fieldYear", {}, "Year"), type: "number" },
     { key: "originalyear", label: i18n.t("smartPlaylistBuilder.fieldOriginalYear", {}, "Original Year"), type: "number" },
     { key: "rating", label: i18n.t("smartPlaylistBuilder.fieldRating", {}, "Rating (Stars)"), type: "number" },
@@ -236,6 +247,12 @@
     const fieldObj = availableFields.find((f) => f.key === fieldKey);
     if (fieldObj && fieldObj.type === "boolean") {
       return [{ op: "=", label: i18n.t("smartPlaylistBuilder.opEquals", {}, "=") }];
+    }
+    if (fieldObj && fieldObj.type === "tempo") {
+      return [
+        { op: "=", label: i18n.t("smartPlaylistBuilder.opIs", {}, "is") },
+        { op: "!=", label: i18n.t("smartPlaylistBuilder.opIsNot", {}, "is not") },
+      ];
     }
     if (fieldObj && fieldObj.type === "number") {
       return [
@@ -413,11 +430,15 @@
                 value={rule.field}
                 onchange={(e) => {
                   const wasDate = DATE_FIELDS.has(rule.field);
+                  const wasTempo = rule.field === "tempo";
                   rule.field = e.currentTarget.value;
                   const ops = getOperatorsForField(rule.field);
                   rule.op = ops[0].op;
-                  // A day or window means nothing to another kind of field.
-                  if (wasDate || DATE_FIELDS.has(rule.field)) rule.value = "";
+                  // A day, window or tempo bucket means nothing to another kind of field.
+                  if (wasDate || DATE_FIELDS.has(rule.field) || wasTempo) rule.value = "";
+                  // A tempo rule picks from a fixed list, so seed the first
+                  // bucket right away rather than leave an empty, dropped rule.
+                  if (rule.field === "tempo") rule.value = normalizeTempoToken(rule.value);
                   // A boolean field has no free-text value to type, so seed
                   // it with a valid "1"/"0" right away — otherwise it'd read
                   // as an empty rule and get dropped from the saved spec.
@@ -497,6 +518,19 @@
                     class="flex-1 min-w-44"
                   />
                 {/if}
+              {:else if fieldType === "tempo"}
+                <Select
+                  value={normalizeTempoToken(rule.value)}
+                  onchange={(e) => {
+                    rule.value = e.currentTarget.value;
+                    if (!userHasEditedName) playlistName = generateSuggestedName(rules);
+                  }}
+                  class="flex-1 min-w-44 bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
+                >
+                  {#each TEMPO_BUCKET_OPTIONS as bucket (bucket.token)}
+                    <option value={bucket.token}>{i18n.t(bucket.labelKey)}</option>
+                  {/each}
+                </Select>
               {:else if rule.field === "folder" || rule.field === "path" || rule.field === "subfolder" || rule.field === "directory"}
                 <div class="flex-1 min-w-52 flex items-center gap-1.5">
                   <Input
