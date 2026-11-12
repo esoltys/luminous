@@ -16,7 +16,6 @@
   let { collapsed, showSubItems }: { collapsed: boolean; showSubItems: boolean } = $props();
 
   const active = $derived(navigationStore.activeTab === "files");
-  const atOverview = $derived(active && navigationStore.filesLocation === null);
 
   function isOpen(source: FileSource): boolean {
     const location = navigationStore.filesLocation;
@@ -94,28 +93,11 @@
       </span>
     </button>
   {:else}
+    <!-- A quiet section label like Library and Playlists. -->
     <div
-      class="w-full flex items-center rounded-lg transition-colors duration-150 {atOverview
-        ? 'bg-brand-accent/20 text-brand-accent-text'
-        : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"
+      class="w-full px-3 pt-2.5 pb-0.5 text-xs font-medium text-brand-text-secondary/70 truncate"
     >
-      <button
-        onclick={() => navigationStore.viewFiles()}
-        class="flex-1 min-w-0 flex items-center gap-3 px-3 py-1.5 text-sm font-medium text-left"
-      >
-        <div class="w-7 h-7 flex items-center justify-center shrink-0">
-          <FoldersIcon class="w-4 h-4 icon-align" />
-        </div>
-        <span class="truncate whitespace-nowrap">{i18n.t("sidebar.files")}</span>
-      </button>
-      <button
-        onclick={() => navigationStore.openSettings("sources")}
-        class="mr-1.5 w-6 h-6 flex items-center justify-center rounded-md text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 transition-colors"
-        title={i18n.t("files.addSource")}
-        aria-label={i18n.t("files.addSource")}
-      >
-        <PlusIcon class="w-3.5 h-3.5" />
-      </button>
+      {i18n.t("sidebar.files")}
     </div>
   {/if}
 
@@ -124,7 +106,7 @@
       {#if filesStore.loaded && filesStore.sources.length === 0}
         <button
           onclick={addMusicFolder}
-          class="w-full flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-semibold text-brand-accent-text hover:bg-brand-accent/10 transition-colors"
+          class="w-full flex items-center gap-2 pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs font-semibold text-brand-accent-text hover:bg-brand-accent/10 transition-colors"
         >
           <PlusIcon class="w-3.5 h-3.5 icon-align" />
           <span class="truncate">{i18n.t("files.addMusicFolder")}</span>
@@ -134,10 +116,10 @@
         {@const Icon = sourceIcon(entry.source)}
         <button
           onclick={() => navigationStore.viewFiles(entry.source)}
-          class="w-full flex items-center px-2.5 py-1 rounded-md text-xs transition-colors {isOpen(
+          class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {isOpen(
             entry.source,
           )
-            ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+            ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
             : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {entry.available
             ? ''
             : 'opacity-60'}"
@@ -167,8 +149,8 @@
             data-drop-target="device"
             data-device-id={device.id}
             data-device-name={name}
-            class="flex-1 min-w-0 flex items-start gap-2 px-2.5 py-1.5 rounded-md text-xs text-left transition-colors {open
-              ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+            class="flex-1 min-w-0 flex items-start gap-2 pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1.5 rounded-md text-xs text-left transition-colors {open
+              ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
               : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {songDrag.isDragging &&
             songDrag.dropTarget?.kind === 'device' &&
             songDrag.dropTarget.id === device.id

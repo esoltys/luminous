@@ -244,12 +244,12 @@
                 navigationStore.selectedArtistName = null;
                 navigationStore.selectedAlbumName = null;
               }}
-              class="w-full flex items-center px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
                 'collection' &&
               navigationStore.activeSubTab === 'artists' &&
               !navigationStore.selectedArtistName &&
               !navigationStore.selectedAlbumName
-                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
                 : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
             >
               <div class="flex items-center gap-2 truncate">
@@ -265,12 +265,12 @@
                 navigationStore.selectedArtistName = null;
                 navigationStore.selectedAlbumName = null;
               }}
-              class="w-full flex items-center px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
                 'collection' &&
               navigationStore.activeSubTab === 'albums' &&
               !navigationStore.selectedArtistName &&
               !navigationStore.selectedAlbumName
-                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
                 : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
             >
               <div class="flex items-center gap-2 truncate">
@@ -286,12 +286,12 @@
                 navigationStore.selectedArtistName = null;
                 navigationStore.selectedAlbumName = null;
               }}
-              class="w-full flex items-center px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
                 'collection' &&
               navigationStore.activeSubTab === 'songs' &&
               !navigationStore.selectedArtistName &&
               !navigationStore.selectedAlbumName
-                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
                 : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
             >
               <div class="flex items-center gap-2 truncate">
@@ -307,12 +307,12 @@
                 navigationStore.selectedArtistName = null;
                 navigationStore.selectedAlbumName = null;
               }}
-              class="w-full flex items-center px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
                 'collection' &&
               navigationStore.activeSubTab === 'genres' &&
               !navigationStore.selectedArtistName &&
               !navigationStore.selectedAlbumName
-                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
                 : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
             >
               <div class="flex items-center gap-2 truncate">
@@ -348,12 +348,12 @@
           <div class="w-full py-0.5 space-y-0">
             <button
               onclick={() => openPlaylistsSubTab("auto")}
-              class="w-full flex items-center px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
                 'playlists' &&
               navigationStore.playlistsSubTab === 'auto' &&
               !navigationStore.selectedPlaylistId &&
               !navigationStore.selectedAutoPlaylist
-                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
                 : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
             >
               <div class="flex items-center gap-2 truncate">
@@ -367,12 +367,12 @@
               data-drop-target={playlistsStore.customPlaylists.length > 0
                 ? "custom-category"
                 : undefined}
-              class="w-full flex items-center px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
                 'playlists' &&
               navigationStore.playlistsSubTab === 'custom' &&
               !navigationStore.selectedPlaylistId &&
               !navigationStore.selectedAutoPlaylist
-                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
                 : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {dragExpandedCustom ||
               (songDrag.isDragging && songDrag.dropTarget?.kind === 'custom-category')
                 ? 'ring-2 ring-brand-accent/60 bg-brand-accent/20 text-brand-text-primary font-semibold'
@@ -512,8 +512,8 @@
 <style>
   /* Horizontal centre of the expanded nav icons, measured from the content edge
      inside the sidebar's p-4: nav button px-3 (12) + half the w-7 icon slot
-     (14). The footer's logo slot uses the same padding, and the sub-item rails
-     are centred on this line (margin = axis - half the 2px border), so change
+     (14). The footer's logo slot uses the same padding, and the sub-item rows
+     start their 14px icons at axis - 7px so they share this line, so change
      this value together with those paddings. */
   aside {
     --sidebar-icon-axis: 26px;

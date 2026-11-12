@@ -262,9 +262,10 @@ describe("Sidebar.svelte - Files section", () => {
 
   it("offers to add a music folder while the library is empty", () => {
     collectionStore.stats = { ...collectionStore.stats!, total_songs: 0 };
-    const { getByRole, queryByRole } = render(Sidebar, { props: { width: 256 } });
+    const { getByRole, getByText, queryByRole } = render(Sidebar, { props: { width: 256 } });
 
-    expect(getByRole("button", { name: "Files" })).toBeInTheDocument();
+    expect(getByText("Files")).toBeInTheDocument();
+    expect(queryByRole("button", { name: "Files" })).toBeNull();
     expect(getByRole("button", { name: /add a music folder/i })).toBeInTheDocument();
     expect(queryByRole("button", { name: /artists/i })).toBeNull();
   });
@@ -277,9 +278,6 @@ describe("Sidebar.svelte - Files section", () => {
     await fireEvent.click(getByRole("button", { name: "Music" }));
     expect(navigationStore.activeTab).toBe("files");
     expect(navigationStore.filesLocation).toEqual({ source: music, path: [] });
-
-    await fireEvent.click(getByRole("button", { name: "Files" }));
-    expect(navigationStore.filesLocation).toBeNull();
   });
 });
 
