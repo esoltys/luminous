@@ -14,6 +14,8 @@
     title?: string;
     /** The item is what Enter or double-click on the row does: bold, with an Enter hint. */
     isDefault?: boolean;
+    /** Keyboard shortcut shown at the row's right edge, e.g. "Ctrl+M". Display only; an `isDefault` row shows its Enter hint instead. */
+    shortcut?: string;
   }
 
   let {
@@ -26,6 +28,7 @@
     disabled = false,
     title,
     isDefault = false,
+    shortcut,
   }: Props = $props();
 </script>
 
@@ -57,5 +60,7 @@
     <kbd class="ml-auto pl-4 font-sans text-[11px] text-brand-text-secondary" aria-hidden="true"
       >↵</kbd
     >
+  {:else if shortcut}
+    <kbd class="ml-auto pl-4 font-sans text-[11px] text-brand-text-secondary">{shortcut}</kbd>
   {/if}
 </button>

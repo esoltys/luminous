@@ -1564,8 +1564,6 @@ export const it = {
     lyricsTooltip: "Mostra il pannello dei testi",
     equalizerTooltip: "Mostra le impostazioni dell'equalizzatore",
     visualizerTooltip: "Attiva/disattiva il visualizzatore audio",
-    seekbarModeWaveform: "Modalità forma d'onda: fai clic per passare alle bande di frequenza",
-    seekbarModeBands: "Modalità bande di frequenza: fai clic per passare alla forma d'onda",
     bandsLegend:
       "Bande di frequenza: blu = basse (bassi), ambra = medie (voci/rullanti/solisti), bianco = alte (hi-hat/piatti/transienti); le bande più alte trasportano più energia",
     songLabel: "Brano",
@@ -1588,7 +1586,7 @@ export const it = {
     composerLabel: "Compositore",
     restoreInterface: "Ripristina interfaccia completa",
     formatLabel: "Formato",
-    miniplayer: "Miniplayer picture-in-picture",
+    miniplayer: "Miniplayer",
     loudnessLabel: "Volume percepito",
     loudnessSourceAnalyzed: "Analisi R128",
     loudnessSourceReplayGain: "Tag ReplayGain",
@@ -1684,10 +1682,14 @@ export const it = {
     playSongFailed: "Impossibile riprodurre questo brano.",
     noSongPlaying: "Nessun brano in riproduzione",
     menuTooltip: "Menu del brano",
+    menuSongInfo: "Info brano",
+    menuMiniplayer: "Miniplayer",
+    menuSeekbarBands: "Barra di avanzamento: bande di frequenza",
+    menuSeekbarWaveform: "Barra di avanzamento: forma d'onda",
+    ctrlKey: "Ctrl",
   },
   miniplayer: {
     title: "Miniplayer",
-    toggleTooltip: "Modalità picture-in-picture (Ctrl+M)",
     exit: "Ripristina finestra intera (Ctrl+M)",
     dragHint: "Trascina la finestra",
     showLyrics: "Mostra testo in tempo reale",
@@ -2836,9 +2838,9 @@ export const it = {
           "Da qui puoi riprodurre, mettere in pausa, saltare, cercare nel brano e alternare casuale o ripeti.",
       },
       playerBarToolbar: {
-        title: "Menu del brano, testi, coda, info e miniplayer",
+        title: "Coda, volume e altro",
         description:
-          "Apri il menu del brano, passa ai Testi, consulta la Coda, mostra il pannello informazioni o passa al Miniplayer flottante, oltre al volume, tutto qui.",
+          "Apri la Coda, regola il volume o apri il menu per Testi, Info brano, Miniplayer e altro.",
       },
       rightPanel: {
         title: "Dettagli del brano",

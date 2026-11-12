@@ -39,7 +39,6 @@
     ArrowsClockwiseIcon as RefreshCw,
     ArrowCounterClockwiseIcon as RotateCcw,
     ArrowClockwiseIcon as RotateCw,
-    DotsThreeIcon as MoreHorizontal,
     XIcon as X,
     EraserIcon as Eraser,
     TagIcon as Tag,
@@ -48,6 +47,7 @@
     ArrowSquareOutIcon as OpenInPicard,
     ShareNetworkIcon as Share,
   } from "phosphor-svelte";
+  import MoreIcon from "./MoreIcon.svelte";
   import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -922,7 +922,7 @@
             title={i18n.t("playlists.moreActionsTooltip")}
             class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs shrink-0 cursor-pointer"
           >
-            <MoreHorizontal class="w-4 h-4" />
+            <MoreIcon class="w-4 h-4" />
           </button>
         </div>
 

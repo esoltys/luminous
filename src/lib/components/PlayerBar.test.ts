@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom";
 import { tick } from "svelte";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, fireEvent } from "@testing-library/svelte";
+import { render, fireEvent, screen } from "@testing-library/svelte";
 import PlayerBar from "./PlayerBar.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { collectionStore } from "../stores/collection.svelte";
@@ -13,6 +13,15 @@ import type { Song, Playlist } from "../types";
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
 }));
+
+/** The live spectrum, which sits in the right-hand cluster (the seek bar has its own canvas). */
+const TOOLBAR_CANVAS = '[data-walkthrough-target="player-bar-toolbar"] canvas';
+
+/** Opens the dock's "more" menu and clicks the item with the given label. */
+async function chooseFromSongMenu(label: string | RegExp) {
+  await fireEvent.click(screen.getByTitle("Song menu"));
+  await fireEvent.click(screen.getByText(label));
+}
 
 describe("PlayerBar.svelte", () => {
   const mockSong: Song = {
@@ -328,8 +337,8 @@ describe("PlayerBar.svelte", () => {
     )!;
     expect(seekRow).toBeInTheDocument();
 
-    // In Full tier, only the right-column PiP toggle is rendered
-    expect(getAllByTitle(/picture-in-picture/i).length).toBe(1);
+    // In Full tier the Mini-player lives in the song menu, not as a dock button
+    expect(queryByTitle(/mini-player/i)).toBeNull();
 
     // Minimal-breakpoint class on previous:
     expect(getByTitle(/previous song/i)).toHaveClass("hidden", "xs:block");
@@ -357,8 +366,26 @@ describe("PlayerBar.svelte", () => {
       compactContainer.querySelector('[data-walkthrough-target="player-bar-toolbar"]'),
     ).toBeNull();
 
-    // Transport PiP toggle takes over in Compact tier so PiP mode is always accessible
-    expect(getCompactAll(/picture-in-picture/i).length).toBe(1);
+    // The song menu button takes over in the Compact tier, so the Mini-player stays reachable
+    expect(getCompactAll("Song menu").length).toBe(1);
+    expect(queryCompactByTitle(/mini-player/i)).toBeNull();
+  });
+
+  it("offers the Mini-player, but not what the window cannot show, from the song menu in the Compact tier (#2042)", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.viewportWidth = 600;
+    const toggleSpy = vi
+      .spyOn(windowLayoutStore, "toggleMiniplayerMode")
+      .mockImplementation(async () => {});
+    const utils = render(PlayerBar);
+
+    await fireEvent.click(utils.getByTitle("Song menu"));
+    expect(utils.queryByText("Lyrics")).toBeNull();
+    expect(utils.queryByText("Song info")).toBeNull();
+    expect(utils.queryByText(/^Seek bar:/)).toBeNull();
+
+    await fireEvent.click(utils.getByText("Mini-player"));
+    expect(toggleSpy).toHaveBeenCalled();
   });
 
   it("handles mute toggle correctly", async () => {
@@ -379,27 +406,24 @@ describe("PlayerBar.svelte", () => {
     expect(volSpy).toHaveBeenCalledWith(0.8);
   });
 
-  it("toggles the right (info) panel from the button above the miniplayer toggle", async () => {
+  it("toggles the right (info) panel from the Song info menu item", async () => {
     playerStore.currentSong = mockSong;
     windowLayoutStore.rightPanelOpen = false;
-    const { getByTitle } = render(PlayerBar);
-
-    const infoBtn = getByTitle("Show Info Panel (Ctrl+I)");
-    await fireEvent.click(infoBtn);
+    render(PlayerBar);
+    await chooseFromSongMenu("Song info");
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
   });
 
-  it("docks the info sidebar from the button when it was unpinned, then hides it to the rail on the next click", async () => {
+  it("docks the info sidebar from the menu when it was unpinned, then hides it to the rail on the next choice", async () => {
     playerStore.currentSong = mockSong;
     windowLayoutStore.setRightPanelPinned(false);
-    const { getByTitle } = render(PlayerBar);
-    const infoBtn = getByTitle("Show Info Panel (Ctrl+I)");
+    const utils = render(PlayerBar);
 
-    await fireEvent.click(infoBtn);
+    await chooseFromSongMenu("Song info");
     expect(windowLayoutStore.rightPanelPinned).toBe(true);
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
 
-    await fireEvent.click(infoBtn);
+    await chooseFromSongMenu("Song info");
     expect(windowLayoutStore.rightPanelVisible).toBe(false);
     expect(windowLayoutStore.rightPanelPinned).toBe(false);
     expect(windowLayoutStore.rightPanelPeeking).toBe(false);
@@ -412,24 +436,22 @@ describe("PlayerBar.svelte", () => {
     windowLayoutStore.rightPanelOpen = false;
     const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
 
-    const { getByTitle } = render(PlayerBar);
-    const infoBtn = getByTitle("Show Info Panel (Ctrl+I)");
-    await fireEvent.click(infoBtn);
+    render(PlayerBar);
+    await chooseFromSongMenu("Song info");
 
     expect(exitImmersiveSpy).toHaveBeenCalled();
     expect(windowLayoutStore.immersiveMode).toBe(false);
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
   });
 
-  it("exits Immersive Mode and keeps the right panel open when Info button is clicked while immersive and panel was already open (#909)", async () => {
+  it("exits Immersive Mode and keeps the right panel open when Song info is chosen while immersive and panel was already open (#909)", async () => {
     playerStore.currentSong = mockSong;
     windowLayoutStore.immersiveMode = true;
     windowLayoutStore.rightPanelOpen = true;
     const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
 
-    const { getByTitle } = render(PlayerBar);
-    const infoBtn = getByTitle("Show Info Panel (Ctrl+I)");
-    await fireEvent.click(infoBtn);
+    render(PlayerBar);
+    await chooseFromSongMenu("Song info");
 
     expect(exitImmersiveSpy).toHaveBeenCalled();
     expect(windowLayoutStore.immersiveMode).toBe(false);
@@ -438,24 +460,24 @@ describe("PlayerBar.svelte", () => {
 
   // #876: the playbar's Menu/Lyrics/Queue button row.
 
-  it("switches to the Lyrics tab when the Lyrics button is clicked", async () => {
+  it("switches to the Lyrics tab when Lyrics is chosen from the song menu", async () => {
     playerStore.currentSong = mockSong;
     navigationStore.activeTab = "collection";
-    const { getByTitle } = render(PlayerBar);
 
-    await fireEvent.click(getByTitle("Lyrics"));
+    render(PlayerBar);
+    await chooseFromSongMenu("Lyrics");
 
     expect(navigationStore.activeTab).toBe("lyrics");
   });
 
-  it("exits Immersive Mode and switches to the Lyrics tab when Lyrics button is clicked while immersive (#909)", async () => {
+  it("exits Immersive Mode and switches to the Lyrics tab when Lyrics is chosen while immersive (#909)", async () => {
     playerStore.currentSong = mockSong;
     windowLayoutStore.immersiveMode = true;
     navigationStore.activeTab = "collection";
     const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
 
-    const { getByTitle } = render(PlayerBar);
-    await fireEvent.click(getByTitle("Lyrics"));
+    render(PlayerBar);
+    await chooseFromSongMenu("Lyrics");
 
     expect(exitImmersiveSpy).toHaveBeenCalled();
     expect(windowLayoutStore.immersiveMode).toBe(false);
@@ -542,35 +564,90 @@ describe("PlayerBar.svelte", () => {
     expect(getByTitle("Song menu")).toBeDisabled();
   });
 
-  it("hides the info, lyrics, shuffle, and repeat buttons at the same breakpoint that auto-hides the right panel and spectrum (< 768px)", () => {
+  it("drops the spectrum below 1100px, then shuffle and repeat below 768px, keeping the menu", () => {
     playerStore.currentSong = mockSong;
     windowLayoutStore.viewportWidth = 1280;
-    expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
-    const { queryByTitle, unmount } = render(PlayerBar);
-    expect(queryByTitle("Show Info Panel (Ctrl+I)")).not.toBeNull();
-    expect(queryByTitle("Lyrics")).not.toBeNull();
+    expect(windowLayoutStore.isDockSpectrumHidden).toBe(false);
+    const { queryByTitle, container, unmount } = render(PlayerBar);
+    expect(container.querySelector(TOOLBAR_CANVAS)).not.toBeNull();
     expect(queryByTitle(/shuffle/i)).not.toBeNull();
     expect(queryByTitle(/repeat/i)).not.toBeNull();
     unmount();
 
-    // 800px is >= 768px (md breakpoint): right panel is not auto-hidden, spectrum, info, lyrics, shuffle, and repeat remain visible
+    // 800px: too narrow for the spectrum (it would overlap the seek bar), but shuffle and repeat stay
     windowLayoutStore.viewportWidth = 800;
+    expect(windowLayoutStore.isDockSpectrumHidden).toBe(true);
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
-    const { queryByTitle: queryByTitleMedium, unmount: unmountMedium } = render(PlayerBar);
-    expect(queryByTitleMedium("Show Info Panel (Ctrl+I)")).not.toBeNull();
-    expect(queryByTitleMedium("Lyrics")).not.toBeNull();
+    const {
+      queryByTitle: queryByTitleMedium,
+      container: mediumContainer,
+      unmount: unmountMedium,
+    } = render(PlayerBar);
+    expect(mediumContainer.querySelector(TOOLBAR_CANVAS)).toBeNull();
     expect(queryByTitleMedium(/shuffle/i)).not.toBeNull();
     expect(queryByTitleMedium(/repeat/i)).not.toBeNull();
     unmountMedium();
 
-    // 700px is < 768px: right panel auto-hides, Info, Lyrics, Shuffle, and Repeat buttons hide
+    // 700px is < 768px: right panel auto-hides, Shuffle and Repeat hide too; the menu stays
     windowLayoutStore.viewportWidth = 700;
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(true);
-    const { queryByTitle: queryByTitleNarrow } = render(PlayerBar);
-    expect(queryByTitleNarrow("Show Info Panel (Ctrl+I)")).toBeNull();
-    expect(queryByTitleNarrow("Lyrics")).toBeNull();
+    const { queryByTitle: queryByTitleNarrow, container: narrowContainer } = render(PlayerBar);
+    expect(narrowContainer.querySelector(TOOLBAR_CANVAS)).toBeNull();
     expect(queryByTitleNarrow(/shuffle/i)).toBeNull();
     expect(queryByTitleNarrow(/repeat/i)).toBeNull();
+    expect(queryByTitleNarrow("Song menu")).not.toBeNull();
+  });
+
+  it("keeps the live spectrum immediately to the left of the Queue button (#2042)", () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.viewportWidth = 1280;
+    const { container, getByTitle } = render(PlayerBar);
+
+    const canvas = container.querySelector(TOOLBAR_CANVAS)!;
+    const queueBtn = getByTitle("Queue");
+    expect(
+      canvas.compareDocumentPosition(queueBtn) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(canvas.closest("div.w-24")!.nextElementSibling).toBe(queueBtn);
+  });
+
+  it("shows the album and the artist on separate lines (#2042)", () => {
+    playerStore.currentSong = mockSong;
+    const { getByText } = render(PlayerBar);
+
+    const album = getByText("Test Album");
+    const artist = getByText("Test Artist");
+    expect(album).not.toBe(artist);
+    expect(album.contains(artist)).toBe(false);
+    expect(artist.contains(album)).toBe(false);
+    expect(album.textContent).not.toContain("Test Artist");
+    expect(artist.textContent).not.toContain("Test Album");
+  });
+
+  it("lists the Mini-player with its Ctrl+M shortcut in the song menu (#2042)", async () => {
+    playerStore.currentSong = mockSong;
+    const toggleSpy = vi
+      .spyOn(windowLayoutStore, "toggleMiniplayerMode")
+      .mockImplementation(async () => {});
+    const utils = render(PlayerBar);
+
+    await fireEvent.click(utils.getByTitle("Song menu"));
+    expect(utils.getByText("Ctrl+M")).toBeInTheDocument();
+    expect(utils.queryByText(/picture-in-picture/i)).toBeNull();
+
+    await fireEvent.click(utils.getByText("Mini-player"));
+    expect(toggleSpy).toHaveBeenCalled();
+  });
+
+  it("switches the seek bar mode from the song menu (#2042)", async () => {
+    playerStore.currentSong = mockSong;
+    const { prefs } = await import("../stores/prefs.svelte");
+    const toggleSpy = vi.spyOn(prefs, "toggleSeekBarMode").mockImplementation(() => {});
+
+    render(PlayerBar);
+    await chooseFromSongMenu(/^Seek bar:/);
+
+    expect(toggleSpy).toHaveBeenCalled();
   });
 
   it("removes chrome and applies edge-to-edge styling in playbar-only mode (< 160px tall)", () => {
@@ -586,11 +663,11 @@ describe("PlayerBar.svelte", () => {
     expect(footer).toHaveClass("h-full");
     expect(footer).toHaveClass("rounded-none");
     expect(footer).toHaveClass("border-none");
-    expect(footer).not.toHaveClass("rounded-[2rem]");
+    expect(footer).not.toHaveClass("rounded-full");
     expect(footer).not.toHaveClass("border-brand-border");
     unmount();
 
-    // Above 160px: returns to floating dock with rounded pill corners and border
+    // Above 160px: returns to floating dock with half-circle ends and border
     windowLayoutStore.viewportHeight = 500;
     expect(windowLayoutStore.isPlaybarOnlyMode).toBe(false);
 
@@ -599,7 +676,7 @@ describe("PlayerBar.svelte", () => {
     expect(footerNormal).not.toBeNull();
     expect(footerNormal).not.toHaveClass("playbar-only-mode");
     expect(footerNormal).not.toHaveClass("rounded-none");
-    expect(footerNormal).toHaveClass("rounded-[2rem]");
+    expect(footerNormal).toHaveClass("rounded-full");
     expect(footerNormal).toHaveClass("border-brand-border");
     expect(footerNormal).toHaveClass("h-20");
     expect(footerNormal).toHaveClass("max-w-[1200px]");

@@ -26,7 +26,6 @@
     ShuffleIcon as Shuffle,
     BroadcastIcon as Radio,
     StackIcon as Layers,
-    DotsThreeIcon as MoreHorizontal,
     EraserIcon as Eraser,
     SparkleIcon as Sparkles,
     FolderPlusIcon as FolderPlus,
@@ -36,6 +35,7 @@
     InfinityIcon as Infinity,
     LinkIcon as Link,
   } from "phosphor-svelte";
+  import MoreIcon from "./MoreIcon.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -952,7 +952,7 @@
                 title={i18n.t("playlists.moreActionsTooltip")}
                 class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs shrink-0 cursor-pointer"
               >
-                <MoreHorizontal class="w-4 h-4" />
+                <MoreIcon class="w-4 h-4" />
               </button>
             </div>
           </div>

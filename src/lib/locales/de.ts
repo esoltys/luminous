@@ -1569,8 +1569,6 @@ export const de = {
     lyricsTooltip: "Songtext-Bereich anzeigen",
     equalizerTooltip: "Equalizer-Einstellungen anzeigen",
     visualizerTooltip: "Audiovisualisierung umschalten",
-    seekbarModeWaveform: "Wellenformmodus – klicken, um zu Frequenzbändern zu wechseln",
-    seekbarModeBands: "Frequenzbandmodus – klicken, um zur Wellenform zu wechseln",
     bandsLegend:
       "Frequenzbänder – blau = tief (Bass), bernsteinfarben = mittel (Gesang/Snares/Leads), weiß = hoch (Hi-Hats/Becken/Transienten); höhere Bänder tragen mehr Energie",
     songLabel: "Titel",
@@ -1593,7 +1591,7 @@ export const de = {
     composerLabel: "Komponist",
     restoreInterface: "Vollständige Oberfläche wiederherstellen",
     formatLabel: "Format",
-    miniplayer: "Bild-in-Bild-Miniplayer",
+    miniplayer: "Miniplayer",
     loudnessLabel: "Lautheit",
     loudnessSourceAnalyzed: "R128-Analyse",
     loudnessSourceReplayGain: "ReplayGain-Tag",
@@ -1689,10 +1687,14 @@ export const de = {
     playSongFailed: "Dieser Titel konnte nicht abgespielt werden.",
     noSongPlaying: "Zurzeit wird kein Titel abgespielt",
     menuTooltip: "Titelmenü",
+    menuSongInfo: "Songinfo",
+    menuMiniplayer: "Miniplayer",
+    menuSeekbarBands: "Suchleiste: Frequenzbänder",
+    menuSeekbarWaveform: "Suchleiste: Wellenform",
+    ctrlKey: "Strg",
   },
   miniplayer: {
     title: "Miniplayer",
-    toggleTooltip: "Bild-in-Bild-Modus (Strg+M)",
     exit: "Vollständiges Fenster wiederherstellen (Strg+M)",
     dragHint: "Fenster ziehen",
     showLyrics: "Live-Songtext anzeigen",
@@ -2849,9 +2851,9 @@ export const de = {
           "Hier startest und pausierst du die Wiedergabe, springst zwischen Titeln, spulst und schaltest Zufallswiedergabe oder Wiederholen um.",
       },
       playerBarToolbar: {
-        title: "Titelmenü, Songtexte, Warteschlange, Info und Miniplayer",
+        title: "Warteschlange, Lautstärke und mehr",
         description:
-          "Öffne das Titelmenü, springe zu den Songtexten, sieh dir die Warteschlange an, zeige den Infobereich an oder wechsle zum schwebenden Miniplayer – dazu die Lautstärke, gleich hier.",
+          "Öffne die Warteschlange, stelle die Lautstärke ein oder öffne das Menü für Songtexte, Songinfo, den Miniplayer und mehr.",
       },
       rightPanel: {
         title: "Titeldetails",

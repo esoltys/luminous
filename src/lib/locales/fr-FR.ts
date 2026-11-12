@@ -1578,8 +1578,6 @@ export const frFR: DeepStringRecord<typeof en> = {
     lyricsTooltip: "Afficher les paroles",
     equalizerTooltip: "Afficher l'égaliseur",
     visualizerTooltip: "Activer/désactiver le visualiseur",
-    seekbarModeWaveform: "Mode forme d'onde — cliquez pour passer aux bandes de fréquences",
-    seekbarModeBands: "Mode bandes de fréquences — cliquez pour passer à la forme d'onde",
     bandsLegend:
       "Bandes de fréquences — bleu = graves, ambre = médiums (voix/caisse claire/instruments solistes), blanc = aigus (charleston/cymbales/transitoires) ; plus la bande est haute, plus elle porte d'énergie",
     songLabel: "Chanson",
@@ -1602,7 +1600,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     composerLabel: "Compositeur",
     restoreInterface: "Restaurer l'interface complète",
     formatLabel: "Format",
-    miniplayer: "Mini-lecteur image dans l'image",
+    miniplayer: "Mini-lecteur",
     loudnessLabel: "Volume",
     loudnessSourceAnalyzed: "Analyse R128",
     loudnessSourceReplayGain: "Balise ReplayGain",
@@ -1698,10 +1696,14 @@ export const frFR: DeepStringRecord<typeof en> = {
     playSongFailed: "Impossible de lire ce morceau.",
     noSongPlaying: "Aucune chanson en cours de lecture",
     menuTooltip: "Menu de la chanson",
+    menuSongInfo: "Infos de la chanson",
+    menuMiniplayer: "Mini-lecteur",
+    menuSeekbarBands: "Barre de lecture : bandes de fréquences",
+    menuSeekbarWaveform: "Barre de lecture : forme d'onde",
+    ctrlKey: "Ctrl",
   },
   miniplayer: {
     title: "Mini-lecteur",
-    toggleTooltip: "Mini-lecteur image dans l'image (Ctrl+M)",
     exit: "Restaurer la fenêtre principale (Ctrl+M)",
     dragHint: "Déplacer la fenêtre",
     showLyrics: "Afficher les paroles synchronisées",
@@ -2855,9 +2857,9 @@ export const frFR: DeepStringRecord<typeof en> = {
           "Lisez, mettez en pause, passez au morceau suivant, avancez dans la piste et activez la lecture aléatoire ou la répétition depuis ici.",
       },
       playerBarToolbar: {
-        title: "Menu, paroles, file d'attente, infos et mini-lecteur",
+        title: "File d'attente, volume et plus",
         description:
-          "Ouvrez le menu du morceau, accédez aux Paroles, à votre file d'attente, au panneau d'informations, ou passez en Mini-lecteur flottant — ainsi que le volume, juste ici.",
+          "Ouvrez votre file d'attente, réglez le volume ou ouvrez le menu pour les Paroles, les infos de la chanson, le Mini-lecteur et plus encore.",
       },
       rightPanel: {
         title: "Détails du morceau",

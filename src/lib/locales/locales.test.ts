@@ -92,6 +92,7 @@ function extractPlaceholders(str: string): string[] {
  * (e.g. loanwords, shared musical terminology, technical acronyms, brand names, or symbols).
  */
 const IDENTICAL_OK_FR = new Set([
+  "playerBar.ctrlKey", // "Ctrl"
   "smartPlaylistBuilder.fieldTempo", // "Tempo"
   "smartPlaylistBuilder.fieldFormat", // "Format"
   "organizer.activeDestinationLabel", // "Destination"
@@ -207,6 +208,7 @@ const IDENTICAL_OK_FR = new Set([
 ]);
 
 const IDENTICAL_OK_IT = new Set<string>([
+  "playerBar.ctrlKey", // "Ctrl"
   "smartPlaylistBuilder.fieldTempo", // "Tempo"
   "settings.onlineLabel", // "Online" is the usual word in this language
   "settings.offlineLabel", // "Offline" is the usual word in this language
@@ -311,6 +313,7 @@ const IDENTICAL_OK_IT = new Set<string>([
 ]);
 
 const IDENTICAL_OK_ES = new Set<string>([
+  "playerBar.ctrlKey", // "Ctrl"
   "smartPlaylistBuilder.fieldTempo", // "Tempo"
   "units.hz", // SI unit symbols are the same in this language
   "units.khz",
@@ -517,6 +520,7 @@ const IDENTICAL_OK_DE = new Set<string>([
 
 // Brands, acronyms, units, symbols and example URLs or paths that Ukrainian leaves as they are.
 const IDENTICAL_OK_UK = new Set<string>([
+  "playerBar.ctrlKey", // "Ctrl"
   "units.lufs", // Loudness unit, written in Latin letters
   "collection.columnBpm", // BPM
   "collection.tableHeaderBpm", // BPM
@@ -560,6 +564,7 @@ const IDENTICAL_OK_UK = new Set<string>([
 
 // Brands, acronyms, units, symbols and example URLs or paths that Russian leaves as they are.
 const IDENTICAL_OK_RU = new Set<string>([
+  "playerBar.ctrlKey", // "Ctrl"
   "units.lufs", // Loudness unit, written in Latin letters
   "collection.columnBpm", // BPM
   "collection.tableHeaderBpm", // BPM

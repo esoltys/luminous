@@ -1527,8 +1527,6 @@ export const en = {
     lyricsTooltip: "Show lyrics panel",
     equalizerTooltip: "Show equalizer settings",
     visualizerTooltip: "Toggle audio visualizer",
-    seekbarModeWaveform: "Waveform mode — click to switch to frequency bands",
-    seekbarModeBands: "Frequency bands mode — click to switch to waveform",
     bandsLegend:
       "Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy",
     songLabel: "Song",
@@ -1551,7 +1549,7 @@ export const en = {
     composerLabel: "Composer",
     restoreInterface: "Restore Full Interface",
     formatLabel: "Format",
-    miniplayer: "Picture-in-Picture Miniplayer",
+    miniplayer: "Mini-player",
     loudnessLabel: "Loudness",
     loudnessSourceAnalyzed: "R128 analysis",
     loudnessSourceReplayGain: "ReplayGain tag",
@@ -1642,10 +1640,14 @@ export const en = {
     playSongFailed: "Couldn't play this track.",
     noSongPlaying: "No song currently playing",
     menuTooltip: "Song menu",
+    menuSongInfo: "Song info",
+    menuMiniplayer: "Mini-player",
+    menuSeekbarBands: "Seek bar: frequency bands",
+    menuSeekbarWaveform: "Seek bar: waveform",
+    ctrlKey: "Ctrl",
   },
   miniplayer: {
     title: "Miniplayer",
-    toggleTooltip: "Picture-in-Picture Mode (Ctrl+M)",
     exit: "Restore Full Window (Ctrl+M)",
     dragHint: "Drag window",
     showLyrics: "Show Live Lyrics",
@@ -2767,9 +2769,9 @@ export const en = {
         description: "Play, pause, skip, seek, and cycle shuffle or repeat from here.",
       },
       playerBarToolbar: {
-        title: "Song menu, lyrics, queue, info, and miniplayer",
+        title: "Queue, volume, and more",
         description:
-          "Open the song menu, jump to Lyrics, view your Queue, show the info panel, or switch to the floating Miniplayer — plus volume, right here.",
+          "Open your Queue, adjust the volume, or open the menu for Lyrics, Song info, the Mini-player and more.",
       },
       rightPanel: {
         title: "Track details",
