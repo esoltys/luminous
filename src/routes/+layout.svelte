@@ -39,6 +39,7 @@
   import { themeStore } from "../lib/stores/theme.svelte";
   import { generateEllipseGradientSvg } from "../lib/utils/ellipseGradient";
   import { formatWindowTitle } from "../lib/utils/formatters";
+  import { publishScrollbarWidth } from "../lib/utils/scrollbarWidth";
   import { FrontendErrorReporter } from "../lib/utils/frontendError";
   import TagEditor from "../lib/components/TagEditor.svelte";
   import DeviceSyncDrawer from "../lib/components/devices/DeviceSyncDrawer.svelte";
@@ -161,6 +162,7 @@
   });
 
   onMount(() => {
+    publishScrollbarWidth();
     i18n.init();
     prefs.init();
     // The very first launch shows WelcomeScreen instead of auto-popping the

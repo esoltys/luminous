@@ -60,8 +60,11 @@
 </script>
 
 {#if open && device}
+  <!-- Insets match the views' px-6 content padding; the right one also clears the page scroller's
+       scrollbar (--scrollbar-width, see publishScrollbarWidth), which sits inside <main> so the
+       content ends that much earlier. -->
   <div
-    class="absolute inset-x-4 z-30 rounded-2xl border border-brand-border/50 acrylic-float shadow-2xl px-4 py-3 flex flex-col gap-2 {playerStore.currentSong
+    class="absolute left-6 right-[calc(1.5rem+var(--scrollbar-width,0px))] z-30 rounded-2xl border border-brand-border acrylic-float shadow-2xl px-4 py-3 flex flex-col gap-2 {playerStore.currentSong
       ? 'bottom-[6.5rem]'
       : 'bottom-4'}"
     transition:fly={{ y: 16, duration: DRAWER_MS, easing: cubicOut }}
