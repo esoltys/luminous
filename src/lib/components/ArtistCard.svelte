@@ -5,7 +5,7 @@
   import CoverStack from "./CoverStack.svelte";
   import GenreChips from "./GenreChips.svelte";
   import { getArtistCoverStack, resolveArtistPortraitUrl } from "../utils/covers";
-  import { PLAIN_TILE_COVER, useCardAppearance } from "../utils/cardAppearance";
+  import { PLAIN_TILE_COVER, PLAIN_TILE_RING, useCardAppearance } from "../utils/cardAppearance";
 
   const plain = useCardAppearance() === "plain";
 
@@ -88,7 +88,9 @@
           src={artistPortraitUrl}
           crossorigin="anonymous"
           alt={artist.name || i18n.t("collection.unknownArtist")}
-          class="w-full h-full object-cover"
+          class="w-full h-full object-cover {plain
+            ? 'transition-transform duration-300 group-hover:scale-105'
+            : ''}"
         />
       </div>
     {:else}
@@ -96,7 +98,11 @@
         {covers}
         fallbackName={artist.name || i18n.t("collection.unknownArtist")}
         sizeClass="w-36 h-36"
+        hoverEffect={plain}
       />
+    {/if}
+    {#if plain}
+      <div class={PLAIN_TILE_RING}></div>
     {/if}
   </div>
 

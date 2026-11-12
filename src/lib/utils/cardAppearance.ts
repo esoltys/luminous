@@ -52,6 +52,13 @@ export function cardAppearanceContext(appearance: CardAppearance): Map<symbol, C
   return new Map([[APPEARANCE_KEY, appearance]]);
 }
 
+/**
+ * Overlay drawn over a full-bleed cover (album art, artist portrait), where the cover's own
+ * outline would be painted over. Place inside the PLAIN_TILE_COVER square.
+ */
+export const PLAIN_TILE_RING =
+  "absolute inset-0 z-20 rounded-lg ring-2 ring-inset ring-transparent group-hover:ring-brand-accent group-focus-within:ring-brand-accent transition-[box-shadow] duration-200 pointer-events-none";
+
 /** The cover square of a tile: gets the hover/focus outline when the box is gone. */
 export const PLAIN_TILE_COVER =
   "rounded-lg outline-2 -outline-offset-2 outline-transparent group-hover:outline-brand-accent group-focus-within:outline-brand-accent transition-[outline-color] duration-200";
