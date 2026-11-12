@@ -20,6 +20,8 @@
     onRate?: (rating: number) => void;
     prefix?: import("svelte").Snippet;
     suffix?: import("svelte").Snippet;
+    /** Shown on the title line right after the year, so it shares the year's baseline. */
+    yearNote?: import("svelte").Snippet;
     /** Proportional listening weight percentage [0, 100] for ranked charts (#1475). */
     progressPercent?: number;
   }
@@ -32,6 +34,7 @@
     onRate,
     prefix,
     suffix,
+    yearNote,
     progressPercent,
   }: Props = $props();
 
@@ -119,10 +122,15 @@
       <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
         {album.album || i18n.t("collection.unknownAlbum")}
       </p>
-      {#if album.year}
-        <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0"
-          >{album.year}</span
-        >
+      {#if album.year || yearNote}
+        <span class="flex items-center gap-2 shrink-0">
+          {#if album.year}
+            <span class="text-xs text-brand-text-secondary font-medium tabular-nums"
+              >{album.year}</span
+            >
+          {/if}
+          {@render yearNote?.()}
+        </span>
       {/if}
     </div>
     <div class="flex items-center justify-between gap-2 min-w-0">

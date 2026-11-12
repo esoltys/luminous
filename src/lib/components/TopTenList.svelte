@@ -307,17 +307,15 @@
             {#snippet rankPrefix()}
               {@render rankSnippet(i + 1)}
             {/snippet}
-            <!-- Cover-height box with the text pinned to its top, so the word sits on the
-                 same line as the year instead of floating in the middle of the row. -->
-            {#snippet movementSuffix()}
-              <div class="h-11 pt-0.5">
-                {@render movementSnippet(item, i + 1)}
-              </div>
+            <!-- Rendered on the row's year line, so the word shares the year's baseline whatever
+                 height the row's rating slot gives the text column. -->
+            {#snippet movementNote()}
+              {@render movementSnippet(item, i + 1)}
             {/snippet}
             <AlbumRowCard
               album={albumItem}
               prefix={rankInsideRow ? rankPrefix : undefined}
-              suffix={rankInsideRow ? movementSuffix : undefined}
+              yearNote={rankInsideRow ? movementNote : undefined}
               progressPercent={showAccentBars ? itemPercent : undefined}
               onclick={() => openItem(item)}
               onRate={(r) => {
