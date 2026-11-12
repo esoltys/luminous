@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
   import type { AlbumItem } from "../types";
+  import { rateAlbum } from "../utils/stats";
   import { navigationStore } from "../stores/navigation.svelte";
   import CoverStack, { type CoverItem } from "./CoverStack.svelte";
   import { albumToCoverItem } from "../utils/covers";
@@ -20,7 +20,6 @@
     onclick?: (e: MouseEvent) => void;
     ondblclick?: (e: MouseEvent) => void;
     oncontextmenu?: (e: MouseEvent) => void;
-    onRate?: (rating: number) => void;
   }
 
   let {
@@ -31,7 +30,6 @@
     onclick: customClick,
     ondblclick: customDblClick,
     oncontextmenu: customContextMenu,
-    onRate,
   }: Props = $props();
 
   // svelte-ignore state_referenced_locally
@@ -65,12 +63,11 @@
     }
   }
 
-  async function rateAlbum(rating: number) {
-    if (!album.album) return;
-    const normalized = await invoke<number>("set_album_rating", { album: album.album, rating });
+  async function handleRate(rating: number) {
+    const normalized = await rateAlbum(album.album, rating);
+    if (normalized === null) return;
     album.rating = normalized;
     currentRating = normalized;
-    onRate?.(normalized);
   }
 </script>
 
@@ -145,7 +142,7 @@
           isAlbum
           revealOnInteract
           rating={currentRating}
-          onRate={rateAlbum}
+          onRate={handleRate}
           size="sm"
         /></span
       >

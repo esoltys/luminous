@@ -22,6 +22,7 @@
   import { provenanceStore } from "../stores/provenance.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import { openInPicard } from "../utils/picard";
+  import { rateAlbum } from "../utils/stats";
   import { invoke } from "@tauri-apps/api/core";
   import { isLosslessFileType, type Song, type Playlist } from "../types";
   import { TOAST_DURATION_MS } from "../constants";
@@ -57,7 +58,7 @@
     /**
      * The album's current rating (-1 = unrated). Omit to leave the rating row out, e.g. when
      * `albumName` is a placeholder rather than the real album name. The rating is written with
-     * `set_album_rating`; every view showing the album follows the backend's `album-stats-changed`
+     * `rateAlbum` (utils/stats); every view showing the album follows the backend's `album-stats-changed`
      * event, so hosts need no callback.
      */
     rating?: number;
@@ -74,11 +75,8 @@
   let currentRating = $state(rating ?? -1);
 
   async function handleRate(next: number) {
-    try {
-      currentRating = await invoke<number>("set_album_rating", { album: albumName, rating: next });
-    } catch (err) {
-      console.error("Failed to rate album:", err);
-    }
+    const normalized = await rateAlbum(albumName, next);
+    if (normalized !== null) currentRating = normalized;
   }
 
   let showShareModal = $state(false);

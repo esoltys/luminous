@@ -55,6 +55,29 @@ describe("AlbumCard.svelte", () => {
     expect(viewAlbumSpy).not.toHaveBeenCalled();
   });
 
+  it("leaves the rating unchanged when the write fails", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Fail only the rating write: other mount-time invokes must still resolve.
+    const defaultInvoke = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (cmd, args) => {
+      if (cmd === "set_album_rating") throw new Error("db locked");
+      return defaultInvoke(cmd, args);
+    });
+    try {
+      // Explicit baseline: earlier tests mutate the shared `mockAlbum.rating`.
+      const album = { ...mockAlbum, rating: -1 };
+      const { getByLabelText } = render(AlbumCard, { props: { album } });
+
+      await fireEvent.click(getByLabelText("Rate 4 of 5"));
+
+      await vi.waitFor(() => expect(error).toHaveBeenCalled());
+      expect(album.rating).toBe(-1);
+    } finally {
+      error.mockRestore();
+      vi.mocked(invoke).mockImplementation(defaultInvoke);
+    }
+  });
+
   it("navigates to album when album title is clicked", async () => {
     const viewAlbumSpy = vi.spyOn(navigationStore, "viewAlbum");
     const { getByText } = render(AlbumCard, { props: { album: mockAlbum } });
