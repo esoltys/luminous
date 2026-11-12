@@ -17,9 +17,10 @@
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { CaretRightIcon as ChevronRight, ShareNetworkIcon as Share } from "phosphor-svelte";
-  import { rowClasses, useCardAppearance } from "../utils/cardAppearance";
+  import { rowListGap, useCardAppearance } from "../utils/cardAppearance";
 
-  const plain = useCardAppearance() === "plain";
+  const appearance = useCardAppearance();
+  const plain = appearance === "plain";
 
   interface Props {
     title?: string;
@@ -220,22 +221,15 @@
   {@const label = movementLabel(item, rank)}
   <!-- alignedColumn reserves one fixed width for every row, empty for steady albums, so the
        years beside it line up whatever the message says. The width fits the longest message
-       in any locale at this size; longer text is cut short and still readable in the tooltip. -->
-  {#if alignedColumn}
+       in any locale at this size; anything longer is cut short with an ellipsis. -->
+  {#if label || alignedColumn}
     <span
-      class="block w-36 shrink-0 truncate text-right text-xs leading-5 font-medium text-brand-text-secondary"
-      title={label
-        ? `${label} · ${i18n.plural("home.chartWeeksCount", item.weeks_on_chart ?? 1)}`
-        : undefined}
+      class="shrink-0 text-xs leading-5 font-medium text-brand-text-secondary {alignedColumn
+        ? 'block w-36 truncate text-right'
+        : 'whitespace-nowrap'}"
+      title={label ? i18n.plural("home.chartWeeksCount", item.weeks_on_chart ?? 1) : undefined}
     >
       {label ?? ""}
-    </span>
-  {:else if label}
-    <span
-      class="shrink-0 text-xs leading-5 font-medium text-brand-text-secondary whitespace-nowrap"
-      title={i18n.plural("home.chartWeeksCount", item.weeks_on_chart ?? 1)}
-    >
-      {label}
     </span>
   {/if}
 {/snippet}
@@ -293,7 +287,7 @@
     </div>
   {/if}
 
-  <div class="flex-1 flex flex-col {plain ? '' : 'gap-2'}">
+  <div class="flex-1 flex flex-col {rowListGap(appearance)}">
     {#each items as item, i (item.key)}
       {@const itemPercent = getItemPercent(item)}
       <div class="flex items-center gap-3">

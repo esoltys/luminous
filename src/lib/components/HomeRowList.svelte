@@ -15,7 +15,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import { CaretRightIcon as ChevronRight } from "phosphor-svelte";
-  import { rowClasses, useCardAppearance } from "../utils/cardAppearance";
+  import { rowClasses, rowListGap, useCardAppearance } from "../utils/cardAppearance";
 
   const appearance = useCardAppearance();
 
@@ -161,7 +161,7 @@
     </h2>
   {/if}
 
-  <div class="flex-1 flex flex-col {appearance === 'plain' ? '' : 'gap-2'}">
+  <div class="flex-1 flex flex-col {rowListGap(appearance)}">
     {#each items as item, i (keyFor(item))}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->

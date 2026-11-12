@@ -42,6 +42,16 @@ export function rowClasses(appearance: CardAppearance): string {
   return `${ROW_BASE} ${appearance === "plain" ? ROW_PLAIN : ROW_BOXED}`;
 }
 
+/** Spacing between stacked rows: boxed rows need a gap, plain rows have their own hairline. */
+export function rowListGap(appearance: CardAppearance): string {
+  return appearance === "plain" ? "" : "gap-2";
+}
+
+/** The context map to hand to a test's `render(Component, { context })`, in place of a provider. */
+export function cardAppearanceContext(appearance: CardAppearance): Map<symbol, CardAppearance> {
+  return new Map([[APPEARANCE_KEY, appearance]]);
+}
+
 /** The cover square of a tile: gets the hover/focus outline when the box is gone. */
 export const PLAIN_TILE_COVER =
   "rounded-lg outline-2 -outline-offset-2 outline-transparent group-hover:outline-brand-accent group-focus-within:outline-brand-accent transition-[outline-color] duration-200";
