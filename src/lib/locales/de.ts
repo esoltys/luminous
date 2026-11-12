@@ -1,7 +1,7 @@
 export const de = {
   sidebar: {
     home: "Start",
-    collection: "Sammlung",
+    collection: "Mediathek",
     playlists: "Wiedergabelisten",
     lyrics: "Songtexte",
     stats: "Statistik",
@@ -448,7 +448,7 @@ export const de = {
     greetingAfternoon: "Guten Tag",
     greetingEvening: "Guten Abend",
     greetingNight: "Gute Nacht",
-    loading: "Sammlung wird geladen ...",
+    loading: "Mediathek wird geladen ...",
     topArtists: "Top-Interpreten",
     topAlbums: "Top-Alben",
     chartNew: "Neu",
@@ -1206,7 +1206,7 @@ export const de = {
     emptyPlaylistTitle: "Diese Wiedergabeliste ist leer.",
     emptyQueueText: "Deine Warteschlange ist leer.",
     emptyPlaylistText:
-      "Titel zu dieser Wiedergabeliste hinzufügen, indem du in der Sammlungsansicht neben einem Titel auf das Symbol „+“ klickst.",
+      "Titel zu dieser Wiedergabeliste hinzufügen, indem du in der Mediathek-Ansicht neben einem Titel auf das Symbol „+“ klickst.",
     playPlaylistTooltip: "Gesamte Wiedergabeliste abspielen",
     clearPlaylistTooltip: "Alle Titel entfernen",
     deletePlaylistTooltip: "Wiedergabeliste löschen",
@@ -2200,7 +2200,7 @@ export const de = {
     enrichmentComplete: "Albumdetails abgerufen",
   },
   immersive: {
-    emptyStateText: "Wähle einen Titel aus deiner Sammlung, um die Wiedergabe zu starten.",
+    emptyStateText: "Wähle einen Titel aus deiner Mediathek, um die Wiedergabe zu starten.",
     queueComplete: "Warteschlange beendet",
     contextComplete: "{context} beendet",
     tracksPlayed: {
@@ -2826,7 +2826,7 @@ export const de = {
       sidebar: {
         title: "In der Mediathek navigieren",
         description:
-          "Von hier aus wechselst du zwischen Start, Sammlung, Wiedergabelisten, Dateien, Statistik, Einstellungen und Hilfe.",
+          "Von hier aus wechselst du zwischen Start, Mediathek, Wiedergabelisten, Dateien, Statistik, Einstellungen und Hilfe.",
       },
       topNavigation: {
         title: "Musik finden und öffnen",
@@ -2834,7 +2834,7 @@ export const de = {
           "Durchsuche deine Mediathek oder wähle „Öffnen …“, um Dateien von beliebiger Stelle deines Computers abzuspielen. Mit den Pfeilen gehst du wie in einem Webbrowser dorthin zurück, wo du warst.",
       },
       collectionView: {
-        title: "Sammlung durchstöbern",
+        title: "Mediathek durchstöbern",
         description:
           "Beim Stöbern in Alben oder Interpreten zwischen Karten- und Zeilenansicht wechseln.",
       },
@@ -3066,7 +3066,8 @@ export const de = {
       one: "{count} Gruppe doppelter Aufnahmen",
       other: "{count} Gruppen doppelter Aufnahmen",
     },
-    shelfDuplicatesHint: "Mehrere Kopien derselben Musikaufnahme wurden in Ihrer Sammlung erkannt.",
+    shelfDuplicatesHint:
+      "Mehrere Kopien derselben Musikaufnahme wurden in Ihrer Mediathek erkannt.",
     reviewDuplicatesBtn: "Duplikate vergleichen",
     shelfProvenanceTitle: "Hinweise zur Audio-Herkunft",
     shelfProvenanceHint:

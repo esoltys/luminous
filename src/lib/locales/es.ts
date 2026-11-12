@@ -1,7 +1,7 @@
 export const es = {
   sidebar: {
     home: "Inicio",
-    collection: "Colección",
+    collection: "Biblioteca",
     playlists: "Listas de reproducción",
     lyrics: "Letras",
     stats: "Estadísticas",
@@ -444,7 +444,7 @@ export const es = {
     greetingAfternoon: "Buenas tardes",
     greetingEvening: "Buenas noches",
     greetingNight: "Buenas noches",
-    loading: "Cargando tu colección...",
+    loading: "Cargando tu biblioteca...",
     topArtists: "Artistas más escuchados",
     topAlbums: "Álbumes más escuchados",
     chartNew: "Nuevo",
@@ -1202,7 +1202,7 @@ export const es = {
     emptyPlaylistTitle: "Esta lista de reproducción está vacía.",
     emptyQueueText: "Tu cola está vacía.",
     emptyPlaylistText:
-      "Agrega canciones a esta lista de reproducción haciendo clic en el icono «+» junto a cualquier canción de la vista Colección.",
+      "Agrega canciones a esta lista de reproducción haciendo clic en el icono «+» junto a cualquier canción de la vista Biblioteca.",
     playPlaylistTooltip: "Reproducir toda la lista de reproducción",
     clearPlaylistTooltip: "Quitar todas las canciones",
     deletePlaylistTooltip: "Eliminar lista de reproducción",
@@ -2189,7 +2189,7 @@ export const es = {
     enrichmentComplete: "Detalles del álbum obtenidos",
   },
   immersive: {
-    emptyStateText: "Selecciona una canción de tu colección para empezar a reproducir.",
+    emptyStateText: "Selecciona una canción de tu biblioteca para empezar a reproducir.",
     queueComplete: "Cola completada",
     contextComplete: "{context} completada",
     tracksPlayed: {
@@ -2817,7 +2817,7 @@ export const es = {
       sidebar: {
         title: "Navega por tu biblioteca",
         description:
-          "Desde aquí puedes ir a Inicio, tu Colección, Listas de reproducción, Archivos, Estadísticas, Configuración y Ayuda.",
+          "Desde aquí puedes ir a Inicio, tu Biblioteca, Listas de reproducción, Archivos, Estadísticas, Configuración y Ayuda.",
       },
       topNavigation: {
         title: "Busca y abre música",
@@ -2825,7 +2825,7 @@ export const es = {
           "Busca en tu biblioteca o elige Abrir… para reproducir archivos de cualquier lugar de tu computadora. Usa las flechas para volver a donde estabas, como en un navegador web.",
       },
       collectionView: {
-        title: "Explora tu colección",
+        title: "Explora tu biblioteca",
         description:
           "Alterna entre la densidad de tarjetas y de filas al explorar Álbumes o Artistas.",
       },
@@ -3058,7 +3058,7 @@ export const es = {
       other: "{count} grupos de grabaciones duplicadas",
     },
     shelfDuplicatesHint:
-      "Se detectaron varias copias de la misma grabación musical en su colección.",
+      "Se detectaron varias copias de la misma grabación musical en su biblioteca.",
     reviewDuplicatesBtn: "Comparar duplicados",
     shelfProvenanceTitle: "Avisos de procedencia de audio",
     shelfProvenanceHint:

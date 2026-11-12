@@ -1,7 +1,7 @@
 export const en = {
   sidebar: {
     home: "Home",
-    collection: "Collection",
+    collection: "Library",
     playlists: "Playlists",
     lyrics: "Lyrics",
     stats: "Stats",
@@ -433,7 +433,7 @@ export const en = {
     greetingAfternoon: "Good Afternoon",
     greetingEvening: "Good Evening",
     greetingNight: "Good Night",
-    loading: "Loading your collection...",
+    loading: "Loading your library...",
     topArtists: "Top Artists",
     topAlbums: "Top Albums",
     chartNew: "New",
@@ -1170,7 +1170,7 @@ export const en = {
     emptyPlaylistTitle: "This playlist is empty.",
     emptyQueueText: "Your queue is empty.",
     emptyPlaylistText:
-      "Add songs to this playlist by clicking the '+' icon next to any song in the Collection view.",
+      "Add songs to this playlist by clicking the '+' icon next to any song in the Library view.",
     playPlaylistTooltip: "Play entire playlist",
     clearPlaylistTooltip: "Clear all songs",
     deletePlaylistTooltip: "Delete playlist",
@@ -2133,7 +2133,7 @@ export const en = {
     enrichmentComplete: "Album details retrieved",
   },
   immersive: {
-    emptyStateText: "Select a song from your collection to start playing.",
+    emptyStateText: "Select a song from your library to start playing.",
     queueComplete: "Queue Complete",
     contextComplete: "{context} Complete",
     tracksPlayed: {
@@ -2746,7 +2746,7 @@ export const en = {
       sidebar: {
         title: "Navigate your library",
         description:
-          "Jump between Home, your Collection, Playlists, Files, Stats, Settings, and Help from here.",
+          "Jump between Home, your Library, Playlists, Files, Stats, Settings, and Help from here.",
       },
       topNavigation: {
         title: "Find and open music",
@@ -2754,7 +2754,7 @@ export const en = {
           "Search your library, or choose Open… to play files from anywhere on your computer. Use the arrows to go back to where you were, like in a web browser.",
       },
       collectionView: {
-        title: "Browse your collection",
+        title: "Browse your library",
         description: "Toggle between card and row density while browsing Albums or Artists.",
       },
       playerBarCover: {
@@ -2982,7 +2982,7 @@ export const en = {
       other: "{count} duplicate recording groups",
     },
     shelfDuplicatesHint:
-      "Multiple copies of the same musical recording detected across your collection.",
+      "Multiple copies of the same musical recording detected across your library.",
     reviewDuplicatesBtn: "Compare Duplicates",
     shelfProvenanceTitle: "Audio Provenance Notices",
     shelfProvenanceHint:

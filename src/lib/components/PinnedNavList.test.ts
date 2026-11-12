@@ -37,12 +37,12 @@ describe("PinnedNavList.svelte", () => {
     pinnedStore.items = [mockAlbumItem, mockSongItem];
   });
 
-  it("renders pinned items in expanded mode without extra section header", () => {
-    const { getByText, queryByText } = render(PinnedNavList, {
+  it("renders pinned items in expanded mode under a Pinned section label", () => {
+    const { getByText } = render(PinnedNavList, {
       props: { collapsed: false },
     });
 
-    expect(queryByText("Pinned")).not.toBeInTheDocument();
+    expect(getByText("Pinned")).toBeInTheDocument();
     expect(getByText("OK Computer")).toBeInTheDocument();
     expect(getByText("Paranoid Android")).toBeInTheDocument();
   });

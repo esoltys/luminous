@@ -7,7 +7,7 @@ type DeepStringRecord<T> = {
 export const frFR: DeepStringRecord<typeof en> = {
   sidebar: {
     home: "Accueil",
-    collection: "Collection",
+    collection: "Bibliothèque",
     playlists: "Listes de lecture",
     lyrics: "Paroles",
     stats: "Statistiques",
@@ -453,7 +453,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     greetingAfternoon: "Bon après-midi",
     greetingEvening: "Bonsoir",
     greetingNight: "Bonne nuit",
-    loading: "Chargement de votre collection...",
+    loading: "Chargement de votre bibliothèque...",
     topArtists: "Artistes populaires",
     topAlbums: "Palmarès des albums",
     chartNew: "Nouveau",
@@ -1215,7 +1215,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     emptyPlaylistTitle: "Cette liste de lecture est vide.",
     emptyQueueText: "Votre file d'attente est vide.",
     emptyPlaylistText:
-      "Ajoutez des chansons à cette liste de lecture en cliquant sur l'icône « + » à côté de n'importe quelle chanson dans la vue Collection.",
+      "Ajoutez des chansons à cette liste de lecture en cliquant sur l'icône « + » à côté de n'importe quelle chanson dans la vue Bibliothèque.",
     playPlaylistTooltip: "Lire toute la liste de lecture",
     clearPlaylistTooltip: "Vider la liste de lecture",
     deletePlaylistTooltip: "Supprimer la liste de lecture",
@@ -2292,7 +2292,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     enrichmentComplete: "Détails de l'album récupérés",
   },
   immersive: {
-    emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture.",
+    emptyStateText: "Sélectionnez une chanson de votre bibliothèque pour commencer la lecture.",
     queueComplete: "File d'attente terminée",
     contextComplete: "{context} terminée",
     tracksPlayed: {
@@ -2832,7 +2832,7 @@ export const frFR: DeepStringRecord<typeof en> = {
       sidebar: {
         title: "Naviguez dans votre bibliothèque",
         description:
-          "Passez d'Accueil à Collection, Listes de lecture, Fichiers, Statistiques, Paramètres et Aide depuis ici.",
+          "Passez d'Accueil à Bibliothèque, Listes de lecture, Fichiers, Statistiques, Paramètres et Aide depuis ici.",
       },
       topNavigation: {
         title: "Trouvez et ouvrez de la musique",
@@ -2840,7 +2840,7 @@ export const frFR: DeepStringRecord<typeof en> = {
           "Recherchez dans votre bibliothèque, ou choisissez Ouvrir… pour lire des fichiers depuis n’importe où sur votre ordinateur. Utilisez les flèches pour revenir là où vous étiez, comme dans un navigateur web.",
       },
       collectionView: {
-        title: "Parcourez votre collection",
+        title: "Parcourez votre bibliothèque",
         description:
           "Basculez entre l'affichage en cartes ou en lignes lorsque vous parcourez Albums ou Artistes.",
       },
@@ -3073,7 +3073,7 @@ export const frFR: DeepStringRecord<typeof en> = {
       other: "{count} groupes d'enregistrements en double",
     },
     shelfDuplicatesHint:
-      "Plusieurs copies du même enregistrement musical ont été détectées dans votre collection.",
+      "Plusieurs copies du même enregistrement musical ont été détectées dans votre bibliothèque.",
     reviewDuplicatesBtn: "Comparer les doublons",
     shelfProvenanceTitle: "Avis sur la provenance audio",
     shelfProvenanceHint:

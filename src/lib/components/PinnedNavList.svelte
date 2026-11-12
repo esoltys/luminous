@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { i18n } from "../stores/i18n.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import type { PinnedItem } from "../types";
   import type { NavigablePin } from "../utils/pinnedNav";
   import PinnedNavItem from "./PinnedNavItem.svelte";
+  import { SIDEBAR_SECTION_LABEL_CLASS } from "../utils/sidebarNav";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import ArtistContextMenu from "./ArtistContextMenu.svelte";
@@ -84,6 +86,11 @@
     data-pinned-nav-list="true"
     class="w-full flex flex-col {collapsed ? 'items-center py-1' : 'py-0.5'}"
   >
+    {#if !collapsed}
+      <div class={SIDEBAR_SECTION_LABEL_CLASS}>
+        {i18n.t("sidebar.pinned")}
+      </div>
+    {/if}
     <div class="w-full space-y-0.5 flex flex-col {collapsed ? 'items-center' : ''}">
       {#each pinnedStore.navigableItems as pin, index (pin.id)}
         <PinnedNavItem

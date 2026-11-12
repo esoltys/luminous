@@ -1,7 +1,7 @@
 export const it = {
   sidebar: {
     home: "Home",
-    collection: "Raccolta",
+    collection: "Libreria",
     playlists: "Playlist",
     lyrics: "Testi",
     stats: "Statistiche",
@@ -443,7 +443,7 @@ export const it = {
     greetingAfternoon: "Buon pomeriggio",
     greetingEvening: "Buonasera",
     greetingNight: "Buonanotte",
-    loading: "Caricamento della raccolta...",
+    loading: "Caricamento della libreria...",
     topArtists: "Artisti più ascoltati",
     topAlbums: "Album più ascoltati",
     chartNew: "Nuovo",
@@ -1203,7 +1203,7 @@ export const it = {
     emptyPlaylistTitle: "Questa playlist è vuota.",
     emptyQueueText: "La coda è vuota.",
     emptyPlaylistText:
-      "Aggiungi brani a questa playlist facendo clic sull'icona «+» accanto a qualsiasi brano nella vista Raccolta.",
+      "Aggiungi brani a questa playlist facendo clic sull'icona «+» accanto a qualsiasi brano nella vista Libreria.",
     playPlaylistTooltip: "Riproduci l'intera playlist",
     clearPlaylistTooltip: "Rimuovi tutti i brani",
     deletePlaylistTooltip: "Elimina playlist",
@@ -1461,7 +1461,7 @@ export const it = {
     sourceManual: "Manuale",
     sourceManualTip: "Testo personalizzato salvato in locale",
     sourceCached: "In cache",
-    sourceCachedTip: "Memorizzato nel database della raccolta locale",
+    sourceCachedTip: "Memorizzato nel database della libreria locale",
     rejectMatch: "Rifiuta corrispondenza",
     rejectMatchTooltip:
       "Rifiuta il testo online non corretto e impedisci questa corrispondenza in futuro",
@@ -2190,7 +2190,7 @@ export const it = {
     enrichmentComplete: "Dettagli dell'album recuperati",
   },
   immersive: {
-    emptyStateText: "Seleziona un brano dalla tua raccolta per avviare la riproduzione.",
+    emptyStateText: "Seleziona un brano dalla tua libreria per avviare la riproduzione.",
     queueComplete: "Coda completata",
     contextComplete: "{context} completato",
     tracksPlayed: {
@@ -2814,7 +2814,7 @@ export const it = {
       sidebar: {
         title: "Naviga nella tua libreria",
         description:
-          "Passa da qui a Home, Raccolta, Playlist, File, Statistiche, Impostazioni e Guida.",
+          "Passa da qui a Home, Libreria, Playlist, File, Statistiche, Impostazioni e Guida.",
       },
       topNavigation: {
         title: "Trova e apri la musica",
@@ -2822,7 +2822,7 @@ export const it = {
           "Cerca nella libreria oppure scegli Apri… per riprodurre file da qualsiasi punto del computer. Usa le frecce per tornare dove eri, come in un browser web.",
       },
       collectionView: {
-        title: "Sfoglia la tua raccolta",
+        title: "Sfoglia la tua libreria",
         description: "Passa dalla vista a schede a quella a righe mentre sfogli Album o Artisti.",
       },
       playerBarCover: {
@@ -3051,7 +3051,7 @@ export const it = {
       one: "{count} gruppo di registrazioni duplicate",
       other: "{count} gruppi di registrazioni duplicate",
     },
-    shelfDuplicatesHint: "Rilevate più copie della stessa registrazione musicale nella collezione.",
+    shelfDuplicatesHint: "Rilevate più copie della stessa registrazione musicale nella libreria.",
     reviewDuplicatesBtn: "Confronta duplicati",
     shelfProvenanceTitle: "Avvisi di provenienza audio",
     shelfProvenanceHint:

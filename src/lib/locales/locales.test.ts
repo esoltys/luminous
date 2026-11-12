@@ -176,7 +176,6 @@ const IDENTICAL_OK_FR = new Set([
   "settings.webdavUrlPlaceholder", // "https://cloud.example.com/remote.php/webdav"
   "shortcuts.groupNavigation", // "Navigation"
   "sidebar.albums", // "Albums"
-  "sidebar.collection", // "Collection"
   "sidebar.genres", // "Genres"
   "smartPlaylistBuilder.fieldAlbum", // "Album"
   "smartPlaylistBuilder.fieldBpm", // "BPM"

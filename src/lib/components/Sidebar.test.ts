@@ -63,30 +63,29 @@ describe("Sidebar.svelte", () => {
     expect(navigationStore.activeSubTab).toBe("songs");
   });
 
-  it("keeps Collection sub-items expanded even when a non-collection tab is active", () => {
+  it("keeps Library sub-items expanded even when a non-library tab is active", () => {
     navigationStore.activeTab = "home";
     const { queryByRole } = render(Sidebar, { props: { width: 256 } });
     expect(queryByRole("button", { name: /artists/i })).not.toBeNull();
     expect(queryByRole("button", { name: /albums/i })).not.toBeNull();
   });
 
-  it("keeps Collection sub-items visible after clicking the Collection header repeatedly", async () => {
-    const { getByTitle, queryByRole } = render(Sidebar, { props: { width: 256 } });
-    const collectionBtn = getByTitle("Collection");
-
-    await fireEvent.click(collectionBtn);
-    expect(queryByRole("button", { name: /artists/i })).not.toBeNull();
-
-    await fireEvent.click(collectionBtn);
-    expect(queryByRole("button", { name: /artists/i })).not.toBeNull();
+  it("labels the Library and Playlists sections as plain text, not buttons, when expanded", () => {
+    const { getByText, queryByRole, queryByTitle } = render(Sidebar, { props: { width: 256 } });
+    expect(getByText("Library")).toBeInTheDocument();
+    expect(getByText("Playlists")).toBeInTheDocument();
+    expect(queryByRole("button", { name: "Library" })).toBeNull();
+    expect(queryByRole("button", { name: "Playlists" })).toBeNull();
+    expect(queryByTitle("Library")).toBeNull();
   });
 
-  it("centers Collection and Playlists wrapper containers when collapsed (width < 180)", () => {
-    const { getByTitle } = render(Sidebar, { props: { width: 64 } });
-    const collectionBtn = getByTitle("Collection");
+  it("keeps one icon button per section and no text labels when collapsed (width < 180)", () => {
+    const { getByTitle, queryByText } = render(Sidebar, { props: { width: 64 } });
+    const libraryBtn = getByTitle("Library");
     const playlistsBtn = getByTitle("Playlists");
-    expect(collectionBtn.parentElement).toHaveClass("items-center");
+    expect(libraryBtn.parentElement).toHaveClass("items-center");
     expect(playlistsBtn.parentElement).toHaveClass("items-center");
+    expect(queryByText("Library")).toBeNull();
   });
 
   it("animates width changes by default but suppresses the transition while actively resizing", () => {
@@ -99,15 +98,12 @@ describe("Sidebar.svelte", () => {
     expect(aside).toHaveClass("transition-none");
   });
 
-  it("formats collection numbers according to the active locale", () => {
-    i18n.currentLocale = "fr-CA";
-    collectionStore.stats = {
-      ...collectionStore.stats,
-      total_songs: 3095,
-    };
+  it("shows no counts next to any sidebar entry", () => {
+    collectionStore.stats = { ...collectionStore.stats, total_songs: 3095 };
     const { getByRole } = render(Sidebar, { props: { width: 256 } });
-    const songsBtn = getByRole("button", { name: /chansons|songs/i });
-    expect(songsBtn.textContent).toMatch(/3[\s\u202f]095/);
+    for (const name of [/artists/i, /albums/i, /songs/i, /genres/i, /auto/i, /custom/i]) {
+      expect(getByRole("button", { name }).textContent).not.toMatch(/\d/);
+    }
   });
 
   it("renders pinned navigation items in expanded and collapsed sidebar modes", async () => {
@@ -128,12 +124,14 @@ describe("Sidebar.svelte", () => {
     });
     expect(getByText("OK Computer")).toBeInTheDocument();
     expect(getByText("Radiohead")).toBeInTheDocument();
+    expect(getByText("Pinned")).toBeInTheDocument();
 
     // Collapsed sidebar
     rerender({ width: 64 });
     await vi.waitFor(() => {
       expect(queryByText("Radiohead")).not.toBeInTheDocument();
     });
+    expect(queryByText("Pinned")).not.toBeInTheDocument();
     const pinnedBtn = getAllByTitle("OK Computer • Radiohead");
     expect(pinnedBtn.length).toBeGreaterThan(0);
   });
@@ -264,24 +262,22 @@ describe("Sidebar.svelte - Files section", () => {
 
   it("offers to add a music folder while the library is empty", () => {
     collectionStore.stats = { ...collectionStore.stats!, total_songs: 0 };
-    const { getByRole, queryByRole } = render(Sidebar, { props: { width: 256 } });
+    const { getByRole, getByText, queryByRole } = render(Sidebar, { props: { width: 256 } });
 
-    expect(getByRole("button", { name: "Files" })).toBeInTheDocument();
+    expect(getByText("Files")).toBeInTheDocument();
+    expect(queryByRole("button", { name: "Files" })).toBeNull();
     expect(getByRole("button", { name: /add a music folder/i })).toBeInTheDocument();
     expect(queryByRole("button", { name: /artists/i })).toBeNull();
   });
 
-  it("lists each source with its song count and opens it in the Files view", async () => {
+  it("lists each source without a count and opens it in the Files view", async () => {
     filesStore.sources = [{ source: music, name: "Music", songCount: 1234, available: true }];
     const { getByRole, queryByRole } = render(Sidebar, { props: { width: 256 } });
 
     expect(queryByRole("button", { name: /add a music folder/i })).toBeNull();
-    await fireEvent.click(getByRole("button", { name: /Music \(1,234\)/ }));
+    await fireEvent.click(getByRole("button", { name: "Music" }));
     expect(navigationStore.activeTab).toBe("files");
     expect(navigationStore.filesLocation).toEqual({ source: music, path: [] });
-
-    await fireEvent.click(getByRole("button", { name: "Files" }));
-    expect(navigationStore.filesLocation).toBeNull();
   });
 });
 
@@ -307,19 +303,10 @@ describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
     ];
   });
 
-  it("exposes Queue drop target and highlights during drag", async () => {
-    const { songDrag, songsPayload } = await import("../stores/songDrag.svelte");
-    songDrag.start(songsPayload([{ id: 10, title: "Track" } as any]), { x: 0, y: 0 });
-
-    const { getByRole } = render(Sidebar, { props: { width: 256 } });
-    const queueBtn = getByRole("button", { name: /queue/i });
-    expect(queueBtn.getAttribute("data-drop-target")).toBe("queue");
-
-    songDrag.dropTarget = { kind: "queue" };
-    await tick();
-    expect(queueBtn.className).toContain("ring-brand-accent");
-
-    songDrag.end();
+  it("has no Queue entry; the dock's Queue button is the queue drop target", () => {
+    const { queryByRole, container } = render(Sidebar, { props: { width: 256 } });
+    expect(queryByRole("button", { name: /queue/i })).toBeNull();
+    expect(container.querySelector('[data-drop-target="queue"]')).toBeNull();
   });
 
   it("expands custom playlists after dragging over Custom for 500ms", async () => {
