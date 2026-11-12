@@ -1691,10 +1691,10 @@ export const de = {
     menuMiniplayer: "Miniplayer",
     menuSeekbarBands: "Suchleiste: Frequenzbänder",
     menuSeekbarWaveform: "Suchleiste: Wellenform",
+    ctrlKey: "Strg",
   },
   miniplayer: {
     title: "Miniplayer",
-    toggleTooltip: "Miniplayer (Strg+M)",
     exit: "Vollständiges Fenster wiederherstellen (Strg+M)",
     dragHint: "Fenster ziehen",
     showLyrics: "Live-Songtext anzeigen",

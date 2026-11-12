@@ -366,8 +366,26 @@ describe("PlayerBar.svelte", () => {
       compactContainer.querySelector('[data-walkthrough-target="player-bar-toolbar"]'),
     ).toBeNull();
 
-    // Transport Mini-player toggle takes over in Compact tier so it is always accessible
-    expect(getCompactAll(/mini-player/i).length).toBe(1);
+    // The song menu button takes over in the Compact tier, so the Mini-player stays reachable
+    expect(getCompactAll("Song menu").length).toBe(1);
+    expect(queryCompactByTitle(/mini-player/i)).toBeNull();
+  });
+
+  it("offers the Mini-player, but not what the window cannot show, from the song menu in the Compact tier (#2042)", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.viewportWidth = 600;
+    const toggleSpy = vi
+      .spyOn(windowLayoutStore, "toggleMiniplayerMode")
+      .mockImplementation(async () => {});
+    const utils = render(PlayerBar);
+
+    await fireEvent.click(utils.getByTitle("Song menu"));
+    expect(utils.queryByText("Lyrics")).toBeNull();
+    expect(utils.queryByText("Song info")).toBeNull();
+    expect(utils.queryByText(/^Seek bar:/)).toBeNull();
+
+    await fireEvent.click(utils.getByText("Mini-player"));
+    expect(toggleSpy).toHaveBeenCalled();
   });
 
   it("handles mute toggle correctly", async () => {

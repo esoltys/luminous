@@ -1805,10 +1805,10 @@ export const ru = {
     menuMiniplayer: "Мини-проигрыватель",
     menuSeekbarBands: "Полоса перемотки: частотные полосы",
     menuSeekbarWaveform: "Полоса перемотки: волновая форма",
+    ctrlKey: "Ctrl",
   },
   miniplayer: {
     title: "Мини-проигрыватель",
-    toggleTooltip: "Мини-проигрыватель (Ctrl+M)",
     exit: "Вернуть полное окно (Ctrl+M)",
     dragHint: "Перетащить окно",
     showLyrics: "Показать текст в реальном времени",

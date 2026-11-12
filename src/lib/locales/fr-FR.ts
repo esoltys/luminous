@@ -1700,10 +1700,10 @@ export const frFR: DeepStringRecord<typeof en> = {
     menuMiniplayer: "Mini-lecteur",
     menuSeekbarBands: "Barre de lecture : bandes de fréquences",
     menuSeekbarWaveform: "Barre de lecture : forme d'onde",
+    ctrlKey: "Ctrl",
   },
   miniplayer: {
     title: "Mini-lecteur",
-    toggleTooltip: "Mini-lecteur (Ctrl+M)",
     exit: "Restaurer la fenêtre principale (Ctrl+M)",
     dragHint: "Déplacer la fenêtre",
     showLyrics: "Afficher les paroles synchronisées",

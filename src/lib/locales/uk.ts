@@ -1796,10 +1796,10 @@ export const uk = {
     menuMiniplayer: "Міні-плеєр",
     menuSeekbarBands: "Смуга перемотування: смуги частот",
     menuSeekbarWaveform: "Смуга перемотування: хвильова форма",
+    ctrlKey: "Ctrl",
   },
   miniplayer: {
     title: "Міні-плеєр",
-    toggleTooltip: "Міні-плеєр (Ctrl+M)",
     exit: "Відновити повне вікно (Ctrl+M)",
     dragHint: "Перетягнути вікно",
     showLyrics: "Показати текст наживо",

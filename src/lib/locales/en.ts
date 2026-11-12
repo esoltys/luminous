@@ -1644,10 +1644,10 @@ export const en = {
     menuMiniplayer: "Mini-player",
     menuSeekbarBands: "Seek bar: frequency bands",
     menuSeekbarWaveform: "Seek bar: waveform",
+    ctrlKey: "Ctrl",
   },
   miniplayer: {
     title: "Miniplayer",
-    toggleTooltip: "Mini-player (Ctrl+M)",
     exit: "Restore Full Window (Ctrl+M)",
     dragHint: "Drag window",
     showLyrics: "Show Live Lyrics",

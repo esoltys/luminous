@@ -229,6 +229,9 @@
 
   // Playbar right cluster (#876, #2042): spectrum, Queue, volume and a "more" button whose
   // song menu also carries Lyrics, Song info, Mini-player and the seek bar mode.
+  // Locale-appropriate name of the Ctrl key ("Strg" in German), as the user guide writes it.
+  const ctrlKey = $derived(i18n.t("playerBar.ctrlKey", {}, "Ctrl"));
+
   let contextMenuState = $state<{ x: number; y: number } | null>(null);
   let editingSongId = $state<number | null>(null);
 
@@ -315,6 +318,23 @@
     };
   }
 </script>
+
+<!-- The "more" button opens the song menu. It is the dock's only route to Lyrics, Song info,
+     the Mini-player and the seek bar mode, so every width tier shows it: the right-hand
+     cluster in the full tier, the transport row in the compact tier. -->
+{#snippet moreButton(iconClass: string)}
+  <button
+    onmousedown={() => (menuWasOpenOnPress = contextMenuState !== null)}
+    onclick={openCurrentSongMenu}
+    disabled={!playerStore.currentSong}
+    class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
+    title={i18n.t("playerBar.menuTooltip")}
+    aria-haspopup="menu"
+    aria-expanded={contextMenuState !== null}
+  >
+    <MoreHorizontal weight="bold" class={iconClass} />
+  </button>
+{/snippet}
 
 <footer
   transition:fly={{
@@ -508,13 +528,7 @@
       {/if}
 
       {#if windowLayoutStore.isPlayerBarCompact}
-        <button
-          onclick={() => windowLayoutStore.toggleMiniplayerMode()}
-          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
-          title={i18n.t("miniplayer.toggleTooltip", {}, "Mini-player (Ctrl+M)")}
-        >
-          <PictureInPicture class="w-4 h-4" />
-        </button>
+        {@render moreButton("w-5 h-5")}
       {/if}
     </div>
 
@@ -579,17 +593,7 @@
           aria-label={i18n.t("playerBar.volumeSlider")}
           title={i18n.t("playerBar.volumeWithValue", { value: Math.round(volumePercent) })}
         />
-        <button
-          onmousedown={() => (menuWasOpenOnPress = contextMenuState !== null)}
-          onclick={openCurrentSongMenu}
-          disabled={!playerStore.currentSong}
-          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
-          title={i18n.t("playerBar.menuTooltip")}
-          aria-haspopup="menu"
-          aria-expanded={contextMenuState !== null}
-        >
-          <MoreHorizontal weight="bold" class="w-5 h-5" />
-        </button>
+        {@render moreButton("w-5 h-5")}
       </div>
     </div>
   {/if}
@@ -625,43 +629,49 @@
     }}
   >
     {#snippet trailing()}
-      <ContextMenuItem
-        icon={Lyrics}
-        label={i18n.t("sidebar.lyrics")}
-        onclick={() => {
-          windowLayoutStore.exitImmersiveMode();
-          navigationStore.activeTab = "lyrics";
-          contextMenuState = null;
-        }}
-      />
-      <ContextMenuItem
-        icon={Info}
-        label={i18n.t("playerBar.menuSongInfo", {}, "Song info")}
-        shortcut="Ctrl+I"
-        onclick={() => {
-          handleInfoClick();
-          contextMenuState = null;
-        }}
-      />
+      <!-- Lyrics and the info panel are hidden below the right-panel breakpoint, and the
+           seek bar below the compact one, so the menu leaves out what the window can't show. -->
+      {#if !windowLayoutStore.isRightPanelAutoHidden}
+        <ContextMenuItem
+          icon={Lyrics}
+          label={i18n.t("sidebar.lyrics")}
+          onclick={() => {
+            windowLayoutStore.exitImmersiveMode();
+            navigationStore.activeTab = "lyrics";
+            contextMenuState = null;
+          }}
+        />
+        <ContextMenuItem
+          icon={Info}
+          label={i18n.t("playerBar.menuSongInfo", {}, "Song info")}
+          shortcut={`${ctrlKey}+I`}
+          onclick={() => {
+            handleInfoClick();
+            contextMenuState = null;
+          }}
+        />
+      {/if}
       <ContextMenuItem
         icon={PictureInPicture}
         label={i18n.t("playerBar.menuMiniplayer", {}, "Mini-player")}
-        shortcut="Ctrl+M"
+        shortcut={`${ctrlKey}+M`}
         onclick={() => {
           windowLayoutStore.toggleMiniplayerMode();
           contextMenuState = null;
         }}
       />
-      <ContextMenuItem
-        icon={prefs.seekBarMode === "waveform" ? Palette : AudioWaveform}
-        label={prefs.seekBarMode === "waveform"
-          ? i18n.t("playerBar.menuSeekbarBands", {}, "Seek bar: frequency bands")
-          : i18n.t("playerBar.menuSeekbarWaveform", {}, "Seek bar: waveform")}
-        onclick={() => {
-          prefs.toggleSeekBarMode();
-          contextMenuState = null;
-        }}
-      />
+      {#if !windowLayoutStore.isPlayerBarCompact}
+        <ContextMenuItem
+          icon={prefs.seekBarMode === "waveform" ? Palette : AudioWaveform}
+          label={prefs.seekBarMode === "waveform"
+            ? i18n.t("playerBar.menuSeekbarBands", {}, "Seek bar: frequency bands")
+            : i18n.t("playerBar.menuSeekbarWaveform", {}, "Seek bar: waveform")}
+          onclick={() => {
+            prefs.toggleSeekBarMode();
+            contextMenuState = null;
+          }}
+        />
+      {/if}
     {/snippet}
   </SongContextMenu>
 {/if}

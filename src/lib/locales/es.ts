@@ -1687,10 +1687,10 @@ export const es = {
     menuMiniplayer: "Minirreproductor",
     menuSeekbarBands: "Barra de búsqueda: bandas de frecuencia",
     menuSeekbarWaveform: "Barra de búsqueda: forma de onda",
+    ctrlKey: "Ctrl",
   },
   miniplayer: {
     title: "Minirreproductor",
-    toggleTooltip: "Minirreproductor (Ctrl+M)",
     exit: "Restaurar la ventana completa (Ctrl+M)",
     dragHint: "Arrastrar ventana",
     showLyrics: "Mostrar letra en vivo",

@@ -1686,10 +1686,10 @@ export const it = {
     menuMiniplayer: "Miniplayer",
     menuSeekbarBands: "Barra di avanzamento: bande di frequenza",
     menuSeekbarWaveform: "Barra di avanzamento: forma d'onda",
+    ctrlKey: "Ctrl",
   },
   miniplayer: {
     title: "Miniplayer",
-    toggleTooltip: "Miniplayer (Ctrl+M)",
     exit: "Ripristina finestra intera (Ctrl+M)",
     dragHint: "Trascina la finestra",
     showLyrics: "Mostra testo in tempo reale",
