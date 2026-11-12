@@ -21,7 +21,7 @@
 
   let hoverValue = $state<number | null>(null);
 
-  const hidden = $derived(revealOnInteract && rating <= 0 && hoverValue === null);
+  const awaitingReveal = $derived(revealOnInteract && rating <= 0 && hoverValue === null);
 
   const starClass = $derived(size === "md" ? "w-4 h-4" : "w-3.5 h-3.5");
   const clearClass = $derived(size === "md" ? "w-3.5 h-3.5" : "w-3 h-3");
@@ -53,7 +53,7 @@
 </script>
 
 <div
-  class="flex items-center gap-0.5 transition-opacity {hidden
+  class="flex items-center gap-0.5 transition-opacity {awaitingReveal
     ? 'opacity-0 pointer-events-none group-hover:opacity-40 group-hover:pointer-events-auto group-focus-within:opacity-40 group-focus-within:pointer-events-auto focus-within:opacity-40 focus-within:pointer-events-auto'
     : rating <= 0 && !hoverValue
       ? 'opacity-40'
