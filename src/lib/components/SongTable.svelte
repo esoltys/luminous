@@ -65,7 +65,7 @@
   } from "phosphor-svelte";
   import type { Snippet } from "svelte";
 
-  const POINTER_DRAG_THRESHOLD_PX = 4;
+  import { startPointerDrag, type PointerDragHandle } from "../utils/pointerDrag";
 
   interface Props {
     rows: SongTableRow[];
@@ -267,10 +267,6 @@
   let orderForRange = $derived(rangeSelectionOrder ?? rows);
 
   function handleRowClick(e: MouseEvent, row: SongTableRow) {
-    if (swallowNextRowClick) {
-      swallowNextRowClick = false;
-      return;
-    }
     const order = orderForRange;
     if (e.shiftKey && lastSelectedKey !== null) {
       const idx1 = order.findIndex((r) => r.key === lastSelectedKey);
@@ -342,9 +338,6 @@
   let pressedRow: SongTableRow | null = null;
   let draggedIndex = $state<number | null>(null);
   let dragOverIndex = $state<number | null>(null);
-  let pointerDragArmed = false;
-  let pointerDragStartX = 0;
-  let pointerDragStartY = 0;
 
   /** The rows a drag from `row` carries: the whole selection when `row` is part of it, in table
    * order, so songs dropped on the Queue or a playlist arrive in the order shown. (A reorder,
@@ -360,89 +353,53 @@
     onReorder?.(draggedIndex, targetIndex, keys);
   }
 
-  // Set when a drag ends, so the click that follows the release (sent to the pressed row, which
-  // holds pointer capture) doesn't also change the selection. The next press clears it, so a
-  // release that produces no click can't swallow a later one.
-  let swallowNextRowClick = false;
-
-  function handleRowPointerDown(e: PointerEvent, row: SongTableRow) {
-    swallowNextRowClick = false;
-    if (!row.song || row.disabled) return;
-    const target = e.target as HTMLElement;
-    if (target.closest("button, a, input, select, textarea, [data-interactive]")) return;
-    if (e.button !== 0) return;
-    pressedRow = row;
-    pointerDragArmed = false;
-    pointerDragStartX = e.clientX;
-    pointerDragStartY = e.clientY;
-    // With the window's dragDropEnabled option on, WebView2 can hijack an in-progress mouse
-    // gesture into a native OS drag once it crosses the platform's drag threshold, silently
-    // stopping pointermove/pointerup from reaching the DOM. Explicit pointer capture pins
-    // subsequent events to this element (and this JS event loop) instead, preventing that.
-    // The row's own click/dblclick handlers live on this same element, so capture doesn't
-    // retarget them.
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-    window.addEventListener("pointermove", handlePointerDragMove);
-    window.addEventListener("pointerup", handlePointerDragUp);
-    window.addEventListener("pointercancel", handlePointerDragCancel);
-  }
-
-  function handlePointerDragMove(e: PointerEvent) {
-    if (!pressedRow) return;
-    const pos = { x: e.clientX, y: e.clientY };
-    if (!pointerDragArmed) {
-      if (Math.hypot(pos.x - pointerDragStartX, pos.y - pointerDragStartY) < POINTER_DRAG_THRESHOLD_PX) return;
-      pointerDragArmed = true;
-      const songs = draggedRowsFor(pressedRow).flatMap((r) => (r.song && !r.disabled ? [r.song] : []));
-      songDrag.start(songsPayload(songs, dragSourcePlaylistId), pos);
-      if (onReorder && pressedRow.underlyingIndex !== undefined) draggedIndex = pressedRow.underlyingIndex;
-    }
-    songDrag.move(pos);
-    if (draggedIndex === null || songDrag.dropTarget) {
-      dragOverIndex = null;
-      return;
-    }
-    const el = document.elementFromPoint(pos.x, pos.y)?.closest("[data-song-row]") as HTMLElement | null;
-    const idx = el?.dataset.index;
-    dragOverIndex = idx !== undefined ? Number(idx) : null;
-  }
-
-  function stopListening() {
-    window.removeEventListener("pointermove", handlePointerDragMove);
-    window.removeEventListener("pointerup", handlePointerDragUp);
-    window.removeEventListener("pointercancel", handlePointerDragCancel);
-  }
+  let rowDrag: PointerDragHandle | null = null;
 
   function resetDrag() {
     pressedRow = null;
     draggedIndex = null;
     dragOverIndex = null;
-    pointerDragArmed = false;
+    rowDrag = null;
   }
 
-  async function handlePointerDragUp(e: PointerEvent) {
-    stopListening();
-    if (!pointerDragArmed) {
-      resetDrag();
-      return;
-    }
-    swallowNextRowClick = true;
-    const reorderTo = dragOverIndex;
-    const droppedOnTarget = await songDrag.drop({ x: e.clientX, y: e.clientY });
-    if (!droppedOnTarget && reorderTo !== null) commitReorder(reorderTo);
-    resetDrag();
+  // The row's own click/dblclick handlers live on the element that takes pointer capture, so the
+  // helper's default capture-on-press doesn't retarget them.
+  function handleRowPointerDown(e: PointerEvent, row: SongTableRow) {
+    if (!row.song || row.disabled) return;
+    pressedRow = row;
+    rowDrag = startPointerDrag(e, {
+      onTap: resetDrag,
+      onArm: (pos) => {
+        const songs = draggedRowsFor(row).flatMap((r) => (r.song && !r.disabled ? [r.song] : []));
+        songDrag.start(songsPayload(songs, dragSourcePlaylistId), pos);
+        if (onReorder && row.underlyingIndex !== undefined) draggedIndex = row.underlyingIndex;
+      },
+      onMove: (pos) => {
+        songDrag.move(pos);
+        if (draggedIndex === null || songDrag.dropTarget) {
+          dragOverIndex = null;
+          return;
+        }
+        const el = document.elementFromPoint(pos.x, pos.y)?.closest("[data-song-row]") as HTMLElement | null;
+        const idx = el?.dataset.index;
+        dragOverIndex = idx !== undefined ? Number(idx) : null;
+      },
+      onDrop: async (pos) => {
+        const reorderTo = dragOverIndex;
+        const droppedOnTarget = await songDrag.drop(pos);
+        if (!droppedOnTarget && reorderTo !== null) commitReorder(reorderTo);
+        resetDrag();
+      },
+      onCancel: (wasArmed) => {
+        if (wasArmed) songDrag.end();
+        resetDrag();
+      }
+    });
+    // An ignored press (button, link, non-primary click) is not ours to track.
+    if (!rowDrag) pressedRow = null;
   }
 
-  function handlePointerDragCancel() {
-    stopListening();
-    if (pointerDragArmed) songDrag.end();
-    resetDrag();
-  }
-
-  $effect(() => () => {
-    stopListening();
-    if (pointerDragArmed) songDrag.end();
-  });
+  $effect(() => () => rowDrag?.cancel());
 
   async function handleSetLoved(song: Song, loved: number) {
     if (onSetLoved) {

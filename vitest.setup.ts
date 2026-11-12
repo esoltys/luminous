@@ -1,6 +1,10 @@
 import "@testing-library/jest-dom";
 import type { TestingLibraryMatchers } from "@testing-library/jest-dom/matchers";
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
+import { clearPendingClickSwallow } from "./src/lib/utils/pointerDrag";
+
+// A drag test leaves the helper's one-shot click guard armed (no real press follows to retract it).
+afterEach(clearPendingClickSwallow);
 
 // jest-dom 7.0.1 augments Vitest's pre-5 `Assertion<T>`, which no longer merges with
 // Vitest 5's `Assertion<R, T>`, so its matchers vanish from the types (they still work at

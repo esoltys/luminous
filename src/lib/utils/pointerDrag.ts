@@ -75,6 +75,15 @@ function swallowNextClick() {
 }
 
 /**
+ * Drops a pending click guard. In the app the next press or key press does this; tests that drag
+ * and then dispatch a bare `click` (no press) would otherwise see that click swallowed, so the
+ * suite's setup calls this after every test.
+ */
+export function clearPendingClickSwallow() {
+  retractClickGuard?.();
+}
+
+/**
  * Starts tracking a pointer gesture from a `pointerdown` event. Returns `null` when the press is
  * ignored (non-primary button, or inside an interactive descendant); otherwise a handle whose
  * `cancel()` the owner calls on teardown.
