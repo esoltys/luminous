@@ -13,6 +13,8 @@
     size?: "sm" | "md";
     /** If true, strictly render stars (albums don't have a love flag). */
     isAlbum?: boolean;
+    /** Hide the stars while unrated until the surrounding `group` is hovered or focused (see StarRating). */
+    revealOnInteract?: boolean;
   }
 
   let {
@@ -22,6 +24,7 @@
     onSetLoved,
     size = "sm",
     isAlbum = false,
+    revealOnInteract = false,
   }: Props = $props();
 
   let showStars = $derived(
@@ -58,7 +61,7 @@
       onSetLoved={handleHeartSetLoved}
       sizeClass={size === "md" ? "w-5 h-5" : "w-4 h-4"}
     />
-    <StarRating {rating} {onRate} {size} />
+    <StarRating {rating} {onRate} {size} {revealOnInteract} />
   </div>
 {:else if showHeart}
   <HeartToggle
@@ -69,5 +72,5 @@
     sizeClass={size === "md" ? "w-5 h-5" : "w-4 h-4"}
   />
 {:else}
-  <StarRating {rating} {onRate} {size} />
+  <StarRating {rating} {onRate} {size} {revealOnInteract} />
 {/if}

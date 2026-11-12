@@ -127,7 +127,13 @@
         {album.artist || i18n.t("collection.variousArtists")}
       </p>
       <span class="shrink-0" onclick={(e) => e.stopPropagation()}
-        ><SongRating isAlbum rating={currentRating} onRate={rateAlbum} size="sm" /></span
+        ><SongRating
+          isAlbum
+          revealOnInteract
+          rating={currentRating}
+          onRate={rateAlbum}
+          size="sm"
+        /></span
       >
     </div>
   </div>

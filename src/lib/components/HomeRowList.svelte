@@ -233,6 +233,7 @@
                 {:else}
                   <SongRating
                     isAlbum
+                    revealOnInteract
                     rating={item.album.rating}
                     onRate={(r) => rateAlbum(item.album, r)}
                     size="sm"

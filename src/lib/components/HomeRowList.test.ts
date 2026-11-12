@@ -97,6 +97,14 @@ describe("HomeRowList.svelte", () => {
     expect(container.querySelector('[role="group"][aria-label="Rating"]')).toBeInTheDocument();
   });
 
+  it("keeps the unrated rating control inside a hover/focus `group` so it can be revealed", () => {
+    const items: HomeItem[] = [{ type: "album", album: makeAlbum() }];
+    const { container } = render(HomeRowList, { props: { items, variant: "rank" } });
+    const control = container.querySelector('[role="group"][aria-label="Rating"]')!;
+    expect(control).toHaveClass("opacity-0");
+    expect(control.closest(".group")).not.toBeNull();
+  });
+
   it("omits the year when the album has none", () => {
     const items: HomeItem[] = [{ type: "album", album: makeAlbum({ year: null }) }];
     const { getByText, queryByText } = render(HomeRowList, { props: { items, variant: "rank" } });

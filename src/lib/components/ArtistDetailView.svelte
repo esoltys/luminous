@@ -1062,6 +1062,7 @@
     y={albumContextMenuState.y}
     albumName={album.album || i18n.t("collection.unknownAlbum")}
     artistName={album.artist || artistName}
+    rating={album.album ? album.rating : undefined}
     onPlay={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
       const playable = songs.filter((s) => !s.not_included);

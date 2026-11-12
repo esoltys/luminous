@@ -29,6 +29,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import ShareModal from "./ShareModal.svelte";
+  import StarRating from "./StarRating.svelte";
   import ViewInFilesItem from "./ViewInFilesItem.svelte";
   import AddToDeviceMenuItem from "./AddToDeviceMenuItem.svelte";
   import AddToPlaylistSubmenu from "./AddToPlaylistSubmenu.svelte";
@@ -39,6 +40,7 @@
     albumName,
     albumKey,
     artistName,
+    rating,
     onPlay,
     onAddToQueue,
     onAddToPlaylist,
@@ -52,6 +54,13 @@
     albumName: string;
     albumKey?: string;
     artistName?: string;
+    /**
+     * The album's current rating (-1 = unrated). Omit to leave the rating row out, e.g. when
+     * `albumName` is a placeholder rather than the real album name. The rating is written with
+     * `set_album_rating`; every view showing the album follows the backend's `album-stats-changed`
+     * event, so hosts need no callback.
+     */
+    rating?: number;
     onPlay: () => void;
     onAddToQueue?: () => void;
     onAddToPlaylist?: () => void;
@@ -60,6 +69,17 @@
     onOpenInPicard?: () => void;
     onClose: () => void;
   } = $props();
+
+  // svelte-ignore state_referenced_locally
+  let currentRating = $state(rating ?? -1);
+
+  async function handleRate(next: number) {
+    try {
+      currentRating = await invoke<number>("set_album_rating", { album: albumName, rating: next });
+    } catch (err) {
+      console.error("Failed to rate album:", err);
+    }
+  }
 
   let showShareModal = $state(false);
   // The Share item deliberately keeps this component mounted (no onClose())
@@ -169,6 +189,14 @@
     >
       {albumName || i18n.t("collection.unknownAlbum")}
     </div>
+
+    {#if albumName && rating !== undefined}
+      <div class="px-3 py-1.5 flex items-center gap-2.5" role="menuitem" tabindex="-1">
+        <span class="text-brand-text-secondary">{i18n.t("rating.label")}</span>
+        <StarRating rating={currentRating} onRate={handleRate} size="md" />
+      </div>
+      <ContextMenuDivider />
+    {/if}
 
     <ContextMenuItem
       icon={Play}

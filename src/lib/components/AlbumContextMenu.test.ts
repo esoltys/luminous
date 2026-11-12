@@ -56,3 +56,40 @@ describe("AlbumContextMenu.svelte - View in Files", () => {
     expect(screen.queryByText("View in Files")).not.toBeInTheDocument();
   });
 });
+
+describe("AlbumContextMenu.svelte - rating", () => {
+  const baseProps = { x: 0, y: 0, albumName: "Fake Nudes", onPlay: () => {}, onClose: () => {} };
+
+  it("rates the album through set_album_rating and keeps the menu open", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === "set_album_rating" ? 4 : null,
+    );
+    const onClose = vi.fn();
+    render(AlbumContextMenu, { ...baseProps, rating: -1, onClose });
+    expect(await screen.findByText("Rating")).toBeInTheDocument();
+
+    await fireEvent.click(await screen.findByLabelText("Rate 4 of 5"));
+
+    expect(invoke).toHaveBeenCalledWith("set_album_rating", { album: "Fake Nudes", rating: 4 });
+    expect(onClose).not.toHaveBeenCalled();
+    // The row now shows the normalized rating, so the clear button becomes available.
+    await waitFor(() => expect(screen.getByLabelText("Clear rating")).not.toBeDisabled());
+  });
+
+  it("clears an existing rating", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === "set_album_rating" ? -1 : null,
+    );
+    render(AlbumContextMenu, { ...baseProps, rating: 3 });
+
+    await fireEvent.click(await screen.findByLabelText("Clear rating"));
+
+    expect(invoke).toHaveBeenCalledWith("set_album_rating", { album: "Fake Nudes", rating: -1 });
+  });
+
+  it("leaves the rating row out when the host passes no rating", async () => {
+    render(AlbumContextMenu, baseProps);
+    await screen.findByText("Fake Nudes");
+    expect(screen.queryByLabelText("Rate 4 of 5")).not.toBeInTheDocument();
+  });
+});

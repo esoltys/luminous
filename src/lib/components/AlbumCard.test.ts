@@ -37,6 +37,13 @@ describe("AlbumCard.svelte", () => {
     expect(getByText("Alternative")).toBeInTheDocument();
   });
 
+  it("keeps the unrated rating control inside a hover/focus `group` so it can be revealed", () => {
+    const { container } = render(AlbumCard, { props: { album: mockAlbum } });
+    const control = container.querySelector('[role="group"][aria-label="Rating"]')!;
+    expect(control).toHaveClass("opacity-0");
+    expect(control.closest(".group")).not.toBeNull();
+  });
+
   it("rates the album via the rating widget without navigating to it", async () => {
     vi.mocked(invoke).mockResolvedValueOnce(4);
     const viewAlbumSpy = vi.spyOn(navigationStore, "viewAlbum");

@@ -1,3 +1,4 @@
+import "@testing-library/jest-dom";
 import { describe, it, expect, vi } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import StarRating from "./StarRating.svelte";
@@ -60,5 +61,49 @@ describe("StarRating", () => {
   it("shows no fill when unrated", () => {
     const { container } = render(StarRating, { rating: -1 });
     expect(container.querySelectorAll("span.absolute")).toHaveLength(0);
+  });
+
+  describe("revealOnInteract", () => {
+    // jsdom applies no Tailwind CSS, so assert on the classes that hide and reveal the control.
+    const group = (container: HTMLElement) => container.querySelector('[role="group"]')!;
+
+    it("hides an unrated control until the surrounding group is hovered or focused", () => {
+      const { container } = render(StarRating, {
+        rating: -1,
+        onRate: vi.fn(),
+        revealOnInteract: true,
+      });
+      expect(group(container)).toHaveClass(
+        "opacity-0",
+        "group-hover:opacity-40",
+        "group-focus-within:opacity-40",
+        "focus-within:opacity-40",
+      );
+    });
+
+    it("keeps the stars in the tab order while hidden", () => {
+      const { getAllByRole } = render(StarRating, {
+        rating: -1,
+        onRate: vi.fn(),
+        revealOnInteract: true,
+      });
+      const stars = getAllByRole("button").filter((b) => !b.hasAttribute("disabled"));
+      expect(stars).toHaveLength(5);
+    });
+
+    it("always shows a rated control", () => {
+      const { container } = render(StarRating, {
+        rating: 3,
+        onRate: vi.fn(),
+        revealOnInteract: true,
+      });
+      expect(group(container)).not.toHaveClass("opacity-0");
+    });
+
+    it("is unchanged without the prop", () => {
+      const { container } = render(StarRating, { rating: -1, onRate: vi.fn() });
+      expect(group(container)).not.toHaveClass("opacity-0");
+      expect(group(container)).toHaveClass("opacity-40");
+    });
   });
 });
