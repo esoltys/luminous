@@ -1199,6 +1199,23 @@ impl CollectionScanner {
                 ScanEvent::Incident(incident, ids) => on_incident(incident, ids),
             }
         }
+        let pending = match task.await.context("library scan task panicked")?? {
+            LocalScan::Finished(report) => return Ok(report),
+            LocalScan::Pending(pending) => pending,
+        };
+        let mut report = self.finish_scan(pending, silent, &mut on_progress).await;
+        report.total_ms = scan_started.elapsed().as_millis();
+        Ok(report)
+    }
+
+    /// The async tail of a scan: remote cover lookups for albums the blocking
+    /// pass found no local art for, the covers-cache sweep, and `Done`.
+    async fn finish_scan(
+        &self,
+        pending: PendingScan,
+        silent: bool,
+        on_progress: &mut impl FnMut(ScanProgress),
+    ) -> ScanReport {
         let PendingScan {
             mut report,
             cover_manager,
@@ -1207,18 +1224,12 @@ impl CollectionScanner {
             total,
             total_updating_items,
             default_dir_context,
-        } = match task.await.context("library scan task panicked")?? {
-            LocalScan::Finished(report) => return Ok(report),
-            LocalScan::Pending(pending) => pending,
-        };
+        } = pending;
 
-        // Last resort for albums with no local art: the remote lookup. Limited
-        // to `REMOTE_ART_FETCH_LIMIT` per scan to avoid long scans and rate
-        // limits (the blocking pass collects at most that many). Progress
-        // keeps the counter at `total` so the bar never moves backwards.
-        let mut remote_fetch_count = 0;
+        // Progress keeps the counter at `total` so the bar never moves
+        // backwards; only the label changes.
+        report.remote_art_fetches = remote_candidates.len();
         for candidate in remote_candidates {
-            remote_fetch_count += 1;
             on_progress(ScanProgress {
                 phase: ScanPhase::ResolvingArtwork,
                 scanned: total_updating_items,
@@ -1232,17 +1243,16 @@ impl CollectionScanner {
             tokio::time::sleep(std::time::Duration::from_millis(150)).await;
 
             if let Ok(Some(filename)) = cover_manager.fetch_remote_cover(candidate.song_id).await {
-                if let Ok(conn) = self.db.pool.get() {
-                    let _ = conn.execute(
-                        "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND (album_key = ?3 OR album_key = ?4)",
-                        params![filename, candidate.effective_artist, candidate.comp_key, candidate.raw_key],
-                    );
-                }
+                self.set_album_art_automatic(
+                    &filename,
+                    &candidate.effective_artist,
+                    &candidate.comp_key,
+                    &candidate.raw_key,
+                );
             }
         }
 
         report.artwork_albums = total_updating_items as usize;
-        report.remote_art_fetches = remote_fetch_count;
         report.artwork_ms = artwork_started.elapsed().as_millis();
 
         // Prune orphaned covers-cache files and shrink ones cached at full
@@ -1276,8 +1286,18 @@ impl CollectionScanner {
             external_changes: report.external_changes,
         });
 
-        report.total_ms = scan_started.elapsed().as_millis();
-        Ok(report)
+        report
+    }
+
+    /// Points every song of an album at an automatically resolved cover (a
+    /// best-effort write: a failure just leaves the album without art).
+    fn set_album_art_automatic(&self, art: &str, artist: &str, comp_key: &str, raw_key: &str) {
+        if let Ok(conn) = self.db.pool.get() {
+            let _ = conn.execute(
+                "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND (album_key = ?3 OR album_key = ?4)",
+                params![art, artist, comp_key, raw_key],
+            );
+        }
     }
 
     /// The synchronous part of a scan, run on a blocking thread by
@@ -1753,12 +1773,12 @@ impl CollectionScanner {
             let raw_key = crate::album_key::album_key(&album);
             let try_folder_art = || {
                 let folder_art_path = cover_manager.scan_folder_art(path)?;
-                if let Ok(conn) = self.db.pool.get() {
-                    let _ = conn.execute(
-                        "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND (album_key = ?3 OR album_key = ?4)",
-                        params![folder_art_path.to_string_lossy(), effective_artist, comp_key, raw_key],
-                    );
-                }
+                self.set_album_art_automatic(
+                    &folder_art_path.to_string_lossy(),
+                    &effective_artist,
+                    &comp_key,
+                    &raw_key,
+                );
                 Some(())
             };
 
@@ -1770,12 +1790,12 @@ impl CollectionScanner {
                 if let Ok(Some(cached_filename)) =
                     cover_manager.extract_embedded_art(path, &effective_artist, &album)
                 {
-                    if let Ok(conn) = self.db.pool.get() {
-                        let _ = conn.execute(
-                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND (album_key = ?3 OR album_key = ?4)",
-                            params![cached_filename, effective_artist, comp_key, raw_key],
-                        );
-                    }
+                    self.set_album_art_automatic(
+                        &cached_filename,
+                        &effective_artist,
+                        &comp_key,
+                        &raw_key,
+                    );
                     resolved = true;
                 }
             }
