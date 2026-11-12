@@ -469,8 +469,8 @@ export const it = {
     },
     suggestAdd: "Aggiungi alla libreria",
     suggestAddNamed: "Aggiungi {folder} alla tua libreria",
-    suggestNotNow: "Non ora",
-    suggestNotNowNamed: "Non ora per {folder}",
+    suggestIgnore: "Ignora cartella",
+    suggestIgnoreNamed: "Ignora {folder}",
     suggestHide: "Nascondi i suggerimenti",
   },
   emptyLibrary: {

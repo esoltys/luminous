@@ -129,7 +129,7 @@ pub fn suggested_folders(
         .collect())
 }
 
-/// "Not now": never offer `path` again.
+/// "Ignore folder": never offer `path` again.
 pub fn dismiss_folder(conn: &rusqlite::Connection, path: &str) -> Result<()> {
     let key = folder_key(Path::new(path));
     let mut dismissed = dismissed_keys(conn)?;
@@ -146,7 +146,7 @@ pub fn is_hidden(conn: &rusqlite::Connection) -> Result<bool> {
     Ok(read_setting(conn, HIDDEN_KEY)?.as_deref() == Some("true"))
 }
 
-/// Turn suggestions off (`true`) or back on (`false`). Per-folder "Not now"
+/// Turn suggestions off (`true`) or back on (`false`). Per-folder "Ignore folder"
 /// dismissals are left alone, so folders the user declined stay declined.
 pub fn set_hidden(conn: &rusqlite::Connection, hidden: bool) -> Result<()> {
     write_setting(conn, HIDDEN_KEY, if hidden { "true" } else { "false" })

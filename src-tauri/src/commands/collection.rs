@@ -107,7 +107,7 @@ pub async fn get_suggested_library_folders(
     .map_err(|e| e.to_string())
 }
 
-/// "Not now" on one suggested folder. Emits `library-folder-suggestions-changed`
+/// "Ignore folder" on one suggested folder. Emits `library-folder-suggestions-changed`
 /// so every open surface refetches instead of assuming the write landed.
 #[tauri::command]
 pub async fn dismiss_library_folder_suggestion(
@@ -136,7 +136,7 @@ pub async fn get_library_folder_suggestions_hidden(
 
 /// Turn folder suggestions off ("Hide suggestions") or back on (Settings).
 /// Emits `library-folder-suggestions-changed` so the Home card and the
-/// Settings row refetch. Per-folder "Not now" dismissals are untouched.
+/// Settings row refetch. Per-folder "Ignore folder" dismissals are untouched.
 #[tauri::command]
 pub async fn set_library_folder_suggestions_hidden(
     app: AppHandle,

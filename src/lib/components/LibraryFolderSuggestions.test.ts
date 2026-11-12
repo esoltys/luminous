@@ -80,7 +80,7 @@ describe("LibraryFolderSuggestions.svelte", () => {
     mockFolders = [MUSIC, PODCASTS];
     render(LibraryFolderSuggestions);
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Not now for Jazz" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Ignore Jazz" }));
     expect(invoke).toHaveBeenCalledWith("dismiss_library_folder_suggestion", {
       path: "E:\\Music\\Jazz",
     });

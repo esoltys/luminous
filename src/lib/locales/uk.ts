@@ -531,8 +531,8 @@ export const uk = {
     },
     suggestAdd: "Додати до медіатеки",
     suggestAddNamed: "Додати {folder} до медіатеки",
-    suggestNotNow: "Не зараз",
-    suggestNotNowNamed: "Не зараз для {folder}",
+    suggestIgnore: "Ігнорувати папку",
+    suggestIgnoreNamed: "Ігнорувати {folder}",
     suggestHide: "Сховати пропозиції",
   },
   emptyLibrary: {

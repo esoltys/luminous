@@ -474,8 +474,8 @@ export const de = {
     },
     suggestAdd: "Zur Mediathek hinzufügen",
     suggestAddNamed: "{folder} zu deiner Mediathek hinzufügen",
-    suggestNotNow: "Nicht jetzt",
-    suggestNotNowNamed: "Nicht jetzt für {folder}",
+    suggestIgnore: "Ordner ignorieren",
+    suggestIgnoreNamed: "{folder} ignorieren",
     suggestHide: "Vorschläge ausblenden",
   },
   emptyLibrary: {

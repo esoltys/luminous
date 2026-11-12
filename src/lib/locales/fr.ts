@@ -479,8 +479,8 @@ export const fr: DeepStringRecord<typeof en> = {
     },
     suggestAdd: "Ajouter à la bibliothèque",
     suggestAddNamed: "Ajouter {folder} à votre bibliothèque",
-    suggestNotNow: "Pas maintenant",
-    suggestNotNowNamed: "Pas maintenant pour {folder}",
+    suggestIgnore: "Ignorer le dossier",
+    suggestIgnoreNamed: "Ignorer {folder}",
     suggestHide: "Masquer les suggestions",
   },
   emptyLibrary: {

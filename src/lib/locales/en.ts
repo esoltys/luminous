@@ -459,8 +459,8 @@ export const en = {
     },
     suggestAdd: "Add to Library",
     suggestAddNamed: "Add {folder} to your library",
-    suggestNotNow: "Not now",
-    suggestNotNowNamed: "Not now for {folder}",
+    suggestIgnore: "Ignore folder",
+    suggestIgnoreNamed: "Ignore {folder}",
     suggestHide: "Hide suggestions",
   },
   emptyLibrary: {
