@@ -216,9 +216,21 @@
   </span>
 {/snippet}
 
-{#snippet movementSnippet(item: StatsTopItem, rank: number)}
+{#snippet movementSnippet(item: StatsTopItem, rank: number, alignedColumn: boolean = false)}
   {@const label = movementLabel(item, rank)}
-  {#if label}
+  <!-- alignedColumn reserves one fixed width for every row, empty for steady albums, so the
+       years beside it line up whatever the message says. The width fits the longest message
+       in any locale at this size; longer text is cut short and still readable in the tooltip. -->
+  {#if alignedColumn}
+    <span
+      class="block w-36 shrink-0 truncate text-xs leading-5 font-medium text-brand-text-secondary"
+      title={label
+        ? `${label} · ${i18n.plural("home.chartWeeksCount", item.weeks_on_chart ?? 1)}`
+        : undefined}
+    >
+      {label ?? ""}
+    </span>
+  {:else if label}
     <span
       class="shrink-0 text-xs leading-5 font-medium text-brand-text-secondary whitespace-nowrap"
       title={i18n.plural("home.chartWeeksCount", item.weeks_on_chart ?? 1)}
@@ -310,7 +322,7 @@
             <!-- Rendered on the row's year line, so the word shares the year's baseline whatever
                  height the row's rating slot gives the text column. -->
             {#snippet movementNote()}
-              {@render movementSnippet(item, i + 1)}
+              {@render movementSnippet(item, i + 1, true)}
             {/snippet}
             <AlbumRowCard
               album={albumItem}
