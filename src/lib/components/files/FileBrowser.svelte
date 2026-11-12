@@ -5,6 +5,7 @@
   import { FolderIcon, CaretRightIcon, ArrowClockwiseIcon } from "phosphor-svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import { formatFileSize } from "../../utils/formatters";
+  import { startPointerDrag, type PointerDragHandle } from "../../utils/pointerDrag";
   import type { DirListing, FileEntry, FileEntryStatus, FileMenuTarget, FileSource } from "../../types";
   import Button from "../Button.svelte";
   import AlphabetScrubber from "../AlphabetScrubber.svelte";
@@ -500,114 +501,30 @@
     select(name);
   }
 
-  const CLICK_VS_DRAG_THRESHOLD_PX = 4;
-  let pointerDragArmed = false;
-  let pointerDragStartX = 0;
-  let pointerDragStartY = 0;
-  let pointerDragEntry: FileEntry | null = null;
-  let capturedEl: HTMLElement | null = null;
-  let capturedPointerId: number | null = null;
-  let wasDragged = false;
-  let wasDraggedTimer: ReturnType<typeof setTimeout> | undefined;
+  let fileDrag: PointerDragHandle | null = null;
 
+  // A file row's click lives on the row itself, which takes the helper's capture-on-press.
   function handleRowPointerDown(e: PointerEvent, entry: FileEntry) {
-    if (entry.isDir || e.button !== 0) return;
-    const target = e.target as HTMLElement;
-    if (target.closest("button, a, input, select, textarea, [data-interactive]")) return;
-
-    pointerDragArmed = false;
-    wasDragged = false;
-    pointerDragStartX = e.clientX;
-    pointerDragStartY = e.clientY;
-    pointerDragEntry = entry;
-    capturedEl = e.currentTarget as HTMLElement;
-    capturedPointerId = e.pointerId;
-
-    try {
-      capturedEl.setPointerCapture(e.pointerId);
-    } catch {
-      // Ignored in headless/test environments where setPointerCapture may not be defined
-    }
-
-    window.addEventListener("pointermove", handlePointerDragMove);
-    window.addEventListener("pointerup", handlePointerDragUp);
-    window.addEventListener("pointercancel", handlePointerDragCancel);
-  }
-
-  function handlePointerDragMove(e: PointerEvent) {
-    if (!pointerDragEntry) return;
-
-    if (!pointerDragArmed) {
-      const dx = e.clientX - pointerDragStartX;
-      const dy = e.clientY - pointerDragStartY;
-      if (Math.hypot(dx, dy) < CLICK_VS_DRAG_THRESHOLD_PX) return;
-      pointerDragArmed = true;
-
-      const dragged = selection.includes(pointerDragEntry.name)
-        ? sortedEntries.filter((ent) => !ent.isDir && selection.includes(ent.name))
-        : [pointerDragEntry];
-      if (!selection.includes(pointerDragEntry.name)) {
-        select(pointerDragEntry.name);
+    if (entry.isDir) return;
+    fileDrag = startPointerDrag(e, {
+      onArm: (pos) => {
+        const dragged = selection.includes(entry.name)
+          ? sortedEntries.filter((ent) => !ent.isDir && selection.includes(ent.name))
+          : [entry];
+        if (!selection.includes(entry.name)) select(entry.name);
+        songDrag.start(filesPayload(dragged), pos);
+      },
+      onMove: (pos) => songDrag.move(pos),
+      onDrop: async (pos) => {
+        await songDrag.drop(pos);
+      },
+      onCancel: (wasArmed) => {
+        if (wasArmed) songDrag.end();
       }
-      songDrag.start(filesPayload(dragged), { x: e.clientX, y: e.clientY });
-    }
-
-    songDrag.move({ x: e.clientX, y: e.clientY });
+    });
   }
 
-  async function handlePointerDragUp(e?: PointerEvent) {
-    window.removeEventListener("pointermove", handlePointerDragMove);
-    window.removeEventListener("pointerup", handlePointerDragUp);
-    window.removeEventListener("pointercancel", handlePointerDragCancel);
-
-    try {
-      if (capturedEl && capturedPointerId !== null) {
-        capturedEl.releasePointerCapture(capturedPointerId);
-      }
-    } catch {}
-    capturedEl = null;
-    capturedPointerId = null;
-
-    if (pointerDragArmed) {
-      wasDragged = true;
-      clearTimeout(wasDraggedTimer);
-      wasDraggedTimer = setTimeout(() => {
-        wasDragged = false;
-      }, 100);
-
-      await songDrag.drop(e ? { x: e.clientX, y: e.clientY } : undefined);
-    }
-
-    pointerDragArmed = false;
-    pointerDragEntry = null;
-  }
-
-  function handlePointerDragCancel() {
-    window.removeEventListener("pointermove", handlePointerDragMove);
-    window.removeEventListener("pointerup", handlePointerDragUp);
-    window.removeEventListener("pointercancel", handlePointerDragCancel);
-
-    try {
-      if (capturedEl && capturedPointerId !== null) {
-        capturedEl.releasePointerCapture(capturedPointerId);
-      }
-    } catch {}
-    capturedEl = null;
-    capturedPointerId = null;
-
-    if (pointerDragArmed) {
-      songDrag.end();
-    }
-    pointerDragArmed = false;
-    pointerDragEntry = null;
-  }
-
-  $effect(() => () => {
-    window.removeEventListener("pointermove", handlePointerDragMove);
-    window.removeEventListener("pointerup", handlePointerDragUp);
-    window.removeEventListener("pointercancel", handlePointerDragCancel);
-    clearTimeout(wasDraggedTimer);
-  });
+  $effect(() => () => fileDrag?.cancel());
 
   /** A right-click on a folder acts on it alone; on a file, on the selection it belongs to. */
   function openMenu(event: MouseEvent, entry: FileEntry) {
@@ -785,10 +702,6 @@
                     tabindex="-1"
                     onpointerdown={(e) => handleRowPointerDown(e, entry)}
                     onclick={(e) => {
-                      if (wasDragged) {
-                        wasDragged = false;
-                        return;
-                      }
                       if (entry.isDir) openFolder(dir, entry.name);
                       else clickFile(e, entry.name);
                     }}

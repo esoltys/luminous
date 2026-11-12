@@ -17,6 +17,7 @@
     queueAutoPlaylistAsPlaylist,
   } from "../utils/playlist";
   import { autoPlaylistLabel } from "../utils/pinnedNav";
+  import { startPointerDrag } from "../utils/pointerDrag";
 
   interface Props {
     collapsed?: boolean;
@@ -24,92 +25,40 @@
 
   let { collapsed = false }: Props = $props();
 
-  const POINTER_DRAG_THRESHOLD_PX = 4;
-
   let draggedIndex = $state<number | null>(null);
   let dragOverIndex = $state<number | null>(null);
-  let pointerDragArmed = false;
-  let pointerDragStartX = 0;
-  let pointerDragStartY = 0;
-  let wasDragged = false;
 
   let contextMenuState = $state<{ x: number; y: number; item: PinnedItem } | null>(null);
 
+  function resetDrag() {
+    draggedIndex = null;
+    dragOverIndex = null;
+  }
+
   function handlePointerDown(e: PointerEvent, index: number) {
-    if (e.button !== 0) return;
-    const target = e.target as HTMLElement;
-    if (target.closest("button, a, input, select, textarea, [data-interactive]")) return;
-
-    pointerDragArmed = false;
-    wasDragged = false;
-    pointerDragStartX = e.clientX;
-    pointerDragStartY = e.clientY;
-    draggedIndex = index;
-
-    // Immediately capture pointer so WebView2 doesn't hijack into a native OS drag gesture
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-    window.addEventListener("pointercancel", handlePointerCancel);
-  }
-
-  function handlePointerMove(e: PointerEvent) {
-    if (draggedIndex === null) return;
-
-    if (!pointerDragArmed) {
-      const dx = e.clientX - pointerDragStartX;
-      const dy = e.clientY - pointerDragStartY;
-      if (Math.hypot(dx, dy) < POINTER_DRAG_THRESHOLD_PX) return;
-      pointerDragArmed = true;
-    }
-
-    const listEl = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-pinned-nav-list]");
-    if (!listEl) {
-      dragOverIndex = null;
-      return;
-    }
-
-    const rowEl = document
-      .elementFromPoint(e.clientX, e.clientY)
-      ?.closest("[data-pinned-nav-index]") as HTMLElement | null;
-    const idx = rowEl?.dataset.pinnedNavIndex;
-    if (idx !== undefined) {
-      dragOverIndex = Number(idx);
-    }
-  }
-
-  async function handlePointerUp() {
-    window.removeEventListener("pointermove", handlePointerMove);
-    window.removeEventListener("pointerup", handlePointerUp);
-    window.removeEventListener("pointercancel", handlePointerCancel);
-
-    if (pointerDragArmed) {
-      wasDragged = true;
-      if (dragOverIndex !== null && draggedIndex !== null && dragOverIndex !== draggedIndex) {
-        await pinnedStore.reorderVisible(draggedIndex, dragOverIndex);
-      }
-    }
-
-    draggedIndex = null;
-    dragOverIndex = null;
-    pointerDragArmed = false;
-  }
-
-  function handlePointerCancel() {
-    window.removeEventListener("pointermove", handlePointerMove);
-    window.removeEventListener("pointerup", handlePointerUp);
-    window.removeEventListener("pointercancel", handlePointerCancel);
-    draggedIndex = null;
-    dragOverIndex = null;
-    pointerDragArmed = false;
+    const handle = startPointerDrag(e, {
+      onMove: (pos) => {
+        const hit = document.elementFromPoint(pos.x, pos.y);
+        if (!hit?.closest("[data-pinned-nav-list]")) {
+          dragOverIndex = null;
+          return;
+        }
+        const idx = (hit.closest("[data-pinned-nav-index]") as HTMLElement | null)?.dataset.pinnedNavIndex;
+        if (idx !== undefined) dragOverIndex = Number(idx);
+      },
+      onDrop: async () => {
+        if (dragOverIndex !== null && dragOverIndex !== index) {
+          await pinnedStore.reorderVisible(index, dragOverIndex);
+        }
+        resetDrag();
+      },
+      onTap: resetDrag,
+      onCancel: resetDrag
+    });
+    if (handle) draggedIndex = index;
   }
 
   function handleRowClick(pin: NavigablePin) {
-    if (wasDragged) {
-      wasDragged = false;
-      return;
-    }
     pin.open();
   }
 
