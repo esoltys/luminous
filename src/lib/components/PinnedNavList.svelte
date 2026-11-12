@@ -6,6 +6,7 @@
   import type { PinnedItem } from "../types";
   import type { NavigablePin } from "../utils/pinnedNav";
   import PinnedNavItem from "./PinnedNavItem.svelte";
+  import { SIDEBAR_SECTION_LABEL_CLASS } from "../utils/sidebarNav";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import ArtistContextMenu from "./ArtistContextMenu.svelte";
@@ -86,9 +87,7 @@
     class="w-full flex flex-col {collapsed ? 'items-center py-1' : 'py-0.5'}"
   >
     {#if !collapsed}
-      <div
-        class="w-full px-3 pt-2.5 pb-0.5 text-xs font-medium text-brand-text-secondary/70 truncate"
-      >
+      <div class={SIDEBAR_SECTION_LABEL_CLASS}>
         {i18n.t("sidebar.pinned")}
       </div>
     {/if}

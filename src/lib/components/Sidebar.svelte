@@ -34,6 +34,7 @@
     LightningSlashIcon as LightningSlash,
   } from "phosphor-svelte";
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
+  import { SIDEBAR_SECTION_LABEL_CLASS, sidebarSubItemClass } from "../utils/sidebarNav";
 
   let { width = 256, resizing = false }: { width?: number; resizing?: boolean } = $props();
 
@@ -182,9 +183,7 @@
 <!-- Quiet section heading for the expanded sidebar: sentence case, not a button. The collapsed
      sidebar has no room for text and keeps one icon button per section instead. -->
 {#snippet sectionLabel(text: string)}
-  <div class="w-full px-3 pt-2.5 pb-0.5 text-xs font-medium text-brand-text-secondary/70 truncate">
-    {text}
-  </div>
+  <div class={SIDEBAR_SECTION_LABEL_CLASS}>{text}</div>
 {/snippet}
 
 <aside
@@ -204,7 +203,7 @@
 
     <PinnedNavList collapsed={layoutCollapsed} />
 
-    <!-- Collection/Playlists/Organize/Stats stay hidden until the library has
+    <!-- Library/Playlists/Organize/Stats stay hidden until the library has
          songs — except during the walkthrough, whose "sidebar" step
          narrates all of them, so an empty-library first-run tour would
          otherwise describe nav items the user can't see. -->
@@ -244,13 +243,12 @@
                 navigationStore.selectedArtistName = null;
                 navigationStore.selectedAlbumName = null;
               }}
-              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
-                'collection' &&
-              navigationStore.activeSubTab === 'artists' &&
-              !navigationStore.selectedArtistName &&
-              !navigationStore.selectedAlbumName
-                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
-                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+              class={sidebarSubItemClass(
+                navigationStore.activeTab === "collection" &&
+                  navigationStore.activeSubTab === "artists" &&
+                  !navigationStore.selectedArtistName &&
+                  !navigationStore.selectedAlbumName,
+              )}
             >
               <div class="flex items-center gap-2 truncate">
                 <Mic2 class="w-3.5 h-3.5 icon-align" />
@@ -265,13 +263,12 @@
                 navigationStore.selectedArtistName = null;
                 navigationStore.selectedAlbumName = null;
               }}
-              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
-                'collection' &&
-              navigationStore.activeSubTab === 'albums' &&
-              !navigationStore.selectedArtistName &&
-              !navigationStore.selectedAlbumName
-                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
-                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+              class={sidebarSubItemClass(
+                navigationStore.activeTab === "collection" &&
+                  navigationStore.activeSubTab === "albums" &&
+                  !navigationStore.selectedArtistName &&
+                  !navigationStore.selectedAlbumName,
+              )}
             >
               <div class="flex items-center gap-2 truncate">
                 <DiscAlbum class="w-3.5 h-3.5 icon-align" />
@@ -286,13 +283,12 @@
                 navigationStore.selectedArtistName = null;
                 navigationStore.selectedAlbumName = null;
               }}
-              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
-                'collection' &&
-              navigationStore.activeSubTab === 'songs' &&
-              !navigationStore.selectedArtistName &&
-              !navigationStore.selectedAlbumName
-                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
-                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+              class={sidebarSubItemClass(
+                navigationStore.activeTab === "collection" &&
+                  navigationStore.activeSubTab === "songs" &&
+                  !navigationStore.selectedArtistName &&
+                  !navigationStore.selectedAlbumName,
+              )}
             >
               <div class="flex items-center gap-2 truncate">
                 <Music class="w-3.5 h-3.5 icon-align" />
@@ -307,13 +303,12 @@
                 navigationStore.selectedArtistName = null;
                 navigationStore.selectedAlbumName = null;
               }}
-              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
-                'collection' &&
-              navigationStore.activeSubTab === 'genres' &&
-              !navigationStore.selectedArtistName &&
-              !navigationStore.selectedAlbumName
-                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
-                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+              class={sidebarSubItemClass(
+                navigationStore.activeTab === "collection" &&
+                  navigationStore.activeSubTab === "genres" &&
+                  !navigationStore.selectedArtistName &&
+                  !navigationStore.selectedAlbumName,
+              )}
             >
               <div class="flex items-center gap-2 truncate">
                 <Tag class="w-3.5 h-3.5 icon-align" />
@@ -348,13 +343,12 @@
           <div class="w-full py-0.5 space-y-0">
             <button
               onclick={() => openPlaylistsSubTab("auto")}
-              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
-                'playlists' &&
-              navigationStore.playlistsSubTab === 'auto' &&
-              !navigationStore.selectedPlaylistId &&
-              !navigationStore.selectedAutoPlaylist
-                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
-                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+              class={sidebarSubItemClass(
+                navigationStore.activeTab === "playlists" &&
+                  navigationStore.playlistsSubTab === "auto" &&
+                  !navigationStore.selectedPlaylistId &&
+                  !navigationStore.selectedAutoPlaylist,
+              )}
             >
               <div class="flex items-center gap-2 truncate">
                 <Sparkles class="w-3.5 h-3.5 icon-align" />
@@ -367,13 +361,12 @@
               data-drop-target={playlistsStore.customPlaylists.length > 0
                 ? "custom-category"
                 : undefined}
-              class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
-                'playlists' &&
-              navigationStore.playlistsSubTab === 'custom' &&
-              !navigationStore.selectedPlaylistId &&
-              !navigationStore.selectedAutoPlaylist
-                ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
-                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {dragExpandedCustom ||
+              class="{sidebarSubItemClass(
+                navigationStore.activeTab === 'playlists' &&
+                  navigationStore.playlistsSubTab === 'custom' &&
+                  !navigationStore.selectedPlaylistId &&
+                  !navigationStore.selectedAutoPlaylist,
+              )} {dragExpandedCustom ||
               (songDrag.isDragging && songDrag.dropTarget?.kind === 'custom-category')
                 ? 'ring-2 ring-brand-accent/60 bg-brand-accent/20 text-brand-text-primary font-semibold'
                 : ''}"

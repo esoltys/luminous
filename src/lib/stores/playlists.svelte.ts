@@ -33,24 +33,6 @@ export class PlaylistsStore {
   mostPlayedCount = $state(0);
   historyCount = $state(0);
 
-  /** Count of auto-playlists that currently have at least one song — used for
-   * the Auto view's count, kept in sync with the Auto grid's own filtering. */
-  visibleAutoPlaylistCount = $derived.by(() => {
-    const genreCount = this.playlists.filter(
-      (p) =>
-        p.dynamic_enabled &&
-        p.track_count > 0 &&
-        (p.dynamic_spec !== "missingmbid" || picardStore.missingPlaylistEnabled),
-    ).length;
-    return (
-      genreCount +
-      (this.favouritesCount > 0 ? 1 : 0) +
-      (this.recentlyAddedCount > 0 ? 1 : 0) +
-      (this.mostPlayedCount > 0 ? 1 : 0) +
-      (this.historyCount > 0 ? 1 : 0)
-    );
-  });
-
   /** The special pinned Queue playlist, always present and never deletable. */
   queuePlaylist = $derived.by((): Playlist | null => {
     return this.playlists.find((p) => p.is_queue) ?? null;

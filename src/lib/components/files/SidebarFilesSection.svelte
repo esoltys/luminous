@@ -11,6 +11,13 @@
   import DeviceProgressRing from "../devices/DeviceProgressRing.svelte";
   import { collectionStore } from "../../stores/collection.svelte";
   import { i18n, formatNumber } from "../../stores/i18n.svelte";
+  import {
+    SIDEBAR_ROW_IDLE_CLASS,
+    SIDEBAR_ROW_SELECTED_CLASS,
+    SIDEBAR_SECTION_LABEL_CLASS,
+    SIDEBAR_SUB_ITEM_INDENT_CLASS,
+    sidebarSubItemClass,
+  } from "../../utils/sidebarNav";
   import type { ConnectedDevice, FileSource } from "../../types";
 
   let { collapsed, showSubItems }: { collapsed: boolean; showSubItems: boolean } = $props();
@@ -94,9 +101,7 @@
     </button>
   {:else}
     <!-- A quiet section label like Library and Playlists. -->
-    <div
-      class="w-full px-3 pt-2.5 pb-0.5 text-xs font-medium text-brand-text-secondary/70 truncate"
-    >
+    <div class={SIDEBAR_SECTION_LABEL_CLASS}>
       {i18n.t("sidebar.files")}
     </div>
   {/if}
@@ -106,7 +111,7 @@
       {#if filesStore.loaded && filesStore.sources.length === 0}
         <button
           onclick={addMusicFolder}
-          class="w-full flex items-center gap-2 pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs font-semibold text-brand-accent-text hover:bg-brand-accent/10 transition-colors"
+          class="w-full flex items-center gap-2 {SIDEBAR_SUB_ITEM_INDENT_CLASS} pr-2.5 py-1 rounded-md text-xs font-semibold text-brand-accent-text hover:bg-brand-accent/10 transition-colors"
         >
           <PlusIcon class="w-3.5 h-3.5 icon-align" />
           <span class="truncate">{i18n.t("files.addMusicFolder")}</span>
@@ -116,13 +121,7 @@
         {@const Icon = sourceIcon(entry.source)}
         <button
           onclick={() => navigationStore.viewFiles(entry.source)}
-          class="w-full flex items-center pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1 rounded-md text-xs transition-colors {isOpen(
-            entry.source,
-          )
-            ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
-            : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {entry.available
-            ? ''
-            : 'opacity-60'}"
+          class="{sidebarSubItemClass(isOpen(entry.source))} {entry.available ? '' : 'opacity-60'}"
         >
           <div class="flex items-center gap-2 truncate">
             <Icon class="w-3.5 h-3.5 icon-align shrink-0" />
@@ -149,9 +148,9 @@
             data-drop-target="device"
             data-device-id={device.id}
             data-device-name={name}
-            class="flex-1 min-w-0 flex items-start gap-2 pl-[calc(var(--sidebar-icon-axis)_-_7px)] pr-2.5 py-1.5 rounded-md text-xs text-left transition-colors {open
-              ? 'bg-brand-accent text-brand-accent-contrast font-semibold shadow-lg shadow-brand-accent/20'
-              : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {songDrag.isDragging &&
+            class="flex-1 min-w-0 flex items-start gap-2 {SIDEBAR_SUB_ITEM_INDENT_CLASS} pr-2.5 py-1.5 rounded-md text-xs text-left transition-colors {open
+              ? SIDEBAR_ROW_SELECTED_CLASS
+              : SIDEBAR_ROW_IDLE_CLASS} {songDrag.isDragging &&
             songDrag.dropTarget?.kind === 'device' &&
             songDrag.dropTarget.id === device.id
               ? 'bg-brand-accent/30 ring-2 ring-brand-accent text-brand-text-primary font-semibold'
@@ -161,20 +160,26 @@
             <span class="flex-1 min-w-0 flex flex-col gap-1">
               <span class="truncate">{name}</span>
               <span
-                class="h-[3px] rounded-full bg-brand-border/50 overflow-hidden"
+                class="h-[3px] rounded-full overflow-hidden {open
+                  ? 'bg-brand-accent-contrast/30'
+                  : 'bg-brand-border/50'}"
                 aria-hidden="true"
               >
                 <span
-                  class="block h-full rounded-full {fraction === null
-                    ? 'bg-brand-text-secondary/70'
-                    : 'bg-brand-accent-text'}"
+                  class="block h-full rounded-full {open
+                    ? 'bg-brand-accent-contrast'
+                    : fraction === null
+                      ? 'bg-brand-text-secondary/70'
+                      : 'bg-brand-accent-text'}"
                   style:width="{Math.round((fraction ?? space.used) * 100)}%"
                 ></span>
               </span>
               <span
-                class="text-[10px] font-normal truncate {fraction === null
-                  ? 'text-brand-text-secondary/80'
-                  : 'text-brand-accent-text'}"
+                class="text-[10px] font-normal truncate {open
+                  ? 'text-brand-accent-contrast/80'
+                  : fraction === null
+                    ? 'text-brand-text-secondary/80'
+                    : 'text-brand-accent-text'}"
               >
                 {fraction === null ? space.free : syncingText(device.id)}
               </span>
