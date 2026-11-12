@@ -1,6 +1,6 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
-  import { navigationStore } from "../stores/navigation.svelte";
+  import { navigationStore, type ActiveTab } from "../stores/navigation.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
@@ -142,18 +142,18 @@
 </script>
 
 <!-- One top-level entry: icon + label, or icon only when collapsed. `updateBadge` is the
-     "update available" marker (Settings only); it rides in the label row when expanded and
-     on the icon corner when collapsed. -->
+     "update available" marker (Settings only): it rides in the label row when expanded, on
+     the icon corner when collapsed, and is spelled out in the tooltip. -->
 {#snippet navButton(
-  tab: string,
+  tab: ActiveTab,
   label: string,
   Icon: Component<{ class?: string }>,
-  opts: { walkthroughTarget?: string; title?: string; updateBadge?: boolean } = {},
+  opts: { walkthroughTarget?: string; updateBadge?: boolean } = {},
 )}
   <button
     data-walkthrough-target={opts.walkthroughTarget}
     onclick={() => {
-      navigationStore.activeTab = tab as typeof navigationStore.activeTab;
+      navigationStore.activeTab = tab;
     }}
     class="relative flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab ===
     tab
@@ -161,7 +161,9 @@
       : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
       ? 'justify-center w-10 h-10 rounded-xl p-0'
       : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-    title={opts.title ?? label}
+    title={opts.updateBadge
+      ? `${label} (${i18n.t("settings.updateAvailable", {}, "Update available")})`
+      : label}
   >
     {#if layoutCollapsed}
       <Icon class="w-5 h-5" />
@@ -521,9 +523,6 @@
     {@render navButton("settings", i18n.t("sidebar.settings"), Settings, {
       walkthroughTarget: "library-folders",
       updateBadge: showUpdateBadge,
-      title: showUpdateBadge
-        ? `${i18n.t("sidebar.settings")} (${i18n.t("settings.updateAvailable", {}, "Update available")})`
-        : undefined,
     })}
     {@render navButton("help", i18n.t("sidebar.help"), HelpCircle)}
 
