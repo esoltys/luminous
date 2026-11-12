@@ -533,8 +533,8 @@ export const ru = {
     },
     suggestAdd: "Добавить в медиатеку",
     suggestAddNamed: "Добавить {folder} в медиатеку",
-    suggestNotNow: "Не сейчас",
-    suggestNotNowNamed: "Не сейчас для {folder}",
+    suggestIgnore: "Игнорировать папку",
+    suggestIgnoreNamed: "Игнорировать {folder}",
     suggestHide: "Скрыть предложения",
   },
   emptyLibrary: {
@@ -1131,6 +1131,12 @@ export const ru = {
     scanOnStartupLabel: "Пересканировать библиотеку при запуске",
     scanOnStartupHint:
       "Автоматически выполнять инкрементное сканирование при каждом запуске Luminous.",
+    suggestFoldersLabel: "Предлагать папки для добавления в медиатеку",
+    suggestFoldersHint:
+      "Показывать на главной карточку с предложением добавить в медиатеку папки открытых вами файлов.",
+    suggestFoldersReset: "Сбросить",
+    suggestFoldersResetTitle: "Сбросить игнорируемые папки",
+    suggestFoldersResetDone: "Игнорируемые папки снова будут предлагаться.",
     autoOrganizeLabel: "Автоупорядочение новых файлов и изменений тегов",
     autoOrganizeHint:
       "Упорядочивать файлы в фоновом режиме по активному шаблону, когда появляются новые композиции или изменяются теги.",

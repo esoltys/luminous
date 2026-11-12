@@ -54,14 +54,14 @@
 
   // The backend emits `library-folder-suggestions-changed` once the write has
   // landed; nothing is removed from the list optimistically.
-  function notNow(path: string) {
+  function ignoreFolder(path: string) {
     invoke("dismiss_library_folder_suggestion", { path }).catch((err) =>
       console.error("Failed to dismiss folder suggestion:", err),
     );
   }
 
   function hideAll() {
-    invoke("hide_library_folder_suggestions").catch((err) =>
+    invoke("set_library_folder_suggestions_hidden", { hidden: true }).catch((err) =>
       console.error("Failed to hide folder suggestions:", err),
     );
   }
@@ -134,10 +134,10 @@
             <Button
               variant="secondary"
               size="sm"
-              aria-label={i18n.t("home.suggestNotNowNamed", { folder: name })}
-              onclick={() => notNow(folder.path)}
+              aria-label={i18n.t("home.suggestIgnoreNamed", { folder: name })}
+              onclick={() => ignoreFolder(folder.path)}
             >
-              {i18n.t("home.suggestNotNow")}
+              {i18n.t("home.suggestIgnore")}
             </Button>
           </div>
         </li>

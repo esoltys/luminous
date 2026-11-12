@@ -479,8 +479,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     },
     suggestAdd: "Ajouter à la bibliothèque",
     suggestAddNamed: "Ajouter {folder} à votre bibliothèque",
-    suggestNotNow: "Pas maintenant",
-    suggestNotNowNamed: "Pas maintenant pour {folder}",
+    suggestIgnore: "Ignorer le dossier",
+    suggestIgnoreNamed: "Ignorer {folder}",
     suggestHide: "Masquer les suggestions",
   },
   emptyLibrary: {
@@ -1063,6 +1063,12 @@ export const frFR: DeepStringRecord<typeof en> = {
     scanOnStartupLabel: "Analyser la bibliothèque au démarrage",
     scanOnStartupHint:
       "Exécutez automatiquement une réanalyse incrémentielle au lancement de Luminous.",
+    suggestFoldersLabel: "Suggérer des dossiers à ajouter à la bibliothèque",
+    suggestFoldersHint:
+      "Affiche sur l'accueil une carte qui propose d'ajouter à votre bibliothèque les dossiers des fichiers que vous avez ouverts.",
+    suggestFoldersReset: "Réinitialiser",
+    suggestFoldersResetTitle: "Réinitialiser les dossiers ignorés",
+    suggestFoldersResetDone: "Les dossiers ignorés seront de nouveau suggérés.",
     autoOrganizeLabel: "Organisation automatique des nouveaux fichiers et balises",
     autoOrganizeHint:
       "Organisez automatiquement les fichiers en arrière-plan selon votre modèle actif lors de l'arrivée de nouvelles pistes ou de l'enregistrement d'balises.",

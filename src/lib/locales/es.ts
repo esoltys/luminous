@@ -470,8 +470,8 @@ export const es = {
     },
     suggestAdd: "Agregar a la biblioteca",
     suggestAddNamed: "Agregar {folder} a tu biblioteca",
-    suggestNotNow: "Ahora no",
-    suggestNotNowNamed: "Ahora no para {folder}",
+    suggestIgnore: "Ignorar carpeta",
+    suggestIgnoreNamed: "Ignorar {folder}",
     suggestHide: "Ocultar sugerencias",
   },
   emptyLibrary: {
@@ -1051,6 +1051,12 @@ export const es = {
     scanOnStartupLabel: "Volver a analizar la biblioteca al iniciar",
     scanOnStartupHint:
       "Ejecuta un análisis incremental automáticamente cada vez que se inicia Luminous.",
+    suggestFoldersLabel: "Sugerir carpetas para agregar a la biblioteca",
+    suggestFoldersHint:
+      "Muestra en Inicio una tarjeta que propone agregar a tu biblioteca las carpetas de los archivos que has abierto.",
+    suggestFoldersReset: "Restablecer",
+    suggestFoldersResetTitle: "Restablecer carpetas ignoradas",
+    suggestFoldersResetDone: "Las carpetas ignoradas se volverán a sugerir.",
     autoOrganizeLabel: "Organizar automáticamente archivos nuevos y cambios de etiquetas",
     autoOrganizeHint:
       "Organiza los archivos en segundo plano con tu plantilla activa cuando llegan pistas nuevas o se editan etiquetas.",

@@ -7,7 +7,8 @@
 //! [`suggested_folders`] owns every filtering rule, so the UI shows exactly
 //! what it returns: folders on an unplugged drive can't be scanned, folders
 //! already watched have nothing to add, and a dismissed folder or the global
-//! hide stays dismissed (persisted in `app_state`).
+//! hide stays dismissed (persisted in `app_state`). The global hide can be
+//! turned back off ([`set_hidden`]); per-folder dismissals survive that.
 
 use crate::models::SongSource;
 use anyhow::Result;
@@ -73,7 +74,7 @@ pub fn suggested_folders(
     conn: &rusqlite::Connection,
     limit: usize,
 ) -> Result<Vec<SuggestedFolder>> {
-    if read_setting(conn, HIDDEN_KEY)?.as_deref() == Some("true") {
+    if is_hidden(conn)? {
         return Ok(Vec::new());
     }
     let dismissed = dismissed_keys(conn)?;
@@ -128,7 +129,7 @@ pub fn suggested_folders(
         .collect())
 }
 
-/// "Not now": never offer `path` again.
+/// "Ignore folder": never offer `path` again.
 pub fn dismiss_folder(conn: &rusqlite::Connection, path: &str) -> Result<()> {
     let key = folder_key(Path::new(path));
     let mut dismissed = dismissed_keys(conn)?;
@@ -139,9 +140,25 @@ pub fn dismiss_folder(conn: &rusqlite::Connection, path: &str) -> Result<()> {
     Ok(())
 }
 
-/// "Hide suggestions": stop offering any folder.
-pub fn hide_all(conn: &rusqlite::Connection) -> Result<()> {
-    write_setting(conn, HIDDEN_KEY, "true")
+/// Forget every ignored folder, so each is offered again.
+pub fn reset_dismissed(conn: &rusqlite::Connection) -> Result<()> {
+    conn.execute(
+        "DELETE FROM app_state WHERE key = ?1",
+        params![DISMISSED_KEY],
+    )?;
+    Ok(())
+}
+
+/// Whether the user has turned suggestions off (the Home card's "Hide
+/// suggestions" link, or the Settings toggle).
+pub fn is_hidden(conn: &rusqlite::Connection) -> Result<bool> {
+    Ok(read_setting(conn, HIDDEN_KEY)?.as_deref() == Some("true"))
+}
+
+/// Turn suggestions off (`true`) or back on (`false`). Per-folder "Ignore folder"
+/// dismissals are left alone, so folders the user declined stay declined.
+pub fn set_hidden(conn: &rusqlite::Connection, hidden: bool) -> Result<()> {
+    write_setting(conn, HIDDEN_KEY, if hidden { "true" } else { "false" })
 }
 
 #[cfg(test)]
@@ -290,15 +307,53 @@ mod tests {
     }
 
     #[test]
-    fn hide_all_silences_every_suggestion() {
+    fn hiding_silences_every_suggestion() {
         let f = fixture();
         let conn = f.db.pool.get().unwrap();
         open_file(&conn, &f.root.join("a"), "a.mp3", None);
         open_file(&conn, &f.root.join("b"), "b.mp3", None);
+        assert!(!is_hidden(&conn).unwrap());
         assert_eq!(suggested_folders(&conn, 10).unwrap().len(), 2);
 
-        hide_all(&conn).unwrap();
+        set_hidden(&conn, true).unwrap();
+        assert!(is_hidden(&conn).unwrap());
         assert!(suggested_folders(&conn, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn reset_offers_ignored_folders_again() {
+        let f = fixture();
+        let conn = f.db.pool.get().unwrap();
+        let dir = f.root.join("music");
+        open_file(&conn, &dir, "a.mp3", None);
+        dismiss_folder(&conn, &dir.to_string_lossy()).unwrap();
+        assert!(suggested_folders(&conn, 10).unwrap().is_empty());
+
+        reset_dismissed(&conn).unwrap();
+        assert_eq!(suggested_folders(&conn, 10).unwrap().len(), 1);
+        // Idempotent when nothing is ignored.
+        reset_dismissed(&conn).unwrap();
+    }
+
+    #[test]
+    fn showing_again_keeps_dismissed_folders_dismissed() {
+        let f = fixture();
+        let conn = f.db.pool.get().unwrap();
+        let declined = f.root.join("declined");
+        let other = f.root.join("other");
+        open_file(&conn, &declined, "a.mp3", None);
+        open_file(&conn, &other, "b.mp3", None);
+        dismiss_folder(&conn, &declined.to_string_lossy()).unwrap();
+
+        set_hidden(&conn, true).unwrap();
+        set_hidden(&conn, false).unwrap();
+
+        assert!(!is_hidden(&conn).unwrap());
+        let folders = suggested_folders(&conn, 10).unwrap();
+        assert_eq!(
+            folders.iter().map(|f| f.path.clone()).collect::<Vec<_>>(),
+            vec![other.to_string_lossy().to_string()]
+        );
     }
 
     /// The nudge's promise: adding the folder keeps the opened files' ids, so

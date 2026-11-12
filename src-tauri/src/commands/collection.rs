@@ -107,7 +107,7 @@ pub async fn get_suggested_library_folders(
     .map_err(|e| e.to_string())
 }
 
-/// "Not now" on one suggested folder. Emits `library-folder-suggestions-changed`
+/// "Ignore folder" on one suggested folder. Emits `library-folder-suggestions-changed`
 /// so every open surface refetches instead of assuming the write landed.
 #[tauri::command]
 pub async fn dismiss_library_folder_suggestion(
@@ -124,15 +124,44 @@ pub async fn dismiss_library_folder_suggestion(
     Ok(())
 }
 
-/// "Hide suggestions": no folder is offered again.
+/// "Reset" in Settings: every folder ignored with "Ignore folder" is offered
+/// again. Does not change whether suggestions are on or off.
 #[tauri::command]
-pub async fn hide_library_folder_suggestions(
+pub async fn reset_library_folder_suggestion_dismissals(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    crate::db::run_blocking(&state.db, crate::collection::suggestions::hide_all)
+    crate::db::run_blocking(&state.db, crate::collection::suggestions::reset_dismissed)
         .await
         .map_err(|e| e.to_string())?;
+    let _ = app.emit("library-folder-suggestions-changed", ());
+    Ok(())
+}
+
+/// Whether folder suggestions are turned off (Settings toggle's source of truth).
+#[tauri::command]
+pub async fn get_library_folder_suggestions_hidden(
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    crate::db::run_blocking(&state.db, crate::collection::suggestions::is_hidden)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Turn folder suggestions off ("Hide suggestions") or back on (Settings).
+/// Emits `library-folder-suggestions-changed` so the Home card and the
+/// Settings row refetch. Per-folder "Ignore folder" dismissals are untouched.
+#[tauri::command]
+pub async fn set_library_folder_suggestions_hidden(
+    app: AppHandle,
+    hidden: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    crate::db::run_blocking(&state.db, move |conn| {
+        crate::collection::suggestions::set_hidden(conn, hidden)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     let _ = app.emit("library-folder-suggestions-changed", ());
     Ok(())
 }

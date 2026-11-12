@@ -474,8 +474,8 @@ export const de = {
     },
     suggestAdd: "Zur Mediathek hinzufügen",
     suggestAddNamed: "{folder} zu deiner Mediathek hinzufügen",
-    suggestNotNow: "Nicht jetzt",
-    suggestNotNowNamed: "Nicht jetzt für {folder}",
+    suggestIgnore: "Ordner ignorieren",
+    suggestIgnoreNamed: "{folder} ignorieren",
     suggestHide: "Vorschläge ausblenden",
   },
   emptyLibrary: {
@@ -1054,6 +1054,12 @@ export const de = {
     scanOnStartupLabel: "Mediathek beim Start erneut durchsuchen",
     scanOnStartupHint:
       "Bei jedem Start von Luminous automatisch eine inkrementelle Suche ausführen.",
+    suggestFoldersLabel: "Ordner zum Hinzufügen zur Mediathek vorschlagen",
+    suggestFoldersHint:
+      "Zeigt auf der Startseite eine Karte, die vorschlägt, die Ordner geöffneter Dateien zur Mediathek hinzuzufügen.",
+    suggestFoldersReset: "Zurücksetzen",
+    suggestFoldersResetTitle: "Ignorierte Ordner zurücksetzen",
+    suggestFoldersResetDone: "Ignorierte Ordner werden wieder vorgeschlagen.",
     autoOrganizeLabel: "Neue Dateien und Tag-Änderungen automatisch organisieren",
     autoOrganizeHint:
       "Dateien im Hintergrund mit der aktiven Vorlage organisieren, wenn neue Titel hinzukommen oder Tags bearbeitet werden.",

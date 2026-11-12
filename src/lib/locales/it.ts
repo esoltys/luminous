@@ -469,8 +469,8 @@ export const it = {
     },
     suggestAdd: "Aggiungi alla libreria",
     suggestAddNamed: "Aggiungi {folder} alla tua libreria",
-    suggestNotNow: "Non ora",
-    suggestNotNowNamed: "Non ora per {folder}",
+    suggestIgnore: "Ignora cartella",
+    suggestIgnoreNamed: "Ignora {folder}",
     suggestHide: "Nascondi i suggerimenti",
   },
   emptyLibrary: {
@@ -1052,6 +1052,12 @@ export const it = {
     scanOnStartupLabel: "Riesegui scansione libreria all'avvio",
     scanOnStartupHint:
       "Esegui una scansione incrementale automaticamente a ogni avvio di Luminous.",
+    suggestFoldersLabel: "Suggerisci cartelle da aggiungere alla libreria",
+    suggestFoldersHint:
+      "Mostra in Home una scheda che propone di aggiungere alla libreria le cartelle dei file che hai aperto.",
+    suggestFoldersReset: "Ripristina",
+    suggestFoldersResetTitle: "Ripristina cartelle ignorate",
+    suggestFoldersResetDone: "Le cartelle ignorate verranno suggerite di nuovo.",
     autoOrganizeLabel: "Organizza automaticamente nuovi file e modifiche ai tag",
     autoOrganizeHint:
       "Organizza i file automaticamente in background con il modello attivo quando arrivano nuovi brani o vengono modificati i tag.",

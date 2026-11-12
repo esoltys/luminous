@@ -29,6 +29,7 @@
   import { getDirectoryDisplayName } from "../utils/pathUtils";
   import { formatFileSize, formatNumber } from "../utils/formatters";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import {
     FolderIcon as Folder,
     PlusIcon as Plus,
@@ -328,6 +329,32 @@
     return kind ? `${server.url} · ${kind}` : server.url;
   }
 
+  // The backend owns this flag; the row mirrors it and refetches on the event
+  // rather than assuming the write landed (the Home card's "Hide suggestions"
+  // link changes it too).
+  // `null` until the first read lands, so the toggle never flashes a wrong state.
+  let suggestFolders = $state<boolean | null>(null);
+
+  async function refreshSuggestFolders() {
+    try {
+      suggestFolders = !(await invoke<boolean>("get_library_folder_suggestions_hidden"));
+    } catch (err) {
+      console.error("Failed to load the folder suggestions setting:", err);
+    }
+  }
+
+  function handleToggleSuggestFolders(v: boolean) {
+    invoke("set_library_folder_suggestions_hidden", { hidden: !v }).catch((err) =>
+      console.error("Failed to change the folder suggestions setting:", err),
+    );
+  }
+
+  function handleResetIgnoredFolders() {
+    invoke("reset_library_folder_suggestion_dismissals")
+      .then(() => toastStore.show(i18n.t("settings.suggestFoldersResetDone"), "success"))
+      .catch((err) => console.error("Failed to reset ignored folders:", err));
+  }
+
   onMount(() => {
     loudnessStore.init();
     musicalAnalysisStore.init();
@@ -336,6 +363,11 @@
     hierarchySidecarStore
       .refresh()
       .catch((e) => console.error("Failed to load the default library:", e));
+    refreshSuggestFolders();
+    const unlistenSuggestions = listen("library-folder-suggestions-changed", refreshSuggestFolders);
+    return () => {
+      unlistenSuggestions.then((fn) => fn());
+    };
   });
 
   async function handleRemoveDirectory(path: string) {
@@ -1058,6 +1090,33 @@
         onchange={(v) => prefs.setDetectTempoAndKey(v)}
         label={i18n.t("settings.detectTempoKeyLabel")}
       />
+    </div>
+
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <span class="text-sm font-medium text-brand-text-primary"
+          >{i18n.t("settings.suggestFoldersLabel")}</span
+        >
+        <p class="text-xs text-brand-text-secondary text-pretty">
+          {i18n.t("settings.suggestFoldersHint")}
+        </p>
+      </div>
+      <div class="flex items-center gap-3 shrink-0">
+        <Button
+          onclick={handleResetIgnoredFolders}
+          size="sm"
+          title={i18n.t("settings.suggestFoldersResetTitle")}
+          aria-label={i18n.t("settings.suggestFoldersResetTitle")}
+        >
+          {i18n.t("settings.suggestFoldersReset")}
+        </Button>
+        <Toggle
+          checked={suggestFolders === true}
+          disabled={suggestFolders === null}
+          onchange={handleToggleSuggestFolders}
+          label={i18n.t("settings.suggestFoldersLabel")}
+        />
+      </div>
     </div>
   </div>
 

@@ -531,8 +531,8 @@ export const uk = {
     },
     suggestAdd: "Додати до медіатеки",
     suggestAddNamed: "Додати {folder} до медіатеки",
-    suggestNotNow: "Не зараз",
-    suggestNotNowNamed: "Не зараз для {folder}",
+    suggestIgnore: "Ігнорувати папку",
+    suggestIgnoreNamed: "Ігнорувати {folder}",
     suggestHide: "Сховати пропозиції",
   },
   emptyLibrary: {
@@ -1127,6 +1127,12 @@ export const uk = {
     scanOnStartupLabel: "Пересканувати бібліотеку під час запуску",
     scanOnStartupHint:
       "Автоматично запускати інкрементальне пересканування під час кожного запуску Luminous.",
+    suggestFoldersLabel: "Пропонувати папки для додавання до медіатеки",
+    suggestFoldersHint:
+      "Показувати на головній картку з пропозицією додати до медіатеки папки відкритих вами файлів.",
+    suggestFoldersReset: "Скинути",
+    suggestFoldersResetTitle: "Скинути ігноровані папки",
+    suggestFoldersResetDone: "Ігноровані папки знову пропонуватимуться.",
     autoOrganizeLabel: "Автоматично впорядковувати нові файли й оновлення тегів",
     autoOrganizeHint:
       "Автоматично впорядковувати файли у фоновому режимі за активним шаблоном, коли з’являються нові композиції або змінюються теги.",
