@@ -14,7 +14,7 @@ use anyhow::Result;
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// `app_state` key holding a JSON array of folder paths the user dismissed.
 const DISMISSED_KEY: &str = "library_folder_suggestions_dismissed";
@@ -103,26 +103,29 @@ pub fn suggested_folders(
         group.last_played = group.last_played.max(last_played);
     }
 
-    let mut folders: Vec<SuggestedFolder> = groups
+    // A folder already watched is a library folder, not a suggestion. Both
+    // checks so far are in memory.
+    let mut candidates: Vec<SuggestedFolder> = groups
         .into_iter()
         .filter(|(key, _)| !dismissed.contains(key))
         .map(|(_, folder)| folder)
-        .filter(|f| {
-            let dir = PathBuf::from(&f.path);
-            // An unplugged drive (or moved folder) can't be scanned. A folder
-            // already watched is a library folder, not a suggestion.
-            dir.is_dir() && watched.source_for(&dir) == SongSource::OpenedFile
-        })
+        .filter(|f| watched.source_for(Path::new(&f.path)) == SongSource::OpenedFile)
         .collect();
     // Most recent first, then busiest, then by path so the order is stable.
-    folders.sort_by(|a, b| {
+    candidates.sort_by(|a, b| {
         b.last_played
             .cmp(&a.last_played)
             .then(b.song_count.cmp(&a.song_count))
             .then(a.path.cmp(&b.path))
     });
-    folders.truncate(limit);
-    Ok(folders)
+    // Reachability touches the disk, and a dead network share can stall for
+    // seconds, so check lazily and stop at `limit` rather than probing every
+    // folder. An unplugged drive (or moved folder) can't be scanned.
+    Ok(candidates
+        .into_iter()
+        .filter(|f| Path::new(&f.path).is_dir())
+        .take(limit)
+        .collect())
 }
 
 /// "Not now": never offer `path` again.
@@ -146,6 +149,7 @@ mod tests {
     use super::*;
     use crate::db::Database;
     use crate::models::Song;
+    use std::path::PathBuf;
 
     struct Fixture {
         _guard: tempfile::TempDir,
