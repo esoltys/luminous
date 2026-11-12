@@ -4,26 +4,58 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-if ! command -v rustfmt >/dev/null 2>&1; then
-  echo "error: rustfmt is not installed or not on PATH." >&2
-  exit 1
-fi
+# Staged, added/copied/modified/renamed files matching the given pathspecs.
+staged() {
+  git diff --cached --name-only -z --diff-filter=ACMR -- "$@"
+}
 
+# --- Rust -------------------------------------------------------------------
 rust_files=()
 while IFS= read -r -d '' file; do
   if [[ "$file" == *.rs ]]; then
     rust_files+=("$file")
   fi
-done < <(git diff --cached --name-only -z --diff-filter=ACMR -- src-tauri crates)
+done < <(staged src-tauri crates)
 
-if [ ${#rust_files[@]} -eq 0 ]; then
-  exit 0
+if [ ${#rust_files[@]} -gt 0 ]; then
+  if ! command -v rustfmt >/dev/null 2>&1; then
+    echo "error: rustfmt is not installed or not on PATH." >&2
+    exit 1
+  fi
+
+  echo "Formatting staged Rust files with rustfmt..."
+  rustfmt --edition 2021 "${rust_files[@]}"
+
+  echo "Re-adding formatted Rust files to the index..."
+  git add -- "${rust_files[@]}"
 fi
 
-echo "Formatting staged Rust files with rustfmt..."
-rustfmt --edition 2021 "${rust_files[@]}"
+# --- Prettier (TypeScript, Svelte, CSS, JSON, JS) ---------------------------
+# Files matched by .prettierignore are skipped silently by Prettier itself.
+prettier_files=()
+while IFS= read -r -d '' file; do
+  case "$file" in
+    *.ts | *.js | *.svelte | *.css | *.json)
+      # A file with unstaged edits would have them swept into the commit by the
+      # re-add below, so leave it alone; `bun run check` / CI still catch it.
+      if git diff --quiet -- "$file"; then
+        prettier_files+=("$file")
+      else
+        echo "Skipping Prettier for $file (has unstaged changes); run 'bun run fmt'." >&2
+      fi
+      ;;
+  esac
+done < <(staged .)
 
-echo "Re-adding formatted Rust files to the index..."
-git add -- "${rust_files[@]}"
+if [ ${#prettier_files[@]} -gt 0 ]; then
+  if ! command -v bun >/dev/null 2>&1 || [ ! -d node_modules/prettier ]; then
+    echo "error: bun or node_modules/prettier is missing; run 'bun install'." >&2
+    exit 1
+  fi
 
-echo "rustfmt completed and staged Rust files have been re-staged."
+  echo "Formatting staged files with Prettier..."
+  bun run prettier --write --log-level warn "${prettier_files[@]}"
+
+  echo "Re-adding formatted files to the index..."
+  git add -- "${prettier_files[@]}"
+fi

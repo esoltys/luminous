@@ -195,7 +195,7 @@ Follow [docs/ISSUES_AND_PRS.md](docs/ISSUES_AND_PRS.md) before creating an issue
 
 ## Git Hooks
 
-- Git hooks are configured automatically by `bun install` / `bun run prepare` via `scripts/install-git-hooks.ts`. To manually install them on a fresh clone or worktree, run `bun run install:git-hooks`. The pre-commit hook auto-formats staged Rust files with `cargo fmt`.
+- Git hooks are configured automatically by `bun install` / `bun run prepare` via `scripts/install-git-hooks.ts`. To manually install them on a fresh clone or worktree, run `bun run install:git-hooks`. The pre-commit hook auto-formats staged Rust files with `rustfmt` and staged TS/JS/Svelte/CSS/JSON files with Prettier.
 
 ## Release & Versioning
 
