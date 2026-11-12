@@ -58,10 +58,6 @@
     if (handle) draggedIndex = index;
   }
 
-  function handleRowClick(pin: NavigablePin) {
-    pin.open();
-  }
-
   function handleContextMenu(e: MouseEvent, item: PinnedItem) {
     e.preventDefault();
     e.stopPropagation();
@@ -97,7 +93,7 @@
           isDragged={draggedIndex === index}
           isDragOver={dragOverIndex === index && draggedIndex !== null && draggedIndex !== index}
           dropIndicatorPosition={draggedIndex !== null && draggedIndex < index ? "bottom" : "top"}
-          onclick={() => handleRowClick(pin)}
+          onclick={() => pin.open()}
           oncontextmenu={(e) => handleContextMenu(e, pin.rawItem)}
           onpointerdown={(e) => handlePointerDown(e, index)}
           onkeydown={(e) => handleKeyDown(e, index, pin)}

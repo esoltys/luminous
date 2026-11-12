@@ -366,7 +366,6 @@
   // helper's default capture-on-press doesn't retarget them.
   function handleRowPointerDown(e: PointerEvent, row: SongTableRow) {
     if (!row.song || row.disabled) return;
-    pressedRow = row;
     rowDrag = startPointerDrag(e, {
       onTap: resetDrag,
       onArm: (pos) => {
@@ -396,7 +395,7 @@
       }
     });
     // An ignored press (button, link, non-primary click) is not ours to track.
-    if (!rowDrag) pressedRow = null;
+    if (rowDrag) pressedRow = row;
   }
 
   $effect(() => () => rowDrag?.cancel());

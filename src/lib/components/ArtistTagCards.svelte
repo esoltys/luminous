@@ -147,7 +147,9 @@
       // Capture only once a drag is real: capture on press would retarget a plain click.
       captureOn: "arm",
       ignoreSelector,
-      onArm: () => (dragMoved = true),
+      onArm: () => {
+        dragMoved = true;
+      },
       onMove: handlePointerMove,
       onDrop: handleDrop,
       onTap: handleTap,

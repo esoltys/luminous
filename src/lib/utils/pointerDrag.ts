@@ -116,7 +116,7 @@ export function startPointerDrag(e: PointerEvent, opts: PointerDragOptions): Poi
     ended = true;
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
-    window.removeEventListener("pointercancel", onCancel);
+    window.removeEventListener("pointercancel", abort);
     try {
       el?.releasePointerCapture?.(pointerId);
     } catch {
@@ -145,7 +145,7 @@ export function startPointerDrag(e: PointerEvent, opts: PointerDragOptions): Poi
     return opts.onDrop?.({ x: ev.clientX, y: ev.clientY }, ev);
   }
 
-  function onCancel() {
+  function abort() {
     if (ended) return;
     const wasArmed = armed;
     stop();
@@ -154,7 +154,7 @@ export function startPointerDrag(e: PointerEvent, opts: PointerDragOptions): Poi
 
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
-  window.addEventListener("pointercancel", onCancel);
+  window.addEventListener("pointercancel", abort);
 
-  return { cancel: onCancel };
+  return { cancel: abort };
 }
