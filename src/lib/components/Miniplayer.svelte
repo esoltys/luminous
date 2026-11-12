@@ -193,13 +193,22 @@
     }
   }
 
-  function handleStartDrag(e: PointerEvent) {
-    invoke("start_window_drag").catch(() => {});
+  // The grabbers and resize edges go through our own window commands, which
+  // are the only way this window starts a drag or resize. Do not also mark
+  // them `data-tauri-drag-region`: Tauri's injected script would then call the
+  // built-in `start_dragging` as well, which the `main` capability
+  // (src-tauri/capabilities/default.json) deliberately does not grant (#1603).
+  function handleStartDrag() {
+    invoke("start_window_drag").catch((err) => {
+      console.error("Failed to start miniplayer window drag:", err);
+    });
   }
 
   function handleStartResize(direction: string, e: PointerEvent) {
     e.stopPropagation();
-    invoke("start_window_resize", { direction }).catch(() => {});
+    invoke("start_window_resize", { direction }).catch((err) => {
+      console.error("Failed to start miniplayer window resize:", err);
+    });
   }
 
   function handleKeyDown(e: KeyboardEvent) {
@@ -456,7 +465,6 @@
     >
       <!-- Drag handle at top -->
       <div
-        data-tauri-drag-region
         onpointerdown={handleStartDrag}
         role="button"
         tabindex="0"
@@ -726,7 +734,6 @@
         : 'opacity-0 pointer-events-none'} hover-mask bg-brand-main/85 backdrop-blur-md"
     >
       <div
-        data-tauri-drag-region
         onpointerdown={handleStartDrag}
         role="button"
         tabindex="0"

@@ -13,13 +13,6 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: vi.fn().mockReturnValue({
-    startResizing: vi.fn().mockResolvedValue(undefined),
-    startDragging: vi.fn().mockResolvedValue(undefined),
-  }),
-}));
-
 describe("Miniplayer.svelte", () => {
   const mockSong: Song = {
     id: 101,
@@ -345,6 +338,40 @@ describe("Miniplayer.svelte", () => {
     });
     expect(playerStore.currentSong?.lyrics).toBe("[00:01.00] Synced line");
     expect(playerStore.currentSong?.lyrics_source).toBe("lrclib");
+  });
+
+  describe("Window drag (#1603)", () => {
+    it("starts a window drag through the start_window_drag command when the grabber is pressed", async () => {
+      playerStore.currentSong = mockSong;
+      const { getByTitle } = render(Miniplayer);
+
+      await fireEvent.pointerDown(getByTitle("Drag window"));
+
+      expect(invoke).toHaveBeenCalledWith("start_window_drag");
+    });
+
+    it("has no data-tauri-drag-region, which would start a second, unpermitted drag", () => {
+      playerStore.currentSong = mockSong;
+      const { container } = render(Miniplayer);
+
+      expect(container.querySelector("[data-tauri-drag-region]")).toBeNull();
+    });
+
+    it("logs a failed drag instead of leaving the rejection unhandled", async () => {
+      playerStore.currentSong = mockSong;
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(invoke).mockImplementation((cmd) =>
+        cmd === "start_window_drag" ? Promise.reject("drag refused") : Promise.resolve(null),
+      );
+      const { getByTitle } = render(Miniplayer);
+
+      await fireEvent.pointerDown(getByTitle("Drag window"));
+
+      await waitFor(() =>
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("drag"), "drag refused"),
+      );
+      errorSpy.mockRestore();
+    });
   });
 
   describe("Session Wrap & Queue Completion (#1379)", () => {
