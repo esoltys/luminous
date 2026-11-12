@@ -5,6 +5,7 @@
   import { toastStore } from "../stores/toast.svelte";
   import { genreColorHsl, getGenreColorChoices } from "../utils/genrePalette";
   import { portal } from "../utils/portal";
+  import { startPointerDrag, type PointerDragHandle } from "../utils/pointerDrag";
   import ArtistTagContextMenu from "./ArtistTagContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import ColorPicker from "./ColorPicker.svelte";
@@ -112,11 +113,12 @@
   let draggedCard = $state<string | null>(null);
   let dropTarget = $state<TagCardDropTarget | null>(null);
   let pointerPos = $state<{ x: number; y: number } | null>(null);
-  const CLICK_VS_DRAG_THRESHOLD_PX = 4;
-  let dragStartPos: { x: number; y: number } | null = null;
-  /** Reactive so the ghost only appears once the pointer has actually moved — a plain click
+  let tagDrag: PointerDragHandle | null = null;
+  /** Reactive so the ghost only appears once the drag has armed — a plain click
    * on a chip must not flash it. */
   let dragMoved = $state(false);
+
+  $effect(() => () => tagDrag?.cancel());
 
   let ghostInfo = $derived.by(() => {
     if (draggedChip) {
@@ -130,34 +132,46 @@
     return null;
   });
 
-  function handleChipPointerDown(e: PointerEvent, name: string, fromGroup: string) {
-    if (e.button !== 0) return;
-    if ((e.target as HTMLElement).tagName === "INPUT") return;
-    e.preventDefault();
-    draggedChip = { name, fromGroup };
-    dragStartPos = { x: e.clientX, y: e.clientY };
+  function endDrag() {
+    draggedChip = null;
+    draggedCard = null;
+    dropTarget = null;
+    pointerPos = null;
     dragMoved = false;
+    tagDrag = null;
+  }
+
+  /** Tracks one press-drag-release; `grab` records what was picked up once the press is accepted. */
+  function beginDrag(e: PointerEvent, ignoreSelector: string | undefined, grab: () => void) {
+    tagDrag = startPointerDrag(e, {
+      // Capture only once a drag is real: capture on press would retarget a plain click.
+      captureOn: "arm",
+      ignoreSelector,
+      onArm: () => (dragMoved = true),
+      onMove: handlePointerMove,
+      onDrop: handleDrop,
+      onTap: handleTap,
+      onCancel: endDrag
+    });
+    if (!tagDrag) return;
+    // Right-click (and middle-click) never reach here: calling preventDefault on any
+    // pointerdown suppresses the compatibility mouse events it's derived from.
+    e.preventDefault();
+    grab();
     pointerPos = { x: e.clientX, y: e.clientY };
+  }
+
+  function handleChipPointerDown(e: PointerEvent, name: string, fromGroup: string) {
+    beginDrag(e, "input", () => (draggedChip = { name, fromGroup }));
   }
 
   function handleCardPointerDown(e: PointerEvent, name: string) {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    draggedCard = name;
-    dragStartPos = { x: e.clientX, y: e.clientY };
-    dragMoved = false;
-    pointerPos = { x: e.clientX, y: e.clientY };
+    beginDrag(e, undefined, () => (draggedCard = name));
   }
 
-  function handlePointerMove(e: PointerEvent) {
-    if (!draggedChip && !draggedCard) return;
-    pointerPos = { x: e.clientX, y: e.clientY };
-    if (dragStartPos && !dragMoved) {
-      const dx = e.clientX - dragStartPos.x;
-      const dy = e.clientY - dragStartPos.y;
-      if (Math.hypot(dx, dy) > CLICK_VS_DRAG_THRESHOLD_PX) dragMoved = true;
-    }
-    const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+  function handlePointerMove(pos: { x: number; y: number }) {
+    pointerPos = pos;
+    const el = document.elementFromPoint(pos.x, pos.y) as HTMLElement | null;
     const chipEl = el?.closest<HTMLElement>("[data-artist-chip-key]");
     const headerEl = el?.closest<HTMLElement>("[data-artist-card-header]");
     const cardEl = el?.closest<HTMLElement>("[data-artist-card-name]");
@@ -183,17 +197,17 @@
     draggedCard ? cardDropApplies(draggedCard, dropTarget) : draggedChip ? chipDropAction(draggedChip, dropTarget) !== null : false
   );
 
-  async function handlePointerUp() {
+  function handleTap() {
+    const chip = draggedChip;
+    endDrag();
+    if (chip) onOpenTag(chip.name);
+  }
+
+  async function handleDrop() {
     const chip = draggedChip;
     const card = draggedCard;
     const target = dropTarget;
-    const moved = dragMoved;
-    draggedChip = null;
-    draggedCard = null;
-    dropTarget = null;
-    pointerPos = null;
-    dragStartPos = null;
-    dragMoved = false;
+    endDrag();
 
     if (card) {
       if (cardDropApplies(card, target)) {
@@ -203,10 +217,6 @@
     }
 
     if (!chip) return;
-    if (!moved) {
-      onOpenTag(chip.name);
-      return;
-    }
 
     switch (chipDropAction(chip, target)) {
       case "promote":
@@ -225,7 +235,7 @@
   }
 </script>
 
-<svelte:window onpointermove={handlePointerMove} onpointerup={handlePointerUp} onmousedown={handleWindowMouseDown} />
+<svelte:window onmousedown={handleWindowMouseDown} />
 
 <div class="grid grid-cols-1 @xl:grid-cols-2 @5xl:grid-cols-3 gap-3">
   {#each sortedHierarchy as group (group.name)}

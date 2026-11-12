@@ -5,6 +5,7 @@
   import { toastStore } from "../stores/toast.svelte";
   import { genreColorHsl, genreColorHslBright, genreColorHslDark, getGenreColorChoices } from "../utils/genrePalette";
   import { portal } from "../utils/portal";
+  import { startPointerDrag, type PointerDragHandle } from "../utils/pointerDrag";
   import { themeStore } from "../stores/theme.svelte";
   import { isLightColor } from "../utils/colorUtils";
   import GenreContextMenu from "./GenreContextMenu.svelte";
@@ -148,14 +149,11 @@
   /** Cursor position while a drag is active, for the floating ghost label —
    * cleared alongside draggedChip/draggedCard on pointerup. */
   let pointerPos = $state<{ x: number; y: number } | null>(null);
-  /** Distinguishes a click from a drag on the same pointerdown/up pair — a
-   * chip's whole surface (not just its edge padding) needs to be grabbable,
-   * so click-to-open can no longer be a separate <button> the drag simply
-   * avoids; instead, movement past this threshold before pointerup is what
-   * makes it a drag rather than a click. */
-  const CLICK_VS_DRAG_THRESHOLD_PX = 4;
-  let dragStartPos: { x: number; y: number } | null = null;
-  /** Reactive so the ghost only appears once the pointer has actually moved — a plain click
+  /** A chip's whole surface (not just its edge padding) needs to be grabbable, so click-to-open
+   * can't be a separate <button> the drag simply avoids; instead the shared pointer-drag helper's
+   * threshold decides whether the gesture was a click (`onTap`) or a drag. */
+  let tagDrag: PointerDragHandle | null = null;
+  /** Reactive so the ghost only appears once the drag has armed — a plain click
    * on a chip must not flash it. */
   let dragMoved = $state(false);
 
@@ -174,40 +172,50 @@
     return null;
   });
 
-  function handleChipPointerDown(e: PointerEvent, name: string, fromGroup: string) {
-    // Right-click (and middle-click) must fall through untouched — calling
-    // preventDefault on any pointerdown suppresses the compatibility mouse
-    // events it's derived from, which was silently swallowing the
-    // right-button's contextmenu trigger too.
-    if (e.button !== 0) return;
-    // The rename input and the a11y checkbox handle their own clicks —
-    // don't hijack them into a drag.
-    if ((e.target as HTMLElement).tagName === "INPUT") return;
-    e.preventDefault();
-    draggedChip = { name, fromGroup };
-    dragStartPos = { x: e.clientX, y: e.clientY };
+  $effect(() => () => tagDrag?.cancel());
+
+  function endDrag() {
+    draggedChip = null;
+    draggedCard = null;
+    dropTarget = null;
+    pointerPos = null;
     dragMoved = false;
+    tagDrag = null;
+  }
+
+  /** Tracks one press-drag-release; `grab` records what was picked up once the press is accepted. */
+  function beginDrag(e: PointerEvent, ignoreSelector: string | undefined, grab: () => void) {
+    tagDrag = startPointerDrag(e, {
+      // Capture only once a drag is real: capture on press would retarget a plain click.
+      captureOn: "arm",
+      ignoreSelector,
+      onArm: () => (dragMoved = true),
+      onMove: handlePointerMove,
+      onDrop: handleDrop,
+      onTap: handleTap,
+      onCancel: endDrag
+    });
+    if (!tagDrag) return;
+    // Right-click (and middle-click) never reach here: calling preventDefault on any
+    // pointerdown suppresses the compatibility mouse events it's derived from, which was
+    // silently swallowing the right-button's contextmenu trigger too.
+    e.preventDefault();
+    grab();
     pointerPos = { x: e.clientX, y: e.clientY };
+  }
+
+  function handleChipPointerDown(e: PointerEvent, name: string, fromGroup: string) {
+    // The rename input and the a11y checkbox handle their own clicks — don't hijack them into a drag.
+    beginDrag(e, "input", () => (draggedChip = { name, fromGroup }));
   }
 
   function handleCardPointerDown(e: PointerEvent, name: string) {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    draggedCard = name;
-    dragStartPos = { x: e.clientX, y: e.clientY };
-    dragMoved = false;
-    pointerPos = { x: e.clientX, y: e.clientY };
+    beginDrag(e, undefined, () => (draggedCard = name));
   }
 
-  function handlePointerMove(e: PointerEvent) {
-    if (!draggedChip && !draggedCard) return;
-    pointerPos = { x: e.clientX, y: e.clientY };
-    if (dragStartPos && !dragMoved) {
-      const dx = e.clientX - dragStartPos.x;
-      const dy = e.clientY - dragStartPos.y;
-      if (Math.hypot(dx, dy) > CLICK_VS_DRAG_THRESHOLD_PX) dragMoved = true;
-    }
-    const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+  function handlePointerMove(pos: { x: number; y: number }) {
+    pointerPos = pos;
+    const el = document.elementFromPoint(pos.x, pos.y) as HTMLElement | null;
     const chipEl = el?.closest<HTMLElement>("[data-chip-key]");
     const headerEl = el?.closest<HTMLElement>("[data-card-header]");
     const cardEl = el?.closest<HTMLElement>("[data-card-name]");
@@ -237,17 +245,19 @@
     draggedCard ? cardDropApplies(draggedCard, dropTarget) : draggedChip ? chipDropAction(draggedChip, dropTarget) !== null : false
   );
 
-  async function handlePointerUp() {
+  // Barely moved — treat the whole gesture as a plain click on the chip rather than a drag, so
+  // the entire pill (not just its edge) opens the drill-down view.
+  function handleTap() {
+    const chip = draggedChip;
+    endDrag();
+    if (chip) onOpenGenreEdge(chip.fromGroup, chip.name);
+  }
+
+  async function handleDrop() {
     const chip = draggedChip;
     const card = draggedCard;
     const target = dropTarget;
-    const moved = dragMoved;
-    draggedChip = null;
-    draggedCard = null;
-    dropTarget = null;
-    pointerPos = null;
-    dragStartPos = null;
-    dragMoved = false;
+    endDrag();
 
     if (card) {
       if (cardDropApplies(card, target)) {
@@ -257,13 +267,6 @@
     }
 
     if (!chip) return;
-    // Barely moved — treat the whole gesture as a plain click on the chip
-    // rather than a drag, so the entire pill (not just its edge) opens the
-    // drill-down view.
-    if (!moved) {
-      onOpenGenreEdge(chip.fromGroup, chip.name);
-      return;
-    }
 
     switch (chipDropAction(chip, target)) {
       case "promote":
@@ -282,7 +285,7 @@
   }
 </script>
 
-<svelte:window onpointermove={handlePointerMove} onpointerup={handlePointerUp} onmousedown={handleWindowMouseDown} />
+<svelte:window onmousedown={handleWindowMouseDown} />
 
 <div class="grid grid-cols-1 @xl:grid-cols-2 @5xl:grid-cols-3 gap-3">
   {#each sortedHierarchy as group (group.name)}
