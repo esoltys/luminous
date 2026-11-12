@@ -132,7 +132,11 @@
 >
   {#if activeCovers.length > 0}
     {#if activeCovers.length === 1}
-      <div class="{sizeClass} overflow-hidden relative group/artwork">
+      <div
+        class="{sizeClass} overflow-hidden relative group/artwork {hoverEffect
+          ? 'transition-transform duration-300 group-hover:scale-105'
+          : ''}"
+      >
         <CoverArt
           songId={activeCovers[0].songId}
           artEmbedded={activeCovers[0].artEmbedded}

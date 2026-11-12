@@ -211,13 +211,15 @@
     {#snippet children(mode)}
       {@const rows = mode === "rows"}
       {#each visibleItems as item, index (keyFor(item))}
+        <!-- [role=button] cards (ArtistCard) would otherwise show app.css's default arrow instead of
+             this wrapper's grab cursor. -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           data-pinned-index={index}
           onpointerdown={(e) => handleCardPointerDown(e, index)}
           oncontextmenu={(e) => handleContextMenu(e, item)}
           ondragstart={(e) => e.preventDefault()}
-          class="relative transition-opacity cursor-grab active:cursor-grabbing {rows
+          class="relative transition-opacity cursor-grab active:cursor-grabbing [&_[role=button]]:cursor-[inherit] {rows
             ? 'rounded-lg'
             : 'rounded-xl'} {draggedIndex === index ? 'opacity-40' : ''}"
         >

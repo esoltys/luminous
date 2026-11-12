@@ -11,7 +11,7 @@
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import BoxSetDiscIcons from "./BoxSetDiscIcons.svelte";
   import GenreChips from "./GenreChips.svelte";
-  import { PLAIN_TILE_COVER, useCardAppearance } from "../utils/cardAppearance";
+  import { PLAIN_TILE_COVER, PLAIN_TILE_RING, useCardAppearance } from "../utils/cardAppearance";
 
   const plain = useCardAppearance() === "plain";
 
@@ -92,7 +92,11 @@
     <CoverStack
       covers={covers && covers.length > 0 ? covers : [albumToCoverItem(album)]}
       sizeClass={covers && covers.length > 1 ? "w-24 h-24" : "w-full h-full"}
+      hoverEffect={plain}
     />
+    {#if plain}
+      <div class={PLAIN_TILE_RING}></div>
+    {/if}
     {#if currentRating === 5}
       <FavouriteCornerFlag size="md" />
     {/if}
