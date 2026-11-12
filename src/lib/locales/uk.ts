@@ -520,6 +520,20 @@ export const uk = {
     pinned: "Закріплені",
     exploreLibrary: "Досліджуйте свою бібліотеку",
     emptyState: "Додайте музику, щоб побачити персональні добірки",
+    suggestTitle: "Додайте папки, з яких ви слухаєте",
+    suggestHint:
+      "Додайте папку, щоб переглядати її за виконавцями, альбомами та жанрами. Історія прослуховувань і оцінки збережуться для кожного треку.",
+    suggestSongs: {
+      one: "Прослухано {count} трек",
+      few: "Прослухано {count} треки",
+      many: "Прослухано {count} треків",
+      other: "Прослухано {count} треку",
+    },
+    suggestAdd: "Додати до медіатеки",
+    suggestAddNamed: "Додати {folder} до медіатеки",
+    suggestNotNow: "Не зараз",
+    suggestNotNowNamed: "Не зараз для {folder}",
+    suggestHide: "Сховати пропозиції",
   },
   emptyLibrary: {
     playHeading: "Відтворення музики",

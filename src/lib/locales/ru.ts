@@ -522,6 +522,20 @@ export const ru = {
     pinned: "Закреплённые",
     exploreLibrary: "Изучите свою библиотеку",
     emptyState: "Добавьте музыку, чтобы увидеть персональные подборки",
+    suggestTitle: "Добавьте папки, из которых вы слушаете",
+    suggestHint:
+      "Добавьте папку, чтобы просматривать её по исполнителям, альбомам и жанрам. История прослушиваний и оценки сохранятся для каждого трека.",
+    suggestSongs: {
+      one: "Прослушан {count} трек",
+      few: "Прослушано {count} трека",
+      many: "Прослушано {count} треков",
+      other: "Прослушано {count} трека",
+    },
+    suggestAdd: "Добавить в медиатеку",
+    suggestAddNamed: "Добавить {folder} в медиатеку",
+    suggestNotNow: "Не сейчас",
+    suggestNotNowNamed: "Не сейчас для {folder}",
+    suggestHide: "Скрыть предложения",
   },
   emptyLibrary: {
     playHeading: "Слушать музыку",

@@ -50,6 +50,7 @@ pub(crate) mod reconcile;
 pub mod relocate;
 pub mod safeguard;
 mod scan_gate;
+pub mod suggestions;
 mod watcher;
 pub(crate) use query::get_artist_profile_conn;
 #[cfg(test)]
