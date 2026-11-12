@@ -6,6 +6,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
+  import { rateAlbum } from "../utils/stats";
   import CoverArt from "./CoverArt.svelte";
   import PlaylistCoverThumb from "./PlaylistCoverThumb.svelte";
   import SongRating from "./SongRating.svelte";
@@ -135,9 +136,9 @@
     song.loved = await invoke<number>("set_song_loved", { songId: song.id, loved });
   }
 
-  async function rateAlbum(album: AlbumItem, rating: number) {
-    if (!album.album) return;
-    album.rating = await invoke<number>("set_album_rating", { album: album.album, rating });
+  async function handleRateAlbum(album: AlbumItem, rating: number) {
+    const normalized = await rateAlbum(album.album, rating);
+    if (normalized !== null) album.rating = normalized;
   }
 </script>
 
@@ -235,7 +236,7 @@
                     isAlbum
                     revealOnInteract
                     rating={item.album.rating}
-                    onRate={(r) => rateAlbum(item.album, r)}
+                    onRate={(r) => handleRateAlbum(item.album, r)}
                     size="sm"
                   />
                 {/if}

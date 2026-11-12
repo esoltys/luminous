@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
   import type { AlbumItem } from "../types";
+  import { rateAlbum } from "../utils/stats";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import CoverArt from "./CoverArt.svelte";
@@ -59,9 +59,9 @@
     }
   }
 
-  async function rateAlbum(rating: number) {
-    if (!album.album) return;
-    const normalized = await invoke<number>("set_album_rating", { album: album.album, rating });
+  async function handleRate(rating: number) {
+    const normalized = await rateAlbum(album.album, rating);
+    if (normalized === null) return;
     album.rating = normalized;
     currentRating = normalized;
     onRate?.(normalized);
@@ -131,7 +131,7 @@
           isAlbum
           revealOnInteract
           rating={currentRating}
-          onRate={rateAlbum}
+          onRate={handleRate}
           size="sm"
         /></span
       >

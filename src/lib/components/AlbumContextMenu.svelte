@@ -22,6 +22,7 @@
   import { provenanceStore } from "../stores/provenance.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import { openInPicard } from "../utils/picard";
+  import { rateAlbum } from "../utils/stats";
   import { invoke } from "@tauri-apps/api/core";
   import { isLosslessFileType, type Song, type Playlist } from "../types";
   import { TOAST_DURATION_MS } from "../constants";
@@ -74,11 +75,8 @@
   let currentRating = $state(rating ?? -1);
 
   async function handleRate(next: number) {
-    try {
-      currentRating = await invoke<number>("set_album_rating", { album: albumName, rating: next });
-    } catch (err) {
-      console.error("Failed to rate album:", err);
-    }
+    const normalized = await rateAlbum(albumName, next);
+    if (normalized !== null) currentRating = normalized;
   }
 
   let showShareModal = $state(false);

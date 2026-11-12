@@ -9,6 +9,7 @@
     type SongStatsPayload,
     applyAlbumStats,
     type AlbumStatsPayload,
+    rateAlbum,
   } from "../utils/stats";
   import { collectionStore } from "../stores/collection.svelte";
   import { onDevScreenHooks } from "../scripting/devHooks";
@@ -634,10 +635,9 @@
     song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
   }
 
-  async function rateAlbum(rating: number) {
-    if (!albumItem?.album) return;
-    const normalized = await invoke<number>("set_album_rating", { album: albumItem.album, rating });
-    albumItem.rating = normalized;
+  async function handleRateAlbum(rating: number) {
+    const normalized = await rateAlbum(albumItem?.album, rating);
+    if (normalized !== null && albumItem) albumItem.rating = normalized;
   }
 
   // Sync rating/playcount changes from other views and scrobble bumps into
@@ -730,7 +730,7 @@
             <span>{totalDurationLabel}</span>
             {#if albumItem}
               <span>•</span>
-              <SongRating isAlbum rating={albumItem.rating} onRate={rateAlbum} size="sm" />
+              <SongRating isAlbum rating={albumItem.rating} onRate={handleRateAlbum} size="sm" />
             {/if}
           </div>
         {/if}
