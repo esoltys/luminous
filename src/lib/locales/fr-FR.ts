@@ -521,17 +521,33 @@ export const frFR: DeepStringRecord<typeof en> = {
     albums: "Albums ({count})",
     songs: "Chansons ({count})",
     languages: "Langues",
-    showingSongs: {
-      one: "Affichage de {count} chanson",
-      other: "Affichage de {count} chansons",
+    songCount: {
+      one: "{count} chanson",
+      other: "{count} chansons",
     },
-    showingAlbums: {
-      one: "Affichage de {count} album",
-      other: "Affichage de {count} albums",
+    songCountFiltered: {
+      one: "{matched} sur {count} chanson",
+      other: "{matched} sur {count} chansons",
     },
-    showingArtists: {
-      one: "Affichage de {count} artiste",
-      other: "Affichage de {count} artistes",
+    albumCount: {
+      one: "{count} album",
+      other: "{count} albums",
+    },
+    albumCountFiltered: {
+      one: "{matched} sur {count} album",
+      other: "{matched} sur {count} albums",
+    },
+    artistCount: {
+      one: "{count} artiste",
+      other: "{count} artistes",
+    },
+    artistCountFiltered: {
+      one: "{matched} sur {count} artiste",
+      other: "{matched} sur {count} artistes",
+    },
+    genreCount: {
+      one: "{count} genre",
+      other: "{count} genres",
     },
     noSongsTitle: "Aucune chanson trouvée",
     noSongsSearchEmpty:
@@ -1194,9 +1210,11 @@ export const frFR: DeepStringRecord<typeof en> = {
       "« {name} » est réservé à la file d'attente intégrée. Veuillez choisir un autre nom.",
     noPlaylistsTitle: "Aucune liste de lecture",
     noPlaylistsText: "Cliquez sur « Nouvelle liste » ci-dessus pour créer la première.",
-    showingPlaylists: {
-      one: "Affichage de {count} liste de lecture",
-      other: "Affichage de {count} listes de lecture",
+    autoTitle: "Listes automatiques",
+    customTitle: "Listes personnalisées",
+    playlistCount: {
+      one: "{count} liste de lecture",
+      other: "{count} listes de lecture",
     },
     newPlaylistBtn: "Nouvelle liste",
     newSmartPlaylistBtn: "Nouvelle liste intelligente",

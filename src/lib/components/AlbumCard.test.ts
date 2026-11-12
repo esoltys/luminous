@@ -28,54 +28,16 @@ describe("AlbumCard.svelte", () => {
     prefs.ratingStyle = "stars";
   });
 
-  it("renders album title, artist, year, and genre", () => {
-    const { getByText } = render(AlbumCard, { props: { album: mockAlbum } });
+  it("renders album title, artist, and year without genre chips or inline rating", () => {
+    const { getByText, queryByText, queryByTestId } = render(AlbumCard, {
+      props: { album: mockAlbum },
+    });
 
     expect(getByText("Fake Nudes")).toBeInTheDocument();
     expect(getByText("Barenaked Ladies")).toBeInTheDocument();
     expect(getByText("2017")).toBeInTheDocument();
-    expect(getByText("Alternative")).toBeInTheDocument();
-  });
-
-  it("keeps the unrated rating control inside a hover/focus `group` so it can be revealed", () => {
-    const { container } = render(AlbumCard, { props: { album: mockAlbum } });
-    const control = container.querySelector('[role="group"][aria-label="Rating"]')!;
-    expect(control).toHaveClass("opacity-0");
-    expect(control.closest(".group")).not.toBeNull();
-  });
-
-  it("rates the album via the rating widget without navigating to it", async () => {
-    vi.mocked(invoke).mockResolvedValueOnce(4);
-    const viewAlbumSpy = vi.spyOn(navigationStore, "viewAlbum");
-    const { getByLabelText } = render(AlbumCard, { props: { album: mockAlbum } });
-
-    await fireEvent.click(getByLabelText("Rate 4 of 5"));
-
-    expect(invoke).toHaveBeenCalledWith("set_album_rating", { album: "Fake Nudes", rating: 4 });
-    expect(viewAlbumSpy).not.toHaveBeenCalled();
-  });
-
-  it("leaves the rating unchanged when the write fails", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    // Fail only the rating write: other mount-time invokes must still resolve.
-    const defaultInvoke = vi.mocked(invoke).getMockImplementation()!;
-    vi.mocked(invoke).mockImplementation(async (cmd, args) => {
-      if (cmd === "set_album_rating") throw new Error("db locked");
-      return defaultInvoke(cmd, args);
-    });
-    try {
-      // Explicit baseline: earlier tests mutate the shared `mockAlbum.rating`.
-      const album = { ...mockAlbum, rating: -1 };
-      const { getByLabelText } = render(AlbumCard, { props: { album } });
-
-      await fireEvent.click(getByLabelText("Rate 4 of 5"));
-
-      await vi.waitFor(() => expect(error).toHaveBeenCalled());
-      expect(album.rating).toBe(-1);
-    } finally {
-      error.mockRestore();
-      vi.mocked(invoke).mockImplementation(defaultInvoke);
-    }
+    expect(queryByText("Alternative")).not.toBeInTheDocument();
+    expect(queryByTestId("album-card-genre-row")).toBeNull();
   });
 
   it("navigates to album when album title is clicked", async () => {
@@ -126,18 +88,6 @@ describe("AlbumCard.svelte", () => {
     const { getByText } = render(AlbumCard, { props: { album: mockAlbum } });
     const card = getByText("Fake Nudes").closest("div.bg-brand-sidebar")!;
     expect(card.className).toContain("w-full");
-  });
-
-  // jsdom has no layout, so this checks the reserved height class rather than measured pixels;
-  // the pixel alignment itself was verified in the running app (#1757).
-  it("reserves the genre chip's row height when the album has no genre", () => {
-    const { getByTestId, queryByText } = render(AlbumCard, {
-      props: { album: { ...mockAlbum, genre: null } },
-    });
-
-    expect(queryByText("Alternative")).not.toBeInTheDocument();
-    const row = getByTestId("album-card-genre-row");
-    expect(row.className).toContain("min-h-6");
   });
 
   it("passes sample_song_id to CoverArt when art_automatic and art_manual are null (#1823)", async () => {

@@ -517,17 +517,33 @@ export const de = {
     albums: "Alben ({count})",
     songs: "Titel ({count})",
     languages: "Sprachen",
-    showingSongs: {
-      one: "{count} Titel wird angezeigt",
-      other: "{count} Titel werden angezeigt",
+    songCount: {
+      one: "{count} Titel",
+      other: "{count} Titel",
     },
-    showingAlbums: {
-      one: "{count} Album wird angezeigt",
-      other: "{count} Alben werden angezeigt",
+    songCountFiltered: {
+      one: "{matched} von {count} Titel",
+      other: "{matched} von {count} Titeln",
     },
-    showingArtists: {
-      one: "{count} Interpret wird angezeigt",
-      other: "{count} Interpreten werden angezeigt",
+    albumCount: {
+      one: "{count} Album",
+      other: "{count} Alben",
+    },
+    albumCountFiltered: {
+      one: "{matched} von {count} Album",
+      other: "{matched} von {count} Alben",
+    },
+    artistCount: {
+      one: "{count} Interpret",
+      other: "{count} Interpreten",
+    },
+    artistCountFiltered: {
+      one: "{matched} von {count} Interpret",
+      other: "{matched} von {count} Interpreten",
+    },
+    genreCount: {
+      one: "{count} Genre",
+      other: "{count} Genres",
     },
     noSongsTitle: "Keine Titel gefunden",
     noSongsSearchEmpty:
@@ -1185,9 +1201,11 @@ export const de = {
       "„{name}“ ist für die integrierte Warteschlange reserviert. Wähle einen anderen Namen.",
     noPlaylistsTitle: "Keine Wiedergabelisten",
     noPlaylistsText: "Oben auf „Neue Wiedergabeliste“ klicken, um die erste zu erstellen.",
-    showingPlaylists: {
-      one: "{count} Wiedergabeliste wird angezeigt",
-      other: "{count} Wiedergabelisten werden angezeigt",
+    autoTitle: "Automatische Wiedergabelisten",
+    customTitle: "Eigene Wiedergabelisten",
+    playlistCount: {
+      one: "{count} Wiedergabeliste",
+      other: "{count} Wiedergabelisten",
     },
     newPlaylistBtn: "Neue Wiedergabeliste",
     newSmartPlaylistBtn: "Neue intelligente Wiedergabeliste",

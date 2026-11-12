@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CollectionHeader from "./CollectionHeader.svelte";
   import ViewModeToggle from "./ViewModeToggle.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
@@ -509,12 +510,72 @@
 {:else}
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
     <div
-      class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}"
+      class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}"
       use:rememberScroll={`playlists:${navigationStore.playlistsSubTab}`}
     >
-      <div class="sticky top-0 z-20 bg-brand-main pt-3">
-        {#if navigationStore.playlistsSubTab === "custom"}
-          <div class="h-10 flex items-center gap-2 mb-2">
+      <CollectionHeader
+        title={navigationStore.playlistsSubTab === "auto"
+          ? i18n.t("playlists.autoTitle")
+          : i18n.t("playlists.customTitle")}
+        subtitle={i18n.plural(
+          "playlists.playlistCount",
+          navigationStore.playlistsSubTab === "auto"
+            ? sortedAutoDefs.length
+            : sortedPlaylists.length,
+        )}
+      >
+        {#snippet actions()}
+          <button
+            onclick={handleRefreshAll}
+            disabled={isRefreshingAll}
+            class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary hover:text-brand-accent-text hover:border-brand-accent/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+            title={i18n.t("playlists.refreshAllPlaylistsTooltip")}
+            aria-label={i18n.t("playlists.refreshAllPlaylistsTooltip")}
+          >
+            <RefreshCw class="w-4 h-4 {isRefreshingAll ? 'animate-spin' : ''}" />
+          </button>
+          <ViewModeToggle mode={activeViewMode} onChange={setActiveViewMode} />
+          <div class="relative">
+            {#if navigationStore.playlistsSubTab === "auto"}
+              <Select
+                value={`${autoSortField}-${autoSortAsc}`}
+                onchange={(e) => {
+                  const [field, asc] = e.currentTarget.value.split("-");
+                  autoSortField = field as "name" | "track_count" | "updated";
+                  autoSortAsc = asc === "true";
+                }}
+                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+              >
+                <option value="name-true">▲ {i18n.t("playlists.sortLabelName")}</option>
+                <option value="name-false">▼ {i18n.t("playlists.sortLabelName")}</option>
+                <option value="track_count-true">▲ {i18n.t("playlists.sortLabelSongs")}</option>
+                <option value="track_count-false">▼ {i18n.t("playlists.sortLabelSongs")}</option>
+                <option value="updated-true">▲ {i18n.t("playlists.sortLabelUpdated")}</option>
+                <option value="updated-false">▼ {i18n.t("playlists.sortLabelUpdated")}</option>
+              </Select>
+            {:else}
+              <Select
+                value={`${customSortField}-${customSortAsc}`}
+                onchange={(e) => {
+                  const [field, asc] = e.currentTarget.value.split("-");
+                  customSortField = field as "name" | "track_count" | "updated";
+                  customSortAsc = asc === "true";
+                }}
+                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+              >
+                <option value="name-true">▲ {i18n.t("playlists.sortLabelName")}</option>
+                <option value="name-false">▼ {i18n.t("playlists.sortLabelName")}</option>
+                <option value="track_count-true">▲ {i18n.t("playlists.sortLabelSongs")}</option>
+                <option value="track_count-false">▼ {i18n.t("playlists.sortLabelSongs")}</option>
+                <option value="updated-true">▲ {i18n.t("playlists.sortLabelUpdated")}</option>
+                <option value="updated-false">▼ {i18n.t("playlists.sortLabelUpdated")}</option>
+              </Select>
+            {/if}
+          </div>
+        {/snippet}
+
+        {#snippet toolbar()}
+          {#if navigationStore.playlistsSubTab === "custom"}
             <Button
               onclick={handleCreateBlankPlaylist}
               variant="primary"
@@ -539,71 +600,11 @@
               <FolderInput class="w-4 h-4 text-brand-accent-text" />
               <span>{i18n.t("playlists.importPlaylistBtn")}</span>
             </Button>
-          </div>
-        {/if}
+          {/if}
+        {/snippet}
+      </CollectionHeader>
 
-        <div class="h-12 flex items-center justify-between">
-          <div class="text-xs text-brand-text-secondary font-medium">
-            {#if navigationStore.playlistsSubTab === "auto"}
-              {i18n.plural("playlists.showingPlaylists", sortedAutoDefs.length)}
-            {:else}
-              {i18n.plural("playlists.showingPlaylists", sortedPlaylists.length)}
-            {/if}
-          </div>
-
-          <div class="flex items-center gap-2">
-            <button
-              onclick={handleRefreshAll}
-              disabled={isRefreshingAll}
-              class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary hover:text-brand-accent-text hover:border-brand-accent/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
-              title={i18n.t("playlists.refreshAllPlaylistsTooltip")}
-              aria-label={i18n.t("playlists.refreshAllPlaylistsTooltip")}
-            >
-              <RefreshCw class="w-4 h-4 {isRefreshingAll ? 'animate-spin' : ''}" />
-            </button>
-            <ViewModeToggle mode={activeViewMode} onChange={setActiveViewMode} />
-            <div class="relative">
-              {#if navigationStore.playlistsSubTab === "auto"}
-                <Select
-                  value={`${autoSortField}-${autoSortAsc}`}
-                  onchange={(e) => {
-                    const [field, asc] = e.currentTarget.value.split("-");
-                    autoSortField = field as "name" | "track_count" | "updated";
-                    autoSortAsc = asc === "true";
-                  }}
-                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-                >
-                  <option value="name-true">▲ {i18n.t("playlists.sortLabelName")}</option>
-                  <option value="name-false">▼ {i18n.t("playlists.sortLabelName")}</option>
-                  <option value="track_count-true">▲ {i18n.t("playlists.sortLabelSongs")}</option>
-                  <option value="track_count-false">▼ {i18n.t("playlists.sortLabelSongs")}</option>
-                  <option value="updated-true">▲ {i18n.t("playlists.sortLabelUpdated")}</option>
-                  <option value="updated-false">▼ {i18n.t("playlists.sortLabelUpdated")}</option>
-                </Select>
-              {:else}
-                <Select
-                  value={`${customSortField}-${customSortAsc}`}
-                  onchange={(e) => {
-                    const [field, asc] = e.currentTarget.value.split("-");
-                    customSortField = field as "name" | "track_count" | "updated";
-                    customSortAsc = asc === "true";
-                  }}
-                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-                >
-                  <option value="name-true">▲ {i18n.t("playlists.sortLabelName")}</option>
-                  <option value="name-false">▼ {i18n.t("playlists.sortLabelName")}</option>
-                  <option value="track_count-true">▲ {i18n.t("playlists.sortLabelSongs")}</option>
-                  <option value="track_count-false">▼ {i18n.t("playlists.sortLabelSongs")}</option>
-                  <option value="updated-true">▲ {i18n.t("playlists.sortLabelUpdated")}</option>
-                  <option value="updated-false">▼ {i18n.t("playlists.sortLabelUpdated")}</option>
-                </Select>
-              {/if}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="pt-2 pb-8">
+      <div class="px-6 pb-8">
         {#if navigationStore.playlistsSubTab === "auto"}
           <div
             class="grid {activeViewMode === 'rows'

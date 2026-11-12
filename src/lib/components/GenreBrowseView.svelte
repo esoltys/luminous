@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CollectionHeader from "./CollectionHeader.svelte";
   import ViewModeToggle from "./ViewModeToggle.svelte";
   import { TagIcon, PlusIcon as Plus, GitMergeIcon as GitMerge } from "phosphor-svelte";
   import { onMount } from "svelte";
@@ -115,9 +116,12 @@
   }
 </script>
 
-<div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-  <div class="sticky top-0 z-20 bg-brand-main pt-3">
-    <div class="h-10 flex items-center justify-between mb-2">
+<div class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
+  <CollectionHeader
+    title={i18n.t("sidebar.genres")}
+    subtitle={i18n.plural("collection.genreCount", tagsStore.allTags.length)}
+  >
+    {#snippet actions()}
       {#if totalArtistTagCount > 0}
         <Button
           onclick={() => {
@@ -129,103 +133,98 @@
           <Plus class="w-4 h-4" />
           <span>{i18n.t("songTags.newArtistGroup", {}, "New Group")}</span>
         </Button>
-      {:else}
-        <div></div>
       {/if}
-      <div class="flex items-center gap-2">
-        <Button
-          onclick={() => tagsStore.openAliasDialog()}
-          variant="secondary"
-          title={i18n.t("songTags.manageAliases", {}, "Manage Aliases")}
+      <Button
+        onclick={() => tagsStore.openAliasDialog()}
+        variant="secondary"
+        title={i18n.t("songTags.manageAliases", {}, "Manage Aliases")}
+      >
+        <GitMerge class="w-4 h-4" />
+        <span>{i18n.t("songTags.manageAliases", {}, "Manage Aliases")}</span>
+      </Button>
+      <!-- Cards / rows toggle -->
+      <ViewModeToggle
+        mode={prefs.genreCardsViewMode}
+        onChange={(m) => prefs.setGenreCardsViewMode(m)}
+      />
+      <!-- Sort dropdown -->
+      <div class="relative">
+        <Select
+          value={`${prefs.genreSortField}-${prefs.genreSortAsc}`}
+          onchange={(e) => {
+            const [field, asc] = e.currentTarget.value.split("-");
+            prefs.setGenreSortField(field as GenreSortField);
+            prefs.setGenreSortAsc(asc === "true");
+          }}
+          class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
         >
-          <GitMerge class="w-4 h-4" />
-          <span>{i18n.t("songTags.manageAliases", {}, "Manage Aliases")}</span>
-        </Button>
-        <!-- Cards / rows toggle -->
-        <ViewModeToggle
-          mode={prefs.genreCardsViewMode}
-          onChange={(m) => prefs.setGenreCardsViewMode(m)}
-        />
-        <!-- Sort dropdown -->
-        <div class="relative">
-          <Select
-            value={`${prefs.genreSortField}-${prefs.genreSortAsc}`}
-            onchange={(e) => {
-              const [field, asc] = e.currentTarget.value.split("-");
-              prefs.setGenreSortField(field as GenreSortField);
-              prefs.setGenreSortAsc(asc === "true");
-            }}
-            class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+          <option value="name-true">▲ {i18n.t("songTags.sortName", {}, "Name")}</option>
+          <option value="name-false">▼ {i18n.t("songTags.sortName", {}, "Name")}</option>
+          <option value="count-true">▲ {i18n.t("songTags.sortSongCount", {}, "Song Count")}</option>
+          <option value="count-false">▼ {i18n.t("songTags.sortSongCount", {}, "Song Count")}</option
           >
-            <option value="name-true">▲ {i18n.t("songTags.sortName", {}, "Name")}</option>
-            <option value="name-false">▼ {i18n.t("songTags.sortName", {}, "Name")}</option>
-            <option value="count-true"
-              >▲ {i18n.t("songTags.sortSongCount", {}, "Song Count")}</option
-            >
-            <option value="count-false"
-              >▼ {i18n.t("songTags.sortSongCount", {}, "Song Count")}</option
-            >
-          </Select>
-        </div>
+        </Select>
       </div>
-    </div>
+    {/snippet}
+  </CollectionHeader>
+
+  <div class="px-6">
+    {#if totalArtistTagCount > 0}
+      <div class="mb-6">
+        <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
+          {i18n.t("songTags.artistTagsHeading", {}, "Artist Tags")}
+        </h2>
+        <ArtistTagCards
+          hierarchy={artistOnlyHierarchy}
+          onOpenTag={openArtistTag}
+          sortField={prefs.genreSortField}
+          sortAsc={prefs.genreSortAsc}
+          compact={prefs.genreCardsViewMode === "rows"}
+        />
+      </div>
+    {/if}
+
+    {#if tagsStore.languages.length > 0}
+      <div class="mb-6">
+        <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
+          {i18n.t("collection.languages", {}, "Languages")}
+        </h2>
+        <LanguageCards
+          onOpenLanguage={openLanguage}
+          sortField={prefs.genreSortField}
+          sortAsc={prefs.genreSortAsc}
+          compact={prefs.genreCardsViewMode === "rows"}
+        />
+      </div>
+    {/if}
+
+    {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0 && tagsStore.artistTags.length === 0 && tagsStore.languages.length === 0}
+      <div class="py-16">
+        <EmptyState
+          icon={TagIcon}
+          title={i18n.t("songTags.emptyTitle", {}, "No tags yet")}
+          subtitle={i18n.t(
+            "songTags.emptySubtitle",
+            {},
+            "Right-click a song and choose Edit Tags to give it a genre — the first value is its main category, the rest are subgenres.",
+          )}
+        />
+      </div>
+    {:else}
+      <h2 class="text-xl font-semibold text-brand-text-primary mb-3">
+        {i18n.t("songTags.songTagsHeading", {}, "Song Tags")}
+      </h2>
+      <GenreCards
+        onOpenMainTag={openMainTag}
+        onOpenGenreEdge={openGenreEdge}
+        sortField={prefs.genreSortField}
+        sortAsc={prefs.genreSortAsc}
+        compact={prefs.genreCardsViewMode === "rows"}
+        noGenreCount={tagsStore.noGenreCount}
+        onOpenNoGenre={openNoGenre}
+      />
+    {/if}
   </div>
-
-  {#if totalArtistTagCount > 0}
-    <div class="mb-6">
-      <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
-        {i18n.t("songTags.artistTagsHeading", {}, "Artist Tags")}
-      </h2>
-      <ArtistTagCards
-        hierarchy={artistOnlyHierarchy}
-        onOpenTag={openArtistTag}
-        sortField={prefs.genreSortField}
-        sortAsc={prefs.genreSortAsc}
-        compact={prefs.genreCardsViewMode === "rows"}
-      />
-    </div>
-  {/if}
-
-  {#if tagsStore.languages.length > 0}
-    <div class="mb-6">
-      <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
-        {i18n.t("collection.languages", {}, "Languages")}
-      </h2>
-      <LanguageCards
-        onOpenLanguage={openLanguage}
-        sortField={prefs.genreSortField}
-        sortAsc={prefs.genreSortAsc}
-        compact={prefs.genreCardsViewMode === "rows"}
-      />
-    </div>
-  {/if}
-
-  {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0 && tagsStore.artistTags.length === 0 && tagsStore.languages.length === 0}
-    <div class="py-16">
-      <EmptyState
-        icon={TagIcon}
-        title={i18n.t("songTags.emptyTitle", {}, "No tags yet")}
-        subtitle={i18n.t(
-          "songTags.emptySubtitle",
-          {},
-          "Right-click a song and choose Edit Tags to give it a genre — the first value is its main category, the rest are subgenres.",
-        )}
-      />
-    </div>
-  {:else}
-    <h2 class="text-xl font-semibold text-brand-text-primary mb-3">
-      {i18n.t("songTags.songTagsHeading", {}, "Song Tags")}
-    </h2>
-    <GenreCards
-      onOpenMainTag={openMainTag}
-      onOpenGenreEdge={openGenreEdge}
-      sortField={prefs.genreSortField}
-      sortAsc={prefs.genreSortAsc}
-      compact={prefs.genreCardsViewMode === "rows"}
-      noGenreCount={tagsStore.noGenreCount}
-      onOpenNoGenre={openNoGenre}
-    />
-  {/if}
 </div>
 
 {#if showNewGroupDialog}

@@ -1,16 +1,13 @@
 <script lang="ts">
   import type { AlbumItem } from "../types";
-  import { rateAlbum } from "../utils/stats";
   import { navigationStore } from "../stores/navigation.svelte";
   import CoverStack, { type CoverItem } from "./CoverStack.svelte";
   import { albumToCoverItem } from "../utils/covers";
   import LinkButton from "./LinkButton.svelte";
-  import SongRating from "./SongRating.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { queueAlbumAsPlaylist } from "../utils/playlist";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import BoxSetDiscIcons from "./BoxSetDiscIcons.svelte";
-  import GenreChips from "./GenreChips.svelte";
   import { PLAIN_TILE_COVER, PLAIN_TILE_RING, useCardAppearance } from "../utils/cardAppearance";
 
   const plain = useCardAppearance() === "plain";
@@ -64,13 +61,6 @@
     } else {
       await queueAlbumAsPlaylist(album);
     }
-  }
-
-  async function handleRate(rating: number) {
-    const normalized = await rateAlbum(album.album, rating);
-    if (normalized === null) return;
-    album.rating = normalized;
-    currentRating = normalized;
   }
 </script>
 
@@ -140,28 +130,6 @@
       {/if}
       <span class="text-xs text-brand-text-secondary font-medium shrink-0">{album.year || ""}</span>
     </div>
-    <!-- Plain tiles (Home) stop at one line of detail; the genre chips and stars stay in the
-         boxed card, and the rating stays reachable from the album menu and the album page. -->
-    {#if !plain}
-      <!-- min-h-6 matches the compact genre chip's h-6, so the stars sit at the same height whether
-           or not the album has a genre (#1757). The chip's wrapper is flex so the inline chip adds
-           no line-box gap below it. -->
-      <div
-        data-testid="album-card-genre-row"
-        class="flex items-center justify-between mt-0.5 gap-2 min-h-6"
-      >
-        <div class="flex min-w-0"><GenreChips genre={album.genre} /></div>
-        <span class="shrink-0"
-          ><SongRating
-            isAlbum
-            revealOnInteract
-            rating={currentRating}
-            onRate={handleRate}
-            size="sm"
-          /></span
-        >
-      </div>
-    {/if}
   </div>
   {#if !plain}
     <div

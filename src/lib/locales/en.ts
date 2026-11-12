@@ -501,17 +501,33 @@ export const en = {
     albums: "Albums ({count})",
     songs: "Songs ({count})",
     languages: "Languages",
-    showingSongs: {
-      one: "Showing {count} song",
-      other: "Showing {count} songs",
+    songCount: {
+      one: "{count} song",
+      other: "{count} songs",
     },
-    showingAlbums: {
-      one: "Showing {count} album",
-      other: "Showing {count} albums",
+    songCountFiltered: {
+      one: "{matched} of {count} song",
+      other: "{matched} of {count} songs",
     },
-    showingArtists: {
-      one: "Showing {count} artist",
-      other: "Showing {count} artists",
+    albumCount: {
+      one: "{count} album",
+      other: "{count} albums",
+    },
+    albumCountFiltered: {
+      one: "{matched} of {count} album",
+      other: "{matched} of {count} albums",
+    },
+    artistCount: {
+      one: "{count} artist",
+      other: "{count} artists",
+    },
+    artistCountFiltered: {
+      one: "{matched} of {count} artist",
+      other: "{matched} of {count} artists",
+    },
+    genreCount: {
+      one: "{count} genre",
+      other: "{count} genres",
     },
     noSongsTitle: "No songs found",
     noSongsSearchEmpty:
@@ -1149,9 +1165,11 @@ export const en = {
       '"{name}" is reserved for the built-in Queue playlist. Please choose a different name.',
     noPlaylistsTitle: "No playlists",
     noPlaylistsText: 'Click "New Playlist" above to create your first one.',
-    showingPlaylists: {
-      one: "Showing {count} playlist",
-      other: "Showing {count} playlists",
+    autoTitle: "Auto Playlists",
+    customTitle: "Custom Playlists",
+    playlistCount: {
+      one: "{count} playlist",
+      other: "{count} playlists",
     },
     newPlaylistBtn: "New Playlist",
     newSmartPlaylistBtn: "New Smart Playlist",
