@@ -185,12 +185,17 @@ describe("PlayerStore", () => {
       await vi.advanceTimersByTimeAsync(50);
 
       errorCallback?.({
-        payload: { songId: 9, title: "Remote Song", path: "subsonic://2/tr-9", message: "Wrong username or password." },
+        payload: {
+          songId: 9,
+          title: "Remote Song",
+          path: "subsonic://2/tr-9",
+          message: "Wrong username or password.",
+        },
       });
       await vi.advanceTimersByTimeAsync(500);
       expect(showSpy).toHaveBeenLastCalledWith(
         'Couldn\'t play "Remote Song" — Wrong username or password. Skipped.',
-        "error"
+        "error",
       );
 
       errorCallback?.({
@@ -198,22 +203,28 @@ describe("PlayerStore", () => {
           songId: 11,
           title: "Long",
           path: "http://nas/dav/Artist/Album/a_really_long_track_filename_here.flac",
-          message: "HTTP error 401 Unauthorized when accessing 'http://nas/dav/Artist/Album/a_really_long_track_filename_here.flac'.",
+          message:
+            "HTTP error 401 Unauthorized when accessing 'http://nas/dav/Artist/Album/a_really_long_track_filename_here.flac'.",
         },
       });
       await vi.advanceTimersByTimeAsync(500);
       expect(showSpy).toHaveBeenLastCalledWith(
         `Couldn't play "Long" — HTTP error 401 Unauthorized when accessing 'http://nas/…a_really_lon…e_here.flac'. Skipped.`,
-        "error"
+        "error",
       );
 
       errorCallback?.({
-        payload: { songId: 10, title: "Local Song", path: "/music/a.flac", message: "No such file" },
+        payload: {
+          songId: 10,
+          title: "Local Song",
+          path: "/music/a.flac",
+          message: "No such file",
+        },
       });
       await vi.advanceTimersByTimeAsync(500);
       expect(showSpy).toHaveBeenLastCalledWith(
         'Couldn\'t play "Local Song" — file not found. Skipped.',
-        "error"
+        "error",
       );
     } finally {
       vi.useRealTimers();
@@ -239,11 +250,16 @@ describe("PlayerStore", () => {
       unavailableCallback?.({ payload: { message: "no device" } });
       expect(showSpy).toHaveBeenCalledTimes(1);
       // No durationMs: the toast must wait for the user to dismiss it.
-      expect(showSpy).toHaveBeenCalledWith("Audio output unavailable. Connect a device and press play.", "error");
+      expect(showSpy).toHaveBeenCalledWith(
+        "Audio output unavailable. Connect a device and press play.",
+        "error",
+      );
 
       // A failed retry replaces the toast rather than stacking a second one.
       unavailableCallback?.({ payload: { message: "still no device" } });
-      expect(toastStore.messages.filter((m) => m.text.startsWith("Audio output unavailable"))).toHaveLength(1);
+      expect(
+        toastStore.messages.filter((m) => m.text.startsWith("Audio output unavailable")),
+      ).toHaveLength(1);
     } finally {
       vi.useRealTimers();
       showSpy.mockRestore();
@@ -271,7 +287,7 @@ describe("PlayerStore", () => {
       // Replaced, not stacked, and never auto-dismissed.
       expect(toasts).toHaveLength(1);
       expect(toasts[0].text).toBe(
-        "Couldn't start Exclusive Mode (WASAPI): another app is using the device. Playing through shared audio for now."
+        "Couldn't start Exclusive Mode (WASAPI): another app is using the device. Playing through shared audio for now.",
       );
       await vi.advanceTimersByTimeAsync(60_000);
       expect(toastStore.messages).toContainEqual(expect.objectContaining({ id: toasts[0].id }));
@@ -298,7 +314,8 @@ describe("PlayerStore", () => {
     const output = (bypasses: boolean, fellBack: boolean) => ({
       payload: { output_bypasses_mixer: bypasses, output_fell_back: fellBack },
     });
-    const fallbackToasts = () => toastStore.messages.filter((m) => m.text.startsWith("Couldn't start"));
+    const fallbackToasts = () =>
+      toastStore.messages.filter((m) => m.text.startsWith("Couldn't start"));
     const restoredToasts = () => toastStore.messages.filter((m) => m.text.includes("is back"));
 
     toastStore.messages = [];
@@ -316,7 +333,9 @@ describe("PlayerStore", () => {
       pipelineCallback?.(output(true, false));
       expect(fallbackToasts()).toHaveLength(0);
       expect(restoredToasts()).toHaveLength(1);
-      expect(restoredToasts()[0].text).toBe("Direct Hardware (ALSA) is back. Check your volume, then press Play to resume.");
+      expect(restoredToasts()[0].text).toBe(
+        "Direct Hardware (ALSA) is back. Check your volume, then press Play to resume.",
+      );
 
       // Later pipeline changes (a rate switch) don't announce it again.
       pipelineCallback?.(output(true, false));
@@ -389,8 +408,24 @@ describe("PlayerStore", () => {
     });
 
     playlistsStore.playlists = [
-      { id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 0, is_queue: true },
-      { id: 2, name: "Rock Classics", dynamic_enabled: false, created: 0, updated: 0, track_count: 5, is_queue: false },
+      {
+        id: 1,
+        name: "Queue",
+        dynamic_enabled: false,
+        created: 0,
+        updated: 0,
+        track_count: 0,
+        is_queue: true,
+      },
+      {
+        id: 2,
+        name: "Rock Classics",
+        dynamic_enabled: false,
+        created: 0,
+        updated: 0,
+        track_count: 5,
+        is_queue: false,
+      },
     ];
     const customPl = playlistsStore.playlists.find((p) => !p.is_queue);
     expect(customPl).toBeDefined();
@@ -449,10 +484,32 @@ describe("PlayerStore", () => {
         store = new PlayerStore();
         await new Promise((resolve) => setTimeout(resolve, 50));
         playlistsStore.playlists = [
-          { id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 1, is_queue: true },
-          { id: 2, name: "Rock Classics", dynamic_enabled: false, created: 0, updated: 0, track_count: 5, is_queue: false },
+          {
+            id: 1,
+            name: "Queue",
+            dynamic_enabled: false,
+            created: 0,
+            updated: 0,
+            track_count: 1,
+            is_queue: true,
+          },
+          {
+            id: 2,
+            name: "Rock Classics",
+            dynamic_enabled: false,
+            created: 0,
+            updated: 0,
+            track_count: 5,
+            is_queue: false,
+          },
         ];
-        const base = { position_nanosec: 0, volume: 1, shuffle_mode: "off", repeat_mode: "off", auto_continue: true };
+        const base = {
+          position_nanosec: 0,
+          volume: 1,
+          shuffle_mode: "off",
+          repeat_mode: "off",
+          auto_continue: true,
+        };
         await playbackStateCallback?.({
           payload: {
             ...base,
@@ -467,7 +524,14 @@ describe("PlayerStore", () => {
         expect(store.autoContinue).toBe(true);
         showSpy.mockClear();
         await playbackStateCallback?.({
-          payload: { ...base, state: "stopped", current_song: null, playlist_id: null, playlist_item_uuid: null, remaining_playlist_items: 0 },
+          payload: {
+            ...base,
+            state: "stopped",
+            current_song: null,
+            playlist_id: null,
+            playlist_item_uuid: null,
+            remaining_playlist_items: 0,
+          },
         });
         return showSpy.mock.calls.filter(([, variant]) => variant === "milestone");
       } finally {
@@ -493,7 +557,12 @@ describe("PlayerStore", () => {
   });
 
   describe("Session Wrap & Queue Completion (#1379)", () => {
-    async function finishPlayback(isMiniplayer: boolean, isQueue: boolean, contextName = "My Mix", isImmersive = false) {
+    async function finishPlayback(
+      isMiniplayer: boolean,
+      isQueue: boolean,
+      contextName = "My Mix",
+      isImmersive = false,
+    ) {
       const originalListenImpl = vi.mocked(listen).getMockImplementation();
       let playbackStateCallback: ((event: { payload: any }) => Promise<void>) | undefined;
       vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
@@ -507,8 +576,24 @@ describe("PlayerStore", () => {
         store = new PlayerStore();
         await new Promise((resolve) => setTimeout(resolve, 50));
         playlistsStore.playlists = [
-          { id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 2, is_queue: true },
-          { id: 2, name: "My Mix", dynamic_enabled: false, created: 0, updated: 0, track_count: 5, is_queue: false },
+          {
+            id: 1,
+            name: "Queue",
+            dynamic_enabled: false,
+            created: 0,
+            updated: 0,
+            track_count: 2,
+            is_queue: true,
+          },
+          {
+            id: 2,
+            name: "My Mix",
+            dynamic_enabled: false,
+            created: 0,
+            updated: 0,
+            track_count: 5,
+            is_queue: false,
+          },
         ];
         const plId = isQueue ? 1 : 2;
         // Seed session songs
@@ -587,10 +672,13 @@ describe("PlayerStore", () => {
       vi.mocked(invoke).mockClear();
 
       await store.replayCompletedSession();
-      expect(invoke).toHaveBeenCalledWith("play_songs", expect.objectContaining({
-        songIds: [10, 20],
-        startIndex: 0,
-      }));
+      expect(invoke).toHaveBeenCalledWith(
+        "play_songs",
+        expect.objectContaining({
+          songIds: [10, 20],
+          startIndex: 0,
+        }),
+      );
     });
 
     it("replays completed session on togglePlayPause when stopped (#1380)", async () => {
@@ -599,10 +687,13 @@ describe("PlayerStore", () => {
       vi.mocked(invoke).mockClear();
 
       await store.togglePlayPause();
-      expect(invoke).toHaveBeenCalledWith("play_songs", expect.objectContaining({
-        songIds: [10, 20],
-        startIndex: 0,
-      }));
+      expect(invoke).toHaveBeenCalledWith(
+        "play_songs",
+        expect.objectContaining({
+          songIds: [10, 20],
+          startIndex: 0,
+        }),
+      );
     });
 
     it("shuffles library songs and plays them on shuffleLibrary", async () => {
@@ -610,9 +701,12 @@ describe("PlayerStore", () => {
       vi.mocked(invoke).mockClear();
 
       await store.shuffleLibrary(mockSongs);
-      expect(invoke).toHaveBeenCalledWith("play_songs", expect.objectContaining({
-        startIndex: 0,
-      }));
+      expect(invoke).toHaveBeenCalledWith(
+        "play_songs",
+        expect.objectContaining({
+          startIndex: 0,
+        }),
+      );
       const call = vi.mocked(invoke).mock.calls.find(([cmd]) => cmd === "play_songs");
       expect(call).toBeDefined();
       const songIds = (call![1] as any).songIds;
@@ -621,7 +715,9 @@ describe("PlayerStore", () => {
     });
 
     it("updates playlistIndex and playlistTotal on playback-state event and derives queueProgressText (#1605)", async () => {
-      const playbackStateCall = vi.mocked(listen).mock.calls.find(([event]) => event === "playback-state");
+      const playbackStateCall = vi
+        .mocked(listen)
+        .mock.calls.find(([event]) => event === "playback-state");
       expect(playbackStateCall).toBeDefined();
       const playbackStateCallback = playbackStateCall![1] as (event: any) => Promise<void>;
 
@@ -666,4 +762,3 @@ describe("PlayerStore", () => {
     });
   });
 });
-

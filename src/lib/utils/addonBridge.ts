@@ -62,6 +62,6 @@ export function spectrumMessage(bins: number[]): OverlayMessage {
     bass: clamp01(average(bins, 0, 8)),
     mid: clamp01(average(bins, 8, 20)),
     treble: clamp01(average(bins, 20, 32)),
-    bars: bins.map(clamp01)
+    bars: bins.map(clamp01),
   };
 }

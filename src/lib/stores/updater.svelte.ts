@@ -121,9 +121,11 @@ class UpdaterStore {
       }
 
       // Back online: catch up on the check that was skipped while offline.
-      void this.events.listen<boolean>("online-mode-changed", (event) => {
-        if (event.payload && this.updateCheckEnabled) void this.checkForUpdates();
-      }).catch(() => {});
+      void this.events
+        .listen<boolean>("online-mode-changed", (event) => {
+          if (event.payload && this.updateCheckEnabled) void this.checkForUpdates();
+        })
+        .catch(() => {});
 
       // 3. Perform check & setup interval if enabled
       if (this.updateCheckEnabled) {
@@ -159,7 +161,12 @@ class UpdaterStore {
     } catch (e) {
       console.error("Failed to save update_auto_install setting:", e);
     }
-    if (enabled && this.updateAvailable && this.installFormat.supports_self_update && this.installStatus === "idle") {
+    if (
+      enabled &&
+      this.updateAvailable &&
+      this.installFormat.supports_self_update &&
+      this.installStatus === "idle"
+    ) {
       this.downloadAndInstall();
     }
   }
@@ -171,7 +178,8 @@ class UpdaterStore {
     }
     if (!this.updateCheckEnabled) await this.setUpdateCheckEnabled(true);
     const wantsAutoInstall = policy === "auto";
-    if (this.updateAutoInstall !== wantsAutoInstall) await this.setUpdateAutoInstall(wantsAutoInstall);
+    if (this.updateAutoInstall !== wantsAutoInstall)
+      await this.setUpdateAutoInstall(wantsAutoInstall);
   }
 
   startPeriodicCheck() {
@@ -250,7 +258,11 @@ class UpdaterStore {
   }
 
   async downloadAndInstall() {
-    if (!this.pendingUpdate || !this.installFormat.supports_self_update || this.installStatus === "downloading") {
+    if (
+      !this.pendingUpdate ||
+      !this.installFormat.supports_self_update ||
+      this.installStatus === "downloading"
+    ) {
       return;
     }
     if (!(await this.isOnline())) return;
@@ -286,7 +298,11 @@ class UpdaterStore {
       });
       this.installStatus = "ready-to-restart";
       toastStore.show(
-        i18n.t("settings.updateReadyToRestart", {}, "Update downloaded — restart to finish installing."),
+        i18n.t(
+          "settings.updateReadyToRestart",
+          {},
+          "Update downloaded — restart to finish installing.",
+        ),
         "success",
         undefined,
         undefined,
@@ -294,7 +310,7 @@ class UpdaterStore {
           label: i18n.t("settings.updateRestartBtn", {}, "Restart to Update"),
           onClick: () => this.restartNow(),
           icon: "refresh",
-        }
+        },
       );
     } catch (err: unknown) {
       console.error("Failed to download and install update:", err);
@@ -317,10 +333,7 @@ class UpdaterStore {
       console.error("Failed to restart for update:", err);
       this.installStatus = "error";
       this.errorMessage = extractErrorMessage(err, i18n.t("settings.updateRestartFailed"));
-      toastStore.show(
-        i18n.t("settings.updateInstallError", {}, "Update failed."),
-        "error"
-      );
+      toastStore.show(i18n.t("settings.updateInstallError", {}, "Update failed."), "error");
     }
   }
 

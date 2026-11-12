@@ -22,7 +22,7 @@
       ? {
           r: parseInt(result[1], 16),
           g: parseInt(result[2], 16),
-          b: parseInt(result[3], 16)
+          b: parseInt(result[3], 16),
         }
       : null;
   }
@@ -88,8 +88,8 @@
 
   $effect(() => {
     const colors = themeStore.resolvedColors;
-    accentColor = colors["color-accent"] || '#8b5cf6';
-    hoverColor = colors["color-accent-hover"] || '#a78bfa';
+    accentColor = colors["color-accent"] || "#8b5cf6";
+    hoverColor = colors["color-accent-hover"] || "#a78bfa";
     scheduleDraw();
   });
 
@@ -128,5 +128,7 @@
   });
 </script>
 
-<canvas bind:this={canvas} class="w-full h-full opacity-85 hover:opacity-100 transition-opacity duration-300"></canvas>
-
+<canvas
+  bind:this={canvas}
+  class="w-full h-full opacity-85 hover:opacity-100 transition-opacity duration-300"
+></canvas>

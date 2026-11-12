@@ -34,7 +34,9 @@
 </script>
 
 <Modal onClose={onCancel} maxWidth="max-w-sm">
-  <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
+  <div
+    class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main"
+  >
     <div class="flex items-center gap-2">
       <FolderPlus class="w-4 h-4 text-brand-accent-text" />
       <h3 class="text-sm font-bold">
@@ -43,7 +45,10 @@
           : i18n.t("songTags.createGroupTitle", {}, "Create Tag Group")}
       </h3>
     </div>
-    <button onclick={onCancel} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
+    <button
+      onclick={onCancel}
+      class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+    >
       <X class="w-4 h-4" />
     </button>
   </div>
@@ -52,11 +57,17 @@
     {#if initialTags.length > 0}
       <div class="flex flex-col gap-1.5">
         <span class="text-xs text-brand-text-secondary font-medium">
-          {i18n.t("songTags.selectedCount", { count: initialTags.length }, `${initialTags.length} selected`)}:
+          {i18n.t(
+            "songTags.selectedCount",
+            { count: initialTags.length },
+            `${initialTags.length} selected`,
+          )}:
         </span>
         <div class="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
           {#each initialTags as tag (tag)}
-            <span class="px-2 py-0.5 rounded-full text-xs bg-brand-sidebar border border-brand-border text-brand-text-primary">
+            <span
+              class="px-2 py-0.5 rounded-full text-xs bg-brand-sidebar border border-brand-border text-brand-text-primary"
+            >
               {tag}
             </span>
           {/each}
@@ -82,12 +93,7 @@
       <Button variant="secondary" size="sm" onclick={onCancel}>
         {i18n.t("songTags.cancelBtn", {}, "Cancel")}
       </Button>
-      <Button
-        variant="primary"
-        size="sm"
-        disabled={!groupName.trim()}
-        onclick={handleSubmit}
-      >
+      <Button variant="primary" size="sm" disabled={!groupName.trim()} onclick={handleSubmit}>
         {initialTags.length > 0
           ? i18n.t("songTags.groupSelected", {}, "Group Selected")
           : i18n.t("songTags.createGroupBtn", {}, "Create")}

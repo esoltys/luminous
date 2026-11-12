@@ -105,9 +105,30 @@ describe("ArtistEventsSection", () => {
 
   it("sorts past events descending with most recent on top", async () => {
     const pastList: ArtistEvent[] = [
-      { id: "e1", name: "Old Show 2017", begin_date: "2017-05-01", cancelled: false, ticket_urls: [], event_urls: [] },
-      { id: "e2", name: "Recent Show 2023", begin_date: "2023-09-01", cancelled: false, ticket_urls: [], event_urls: [] },
-      { id: "e3", name: "Mid Show 2020", begin_date: "2020-01-15", cancelled: false, ticket_urls: [], event_urls: [] },
+      {
+        id: "e1",
+        name: "Old Show 2017",
+        begin_date: "2017-05-01",
+        cancelled: false,
+        ticket_urls: [],
+        event_urls: [],
+      },
+      {
+        id: "e2",
+        name: "Recent Show 2023",
+        begin_date: "2023-09-01",
+        cancelled: false,
+        ticket_urls: [],
+        event_urls: [],
+      },
+      {
+        id: "e3",
+        name: "Mid Show 2020",
+        begin_date: "2020-01-15",
+        cancelled: false,
+        ticket_urls: [],
+        event_urls: [],
+      },
     ];
 
     const { container } = render(ArtistEventsSection, {
@@ -120,8 +141,9 @@ describe("ArtistEventsSection", () => {
     const toggleBtn = screen.getByText(/Show past events/i);
     await fireEvent.click(toggleBtn);
 
-    const eventNames = Array.from(container.querySelectorAll(".text-brand-text-primary.truncate"))
-      .map((el) => el.textContent?.trim());
+    const eventNames = Array.from(
+      container.querySelectorAll(".text-brand-text-primary.truncate"),
+    ).map((el) => el.textContent?.trim());
 
     expect(eventNames).toEqual(["Recent Show 2023", "Mid Show 2020", "Old Show 2017"]);
   });
@@ -132,7 +154,8 @@ describe("ArtistEventsSection", () => {
       props: {
         events: sampleEvents,
         artistName: "Coldplay",
-        musicbrainzUrl: "https://musicbrainz.org/artist/cc197027-5f32-4d2b-add3-13eac73b1230/events",
+        musicbrainzUrl:
+          "https://musicbrainz.org/artist/cc197027-5f32-4d2b-add3-13eac73b1230/events",
         onOpenUrl: handleOpenUrl,
       },
     });
@@ -141,7 +164,7 @@ describe("ArtistEventsSection", () => {
     expect(headerBtn).toBeTruthy();
     await fireEvent.click(headerBtn);
     expect(handleOpenUrl).toHaveBeenCalledWith(
-      "https://musicbrainz.org/artist/cc197027-5f32-4d2b-add3-13eac73b1230/events"
+      "https://musicbrainz.org/artist/cc197027-5f32-4d2b-add3-13eac73b1230/events",
     );
   });
 
@@ -251,13 +274,10 @@ describe("ArtistEventsSection", () => {
 
     // Dated event should appear before undated event in the DOM
     const eventTitles = Array.from(
-      container.querySelectorAll(".font-medium.text-brand-text-primary.text-xs")
+      container.querySelectorAll(".font-medium.text-brand-text-primary.text-xs"),
     ).map((el) => el.textContent?.trim());
 
-    expect(eventTitles).toEqual([
-      "The Age of Pleasure: Portland",
-      "The Age of Pleasure: Seattle",
-    ]);
+    expect(eventTitles).toEqual(["The Age of Pleasure: Portland", "The Age of Pleasure: Seattle"]);
   });
 
   it("renders year-only date badge when event date only has a year", () => {
@@ -283,4 +303,3 @@ describe("ArtistEventsSection", () => {
     expect(screen.getByText("2099")).toBeTruthy();
   });
 });
-

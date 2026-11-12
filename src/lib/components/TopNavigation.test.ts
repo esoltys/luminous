@@ -8,7 +8,6 @@ import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { filesStore } from "../stores/files.svelte";
 
-
 describe("TopNavigation.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -24,7 +23,12 @@ describe("TopNavigation.svelte", () => {
     navigationStore.activeTab = "collection";
     navigationStore.filesLocation = null;
     filesStore.sources = [
-      { source: { kind: "folder", id: 1 }, name: "Lossless archive", songCount: 15, available: true },
+      {
+        source: { kind: "folder", id: 1 },
+        name: "Lossless archive",
+        songCount: 15,
+        available: true,
+      },
     ];
     filesStore.filterQuery = "";
     filesStore.filterMatchCount = 0;
@@ -82,12 +86,20 @@ describe("TopNavigation.svelte", () => {
 
     const portrait = await findByAltText("Dave Hawkins");
     expect(portrait.tagName).toBe("IMG");
-    expect(portrait.getAttribute("src")).toBe("luminous-art://local/C:/Music/Dave Hawkins/artist.jpg");
+    expect(portrait.getAttribute("src")).toBe(
+      "luminous-art://local/C:/Music/Dave Hawkins/artist.jpg",
+    );
   });
 
   it("shows a discovered artist portrait instead of the generic icon in Recent Searches (#98/#761)", async () => {
     collectionStore.recentSearches = [
-      { id: "1", kind: "artist", title: "Dave Hawkins", subtitle: "Artist", timestamp: 1_700_000_000_000 },
+      {
+        id: "1",
+        kind: "artist",
+        title: "Dave Hawkins",
+        subtitle: "Artist",
+        timestamp: 1_700_000_000_000,
+      },
     ];
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_extended_artwork_for_artist") {
@@ -110,7 +122,9 @@ describe("TopNavigation.svelte", () => {
 
     const portrait = await findByAltText("Dave Hawkins");
     expect(portrait.tagName).toBe("IMG");
-    expect(portrait.getAttribute("src")).toBe("luminous-art://local/C:/Music/Dave Hawkins/artist.jpg");
+    expect(portrait.getAttribute("src")).toBe(
+      "luminous-art://local/C:/Music/Dave Hawkins/artist.jpg",
+    );
   });
 
   it("falls back to the stored artUrl for a Recent Searches artist with no discovered portrait", async () => {
@@ -148,13 +162,18 @@ describe("TopNavigation.svelte", () => {
 
   it("switches to folder filter mode when a folder is open in Files and escapes to whole-library search (#1886)", async () => {
     navigationStore.activeTab = "files";
-    navigationStore.filesLocation = { source: { kind: "folder", id: 1 }, path: ["Katatonia", "2006 - The Great Cold Distance"] };
+    navigationStore.filesLocation = {
+      source: { kind: "folder", id: 1 },
+      path: ["Katatonia", "2006 - The Great Cold Distance"],
+    };
     filesStore.activeFolderTitle = "2006 - The Great Cold Distance";
     filesStore.filterMatchCount = 2;
     filesStore.filterTotalCount = 15;
 
     const { getByPlaceholderText, getByTestId, getByText } = render(TopNavigation);
-    const input = getByPlaceholderText("Filter 2006 - The Great Cold Distance…") as HTMLInputElement;
+    const input = getByPlaceholderText(
+      "Filter 2006 - The Great Cold Distance…",
+    ) as HTMLInputElement;
 
     await fireEvent.focus(input);
     expect(getByText("Filter this folder by name, type or library status")).toBeInTheDocument();

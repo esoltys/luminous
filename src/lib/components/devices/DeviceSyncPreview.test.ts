@@ -14,8 +14,20 @@ const device: ConnectedDevice = {
   kind: "massStorage",
   model: null,
   defaultName: "Walkman",
-  storages: [{ id: "E:\\", label: null, mountPath: "E:\\", filesystem: "exFAT", totalBytes: 64 * GB, freeBytes: 20 * GB }],
-  profile: { nickname: null, convert: { mode: "unsupported", format: "aac", bitrateKbps: 256 } } as unknown as ConnectedDevice["profile"],
+  storages: [
+    {
+      id: "E:\\",
+      label: null,
+      mountPath: "E:\\",
+      filesystem: "exFAT",
+      totalBytes: 64 * GB,
+      freeBytes: 20 * GB,
+    },
+  ],
+  profile: {
+    nickname: null,
+    convert: { mode: "unsupported", format: "aac", bitrateKbps: 256 },
+  } as unknown as ConnectedDevice["profile"],
   lastSyncedAt: null,
 };
 
@@ -27,7 +39,10 @@ const state: DeviceSyncState = {
 
 const none: SyncChangeList = { songs: 0, bytes: 0, items: [] };
 
-function plan(overrides: Partial<SyncPlan> = {}, storage: Partial<SyncPlan["storage"]> = {}): SyncPlan {
+function plan(
+  overrides: Partial<SyncPlan> = {},
+  storage: Partial<SyncPlan["storage"]> = {},
+): SyncPlan {
   return {
     planId: "plan-1",
     deviceId: device.id,
@@ -65,14 +80,16 @@ const tooBig = plan(
     conversionTarget: { format: "aac", bitrateKbps: 256, substituted: false, devicePlays: true },
     shortfall: { bytes: 6 * GB, largestSource: null, convertAllSavingBytes: 12 * GB },
   },
-  { copiedBytes: 26 * GB, freeAfterBytes: -6 * GB, fits: false }
+  { copiedBytes: 26 * GB, freeAfterBytes: -6 * GB, fits: false },
 );
 
 function setup(shown: SyncPlan) {
   const onback = vi.fn();
   const onplan = vi.fn();
   const onstarted = vi.fn();
-  const result = render(DeviceSyncPreview, { props: { device, plan: shown, onback, onplan, onstarted } });
+  const result = render(DeviceSyncPreview, {
+    props: { device, plan: shown, onback, onplan, onstarted },
+  });
   return { ...result, onback, onplan, onstarted };
 }
 

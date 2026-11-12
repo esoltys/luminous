@@ -11,7 +11,7 @@
     ArrowSquareOutIcon as OpenInPicard,
     ChartBarIcon as BarChart2,
     ShareNetworkIcon as Share,
-    ShieldCheckIcon as ShieldCheck
+    ShieldCheckIcon as ShieldCheck,
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -79,7 +79,9 @@
         const songIds = playable.map((s) => s.id);
         await playlistsStore.addSongsToQueue(songIds);
         const name = albumName || i18n.t("collection.unknownAlbum");
-        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
+        toastStore.show(
+          i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`),
+        );
       }
     } catch (err) {
       console.error("Failed to add album to Queue:", err);
@@ -105,12 +107,21 @@
     try {
       const songs = await invoke<Song[]>("get_songs_by_album", { album: albumName || "" });
       const lossless = songs.filter(
-        (s) => isLosslessFileType(s.filetype) && (s.source === "local_file" || s.source === "collection")
+        (s) =>
+          isLosslessFileType(s.filetype) &&
+          (s.source === "local_file" || s.source === "collection"),
       );
       if (lossless.length > 0) {
-        await provenanceStore.verifySongs(lossless.map((s) => s.id), albumName);
+        await provenanceStore.verifySongs(
+          lossless.map((s) => s.id),
+          albumName,
+        );
       } else {
-        toastStore.show(i18n.t("collection.noLosslessTracks", {}, "No local lossless tracks in this album"), "info", TOAST_DURATION_MS);
+        toastStore.show(
+          i18n.t("collection.noLosslessTracks", {}, "No local lossless tracks in this album"),
+          "info",
+          TOAST_DURATION_MS,
+        );
       }
     } catch (err) {
       console.error("Failed to verify album authenticity:", err);
@@ -123,7 +134,11 @@
   }
 
   async function handleAddToCustomPlaylist(targetPlaylist: Playlist) {
-    if (onAddToPlaylist && playlistsStore.activeCustomPlaylist && targetPlaylist.id === playlistsStore.activeCustomPlaylist.id) {
+    if (
+      onAddToPlaylist &&
+      playlistsStore.activeCustomPlaylist &&
+      targetPlaylist.id === playlistsStore.activeCustomPlaylist.id
+    ) {
       onAddToPlaylist();
       return;
     }
@@ -148,112 +163,138 @@
 </script>
 
 {#if menuVisible}
-<ContextMenu {x} {y} {onClose}>
-  <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
-    {albumName || i18n.t("collection.unknownAlbum")}
-  </div>
+  <ContextMenu {x} {y} {onClose}>
+    <div
+      class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate"
+    >
+      {albumName || i18n.t("collection.unknownAlbum")}
+    </div>
 
-  <ContextMenuItem
-    icon={Play}
-    accent
-    label={i18n.t("playlists.contextMenuPlayAlbum")}
-    onclick={() => { onPlay(); onClose(); }}
-  />
+    <ContextMenuItem
+      icon={Play}
+      accent
+      label={i18n.t("playlists.contextMenuPlayAlbum")}
+      onclick={() => {
+        onPlay();
+        onClose();
+      }}
+    />
 
-  <ContextMenuItem
-    icon={Layers}
-    label={i18n.t("playlists.contextMenuAddQueue", {}, "Add to Queue")}
-    onclick={async () => {
-      if (onAddToQueue) {
-        onAddToQueue();
-      } else {
-        await handleDefaultAddToQueue();
-      }
-      onClose();
-    }}
-  />
+    <ContextMenuItem
+      icon={Layers}
+      label={i18n.t("playlists.contextMenuAddQueue", {}, "Add to Queue")}
+      onclick={async () => {
+        if (onAddToQueue) {
+          onAddToQueue();
+        } else {
+          await handleDefaultAddToQueue();
+        }
+        onClose();
+      }}
+    />
 
-  <AddToPlaylistSubmenu
-    onSelectPlaylist={handleAddToCustomPlaylist}
-    onCreatePlaylist={handleCreateAndAddToPlaylist}
-    {onClose}
-  />
-
-  {#if albumName}
-    <AddToDeviceMenuItem
-      source={{ kind: "album", album: albumName, artist: artistName || "" }}
-      sourceName={artistName ? `${albumName} — ${artistName}` : albumName}
+    <AddToPlaylistSubmenu
+      onSelectPlaylist={handleAddToCustomPlaylist}
+      onCreatePlaylist={handleCreateAndAddToPlaylist}
       {onClose}
     />
-  {/if}
 
-  {#if onGoToArtist && artistName}
-    <ContextMenuDivider />
-    <ContextMenuItem
-      icon={Mic2}
-      label={i18n.t("playlists.contextMenuGoArtist")}
-      onclick={() => { onGoToArtist?.(); onClose(); }}
-    />
-  {/if}
+    {#if albumName}
+      <AddToDeviceMenuItem
+        source={{ kind: "album", album: albumName, artist: artistName || "" }}
+        sourceName={artistName ? `${albumName} — ${artistName}` : albumName}
+        {onClose}
+      />
+    {/if}
 
-  {#if albumName}
-    <ContextMenuDivider />
-    <ContextMenuItem
-      icon={Edit3}
-      label={i18n.t("albumDetail.editInfoTooltip")}
-      onclick={() => {
-        if (onEditAlbum) {
-          onEditAlbum();
-        } else {
-          navigationStore.viewAlbum(albumName, undefined, albumKey);
-        }
-        onClose();
-      }}
-    />
-    <ContextMenuItem
-      icon={OpenInPicard}
-      label={i18n.t("picard.openInPicard")}
-      onclick={async () => {
-        if (onOpenInPicard) {
-          onOpenInPicard();
-        } else {
-          await handleDefaultOpenInPicard();
-        }
-        onClose();
-      }}
-      disabled={!picardStore.available}
-      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
-    />
-    <ContextMenuItem
-      icon={ShieldCheck}
-      label={i18n.t("collection.verifyAuthenticity", {}, "Verify Audio Authenticity")}
-      onclick={() => { handleVerifyAlbum(); onClose(); }}
-    />
-    <ViewInFilesItem album={albumName} {onClose} />
-    <ContextMenuItem
-      icon={Share}
-      label={i18n.t("shareModal.menuItem")}
-      onclick={() => { menuVisible = false; showShareModal = true; }}
-    />
-    <ContextMenuDivider />
-    <ContextMenuItem
-      icon={pinnedStore.isPinned("album", albumName) ? PinOff : Pin}
-      label={pinnedStore.isPinned("album", albumName)
-        ? i18n.t("playlists.contextMenuUnpinHome")
-        : i18n.t("playlists.contextMenuPinHome")}
-      onclick={() => { pinnedStore.toggle("album", albumName); onClose(); }}
-    />
-    <ContextMenuItem
-      icon={BarChart2}
-      label={statsExclusionsStore.isExcluded("album", albumName)
-        ? i18n.t("stats.includeInStats")
-        : i18n.t("stats.excludeFromStats")}
-      onclick={() => { handleToggleStatsExcluded(); onClose(); }}
-    />
-  {/if}
-</ContextMenu>
+    {#if onGoToArtist && artistName}
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={Mic2}
+        label={i18n.t("playlists.contextMenuGoArtist")}
+        onclick={() => {
+          onGoToArtist?.();
+          onClose();
+        }}
+      />
+    {/if}
+
+    {#if albumName}
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={Edit3}
+        label={i18n.t("albumDetail.editInfoTooltip")}
+        onclick={() => {
+          if (onEditAlbum) {
+            onEditAlbum();
+          } else {
+            navigationStore.viewAlbum(albumName, undefined, albumKey);
+          }
+          onClose();
+        }}
+      />
+      <ContextMenuItem
+        icon={OpenInPicard}
+        label={i18n.t("picard.openInPicard")}
+        onclick={async () => {
+          if (onOpenInPicard) {
+            onOpenInPicard();
+          } else {
+            await handleDefaultOpenInPicard();
+          }
+          onClose();
+        }}
+        disabled={!picardStore.available}
+        title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+      />
+      <ContextMenuItem
+        icon={ShieldCheck}
+        label={i18n.t("collection.verifyAuthenticity", {}, "Verify Audio Authenticity")}
+        onclick={() => {
+          handleVerifyAlbum();
+          onClose();
+        }}
+      />
+      <ViewInFilesItem album={albumName} {onClose} />
+      <ContextMenuItem
+        icon={Share}
+        label={i18n.t("shareModal.menuItem")}
+        onclick={() => {
+          menuVisible = false;
+          showShareModal = true;
+        }}
+      />
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={pinnedStore.isPinned("album", albumName) ? PinOff : Pin}
+        label={pinnedStore.isPinned("album", albumName)
+          ? i18n.t("playlists.contextMenuUnpinHome")
+          : i18n.t("playlists.contextMenuPinHome")}
+        onclick={() => {
+          pinnedStore.toggle("album", albumName);
+          onClose();
+        }}
+      />
+      <ContextMenuItem
+        icon={BarChart2}
+        label={statsExclusionsStore.isExcluded("album", albumName)
+          ? i18n.t("stats.includeInStats")
+          : i18n.t("stats.excludeFromStats")}
+        onclick={() => {
+          handleToggleStatsExcluded();
+          onClose();
+        }}
+      />
+    {/if}
+  </ContextMenu>
 {/if}
 
 {#if showShareModal}
-  <ShareModal entity={{ kind: "album", albumName }} onClose={() => { showShareModal = false; onClose(); }} />
+  <ShareModal
+    entity={{ kind: "album", albumName }}
+    onClose={() => {
+      showShareModal = false;
+      onClose();
+    }}
+  />
 {/if}

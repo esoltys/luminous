@@ -57,7 +57,9 @@
     }
   }
 
-  let contextMenuTarget = $state<{ x: number; y: number; name: string; isRoot: boolean } | null>(null);
+  let contextMenuTarget = $state<{ x: number; y: number; name: string; isRoot: boolean } | null>(
+    null,
+  );
   let renamingTag = $state<string | null>(null);
   let renameValue = $state("");
   let deleteConfirmName = $state<string | null>(null);
@@ -84,8 +86,12 @@
     if (!from || !into || into === from) return;
     const count = await tagsStore.mergeArtistTags(from, into);
     toastStore.show(
-      i18n.t("songTags.artistRenameToast", { count, name: into }, `Renamed to "${into}" (${count} artists updated)`),
-      "success"
+      i18n.t(
+        "songTags.artistRenameToast",
+        { count, name: into },
+        `Renamed to "${into}" (${count} artists updated)`,
+      ),
+      "success",
     );
   }
 
@@ -94,19 +100,19 @@
     deleteConfirmName = null;
     if (!name) return;
     const count = await tagsStore.deleteArtistTags([name]);
-    toastStore.show(
-      i18n.plural("songTags.artistDeleteToast", count),
-      "success"
-    );
+    toastStore.show(i18n.plural("songTags.artistDeleteToast", count), "success");
   }
 
   let sortedHierarchy = $derived.by(() => {
     const dir = sortAsc ? 1 : -1;
-    const cmp = (a: { name: string; song_count: number }, b: { name: string; song_count: number }) =>
-      sortField === "name" ? a.name.localeCompare(b.name) * dir : (a.song_count - b.song_count) * dir;
-    return effectiveHierarchy
-      .map((g) => ({ ...g, children: [...g.children].sort(cmp) }))
-      .sort(cmp);
+    const cmp = (
+      a: { name: string; song_count: number },
+      b: { name: string; song_count: number },
+    ) =>
+      sortField === "name"
+        ? a.name.localeCompare(b.name) * dir
+        : (a.song_count - b.song_count) * dir;
+    return effectiveHierarchy.map((g) => ({ ...g, children: [...g.children].sort(cmp) })).sort(cmp);
   });
 
   let draggedChip = $state<{ name: string; fromGroup: string } | null>(null);
@@ -153,7 +159,7 @@
       onMove: handlePointerMove,
       onDrop: handleDrop,
       onTap: handleTap,
-      onCancel: endDrag
+      onCancel: endDrag,
     });
     if (!tagDrag) return;
     // Right-click (and middle-click) never reach here: calling preventDefault on any
@@ -178,7 +184,11 @@
     const headerEl = el?.closest<HTMLElement>("[data-artist-card-header]");
     const cardEl = el?.closest<HTMLElement>("[data-artist-card-name]");
     if (chipEl) {
-      dropTarget = { kind: "chip", group: chipEl.dataset.artistChipGroup!, chip: chipEl.dataset.artistChipKey! };
+      dropTarget = {
+        kind: "chip",
+        group: chipEl.dataset.artistChipGroup!,
+        chip: chipEl.dataset.artistChipKey!,
+      };
     } else if (headerEl) {
       dropTarget = { kind: "header", group: headerEl.dataset.artistCardHeader! };
     } else if (cardEl) {
@@ -196,7 +206,11 @@
   }
 
   let dropApplies = $derived(
-    draggedCard ? cardDropApplies(draggedCard, dropTarget) : draggedChip ? chipDropAction(draggedChip, dropTarget) !== null : false
+    draggedCard
+      ? cardDropApplies(draggedCard, dropTarget)
+      : draggedChip
+        ? chipDropAction(draggedChip, dropTarget) !== null
+        : false,
   );
 
   function handleTap() {
@@ -229,7 +243,8 @@
         break;
       case "reorder": {
         const group = effectiveHierarchy.find((g) => g.name === chip.fromGroup);
-        const newIndex = group?.children.findIndex((c: TagGroupChild) => c.name === target!.chip) ?? 0;
+        const newIndex =
+          group?.children.findIndex((c: TagGroupChild) => c.name === target!.chip) ?? 0;
         await tagsStore.reorderArtistTagInGroup(chip.name, newIndex);
         break;
       }
@@ -241,26 +256,43 @@
 
 <div class="grid grid-cols-1 @xl:grid-cols-2 @5xl:grid-cols-3 gap-3">
   {#each sortedHierarchy as group (group.name)}
-    {@const cardHighlighted = (dropTarget?.kind === 'card' || dropTarget?.kind === 'header') && dropTarget.group === group.name && (draggedChip || draggedCard)}
+    {@const cardHighlighted =
+      (dropTarget?.kind === "card" || dropTarget?.kind === "header") &&
+      dropTarget.group === group.name &&
+      (draggedChip || draggedCard)}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       data-artist-card-name={group.name}
       onclick={(e) => handleCardClick(e, group.name)}
-      class="rounded-lg bg-brand-sidebar border-2 overflow-hidden transition-[opacity,box-shadow,border-color,transform] cursor-pointer {draggedCard === group.name ? 'opacity-40' : ''} {cardHighlighted ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5' : ''}"
-      style={cardHighlighted ? '' : `border-color: ${genreColorHsl(group.color_index)}`}
+      class="rounded-lg bg-brand-sidebar border-2 overflow-hidden transition-[opacity,box-shadow,border-color,transform] cursor-pointer {draggedCard ===
+      group.name
+        ? 'opacity-40'
+        : ''} {cardHighlighted
+        ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5'
+        : ''}"
+      style={cardHighlighted ? "" : `border-color: ${genreColorHsl(group.color_index)}`}
     >
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         data-artist-card-header={group.name}
         oncontextmenu={(e) => openContextMenu(e, group.name, true)}
-        class="flex items-center gap-2 px-3 py-2.5 transition-colors {dropTarget?.kind === 'header' && dropTarget.group === group.name ? 'bg-brand-accent/25' : ''}"
+        class="flex items-center gap-2 px-3 py-2.5 transition-colors {dropTarget?.kind ===
+          'header' && dropTarget.group === group.name
+          ? 'bg-brand-accent/25'
+          : ''}"
       >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span
           onpointerdown={(e) => handleCardPointerDown(e, group.name)}
-          class="shrink-0 touch-none artist-drag-handle {draggedCard === group.name ? 'is-dragging' : ''} text-brand-text-secondary/50 hover:text-brand-text-secondary"
-          title={i18n.t("songTags.dragArtistCardTooltip", {}, "Drag to make this a sub-tag of another card")}
+          class="shrink-0 touch-none artist-drag-handle {draggedCard === group.name
+            ? 'is-dragging'
+            : ''} text-brand-text-secondary/50 hover:text-brand-text-secondary"
+          title={i18n.t(
+            "songTags.dragArtistCardTooltip",
+            {},
+            "Drag to make this a sub-tag of another card",
+          )}
         >
           <GripVertical class="w-3.5 h-3.5" />
         </span>
@@ -314,7 +346,12 @@
             data-artist-chip-group={group.name}
             onpointerdown={(e) => handleChipPointerDown(e, child.name, group.name)}
             oncontextmenu={(e) => openContextMenu(e, child.name, false)}
-            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] artist-drag-handle {draggedChip?.name === child.name ? 'is-dragging opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : ''}"
+            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] artist-drag-handle {draggedChip?.name ===
+            child.name
+              ? 'is-dragging opacity-40'
+              : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name
+              ? 'ring-4 ring-brand-accent scale-110'
+              : ''}"
             style={`border-color: ${genreColorHsl(group.color_index)};`}
           >
             {#if renamingTag === child.name}
@@ -365,7 +402,10 @@
     <ColorPicker
       choices={genreColorChoices}
       value={group ? String(group.color_index) : null}
-      onChange={(v) => { tagsStore.setArtistGroupColor(colorPopoverFor!, Number(v)); colorPopoverFor = null; }}
+      onChange={(v) => {
+        tagsStore.setArtistGroupColor(colorPopoverFor!, Number(v));
+        colorPopoverFor = null;
+      }}
       size="sm"
       columns={5}
     />
@@ -379,9 +419,15 @@
     name={contextMenuTarget.name}
     isRoot={contextMenuTarget.isRoot}
     onRename={() => startRename(contextMenuTarget!.name)}
-    onPromote={contextMenuTarget.isRoot ? undefined : () => tagsStore.promoteArtistTag(contextMenuTarget!.name)}
-    onDelete={() => { deleteConfirmName = contextMenuTarget!.name; }}
-    onClose={() => { contextMenuTarget = null; }}
+    onPromote={contextMenuTarget.isRoot
+      ? undefined
+      : () => tagsStore.promoteArtistTag(contextMenuTarget!.name)}
+    onDelete={() => {
+      deleteConfirmName = contextMenuTarget!.name;
+    }}
+    onClose={() => {
+      contextMenuTarget = null;
+    }}
   />
 {/if}
 
@@ -392,7 +438,9 @@
     confirmLabel={i18n.t("songTags.deleteBtn", {}, "Delete")}
     cancelLabel={i18n.t("songTags.cancelBtn", {}, "Cancel")}
     onConfirm={confirmDeleteTag}
-    onCancel={() => { deleteConfirmName = null; }}
+    onCancel={() => {
+      deleteConfirmName = null;
+    }}
   />
 {/if}
 

@@ -4,7 +4,13 @@
  * images only — see BlurredCover.svelte — so a plain O(w·h·passes) loop is
  * plenty; WebKitGTK has no CanvasRenderingContext2D.filter to do it instead.
  */
-export function boxBlurRGBA(data: Uint8ClampedArray, width: number, height: number, radius: number, passes = 3): void {
+export function boxBlurRGBA(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  radius: number,
+  passes = 3,
+): void {
   if (radius < 1 || width === 0 || height === 0) return;
   const scratch = new Uint8ClampedArray(data.length);
   for (let pass = 0; pass < passes; pass++) {
@@ -19,7 +25,7 @@ function blurAxis(
   width: number,
   height: number,
   radius: number,
-  horizontal: boolean
+  horizontal: boolean,
 ): void {
   const lines = horizontal ? height : width;
   const length = horizontal ? width : height;
@@ -36,7 +42,9 @@ function blurAxis(
       }
       for (let pos = 0; pos < length; pos++) {
         dst[index(line, pos) + channel] = Math.round(sum / span);
-        sum += src[index(line, clamp(pos + radius + 1)) + channel] - src[index(line, clamp(pos - radius)) + channel];
+        sum +=
+          src[index(line, clamp(pos + radius + 1)) + channel] -
+          src[index(line, clamp(pos - radius)) + channel];
       }
     }
   }

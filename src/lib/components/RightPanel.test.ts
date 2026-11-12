@@ -77,7 +77,7 @@ describe("RightPanel.svelte", () => {
 
   it("offers a way back to the viewed album while a selected song is described", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) =>
-      cmd === "get_songs_by_album" ? [{ ...mockSong, id: 100 }] : null
+      cmd === "get_songs_by_album" ? [{ ...mockSong, id: 100 }] : null,
     );
     navigationStore.activeTab = "collection";
     navigationStore.selectedAlbumName = "Test Album";
@@ -216,7 +216,7 @@ describe("RightPanel.svelte", () => {
     await fireEvent.click(getByText("Test Track Title"));
 
     expect(openExternalUrlMock).toHaveBeenCalledWith(
-      "https://musicbrainz.org/recording/recording-uuid"
+      "https://musicbrainz.org/recording/recording-uuid",
     );
   });
 
@@ -273,17 +273,17 @@ describe("RightPanel.svelte", () => {
 
     await fireEvent.click(getByText("Test Track Title"));
     expect(openExternalUrlMock).toHaveBeenCalledWith(
-      "https://listenbrainz.org/recording/recording-uuid/"
+      "https://listenbrainz.org/recording/recording-uuid/",
     );
 
     await fireEvent.click(getByText("Test Album"));
     expect(openExternalUrlMock).toHaveBeenCalledWith(
-      "https://listenbrainz.org/album/4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39/"
+      "https://listenbrainz.org/album/4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39/",
     );
 
     await fireEvent.click(getByText("Test Artist"));
     expect(openExternalUrlMock).toHaveBeenCalledWith(
-      "https://listenbrainz.org/artist/artist-uuid/"
+      "https://listenbrainz.org/artist/artist-uuid/",
     );
   });
 
@@ -297,7 +297,7 @@ describe("RightPanel.svelte", () => {
 
     await fireEvent.click(getByAltText("ListenBrainz"));
     expect(openExternalUrlMock).toHaveBeenCalledWith(
-      "https://listenbrainz.org/album/4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39/"
+      "https://listenbrainz.org/album/4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39/",
     );
   });
 
@@ -400,7 +400,11 @@ describe("RightPanel.svelte", () => {
     await fireEvent.click(getByText("Information"));
 
     expect(await findByText("No details for this song yet")).toBeInTheDocument();
-    expect(await findByText("Luminous shows what is saved in the song's tags. Fill them in and they appear here.")).toBeInTheDocument();
+    expect(
+      await findByText(
+        "Luminous shows what is saved in the song's tags. Fill them in and they appear here.",
+      ),
+    ).toBeInTheDocument();
 
     const editTagsBtn = await findByRole("button", { name: "Edit tags" });
     expect(editTagsBtn).toBeInTheDocument();

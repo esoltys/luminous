@@ -52,7 +52,10 @@ describe("WebDavModal.svelte", () => {
     await fireEvent.click(getByRole("button", { name: "Add WebDAV" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    const [, args] = callsOf("save_webdav_server")[0] as [string, { input: Record<string, unknown> }];
+    const [, args] = callsOf("save_webdav_server")[0] as [
+      string,
+      { input: Record<string, unknown> },
+    ];
     expect(args.input).toMatchObject({ autoSyncEnabled: true });
   });
 
@@ -69,7 +72,10 @@ describe("WebDavModal.svelte", () => {
     await fireEvent.click(getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    const [, args] = callsOf("save_webdav_server")[0] as [string, { input: Record<string, unknown> }];
+    const [, args] = callsOf("save_webdav_server")[0] as [
+      string,
+      { input: Record<string, unknown> },
+    ];
     expect(args.input).toMatchObject({ autoSyncEnabled: false });
   });
 
@@ -90,7 +96,10 @@ describe("WebDavModal.svelte", () => {
     await fireEvent.click(getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    const [, args] = callsOf("save_webdav_server")[0] as [string, { input: Record<string, unknown> }];
+    const [, args] = callsOf("save_webdav_server")[0] as [
+      string,
+      { input: Record<string, unknown> },
+    ];
     expect(args.input).toMatchObject({ autoSyncEnabled: true });
   });
 });

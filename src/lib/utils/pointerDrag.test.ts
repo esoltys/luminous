@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { POINTER_DRAG_THRESHOLD_PX, startPointerDrag, type PointerDragOptions } from "./pointerDrag";
+import {
+  POINTER_DRAG_THRESHOLD_PX,
+  startPointerDrag,
+  type PointerDragOptions,
+} from "./pointerDrag";
 
 let host: HTMLElement;
 let child: HTMLButtonElement;
@@ -12,7 +16,7 @@ function press(opts: PointerDragOptions, init: PointerEventInit = {}, target: HT
   };
   host.addEventListener("pointerdown", onDown, { once: true });
   target.dispatchEvent(
-    new MouseEvent("pointerdown", { bubbles: true, clientX: 10, clientY: 10, button: 0, ...init })
+    new MouseEvent("pointerdown", { bubbles: true, clientX: 10, clientY: 10, button: 0, ...init }),
   );
   return handle as ReturnType<typeof startPointerDrag>;
 }

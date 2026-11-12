@@ -11,7 +11,16 @@ const walkman: ConnectedDevice = {
   kind: "massStorage",
   model: null,
   defaultName: "Walkman",
-  storages: [{ id: "E:\\", label: null, mountPath: "E:\\", filesystem: "FAT32", totalBytes: 64_000_000_000, freeBytes: 20_000_000_000 }],
+  storages: [
+    {
+      id: "E:\\",
+      label: null,
+      mountPath: "E:\\",
+      filesystem: "FAT32",
+      totalBytes: 64_000_000_000,
+      freeBytes: 20_000_000_000,
+    },
+  ],
   profile: { nickname: null } as ConnectedDevice["profile"],
   lastSyncedAt: null,
 };
@@ -21,7 +30,16 @@ const ipod: ConnectedDevice = {
   kind: "massStorage",
   model: null,
   defaultName: "iPod Classic",
-  storages: [{ id: "F:\\", label: null, mountPath: "F:\\", filesystem: "FAT32", totalBytes: 160_000_000_000, freeBytes: 80_000_000_000 }],
+  storages: [
+    {
+      id: "F:\\",
+      label: null,
+      mountPath: "F:\\",
+      filesystem: "FAT32",
+      totalBytes: 160_000_000_000,
+      freeBytes: 80_000_000_000,
+    },
+  ],
   profile: { nickname: null } as ConnectedDevice["profile"],
   lastSyncedAt: null,
 };
@@ -48,7 +66,11 @@ describe("AddToDeviceMenuItem.svelte", () => {
   it("renders direct 1-click item when 1 device is connected and adds when not in sync", async () => {
     devicesStore.devices = [walkman];
     devicesStore.syncStates = {
-      [walkman.id]: { settings: { storageId: null, sources: [], unselected: "remove" }, lastSummary: null, running: false },
+      [walkman.id]: {
+        settings: { storageId: null, sources: [], unselected: "remove" },
+        lastSummary: null,
+        running: false,
+      },
     };
     const toggleSpy = vi.spyOn(devicesStore, "toggleDeviceSync").mockResolvedValue(true);
     const onClose = vi.fn();
@@ -65,7 +87,12 @@ describe("AddToDeviceMenuItem.svelte", () => {
     expect(item).toBeInTheDocument();
 
     await fireEvent.click(item);
-    expect(toggleSpy).toHaveBeenCalledWith(walkman, { kind: "album", album: "Damnation", artist: "Opeth" }, "Damnation", undefined);
+    expect(toggleSpy).toHaveBeenCalledWith(
+      walkman,
+      { kind: "album", album: "Damnation", artist: "Opeth" },
+      "Damnation",
+      undefined,
+    );
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -97,7 +124,12 @@ describe("AddToDeviceMenuItem.svelte", () => {
     expect(item).toBeInTheDocument();
 
     await fireEvent.click(item);
-    expect(toggleSpy).toHaveBeenCalledWith(walkman, { kind: "album", album: "Damnation", artist: "Opeth" }, "Damnation", undefined);
+    expect(toggleSpy).toHaveBeenCalledWith(
+      walkman,
+      { kind: "album", album: "Damnation", artist: "Opeth" },
+      "Damnation",
+      undefined,
+    );
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -141,7 +173,12 @@ describe("AddToDeviceMenuItem.svelte", () => {
     expect(getByText("iPod Classic")).toBeInTheDocument();
 
     await fireEvent.click(walkmanOption);
-    expect(toggleSpy).toHaveBeenCalledWith(walkman, { kind: "artist", name: "Opeth" }, "Opeth", undefined);
+    expect(toggleSpy).toHaveBeenCalledWith(
+      walkman,
+      { kind: "artist", name: "Opeth" },
+      "Opeth",
+      undefined,
+    );
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -151,7 +188,10 @@ describe("AddToDeviceMenuItem.svelte", () => {
       [walkman.id]: {
         settings: {
           storageId: null,
-          sources: [{ kind: "song", id: 1 }, { kind: "song", id: 2 }],
+          sources: [
+            { kind: "song", id: 1 },
+            { kind: "song", id: 2 },
+          ],
           unselected: "remove",
         },
         lastSummary: null,

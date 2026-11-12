@@ -49,9 +49,7 @@ vi.mock("@tauri-apps/api/core", () => {
       if (cmd === "search_songs") {
         const q = (args?.query || "").toLowerCase();
         return mockSongs.filter(
-          (s) =>
-            s.title.toLowerCase().includes(q) ||
-            s.artist.toLowerCase().includes(q)
+          (s) => s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q),
         );
       }
       if (cmd === "get_playback_state") {
@@ -154,7 +152,8 @@ describe("CollectionView Virtualization Benchmark", () => {
 
     const avgSortTimeTitle = sortTimesTitle.reduce((a, b) => a + b, 0) / sortTimesTitle.length;
     const avgSortTimeArtist = sortTimesArtist.reduce((a, b) => a + b, 0) / sortTimesArtist.length;
-    const avgSortTimeDuration = sortTimesDuration.reduce((a, b) => a + b, 0) / sortTimesDuration.length;
+    const avgSortTimeDuration =
+      sortTimesDuration.reduce((a, b) => a + b, 0) / sortTimesDuration.length;
 
     // 3. Benchmark Rendering (Mount) Performance under JSDOM
     const renderTimes: number[] = [];

@@ -161,9 +161,17 @@ export const SOCIAL_PLATFORMS: SocialPlatformInfo[] = [
 export function localizePlatform(info: SocialPlatformInfo): SocialPlatformInfo {
   switch (info.id) {
     case "lyrics":
-      return { ...info, label: i18n.t("socialPlatforms.lyrics"), placeholder: i18n.t("socialPlatforms.lyricsPlaceholder") };
+      return {
+        ...info,
+        label: i18n.t("socialPlatforms.lyrics"),
+        placeholder: i18n.t("socialPlatforms.lyricsPlaceholder"),
+      };
     case "other_databases":
-      return { ...info, label: i18n.t("socialPlatforms.otherDatabases"), placeholder: i18n.t("socialPlatforms.otherDatabasesPlaceholder") };
+      return {
+        ...info,
+        label: i18n.t("socialPlatforms.otherDatabases"),
+        placeholder: i18n.t("socialPlatforms.otherDatabasesPlaceholder"),
+      };
     case "custom":
       return info.placeholder.includes("e.g.")
         ? { ...info, placeholder: i18n.t("socialPlatforms.customPlaceholder") }
@@ -199,7 +207,10 @@ export function resolveSocialUrl(platformId: string, input: string): string {
   }
 
   // Handle protocol-relative or bare domain URL
-  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+\/?/i.test(trimmed) && (platformId === "website" || platformId === "custom" || trimmed.includes("/"))) {
+  if (
+    /^[a-z0-9-]+(\.[a-z0-9-]+)+\/?/i.test(trimmed) &&
+    (platformId === "website" || platformId === "custom" || trimmed.includes("/"))
+  ) {
     return `https://${trimmed}`;
   }
 
@@ -257,16 +268,9 @@ export function resolveSocialUrl(platformId: string, input: string): string {
  * Twitter/X is blocked by policy (#1123); Rate Your Music is excluded from
  * album/release link lists.
  */
-export const BLOCKED_LINK_DOMAINS = [
-  "x.com",
-  "twitter.com",
-  "rateyourmusic.com",
-] as const;
+export const BLOCKED_LINK_DOMAINS = ["x.com", "twitter.com", "rateyourmusic.com"] as const;
 
-const BLOCKED_LINK_PLATFORMS = new Set([
-  "x",
-  "twitter",
-]);
+const BLOCKED_LINK_PLATFORMS = new Set(["x", "twitter"]);
 
 /**
  * Checks whether an external link (URL, handle, or platform) matches the
@@ -274,7 +278,7 @@ const BLOCKED_LINK_PLATFORMS = new Set([
  */
 export function isBlacklistedLink(
   handleOrUrl: string | null | undefined,
-  platform?: string | null
+  platform?: string | null,
 ): boolean {
   if (platform && BLOCKED_LINK_PLATFORMS.has(platform.trim().toLowerCase())) {
     return true;
@@ -409,7 +413,9 @@ const MBID_PATTERN = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
  * Returns null when there's no MusicBrainz link, or its value doesn't
  * contain a recognizable MBID.
  */
-export function deriveFanartTvUrl(socialLinks: ArtistSocialLink[] | undefined | null): string | null {
+export function deriveFanartTvUrl(
+  socialLinks: ArtistSocialLink[] | undefined | null,
+): string | null {
   const mbLink = socialLinks?.find((l) => l.platform === "musicbrainz");
   if (!mbLink?.handle_or_url) return null;
   const match = mbLink.handle_or_url.match(MBID_PATTERN);
@@ -427,7 +433,7 @@ export function deriveFanartTvUrl(socialLinks: ArtistSocialLink[] | undefined | 
  */
 export function resolveArtistMbid(
   musicbrainzArtistId: string | null | undefined,
-  socialLinks: ArtistSocialLink[] | undefined | null
+  socialLinks: ArtistSocialLink[] | undefined | null,
 ): string | null {
   const directMatch = musicbrainzArtistId?.trim().match(MBID_PATTERN);
   if (directMatch) return directMatch[1].toLowerCase();

@@ -9,7 +9,7 @@
     ArrowsClockwiseIcon as RefreshCw,
     MusicNotesIcon as Music2,
     SubtitlesIcon as Lyrics,
-    ProhibitIcon as Prohibit
+    ProhibitIcon as Prohibit,
   } from "phosphor-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Button from "./Button.svelte";
@@ -37,7 +37,7 @@
       maximumFractionDigits: 1,
       signDisplay,
     });
-    return i18n.t('lyrics.offsetSeconds', { seconds });
+    return i18n.t("lyrics.offsetSeconds", { seconds });
   }
 
   let parsed = $derived(parseLrc(lyricsText, userOffsetMs));
@@ -56,10 +56,12 @@
         break;
       }
     }
-    
+
     // Log every 5 seconds or on line index changes to avoid console flooding
     if (matchIdx !== -1 && (matchIdx % 5 === 0 || currentMs % 5000 < 250)) {
-      console.log(`[LyricsView] Position: ${Math.round(currentMs)}ms, Active index: ${matchIdx}, Text: "${parsedLines[matchIdx]?.text}"`);
+      console.log(
+        `[LyricsView] Position: ${Math.round(currentMs)}ms, Active index: ${matchIdx}, Text: "${parsedLines[matchIdx]?.text}"`,
+      );
     }
     return matchIdx;
   });
@@ -75,7 +77,11 @@
       case "sidecar":
         return {
           label: i18n.t("lyrics.sourceSidecar", {}, "Sidecar"),
-          tip: i18n.t("lyrics.sourceSidecarTip", {}, "Loaded from a local .lrc, .vtt, or .srt file"),
+          tip: i18n.t(
+            "lyrics.sourceSidecarTip",
+            {},
+            "Loaded from a local .lrc, .vtt, or .srt file",
+          ),
         };
       case "lrclib":
         return {
@@ -90,7 +96,11 @@
       case "lyrics_ovh":
         return {
           label: "Lyrics.ovh",
-          tip: i18n.t("lyrics.sourceOnlineTip", { provider: "Lyrics.ovh" }, "Downloaded from Lyrics.ovh"),
+          tip: i18n.t(
+            "lyrics.sourceOnlineTip",
+            { provider: "Lyrics.ovh" },
+            "Downloaded from Lyrics.ovh",
+          ),
         };
       case "manual":
         return {
@@ -123,7 +133,9 @@
       return;
     }
 
-    console.log(`[LyricsView] loadLyrics: fetching lyrics for songId: ${songId}, forceRefresh: ${forceRefresh}`);
+    console.log(
+      `[LyricsView] loadLyrics: fetching lyrics for songId: ${songId}, forceRefresh: ${forceRefresh}`,
+    );
     isLoading = true;
     errorMsg = "";
     isEditing = false;
@@ -132,7 +144,9 @@
       const payload = await invoke<LyricsPayload | string>("get_lyrics", { songId, forceRefresh });
       const lyrics = typeof payload === "string" ? payload : payload.text;
       const source = typeof payload === "string" ? "unknown" : payload.source;
-      console.log(`[LyricsView] get_lyrics returned lyrics of length: ${lyrics?.length || 0}, source: ${source}`);
+      console.log(
+        `[LyricsView] get_lyrics returned lyrics of length: ${lyrics?.length || 0}, source: ${source}`,
+      );
       lyricsText = lyrics;
       lyricsSource = source;
 
@@ -162,13 +176,13 @@
         errorMsg = "";
       } else if (errStrLower.startsWith("offline:")) {
         // Online lookup is switched off (#1398); only saved lyrics are available.
-        errorMsg = i18n.t('lyrics.offlineNoLyrics');
+        errorMsg = i18n.t("lyrics.offlineNoLyrics");
       } else if (errStrLower.includes("no lyrics found on any online provider")) {
         // Known backend error (src-tauri/src/lyrics.rs) — surface the translated
         // message instead of the raw Rust error string.
-        errorMsg = i18n.t('lyrics.noOnlineResults');
+        errorMsg = i18n.t("lyrics.noOnlineResults");
       } else if (errStrLower.includes("insufficient song metadata")) {
-        errorMsg = i18n.t('lyrics.insufficientMetadata');
+        errorMsg = i18n.t("lyrics.insufficientMetadata");
       } else {
         errorMsg = errStr;
       }
@@ -196,7 +210,10 @@
       }
     } catch (e: any) {
       console.error("[LyricsView] Failed to toggle instrumental status:", e);
-      toastStore.show(i18n.t('lyrics.saveFailedPrefix', {}, "Failed to save: ") + e.toString(), "error");
+      toastStore.show(
+        i18n.t("lyrics.saveFailedPrefix", {}, "Failed to save: ") + e.toString(),
+        "error",
+      );
     }
   }
 
@@ -210,13 +227,16 @@
       playerStore.currentSong.lyrics = editText;
       playerStore.currentSong.lyrics_source = "manual";
       if (playerStore.currentSong.is_instrumental) {
-        await invoke("set_instrumental", { songId: playerStore.currentSong.id, isInstrumental: false });
+        await invoke("set_instrumental", {
+          songId: playerStore.currentSong.id,
+          isInstrumental: false,
+        });
         playerStore.currentSong.is_instrumental = false;
       }
       isEditing = false;
     } catch (e: any) {
       console.error("[LyricsView] Failed to save lyrics manually:", e);
-      toastStore.show(i18n.t('lyrics.saveFailedPrefix') + e.toString(), "error");
+      toastStore.show(i18n.t("lyrics.saveFailedPrefix") + e.toString(), "error");
     }
   }
 
@@ -340,16 +360,24 @@
   });
 </script>
 
-<div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
-  <div class="h-16 flex items-center justify-between gap-4 px-8 border-b border-brand-border acrylic-chrome [--acrylic-tint:var(--color-brand-main)] shrink-0">
+<div
+  class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative"
+>
+  <div
+    class="h-16 flex items-center justify-between gap-4 px-8 border-b border-brand-border acrylic-chrome [--acrylic-tint:var(--color-brand-main)] shrink-0"
+  >
     <div class="flex items-center gap-3 min-w-0 flex-1">
       <Lyrics class="w-6 h-6 text-brand-accent-text shrink-0" />
       <div class="min-w-0">
-        <h2 class="text-sm font-bold truncate max-w-xs @3xl:max-w-md text-brand-text-primary py-0.5 leading-snug">
+        <h2
+          class="text-sm font-bold truncate max-w-xs @3xl:max-w-md text-brand-text-primary py-0.5 leading-snug"
+        >
           {playerStore.currentSongDisplayTitle}
         </h2>
         <p class="text-[10px] text-brand-text-secondary/70 truncate max-w-xs @3xl:max-w-md">
-          {playerStore.currentSong ? `${playerStore.currentSong.artist || i18n.t('collection.unknownArtist')} — ${playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}` : i18n.t('lyrics.lyricsHelpText')}
+          {playerStore.currentSong
+            ? `${playerStore.currentSong.artist || i18n.t("collection.unknownArtist")} — ${playerStore.currentSong.album || i18n.t("collection.unknownAlbum")}`
+            : i18n.t("lyrics.lyricsHelpText")}
         </p>
       </div>
     </div>
@@ -358,7 +386,8 @@
       <div class="flex items-center gap-2 shrink-0">
         {#if playerStore.currentSong.is_instrumental}
           <Button onclick={() => toggleInstrumental(false)} variant="secondary" size="sm">
-            <Music2 class="w-3.5 h-3.5" /> {i18n.t('lyrics.unmarkInstrumental', {}, "Unmark Instrumental")}
+            <Music2 class="w-3.5 h-3.5" />
+            {i18n.t("lyrics.unmarkInstrumental", {}, "Unmark Instrumental")}
           </Button>
         {:else if !isEditing}
           {#if sourceBadgeInfo}
@@ -367,29 +396,37 @@
               id="lyrics-source-badge"
               data-testid="lyrics-source-badge"
             >
-              <span class="text-[11px] font-medium text-brand-text-primary" id="lyrics-source-value">
+              <span
+                class="text-[11px] font-medium text-brand-text-primary"
+                id="lyrics-source-value"
+              >
                 {sourceBadgeInfo.label}
               </span>
               <HelpTip
                 text={sourceBadgeInfo.tip}
-                label={i18n.t('lyrics.sourceHelpLabel', {}, 'Lyrics Source')}
+                label={i18n.t("lyrics.sourceHelpLabel", {}, "Lyrics Source")}
                 describes="lyrics-source-value"
               />
             </div>
           {/if}
           {#if isSynced}
-            <div class="flex items-center bg-brand-sidebar border border-brand-border rounded-lg px-2 py-1 text-xs text-brand-text-secondary gap-1.5 shadow-sm">
+            <div
+              class="flex items-center bg-brand-sidebar border border-brand-border rounded-lg px-2 py-1 text-xs text-brand-text-secondary gap-1.5 shadow-sm"
+            >
               <button
                 onclick={() => adjustOffset(-500)}
                 class="hover:text-brand-text-primary px-1 font-mono font-bold transition-colors cursor-pointer"
-                title={i18n.t('lyrics.offsetLater', {}, 'Show lyrics 0.5 s later')}
-                aria-label={i18n.t('lyrics.offsetLater', {}, 'Show lyrics 0.5 s later')}
+                title={i18n.t("lyrics.offsetLater", {}, "Show lyrics 0.5 s later")}
+                aria-label={i18n.t("lyrics.offsetLater", {}, "Show lyrics 0.5 s later")}
               >
                 {formatOffset(-500, "always")}
               </button>
               <button
                 onclick={resetOffset}
-                class="text-[11px] font-mono px-1 hover:text-brand-accent-text transition-colors cursor-pointer {userOffsetMs !== 0 ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/70'}"
+                class="text-[11px] font-mono px-1 hover:text-brand-accent-text transition-colors cursor-pointer {userOffsetMs !==
+                0
+                  ? 'text-brand-accent-text font-bold'
+                  : 'text-brand-text-secondary/70'}"
                 id="lyrics-offset-value"
               >
                 {formatOffset(userOffsetMs, "exceptZero")}
@@ -397,17 +434,27 @@
               <button
                 onclick={() => adjustOffset(500)}
                 class="hover:text-brand-text-primary px-1 font-mono font-bold transition-colors cursor-pointer"
-                title={i18n.t('lyrics.offsetEarlier', {}, 'Show lyrics 0.5 s earlier')}
-                aria-label={i18n.t('lyrics.offsetEarlier', {}, 'Show lyrics 0.5 s earlier')}
+                title={i18n.t("lyrics.offsetEarlier", {}, "Show lyrics 0.5 s earlier")}
+                aria-label={i18n.t("lyrics.offsetEarlier", {}, "Show lyrics 0.5 s earlier")}
               >
                 {formatOffset(500, "always")}
               </button>
-              <HelpTip text={i18n.t('lyrics.offsetHelp')} label={i18n.t('lyrics.syncOffsetLabel', {}, 'Sync Offset')} describes="lyrics-offset-value" />
+              <HelpTip
+                text={i18n.t("lyrics.offsetHelp")}
+                label={i18n.t("lyrics.syncOffsetLabel", {}, "Sync Offset")}
+                describes="lyrics-offset-value"
+              />
             </div>
           {/if}
           {#if prefs.onlineEnabled}
-            <Button onclick={() => loadLyrics(playerStore.currentSong?.id, true)} variant="secondary" size="sm" title={i18n.t('lyrics.refetchTooltip', {}, "Refetch lyrics online")}>
-              <RefreshCw class="w-3.5 h-3.5" /> {i18n.t('lyrics.refetchBtn', {}, "Refetch")}
+            <Button
+              onclick={() => loadLyrics(playerStore.currentSong?.id, true)}
+              variant="secondary"
+              size="sm"
+              title={i18n.t("lyrics.refetchTooltip", {}, "Refetch lyrics online")}
+            >
+              <RefreshCw class="w-3.5 h-3.5" />
+              {i18n.t("lyrics.refetchBtn", {}, "Refetch")}
             </Button>
             {#if isOnlineSource}
               <Button
@@ -415,55 +462,87 @@
                 disabled={isRejecting}
                 variant="secondary"
                 size="sm"
-                title={i18n.t('lyrics.rejectMatchTooltip', {}, "Reject incorrect online lyrics and prevent this match in future")}
+                title={i18n.t(
+                  "lyrics.rejectMatchTooltip",
+                  {},
+                  "Reject incorrect online lyrics and prevent this match in future",
+                )}
               >
-                <Prohibit class="w-3.5 h-3.5" /> {i18n.t('lyrics.rejectMatch', {}, "Reject Match")}
+                <Prohibit class="w-3.5 h-3.5" />
+                {i18n.t("lyrics.rejectMatch", {}, "Reject Match")}
               </Button>
             {/if}
           {/if}
           <Button onclick={startEditing} variant="primary" size="sm">
-            <Edit3 class="w-3.5 h-3.5" /> {i18n.t('settings.editThemeShort')}
+            <Edit3 class="w-3.5 h-3.5" />
+            {i18n.t("settings.editThemeShort")}
           </Button>
         {:else}
-          <Button onclick={() => { isEditing = false; }} variant="secondary" size="sm">
-            <X class="w-3.5 h-3.5" /> {i18n.t('settings.cancel')}
+          <Button
+            onclick={() => {
+              isEditing = false;
+            }}
+            variant="secondary"
+            size="sm"
+          >
+            <X class="w-3.5 h-3.5" />
+            {i18n.t("settings.cancel")}
           </Button>
           <Button onclick={saveManualLyrics} variant="primary" size="sm">
-            <Save class="w-3.5 h-3.5" /> {i18n.t('tagEditor.saveBtnShort')}
+            <Save class="w-3.5 h-3.5" />
+            {i18n.t("tagEditor.saveBtnShort")}
           </Button>
         {/if}
       </div>
     {/if}
   </div>
 
-  <div class="flex-1 overflow-y-auto px-6 py-12" class:pb-28={!!playerStore.currentSong} bind:this={containerEl} use:rememberScroll={"lyrics"}>
+  <div
+    class="flex-1 overflow-y-auto px-6 py-12"
+    class:pb-28={!!playerStore.currentSong}
+    bind:this={containerEl}
+    use:rememberScroll={"lyrics"}
+  >
     {#if isLoading}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3">
-        <LoadingSpinner label={i18n.t('lyrics.fetching', {}, "Fetching lyrics...")} />
+        <LoadingSpinner label={i18n.t("lyrics.fetching", {}, "Fetching lyrics...")} />
       </div>
     {:else if playerStore.currentSong?.is_instrumental}
       <div class="w-full h-full flex flex-col items-center justify-center gap-4 p-8 text-center">
-        <div class="p-4 rounded-full bg-brand-sidebar border border-brand-border text-brand-accent shadow-inner">
+        <div
+          class="p-4 rounded-full bg-brand-sidebar border border-brand-border text-brand-accent shadow-inner"
+        >
           <Music2 class="w-12 h-12 stroke-[1.5]" />
         </div>
         <div class="space-y-1 max-w-sm">
           <h3 class="text-base font-bold text-brand-text-primary">
-            {i18n.t('lyrics.instrumentalTitle', {}, "Instrumental Track")}
+            {i18n.t("lyrics.instrumentalTitle", {}, "Instrumental Track")}
           </h3>
           <p class="text-xs text-brand-text-secondary/70">
-            {i18n.t('lyrics.instrumentalDesc', {}, "This track is marked as instrumental. Online lyrics search is bypassed.")}
+            {i18n.t(
+              "lyrics.instrumentalDesc",
+              {},
+              "This track is marked as instrumental. Online lyrics search is bypassed.",
+            )}
           </p>
         </div>
       </div>
     {:else if isEditing}
       <div class="max-w-2xl mx-auto h-full flex flex-col gap-3">
-        <label for="lyrics-editor" class="text-xs font-bold text-brand-text-secondary/65 uppercase tracking-wider">{i18n.t('lyrics.editorLabel', {}, "Lyrics Text (plain or LRC synced format)")}</label>
+        <label
+          for="lyrics-editor"
+          class="text-xs font-bold text-brand-text-secondary/65 uppercase tracking-wider"
+          >{i18n.t("lyrics.editorLabel", {}, "Lyrics Text (plain or LRC synced format)")}</label
+        >
         <textarea
           id="lyrics-editor"
           bind:value={editText}
           class="flex-1 bg-brand-sidebar border border-brand-border rounded-xl p-4 text-sm font-mono text-brand-text-primary outline-none focus:border-brand-accent resize-none h-[calc(100vh-280px)] focus:ring-1 focus:ring-brand-accent"
-          placeholder={i18n.t('lyrics.editorPlaceholder', {}, "Paste synced LRC or plain text lyrics here...")}
-        ></textarea>
+          placeholder={i18n.t(
+            "lyrics.editorPlaceholder",
+            {},
+            "Paste synced LRC or plain text lyrics here...",
+          )}></textarea>
       </div>
     {:else if lyricsText}
       <div class="max-w-3xl mx-auto text-center">
@@ -477,14 +556,18 @@
                 data-index={idx}
                 dir="auto"
                 onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
-                class="text-xl @3xl:text-2xl font-bold transition-all duration-300 transform text-balance {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/30 hover:text-brand-text-secondary/60'}"
+                class="text-xl @3xl:text-2xl font-bold transition-all duration-300 transform text-balance {isActive
+                  ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold'
+                  : 'text-brand-text-secondary/30 hover:text-brand-text-secondary/60'}"
               >
                 {#if isActive && line.words && line.words.length > 0}
                   {#each line.words as word}
                     {@const isWordSung = currentMs >= word.timeMs}
                     <span
-                      class="inline-block whitespace-pre-wrap transition-all duration-150 {isWordSung ? 'text-brand-text-primary opacity-100 filter drop-shadow-[0_0_6px_var(--color-brand-accent)]' : 'text-brand-text-primary/40 opacity-40'}"
-                    >{word.text}</span>
+                      class="inline-block whitespace-pre-wrap transition-all duration-150 {isWordSung
+                        ? 'text-brand-text-primary opacity-100 filter drop-shadow-[0_0_6px_var(--color-brand-accent)]'
+                        : 'text-brand-text-primary/40 opacity-40'}">{word.text}</span
+                    >
                   {/each}
                 {:else}
                   {line.text || "•••"}
@@ -493,46 +576,76 @@
             {/each}
           </div>
         {:else}
-          <div class="mb-8 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-border bg-brand-sidebar text-[11px] font-semibold text-brand-text-secondary/60 select-none shadow-sm">
+          <div
+            class="mb-8 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-border bg-brand-sidebar text-[11px] font-semibold text-brand-text-secondary/60 select-none shadow-sm"
+          >
             <span class="w-1.5 h-1.5 rounded-full bg-brand-accent animate-pulse"></span>
-            {i18n.t('lyrics.plainTextNotice', {}, "Synced lyrics not available. Showing plain text.")}
+            {i18n.t(
+              "lyrics.plainTextNotice",
+              {},
+              "Synced lyrics not available. Showing plain text.",
+            )}
           </div>
-          <div dir="auto" class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary/80 select-text pb-20 font-medium font-sans text-pretty">
+          <div
+            dir="auto"
+            class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary/80 select-text pb-20 font-medium font-sans text-pretty"
+          >
             {lyricsText.startsWith("[synced:false]\n")
               ? lyricsText.substring("[synced:false]\n".length)
-              : (lyricsText.startsWith("[synced:false]") ? lyricsText.substring("[synced:false]".length) : lyricsText)}
+              : lyricsText.startsWith("[synced:false]")
+                ? lyricsText.substring("[synced:false]".length)
+                : lyricsText}
           </div>
         {/if}
       </div>
     {:else if errorMsg}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
-        <p class="text-sm font-semibold text-brand-text-primary">{i18n.t('lyrics.lyricsNotFound')}</p>
+        <p class="text-sm font-semibold text-brand-text-primary">
+          {i18n.t("lyrics.lyricsNotFound")}
+        </p>
         <p class="text-xs text-brand-text-secondary/50 max-w-sm">{errorMsg}</p>
         <div class="flex items-center gap-2 mt-2">
           {#if prefs.onlineEnabled}
-            <Button onclick={() => loadLyrics(playerStore.currentSong?.id)} variant="secondary" size="sm">
-              {i18n.t('lyrics.retrySearch', {}, "Retry Search")}
+            <Button
+              onclick={() => loadLyrics(playerStore.currentSong?.id)}
+              variant="secondary"
+              size="sm"
+            >
+              {i18n.t("lyrics.retrySearch", {}, "Retry Search")}
             </Button>
           {/if}
           {#if playerStore.currentSong}
             <Button onclick={() => toggleInstrumental(true)} variant="accent-soft" size="sm">
-              {i18n.t('lyrics.markInstrumental', {}, "Mark as Instrumental")}
+              {i18n.t("lyrics.markInstrumental", {}, "Mark as Instrumental")}
             </Button>
           {/if}
         </div>
       </div>
     {:else}
-      <div class="w-full h-full flex flex-col items-center justify-center gap-2 text-center text-brand-text-secondary/50">
+      <div
+        class="w-full h-full flex flex-col items-center justify-center gap-2 text-center text-brand-text-secondary/50"
+      >
         <FileText class="w-12 h-12 stroke-[1] text-brand-text-secondary/30 mb-2" />
         {#if playerStore.currentSong}
-          <p class="text-sm font-semibold text-brand-text-secondary/80">{i18n.t('lyrics.lyricsNotFound')}</p>
-          <p class="text-xs text-brand-text-secondary/50 max-w-xs mt-1">{i18n.t('lyrics.lyricsHelpText')}</p>
-          <Button onclick={() => toggleInstrumental(true)} variant="accent-soft" size="sm" class="mt-3">
-            {i18n.t('lyrics.markInstrumental', {}, "Mark as Instrumental")}
+          <p class="text-sm font-semibold text-brand-text-secondary/80">
+            {i18n.t("lyrics.lyricsNotFound")}
+          </p>
+          <p class="text-xs text-brand-text-secondary/50 max-w-xs mt-1">
+            {i18n.t("lyrics.lyricsHelpText")}
+          </p>
+          <Button
+            onclick={() => toggleInstrumental(true)}
+            variant="accent-soft"
+            size="sm"
+            class="mt-3"
+          >
+            {i18n.t("lyrics.markInstrumental", {}, "Mark as Instrumental")}
           </Button>
         {:else}
-          <p class="text-sm font-semibold text-brand-text-secondary/80">{i18n.t('playerBar.notPlaying')}</p>
-          <p class="text-xs text-brand-text-secondary/50 mt-1">{i18n.t('lyrics.lyricsHelpText')}</p>
+          <p class="text-sm font-semibold text-brand-text-secondary/80">
+            {i18n.t("playerBar.notPlaying")}
+          </p>
+          <p class="text-xs text-brand-text-secondary/50 mt-1">{i18n.t("lyrics.lyricsHelpText")}</p>
         {/if}
       </div>
     {/if}

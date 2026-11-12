@@ -27,7 +27,9 @@ describe("MarkdownBio.svelte", () => {
       },
     });
 
-    const link = screen.getByRole("button", { name: /https:\/\/en\.wikipedia\.org\/wiki\/Gunship_\(band\)/i });
+    const link = screen.getByRole("button", {
+      name: /https:\/\/en\.wikipedia\.org\/wiki\/Gunship_\(band\)/i,
+    });
     expect(link).toBeTruthy();
     expect(link.getAttribute("title")).toBe("https://en.wikipedia.org/wiki/Gunship_(band)");
   });

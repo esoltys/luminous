@@ -212,7 +212,7 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
       if (!target) {
         const query = selector.toLowerCase();
         const candidates = Array.from(
-          document.querySelectorAll("button, [role=button], a, summary, [data-testid]")
+          document.querySelectorAll("button, [role=button], a, summary, [data-testid]"),
         );
         target =
           candidates.find(
@@ -220,7 +220,7 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
               el.textContent?.trim().toLowerCase().includes(query) ||
               el.getAttribute("title")?.toLowerCase().includes(query) ||
               el.getAttribute("aria-label")?.toLowerCase().includes(query) ||
-              el.getAttribute("data-testid")?.toLowerCase().includes(query)
+              el.getAttribute("data-testid")?.toLowerCase().includes(query),
           ) ?? null;
       }
 
@@ -253,7 +253,7 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
             { transform: `scale(${currentScale * 0.82})` },
             { transform: currentScale === 1 ? "scale(1)" : `scale(${currentScale})` },
           ],
-          { duration: 180, easing: "ease-out" }
+          { duration: 180, easing: "ease-out" },
         );
       }
 
@@ -269,7 +269,7 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
             { width: "0px", height: "0px", opacity: 0.9 },
             { width: "42px", height: "42px", opacity: 0 },
           ],
-          { duration: 320, easing: "cubic-bezier(0, 0, 0.2, 1)" }
+          { duration: 320, easing: "cubic-bezier(0, 0, 0.2, 1)" },
         );
         anim.onfinish = () => ripple.remove();
       } else {
@@ -287,7 +287,7 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
 
     async setSpotlight(
       enabled: boolean,
-      options?: { radius?: number; opacity?: number }
+      options?: { radius?: number; opacity?: number },
     ): Promise<void> {
       isSpotlightActive = enabled;
       if (options?.radius !== undefined) spotlightRadius = options.radius;
@@ -349,15 +349,20 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
       const el = getOrCreateKeystroke(host);
 
       const parts = keys.includes("+")
-        ? keys.split("+").map((s) => s.trim()).filter(Boolean)
+        ? keys
+            .split("+")
+            .map((s) => s.trim())
+            .filter(Boolean)
         : [keys.trim()];
 
       const badges = parts
         .map(
           (part) =>
-            `<kbd style="background: rgba(255, 255, 255, 0.16); padding: 5px 12px; border-radius: 6px; font-size: 15px; font-weight: 700; color: #ffffff; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.25); letter-spacing: 0.02em;">${escapeHtml(part)}</kbd>`
+            `<kbd style="background: rgba(255, 255, 255, 0.16); padding: 5px 12px; border-radius: 6px; font-size: 15px; font-weight: 700; color: #ffffff; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.25); letter-spacing: 0.02em;">${escapeHtml(part)}</kbd>`,
         )
-        .join('<span style="color: rgba(255, 255, 255, 0.6); font-size: 14px; font-weight: 700;">+</span>');
+        .join(
+          '<span style="color: rgba(255, 255, 255, 0.6); font-size: 14px; font-weight: 700;">+</span>',
+        );
 
       el.innerHTML = badges;
       el.style.display = "flex";

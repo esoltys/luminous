@@ -88,7 +88,10 @@ export function clearPendingClickSwallow() {
  * ignored (non-primary button, or inside an interactive descendant); otherwise a handle whose
  * `cancel()` the owner calls on teardown.
  */
-export function startPointerDrag(e: PointerEvent, opts: PointerDragOptions): PointerDragHandle | null {
+export function startPointerDrag(
+  e: PointerEvent,
+  opts: PointerDragOptions,
+): PointerDragHandle | null {
   if (e.button !== 0) return null;
   const selector = opts.ignoreSelector ?? INTERACTIVE_SELECTOR;
   if ((e.target as Element | null)?.closest?.(selector)) return null;

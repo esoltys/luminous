@@ -121,7 +121,9 @@ describe("Sidebar.svelte", () => {
     ];
 
     // Expanded sidebar
-    const { getByText, queryByText, getAllByTitle, rerender } = render(Sidebar, { props: { width: 256 } });
+    const { getByText, queryByText, getAllByTitle, rerender } = render(Sidebar, {
+      props: { width: 256 },
+    });
     expect(getByText("OK Computer")).toBeInTheDocument();
     expect(getByText("Radiohead")).toBeInTheDocument();
 
@@ -189,7 +191,6 @@ describe("Sidebar.svelte", () => {
     });
   });
 });
-
 
 describe("Sidebar.svelte - Files section", () => {
   const music = { kind: "folder", id: 1 } as const;
@@ -293,7 +294,13 @@ describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
     // because its rules decide what it holds.
     playlistsStore.playlists = [
       ...playlistsStore.playlists,
-      { id: 3, name: "Rock Rules", is_queue: false, dynamic_enabled: true, dynamic_spec: "genre:rock" } as any,
+      {
+        id: 3,
+        name: "Rock Rules",
+        is_queue: false,
+        dynamic_enabled: true,
+        dynamic_spec: "genre:rock",
+      } as any,
     ];
     vi.useFakeTimers();
     try {
@@ -306,7 +313,10 @@ describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
       vi.advanceTimersByTime(500);
       await tick();
 
-      expect(await findByRole("button", { name: "Favorites" })).toHaveAttribute("data-drop-target", "playlist");
+      expect(await findByRole("button", { name: "Favorites" })).toHaveAttribute(
+        "data-drop-target",
+        "playlist",
+      );
       expect(queryByRole("button", { name: "Rock Rules" })).toBeNull();
       songDrag.end();
     } finally {
@@ -317,7 +327,13 @@ describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
   it("doesn't offer Custom as a target when it holds only smart playlists", () => {
     playlistsStore.playlists = [
       { id: 1, name: "Queue", is_queue: true } as any,
-      { id: 3, name: "Rock Rules", is_queue: false, dynamic_enabled: true, dynamic_spec: "genre:rock" } as any,
+      {
+        id: 3,
+        name: "Rock Rules",
+        is_queue: false,
+        dynamic_enabled: true,
+        dynamic_spec: "genre:rock",
+      } as any,
     ];
     const { getByRole } = render(Sidebar, { props: { width: 256 } });
     expect(getByRole("button", { name: /custom/i })).not.toHaveAttribute("data-drop-target");

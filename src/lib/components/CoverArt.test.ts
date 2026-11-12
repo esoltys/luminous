@@ -49,7 +49,9 @@ describe("CoverArt.svelte - fanart.tv cover fallback (#1277)", () => {
     const { container } = render(CoverArt, { props: { songId: 7 } });
 
     await vi.waitFor(() => {
-      expect(vi.mocked(invoke).mock.calls.filter(([c]) => c === "get_cover_art_uri")).toHaveLength(2);
+      expect(vi.mocked(invoke).mock.calls.filter(([c]) => c === "get_cover_art_uri")).toHaveLength(
+        2,
+      );
     });
     expect(container.querySelector("img")).toBeNull();
   });

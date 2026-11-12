@@ -9,7 +9,14 @@ import { contextStore } from "../stores/context.svelte";
 import { prefs } from "../stores/prefs.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
-const SONG = { id: 1, title: "Song", artist: "Shania Twain", album: "Album", path: "/a.mp3", duration: 100 };
+const SONG = {
+  id: 1,
+  title: "Song",
+  artist: "Shania Twain",
+  album: "Album",
+  path: "/a.mp3",
+  duration: 100,
+};
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn((cmd: string, args?: any) => {
@@ -21,9 +28,7 @@ vi.mock("@tauri-apps/api/core", () => ({
         artist_key: args?.artist || "Shania Twain",
         website: "https://www.shaniatwain.com",
         tags: ["country", "canadian", "pop"],
-        social_links: [
-          { platform: "instagram", handle_or_url: "@shaniatwain" },
-        ],
+        social_links: [{ platform: "instagram", handle_or_url: "@shaniatwain" }],
         bio: "Canadian music icon",
       });
     }
@@ -47,9 +52,7 @@ describe("ArtistDetailView", () => {
         artist_key: "Shania Twain",
         website: "https://www.shaniatwain.com",
         tags: ["country", "canadian", "pop"],
-        social_links: [
-          { platform: "instagram", handle_or_url: "@shaniatwain" },
-        ],
+        social_links: [{ platform: "instagram", handle_or_url: "@shaniatwain" }],
         bio: "Canadian music icon",
       },
     };
@@ -138,8 +141,20 @@ describe("ArtistDetailView", () => {
     invokeMock.mockImplementation((cmd: string, args?: any) => {
       if (cmd === "get_songs_by_artist") {
         return Promise.resolve([
-          { id: 10, title: "Song 1", artist: "Shania Twain", genre: "Country", length_nanosec: 180_000_000_000 } as any,
-          { id: 11, title: "Song 2", artist: "Shania Twain", genre: "Pop", length_nanosec: 200_000_000_000 } as any,
+          {
+            id: 10,
+            title: "Song 1",
+            artist: "Shania Twain",
+            genre: "Country",
+            length_nanosec: 180_000_000_000,
+          } as any,
+          {
+            id: 11,
+            title: "Song 2",
+            artist: "Shania Twain",
+            genre: "Pop",
+            length_nanosec: 200_000_000_000,
+          } as any,
         ]);
       }
       if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
@@ -165,8 +180,20 @@ describe("ArtistDetailView", () => {
     invokeMock.mockImplementation((cmd: string, args?: any) => {
       if (cmd === "get_songs_by_artist") {
         return Promise.resolve([
-          { id: 10, title: "Song 1", artist: "Shania Twain", genre: "Country", length_nanosec: 180_000_000_000 } as any,
-          { id: 11, title: "Song 2", artist: "Shania Twain", genre: "Pop", length_nanosec: 200_000_000_000 } as any,
+          {
+            id: 10,
+            title: "Song 1",
+            artist: "Shania Twain",
+            genre: "Country",
+            length_nanosec: 180_000_000_000,
+          } as any,
+          {
+            id: 11,
+            title: "Song 2",
+            artist: "Shania Twain",
+            genre: "Pop",
+            length_nanosec: 200_000_000_000,
+          } as any,
         ]);
       }
       if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
@@ -178,7 +205,9 @@ describe("ArtistDetailView", () => {
     });
 
     const startScanSpy = vi.spyOn(collectionStore, "startScan");
-    const refreshLibrarySpy = vi.spyOn(collectionStore, "refreshLibrary").mockResolvedValue(undefined as any);
+    const refreshLibrarySpy = vi
+      .spyOn(collectionStore, "refreshLibrary")
+      .mockResolvedValue(undefined as any);
 
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -205,8 +234,20 @@ describe("ArtistDetailView", () => {
     invokeMock.mockImplementation((cmd: string, args?: any) => {
       if (cmd === "get_songs_by_artist") {
         return Promise.resolve([
-          { id: 1, title: "Song 1", artist: "Shania Twain", genre: "Country; Pop", length_nanosec: 180_000_000_000 } as any,
-          { id: 2, title: "Song 2", artist: "Shania Twain", genre: "Country; Rock", length_nanosec: 200_000_000_000 } as any,
+          {
+            id: 1,
+            title: "Song 1",
+            artist: "Shania Twain",
+            genre: "Country; Pop",
+            length_nanosec: 180_000_000_000,
+          } as any,
+          {
+            id: 2,
+            title: "Song 2",
+            artist: "Shania Twain",
+            genre: "Country; Rock",
+            length_nanosec: 200_000_000_000,
+          } as any,
         ]);
       }
       if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
@@ -238,7 +279,13 @@ describe("ArtistDetailView", () => {
     invokeMock.mockImplementation((cmd: string, args?: any) => {
       if (cmd === "get_songs_by_artist") {
         return Promise.resolve([
-          { id: 1, title: "Song 1", artist: "Shania Twain", genre: "Country; Canadian; Pop", length_nanosec: 180_000_000_000 } as any,
+          {
+            id: 1,
+            title: "Song 1",
+            artist: "Shania Twain",
+            genre: "Country; Canadian; Pop",
+            length_nanosec: 180_000_000_000,
+          } as any,
         ]);
       }
       if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
@@ -251,7 +298,11 @@ describe("ArtistDetailView", () => {
         // it isn't part of the mocked getter above -- the filter checks
         // against every genre in the library, not just this artist's songs.
         return Promise.resolve({
-          tags: [{ name: "Country", song_count: 1 }, { name: "Pop", song_count: 1 }, { name: "Canadian", song_count: 5 }],
+          tags: [
+            { name: "Country", song_count: 1 },
+            { name: "Pop", song_count: 1 },
+            { name: "Canadian", song_count: 5 },
+          ],
           graph: [],
           no_genre_count: 0,
         });
@@ -288,7 +339,14 @@ describe("ArtistDetailView", () => {
     collectionStore.artistProfiles = {
       nightwish: {
         artist_key: "Nightwish",
-        tags: ["Symphonic Metal", "Gothic Metal", "Power Metal", "Heavy Metal", "Pop Rock", "Finnish"],
+        tags: [
+          "Symphonic Metal",
+          "Gothic Metal",
+          "Power Metal",
+          "Heavy Metal",
+          "Pop Rock",
+          "Finnish",
+        ],
         social_links: [],
       },
     };
@@ -296,12 +354,19 @@ describe("ArtistDetailView", () => {
     invokeMock.mockImplementation((cmd: string, args?: any) => {
       if (cmd === "get_songs_by_artist") {
         return Promise.resolve([
-          { id: 1, title: "Song 1", artist: "Nightwish", genre: "Metal", length_nanosec: 180_000_000_000 } as any,
+          {
+            id: 1,
+            title: "Song 1",
+            artist: "Nightwish",
+            genre: "Metal",
+            length_nanosec: 180_000_000_000,
+          } as any,
         ]);
       }
       if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
       if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-      if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["nightwish"]);
+      if (cmd === "get_artist_profile")
+        return Promise.resolve(collectionStore.artistProfiles["nightwish"]);
       return Promise.resolve();
     });
 
@@ -359,7 +424,6 @@ describe("ArtistDetailView", () => {
 
       expect(await screen.findByRole("heading", { name: "Shania Twain" })).toBeTruthy();
     });
-
   });
 
   describe("collapsed header and enrichment", () => {
@@ -405,22 +469,34 @@ describe("ArtistDetailView", () => {
       invokeMock.mockImplementation((cmd: string, args?: any) => {
         if (cmd === "get_songs_by_artist") {
           return Promise.resolve([
-            { id: 1, title: "Man! I Feel Like a Woman!", artist: "Shania Twain", musicbrainz_artist_id: "mbid-123" } as any,
+            {
+              id: 1,
+              title: "Man! I Feel Like a Woman!",
+              artist: "Shania Twain",
+              musicbrainz_artist_id: "mbid-123",
+            } as any,
           ]);
         }
         if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
         if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
+        if (cmd === "get_artist_profile")
+          return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
         if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
         if (cmd === "retrieve_artist_details") return Promise.resolve({ added_count: 2 });
-        if (cmd === "get_song_context") return Promise.resolve({ wikipedia_extract: "Bio summary" });
+        if (cmd === "get_song_context")
+          return Promise.resolve({ wikipedia_extract: "Bio summary" });
         if (cmd === "retrieve_artist_image") {
           return Promise.resolve({
             uri: "luminous-art://shania.jpg",
             source: "fanart",
             logo_uri: null,
             background_uri: null,
-            profile: { ...collectionStore.artistProfiles["shania twain"], image_fetched: true, logo_fetched: true, background_fetched: true },
+            profile: {
+              ...collectionStore.artistProfiles["shania twain"],
+              image_fetched: true,
+              logo_fetched: true,
+              background_fetched: true,
+            },
           });
         }
         return Promise.resolve();
@@ -428,8 +504,14 @@ describe("ArtistDetailView", () => {
 
       render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
       await waitFor(() => {
-        expect(invokeMock).toHaveBeenCalledWith("retrieve_artist_details", expect.objectContaining({ artist: "Shania Twain" }));
-        expect(invokeMock).toHaveBeenCalledWith("retrieve_artist_image", expect.objectContaining({ artist: "Shania Twain" }));
+        expect(invokeMock).toHaveBeenCalledWith(
+          "retrieve_artist_details",
+          expect.objectContaining({ artist: "Shania Twain" }),
+        );
+        expect(invokeMock).toHaveBeenCalledWith(
+          "retrieve_artist_image",
+          expect.objectContaining({ artist: "Shania Twain" }),
+        );
       });
     });
 
@@ -451,12 +533,18 @@ describe("ArtistDetailView", () => {
       invokeMock.mockImplementation((cmd: string, args?: any) => {
         if (cmd === "get_songs_by_artist") {
           return Promise.resolve([
-            { id: 1, title: "Man! I Feel Like a Woman!", artist: "Shania Twain", musicbrainz_artist_id: "mbid-123" } as any,
+            {
+              id: 1,
+              title: "Man! I Feel Like a Woman!",
+              artist: "Shania Twain",
+              musicbrainz_artist_id: "mbid-123",
+            } as any,
           ]);
         }
         if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
         if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
+        if (cmd === "get_artist_profile")
+          return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
         if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
         return Promise.resolve();
       });
@@ -485,12 +573,18 @@ describe("ArtistDetailView", () => {
       invokeMock.mockImplementation((cmd: string) => {
         if (cmd === "get_songs_by_artist") {
           return Promise.resolve([
-            { id: 1, title: "Man! I Feel Like a Woman!", artist: "Shania Twain", musicbrainz_artist_id: "mbid-123" } as any,
+            {
+              id: 1,
+              title: "Man! I Feel Like a Woman!",
+              artist: "Shania Twain",
+              musicbrainz_artist_id: "mbid-123",
+            } as any,
           ]);
         }
         if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
         if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
+        if (cmd === "get_artist_profile")
+          return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
         if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
         if (cmd === "retrieve_artist_image") {
           return Promise.resolve({
@@ -498,7 +592,12 @@ describe("ArtistDetailView", () => {
             source: null,
             logo_uri: "luminous-art://shania_logo.png",
             background_uri: null,
-            profile: { ...collectionStore.artistProfiles["shania twain"], logo_fetched: true, background_fetched: true, fetched_logo_filename: "shania_logo.png" },
+            profile: {
+              ...collectionStore.artistProfiles["shania twain"],
+              logo_fetched: true,
+              background_fetched: true,
+              fetched_logo_filename: "shania_logo.png",
+            },
           });
         }
         return Promise.resolve();
@@ -506,7 +605,10 @@ describe("ArtistDetailView", () => {
 
       render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
       await waitFor(() => {
-        expect(invokeMock).toHaveBeenCalledWith("retrieve_artist_image", expect.objectContaining({ artist: "Shania Twain", onlyMissing: true }));
+        expect(invokeMock).toHaveBeenCalledWith(
+          "retrieve_artist_image",
+          expect.objectContaining({ artist: "Shania Twain", onlyMissing: true }),
+        );
       });
       expect(invokeMock).not.toHaveBeenCalledWith("retrieve_artist_details", expect.anything());
     });
@@ -531,12 +633,18 @@ describe("ArtistDetailView", () => {
       invokeMock.mockImplementation((cmd: string) => {
         if (cmd === "get_songs_by_artist") {
           return Promise.resolve([
-            { id: 1, title: "Man! I Feel Like a Woman!", artist: "Shania Twain", musicbrainz_artist_id: "mbid-123" } as any,
+            {
+              id: 1,
+              title: "Man! I Feel Like a Woman!",
+              artist: "Shania Twain",
+              musicbrainz_artist_id: "mbid-123",
+            } as any,
           ]);
         }
         if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
         if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
+        if (cmd === "get_artist_profile")
+          return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
         if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
         return Promise.resolve();
       });
@@ -571,12 +679,19 @@ describe("ArtistDetailView", () => {
       invokeMock.mockImplementation((cmd: string) => {
         if (cmd === "get_songs_by_artist") {
           return Promise.resolve([
-            { id: 1, title: "Man! I Feel Like a Woman!", album: "Come On Over", artist: "Shania Twain", length_nanosec: 240_000_000_000 } as any,
+            {
+              id: 1,
+              title: "Man! I Feel Like a Woman!",
+              album: "Come On Over",
+              artist: "Shania Twain",
+              length_nanosec: 240_000_000_000,
+            } as any,
           ]);
         }
         if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
         if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
+        if (cmd === "get_artist_profile")
+          return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
         return Promise.resolve();
       });
 
@@ -588,23 +703,44 @@ describe("ArtistDetailView", () => {
     });
 
     it("shows one Cards/Rows toggle that switches every release section to rows", async () => {
-      const release = { artist: "Shania Twain", year: 1997, disc_count: 1, art_embedded: false, art_automatic: null, art_manual: null, rating: -1 };
+      const release = {
+        artist: "Shania Twain",
+        year: 1997,
+        disc_count: 1,
+        art_embedded: false,
+        art_automatic: null,
+        art_manual: null,
+        rating: -1,
+      };
       collectionStore.albums = [
-        { ...release, album: "Come On Over", track_count: 16, total_duration_nanosec: 3_600_000_000_000 },
-        { ...release, album: "Short Cuts", track_count: 5, total_duration_nanosec: 1_200_000_000_000 },
+        {
+          ...release,
+          album: "Come On Over",
+          track_count: 16,
+          total_duration_nanosec: 3_600_000_000_000,
+        },
+        {
+          ...release,
+          album: "Short Cuts",
+          track_count: 5,
+          total_duration_nanosec: 1_200_000_000_000,
+        },
       ];
       vi.mocked(invoke).mockImplementation((cmd: string) => {
         if (cmd === "get_songs_by_artist") return Promise.resolve([SONG] as any);
         if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
         if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
+        if (cmd === "get_artist_profile")
+          return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
         return Promise.resolve();
       });
       const setMode = vi.spyOn(prefs, "setArtistReleasesViewMode").mockImplementation(() => {});
       prefs.artistReleasesViewMode = "rows";
 
       try {
-        const { findByText, getAllByRole, container } = render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+        const { findByText, getAllByRole, container } = render(ArtistDetailView, {
+          props: { artistName: "Shania Twain" },
+        });
         await findByText("Come On Over");
         await findByText("Short Cuts");
 

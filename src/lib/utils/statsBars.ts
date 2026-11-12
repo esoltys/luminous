@@ -20,5 +20,7 @@ export function statsBarPercents(items: Pick<StatsTopItem, "minutes" | "play_cou
           ? Math.max(0, ...items.map((it) => it.minutes || 0))
           : Math.max(0, ...items.map((it) => it.play_count || 0));
   if (maxMetric <= 0) return items.map(() => 0);
-  return items.map((it) => Math.min(100, Math.max(0, ((useMinutes ? it.minutes : it.play_count) / maxMetric) * 100)));
+  return items.map((it) =>
+    Math.min(100, Math.max(0, ((useMinutes ? it.minutes : it.play_count) / maxMetric) * 100)),
+  );
 }

@@ -19,7 +19,10 @@ describe("svelteVirtualStyleGuard (#1895)", () => {
     const cacheDir = join(import.meta.dirname, "..", ".svelte-kit");
     mkdirSync(cacheDir, { recursive: true });
     root = mkdtempSync(join(cacheDir, "style-guard-"));
-    writeFileSync(join(root, "Card.svelte"), `<div class="card">x</div>\n<style>.card { position: absolute; }</style>\n`);
+    writeFileSync(
+      join(root, "Card.svelte"),
+      `<div class="card">x</div>\n<style>.card { position: absolute; }</style>\n`,
+    );
     writeFileSync(join(root, "Plain.svelte"), `<div>x</div>\n`);
     server = await createServer({
       configFile: false,

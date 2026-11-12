@@ -58,7 +58,7 @@ function main() {
     let cargo = fs.readFileSync(cargoPath, "utf-8");
     const oldVersionMatch = cargo.match(/^version\s*=\s*"([^"]+)"/m);
     const oldVersion = oldVersionMatch ? oldVersionMatch[1] : "unknown";
-    
+
     // Replace the version string under [package]
     cargo = cargo.replace(/^version\s*=\s*"[^"]+"/m, `version = "${version}"`);
     fs.writeFileSync(cargoPath, cargo);
@@ -68,7 +68,12 @@ function main() {
   }
 
   // 4. src-tauri/metainfo/org.luminous.music.metainfo.xml
-  const metainfoPath = path.join(rootDir, "src-tauri", "metainfo", "org.luminous.music.metainfo.xml");
+  const metainfoPath = path.join(
+    rootDir,
+    "src-tauri",
+    "metainfo",
+    "org.luminous.music.metainfo.xml",
+  );
   if (fs.existsSync(metainfoPath)) {
     const metainfo = fs.readFileSync(metainfoPath, "utf-8");
     const today = new Date().toISOString().split("T")[0];
@@ -88,7 +93,7 @@ function main() {
       fs.writeFileSync(metainfoPath, lines.join("\n"));
       console.log(`[Version Bump] Updated existing release in metainfo.xml: ${version} (${today})`);
     } else {
-      const releasesIndex = lines.findIndex(l => l.includes("<releases>"));
+      const releasesIndex = lines.findIndex((l) => l.includes("<releases>"));
       if (releasesIndex !== -1) {
         lines.splice(releasesIndex + 1, 0, `    <release version="${version}" date="${today}" />`);
         fs.writeFileSync(metainfoPath, lines.join("\n"));

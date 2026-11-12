@@ -62,7 +62,15 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     navigationStore.activeTab = "collection";
     collectionStore.albums = [];
     playlistsStore.playlists = [
-      { id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false, is_queue: true },
+      {
+        id: 99,
+        name: "Queue",
+        track_count: 0,
+        created: 100,
+        updated: 100,
+        dynamic_enabled: false,
+        is_queue: true,
+      },
     ];
 
     vi.mocked(invoke).mockImplementation((cmd: string) => {
@@ -73,10 +81,28 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
         return Promise.resolve({});
       }
       if (cmd === "get_playlists") {
-        return Promise.resolve([{ id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false, is_queue: true }]);
+        return Promise.resolve([
+          {
+            id: 99,
+            name: "Queue",
+            track_count: 0,
+            created: 100,
+            updated: 100,
+            dynamic_enabled: false,
+            is_queue: true,
+          },
+        ]);
       }
       if (cmd === "create_playlist") {
-        return Promise.resolve({ id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false, is_queue: true });
+        return Promise.resolve({
+          id: 99,
+          name: "Queue",
+          track_count: 0,
+          created: 100,
+          updated: 100,
+          dynamic_enabled: false,
+          is_queue: true,
+        });
       }
       if (cmd === "get_playlist_items") {
         return Promise.resolve([]);
@@ -236,8 +262,12 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     // component's own `.then` was registered first, so it has run by the time
     // this await returns, and tick() renders the result. No polling.
     const songs = Promise.resolve([{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }]);
-    vi.mocked(invoke).mockImplementation(async (cmd: string) => (cmd === "get_songs_by_album" ? songs : []));
-    const { getByTitle, getByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === "get_songs_by_album" ? songs : [],
+    );
+    const { getByTitle, getByText } = render(AlbumDetailView, {
+      props: { albumName: mockAlbumName },
+    });
     await songs;
     await tick();
 
@@ -250,10 +280,12 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
   });
 
   it("disables Review on CritiqueBrainz when no release group MBID is tagged (#1387)", async () => {
-    const { findByTitle, findByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    const { findByTitle, findByText } = render(AlbumDetailView, {
+      props: { albumName: mockAlbumName },
+    });
     // Wait for the album's songs to be requested, so "disabled" is the answer to a loaded album.
     await vi.waitFor(() =>
-      expect(vi.mocked(invoke).mock.calls.map((call) => call[0])).toContain("get_songs_by_album")
+      expect(vi.mocked(invoke).mock.calls.map((call) => call[0])).toContain("get_songs_by_album"),
     );
     await fireEvent.click(await findByTitle("More actions"));
     const item = await findByText("Review on CritiqueBrainz");
@@ -262,12 +294,23 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
   it("shows the CritiqueBrainz community rating in the header (#1387)", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "get_songs_by_album") return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
-      if (cmd === "get_song_context") return { critiquebrainz_rating: 4.2, critiquebrainz_review_count: 7, critiquebrainz_review_links: [] };
+      if (cmd === "get_songs_by_album")
+        return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
+      if (cmd === "get_song_context")
+        return {
+          critiquebrainz_rating: 4.2,
+          critiquebrainz_review_count: 7,
+          critiquebrainz_review_links: [],
+        };
       return [];
     });
     collectionStore.albumProfiles = {
-      "abbey road": { album_key: "abbey road", artist_key: "the beatles", description: "Classic album", links: [] },
+      "abbey road": {
+        album_key: "abbey road",
+        artist_key: "the beatles",
+        description: "Classic album",
+        links: [],
+      },
     };
     const { findByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
     expect(await findByText("(7)")).toBeInTheDocument();
@@ -276,8 +319,14 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
   it("shows the community rating even when the album has no profile content (#1387)", async () => {
     collectionStore.albumProfiles = {};
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "get_songs_by_album") return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
-      if (cmd === "get_song_context") return { critiquebrainz_rating: 3.5, critiquebrainz_review_count: 2, critiquebrainz_review_links: [] };
+      if (cmd === "get_songs_by_album")
+        return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
+      if (cmd === "get_song_context")
+        return {
+          critiquebrainz_rating: 3.5,
+          critiquebrainz_review_count: 2,
+          critiquebrainz_review_links: [],
+        };
       return [];
     });
     const { findByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
@@ -286,12 +335,24 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
   it("falls back to the MusicBrainz community rating when CritiqueBrainz has no rating (#1571)", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "get_songs_by_album") return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
-      if (cmd === "get_song_context") return { mb_rating: 3.75, mb_rating_votes: 4, critiquebrainz_rating: null, critiquebrainz_review_links: [] };
+      if (cmd === "get_songs_by_album")
+        return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
+      if (cmd === "get_song_context")
+        return {
+          mb_rating: 3.75,
+          mb_rating_votes: 4,
+          critiquebrainz_rating: null,
+          critiquebrainz_review_links: [],
+        };
       return [];
     });
     collectionStore.albumProfiles = {
-      "abbey road": { album_key: "abbey road", artist_key: "the beatles", description: "Classic album", links: [] },
+      "abbey road": {
+        album_key: "abbey road",
+        artist_key: "the beatles",
+        description: "Classic album",
+        links: [],
+      },
     };
     const { findByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
     const votes = await findByText("(4)");
@@ -303,7 +364,12 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
   describe("info sidebar toggle (#1630)", () => {
     beforeEach(() => {
       collectionStore.albumProfiles = {
-        "abbey road": { album_key: "abbey road", artist_key: "the beatles", description: "Classic album", links: [] },
+        "abbey road": {
+          album_key: "abbey road",
+          artist_key: "the beatles",
+          description: "Classic album",
+          links: [],
+        },
       };
     });
 
@@ -325,20 +391,31 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       if (cmd === "get_all_app_settings") return {};
       return [];
     });
-    const { findByRole, getByRole } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    const { findByRole, getByRole } = render(AlbumDetailView, {
+      props: { albumName: mockAlbumName },
+    });
 
     expect(await findByRole("separator", { name: "Disc 1" })).toBeInTheDocument();
     expect(getByRole("separator", { name: "Disc 2 — BBC Sessions" })).toBeInTheDocument();
   });
 
   it("shows no disc headings for a single-disc album without a subtitle", async () => {
-    const { findByText, queryAllByRole } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    const { findByText, queryAllByRole } = render(AlbumDetailView, {
+      props: { albumName: mockAlbumName },
+    });
     await findByText("Come Together");
-    expect(queryAllByRole("separator").filter((el) => el.hasAttribute("data-row-divider"))).toHaveLength(0);
+    expect(
+      queryAllByRole("separator").filter((el) => el.hasAttribute("data-row-divider")),
+    ).toHaveLength(0);
   });
 
   it("opens the album's folder from the overflow menu with View in Files (#1883)", async () => {
-    const target = { source: { kind: "folder", id: 1 }, path: ["The Beatles", "Abbey Road"], selectedName: null, exact: true };
+    const target = {
+      source: { kind: "folder", id: 1 },
+      path: ["The Beatles", "Abbey Road"],
+      selectedName: null,
+      exact: true,
+    };
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_songs_by_album") return mockSongs;
       if (cmd === "locate_album_in_files") return target;
@@ -346,7 +423,9 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       return [];
     });
     const openInFiles = vi.spyOn(navigationStore, "openInFiles").mockImplementation(() => {});
-    const { getByTitle, findByText, queryByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    const { getByTitle, findByText, queryByText } = render(AlbumDetailView, {
+      props: { albumName: mockAlbumName },
+    });
 
     await fireEvent.click(getByTitle("More actions"));
     await fireEvent.click(await findByText("View in Files"));
@@ -384,7 +463,9 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(excludeItem).toBeInTheDocument();
 
     await fireEvent.click(excludeItem);
-    await vi.waitFor(() => expect(statsExclusionsStore.isExcluded("album", mockAlbumName)).toBe(true));
+    await vi.waitFor(() =>
+      expect(statsExclusionsStore.isExcluded("album", mockAlbumName)).toBe(true),
+    );
     expect(invoke).toHaveBeenCalledWith("set_stats_excluded", {
       entityType: "album",
       entityKey: mockAlbumName,
@@ -437,7 +518,10 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     });
     // The automatic pass also backfills fanart.tv art, but only what's missing (#1277).
     await vi.waitFor(() => {
-      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", { album: "Abbey Road", onlyMissing: true });
+      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", {
+        album: "Abbey Road",
+        onlyMissing: true,
+      });
     });
   });
 
@@ -449,7 +533,13 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === "get_songs_by_album") {
         return Promise.resolve([
-          { id: 1, title: "Come Together", artist: "The Beatles", album: "Abbey Road", musicbrainz_release_group_id: "rg-123" },
+          {
+            id: 1,
+            title: "Come Together",
+            artist: "The Beatles",
+            album: "Abbey Road",
+            musicbrainz_release_group_id: "rg-123",
+          },
         ]);
       }
       if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
@@ -462,7 +552,9 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
     await vi.waitFor(() => expect(warnSpy).toHaveBeenCalled());
     expect(tasksStore.tasks.some((t) => t.id === "album-enrichment-abbey road")).toBe(false);
-    expect(toastStore.messages.some((m) => m.task?.taskId === "album-enrichment-abbey road")).toBe(false);
+    expect(toastStore.messages.some((m) => m.task?.taskId === "album-enrichment-abbey road")).toBe(
+      false,
+    );
     warnSpy.mockRestore();
   });
 
@@ -511,7 +603,10 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       style = document.createElement("style");
       style.textContent = ".overflow-y-auto { overflow-y: auto; }";
       document.head.appendChild(style);
-      vi.spyOn(Element.prototype, "scrollTop", "set").mockImplementation(function (this: Element, value: number) {
+      vi.spyOn(Element.prototype, "scrollTop", "set").mockImplementation(function (
+        this: Element,
+        value: number,
+      ) {
         if (this.classList.contains("overflow-y-auto")) scrolledTo.push(value);
       });
     });
@@ -527,7 +622,9 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
       const row = container.querySelector<HTMLElement>('[data-song-row][data-key="2"]')!;
       expect(row.className).toContain("bg-brand-accent/20");
-      expect(container.querySelector('[data-song-row][data-key="1"]')!.className).not.toContain("bg-brand-accent/20");
+      expect(container.querySelector('[data-song-row][data-key="1"]')!.className).not.toContain(
+        "bg-brand-accent/20",
+      );
       expect(scrolledTo.some((top) => top > 0)).toBe(true);
       expect(navigationStore.pendingFocusSongId).toBeNull();
     });
@@ -554,7 +651,13 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === "get_songs_by_album") {
         return Promise.resolve([
-          { id: 1, title: "Come Together", artist: "The Beatles", album: "Abbey Road", musicbrainz_release_group_id: "rg-123" },
+          {
+            id: 1,
+            title: "Come Together",
+            artist: "The Beatles",
+            album: "Abbey Road",
+            musicbrainz_release_group_id: "rg-123",
+          },
         ]);
       }
       if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
@@ -562,7 +665,13 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
         return Promise.resolve({
           cover_uri: null,
           disc_uri: null,
-          profile: { album_key: "abbey road", details_fetched: true, links: [], cover_fetched: true, disc_fetched: true },
+          profile: {
+            album_key: "abbey road",
+            details_fetched: true,
+            links: [],
+            cover_fetched: true,
+            disc_fetched: true,
+          },
         });
       }
       return Promise.resolve();
@@ -575,7 +684,10 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     const { invokeMock } = renderWithFetchedDetails({ cover_fetched: true, disc_fetched: false });
 
     await vi.waitFor(() => {
-      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", { album: "Abbey Road", onlyMissing: true });
+      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", {
+        album: "Abbey Road",
+        onlyMissing: true,
+      });
     });
     expect(invokeMock).not.toHaveBeenCalledWith("retrieve_album_details", expect.anything());
   });
@@ -592,19 +704,35 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
   });
 
   it("fetches every fanart.tv art type from a manual Retrieve Album Details (#1277)", async () => {
-    const { invokeMock, view } = renderWithFetchedDetails({ cover_fetched: true, disc_fetched: true });
+    const { invokeMock, view } = renderWithFetchedDetails({
+      cover_fetched: true,
+      disc_fetched: true,
+    });
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === "get_songs_by_album") {
         return Promise.resolve([
-          { id: 1, title: "Come Together", artist: "The Beatles", album: "Abbey Road", musicbrainz_release_group_id: "rg-123" },
+          {
+            id: 1,
+            title: "Come Together",
+            artist: "The Beatles",
+            album: "Abbey Road",
+            musicbrainz_release_group_id: "rg-123",
+          },
         ]);
       }
       if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
       if (cmd === "retrieve_album_details") {
-        return Promise.resolve({ added_count: 0, profile: { album_key: "abbey road", details_fetched: true, links: [] } });
+        return Promise.resolve({
+          added_count: 0,
+          profile: { album_key: "abbey road", details_fetched: true, links: [] },
+        });
       }
       if (cmd === "retrieve_album_art") {
-        return Promise.resolve({ cover_uri: null, disc_uri: null, profile: { album_key: "abbey road", details_fetched: true, links: [] } });
+        return Promise.resolve({
+          cover_uri: null,
+          disc_uri: null,
+          profile: { album_key: "abbey road", details_fetched: true, links: [] },
+        });
       }
       return Promise.resolve();
     });
@@ -614,7 +742,10 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     await fireEvent.click(await view.findByText("Retrieve Album Details"));
 
     await vi.waitFor(() => {
-      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", { album: "Abbey Road", onlyMissing: false });
+      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", {
+        album: "Abbey Road",
+        onlyMissing: false,
+      });
     });
   });
 
@@ -623,15 +754,31 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === "get_songs_by_album") {
         return Promise.resolve([
-          { id: 1, title: "Come Together", artist: "The Beatles", album: "Abbey Road", disc: 1, track: 1 },
-          { id: 2, title: "Something", artist: "The Beatles", album: "Abbey Road", disc: 1, track: 2 },
+          {
+            id: 1,
+            title: "Come Together",
+            artist: "The Beatles",
+            album: "Abbey Road",
+            disc: 1,
+            track: 1,
+          },
+          {
+            id: 2,
+            title: "Something",
+            artist: "The Beatles",
+            album: "Abbey Road",
+            disc: 1,
+            track: 2,
+          },
         ]);
       }
       if (cmd === "rescan_songs") return Promise.resolve();
       return Promise.resolve();
     });
 
-    const refreshLibrarySpy = vi.spyOn(collectionStore, "refreshLibrary").mockResolvedValue(undefined as any);
+    const refreshLibrarySpy = vi
+      .spyOn(collectionStore, "refreshLibrary")
+      .mockResolvedValue(undefined as any);
     const startScanSpy = vi.spyOn(collectionStore, "startScan");
 
     const view = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
@@ -653,10 +800,19 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       if (cmd === "get_songs_by_album") {
         // Tauri rejects a null `album` before the command runs.
         if (args?.album == null) {
-          return Promise.reject("invalid args `album` for command `get_songs_by_album`: invalid type: null");
+          return Promise.reject(
+            "invalid args `album` for command `get_songs_by_album`: invalid type: null",
+          );
         }
         return Promise.resolve([
-          { id: 1, title: "Come Together", artist: "The Beatles", album: "Abbey Road", disc: 1, track: 1 },
+          {
+            id: 1,
+            title: "Come Together",
+            artist: "The Beatles",
+            album: "Abbey Road",
+            disc: 1,
+            track: 1,
+          },
         ]);
       }
       return Promise.resolve();

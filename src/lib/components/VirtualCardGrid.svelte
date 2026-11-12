@@ -68,7 +68,7 @@
   let columnWidth = $derived(((width ?? 0) - gap * (columns - 1)) / columns);
   // The measured height, while it was measured at the current column width.
   let freshHeight = $derived(
-    measured && Math.abs(measured.columnWidth - columnWidth) < 0.5 ? measured.height : null
+    measured && Math.abs(measured.columnWidth - columnWidth) < 0.5 ? measured.height : null,
   );
   let rowHeight = $derived(freshHeight ?? estimateRowHeight(Math.max(columnWidth, minColumnWidth)));
   // Shorter rows stretch to the stride, so the mounted rows sit exactly where
@@ -82,7 +82,7 @@
 
   let firstRow = $derived(Math.max(0, Math.floor(viewTop / rowStride) - overscanRows));
   let lastRow = $derived(
-    Math.min(rowCount, Math.ceil((viewTop + viewHeight) / rowStride) + overscanRows)
+    Math.min(rowCount, Math.ceil((viewTop + viewHeight) / rowStride) + overscanRows),
   );
   let visible = $derived(width === null ? [] : items.slice(firstRow * columns, lastRow * columns));
 
@@ -129,7 +129,8 @@
     if (!node) return;
     const tallest = () => {
       let height = 0;
-      for (const card of node.children) height = Math.max(height, card.getBoundingClientRect().height);
+      for (const card of node.children)
+        height = Math.max(height, card.getBoundingClientRect().height);
       return height;
     };
     const measure = () => {
@@ -183,7 +184,8 @@
   <div
     bind:this={rowsEl}
     class="grid"
-    style="position: absolute; left: 0; right: 0; top: {firstRow * rowStride}px; grid-template-columns: repeat({columns}, minmax(0, 1fr)); grid-auto-rows: {rowTrack}; gap: {gap}px;"
+    style="position: absolute; left: 0; right: 0; top: {firstRow *
+      rowStride}px; grid-template-columns: repeat({columns}, minmax(0, 1fr)); grid-auto-rows: {rowTrack}; gap: {gap}px;"
   >
     {#each visible as entry (key(entry))}
       {@render item(entry)}

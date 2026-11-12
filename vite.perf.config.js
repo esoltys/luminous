@@ -7,15 +7,15 @@ export default defineConfig(async (env) => {
     ...base,
     resolve: {
       ...base.resolve,
-      conditions: ["browser"]
+      conditions: ["browser"],
     },
     test: {
       ...base.test,
       include: ["src/**/*.benchmark.ts"],
       environment: "jsdom",
       testTransformMode: {
-        web: ["**/*.svelte"]
-      }
-    }
+        web: ["**/*.svelte"],
+      },
+    },
   };
 });

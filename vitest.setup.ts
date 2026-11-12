@@ -21,25 +21,33 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => { store[key] = value.toString(); },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
+    setItem: (key: string, value: string) => {
+      store[key] = value.toString();
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
     key: (index: number) => Object.keys(store)[index] || null,
-    get length() { return Object.keys(store).length; }
+    get length() {
+      return Object.keys(store).length;
+    },
   };
 })();
 
 Object.defineProperty(globalThis, "localStorage", {
   value: localStorageMock,
   writable: true,
-  configurable: true
+  configurable: true,
 });
 
 if (typeof window !== "undefined") {
   Object.defineProperty(window, "localStorage", {
     value: localStorageMock,
     writable: true,
-    configurable: true
+    configurable: true,
   });
 }
 
@@ -108,7 +116,15 @@ vi.mock("@tauri-apps/api/core", () => {
       // playlist listing always contains it — model that guarantee here.
       if (cmd === "get_playlists") {
         return [
-          { id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 0, is_queue: true },
+          {
+            id: 1,
+            name: "Queue",
+            dynamic_enabled: false,
+            created: 0,
+            updated: 0,
+            track_count: 0,
+            is_queue: true,
+          },
         ];
       }
       if (cmd === "get_library_snapshot") {

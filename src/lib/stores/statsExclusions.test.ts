@@ -134,7 +134,9 @@ describe("StatsExclusionsStore", () => {
   });
 
   it("toggleStatsExcluded helper invokes toggleWithToast", async () => {
-    const toggleSpy = vi.spyOn(statsExclusionsStore, "toggleWithToast").mockResolvedValue(undefined);
+    const toggleSpy = vi
+      .spyOn(statsExclusionsStore, "toggleWithToast")
+      .mockResolvedValue(undefined);
 
     await toggleStatsExcluded("artist", "Radiohead");
     expect(toggleSpy).toHaveBeenCalledWith("artist", "Radiohead", undefined);
@@ -159,7 +161,12 @@ describe("StatsExclusionsStore", () => {
     expect(statsExclusionsStore.isSongExcluded(directSong)).toBe(true);
 
     // Song excluded via album
-    const albumSong = { id: 11, title: "Come Together", album: "Abbey Road", artist: "The Beatles" };
+    const albumSong = {
+      id: 11,
+      title: "Come Together",
+      album: "Abbey Road",
+      artist: "The Beatles",
+    };
     expect(statsExclusionsStore.getSongExclusionReason(albumSong)).toBe("album");
     expect(statsExclusionsStore.isSongExcluded(albumSong)).toBe(true);
 

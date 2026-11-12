@@ -14,7 +14,9 @@
 {#if visible.length > 0}
   <div>
     <div class="flex items-center justify-between mb-3">
-      <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t("settings.addonThemes")}</h4>
+      <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">
+        {i18n.t("settings.addonThemes")}
+      </h4>
       <button
         onclick={() => void invoke("refresh_addons")}
         class="h-7 px-3 inline-flex items-center gap-1.5 rounded-lg border border-brand-border text-xs font-semibold text-brand-text-primary hover:bg-brand-border/40 transition-colors"

@@ -12,7 +12,7 @@ describe("Scripting API release-build gating", () => {
     if (!existsSync(buildDir)) {
       if (isStrict) {
         throw new Error(
-          `Release build directory "${buildDir}" was not found. Run "bun run build" before running this release verification.`
+          `Release build directory "${buildDir}" was not found. Run "bun run build" before running this release verification.`,
         );
       }
       return;
@@ -47,7 +47,7 @@ describe("Scripting API release-build gating", () => {
 
     expect(
       leakingFiles,
-      `Found scripting marker "${marker}" in production release bundle chunks: ${leakingFiles.join(", ")}`
+      `Found scripting marker "${marker}" in production release bundle chunks: ${leakingFiles.join(", ")}`,
     ).toEqual([]);
   });
 

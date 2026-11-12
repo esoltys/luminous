@@ -35,11 +35,11 @@
 
   function defaultLabel(name: string): string {
     const keyMap: Record<string, string> = {
-      "Flat": "flatPreset",
-      "Pop": "popPreset",
-      "Rock": "rockPreset",
-      "Classical": "classicalPreset",
-      "Jazz": "jazzPreset",
+      Flat: "flatPreset",
+      Pop: "popPreset",
+      Rock: "rockPreset",
+      Classical: "classicalPreset",
+      Jazz: "jazzPreset",
       "Bass Boost": "bassBoostPreset",
       "Vocal Boost": "vocalBoostPreset",
       "Treble Boost": "trebleBoostPreset",
@@ -57,9 +57,7 @@
   }
 
   let groups = $derived.by<ListboxGroup[]>(() => {
-    const result: ListboxGroup[] = [
-      { id: "builtin", label: i18n.t("equalizer.builtinPresets") },
-    ];
+    const result: ListboxGroup[] = [{ id: "builtin", label: i18n.t("equalizer.builtinPresets") }];
     if (mode === "parametric" && presets.user.length > 0) {
       result.push({ id: "user", label: i18n.t("equalizer.userPresets") });
     }
@@ -142,7 +140,12 @@
           stroke-dasharray="3 3"
           stroke-width="1"
         />
-        <path d={item.data.curvePath} stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <path
+          d={item.data.curvePath}
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
       </svg>
     {/if}
   {/snippet}
@@ -152,7 +155,9 @@
     {#if item.data?.curvePath}
       <svg
         viewBox="0 0 100 40"
-        class="w-12 h-4 shrink-0 text-brand-accent stroke-current fill-none {isSelected || isFocused ? 'opacity-100' : 'opacity-70'}"
+        class="w-12 h-4 shrink-0 text-brand-accent stroke-current fill-none {isSelected || isFocused
+          ? 'opacity-100'
+          : 'opacity-70'}"
         aria-hidden="true"
       >
         <line
@@ -165,7 +170,12 @@
           stroke-dasharray="3 3"
           stroke-width="1"
         />
-        <path d={item.data.curvePath} stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <path
+          d={item.data.curvePath}
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
       </svg>
     {/if}
   {/snippet}

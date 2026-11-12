@@ -33,7 +33,10 @@ const TAILWIND_THEME = createRequire(import.meta.url).resolve("tailwindcss/theme
 
 /** Properties provided by something other than our source, each with its reason. */
 const HOST_PROVIDED: { pattern: RegExp; reason: string }[] = [
-  { pattern: /^--tw-/, reason: "Tailwind utilities declare their own --tw-* internals per element" },
+  {
+    pattern: /^--tw-/,
+    reason: "Tailwind utilities declare their own --tw-* internals per element",
+  },
 ];
 
 interface Read {
@@ -49,7 +52,9 @@ function walk(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) return walk(full);
-    return /\.(css|svelte|ts)$/.test(entry.name) && !/\.(test|spec)\.ts$/.test(entry.name) ? [full] : [];
+    return /\.(css|svelte|ts)$/.test(entry.name) && !/\.(test|spec)\.ts$/.test(entry.name)
+      ? [full]
+      : [];
   });
 }
 
@@ -80,11 +85,23 @@ function collectWriters(text: string, into: Set<string>) {
 function collectReads(text: string, file: string, into: Read[]) {
   const rel = path.relative(ROOT, file).replaceAll("\\", "/");
   for (const m of text.matchAll(/var\(\s*(--[\w-]+)(\$\{)?\s*(,)?/g)) {
-    into.push({ name: m[1], file: rel, line: lineOf(text, m.index), isPrefix: !!m[2], hasFallback: !!m[3] });
+    into.push({
+      name: m[1],
+      file: rel,
+      line: lineOf(text, m.index),
+      isPrefix: !!m[2],
+      hasFallback: !!m[3],
+    });
   }
   // Tailwind v4 shorthand: bg-(--glass-bg), shadow-(--glass-shadow)
   for (const m of text.matchAll(/[\w\]]-\((--[\w-]+)\)/g)) {
-    into.push({ name: m[1], file: rel, line: lineOf(text, m.index), isPrefix: false, hasFallback: false });
+    into.push({
+      name: m[1],
+      file: rel,
+      line: lineOf(text, m.index),
+      isPrefix: false,
+      hasFallback: false,
+    });
   }
 }
 
@@ -115,13 +132,18 @@ function main() {
     for (const file of files) {
       const text = stripComments(readFileSync(file, "utf8"), file);
       collectWriters(text, ownWriters);
-      for (const block of text.matchAll(/@theme[^{]*\{([^}]*)\}/g)) collectWriters(block[1], themeTokens);
+      for (const block of text.matchAll(/@theme[^{]*\{([^}]*)\}/g))
+        collectWriters(block[1], themeTokens);
     }
     const unread = [...ownWriters].filter(
-      (w) => !themeTokens.has(w) && !reads.some((r) => (r.isPrefix ? w.startsWith(r.name) : r.name === w)),
+      (w) =>
+        !themeTokens.has(w) &&
+        !reads.some((r) => (r.isPrefix ? w.startsWith(r.name) : r.name === w)),
     );
     const hiddenTypos = reads.filter((r) => r.hasFallback && !isWritten(r));
-    console.log(`Written in src but never read via var(), excluding @theme tokens (${unread.length}) — check for JS readers before deleting:`);
+    console.log(
+      `Written in src but never read via var(), excluding @theme tokens (${unread.length}) — check for JS readers before deleting:`,
+    );
     for (const name of unread.sort()) console.log(`  ${name}`);
     console.log(`\nFallback-guarded reads of a property written nowhere (${hiddenTypos.length}):`);
     for (const r of hiddenTypos) console.log(`  ${r.file}:${r.line}  ${r.name}`);
@@ -129,12 +151,19 @@ function main() {
   }
 
   if (broken.length > 0) {
-    console.error(`✖ ${broken.length} custom propert${broken.length === 1 ? "y is" : "ies are"} read with no fallback and never defined:`);
-    for (const r of broken) console.error(`  ${r.file}:${r.line}  ${r.name}${r.isPrefix ? "*" : ""}`);
-    console.error("\nAn undefined var() computes to `unset` (transparent/missing) with no error. Define it, add a fallback, or fix the name.");
+    console.error(
+      `✖ ${broken.length} custom propert${broken.length === 1 ? "y is" : "ies are"} read with no fallback and never defined:`,
+    );
+    for (const r of broken)
+      console.error(`  ${r.file}:${r.line}  ${r.name}${r.isPrefix ? "*" : ""}`);
+    console.error(
+      "\nAn undefined var() computes to `unset` (transparent/missing) with no error. Define it, add a fallback, or fix the name.",
+    );
     process.exit(1);
   }
-  console.log(`✔ CSS custom properties: ${reads.length} reads across ${files.length} files, all defined or guarded by a fallback.`);
+  console.log(
+    `✔ CSS custom properties: ${reads.length} reads across ${files.length} files, all defined or guarded by a fallback.`,
+  );
 }
 
 main();

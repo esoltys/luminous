@@ -22,7 +22,13 @@ describe("registerTap", () => {
   });
 
   it("starts over after a pause longer than the reset window", () => {
-    const { taps, bpm } = tapAll([0, 500, 1000, 1000 + TAP_RESET_MS + 1, 1000 + TAP_RESET_MS + 1 + 400]);
+    const { taps, bpm } = tapAll([
+      0,
+      500,
+      1000,
+      1000 + TAP_RESET_MS + 1,
+      1000 + TAP_RESET_MS + 1 + 400,
+    ]);
     expect(taps).toHaveLength(2);
     expect(bpm).toBe(150);
   });

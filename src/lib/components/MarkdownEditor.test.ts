@@ -113,7 +113,9 @@ describe("MarkdownEditor.svelte", () => {
       },
     });
 
-    const openExternalBtn = screen.getByTitle(/open this markdown file in your default system editor/i);
+    const openExternalBtn = screen.getByTitle(
+      /open this markdown file in your default system editor/i,
+    );
     await fireEvent.click(openExternalBtn);
 
     expect(invoke).toHaveBeenCalledWith("open_artist_bio_file", {
@@ -182,7 +184,9 @@ describe("MarkdownEditor.svelte", () => {
     const reloadBtn = screen.getByRole("button", { name: /reload from disk/i });
     await fireEvent.click(reloadBtn);
 
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("External edit on disk");
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+      "External edit on disk",
+    );
     expect(screen.queryByText(/modified on disk by an external editor/i)).toBeNull();
   });
 

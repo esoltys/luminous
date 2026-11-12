@@ -27,8 +27,33 @@ export interface AlphabetIndexResult {
 }
 
 const LATIN_LETTERS_ASC = [
-  "#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
-  "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
+  "#",
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "H",
+  "I",
+  "J",
+  "K",
+  "L",
+  "M",
+  "N",
+  "O",
+  "P",
+  "Q",
+  "R",
+  "S",
+  "T",
+  "U",
+  "V",
+  "W",
+  "X",
+  "Y",
+  "Z",
 ] as const;
 
 export const BASE_LETTERS_ASC = LATIN_LETTERS_ASC;
@@ -75,7 +100,10 @@ export function extractBucketLetter(str: string | null | undefined, locale = "en
   }
 
   // Decompose diacritics and strip combining marks for Latin letters
-  const char = firstChar.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const char = firstChar
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
   if (char >= "A" && char <= "Z") {
     return char;
   }
@@ -104,7 +132,7 @@ export function buildAlphabetIndex<T>(
   items: T[],
   getKey: (item: T) => string | null | undefined,
   _ascending = true,
-  locale = "en"
+  locale = "en",
 ): AlphabetIndexResult {
   if (items.length === 0) {
     return {

@@ -48,7 +48,10 @@
   });
   let artistProfile = $derived(collectionStore.getArtistProfile(artist.name));
   let artistPortraitUrl = $derived(
-    resolveArtistPortraitUrl(artistArtwork?.artist_portrait_uri, artistProfile?.fetched_image_filename)
+    resolveArtistPortraitUrl(
+      artistArtwork?.artist_portrait_uri,
+      artistProfile?.fetched_image_filename,
+    ),
   );
 </script>
 
@@ -59,23 +62,32 @@
   tabindex="0"
   onclick={(e) => customClick?.(e)}
   oncontextmenu={(e) => customContextMenu?.(e)}
-  onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); customClick?.(e as unknown as MouseEvent); } }}
+  onkeydown={(e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      customClick?.(e as unknown as MouseEvent);
+    }
+  }}
   class="artist-card group h-full bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-start text-left outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
 >
-  <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden">
+  <div
+    class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden"
+  >
     {#if artistPortraitUrl}
-      <div class="w-full h-full relative overflow-hidden bg-brand-sidebar border border-brand-border shrink-0">
+      <div
+        class="w-full h-full relative overflow-hidden bg-brand-sidebar border border-brand-border shrink-0"
+      >
         <img
           src={artistPortraitUrl}
           crossorigin="anonymous"
-          alt={artist.name || i18n.t('collection.unknownArtist')}
+          alt={artist.name || i18n.t("collection.unknownArtist")}
           class="w-full h-full object-cover"
         />
       </div>
     {:else}
       <CoverStack
-        covers={covers}
-        fallbackName={artist.name || i18n.t('collection.unknownArtist')}
+        {covers}
+        fallbackName={artist.name || i18n.t("collection.unknownArtist")}
         sizeClass="w-36 h-36"
       />
     {/if}
@@ -83,9 +95,11 @@
 
   <span
     class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-colors duration-150 text-left truncate w-full"
-    title={i18n.t('collection.filterByArtist', { artist: artist.name || i18n.t('collection.unknownArtist') })}
+    title={i18n.t("collection.filterByArtist", {
+      artist: artist.name || i18n.t("collection.unknownArtist"),
+    })}
   >
-    {artist.name || i18n.t('collection.unknownArtist')}
+    {artist.name || i18n.t("collection.unknownArtist")}
   </span>
   <span class="text-xs text-brand-text-secondary font-medium truncate w-full mt-0.5 text-left">
     {i18n.plural("playlists.songsCount", artist.song_count)}
@@ -95,7 +109,7 @@
       <GenreChips genre={artist.genre} />
     {:else}
       <span class="text-xs text-brand-text-secondary font-medium truncate text-left">
-        {i18n.t('artistDetail.unknownGenre')}
+        {i18n.t("artistDetail.unknownGenre")}
       </span>
     {/if}
   </div>

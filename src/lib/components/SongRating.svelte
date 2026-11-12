@@ -24,8 +24,12 @@
     isAlbum = false,
   }: Props = $props();
 
-  let showStars = $derived(isAlbum || prefs.ratingStyle === "stars" || prefs.ratingStyle === "both");
-  let showHeart = $derived(!isAlbum && (prefs.ratingStyle === "heart" || prefs.ratingStyle === "both"));
+  let showStars = $derived(
+    isAlbum || prefs.ratingStyle === "stars" || prefs.ratingStyle === "both",
+  );
+  let showHeart = $derived(
+    !isAlbum && (prefs.ratingStyle === "heart" || prefs.ratingStyle === "both"),
+  );
 
   function handleHeartToggle() {
     if (onSetLoved) {

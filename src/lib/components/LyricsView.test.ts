@@ -122,7 +122,9 @@ describe("LyricsView.svelte", () => {
     const { getAllByText, getByText } = render(LyricsView);
 
     expect(getByText("Instrumental Song")).toBeInTheDocument();
-    expect(getByText("This song is marked as instrumental. Online lyrics search is bypassed.")).toBeInTheDocument();
+    expect(
+      getByText("This song is marked as instrumental. Online lyrics search is bypassed."),
+    ).toBeInTheDocument();
 
     const buttons = getAllByText("Unmark Instrumental");
     expect(buttons).toHaveLength(1);
@@ -201,8 +203,12 @@ describe("LyricsView.svelte", () => {
       await waitFor(() => {
         expect(document.getElementById("lyrics-offset-value")).toHaveTextContent("+1,5 s");
       });
-      expect(getByRole("button", { name: "Afficher les paroles 0,5 s plus tôt" })).toHaveTextContent("+0,5 s");
-      expect(getByRole("button", { name: "Afficher les paroles 0,5 s plus tard" })).toHaveTextContent(/^[-−]0,5 s$/);
+      expect(
+        getByRole("button", { name: "Afficher les paroles 0,5 s plus tôt" }),
+      ).toHaveTextContent("+0,5 s");
+      expect(
+        getByRole("button", { name: "Afficher les paroles 0,5 s plus tard" }),
+      ).toHaveTextContent(/^[-−]0,5 s$/);
     } finally {
       i18n.currentLocale = "en-CA";
       getOffsetResult = 0;
@@ -285,4 +291,3 @@ describe("LyricsView.svelte", () => {
     expect(invoke).toHaveBeenCalledWith("reject_song_lyrics", { songId: mockSong.id });
   });
 });
-

@@ -18,5 +18,7 @@ export const TEMPO_BUCKET_OPTIONS = [
 /** A tempo rule's stored value if it names a known bucket, else the first bucket. */
 export function normalizeTempoToken(value: string): string {
   const token = value.trim().toLowerCase();
-  return TEMPO_BUCKET_OPTIONS.some((o) => o.token === token) ? token : TEMPO_BUCKET_OPTIONS[0].token;
+  return TEMPO_BUCKET_OPTIONS.some((o) => o.token === token)
+    ? token
+    : TEMPO_BUCKET_OPTIONS[0].token;
 }

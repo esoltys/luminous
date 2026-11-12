@@ -3,10 +3,15 @@ import { render } from "@testing-library/svelte";
 import { tick } from "svelte";
 
 const listenMock = vi.fn(async () => () => {});
-vi.mock("@tauri-apps/api/event", () => ({ listen: (...a: unknown[]) => (listenMock as any)(...a) }));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: (...a: unknown[]) => (listenMock as any)(...a),
+}));
 const acquire = vi.fn();
 const release = vi.fn();
-vi.mock("../utils/spectrumEnable", () => ({ acquireSpectrum: () => acquire(), releaseSpectrum: () => release() }));
+vi.mock("../utils/spectrumEnable", () => ({
+  acquireSpectrum: () => acquire(),
+  releaseSpectrum: () => release(),
+}));
 
 import AddonOverlay from "./AddonOverlay.svelte";
 import { playerStore } from "../stores/player.svelte";
@@ -16,7 +21,7 @@ const base: AddonTheme = {
   id: "fixture-addon",
   name: "Fixture",
   colors: {} as AddonTheme["colors"],
-  overlayEntry: "overlay.html"
+  overlayEntry: "overlay.html",
 };
 
 function frameOf(container: HTMLElement): HTMLIFrameElement {

@@ -98,24 +98,34 @@
   </div>
   <div class="p-3.5 flex flex-col flex-1">
     <LinkButton
-      onclick={(e) => { e.stopPropagation(); openAlbum(); }}
+      onclick={(e) => {
+        e.stopPropagation();
+        openAlbum();
+      }}
       class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-colors duration-150 truncate w-full"
-      title={i18n.t('collection.filterByAlbum', { album: album.album || i18n.t('collection.unknownAlbum') })}
+      title={i18n.t("collection.filterByAlbum", {
+        album: album.album || i18n.t("collection.unknownAlbum"),
+      })}
     >
-      {album.album || i18n.t('collection.unknownAlbum')}
+      {album.album || i18n.t("collection.unknownAlbum")}
     </LinkButton>
     <div class="flex items-center justify-between mt-0.5 gap-2">
       {#if showArtist}
         {#if album.artist}
           <LinkButton
-            onclick={(e) => { e.stopPropagation(); navigationStore.viewArtist(album.artist || ""); }}
+            onclick={(e) => {
+              e.stopPropagation();
+              navigationStore.viewArtist(album.artist || "");
+            }}
             class="text-xs text-brand-text-secondary truncate min-w-0 font-medium"
-            title={i18n.t('collection.filterByArtist', { artist: album.artist })}
+            title={i18n.t("collection.filterByArtist", { artist: album.artist })}
           >
             {album.artist}
           </LinkButton>
         {:else}
-          <span class="text-xs text-brand-text-secondary text-left truncate min-w-0 font-medium">{i18n.t('collection.variousArtists')}</span>
+          <span class="text-xs text-brand-text-secondary text-left truncate min-w-0 font-medium"
+            >{i18n.t("collection.variousArtists")}</span
+          >
         {/if}
       {:else}
         <span></span>
@@ -125,10 +135,17 @@
     <!-- min-h-6 matches the compact genre chip's h-6, so the stars sit at the same height whether
          or not the album has a genre (#1757). The chip's wrapper is flex so the inline chip adds
          no line-box gap below it. -->
-    <div data-testid="album-card-genre-row" class="flex items-center justify-between mt-0.5 gap-2 min-h-6">
+    <div
+      data-testid="album-card-genre-row"
+      class="flex items-center justify-between mt-0.5 gap-2 min-h-6"
+    >
       <div class="flex min-w-0"><GenreChips genre={album.genre} /></div>
-      <span class="shrink-0"><SongRating isAlbum rating={currentRating} onRate={rateAlbum} size="sm" /></span>
+      <span class="shrink-0"
+        ><SongRating isAlbum rating={currentRating} onRate={rateAlbum} size="sm" /></span
+      >
     </div>
   </div>
-  <div class="absolute inset-0 rounded-b-xl ring-2 ring-inset ring-transparent group-hover:ring-brand-accent transition-[box-shadow] duration-200 pointer-events-none"></div>
+  <div
+    class="absolute inset-0 rounded-b-xl ring-2 ring-inset ring-transparent group-hover:ring-brand-accent transition-[box-shadow] duration-200 pointer-events-none"
+  ></div>
 </div>

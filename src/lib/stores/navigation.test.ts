@@ -70,9 +70,15 @@ describe("CollectionStore - artist/album navigation and history", () => {
   });
 
   it("persists the selected album/artist detail view to localStorage so a relaunch restores it", () => {
-    navigationStore.viewAlbum("Dark Side of the Moon", undefined, "pink floyd\x1fdark side of the moon");
+    navigationStore.viewAlbum(
+      "Dark Side of the Moon",
+      undefined,
+      "pink floyd\x1fdark side of the moon",
+    );
     expect(localStorage.getItem("navigation_selectedAlbumName")).toBe("Dark Side of the Moon");
-    expect(localStorage.getItem("navigation_selectedAlbumKey")).toBe("pink floyd\x1fdark side of the moon");
+    expect(localStorage.getItem("navigation_selectedAlbumKey")).toBe(
+      "pink floyd\x1fdark side of the moon",
+    );
     expect(navigationStore.selectedAlbumKey).toBe("pink floyd\x1fdark side of the moon");
     expect(localStorage.getItem("navigation_selectedArtistName")).toBeNull();
 
@@ -279,23 +285,42 @@ describe("navigationStore - Files location", () => {
     });
 
     it("opens the target's folder with its file selected and marked as arrived at", () => {
-      navigationStore.openInFiles({ source: music, path: ["Katatonia", "2006"], selectedName: "11 The Itch.flac", exact: true });
+      navigationStore.openInFiles({
+        source: music,
+        path: ["Katatonia", "2006"],
+        selectedName: "11 The Itch.flac",
+        exact: true,
+      });
 
       expect(navigationStore.activeTab).toBe("files");
-      expect(navigationStore.filesLocation).toEqual({ source: music, path: ["Katatonia", "2006"], selectedName: "11 The Itch.flac" });
+      expect(navigationStore.filesLocation).toEqual({
+        source: music,
+        path: ["Katatonia", "2006"],
+        selectedName: "11 The Itch.flac",
+      });
       expect(navigationStore.pendingFilesArrival).toBe("11 The Itch.flac");
       expect(toastStore.messages).toHaveLength(0);
     });
 
     it("opens an album's folder with nothing selected", () => {
-      navigationStore.openInFiles({ source: music, path: ["Katatonia", "2006"], selectedName: null, exact: true });
+      navigationStore.openInFiles({
+        source: music,
+        path: ["Katatonia", "2006"],
+        selectedName: null,
+        exact: true,
+      });
 
       expect(navigationStore.filesLocation).toEqual({ source: music, path: ["Katatonia", "2006"] });
       expect(navigationStore.pendingFilesArrival).toBeNull();
     });
 
     it("says so when the target moved and this is the nearest folder still there", () => {
-      navigationStore.openInFiles({ source: music, path: ["Katatonia"], selectedName: null, exact: false });
+      navigationStore.openInFiles({
+        source: music,
+        path: ["Katatonia"],
+        selectedName: null,
+        exact: false,
+      });
 
       expect(navigationStore.filesLocation).toEqual({ source: music, path: ["Katatonia"] });
       expect(toastStore.messages.map((m) => m.text)).toEqual([i18n.t("files.movedShowingNearest")]);
@@ -304,7 +329,12 @@ describe("navigationStore - Files location", () => {
     it("goes back in one step, and forward re-selects the file without marking it again", async () => {
       navigationStore.viewAlbum("The Great Cold Distance");
       await Promise.resolve();
-      navigationStore.openInFiles({ source: music, path: ["Katatonia", "2006"], selectedName: "11 The Itch.flac", exact: true });
+      navigationStore.openInFiles({
+        source: music,
+        path: ["Katatonia", "2006"],
+        selectedName: "11 The Itch.flac",
+        exact: true,
+      });
       await Promise.resolve();
       navigationStore.pendingFilesArrival = null; // consumed by the browser
 

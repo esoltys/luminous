@@ -19,7 +19,14 @@
     children: Snippet<[CollectionViewMode]>;
   }
 
-  let { title, headerExtra, onHeaderClick, viewMode = "cards", onViewModeChange, children }: Props = $props();
+  let {
+    title,
+    headerExtra,
+    onHeaderClick,
+    viewMode = "cards",
+    onViewModeChange,
+    children,
+  }: Props = $props();
 </script>
 
 <!-- A titled grid of cards or rows. The column count follows the container's
@@ -52,7 +59,9 @@
   {/if}
 
   <div
-    class="grid {viewMode === 'rows' ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2' : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6'}"
+    class="grid {viewMode === 'rows'
+      ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2'
+      : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6'}"
     data-testid="card-section-grid"
   >
     {@render children(viewMode)}

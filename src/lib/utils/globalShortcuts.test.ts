@@ -11,7 +11,9 @@ describe("shouldSkipGlobalShortcut", () => {
     let result: boolean | undefined;
     const listener = (e: KeyboardEvent) => (result = shouldSkipGlobalShortcut(e));
     window.addEventListener("keydown", listener);
-    target.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true, ...init }));
+    target.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true, ...init }),
+    );
     window.removeEventListener("keydown", listener);
     return result!;
   }

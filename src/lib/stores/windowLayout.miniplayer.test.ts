@@ -52,12 +52,22 @@ describe("CollectionStore - miniplayer geometry and window-geometry IPC races", 
     });
 
     await windowLayoutStore.enterMiniplayerMode();
-    expect(invoke).toHaveBeenCalledWith("enter_miniplayer_mode", { width: 310, height: 370, x: 20, y: 30 });
+    expect(invoke).toHaveBeenCalledWith("enter_miniplayer_mode", {
+      width: 310,
+      height: 370,
+      x: 20,
+      y: 30,
+    });
     expect(windowLayoutStore.isMiniplayer).toBe(true);
     expect(windowLayoutStore.miniplayerWidth).toBe(310);
 
     await windowLayoutStore.exitMiniplayerMode();
-    expect(invoke).toHaveBeenCalledWith("exit_miniplayer_mode", { width: 1400, height: 900, x: 50, y: 60 });
+    expect(invoke).toHaveBeenCalledWith("exit_miniplayer_mode", {
+      width: 1400,
+      height: 900,
+      x: 50,
+      y: 60,
+    });
     expect(windowLayoutStore.isMiniplayer).toBe(false);
     expect(windowLayoutStore.savedWindowWidth).toBe(1400);
   });

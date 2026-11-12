@@ -35,10 +35,13 @@ export function methodPaths(api: object, prefix = ""): string[] {
 export function negotiateContract(
   requiredVersion: string,
   requiredCapabilities: readonly string[],
-  offered: string[]
+  offered: string[],
 ): ScriptContract {
   const needed = parseVersion(requiredVersion);
-  if (!needed) throw new Error(`connect() needs a version like "1", "1.2" or "1.2.3", not "${requiredVersion}".`);
+  if (!needed)
+    throw new Error(
+      `connect() needs a version like "1", "1.2" or "1.2.3", not "${requiredVersion}".`,
+    );
   const running = parseVersion(SCRIPT_API_VERSION)!;
 
   const problems: string[] = [];
@@ -48,7 +51,8 @@ export function negotiateContract(
   }
   const missing = requiredCapabilities.filter((name) => !offered.includes(name));
   if (missing.length > 0) problems.push(`lacks ${missing.join(", ")}`);
-  if (problems.length > 0) throw new Error(`Luminous scripting API ${SCRIPT_API_VERSION} ${problems.join(" and ")}.`);
+  if (problems.length > 0)
+    throw new Error(`Luminous scripting API ${SCRIPT_API_VERSION} ${problems.join(" and ")}.`);
 
   return { version: SCRIPT_API_VERSION, capabilities: offered };
 }

@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { ArrowRightIcon as ArrowRight, TrashIcon as Trash2, XIcon as X, GitMergeIcon as GitMerge } from "phosphor-svelte";
+  import {
+    ArrowRightIcon as ArrowRight,
+    TrashIcon as Trash2,
+    XIcon as X,
+    GitMergeIcon as GitMerge,
+  } from "phosphor-svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -70,7 +75,9 @@
 </script>
 
 <Modal {onClose} maxWidth="max-w-lg">
-  <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
+  <div
+    class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main"
+  >
     <div class="flex items-center gap-2">
       <GitMerge class="w-4 h-4 text-brand-accent-text" />
       <h3 class="text-sm font-bold">{i18n.t("songTags.aliasesTitle", {}, "Genre Aliases")}</h3>
@@ -86,7 +93,11 @@
 
   <div class="p-6 flex flex-col gap-4">
     <p class="text-xs text-brand-text-secondary">
-      {i18n.t("songTags.aliasesHint", {}, "Treat one genre spelling as another. Your files' tags stay unchanged.")}
+      {i18n.t(
+        "songTags.aliasesHint",
+        {},
+        "Treat one genre spelling as another. Your files' tags stay unchanged.",
+      )}
     </p>
 
     <div class="flex items-end gap-2">

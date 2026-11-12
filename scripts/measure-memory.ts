@@ -80,7 +80,8 @@ export interface Snapshot {
 export function cpuSecondsBetween(from: Snapshot, to: Snapshot): number | null {
   if (!from.cpuSeconds.size || !to.cpuSeconds.size) return null;
   let total = 0;
-  for (const [pid, secs] of to.cpuSeconds) total += Math.max(0, secs - (from.cpuSeconds.get(pid) ?? 0));
+  for (const [pid, secs] of to.cpuSeconds)
+    total += Math.max(0, secs - (from.cpuSeconds.get(pid) ?? 0));
   return total;
 }
 
@@ -112,7 +113,11 @@ function parseArgs() {
 }
 
 function snapshotWindows(): Snapshot {
-  return parseWindowsSnapshot(execFileSync("powershell", ["-NoProfile", "-Command", WINDOWS_SNAPSHOT_SCRIPT], { encoding: "utf8" }));
+  return parseWindowsSnapshot(
+    execFileSync("powershell", ["-NoProfile", "-Command", WINDOWS_SNAPSHOT_SCRIPT], {
+      encoding: "utf8",
+    }),
+  );
 }
 
 // Sum WorkingSet64/PrivateMemorySize64 across the main exe and every
@@ -256,23 +261,30 @@ function snapshotLinux(): Snapshot {
 export function snapshot(): Snapshot {
   if (process.platform === "win32") return snapshotWindows();
   if (process.platform === "linux") return snapshotLinux();
-  throw new Error(`Unsupported platform: ${process.platform} (this script covers Windows and Linux)`);
+  throw new Error(
+    `Unsupported platform: ${process.platform} (this script covers Windows and Linux)`,
+  );
 }
 
 /** Like `snapshot()`, but doesn't block the event loop while PowerShell runs (Windows; elsewhere it's the sync read). */
 export function snapshotAsync(): Promise<Snapshot> {
   if (process.platform !== "win32") return Promise.resolve().then(snapshot);
   return new Promise((resolve, reject) => {
-    execFile("powershell", ["-NoProfile", "-Command", WINDOWS_SNAPSHOT_SCRIPT], { encoding: "utf8" }, (err, out) => {
-      if (err) reject(err);
-      else {
-        try {
-          resolve(parseWindowsSnapshot(out));
-        } catch (e) {
-          reject(e);
+    execFile(
+      "powershell",
+      ["-NoProfile", "-Command", WINDOWS_SNAPSHOT_SCRIPT],
+      { encoding: "utf8" },
+      (err, out) => {
+        if (err) reject(err);
+        else {
+          try {
+            resolve(parseWindowsSnapshot(out));
+          } catch (e) {
+            reject(e);
+          }
         }
-      }
-    });
+      },
+    );
   });
 }
 
@@ -336,7 +348,10 @@ function median(values: number[]): number {
 export async function sampleMedian(
   count: number,
   intervalSec: number,
-  { allowHidden = false, onSample }: { allowHidden?: boolean; onSample?: (s: Snapshot) => void } = {},
+  {
+    allowHidden = false,
+    onSample,
+  }: { allowHidden?: boolean; onSample?: (s: Snapshot) => void } = {},
 ): Promise<Snapshot & { cpuPercent: number | null }> {
   const samples: Snapshot[] = [];
   for (let i = 0; i < count; i++) {
@@ -368,7 +383,11 @@ export function assertVisible(s: Snapshot, allowHidden: boolean) {
   );
 }
 
-export function formatSnapshot(label: string, s: Snapshot, timestamp = new Date().toISOString()): string {
+export function formatSnapshot(
+  label: string,
+  s: Snapshot,
+  timestamp = new Date().toISOString(),
+): string {
   return `[${timestamp}]${label ? ` ${label}:` : ""} ${s.processCount} process(es), working set ${s.workingSetMb.toFixed(1)} MB, private bytes ${s.privateBytesMb.toFixed(1)} MB (window ${s.windowState})`;
 }
 
@@ -417,7 +436,9 @@ export function appendCsvRow(csv: string, row: CsvRow) {
     const existing = text.split(/\r?\n/, 1)[0];
     if (existing !== header) {
       if (!header.startsWith(`${existing},`)) {
-        throw new Error(`${csv} has header "${existing}", expected "${header}". Refusing to append a mismatched row.`);
+        throw new Error(
+          `${csv} has header "${existing}", expected "${header}". Refusing to append a mismatched row.`,
+        );
       }
       const missing = CSV_COLUMNS.length - existing.split(",").length;
       const widened = text

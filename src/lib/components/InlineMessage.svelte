@@ -21,7 +21,13 @@
   let { children, size = "default", role, id, class: className = "" }: Props = $props();
 </script>
 
-<div {id} {role} class="flex items-start gap-1.5 text-brand-text-primary {size === 'compact' ? 'text-[11px]' : 'text-xs'} {className}">
+<div
+  {id}
+  {role}
+  class="flex items-start gap-1.5 text-brand-text-primary {size === 'compact'
+    ? 'text-[11px]'
+    : 'text-xs'} {className}"
+>
   <WarningIcon class="w-[1.1em] h-[1.1em] shrink-0 translate-y-[calc((1lh-1.1em)/2)]" />
   <span class="min-w-0 wrap-anywhere">{@render children()}</span>
 </div>

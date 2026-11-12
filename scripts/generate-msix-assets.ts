@@ -49,7 +49,10 @@ function resizeAreaAverage(src: Image, dstW: number, dstH: number): Image {
       const endX = Math.min(Math.ceil(sx1), src.width);
 
       let totalWeight = 0;
-      let pR = 0, pG = 0, pB = 0, pA = 0;
+      let pR = 0,
+        pG = 0,
+        pB = 0,
+        pA = 0;
 
       for (let sy = startY; sy < endY; sy++) {
         const yWeight = Math.min(sy + 1, sy1) - Math.max(sy, sy0);
@@ -132,7 +135,9 @@ function padToSquare(src: Image): Image {
  */
 async function generateFileTypeVariants() {
   fs.mkdirSync(fileTypeAssetsDir, { recursive: true });
-  const sources = fs.readdirSync(fileTypeIconsDir).filter((f) => /^luminous-file-.*\.png$/i.test(f));
+  const sources = fs
+    .readdirSync(fileTypeIconsDir)
+    .filter((f) => /^luminous-file-.*\.png$/i.test(f));
   for (const name of sources) {
     const source = padToSquare(await read(path.join(fileTypeIconsDir, name)));
     await write(path.join(fileTypeAssetsDir, name), resizeAreaAverage(source, 256, 256));

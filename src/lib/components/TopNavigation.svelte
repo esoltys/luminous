@@ -12,9 +12,13 @@
     MusicNotesIcon as Music,
     ClockCounterClockwiseIcon as History,
     XIcon as X,
-    SparkleIcon as Sparkles
+    SparkleIcon as Sparkles,
   } from "phosphor-svelte";
-  import { parseSearchRules, hasAdvancedSearchTerms, isSmartPlaylistSpec } from "../utils/filterParser";
+  import {
+    parseSearchRules,
+    hasAdvancedSearchTerms,
+    isSmartPlaylistSpec,
+  } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
   import { onDevScreenHooks } from "../scripting/devHooks";
@@ -146,24 +150,32 @@
     > = [];
 
     const favLabel = i18n.t("playlists.autoFavourites", {}, "Favourite Songs");
-    if (favLabel.toLowerCase().includes(query) || "favourites".includes(query) || "favorites".includes(query)) {
+    if (
+      favLabel.toLowerCase().includes(query) ||
+      "favourites".includes(query) ||
+      "favorites".includes(query)
+    ) {
       results.push({
         type: "auto",
         id: "auto:favourites",
         label: favLabel,
         subtitle: i18n.t("playlists.autoPlaylistLabel"),
-        ref: { kind: "favourites" }
+        ref: { kind: "favourites" },
       });
     }
 
     const recLabel = i18n.t("playlists.autoRecentlyAdded", {}, "Recently Added");
-    if (recLabel.toLowerCase().includes(query) || "recently added".includes(query) || "recent".includes(query)) {
+    if (
+      recLabel.toLowerCase().includes(query) ||
+      "recently added".includes(query) ||
+      "recent".includes(query)
+    ) {
       results.push({
         type: "auto",
         id: "auto:recently_added",
         label: recLabel,
         subtitle: i18n.t("playlists.autoPlaylistLabel"),
-        ref: { kind: "recently_added" }
+        ref: { kind: "recently_added" },
       });
     }
 
@@ -174,7 +186,7 @@
         id: "auto:history",
         label: histLabel,
         subtitle: i18n.t("playlists.autoPlaylistLabel"),
-        ref: { kind: "history" }
+        ref: { kind: "history" },
       });
     }
 
@@ -193,7 +205,7 @@
               id: `auto:decade:${p.id}`,
               label: getPlaylistDisplayName(p),
               subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${i18n.t("playlists.decadeAutoPlaylist")}`,
-              ref: { kind: "decade", decade, playlistId: p.id, updated: p.updated }
+              ref: { kind: "decade", decade, playlistId: p.id, updated: p.updated },
             });
           } else if (p.dynamic_spec?.startsWith("bpmrange:")) {
             const bpm = p.dynamic_spec.replace(/^bpmrange:/, "");
@@ -202,7 +214,7 @@
               id: `auto:bpm:${p.id}`,
               label: getPlaylistDisplayName(p),
               subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${formatBpmRange(bpm) ?? i18n.t("playlists.bpmAutoPlaylist")}`,
-              ref: { kind: "bpm", bpm, playlistId: p.id, updated: p.updated }
+              ref: { kind: "bpm", bpm, playlistId: p.id, updated: p.updated },
             });
           } else if (p.dynamic_spec?.startsWith("artisttag:")) {
             const artistTag = p.dynamic_spec.replace(/^artisttag:/, "");
@@ -211,7 +223,7 @@
               id: `auto:artist_tag:${p.id}`,
               label: getPlaylistDisplayName(p),
               subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${i18n.t("playlists.artistTagAutoPlaylist")}`,
-              ref: { kind: "artist_tag", artistTag, playlistId: p.id, updated: p.updated }
+              ref: { kind: "artist_tag", artistTag, playlistId: p.id, updated: p.updated },
             });
           } else if (p.dynamic_spec === "missingmeta") {
             results.push({
@@ -219,7 +231,7 @@
               id: `auto:missing_metadata:${p.id}`,
               label: getPlaylistDisplayName(p),
               subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${i18n.t("playlists.missingMetadataAutoPlaylist")}`,
-              ref: { kind: "missing_metadata", playlistId: p.id, updated: p.updated }
+              ref: { kind: "missing_metadata", playlistId: p.id, updated: p.updated },
             });
           } else if (p.dynamic_spec === "missingmbid") {
             if (!picardStore.missingPlaylistEnabled) continue;
@@ -228,7 +240,7 @@
               id: `auto:missing_musicbrainz:${p.id}`,
               label: getPlaylistDisplayName(p),
               subtitle: i18n.t("playlists.missingMusicBrainzAutoPlaylist", {}, "Auto-Playlist"),
-              ref: { kind: "missing_musicbrainz", playlistId: p.id, updated: p.updated }
+              ref: { kind: "missing_musicbrainz", playlistId: p.id, updated: p.updated },
             });
           } else if (p.dynamic_spec?.startsWith("daypart:")) {
             results.push({
@@ -236,7 +248,7 @@
               id: `auto:daypart:${p.id}`,
               label: getPlaylistDisplayName(p),
               subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${i18n.t("playlists.daypartAutoPlaylist")}`,
-              ref: { kind: "daypart", playlistId: p.id, updated: p.updated }
+              ref: { kind: "daypart", playlistId: p.id, updated: p.updated },
             });
           } else {
             const genre = p.dynamic_spec?.replace(/^tag:/, "") ?? p.name;
@@ -245,7 +257,7 @@
               id: `auto:genre:${p.id}`,
               label: getPlaylistDisplayName(p),
               subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${i18n.t("playlists.genreAutoPlaylist")}`,
-              ref: { kind: "genre", genre, playlistId: p.id, updated: p.updated }
+              ref: { kind: "genre", genre, playlistId: p.id, updated: p.updated },
             });
           }
         } else {
@@ -253,7 +265,7 @@
             type: "custom",
             id: p.id,
             label: p.name,
-            subtitle: i18n.t("playlists.playlistTypeLabel")
+            subtitle: i18n.t("playlists.playlistTypeLabel"),
           });
         }
       }
@@ -265,7 +277,10 @@
   function handleKeyDown(e: KeyboardEvent) {
     const keyLower = e.key.toLowerCase();
     if (
-      ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (keyLower === "l" || keyLower === "f")) ||
+      ((e.ctrlKey || e.metaKey) &&
+        !e.altKey &&
+        !e.shiftKey &&
+        (keyLower === "l" || keyLower === "f")) ||
       (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !shouldSkipGlobalShortcut(e))
     ) {
       e.preventDefault();
@@ -325,7 +340,7 @@
         kind: "query",
         title: q,
         query: q,
-        subtitle: i18n.t('topNav.searchQuerySubtitle', {}, "Search query")
+        subtitle: i18n.t("topNav.searchQuerySubtitle", {}, "Search query"),
       });
       collectionStore.search(q);
     }
@@ -340,7 +355,10 @@
     } else if (item.kind === "playlist" && item.entityId) {
       navigationStore.viewPlaylist(Number(item.entityId));
     } else if (item.kind === "song" && item.query) {
-      navigationStore.viewAlbum(item.query, item.entityId !== undefined ? Number(item.entityId) : undefined);
+      navigationStore.viewAlbum(
+        item.query,
+        item.entityId !== undefined ? Number(item.entityId) : undefined,
+      );
     } else {
       collectionStore.searchQuery = item.query || item.title;
       collectionStore.search(item.query || item.title);
@@ -351,7 +369,7 @@
       subtitle: item.subtitle,
       query: item.query,
       artUrl: item.artUrl,
-      entityId: item.entityId
+      entityId: item.entityId,
     });
     isSearchFocused = false;
   }
@@ -361,13 +379,21 @@
     collectionStore.searchQuery = "";
     collectionStore.search("");
   }
-
-
 </script>
 
-<svelte:window on:keydown={handleKeyDown} on:mouseup={handleMouseUp} on:mousedown={handleWindowMouseDown} />
+<svelte:window
+  on:keydown={handleKeyDown}
+  on:mouseup={handleMouseUp}
+  on:mousedown={handleWindowMouseDown}
+/>
 
-<header data-walkthrough-target="top-navigation" in:fade={{ duration: 200 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
+<header
+  data-walkthrough-target="top-navigation"
+  in:fade={{ duration: 200 }}
+  class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme
+    ? 'glass-surface'
+    : ''}"
+>
   <!-- Shadow layer for the glass theme only; see .header-shadow (#1655). -->
   {#if themeStore.isGlassTheme}
     <div class="header-shadow" aria-hidden="true"></div>
@@ -377,7 +403,7 @@
       <button
         onclick={() => windowLayoutStore.toggleSidebarCompact()}
         class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary transition-colors"
-        title={i18n.t('topNav.toggleSidebarCompact', {}, 'Toggle sidebar (compact / expanded)')}
+        title={i18n.t("topNav.toggleSidebarCompact", {}, "Toggle sidebar (compact / expanded)")}
       >
         <Menu class="w-5 h-5" />
       </button>
@@ -390,7 +416,7 @@
         onclick={() => navigationStore.goBack()}
         disabled={!navigationStore.canGoBack}
         class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        title={i18n.t('topNav.goBack')}
+        title={i18n.t("topNav.goBack")}
       >
         <ChevronLeft class="w-5 h-5" />
       </button>
@@ -398,7 +424,7 @@
         onclick={() => navigationStore.goForward()}
         disabled={!navigationStore.canGoForward}
         class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        title={i18n.t('topNav.goForward')}
+        title={i18n.t("topNav.goForward")}
       >
         <ChevronRight class="w-5 h-5" />
       </button>
@@ -408,558 +434,678 @@
   <!-- Search + Open share the width search alone used to take, so adding the
        button shrinks the search box rather than pushing the header wider. -->
   <div class="flex-1 max-w-2xl flex items-center gap-3 min-w-0">
-  <div bind:this={searchContainerRef} class="relative flex-1 min-w-0">
-    <form onsubmit={handleSearch} class="w-full flex items-center gap-3 bg-brand-main rounded-lg px-4 py-2 border border-brand-border focus-within:border-brand-accent focus-within:transition-colors duration-150">
-      <Search class="w-4 h-4 text-brand-text-secondary flex-shrink-0" />
-      <input
-        bind:this={searchInput}
-        value={isFilesFilterMode ? filesStore.filterQuery : collectionStore.searchQuery}
-        onfocus={() => { isSearchFocused = true; }}
-        oninput={(e) => {
-          const val = (e.target as HTMLInputElement).value;
-          isSearchFocused = true;
-          if (isFilesFilterMode) {
-            filesStore.filterQuery = val;
-          } else {
-            collectionStore.searchQuery = val;
-            debouncedSearch(val);
-          }
-        }}
-        onkeydown={handleSearchInputKeyDown}
-        type="text"
-        placeholder={isFilesFilterMode
-          ? i18n.t('files.filterPlaceholder', { folder: filesStore.activeFolderTitle || i18n.t('sidebar.files') })
-          : i18n.t('topNav.searchPlaceholder')}
-        class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
-      />
+    <div bind:this={searchContainerRef} class="relative flex-1 min-w-0">
+      <form
+        onsubmit={handleSearch}
+        class="w-full flex items-center gap-3 bg-brand-main rounded-lg px-4 py-2 border border-brand-border focus-within:border-brand-accent focus-within:transition-colors duration-150"
+      >
+        <Search class="w-4 h-4 text-brand-text-secondary flex-shrink-0" />
+        <input
+          bind:this={searchInput}
+          value={isFilesFilterMode ? filesStore.filterQuery : collectionStore.searchQuery}
+          onfocus={() => {
+            isSearchFocused = true;
+          }}
+          oninput={(e) => {
+            const val = (e.target as HTMLInputElement).value;
+            isSearchFocused = true;
+            if (isFilesFilterMode) {
+              filesStore.filterQuery = val;
+            } else {
+              collectionStore.searchQuery = val;
+              debouncedSearch(val);
+            }
+          }}
+          onkeydown={handleSearchInputKeyDown}
+          type="text"
+          placeholder={isFilesFilterMode
+            ? i18n.t("files.filterPlaceholder", {
+                folder: filesStore.activeFolderTitle || i18n.t("sidebar.files"),
+              })
+            : i18n.t("topNav.searchPlaceholder")}
+          class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
+        />
 
-      {#if isFilesFilterMode}
-        {#if filesStore.filterQuery.trim() !== ""}
+        {#if isFilesFilterMode}
+          {#if filesStore.filterQuery.trim() !== ""}
+            <span
+              class="text-[10px] bg-brand-border/60 px-1.5 py-0.5 rounded text-brand-text-secondary font-mono flex-shrink-0 select-none"
+              data-testid="files-filter-badge"
+            >
+              {i18n.t("files.filterCountBadge", {
+                matched: filesStore.filterMatchCount,
+                total: filesStore.filterTotalCount,
+              })}
+            </span>
+            <button
+              type="button"
+              onclick={() => filesStore.clearFilter()}
+              class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0 font-bold leading-none text-sm"
+              title={i18n.t("files.clearFilter")}
+              aria-label={i18n.t("files.clearFilter")}
+            >
+              ✕
+            </button>
+          {/if}
+        {:else if collectionStore.searchLoading}
+          <div
+            class="animate-spin rounded-full h-4 w-4 border-2 border-brand-accent border-t-transparent flex-shrink-0"
+            title={i18n.t("topNav.searching")}
+          ></div>
+        {:else if collectionStore.searchQuery}
           <span
             class="text-[10px] bg-brand-border/60 px-1.5 py-0.5 rounded text-brand-text-secondary font-mono flex-shrink-0 select-none"
-            data-testid="files-filter-badge"
           >
-            {i18n.t("files.filterCountBadge", {
-              matched: filesStore.filterMatchCount,
-              total: filesStore.filterTotalCount
-            })}
+            {i18n.plural("topNav.tracksCount", collectionStore.searchResults.length)}
           </span>
           <button
             type="button"
-            onclick={() => filesStore.clearFilter()}
+            onclick={clearSearch}
             class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0 font-bold leading-none text-sm"
-            title={i18n.t('files.clearFilter')}
-            aria-label={i18n.t('files.clearFilter')}
+            title={i18n.t("topNav.clearSearch")}
           >
             ✕
           </button>
         {/if}
-      {:else if collectionStore.searchLoading}
-        <div class="animate-spin rounded-full h-4 w-4 border-2 border-brand-accent border-t-transparent flex-shrink-0" title={i18n.t('topNav.searching')}></div>
-      {:else if collectionStore.searchQuery}
-        <span class="text-[10px] bg-brand-border/60 px-1.5 py-0.5 rounded text-brand-text-secondary font-mono flex-shrink-0 select-none">
-          {i18n.plural("topNav.tracksCount", collectionStore.searchResults.length)}
-        </span>
-        <button
-          type="button"
-          onclick={clearSearch}
-          class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0 font-bold leading-none text-sm"
-          title={i18n.t('topNav.clearSearch')}
+      </form>
+
+      {#if isSearchFocused}
+        <div
+          bind:this={searchDropdownRef}
+          class="absolute left-0 right-0 top-full mt-2 bg-brand-sidebar rounded-xl border border-brand-border shadow-2xl p-3 z-50 max-h-96 overflow-y-auto"
         >
-          ✕
-        </button>
-      {/if}
-    </form>
-
-    {#if isSearchFocused}
-      <div
-        bind:this={searchDropdownRef}
-        class="absolute left-0 right-0 top-full mt-2 bg-brand-sidebar rounded-xl border border-brand-border shadow-2xl p-3 z-50 max-h-96 overflow-y-auto"
-      >
-        {#if isFilesFilterMode}
-          <div class="p-2.5 rounded-xl bg-brand-main/60 border border-brand-border/40 text-xs text-brand-text-secondary/90">
-            <div class="font-semibold text-brand-text-primary mb-2">
-              {i18n.t("files.filterHelpTitle")}
-            </div>
-            <div class="space-y-1.5 text-[11px]">
-              <div class="flex items-center flex-wrap gap-1.5">
-                <span class="font-medium text-brand-text-secondary min-w-12">{i18n.t("files.filterHelpTypeLabel")}</span>
-                {#each ["ext:flac", "ext:cue", "ext:md", "ext:jpg"] as token (token)}
-                  <button
-                    type="button"
-                    onclick={() => toggleFilterToken(token)}
-                    class="font-mono bg-brand-sidebar hover:bg-brand-accent/20 text-brand-text-primary px-1.5 py-0.5 rounded border border-brand-border/50 transition-colors"
-                  >
-                    {token}
-                  </button>
-                {/each}
+          {#if isFilesFilterMode}
+            <div
+              class="p-2.5 rounded-xl bg-brand-main/60 border border-brand-border/40 text-xs text-brand-text-secondary/90"
+            >
+              <div class="font-semibold text-brand-text-primary mb-2">
+                {i18n.t("files.filterHelpTitle")}
               </div>
-              <div class="flex items-center flex-wrap gap-1.5">
-                <span class="font-medium text-brand-text-secondary min-w-12">{i18n.t("files.filterHelpStatusLabel")}</span>
-                {#each ["status:library", "status:unscanned"] as token (token)}
-                  <button
-                    type="button"
-                    onclick={() => toggleFilterToken(token)}
-                    class="font-mono bg-brand-sidebar hover:bg-brand-accent/20 text-brand-text-primary px-1.5 py-0.5 rounded border border-brand-border/50 transition-colors"
+              <div class="space-y-1.5 text-[11px]">
+                <div class="flex items-center flex-wrap gap-1.5">
+                  <span class="font-medium text-brand-text-secondary min-w-12"
+                    >{i18n.t("files.filterHelpTypeLabel")}</span
                   >
-                    {token}
-                  </button>
-                {/each}
+                  {#each ["ext:flac", "ext:cue", "ext:md", "ext:jpg"] as token (token)}
+                    <button
+                      type="button"
+                      onclick={() => toggleFilterToken(token)}
+                      class="font-mono bg-brand-sidebar hover:bg-brand-accent/20 text-brand-text-primary px-1.5 py-0.5 rounded border border-brand-border/50 transition-colors"
+                    >
+                      {token}
+                    </button>
+                  {/each}
+                </div>
+                <div class="flex items-center flex-wrap gap-1.5">
+                  <span class="font-medium text-brand-text-secondary min-w-12"
+                    >{i18n.t("files.filterHelpStatusLabel")}</span
+                  >
+                  {#each ["status:library", "status:unscanned"] as token (token)}
+                    <button
+                      type="button"
+                      onclick={() => toggleFilterToken(token)}
+                      class="font-mono bg-brand-sidebar hover:bg-brand-accent/20 text-brand-text-primary px-1.5 py-0.5 rounded border border-brand-border/50 transition-colors"
+                    >
+                      {token}
+                    </button>
+                  {/each}
+                </div>
               </div>
             </div>
-          </div>
-          {#if libraryEscapeQuery}
-            <div class="mt-2 pt-2 border-t border-brand-border/40">
-              <div
-                role="button"
-                tabindex="0"
-                onclick={() => searchWholeLibrary(libraryEscapeQuery)}
-                onkeydown={(e) => {
-                  if (e.key === "Enter") searchWholeLibrary(libraryEscapeQuery);
-                  else handleSearchResultKeyDown(e);
+            {#if libraryEscapeQuery}
+              <div class="mt-2 pt-2 border-t border-brand-border/40">
+                <div
+                  role="button"
+                  tabindex="0"
+                  onclick={() => searchWholeLibrary(libraryEscapeQuery)}
+                  onkeydown={(e) => {
+                    if (e.key === "Enter") searchWholeLibrary(libraryEscapeQuery);
+                    else handleSearchResultKeyDown(e);
+                  }}
+                  class="search-result-item group flex items-center gap-2.5 p-2 rounded-lg hover:bg-brand-main/80 transition-colors text-xs text-brand-text-secondary hover:text-brand-text-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  data-testid="files-search-whole-library"
+                >
+                  <Search
+                    class="w-4 h-4 shrink-0 text-brand-text-secondary group-hover:text-brand-accent-text"
+                  />
+                  <span class="truncate">
+                    {i18n.t("files.searchWholeLibraryFor", { query: libraryEscapeQuery })}
+                  </span>
+                </div>
+              </div>
+            {/if}
+          {:else}
+            {#if hasAdvancedSearchTerms(collectionStore.searchQuery)}
+              <button
+                type="button"
+                onclick={() => {
+                  const rules = parseSearchRules(collectionStore.searchQuery);
+                  collectionStore.openSmartBuilder(rules);
+                  isSearchFocused = false;
                 }}
-                class="search-result-item group flex items-center gap-2.5 p-2 rounded-lg hover:bg-brand-main/80 transition-colors text-xs text-brand-text-secondary hover:text-brand-text-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                data-testid="files-search-whole-library"
+                class="w-full flex items-center justify-between p-2.5 mb-2.5 rounded-xl bg-brand-accent/10 border border-brand-accent/40 hover:bg-brand-accent/20 transition-all text-left group"
               >
-                <Search class="w-4 h-4 shrink-0 text-brand-text-secondary group-hover:text-brand-accent-text" />
-                <span class="truncate">
-                  {i18n.t("files.searchWholeLibraryFor", { query: libraryEscapeQuery })}
-                </span>
-              </div>
-            </div>
-          {/if}
-        {:else}
-        {#if hasAdvancedSearchTerms(collectionStore.searchQuery)}
-          <button
-            type="button"
-            onclick={() => {
-              const rules = parseSearchRules(collectionStore.searchQuery);
-              collectionStore.openSmartBuilder(rules);
-              isSearchFocused = false;
-            }}
-            class="w-full flex items-center justify-between p-2.5 mb-2.5 rounded-xl bg-brand-accent/10 border border-brand-accent/40 hover:bg-brand-accent/20 transition-all text-left group"
-          >
-            <div class="flex items-center gap-2.5">
-              <div class="p-1.5 rounded-lg bg-brand-accent text-brand-accent-contrast">
-                <Sparkles class="w-4 h-4" />
-              </div>
-              <div>
-                <div class="text-xs font-bold text-brand-text-primary group-hover:text-brand-accent-text transition-colors">
-                  {i18n.t('topNav.createSmartPlaylistFromSearch')}
+                <div class="flex items-center gap-2.5">
+                  <div class="p-1.5 rounded-lg bg-brand-accent text-brand-accent-contrast">
+                    <Sparkles class="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div
+                      class="text-xs font-bold text-brand-text-primary group-hover:text-brand-accent-text transition-colors"
+                    >
+                      {i18n.t("topNav.createSmartPlaylistFromSearch")}
+                    </div>
+                    <div class="text-[11px] text-brand-text-secondary/80">
+                      {i18n.t("topNav.createSmartPlaylistFromSearchHint")}
+                    </div>
+                  </div>
                 </div>
-                <div class="text-[11px] text-brand-text-secondary/80">
-                  {i18n.t('topNav.createSmartPlaylistFromSearchHint')}
+                <span class="text-xs font-semibold text-brand-accent-text group-hover:underline"
+                  >{i18n.t("topNav.openBuilder")}</span
+                >
+              </button>
+            {/if}
+
+            {#if collectionStore.searchQuery.includes(":")}
+              <div
+                class="p-2.5 mb-2.5 rounded-xl bg-brand-main/60 border border-brand-border/40 text-xs text-brand-text-secondary/90"
+              >
+                <div class="font-semibold text-brand-text-primary mb-1 flex items-center gap-1">
+                  <span>{i18n.t("topNav.filterSyntaxHint")}</span>
+                </div>
+                <div class="space-y-0.5 text-[11px]">
+                  <div>
+                    <span class="font-medium text-brand-text-primary"
+                      >{i18n.t("topNav.filterFieldsLabel")}</span
+                    > <code class="bg-brand-sidebar px-1 rounded">artist</code>,
+                    <code class="bg-brand-sidebar px-1 rounded">album</code>,
+                    <code class="bg-brand-sidebar px-1 rounded">title</code>,
+                    <code class="bg-brand-sidebar px-1 rounded">genre</code>,
+                    <code class="bg-brand-sidebar px-1 rounded">year</code>,
+                    <code class="bg-brand-sidebar px-1 rounded">rating</code>,
+                    <code class="bg-brand-sidebar px-1 rounded">duration</code>,
+                    <code class="bg-brand-sidebar px-1 rounded">playcount</code>
+                  </div>
+                  <div>
+                    <span class="font-medium text-brand-text-primary"
+                      >{i18n.t("topNav.filterOperatorsLabel")}</span
+                    > <code class="bg-brand-sidebar px-1 rounded">=</code>
+                    <code class="bg-brand-sidebar px-1 rounded">!=</code>
+                    <code class="bg-brand-sidebar px-1 rounded">&gt;</code>
+                    <code class="bg-brand-sidebar px-1 rounded">&gt;=</code>
+                    <code class="bg-brand-sidebar px-1 rounded">&lt;</code>
+                    <code class="bg-brand-sidebar px-1 rounded">&lt;=</code>
+                  </div>
+                  <div class="text-brand-text-secondary/60 italic pt-0.5">
+                    {i18n.t("topNav.filterExample")}
+                  </div>
                 </div>
               </div>
-            </div>
-            <span class="text-xs font-semibold text-brand-accent-text group-hover:underline">{i18n.t('topNav.openBuilder')}</span>
-          </button>
-        {/if}
+            {/if}
 
-        {#if collectionStore.searchQuery.includes(":")}
-          <div class="p-2.5 mb-2.5 rounded-xl bg-brand-main/60 border border-brand-border/40 text-xs text-brand-text-secondary/90">
-            <div class="font-semibold text-brand-text-primary mb-1 flex items-center gap-1">
-              <span>{i18n.t('topNav.filterSyntaxHint')}</span>
-            </div>
-            <div class="space-y-0.5 text-[11px]">
-              <div><span class="font-medium text-brand-text-primary">{i18n.t('topNav.filterFieldsLabel')}</span> <code class="bg-brand-sidebar px-1 rounded">artist</code>, <code class="bg-brand-sidebar px-1 rounded">album</code>, <code class="bg-brand-sidebar px-1 rounded">title</code>, <code class="bg-brand-sidebar px-1 rounded">genre</code>, <code class="bg-brand-sidebar px-1 rounded">year</code>, <code class="bg-brand-sidebar px-1 rounded">rating</code>, <code class="bg-brand-sidebar px-1 rounded">duration</code>, <code class="bg-brand-sidebar px-1 rounded">playcount</code></div>
-              <div><span class="font-medium text-brand-text-primary">{i18n.t('topNav.filterOperatorsLabel')}</span> <code class="bg-brand-sidebar px-1 rounded">=</code> <code class="bg-brand-sidebar px-1 rounded">!=</code> <code class="bg-brand-sidebar px-1 rounded">&gt;</code> <code class="bg-brand-sidebar px-1 rounded">&gt;=</code> <code class="bg-brand-sidebar px-1 rounded">&lt;</code> <code class="bg-brand-sidebar px-1 rounded">&lt;=</code></div>
-              <div class="text-brand-text-secondary/60 italic pt-0.5">{i18n.t("topNav.filterExample")}</div>
-            </div>
-          </div>
-        {/if}
-
-        {#if collectionStore.searchQuery.trim() !== ""}
-          <div class="mb-3">
-            <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-brand-border/40 select-none">
-              <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
-                {i18n.t('topNav.searchSuggestions', {}, 'Suggestions')}
-              </span>
-              {#if collectionStore.searchLoading}
-                <span class="text-[10px] text-brand-accent-text font-mono">
-                  {i18n.t('topNav.searching', {}, 'Searching...')}
-                </span>
-              {/if}
-            </div>
-
-            {#if collectionStore.filteredArtists.length === 0 && collectionStore.filteredAlbums.length === 0 && matchingPlaylists.length === 0 && collectionStore.searchResults.length === 0 && collectionStore.folderSearchResults.length === 0 && !collectionStore.searchLoading}
-              <div class="p-3 text-center text-xs text-brand-text-secondary/60 select-none">
-                {i18n.t('topNav.noSuggestions', {}, 'No matching suggestions')}
-              </div>
-            {:else}
-              <div class="flex flex-col gap-1">
-                {#each collectionStore.filteredArtists.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as artist (artist.name)}
-                  <div
-                    role="button"
-                    tabindex="0"
-                    onclick={() => {
-                      if (artist.name) {
-                        navigationStore.viewArtist(artist.name);
-                        collectionStore.addRecentSearch({
-                          kind: "artist",
-                          title: artist.name,
-                          subtitle: i18n.t('playerBar.artistLabel'),
-                          query: artist.name
-                        });
-                        isSearchFocused = false;
-                      }
-                    }}
-                    onkeydown={(e) => {
-                      if (e.key === 'Enter' && artist.name) navigationStore.viewArtist(artist.name);
-                      else handleSearchResultKeyDown(e);
-                    }}
-                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
+            {#if collectionStore.searchQuery.trim() !== ""}
+              <div class="mb-3">
+                <div
+                  class="flex items-center justify-between px-2 py-1 mb-1 border-b border-brand-border/40 select-none"
+                >
+                  <span
+                    class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider"
                   >
-                    <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <div class="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border overflow-hidden">
-                        {#if artist.name}
-                          {#await collectionStore.getExtendedArtworkForArtist(artist.name)}
-                            <User class="w-4 h-4 text-brand-text-secondary" />
-                          {:then artwork}
-                            {@const portraitUrl = resolveArtistPortraitUrl(artwork.artist_portrait_uri, collectionStore.getArtistProfile(artist.name)?.fetched_image_filename)}
-                            {#if portraitUrl}
-                              <img src={portraitUrl} crossorigin="anonymous" alt={artist.name} class="w-full h-full object-cover" />
-                            {:else}
-                              <User class="w-4 h-4 text-brand-text-secondary" />
-                            {/if}
-                          {:catch}
-                            <User class="w-4 h-4 text-brand-text-secondary" />
-                          {/await}
-                        {:else}
-                          <User class="w-4 h-4 text-brand-text-secondary" />
-                        {/if}
-                      </div>
-                      <div class="flex flex-col min-w-0 flex-1">
-                        <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
-                          {artist.name}
-                        </span>
-                        <span class="text-xs text-brand-text-secondary/70 truncate">
-                          {i18n.t('playerBar.artistLabel')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                {/each}
-
-                {#each collectionStore.filteredAlbums.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as album (album.album_key || album.album)}
-                  <div
-                    role="button"
-                    tabindex="0"
-                    onclick={() => {
-                      if (album.album) {
-                        navigationStore.viewAlbum(album.album, undefined, album.album_key ?? undefined);
-                        collectionStore.addRecentSearch({
-                          kind: "album",
-                          title: album.album,
-                          subtitle: `${i18n.t('playerBar.albumLabel')} • ${album.artist || i18n.t('collection.unknownArtist')}`,
-                          query: album.album,
-                          artUrl: album.art_manual || album.art_automatic
-                        });
-                        isSearchFocused = false;
-                      }
-                    }}
-                    onkeydown={(e) => {
-                      if (e.key === 'Enter' && album.album) navigationStore.viewAlbum(album.album, undefined, album.album_key ?? undefined);
-                      else handleSearchResultKeyDown(e);
-                    }}
-                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  >
-                    <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <div class="relative shrink-0 overflow-hidden">
-                        <CoverArt
-                          songId={undefined}
-                          artManual={album.art_manual}
-                          artAutomatic={album.art_automatic}
-                          artEmbedded={album.art_embedded}
-                          sizeClass="w-8 h-8"
-                        />
-                        {#if album.rating === 5}
-                          <FavouriteCornerFlag size="xs" />
-                        {/if}
-                      </div>
-                      <div class="flex flex-col min-w-0 flex-1">
-                        <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
-                          {album.album}
-                        </span>
-                        <span class="text-xs text-brand-text-secondary/70 truncate">
-                          {i18n.t('playerBar.albumLabel')} • {album.artist || i18n.t('collection.unknownArtist')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                {/each}
-
-                {#each matchingPlaylists.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as item (item.id)}
-                  <div
-                    role="button"
-                    tabindex="0"
-                    onclick={() => {
-                      if (item.type === 'auto') {
-                        navigationStore.viewAutoPlaylist(item.ref);
-                        collectionStore.addRecentSearch({
-                          kind: "playlist",
-                          title: item.label,
-                          subtitle: item.subtitle,
-                          query: item.label
-                        });
-                      } else {
-                        navigationStore.viewPlaylist(item.id);
-                        collectionStore.addRecentSearch({
-                          kind: "playlist",
-                          title: item.label,
-                          subtitle: item.subtitle,
-                          query: item.label,
-                          entityId: item.id
-                        });
-                      }
-                      isSearchFocused = false;
-                    }}
-                    onkeydown={(e) => {
-                      if (e.key === 'Enter') {
-                        if (item.type === 'auto') navigationStore.viewAutoPlaylist(item.ref);
-                        else navigationStore.viewPlaylist(item.id);
-                        isSearchFocused = false;
-                      } else {
-                        handleSearchResultKeyDown(e);
-                      }
-                    }}
-                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  >
-                    <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <div class="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
-                        <ListMusic class="w-4 h-4 text-brand-text-secondary" />
-                      </div>
-                      <div class="flex flex-col min-w-0 flex-1">
-                        <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
-                          {item.label}
-                        </span>
-                        <span class="text-xs text-brand-text-secondary/70 truncate">
-                          {item.subtitle}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                {/each}
-
-                {#each collectionStore.searchResults.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as song (song.id)}
-                  <div
-                    role="button"
-                    tabindex="0"
-                    onclick={() => {
-                      const songTitle = song.title || i18n.t('collection.unknownSong');
-                      if (song.album) {
-                        navigationStore.viewAlbum(song.album, song.id);
-                      } else {
-                        collectionStore.searchQuery = songTitle;
-                        collectionStore.search(songTitle);
-                      }
-                      collectionStore.addRecentSearch({
-                        kind: "song",
-                        title: songTitle,
-                        subtitle: `${i18n.t('playerBar.songLabel')} • ${song.artist || i18n.t('collection.unknownArtist')}`,
-                        query: song.album || songTitle,
-                        artUrl: song.art_manual || song.art_automatic,
-                        entityId: song.id
-                      });
-                      isSearchFocused = false;
-                    }}
-                    onkeydown={(e) => {
-                      if (e.key === 'Enter') {
-                        if (song.album) navigationStore.viewAlbum(song.album, song.id);
-                        else collectionStore.search(song.title || "");
-                        isSearchFocused = false;
-                      } else {
-                        handleSearchResultKeyDown(e);
-                      }
-                    }}
-                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  >
-                    <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <CoverArt
-                        songId={song.id}
-                        artManual={song.art_manual}
-                        artAutomatic={song.art_automatic}
-                        artEmbedded={song.art_embedded}
-                        sizeClass="w-8 h-8"
-                      />
-                      <div class="flex flex-col min-w-0 flex-1">
-                        <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
-                          {song.title || i18n.t('collection.unknownSong')}
-                        </span>
-                        <span class="text-xs text-brand-text-secondary/70 truncate">
-                          {i18n.t('playerBar.songLabel')} • {song.artist || i18n.t('collection.unknownArtist')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                {/each}
-              </div>
-
-              {#if collectionStore.folderSearchResults.length > 0}
-                <div class="mt-2 pt-1">
-                  <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-brand-border/40 select-none">
-                    <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
-                      {i18n.t('topNav.filesAndFolders')}
+                    {i18n.t("topNav.searchSuggestions", {}, "Suggestions")}
+                  </span>
+                  {#if collectionStore.searchLoading}
+                    <span class="text-[10px] text-brand-accent-text font-mono">
+                      {i18n.t("topNav.searching", {}, "Searching...")}
                     </span>
+                  {/if}
+                </div>
+
+                {#if collectionStore.filteredArtists.length === 0 && collectionStore.filteredAlbums.length === 0 && matchingPlaylists.length === 0 && collectionStore.searchResults.length === 0 && collectionStore.folderSearchResults.length === 0 && !collectionStore.searchLoading}
+                  <div class="p-3 text-center text-xs text-brand-text-secondary/60 select-none">
+                    {i18n.t("topNav.noSuggestions", {}, "No matching suggestions")}
                   </div>
+                {:else}
                   <div class="flex flex-col gap-1">
-                    {#each collectionStore.folderSearchResults.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as folder (`${folder.source.kind}:${folder.source.id}:${folder.path.join("/")}`)}
+                    {#each collectionStore.filteredArtists.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as artist (artist.name)}
                       <div
                         role="button"
                         tabindex="0"
-                        onclick={() => openSearchedFolder(folder)}
+                        onclick={() => {
+                          if (artist.name) {
+                            navigationStore.viewArtist(artist.name);
+                            collectionStore.addRecentSearch({
+                              kind: "artist",
+                              title: artist.name,
+                              subtitle: i18n.t("playerBar.artistLabel"),
+                              query: artist.name,
+                            });
+                            isSearchFocused = false;
+                          }
+                        }}
                         onkeydown={(e) => {
-                          if (e.key === 'Enter') openSearchedFolder(folder);
+                          if (e.key === "Enter" && artist.name)
+                            navigationStore.viewArtist(artist.name);
                           else handleSearchResultKeyDown(e);
                         }}
                         class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                        data-testid="search-folder-result"
                       >
                         <div class="flex items-center gap-3 min-w-0 flex-1">
-                          <div class="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
-                            <FolderIcon class="w-4 h-4 text-brand-text-secondary" />
+                          <div
+                            class="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border overflow-hidden"
+                          >
+                            {#if artist.name}
+                              {#await collectionStore.getExtendedArtworkForArtist(artist.name)}
+                                <User class="w-4 h-4 text-brand-text-secondary" />
+                              {:then artwork}
+                                {@const portraitUrl = resolveArtistPortraitUrl(
+                                  artwork.artist_portrait_uri,
+                                  collectionStore.getArtistProfile(artist.name)
+                                    ?.fetched_image_filename,
+                                )}
+                                {#if portraitUrl}
+                                  <img
+                                    src={portraitUrl}
+                                    crossorigin="anonymous"
+                                    alt={artist.name}
+                                    class="w-full h-full object-cover"
+                                  />
+                                {:else}
+                                  <User class="w-4 h-4 text-brand-text-secondary" />
+                                {/if}
+                              {:catch}
+                                <User class="w-4 h-4 text-brand-text-secondary" />
+                              {/await}
+                            {:else}
+                              <User class="w-4 h-4 text-brand-text-secondary" />
+                            {/if}
                           </div>
                           <div class="flex flex-col min-w-0 flex-1">
-                            <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
-                              {folder.name}
+                            <span
+                              class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors"
+                            >
+                              {artist.name}
                             </span>
                             <span class="text-xs text-brand-text-secondary/70 truncate">
-                              {folder.breadcrumb}
+                              {i18n.t("playerBar.artistLabel")}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    {/each}
+
+                    {#each collectionStore.filteredAlbums.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as album (album.album_key || album.album)}
+                      <div
+                        role="button"
+                        tabindex="0"
+                        onclick={() => {
+                          if (album.album) {
+                            navigationStore.viewAlbum(
+                              album.album,
+                              undefined,
+                              album.album_key ?? undefined,
+                            );
+                            collectionStore.addRecentSearch({
+                              kind: "album",
+                              title: album.album,
+                              subtitle: `${i18n.t("playerBar.albumLabel")} • ${album.artist || i18n.t("collection.unknownArtist")}`,
+                              query: album.album,
+                              artUrl: album.art_manual || album.art_automatic,
+                            });
+                            isSearchFocused = false;
+                          }
+                        }}
+                        onkeydown={(e) => {
+                          if (e.key === "Enter" && album.album)
+                            navigationStore.viewAlbum(
+                              album.album,
+                              undefined,
+                              album.album_key ?? undefined,
+                            );
+                          else handleSearchResultKeyDown(e);
+                        }}
+                        class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      >
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                          <div class="relative shrink-0 overflow-hidden">
+                            <CoverArt
+                              songId={undefined}
+                              artManual={album.art_manual}
+                              artAutomatic={album.art_automatic}
+                              artEmbedded={album.art_embedded}
+                              sizeClass="w-8 h-8"
+                            />
+                            {#if album.rating === 5}
+                              <FavouriteCornerFlag size="xs" />
+                            {/if}
+                          </div>
+                          <div class="flex flex-col min-w-0 flex-1">
+                            <span
+                              class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors"
+                            >
+                              {album.album}
+                            </span>
+                            <span class="text-xs text-brand-text-secondary/70 truncate">
+                              {i18n.t("playerBar.albumLabel")} • {album.artist ||
+                                i18n.t("collection.unknownArtist")}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    {/each}
+
+                    {#each matchingPlaylists.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as item (item.id)}
+                      <div
+                        role="button"
+                        tabindex="0"
+                        onclick={() => {
+                          if (item.type === "auto") {
+                            navigationStore.viewAutoPlaylist(item.ref);
+                            collectionStore.addRecentSearch({
+                              kind: "playlist",
+                              title: item.label,
+                              subtitle: item.subtitle,
+                              query: item.label,
+                            });
+                          } else {
+                            navigationStore.viewPlaylist(item.id);
+                            collectionStore.addRecentSearch({
+                              kind: "playlist",
+                              title: item.label,
+                              subtitle: item.subtitle,
+                              query: item.label,
+                              entityId: item.id,
+                            });
+                          }
+                          isSearchFocused = false;
+                        }}
+                        onkeydown={(e) => {
+                          if (e.key === "Enter") {
+                            if (item.type === "auto") navigationStore.viewAutoPlaylist(item.ref);
+                            else navigationStore.viewPlaylist(item.id);
+                            isSearchFocused = false;
+                          } else {
+                            handleSearchResultKeyDown(e);
+                          }
+                        }}
+                        class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      >
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                          <div
+                            class="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden"
+                          >
+                            <ListMusic class="w-4 h-4 text-brand-text-secondary" />
+                          </div>
+                          <div class="flex flex-col min-w-0 flex-1">
+                            <span
+                              class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors"
+                            >
+                              {item.label}
+                            </span>
+                            <span class="text-xs text-brand-text-secondary/70 truncate">
+                              {item.subtitle}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    {/each}
+
+                    {#each collectionStore.searchResults.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as song (song.id)}
+                      <div
+                        role="button"
+                        tabindex="0"
+                        onclick={() => {
+                          const songTitle = song.title || i18n.t("collection.unknownSong");
+                          if (song.album) {
+                            navigationStore.viewAlbum(song.album, song.id);
+                          } else {
+                            collectionStore.searchQuery = songTitle;
+                            collectionStore.search(songTitle);
+                          }
+                          collectionStore.addRecentSearch({
+                            kind: "song",
+                            title: songTitle,
+                            subtitle: `${i18n.t("playerBar.songLabel")} • ${song.artist || i18n.t("collection.unknownArtist")}`,
+                            query: song.album || songTitle,
+                            artUrl: song.art_manual || song.art_automatic,
+                            entityId: song.id,
+                          });
+                          isSearchFocused = false;
+                        }}
+                        onkeydown={(e) => {
+                          if (e.key === "Enter") {
+                            if (song.album) navigationStore.viewAlbum(song.album, song.id);
+                            else collectionStore.search(song.title || "");
+                            isSearchFocused = false;
+                          } else {
+                            handleSearchResultKeyDown(e);
+                          }
+                        }}
+                        class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      >
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                          <CoverArt
+                            songId={song.id}
+                            artManual={song.art_manual}
+                            artAutomatic={song.art_automatic}
+                            artEmbedded={song.art_embedded}
+                            sizeClass="w-8 h-8"
+                          />
+                          <div class="flex flex-col min-w-0 flex-1">
+                            <span
+                              class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors"
+                            >
+                              {song.title || i18n.t("collection.unknownSong")}
+                            </span>
+                            <span class="text-xs text-brand-text-secondary/70 truncate">
+                              {i18n.t("playerBar.songLabel")} • {song.artist ||
+                                i18n.t("collection.unknownArtist")}
                             </span>
                           </div>
                         </div>
                       </div>
                     {/each}
                   </div>
-                </div>
-              {/if}
-            {/if}
-          </div>
-        {/if}
 
-        <div class="flex items-center justify-between px-2 py-1 mb-2 border-b border-brand-border/40 select-none">
-          <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
-            {i18n.t('topNav.recentSearches', {}, 'Recent searches')}
-          </span>
-          {#if collectionStore.recentSearches.length > 0}
-            <button
-              type="button"
-              onclick={(e) => { e.stopPropagation(); collectionStore.clearRecentSearches(); }}
-              class="text-xs text-brand-text-secondary hover:text-brand-accent-text transition-colors"
-            >
-              {i18n.t('topNav.clearRecentSearches', {}, 'Clear recent searches')}
-            </button>
-          {/if}
-        </div>
-
-        {#if collectionStore.recentSearches.length === 0}
-          <div class="p-4 text-center text-xs text-brand-text-secondary/60 select-none">
-            {i18n.t('topNav.noRecentSearches', {}, 'No recent searches')}
-          </div>
-        {:else}
-          <div class="flex flex-col gap-1">
-            {#each collectionStore.recentSearches as item (item.id)}
-              <div
-                role="button"
-                tabindex="0"
-                onclick={() => selectRecentSearch(item)}
-                onkeydown={(e) => {
-                  if (e.key === 'Enter') selectRecentSearch(item);
-                  else handleSearchResultKeyDown(e);
-                }}
-                class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
-              >
-                <div class="flex items-center gap-3 min-w-0 flex-1">
-                  {#if item.kind === 'artist'}
-                    {#await collectionStore.getExtendedArtworkForArtist(item.title)}
-                      <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full">
-                        <User class="w-4 h-4 text-brand-text-secondary" />
+                  {#if collectionStore.folderSearchResults.length > 0}
+                    <div class="mt-2 pt-1">
+                      <div
+                        class="flex items-center justify-between px-2 py-1 mb-1 border-b border-brand-border/40 select-none"
+                      >
+                        <span
+                          class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider"
+                        >
+                          {i18n.t("topNav.filesAndFolders")}
+                        </span>
                       </div>
-                    {:then artwork}
-                      {@const portraitUrl = resolveArtistPortraitUrl(artwork.artist_portrait_uri, collectionStore.getArtistProfile(item.title)?.fetched_image_filename)}
-                      {#if portraitUrl}
-                        <div class="w-9 h-9 flex-shrink-0 overflow-hidden bg-brand-sidebar border border-brand-border">
-                          <img src={portraitUrl} crossorigin="anonymous" alt={item.title} class="w-full h-full object-cover" />
-                        </div>
-                      {:else if item.artUrl}
-                        <CoverArt
-                          songId={typeof item.entityId === 'number' ? item.entityId : undefined}
-                          artManual={item.artUrl}
-                          artAutomatic={item.artUrl}
-                          sizeClass="w-9 h-9 rounded-full"
-                        />
-                      {:else}
-                        <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full">
-                          <User class="w-4 h-4 text-brand-text-secondary" />
-                        </div>
-                      {/if}
-                    {:catch}
-                      <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full">
-                        <User class="w-4 h-4 text-brand-text-secondary" />
+                      <div class="flex flex-col gap-1">
+                        {#each collectionStore.folderSearchResults.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as folder (`${folder.source.kind}:${folder.source.id}:${folder.path.join("/")}`)}
+                          <div
+                            role="button"
+                            tabindex="0"
+                            onclick={() => openSearchedFolder(folder)}
+                            onkeydown={(e) => {
+                              if (e.key === "Enter") openSearchedFolder(folder);
+                              else handleSearchResultKeyDown(e);
+                            }}
+                            class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                            data-testid="search-folder-result"
+                          >
+                            <div class="flex items-center gap-3 min-w-0 flex-1">
+                              <div
+                                class="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden"
+                              >
+                                <FolderIcon class="w-4 h-4 text-brand-text-secondary" />
+                              </div>
+                              <div class="flex flex-col min-w-0 flex-1">
+                                <span
+                                  class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors"
+                                >
+                                  {folder.name}
+                                </span>
+                                <span class="text-xs text-brand-text-secondary/70 truncate">
+                                  {folder.breadcrumb}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        {/each}
                       </div>
-                    {/await}
-                  {:else if item.artUrl}
-                    <CoverArt
-                      songId={typeof item.entityId === 'number' ? item.entityId : undefined}
-                      artManual={item.artUrl}
-                      artAutomatic={item.artUrl}
-                      sizeClass="w-9 h-9"
-                    />
-                  {:else}
-                    <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
-                      {#if item.kind === 'album'}
-                        <Disc class="w-4 h-4 text-brand-text-secondary" />
-                      {:else if item.kind === 'playlist'}
-                        <ListMusic class="w-4 h-4 text-brand-text-secondary" />
-                      {:else if item.kind === 'song'}
-                        <Music class="w-4 h-4 text-brand-text-secondary" />
-                      {:else}
-                        <History class="w-4 h-4 text-brand-text-secondary" />
-                      {/if}
                     </div>
                   {/if}
+                {/if}
+              </div>
+            {/if}
 
-                  <div class="flex flex-col min-w-0 flex-1">
-                    <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
-                      {item.title}
-                    </span>
-                    <span class="text-xs text-brand-text-secondary/70 truncate capitalize">
-                      {item.subtitle || item.kind}
-                    </span>
-                  </div>
-                </div>
-
+            <div
+              class="flex items-center justify-between px-2 py-1 mb-2 border-b border-brand-border/40 select-none"
+            >
+              <span
+                class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider"
+              >
+                {i18n.t("topNav.recentSearches", {}, "Recent searches")}
+              </span>
+              {#if collectionStore.recentSearches.length > 0}
                 <button
                   type="button"
                   onclick={(e) => {
                     e.stopPropagation();
-                    collectionStore.removeRecentSearch(item.id);
+                    collectionStore.clearRecentSearches();
                   }}
-                  class="p-1.5 opacity-0 group-hover:opacity-100 hover:text-brand-text-primary text-brand-text-secondary/60 transition-all rounded"
-                  title={i18n.t('topNav.removeRecentSearchTooltip')}
+                  class="text-xs text-brand-text-secondary hover:text-brand-accent-text transition-colors"
                 >
-                  <X class="w-3.5 h-3.5" />
+                  {i18n.t("topNav.clearRecentSearches", {}, "Clear recent searches")}
                 </button>
-              </div>
-            {/each}
-          </div>
-        {/if}
-        {/if}
-      </div>
-    {/if}
-  </div>
+              {/if}
+            </div>
 
-  <!-- Kept outside the search box with a text label: tucked inside as a bare
+            {#if collectionStore.recentSearches.length === 0}
+              <div class="p-4 text-center text-xs text-brand-text-secondary/60 select-none">
+                {i18n.t("topNav.noRecentSearches", {}, "No recent searches")}
+              </div>
+            {:else}
+              <div class="flex flex-col gap-1">
+                {#each collectionStore.recentSearches as item (item.id)}
+                  <div
+                    role="button"
+                    tabindex="0"
+                    onclick={() => selectRecentSearch(item)}
+                    onkeydown={(e) => {
+                      if (e.key === "Enter") selectRecentSearch(item);
+                      else handleSearchResultKeyDown(e);
+                    }}
+                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  >
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                      {#if item.kind === "artist"}
+                        {#await collectionStore.getExtendedArtworkForArtist(item.title)}
+                          <div
+                            class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full"
+                          >
+                            <User class="w-4 h-4 text-brand-text-secondary" />
+                          </div>
+                        {:then artwork}
+                          {@const portraitUrl = resolveArtistPortraitUrl(
+                            artwork.artist_portrait_uri,
+                            collectionStore.getArtistProfile(item.title)?.fetched_image_filename,
+                          )}
+                          {#if portraitUrl}
+                            <div
+                              class="w-9 h-9 flex-shrink-0 overflow-hidden bg-brand-sidebar border border-brand-border"
+                            >
+                              <img
+                                src={portraitUrl}
+                                crossorigin="anonymous"
+                                alt={item.title}
+                                class="w-full h-full object-cover"
+                              />
+                            </div>
+                          {:else if item.artUrl}
+                            <CoverArt
+                              songId={typeof item.entityId === "number" ? item.entityId : undefined}
+                              artManual={item.artUrl}
+                              artAutomatic={item.artUrl}
+                              sizeClass="w-9 h-9 rounded-full"
+                            />
+                          {:else}
+                            <div
+                              class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full"
+                            >
+                              <User class="w-4 h-4 text-brand-text-secondary" />
+                            </div>
+                          {/if}
+                        {:catch}
+                          <div
+                            class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full"
+                          >
+                            <User class="w-4 h-4 text-brand-text-secondary" />
+                          </div>
+                        {/await}
+                      {:else if item.artUrl}
+                        <CoverArt
+                          songId={typeof item.entityId === "number" ? item.entityId : undefined}
+                          artManual={item.artUrl}
+                          artAutomatic={item.artUrl}
+                          sizeClass="w-9 h-9"
+                        />
+                      {:else}
+                        <div
+                          class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden"
+                        >
+                          {#if item.kind === "album"}
+                            <Disc class="w-4 h-4 text-brand-text-secondary" />
+                          {:else if item.kind === "playlist"}
+                            <ListMusic class="w-4 h-4 text-brand-text-secondary" />
+                          {:else if item.kind === "song"}
+                            <Music class="w-4 h-4 text-brand-text-secondary" />
+                          {:else}
+                            <History class="w-4 h-4 text-brand-text-secondary" />
+                          {/if}
+                        </div>
+                      {/if}
+
+                      <div class="flex flex-col min-w-0 flex-1">
+                        <span
+                          class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors"
+                        >
+                          {item.title}
+                        </span>
+                        <span class="text-xs text-brand-text-secondary/70 truncate capitalize">
+                          {item.subtitle || item.kind}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        collectionStore.removeRecentSearch(item.id);
+                      }}
+                      class="p-1.5 opacity-0 group-hover:opacity-100 hover:text-brand-text-primary text-brand-text-secondary/60 transition-all rounded"
+                      title={i18n.t("topNav.removeRecentSearchTooltip")}
+                    >
+                      <X class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          {/if}
+        </div>
+      {/if}
+    </div>
+
+    <!-- Kept outside the search box with a text label: tucked inside as a bare
        icon it read as a search option, not as the way to play loose files. -->
-  <button
-    type="button"
-    onclick={() => playerStore.openFileDialog()}
-    class="flex items-center gap-2 px-3 py-2 rounded-lg border border-brand-border bg-brand-main text-sm text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent transition-colors flex-shrink-0"
-    title={i18n.t('topNav.openFilesTooltip')}
-  >
-    <FolderOpen class="w-4 h-4" />
-    {i18n.t('topNav.open')}
-  </button>
+    <button
+      type="button"
+      onclick={() => playerStore.openFileDialog()}
+      class="flex items-center gap-2 px-3 py-2 rounded-lg border border-brand-border bg-brand-main text-sm text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent transition-colors flex-shrink-0"
+      title={i18n.t("topNav.openFilesTooltip")}
+    >
+      <FolderOpen class="w-4 h-4" />
+      {i18n.t("topNav.open")}
+    </button>
   </div>
 
   <!-- overflow-hidden + isolate scoped to just this wrapper (not the header,
@@ -970,7 +1116,9 @@
        (moved here from the removed info-panel toggle button, see PlayerBar's
        own info-panel toggle) keeps the logo pinned to the header's right
        edge instead of drifting up against the search box. -->
-  <div class="hidden lg:flex items-center justify-center flex-shrink-0 overflow-hidden isolate ml-auto">
+  <div
+    class="hidden lg:flex items-center justify-center flex-shrink-0 overflow-hidden isolate ml-auto"
+  >
     <ReactiveLogoBrand size="lg" />
   </div>
 </header>
@@ -1003,4 +1151,3 @@
     will-change: transform;
   }
 </style>
-

@@ -79,5 +79,9 @@
   {onkeydown}
   {onfocus}
   {style}
-  class="border text-brand-text-primary outline-none focus:border-brand-accent disabled:opacity-50 transition-colors {pill ? 'rounded-full' : radiusClasses[size]} {surfaceClasses[surface]} {sizeClasses[size]} {highlighted ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'} {className}"
+  class="border text-brand-text-primary outline-none focus:border-brand-accent disabled:opacity-50 transition-colors {pill
+    ? 'rounded-full'
+    : radiusClasses[size]} {surfaceClasses[surface]} {sizeClasses[size]} {highlighted
+    ? 'border-brand-accent ring-1 ring-brand-accent/40'
+    : 'border-brand-border'} {className}"
 />

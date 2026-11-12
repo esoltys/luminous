@@ -35,10 +35,10 @@ export const ADDON_CATALOG: readonly AddonCatalogEntry[] = [
       "color-accent-hover": "#e2bd86",
       "color-text-primary": "#ffffff",
       "color-text-secondary": "#e2e8f0",
-      "color-border": "#904d46"
+      "color-border": "#904d46",
     },
-    art: "/addons/mothman-store.png"
-  }
+    art: "/addons/mothman-store.png",
+  },
 ];
 
 /** Order of the theme colours shown as swatches. */
@@ -48,5 +48,5 @@ export const SWATCH_KEYS = [
   "bg-playerbar",
   "color-accent",
   "color-accent-hover",
-  "color-border"
+  "color-border",
 ] as const;

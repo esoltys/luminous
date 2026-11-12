@@ -33,7 +33,8 @@ const song = (id: number, title: string) => ({ id, title }) as Song;
 function placeTarget(attrs: Record<string, string>): HTMLElement {
   const el = document.createElement("button");
   Object.assign(el.dataset, attrs);
-  el.getBoundingClientRect = () => ({ left: 10, right: 110, top: 20, bottom: 60, width: 100, height: 40 }) as DOMRect;
+  el.getBoundingClientRect = () =>
+    ({ left: 10, right: 110, top: 20, bottom: 60, width: 100, height: 40 }) as DOMRect;
   document.body.appendChild(el);
   return el;
 }
@@ -138,7 +139,10 @@ describe("songDrag store", () => {
     it("reports files left out because they aren't in the library", async () => {
       vi.spyOn(playlistsStore, "addSongsToQueue").mockResolvedValue();
       placeTarget({ dropTarget: "queue" });
-      songDrag.start(filesPayload([mockEntry("a.flac", 101), mockEntry("b.flac", null)]), { x: 0, y: 0 });
+      songDrag.start(filesPayload([mockEntry("a.flac", 101), mockEntry("b.flac", null)]), {
+        x: 0,
+        y: 0,
+      });
 
       await songDrag.drop({ x: 50, y: 40 });
       expect(toastTexts()).toHaveLength(2);

@@ -55,14 +55,7 @@ describe("alphabetIndex.ts — buildAlphabetIndex (#1973)", () => {
   });
 
   it("derives sections dynamically from the items present in the collection", () => {
-    const items = [
-      "123 Band",
-      "Alice in Chains",
-      "Anthrax",
-      "Beatles",
-      "David Bowie",
-      "Eagles",
-    ];
+    const items = ["123 Band", "Alice in Chains", "Anthrax", "Beatles", "David Bowie", "Eagles"];
 
     const { sections, getJumpIndex } = buildAlphabetIndex(items, (x) => x, true);
 
@@ -106,15 +99,7 @@ describe("alphabetIndex.ts — buildAlphabetIndex (#1973)", () => {
   });
 
   it("derives Cyrillic sections for Russian titles", () => {
-    const items = [
-      "123",
-      "Аквариум",
-      "Би-2",
-      "Ёлка",
-      "Земфира",
-      "Кино",
-      "Ялла"
-    ];
+    const items = ["123", "Аквариум", "Би-2", "Ёлка", "Земфира", "Кино", "Ялла"];
     const { sections, getJumpIndex } = buildAlphabetIndex(items, (x) => x, true, "ru");
 
     const letters = sections.map((s) => s.letter);
@@ -142,13 +127,7 @@ describe("alphabetIndex.ts — buildAlphabetIndex (#1973)", () => {
   });
 
   it("seamlessly handles multilingual libraries with both Cyrillic and Latin items", () => {
-    const mixedItems = [
-      "123 Band",
-      "Аквариум",
-      "Кино",
-      "Beatles",
-      "Queen",
-    ];
+    const mixedItems = ["123 Band", "Аквариум", "Кино", "Beatles", "Queen"];
     const { sections, getJumpIndex } = buildAlphabetIndex(mixedItems, (x) => x, true, "ru");
 
     const letters = sections.map((s) => s.letter);

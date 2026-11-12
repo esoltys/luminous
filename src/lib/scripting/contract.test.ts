@@ -14,7 +14,12 @@ import {
   type ScriptSubTab,
   type ScriptTab,
 } from "./types";
-import type { ActiveSubTab, ActiveTab, AutoPlaylistRef, SettingsTab } from "../stores/navigation.svelte";
+import type {
+  ActiveSubTab,
+  ActiveTab,
+  AutoPlaylistRef,
+  SettingsTab,
+} from "../stores/navigation.svelte";
 import type { VisibleColumns } from "../stores/collection.svelte";
 import type { PlaybackState, Song } from "../types";
 
@@ -23,7 +28,8 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() =
 
 // types.ts copies these app types so it can be vendored without imports.
 // Each line fails `bun run check` once a copy drifts from its original.
-type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type Assert<T extends true> = T;
 export type DriftChecks = [
   Assert<Equal<ScriptTab, ActiveTab>>,
@@ -66,21 +72,26 @@ describe("Scripting contract", () => {
       const [major, minor] = parse(SCRIPT_API_VERSION);
       const requires = `${major}.${minor + 1}`;
       await expect(createScriptingApi().connect(requires)).rejects.toThrow(
-        `Luminous scripting API ${SCRIPT_API_VERSION} does not satisfy ^${requires}.0 (needs ≥${requires}.0 <${major + 1}.0.0).`
+        `Luminous scripting API ${SCRIPT_API_VERSION} does not satisfy ^${requires}.0 (needs ≥${requires}.0 <${major + 1}.0.0).`,
       );
     });
 
     it("rejects another major, even an older one", async () => {
       const [major] = parse(SCRIPT_API_VERSION);
-      await expect(createScriptingApi().connect(`${major + 1}`)).rejects.toThrow("does not satisfy");
-      if (major > 0) await expect(createScriptingApi().connect(`${major - 1}`)).rejects.toThrow("does not satisfy");
+      await expect(createScriptingApi().connect(`${major + 1}`)).rejects.toThrow(
+        "does not satisfy",
+      );
+      if (major > 0)
+        await expect(createScriptingApi().connect(`${major - 1}`)).rejects.toThrow(
+          "does not satisfy",
+        );
     });
 
     it("names every missing capability alongside a version mismatch", async () => {
       const [major] = parse(SCRIPT_API_VERSION);
-      await expect(createScriptingApi().connect(`${major + 1}`, ["wait.settled", "wait.nope", "x.y"])).rejects.toThrow(
-        /does not satisfy .* and lacks wait\.nope, x\.y\.$/
-      );
+      await expect(
+        createScriptingApi().connect(`${major + 1}`, ["wait.settled", "wait.nope", "x.y"]),
+      ).rejects.toThrow(/does not satisfy .* and lacks wait\.nope, x\.y\.$/);
     });
 
     it("rejects a requirement that isn't a version", async () => {
@@ -96,7 +107,9 @@ describe("Scripting contract", () => {
       // If this fails, append a ledger entry for the new surface and bump
       // SCRIPT_API_VERSION in types.ts: minor for additions, major for removals.
       // Editing the newest entry in place instead of appending passes; review catches that.
-      expect(history[SCRIPT_API_VERSION as keyof typeof history]).toEqual(methodPaths(createScriptingApi()));
+      expect(history[SCRIPT_API_VERSION as keyof typeof history]).toEqual(
+        methodPaths(createScriptingApi()),
+      );
     });
 
     it("bumps major for every removed method and at least minor for every added one", () => {

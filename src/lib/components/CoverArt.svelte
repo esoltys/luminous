@@ -4,7 +4,7 @@
   import {
     MusicNotesIcon as Music,
     DiscIcon as Disc,
-    CircleNotchIcon as LoaderCircle
+    CircleNotchIcon as LoaderCircle,
   } from "phosphor-svelte";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -30,7 +30,7 @@
     artManual = null,
     sizeClass = "w-12 h-12",
     animateSpin = false,
-    fullResolution = false
+    fullResolution = false,
   }: Props = $props();
 
   let imgSrc = $state<string | null>(null);
@@ -48,7 +48,7 @@
       coverRequestUrl(imgSrc, {
         devicePixels: fullResolution ? 0 : (boxPixels ?? 0),
         version: collectionStore.coverArtVersion,
-      })
+      }),
   );
 
   $effect(() => {
@@ -79,7 +79,10 @@
       // original embedded picture for large views.
       if (fullResolution && artEmbedded && id !== undefined && artAutomatic.startsWith("album-")) {
         try {
-          const uri = await invoke<string | null>("get_cover_art_uri", { songId: id, fullResolution: true });
+          const uri = await invoke<string | null>("get_cover_art_uri", {
+            songId: id,
+            fullResolution: true,
+          });
           if (uri && token === loadToken) imgSrc = getCoverArtUrl(uri);
         } catch (e) {
           console.error("Failed to load full-resolution cover art URI:", e);
@@ -158,14 +161,19 @@
   });
 </script>
 
-<div bind:this={box} class="{sizeClass} relative overflow-hidden bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary group shrink-0">
+<div
+  bind:this={box}
+  class="{sizeClass} relative overflow-hidden bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary group shrink-0"
+>
   {#if displaySrc && boxPixels !== null && !hasFailed}
     <img
       src={displaySrc}
       crossorigin="anonymous"
-      alt={i18n.t('common.albumArtAlt')}
+      alt={i18n.t("common.albumArtAlt")}
       loading="lazy"
-      class="w-full h-full object-cover transition-opacity duration-300 {isLoading ? 'opacity-0' : 'opacity-100'} {animateSpin ? 'animate-spin' : ''}"
+      class="w-full h-full object-cover transition-opacity duration-300 {isLoading
+        ? 'opacity-0'
+        : 'opacity-100'} {animateSpin ? 'animate-spin' : ''}"
       style={animateSpin ? "animation-duration: 6s;" : ""}
       onerror={() => {
         hasFailed = true;
@@ -175,9 +183,14 @@
   {:else if isLoading}
     <LoaderCircle class="w-1/2 h-1/2 animate-spin text-brand-accent-text" />
   {:else}
-    <div class="flex items-center justify-center w-full h-full bg-linear-to-b from-brand-sidebar to-brand-main">
+    <div
+      class="flex items-center justify-center w-full h-full bg-linear-to-b from-brand-sidebar to-brand-main"
+    >
       {#if animateSpin}
-        <Disc class="w-1/2 h-1/2 animate-spin text-brand-accent-text" style="animation-duration: 4s;" />
+        <Disc
+          class="w-1/2 h-1/2 animate-spin text-brand-accent-text"
+          style="animation-duration: 4s;"
+        />
       {:else}
         <Music class="w-1/2 h-1/2 text-brand-text-secondary/60" />
       {/if}

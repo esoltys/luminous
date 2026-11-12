@@ -29,8 +29,12 @@ describe("user guide image manifest & validation", () => {
     });
 
     if (!report.valid) {
-      const messages = report.issues.map((i: ValidationIssue) => `[${i.code}] ${i.message}`).join("\n");
-      expect.unreachable(`Guide validation failed with ${report.issues.length} issue(s):\n${messages}`);
+      const messages = report.issues
+        .map((i: ValidationIssue) => `[${i.code}] ${i.message}`)
+        .join("\n");
+      expect.unreachable(
+        `Guide validation failed with ${report.issues.length} issue(s):\n${messages}`,
+      );
     }
     expect(report.valid).toBe(true);
     expect(report.issues).toEqual([]);
@@ -67,7 +71,9 @@ describe("user guide image manifest & validation", () => {
       for (const img of langManifest.images) {
         expect(img.width).toBeGreaterThan(0);
         expect(img.height).toBeGreaterThan(0);
-        expect(img.src).toMatch(new RegExp(`^assets/${langManifest.locale}/screenshots/dark/[a-z0-9-]+\\.webp$`));
+        expect(img.src).toMatch(
+          new RegExp(`^assets/${langManifest.locale}/screenshots/dark/[a-z0-9-]+\\.webp$`),
+        );
       }
     }
   });
@@ -116,7 +122,10 @@ describe("user guide image manifest & validation", () => {
       });
 
       expect(report.valid).toBe(false);
-      const dimensionMismatch = report.issues.find((i: ValidationIssue) => i.code === "DIMENSION_MISMATCH" || i.code === "HTML_DIMENSION_MISMATCH");
+      const dimensionMismatch = report.issues.find(
+        (i: ValidationIssue) =>
+          i.code === "DIMENSION_MISMATCH" || i.code === "HTML_DIMENSION_MISMATCH",
+      );
       expect(dimensionMismatch).toBeDefined();
     } finally {
       if (fs.existsSync(tmpManifestPath)) {

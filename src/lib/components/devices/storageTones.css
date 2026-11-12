@@ -1,6 +1,10 @@
 /* How each slice of a device's storage is drawn (#839), shared by the bar and its legend. */
 .storage-tone-music {
-  background-color: color-mix(in srgb, var(--color-brand-text-secondary) 75%, var(--color-brand-accent) 25%);
+  background-color: color-mix(
+    in srgb,
+    var(--color-brand-text-secondary) 75%,
+    var(--color-brand-accent) 25%
+  );
 }
 .storage-tone-copied {
   background-color: var(--color-brand-accent-text);
@@ -15,7 +19,11 @@
 /* Amber 400, the app's warning colour. */
 .storage-tone-removed,
 .storage-tone-over {
-  background: repeating-linear-gradient(-45deg, #fbbf24 0 3px, color-mix(in srgb, #fbbf24 30%, transparent) 3px 6px);
+  background: repeating-linear-gradient(
+    -45deg,
+    #fbbf24 0 3px,
+    color-mix(in srgb, #fbbf24 30%, transparent) 3px 6px
+  );
 }
 .storage-tone-reserve {
   background: repeating-linear-gradient(

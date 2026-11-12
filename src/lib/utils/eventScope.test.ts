@@ -26,9 +26,7 @@ describe("EventScope", () => {
   it("unregisters all listeners when dispose() is called", async () => {
     const unlisten1 = vi.fn();
     const unlisten2 = vi.fn();
-    vi.mocked(listen)
-      .mockResolvedValueOnce(unlisten1)
-      .mockResolvedValueOnce(unlisten2);
+    vi.mocked(listen).mockResolvedValueOnce(unlisten1).mockResolvedValueOnce(unlisten2);
 
     const scope = createEventScope();
     await scope.listen("event-1", vi.fn());
@@ -120,9 +118,7 @@ describe("EventScope", () => {
     });
     const goodUnlisten = vi.fn();
 
-    vi.mocked(listen)
-      .mockResolvedValueOnce(brokenUnlisten)
-      .mockResolvedValueOnce(goodUnlisten);
+    vi.mocked(listen).mockResolvedValueOnce(brokenUnlisten).mockResolvedValueOnce(goodUnlisten);
 
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -143,9 +139,7 @@ describe("EventScope", () => {
     const parentUnlisten = vi.fn();
     const childUnlisten = vi.fn();
 
-    vi.mocked(listen)
-      .mockResolvedValueOnce(parentUnlisten)
-      .mockResolvedValueOnce(childUnlisten);
+    vi.mocked(listen).mockResolvedValueOnce(parentUnlisten).mockResolvedValueOnce(childUnlisten);
 
     const parent = createEventScope();
     const child = parent.createChild();
@@ -163,9 +157,7 @@ describe("EventScope", () => {
     const parentUnlisten = vi.fn();
     const childUnlisten = vi.fn();
 
-    vi.mocked(listen)
-      .mockResolvedValueOnce(parentUnlisten)
-      .mockResolvedValueOnce(childUnlisten);
+    vi.mocked(listen).mockResolvedValueOnce(parentUnlisten).mockResolvedValueOnce(childUnlisten);
 
     const parent = createEventScope();
     const child = parent.createChild();

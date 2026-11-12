@@ -5,9 +5,26 @@ import { i18n } from "./i18n.svelte";
 import { sameAlbum, albumKey as computeAlbumKey } from "$lib/utils/albumKey";
 import type { FileNavigationTarget, FileSource } from "../types";
 
-export type ActiveTab = "home" | "collection" | "playlists" | "files" | "settings" | "lyrics" | "stats" | "organize" | "help";
+export type ActiveTab =
+  | "home"
+  | "collection"
+  | "playlists"
+  | "files"
+  | "settings"
+  | "lyrics"
+  | "stats"
+  | "organize"
+  | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
-const SETTINGS_TABS = ["general", "system", "sources", "integrations", "themes", "equalizer", "about"] as const;
+const SETTINGS_TABS = [
+  "general",
+  "system",
+  "sources",
+  "integrations",
+  "themes",
+  "equalizer",
+  "about",
+] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
@@ -79,7 +96,9 @@ class NavigationStore {
   private _activeSubTab = $state<ActiveSubTab>("songs");
   private _playlistsSubTab = $state<PlaylistsSubTab>("custom");
 
-  get activeTab() { return this._activeTab; }
+  get activeTab() {
+    return this._activeTab;
+  }
   set activeTab(val) {
     this._activeTab = val;
     if (typeof window !== "undefined") {
@@ -88,7 +107,9 @@ class NavigationStore {
     this.scheduleRecordHistory();
   }
 
-  get activeSubTab() { return this._activeSubTab; }
+  get activeSubTab() {
+    return this._activeSubTab;
+  }
   set activeSubTab(val) {
     this._activeSubTab = val;
     if (typeof window !== "undefined") {
@@ -97,7 +118,9 @@ class NavigationStore {
     this.scheduleRecordHistory();
   }
 
-  get playlistsSubTab() { return this._playlistsSubTab; }
+  get playlistsSubTab() {
+    return this._playlistsSubTab;
+  }
   set playlistsSubTab(val) {
     this._playlistsSubTab = val;
     if (typeof window !== "undefined") {
@@ -107,9 +130,13 @@ class NavigationStore {
   }
 
   private _settingsSubTab = $state<SettingsTab>(
-    (typeof window !== "undefined" && (localStorage.getItem("navigation_settingsSubTab") as SettingsTab)) || "general"
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("navigation_settingsSubTab") as SettingsTab)) ||
+      "general",
   );
-  get settingsSubTab() { return this._settingsSubTab; }
+  get settingsSubTab() {
+    return this._settingsSubTab;
+  }
   set settingsSubTab(val: SettingsTab) {
     this._settingsSubTab = val;
     if (typeof window !== "undefined") {
@@ -131,8 +158,12 @@ class NavigationStore {
   }
 
   private _helpSection = $state<string | null>(null);
-  get helpSection() { return this._helpSection; }
-  set helpSection(val: string | null) { this._helpSection = val; }
+  get helpSection() {
+    return this._helpSection;
+  }
+  set helpSection(val: string | null) {
+    this._helpSection = val;
+  }
 
   openHelp(section?: string) {
     this._helpSection = section ?? null;
@@ -151,7 +182,9 @@ class NavigationStore {
   private _selectedAutoPlaylist = $state<AutoPlaylistRef | null>(null);
 
   /** Selected real playlist for the Playlist Detail view (rendered inside PlaylistsCollectionView). */
-  get selectedPlaylistId() { return this._selectedPlaylistId; }
+  get selectedPlaylistId() {
+    return this._selectedPlaylistId;
+  }
   set selectedPlaylistId(val) {
     this._selectedPlaylistId = val;
     if (typeof window !== "undefined") {
@@ -165,7 +198,9 @@ class NavigationStore {
   }
 
   /** Selected auto-playlist for the read-only Auto-Playlist Detail view. */
-  get selectedAutoPlaylist() { return this._selectedAutoPlaylist; }
+  get selectedAutoPlaylist() {
+    return this._selectedAutoPlaylist;
+  }
   set selectedAutoPlaylist(val) {
     this._selectedAutoPlaylist = val;
     if (typeof window !== "undefined") {
@@ -176,7 +211,9 @@ class NavigationStore {
   }
 
   /** Selected artist for the Artist Detail view (rendered inside CollectionView). */
-  get selectedArtistName() { return this._selectedArtistName; }
+  get selectedArtistName() {
+    return this._selectedArtistName;
+  }
   set selectedArtistName(val) {
     this._selectedArtistName = val;
     if (typeof window !== "undefined") {
@@ -187,7 +224,9 @@ class NavigationStore {
   }
 
   /** Selected album for the Album Detail view (rendered inside CollectionView). */
-  get selectedAlbumName() { return this._selectedAlbumName; }
+  get selectedAlbumName() {
+    return this._selectedAlbumName;
+  }
   set selectedAlbumName(val) {
     this._selectedAlbumName = val;
     if (val === null) {
@@ -204,7 +243,9 @@ class NavigationStore {
   }
 
   /** Selected album's composite key (effective_artist\u{1f}folded_album) (#1932). */
-  get selectedAlbumKey() { return this._selectedAlbumKey; }
+  get selectedAlbumKey() {
+    return this._selectedAlbumKey;
+  }
   set selectedAlbumKey(val) {
     this._selectedAlbumKey = val;
     if (typeof window !== "undefined") {
@@ -217,7 +258,9 @@ class NavigationStore {
   private _filesLocation = $state<FilesLocation | null>(null);
 
   /** The folder the Files view shows; null is the Files overview. */
-  get filesLocation() { return this._filesLocation; }
+  get filesLocation() {
+    return this._filesLocation;
+  }
   set filesLocation(val) {
     this._filesLocation = val;
     if (typeof window !== "undefined") {
@@ -252,7 +295,9 @@ class NavigationStore {
     const here = this._filesLocation;
     const same = here?.source.kind === "device" && here.source.id === id;
     this.activeTab = "files";
-    this.filesLocation = same ? { ...here, deviceTab: tab } : { source: { kind: "device", id }, path: [], deviceTab: tab };
+    this.filesLocation = same
+      ? { ...here, deviceTab: tab }
+      : { source: { kind: "device", id }, path: [], deviceTab: tab };
   }
 
   // Back/Forward navigation history. Snapshots are coalesced via a microtask
@@ -264,8 +309,12 @@ class NavigationStore {
   private isNavigatingHistory = false;
   private historyRecordScheduled = false;
 
-  get canGoBack(): boolean { return this.historyIndex > 0; }
-  get canGoForward(): boolean { return this.historyIndex < this.history.length - 1; }
+  get canGoBack(): boolean {
+    return this.historyIndex > 0;
+  }
+  get canGoForward(): boolean {
+    return this.historyIndex < this.history.length - 1;
+  }
 
   private snapshotView(): NavigationView {
     return {
@@ -390,20 +439,24 @@ class NavigationStore {
   reconcile() {
     if (collectionStore.statsLoaded && !collectionStore.isScanning) {
       if (this._selectedAlbumKey !== null) {
-        const albumExists = collectionStore.albums.some((a) => a.album_key === this._selectedAlbumKey);
+        const albumExists = collectionStore.albums.some(
+          (a) => a.album_key === this._selectedAlbumKey,
+        );
         if (!albumExists) {
           this.selectedAlbumKey = null;
           this.selectedAlbumName = null;
         }
       } else if (this._selectedAlbumName !== null) {
-        const albumExists = collectionStore.albums.some((a) => sameAlbum(a.album, this._selectedAlbumName));
+        const albumExists = collectionStore.albums.some((a) =>
+          sameAlbum(a.album, this._selectedAlbumName),
+        );
         if (!albumExists) {
           this.selectedAlbumName = null;
         }
       }
       if (this._selectedArtistName !== null) {
         const artistExists = collectionStore.artists.some(
-          (a) => a.name?.toLowerCase() === this._selectedArtistName?.toLowerCase()
+          (a) => a.name?.toLowerCase() === this._selectedArtistName?.toLowerCase(),
         );
         if (!artistExists) {
           this.selectedArtistName = null;
@@ -411,7 +464,9 @@ class NavigationStore {
       }
     }
     if (playlistsStore.playlists.length > 0 && this._selectedPlaylistId !== null) {
-      const playlistExists = playlistsStore.playlists.some((p) => p.id === this._selectedPlaylistId);
+      const playlistExists = playlistsStore.playlists.some(
+        (p) => p.id === this._selectedPlaylistId,
+      );
       if (!playlistExists) {
         this.selectedPlaylistId = null;
       }
@@ -431,7 +486,7 @@ class NavigationStore {
     this.selectedArtistName = null;
     this.selectedAlbumName = null;
     const playlist = playlistsStore.playlists.find(
-      (p) => p.dynamic_enabled && p.dynamic_spec === `tag:${tag}`
+      (p) => p.dynamic_enabled && p.dynamic_spec === `tag:${tag}`,
     );
     this.viewAutoPlaylist({
       kind: "genre",
@@ -454,7 +509,7 @@ class NavigationStore {
     this.selectedArtistName = null;
     this.selectedAlbumName = null;
     const playlist = playlistsStore.playlists.find(
-      (p) => p.dynamic_enabled && p.dynamic_spec === `artisttag:${tag}`
+      (p) => p.dynamic_enabled && p.dynamic_spec === `artisttag:${tag}`,
     );
     this.viewAutoPlaylist({
       kind: "artist_tag",
@@ -475,7 +530,7 @@ class NavigationStore {
     this.selectedArtistName = null;
     this.selectedAlbumName = null;
     const playlist = playlistsStore.playlists.find(
-      (p) => p.dynamic_enabled && p.dynamic_spec === `language:${code}`
+      (p) => p.dynamic_enabled && p.dynamic_spec === `language:${code}`,
     );
     this.viewAutoPlaylist({
       kind: "language",
@@ -509,7 +564,11 @@ class NavigationStore {
     if (!resolvedKey && focusSongId !== undefined) {
       const song = collectionStore.songs.find((s) => s.id === focusSongId);
       if (song) {
-        resolvedKey = computeAlbumKey(song.album, song.album_artist || song.artist, song.compilation);
+        resolvedKey = computeAlbumKey(
+          song.album,
+          song.album_artist || song.artist,
+          song.compilation,
+        );
       }
     }
 

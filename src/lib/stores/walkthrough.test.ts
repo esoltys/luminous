@@ -22,7 +22,8 @@ describe("WalkthroughStore", () => {
 
   it("loads seen steps from the backend on init", async () => {
     vi.mocked(invoke).mockImplementationOnce(async (cmd) => {
-      if (cmd === "get_all_app_settings") return { walkthrough_seen_steps: "sidebar,top-navigation" };
+      if (cmd === "get_all_app_settings")
+        return { walkthrough_seen_steps: "sidebar,top-navigation" };
       return null;
     });
 
@@ -268,7 +269,11 @@ describe("WalkthroughStore", () => {
       walkthroughStore.start();
 
       // sidebar, top-navigation, library-folders — not all 8.
-      expect(walkthroughStore.availableSteps.map((s) => s.id)).toEqual(["sidebar", "top-navigation", "library-folders"]);
+      expect(walkthroughStore.availableSteps.map((s) => s.id)).toEqual([
+        "sidebar",
+        "top-navigation",
+        "library-folders",
+      ]);
       expect(walkthroughStore.currentAvailableIndex).toBe(0);
 
       walkthroughStore.next();

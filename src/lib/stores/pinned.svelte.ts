@@ -22,7 +22,6 @@ export class PinnedStore {
     return getNavigablePins(this.items);
   }
 
-
   private async init() {
     try {
       await this.events.listen("pinned-items-changed", () => this.refresh());
@@ -133,4 +132,3 @@ export class PinnedStore {
 }
 
 export const pinnedStore = new PinnedStore();
-

@@ -65,7 +65,14 @@ export type EqImportError =
   | { code: "unsupported_filters"; filters: { line: number; kind: string }[] }
   | { code: "unsupported_line"; line: number }
   | { code: "malformed"; line: number }
-  | { code: "out_of_range"; line: number; field: "freq" | "gain" | "q"; value: number; min: number; max: number }
+  | {
+      code: "out_of_range";
+      line: number;
+      field: "freq" | "gain" | "q";
+      value: number;
+      min: number;
+      max: number;
+    }
   | { code: "preamp_out_of_range"; value: number; min: number; max: number }
   | { code: "file_too_large"; max_bytes: number }
   | { code: "read_failed" }

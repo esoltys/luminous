@@ -19,7 +19,7 @@ export function visibleRows(
   tops: readonly number[],
   top: number,
   bottom: number,
-  overscan: number
+  overscan: number,
 ): { start: number; end: number } {
   const n = tops.length - 1;
   // First row whose bottom edge is below `top`.

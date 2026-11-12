@@ -29,17 +29,25 @@ export interface OrganizeConsequences {
  * are counted towards moving files and destination folders. By default, untagged tracks (missing_tag) are held back.
  */
 export function computeOrganizeConsequences(
-  items: Array<{ from_path?: string; to_path?: string; status?: string; error_message?: string | null }>,
-  options: { cleanEmptyDirs: boolean; moveExtraFiles: boolean; includeMissingTags?: boolean }
+  items: Array<{
+    from_path?: string;
+    to_path?: string;
+    status?: string;
+    error_message?: string | null;
+  }>,
+  options: { cleanEmptyDirs: boolean; moveExtraFiles: boolean; includeMissingTags?: boolean },
 ): OrganizeConsequences {
   const includeMissingTags = options.includeMissingTags ?? false;
   const movingItems = items.filter((item) => {
     const s = String(item.status || "").toLowerCase();
-    const canMove = s === "ok" || (includeMissingTags && (s === "missing_tag" || s === "missingtag"));
+    const canMove =
+      s === "ok" || (includeMissingTags && (s === "missing_tag" || s === "missingtag"));
     const hasCollision = s === "collision" || (s === "ok" && item.error_message);
     const fromPath = item.from_path ?? "";
     const toPath = item.to_path ?? "";
-    return canMove && !hasCollision && fromPath.length > 0 && toPath.length > 0 && fromPath !== toPath;
+    return (
+      canMove && !hasCollision && fromPath.length > 0 && toPath.length > 0 && fromPath !== toPath
+    );
   });
 
   const targetFolders = new Set<string>();

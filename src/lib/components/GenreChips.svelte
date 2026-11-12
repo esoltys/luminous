@@ -108,7 +108,7 @@
     if (item.isCurated && curatedTagTitle) {
       return curatedTagTitle(item.label);
     }
-    return i18n.t('songTags.goToGenreTooltip', { genre: item.label }, `Browse ${item.label}`);
+    return i18n.t("songTags.goToGenreTooltip", { genre: item.label }, `Browse ${item.label}`);
   }
 
   function handleItemClick(e: MouseEvent, item: ChipItem) {
@@ -157,7 +157,7 @@
       {#if remainingCount > 0}
         <span
           class="inline-flex items-center px-2 py-1 rounded-full bg-brand-sidebar text-brand-text-secondary border border-brand-border text-xs font-medium select-none shrink-0"
-          title={remainingItems.map(i => i.label).join(", ")}
+          title={remainingItems.map((i) => i.label).join(", ")}
         >
           +{remainingCount}
         </span>

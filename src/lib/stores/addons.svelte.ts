@@ -6,12 +6,7 @@ import type { Theme } from "./theme.svelte";
  * with no Store entitlement path never leave `unavailable`.
  */
 export type AddonState =
-  | "unavailable"
-  | "unowned"
-  | "purchasing"
-  | "downloading"
-  | "owned"
-  | "error";
+  "unavailable" | "unowned" | "purchasing" | "downloading" | "owned" | "error";
 
 const ADDON_STATES: readonly AddonState[] = [
   "unavailable",
@@ -19,7 +14,7 @@ const ADDON_STATES: readonly AddonState[] = [
   "purchasing",
   "downloading",
   "owned",
-  "error"
+  "error",
 ];
 
 /** Payload of the backend's `addon-state-changed` event. */
@@ -87,7 +82,7 @@ export class AddonsStore {
       }),
       this.events.listen<AddonPrice>("addon-price-defined", (event) => {
         this.prices[event.payload.id] = event.payload;
-      })
+      }),
     ]);
   }
 

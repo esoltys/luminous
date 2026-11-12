@@ -100,7 +100,10 @@
     bandData = [];
     startLoadingAnimation();
     try {
-      const data = await invoke<number[] | null>("get_band_waveform_data", { song_id: songId, songId });
+      const data = await invoke<number[] | null>("get_band_waveform_data", {
+        song_id: songId,
+        songId,
+      });
       if (requestId !== bandRequestId) return;
       bandData = data ?? [];
     } catch (e) {
@@ -139,9 +142,9 @@
     const progressPct = playerStore.positionNanosec / songLength;
 
     const colors = themeStore.resolvedColors;
-    const accentColor = colors["color-accent"] || '#8b5cf6';
-    const hoverColor = colors["color-accent-hover"] || '#a78bfa';
-    const borderCol = colors["color-border"] || '#374151';
+    const accentColor = colors["color-accent"] || "#8b5cf6";
+    const hoverColor = colors["color-accent-hover"] || "#a78bfa";
+    const borderCol = colors["color-border"] || "#374151";
 
     if (prefs.seekBarMode === "bands") {
       drawBands(ctx, width, height, progressPct, accentColor);
@@ -192,7 +195,7 @@
     gradPlayed.addColorStop(0, accentColor);
     gradPlayed.addColorStop(1, hoverColor);
 
-    const textSecCol = themeStore.resolvedColors["color-text-secondary"] || '#9ca3af';
+    const textSecCol = themeStore.resolvedColors["color-text-secondary"] || "#9ca3af";
 
     for (let i = 0; i < numBars; i++) {
       let val: number;
@@ -416,8 +419,12 @@
   data-waveform-container
   data-waveform-loading={isLoadingWaveform || isLoadingBands ? "true" : "false"}
   class="relative flex-1 h-7 overflow-hidden flex items-center group select-none"
-  title={prefs.seekBarMode === 'bands'
-    ? i18n.t('playerBar.bandsLegend', {}, 'Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy')
+  title={prefs.seekBarMode === "bands"
+    ? i18n.t(
+        "playerBar.bandsLegend",
+        {},
+        "Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy",
+      )
     : undefined}
 >
   <canvas bind:this={canvas} class="block w-full h-7 opacity-100"></canvas>

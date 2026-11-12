@@ -21,7 +21,7 @@
       indicatorStyle = {
         left: el.offsetLeft,
         width: el.offsetWidth,
-        opacity: 1
+        opacity: 1,
       };
     }
   }
@@ -47,7 +47,11 @@
 
   // Tab order per #120 feedback: All, Favourites, Familiar, Discover, Deep Cuts.
   const MODES: { value: QueuePopulationMode; labelKey: string; tooltipKey: string }[] = [
-    { value: "all", labelKey: "playlists.populationModeAll", tooltipKey: "playlists.populationModeTooltipAll" },
+    {
+      value: "all",
+      labelKey: "playlists.populationModeAll",
+      tooltipKey: "playlists.populationModeTooltipAll",
+    },
     {
       value: "favourites",
       labelKey: "playlists.populationModeFavourites",
@@ -78,7 +82,9 @@
 >
   <!-- Sliding active indicator -->
   <div
-    class="absolute top-0.5 bottom-0.5 bg-brand-accent rounded-full shadow-sm pointer-events-none {mounted ? 'transition-[left,width] duration-200 ease-out' : 'transition-none'}"
+    class="absolute top-0.5 bottom-0.5 bg-brand-accent rounded-full shadow-sm pointer-events-none {mounted
+      ? 'transition-[left,width] duration-200 ease-out'
+      : 'transition-none'}"
     style="left: {indicatorStyle.left}px; width: {indicatorStyle.width}px; opacity: {indicatorStyle.opacity};"
     aria-hidden="true"
   ></div>

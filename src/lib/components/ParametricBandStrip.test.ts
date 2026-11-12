@@ -14,7 +14,13 @@ const ranges: EqRanges = {
   min_bands: 1,
 };
 
-const peak = (freq: number, gain_db = 0, q = 1): ParametricBand => ({ kind: "peak", freq, gain_db, q, enabled: true });
+const peak = (freq: number, gain_db = 0, q = 1): ParametricBand => ({
+  kind: "peak",
+  freq,
+  gain_db,
+  q,
+  enabled: true,
+});
 
 function setup(bands: ParametricBand[] = [peak(60), peak(1000)]) {
   const props = {
@@ -49,7 +55,9 @@ describe("ParametricBandStrip.svelte", () => {
 
   it("shows f32 values at a readable precision in English", () => {
     i18n.currentLocale = "en-CA";
-    const { getByLabelText } = setup([{ kind: "low_shelf", freq: 31.25, gain_db: -0.800000011920929, q: 0.70710677, enabled: true }]);
+    const { getByLabelText } = setup([
+      { kind: "low_shelf", freq: 31.25, gain_db: -0.800000011920929, q: 0.70710677, enabled: true },
+    ]);
     expect(getByLabelText("Frequency 1")).toHaveValue("31.3");
     expect(getByLabelText("Gain 1")).toHaveValue("-0.8");
     expect(getByLabelText(/^Q.* 1$/)).toHaveValue("0.71");
@@ -57,7 +65,9 @@ describe("ParametricBandStrip.svelte", () => {
 
   it("shows f32 values localized in French with commas", () => {
     i18n.currentLocale = "fr-CA";
-    const { getByLabelText } = setup([{ kind: "low_shelf", freq: 31.25, gain_db: -0.800000011920929, q: 0.70710677, enabled: true }]);
+    const { getByLabelText } = setup([
+      { kind: "low_shelf", freq: 31.25, gain_db: -0.800000011920929, q: 0.70710677, enabled: true },
+    ]);
     expect(getByLabelText(/Fréquence.* 1/)).toHaveValue("31,3");
     expect(getByLabelText(/Gain.* 1/)).toHaveValue("-0,8");
     expect(getByLabelText(/^Q.* 1$/)).toHaveValue("0,71");

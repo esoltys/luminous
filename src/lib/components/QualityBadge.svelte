@@ -28,7 +28,8 @@
     const isLossless = LOSSLESS_FORMATS.has(format);
 
     if (isLossless) {
-      const isHiRes = (song.samplerate ?? 0) > 48000 || (song.bitdepth != null && song.bitdepth > 16);
+      const isHiRes =
+        (song.samplerate ?? 0) > 48000 || (song.bitdepth != null && song.bitdepth > 16);
       return isHiRes ? "hi-res" : "hq";
     }
 
@@ -53,7 +54,11 @@
   let tierDescription = $derived.by(() => {
     switch (tier) {
       case "hi-res":
-        return i18n.t("audioPipeline.tierHiResDesc", {}, "Lossless format with sample rate above 48 kHz or bit depth above 16-bit");
+        return i18n.t(
+          "audioPipeline.tierHiResDesc",
+          {},
+          "Lossless format with sample rate above 48 kHz or bit depth above 16-bit",
+        );
       case "hq":
         return i18n.t("audioPipeline.tierHqDesc", {}, "Lossless format");
       case "sq":
@@ -92,9 +97,17 @@
       bind:this={buttonEl}
       type="button"
       onclick={togglePopover}
-      title={i18n.t("audioPipeline.badgeTooltip", { tier: label }, `Audio quality: ${label} — click to view audio pipeline`)}
+      title={i18n.t(
+        "audioPipeline.badgeTooltip",
+        { tier: label },
+        `Audio quality: ${label} — click to view audio pipeline`,
+      )}
       class="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] uppercase leading-none rounded transition-all cursor-pointer select-none active:scale-95 {styleClasses} {className}"
-      aria-label={i18n.t("audioPipeline.badgeTooltip", { tier: label }, `Audio quality: ${label} — click to view audio pipeline`)}
+      aria-label={i18n.t(
+        "audioPipeline.badgeTooltip",
+        { tier: label },
+        `Audio quality: ${label} — click to view audio pipeline`,
+      )}
       aria-expanded={isPopoverOpen}
       aria-haspopup="dialog"
     >

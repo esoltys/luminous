@@ -17,7 +17,7 @@
     "bundle",
     "unsupported_api",
     "reconfirm",
-    "internal"
+    "internal",
   ];
 
   let state = $derived(addonsStore.stateOf(entry.id));
@@ -38,14 +38,16 @@
 
   let errorMessage = $derived(
     state === "error"
-      ? i18n.t(`settings.addonError_${ERROR_CODES.includes(errorCode ?? "") ? errorCode : "internal"}`)
-      : null
+      ? i18n.t(
+          `settings.addonError_${ERROR_CODES.includes(errorCode ?? "") ? errorCode : "internal"}`,
+        )
+      : null,
   );
 
   let cardClass = $derived(
     `bg-brand-main/50 border-2 rounded-xl flex flex-col overflow-hidden text-left w-full transition-colors duration-200 ${
       isActive ? "border-brand-accent shadow-md shadow-brand-accent/5" : "border-brand-border/60"
-    } ${selectable ? "hover:border-brand-accent/40" : ""}`
+    } ${selectable ? "hover:border-brand-accent/40" : ""}`,
   );
 
   function get() {
@@ -74,7 +76,9 @@
           >
             {entry.name}
           </span>
-          <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text">
+          <span
+            class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text"
+          >
             {i18n.t("settings.addonBadge")}
           </span>
         </div>
@@ -92,14 +96,21 @@
         />
       </div>
 
-      <div class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
+      <div
+        class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10"
+      >
         {#each swatches as color}
           <div class="flex-1" style="background-color: {color}"></div>
         {/each}
       </div>
     </div>
 
-    <div class="text-xs leading-relaxed min-h-9 {errorMessage ? 'text-brand-gold' : 'text-brand-text-secondary'}" role={errorMessage ? "alert" : undefined}>
+    <div
+      class="text-xs leading-relaxed min-h-9 {errorMessage
+        ? 'text-brand-gold'
+        : 'text-brand-text-secondary'}"
+      role={errorMessage ? "alert" : undefined}
+    >
       {errorMessage ?? i18n.t(entry.descriptionKey)}
     </div>
 
@@ -124,7 +135,9 @@
         class="w-full py-2 px-3 rounded-md text-xs font-semibold bg-brand-border text-brand-text-primary flex items-center justify-center gap-2"
       >
         <Spinner class="w-3.5 h-3.5 spin" />
-        {state === "purchasing" ? i18n.t("settings.addonWaitingStore") : i18n.t("settings.addonDownloading")}
+        {state === "purchasing"
+          ? i18n.t("settings.addonWaitingStore")
+          : i18n.t("settings.addonDownloading")}
       </button>
     {:else if state === "error"}
       <button

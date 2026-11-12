@@ -103,7 +103,9 @@ describe("SettingsSources.svelte - WebDAV section", () => {
     const { findByText } = render(SettingsSources);
 
     expect(await findByText("Remote WebDAV")).toBeInTheDocument();
-    expect(await findByText("https://cloud.example.com/remote.php/webdav/Music")).toBeInTheDocument();
+    expect(
+      await findByText("https://cloud.example.com/remote.php/webdav/Music"),
+    ).toBeInTheDocument();
   });
 
   it("opens WebDavModal when clicking Add WebDAV", async () => {
@@ -138,7 +140,7 @@ describe("SettingsSources.svelte - Media servers section", () => {
 
     expect(invoke).toHaveBeenCalledWith("sync_subsonic_server", { id: 7 });
     expect(
-      await findByText("Home Navidrome: 3 added, 1 updated, 0 removed, 0 errors")
+      await findByText("Home Navidrome: 3 added, 1 updated, 0 removed, 0 errors"),
     ).toBeInTheDocument();
   });
 
@@ -184,7 +186,7 @@ describe("SettingsSources.svelte - Disk Size breakdown", () => {
     const card = getByRole("button", { name: "Disk Size: 2.10 GB" });
     expect(card).toHaveClass("cursor-help");
     expect(card).toHaveAccessibleDescription(
-      "Music files: 2.00 GB\nAlbum art: 25.0 MB\nArtist images: 64.0 MB\nFolder art thumbnails: 11.0 MB"
+      "Music files: 2.00 GB\nAlbum art: 25.0 MB\nArtist images: 64.0 MB\nFolder art thumbnails: 11.0 MB",
     );
   });
 });
@@ -196,9 +198,7 @@ describe("SettingsSources.svelte - Default library", () => {
 
   it("offers the watched folders and shows why a link was refused, keeping the picker on None", async () => {
     const { collectionStore } = await import("../stores/collection.svelte");
-    collectionStore.directories = [
-      { id: 1, path: "D:\\Music", nickname: "" } as never,
-    ];
+    collectionStore.directories = [{ id: 1, path: "D:\\Music", nickname: "" } as never];
     const { findByLabelText, findByRole } = render(SettingsSources);
 
     const select = (await findByLabelText("Default Library")) as HTMLSelectElement;
@@ -208,7 +208,7 @@ describe("SettingsSources.svelte - Default library", () => {
 
     expect(invoke).toHaveBeenCalledWith("set_default_library", { path: "D:\\Music" });
     expect(await findByRole("alert")).toHaveTextContent(
-      "The genre hierarchy file in D:\\Music is broken."
+      "The genre hierarchy file in D:\\Music is broken.",
     );
     expect(select.value).toBe("");
   });
@@ -303,7 +303,9 @@ describe("SettingsSources.svelte - Save artwork to folders", () => {
     await fireEvent.click(confirmBtn);
 
     await waitFor(() => {
-      expect(queryByText("Are you sure you want to turn on Auto-Organize?")).not.toBeInTheDocument();
+      expect(
+        queryByText("Are you sure you want to turn on Auto-Organize?"),
+      ).not.toBeInTheDocument();
     });
     expect(setAutoOrganizeSpy).toHaveBeenCalledWith(true);
   });
@@ -317,4 +319,3 @@ describe("SettingsSources.svelte - Save artwork to folders", () => {
     expect(await findByText("No blocked metadata matches.")).toBeInTheDocument();
   });
 });
-

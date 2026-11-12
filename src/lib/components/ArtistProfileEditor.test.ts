@@ -31,9 +31,7 @@ describe("ArtistProfileEditor", () => {
         artist_key: "Shania Twain",
         website: "https://www.shaniatwain.com",
         tags: ["country", "pop"],
-        social_links: [
-          { platform: "instagram", handle_or_url: "@shaniatwain" },
-        ],
+        social_links: [{ platform: "instagram", handle_or_url: "@shaniatwain" }],
         bio: "Legendary country pop star",
       },
     };

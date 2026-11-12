@@ -69,7 +69,10 @@ describe("PinnedStore", () => {
   });
 
   it("reorder() invokes reorder_pinned_items with the given order and refreshes", async () => {
-    const order: Array<["song", string]> = [["song", "2"], ["song", "1"]];
+    const order: Array<["song", string]> = [
+      ["song", "2"],
+      ["song", "1"],
+    ];
     await pinnedStore.reorder(order);
     expect(invoke).toHaveBeenCalledWith("reorder_pinned_items", { order });
     expect(invoke).toHaveBeenCalledWith("get_pinned_items");
@@ -157,4 +160,3 @@ describe("PinnedStore", () => {
     });
   });
 });
-

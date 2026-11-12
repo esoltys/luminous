@@ -40,7 +40,7 @@ export class PlaylistsStore {
       (p) =>
         p.dynamic_enabled &&
         p.track_count > 0 &&
-        (p.dynamic_spec !== "missingmbid" || picardStore.missingPlaylistEnabled)
+        (p.dynamic_spec !== "missingmbid" || picardStore.missingPlaylistEnabled),
     ).length;
     return (
       genreCount +
@@ -126,7 +126,11 @@ export class PlaylistsStore {
       // membership immediately.
       await this.events.listen<number[]>("playlists-changed", async (event) => {
         await this.refreshPlaylists();
-        if (this.activePlaylistId !== null && Array.isArray(event.payload) && event.payload.includes(this.activePlaylistId)) {
+        if (
+          this.activePlaylistId !== null &&
+          Array.isArray(event.payload) &&
+          event.payload.includes(this.activePlaylistId)
+        ) {
           await this.selectPlaylist(this.activePlaylistId);
         }
         this.scheduleRefreshAutoPlaylistCounts(300);
@@ -261,7 +265,7 @@ export class PlaylistsStore {
     await this.pinPlaylist(playlist.id);
     toastStore.show(
       i18n.t("celebrations.playlistCreated", { name }, `Playlist "${name}" created`),
-      "success"
+      "success",
     );
     return playlist;
   }
@@ -277,11 +281,7 @@ export class PlaylistsStore {
     return playlist;
   }
 
-  async updatePlaylistSpec(
-    id: number,
-    spec: string,
-    populationMode: QueuePopulationMode = "all"
-  ) {
+  async updatePlaylistSpec(id: number, spec: string, populationMode: QueuePopulationMode = "all") {
     await invoke("set_playlist_dynamic_config", { playlistId: id, mode: populationMode, spec });
     await this.refreshPlaylists();
     if (this.activePlaylistId === id) {
@@ -351,11 +351,21 @@ export class PlaylistsStore {
     const isQueue = !targetPlaylist || targetPlaylist.is_queue;
     if (isQueue) {
       await this.addSongsToQueue(songIds);
-      toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: queueLabel }, `Added ${queueLabel} to Queue`));
+      toastStore.show(
+        i18n.t(
+          "playlists.addedToQueueSuccess",
+          { name: queueLabel },
+          `Added ${queueLabel} to Queue`,
+        ),
+      );
     } else {
       await this.addSongsToPlaylist(targetPlaylist.id, songIds);
       toastStore.show(
-        i18n.t("playlists.addedToPlaylistSuccess", { name: targetPlaylist.name }, `Added to ${targetPlaylist.name}`)
+        i18n.t(
+          "playlists.addedToPlaylistSuccess",
+          { name: targetPlaylist.name },
+          `Added to ${targetPlaylist.name}`,
+        ),
       );
     }
   }
@@ -382,7 +392,11 @@ export class PlaylistsStore {
       const moving = new Set(uuids);
       const rest = this.activePlaylistTracks.filter((t) => !moving.has(t.uuid));
       const at = beforeUuid === null ? -1 : rest.findIndex((t) => t.uuid === beforeUuid);
-      rest.splice(at === -1 ? rest.length : at, 0, ...this.activePlaylistTracks.filter((t) => moving.has(t.uuid)));
+      rest.splice(
+        at === -1 ? rest.length : at,
+        0,
+        ...this.activePlaylistTracks.filter((t) => moving.has(t.uuid)),
+      );
       this.activePlaylistTracks = rest;
     }
     await invoke("move_playlist_items", { playlistId, uuids, beforeUuid });

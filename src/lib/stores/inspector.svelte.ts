@@ -54,8 +54,10 @@ class InspectorStore {
   private get viewedEntity(): Entity | null {
     if (navigationStore.activeTab !== "collection") return null;
     // CollectionView shows the album view in preference to the artist view.
-    if (navigationStore.selectedAlbumName !== null) return { kind: "album", name: navigationStore.selectedAlbumName };
-    if (navigationStore.selectedArtistName !== null) return { kind: "artist", name: navigationStore.selectedArtistName };
+    if (navigationStore.selectedAlbumName !== null)
+      return { kind: "album", name: navigationStore.selectedAlbumName };
+    if (navigationStore.selectedArtistName !== null)
+      return { kind: "artist", name: navigationStore.selectedArtistName };
     return null;
   }
 
@@ -89,16 +91,37 @@ class InspectorStore {
   get subject(): InspectorSubject | null {
     const viewed = this.viewedSubject;
     const requested = this.focus === "playing" ? playerStore.currentSong : undefined;
-    if (requested) return { kind: "song", song: requested, source: "playing", key: `song:${requested.id}`, name: requested.artist ?? "" };
+    if (requested)
+      return {
+        kind: "song",
+        song: requested,
+        source: "playing",
+        key: `song:${requested.id}`,
+        name: requested.artist ?? "",
+      };
     if (this.focus === "viewed" && viewed) return viewed;
 
     const selected = this.selections.at(-1);
-    if (selected) return { kind: "song", song: selected.song, source: "selection", key: `song:${selected.song.id}`, name: selected.song.artist ?? "" };
+    if (selected)
+      return {
+        kind: "song",
+        song: selected.song,
+        source: "selection",
+        key: `song:${selected.song.id}`,
+        name: selected.song.artist ?? "",
+      };
 
     if (viewed) return viewed;
 
     const playing = playerStore.currentSong;
-    if (playing) return { kind: "song", song: playing, source: "playing", key: `song:${playing.id}`, name: playing.artist ?? "" };
+    if (playing)
+      return {
+        kind: "song",
+        song: playing,
+        source: "playing",
+        key: `song:${playing.id}`,
+        name: playing.artist ?? "",
+      };
     return null;
   }
 

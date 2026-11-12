@@ -9,7 +9,7 @@ import {
   flatGlassColor,
   CHROME_SATURATION,
   extractColorsFromImage,
-  type Theme
+  type Theme,
 } from "./theme.svelte";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -19,7 +19,7 @@ import { invoke } from "@tauri-apps/api/core";
 describe("buildExtractedColors (archetype-based artwork color extraction, #61)", () => {
   const darkCoverWithNeonAccent = [
     { r: 5, g: 5, b: 5, count: 1000 },
-    { r: 20, g: 40, b: 255, count: 5 }
+    { r: 20, g: 40, b: 255, count: 5 },
   ];
 
   it("picks the small neon cluster as the accent instead of losing it to the black background", () => {
@@ -105,12 +105,12 @@ describe("Custom Theme Builder & ThemeStore", () => {
       id: "custom-neon",
       name: "Custom Neon",
       colors: { ...LUMINOUS_DARK_COLORS, "color-accent": "#00ff00" },
-      isCustom: true
+      isCustom: true,
     };
 
     vi.mocked(invoke).mockResolvedValueOnce({
       custom_themes: JSON.stringify([mockCustomTheme]),
-      active_theme_id: "custom-neon"
+      active_theme_id: "custom-neon",
     } as any);
 
     await themeStore.init();
@@ -126,7 +126,7 @@ describe("Custom Theme Builder & ThemeStore", () => {
       id: "my-theme",
       name: "My Theme",
       colors: { ...LUMINOUS_DARK_COLORS, "color-accent": "#ff00ff" },
-      isCustom: true
+      isCustom: true,
     };
 
     await themeStore.addCustomTheme(customTheme);
@@ -135,11 +135,11 @@ describe("Custom Theme Builder & ThemeStore", () => {
     expect(themeStore.activeThemeId).toBe("my-theme");
     expect(invoke).toHaveBeenCalledWith("set_app_setting", {
       key: "custom_themes",
-      value: JSON.stringify([customTheme])
+      value: JSON.stringify([customTheme]),
     });
     expect(invoke).toHaveBeenCalledWith("set_app_setting", {
       key: "active_theme_id",
-      value: "my-theme"
+      value: "my-theme",
     });
   });
 
@@ -148,7 +148,7 @@ describe("Custom Theme Builder & ThemeStore", () => {
       id: "temp-theme",
       name: "Temp Theme",
       colors: { ...LUMINOUS_DARK_COLORS },
-      isCustom: true
+      isCustom: true,
     };
 
     await themeStore.addCustomTheme(customTheme);
@@ -165,7 +165,7 @@ describe("Custom Theme Builder & ThemeStore", () => {
       id: "custom-imported-123",
       name: "Imported Glow",
       colors: { ...LUMINOUS_DARK_COLORS, "color-accent": "#10b981" },
-      isCustom: true
+      isCustom: true,
     };
 
     vi.mocked(invoke).mockResolvedValueOnce(importedTheme);
@@ -183,13 +183,15 @@ describe("Custom Theme Builder & ThemeStore", () => {
       id: "custom-invalid",
       name: "Invalid Theme",
       colors: {
-        "bg-main": "#000"
-      }
+        "bg-main": "#000",
+      },
     };
 
     vi.mocked(invoke).mockResolvedValueOnce(invalidTheme as any);
 
-    await expect(themeStore.importTheme("/path/to/bad.json")).rejects.toThrow("Missing or invalid color");
+    await expect(themeStore.importTheme("/path/to/bad.json")).rejects.toThrow(
+      "Missing or invalid color",
+    );
   });
 
   it("exports a custom theme by invoking export_theme command", async () => {
@@ -197,7 +199,7 @@ describe("Custom Theme Builder & ThemeStore", () => {
       id: "export-me",
       name: "Export Me",
       colors: { ...LUMINOUS_DARK_COLORS },
-      isCustom: true
+      isCustom: true,
     };
 
     vi.mocked(invoke).mockResolvedValueOnce(undefined as any);
@@ -206,7 +208,7 @@ describe("Custom Theme Builder & ThemeStore", () => {
 
     expect(invoke).toHaveBeenCalledWith("export_theme", {
       theme: themeToExport,
-      exportPath: "/path/to/exported.json"
+      exportPath: "/path/to/exported.json",
     });
   });
 
@@ -244,7 +246,7 @@ describe("Custom Theme Builder & ThemeStore", () => {
       expect(themeStore.resolvedColors).toEqual(LUMINOUS_DARK_COLORS);
       expect(invoke).toHaveBeenCalledWith("set_app_setting", {
         key: "color_scheme_mode",
-        value: "dark"
+        value: "dark",
       });
     });
 
@@ -266,7 +268,7 @@ describe("Custom Theme Builder & ThemeStore", () => {
 
     it("init() restores a persisted color_scheme_mode", async () => {
       vi.mocked(invoke).mockResolvedValueOnce({
-        color_scheme_mode: "dark"
+        color_scheme_mode: "dark",
       } as any);
 
       await themeStore.init();
@@ -276,7 +278,7 @@ describe("Custom Theme Builder & ThemeStore", () => {
 
     it("ignores an invalid persisted color_scheme_mode", async () => {
       vi.mocked(invoke).mockResolvedValueOnce({
-        color_scheme_mode: "not-a-real-mode"
+        color_scheme_mode: "not-a-real-mode",
       } as any);
 
       await themeStore.init();
@@ -307,7 +309,7 @@ describe("Custom Theme Builder & ThemeStore", () => {
       playerbar: "#f0f0f0",
       accent: "#123456",
       accentHover: "#234567",
-      border: "#dddddd"
+      border: "#dddddd",
     };
     expect(themeStore.resolvedColors["color-text-primary"]).toBe("#16181d");
     expect(themeStore.resolvedColors["color-text-secondary"]).toBe("#5a6072");
@@ -319,7 +321,7 @@ describe("Custom Theme Builder & ThemeStore", () => {
       playerbar: "#0a0a0a",
       accent: "#123456",
       accentHover: "#234567",
-      border: "#222222"
+      border: "#222222",
     };
     expect(themeStore.resolvedColors["color-text-primary"]).toBe("#ffffff");
     expect(themeStore.resolvedColors["color-text-secondary"]).toBe("#e2e8f0");
@@ -336,13 +338,17 @@ describe("Custom Theme Builder & ThemeStore", () => {
       playerbar: "#345678",
       accent: "#456789",
       accentHover: "#56789a",
-      border: "#6789ab"
+      border: "#6789ab",
     };
 
     await themeStore.setTheme("dynamic-artwork");
 
-    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).toBe("#123456");
-    expect(document.documentElement.style.getPropertyValue("--color-artwork-accent")).toBe("#456789");
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).toBe(
+      "#123456",
+    );
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-accent")).toBe(
+      "#456789",
+    );
   });
 
   it("updateArtworkColors updates CSS custom properties unconditionally even when another theme is active", async () => {
@@ -353,13 +359,17 @@ describe("Custom Theme Builder & ThemeStore", () => {
       playerbar: "#334455",
       accent: "#445566",
       accentHover: "#556677",
-      border: "#667788"
+      border: "#667788",
     };
 
     themeStore.applyArtworkColors(colors);
 
-    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).toBe("#112233");
-    expect(document.documentElement.style.getPropertyValue("--color-artwork-accent")).toBe("#445566");
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).toBe(
+      "#112233",
+    );
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-accent")).toBe(
+      "#445566",
+    );
   });
 
   it("applyArtworkColors triggers applyActiveTheme to update glass panel and contrast variables immediately", () => {
@@ -372,7 +382,7 @@ describe("Custom Theme Builder & ThemeStore", () => {
       playerbar: "#334455",
       accent: "#445566",
       accentHover: "#556677",
-      border: "#667788"
+      border: "#667788",
     });
 
     expect(spy).toHaveBeenCalled();
@@ -393,7 +403,9 @@ describe("flatGlassColor (solid stand-in for glass over the flat canvas)", () =>
   });
 
   it("matches the default dark theme's first-paint value in app.css", () => {
-    expect(flatGlassColor(LUMINOUS_DARK_COLORS["bg-sidebar"], 0.5, LUMINOUS_DARK_COLORS["bg-main"])).toBe("#1e1e1c");
+    expect(
+      flatGlassColor(LUMINOUS_DARK_COLORS["bg-sidebar"], 0.5, LUMINOUS_DARK_COLORS["bg-main"]),
+    ).toBe("#1e1e1c");
   });
 
   // The flattened panels only match the live glass beside them (the player
@@ -411,7 +423,7 @@ describe("Theme change View Transitions", () => {
   const fakeTransition = () => ({
     ready: new Promise<void>(() => {}),
     finished: new Promise<void>(() => {}),
-    skipTransition: vi.fn()
+    skipTransition: vi.fn(),
   });
 
   beforeEach(() => {
@@ -419,7 +431,10 @@ describe("Theme change View Transitions", () => {
       update();
       return fakeTransition();
     });
-    Object.defineProperty(document, "startViewTransition", { value: startViewTransition, configurable: true });
+    Object.defineProperty(document, "startViewTransition", {
+      value: startViewTransition,
+      configurable: true,
+    });
     document.documentElement.classList.remove("theme-vt");
     document.documentElement.style.removeProperty("--color-artwork-primary");
   });
@@ -438,7 +453,9 @@ describe("Theme change View Transitions", () => {
     store.activeThemeId = "nordic-blue";
     store.applyActiveTheme();
     expect(startViewTransition).toHaveBeenCalledTimes(1);
-    expect(document.documentElement.style.getPropertyValue("--glass-solid-sidebar")).toMatch(/^#[0-9a-f]{6}$/);
+    expect(document.documentElement.style.getPropertyValue("--glass-solid-sidebar")).toMatch(
+      /^#[0-9a-f]{6}$/,
+    );
   });
 
   it("writes Dynamic Artwork colors and the theme inside one transition", () => {
@@ -454,17 +471,21 @@ describe("Theme change View Transitions", () => {
       playerbar: "#334455",
       accent: "#445566",
       accentHover: "#556677",
-      border: "#667788"
+      border: "#667788",
     });
 
     // Nothing written yet: the update runs inside the transition, after the
     // old frame is snapshotted.
     expect(startViewTransition).toHaveBeenCalledTimes(1);
-    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).not.toBe("#112233");
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).not.toBe(
+      "#112233",
+    );
 
     const update = startViewTransition.mock.calls[0][0] as () => void;
     update();
-    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).toBe("#112233");
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).toBe(
+      "#112233",
+    );
     expect(startViewTransition).toHaveBeenCalledTimes(1);
   });
 
@@ -505,7 +526,7 @@ describe("Theme change View Transitions", () => {
     const transition = {
       ready: new Promise<void>(() => {}),
       finished: new Promise<void>((resolve) => (finish = resolve)),
-      skipTransition: vi.fn()
+      skipTransition: vi.fn(),
     };
     startViewTransition.mockImplementation((update: () => void) => {
       update();
@@ -535,7 +556,11 @@ describe("Theme change View Transitions", () => {
     const skipped = new DOMException("Transition was skipped", "AbortError");
     startViewTransition.mockImplementation((update: () => void) => {
       update();
-      return { ready: Promise.reject(skipped), finished: Promise.resolve(), skipTransition: vi.fn() };
+      return {
+        ready: Promise.reject(skipped),
+        finished: Promise.resolve(),
+        skipTransition: vi.fn(),
+      };
     });
     const unhandled = vi.fn();
     process.on("unhandledRejection", unhandled);
@@ -586,13 +611,22 @@ describe("Image Extraction Fallbacks", () => {
 describe("custom themes saved with unreadable text", () => {
   it("resolves readable text for a custom theme whose stored text fails contrast", async () => {
     const store = new ThemeStore();
-    store.customThemes = [{
-      id: "custom-cream",
-      name: "Cream",
-      isCustom: true,
-      colors: { ...LUMINOUS_DARK_COLORS, "bg-main": "#eee9df", "bg-sidebar": "#e5e0d4", "bg-playerbar": "#e5e0d4" }
-    }];
+    store.customThemes = [
+      {
+        id: "custom-cream",
+        name: "Cream",
+        isCustom: true,
+        colors: {
+          ...LUMINOUS_DARK_COLORS,
+          "bg-main": "#eee9df",
+          "bg-sidebar": "#e5e0d4",
+          "bg-playerbar": "#e5e0d4",
+        },
+      },
+    ];
     store.activeThemeId = "custom-cream";
-    expect(store.resolvedColors["color-text-primary"]).toBe(LUMINOUS_LIGHT_COLORS["color-text-primary"]);
+    expect(store.resolvedColors["color-text-primary"]).toBe(
+      LUMINOUS_LIGHT_COLORS["color-text-primary"],
+    );
   });
 });

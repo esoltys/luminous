@@ -90,8 +90,12 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
   const genreView = { kind: "genre" as const, genre: "Synthwave", playlistId: 5 };
 
   it("draws the backing playlist's break above the first song that doesn't fit", async () => {
-    const { findByRole, getByText, getByRole } = render(AutoPlaylistDetailView, { view: genreView });
-    const brk = await findByRole("separator", { name: "16 GB limit · 2 songs above fit · 7.6 GB below" });
+    const { findByRole, getByText, getByRole } = render(AutoPlaylistDetailView, {
+      view: genreView,
+    });
+    const brk = await findByRole("separator", {
+      name: "16 GB limit · 2 songs above fit · 7.6 GB below",
+    });
     expect(brk.nextElementSibling).toHaveTextContent("Track Three");
     expect(getByText("12.4 GB of 16 GB used")).toBeInTheDocument();
     expect(getByRole("button", { name: /Limit 16 GB/ })).toBeInTheDocument();
@@ -129,7 +133,7 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
         "Track Two",
         "Track Three",
         "Track One",
-      ])
+      ]),
     );
   });
 });

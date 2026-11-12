@@ -189,7 +189,7 @@ describe("scrobblerStore", () => {
     await scrobblerStore.startLastfmAuth();
     expect(scrobblerStore.lastfmPendingToken).toBe("tok-abc");
     expect(openExternalUrl).toHaveBeenCalledWith(
-      "https://www.last.fm/api/auth/?api_key=key&token=tok-abc"
+      "https://www.last.fm/api/auth/?api_key=key&token=tok-abc",
     );
 
     const ok = await scrobblerStore.finishLastfmAuth();

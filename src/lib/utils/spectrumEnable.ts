@@ -31,7 +31,7 @@ export function acquireSpectrum(): void {
   }
   if (refCount === 1) {
     void invoke("set_spectrum_enabled", { enabled: true }).catch((e) =>
-      console.error("Failed to enable spectrum:", e)
+      console.error("Failed to enable spectrum:", e),
     );
   }
 }
@@ -42,7 +42,7 @@ export function releaseSpectrum(): void {
     disableTimer = setTimeout(() => {
       disableTimer = null;
       void invoke("set_spectrum_enabled", { enabled: false }).catch((e) =>
-        console.error("Failed to disable spectrum:", e)
+        console.error("Failed to disable spectrum:", e),
       );
     }, DISABLE_DEBOUNCE_MS);
   }

@@ -1,6 +1,15 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ArrowsClockwiseIcon, CaretUpIcon, CheckIcon, EjectIcon, PencilSimpleIcon, PlayIcon, StopIcon, XIcon } from "phosphor-svelte";
+  import {
+    ArrowsClockwiseIcon,
+    CaretUpIcon,
+    CheckIcon,
+    EjectIcon,
+    PencilSimpleIcon,
+    PlayIcon,
+    StopIcon,
+    XIcon,
+  } from "phosphor-svelte";
   import { navigationStore, type DeviceTab } from "../../stores/navigation.svelte";
   import { devicesStore } from "../../stores/devices.svelte";
   import { playerStore } from "../../stores/player.svelte";
@@ -39,7 +48,7 @@
   const syncing = $derived(devicesStore.isSyncing(device.id));
   /** The storage browsed and measured: the one picked here, else the first. */
   const storage = $derived(
-    deviceStorage(device, location.source.kind === "device" ? location.source.storage : null)
+    deviceStorage(device, location.source.kind === "device" ? location.source.storage : null),
   );
 
   let preview = $state<SyncPlan | null>(null);
@@ -83,7 +92,10 @@
     const nickname = newName.trim();
     if (nickname === name) return;
     try {
-      await invoke("update_device_profile", { id: device.id, profile: { ...device.profile, nickname: nickname || null } });
+      await invoke("update_device_profile", {
+        id: device.id,
+        profile: { ...device.profile, nickname: nickname || null },
+      });
     } catch (err) {
       console.error("Failed to rename device:", err);
     }
@@ -99,7 +111,11 @@
   }
 
   function setStorage(storageId: string) {
-    navigationStore.filesLocation = { ...location, source: { kind: "device", id: device.id, storage: storageId }, path: [] };
+    navigationStore.filesLocation = {
+      ...location,
+      source: { kind: "device", id: device.id, storage: storageId },
+      path: [],
+    };
   }
 
   /**
@@ -111,7 +127,9 @@
     // Switch first: the switch closes any preview, so it must not land after this one opens.
     if (tab !== "sync") setTab("sync");
     try {
-      const settings = syncSettings ? $state.snapshot(syncSettings) : (syncState ?? (await devicesStore.refreshSyncState(device.id)))?.settings;
+      const settings = syncSettings
+        ? $state.snapshot(syncSettings)
+        : (syncState ?? (await devicesStore.refreshSyncState(device.id)))?.settings;
       if (!settings) return;
       preview = await devicesStore.planSync(device.id, settings);
     } catch (err) {
@@ -129,16 +147,23 @@
   let reloadToken = $state(0);
   let confirmingDelete = $state(false);
 
-  const browsed = $derived({ kind: "device" as const, id: device.id, storage: storage?.id ?? null });
+  const browsed = $derived({
+    kind: "device" as const,
+    id: device.id,
+    storage: storage?.id ?? null,
+  });
   const selectedEntries = $derived(
-    (listing?.entries ?? []).filter((e) => selection.includes(e.name))
+    (listing?.entries ?? []).filter((e) => selection.includes(e.name)),
   );
   const playable = $derived(selectedEntries.filter((e) => e.songId !== null));
 
   $effect(() => {
     const folderTitle =
       location.path.length > 0
-        ? shownName(location.path[location.path.length - 1], listing?.pathMissingTags[location.path.length - 1])
+        ? shownName(
+            location.path[location.path.length - 1],
+            listing?.pathMissingTags[location.path.length - 1],
+          )
         : name;
     filesStore.activeFolderTitle = folderTitle;
   });
@@ -172,13 +197,27 @@
     confirmingDelete = false;
     const names = selectedEntries.map((e) => e.name);
     try {
-      await invoke("delete_device_files", { deviceId: device.id, storageId: storage?.id ?? null, path: location.path, names });
-      toastStore.show(i18n.plural("devices.deleted", names.length, { device: name }), "success", 4000);
+      await invoke("delete_device_files", {
+        deviceId: device.id,
+        storageId: storage?.id ?? null,
+        path: location.path,
+        names,
+      });
+      toastStore.show(
+        i18n.plural("devices.deleted", names.length, { device: name }),
+        "success",
+        4000,
+      );
     } catch (err) {
       console.error("Failed to delete files from device:", err);
       toastStore.show(
-        i18n.t(String(err) === "sync-in-progress" ? "devices.deleteWhileSyncing" : "devices.deleteFailed", { device: name }),
-        "error"
+        i18n.t(
+          String(err) === "sync-in-progress"
+            ? "devices.deleteWhileSyncing"
+            : "devices.deleteFailed",
+          { device: name },
+        ),
+        "error",
       );
     } finally {
       selection = [];
@@ -188,7 +227,12 @@
 </script>
 
 <!-- Right padding belongs to each part, so scrollable ones scroll at the window edge. -->
-<div class="flex-1 min-h-0 flex flex-col pl-6 pt-4 gap-4" class:pb-28={!!playerStore.currentSong} class:pb-6={!playerStore.currentSong} data-testid="device-view">
+<div
+  class="flex-1 min-h-0 flex flex-col pl-6 pt-4 gap-4"
+  class:pb-28={!!playerStore.currentSong}
+  class:pb-6={!playerStore.currentSong}
+  data-testid="device-view"
+>
   {#if preview}
     <DeviceSyncPreview
       {device}
@@ -200,7 +244,9 @@
   {:else}
     <header class="mr-6 flex items-start justify-between gap-4 flex-wrap">
       <div class="flex items-center gap-4 min-w-0">
-        <div class="w-14 h-14 shrink-0 flex items-center justify-center rounded-xl border border-brand-border/50 bg-brand-sidebar/60">
+        <div
+          class="w-14 h-14 shrink-0 flex items-center justify-center rounded-xl border border-brand-border/50 bg-brand-sidebar/60"
+        >
           <Icon class="w-7 h-7 text-brand-accent-text" />
         </div>
         <div class="min-w-0">
@@ -208,16 +254,29 @@
             <div class="flex items-center gap-2">
               <input
                 bind:value={newName}
-                onkeydown={(e) => { if (e.key === "Enter") saveRename(); else if (e.key === "Escape") renaming = false; }}
+                onkeydown={(e) => {
+                  if (e.key === "Enter") saveRename();
+                  else if (e.key === "Escape") renaming = false;
+                }}
                 placeholder={device.defaultName}
                 aria-label={i18n.t("devices.rename")}
                 class="min-w-0 bg-brand-sidebar border border-brand-accent text-brand-text-primary px-3 py-1 text-2xl font-bold rounded-lg focus:outline-none"
                 use:focusAndSelect
               />
-              <button onclick={saveRename} class="p-1.5 text-brand-accent-text hover:text-brand-accent" title={i18n.t("common.save")} aria-label={i18n.t("common.save")}>
+              <button
+                onclick={saveRename}
+                class="p-1.5 text-brand-accent-text hover:text-brand-accent"
+                title={i18n.t("common.save")}
+                aria-label={i18n.t("common.save")}
+              >
                 <CheckIcon class="w-5 h-5" />
               </button>
-              <button onclick={() => (renaming = false)} class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary" title={i18n.t("common.cancel")} aria-label={i18n.t("common.cancel")}>
+              <button
+                onclick={() => (renaming = false)}
+                class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary"
+                title={i18n.t("common.cancel")}
+                aria-label={i18n.t("common.cancel")}
+              >
                 <XIcon class="w-5 h-5" />
               </button>
             </div>
@@ -226,7 +285,9 @@
               <h1
                 class="text-3xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5 hover:text-brand-accent-text transition-colors"
                 ondblclick={startRename}
-              >{name}</h1>
+              >
+                {name}
+              </h1>
               <button
                 onclick={startRename}
                 class="shrink-0 p-1 text-brand-text-secondary hover:text-brand-text-primary opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 transition-opacity"
@@ -271,21 +332,34 @@
 
     {#if tab === "sync"}
       <section class="mr-6 rounded-xl border border-brand-border/40 bg-brand-sidebar/40 px-4 py-3">
-        <DeviceSyncProjection {device} plan={syncPlan} unselected={syncSettings?.unselected} failed={syncPlanFailed} />
+        <DeviceSyncProjection
+          {device}
+          plan={syncPlan}
+          unselected={syncSettings?.unselected}
+          failed={syncPlanFailed}
+        />
       </section>
     {:else if storage}
       <section class="mr-6 rounded-xl border border-brand-border/40 bg-brand-sidebar/40 px-4 py-3">
         <DeviceStorageGauge {device} {storage}>
           {#snippet switcher()}
             {#if device.storages.length > 1}
-              <div class="inline-flex rounded-lg bg-brand-main/60 p-0.5" role="radiogroup" aria-label={i18n.t("devices.storage")}>
+              <div
+                class="inline-flex rounded-lg bg-brand-main/60 p-0.5"
+                role="radiogroup"
+                aria-label={i18n.t("devices.storage")}
+              >
                 {#each device.storages as s (s.id)}
                   <button
-                    class="px-3 py-1 rounded-md text-xs font-semibold transition-colors {s.id === storage.id ? 'bg-brand-accent/20 text-brand-text-primary' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                    class="px-3 py-1 rounded-md text-xs font-semibold transition-colors {s.id ===
+                    storage.id
+                      ? 'bg-brand-accent/20 text-brand-text-primary'
+                      : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                     role="radio"
                     aria-checked={s.id === storage.id}
                     onclick={() => setStorage(s.id)}
-                  >{storageName(device, s)}, {formatStorageSize(s.totalBytes)}</button>
+                    >{storageName(device, s)}, {formatStorageSize(s.totalBytes)}</button
+                  >
                 {/each}
               </div>
             {/if}
@@ -297,11 +371,14 @@
     <div class="mr-6 flex items-center gap-6 border-b border-brand-border/40" role="tablist">
       {#each ["files", "sync"] as const as t (t)}
         <button
-          class="-mb-px py-2 text-sm font-semibold border-b-2 transition-colors {tab === t ? 'border-brand-accent-text text-brand-text-primary' : 'border-transparent text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="-mb-px py-2 text-sm font-semibold border-b-2 transition-colors {tab === t
+            ? 'border-brand-accent-text text-brand-text-primary'
+            : 'border-transparent text-brand-text-secondary hover:text-brand-text-primary'}"
           role="tab"
           aria-selected={tab === t}
           onclick={() => setTab(t)}
-        >{i18n.t(t === "files" ? "devices.tabFiles" : "devices.tabSync")}</button>
+          >{i18n.t(t === "files" ? "devices.tabFiles" : "devices.tabSync")}</button
+        >
       {/each}
     </div>
 
@@ -322,24 +399,40 @@
           bind:totalCount={filesStore.filterTotalCount}
         >
           {#snippet footer()}
-            <div class="flex items-center justify-between gap-3 px-4 py-2 text-xs text-brand-text-secondary">
+            <div
+              class="flex items-center justify-between gap-3 px-4 py-2 text-xs text-brand-text-secondary"
+            >
               <span class="line-clamp-2 min-w-0">
                 {#if selection.length > 0}
                   {i18n.plural("devices.selected", selection.length)}
                 {:else if filesStore.isFilterActive}
-                  {i18n.plural("files.filterMatchSummary", filesStore.filterTotalCount, { matched: filesStore.filterMatchCount })}
+                  {i18n.plural("files.filterMatchSummary", filesStore.filterTotalCount, {
+                    matched: filesStore.filterMatchCount,
+                  })}
                 {:else}
                   {i18n.t("devices.onlyRemovesOwn")}
-                  {#if listing && listing.hiddenCount > 0}{i18n.plural("files.hiddenFiles", listing.hiddenCount)}{/if}
+                  {#if listing && listing.hiddenCount > 0}{i18n.plural(
+                      "files.hiddenFiles",
+                      listing.hiddenCount,
+                    )}{/if}
                 {/if}
               </span>
               {#if selection.length > 0}
                 <div class="flex items-center gap-2 shrink-0">
-                  <Button size="sm" onclick={() => play(selectedEntries)} disabled={playable.length === 0}>
+                  <Button
+                    size="sm"
+                    onclick={() => play(selectedEntries)}
+                    disabled={playable.length === 0}
+                  >
                     <PlayIcon weight="fill" class="w-3.5 h-3.5" />
                     {i18n.t("devices.play")}
                   </Button>
-                  <Button size="sm" variant="warning" onclick={() => (confirmingDelete = true)} disabled={syncing}>
+                  <Button
+                    size="sm"
+                    variant="warning"
+                    onclick={() => (confirmingDelete = true)}
+                    disabled={syncing}
+                  >
                     {i18n.t("devices.deleteFromDevice")}
                   </Button>
                 </div>
@@ -349,7 +442,12 @@
         </FileBrowser>
       </div>
     {:else}
-      <DeviceSyncSettings {device} bind:settings={syncSettings} bind:plan={syncPlan} bind:previewError={syncPlanFailed} />
+      <DeviceSyncSettings
+        {device}
+        bind:settings={syncSettings}
+        bind:plan={syncPlan}
+        bind:previewError={syncPlanFailed}
+      />
     {/if}
   {/if}
 </div>

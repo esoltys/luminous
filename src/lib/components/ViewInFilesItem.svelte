@@ -36,9 +36,13 @@
     if (!lookup) return;
     let stale = false;
     lookup
-      .then((found) => { if (!stale) target = found ?? null; })
+      .then((found) => {
+        if (!stale) target = found ?? null;
+      })
       .catch((err) => console.error("Failed to find this in Files:", err));
-    return () => { stale = true; };
+    return () => {
+      stale = true;
+    };
   });
 </script>
 
@@ -48,6 +52,9 @@
     icon={FolderIcon}
     label={i18n.t("files.viewInFiles")}
     {onmouseenter}
-    onclick={() => { navigationStore.openInFiles(found); onClose(); }}
+    onclick={() => {
+      navigationStore.openInFiles(found);
+      onClose();
+    }}
   />
 {/if}

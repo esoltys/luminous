@@ -32,8 +32,8 @@ describe("pathUtils", () => {
     it("handles Windows backslash paths", () => {
       expect(
         getParentFolder(
-          "C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross\\1-01 Head Together.flac"
-        )
+          "C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross\\1-01 Head Together.flac",
+        ),
       ).toBe("C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross");
     });
 
@@ -43,7 +43,7 @@ describe("pathUtils", () => {
 
     it("handles Unix paths", () => {
       expect(getParentFolder("/home/user/music/Big Wreck/2012 - Albatross/01.flac")).toBe(
-        "/home/user/music/Big Wreck/2012 - Albatross"
+        "/home/user/music/Big Wreck/2012 - Albatross",
       );
     });
 
@@ -54,8 +54,8 @@ describe("pathUtils", () => {
     it("handles WebDAV URLs", () => {
       expect(
         getParentFolder(
-          "https://example.com/remote.php/webdav/Music/Big%20Wreck/2012%20-%20Albatross/01.flac"
-        )
+          "https://example.com/remote.php/webdav/Music/Big%20Wreck/2012%20-%20Albatross/01.flac",
+        ),
       ).toBe("https://example.com/remote.php/webdav/Music/Big%20Wreck/2012%20-%20Albatross");
     });
 
@@ -71,11 +71,9 @@ describe("pathUtils", () => {
 
   describe("getFolderName", () => {
     it("extracts folder name from paths", () => {
-      expect(
-        getFolderName(
-          "C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross"
-        )
-      ).toBe("2012 - Albatross");
+      expect(getFolderName("C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross")).toBe(
+        "2012 - Albatross",
+      );
       expect(getFolderName("/music/Big Wreck/Disc 1")).toBe("Disc 1");
       expect(getFolderName("Disc 2")).toBe("Disc 2");
     });
@@ -83,7 +81,9 @@ describe("pathUtils", () => {
 
   describe("getDirectoryDisplayName", () => {
     it("prefers a non-blank nickname, trimmed", () => {
-      expect(getDirectoryDisplayName({ nickname: " BandCamp ", path: "Z:\\BandCamp" })).toBe("BandCamp");
+      expect(getDirectoryDisplayName({ nickname: " BandCamp ", path: "Z:\\BandCamp" })).toBe(
+        "BandCamp",
+      );
     });
 
     it("falls back to the folder name when the nickname is missing or blank", () => {
@@ -103,7 +103,7 @@ describe("pathUtils", () => {
         "C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross\\1-02 All Is Fair.flac",
       ];
       expect(getAlbumFolderPath(paths)).toBe(
-        "C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross"
+        "C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross",
       );
     });
 

@@ -31,7 +31,7 @@ function isVariousArtists(artist: string | null | undefined): boolean {
 export function albumKey(
   album: string | null | undefined,
   artist?: string | null | undefined,
-  isCompilation = false
+  isCompilation = false,
 ): string {
   const foldedAlbum = foldKey(album);
   if (!foldedAlbum) return "";
@@ -44,9 +44,8 @@ export function albumKey(
     return foldedAlbum;
   }
 
-  const artistKey = isCompilation || isVariousArtists(artist)
-    ? COMPILATION_ARTIST_KEY
-    : foldKey(artist);
+  const artistKey =
+    isCompilation || isVariousArtists(artist) ? COMPILATION_ARTIST_KEY : foldKey(artist);
 
   return `${artistKey}${ALBUM_KEY_SEPARATOR}${foldedAlbum}`;
 }

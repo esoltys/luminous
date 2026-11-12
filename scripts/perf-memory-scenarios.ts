@@ -135,15 +135,18 @@ function parseArgs() {
     const i = args.indexOf(flag);
     return i !== -1 ? args[i + 1] : undefined;
   };
-  const getAll = (flag: string) => args.flatMap((a, i) => (a === flag && args[i + 1] ? [args[i + 1]] : []));
+  const getAll = (flag: string) =>
+    args.flatMap((a, i) => (a === flag && args[i + 1] ? [args[i + 1]] : []));
   const window = get("--window") ?? "1400x900";
   const [width, height] = window.split("x").map(Number);
   if (!width || !height) throw new Error(`--window must look like 1400x900, got "${window}"`);
   const track = get("--track");
-  if (!track) throw new Error("--track <path> is required — docs/PERFORMANCE.md names the baseline track.");
+  if (!track)
+    throw new Error("--track <path> is required — docs/PERFORMANCE.md names the baseline track.");
   const sources = (get("--sources") ?? "local").split(",").map((s) => s.trim());
   for (const s of sources) {
-    if (!SOURCES.includes(s as Source)) throw new Error(`Unknown source "${s}" — use ${SOURCES.join(", ")}.`);
+    if (!SOURCES.includes(s as Source))
+      throw new Error(`Unknown source "${s}" — use ${SOURCES.join(", ")}.`);
   }
   const exe = get("--exe") ?? defaultReleaseExe();
   return {
@@ -169,7 +172,10 @@ type Options = ReturnType<typeof parseArgs>;
 
 function exeRepoRoot(exe: string): string {
   try {
-    return execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: path.dirname(exe), encoding: "utf8" }).trim();
+    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: path.dirname(exe),
+      encoding: "utf8",
+    }).trim();
   } catch {
     return REPO_ROOT;
   }
@@ -177,7 +183,6 @@ function exeRepoRoot(exe: string): string {
 
 const sleep = (sec: number) => new Promise((r) => setTimeout(r, sec * 1000));
 const log = (msg: string) => console.log(`[perf] ${msg}`);
-
 
 // ── IPC over CDP ──────────────────────────────────────────────────────────
 
@@ -201,9 +206,18 @@ async function callInPage<T>(cdp: CdpClient, fn: string, ...args: unknown[]): Pr
   return res.result?.value as T;
 }
 
-async function invoke<T = unknown>(cdp: CdpClient, cmd: string, args: Record<string, unknown> = {}): Promise<T> {
+async function invoke<T = unknown>(
+  cdp: CdpClient,
+  cmd: string,
+  args: Record<string, unknown> = {},
+): Promise<T> {
   try {
-    return await callInPage<T>(cdp, "function (cmd, args) { return this.__TAURI_INTERNALS__.invoke(cmd, args); }", cmd, args);
+    return await callInPage<T>(
+      cdp,
+      "function (cmd, args) { return this.__TAURI_INTERNALS__.invoke(cmd, args); }",
+      cmd,
+      args,
+    );
   } catch (e) {
     throw new Error(`invoke('${cmd}') failed: ${e instanceof Error ? e.message : e}`);
   }
@@ -230,7 +244,13 @@ async function timed<T>(work: () => Promise<T>): Promise<{ result: T; seconds: s
 // ── Baseline track ────────────────────────────────────────────────────────
 
 // The keys Player::new restores the loaded track and position from.
-const PLAYER_KEYS = ["last_song_id", "last_playlist_id", "last_item_uuid", "last_position_nanosec", "last_adhoc_song_ids"];
+const PLAYER_KEYS = [
+  "last_song_id",
+  "last_playlist_id",
+  "last_item_uuid",
+  "last_position_nanosec",
+  "last_adhoc_song_ids",
+];
 // models.rs FileType
 const FILE_TYPES: Record<number, string> = {
   1: "MP3",
@@ -256,14 +276,14 @@ interface BaselineTrack {
   length_nanosec: number;
 }
 
-
 const describeTrack = (t: BaselineTrack) =>
   `"${t.title}" (${FILE_TYPES[t.filetype] ?? `filetype ${t.filetype}`}, ${t.samplerate} Hz` +
   `${t.bitdepth ? `/${t.bitdepth}-bit` : ""}, ${t.bitrate} kbps, ${Math.round(t.length_nanosec / 1e9)}s)`;
 
 function openRealDbReadOnly(): Database {
   const dbPath = defaultDbPath();
-  if (!dbPath || !existsSync(dbPath)) throw new Error(`Your Luminous database wasn't found at ${dbPath}.`);
+  if (!dbPath || !existsSync(dbPath))
+    throw new Error(`Your Luminous database wasn't found at ${dbPath}.`);
   return new Database(dbPath, { readonly: true });
 }
 
@@ -272,16 +292,20 @@ function readRealProfile(trackPath: string): { track: BaselineTrack; folders: st
   const db = openRealDbReadOnly();
   try {
     const track = db
-      .query(`SELECT ${TRACK_COLUMNS} FROM songs WHERE path = ?1 COLLATE NOCASE AND unavailable = 0 AND cue_path IS NULL`)
+      .query(
+        `SELECT ${TRACK_COLUMNS} FROM songs WHERE path = ?1 COLLATE NOCASE AND unavailable = 0 AND cue_path IS NULL`,
+      )
       .get(path.normalize(trackPath)) as BaselineTrack | null;
-    if (!track) throw new Error(`--track "${trackPath}" isn't an available, non-CUE song in your library.`);
-    const folders = (db.query("SELECT path FROM directories ORDER BY id").all() as { path: string }[]).map((d) => d.path);
+    if (!track)
+      throw new Error(`--track "${trackPath}" isn't an available, non-CUE song in your library.`);
+    const folders = (
+      db.query("SELECT path FROM directories ORDER BY id").all() as { path: string }[]
+    ).map((d) => d.path);
     return { track, folders };
   } finally {
     db.close();
   }
 }
-
 
 // ── Scenarios ─────────────────────────────────────────────────────────────
 
@@ -354,8 +378,11 @@ class Recorder {
       },
     });
     const peak = (await this.peak.stop()) ?? settled;
-    log(`${label}: peak working set ${peak.workingSetMb.toFixed(1)} MB, private bytes ${peak.privateBytesMb.toFixed(1)} MB`);
-    const stalls = this.hasWatchdog && this.profile ? this.profile.stallWarningsSince(this.logOffset) : "";
+    log(
+      `${label}: peak working set ${peak.workingSetMb.toFixed(1)} MB, private bytes ${peak.privateBytesMb.toFixed(1)} MB`,
+    );
+    const stalls =
+      this.hasWatchdog && this.profile ? this.profile.stallWarningsSince(this.logOffset) : "";
     this.rows.push(
       this.row(label, settled, peak, {
         cpu_percent: settled.cpuPercent === null ? "" : settled.cpuPercent.toFixed(2),
@@ -418,7 +445,8 @@ async function playbackScenario(rec: Recorder, label: string, song: BaselineTrac
         );
       }
       const eq = await invoke<EqualizerConfig>(c, "get_equalizer_state");
-      if (!eq.enabled) await invoke(c, "apply_equalizer_config", { config: { ...eq, enabled: true } });
+      if (!eq.enabled)
+        await invoke(c, "apply_equalizer_config", { config: { ...eq, enabled: true } });
       await invoke(c, "resume");
       log(`playing "${song.title}" from 0:00`);
     });
@@ -433,7 +461,9 @@ async function playbackScenario(rec: Recorder, label: string, song: BaselineTrac
   });
   if (played.current_song?.id !== song.id) {
     rec.rows.pop();
-    throw new Error(`Playback moved off the baseline track (to "${played.current_song?.title}") — not recording ${label}.`);
+    throw new Error(
+      `Playback moved off the baseline track (to "${played.current_song?.title}") — not recording ${label}.`,
+    );
   }
 }
 
@@ -491,7 +521,12 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
       );
       tracks = await withCdp(libraryTracks);
       log(`initial scan of ${tracks} tracks in ${folders.length} folder(s) took ${scan.seconds}s`);
-      await rec.finish("initial-scan", SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks, scan_seconds: scan.seconds }, true);
+      await rec.finish(
+        "initial-scan",
+        SETTLE_AFTER_SCAN_SEC,
+        { library_tracks: tracks, scan_seconds: scan.seconds },
+        true,
+      );
     } catch (e) {
       await rec.abandon();
       throw e;
@@ -499,25 +534,42 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
     await profile.close();
 
     const song = profile.findPlayableSong("path = ?1 COLLATE NOCASE", path.normalize(opts.track));
-    if (!song) throw new Error(`The scan didn't pick up --track "${opts.track}"; is it under ${folders.join(", ")}?`);
+    if (!song)
+      throw new Error(
+        `The scan didn't pick up --track "${opts.track}"; is it under ${folders.join(", ")}?`,
+      );
     profile.cue(song);
 
     // 2. Idle, in a fresh launch over the already-scanned library. This is the launch whose startup time is
     // recorded: the first one also creates the WebView2 user data folder, so it isn't comparable.
     const startup = await profile.launch();
     rec.begin();
-    const visualizerMounted = await withCdp((c) => c.eval("document.querySelectorAll('canvas').length > 0"));
+    const visualizerMounted = await withCdp((c) =>
+      c.eval("document.querySelectorAll('canvas').length > 0"),
+    );
     if (visualizerMounted.value !== true) {
-      log("warning: no visualizer canvas found — the playback scenario won't exercise the analyzer's rendering.");
+      log(
+        "warning: no visualizer canvas found — the playback scenario won't exercise the analyzer's rendering.",
+      );
     }
-    await rec.finish("idle", SETTLE_IDLE_SEC, { library_tracks: tracks, startup_seconds: startup.toFixed(2) });
+    await rec.finish("idle", SETTLE_IDLE_SEC, {
+      library_tracks: tracks,
+      startup_seconds: startup.toFixed(2),
+    });
 
     // 3. Forced full scan — same call as Settings → Force Full Scan.
     rec.begin();
     try {
-      const scan = await withCdp((c) => timed(() => invoke(c, "scan_directories", { force: true })));
+      const scan = await withCdp((c) =>
+        timed(() => invoke(c, "scan_directories", { force: true })),
+      );
       log(`forced full scan took ${scan.seconds}s`);
-      await rec.finish("after-full-scan", SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks, scan_seconds: scan.seconds }, true);
+      await rec.finish(
+        "after-full-scan",
+        SETTLE_AFTER_SCAN_SEC,
+        { library_tracks: tracks, scan_seconds: scan.seconds },
+        true,
+      );
     } catch (e) {
       await rec.abandon();
       throw e;
@@ -532,7 +584,9 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
     await profile.launch();
     rec.begin();
     try {
-      const scroll = await withCdp((c) => timed(() => callInPage<{ steps: number; cards: number }>(c, SCROLL_ALBUM_GRID)));
+      const scroll = await withCdp((c) =>
+        timed(() => callInPage<{ steps: number; cards: number }>(c, SCROLL_ALBUM_GRID)),
+      );
       log(`scrolled the Albums grid in ${scroll.result.steps} steps (${scroll.seconds}s)`);
       await rec.finish("album-grid", SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks }, true);
     } catch (e) {
@@ -555,7 +609,10 @@ interface RemoteServer {
 function remoteServer(source: "webdav" | "subsonic"): RemoteServer {
   const env = (name: string) => process.env[`LUMINOUS_PERF_${source.toUpperCase()}_${name}`];
   const url = env("URL");
-  if (!url) throw new Error(`--sources ${source} needs LUMINOUS_PERF_${source.toUpperCase()}_URL (see the script header).`);
+  if (!url)
+    throw new Error(
+      `--sources ${source} needs LUMINOUS_PERF_${source.toUpperCase()}_URL (see the script header).`,
+    );
   // Auto-sync off: a scheduled sync mid-scenario would land in the readings.
   const common = { id: null, name: `perf ${source}`, url, enabled: true, autoSyncEnabled: false };
   if (source === "webdav") {
@@ -563,18 +620,33 @@ function remoteServer(source: "webdav" | "subsonic"): RemoteServer {
       label: source,
       save: "save_webdav_server",
       sync: "sync_webdav_server",
-      input: { ...common, username: env("USER") ?? null, password: env("PASSWORD") ?? null, remotePath: env("PATH") ?? null },
+      input: {
+        ...common,
+        username: env("USER") ?? null,
+        password: env("PASSWORD") ?? null,
+        remotePath: env("PATH") ?? null,
+      },
     };
   }
   return {
     label: source,
     save: "save_subsonic_server",
     sync: "sync_subsonic_server",
-    input: { ...common, username: env("USER") ?? "", password: env("PASSWORD") ?? null, reportPlays: false },
+    input: {
+      ...common,
+      username: env("USER") ?? "",
+      password: env("PASSWORD") ?? null,
+      reportPlays: false,
+    },
   };
 }
 
-async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrack, server: RemoteServer) {
+async function remoteSource(
+  opts: Options,
+  rec: Recorder,
+  baseline: BaselineTrack,
+  server: RemoteServer,
+) {
   const { label } = server;
   const profile = new AppProfile({ exe: opts.exe, window: opts });
   log(`${label}: scratch profile ${profile.root}`);
@@ -600,7 +672,12 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
       const sync = await withCdp((c) => timed(() => invoke(c, server.sync, { id: saved.id })));
       tracks = await withCdp(libraryTracks);
       log(`${label} sync of ${tracks} tracks took ${sync.seconds}s`);
-      await rec.finish(`${label}-sync`, SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks, scan_seconds: sync.seconds }, true);
+      await rec.finish(
+        `${label}-sync`,
+        SETTLE_AFTER_SCAN_SEC,
+        { library_tracks: tracks, scan_seconds: sync.seconds },
+        true,
+      );
     } catch (e) {
       await rec.abandon();
       throw e;
@@ -614,14 +691,20 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
       baseline.album,
       baseline.length_nanosec,
     );
-    if (!song) throw new Error(`${label}: the server has no copy of "${baseline.title}" (${baseline.album}).`);
+    if (!song)
+      throw new Error(
+        `${label}: the server has no copy of "${baseline.title}" (${baseline.album}).`,
+      );
     log(`${label} baseline track: ${describeTrack(song)}`);
     profile.cue(song);
 
     // 2. Idle, then 3. streamed playback, in a fresh launch.
     const startup = await profile.launch();
     rec.begin();
-    await rec.finish(`${label}-idle`, SETTLE_IDLE_SEC, { library_tracks: tracks, startup_seconds: startup.toFixed(2) });
+    await rec.finish(`${label}-idle`, SETTLE_IDLE_SEC, {
+      library_tracks: tracks,
+      startup_seconds: startup.toFixed(2),
+    });
     await playbackScenario(rec, `${label}-playback`, song, tracks);
     await profile.close();
   } finally {
@@ -635,23 +718,41 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
 function busyBuilders(): string[] {
   const out = execFileSync(
     "powershell",
-    ["-NoProfile", "-Command", "Get-Process -Name rustc,cargo,cl,link,tsc -ErrorAction SilentlyContinue | ForEach-Object { $_.ProcessName }; exit 0"],
+    [
+      "-NoProfile",
+      "-Command",
+      "Get-Process -Name rustc,cargo,cl,link,tsc -ErrorAction SilentlyContinue | ForEach-Object { $_.ProcessName }; exit 0",
+    ],
     { encoding: "utf8" },
   );
-  return [...new Set(out.split(/\r?\n/).map((n) => n.trim().toLowerCase()).filter(Boolean))];
+  return [
+    ...new Set(
+      out
+        .split(/\r?\n/)
+        .map((n) => n.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function checkPreconditions(opts: Options) {
   checkProfilePreconditions(opts.exe);
   const busy = opts.allowBusy ? [] : busyBuilders();
   if (busy.length) {
-    throw new Error(`${busy.join(", ")} running: its CPU and memory load would skew the readings. Wait for it, or pass --allow-busy.`);
+    throw new Error(
+      `${busy.join(", ")} running: its CPU and memory load would skew the readings. Wait for it, or pass --allow-busy.`,
+    );
   }
   const lastSourceChange = Number(
-    execFileSync("git", ["log", "-1", "--format=%ct", "--", ...APP_SOURCE_PATHS], { cwd: opts.exeRepo, encoding: "utf8" }).trim(),
+    execFileSync("git", ["log", "-1", "--format=%ct", "--", ...APP_SOURCE_PATHS], {
+      cwd: opts.exeRepo,
+      encoding: "utf8",
+    }).trim(),
   );
   if (statSync(opts.exe).mtimeMs / 1000 < lastSourceChange) {
-    throw new Error(`${opts.exe} is older than the last app-source commit — rebuild it (bun run tauri build --no-bundle).`);
+    throw new Error(
+      `${opts.exe} is older than the last app-source commit — rebuild it (bun run tauri build --no-bundle).`,
+    );
   }
   if (appCommit(opts.exeRepo).endsWith("-dirty")) {
     log("warning: app source has uncommitted changes; the commit column will be marked -dirty.");
@@ -667,7 +768,9 @@ async function main() {
     throw new Error("Your profile has no watched folders; pass --library <dir>.");
   }
   // Fail on missing server settings now, not after the local scenarios have run.
-  const remotes = opts.sources.filter((s): s is "webdav" | "subsonic" => s !== "local").map(remoteServer);
+  const remotes = opts.sources
+    .filter((s): s is "webdav" | "subsonic" => s !== "local")
+    .map(remoteServer);
 
   const baseline = real.track;
   // The playback scenario must stop short of the halfway mark, where a listen
@@ -694,7 +797,9 @@ async function main() {
       if (opts.dryRun) console.log(csvLine(r));
       else appendCsvRow(opts.csv, r);
     }
-    log(opts.dryRun ? "dry run — nothing written" : `appended ${rec.rows.length} rows to ${opts.csv}`);
+    log(
+      opts.dryRun ? "dry run — nothing written" : `appended ${rec.rows.length} rows to ${opts.csv}`,
+    );
   }
   log("compare with: python scripts/perf-chart.py --baseline <ver> --candidate " + opts.appVersion);
 }

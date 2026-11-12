@@ -35,7 +35,10 @@ describe("remoteSource", () => {
 
   describe("parseSubsonicPath", () => {
     it("splits server id and track id", () => {
-      expect(parseSubsonicPath("subsonic://12/tr-abc/def")).toEqual({ serverId: 12, trackId: "tr-abc/def" });
+      expect(parseSubsonicPath("subsonic://12/tr-abc/def")).toEqual({
+        serverId: 12,
+        trackId: "tr-abc/def",
+      });
     });
 
     it("returns null for anything else", () => {

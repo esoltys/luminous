@@ -71,7 +71,9 @@ describe("musicbrainzStore", () => {
     expect(invoke).toHaveBeenCalledWith("start_musicbrainz_login", {
       preferLoopback: true,
     });
-    expect(openExternalUrl).toHaveBeenCalledWith("https://musicbrainz.org/oauth2/authorize?client_id=123");
+    expect(openExternalUrl).toHaveBeenCalledWith(
+      "https://musicbrainz.org/oauth2/authorize?client_id=123",
+    );
     expect(url).toBe("https://musicbrainz.org/oauth2/authorize?client_id=123");
     expect(musicbrainzStore.isAuthorizing).toBe(true);
   });

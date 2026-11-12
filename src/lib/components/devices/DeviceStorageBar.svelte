@@ -42,11 +42,15 @@
 </script>
 
 <div class="relative w-full min-w-0 {height}" role="img" aria-label={label}>
-  <div class="absolute inset-y-0 left-0 rounded-[3px] bg-brand-border/25 border border-brand-border/40" style:width={pct(capacityBytes)}></div>
+  <div
+    class="absolute inset-y-0 left-0 rounded-[3px] bg-brand-border/25 border border-brand-border/40"
+    style:width={pct(capacityBytes)}
+  ></div>
   <div class="absolute inset-0 flex overflow-hidden rounded-[3px]" aria-hidden="true">
     {#each slices as slice, i (i)}
       {#if slice.bytes > 0}
-        <span class="h-full shrink-0 storage-tone-{slice.tone}" style:width={pct(slice.bytes)}></span>
+        <span class="h-full shrink-0 storage-tone-{slice.tone}" style:width={pct(slice.bytes)}
+        ></span>
       {/if}
     {/each}
   </div>
@@ -67,6 +71,10 @@
     ></span>
   {/if}
   {#if scale > capacityBytes || scaleBytes !== undefined}
-    <span class="absolute -inset-y-1 w-0.5 -translate-x-full bg-brand-text-primary/80" style:left={pct(capacityBytes)} aria-hidden="true"></span>
+    <span
+      class="absolute -inset-y-1 w-0.5 -translate-x-full bg-brand-text-primary/80"
+      style:left={pct(capacityBytes)}
+      aria-hidden="true"
+    ></span>
   {/if}
 </div>

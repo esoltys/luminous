@@ -12,7 +12,12 @@ import { getDaypartBucket, type DaypartBucket } from "./daypart";
  * stale-offset bugs if the user's timezone changes between listen-time
  * and view-time. */
 export function bucketListeningClock(timestamps: number[]): Record<DaypartBucket, number> {
-  const counts: Record<DaypartBucket, number> = { morning: 0, afternoon: 0, evening: 0, latenight: 0 };
+  const counts: Record<DaypartBucket, number> = {
+    morning: 0,
+    afternoon: 0,
+    evening: 0,
+    latenight: 0,
+  };
   for (const ts of timestamps) {
     counts[getDaypartBucket(new Date(ts * 1000))]++;
   }

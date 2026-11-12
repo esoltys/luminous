@@ -21,7 +21,9 @@ describe("DragGhost.svelte", () => {
     const off = render(DragGhost, { props: { x: 0, y: 0, testId: "off", children: label } });
     expect(off.getByTestId("off")).not.toHaveAttribute("data-over-target");
 
-    const on = render(DragGhost, { props: { x: 0, y: 0, overTarget: true, testId: "on", children: label } });
+    const on = render(DragGhost, {
+      props: { x: 0, y: 0, overTarget: true, testId: "on", children: label },
+    });
     expect(on.getByTestId("on")).toHaveAttribute("data-over-target");
   });
 

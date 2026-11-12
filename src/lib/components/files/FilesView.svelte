@@ -1,11 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import {
-    PlayIcon,
-    DotsThreeIcon,
-    PlusIcon,
-    CaretRightIcon,
-  } from "phosphor-svelte";
+  import { PlayIcon, DotsThreeIcon, PlusIcon, CaretRightIcon } from "phosphor-svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { filesStore, sourceKey } from "../../stores/files.svelte";
   import { sourceIcon } from "./sourceIcon";
@@ -27,7 +22,9 @@
 
   const location = $derived(navigationStore.filesLocation);
   const openDevice = $derived(
-    location?.source.kind === "device" ? filesStore.devices.find((d) => d.id === location.source.id) : undefined
+    location?.source.kind === "device"
+      ? filesStore.devices.find((d) => d.id === location.source.id)
+      : undefined,
   );
   const sourceName = $derived(location ? filesStore.name(location.source) : "");
 
@@ -37,9 +34,23 @@
   let menu = $state<(FileMenuTarget & { x: number; y: number; fromHeader?: boolean }) | null>(null);
   let headerMenuButtonEl = $state<HTMLButtonElement | null>(null);
   let editingSongId = $state<number | null>(null);
-  let editingFile = $state<{ path: string; name: string; folderPath: string[]; folderName: string } | null>(null);
-  let editingFolder = $state<{ folderName: string; songIds: number[]; filePaths: string[]; folderPath: string[] } | null>(null);
-  let editingBatch = $state<{ songIds: number[]; filePaths: string[]; folderPath: string[] } | null>(null);
+  let editingFile = $state<{
+    path: string;
+    name: string;
+    folderPath: string[];
+    folderName: string;
+  } | null>(null);
+  let editingFolder = $state<{
+    folderName: string;
+    songIds: number[];
+    filePaths: string[];
+    folderPath: string[];
+  } | null>(null);
+  let editingBatch = $state<{
+    songIds: number[];
+    filePaths: string[];
+    folderPath: string[];
+  } | null>(null);
 
   function toggleHeaderMenu() {
     if (menu?.fromHeader) {
@@ -66,10 +77,13 @@
         path: dirPath,
       });
       const audioEntries = dirListing.entries.filter(
-        (e) => !e.isDir && (e.kind === "audio" || e.status === "inLibrary" || e.status === "notScanned")
+        (e) =>
+          !e.isDir && (e.kind === "audio" || e.status === "inLibrary" || e.status === "notScanned"),
       );
       const songIds = audioEntries.flatMap((e) => (e.songId !== null ? [e.songId] : []));
-      const filePaths = audioEntries.flatMap((e) => (e.songId === null && e.location !== null ? [e.location] : []));
+      const filePaths = audioEntries.flatMap((e) =>
+        e.songId === null && e.location !== null ? [e.location] : [],
+      );
       if (songIds.length === 0 && filePaths.length === 0) {
         toastStore.show(i18n.t("files.nothingToPlay"), "info");
         return;
@@ -88,7 +102,9 @@
   function editBatchTags(entries: FileEntry[]) {
     if (!location) return;
     const songIds = entries.flatMap((e) => (e.songId !== null ? [e.songId] : []));
-    const filePaths = entries.flatMap((e) => (e.songId === null && e.location !== null ? [e.location] : []));
+    const filePaths = entries.flatMap((e) =>
+      e.songId === null && e.location !== null ? [e.location] : [],
+    );
     editingBatch = { songIds, filePaths, folderPath: location.path };
   }
 
@@ -107,7 +123,9 @@
   const hasLocation = $derived(isLocal || location?.source.kind === "webdav");
   /** The `i`th name of the current path as shown; the listing says which are missing tags. */
   const pathName = (i: number) => shownName(location?.path[i] ?? "", listing?.pathMissingTags[i]);
-  const title = $derived(location && location.path.length > 0 ? pathName(location.path.length - 1) : sourceName);
+  const title = $derived(
+    location && location.path.length > 0 ? pathName(location.path.length - 1) : sourceName,
+  );
   const unreachableLabel = $derived(i18n.t("files.unreachable", { name: sourceName }));
 
   $effect(() => {
@@ -130,8 +148,12 @@
     }
     if (entry.songId === null) {
       toastStore.show(
-        i18n.t(isLocal && entry.status === "notScanned" ? "files.notInLibraryScan" : "files.notInLibrary"),
-        "info"
+        i18n.t(
+          isLocal && entry.status === "notScanned"
+            ? "files.notInLibraryScan"
+            : "files.notInLibrary",
+        ),
+        "info",
       );
       return;
     }
@@ -140,12 +162,14 @@
 
   /** The files selected, when there's more than one; the footer counts them. */
   const selectedFiles = $derived(
-    selection.length > 1 && listing ? listing.entries.filter((e) => !e.isDir && selection.includes(e.name)) : []
+    selection.length > 1 && listing
+      ? listing.entries.filter((e) => !e.isDir && selection.includes(e.name))
+      : [],
   );
 
   /** How many files in this folder are waiting to be scanned into the library. */
   const unscannedCount = $derived(
-    listing ? listing.entries.filter((e) => !e.isDir && e.status === "notScanned").length : 0
+    listing ? listing.entries.filter((e) => !e.isDir && e.status === "notScanned").length : 0,
   );
 
   /** The footer's lines: the selection, or the folder's size, then what is in the library. */
@@ -177,37 +201,67 @@
   }
 </script>
 
-<div class="flex-1 flex flex-col h-full min-h-0 bg-brand-main text-brand-text-primary select-none overflow-hidden" data-testid="files-view">
+<div
+  class="flex-1 flex flex-col h-full min-h-0 bg-brand-main text-brand-text-primary select-none overflow-hidden"
+  data-testid="files-view"
+>
   {#if openDevice}
     {#key openDevice.id}
       <DeviceView device={openDevice} />
     {/key}
   {:else if location}
-    <div class="flex-1 min-h-0 flex flex-col px-6 pt-4 gap-4" class:pb-28={!!playerStore.currentSong} class:pb-6={!playerStore.currentSong}>
+    <div
+      class="flex-1 min-h-0 flex flex-col px-6 pt-4 gap-4"
+      class:pb-28={!!playerStore.currentSong}
+      class:pb-6={!playerStore.currentSong}
+    >
       <header class="flex items-end justify-between gap-4 flex-wrap">
         <div class="min-w-0">
-          <nav class="flex items-center gap-1.5 text-sm text-brand-text-secondary min-w-0" aria-label={i18n.t("files.breadcrumb")}>
-            <button class="hover:text-brand-text-primary truncate" onclick={() => navigationStore.viewFiles()}>{i18n.t("sidebar.files")}</button>
+          <nav
+            class="flex items-center gap-1.5 text-sm text-brand-text-secondary min-w-0"
+            aria-label={i18n.t("files.breadcrumb")}
+          >
+            <button
+              class="hover:text-brand-text-primary truncate"
+              onclick={() => navigationStore.viewFiles()}>{i18n.t("sidebar.files")}</button
+            >
             <span aria-hidden="true">/</span>
             <button
-              class="truncate {location.path.length === 0 ? 'text-brand-text-primary font-semibold' : 'hover:text-brand-text-primary'}"
-              onclick={() => navigate([])}
-            >{sourceName}</button>
+              class="truncate {location.path.length === 0
+                ? 'text-brand-text-primary font-semibold'
+                : 'hover:text-brand-text-primary'}"
+              onclick={() => navigate([])}>{sourceName}</button
+            >
             {#each location.path as _, i (i)}
               <span aria-hidden="true">/</span>
               <button
-                class="truncate {i === location.path.length - 1 ? 'text-brand-text-primary font-semibold' : 'hover:text-brand-text-primary'}"
-                onclick={() => navigate(location.path.slice(0, i + 1))}
-              >{pathName(i)}</button>
+                class="truncate {i === location.path.length - 1
+                  ? 'text-brand-text-primary font-semibold'
+                  : 'hover:text-brand-text-primary'}"
+                onclick={() => navigate(location.path.slice(0, i + 1))}>{pathName(i)}</button
+              >
             {/each}
           </nav>
-          <h1 class="text-3xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={title}>{title}</h1>
+          <h1
+            class="text-3xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5"
+            {title}
+          >
+            {title}
+          </h1>
           {#if hasLocation}
-            <p class="text-xs text-brand-text-secondary truncate select-text" title={listing?.location}>{listing?.location ?? " "}</p>
+            <p
+              class="text-xs text-brand-text-secondary truncate select-text"
+              title={listing?.location}
+            >
+              {listing?.location ?? " "}
+            </p>
           {/if}
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <Button variant="primary" onclick={() => playFolder(location.source, location.path, title)}>
+          <Button
+            variant="primary"
+            onclick={() => playFolder(location.source, location.path, title)}
+          >
             <PlayIcon weight="fill" class="w-4 h-4" />
             {i18n.t("files.playFolder")}
           </Button>
@@ -251,14 +305,17 @@
                   <span class="truncate" title={line}>
                     {line}
                     {#if i === 1 && collectionStore.isScanning}
-                      <span class="text-brand-accent font-medium ml-1.5">· {i18n.t("files.scanning")}</span>
+                      <span class="text-brand-accent font-medium ml-1.5"
+                        >· {i18n.t("files.scanning")}</span
+                      >
                     {:else if i === 1 && isLocal && !listing.excluded && unscannedCount > 0}
                       <span class="ml-1.5">
                         · {i18n.plural("files.summaryUnscanned", unscannedCount)}
                         <button
                           class="text-brand-accent hover:underline font-medium ml-1 cursor-pointer"
                           onclick={() => scanFolder(location.source, location.path)}
-                        >{i18n.t("files.scanNudge")}</button>
+                          >{i18n.t("files.scanNudge")}</button
+                        >
                       </span>
                     {/if}
                   </span>
@@ -302,7 +359,11 @@
       />
     {/if}
     {#if editingSongId !== null}
-      <TagEditor songId={editingSongId} onClose={() => (editingSongId = null)} onSave={() => filesStore.reloadFolder()} />
+      <TagEditor
+        songId={editingSongId}
+        onClose={() => (editingSongId = null)}
+        onSave={() => filesStore.reloadFolder()}
+      />
     {/if}
     {#if editingFile !== null}
       <TagEditor
@@ -339,9 +400,15 @@
       />
     {/if}
   {:else}
-    <div class="flex-1 overflow-y-auto px-6 pt-4" class:pb-28={!!playerStore.currentSong} class:pb-12={!playerStore.currentSong}>
+    <div
+      class="flex-1 overflow-y-auto px-6 pt-4"
+      class:pb-28={!!playerStore.currentSong}
+      class:pb-12={!playerStore.currentSong}
+    >
       <header class="flex items-end justify-between gap-4 mb-4">
-        <h1 class="text-3xl font-heading font-bold text-brand-text-primary leading-snug">{i18n.t("sidebar.files")}</h1>
+        <h1 class="text-3xl font-heading font-bold text-brand-text-primary leading-snug">
+          {i18n.t("sidebar.files")}
+        </h1>
         <Button onclick={() => navigationStore.openSettings("sources")}>
           <PlusIcon class="w-4 h-4" />
           {i18n.t("files.addSource")}
@@ -355,14 +422,19 @@
             {@const Icon = sourceIcon(entry.source)}
             <li>
               <button
-                class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-brand-border/40 hover:bg-brand-accent/10 transition-colors text-left {entry.available ? '' : 'opacity-60'}"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-brand-border/40 hover:bg-brand-accent/10 transition-colors text-left {entry.available
+                  ? ''
+                  : 'opacity-60'}"
                 onclick={() => navigationStore.viewFiles(entry.source)}
               >
                 <Icon class="w-5 h-5 shrink-0 text-brand-text-secondary" />
                 <span class="flex-1 min-w-0">
                   <span class="block text-sm font-semibold truncate">{entry.name}</span>
                   <span class="block text-xs text-brand-text-secondary">
-                    {i18n.t(`files.kind.${entry.source.kind}`)} · {i18n.plural("files.songCount", entry.songCount)}
+                    {i18n.t(`files.kind.${entry.source.kind}`)} · {i18n.plural(
+                      "files.songCount",
+                      entry.songCount,
+                    )}
                   </span>
                 </span>
                 <CaretRightIcon class="w-4 h-4 text-brand-text-secondary" />

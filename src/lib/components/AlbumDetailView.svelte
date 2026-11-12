@@ -4,7 +4,12 @@
   import { tick } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
+  import {
+    applySongStats,
+    type SongStatsPayload,
+    applyAlbumStats,
+    type AlbumStatsPayload,
+  } from "../utils/stats";
   import { collectionStore } from "../stores/collection.svelte";
   import { onDevScreenHooks } from "../scripting/devHooks";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -117,7 +122,9 @@
       if (albumName !== requested || albumKey !== requestedKey) return;
       songs = fetchedSongs;
       artworkRefreshToken++;
-      toastStore.show(i18n.t("albumDetail.refreshSuccess", {}, "Album metadata and artwork refreshed"));
+      toastStore.show(
+        i18n.t("albumDetail.refreshSuccess", {}, "Album metadata and artwork refreshed"),
+      );
     } catch (err) {
       console.error("Failed to refresh album:", err);
       toastStore.show(i18n.t("albumDetail.refreshError", {}, "Failed to refresh album metadata"));
@@ -127,7 +134,8 @@
   }
 
   let releaseGroupMbid = $derived(
-    songs.map((s) => (s.musicbrainz_release_group_id ?? "").trim()).find((id) => id.length > 0) ?? ""
+    songs.map((s) => (s.musicbrainz_release_group_id ?? "").trim()).find((id) => id.length > 0) ??
+      "",
   );
   let hasReleaseGroupMbid = $derived(releaseGroupMbid.length > 0);
 
@@ -167,9 +175,14 @@
     });
     try {
       const result = await collectionStore.retrieveAlbumDetails(albumName);
-      const label = result.added_count > 1
+      const label =
+        result.added_count > 1
           ? i18n.plural("albumDetail.retrieveDetailsSuccess", result.added_count)
-          : i18n.t("albumDetail.retrieveDetailsNoResults", {}, "No additional details found on MusicBrainz");
+          : i18n.t(
+              "albumDetail.retrieveDetailsNoResults",
+              {},
+              "No additional details found on MusicBrainz",
+            );
       await retrieveAlbumArt(auto);
       tasksStore.completeTask(taskId, label);
     } catch (err) {
@@ -206,14 +219,19 @@
     if (selectedKeys.size === 0) return;
     const selectedList = songs.filter((s) => selectedKeys.has(String(s.id)));
     if (selectedList.length > 0) {
-      playerStore.playSongs(selectedList.map((s) => s.id), 0, undefined, albumPlayContext());
+      playerStore.playSongs(
+        selectedList.map((s) => s.id),
+        0,
+        undefined,
+        albumPlayContext(),
+      );
     }
   }
 
   let albumItem = $derived(
     (albumKey ? collectionStore.albums.find((a) => a.album_key === albumKey) : null) ||
-    collectionStore.albums.find((a) => sameAlbum(a.album, albumName)) ||
-    null
+      collectionStore.albums.find((a) => sameAlbum(a.album, albumName)) ||
+      null,
   );
 
   /** Any one track's id, used to look up extended local artwork (#98/#760)
@@ -276,7 +294,7 @@
 
   let rawGenre = $derived.by(() => (songs.length > 0 ? songs[0].genre : undefined));
 
-  let genreLabel = $derived(rawGenre || i18n.t('albumDetail.unknownGenre'));
+  let genreLabel = $derived(rawGenre || i18n.t("albumDetail.unknownGenre"));
 
   let yearLabel = $derived.by(() => {
     if (albumItem?.year) return albumItem.year;
@@ -294,7 +312,11 @@
   // Dev-only entry points for scripted captures (src/lib/scripting/screens.ts).
   $effect(() => {
     if (!import.meta.env.DEV) return;
-    return onDevScreenHooks((hook) => [hook("openAlbumEditor", () => { isEditorOpen = true; })]);
+    return onDevScreenHooks((hook) => [
+      hook("openAlbumEditor", () => {
+        isEditorOpen = true;
+      }),
+    ]);
   });
   let albumProfile = $derived(collectionStore.getAlbumProfile(albumName));
   let hasChips = $derived(Boolean(rawGenre?.trim()));
@@ -321,7 +343,12 @@
     lastAutoFetchedAlbum = currentAlbum;
     const detailsFetched = !!profile?.details_fetched;
     collectionStore.isContextEnrichmentEnabled().then((enabled) => {
-      if (!enabled || retrievingDetails || tasksStore.isTaskActive(`album-enrichment-${currentAlbum.toLowerCase()}`)) return;
+      if (
+        !enabled ||
+        retrievingDetails ||
+        tasksStore.isTaskActive(`album-enrichment-${currentAlbum.toLowerCase()}`)
+      )
+        return;
       if (detailsFetched) {
         // Details are done — quietly fill in just the missing art.
         retrieveAlbumArt(true);
@@ -336,7 +363,8 @@
   }
 
   function openCritiqueBrainz() {
-    if (releaseGroupMbid) handleOpenUrl(`https://critiquebrainz.org/release-group/${releaseGroupMbid}`);
+    if (releaseGroupMbid)
+      handleOpenUrl(`https://critiquebrainz.org/release-group/${releaseGroupMbid}`);
   }
 
   /** Which album `songs` currently holds — lags `albumName` until its fetch lands. */
@@ -354,7 +382,8 @@
       })
       .catch((err) => {
         console.error("Failed to load album detail:", err);
-        if (requested === albumName && requestedKey === albumKey) navigationStore.pendingFocusSongId = null;
+        if (requested === albumName && requestedKey === albumKey)
+          navigationStore.pendingFocusSongId = null;
       })
       .finally(() => {
         if (requested === albumName && requestedKey === albumKey) loading = false;
@@ -406,12 +435,33 @@
 
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const ALBUM_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
-    track: "48px", title: "2fr", artist: "1.5fr", album: "1.5fr",
-    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px", originalyear: "60px",
-    genre: "1.2fr", grouping: "1.2fr", bpm: "60px", initial_key: "60px",
-    bitrate: "70px", samplerate: "75px", bitdepth: "65px", channels: "70px",
-    filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
-    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", library: "130px", actions: "80px",
+    track: "48px",
+    title: "2fr",
+    artist: "1.5fr",
+    album: "1.5fr",
+    composer: "1.5fr",
+    album_artist: "1.5fr",
+    format: "64px",
+    year: "60px",
+    originalyear: "60px",
+    genre: "1.2fr",
+    grouping: "1.2fr",
+    bpm: "60px",
+    initial_key: "60px",
+    bitrate: "70px",
+    samplerate: "75px",
+    bitdepth: "65px",
+    channels: "70px",
+    filesize: "75px",
+    rating: "96px",
+    playcount: "70px",
+    skipcount: "70px",
+    lastplayed: "90px",
+    added: "90px",
+    duration: "80px",
+    path: "2fr",
+    library: "130px",
+    actions: "80px",
   };
 
   function songToRow(song: Song): SongTableRow {
@@ -426,17 +476,22 @@
 
   // A heading above each disc ("Disc 2 — BBC Sessions") while the tracks are
   // in their natural disc/track order; any other sort scatters a disc's tracks.
-  let discHeadings = $derived(sortField === "track" && sortAsc ? discStarts(sortedSongs) : new Map());
+  let discHeadings = $derived(
+    sortField === "track" && sortAsc ? discStarts(sortedSongs) : new Map(),
+  );
   let tableRows = $derived(
     sortedSongs.map((song, index) => {
       const start = discHeadings.get(index);
       const row = songToRow(song);
       if (!start) return row;
       row.dividerBefore = start.subtitle
-        ? i18n.t("albumDetail.discHeadingWithSubtitle", { disc: start.disc, subtitle: start.subtitle })
+        ? i18n.t("albumDetail.discHeadingWithSubtitle", {
+            disc: start.disc,
+            subtitle: start.subtitle,
+          })
         : i18n.t("albumDetail.discHeading", { disc: start.disc });
       return row;
-    })
+    }),
   );
   // Range (shift-click) selection matches natural track order, not the
   // currently displayed sort — preserving the existing behavior.
@@ -457,7 +512,12 @@
   async function handlePlayAll() {
     if (playableSongs.length === 0) return;
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(playableSongs.map((s) => s.id), 0, undefined, albumPlayContext());
+    await playerStore.playSongs(
+      playableSongs.map((s) => s.id),
+      0,
+      undefined,
+      albumPlayContext(),
+    );
   }
 
   async function handleShufflePlay() {
@@ -476,7 +536,7 @@
     if (playableSongs.length === 0) return;
     await playlistsStore.addSongsToActiveTarget(
       playableSongs.map((s) => s.id),
-      albumName || "Album"
+      albumName || "Album",
     );
   }
 
@@ -502,16 +562,24 @@
 
   async function handleVerifyAlbum() {
     const lossless = songs.filter(
-      (s) => isLosslessFileType(s.filetype) && (s.source === "local_file" || s.source === "collection")
+      (s) =>
+        isLosslessFileType(s.filetype) && (s.source === "local_file" || s.source === "collection"),
     );
     if (lossless.length > 0) {
       try {
-        await provenanceStore.verifySongs(lossless.map((s) => s.id), albumName);
+        await provenanceStore.verifySongs(
+          lossless.map((s) => s.id),
+          albumName,
+        );
       } catch (err) {
         console.error("Failed to verify album provenance:", err);
       }
     } else {
-      toastStore.show(i18n.t("collection.noLosslessTracks", {}, "No local lossless tracks in this album"), "info", TOAST_DURATION_MS);
+      toastStore.show(
+        i18n.t("collection.noLosslessTracks", {}, "No local lossless tracks in this album"),
+        "info",
+        TOAST_DURATION_MS,
+      );
     }
   }
 
@@ -533,7 +601,9 @@
     // below, which naturally drops that song if it moved to a different album.
     if (isAlbumEdit && songs[0]?.id !== undefined) {
       try {
-        const details = await invoke<{ album: string }>("get_song_details", { songId: songs[0].id });
+        const details = await invoke<{ album: string }>("get_song_details", {
+          songId: songs[0].id,
+        });
         if (details.album && details.album !== albumName) {
           navigationStore.selectedAlbumName = details.album;
           return;
@@ -593,7 +663,8 @@
     let unlisten: (() => void) | undefined;
     let disposed = false;
     listen<AlbumStatsPayload>("album-stats-changed", (event) => {
-      if (albumItem && sameAlbum(albumItem.album, event.payload.album)) applyAlbumStats(albumItem, event.payload);
+      if (albumItem && sameAlbum(albumItem.album, event.payload.album))
+        applyAlbumStats(albumItem, event.payload);
     }).then((fn) => {
       if (disposed) fn();
       else unlisten = fn;
@@ -606,53 +677,69 @@
 </script>
 
 <div
-  class="relative flex-1 flex flex-col overflow-y-auto text-brand-text-secondary h-full {backdropUrl ? '' : 'bg-brand-main'}"
+  class="relative flex-1 flex flex-col overflow-y-auto text-brand-text-secondary h-full {backdropUrl
+    ? ''
+    : 'bg-brand-main'}"
   use:rememberScroll={`album-detail:${albumName}`}
 >
   {#if backdropUrl}
     <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
       <BlurredCover src={backdropUrl} class="w-full h-full" style="transform: scale(1.5);" />
-      <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-brand-main"></div>
+      <div
+        class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-brand-main"
+      ></div>
     </div>
   {/if}
 
-  <div class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
+  <div
+    class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isDetailHeaderCollapsed
+      ? 'py-3'
+      : 'pt-6 pb-6'}"
+  >
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end min-w-0 max-w-xl">
         {#if !windowLayoutStore.isDetailHeaderCollapsed}
-        <h1 class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={albumName}>
-          {albumName}
-        </h1>
+          <h1
+            class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5"
+            title={albumName}
+          >
+            {albumName}
+          </h1>
 
-        <div class="flex items-center gap-2 text-base font-semibold text-brand-text-primary mt-0.5">
-          {#if artistName}
-            <LinkButton
-              onclick={() => navigationStore.viewArtist(artistName)}
-              class="font-bold"
-            >
-              {artistName}
-            </LinkButton>
-          {:else}
-            <span class="text-brand-text-primary">{i18n.t('collection.unknownArtist')}</span>
-          {/if}
-        </div>
+          <div
+            class="flex items-center gap-2 text-base font-semibold text-brand-text-primary mt-0.5"
+          >
+            {#if artistName}
+              <LinkButton onclick={() => navigationStore.viewArtist(artistName)} class="font-bold">
+                {artistName}
+              </LinkButton>
+            {:else}
+              <span class="text-brand-text-primary">{i18n.t("collection.unknownArtist")}</span>
+            {/if}
+          </div>
 
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium mt-1.5">
-          {#if yearLabel}
-            <span>{yearLabel}</span>
+          <div
+            class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium mt-1.5"
+          >
+            {#if yearLabel}
+              <span>{yearLabel}</span>
+              <span>•</span>
+            {/if}
+            <span>{i18n.plural("playlists.songsCount", songs.length)}</span>
             <span>•</span>
-          {/if}
-          <span>{i18n.plural("playlists.songsCount", songs.length)}</span>
-          <span>•</span>
-          <span>{totalDurationLabel}</span>
-          {#if albumItem}
-            <span>•</span>
-            <SongRating isAlbum rating={albumItem.rating} onRate={rateAlbum} size="sm" />
-          {/if}
-        </div>
+            <span>{totalDurationLabel}</span>
+            {#if albumItem}
+              <span>•</span>
+              <SongRating isAlbum rating={albumItem.rating} onRate={rateAlbum} size="sm" />
+            {/if}
+          </div>
         {/if}
 
-        <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'} select-none">
+        <div
+          class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed
+            ? ''
+            : 'mt-3'} select-none"
+        >
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
             onShufflePlay={handleShufflePlay}
@@ -662,8 +749,10 @@
             onclick={handleAddAlbumToPlaylist}
             disabled={loading || songs.length === 0}
             title={playlistsStore.activeCustomPlaylist
-              ? i18n.t('albumDetail.addAllToPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
-              : i18n.t('albumDetail.addAllToPlaylistTooltipDefault')}
+              ? i18n.t("albumDetail.addAllToPlaylistTooltip", {
+                  name: playlistsStore.activeCustomPlaylist.name,
+                })
+              : i18n.t("albumDetail.addAllToPlaylistTooltipDefault")}
           >
             {#snippet icon()}<Plus class="w-4 h-4" />{/snippet}
           </IconActionButton>
@@ -682,7 +771,9 @@
             {/snippet}
           </IconActionButton>
           <IconActionButton
-            onclick={() => { showShareModal = true; }}
+            onclick={() => {
+              showShareModal = true;
+            }}
             title={i18n.t("shareModal.menuItem")}
           >
             {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
@@ -698,27 +789,29 @@
       </div>
 
       {#if !windowLayoutStore.isDetailHeaderCollapsed}
-      <div class="relative w-40 h-40 hidden @xl:block shrink-0">
-        <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl">
-          <CoverStack
-            covers={[{
-              songId: albumItem?.sample_song_id ?? representativeSongId,
-              artEmbedded: albumItem?.art_embedded ?? songs.some((s) => s.art_embedded),
-              artAutomatic: albumItem?.art_automatic ?? songs[0]?.art_automatic,
-              artManual: albumItem?.art_manual ?? songs[0]?.art_manual,
-            }]}
-            extendedArtworkSongId={representativeSongId}
-            refreshToken={artworkRefreshToken}
-            sizeClass="w-full h-full object-cover"
-          />
-          {#if albumItem && albumItem.rating === 5}
-            <FavouriteCornerFlag size="lg" />
-          {/if}
-          {#if albumItem && albumItem.disc_count > 1}
-            <BoxSetDiscIcons discCount={albumItem.disc_count} size="md" />
-          {/if}
+        <div class="relative w-40 h-40 hidden @xl:block shrink-0">
+          <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl">
+            <CoverStack
+              covers={[
+                {
+                  songId: albumItem?.sample_song_id ?? representativeSongId,
+                  artEmbedded: albumItem?.art_embedded ?? songs.some((s) => s.art_embedded),
+                  artAutomatic: albumItem?.art_automatic ?? songs[0]?.art_automatic,
+                  artManual: albumItem?.art_manual ?? songs[0]?.art_manual,
+                },
+              ]}
+              extendedArtworkSongId={representativeSongId}
+              refreshToken={artworkRefreshToken}
+              sizeClass="w-full h-full object-cover"
+            />
+            {#if albumItem && albumItem.rating === 5}
+              <FavouriteCornerFlag size="lg" />
+            {/if}
+            {#if albumItem && albumItem.disc_count > 1}
+              <BoxSetDiscIcons discCount={albumItem.disc_count} size="md" />
+            {/if}
+          </div>
         </div>
-      </div>
       {/if}
     </div>
   </div>
@@ -727,18 +820,18 @@
     {#if !windowLayoutStore.isDetailHeaderCollapsed}
       <div class="flex flex-wrap items-center justify-between gap-3">
         {#if hasChips}
-          <GenreChips
-            genre={rawGenre}
-            variant="full"
-            limit={4}
-          />
+          <GenreChips genre={rawGenre} variant="full" limit={4} />
         {:else}
-          <div class="inline-flex items-center px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-xs text-brand-text-secondary italic">
+          <div
+            class="inline-flex items-center px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-xs text-brand-text-secondary italic"
+          >
             <span>{genreLabel}</span>
           </div>
         {/if}
         {#if communityRating}
-          <div class="inline-flex items-center px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-xs font-medium text-brand-text-secondary shrink-0 ml-auto">
+          <div
+            class="inline-flex items-center px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-xs font-medium text-brand-text-secondary shrink-0 ml-auto"
+          >
             <CommunityRating rating={communityRating.rating} count={communityRating.count} />
           </div>
         {/if}
@@ -772,7 +865,9 @@
 {#if editingSongId !== null}
   <TagEditor
     songId={editingSongId}
-    onClose={() => { editingSongId = null; }}
+    onClose={() => {
+      editingSongId = null;
+    }}
     onSave={handleTagEditorSaved}
   />
 {/if}
@@ -783,14 +878,17 @@
     songIds={batchEditSongs.map((s) => s.id)}
     initialTracks={batchEditSongs}
     hasEmbeddedArt={batchEditSongs.some((s) => s.art_embedded)}
-    onClose={() => { batchEditSongs = null; }}
+    onClose={() => {
+      batchEditSongs = null;
+    }}
     onSave={() => handleTagEditorSaved()}
   />
 {/if}
 
 {#if contextMenuState && contextMenuState.song}
   {@const song = contextMenuState.song}
-  {@const selectedSongs = selectedKeys.size > 1 ? songs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
+  {@const selectedSongs =
+    selectedKeys.size > 1 ? songs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
   <SongContextMenu
     x={contextMenuState.x}
     y={contextMenuState.y}
@@ -815,9 +913,14 @@
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
-    onEditBatchTags={() => { batchEditSongs = selectedSongs ?? null; }}
-    onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
-    onClose={() => { contextMenuState = null; }}
+    onEditBatchTags={() => {
+      batchEditSongs = selectedSongs ?? null;
+    }}
+    onOpenInPicard={() =>
+      openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
+    onClose={() => {
+      contextMenuState = null;
+    }}
   />
 {/if}
 
@@ -825,43 +928,83 @@
   <ContextMenu
     x={overflowMenuPos.x}
     y={overflowMenuPos.y}
-    onClose={() => { overflowMenuPos = null; }}
+    onClose={() => {
+      overflowMenuPos = null;
+    }}
   >
     <ContextMenuItem
       icon={Edit3}
       label={i18n.t("albumDetail.editAlbumDetails", {}, "Edit Album Details")}
-      onclick={() => { isEditorOpen = true; overflowMenuPos = null; }}
+      onclick={() => {
+        isEditorOpen = true;
+        overflowMenuPos = null;
+      }}
       disabled={loading}
     />
     <ContextMenuItem
       icon={RefreshCw}
       label={i18n.t("albumDetail.refresh", {}, "Refresh Album")}
-      title={i18n.t('albumDetail.refreshTooltip')}
-      onclick={() => { handleRefreshAlbum(); overflowMenuPos = null; }}
+      title={i18n.t("albumDetail.refreshTooltip")}
+      onclick={() => {
+        handleRefreshAlbum();
+        overflowMenuPos = null;
+      }}
       disabled={loading || collectionStore.isScanning || refreshing}
     />
     {#if prefs.onlineEnabled}
-    <ContextMenuItem
-      icon={RetrieveDetails}
-      label={i18n.t("albumDetail.retrieveAlbumDetails", {}, "Retrieve Album Details")}
-      title={hasReleaseGroupMbid ? i18n.t("albumDetail.retrieveAlbumDetailsTooltip", {}, "Fetch Discogs, AllMusic, Wikidata and lyrics links from MusicBrainz") : i18n.t("albumDetail.retrieveAlbumDetailsNoMbidTooltip", {}, "No MusicBrainz release group ID found for this album")}
-      onclick={() => { handleRetrieveAlbumDetails(); overflowMenuPos = null; }}
-      disabled={loading || retrievingDetails || !hasReleaseGroupMbid}
-    />
-    <ContextMenuDivider />
-    <ContextMenuItem
-      icon={ExternalLink}
-      label={i18n.t("albumDetail.reviewOnCritiqueBrainz", {}, "Review on CritiqueBrainz")}
-      title={hasReleaseGroupMbid ? i18n.t("albumDetail.reviewOnCritiqueBrainzTooltip", {}, "Open this album on CritiqueBrainz to read or write reviews") : i18n.t("albumDetail.retrieveAlbumDetailsNoMbidTooltip", {}, "No MusicBrainz release group ID found for this album")}
-      onclick={() => { openCritiqueBrainz(); overflowMenuPos = null; }}
-      disabled={loading || !hasReleaseGroupMbid}
-    />
+      <ContextMenuItem
+        icon={RetrieveDetails}
+        label={i18n.t("albumDetail.retrieveAlbumDetails", {}, "Retrieve Album Details")}
+        title={hasReleaseGroupMbid
+          ? i18n.t(
+              "albumDetail.retrieveAlbumDetailsTooltip",
+              {},
+              "Fetch Discogs, AllMusic, Wikidata and lyrics links from MusicBrainz",
+            )
+          : i18n.t(
+              "albumDetail.retrieveAlbumDetailsNoMbidTooltip",
+              {},
+              "No MusicBrainz release group ID found for this album",
+            )}
+        onclick={() => {
+          handleRetrieveAlbumDetails();
+          overflowMenuPos = null;
+        }}
+        disabled={loading || retrievingDetails || !hasReleaseGroupMbid}
+      />
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={ExternalLink}
+        label={i18n.t("albumDetail.reviewOnCritiqueBrainz", {}, "Review on CritiqueBrainz")}
+        title={hasReleaseGroupMbid
+          ? i18n.t(
+              "albumDetail.reviewOnCritiqueBrainzTooltip",
+              {},
+              "Open this album on CritiqueBrainz to read or write reviews",
+            )
+          : i18n.t(
+              "albumDetail.retrieveAlbumDetailsNoMbidTooltip",
+              {},
+              "No MusicBrainz release group ID found for this album",
+            )}
+        onclick={() => {
+          openCritiqueBrainz();
+          overflowMenuPos = null;
+        }}
+        disabled={loading || !hasReleaseGroupMbid}
+      />
     {/if}
     <ContextMenuItem
       icon={OpenInPicard}
       label={i18n.t("picard.openInPicard")}
-      onclick={() => { handleOpenAlbumInPicard(); overflowMenuPos = null; }}
-      disabled={loading || songs.length === 0 || !picardStore.available || songs.every(isRemoteSource)}
+      onclick={() => {
+        handleOpenAlbumInPicard();
+        overflowMenuPos = null;
+      }}
+      disabled={loading ||
+        songs.length === 0 ||
+        !picardStore.available ||
+        songs.every(isRemoteSource)}
       title={!picardStore.available
         ? i18n.t("picard.notFoundTooltip")
         : songs.length > 0 && songs.every(isRemoteSource)
@@ -871,17 +1014,28 @@
     <ContextMenuItem
       icon={ShieldCheck}
       label={i18n.t("collection.verifyAuthenticity", {}, "Verify Audio Authenticity")}
-      onclick={() => { handleVerifyAlbum(); overflowMenuPos = null; }}
+      onclick={() => {
+        handleVerifyAlbum();
+        overflowMenuPos = null;
+      }}
       disabled={loading || songs.length === 0}
     />
-    <ViewInFilesItem album={albumName} onClose={() => { overflowMenuPos = null; }} />
+    <ViewInFilesItem
+      album={albumName}
+      onClose={() => {
+        overflowMenuPos = null;
+      }}
+    />
     <ContextMenuDivider />
     <ContextMenuItem
       icon={BarChart2}
       label={statsExclusionsStore.isExcluded("album", albumName)
         ? i18n.t("stats.includeInStats")
         : i18n.t("stats.excludeFromStats")}
-      onclick={() => { handleToggleStatsExcluded(); overflowMenuPos = null; }}
+      onclick={() => {
+        handleToggleStatsExcluded();
+        overflowMenuPos = null;
+      }}
     />
   </ContextMenu>
 {/if}
@@ -891,12 +1045,19 @@
     count={selectedKeys.size}
     onPlaySelected={handlePlaySelected}
     onAddToPlaylist={handleBulkAddToPlaylist}
-    onClear={() => { selectedKeys = new Set(); }}
+    onClear={() => {
+      selectedKeys = new Set();
+    }}
   />
 {/if}
 
 {#if showShareModal}
-  <ShareModal entity={{ kind: "album", albumName }} onClose={() => { showShareModal = false; }} />
+  <ShareModal
+    entity={{ kind: "album", albumName }}
+    onClose={() => {
+      showShareModal = false;
+    }}
+  />
 {/if}
 
 {#if isEditorOpen && songs.length > 0}
@@ -908,8 +1069,9 @@
     hasEmbeddedArt={songs.some((s) => s.art_embedded)}
     initialArtAutomatic={albumItem?.art_automatic ?? songs[0]?.art_automatic}
     initialArtManual={albumItem?.art_manual ?? songs[0]?.art_manual}
-    onClose={() => { isEditorOpen = false; }}
+    onClose={() => {
+      isEditorOpen = false;
+    }}
     onSaved={() => handleTagEditorSaved(true)}
   />
 {/if}
-

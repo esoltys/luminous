@@ -72,7 +72,10 @@ describe("ToastStore", () => {
   });
 
   it("a toast shown without durationMs persists indefinitely, action or not", () => {
-    toastStore.show("Update ready", "success", undefined, undefined, { label: "Restart", onClick: vi.fn() });
+    toastStore.show("Update ready", "success", undefined, undefined, {
+      label: "Restart",
+      onClick: vi.fn(),
+    });
 
     vi.advanceTimersByTime(10 * 60 * 1000);
 

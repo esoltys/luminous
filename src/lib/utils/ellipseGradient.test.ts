@@ -3,7 +3,11 @@ import { generateEllipseGradientSvg, ellipseGradientDataUri } from "./ellipseGra
 
 describe("generateEllipseGradientSvg", () => {
   it("produces a well-formed SVG with a background rect and one gradient+rect per layer", () => {
-    const svg = generateEllipseGradientSvg({ seed: 1, colors: ["#111111", "#222222"], layersPerColor: 2 });
+    const svg = generateEllipseGradientSvg({
+      seed: 1,
+      colors: ["#111111", "#222222"],
+      layersPerColor: 2,
+    });
 
     expect(svg.startsWith("<svg")).toBe(true);
     expect(svg.endsWith("</svg>")).toBe(true);

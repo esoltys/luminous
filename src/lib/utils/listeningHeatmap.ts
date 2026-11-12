@@ -69,7 +69,7 @@ export function buildHeatmapGrid(
   dailyMinutes: Map<string, number>,
   weeks: number,
   weekStart: WeekStart,
-  today: Date = new Date()
+  today: Date = new Date(),
 ): HeatmapCell[][] {
   const todayStart = startOfDay(today);
   const todayDow = weekStart === "sunday" ? todayStart.getDay() : (todayStart.getDay() + 6) % 7;
@@ -104,7 +104,11 @@ export function buildHeatmapGrid(
  * columns. Used for the 7-day bar chart view, which shows exactly "the past
  * 7 days" (matching the Stats page's other Past-7-Days panels) rather than
  * a calendar-aligned week. */
-export function buildLastNDays(dailyMinutes: Map<string, number>, days: number, today: Date = new Date()): HeatmapCell[] {
+export function buildLastNDays(
+  dailyMinutes: Map<string, number>,
+  days: number,
+  today: Date = new Date(),
+): HeatmapCell[] {
   const todayStart = startOfDay(today);
   const cells: HeatmapCell[] = [];
   for (let i = days - 1; i >= 0; i--) {
@@ -131,9 +135,12 @@ function countBackwardFrom(activeDays: Set<string>, start: Date): number {
  * played), in whole days. The current streak allows one day of grace: if
  * today has no listening yet, it counts backward from yesterday instead of
  * resetting to zero mid-day, matching how most streak trackers behave. */
-export function computeStreaks(dailyMinutes: Map<string, number>, today: Date = new Date()): StreakInfo {
+export function computeStreaks(
+  dailyMinutes: Map<string, number>,
+  today: Date = new Date(),
+): StreakInfo {
   const activeDays = new Set(
-    [...dailyMinutes.entries()].filter(([, minutes]) => minutes > 0).map(([key]) => key)
+    [...dailyMinutes.entries()].filter(([, minutes]) => minutes > 0).map(([key]) => key),
   );
   if (activeDays.size === 0) return { current: 0, longest: 0 };
 

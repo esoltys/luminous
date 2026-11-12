@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { CaretRightIcon as CaretRight, DeviceMobileSpeakerIcon, CheckIcon } from "phosphor-svelte";
+  import {
+    CaretRightIcon as CaretRight,
+    DeviceMobileSpeakerIcon,
+    CheckIcon,
+  } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { filesStore } from "../stores/files.svelte";
   import { devicesStore } from "../stores/devices.svelte";
@@ -57,7 +61,9 @@
       const rect = submenuTriggerEl.getBoundingClientRect();
       opensLeft = rect.right + 224 + VIEWPORT_EDGE_PADDING_PX > window.innerWidth;
       const dockClearance = playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0;
-      opensUp = rect.top + SUBMENU_MAX_HEIGHT_PX > window.innerHeight - dockClearance - VIEWPORT_EDGE_PADDING_PX;
+      opensUp =
+        rect.top + SUBMENU_MAX_HEIGHT_PX >
+        window.innerHeight - dockClearance - VIEWPORT_EDGE_PADDING_PX;
     }
     isSubmenuOpen = true;
   }
@@ -104,7 +110,9 @@
   >
     <button
       type="button"
-      class="w-full text-left px-3 py-1.5 flex items-center gap-2.5 transition-colors hover:bg-brand-main hover:text-brand-text-primary {isSubmenuOpen ? 'bg-brand-main text-brand-text-primary' : 'text-brand-text-primary'}"
+      class="w-full text-left px-3 py-1.5 flex items-center gap-2.5 transition-colors hover:bg-brand-main hover:text-brand-text-primary {isSubmenuOpen
+        ? 'bg-brand-main text-brand-text-primary'
+        : 'text-brand-text-primary'}"
       role="menuitem"
       aria-haspopup="menu"
       aria-expanded={isSubmenuOpen}
@@ -120,13 +128,23 @@
       }}
     >
       <DeviceMobileSpeakerIcon class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary" />
-      <span class="flex-1">{allInSync ? i18n.t("devices.removeFromPortablePlayer") : i18n.t("devices.addToPortablePlayer")}</span>
-      <CaretRight class="w-3 h-3 shrink-0 text-brand-text-secondary/70 {isSubmenuOpen ? 'text-brand-text-primary' : ''}" />
+      <span class="flex-1"
+        >{allInSync
+          ? i18n.t("devices.removeFromPortablePlayer")
+          : i18n.t("devices.addToPortablePlayer")}</span
+      >
+      <CaretRight
+        class="w-3 h-3 shrink-0 text-brand-text-secondary/70 {isSubmenuOpen
+          ? 'text-brand-text-primary'
+          : ''}"
+      />
     </button>
 
     {#if isSubmenuOpen}
       <div
-        class="absolute z-50 w-56 max-h-60 overflow-y-auto bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none {opensLeft ? 'right-[calc(100%-2px)]' : 'left-[calc(100%-2px)]'} {opensUp ? 'bottom-0' : 'top-0'}"
+        class="absolute z-50 w-56 max-h-60 overflow-y-auto bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none {opensLeft
+          ? 'right-[calc(100%-2px)]'
+          : 'left-[calc(100%-2px)]'} {opensUp ? 'bottom-0' : 'top-0'}"
         role="menu"
         tabindex="-1"
         onmouseenter={openSubmenu}
@@ -154,11 +172,17 @@
               {:else}
                 <DeviceMobileSpeakerIcon class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary" />
               {/if}
-              <span class="truncate font-medium {inSync ? 'text-brand-accent-text' : 'text-brand-text-primary'}" title={name}>{name}</span>
+              <span
+                class="truncate font-medium {inSync
+                  ? 'text-brand-accent-text'
+                  : 'text-brand-text-primary'}"
+                title={name}>{name}</span
+              >
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
               {#if inSync}
-                <span class="text-[10px] text-brand-text-secondary">{i18n.t("devices.inSync")}</span>
+                <span class="text-[10px] text-brand-text-secondary">{i18n.t("devices.inSync")}</span
+                >
               {:else if storage}
                 <span class="text-[10px] text-brand-text-secondary/70 shrink-0">
                   {formatStorageSize(storage.freeBytes)}

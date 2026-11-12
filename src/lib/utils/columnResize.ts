@@ -104,7 +104,7 @@ export interface ColumnResizeOptions {
  */
 export function columnResize(
   node: HTMLElement,
-  opts: ColumnResizeOptions
+  opts: ColumnResizeOptions,
 ): { update: (newOpts: ColumnResizeOptions) => void; destroy: () => void } {
   ensureStyles();
 

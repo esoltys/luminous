@@ -28,7 +28,9 @@ describe("multiValue utils", () => {
 
   describe("joinMultiValue", () => {
     it("joins with the '; ' delimiter", () => {
-      expect(joinMultiValue(["Rock", "Jazz Fusion"])).toBe(`Rock${MULTI_VALUE_DELIMITER}Jazz Fusion`);
+      expect(joinMultiValue(["Rock", "Jazz Fusion"])).toBe(
+        `Rock${MULTI_VALUE_DELIMITER}Jazz Fusion`,
+      );
     });
 
     it("returns an empty string for an empty list", () => {

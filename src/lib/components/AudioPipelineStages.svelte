@@ -1,34 +1,35 @@
 <script lang="ts">
-  import type { AudioPipelineInfo, LoudnessGainSource } from '../types';
-  import { i18n, formatNumber } from '../stores/i18n.svelte';
-  import { playerStore } from '../stores/player.svelte';
+  import type { AudioPipelineInfo, LoudnessGainSource } from "../types";
+  import { i18n, formatNumber } from "../stores/i18n.svelte";
+  import { playerStore } from "../stores/player.svelte";
   import {
     CpuIcon as Cpu,
     SlidersIcon as Sliders,
     SpeakerHighIcon as Speaker,
     SparkleIcon as Sparkles,
-  } from 'phosphor-svelte';
+  } from "phosphor-svelte";
 
   interface Props {
     pipeline: AudioPipelineInfo | null;
     class?: string;
   }
 
-  let { pipeline, class: className = '' }: Props = $props();
+  let { pipeline, class: className = "" }: Props = $props();
 
   /** The backend reports the EQ mode as an English string; show the localized name. */
   function eqModeLabel(mode?: string): string {
-    if (mode === 'Parametric') return i18n.t('equalizer.modeParametric', {}, 'Parametric');
-    if (mode === '10-band Graphic') return i18n.t('audioPipeline.eqModeGraphic', {}, '10-band Graphic');
-    return mode || i18n.t('common.active', {}, 'Active');
+    if (mode === "Parametric") return i18n.t("equalizer.modeParametric", {}, "Parametric");
+    if (mode === "10-band Graphic")
+      return i18n.t("audioPipeline.eqModeGraphic", {}, "10-band Graphic");
+    return mode || i18n.t("common.active", {}, "Active");
   }
 
   const LOUDNESS_SOURCE_KEYS: Record<LoudnessGainSource, string> = {
-    disabled: 'audioPipeline.normalizationDisabled',
-    analyzed: 'playerBar.loudnessSourceAnalyzed',
-    replay_gain: 'playerBar.loudnessSourceReplayGain',
-    dynamic_range_log: 'playerBar.loudnessSourceDynamicRangeLog',
-    fallback: 'playerBar.loudnessSourceFallback',
+    disabled: "audioPipeline.normalizationDisabled",
+    analyzed: "playerBar.loudnessSourceAnalyzed",
+    replay_gain: "playerBar.loudnessSourceReplayGain",
+    dynamic_range_log: "playerBar.loudnessSourceDynamicRangeLog",
+    fallback: "playerBar.loudnessSourceFallback",
   };
 
   function loudnessSourceLabel(source: LoudnessGainSource): string {
@@ -36,29 +37,29 @@
   }
 
   function formatChannels(channels?: number): string {
-    if (!channels) return i18n.t('audioPipeline.channelsStereo');
-    if (channels === 1) return i18n.t('audioPipeline.channelsMono');
-    if (channels === 2) return i18n.t('audioPipeline.channelsStereo');
-    return i18n.t('audioPipeline.channelsCount', { count: channels });
+    if (!channels) return i18n.t("audioPipeline.channelsStereo");
+    if (channels === 1) return i18n.t("audioPipeline.channelsMono");
+    if (channels === 2) return i18n.t("audioPipeline.channelsStereo");
+    return i18n.t("audioPipeline.channelsCount", { count: channels });
   }
 
   function formatSampleRate(rate?: number): string {
-    if (!rate) return '—';
+    if (!rate) return "—";
     const digits = rate % 1000 === 0 ? 0 : 1;
     return `${formatNumber(rate / 1000, { minimumFractionDigits: digits, maximumFractionDigits: digits })} ${i18n.t("units.khz")}`;
   }
 
   function getQualityTierLabel(tier: string): string {
     switch (tier) {
-      case 'hi-res':
-        return i18n.t('audioPipeline.tierHiRes', {}, 'Hi-Res Audio');
-      case 'hq':
-        return i18n.t('audioPipeline.tierHq', {}, 'High Quality');
-      case 'sq':
-        return i18n.t('audioPipeline.tierSq', {}, 'Standard Quality');
-      case 'lq':
+      case "hi-res":
+        return i18n.t("audioPipeline.tierHiRes", {}, "Hi-Res Audio");
+      case "hq":
+        return i18n.t("audioPipeline.tierHq", {}, "High Quality");
+      case "sq":
+        return i18n.t("audioPipeline.tierSq", {}, "Standard Quality");
+      case "lq":
       default:
-        return i18n.t('audioPipeline.tierLq', {}, 'Low Quality');
+        return i18n.t("audioPipeline.tierLq", {}, "Low Quality");
     }
   }
 
@@ -68,11 +69,11 @@
 
   // Untouched by Luminous: no EQ, normalization or resampling.
   let unprocessed = $derived(
-    !!pipeline && !pipeline.eq_enabled && pipeline.loudness_source === 'disabled' && !resampled
+    !!pipeline && !pipeline.eq_enabled && pipeline.loudness_source === "disabled" && !resampled,
   );
   // Volume is neutral if handled in device hardware or set to 100% in software.
   let volumeNeutral = $derived(
-    !!pipeline?.output_hardware_volume || Math.abs((playerStore.volume ?? 1) - 1.0) < 0.001
+    !!pipeline?.output_hardware_volume || Math.abs((playerStore.volume ?? 1) - 1.0) < 0.001,
   );
   // Bit-perfect also needs an output with no system mixer after Luminous, and no software gain.
   let isBitPerfect = $derived(unprocessed && !!pipeline?.output_bypasses_mixer && volumeNeutral);
@@ -82,52 +83,80 @@
 <div class={`space-y-4 select-text ${className}`}>
   {#if !pipeline}
     <div class="text-xs text-brand-text-primary py-4 text-center">
-      {i18n.t('playerBar.noSongPlaying')}
+      {i18n.t("playerBar.noSongPlaying")}
     </div>
   {:else}
     <!-- Stage 1: Input -->
     <div>
       <div class="flex items-center justify-between gap-2 mb-2">
-        <div class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-text-primary">
+        <div
+          class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-text-primary"
+        >
           <Cpu class="w-3.5 h-3.5 text-brand-text-primary" />
-          <span>{i18n.t('audioPipeline.stageInput', {}, 'Input')}</span>
+          <span>{i18n.t("audioPipeline.stageInput", {}, "Input")}</span>
         </div>
-        <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full">
+        <span
+          class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
+        >
           {getQualityTierLabel(pipeline.quality_tier)}
         </span>
       </div>
 
-      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30">
+      <div
+        class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30"
+      >
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.codec', {}, 'Codec')}</span>
-          <span class="text-brand-text-primary font-semibold uppercase">{pipeline.input_format}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.codec", {}, "Codec")}</span
+          >
+          <span class="text-brand-text-primary font-semibold uppercase"
+            >{pipeline.input_format}</span
+          >
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.bitrate', {}, 'Bitrate')}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.bitrate", {}, "Bitrate")}</span
+          >
           <span class="text-brand-text-primary font-semibold">
-            {pipeline.input_bitrate_kbps ? `${pipeline.input_bitrate_kbps} kbps` : '—'}
+            {pipeline.input_bitrate_kbps ? `${pipeline.input_bitrate_kbps} kbps` : "—"}
           </span>
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.sampleRate', {}, 'Sample Rate')}</span>
-          <span class="text-brand-text-primary font-semibold">{formatSampleRate(pipeline.input_sample_rate)}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.sampleRate", {}, "Sample Rate")}</span
+          >
+          <span class="text-brand-text-primary font-semibold"
+            >{formatSampleRate(pipeline.input_sample_rate)}</span
+          >
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.bitDepth', {}, 'Bit Depth')}</span>
-          <span class="text-brand-text-primary font-semibold">{pipeline.input_bit_depth ? `${pipeline.input_bit_depth}-bit` : '16-bit / lossy'}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.bitDepth", {}, "Bit Depth")}</span
+          >
+          <span class="text-brand-text-primary font-semibold"
+            >{pipeline.input_bit_depth ? `${pipeline.input_bit_depth}-bit` : "16-bit / lossy"}</span
+          >
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.channels', {}, 'Channels')}</span>
-          <span class="text-brand-text-primary font-semibold">{formatChannels(pipeline.input_channels)}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.channels", {}, "Channels")}</span
+          >
+          <span class="text-brand-text-primary font-semibold"
+            >{formatChannels(pipeline.input_channels)}</span
+          >
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.decoder', {}, 'Decoder')}</span>
-          <span class="text-brand-text-primary font-semibold wrap-anywhere">{pipeline.decoder_name}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.decoder", {}, "Decoder")}</span
+          >
+          <span class="text-brand-text-primary font-semibold wrap-anywhere"
+            >{pipeline.decoder_name}</span
+          >
         </div>
       </div>
     </div>
@@ -135,54 +164,76 @@
     <!-- Stage 2: Processing (DSP & Effects) -->
     <div>
       <div class="flex items-center justify-between gap-2 mb-2">
-        <div class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-text-primary">
+        <div
+          class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-text-primary"
+        >
           <Sliders class="w-3.5 h-3.5 text-brand-text-primary" />
-          <span>{i18n.t('audioPipeline.stageProcessing', {}, 'Processing')}</span>
+          <span>{i18n.t("audioPipeline.stageProcessing", {}, "Processing")}</span>
         </div>
         {#if isBitPerfect}
-          <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full flex items-center gap-1">
+          <span
+            class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full flex items-center gap-1"
+          >
             <Sparkles class="w-2.5 h-2.5 text-brand-text-primary" />
-            {i18n.t('audioPipeline.bitPerfect', {}, 'Bit-perfect')}
+            {i18n.t("audioPipeline.bitPerfect", {}, "Bit-perfect")}
           </span>
         {:else if !unprocessed || !volumeNeutral}
-          <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full">
-            {i18n.t('audioPipeline.processed', {}, 'Processed')}
+          <span
+            class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
+          >
+            {i18n.t("audioPipeline.processed", {}, "Processed")}
           </span>
         {/if}
       </div>
 
-      <div class="grid grid-cols-1 gap-2 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30">
+      <div
+        class="grid grid-cols-1 gap-2 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30"
+      >
         <!-- Equalizer -->
         <div class="flex items-center justify-between gap-2">
-          <span class="text-brand-text-secondary font-medium">{i18n.t('audioPipeline.equalizer', {}, 'Equalizer & DSP')}</span>
+          <span class="text-brand-text-secondary font-medium"
+            >{i18n.t("audioPipeline.equalizer", {}, "Equalizer & DSP")}</span
+          >
           <span class="font-semibold text-right text-brand-text-primary">
             {#if pipeline.eq_enabled}
               {@const eqMode = eqModeLabel(pipeline.eq_mode)}
-              {i18n.t('audioPipeline.equalizerActive', { mode: eqMode, bands: pipeline.eq_active_bands_count }, `${eqMode} (${pipeline.eq_active_bands_count} active)`)}
+              {i18n.t(
+                "audioPipeline.equalizerActive",
+                { mode: eqMode, bands: pipeline.eq_active_bands_count },
+                `${eqMode} (${pipeline.eq_active_bands_count} active)`,
+              )}
             {:else}
-              {i18n.t('audioPipeline.equalizerDisabled', {}, 'Bypass / Disabled')}
+              {i18n.t("audioPipeline.equalizerDisabled", {}, "Bypass / Disabled")}
             {/if}
           </span>
         </div>
 
         <!-- Volume Normalization -->
         <div class="flex items-center justify-between gap-2">
-          <span class="text-brand-text-secondary font-medium">{i18n.t('audioPipeline.volumeNormalization', {}, 'Volume Normalization')}</span>
+          <span class="text-brand-text-secondary font-medium"
+            >{i18n.t("audioPipeline.volumeNormalization", {}, "Volume Normalization")}</span
+          >
           <span class="font-semibold text-right text-brand-text-primary">
-            {#if pipeline.loudness_source !== 'disabled'}
+            {#if pipeline.loudness_source !== "disabled"}
               {@const gain = pipeline.loudness_gain_db ?? 0}
-              {@const formattedGain = `${gain >= 0 ? '+' : ''}${formatNumber(gain, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`}
+              {@const formattedGain = `${gain >= 0 ? "+" : ""}${formatNumber(gain, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`}
               {@const source = loudnessSourceLabel(pipeline.loudness_source)}
-              {i18n.t('audioPipeline.normalizationGain', { gain: formattedGain, source }, `${formattedGain} dB (${source})`)}
+              {i18n.t(
+                "audioPipeline.normalizationGain",
+                { gain: formattedGain, source },
+                `${formattedGain} dB (${source})`,
+              )}
             {:else}
-              {i18n.t('audioPipeline.normalizationDisabled', {}, 'Disabled')}
+              {i18n.t("audioPipeline.normalizationDisabled", {}, "Disabled")}
             {/if}
           </span>
         </div>
 
         <!-- Headroom / Bit-perfect note -->
         <div class="flex items-center justify-between gap-2">
-          <span class="text-brand-text-secondary font-medium">{i18n.t('audioPipeline.headroom', {}, 'Processing Mode')}</span>
+          <span class="text-brand-text-secondary font-medium"
+            >{i18n.t("audioPipeline.headroom", {}, "Processing Mode")}</span
+          >
           <span class="font-semibold text-right text-brand-text-primary">{pipeline.headroom}</span>
         </div>
       </div>
@@ -191,72 +242,102 @@
     <!-- Stage 3: Output -->
     <div>
       <div class="flex items-center justify-between gap-2 mb-2">
-        <div class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-text-primary">
+        <div
+          class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-text-primary"
+        >
           <Speaker class="w-3.5 h-3.5 text-brand-text-primary" />
-          <span>{i18n.t('audioPipeline.stageOutput', {}, 'Output')}</span>
+          <span>{i18n.t("audioPipeline.stageOutput", {}, "Output")}</span>
         </div>
         {#if resampled}
-          <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full">
-            {i18n.t('audioPipeline.resampled', {}, 'Resampled')}
+          <span
+            class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
+          >
+            {i18n.t("audioPipeline.resampled", {}, "Resampled")}
           </span>
         {:else if sharedMixer}
-          <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full">
-            {i18n.t('audioPipeline.systemMixer', {}, 'System mixer')}
+          <span
+            class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
+          >
+            {i18n.t("audioPipeline.systemMixer", {}, "System mixer")}
           </span>
         {:else}
-          <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full">
-            {i18n.t('audioPipeline.directRate', {}, 'Direct rate')}
+          <span
+            class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
+          >
+            {i18n.t("audioPipeline.directRate", {}, "Direct rate")}
           </span>
         {/if}
       </div>
 
-      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30">
+      <div
+        class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30"
+      >
         <div class="col-span-2 flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.outputDevice', {}, 'Device')}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.outputDevice", {}, "Device")}</span
+          >
           <span class="text-brand-text-primary font-semibold wrap-anywhere">
-            {pipeline.output_device_name || i18n.t('audioPipeline.defaultOutputDevice')}
+            {pipeline.output_device_name || i18n.t("audioPipeline.defaultOutputDevice")}
           </span>
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.outputFormat', {}, 'Format')}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.outputFormat", {}, "Format")}</span
+          >
           <span class="text-brand-text-primary font-semibold">
             {formatSampleRate(pipeline.output_sample_rate)} / {pipeline.output_format}
           </span>
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.channels', {}, 'Channels')}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.channels", {}, "Channels")}</span
+          >
           <span class="text-brand-text-primary font-semibold">
             {formatChannels(pipeline.output_channels)}
           </span>
         </div>
 
         <div class="col-span-2 flex flex-col pt-1 border-t border-brand-border/20">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.resampling', {}, 'Resampling')}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.resampling", {}, "Resampling")}</span
+          >
           <span class="text-brand-text-primary font-semibold">
             {#if resampled}
-              {i18n.t('audioPipeline.resamplingTo', { rate: formatSampleRate(pipeline.output_sample_rate) }, `Resampled to ${formatSampleRate(pipeline.output_sample_rate)}`)}
+              {i18n.t(
+                "audioPipeline.resamplingTo",
+                { rate: formatSampleRate(pipeline.output_sample_rate) },
+                `Resampled to ${formatSampleRate(pipeline.output_sample_rate)}`,
+              )}
             {:else if sharedMixer}
-              {i18n.t('audioPipeline.resamplingSystemMixer', {}, 'None in Luminous; the system mixer may convert')}
+              {i18n.t(
+                "audioPipeline.resamplingSystemMixer",
+                {},
+                "None in Luminous; the system mixer may convert",
+              )}
             {:else}
-              {i18n.t('audioPipeline.resamplingDirect', {}, 'Direct (no resampling)')}
+              {i18n.t("audioPipeline.resamplingDirect", {}, "Direct (no resampling)")}
             {/if}
           </span>
         </div>
 
         <div class="col-span-2 flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.outputBackend', {}, 'Backend')}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.outputBackend", {}, "Backend")}</span
+          >
           <span class="text-brand-text-primary font-semibold">{pipeline.output_backend}</span>
         </div>
 
         <div class="col-span-2 flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.volumeMode', {}, 'Volume Control')}</span>
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+            >{i18n.t("audioPipeline.volumeMode", {}, "Volume Control")}</span
+          >
           <span class="text-brand-text-primary font-semibold">
             {#if pipeline.output_hardware_volume}
-              {i18n.t('audioPipeline.volumeHardware', {}, 'Hardware (bit-perfect)')}
+              {i18n.t("audioPipeline.volumeHardware", {}, "Hardware (bit-perfect)")}
             {:else}
-              {i18n.t('audioPipeline.volumeSoftware', {}, 'Software')}
+              {i18n.t("audioPipeline.volumeSoftware", {}, "Software")}
             {/if}
           </span>
         </div>

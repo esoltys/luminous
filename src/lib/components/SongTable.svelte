@@ -33,7 +33,14 @@
   import { i18n } from "../stores/i18n.svelte";
   import { songDrag, songsPayload } from "../stores/songDrag.svelte";
   import { isLosslessFileType } from "../types";
-  import { formatBpm, formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
+  import {
+    formatBpm,
+    formatFileSize,
+    formatSampleRate,
+    formatBitDepth,
+    formatChannels,
+    formatDuration,
+  } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { formatTrackNumber } from "../utils/artist";
   import { parseMultiValue } from "../utils/multiValue";
@@ -61,7 +68,7 @@
     MusicNotesIcon as Music,
     ClockIcon as Clock,
     DiscIcon as DiscAlbum,
-    ShieldCheckIcon as ShieldCheck
+    ShieldCheckIcon as ShieldCheck,
   } from "phosphor-svelte";
   import type { Snippet } from "svelte";
 
@@ -158,7 +165,8 @@
   // clears too, so a closed view never leaves a stale subject behind.
   const inspectorViewId = `song-table-${++songTableInstanceCount}`;
   $effect(() => {
-    const only = selectedKeys.size === 1 ? rows.find((r) => r.key === [...selectedKeys][0])?.song : undefined;
+    const only =
+      selectedKeys.size === 1 ? rows.find((r) => r.key === [...selectedKeys][0])?.song : undefined;
     inspectorStore.setSelection(inspectorViewId, only ?? null);
   });
   $effect(() => () => inspectorStore.setSelection(inspectorViewId, null));
@@ -194,7 +202,9 @@
   const DIVIDER_HEIGHT_PX = 32;
   const OVERSCAN_ROWS = 10;
 
-  let tops = $derived(rowTops(rows.map((r) => ROW_HEIGHT_PX + (r.dividerBefore ? DIVIDER_HEIGHT_PX : 0))));
+  let tops = $derived(
+    rowTops(rows.map((r) => ROW_HEIGHT_PX + (r.dividerBefore ? DIVIDER_HEIGHT_PX : 0))),
+  );
   let viewTop = $state(0);
   let viewBottom = $state(0);
   let visible = $derived(visibleRows(tops, viewTop, viewBottom, OVERSCAN_ROWS));
@@ -212,7 +222,9 @@
 
   /** The body's top edge in its scroller's content coordinates. */
   function bodyOffset(scroller: HTMLElement, body: HTMLElement): number {
-    return body.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    return (
+      body.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
+    );
   }
 
   $effect(() => {
@@ -343,13 +355,17 @@
    * order, so songs dropped on the Queue or a playlist arrive in the order shown. (A reorder,
    * below, passes the same selection in selection order instead: that is what it always passed.) */
   function draggedRowsFor(row: SongTableRow): SongTableRow[] {
-    return selectedKeys.size > 1 && selectedKeys.has(row.key) ? rows.filter((r) => selectedKeys.has(r.key)) : [row];
+    return selectedKeys.size > 1 && selectedKeys.has(row.key)
+      ? rows.filter((r) => selectedKeys.has(r.key))
+      : [row];
   }
 
   function commitReorder(targetIndex: number) {
     if (!pressedRow || draggedIndex === null || targetIndex === draggedIndex) return;
     const keys =
-      selectedKeys.size > 1 && selectedKeys.has(pressedRow.key) ? Array.from(selectedKeys) : [pressedRow.key];
+      selectedKeys.size > 1 && selectedKeys.has(pressedRow.key)
+        ? Array.from(selectedKeys)
+        : [pressedRow.key];
     onReorder?.(draggedIndex, targetIndex, keys);
   }
 
@@ -379,7 +395,9 @@
           dragOverIndex = null;
           return;
         }
-        const el = document.elementFromPoint(pos.x, pos.y)?.closest("[data-song-row]") as HTMLElement | null;
+        const el = document
+          .elementFromPoint(pos.x, pos.y)
+          ?.closest("[data-song-row]") as HTMLElement | null;
         const idx = el?.dataset.index;
         dragOverIndex = idx !== undefined ? Number(idx) : null;
       },
@@ -392,7 +410,7 @@
       onCancel: (wasArmed) => {
         if (wasArmed) songDrag.end();
         resetDrag();
-      }
+      },
     });
     // An ignored press (button, link, non-primary click) is not ours to track.
     if (rowDrag) pressedRow = row;
@@ -442,34 +460,167 @@
     truncateClass?: string;
   }
   const HEADER_META: Partial<Record<string, HeaderMeta>> = {
-    track: { i18nKey: "collection.tableHeaderTrack", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-1rem)]" },
-    title: { i18nKey: "collection.tableHeaderTitle", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-1rem)]" },
-    artist: { i18nKey: "collection.tableHeaderArtist", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-1rem)]" },
-    album: { i18nKey: "collection.tableHeaderAlbum", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-1rem)]" },
-    composer: { i18nKey: "collection.tableHeaderComposer", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    album_artist: { i18nKey: "collection.tableHeaderAlbumArtist", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    artist_tag: { i18nKey: "collection.tableHeaderArtistTag", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    format: { i18nKey: "collection.tableHeaderFormat", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    year: { i18nKey: "collection.tableHeaderYear", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    originalyear: { i18nKey: "collection.tableHeaderOriginalYear", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    genre: { i18nKey: "collection.tableHeaderGenre", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    grouping: { i18nKey: "collection.tableHeaderGrouping", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    bpm: { i18nKey: "collection.tableHeaderBpm", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    initial_key: { i18nKey: "collection.tableHeaderInitialKey", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    musicbrainz_id: { i18nKey: "collection.tableHeaderMusicBrainzId", className: "flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full" },
-    bitrate: { i18nKey: "collection.tableHeaderBitrate", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    samplerate: { i18nKey: "collection.tableHeaderSampleRate", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    bitdepth: { i18nKey: "collection.tableHeaderBitDepth", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    channels: { i18nKey: "collection.tableHeaderChannels", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    filesize: { i18nKey: "collection.tableHeaderFileSize", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    rating: { i18nKey: "collection.tableHeaderRating", className: "flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full" },
-    playcount: { i18nKey: "collection.tableHeaderPlays", className: "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full" },
-    skipcount: { i18nKey: "collection.tableHeaderSkips", className: "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full" },
-    lastplayed: { i18nKey: "collection.tableHeaderLastPlayed", className: "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full" },
-    added: { i18nKey: "collection.tableHeaderAdded", className: "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full" },
-    duration: { i18nKey: "", className: "flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full" },
-    path: { i18nKey: "collection.tableHeaderPath", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
-    library: { i18nKey: "collection.tableHeaderLibrary", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
+    track: {
+      i18nKey: "collection.tableHeaderTrack",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-1rem)]",
+    },
+    title: {
+      i18nKey: "collection.tableHeaderTitle",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-1rem)]",
+    },
+    artist: {
+      i18nKey: "collection.tableHeaderArtist",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-1rem)]",
+    },
+    album: {
+      i18nKey: "collection.tableHeaderAlbum",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-1rem)]",
+    },
+    composer: {
+      i18nKey: "collection.tableHeaderComposer",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    album_artist: {
+      i18nKey: "collection.tableHeaderAlbumArtist",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    artist_tag: {
+      i18nKey: "collection.tableHeaderArtistTag",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    format: {
+      i18nKey: "collection.tableHeaderFormat",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    year: {
+      i18nKey: "collection.tableHeaderYear",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    originalyear: {
+      i18nKey: "collection.tableHeaderOriginalYear",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    genre: {
+      i18nKey: "collection.tableHeaderGenre",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    grouping: {
+      i18nKey: "collection.tableHeaderGrouping",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    bpm: {
+      i18nKey: "collection.tableHeaderBpm",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    initial_key: {
+      i18nKey: "collection.tableHeaderInitialKey",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    musicbrainz_id: {
+      i18nKey: "collection.tableHeaderMusicBrainzId",
+      className:
+        "flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full",
+    },
+    bitrate: {
+      i18nKey: "collection.tableHeaderBitrate",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    samplerate: {
+      i18nKey: "collection.tableHeaderSampleRate",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    bitdepth: {
+      i18nKey: "collection.tableHeaderBitDepth",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    channels: {
+      i18nKey: "collection.tableHeaderChannels",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    filesize: {
+      i18nKey: "collection.tableHeaderFileSize",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    rating: {
+      i18nKey: "collection.tableHeaderRating",
+      className:
+        "flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full",
+    },
+    playcount: {
+      i18nKey: "collection.tableHeaderPlays",
+      className:
+        "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+    },
+    skipcount: {
+      i18nKey: "collection.tableHeaderSkips",
+      className:
+        "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+    },
+    lastplayed: {
+      i18nKey: "collection.tableHeaderLastPlayed",
+      className:
+        "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+    },
+    added: {
+      i18nKey: "collection.tableHeaderAdded",
+      className:
+        "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+    },
+    duration: {
+      i18nKey: "",
+      className:
+        "flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full",
+    },
+    path: {
+      i18nKey: "collection.tableHeaderPath",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
+    library: {
+      i18nKey: "collection.tableHeaderLibrary",
+      className:
+        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      truncateClass: "max-w-[calc(100%-0.5rem)]",
+    },
   };
 
   function headerActiveField(col: (typeof SONG_TABLE_COLUMNS)[number]): string {
@@ -477,7 +628,11 @@
   }
 
   function bindResize(key: keyof VisibleColumns) {
-    return { column: key, onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) };
+    return {
+      column: key,
+      onResize: collectionStore.setColumnWidth.bind(collectionStore),
+      onReset: collectionStore.resetColumnWidth.bind(collectionStore),
+    };
   }
 
   function rowDisabled(row: SongTableRow): boolean {
@@ -494,7 +649,9 @@
 {#snippet headerCell(col: (typeof SONG_TABLE_COLUMNS)[number])}
   {@const meta = HEADER_META[col.key]}
   {#if col.key === "actions"}
-    <div use:columnResize={bindResize(col.key)} class="relative overflow-hidden text-center">{i18n.t("collection.tableHeaderActions")}</div>
+    <div use:columnResize={bindResize(col.key)} class="relative overflow-hidden text-center">
+      {i18n.t("collection.tableHeaderActions")}
+    </div>
   {:else if meta}
     <div use:columnResize={bindResize(col.key)} class="relative overflow-hidden">
       <SortableHeader
@@ -518,7 +675,12 @@
 {#snippet bodyCell(col: (typeof SONG_TABLE_COLUMNS)[number], song: Song, row: SongTableRow)}
   {#if col.key === "track"}
     <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
-      {formatTrackNumber(song.track, song.disc, discCount, row.underlyingIndex ?? keyIndex?.get(row.key) ?? 0)}
+      {formatTrackNumber(
+        song.track,
+        song.disc,
+        discCount,
+        row.underlyingIndex ?? keyIndex?.get(row.key) ?? 0,
+      )}
     </div>
   {:else if col.key === "title"}
     <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
@@ -543,7 +705,10 @@
         </span>
       {/if}
       <span
-        class="truncate text-brand-text-primary {row.disabledVariant === 'strikethrough' && rowDisabled(row) ? 'line-through' : ''}"
+        class="truncate text-brand-text-primary {row.disabledVariant === 'strikethrough' &&
+        rowDisabled(row)
+          ? 'line-through'
+          : ''}"
         title={song.title || i18n.t("collection.unknownSong")}
       >
         {song.title || i18n.t("collection.unknownSong")}
@@ -552,12 +717,17 @@
   {:else if col.key === "artist"}
     <div class="{secondaryColor(song)} truncate pr-4 flex items-center min-w-0">
       {#if disabledPlaceholder && rowDisabled(row)}
-        <span class="text-brand-text-secondary italic text-xs truncate min-w-0">{song.artist || row.disabledTooltip}</span>
+        <span class="text-brand-text-secondary italic text-xs truncate min-w-0"
+          >{song.artist || row.disabledTooltip}</span
+        >
       {:else if song.artist}
         {#each parseMultiValue(song.artist) as name, i (name)}
           {#if i > 0}<span class="{secondaryColor(song)}/50 shrink-0">,&nbsp;</span>{/if}
           <LinkButton
-            onclick={(e) => { e.stopPropagation(); navigationStore.viewArtist(name); }}
+            onclick={(e) => {
+              e.stopPropagation();
+              navigationStore.viewArtist(name);
+            }}
             class="{secondaryColor(song)} truncate min-w-0"
             title={i18n.t("collection.filterByArtist", { artist: name })}
           >
@@ -565,16 +735,23 @@
           </LinkButton>
         {/each}
       {:else}
-        <span class="{secondaryColor(song)} truncate min-w-0">{i18n.t("collection.unknownArtist")}</span>
+        <span class="{secondaryColor(song)} truncate min-w-0"
+          >{i18n.t("collection.unknownArtist")}</span
+        >
       {/if}
     </div>
   {:else if col.key === "album"}
     <div class="{secondaryColor(song)} truncate pr-4 flex items-center min-w-0">
       {#if disabledPlaceholder && rowDisabled(row)}
-        <span class="text-brand-text-secondary italic text-xs truncate min-w-0">{song.album ?? ""}</span>
+        <span class="text-brand-text-secondary italic text-xs truncate min-w-0"
+          >{song.album ?? ""}</span
+        >
       {:else if song.album}
         <LinkButton
-          onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(song.album || "", song.id); }}
+          onclick={(e) => {
+            e.stopPropagation();
+            navigationStore.viewAlbum(song.album || "", song.id);
+          }}
           class="{secondaryColor(song)} truncate min-w-0"
           title={i18n.t("collection.filterByAlbum", { album: song.album })}
         >
@@ -585,11 +762,17 @@
       {/if}
     </div>
   {:else if col.key === "composer"}
-    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium" title={song.composer}>
+    <div
+      class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium"
+      title={song.composer}
+    >
       {song.composer || "—"}
     </div>
   {:else if col.key === "album_artist"}
-    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium" title={song.album_artist}>
+    <div
+      class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium"
+      title={song.album_artist}
+    >
       {song.album_artist || "—"}
     </div>
   {:else if col.key === "artist_tag"}
@@ -598,19 +781,23 @@
     {@const tags = profile?.tags ?? []}
     <div class="truncate pr-2 min-w-0" title={tags.join("; ")}>
       {#if tags.length > 0}
-        <ArtistTagChips tags={tags} />
+        <ArtistTagChips {tags} />
       {:else}
         <span class="{secondaryColor(song)} text-xs font-medium">—</span>
       {/if}
     </div>
   {:else if col.key === "format"}
     {@const verdict = song.id ? provenanceStore.getVerdict(song.id) : undefined}
-    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-semibold uppercase flex items-center gap-1">
+    <div
+      class="{secondaryColor(
+        song,
+      )} truncate pr-2 min-w-0 text-xs font-semibold uppercase flex items-center gap-1"
+    >
       <span>{song.filetype ? song.filetype.toUpperCase() : "—"}</span>
-      {#if isLosslessFileType(song.filetype) && (verdict === 'authentic' || verdict === 'authentic_hires')}
+      {#if isLosslessFileType(song.filetype) && (verdict === "authentic" || verdict === "authentic_hires")}
         <span
           class="inline-flex shrink-0 text-brand-accent"
-          title={i18n.t('playerBar.provenanceAuthentic', {}, 'Authentic Lossless')}
+          title={i18n.t("playerBar.provenanceAuthentic", {}, "Authentic Lossless")}
         >
           <ShieldCheck class="w-3.5 h-3.5" />
         </span>
@@ -633,7 +820,10 @@
       {/if}
     </div>
   {:else if col.key === "grouping"}
-    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium" title={song.grouping}>
+    <div
+      class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium"
+      title={song.grouping}
+    >
       {song.grouping || "—"}
     </div>
   {:else if col.key === "bpm"}
@@ -707,7 +897,9 @@
       {#if dir}
         <LibraryBadge directory={dir} size="xs" />
       {:else if song.source === "opened_file"}
-        <span class="{secondaryColor(song)} truncate text-xs font-medium italic">{i18n.t("collection.notInLibrary")}</span>
+        <span class="{secondaryColor(song)} truncate text-xs font-medium italic"
+          >{i18n.t("collection.notInLibrary")}</span
+        >
       {:else}
         <span class="{secondaryColor(song)} text-xs font-medium">—</span>
       {/if}
@@ -757,7 +949,9 @@
   {@const song = row.song}
   <div class="text-center flex justify-center relative w-9 h-6 items-center">
     {#if song && rowIsPlaying(row) && playerStore.state === "playing"}
-      <div class="flex items-center justify-center gap-0.5 h-3.5 w-3.5 absolute group-hover:opacity-0 transition-opacity">
+      <div
+        class="flex items-center justify-center gap-0.5 h-3.5 w-3.5 absolute group-hover:opacity-0 transition-opacity"
+      >
         <NowPlayingBars />
       </div>
     {:else if song?.not_included}
@@ -768,11 +962,17 @@
         <EyeSlash class="w-3.5 h-3.5 text-brand-text-secondary/70" />
       </span>
     {:else if mode === "position"}
-      <span class="absolute text-xs font-medium text-brand-text-primary group-hover:opacity-0 transition-opacity">{displayIndex + 1}</span>
+      <span
+        class="absolute text-xs font-medium text-brand-text-primary group-hover:opacity-0 transition-opacity"
+        >{displayIndex + 1}</span
+      >
     {/if}
     {#if song}
       <button
-        onclick={(e) => { e.stopPropagation(); if (!rowDisabled(row)) onRowDoubleClick(row); }}
+        onclick={(e) => {
+          e.stopPropagation();
+          if (!rowDisabled(row)) onRowDoubleClick(row);
+        }}
         class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-text-primary hover:text-brand-accent-text-hover transition-[opacity,color] duration-150 disabled:opacity-0 disabled:cursor-not-allowed"
         disabled={rowDisabled(row)}
         title={row.disabledTooltip ?? i18n.t("collection.playSong")}
@@ -820,8 +1020,11 @@
     tabindex="0"
     onclick={(e) => song && (!disabled || interactiveWhenDisabled) && handleRowClick(e, row)}
     ondblclick={() => song && !disabled && onRowDoubleClick(row)}
-    oncontextmenu={(e) => song && (!disabled || interactiveWhenDisabled) && handleRowContextMenu(e, row)}
-    onkeydown={(e) => { if (e.key === "Enter" && song && !disabled) onRowDoubleClick(row); }}
+    oncontextmenu={(e) =>
+      song && (!disabled || interactiveWhenDisabled) && handleRowContextMenu(e, row)}
+    onkeydown={(e) => {
+      if (e.key === "Enter" && song && !disabled) onRowDoubleClick(row);
+    }}
     onpointerdown={(e) => handleRowPointerDown(e, row)}
     style={gridColsStyle}
     style:height="{ROW_HEIGHT_PX}px"
@@ -829,7 +1032,11 @@
     class="grid items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
       {disabled ? 'opacity-50 cursor-not-allowed' : ''}
       {song && !disabled ? 'cursor-grab active:cursor-grabbing' : ''}
-      {selectedKeys.has(row.key) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (song && rowIsPlaying(row) ? 'bg-brand-accent/10' : '')}
+      {selectedKeys.has(row.key)
+      ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover'
+      : song && rowIsPlaying(row)
+        ? 'bg-brand-accent/10'
+        : ''}
       {draggedIndex !== null && dragOverIndex === row.underlyingIndex ? 'bg-brand-accent/30!' : ''}"
   >
     {@render leadingCell(row, displayIndex)}
@@ -844,8 +1051,16 @@
 {/snippet}
 
 <ColumnSelector bind:this={columnSelector} hideTrigger />
-<div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-  <div role="row" tabindex="-1" oncontextmenu={handleHeaderContextMenu} class="grid items-center py-3 px-4" style={gridColsStyle}>
+<div
+  class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none"
+>
+  <div
+    role="row"
+    tabindex="-1"
+    oncontextmenu={handleHeaderContextMenu}
+    class="grid items-center py-3 px-4"
+    style={gridColsStyle}
+  >
     {#if mode === "position" && positionSortField}
       <SortableHeader
         active={sortField === positionSortField}
@@ -853,7 +1068,9 @@
         onclick={() => onToggleSort(positionSortField)}
         class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0"
       >
-        {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('playlists.tableHeaderTrack')} {arrow}</span>{/snippet}
+        {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]"
+            >{i18n.t("playlists.tableHeaderTrack")} {arrow}</span
+          >{/snippet}
       </SortableHeader>
     {:else}
       <div class="text-center w-9"></div>
@@ -866,10 +1083,7 @@
   </div>
 </div>
 
-<div
-  bind:this={bodyContainer}
-  class="rounded-b-lg overflow-hidden"
->
+<div bind:this={bodyContainer} class="rounded-b-lg overflow-hidden">
   {#if loading}
     <div class="flex items-center justify-center py-16">
       <div class="text-brand-text-primary text-sm">{i18n.t("home.loading")}</div>

@@ -48,14 +48,14 @@ describe("AlbumProfileEditor.svelte", () => {
 
     // Should display the album folder
     expect(
-      getByText("C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross")
+      getByText("C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross"),
     ).toBeInTheDocument();
 
     // Should NOT display the first song's file name
     expect(
       queryByText(
-        "C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross\\1-01 Head Together.flac"
-      )
+        "C:\\Users\\ericj\\OneDrive\\Music\\Big Wreck\\2012 - Albatross\\1-01 Head Together.flac",
+      ),
     ).not.toBeInTheDocument();
   });
 
@@ -113,14 +113,26 @@ describe("AlbumProfileEditor.svelte", () => {
   });
 
   it("keeps the user's edited genres in the form while the save is in flight", async () => {
-    const tracks = [{ id: 1, path: "/m/a.flac", title: "A", artist: "Artist", album: "Album", genre: "Rock" } as Song];
+    const tracks = [
+      {
+        id: 1,
+        path: "/m/a.flac",
+        title: "A",
+        artist: "Artist",
+        album: "Album",
+        genre: "Rock",
+      } as Song,
+    ];
     collectionStore.songs = tracks;
     // The profile save lands first and updates the profile store; the tag
     // save is held open so the form can be inspected mid-save.
     let finishTagSave!: () => void;
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "set_album_profile") return args.profile;
-      if (cmd === "save_album_tags") return new Promise<void>((resolve) => { finishTagSave = resolve; });
+      if (cmd === "save_album_tags")
+        return new Promise<void>((resolve) => {
+          finishTagSave = resolve;
+        });
       return null;
     });
 
@@ -149,8 +161,22 @@ describe("AlbumProfileEditor.svelte", () => {
 
   it("edits and saves album language tag", async () => {
     const tracks = [
-      { id: 1, path: "/m/a.flac", title: "A", artist: "Artist", album: "Album", language: "eng" } as Song,
-      { id: 2, path: "/m/b.flac", title: "B", artist: "Artist", album: "Album", language: "eng" } as Song,
+      {
+        id: 1,
+        path: "/m/a.flac",
+        title: "A",
+        artist: "Artist",
+        album: "Album",
+        language: "eng",
+      } as Song,
+      {
+        id: 2,
+        path: "/m/b.flac",
+        title: "B",
+        artist: "Artist",
+        album: "Album",
+        language: "eng",
+      } as Song,
     ];
     collectionStore.songs = tracks;
 

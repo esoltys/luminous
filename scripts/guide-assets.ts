@@ -34,7 +34,11 @@ export function referencedAssets(guideDir: string = USER_GUIDE_DIR): string[] {
     }
   }
   // A light twin that was never captured is fine: guide.js falls back to the dark one.
-  return [...refs].filter((ref) => fs.existsSync(path.join(guideDir, ref)) || fs.existsSync(pngMaster(guideDir, ref))).sort();
+  return [...refs]
+    .filter(
+      (ref) => fs.existsSync(path.join(guideDir, ref)) || fs.existsSync(pngMaster(guideDir, ref)),
+    )
+    .sort();
 }
 
 function pngMaster(guideDir: string, ref: string): string {
@@ -45,7 +49,10 @@ function pngMaster(guideDir: string, ref: string): string {
  * Re-encodes the WebP copy of every referenced capture whose copy is missing or older than its
  * PNG. Needs ImageMagick (`magick`) on PATH; without it, warns and leaves the copies alone.
  */
-export function encodeGuideWebp(guideDir: string = USER_GUIDE_DIR): { encoded: string[]; failed: string[] } {
+export function encodeGuideWebp(guideDir: string = USER_GUIDE_DIR): {
+  encoded: string[];
+  failed: string[];
+} {
   const encoded: string[] = [];
   const failed: string[] = [];
   for (const ref of referencedAssets(guideDir).filter((r) => r.endsWith(".webp"))) {
@@ -54,15 +61,27 @@ export function encodeGuideWebp(guideDir: string = USER_GUIDE_DIR): { encoded: s
     if (!fs.existsSync(png)) continue;
     if (fs.existsSync(webp) && fs.statSync(webp).mtimeMs >= fs.statSync(png).mtimeMs) continue;
 
-    const result = spawnSync("magick", [png, "-quality", String(WEBP_QUALITY), "-define", "webp:method=6", webp]);
+    const result = spawnSync("magick", [
+      png,
+      "-quality",
+      String(WEBP_QUALITY),
+      "-define",
+      "webp:method=6",
+      webp,
+    ]);
     if (result.error && (result.error as NodeJS.ErrnoException).code === "ENOENT") {
-      console.warn("[guide-webp] ImageMagick (`magick`) is not on PATH, so the guide's WebP copies were not updated. Install it and run `bun run guide-webp`.");
+      console.warn(
+        "[guide-webp] ImageMagick (`magick`) is not on PATH, so the guide's WebP copies were not updated. Install it and run `bun run guide-webp`.",
+      );
       return { encoded, failed };
     }
     if (result.status === 0) encoded.push(ref);
     else failed.push(ref);
   }
-  if (encoded.length) console.log(`[guide-webp] Encoded ${encoded.length} WebP cop${encoded.length === 1 ? "y" : "ies"}.`);
+  if (encoded.length)
+    console.log(
+      `[guide-webp] Encoded ${encoded.length} WebP cop${encoded.length === 1 ? "y" : "ies"}.`,
+    );
   for (const ref of failed) console.warn(`[guide-webp] Failed to encode ${ref}`);
   return { encoded, failed };
 }

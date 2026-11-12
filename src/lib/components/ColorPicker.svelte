@@ -36,15 +36,27 @@
       class="relative rounded-full border-2 transition-transform duration-150 flex items-center justify-center
         {size === 'sm' ? 'w-5 h-5' : 'w-7 h-7'}
         {isSelected
-          ? (size === 'sm' ? 'border-brand-text-primary' : 'scale-110 ring-2 ring-brand-accent')
-          : (size === 'sm' ? 'border-transparent hover:border-brand-border' : 'hover:scale-105')}
-        {choice.value === null ? 'bg-brand-sidebar border-brand-border' : (size === 'sm' ? '' : 'border-white/20')}"
-      style={swatchColor ? `background-color: ${swatchColor};` : ''}
+        ? size === 'sm'
+          ? 'border-brand-text-primary'
+          : 'scale-110 ring-2 ring-brand-accent'
+        : size === 'sm'
+          ? 'border-transparent hover:border-brand-border'
+          : 'hover:scale-105'}
+        {choice.value === null
+        ? 'bg-brand-sidebar border-brand-border'
+        : size === 'sm'
+          ? ''
+          : 'border-white/20'}"
+      style={swatchColor ? `background-color: ${swatchColor};` : ""}
       title={i18n.t(choice.label)}
       aria-label={i18n.t(choice.label)}
     >
-      {#if isSelected && size !== 'sm'}
-        <Check class="w-3.5 h-3.5 {choice.value === null ? 'text-brand-accent-text' : 'text-white'} drop-shadow-sm" />
+      {#if isSelected && size !== "sm"}
+        <Check
+          class="w-3.5 h-3.5 {choice.value === null
+            ? 'text-brand-accent-text'
+            : 'text-white'} drop-shadow-sm"
+        />
       {/if}
     </button>
   {/each}

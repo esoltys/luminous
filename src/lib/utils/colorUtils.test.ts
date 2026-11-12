@@ -15,7 +15,7 @@ import {
   ARCHETYPE_TARGETS,
   quantizeMedianCut,
   extractArchetypes,
-  type Swatch
+  type Swatch,
 } from "./colorUtils";
 
 describe("hexToRgb", () => {
@@ -203,14 +203,14 @@ describe("quantizeMedianCut", () => {
     const swatches = quantizeMedianCut(
       [
         { r: 5, g: 5, b: 5, count: 1000 },
-        { r: 20, g: 40, b: 255, count: 5 }
+        { r: 20, g: 40, b: 255, count: 5 },
       ],
-      8
+      8,
     );
-    const neon = swatches.find(s => s.b > 200);
+    const neon = swatches.find((s) => s.b > 200);
     expect(neon).toBeDefined();
     expect(neon?.population).toBe(5);
-    const black = swatches.find(s => s.b <= 10);
+    const black = swatches.find((s) => s.b <= 10);
     expect(black?.population).toBe(1000);
   });
 
@@ -219,7 +219,7 @@ describe("quantizeMedianCut", () => {
       { r: 5, g: 5, b: 5, count: 1000 },
       { r: 20, g: 40, b: 255, count: 5 },
       { r: 200, g: 200, b: 200, count: 50 },
-      { r: 128, g: 64, b: 32, count: 20 }
+      { r: 128, g: 64, b: 32, count: 20 },
     ];
     const swatches = quantizeMedianCut(input, 8);
     const totalIn = input.reduce((sum, c) => sum + c.count, 0);
@@ -232,7 +232,7 @@ describe("quantizeMedianCut", () => {
       r: (i * 6) % 256,
       g: (i * 11) % 256,
       b: (i * 17) % 256,
-      count: 1
+      count: 1,
     }));
     const swatches = quantizeMedianCut(input, 8);
     expect(swatches.length).toBeLessThanOrEqual(8);
@@ -248,9 +248,9 @@ describe("extractArchetypes", () => {
     const swatches = quantizeMedianCut(
       [
         { r: 5, g: 5, b: 5, count: 1000 },
-        { r: 20, g: 40, b: 255, count: 5 }
+        { r: 20, g: 40, b: 255, count: 5 },
       ],
-      8
+      8,
     );
     const archetypes = extractArchetypes(swatches);
     expect(archetypes.vibrant).toBeTruthy();
@@ -261,7 +261,7 @@ describe("extractArchetypes", () => {
     // Two flat grays (s=0): neither can satisfy any archetype's minS
     const swatches: Swatch[] = [
       { r: 200, g: 200, b: 200, population: 100 },
-      { r: 10, g: 10, b: 10, population: 900 }
+      { r: 10, g: 10, b: 10, population: 900 },
     ];
     const archetypes = extractArchetypes(swatches);
     expect(archetypes.vibrant).toEqual({ r: 10, g: 10, b: 10, population: 900 });
@@ -337,5 +337,3 @@ describe("ensureLightnessSeparation", () => {
     expect(ensureLightnessSeparation("#123456", "not-a-hex", 0.12)).toBe("#123456");
   });
 });
-
-

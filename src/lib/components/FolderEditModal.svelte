@@ -12,10 +12,7 @@
   import LibraryBadge from "./LibraryBadge.svelte";
   import ColorPicker from "./ColorPicker.svelte";
   import { BADGE_ICON_CHOICES, BADGE_COLOR_CHOICES } from "../badgeChoices";
-  import {
-    XIcon as X,
-    FolderSimpleIcon as FolderSimple,
-  } from "phosphor-svelte";
+  import { XIcon as X, FolderSimpleIcon as FolderSimple } from "phosphor-svelte";
 
   interface Props {
     directory: MusicDirectory;
@@ -75,7 +72,8 @@
     } catch (err) {
       console.error("Failed to update directory metadata:", err);
       toastStore.show(
-        i18n.t("settings.folderSaveFailedPrefix", {}, "Failed to save folder details: ") + String(err),
+        i18n.t("settings.folderSaveFailedPrefix", {}, "Failed to save folder details: ") +
+          String(err),
         "error",
       );
     } finally {
@@ -91,20 +89,28 @@
 <div
   class="fixed inset-0 z-50 flex items-center justify-center acrylic-scrim p-4"
   style="padding-bottom: {dockClearance + 16}px"
-  onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+  onclick={(e) => {
+    if (e.target === e.currentTarget) onClose();
+  }}
 >
   <div
     class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col"
     style="max-height: min(90vh, calc(100vh - {dockClearance + 32}px))"
   >
-    <div class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50">
+    <div
+      class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50"
+    >
       <div class="flex items-center gap-2.5 min-w-0">
         <div class="p-2 rounded-xl bg-brand-accent/20 text-brand-accent-text shrink-0">
           <FolderSimple class="w-5 h-5" />
         </div>
         <div class="min-w-0">
-          <h2 class="text-base font-bold text-brand-text-primary truncate">{i18n.t("settings.editFolderTitle")}</h2>
-          <p class="text-xs text-brand-text-secondary/70 truncate" title={directory.path}>{directory.path}</p>
+          <h2 class="text-base font-bold text-brand-text-primary truncate">
+            {i18n.t("settings.editFolderTitle")}
+          </h2>
+          <p class="text-xs text-brand-text-secondary/70 truncate" title={directory.path}>
+            {directory.path}
+          </p>
         </div>
       </div>
       <button
@@ -118,7 +124,9 @@
 
     <form onsubmit={handleSubmit} class="p-6 flex-1 overflow-y-auto flex flex-col gap-5">
       <!-- Live Preview -->
-      <div class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 flex items-center justify-between gap-4">
+      <div
+        class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 flex items-center justify-between gap-4"
+      >
         <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("settings.folderPreview")}
         </span>
@@ -129,7 +137,10 @@
 
       <!-- Nickname -->
       <div>
-        <label for="folder-nickname-input" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-1.5">
+        <label
+          for="folder-nickname-input"
+          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-1.5"
+        >
           {i18n.t("settings.folderNickname")}
         </label>
         <Input
@@ -143,7 +154,9 @@
 
       <!-- Icon Selection -->
       <div>
-        <span class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2">
+        <span
+          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2"
+        >
           {i18n.t("settings.folderIcon")}
         </span>
         <div class="grid grid-cols-5 gap-2">
@@ -152,15 +165,18 @@
             {@const isSelected = selectedIcon === choice.id}
             <button
               type="button"
-              onclick={() => { selectedIcon = choice.id; }}
+              onclick={() => {
+                selectedIcon = choice.id;
+              }}
               class="flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all duration-150 gap-1
                 {isSelected
-                  ? 'bg-brand-accent/20 border-brand-accent text-brand-accent-text ring-1 ring-brand-accent'
-                  : 'bg-brand-main/40 border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-border'}"
+                ? 'bg-brand-accent/20 border-brand-accent text-brand-accent-text ring-1 ring-brand-accent'
+                : 'bg-brand-main/40 border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-border'}"
               title={i18n.t(choice.label)}
             >
               <Icon class="w-5 h-5" />
-              <span class="text-[10px] font-medium truncate max-w-full">{i18n.t(choice.label)}</span>
+              <span class="text-[10px] font-medium truncate max-w-full">{i18n.t(choice.label)}</span
+              >
             </button>
           {/each}
         </div>
@@ -168,24 +184,42 @@
 
       <!-- Color Selection -->
       <div>
-        <span class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2">
+        <span
+          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2"
+        >
           {i18n.t("settings.folderColor")}
         </span>
-        <ColorPicker choices={COLOR_CHOICES} value={selectedColor} onChange={(v) => { selectedColor = v; }} />
+        <ColorPicker
+          choices={COLOR_CHOICES}
+          value={selectedColor}
+          onChange={(v) => {
+            selectedColor = v;
+          }}
+        />
       </div>
 
       <!-- Location -->
       <div>
-        <span class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-1.5">
+        <span
+          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-1.5"
+        >
           {i18n.t("settings.folderLocation")}
         </span>
         <div class="flex items-center justify-between gap-3">
           <p class="text-xs text-brand-text-primary break-all min-w-0">{directory.path}</p>
-          <Button type="button" variant="secondary" size="sm" onclick={handleChangeLocation} disabled={saving}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onclick={handleChangeLocation}
+            disabled={saving}
+          >
             {i18n.t("settings.folderChangeLocation")}
           </Button>
         </div>
-        <p class="text-xs text-brand-text-secondary mt-1.5 text-pretty">{i18n.t("settings.folderLocateHint")}</p>
+        <p class="text-xs text-brand-text-secondary mt-1.5 text-pretty">
+          {i18n.t("settings.folderLocateHint")}
+        </p>
       </div>
 
       <!-- Footer Buttons -->

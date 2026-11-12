@@ -31,7 +31,7 @@
       luminousAddon: 1,
       kind: "size",
       width: frame.clientWidth,
-      height: frame.clientHeight
+      height: frame.clientHeight,
     });
   }
 
@@ -47,7 +47,7 @@
         ? { title: song.title ?? "", artist: song.artist ?? "", album: song.album ?? "" }
         : null,
       accent: themeStore.resolvedColors["color-accent"],
-      reducedMotion: prefersReducedMotion()
+      reducedMotion: prefersReducedMotion(),
     };
     if (loaded) post(message);
   });

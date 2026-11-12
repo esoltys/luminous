@@ -141,9 +141,11 @@ describe("ChipInput.svelte", () => {
 
     document.elementFromPoint = originalElementFromPoint;
 
-    const chipTexts = Array.from(document.querySelectorAll("span")).map((el) => el.textContent?.trim());
+    const chipTexts = Array.from(document.querySelectorAll("span")).map((el) =>
+      el.textContent?.trim(),
+    );
     const order = chipTexts.filter((t): t is string =>
-      ["Metal", "Progressive Metal", "Symphonic Metal"].includes(t ?? "")
+      ["Metal", "Progressive Metal", "Symphonic Metal"].includes(t ?? ""),
     );
     expect(order).toEqual(["Symphonic Metal", "Metal", "Progressive Metal"]);
   });

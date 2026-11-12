@@ -56,7 +56,7 @@ export class ProvenanceStore {
     const startLabel = i18n.t(
       "collection.verifyingAuthenticity",
       {},
-      "Verifying audio authenticity..."
+      "Verifying audio authenticity...",
     );
 
     tasksStore.startTask({
@@ -77,7 +77,7 @@ export class ProvenanceStore {
               total: event.payload.total,
             });
           }
-        }
+        },
       );
 
       const count = await invoke<number>("analyze_songs_provenance", { songIds: validIds });
@@ -85,7 +85,7 @@ export class ProvenanceStore {
       const completeLabel = i18n.t(
         "collection.verifyAuthenticityComplete",
         {},
-        "Audio authenticity verification complete"
+        "Audio authenticity verification complete",
       );
 
       tasksStore.completeTask(taskId, completeLabel, TOAST_DURATION_MS);

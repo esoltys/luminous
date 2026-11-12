@@ -6,7 +6,13 @@
   import { i18n } from "../../stores/i18n.svelte";
   import { formatFileSize } from "../../utils/formatters";
   import { startPointerDrag, type PointerDragHandle } from "../../utils/pointerDrag";
-  import type { DirListing, FileEntry, FileEntryStatus, FileMenuTarget, FileSource } from "../../types";
+  import type {
+    DirListing,
+    FileEntry,
+    FileEntryStatus,
+    FileMenuTarget,
+    FileSource,
+  } from "../../types";
   import Button from "../Button.svelte";
   import AlphabetScrubber from "../AlphabetScrubber.svelte";
   import { shownName } from "./shownName";
@@ -150,13 +156,17 @@
   }
 
   function columnResizeKey(event: KeyboardEvent) {
-    const step = event.key === "ArrowLeft" ? -COLUMN_STEP_PX : event.key === "ArrowRight" ? COLUMN_STEP_PX : 0;
+    const step =
+      event.key === "ArrowLeft" ? -COLUMN_STEP_PX : event.key === "ArrowRight" ? COLUMN_STEP_PX : 0;
     if (step === 0) return;
     event.preventDefault();
     setColumnWidth(columnWidth + step);
   }
 
-  type Loaded = { state: "loading" } | { state: "ready"; listing: DirListing } | { state: "error"; code: string };
+  type Loaded =
+    | { state: "loading" }
+    | { state: "ready"; listing: DirListing }
+    | { state: "error"; code: string };
 
   let listings = $state<Record<string, Loaded>>({});
   let cacheOwner = "";
@@ -178,7 +188,7 @@
   const firstLevel = $derived(Math.max(0, path.length - PARENT_COLUMNS));
   /** The folders shown, outermost first; the last is the current folder. */
   const levels = $derived(
-    Array.from({ length: path.length - firstLevel + 1 }, (_, i) => path.slice(0, firstLevel + i))
+    Array.from({ length: path.length - firstLevel + 1 }, (_, i) => path.slice(0, firstLevel + i)),
   );
 
   $effect(() => {
@@ -217,11 +227,11 @@
   const currentEntries = $derived(current?.state === "ready" ? current.listing.entries : []);
   const parsedFilter = $derived(parseFileFilter(filterQuery));
   const visibleEntries = $derived(
-    parsedFilter.isActive ? currentEntries.filter((e) => matchesFileFilter(e, parsedFilter)) : currentEntries
+    parsedFilter.isActive
+      ? currentEntries.filter((e) => matchesFileFilter(e, parsedFilter))
+      : currentEntries,
   );
-  const sortedEntries = $derived(
-    sortFileEntries(visibleEntries, sortColumn, sortAsc, statusLabel)
-  );
+  const sortedEntries = $derived(sortFileEntries(visibleEntries, sortColumn, sortAsc, statusLabel));
   $effect(() => {
     matchedCount = visibleEntries.length;
     totalCount = currentEntries.length;
@@ -240,7 +250,8 @@
   function columnLabel(dir: string[]): string {
     if (dir.length === 0) return i18n.t("files.folders");
     const loaded = listings[keyOf(dir)];
-    const missingTag = loaded?.state === "ready" ? loaded.listing.pathMissingTags[dir.length - 1] : null;
+    const missingTag =
+      loaded?.state === "ready" ? loaded.listing.pathMissingTags[dir.length - 1] : null;
     return shownName(dir[dir.length - 1], missingTag);
   }
 
@@ -257,7 +268,8 @@
     const end = ends[column] ?? 0;
     // `end` is one past the last row drawn, which may be cut off.
     if (index < start) list.scrollToIndex(index, { behavior: "auto" });
-    else if (index >= end - 1) list.scrollToIndex(Math.max(0, index - Math.max(1, end - start - 2)), { behavior: "auto" });
+    else if (index >= end - 1)
+      list.scrollToIndex(Math.max(0, index - Math.max(1, end - start - 2)), { behavior: "auto" });
   }
 
   async function focusColumn(column: number) {
@@ -391,7 +403,10 @@
     if (wanted !== null && (moved || wanted !== previousTarget)) {
       select(wanted);
       scrollPending = wanted;
-    } else if (now.length < previousPath.length && keyOf(previousPath.slice(0, now.length)) === keyOf(now)) {
+    } else if (
+      now.length < previousPath.length &&
+      keyOf(previousPath.slice(0, now.length)) === keyOf(now)
+    ) {
       select(previousPath[now.length]);
     } else if (moved) {
       select(null);
@@ -483,7 +498,10 @@
     const names = sortedEntries.map((e) => e.name);
     const [a, b] = [names.indexOf(anchor ?? name), names.indexOf(name)].sort((x, y) => x - y);
     if (a < 0) return select(name);
-    selection = sortedEntries.slice(a, b + 1).filter((e) => !e.isDir).map((e) => e.name);
+    selection = sortedEntries
+      .slice(a, b + 1)
+      .filter((e) => !e.isDir)
+      .map((e) => e.name);
     selectedName = name;
     arrived = null;
   }
@@ -492,7 +510,9 @@
   function clickFile(event: MouseEvent, name: string) {
     if (event.shiftKey && anchor !== null) return selectRange(name);
     if (event.ctrlKey || event.metaKey) {
-      selection = selection.includes(name) ? selection.filter((n) => n !== name) : [...selection, name];
+      selection = selection.includes(name)
+        ? selection.filter((n) => n !== name)
+        : [...selection, name];
       selectedName = name;
       anchor = name;
       arrived = null;
@@ -520,7 +540,7 @@
       },
       onCancel: (wasArmed) => {
         if (wasArmed) songDrag.end();
-      }
+      },
     });
   }
 
@@ -531,7 +551,9 @@
     if (!oncontextmenu) return;
     event.preventDefault();
     if (entry.isDir || !selection.includes(entry.name)) select(entry.name);
-    const entries = entry.isDir ? [entry] : sortedEntries.filter((e) => !e.isDir && selection.includes(e.name));
+    const entries = entry.isDir
+      ? [entry]
+      : sortedEntries.filter((e) => !e.isDir && selection.includes(e.name));
     oncontextmenu({ dir: path, entries, inColumn: false }, event.clientX, event.clientY);
   }
 
@@ -542,7 +564,10 @@
   }
 </script>
 
-<div class="@container flex-1 min-h-0 flex rounded-xl border border-brand-border/40 bg-brand-sidebar/40 overflow-hidden" data-testid="file-browser">
+<div
+  class="@container flex-1 min-h-0 flex rounded-xl border border-brand-border/40 bg-brand-sidebar/40 overflow-hidden"
+  data-testid="file-browser"
+>
   {#each levels as dir, column (keyOf(dir))}
     {@const isCurrent = column === levels.length - 1}
     {@const loaded = listings[keyOf(dir)]}
@@ -558,11 +583,24 @@
         onkeydown={(e) => handleParentKey(e, column, dir)}
       >
         <div class="flex-1 min-h-0 p-1.5">
-          <VirtualList items={folderEntries(dir)} height="100%" itemHeight={ROW_HEIGHT_PX} bind:this={lists[column]} bind:start={starts[column]} bind:end={ends[column]}>
+          <VirtualList
+            items={folderEntries(dir)}
+            height="100%"
+            itemHeight={ROW_HEIGHT_PX}
+            bind:this={lists[column]}
+            bind:start={starts[column]}
+            bind:end={ends[column]}
+          >
             {#snippet children({ item: entry }: { item: FileEntry })}
               {@const selected = path[dir.length] === entry.name}
               <button
-                class="w-full h-[31px] flex items-center gap-2 px-2.5 rounded-md text-[13px] text-left transition-colors {selected ? 'bg-brand-accent/20 text-brand-text-primary font-semibold' : 'text-brand-text-primary hover:bg-brand-accent/10'} {MUTED.includes(entry.status) ? 'opacity-60' : ''}"
+                class="w-full h-[31px] flex items-center gap-2 px-2.5 rounded-md text-[13px] text-left transition-colors {selected
+                  ? 'bg-brand-accent/20 text-brand-text-primary font-semibold'
+                  : 'text-brand-text-primary hover:bg-brand-accent/10'} {MUTED.includes(
+                  entry.status,
+                )
+                  ? 'opacity-60'
+                  : ''}"
                 role="option"
                 aria-selected={selected}
                 tabindex="-1"
@@ -572,7 +610,9 @@
                 <FolderIcon class="w-4 h-4 shrink-0 text-brand-text-secondary" />
                 <span class="truncate flex-1">{shownName(entry.name, entry.missingTag)}</span>
                 {#if entry.status === "excluded" || entry.status === "notFromLuminous"}
-                  <span class="text-[11px] text-brand-text-secondary shrink-0">{statusLabel(entry)}</span>
+                  <span class="text-[11px] text-brand-text-secondary shrink-0"
+                    >{statusLabel(entry)}</span
+                  >
                 {:else}
                   <CaretRightIcon class="w-3 h-3 shrink-0 text-brand-text-secondary" />
                 {/if}
@@ -600,11 +640,15 @@
         onkeydown={columnResizeKey}
         ondblclick={() => setColumnWidth(COLUMN_DEFAULT_PX)}
       >
-        <div class="w-px h-full group-hover/resize:bg-brand-accent group-focus-visible/resize:bg-brand-accent transition-colors"></div>
+        <div
+          class="w-px h-full group-hover/resize:bg-brand-accent group-focus-visible/resize:bg-brand-accent transition-colors"
+        ></div>
       </div>
     {:else}
       <div class="@container flex-1 min-w-0 min-h-0 flex flex-col">
-        <div class="h-8 shrink-0 flex items-center gap-3 px-4 border-b border-brand-border/40 text-[11px] text-brand-text-secondary select-none">
+        <div
+          class="h-8 shrink-0 flex items-center gap-3 px-4 border-b border-brand-border/40 text-[11px] text-brand-text-secondary select-none"
+        >
           <button
             type="button"
             onclick={() => toggleSort("name")}
@@ -652,7 +696,9 @@
         </div>
         {#if loaded?.state === "error"}
           <div class="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
-            <p class="text-sm text-brand-text-secondary">{loaded.code === "source-not-found" ? i18n.t("files.sourceGone") : unreachableLabel}</p>
+            <p class="text-sm text-brand-text-secondary">
+              {loaded.code === "source-not-found" ? i18n.t("files.sourceGone") : unreachableLabel}
+            </p>
             {#if loaded.code !== "source-not-found"}
               <Button variant="secondary" onclick={() => retry(dir)}>
                 <ArrowClockwiseIcon class="w-4 h-4" />
@@ -661,9 +707,14 @@
             {/if}
           </div>
         {:else if loaded?.state === "ready" && currentEntries.length === 0}
-          <p class="flex-1 flex items-center justify-center text-sm text-brand-text-secondary">{i18n.t("files.emptyFolder")}</p>
+          <p class="flex-1 flex items-center justify-center text-sm text-brand-text-secondary">
+            {i18n.t("files.emptyFolder")}
+          </p>
         {:else if loaded?.state === "ready" && visibleEntries.length === 0}
-          <div class="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center" data-testid="files-filter-empty">
+          <div
+            class="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center"
+            data-testid="files-filter-empty"
+          >
             <p class="text-sm font-semibold text-brand-text-primary">
               {i18n.t("files.filterEmptyTitle", { query: filterQuery.trim() })}
             </p>
@@ -686,7 +737,14 @@
               aria-label={columnLabel(dir)}
               onkeydown={(e) => handleCurrentKey(e, column)}
             >
-              <VirtualList items={sortedEntries} height="100%" itemHeight={ROW_HEIGHT_PX} bind:this={lists[column]} bind:start={starts[column]} bind:end={ends[column]}>
+              <VirtualList
+                items={sortedEntries}
+                height="100%"
+                itemHeight={ROW_HEIGHT_PX}
+                bind:this={lists[column]}
+                bind:start={starts[column]}
+                bind:end={ends[column]}
+              >
                 {#snippet children({ item: entry }: { item: FileEntry })}
                   {@const selected = selection.includes(entry.name)}
                   {@const muted = MUTED.includes(entry.status)}
@@ -694,7 +752,11 @@
                   {@const isArrival = entry.name === arrived && selected && selection.length === 1}
                   {@const Icon = fileIcon(entry)}
                   <div
-                    class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected ? 'bg-brand-accent/20' : 'hover:bg-brand-accent/10'} {songDrag.isDragging && selected ? 'opacity-60' : ''}"
+                    class="w-full h-[31px] flex items-center gap-3 px-2.5 rounded-md text-[13px] cursor-default transition-colors {selected
+                      ? 'bg-brand-accent/20'
+                      : 'hover:bg-brand-accent/10'} {songDrag.isDragging && selected
+                      ? 'opacity-60'
+                      : ''}"
                     class:arrival={isArrival}
                     class:arrival-halo={isArrival && haloShown}
                     role="option"
@@ -705,17 +767,29 @@
                       if (entry.isDir) openFolder(dir, entry.name);
                       else clickFile(e, entry.name);
                     }}
-                    ondblclick={() => { if (!entry.isDir) onactivate(entry); }}
+                    ondblclick={() => {
+                      if (!entry.isDir) onactivate(entry);
+                    }}
                     oncontextmenu={(e) => openMenu(e, entry)}
                     onkeydown={() => {}}
                   >
-                    <span class="flex-1 min-w-0 flex items-center gap-2 {muted ? 'text-brand-text-secondary' : 'text-brand-text-primary'} {selected ? 'font-semibold' : ''}">
-                      <Icon class="w-4 h-4 shrink-0 text-brand-text-secondary" data-kind={entry.kind ?? "folder"} />
+                    <span
+                      class="flex-1 min-w-0 flex items-center gap-2 {muted
+                        ? 'text-brand-text-secondary'
+                        : 'text-brand-text-primary'} {selected ? 'font-semibold' : ''}"
+                    >
+                      <Icon
+                        class="w-4 h-4 shrink-0 text-brand-text-secondary"
+                        data-kind={entry.kind ?? "folder"}
+                      />
                       <span class="truncate" title={name}>
                         {#if parsedFilter.terms.length > 0}
                           {#each highlightSegments(name, parsedFilter.terms) as seg, segIdx (segIdx)}
                             {#if seg.match}
-                              <mark class="bg-brand-accent/25 text-brand-accent-text font-semibold rounded-xs">{seg.text}</mark>
+                              <mark
+                                class="bg-brand-accent/25 text-brand-accent-text font-semibold rounded-xs"
+                                >{seg.text}</mark
+                              >
                             {:else}
                               {seg.text}
                             {/if}
@@ -725,9 +799,22 @@
                         {/if}
                       </span>
                     </span>
-                    <span class="w-12 shrink-0 text-[11px] text-brand-text-secondary hidden @lg:block">{entry.fileType ?? ""}</span>
-                    <span class="w-16 shrink-0 text-right text-[11px] tabular-nums text-brand-text-secondary hidden @lg:block">{entry.isDir || entry.size === null ? "" : formatFileSize(entry.size)}</span>
-                    <span class="w-40 shrink-0 truncate text-xs hidden @md:block {entry.status === 'notScanned' ? 'text-brand-accent-text' : entry.status === 'inLibrary' ? 'text-brand-text-primary' : 'text-brand-text-secondary'}">{statusLabel(entry)}</span>
+                    <span
+                      class="w-12 shrink-0 text-[11px] text-brand-text-secondary hidden @lg:block"
+                      >{entry.fileType ?? ""}</span
+                    >
+                    <span
+                      class="w-16 shrink-0 text-right text-[11px] tabular-nums text-brand-text-secondary hidden @lg:block"
+                      >{entry.isDir || entry.size === null ? "" : formatFileSize(entry.size)}</span
+                    >
+                    <span
+                      class="w-40 shrink-0 truncate text-xs hidden @md:block {entry.status ===
+                      'notScanned'
+                        ? 'text-brand-accent-text'
+                        : entry.status === 'inLibrary'
+                          ? 'text-brand-text-primary'
+                          : 'text-brand-text-secondary'}">{statusLabel(entry)}</span
+                    >
                   </div>
                 {/snippet}
               </VirtualList>
@@ -763,7 +850,9 @@
   .arrival {
     outline: 2px solid var(--color-brand-accent);
     outline-offset: -2px;
-    transition: background-color 150ms ease, box-shadow 300ms ease-out;
+    transition:
+      background-color 150ms ease,
+      box-shadow 300ms ease-out;
   }
   .arrival-halo {
     box-shadow: inset 0 0 0 5px color-mix(in srgb, var(--color-brand-accent) 30%, transparent);

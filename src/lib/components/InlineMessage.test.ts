@@ -7,7 +7,9 @@ const text = createRawSnippet(() => ({ render: () => "<span>Could not save</span
 
 describe("InlineMessage", () => {
   it("shows the message with a warning icon in the theme's primary text colour", () => {
-    const { getByText, container } = render(InlineMessage, { props: { children: text, role: "alert", id: "m" } });
+    const { getByText, container } = render(InlineMessage, {
+      props: { children: text, role: "alert", id: "m" },
+    });
     const root = container.querySelector("#m")!;
     expect(getByText("Could not save")).toBeInTheDocument();
     expect(root).toHaveAttribute("role", "alert");

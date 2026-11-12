@@ -82,7 +82,7 @@ function brokenText(path: string) {
   return i18n.t(
     "settings.defaultLibraryFileBroken",
     { path },
-    `The genre hierarchy file in ${path} is broken.`
+    `The genre hierarchy file in ${path} is broken.`,
   );
 }
 
@@ -92,7 +92,11 @@ function refusalText(code: string, path: string | null) {
   if (path && code === "unavailable") {
     return i18n.t("settings.defaultLibraryUnavailable", { path }, `${path} isn't available.`);
   }
-  return i18n.t("settings.defaultLibraryChangeFailed", undefined, "Couldn't change the default library.");
+  return i18n.t(
+    "settings.defaultLibraryChangeFailed",
+    undefined,
+    "Couldn't change the default library.",
+  );
 }
 
 export const hierarchySidecarStore = new HierarchySidecarStore();
