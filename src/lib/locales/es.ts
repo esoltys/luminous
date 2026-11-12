@@ -1051,6 +1051,9 @@ export const es = {
     scanOnStartupLabel: "Volver a analizar la biblioteca al iniciar",
     scanOnStartupHint:
       "Ejecuta un análisis incremental automáticamente cada vez que se inicia Luminous.",
+    suggestFoldersLabel: "Sugerir carpetas para agregar a la biblioteca",
+    suggestFoldersHint:
+      "Muestra en Inicio una tarjeta que propone agregar a tu biblioteca las carpetas de los archivos que has abierto.",
     autoOrganizeLabel: "Organizar automáticamente archivos nuevos y cambios de etiquetas",
     autoOrganizeHint:
       "Organiza los archivos en segundo plano con tu plantilla activa cuando llegan pistas nuevas o se editan etiquetas.",

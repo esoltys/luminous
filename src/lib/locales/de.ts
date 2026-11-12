@@ -1054,6 +1054,9 @@ export const de = {
     scanOnStartupLabel: "Mediathek beim Start erneut durchsuchen",
     scanOnStartupHint:
       "Bei jedem Start von Luminous automatisch eine inkrementelle Suche ausführen.",
+    suggestFoldersLabel: "Ordner zum Hinzufügen zur Mediathek vorschlagen",
+    suggestFoldersHint:
+      "Zeigt auf der Startseite eine Karte, die vorschlägt, die Ordner geöffneter Dateien zur Mediathek hinzuzufügen.",
     autoOrganizeLabel: "Neue Dateien und Tag-Änderungen automatisch organisieren",
     autoOrganizeHint:
       "Dateien im Hintergrund mit der aktiven Vorlage organisieren, wenn neue Titel hinzukommen oder Tags bearbeitet werden.",

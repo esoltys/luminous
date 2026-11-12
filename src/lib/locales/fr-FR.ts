@@ -1063,6 +1063,9 @@ export const frFR: DeepStringRecord<typeof en> = {
     scanOnStartupLabel: "Analyser la bibliothèque au démarrage",
     scanOnStartupHint:
       "Exécutez automatiquement une réanalyse incrémentielle au lancement de Luminous.",
+    suggestFoldersLabel: "Suggérer des dossiers à ajouter à la bibliothèque",
+    suggestFoldersHint:
+      "Affiche sur l'accueil une carte qui propose d'ajouter à votre bibliothèque les dossiers des fichiers que vous avez ouverts.",
     autoOrganizeLabel: "Organisation automatique des nouveaux fichiers et balises",
     autoOrganizeHint:
       "Organisez automatiquement les fichiers en arrière-plan selon votre modèle actif lors de l'arrivée de nouvelles pistes ou de l'enregistrement d'balises.",

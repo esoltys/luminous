@@ -124,15 +124,30 @@ pub async fn dismiss_library_folder_suggestion(
     Ok(())
 }
 
-/// "Hide suggestions": no folder is offered again.
+/// Whether folder suggestions are turned off (Settings toggle's source of truth).
 #[tauri::command]
-pub async fn hide_library_folder_suggestions(
+pub async fn get_library_folder_suggestions_hidden(
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    crate::db::run_blocking(&state.db, crate::collection::suggestions::is_hidden)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Turn folder suggestions off ("Hide suggestions") or back on (Settings).
+/// Emits `library-folder-suggestions-changed` so the Home card and the
+/// Settings row refetch. Per-folder "Not now" dismissals are untouched.
+#[tauri::command]
+pub async fn set_library_folder_suggestions_hidden(
     app: AppHandle,
+    hidden: bool,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    crate::db::run_blocking(&state.db, crate::collection::suggestions::hide_all)
-        .await
-        .map_err(|e| e.to_string())?;
+    crate::db::run_blocking(&state.db, move |conn| {
+        crate::collection::suggestions::set_hidden(conn, hidden)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     let _ = app.emit("library-folder-suggestions-changed", ());
     Ok(())
 }

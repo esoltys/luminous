@@ -98,7 +98,9 @@ describe("LibraryFolderSuggestions.svelte", () => {
     render(LibraryFolderSuggestions);
 
     await fireEvent.click(await screen.findByRole("button", { name: "Hide suggestions" }));
-    expect(invoke).toHaveBeenCalledWith("hide_library_folder_suggestions");
+    expect(invoke).toHaveBeenCalledWith("set_library_folder_suggestions_hidden", {
+      hidden: true,
+    });
 
     mockFolders = [];
     listenCallbacks["library-folder-suggestions-changed"]({ payload: null });

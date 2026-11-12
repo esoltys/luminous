@@ -1052,6 +1052,9 @@ export const it = {
     scanOnStartupLabel: "Riesegui scansione libreria all'avvio",
     scanOnStartupHint:
       "Esegui una scansione incrementale automaticamente a ogni avvio di Luminous.",
+    suggestFoldersLabel: "Suggerisci cartelle da aggiungere alla libreria",
+    suggestFoldersHint:
+      "Mostra in Home una scheda che propone di aggiungere alla libreria le cartelle dei file che hai aperto.",
     autoOrganizeLabel: "Organizza automaticamente nuovi file e modifiche ai tag",
     autoOrganizeHint:
       "Organizza i file automaticamente in background con il modello attivo quando arrivano nuovi brani o vengono modificati i tag.",

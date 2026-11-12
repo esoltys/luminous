@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { prefs } from "../stores/prefs.svelte";
 import SettingsSources from "./SettingsSources.svelte";
 
@@ -317,5 +318,59 @@ describe("SettingsSources.svelte - Save artwork to folders", () => {
     await fireEvent.click(manageBtn);
 
     expect(await findByText("No blocked metadata matches.")).toBeInTheDocument();
+  });
+});
+
+describe("SettingsSources.svelte - folder suggestions toggle", () => {
+  const LABEL = "Suggest folders to add to the library";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function mockHidden(hidden: boolean) {
+    const base = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation((cmd: string, args?: unknown) =>
+      cmd === "get_library_folder_suggestions_hidden"
+        ? Promise.resolve(hidden)
+        : base(cmd, args as never),
+    );
+    return base;
+  }
+
+  it("reflects the hidden state and asks the backend to turn suggestions back on", async () => {
+    const base = mockHidden(true);
+    const { findByLabelText } = render(SettingsSources);
+    const toggle = await findByLabelText(LABEL);
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "false"));
+
+    await fireEvent.click(toggle);
+    expect(invoke).toHaveBeenCalledWith("set_library_folder_suggestions_hidden", {
+      hidden: false,
+    });
+    // Nothing is assumed after the write: the row waits for the backend event.
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    mockHidden(false);
+    const callback = vi
+      .mocked(listen)
+      .mock.calls.filter(([event]) => event === "library-folder-suggestions-changed")
+      .at(-1)![1];
+    callback({ payload: null } as never);
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
+    vi.mocked(invoke).mockImplementation(base);
+  });
+
+  it("turns suggestions off from the toggle", async () => {
+    const base = mockHidden(false);
+    const { findByLabelText } = render(SettingsSources);
+    const toggle = await findByLabelText(LABEL);
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
+
+    await fireEvent.click(toggle);
+    expect(invoke).toHaveBeenCalledWith("set_library_folder_suggestions_hidden", {
+      hidden: true,
+    });
+    vi.mocked(invoke).mockImplementation(base);
   });
 });

@@ -61,7 +61,7 @@
   }
 
   function hideAll() {
-    invoke("hide_library_folder_suggestions").catch((err) =>
+    invoke("set_library_folder_suggestions_hidden", { hidden: true }).catch((err) =>
       console.error("Failed to hide folder suggestions:", err),
     );
   }

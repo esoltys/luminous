@@ -1025,6 +1025,9 @@ export const en = {
     defaultLibraryChangeFailed: "Couldn't change the default library.",
     scanOnStartupLabel: "Rescan Library on Startup",
     scanOnStartupHint: "Run an incremental rescan automatically each time Luminous launches.",
+    suggestFoldersLabel: "Suggest folders to add to the library",
+    suggestFoldersHint:
+      "Show a card on Home offering to add the folders of files you've opened to your library.",
     autoOrganizeLabel: "Auto-Organize New Files & Tag Updates",
     autoOrganizeHint:
       "Organize files automatically in the background using your active template when new tracks arrive or tags are edited.",
