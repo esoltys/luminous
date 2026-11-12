@@ -42,11 +42,14 @@
 
   async function addFolder(path: string) {
     try {
-      // The scan that follows emits `library-changed`, which drops the folder.
       await collectionStore.addDirectory(path);
     } catch (err) {
       console.error("Failed to add suggested folder:", err);
     }
+    // The folder is watched now, so the backend stops offering it. Ask instead
+    // of waiting for `library-changed`: a scan that finds nothing to change
+    // (files already recorded) never emits it.
+    await refresh();
   }
 
   // The backend emits `library-folder-suggestions-changed` once the write has

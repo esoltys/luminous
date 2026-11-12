@@ -64,8 +64,15 @@ describe("LibraryFolderSuggestions.svelte", () => {
     const addDirectory = vi.spyOn(collectionStore, "addDirectory").mockResolvedValue(undefined);
     render(LibraryFolderSuggestions);
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Add Tunes to your library" }));
+    const addButton = await screen.findByRole("button", { name: "Add Tunes to your library" });
+    // Adding makes the folder watched, so the backend stops returning it.
+    mockFolders = [MUSIC];
+    await fireEvent.click(addButton);
     expect(addDirectory).toHaveBeenCalledWith("/home/me/Tunes");
+
+    // Once the add resolves the card asks the backend again, with no event needed.
+    await waitFor(() => expect(screen.queryByText("Tunes")).not.toBeInTheDocument());
+    expect(screen.getByText("Jazz")).toBeInTheDocument();
   });
 
   it("dismisses one folder, then refetches only when the backend says it changed", async () => {
