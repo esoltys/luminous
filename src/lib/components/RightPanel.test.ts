@@ -52,6 +52,8 @@ describe("RightPanel.svelte", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps implementations; a test that stubs invoke must not leak into the next.
+    vi.mocked(invoke).mockReset().mockResolvedValue(null);
     playerStore.state = "stopped";
     playerStore.currentSong = undefined;
     prefs.onlineEnabled = true;
