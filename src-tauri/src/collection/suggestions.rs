@@ -7,7 +7,8 @@
 //! [`suggested_folders`] owns every filtering rule, so the UI shows exactly
 //! what it returns: folders on an unplugged drive can't be scanned, folders
 //! already watched have nothing to add, and a dismissed folder or the global
-//! hide stays dismissed (persisted in `app_state`).
+//! hide stays dismissed (persisted in `app_state`). The global hide can be
+//! turned back off ([`set_hidden`]); per-folder dismissals survive that.
 
 use crate::models::SongSource;
 use anyhow::Result;

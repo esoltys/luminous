@@ -342,7 +342,8 @@ describe("SettingsSources.svelte - folder suggestions toggle", () => {
     const base = mockHidden(true);
     const { findByLabelText } = render(SettingsSources);
     const toggle = await findByLabelText(LABEL);
-    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "false"));
+    await waitFor(() => expect(toggle).toBeEnabled());
+    expect(toggle).toHaveAttribute("aria-checked", "false");
 
     await fireEvent.click(toggle);
     expect(invoke).toHaveBeenCalledWith("set_library_folder_suggestions_hidden", {
@@ -365,7 +366,8 @@ describe("SettingsSources.svelte - folder suggestions toggle", () => {
     const base = mockHidden(false);
     const { findByLabelText } = render(SettingsSources);
     const toggle = await findByLabelText(LABEL);
-    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
+    await waitFor(() => expect(toggle).toBeEnabled());
+    expect(toggle).toHaveAttribute("aria-checked", "true");
 
     await fireEvent.click(toggle);
     expect(invoke).toHaveBeenCalledWith("set_library_folder_suggestions_hidden", {

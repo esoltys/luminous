@@ -332,7 +332,8 @@
   // The backend owns this flag; the row mirrors it and refetches on the event
   // rather than assuming the write landed (the Home card's "Hide suggestions"
   // link changes it too).
-  let suggestFolders = $state(true);
+  // `null` until the first read lands, so the toggle never flashes a wrong state.
+  let suggestFolders = $state<boolean | null>(null);
 
   async function refreshSuggestFolders() {
     try {
@@ -1095,7 +1096,8 @@
         </p>
       </div>
       <Toggle
-        checked={suggestFolders}
+        checked={suggestFolders === true}
+        disabled={suggestFolders === null}
         onchange={handleToggleSuggestFolders}
         label={i18n.t("settings.suggestFoldersLabel")}
       />
