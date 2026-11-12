@@ -8,11 +8,20 @@
     /** When provided, the stars are interactive; omitted = read-only display. */
     onRate?: (rating: number) => void;
     size?: "sm" | "md";
+    /**
+     * While unrated, keep the control's space but hide it until an ancestor with the Tailwind
+     * `group` class is hovered or has focus within, or the control itself has focus. Hidden stars
+     * stay in the tab order, so keyboard users reach them (focus reveals them). A rated item
+     * always shows its stars.
+     */
+    revealOnInteract?: boolean;
   }
 
-  let { rating, onRate, size = "sm" }: Props = $props();
+  let { rating, onRate, size = "sm", revealOnInteract = false }: Props = $props();
 
   let hoverValue = $state<number | null>(null);
+
+  const hidden = $derived(revealOnInteract && rating <= 0 && hoverValue === null);
 
   const starClass = $derived(size === "md" ? "w-4 h-4" : "w-3.5 h-3.5");
   const clearClass = $derived(size === "md" ? "w-3.5 h-3.5" : "w-3 h-3");
@@ -44,9 +53,11 @@
 </script>
 
 <div
-  class="flex items-center gap-0.5 {rating <= 0 && !hoverValue
-    ? 'opacity-40'
-    : ''} transition-opacity"
+  class="flex items-center gap-0.5 transition-opacity {hidden
+    ? 'opacity-0 pointer-events-none group-hover:opacity-40 group-hover:pointer-events-auto group-focus-within:opacity-40 group-focus-within:pointer-events-auto focus-within:opacity-40 focus-within:pointer-events-auto'
+    : rating <= 0 && !hoverValue
+      ? 'opacity-40'
+      : ''}"
   role="group"
   aria-label={i18n.t("rating.label")}
   onmouseleave={() => (hoverValue = null)}

@@ -141,7 +141,13 @@
     >
       <div class="flex min-w-0"><GenreChips genre={album.genre} /></div>
       <span class="shrink-0"
-        ><SongRating isAlbum rating={currentRating} onRate={rateAlbum} size="sm" /></span
+        ><SongRating
+          isAlbum
+          revealOnInteract
+          rating={currentRating}
+          onRate={rateAlbum}
+          size="sm"
+        /></span
       >
     </div>
   </div>

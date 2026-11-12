@@ -930,6 +930,7 @@
     y={albumContextMenuState.y}
     albumName={album.album || i18n.t("collection.unknownAlbum")}
     albumKey={album.album_key ?? undefined}
+    rating={album.album ? album.rating : undefined}
     artistName={album.artist || undefined}
     onPlay={() => handlePlayAlbum(album.album || "", album.album_key ?? undefined)}
     onAddToPlaylist={async () => {

@@ -119,6 +119,7 @@
       y={contextMenuState.y}
       albumName={item.album.album || ""}
       artistName={item.album.artist || undefined}
+      rating={item.album.album ? item.album.rating : undefined}
       onPlay={() => queueAlbumAsPlaylist(item.album)}
       onGoToArtist={item.album.artist
         ? () => navigationStore.viewArtist(item.album.artist!)
