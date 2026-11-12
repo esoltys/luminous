@@ -113,7 +113,7 @@
           onclick={addMusicFolder}
           class="w-full flex items-center gap-2 {SIDEBAR_SUB_ITEM_INDENT_CLASS} pr-2.5 py-1 rounded-md text-xs font-semibold text-brand-accent-text hover:bg-brand-accent/10 transition-colors"
         >
-          <PlusIcon class="w-3.5 h-3.5 icon-align" />
+          <PlusIcon class="w-3.5 h-3.5" />
           <span class="truncate">{i18n.t("files.addMusicFolder")}</span>
         </button>
       {/if}
@@ -124,7 +124,7 @@
           class="{sidebarSubItemClass(isOpen(entry.source))} {entry.available ? '' : 'opacity-60'}"
         >
           <div class="flex items-center gap-2 truncate">
-            <Icon class="w-3.5 h-3.5 icon-align shrink-0" />
+            <Icon class="w-3.5 h-3.5 shrink-0" />
             <span class="truncate">{entry.name}</span>
           </div>
         </button>
@@ -156,7 +156,7 @@
               ? 'bg-brand-accent/30 ring-2 ring-brand-accent text-brand-text-primary font-semibold'
               : ''}"
           >
-            <Icon class="w-3.5 h-3.5 icon-align shrink-0 mt-px" />
+            <Icon class="w-3.5 h-3.5 shrink-0 mt-px" />
             <span class="flex-1 min-w-0 flex flex-col gap-1">
               <span class="truncate">{name}</span>
               <span
