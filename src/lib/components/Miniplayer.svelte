@@ -193,13 +193,22 @@
     }
   }
 
-  function handleStartDrag(e: PointerEvent) {
-    invoke("start_window_drag").catch(() => {});
+  // The grabbers and resize edges go through our own window commands, which
+  // are the only way this window starts a drag or resize. Do not also mark
+  // them `data-tauri-drag-region`: Tauri's injected script would then call the
+  // built-in `start_dragging` as well, which the `main` capability
+  // (src-tauri/capabilities/default.json) deliberately does not grant (#1603).
+  function handleStartDrag() {
+    invoke("start_window_drag").catch((err) => {
+      console.error("Failed to start miniplayer window drag:", err);
+    });
   }
 
   function handleStartResize(direction: string, e: PointerEvent) {
     e.stopPropagation();
-    invoke("start_window_resize", { direction }).catch(() => {});
+    invoke("start_window_resize", { direction }).catch((err) => {
+      console.error("Failed to start miniplayer window resize:", err);
+    });
   }
 
   function handleKeyDown(e: KeyboardEvent) {
@@ -377,6 +386,19 @@
   });
 </script>
 
+<!-- The strip across the top of the miniplayer that moves the window. Every
+     layout uses this one snippet, so the drag wiring lives in one place. -->
+{#snippet dragGrabber(sizeClass: string)}
+  <div
+    onpointerdown={handleStartDrag}
+    role="button"
+    tabindex="0"
+    aria-label={i18n.t("miniplayer.dragHint", {}, "Drag window")}
+    class="drag-grabber w-full {sizeClass} flex-shrink-0 cursor-grab active:cursor-grabbing text-brand-text-secondary/40 hover:text-brand-text-secondary/80 transition-colors"
+    title={i18n.t("miniplayer.dragHint", {}, "Drag window")}
+  ></div>
+{/snippet}
+
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
@@ -454,16 +476,7 @@
     <div
       class="relative z-10 w-full h-full flex flex-col items-center justify-between pointer-events-auto"
     >
-      <!-- Drag handle at top -->
-      <div
-        data-tauri-drag-region
-        onpointerdown={handleStartDrag}
-        role="button"
-        tabindex="0"
-        aria-label={i18n.t("miniplayer.dragHint", {}, "Drag window")}
-        class="drag-grabber w-full h-4 flex-shrink-0 cursor-grab active:cursor-grabbing text-brand-text-secondary/40 hover:text-brand-text-secondary/80 transition-colors"
-        title={i18n.t("miniplayer.dragHint", {}, "Drag window")}
-      ></div>
+      {@render dragGrabber("h-4")}
 
       <!-- Center: Celebration Badge & Action Pills -->
       <div class="flex-1 w-full flex flex-col items-center justify-center my-auto px-2 min-h-0">
@@ -725,15 +738,7 @@
         ? 'opacity-100 pointer-events-auto'
         : 'opacity-0 pointer-events-none'} hover-mask bg-brand-main/85 backdrop-blur-md"
     >
-      <div
-        data-tauri-drag-region
-        onpointerdown={handleStartDrag}
-        role="button"
-        tabindex="0"
-        aria-label={i18n.t("miniplayer.dragHint", {}, "Drag window")}
-        class="drag-grabber w-full h-5 flex-shrink-0 z-40 cursor-grab active:cursor-grabbing text-brand-text-secondary/40 hover:text-brand-text-secondary/80 transition-colors"
-        title={i18n.t("miniplayer.dragHint", {}, "Drag window")}
-      ></div>
+      {@render dragGrabber("h-5 z-40")}
 
       <div
         class="w-full text-center px-1 py-0.5 flex flex-col items-center justify-center flex-shrink-0 mt-auto"
