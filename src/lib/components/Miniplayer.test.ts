@@ -43,6 +43,7 @@ describe("Miniplayer.svelte", () => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     playerStore.state = "stopped";
     playerStore.currentSong = undefined;
+    playerStore.completedSession = null;
     playerStore.volume = 0.8;
     playerStore.shuffleMode = "off";
     playerStore.repeatMode = "off";
@@ -350,6 +351,22 @@ describe("Miniplayer.svelte", () => {
       expect(invoke).toHaveBeenCalledWith("start_window_drag");
     });
 
+    it("drags from the session-complete screen's grabber too", async () => {
+      playerStore.currentSong = undefined;
+      playerStore.completedSession = {
+        contextName: "Queue",
+        isQueue: true,
+        songIds: [101, 102],
+        trackCount: 2,
+      };
+      const { getByTitle, container } = render(Miniplayer);
+
+      await fireEvent.pointerDown(getByTitle("Drag window"));
+
+      expect(invoke).toHaveBeenCalledWith("start_window_drag");
+      expect(container.querySelector("[data-tauri-drag-region]")).toBeNull();
+    });
+
     it("has no data-tauri-drag-region, which would start a second, unpermitted drag", () => {
       playerStore.currentSong = mockSong;
       const { container } = render(Miniplayer);
@@ -367,10 +384,9 @@ describe("Miniplayer.svelte", () => {
 
       await fireEvent.pointerDown(getByTitle("Drag window"));
 
-      await waitFor(() =>
-        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("drag"), "drag refused"),
-      );
+      const logged = [...errorSpy.mock.calls];
       errorSpy.mockRestore();
+      expect(logged).toContainEqual([expect.stringContaining("drag"), "drag refused"]);
     });
   });
 
