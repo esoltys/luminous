@@ -34,7 +34,7 @@ export class PlaylistsStore {
   historyCount = $state(0);
 
   /** Count of auto-playlists that currently have at least one song — used for
-   * the sidebar's Auto badge, kept in sync with the Auto grid's own filtering. */
+   * the Auto view's count, kept in sync with the Auto grid's own filtering. */
   visibleAutoPlaylistCount = $derived.by(() => {
     const genreCount = this.playlists.filter(
       (p) =>
@@ -54,23 +54,6 @@ export class PlaylistsStore {
   /** The special pinned Queue playlist, always present and never deletable. */
   queuePlaylist = $derived.by((): Playlist | null => {
     return this.playlists.find((p) => p.is_queue) ?? null;
-  });
-
-  queueVersion = $state(0);
-
-  notifyQueueChanged() {
-    this.queueVersion++;
-  }
-
-  queueTrackCount = $derived.by((): number => {
-    // Explicit signal dependency for Svelte 5 reactivity
-    this.queueVersion;
-    const q = this.playlists.find((p) => p.is_queue);
-    if (q === undefined) return this.activePlaylistTracks.length ?? 0;
-    if (this.activePlaylistId !== null && this.activePlaylistId === q.id) {
-      return this.activePlaylistTracks.length;
-    }
-    return q.track_count ?? 0;
   });
 
   /** The "Active" playlist id: whatever's explicitly pinned via "Make Active",
@@ -198,7 +181,6 @@ export class PlaylistsStore {
   async refreshPlaylists() {
     const playlists = await invoke<Playlist[]>("get_playlists");
     this.playlists = Array.isArray(playlists) ? playlists : [];
-    this.notifyQueueChanged();
   }
 
   scheduleRefreshAutoPlaylistCounts(delayMs = 300) {
@@ -230,7 +212,6 @@ export class PlaylistsStore {
   async selectPlaylist(id: number) {
     this.activePlaylistId = id;
     this.activePlaylistTracks = await invoke("get_playlist_tracks", { playlistId: id });
-    this.notifyQueueChanged();
     await invoke("set_app_setting", { key: "active_playlist_id", value: id.toString() });
   }
 

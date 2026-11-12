@@ -120,9 +120,7 @@
   {/if}
 
   {#if showSubItems}
-    <div
-      class="pl-[9px] pr-1 py-0.5 space-y-0 border-l-2 border-brand-accent/30 ml-[calc(var(--sidebar-icon-axis)_-_1px)] my-0.5"
-    >
+    <div class="w-full py-0.5 space-y-0">
       {#if filesStore.loaded && filesStore.sources.length === 0}
         <button
           onclick={addMusicFolder}
@@ -136,7 +134,7 @@
         {@const Icon = sourceIcon(entry.source)}
         <button
           onclick={() => navigationStore.viewFiles(entry.source)}
-          class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {isOpen(
+          class="w-full flex items-center px-2.5 py-1 rounded-md text-xs transition-colors {isOpen(
             entry.source,
           )
             ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
@@ -148,9 +146,6 @@
             <Icon class="w-3.5 h-3.5 icon-align shrink-0" />
             <span class="truncate">{entry.name}</span>
           </div>
-          <span class="text-[10px] text-brand-text-secondary/60 ml-1"
-            >({formatNumber(entry.songCount)})</span
-          >
         </button>
       {/each}
       {#if filesStore.devices.length > 0}

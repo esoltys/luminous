@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { i18n } from "../stores/i18n.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -84,6 +85,13 @@
     data-pinned-nav-list="true"
     class="w-full flex flex-col {collapsed ? 'items-center py-1' : 'py-0.5'}"
   >
+    {#if !collapsed}
+      <div
+        class="w-full px-3 pt-2.5 pb-0.5 text-xs font-medium text-brand-text-secondary/70 truncate"
+      >
+        {i18n.t("sidebar.pinned")}
+      </div>
+    {/if}
     <div class="w-full space-y-0.5 flex flex-col {collapsed ? 'items-center' : ''}">
       {#each pinnedStore.navigableItems as pin, index (pin.id)}
         <PinnedNavItem
