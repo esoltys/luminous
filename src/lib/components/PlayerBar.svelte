@@ -551,7 +551,7 @@
       class="flex items-center justify-end flex-shrink-0 md:w-1/3 md:min-w-[200px] max-w-xs"
     >
       <div class="h-7 flex items-center gap-3">
-        {#if !windowLayoutStore.isRightPanelAutoHidden}
+        {#if !windowLayoutStore.isDockSpectrumHidden}
           <div transition:collapseFade={{ duration: 250 }} class="w-24 h-7 block flex-shrink-0">
             <SpectrumVisualizer />
           </div>

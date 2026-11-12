@@ -48,11 +48,18 @@ export const BREAKPOINT_NARROW_PX = 420;
 /** Width at which the layout leaves "compact": below it Immersive Mode force-engages and the PlayerBar goes Compact. Tailwind `sm`. */
 export const BREAKPOINT_MEDIUM_PX = 640;
 
-/** Width below which the right panel auto-hides and playbar spectrum/info/lyrics buttons hide. Tailwind `md`. */
+/** Width below which the right panel auto-hides and the PlayerBar drops Shuffle/Repeat and the Lyrics/Song info menu items. Tailwind `md`. */
 export const BREAKPOINT_RIGHT_PANEL_PX = 768;
 
 /** Width below which the sidebar auto-collapses to its icon rail. Tailwind `lg`. */
 export const BREAKPOINT_EXPANDED_PX = 1024;
+
+/**
+ * Width below which the PlayerBar drops its live spectrum. The right-hand cluster (spectrum, Queue,
+ * volume, more) needs about 280px but gets a third of the dock, which is about (width - 140) / 3,
+ * so under roughly 980px the spectrum would overlap the seek bar; 1100 leaves margin.
+ */
+export const BREAKPOINT_DOCK_SPECTRUM_PX = 1100;
 
 /** Height below which the app collapses to showing only the PlayerBar (routes/+layout.svelte, collection.svelte.ts). */
 export const HEIGHT_BREAKPOINT_MINIMAL_PX = 160;

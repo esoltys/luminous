@@ -5,6 +5,7 @@ import {
   SIDEBAR_COLLAPSED_WIDTH_PX,
   BREAKPOINT_EXPANDED_PX,
   BREAKPOINT_RIGHT_PANEL_PX,
+  BREAKPOINT_DOCK_SPECTRUM_PX,
   BREAKPOINT_MEDIUM_PX,
   HEIGHT_BREAKPOINT_MINIMAL_PX,
   HEIGHT_BREAKPOINT_SHORT_PX,
@@ -379,6 +380,11 @@ class WindowLayoutStore {
   // rightPanelPinned it ignores the narrow-window override (isRightPanelAutoHidden).
   get rightPanelVisible(): boolean {
     return this.rightPanelPinned || this.rightPanelPeeking;
+  }
+
+  /** Whether the PlayerBar has too little room for its live spectrum (see BREAKPOINT_DOCK_SPECTRUM_PX). */
+  get isDockSpectrumHidden(): boolean {
+    return this.viewportWidth < BREAKPOINT_DOCK_SPECTRUM_PX;
   }
 
   get isPlayerBarCompact(): boolean {

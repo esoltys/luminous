@@ -564,30 +564,31 @@ describe("PlayerBar.svelte", () => {
     expect(getByTitle("Song menu")).toBeDisabled();
   });
 
-  it("hides the spectrum, shuffle, and repeat at the breakpoint that auto-hides the right panel (< 768px), keeping the menu", () => {
+  it("drops the spectrum below 1100px, then shuffle and repeat below 768px, keeping the menu", () => {
     playerStore.currentSong = mockSong;
     windowLayoutStore.viewportWidth = 1280;
-    expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
+    expect(windowLayoutStore.isDockSpectrumHidden).toBe(false);
     const { queryByTitle, container, unmount } = render(PlayerBar);
     expect(container.querySelector(TOOLBAR_CANVAS)).not.toBeNull();
     expect(queryByTitle(/shuffle/i)).not.toBeNull();
     expect(queryByTitle(/repeat/i)).not.toBeNull();
     unmount();
 
-    // 800px is >= 768px (md breakpoint): spectrum, shuffle, and repeat remain visible
+    // 800px: too narrow for the spectrum (it would overlap the seek bar), but shuffle and repeat stay
     windowLayoutStore.viewportWidth = 800;
+    expect(windowLayoutStore.isDockSpectrumHidden).toBe(true);
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
     const {
       queryByTitle: queryByTitleMedium,
       container: mediumContainer,
       unmount: unmountMedium,
     } = render(PlayerBar);
-    expect(mediumContainer.querySelector(TOOLBAR_CANVAS)).not.toBeNull();
+    expect(mediumContainer.querySelector(TOOLBAR_CANVAS)).toBeNull();
     expect(queryByTitleMedium(/shuffle/i)).not.toBeNull();
     expect(queryByTitleMedium(/repeat/i)).not.toBeNull();
     unmountMedium();
 
-    // 700px is < 768px: right panel auto-hides, spectrum, Shuffle, and Repeat hide; the menu stays
+    // 700px is < 768px: right panel auto-hides, Shuffle and Repeat hide too; the menu stays
     windowLayoutStore.viewportWidth = 700;
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(true);
     const { queryByTitle: queryByTitleNarrow, container: narrowContainer } = render(PlayerBar);
