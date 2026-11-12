@@ -1,53 +1,57 @@
 <script lang="ts">
-  import '../app.css';
-  import TopNavigation from '../lib/components/TopNavigation.svelte';
-  import Sidebar from '../lib/components/Sidebar.svelte';
-  import RightPanelHost from '../lib/components/RightPanelHost.svelte';
-  import PlayerBar from '../lib/components/PlayerBar.svelte';
-  import { slide, fly, fade, prefersReducedMotion } from '../lib/utils/motion';
-  import { cubicOut } from 'svelte/easing';
-  import { collectionStore } from '../lib/stores/collection.svelte';
-  import { navigationStore } from '../lib/stores/navigation.svelte';
-  import { windowLayoutStore } from '../lib/stores/windowLayout.svelte';
-  import { playerStore } from '../lib/stores/player.svelte';
-  import CoverArt from '../lib/components/CoverArt.svelte';
-  import Miniplayer from '../lib/components/Miniplayer.svelte';
-  import ImmersiveSessionWrap from '../lib/components/ImmersiveSessionWrap.svelte';
-  import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
-  import Toast from '../lib/components/Toast.svelte';
-  import SongDragGhost from '../lib/components/SongDragGhost.svelte';
-  import WalkthroughOverlay from '../lib/components/WalkthroughOverlay.svelte';
-  import WelcomeScreen from '../lib/components/WelcomeScreen.svelte';
-  import ConfirmDialog from '../lib/components/ConfirmDialog.svelte';
-  import { IconContext, MusicNotesIcon as Music, CloudArrowUpIcon as UploadCloud } from 'phosphor-svelte';
+  import "../app.css";
+  import TopNavigation from "../lib/components/TopNavigation.svelte";
+  import Sidebar from "../lib/components/Sidebar.svelte";
+  import RightPanelHost from "../lib/components/RightPanelHost.svelte";
+  import PlayerBar from "../lib/components/PlayerBar.svelte";
+  import { slide, fly, fade, prefersReducedMotion } from "../lib/utils/motion";
+  import { cubicOut } from "svelte/easing";
+  import { collectionStore } from "../lib/stores/collection.svelte";
+  import { navigationStore } from "../lib/stores/navigation.svelte";
+  import { windowLayoutStore } from "../lib/stores/windowLayout.svelte";
+  import { playerStore } from "../lib/stores/player.svelte";
+  import CoverArt from "../lib/components/CoverArt.svelte";
+  import Miniplayer from "../lib/components/Miniplayer.svelte";
+  import ImmersiveSessionWrap from "../lib/components/ImmersiveSessionWrap.svelte";
+  import KeyboardShortcutsModal from "../lib/components/KeyboardShortcutsModal.svelte";
+  import Toast from "../lib/components/Toast.svelte";
+  import SongDragGhost from "../lib/components/SongDragGhost.svelte";
+  import WalkthroughOverlay from "../lib/components/WalkthroughOverlay.svelte";
+  import WelcomeScreen from "../lib/components/WelcomeScreen.svelte";
+  import ConfirmDialog from "../lib/components/ConfirmDialog.svelte";
+  import {
+    IconContext,
+    MusicNotesIcon as Music,
+    CloudArrowUpIcon as UploadCloud,
+  } from "phosphor-svelte";
 
-  import { i18n } from '../lib/stores/i18n.svelte';
-  import { prefs } from '../lib/stores/prefs.svelte';
-  import { tagsStore } from '../lib/stores/tags.svelte';
-  import { hierarchySidecarStore } from '../lib/stores/hierarchySidecar.svelte';
-  import { updaterStore } from '../lib/stores/updater.svelte';
-  import { picardStore } from '../lib/stores/picard.svelte';
-  import { scrobblerStore } from '../lib/stores/scrobbler.svelte';
-  import { organizeStore } from '../lib/stores/organizer.svelte';
-  import { toastStore } from '../lib/stores/toast.svelte';
-  import { walkthroughStore } from '../lib/stores/walkthrough.svelte';
-  import { welcomeStore } from '../lib/stores/welcome.svelte';
-  import { themeStore } from '../lib/stores/theme.svelte';
-  import { generateEllipseGradientSvg } from '../lib/utils/ellipseGradient';
-  import { formatWindowTitle } from '../lib/utils/formatters';
-  import { FrontendErrorReporter } from '../lib/utils/frontendError';
-  import TagEditor from '../lib/components/TagEditor.svelte';
-  import DeviceSyncDrawer from '../lib/components/devices/DeviceSyncDrawer.svelte';
-  import { onMount } from 'svelte';
-  import { getCurrentWebview } from '@tauri-apps/api/webview';
-  import { getCurrentWindow } from '@tauri-apps/api/window';
-  import { invoke } from '@tauri-apps/api/core';
+  import { i18n } from "../lib/stores/i18n.svelte";
+  import { prefs } from "../lib/stores/prefs.svelte";
+  import { tagsStore } from "../lib/stores/tags.svelte";
+  import { hierarchySidecarStore } from "../lib/stores/hierarchySidecar.svelte";
+  import { updaterStore } from "../lib/stores/updater.svelte";
+  import { picardStore } from "../lib/stores/picard.svelte";
+  import { scrobblerStore } from "../lib/stores/scrobbler.svelte";
+  import { organizeStore } from "../lib/stores/organizer.svelte";
+  import { toastStore } from "../lib/stores/toast.svelte";
+  import { walkthroughStore } from "../lib/stores/walkthrough.svelte";
+  import { welcomeStore } from "../lib/stores/welcome.svelte";
+  import { themeStore } from "../lib/stores/theme.svelte";
+  import { generateEllipseGradientSvg } from "../lib/utils/ellipseGradient";
+  import { formatWindowTitle } from "../lib/utils/formatters";
+  import { FrontendErrorReporter } from "../lib/utils/frontendError";
+  import TagEditor from "../lib/components/TagEditor.svelte";
+  import DeviceSyncDrawer from "../lib/components/devices/DeviceSyncDrawer.svelte";
+  import { onMount } from "svelte";
+  import { getCurrentWebview } from "@tauri-apps/api/webview";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { invoke } from "@tauri-apps/api/core";
   import {
     SIDEBAR_MIN_WIDTH_PX,
     SIDEBAR_MAX_WIDTH_PX,
     SIDEBAR_COLLAPSED_WIDTH_PX,
     PANEL_RESIZE_STEP_PX,
-  } from '../lib/constants';
+  } from "../lib/constants";
 
   let { children } = $props();
 
@@ -85,7 +89,9 @@
   // Visual-only override: never touches the stored sidebarWidth preference,
   // so widening the window back out restores exactly the width the user had.
   let effectiveSidebarWidth = $derived(
-    windowLayoutStore.isSidebarAutoCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : windowLayoutStore.sidebarWidth
+    windowLayoutStore.isSidebarAutoCollapsed
+      ? SIDEBAR_COLLAPSED_WIDTH_PX
+      : windowLayoutStore.sidebarWidth,
   );
 
   // Immersive ambient background: a layered-ellipse SVG gradient tinted from
@@ -98,8 +104,16 @@
   // the immersive view no longer needs a Linux-specific fallback here.
   let immersiveAmbientSvg = $derived.by(() => {
     const art = themeStore.artworkColors;
-    const colors = art ? [art.vibrant, art.darkVibrant, art.lightVibrant, art.muted].filter((c): c is string => !!c) : undefined;
-    return generateEllipseGradientSvg({ colors, seed: playerStore.currentSong?.id ?? playerStore.completedSession?.completedAt ?? 'immersive-empty' });
+    const colors = art
+      ? [art.vibrant, art.darkVibrant, art.lightVibrant, art.muted].filter((c): c is string => !!c)
+      : undefined;
+    return generateEllipseGradientSvg({
+      colors,
+      seed:
+        playerStore.currentSong?.id ??
+        playerStore.completedSession?.completedAt ??
+        "immersive-empty",
+    });
   });
 
   // Dynamically synchronize the OS window title with Now Playing track status (#29).
@@ -108,10 +122,12 @@
   $effect(() => {
     void i18n.currentLocale;
     const title = formatWindowTitle(playerStore.currentSong, playerStore.state, windowTitleAppName);
-    if (typeof document !== 'undefined') {
+    if (typeof document !== "undefined") {
       document.title = title;
     }
-    void getCurrentWindow()?.setTitle?.(title)?.catch(() => {});
+    void getCurrentWindow()
+      ?.setTitle?.(title)
+      ?.catch(() => {});
   });
 
   // Auto-resumes the walkthrough in "resume" mode (see the onMount comment
@@ -139,7 +155,7 @@
   });
 
   $effect(() => {
-    if (typeof document !== 'undefined') {
+    if (typeof document !== "undefined") {
       document.documentElement.lang = i18n.currentLocale;
     }
   });
@@ -157,29 +173,37 @@
     // one click via the overlay's Skip button or Escape.
     welcomeStore.init();
     walkthroughStore.init();
-    tagsStore.load().catch((err) => console.error('Failed to load tags:', err));
-    hierarchySidecarStore.init().catch((err) => console.error('Failed to load the default library:', err));
+    tagsStore.load().catch((err) => console.error("Failed to load tags:", err));
+    hierarchySidecarStore
+      .init()
+      .catch((err) => console.error("Failed to load the default library:", err));
     updaterStore.init();
     picardStore.init();
     scrobblerStore.init();
     organizeStore.init();
-    void getCurrentWindow().show().catch(() => {});
-    invoke<boolean>('is_remote_devtools_enabled')
+    void getCurrentWindow()
+      .show()
+      .catch(() => {});
+    invoke<boolean>("is_remote_devtools_enabled")
       .then((enabled) => {
-        if (enabled) windowTitleAppName = 'Luminous Debug';
+        if (enabled) windowTitleAppName = "Luminous Debug";
       })
       .catch(() => {});
 
     // Scripting surface is installed in dev servers or the non-release capture flavor.
     // In production release builds (MODE === 'production'), this branch statically folds to false
     // and Rolldown dead-code eliminates the dynamic import and the entire scripting module.
-    const isScriptingEnabled = import.meta.env.DEV || import.meta.env.MODE === 'capture';
+    const isScriptingEnabled = import.meta.env.DEV || import.meta.env.MODE === "capture";
     if (isScriptingEnabled) {
-      import('../lib/scripting').then(({ installScriptingApi, registerDialogHostControls }) => {
+      import("../lib/scripting").then(({ installScriptingApi, registerDialogHostControls }) => {
         installScriptingApi();
         registerDialogHostControls({
-          openShortcuts: () => { isShortcutsModalOpen = true; },
-          openTagEditor: (songId: number) => { editingSongId = songId; },
+          openShortcuts: () => {
+            isShortcutsModalOpen = true;
+          },
+          openTagEditor: (songId: number) => {
+            editingSongId = songId;
+          },
           closeAll: () => {
             isShortcutsModalOpen = false;
             editingSongId = null;
@@ -194,40 +218,40 @@
       if (!(e.ctrlKey || e.metaKey)) return;
 
       switch (e.key.toLowerCase()) {
-        case 'm':
+        case "m":
           e.preventDefault();
           windowLayoutStore.toggleMiniplayerMode();
           break;
-        case ',':
+        case ",":
           e.preventDefault();
-          navigationStore.activeTab = 'settings';
+          navigationStore.activeTab = "settings";
           break;
-        case '[':
+        case "[":
           e.preventDefault();
           navigationStore.goBack();
           break;
-        case ']':
+        case "]":
           e.preventDefault();
           navigationStore.goForward();
           break;
-        case '1':
+        case "1":
           e.preventDefault();
           instantly(() => windowLayoutStore.toggleSidebarCompact());
           break;
-        case '2':
+        case "2":
           e.preventDefault();
           instantly(() => windowLayoutStore.toggleImmersiveMode());
           break;
-        case '3':
-        case 'i':
+        case "3":
+        case "i":
           e.preventDefault();
           instantly(() => windowLayoutStore.toggleRightPanel());
           break;
-        case '/':
+        case "/":
           e.preventDefault();
           isShortcutsModalOpen = !isShortcutsModalOpen;
           break;
-        case 'o':
+        case "o":
           e.preventDefault();
           playerStore.openFileDialog();
           break;
@@ -244,9 +268,9 @@
     let shiftPollInterval: ReturnType<typeof setInterval> | undefined;
     async function refreshShiftHeld() {
       try {
-        isShiftHeld = await invoke<boolean>('is_shift_key_held');
+        isShiftHeld = await invoke<boolean>("is_shift_key_held");
       } catch (e) {
-        console.warn('Failed to query Shift key state:', e);
+        console.warn("Failed to query Shift key state:", e);
       }
     }
     function stopShiftPolling() {
@@ -257,18 +281,18 @@
     }
 
     async function handleFilesDropped(paths: string[]) {
-      const append = await invoke<boolean>('is_shift_key_held').catch(() => false);
+      const append = await invoke<boolean>("is_shift_key_held").catch(() => false);
       if (append) {
         const outcome = await playerStore.addPathsToQueue(paths);
         if (outcome.added > 0) {
           const text = i18n.plural("dragDrop.addedSongs", outcome.added);
-          toastStore.show(text, 'success');
+          toastStore.show(text, "success");
         }
       } else {
         const outcome = await playerStore.openAndPlay(paths);
         if (outcome.played > 0) {
           const text = i18n.plural("dragDrop.playingSongs", outcome.played);
-          toastStore.show(text, 'success');
+          toastStore.show(text, "success");
         }
       }
     }
@@ -283,11 +307,11 @@
     let dragDropUnlisten: (() => void) | undefined;
     getCurrentWebview()
       .onDragDropEvent((event) => {
-        if (event.payload.type === 'drop') {
+        if (event.payload.type === "drop") {
           isDragActive = false;
           stopShiftPolling();
           void handleFilesDropped(event.payload.paths);
-        } else if (event.payload.type === 'leave') {
+        } else if (event.payload.type === "leave") {
           isDragActive = false;
           stopShiftPolling();
         } else if (!isDragActive) {
@@ -302,7 +326,7 @@
         dragDropUnlisten = unlisten;
       })
       .catch((e) => {
-        console.warn('Failed to attach drag-and-drop listener:', e);
+        console.warn("Failed to attach drag-and-drop listener:", e);
       });
 
     const handleWindowFocus = () => {
@@ -311,10 +335,10 @@
       // any suspended DirectComposition surfaces (#441, #789).
       requestAnimationFrame(() => {
         void document.body.offsetHeight;
-        window.dispatchEvent(new Event('resize'));
+        window.dispatchEvent(new Event("resize"));
       });
     };
-    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener("focus", handleWindowFocus);
 
     let focusUnlisten: (() => void) | undefined;
     getCurrentWindow()
@@ -327,32 +351,30 @@
         focusUnlisten = unlisten;
       })
       .catch((e) => {
-        console.warn('Failed to attach window focus listener:', e);
+        console.warn("Failed to attach window focus listener:", e);
       });
 
-    window.addEventListener('keydown', handleGlobalHotkeys);
+    window.addEventListener("keydown", handleGlobalHotkeys);
 
     // Forwards uncaught JS errors/rejections to the backend crash log (#684)
     // with benign notice filtering and burst repeat-collapsing (#1261) — without
     // this, a frontend crash a user hits when not running from a terminal
     // leaves no trace anywhere for a bug report to point to.
     const errorReporter = new FrontendErrorReporter();
-    window.addEventListener('error', errorReporter.handleWindowError);
-    window.addEventListener('unhandledrejection', errorReporter.handleUnhandledRejection);
+    window.addEventListener("error", errorReporter.handleWindowError);
+    window.addEventListener("unhandledrejection", errorReporter.handleUnhandledRejection);
 
     return () => {
-      window.removeEventListener('keydown', handleGlobalHotkeys);
-      window.removeEventListener('focus', handleWindowFocus);
-      window.removeEventListener('error', errorReporter.handleWindowError);
-      window.removeEventListener('unhandledrejection', errorReporter.handleUnhandledRejection);
+      window.removeEventListener("keydown", handleGlobalHotkeys);
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("error", errorReporter.handleWindowError);
+      window.removeEventListener("unhandledrejection", errorReporter.handleUnhandledRejection);
       errorReporter.flush();
       stopShiftPolling();
       dragDropUnlisten?.();
       focusUnlisten?.();
     };
   });
-
-
 
   // There's no way to exit immersive mode when nothing is playing — the only
   // toggle lives on the PlayerBar, which is itself hidden whenever there's no
@@ -420,7 +442,9 @@
       if (currentWidth === SIDEBAR_MIN_WIDTH_PX) {
         windowLayoutStore.setSidebarWidth(SIDEBAR_COLLAPSED_WIDTH_PX);
       } else if (currentWidth > SIDEBAR_MIN_WIDTH_PX) {
-        windowLayoutStore.setSidebarWidth(Math.max(SIDEBAR_MIN_WIDTH_PX, currentWidth - PANEL_RESIZE_STEP_PX));
+        windowLayoutStore.setSidebarWidth(
+          Math.max(SIDEBAR_MIN_WIDTH_PX, currentWidth - PANEL_RESIZE_STEP_PX),
+        );
       }
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
@@ -429,223 +453,269 @@
       if (currentWidth === SIDEBAR_COLLAPSED_WIDTH_PX) {
         windowLayoutStore.setSidebarWidth(SIDEBAR_MIN_WIDTH_PX);
       } else {
-        windowLayoutStore.setSidebarWidth(Math.min(SIDEBAR_MAX_WIDTH_PX, currentWidth + PANEL_RESIZE_STEP_PX));
+        windowLayoutStore.setSidebarWidth(
+          Math.min(SIDEBAR_MAX_WIDTH_PX, currentWidth + PANEL_RESIZE_STEP_PX),
+        );
       }
     }
   }
 </script>
 
-<IconContext values={{ weight: 'duotone' }}>
+<IconContext values={{ weight: "duotone" }}>
   <div class="relative flex flex-col h-screen overflow-hidden bg-brand-main">
     {#if windowLayoutStore.isMiniplayer}
-    <div class="w-full h-full">
-      <Miniplayer />
-    </div>
-  {:else if windowLayoutStore.isPlaybarOnlyMode}
-    <!-- Playbar-only mode: the window is too short to show anything else,
+      <div class="w-full h-full">
+        <Miniplayer />
+      </div>
+    {:else if windowLayoutStore.isPlaybarOnlyMode}
+      <!-- Playbar-only mode: the window is too short to show anything else,
          including the immersive cover view. Renders PlayerBar unconditionally
          (it already has a graceful "not playing" state) so the user never
          sees a blank window when it's squashed short. When in this mode,
          the chrome around the playbar (margins, borders, rounded pill corners,
          and floating drop shadow) is removed so it fills the window edge-to-edge. -->
-    <div class="w-full h-full flex flex-col">
-      <PlayerBar />
-    </div>
-  {:else}
-    <!-- 3D Flip Container fills the full window height; the PlayerBar floats
+      <div class="w-full h-full flex flex-col">
+        <PlayerBar />
+      </div>
+    {:else}
+      <!-- 3D Flip Container fills the full window height; the PlayerBar floats
          on top of it (absolute, below) so scrolled content passes underneath
          the glass footer instead of stopping above it. -->
-    <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={themeStore.gpuCompositing === false || prefersReducedMotion()} class:instant-layout={instantLayout}>
-      <!-- Inner Card Wrapper -->
-      <div class="w-full h-full relative flip-card" class:flipped={windowLayoutStore.effectiveImmersiveMode}>
+      <div
+        class="flex-1 relative overflow-hidden flip-perspective"
+        class:no-3d={themeStore.gpuCompositing === false || prefersReducedMotion()}
+        class:instant-layout={instantLayout}
+      >
+        <!-- Inner Card Wrapper -->
+        <div
+          class="w-full h-full relative flip-card"
+          class:flipped={windowLayoutStore.effectiveImmersiveMode}
+        >
+          <!-- FRONT FACE: Normal App Layout -->
+          <div
+            class="flip-face flip-front flex flex-col {windowLayoutStore.effectiveImmersiveMode
+              ? 'pointer-events-none'
+              : 'pointer-events-auto'}"
+          >
+            <!-- Top Navigation Ribbon -->
+            <div class="flex-shrink-0 z-50 overflow-visible">
+              <TopNavigation />
+            </div>
 
-        <!-- FRONT FACE: Normal App Layout -->
-        <div class="flip-face flip-front flex flex-col {windowLayoutStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
-          <!-- Top Navigation Ribbon -->
-          <div class="flex-shrink-0 z-50 overflow-visible">
-            <TopNavigation />
-          </div>
+            <!-- Main Grid Layout -->
+            <div class="relative flex flex-1 overflow-hidden">
+              <!-- Left Sidebar -->
+              {#if windowLayoutStore.sidebarOpen}
+                <div
+                  transition:slide={{ axis: "x", duration: instantLayout ? 0 : PANEL_SLIDE_MS }}
+                  class="h-full flex-shrink-0 flex overflow-hidden"
+                >
+                  <Sidebar width={effectiveSidebarWidth} resizing={isResizingSidebar} />
 
-          <!-- Main Grid Layout -->
-          <div class="relative flex flex-1 overflow-hidden">
-            <!-- Left Sidebar -->
-            {#if windowLayoutStore.sidebarOpen}
-              <div transition:slide={{ axis: 'x', duration: instantLayout ? 0 : PANEL_SLIDE_MS }} class="h-full flex-shrink-0 flex overflow-hidden">
-                <Sidebar width={effectiveSidebarWidth} resizing={isResizingSidebar} />
-
-                <!-- Left Resize Handle: hidden while auto-collapsed — dragging
+                  <!-- Left Resize Handle: hidden while auto-collapsed — dragging
                      from a visually-64px rail would otherwise jump using the
                      real (larger) stored sidebarWidth as the drag's starting
                      point. Widening the window is the way out. -->
-                {#if !windowLayoutStore.isSidebarAutoCollapsed}
-                  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-                  <div
-                    role="separator"
-                    aria-valuenow={windowLayoutStore.sidebarWidth}
-                    aria-valuemin={SIDEBAR_COLLAPSED_WIDTH_PX}
-                    aria-valuemax={SIDEBAR_MAX_WIDTH_PX}
-                    aria-label={i18n.t('topNav.resizeSidebar')}
-                    tabindex="0"
-                    class="relative w-1 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-colors self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent"
-                    onpointerdown={startResizeSidebar}
-                    onkeydown={handleSidebarKeyDown}
-                  >
-                    <!-- Expanded hover/touch area wrapper -->
-                    <div class="absolute left-0 -right-2 top-0 bottom-0 cursor-col-resize"></div>
-                  </div>
-                {/if}
-              </div>
-            {/if}
+                  {#if !windowLayoutStore.isSidebarAutoCollapsed}
+                    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                    <div
+                      role="separator"
+                      aria-valuenow={windowLayoutStore.sidebarWidth}
+                      aria-valuemin={SIDEBAR_COLLAPSED_WIDTH_PX}
+                      aria-valuemax={SIDEBAR_MAX_WIDTH_PX}
+                      aria-label={i18n.t("topNav.resizeSidebar")}
+                      tabindex="0"
+                      class="relative w-1 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-colors self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent"
+                      onpointerdown={startResizeSidebar}
+                      onkeydown={handleSidebarKeyDown}
+                    >
+                      <!-- Expanded hover/touch area wrapper -->
+                      <div class="absolute left-0 -right-2 top-0 bottom-0 cursor-col-resize"></div>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
 
-            <!-- Central Content Area -->
-            <main class="@container relative flex-1 bg-brand-main overflow-hidden flex flex-col">
-              {@render children()}
-              <DeviceSyncDrawer />
-            </main>
+              <!-- Central Content Area -->
+              <main class="@container relative flex-1 bg-brand-main overflow-hidden flex flex-col">
+                {@render children()}
+                <DeviceSyncDrawer />
+              </main>
 
-            <!-- Right Contextual Panel: docked, or a rail plus hover overlay when unpinned -->
-            <RightPanelHost instant={instantLayout} />
+              <!-- Right Contextual Panel: docked, or a rail plus hover overlay when unpinned -->
+              <RightPanelHost instant={instantLayout} />
+            </div>
           </div>
-        </div>
 
-        <!-- BACK FACE: Immersive Dedicated Album Artwork Screen -->
-        <!-- pb is larger than pt to offset the floating PlayerBar dock (h-20 + bottom-4 inset
+          <!-- BACK FACE: Immersive Dedicated Album Artwork Screen -->
+          <!-- pb is larger than pt to offset the floating PlayerBar dock (h-20 + bottom-4 inset
              ≈ 96px) that overlays the bottom of this face, so the content centers within the
              visible area above the dock rather than the full face height. -->
-        <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-4 xs:px-8 pb-32 select-none {!windowLayoutStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
-          <!-- Immersive Ambient Background: a soft layered-ellipse SVG gradient
+          <div
+            class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-4 xs:px-8 pb-32 select-none {!windowLayoutStore.effectiveImmersiveMode
+              ? 'pointer-events-none'
+              : 'pointer-events-auto'}"
+          >
+            <!-- Immersive Ambient Background: a soft layered-ellipse SVG gradient
                tinted from the current song's artwork colors (see
                immersiveAmbientSvg above). Renders the same, cheaply, on every
                platform — no CSS blur()/backdrop-filter involved. Keyed on
                song id so a track change destroys the old layer and mounts a
                new one; Svelte plays both transitions concurrently, giving a
                genuine cross-dissolve rather than a hard cut. -->
-          {#if playerStore.currentSong || playerStore.completedSession}
-            {#key playerStore.currentSong?.id ?? playerStore.completedSession?.completedAt}
-              <div class="absolute inset-0 z-0 opacity-30 pointer-events-none immersive-ambient" transition:fade={{ duration: 300 }}>
-                {@html immersiveAmbientSvg}
-              </div>
-            {/key}
-          {/if}
+            {#if playerStore.currentSong || playerStore.completedSession}
+              {#key playerStore.currentSong?.id ?? playerStore.completedSession?.completedAt}
+                <div
+                  class="absolute inset-0 z-0 opacity-30 pointer-events-none immersive-ambient"
+                  transition:fade={{ duration: 300 }}
+                >
+                  {@html immersiveAmbientSvg}
+                </div>
+              {/key}
+            {/if}
 
-          <!-- Center Container: Card and Details. Below md, the layout would
+            <!-- Center Container: Card and Details. Below md, the layout would
                stack the text under the cover art — at that point it's just
                clutter (the floating PlayerBar dock repeats the same info),
                so it's hidden and the cover art stands alone. At md+, where
                there's room to sit it beside the art instead, it stays. -->
-          <div class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-4xl w-full justify-center">
-            {#if playerStore.currentSong}
-              <!-- Floating Cover Art Frame -->
-              <div class="w-56 h-56 xs:w-72 xs:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-200 bg-brand-sidebar flex items-center justify-center relative select-none">
-                <CoverArt
-                  songId={playerStore.currentSong?.id}
-                  artEmbedded={playerStore.currentSong?.art_embedded}
-                  artAutomatic={playerStore.currentSong?.art_automatic}
-                  artManual={playerStore.currentSong?.art_manual}
-                  sizeClass="w-full h-full object-cover"
-                  fullResolution
-                />
-              </div>
+            <div
+              class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-4xl w-full justify-center"
+            >
+              {#if playerStore.currentSong}
+                <!-- Floating Cover Art Frame -->
+                <div
+                  class="w-56 h-56 xs:w-72 xs:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-200 bg-brand-sidebar flex items-center justify-center relative select-none"
+                >
+                  <CoverArt
+                    songId={playerStore.currentSong?.id}
+                    artEmbedded={playerStore.currentSong?.art_embedded}
+                    artAutomatic={playerStore.currentSong?.art_automatic}
+                    artManual={playerStore.currentSong?.art_manual}
+                    sizeClass="w-full h-full object-cover"
+                    fullResolution
+                  />
+                </div>
 
-              <!-- Song Details Info: hidden below md, where it would stack
+                <!-- Song Details Info: hidden below md, where it would stack
                    under the cover art instead of sitting beside it. -->
-              <div class="hidden md:flex flex-col text-center md:text-left w-full max-w-md">
-                <span class="self-start px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none">
-                  {i18n.t('playerBar.nowPlaying')}
-                </span>
-                <h1 class="mt-3 text-4xl md:text-6xl font-heading font-bold text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance">
-                  {playerStore.currentSongDisplayTitle}
-                </h1>
-                <p class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold">
-                  {playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}
-                </p>
-                <p class="mt-0.5 text-base md:text-lg text-brand-text-secondary/70 select-text font-medium">
-                  {playerStore.currentSong.artist || i18n.t('collection.unknownArtist')}
-                </p>
-              </div>
-            {:else if playerStore.completedSession}
-              <!-- Immersive Session Wrap Screen (#1380) -->
-              <ImmersiveSessionWrap session={playerStore.completedSession} />
-            {:else}
-              <div class="flex flex-col items-center justify-center text-center">
-                <Music class="w-16 h-16 text-brand-text-secondary/20 mb-4 animate-pulse" />
-                <h2 class="text-2xl font-bold text-brand-text-primary">{i18n.t('playerBar.notPlaying')}</h2>
-                <p class="text-sm text-brand-text-secondary/60 mt-1">{i18n.t('immersive.emptyStateText')}</p>
-              </div>
-            {/if}
+                <div class="hidden md:flex flex-col text-center md:text-left w-full max-w-md">
+                  <span
+                    class="self-start px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
+                  >
+                    {i18n.t("playerBar.nowPlaying")}
+                  </span>
+                  <h1
+                    class="mt-3 text-4xl md:text-6xl font-heading font-bold text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance"
+                  >
+                    {playerStore.currentSongDisplayTitle}
+                  </h1>
+                  <p
+                    class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold"
+                  >
+                    {playerStore.currentSong.album || i18n.t("collection.unknownAlbum")}
+                  </p>
+                  <p
+                    class="mt-0.5 text-base md:text-lg text-brand-text-secondary/70 select-text font-medium"
+                  >
+                    {playerStore.currentSong.artist || i18n.t("collection.unknownArtist")}
+                  </p>
+                </div>
+              {:else if playerStore.completedSession}
+                <!-- Immersive Session Wrap Screen (#1380) -->
+                <ImmersiveSessionWrap session={playerStore.completedSession} />
+              {:else}
+                <div class="flex flex-col items-center justify-center text-center">
+                  <Music class="w-16 h-16 text-brand-text-secondary/20 mb-4 animate-pulse" />
+                  <h2 class="text-2xl font-bold text-brand-text-primary">
+                    {i18n.t("playerBar.notPlaying")}
+                  </h2>
+                  <p class="text-sm text-brand-text-secondary/60 mt-1">
+                    {i18n.t("immersive.emptyStateText")}
+                  </p>
+                </div>
+              {/if}
+            </div>
           </div>
         </div>
-
       </div>
-    </div>
 
-    <!-- Floating PlayDock: inset from all edges (not flush) so it reads as a
+      <!-- Floating PlayDock: inset from all edges (not flush) so it reads as a
          floating glass dock, and the content behind it can still scroll
          underneath the gap for the blur to have something to blur. Hidden
          whenever there's no current song, so it doesn't linger showing
          "Nothing playing" after the queue ends. -->
-    {#if playerStore.currentSong && navigationStore.activeTab !== 'help'}
-      <div class="absolute inset-x-4 bottom-4 z-40">
-        <PlayerBar />
-      </div>
+      {#if playerStore.currentSong && navigationStore.activeTab !== "help"}
+        <div class="absolute inset-x-4 bottom-4 z-40">
+          <PlayerBar />
+        </div>
+      {/if}
     {/if}
-  {/if}
 
-  <!-- Drag-and-drop overlay: shown while the OS reports a file/folder drag
+    <!-- Drag-and-drop overlay: shown while the OS reports a file/folder drag
        hovering the window (native `dragDropEnabled` events, not HTML5 DnD).
        Purely visual — pointer-events-none so it never intercepts the drop
        itself, which the window-level listener in onMount handles. -->
-  {#if isDragActive}
-    <div
-      class="absolute inset-0 z-[100] flex items-center justify-center acrylic-scrim [--acrylic-tint:var(--color-brand-main)] border-4 border-dashed border-brand-accent pointer-events-none select-none"
-      transition:fly={{ duration: 150 }}
-    >
-      <div class="flex flex-col items-center gap-3 text-center px-8">
-        <UploadCloud class="w-14 h-14 text-brand-accent" />
-        <p class="text-2xl font-bold text-brand-text-primary">
-          {isShiftHeld
-            ? i18n.t('dragDrop.overlayAppendTitle', {}, 'Drop to append to queue')
-            : i18n.t('dragDrop.overlayReplaceTitle', {}, 'Drop to replace queue & play')}
-        </p>
-        <p class="text-sm text-brand-text-secondary">
-          {isShiftHeld
-            ? i18n.t('dragDrop.overlayAppendHint', {}, "Playback won't be interrupted")
-            : i18n.t('dragDrop.overlayReplaceHint', {}, 'Hold Shift to append instead')}
-        </p>
+    {#if isDragActive}
+      <div
+        class="absolute inset-0 z-[100] flex items-center justify-center acrylic-scrim [--acrylic-tint:var(--color-brand-main)] border-4 border-dashed border-brand-accent pointer-events-none select-none"
+        transition:fly={{ duration: 150 }}
+      >
+        <div class="flex flex-col items-center gap-3 text-center px-8">
+          <UploadCloud class="w-14 h-14 text-brand-accent" />
+          <p class="text-2xl font-bold text-brand-text-primary">
+            {isShiftHeld
+              ? i18n.t("dragDrop.overlayAppendTitle", {}, "Drop to append to queue")
+              : i18n.t("dragDrop.overlayReplaceTitle", {}, "Drop to replace queue & play")}
+          </p>
+          <p class="text-sm text-brand-text-secondary">
+            {isShiftHeld
+              ? i18n.t("dragDrop.overlayAppendHint", {}, "Playback won't be interrupted")
+              : i18n.t("dragDrop.overlayReplaceHint", {}, "Hold Shift to append instead")}
+          </p>
+        </div>
       </div>
-    </div>
+    {/if}
+  </div>
+
+  {#if isShortcutsModalOpen}
+    <KeyboardShortcutsModal onClose={() => (isShortcutsModalOpen = false)} />
   {/if}
-</div>
 
-{#if isShortcutsModalOpen}
-  <KeyboardShortcutsModal onClose={() => (isShortcutsModalOpen = false)} />
-{/if}
+  {#if editingSongId !== null}
+    <TagEditor
+      songId={editingSongId}
+      onClose={() => {
+        editingSongId = null;
+      }}
+    />
+  {/if}
 
-{#if editingSongId !== null}
-  <TagEditor songId={editingSongId} onClose={() => { editingSongId = null; }} />
-{/if}
+  {#if welcomeStore.initialized && !welcomeStore.hasSeen}
+    <WelcomeScreen onGetStarted={handleWelcomeGetStarted} />
+  {/if}
 
-{#if welcomeStore.initialized && !welcomeStore.hasSeen}
-  <WelcomeScreen onGetStarted={handleWelcomeGetStarted} />
-{/if}
+  <WalkthroughOverlay />
 
-<WalkthroughOverlay />
-
-{#if collectionStore.activeMassRemovalIncident}
-  <ConfirmDialog
-    title={i18n.t('safeguard.dialogTitle', {}, 'Folder or Drive Missing?')}
-    message={i18n.plural('safeguard.dialogMessage', collectionStore.activeMassRemovalIncident.missing_count, {
-      total: i18n.formatNumber(collectionStore.activeMassRemovalIncident.total_count),
-      folder: collectionStore.activeMassRemovalIncident.directory_path,
-    })}
-    confirmLabel={i18n.t('safeguard.confirmRemoveBtn', {}, 'Remove Songs')}
-    cancelLabel={i18n.t('safeguard.keepSongsBtn', {}, 'Keep Songs')}
-    danger={true}
-    onConfirm={() => collectionStore.resolveActiveMassRemoval('prune')}
-    onCancel={() => collectionStore.resolveActiveMassRemoval('keep')}
-  />
-{/if}
+  {#if collectionStore.activeMassRemovalIncident}
+    <ConfirmDialog
+      title={i18n.t("safeguard.dialogTitle", {}, "Folder or Drive Missing?")}
+      message={i18n.plural(
+        "safeguard.dialogMessage",
+        collectionStore.activeMassRemovalIncident.missing_count,
+        {
+          total: i18n.formatNumber(collectionStore.activeMassRemovalIncident.total_count),
+          folder: collectionStore.activeMassRemovalIncident.directory_path,
+        },
+      )}
+      confirmLabel={i18n.t("safeguard.confirmRemoveBtn", {}, "Remove Songs")}
+      cancelLabel={i18n.t("safeguard.keepSongsBtn", {}, "Keep Songs")}
+      danger={true}
+      onConfirm={() => collectionStore.resolveActiveMassRemoval("prune")}
+      onCancel={() => collectionStore.resolveActiveMassRemoval("keep")}
+    />
+  {/if}
 
   <Toast />
   <SongDragGhost />
@@ -734,7 +804,9 @@
     backface-visibility: visible;
     -webkit-backface-visibility: visible;
     transform: none !important;
-    transition: opacity 0.4s ease-in-out, visibility 0s linear 0s;
+    transition:
+      opacity 0.4s ease-in-out,
+      visibility 0s linear 0s;
   }
 
   .no-3d .flip-front {

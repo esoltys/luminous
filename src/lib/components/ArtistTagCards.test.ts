@@ -13,23 +13,23 @@ describe("ArtistTagCards", () => {
       children: [
         { name: "Juno Award", song_count: 3 },
         { name: "Grammy Award", song_count: 2 },
-        { name: "Brit Award", song_count: 1 }
-      ]
+        { name: "Brit Award", song_count: 1 },
+      ],
     },
     {
       name: "Canadian",
       color_index: 4,
       song_count: 10,
-      children: []
-    }
+      children: [],
+    },
   ];
 
   it("renders artist tag groups and children with artist counts", () => {
     render(ArtistTagCards, {
       props: {
         hierarchy: sampleHierarchy,
-        onOpenTag: vi.fn()
-      }
+        onOpenTag: vi.fn(),
+      },
     });
 
     expect(screen.getByText("Award-Winning")).toBeTruthy();
@@ -45,8 +45,8 @@ describe("ArtistTagCards", () => {
     render(ArtistTagCards, {
       props: {
         hierarchy: sampleHierarchy,
-        onOpenTag: vi.fn()
-      }
+        onOpenTag: vi.fn(),
+      },
     });
 
     expect(screen.getByText(/No sub-tags yet/i)).toBeTruthy();
@@ -57,8 +57,8 @@ describe("ArtistTagCards", () => {
     render(ArtistTagCards, {
       props: {
         hierarchy: sampleHierarchy,
-        onOpenTag
-      }
+        onOpenTag,
+      },
     });
 
     const cardBtn = screen.getByText("Award-Winning");

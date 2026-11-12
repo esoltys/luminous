@@ -89,23 +89,36 @@ describe("formatWindowTitle", () => {
   });
 
   it("formats title only when artist is absent or whitespace", () => {
-    expect(formatWindowTitle({ title: "Prelude", artist: null }, "playing")).toBe("Prelude - Luminous");
-    expect(formatWindowTitle({ title: "Prelude", artist: "" }, "playing")).toBe("Prelude - Luminous");
-    expect(formatWindowTitle({ title: "Prelude", artist: "   " }, "playing")).toBe("Prelude - Luminous");
+    expect(formatWindowTitle({ title: "Prelude", artist: null }, "playing")).toBe(
+      "Prelude - Luminous",
+    );
+    expect(formatWindowTitle({ title: "Prelude", artist: "" }, "playing")).toBe(
+      "Prelude - Luminous",
+    );
+    expect(formatWindowTitle({ title: "Prelude", artist: "   " }, "playing")).toBe(
+      "Prelude - Luminous",
+    );
   });
 
   it("falls back to localized Unknown Song when title is absent or whitespace", () => {
-    expect(formatWindowTitle({ title: "", artist: "Queen" }, "playing")).toBe("Unknown Song - Queen - Luminous");
-    expect(formatWindowTitle({ title: "   ", artist: null }, "playing")).toBe("Unknown Song - Luminous");
+    expect(formatWindowTitle({ title: "", artist: "Queen" }, "playing")).toBe(
+      "Unknown Song - Queen - Luminous",
+    );
+    expect(formatWindowTitle({ title: "   ", artist: null }, "playing")).toBe(
+      "Unknown Song - Luminous",
+    );
   });
 
   it("respects French locale for fallback title", () => {
     i18n.currentLocale = "fr-CA";
-    expect(formatWindowTitle({ title: "", artist: "Daft Punk" }, "playing")).toBe("Chanson inconnue - Daft Punk - Luminous");
-    expect(formatWindowTitle({ title: "", artist: "" }, "playing")).toBe("Chanson inconnue - Luminous");
+    expect(formatWindowTitle({ title: "", artist: "Daft Punk" }, "playing")).toBe(
+      "Chanson inconnue - Daft Punk - Luminous",
+    );
+    expect(formatWindowTitle({ title: "", artist: "" }, "playing")).toBe(
+      "Chanson inconnue - Luminous",
+    );
   });
 });
-
 
 describe("formatHoursMinutes", () => {
   beforeEach(() => {

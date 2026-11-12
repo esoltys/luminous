@@ -59,7 +59,9 @@ describe("LibraryWelcome.svelte", () => {
     await fireEvent.click(screen.getByRole("button", { name: /Open Files/ }));
 
     await waitFor(() => {
-      expect(open).toHaveBeenCalledWith(expect.objectContaining({ directory: false, multiple: true }));
+      expect(open).toHaveBeenCalledWith(
+        expect.objectContaining({ directory: false, multiple: true }),
+      );
     });
   });
 });

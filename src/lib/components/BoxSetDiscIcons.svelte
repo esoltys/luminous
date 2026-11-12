@@ -29,14 +29,16 @@
 {#if discCount > 1}
   <div
     class="absolute bottom-1.5 left-1.5 z-10 pointer-events-none flex items-center {customClass}"
-    title={i18n.t('artistDetail.discSet', { count: discCount })}
-    aria-label={i18n.t('artistDetail.discSet', { count: discCount })}
+    title={i18n.t("artistDetail.discSet", { count: discCount })}
+    aria-label={i18n.t("artistDetail.discSet", { count: discCount })}
     data-testid="box-set-disc-icons"
   >
     {#each Array(visibleDiscs) as _, i (i)}
       <Disc
         weight="fill"
-        class="{currentSize.icon} text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] {i > 0 ? currentSize.overlap : ''}"
+        class="{currentSize.icon} text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] {i > 0
+          ? currentSize.overlap
+          : ''}"
         style="z-index: {visibleDiscs - i}"
       />
     {/each}

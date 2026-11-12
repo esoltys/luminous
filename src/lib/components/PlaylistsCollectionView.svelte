@@ -28,7 +28,7 @@
     PlusIcon as Plus,
     PlaylistIcon as ListMusic,
     SparkleIcon as Sparkles,
-    ArrowsClockwiseIcon as RefreshCw
+    ArrowsClockwiseIcon as RefreshCw,
   } from "phosphor-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { getPlaylistDisplayName } from "../utils/playlist";
@@ -38,7 +38,19 @@
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart" | "language";
+    kind:
+      | "favourites"
+      | "recently_added"
+      | "most_played"
+      | "history"
+      | "genre"
+      | "decade"
+      | "bpm"
+      | "artist_tag"
+      | "missing_metadata"
+      | "missing_musicbrainz"
+      | "daypart"
+      | "language";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -53,7 +65,14 @@
   // Fixed intensity order for the BPM auto-playlist bucket names (mirrors
   // src-tauri/src/playlist/tempo_buckets.rs's TEMPO_BUCKETS) — alphabetical sort would
   // scramble Down-Tempo/Mid-Tempo/Uptempo/High Energy/Extreme.
-  const BPM_BUCKET_ORDER = ["Very Slow BPM", "Down-Tempo BPM", "Mid-Tempo BPM", "Uptempo BPM", "High Energy BPM", "Extreme BPM"];
+  const BPM_BUCKET_ORDER = [
+    "Very Slow BPM",
+    "Down-Tempo BPM",
+    "Mid-Tempo BPM",
+    "Uptempo BPM",
+    "High Energy BPM",
+    "Extreme BPM",
+  ];
 
   onMount(async () => {
     try {
@@ -94,40 +113,52 @@
   // System genre auto-playlists are keyed one row per curated tag (#548),
   // stored as "tag:<name>" in dynamic_spec — e.g. "tag:Rock", "tag:Jazz".
   let genreAutoPlaylists = $derived(
-    playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("tag:"))
+    playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("tag:")),
   );
   let artistTagAutoPlaylists = $derived(
-    playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("artisttag:"))
+    playlistsStore.playlists.filter(
+      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("artisttag:"),
+    ),
   );
   let languageAutoPlaylists = $derived(
-    playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("language:"))
+    playlistsStore.playlists.filter(
+      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("language:"),
+    ),
   );
-  let decadeAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:")));
+  let decadeAutoPlaylists = $derived(
+    playlistsStore.playlists.filter(
+      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:"),
+    ),
+  );
   let bpmAutoPlaylists = $derived(
     playlistsStore.playlists
       .filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("bpmrange:"))
-      .sort((a, b) => BPM_BUCKET_ORDER.indexOf(a.name) - BPM_BUCKET_ORDER.indexOf(b.name))
+      .sort((a, b) => BPM_BUCKET_ORDER.indexOf(a.name) - BPM_BUCKET_ORDER.indexOf(b.name)),
   );
   // Missing Metadata (#367) is a singleton diagnostic auto-playlist, not a
   // per-value category like genre/decade/BPM/artist tag.
   let missingMetadataAutoPlaylist = $derived(
-    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta")
+    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta"),
   );
   // Missing MusicBrainz (#83) is surfaced when scrobbling is enabled, identifying
   // songs that lack MusicBrainz recording IDs.
   let missingMusicBrainzAutoPlaylist = $derived(
-    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid")
+    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid"),
   );
   // Daypart Mix (#223) is also a singleton, but unlike missing-metadata its
   // dynamic_spec changes content (bucket/date/genre) every time the daypart
   // boundary crosses — matched by prefix, not exact spec, so the same row
   // (and any Home pin keyed on its id) is found across every crossing.
   let daypartMixPlaylist = $derived(
-    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"))
+    playlistsStore.playlists.find(
+      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"),
+    ),
   );
   let customPlaylists = $derived.by(() => {
     // Include non-dynamic playlists + user-created Smart playlists
-    const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec));
+    const list = playlistsStore.playlists.filter(
+      (p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec),
+    );
     const queue = list.find((p) => p.is_queue);
     const rest = list.filter((p) => !p.is_queue);
     return queue ? [queue, ...rest] : rest;
@@ -187,7 +218,11 @@
         trackCount: missingMetadataAutoPlaylist.track_count,
       });
     }
-    if (picardStore.missingPlaylistEnabled && missingMusicBrainzAutoPlaylist && missingMusicBrainzAutoPlaylist.track_count > 0) {
+    if (
+      picardStore.missingPlaylistEnabled &&
+      missingMusicBrainzAutoPlaylist &&
+      missingMusicBrainzAutoPlaylist.track_count > 0
+    ) {
       defs.push({
         id: `auto:missing_musicbrainz:${missingMusicBrainzAutoPlaylist.id}`,
         kind: "missing_musicbrainz",
@@ -270,10 +305,12 @@
   let autoSortField = $state<"name" | "track_count" | "updated">(
     (typeof window !== "undefined" &&
       (localStorage.getItem("sort_auto_playlist_field") as "name" | "track_count" | "updated")) ||
-      "name"
+      "name",
   );
   let autoSortAsc = $state(
-    typeof window !== "undefined" ? localStorage.getItem("sort_auto_playlist_asc") !== "false" : true
+    typeof window !== "undefined"
+      ? localStorage.getItem("sort_auto_playlist_asc") !== "false"
+      : true,
   );
 
   // Moment Mix and Favourites/Recently Added are always pinned first, ahead of the sort
@@ -285,9 +322,22 @@
   let sortedAutoDefs = $derived.by(() => {
     const field = autoSortField;
     const asc = autoSortAsc;
-    const pinned = autoDefs.filter((d) => d.kind !== "genre" && d.kind !== "decade" && d.kind !== "artist_tag" && d.kind !== "bpm" && d.kind !== "language");
+    const pinned = autoDefs.filter(
+      (d) =>
+        d.kind !== "genre" &&
+        d.kind !== "decade" &&
+        d.kind !== "artist_tag" &&
+        d.kind !== "bpm" &&
+        d.kind !== "language",
+    );
     const rest = autoDefs
-      .filter((d) => d.kind === "genre" || d.kind === "decade" || d.kind === "artist_tag" || d.kind === "language")
+      .filter(
+        (d) =>
+          d.kind === "genre" ||
+          d.kind === "decade" ||
+          d.kind === "artist_tag" ||
+          d.kind === "language",
+      )
       .sort((a, b) => {
         if (field === "name") {
           return asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label);
@@ -304,10 +354,12 @@
   let customSortField = $state<"name" | "track_count" | "updated">(
     (typeof window !== "undefined" &&
       (localStorage.getItem("sort_custom_playlist_field") as "name" | "track_count" | "updated")) ||
-      "name"
+      "name",
   );
   let customSortAsc = $state(
-    typeof window !== "undefined" ? localStorage.getItem("sort_custom_playlist_asc") !== "false" : true
+    typeof window !== "undefined"
+      ? localStorage.getItem("sort_custom_playlist_asc") !== "false"
+      : true,
   );
 
   $effect(() => {
@@ -335,7 +387,9 @@
   });
 
   let activeViewMode = $derived(
-    navigationStore.playlistsSubTab === "auto" ? prefs.playlistsAutoViewMode : prefs.playlistsCustomViewMode
+    navigationStore.playlistsSubTab === "auto"
+      ? prefs.playlistsAutoViewMode
+      : prefs.playlistsCustomViewMode,
   );
 
   function setActiveViewMode(mode: CollectionViewMode) {
@@ -369,20 +423,39 @@
       def.kind === "genre"
         ? { kind: "genre", genre: def.genre, playlistId: def.playlistId, updated: def.updated }
         : def.kind === "artist_tag"
-          ? { kind: "artist_tag", artistTag: def.artistTag, playlistId: def.playlistId, updated: def.updated }
+          ? {
+              kind: "artist_tag",
+              artistTag: def.artistTag,
+              playlistId: def.playlistId,
+              updated: def.updated,
+            }
           : def.kind === "decade"
-            ? { kind: "decade", decade: def.decade, playlistId: def.playlistId, updated: def.updated }
+            ? {
+                kind: "decade",
+                decade: def.decade,
+                playlistId: def.playlistId,
+                updated: def.updated,
+              }
             : def.kind === "bpm"
               ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
               : def.kind === "language"
-                ? { kind: "language", language: def.language, playlistId: def.playlistId, updated: def.updated }
+                ? {
+                    kind: "language",
+                    language: def.language,
+                    playlistId: def.playlistId,
+                    updated: def.updated,
+                  }
                 : def.kind === "missing_metadata"
-                ? { kind: "missing_metadata", playlistId: def.playlistId, updated: def.updated }
-                : def.kind === "missing_musicbrainz"
-                  ? { kind: "missing_musicbrainz", playlistId: def.playlistId, updated: def.updated }
-                  : def.kind === "daypart"
-                    ? { kind: "daypart", playlistId: def.playlistId, updated: def.updated }
-                    : { kind: def.kind }
+                  ? { kind: "missing_metadata", playlistId: def.playlistId, updated: def.updated }
+                  : def.kind === "missing_musicbrainz"
+                    ? {
+                        kind: "missing_musicbrainz",
+                        playlistId: def.playlistId,
+                        updated: def.updated,
+                      }
+                    : def.kind === "daypart"
+                      ? { kind: "daypart", playlistId: def.playlistId, updated: def.updated }
+                      : { kind: def.kind },
     );
   }
 
@@ -393,7 +466,9 @@
 
   async function handleCreateBlankPlaylist() {
     try {
-      const playlist = await playlistsStore.createPlaylist(i18n.t("playlists.untitledPlaylistName"));
+      const playlist = await playlistsStore.createPlaylist(
+        i18n.t("playlists.untitledPlaylistName"),
+      );
       if (playlist) {
         navigationStore.viewPlaylist(playlist.id);
       }
@@ -407,7 +482,12 @@
       const selected = await open({
         multiple: false,
         title: i18n.t("playlists.importPlaylistTooltip"),
-        filters: [{ name: "Playlists (*.m3u, *.m3u8, *.pls, *.xspf)", extensions: ["m3u", "m3u8", "pls", "xspf"] }],
+        filters: [
+          {
+            name: "Playlists (*.m3u, *.m3u8, *.pls, *.xspf)",
+            extensions: ["m3u", "m3u8", "pls", "xspf"],
+          },
+        ],
       });
       if (selected && typeof selected === "string") {
         await playlistsStore.importPlaylist(selected);
@@ -428,21 +508,36 @@
   <GenreAliasesDialogHost />
 {:else}
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-    <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`playlists:${navigationStore.playlistsSubTab}`}>
+    <div
+      class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}"
+      use:rememberScroll={`playlists:${navigationStore.playlistsSubTab}`}
+    >
       <div class="sticky top-0 z-20 bg-brand-main pt-3">
         {#if navigationStore.playlistsSubTab === "custom"}
           <div class="h-10 flex items-center gap-2 mb-2">
-            <Button onclick={handleCreateBlankPlaylist} variant="primary" title={i18n.t('playlists.newPlaylistBtn')}>
+            <Button
+              onclick={handleCreateBlankPlaylist}
+              variant="primary"
+              title={i18n.t("playlists.newPlaylistBtn")}
+            >
               <Plus class="w-4 h-4" />
-              <span>{i18n.t('playlists.newPlaylistBtn')}</span>
+              <span>{i18n.t("playlists.newPlaylistBtn")}</span>
             </Button>
-            <Button onclick={() => collectionStore.openSmartBuilder()} variant="accent-soft" title={i18n.t('playlists.newSmartPlaylistBtn')}>
+            <Button
+              onclick={() => collectionStore.openSmartBuilder()}
+              variant="accent-soft"
+              title={i18n.t("playlists.newSmartPlaylistBtn")}
+            >
               <Sparkles class="w-4 h-4" />
-              <span>{i18n.t('playlists.newSmartPlaylistBtn')}</span>
+              <span>{i18n.t("playlists.newSmartPlaylistBtn")}</span>
             </Button>
-            <Button onclick={handleImportPlaylist} variant="secondary" title={i18n.t('playlists.importPlaylistTooltip')}>
+            <Button
+              onclick={handleImportPlaylist}
+              variant="secondary"
+              title={i18n.t("playlists.importPlaylistTooltip")}
+            >
               <FolderInput class="w-4 h-4 text-brand-accent-text" />
-              <span>{i18n.t('playlists.importPlaylistBtn')}</span>
+              <span>{i18n.t("playlists.importPlaylistBtn")}</span>
             </Button>
           </div>
         {/if}
@@ -461,48 +556,48 @@
               onclick={handleRefreshAll}
               disabled={isRefreshingAll}
               class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary hover:text-brand-accent-text hover:border-brand-accent/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
-              title={i18n.t('playlists.refreshAllPlaylistsTooltip')}
-              aria-label={i18n.t('playlists.refreshAllPlaylistsTooltip')}
+              title={i18n.t("playlists.refreshAllPlaylistsTooltip")}
+              aria-label={i18n.t("playlists.refreshAllPlaylistsTooltip")}
             >
               <RefreshCw class="w-4 h-4 {isRefreshingAll ? 'animate-spin' : ''}" />
             </button>
             <ViewModeToggle mode={activeViewMode} onChange={setActiveViewMode} />
             <div class="relative">
-            {#if navigationStore.playlistsSubTab === "auto"}
-              <Select
-                value={`${autoSortField}-${autoSortAsc}`}
-                onchange={(e) => {
-                  const [field, asc] = e.currentTarget.value.split("-");
-                  autoSortField = field as "name" | "track_count" | "updated";
-                  autoSortAsc = asc === "true";
-                }}
-                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-              >
-                <option value="name-true">▲ {i18n.t('playlists.sortLabelName')}</option>
-                <option value="name-false">▼ {i18n.t('playlists.sortLabelName')}</option>
-                <option value="track_count-true">▲ {i18n.t('playlists.sortLabelSongs')}</option>
-                <option value="track_count-false">▼ {i18n.t('playlists.sortLabelSongs')}</option>
-                <option value="updated-true">▲ {i18n.t('playlists.sortLabelUpdated')}</option>
-                <option value="updated-false">▼ {i18n.t('playlists.sortLabelUpdated')}</option>
-              </Select>
-            {:else}
-              <Select
-                value={`${customSortField}-${customSortAsc}`}
-                onchange={(e) => {
-                  const [field, asc] = e.currentTarget.value.split("-");
-                  customSortField = field as "name" | "track_count" | "updated";
-                  customSortAsc = asc === "true";
-                }}
-                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-              >
-                <option value="name-true">▲ {i18n.t('playlists.sortLabelName')}</option>
-                <option value="name-false">▼ {i18n.t('playlists.sortLabelName')}</option>
-                <option value="track_count-true">▲ {i18n.t('playlists.sortLabelSongs')}</option>
-                <option value="track_count-false">▼ {i18n.t('playlists.sortLabelSongs')}</option>
-                <option value="updated-true">▲ {i18n.t('playlists.sortLabelUpdated')}</option>
-                <option value="updated-false">▼ {i18n.t('playlists.sortLabelUpdated')}</option>
-              </Select>
-            {/if}
+              {#if navigationStore.playlistsSubTab === "auto"}
+                <Select
+                  value={`${autoSortField}-${autoSortAsc}`}
+                  onchange={(e) => {
+                    const [field, asc] = e.currentTarget.value.split("-");
+                    autoSortField = field as "name" | "track_count" | "updated";
+                    autoSortAsc = asc === "true";
+                  }}
+                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                >
+                  <option value="name-true">▲ {i18n.t("playlists.sortLabelName")}</option>
+                  <option value="name-false">▼ {i18n.t("playlists.sortLabelName")}</option>
+                  <option value="track_count-true">▲ {i18n.t("playlists.sortLabelSongs")}</option>
+                  <option value="track_count-false">▼ {i18n.t("playlists.sortLabelSongs")}</option>
+                  <option value="updated-true">▲ {i18n.t("playlists.sortLabelUpdated")}</option>
+                  <option value="updated-false">▼ {i18n.t("playlists.sortLabelUpdated")}</option>
+                </Select>
+              {:else}
+                <Select
+                  value={`${customSortField}-${customSortAsc}`}
+                  onchange={(e) => {
+                    const [field, asc] = e.currentTarget.value.split("-");
+                    customSortField = field as "name" | "track_count" | "updated";
+                    customSortAsc = asc === "true";
+                  }}
+                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                >
+                  <option value="name-true">▲ {i18n.t("playlists.sortLabelName")}</option>
+                  <option value="name-false">▼ {i18n.t("playlists.sortLabelName")}</option>
+                  <option value="track_count-true">▲ {i18n.t("playlists.sortLabelSongs")}</option>
+                  <option value="track_count-false">▼ {i18n.t("playlists.sortLabelSongs")}</option>
+                  <option value="updated-true">▲ {i18n.t("playlists.sortLabelUpdated")}</option>
+                  <option value="updated-false">▼ {i18n.t("playlists.sortLabelUpdated")}</option>
+                </Select>
+              {/if}
             </div>
           </div>
         </div>
@@ -510,7 +605,11 @@
 
       <div class="pt-2 pb-8">
         {#if navigationStore.playlistsSubTab === "auto"}
-          <div class="grid {activeViewMode === 'rows' ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2' : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}">
+          <div
+            class="grid {activeViewMode === 'rows'
+              ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2'
+              : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}"
+          >
             {#each sortedAutoDefs as def (def.id)}
               {#if activeViewMode === "rows"}
                 <AutoPlaylistRowCard
@@ -551,13 +650,17 @@
               <EmptyState
                 card
                 icon={ListMusic}
-                title={i18n.t('playlists.noPlaylistsTitle')}
-                subtitle={i18n.t('playlists.noPlaylistsText')}
+                title={i18n.t("playlists.noPlaylistsTitle")}
+                subtitle={i18n.t("playlists.noPlaylistsText")}
                 subtitleClass="text-xs text-brand-text-secondary font-medium"
               />
             </div>
           {:else}
-            <div class="grid {activeViewMode === 'rows' ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2' : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}">
+            <div
+              class="grid {activeViewMode === 'rows'
+                ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2'
+                : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}"
+            >
               {#each sortedPlaylists as pl (pl.id)}
                 {#if activeViewMode === "rows"}
                   <PlaylistRowCard
@@ -587,7 +690,9 @@
     x={contextMenuState.x}
     y={contextMenuState.y}
     playlist={contextMenuState.playlist}
-    onClose={() => { contextMenuState = null; }}
+    onClose={() => {
+      contextMenuState = null;
+    }}
   />
 {:else if contextMenuState?.kind === "auto"}
   <AutoPlaylistContextMenu
@@ -595,6 +700,8 @@
     y={contextMenuState.y}
     autoPlaylist={contextMenuState.def}
     label={contextMenuState.def.label}
-    onClose={() => { contextMenuState = null; }}
+    onClose={() => {
+      contextMenuState = null;
+    }}
   />
 {/if}

@@ -3,11 +3,9 @@ import { parseLrc } from "./lrc";
 
 describe("parseLrc", () => {
   it("parses standard single-timestamp LRC lines", () => {
-    const lrc = [
-      "[00:05.50] First line",
-      "[00:10.00] Second line",
-      "[01:00.25] Third line",
-    ].join("\n");
+    const lrc = ["[00:05.50] First line", "[00:10.00] Second line", "[01:00.25] Third line"].join(
+      "\n",
+    );
 
     const result = parseLrc(lrc);
     expect(result.fileOffsetMs).toBe(0);
@@ -26,7 +24,8 @@ describe("parseLrc", () => {
   });
 
   it("parses Enhanced LRC word-by-word timing tags and strips literal tags from line text", () => {
-    const lrc = "[00:12.00]<00:12.00>Hello <00:12.50>world <00:13.00>how <00:13.50>are <00:14.00>you";
+    const lrc =
+      "[00:12.00]<00:12.00>Hello <00:12.50>world <00:13.00>how <00:13.50>are <00:14.00>you";
     const result = parseLrc(lrc);
     expect(result.lines).toHaveLength(1);
     const line = result.lines[0];
@@ -55,10 +54,7 @@ describe("parseLrc", () => {
   });
 
   it("applies file [offset:±ms] header (positive makes lyrics appear earlier)", () => {
-    const lrc = [
-      "[offset:500]",
-      "[00:10.00] Lyrics line",
-    ].join("\n");
+    const lrc = ["[offset:500]", "[00:10.00] Lyrics line"].join("\n");
 
     const result = parseLrc(lrc);
     expect(result.fileOffsetMs).toBe(500);
@@ -67,10 +63,7 @@ describe("parseLrc", () => {
   });
 
   it("applies negative file [offset:±ms] header (negative makes lyrics appear later)", () => {
-    const lrc = [
-      "[offset:-300]",
-      "[00:10.00] Lyrics line",
-    ].join("\n");
+    const lrc = ["[offset:-300]", "[00:10.00] Lyrics line"].join("\n");
 
     const result = parseLrc(lrc);
     expect(result.fileOffsetMs).toBe(-300);
@@ -79,10 +72,7 @@ describe("parseLrc", () => {
   });
 
   it("applies user timing offset on top of file offset", () => {
-    const lrc = [
-      "[offset:200]",
-      "[00:10.00]<00:10.00>Word1 <00:11.00>Word2",
-    ].join("\n");
+    const lrc = ["[offset:200]", "[00:10.00]<00:10.00>Word1 <00:11.00>Word2"].join("\n");
 
     // File offset = +200ms, user offset = +500ms => total offset = +700ms
     const result = parseLrc(lrc, 500);

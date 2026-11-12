@@ -16,7 +16,17 @@
 
 import { Database } from "bun:sqlite";
 import { execFileSync, spawn } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,7 +52,9 @@ export function defaultDbPath(): string | undefined {
   }
   if (process.platform === "win32" && existsSync(TAURI_WINDOWS_CONF_PATH)) {
     try {
-      const windowsIdentifier = JSON.parse(readFileSync(TAURI_WINDOWS_CONF_PATH, "utf8")).identifier;
+      const windowsIdentifier = JSON.parse(
+        readFileSync(TAURI_WINDOWS_CONF_PATH, "utf8"),
+      ).identifier;
       if (windowsIdentifier) identifier = windowsIdentifier;
     } catch {
       // Fall back to the base identifier if the override file is malformed.
@@ -54,19 +66,26 @@ export function defaultDbPath(): string | undefined {
   let appDataDir: string;
   switch (process.platform) {
     case "win32":
-      appDataDir = path.join(process.env.APPDATA ?? path.join(home, "AppData", "Roaming"), identifier);
+      appDataDir = path.join(
+        process.env.APPDATA ?? path.join(home, "AppData", "Roaming"),
+        identifier,
+      );
       break;
     case "darwin":
       appDataDir = path.join(home, "Library", "Application Support", identifier);
       break;
     default:
-      appDataDir = path.join(process.env.XDG_DATA_HOME ?? path.join(home, ".local", "share"), identifier);
+      appDataDir = path.join(
+        process.env.XDG_DATA_HOME ?? path.join(home, ".local", "share"),
+        identifier,
+      );
   }
   return path.join(appDataDir, "luminous.db");
 }
 export const CDP_PORT = 9222;
 
-export const TRACK_COLUMNS = "id, title, album, filetype, samplerate, bitdepth, bitrate, length_nanosec";
+export const TRACK_COLUMNS =
+  "id, title, album, filetype, samplerate, bitdepth, bitrate, length_nanosec";
 
 /** First-run UI flags that would otherwise cover the measured or captured view. */
 export const FIRST_RUN_DONE = { welcome_seen: "true", walkthrough_completed: "true" };
@@ -159,7 +178,9 @@ if (-not $main) { throw 'Luminous main window not found' }
 
 function ps(script: string): string {
   if (process.platform !== "win32") return "";
-  return execFileSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8" }).trim();
+  return execFileSync("powershell", ["-NoProfile", "-Command", script], {
+    encoding: "utf8",
+  }).trim();
 }
 
 /**
@@ -192,23 +213,32 @@ export function cloneDatabase(source: string, dest: string): void {
   }
   const copy = new Database(dest);
   try {
-    for (const pattern of OUTWARD_KEY_PATTERNS) copy.run("DELETE FROM app_state WHERE key LIKE ?", [pattern]);
-    const hasTable = (name: string) => !!copy.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
+    for (const pattern of OUTWARD_KEY_PATTERNS)
+      copy.run("DELETE FROM app_state WHERE key LIKE ?", [pattern]);
+    const hasTable = (name: string) =>
+      !!copy.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
     if (hasTable("songs")) {
       copy.run("PRAGMA foreign_keys = ON"); // so dependent rows (stats, playlist entries) go with the songs
       copy.run(
-        "DELETE FROM songs WHERE path LIKE '%tests%fixtures%' OR path LIKE 'http://127.0.0.1:%' OR path LIKE 'http://localhost:%'"
+        "DELETE FROM songs WHERE path LIKE '%tests%fixtures%' OR path LIKE 'http://127.0.0.1:%' OR path LIKE 'http://localhost:%'",
       );
     }
     if (hasTable("subsonic_scrobble_queue")) copy.run("DELETE FROM subsonic_scrobble_queue");
-    const organize = copy.query("SELECT value FROM app_state WHERE key = 'organize_config'").get() as { value: string } | null;
+    const organize = copy
+      .query("SELECT value FROM app_state WHERE key = 'organize_config'")
+      .get() as { value: string } | null;
     if (organize) {
       const config = JSON.parse(organize.value) as Record<string, unknown>;
       config.auto_organize = false;
-      copy.run("UPDATE app_state SET value = ? WHERE key = 'organize_config'", [JSON.stringify(config)]);
+      copy.run("UPDATE app_state SET value = ? WHERE key = 'organize_config'", [
+        JSON.stringify(config),
+      ]);
     }
-    const hasDefault = copy.query("SELECT 1 FROM app_state WHERE key = 'default_library_path'").get();
-    if (!hasDefault) copy.run("INSERT INTO app_state (key, value) VALUES ('default_library_path', '')");
+    const hasDefault = copy
+      .query("SELECT 1 FROM app_state WHERE key = 'default_library_path'")
+      .get();
+    if (!hasDefault)
+      copy.run("INSERT INTO app_state (key, value) VALUES ('default_library_path', '')");
   } finally {
     copy.close();
   }
@@ -217,7 +247,9 @@ export function cloneDatabase(source: string, dest: string): void {
 /** Pins the app's main window to position (100, 100) with the given dimensions. */
 export function pinWindow(w: number, h: number): void {
   if (process.platform !== "win32") return;
-  ps(`${PIN_WINDOW}[LumPerf.Win]::SetWindowPos($main.MainWindowHandle, [IntPtr]::Zero, 100, 100, ${w}, ${h}, 0x14) | Out-Null`);
+  ps(
+    `${PIN_WINDOW}[LumPerf.Win]::SetWindowPos($main.MainWindowHandle, [IntPtr]::Zero, 100, 100, ${w}, ${h}, 0x14) | Out-Null`,
+  );
 }
 
 /** Checks whether a Luminous process is currently running on the system. */
@@ -246,12 +278,16 @@ function webviewProcessCount(userDataDir: string): number {
 export async function closeGracefully(timeoutSec = 30): Promise<void> {
   if (process.platform !== "win32") return;
   if (!isRunning()) return;
-  ps("Get-Process -Name LuminousMusicPlayer -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }");
+  ps(
+    "Get-Process -Name LuminousMusicPlayer -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }",
+  );
   for (let i = 0; i < timeoutSec; i++) {
     if (!isRunning()) return;
     await sleep(1);
   }
-  throw new Error(`Luminous didn't exit within ${timeoutSec}s of being asked to close; close it by hand.`);
+  throw new Error(
+    `Luminous didn't exit within ${timeoutSec}s of being asked to close; close it by hand.`,
+  );
 }
 
 /**
@@ -293,13 +329,19 @@ export function defaultReleaseExe(repoRoot: string = REPO_ROOT): string {
 /** Validates that environment preconditions for driving Luminous are met. */
 export function checkPreconditions(exe: string): void {
   if (process.platform !== "win32") {
-    throw new Error("This runner is Windows-only (it needs WebView2's CDP port). See docs/PERFORMANCE.md for Linux steps.");
+    throw new Error(
+      "This runner is Windows-only (it needs WebView2's CDP port). See docs/PERFORMANCE.md for Linux steps.",
+    );
   }
   if (isRunning()) {
-    throw new Error("Luminous is already running. Close it first — launching a second instance would hand off to yours.");
+    throw new Error(
+      "Luminous is already running. Close it first — launching a second instance would hand off to yours.",
+    );
   }
   if (!existsSync(exe)) {
-    throw new Error(`The release build wasn't found at ${exe}. Build it first: bun run tauri build --no-bundle (or pass --exe).`);
+    throw new Error(
+      `The release build wasn't found at ${exe}. Build it first: bun run tauri build --no-bundle (or pass --exe).`,
+    );
   }
 }
 
@@ -356,7 +398,9 @@ export class AppProfile {
         throw err;
       }
     }
-    const baseState = options?.cloneFrom ? { ...FIRST_RUN_DONE, ...canonicalView("songs") } : DEFAULT_APP_STATE;
+    const baseState = options?.cloneFrom
+      ? { ...FIRST_RUN_DONE, ...canonicalView("songs") }
+      : DEFAULT_APP_STATE;
 
     // Pull defaults downward: suppress first-run popups, set canonical songs view, and apply caller overrides
     this.writeAppState({
@@ -393,7 +437,8 @@ export class AppProfile {
         LUMINOUS_TEST: "1",
         LUMINOUS_REMOTE_DEVTOOLS_PORT: String(this.port),
         WEBVIEW2_USER_DATA_FOLDER: this.webviewDir,
-        WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `${existing} --remote-debugging-port=${this.port}`.trim(),
+        WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:
+          `${existing} --remote-debugging-port=${this.port}`.trim(),
       },
     }).unref();
     closeSync(logFd);
@@ -406,7 +451,9 @@ export class AppProfile {
       const cdp = new CdpClient();
       try {
         await cdp.connect(this.port);
-        const ready = await cdp.eval("document.readyState === 'complete' && !!window.__TAURI_INTERNALS__");
+        const ready = await cdp.eval(
+          "document.readyState === 'complete' && !!window.__TAURI_INTERNALS__",
+        );
         if (ready.value === true) {
           const readySec = (performance.now() - startedAt) / 1000;
           if (win) pinWindow(win.width, win.height);
@@ -418,7 +465,9 @@ export class AppProfile {
         cdp.close();
       }
     }
-    throw new Error(`Luminous didn't expose a ready page on CDP port ${this.port} within ${timeoutSec}s.`);
+    throw new Error(
+      `Luminous didn't expose a ready page on CDP port ${this.port} within ${timeoutSec}s.`,
+    );
   }
 
   /**
@@ -468,7 +517,8 @@ export class AppProfile {
 
   /** Writes (or deletes, if value is null) app_state keys in the profile DB. */
   writeAppState(keys: Record<string, string | null>): void {
-    if (this.hasLaunched && this.isRunning()) throw new Error("Refusing to write app_state while Luminous is running.");
+    if (this.hasLaunched && this.isRunning())
+      throw new Error("Refusing to write app_state while Luminous is running.");
 
     const db = new Database(this.dbPath);
     try {
@@ -495,7 +545,9 @@ export class AppProfile {
     const db = new Database(this.dbPath, { readonly: true });
     try {
       return db
-        .query(`SELECT ${TRACK_COLUMNS} FROM songs WHERE ${where} AND unavailable = 0 AND cue_path IS NULL`)
+        .query(
+          `SELECT ${TRACK_COLUMNS} FROM songs WHERE ${where} AND unavailable = 0 AND cue_path IS NULL`,
+        )
         .get(...params) as SongRecord | null;
     } finally {
       db.close();

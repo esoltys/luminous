@@ -46,13 +46,18 @@
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
     ArrowSquareOutIcon as OpenInPicard,
-    ShareNetworkIcon as Share
+    ShareNetworkIcon as Share,
   } from "phosphor-svelte";
   import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { getPopulationModeSuffix, getBpmBucketLabel, getDaypartMixLabel, getDaypartMixSourceLabel } from "../utils/playlist";
+  import {
+    getPopulationModeSuffix,
+    getBpmBucketLabel,
+    getDaypartMixLabel,
+    getDaypartMixSourceLabel,
+  } from "../utils/playlist";
   import { genreColorHsl, resolveGenreColorIndex } from "../utils/genrePalette";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -68,13 +73,35 @@
   let kind = $derived(view.kind);
 
   // Default column widths (px or fr) — used when no saved width exists for a column.
-  const AUTOPLAYLIST_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
-    title: "2fr", artist: "1.5fr", album: "1.5fr",
-    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px", originalyear: "60px",
-    genre: "1.2fr", grouping: "1.2fr", bpm: "60px", initial_key: "60px",
-    bitrate: "70px", samplerate: "75px", bitdepth: "65px", channels: "70px",
-    filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
-    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", library: "130px", actions: "80px",
+  const AUTOPLAYLIST_COL_DEFAULTS: Partial<
+    Record<keyof typeof collectionStore.visibleColumns, string>
+  > = {
+    title: "2fr",
+    artist: "1.5fr",
+    album: "1.5fr",
+    composer: "1.5fr",
+    album_artist: "1.5fr",
+    format: "64px",
+    year: "60px",
+    originalyear: "60px",
+    genre: "1.2fr",
+    grouping: "1.2fr",
+    bpm: "60px",
+    initial_key: "60px",
+    bitrate: "70px",
+    samplerate: "75px",
+    bitdepth: "65px",
+    channels: "70px",
+    filesize: "75px",
+    rating: "96px",
+    playcount: "70px",
+    skipcount: "70px",
+    lastplayed: "90px",
+    added: "90px",
+    duration: "80px",
+    path: "2fr",
+    library: "130px",
+    actions: "80px",
   };
 
   let genre = $derived(view.genre);
@@ -85,34 +112,52 @@
   let playlistId = $derived.by(() => {
     if (view.playlistId !== undefined) return view.playlistId;
     if (view.kind === "missing_musicbrainz") {
-      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid")?.id;
+      return playlistsStore.playlists.find(
+        (p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid",
+      )?.id;
     }
     if (view.kind === "missing_metadata") {
-      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta")?.id;
+      return playlistsStore.playlists.find(
+        (p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta",
+      )?.id;
     }
     if (view.kind === "daypart") {
-      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"))?.id;
+      return playlistsStore.playlists.find(
+        (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"),
+      )?.id;
     }
     if (view.kind === "decade" && view.decade) {
-      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `decade:${view.decade}`)?.id;
+      return playlistsStore.playlists.find(
+        (p) => p.dynamic_enabled && p.dynamic_spec === `decade:${view.decade}`,
+      )?.id;
     }
     if (view.kind === "bpm" && view.bpm) {
-      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `bpmrange:${view.bpm}`)?.id;
+      return playlistsStore.playlists.find(
+        (p) => p.dynamic_enabled && p.dynamic_spec === `bpmrange:${view.bpm}`,
+      )?.id;
     }
     if (view.kind === "artist_tag" && view.artistTag) {
-      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `artisttag:${view.artistTag}`)?.id;
+      return playlistsStore.playlists.find(
+        (p) => p.dynamic_enabled && p.dynamic_spec === `artisttag:${view.artistTag}`,
+      )?.id;
     }
     if (view.kind === "language" && view.language) {
-      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `language:${view.language}`)?.id;
+      return playlistsStore.playlists.find(
+        (p) => p.dynamic_enabled && p.dynamic_spec === `language:${view.language}`,
+      )?.id;
     }
     if (view.kind === "genre" && view.genre) {
-      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `tag:${view.genre}`)?.id;
+      return playlistsStore.playlists.find(
+        (p) => p.dynamic_enabled && p.dynamic_spec === `tag:${view.genre}`,
+      )?.id;
     }
     return undefined;
   });
   // The playlist row backing this view (undefined for the built-in kinds that have none).
   let backingPlaylist = $derived(
-    playlistId === undefined ? undefined : playlistsStore.playlists.find((p) => p.id === playlistId)
+    playlistId === undefined
+      ? undefined
+      : playlistsStore.playlists.find((p) => p.id === playlistId),
   );
   let updated = $derived(view.updated !== undefined ? view.updated : backingPlaylist?.updated);
   let pinRefKey = $derived(autoPlaylistRefKeyFor(view));
@@ -150,7 +195,10 @@
   async function handleBulkAddToPlaylist() {
     if (selectedKeys.size === 0) return;
     if (playlistsStore.activeCustomPlaylist) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, Array.from(selectedKeys, Number));
+      await playlistsStore.addSongsToPlaylist(
+        playlistsStore.activeCustomPlaylist.id,
+        Array.from(selectedKeys, Number),
+      );
     } else {
       toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
     }
@@ -160,7 +208,13 @@
     if (selectedKeys.size === 0) return;
     const selectedList = songs.filter((s) => selectedKeys.has(String(s.id)));
     if (selectedList.length > 0) {
-      playerStore.playSongs(selectedList.map((s) => s.id), 0, playlistId, undefined, displayName);
+      playerStore.playSongs(
+        selectedList.map((s) => s.id),
+        0,
+        playlistId,
+        undefined,
+        displayName,
+      );
     }
   }
 
@@ -179,44 +233,43 @@
       const suffix = getPopulationModeSuffix(populationMode);
       return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
     }
-    const base = kind === "decade"
-      ? (decade || i18n.t("artistDetail.unknownYear"))
-      : kind === "bpm"
-        ? getBpmBucketLabel(backingPlaylist?.dynamic_spec, backingPlaylist?.name ?? bpm ?? "")
-        : kind === "artist_tag"
-          ? backingPlaylist?.name || toTitleCase(artistTag || "") || i18n.t("playlists.artistTagAutoPlaylist")
-          : kind === "daypart"
-            ? // The row's own `name` IS the current bucket's English mix name
-              // — updated in place by the backend every time the daypart
-              // boundary crosses (#223); the label is localized from its spec.
-              backingPlaylist?.name
+    const base =
+      kind === "decade"
+        ? decade || i18n.t("artistDetail.unknownYear")
+        : kind === "bpm"
+          ? getBpmBucketLabel(backingPlaylist?.dynamic_spec, backingPlaylist?.name ?? bpm ?? "")
+          : kind === "artist_tag"
+            ? backingPlaylist?.name ||
+              toTitleCase(artistTag || "") ||
+              i18n.t("playlists.artistTagAutoPlaylist")
+            : kind === "daypart"
+              ? // The row's own `name` IS the current bucket's English mix name
+                // — updated in place by the backend every time the daypart
+                // boundary crosses (#223); the label is localized from its spec.
+                backingPlaylist?.name
                 ? getDaypartMixLabel(backingPlaylist.dynamic_spec, backingPlaylist.name)
                 : i18n.t("playlists.daypartAutoPlaylist")
-            : kind === "no_genre"
-            ? i18n.t("songTags.noGenre", {}, "No Genre")
-            : genre || i18n.t("artistDetail.unknownGenre");
+              : kind === "no_genre"
+                ? i18n.t("songTags.noGenre", {}, "No Genre")
+                : genre || i18n.t("artistDetail.unknownGenre");
     const suffix = getPopulationModeSuffix(populationMode);
     return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
   });
 
   // Moment Mix only: the genre (or "Explore Your Library" random fill) the mix was built from.
   let daypartSourceLabel = $derived(
-    kind === "daypart"
-      ? getDaypartMixSourceLabel(backingPlaylist?.dynamic_spec)
-      : null
+    kind === "daypart" ? getDaypartMixSourceLabel(backingPlaylist?.dynamic_spec) : null,
   );
 
-  let topCovers = $derived(
-    kind === "missing_metadata"
-      ? []
-      : songsToCoverStack(songs)
-  );
+  let topCovers = $derived(kind === "missing_metadata" ? [] : songsToCoverStack(songs));
 
   // Whether the header badge shows the cover mosaic (auto width, via
   // CoverMosaic's own aspect-ratio) instead of a fixed-square icon badge.
   let hasCoverMosaic = $derived(topCovers.length > 0);
   // Every kind except genre (per-genre hue) and no_genre (neutral) takes its frame from the shared theme.
-  let heroTheme = $derived(kind === "genre" || kind === "no_genre" ? null : getPlaylistCardTheme(kind));
+  let heroTheme = $derived(
+    kind === "genre" || kind === "no_genre" ? null : getPlaylistCardTheme(kind),
+  );
 
   /** Genre auto-playlist header color (#548): follows the curated tag's own
    * color — a chip's playlist uses its parent card's color — instead of the
@@ -255,7 +308,14 @@
 
   let updatedLabel = $derived.by(() => {
     if (
-      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "missing_musicbrainz" && kind !== "daypart" && kind !== "language") ||
+      (kind !== "genre" &&
+        kind !== "decade" &&
+        kind !== "bpm" &&
+        kind !== "artist_tag" &&
+        kind !== "missing_metadata" &&
+        kind !== "missing_musicbrainz" &&
+        kind !== "daypart" &&
+        kind !== "language") ||
       updated === undefined
     )
       return null;
@@ -279,12 +339,30 @@
     return { songs: withSongs.map((item) => item.song as Song), items: withSongs };
   }
 
-  async function fetchSongs(k: typeof kind, g: typeof genre, at: typeof artistTag, d: typeof decade, b: typeof bpm, lang: typeof language, pid: typeof playlistId): Promise<Loaded> {
-    if ((k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "daypart" || k === "language") && pid !== undefined) {
+  async function fetchSongs(
+    k: typeof kind,
+    g: typeof genre,
+    at: typeof artistTag,
+    d: typeof decade,
+    b: typeof bpm,
+    lang: typeof language,
+    pid: typeof playlistId,
+  ): Promise<Loaded> {
+    if (
+      (k === "genre" ||
+        k === "decade" ||
+        k === "bpm" ||
+        k === "artist_tag" ||
+        k === "daypart" ||
+        k === "language") &&
+      pid !== undefined
+    ) {
       return loadPlaylistRows(pid);
     }
     if (k === "language") {
-      return songsOnly(await invoke<Song[]>("get_songs_by_language", { language: lang ?? "", limit: 500 }));
+      return songsOnly(
+        await invoke<Song[]>("get_songs_by_language", { language: lang ?? "", limit: 500 }),
+      );
     }
     if (k === "missing_musicbrainz") {
       if (pid !== undefined) {
@@ -302,17 +380,28 @@
     }
     if (k === "daypart") return songsOnly([]);
     if (k === "favourites") return songsOnly(await invoke<Song[]>("get_favourite_songs"));
-    if (k === "recently_added") return songsOnly(await invoke<Song[]>("get_recently_added_songs", { limit: 50 }));
-    if (k === "most_played") return songsOnly(await invoke<Song[]>("get_most_played_songs", { limit: 50 }));
-    if (k === "history") return songsOnly(await invoke<Song[]>("get_recently_played_songs", { limit: 100 }));
-    if (k === "decade") return songsOnly(await invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 }));
-    if (k === "bpm") return songsOnly(await invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 }));
-    if (k === "artist_tag") return songsOnly(await invoke<Song[]>("get_songs_by_artist_tag", { tag: at ?? "", limit: 500 }));
-    if (k === "no_genre") return songsOnly(await invoke<Song[]>("get_songs_without_genre", { limit: 500 }));
+    if (k === "recently_added")
+      return songsOnly(await invoke<Song[]>("get_recently_added_songs", { limit: 50 }));
+    if (k === "most_played")
+      return songsOnly(await invoke<Song[]>("get_most_played_songs", { limit: 50 }));
+    if (k === "history")
+      return songsOnly(await invoke<Song[]>("get_recently_played_songs", { limit: 100 }));
+    if (k === "decade")
+      return songsOnly(await invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 }));
+    if (k === "bpm")
+      return songsOnly(await invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 }));
+    if (k === "artist_tag")
+      return songsOnly(
+        await invoke<Song[]>("get_songs_by_artist_tag", { tag: at ?? "", limit: 500 }),
+      );
+    if (k === "no_genre")
+      return songsOnly(await invoke<Song[]>("get_songs_without_genre", { limit: 500 }));
     // Sub-threshold fallback (no backing playlist row yet) — direct
     // curated-hierarchy query (#548), same matching a materialized genre
     // auto-playlist's own population uses.
-    return songsOnly(await invoke<Song[]>("get_songs_by_curated_tag", { tagName: g ?? "", limit: 500 }));
+    return songsOnly(
+      await invoke<Song[]>("get_songs_by_curated_tag", { tagName: g ?? "", limit: 500 }),
+    );
   }
 
   function applyLoaded(loaded: Loaded) {
@@ -343,7 +432,7 @@
     k: typeof kind,
     g: typeof genre,
     at: typeof artistTag,
-    primary: Song[]
+    primary: Song[],
   ): Promise<Song[]> {
     if (k === "genre" && g) {
       const lower = g.toLowerCase();
@@ -360,11 +449,14 @@
       const isAlsoGenre = tagsStore.hierarchy.some(
         (group) =>
           group.name.toLowerCase() === lower ||
-          group.children.some((c) => c.name.toLowerCase() === lower)
+          group.children.some((c) => c.name.toLowerCase() === lower),
       );
       if (isAlsoGenre) {
         try {
-          const extra = await invoke<Song[]>("get_songs_by_curated_tag", { tagName: at, limit: 500 });
+          const extra = await invoke<Song[]>("get_songs_by_curated_tag", {
+            tagName: at,
+            limit: 500,
+          });
           return mergeSongsById(primary, extra);
         } catch (e) {
           console.error("Failed to union in genre songs for artist-tag view:", e);
@@ -377,7 +469,9 @@
   // Track backing playlist track_count reactively so refills trigger an instant re-fetch in the UI,
   // and its sort, which changes the order (#344).
   let backingTrackCount = $derived(backingPlaylist?.track_count ?? 0);
-  let backingLayoutKey = $derived(`${backingPlaylist?.sort_field ?? ""}:${backingPlaylist?.sort_asc ?? true}`);
+  let backingLayoutKey = $derived(
+    `${backingPlaylist?.sort_field ?? ""}:${backingPlaylist?.sort_asc ?? true}`,
+  );
 
   // Which list the table is showing. A re-fetch of that same list (new matches,
   // a re-sort) keeps its rows up instead of blanking to "Loading". Plain, not
@@ -397,9 +491,21 @@
     const listKey = JSON.stringify([k, g, at, d, b, lang, pid]);
     if (listKey !== shownListKey) loading = true;
     fetchSongs(k, g, at, d, b, lang, pid)
-      .then(async (loaded) => ({ ...loaded, songs: await unionWithOtherSystem(k, g, at, loaded.songs) }))
+      .then(async (loaded) => ({
+        ...loaded,
+        songs: await unionWithOtherSystem(k, g, at, loaded.songs),
+      }))
       .then((loaded) => {
-        if (kind !== k || genre !== g || artistTag !== at || decade !== d || bpm !== b || language !== lang || playlistId !== pid) return;
+        if (
+          kind !== k ||
+          genre !== g ||
+          artistTag !== at ||
+          decade !== d ||
+          bpm !== b ||
+          language !== lang ||
+          playlistId !== pid
+        )
+          return;
         applyLoaded(loaded);
         shownListKey = listKey;
       })
@@ -407,7 +513,16 @@
         console.error("Failed to load auto-playlist detail:", err);
       })
       .finally(() => {
-        if (kind === k && genre === g && artistTag === at && decade === d && bpm === b && language === lang && playlistId === pid) loading = false;
+        if (
+          kind === k &&
+          genre === g &&
+          artistTag === at &&
+          decade === d &&
+          bpm === b &&
+          language === lang &&
+          playlistId === pid
+        )
+          loading = false;
       });
   });
 
@@ -426,7 +541,13 @@
     if (songs.length === 0) return;
     const queuePl = await playlistsStore.requireQueue();
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
+    await playerStore.playSongs(
+      songs.map((s) => s.id),
+      0,
+      queuePl?.id,
+      undefined,
+      "Queue",
+    );
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
       navigationStore.viewPlaylist(queuePl.id);
@@ -463,7 +584,7 @@
     if (songs.length === 0) return;
     await playlistsStore.addSongsToActiveTarget(
       songs.map((s) => s.id),
-      displayName || "Playlist"
+      displayName || "Playlist",
     );
   }
 
@@ -477,7 +598,10 @@
     if (!savePlaylistName || !savePlaylistName.trim()) return;
     try {
       const created = await playlistsStore.createPlaylist(savePlaylistName.trim());
-      await playlistsStore.addSongsToPlaylist(created.id, songs.map((s) => s.id));
+      await playlistsStore.addSongsToPlaylist(
+        created.id,
+        songs.map((s) => s.id),
+      );
       playlistsStore.selectPlaylist(created.id);
       navigationStore.viewPlaylist(created.id);
       showSaveModal = false;
@@ -562,7 +686,12 @@
       if (song) {
         applySongStats(song, event.payload);
       }
-      if (kind === "history" || kind === "favourites" || kind === "recently_added" || kind === "most_played") {
+      if (
+        kind === "history" ||
+        kind === "favourites" ||
+        kind === "recently_added" ||
+        kind === "most_played"
+      ) {
         try {
           applyLoaded(await fetchSongs(kind, genre, artistTag, decade, bpm, language, playlistId));
         } catch (err) {
@@ -588,7 +717,9 @@
   let localSortField = $state<AutoPlaylistSortField>("default");
   let localSortAsc = $state(true);
   let sortField = $derived<AutoPlaylistSortField>(
-    listedPlaylist ? ((listedPlaylist.sort_field as AutoPlaylistSortField | null) ?? "default") : localSortField
+    listedPlaylist
+      ? ((listedPlaylist.sort_field as AutoPlaylistSortField | null) ?? "default")
+      : localSortField,
   );
   let sortAsc = $derived(listedPlaylist ? (listedPlaylist.sort_asc ?? true) : localSortAsc);
 
@@ -641,9 +772,16 @@
     return [...list].sort((a, b) => compareSongs(a, b, field, sortAsc));
   });
 
-  const sizeLimit = new PlaylistSizeLimit(() => ({ playlist: listedPlaylist, items: playlistItems }));
-  let uuidBySongId = $derived(new Map((playlistItems ?? []).map((item) => [item.song!.id, item.uuid])));
-  let breakBefore = $derived(sizeLimit.breakBefore(sortedSongs.flatMap((s) => uuidBySongId.get(s.id) ?? [])));
+  const sizeLimit = new PlaylistSizeLimit(() => ({
+    playlist: listedPlaylist,
+    items: playlistItems,
+  }));
+  let uuidBySongId = $derived(
+    new Map((playlistItems ?? []).map((item) => [item.song!.id, item.uuid])),
+  );
+  let breakBefore = $derived(
+    sizeLimit.breakBefore(sortedSongs.flatMap((s) => uuidBySongId.get(s.id) ?? [])),
+  );
 
   function songToRow(song: Song): SongTableRow {
     const disconnected = !song.unavailable && collectionStore.isPathOnDisconnectedDrive(song.path);
@@ -659,7 +797,6 @@
   }
 
   let tableRows = $derived(sortedSongs.map(songToRow));
-
 </script>
 
 {#snippet autoPlaylistEmptyState()}
@@ -667,10 +804,13 @@
     <div class="py-12">
       <SearchEmptyState
         icon={Music}
-        title={i18n.t('collection.noSongsTitle')}
-        matchQueryText={i18n.t('collection.noTracksMatchQuery')}
+        title={i18n.t("collection.noSongsTitle")}
+        matchQueryText={i18n.t("collection.noTracksMatchQuery")}
         query={collectionStore.searchQuery}
-        onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+        onReset={() => {
+          collectionStore.searchQuery = "";
+          collectionStore.search("");
+        }}
       />
     </div>
   {:else}
@@ -682,14 +822,21 @@
   class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full"
   use:rememberScroll={`autoplaylist:${view.kind}:${view.genre ?? view.decade ?? view.bpm ?? ""}`}
 >
-  <div class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome [--acrylic-tint:var(--color-brand-main)] px-6 pt-6 pb-6 shrink-0">
+  <div
+    class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome [--acrylic-tint:var(--color-brand-main)] px-6 pt-6 pb-6 shrink-0"
+  >
     <div class="flex items-stretch justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
-        <h1 class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={displayName}>
+        <h1
+          class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5"
+          title={displayName}
+        >
           {displayName}
         </h1>
 
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium">
+        <div
+          class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium"
+        >
           {#if daypartSourceLabel}
             <span>{daypartSourceLabel}</span>
             <span>•</span>
@@ -699,7 +846,7 @@
           <span>{totalDurationLabel}</span>
           {#if updatedLabel}
             <span>•</span>
-            <span>{i18n.t('playlists.updatedOn', { date: updatedLabel })}</span>
+            <span>{i18n.t("playlists.updatedOn", { date: updatedLabel })}</span>
           {/if}
           {#if sizeLimit.status}
             <span>•</span>
@@ -713,8 +860,8 @@
             <button
               type="button"
               class="px-2 py-0.5 rounded-full border border-brand-border bg-brand-sidebar hover:text-brand-accent-text transition-colors cursor-pointer"
-              onclick={() => navigationStore.viewGenreTag(readAsGenre)}
-            >{readAsGenre}</button>
+              onclick={() => navigationStore.viewGenreTag(readAsGenre)}>{readAsGenre}</button
+            >
           </div>
         {:else if includedAliases.length > 0}
           <div class="flex flex-wrap items-center gap-1.5 text-xs text-brand-text-primary">
@@ -723,9 +870,14 @@
               <button
                 type="button"
                 class="px-2 py-0.5 rounded-full border border-brand-border bg-brand-sidebar hover:text-brand-accent-text transition-colors cursor-pointer"
-                aria-label={i18n.t("songTags.manageAliasNamed", { alias: entry.alias }, "Manage alias {alias}")}
+                aria-label={i18n.t(
+                  "songTags.manageAliasNamed",
+                  { alias: entry.alias },
+                  "Manage alias {alias}",
+                )}
                 onclick={() => tagsStore.openAliasDialog(entry.alias)}
-              >{entry.alias} · {entry.song_count}</button>
+                >{entry.alias} · {entry.song_count}</button
+              >
             {/each}
           </div>
         {/if}
@@ -753,7 +905,9 @@
             {/snippet}
           </IconActionButton>
           <IconActionButton
-            onclick={() => { showShareModal = true; }}
+            onclick={() => {
+              showShareModal = true;
+            }}
             title={i18n.t("shareModal.menuItem")}
             class="shrink-0"
             disabled={songs.length === 0}
@@ -795,19 +949,27 @@
             <CoverMosaic covers={topCovers} sizeClass="h-full" />
           </div>
         {:else if kind === "no_genre" && topCovers.length > 0}
-          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)] relative">
+          <div
+            class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)] relative"
+          >
             <CoverMosaic covers={topCovers} sizeClass="h-full" />
           </div>
         {:else if heroTheme && topCovers.length > 0}
-          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br {heroTheme.gradientClass} flex items-center justify-center overflow-hidden border relative">
+          <div
+            class="h-full p-3.5 bg-brand-main bg-gradient-to-br {heroTheme.gradientClass} flex items-center justify-center overflow-hidden border relative"
+          >
             <CoverMosaic covers={topCovers} sizeClass="h-full" />
           </div>
         {:else if kind === "no_genre"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)]">
+          <div
+            class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)]"
+          >
             <Music class="w-16 h-16 text-slate-300" />
           </div>
         {:else if heroTheme}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br {heroTheme.gradientClass} flex items-center justify-center overflow-hidden border">
+          <div
+            class="w-full h-full bg-brand-main bg-gradient-to-br {heroTheme.gradientClass} flex items-center justify-center overflow-hidden border"
+          >
             <PlaylistKindIcon {kind} sizeClass="w-16 h-16" />
           </div>
         {:else}
@@ -817,7 +979,12 @@
               ? `background-image: linear-gradient(to bottom right, color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 25%, transparent), color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 15%, transparent)); border-color: color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 30%, transparent); box-shadow: 0 0 28px 3px color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 40%, transparent);`
               : "background-image: linear-gradient(to bottom right, rgb(22 163 74 / 0.25), rgb(74 222 128 / 0.15)); border-color: rgb(74 222 128 / 0.3); box-shadow: 0 0 28px 3px rgb(74 222 128 / 0.4);"}
           >
-            <Tag class="w-16 h-16" style={genreColorIndex !== undefined ? `color: ${genreColorHsl(genreColorIndex)}` : "color: #4ADE80"} />
+            <Tag
+              class="w-16 h-16"
+              style={genreColorIndex !== undefined
+                ? `color: ${genreColorHsl(genreColorIndex)}`
+                : "color: #4ADE80"}
+            />
           </div>
         {/if}
       </div>
@@ -846,14 +1013,15 @@
         onEditAlbum={openAlbumEditor}
       />
     </div>
-
   </div>
 </div>
 
 {#if editingSongId !== null}
   <TagEditor
     songId={editingSongId}
-    onClose={() => { editingSongId = null; }}
+    onClose={() => {
+      editingSongId = null;
+    }}
     onSave={handleTagEditorSaved}
   />
 {/if}
@@ -863,7 +1031,9 @@
     songIds={editingAlbumSongs.map((s) => s.id)}
     initialTracks={editingAlbumSongs}
     hasEmbeddedArt={editingAlbumSongs.some((s) => s.art_embedded)}
-    onClose={() => { editingAlbumSongs = null; }}
+    onClose={() => {
+      editingAlbumSongs = null;
+    }}
     onSave={handleTagEditorSaved}
   />
 {/if}
@@ -874,14 +1044,17 @@
     songIds={batchEditSongs.map((s) => s.id)}
     initialTracks={batchEditSongs}
     hasEmbeddedArt={batchEditSongs.some((s) => s.art_embedded)}
-    onClose={() => { batchEditSongs = null; }}
+    onClose={() => {
+      batchEditSongs = null;
+    }}
     onSave={handleTagEditorSaved}
   />
 {/if}
 
 {#if contextMenuState}
   {@const song = contextMenuState.song}
-  {@const selectedSongs = selectedKeys.size > 1 ? songs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
+  {@const selectedSongs =
+    selectedKeys.size > 1 ? songs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
   <SongContextMenu
     x={contextMenuState.x}
     y={contextMenuState.y}
@@ -906,9 +1079,14 @@
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
-    onEditBatchTags={() => { batchEditSongs = selectedSongs ?? null; }}
-    onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
-    onClose={() => { contextMenuState = null; }}
+    onEditBatchTags={() => {
+      batchEditSongs = selectedSongs ?? null;
+    }}
+    onOpenInPicard={() =>
+      openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
+    onClose={() => {
+      contextMenuState = null;
+    }}
   />
 {/if}
 
@@ -917,7 +1095,9 @@
     count={selectedKeys.size}
     onPlaySelected={handlePlaySelected}
     onAddToPlaylist={handleBulkAddToPlaylist}
-    onClear={() => { selectedKeys = new Set(); }}
+    onClear={() => {
+      selectedKeys = new Set();
+    }}
   />
 {/if}
 
@@ -925,53 +1105,78 @@
   <ContextMenu
     x={overflowMenuPos.x}
     y={overflowMenuPos.y}
-   
-    onClose={() => { overflowMenuPos = null; }}
+    onClose={() => {
+      overflowMenuPos = null;
+    }}
   >
     <ContextMenuItem
       icon={RotateCcw}
       label={i18n.t("playlists.undoBtn")}
-      onclick={() => { playlistsStore.undo(); overflowMenuPos = null; }}
+      onclick={() => {
+        playlistsStore.undo();
+        overflowMenuPos = null;
+      }}
     />
     <ContextMenuItem
       icon={RotateCw}
       label={i18n.t("playlists.redoBtn")}
-      onclick={() => { playlistsStore.redo(); overflowMenuPos = null; }}
+      onclick={() => {
+        playlistsStore.redo();
+        overflowMenuPos = null;
+      }}
     />
     <ContextMenuDivider />
     <ContextMenuItem
       icon={Plus}
       label={playlistsStore.activeCustomPlaylist
-        ? i18n.t('albumDetail.addAllToPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
-        : i18n.t('albumDetail.addAllToPlaylistTooltipDefault')}
-      onclick={() => { handleAddAllToPlaylist(); overflowMenuPos = null; }}
+        ? i18n.t("albumDetail.addAllToPlaylistTooltip", {
+            name: playlistsStore.activeCustomPlaylist.name,
+          })
+        : i18n.t("albumDetail.addAllToPlaylistTooltipDefault")}
+      onclick={() => {
+        handleAddAllToPlaylist();
+        overflowMenuPos = null;
+      }}
       disabled={loading || songs.length === 0}
     />
     <ContextMenuItem
       icon={FolderPlus}
       label={i18n.t("playlists.saveAsCustomTooltip")}
-      onclick={() => { handleSaveAsCustomPlaylist(); overflowMenuPos = null; }}
+      onclick={() => {
+        handleSaveAsCustomPlaylist();
+        overflowMenuPos = null;
+      }}
       disabled={loading || songs.length === 0}
     />
     {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined}
       <ContextMenuItem
         icon={RefreshCw}
         label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}
-        onclick={() => { handleRefreshAutoPlaylist(); overflowMenuPos = null; }}
+        onclick={() => {
+          handleRefreshAutoPlaylist();
+          overflowMenuPos = null;
+        }}
         disabled={loading || isRefreshing}
       />
     {/if}
 
     {#if kind === "missing_metadata" || kind === "missing_musicbrainz"}
-      {@const picardTargets = selectedKeys.size > 0 ? songs.filter((s) => selectedKeys.has(String(s.id))) : songs}
+      {@const picardTargets =
+        selectedKeys.size > 0 ? songs.filter((s) => selectedKeys.has(String(s.id))) : songs}
       <ContextMenuDivider />
       <ContextMenuItem
         icon={OpenInPicard}
         label={selectedKeys.size > 0
           ? i18n.t("picard.openSelectedInPicard", { count: selectedKeys.size })
           : i18n.t("picard.openAllInPicard")}
-        onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
-        disabled={loading || songs.length === 0 || !picardStore.available || picardTargets.every(isRemoteSource)}
+        onclick={() => {
+          handleOpenAllInPicard();
+          overflowMenuPos = null;
+        }}
+        disabled={loading ||
+          songs.length === 0 ||
+          !picardStore.available ||
+          picardTargets.every(isRemoteSource)}
         title={!picardStore.available
           ? i18n.t("picard.notFoundTooltip")
           : picardTargets.length > 0 && picardTargets.every(isRemoteSource)
@@ -994,24 +1199,45 @@
 {/if}
 
 {#if showShareModal}
-  <ShareModal entity={{ kind: "playlist", title: displayName, songs }} onClose={() => { showShareModal = false; }} />
+  <ShareModal
+    entity={{ kind: "playlist", title: displayName, songs }}
+    onClose={() => {
+      showShareModal = false;
+    }}
+  />
 {/if}
 
 {#if showSaveModal}
-  <Modal onClose={() => showSaveModal = false} maxWidth="max-w-sm">
-    <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
+  <Modal onClose={() => (showSaveModal = false)} maxWidth="max-w-sm">
+    <div
+      class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main"
+    >
       <div class="flex items-center gap-2">
         <FolderPlus class="w-4 h-4 text-brand-accent-text" />
-        <h3 class="text-sm font-bold text-brand-text-primary">{i18n.t("playlists.saveQueueAsPlaylist")}</h3>
+        <h3 class="text-sm font-bold text-brand-text-primary">
+          {i18n.t("playlists.saveQueueAsPlaylist")}
+        </h3>
       </div>
-      <button onclick={() => showSaveModal = false} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
+      <button
+        onclick={() => (showSaveModal = false)}
+        class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+      >
         <X class="w-4 h-4" />
       </button>
     </div>
 
-    <form onsubmit={(e) => { e.preventDefault(); confirmSaveAsCustomPlaylist(); }} class="flex flex-col gap-4 p-6 bg-brand-sidebar">
+    <form
+      onsubmit={(e) => {
+        e.preventDefault();
+        confirmSaveAsCustomPlaylist();
+      }}
+      class="flex flex-col gap-4 p-6 bg-brand-sidebar"
+    >
       <div class="flex flex-col gap-1.5">
-        <label for="save-playlist-name-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+        <label
+          for="save-playlist-name-input"
+          class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+        >
           {i18n.t("playlists.saveQueueNameLabel")}
         </label>
         <Input
@@ -1026,7 +1252,7 @@
       </div>
 
       <div class="flex items-center justify-end gap-3 pt-2">
-        <Button onclick={() => showSaveModal = false} variant="secondary" size="sm">
+        <Button onclick={() => (showSaveModal = false)} variant="secondary" size="sm">
           {i18n.t("playlists.cancel", {}, "Cancel")}
         </Button>
         <Button type="submit" variant="primary" size="sm">
@@ -1036,5 +1262,3 @@
     </form>
   </Modal>
 {/if}
-
-

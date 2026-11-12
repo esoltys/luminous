@@ -70,14 +70,20 @@
     return option ? i18n.t(option.labelKey) : token;
   }
 
-  function generateSuggestedName(ruleList: Array<{ field: string; op: string; value: string }>): string {
+  function generateSuggestedName(
+    ruleList: Array<{ field: string; op: string; value: string }>,
+  ): string {
     const activeRules = ruleList.filter((r) => r.value.trim() !== "");
     const fallbackName = i18n.t("smartPlaylistBuilder.fallbackName", {}, "Smart Playlist");
     if (activeRules.length === 0) return fallbackName;
 
     // Detect a decade range: year >= X and year <= Y where Y - X === 9
-    const yearGteIdx = activeRules.findIndex((r) => r.field === "year" && (r.op === ">=" || r.op === ">"));
-    const yearLteIdx = activeRules.findIndex((r) => r.field === "year" && (r.op === "<=" || r.op === "<"));
+    const yearGteIdx = activeRules.findIndex(
+      (r) => r.field === "year" && (r.op === ">=" || r.op === ">"),
+    );
+    const yearLteIdx = activeRules.findIndex(
+      (r) => r.field === "year" && (r.op === "<=" || r.op === "<"),
+    );
     let decadeToken: string | null = null;
     const consumedIndices = new Set<number>();
 
@@ -107,7 +113,12 @@
         const cleanVal = val.replace(/[\\/]+$/, "");
         const baseName = cleanVal.split(/[\\/]/).pop() || cleanVal;
         parts.push(baseName);
-      } else if (r.field === "genre" || r.field === "artist_tag" || r.field === "artist-tag" || r.field === "language") {
+      } else if (
+        r.field === "genre" ||
+        r.field === "artist_tag" ||
+        r.field === "artist-tag" ||
+        r.field === "language"
+      ) {
         parts.push(val.charAt(0).toUpperCase() + val.slice(1));
       } else if (r.field === "artist") {
         parts.push(val);
@@ -115,7 +126,8 @@
         parts.push(i18n.t("collection.albumPlaylistName", { name: val }));
       } else if (r.field === "year") {
         if (r.op === ">=" || r.op === ">") parts.push(`${val}+`);
-        else if (r.op === "<=" || r.op === "<") parts.push(i18n.t("smartPlaylistBuilder.yearPrefixPre", { value: val }));
+        else if (r.op === "<=" || r.op === "<")
+          parts.push(i18n.t("smartPlaylistBuilder.yearPrefixPre", { value: val }));
         else parts.push(val);
       } else if (r.field === "tempo") {
         const name = tempoLabel(val);
@@ -138,10 +150,19 @@
       const firstNonYear = activeRules.find((r) => r.field !== "year");
       const firstField = firstNonYear?.field ?? activeRules[0].field;
       if (["folder", "subfolder", "directory", "path"].includes(firstField)) return single;
-      if (firstField === "genre" || firstField === "artist_tag" || firstField === "artist-tag" || firstField === "language" || firstField === "tempo") return `${single} ${mixWord}`;
-      if (firstField === "artist") return `${single} ${i18n.t("smartPlaylistBuilder.selectionWord", {}, "Selection")}`;
+      if (
+        firstField === "genre" ||
+        firstField === "artist_tag" ||
+        firstField === "artist-tag" ||
+        firstField === "language" ||
+        firstField === "tempo"
+      )
+        return `${single} ${mixWord}`;
+      if (firstField === "artist")
+        return `${single} ${i18n.t("smartPlaylistBuilder.selectionWord", {}, "Selection")}`;
       if (DATE_FIELDS.has(firstField)) return single;
-      if (firstField === "rating") return `${single} ${i18n.t("smartPlaylistBuilder.songsWord", {}, "Songs")}`;
+      if (firstField === "rating")
+        return `${single} ${i18n.t("smartPlaylistBuilder.songsWord", {}, "Songs")}`;
       return `${single} ${i18n.t("smartPlaylistBuilder.playlistWord", {}, "Playlist")}`;
     }
 
@@ -187,35 +208,119 @@
   });
 
   const availableFields = [
-    { key: "artist", label: i18n.t("smartPlaylistBuilder.fieldArtist", {}, "Artist"), type: "text" },
-    { key: "artist_tag", label: i18n.t("smartPlaylistBuilder.fieldArtistTag", {}, "Artist Tag"), type: "text" },
-    { key: "album_artist", label: i18n.t("smartPlaylistBuilder.fieldAlbumArtist", {}, "Album Artist"), type: "text" },
+    {
+      key: "artist",
+      label: i18n.t("smartPlaylistBuilder.fieldArtist", {}, "Artist"),
+      type: "text",
+    },
+    {
+      key: "artist_tag",
+      label: i18n.t("smartPlaylistBuilder.fieldArtistTag", {}, "Artist Tag"),
+      type: "text",
+    },
+    {
+      key: "album_artist",
+      label: i18n.t("smartPlaylistBuilder.fieldAlbumArtist", {}, "Album Artist"),
+      type: "text",
+    },
     { key: "album", label: i18n.t("smartPlaylistBuilder.fieldAlbum", {}, "Album"), type: "text" },
     { key: "title", label: i18n.t("smartPlaylistBuilder.fieldTitle", {}, "Title"), type: "text" },
     { key: "genre", label: i18n.t("smartPlaylistBuilder.fieldGenre", {}, "Genre"), type: "text" },
-    { key: "language", label: i18n.t("smartPlaylistBuilder.fieldLanguage", {}, "Language"), type: "text" },
-    { key: "folder", label: i18n.t("smartPlaylistBuilder.fieldFolder", {}, "Folder / Path"), type: "text" },
-    { key: "composer", label: i18n.t("smartPlaylistBuilder.fieldComposer", {}, "Composer"), type: "text" },
+    {
+      key: "language",
+      label: i18n.t("smartPlaylistBuilder.fieldLanguage", {}, "Language"),
+      type: "text",
+    },
+    {
+      key: "folder",
+      label: i18n.t("smartPlaylistBuilder.fieldFolder", {}, "Folder / Path"),
+      type: "text",
+    },
+    {
+      key: "composer",
+      label: i18n.t("smartPlaylistBuilder.fieldComposer", {}, "Composer"),
+      type: "text",
+    },
     { key: "key", label: i18n.t("smartPlaylistBuilder.fieldKey", {}, "Key"), type: "text" },
     { key: "bpm", label: i18n.t("smartPlaylistBuilder.fieldBpm", {}, "BPM"), type: "number" },
     { key: "tempo", label: i18n.t("smartPlaylistBuilder.fieldTempo", {}, "Tempo"), type: "tempo" },
     { key: "year", label: i18n.t("smartPlaylistBuilder.fieldYear", {}, "Year"), type: "number" },
-    { key: "originalyear", label: i18n.t("smartPlaylistBuilder.fieldOriginalYear", {}, "Original Year"), type: "number" },
-    { key: "rating", label: i18n.t("smartPlaylistBuilder.fieldRating", {}, "Rating (Stars)"), type: "number" },
-    { key: "playcount", label: i18n.t("smartPlaylistBuilder.fieldPlayCount", {}, "Play Count"), type: "number" },
-    { key: "skipcount", label: i18n.t("smartPlaylistBuilder.fieldSkipCount", {}, "Skip Count"), type: "number" },
-    { key: "lastplayed", label: i18n.t("smartPlaylistBuilder.fieldLastPlayed", {}, "Last Played"), type: "date" },
-    { key: "added", label: i18n.t("smartPlaylistBuilder.fieldAdded", {}, "Date Added"), type: "date" },
-    { key: "track", label: i18n.t("smartPlaylistBuilder.fieldTrack", {}, "Track #"), type: "number" },
+    {
+      key: "originalyear",
+      label: i18n.t("smartPlaylistBuilder.fieldOriginalYear", {}, "Original Year"),
+      type: "number",
+    },
+    {
+      key: "rating",
+      label: i18n.t("smartPlaylistBuilder.fieldRating", {}, "Rating (Stars)"),
+      type: "number",
+    },
+    {
+      key: "playcount",
+      label: i18n.t("smartPlaylistBuilder.fieldPlayCount", {}, "Play Count"),
+      type: "number",
+    },
+    {
+      key: "skipcount",
+      label: i18n.t("smartPlaylistBuilder.fieldSkipCount", {}, "Skip Count"),
+      type: "number",
+    },
+    {
+      key: "lastplayed",
+      label: i18n.t("smartPlaylistBuilder.fieldLastPlayed", {}, "Last Played"),
+      type: "date",
+    },
+    {
+      key: "added",
+      label: i18n.t("smartPlaylistBuilder.fieldAdded", {}, "Date Added"),
+      type: "date",
+    },
+    {
+      key: "track",
+      label: i18n.t("smartPlaylistBuilder.fieldTrack", {}, "Track #"),
+      type: "number",
+    },
     { key: "disc", label: i18n.t("smartPlaylistBuilder.fieldDisc", {}, "Disc #"), type: "number" },
-    { key: "bitrate", label: i18n.t("smartPlaylistBuilder.fieldBitrate", {}, "Bitrate"), type: "number" },
-    { key: "samplerate", label: i18n.t("smartPlaylistBuilder.fieldSampleRate", {}, "Sample Rate (Hz)"), type: "number" },
-    { key: "bitdepth", label: i18n.t("smartPlaylistBuilder.fieldBitDepth", {}, "Bit Depth"), type: "number" },
-    { key: "format", label: i18n.t("smartPlaylistBuilder.fieldFormat", {}, "Format"), type: "text" },
-    { key: "lossless", label: i18n.t("smartPlaylistBuilder.fieldLossless", {}, "Lossless"), type: "boolean" },
-    { key: "channels", label: i18n.t("smartPlaylistBuilder.fieldChannels", {}, "Channels"), type: "number" },
-    { key: "compilation", label: i18n.t("smartPlaylistBuilder.fieldCompilation", {}, "Compilation"), type: "boolean" },
-    { key: "duration", label: i18n.t("smartPlaylistBuilder.fieldDuration", {}, "Duration (MM:SS or Sec)"), type: "text" },
+    {
+      key: "bitrate",
+      label: i18n.t("smartPlaylistBuilder.fieldBitrate", {}, "Bitrate"),
+      type: "number",
+    },
+    {
+      key: "samplerate",
+      label: i18n.t("smartPlaylistBuilder.fieldSampleRate", {}, "Sample Rate (Hz)"),
+      type: "number",
+    },
+    {
+      key: "bitdepth",
+      label: i18n.t("smartPlaylistBuilder.fieldBitDepth", {}, "Bit Depth"),
+      type: "number",
+    },
+    {
+      key: "format",
+      label: i18n.t("smartPlaylistBuilder.fieldFormat", {}, "Format"),
+      type: "text",
+    },
+    {
+      key: "lossless",
+      label: i18n.t("smartPlaylistBuilder.fieldLossless", {}, "Lossless"),
+      type: "boolean",
+    },
+    {
+      key: "channels",
+      label: i18n.t("smartPlaylistBuilder.fieldChannels", {}, "Channels"),
+      type: "number",
+    },
+    {
+      key: "compilation",
+      label: i18n.t("smartPlaylistBuilder.fieldCompilation", {}, "Compilation"),
+      type: "boolean",
+    },
+    {
+      key: "duration",
+      label: i18n.t("smartPlaylistBuilder.fieldDuration", {}, "Duration (MM:SS or Sec)"),
+      type: "text",
+    },
   ];
 
   const dateOpLabels: Record<DateOpChoice, () => string> = {
@@ -372,14 +477,22 @@
     class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col"
     style="max-height: min(90vh, calc(100vh - {dockClearance + 32}px))"
   >
-    <div class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50">
+    <div
+      class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50"
+    >
       <div class="flex items-center gap-2.5">
         <div class="p-2 rounded-xl bg-brand-accent/20 text-brand-accent-text">
           <Sparkles class="w-5 h-5" />
         </div>
         <div>
-          <h2 class="text-base font-bold text-brand-text-primary text-balance">{editing ? i18n.t("smartPlaylistBuilder.editTitle") : i18n.t("smartPlaylistBuilder.createTitle")}</h2>
-          <p class="text-xs text-brand-text-secondary/70 text-pretty">{i18n.t("smartPlaylistBuilder.subtitle")}</p>
+          <h2 class="text-base font-bold text-brand-text-primary text-balance">
+            {editing
+              ? i18n.t("smartPlaylistBuilder.editTitle")
+              : i18n.t("smartPlaylistBuilder.createTitle")}
+          </h2>
+          <p class="text-xs text-brand-text-secondary/70 text-pretty">
+            {i18n.t("smartPlaylistBuilder.subtitle")}
+          </p>
         </div>
       </div>
       <button
@@ -392,14 +505,19 @@
 
     <form onsubmit={handleSubmit} class="p-6 flex-1 overflow-y-auto flex flex-col gap-5">
       <div>
-        <label for="smart-playlist-name-input" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-1.5">
+        <label
+          for="smart-playlist-name-input"
+          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-1.5"
+        >
           {i18n.t("smartPlaylistBuilder.nameLabel")}
         </label>
         <Input
           id="smart-playlist-name-input"
           type="text"
           bind:value={playlistName}
-          oninput={() => { userHasEditedName = true; }}
+          oninput={() => {
+            userHasEditedName = true;
+          }}
           placeholder={i18n.t("smartPlaylistBuilder.namePlaceholder")}
           class="w-full"
           required
@@ -408,7 +526,9 @@
 
       <div>
         <div class="flex items-center justify-between mb-2">
-          <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+          <span
+            class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5"
+          >
             <SlidersHorizontal class="w-3.5 h-3.5 text-brand-accent-text" />
             {i18n.t("smartPlaylistBuilder.matchingRules")}
           </span>
@@ -425,7 +545,9 @@
         <div class="space-y-2.5">
           {#each rules as rule (rule.id)}
             {@const fieldType = availableFields.find((f) => f.key === rule.field)?.type}
-            <div class="flex flex-wrap items-center gap-2 bg-brand-main/60 p-2.5 rounded-xl border border-brand-border/40">
+            <div
+              class="flex flex-wrap items-center gap-2 bg-brand-main/60 p-2.5 rounded-xl border border-brand-border/40"
+            >
               <Select
                 value={rule.field}
                 onchange={(e) => {
@@ -458,7 +580,10 @@
                 <Select
                   value={dateOpChoice(rule.op, rule.value)}
                   onchange={(e) => {
-                    Object.assign(rule, applyDateOpChoice(e.currentTarget.value as DateOpChoice, rule));
+                    Object.assign(
+                      rule,
+                      applyDateOpChoice(e.currentTarget.value as DateOpChoice, rule),
+                    );
                   }}
                   class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
                 >
@@ -469,7 +594,9 @@
               {:else if fieldType !== "boolean"}
                 <Select
                   value={rule.op}
-                  onchange={(e) => { rule.op = e.currentTarget.value; }}
+                  onchange={(e) => {
+                    rule.op = e.currentTarget.value;
+                  }}
                   class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
                 >
                   {#each getOperatorsForField(rule.field) as opItem}
@@ -483,7 +610,9 @@
                   <Toggle
                     id="rule-toggle-{rule.id}"
                     checked={rule.value.trim() === "1"}
-                    onchange={(checked) => { rule.value = checked ? "1" : "0"; }}
+                    onchange={(checked) => {
+                      rule.value = checked ? "1" : "0";
+                    }}
                     label={availableFields.find((f) => f.key === rule.field)?.label ?? ""}
                   />
                 </div>
@@ -501,7 +630,12 @@
                     />
                     <Select
                       value={relative.unit}
-                      onchange={(e) => setRelative(rule, String(relative.count), e.currentTarget.value as RelativeUnit)}
+                      onchange={(e) =>
+                        setRelative(
+                          rule,
+                          String(relative.count),
+                          e.currentTarget.value as RelativeUnit,
+                        )}
                       class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
                     >
                       {#each RELATIVE_UNITS as unit}
@@ -536,8 +670,14 @@
                   <Input
                     type="text"
                     bind:value={rule.value}
-                    oninput={() => { if (!userHasEditedName) playlistName = generateSuggestedName(rules); }}
-                    placeholder={i18n.t("smartPlaylistBuilder.folderValuePlaceholder", {}, "e.g. Radio Downloads or browse...")}
+                    oninput={() => {
+                      if (!userHasEditedName) playlistName = generateSuggestedName(rules);
+                    }}
+                    placeholder={i18n.t(
+                      "smartPlaylistBuilder.folderValuePlaceholder",
+                      {},
+                      "e.g. Radio Downloads or browse...",
+                    )}
                     size="sm"
                     surface="sidebar"
                     class="flex-1 min-w-44"
@@ -579,7 +719,9 @@
 
       <!-- Queue population mode tabs (#120): applied when this playlist (re)populates -->
       <div class="flex items-center gap-3 pt-1">
-        <span class="text-xs font-semibold text-brand-text-primary shrink-0">{i18n.t("playlists.populationModeLabel")}</span>
+        <span class="text-xs font-semibold text-brand-text-primary shrink-0"
+          >{i18n.t("playlists.populationModeLabel")}</span
+        >
         <PopulationModeTabs mode={populationMode} onChange={(m) => (populationMode = m)} />
       </div>
 
@@ -589,7 +731,9 @@
         </Button>
         <Button type="submit" variant="primary" size="sm">
           <Sparkles class="w-3.5 h-3.5" />
-          {editing ? i18n.t("smartPlaylistBuilder.updateBtn") : i18n.t("smartPlaylistBuilder.createBtn")}
+          {editing
+            ? i18n.t("smartPlaylistBuilder.updateBtn")
+            : i18n.t("smartPlaylistBuilder.createBtn")}
         </Button>
       </div>
     </form>

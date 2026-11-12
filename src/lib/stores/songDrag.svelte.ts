@@ -101,7 +101,10 @@ export function filesPayload(entries: FileEntry[]): SongDragPayload {
   const files = entries.filter((e) => !e.isDir);
   return {
     songIds: files.flatMap((e) => (e.songId !== null ? [e.songId] : [])),
-    label: entries.length === 1 ? (entries[0]?.name ?? "") : i18n.plural("files.songCount", entries.length),
+    label:
+      entries.length === 1
+        ? (entries[0]?.name ?? "")
+        : i18n.plural("files.songCount", entries.length),
     skippedCount: files.filter((e) => e.songId === null).length,
     sourcePlaylistId: null,
   };
@@ -109,10 +112,14 @@ export function filesPayload(entries: FileEntry[]): SongDragPayload {
 
 /** Payload for songs dragged from a song list; `sourcePlaylistId` is the playlist (or Queue)
  * the list shows, if any. */
-export function songsPayload(songs: Song[], sourcePlaylistId: number | null = null): SongDragPayload {
+export function songsPayload(
+  songs: Song[],
+  sourcePlaylistId: number | null = null,
+): SongDragPayload {
   return {
     songIds: songs.map((s) => s.id),
-    label: songs.length === 1 ? (songs[0]?.title ?? "") : i18n.plural("files.songCount", songs.length),
+    label:
+      songs.length === 1 ? (songs[0]?.title ?? "") : i18n.plural("files.songCount", songs.length),
     skippedCount: 0,
     sourcePlaylistId,
   };
@@ -165,7 +172,8 @@ class SongDragStore {
     const { songIds, skippedCount } = this.payload;
     this.end();
 
-    if (target?.kind !== "queue" && target?.kind !== "playlist" && target?.kind !== "device") return false;
+    if (target?.kind !== "queue" && target?.kind !== "playlist" && target?.kind !== "device")
+      return false;
     if (songIds.length === 0) {
       toastStore.show(i18n.t("files.nothingToPlay"), "info");
       return true;
@@ -177,7 +185,10 @@ class SongDragStore {
         toastStore.show(i18n.plural("dragDrop.addedSongs", songIds.length), "success");
       } else if (target.kind === "playlist") {
         await playlistsStore.addSongsToPlaylist(target.id, songIds);
-        toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: target.name }), "success");
+        toastStore.show(
+          i18n.t("playlists.addedToPlaylistSuccess", { name: target.name }),
+          "success",
+        );
       } else if (target.kind === "device") {
         await devicesStore.addSongsToSync(target.id, songIds, target.name);
       }
@@ -187,9 +198,9 @@ class SongDragStore {
         target.kind === "queue"
           ? i18n.t("dragDrop.queueFailed")
           : target.kind === "playlist"
-          ? i18n.t("dragDrop.playlistFailed", { name: target.name })
-          : i18n.t("devices.addItemToSyncFailed", { name: target.name, device: target.name }),
-        "error"
+            ? i18n.t("dragDrop.playlistFailed", { name: target.name })
+            : i18n.t("devices.addItemToSyncFailed", { name: target.name, device: target.name }),
+        "error",
       );
       return true;
     }

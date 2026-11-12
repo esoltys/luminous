@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildShareCardSvg, buildStatsShareCardSvg, buildMosaicCoverHtml, SHARE_ASPECT_RATIOS } from "./shareCard";
+import {
+  buildShareCardSvg,
+  buildStatsShareCardSvg,
+  buildMosaicCoverHtml,
+  SHARE_ASPECT_RATIOS,
+} from "./shareCard";
 
 const baseOptions = {
   theme: "dark" as const,
@@ -52,7 +57,7 @@ describe("buildShareCardSvg", () => {
     expect(svg).toContain("Some Artist");
   });
 
-  it("puts a track's secondary text (artist) on its own second line instead of a \"Title — Artist\" run", () => {
+  it('puts a track\'s secondary text (artist) on its own second line instead of a "Title — Artist" run', () => {
     const { svg } = buildShareCardSvg({
       ...baseOptions,
       aspectRatio: "16:9",
@@ -72,7 +77,11 @@ describe("buildShareCardSvg", () => {
   });
 
   it("fits fewer two-line rows per column than single-line rows, showing +N more instead of clipping", () => {
-    const withArtist = Array.from({ length: 30 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}`, secondary: "Artist" }));
+    const withArtist = Array.from({ length: 30 }, (_, i) => ({
+      number: i + 1,
+      title: `Track ${i + 1}`,
+      secondary: "Artist",
+    }));
     const without = withArtist.map(({ secondary: _s, ...t }) => t);
     const count = (svg: string) => (svg.match(/>Track \d+</g) ?? []).length;
     const two = buildShareCardSvg({ ...baseOptions, aspectRatio: "16:9", tracks: withArtist }).svg;
@@ -82,14 +91,20 @@ describe("buildShareCardSvg", () => {
   });
 
   it("caps visible tracks and shows a +N more overflow row", () => {
-    const tracks = Array.from({ length: 20 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}` }));
+    const tracks = Array.from({ length: 20 }, (_, i) => ({
+      number: i + 1,
+      title: `Track ${i + 1}`,
+    }));
     const { svg } = buildShareCardSvg({ ...baseOptions, aspectRatio: "16:9", tracks });
     expect(svg).toContain("Track 1<");
     expect(svg).toMatch(/\+\d+ more/);
   });
 
   it("fans a long track list out into multiple CSS columns, more on wider frames", () => {
-    const tracks = Array.from({ length: 20 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}` }));
+    const tracks = Array.from({ length: 20 }, (_, i) => ({
+      number: i + 1,
+      title: `Track ${i + 1}`,
+    }));
     const landscape = buildShareCardSvg({ ...baseOptions, aspectRatio: "16:9", tracks });
     const portrait = buildShareCardSvg({ ...baseOptions, aspectRatio: "9:16", tracks });
     expect(landscape.svg).toContain("column-count:3");
@@ -112,7 +127,11 @@ describe("buildShareCardSvg", () => {
     const { svg } = buildShareCardSvg({
       ...baseOptions,
       aspectRatio: "1:1",
-      coverStackDataUris: ["data:image/png;base64,AAA", "data:image/png;base64,BBB", "data:image/png;base64,CCC"],
+      coverStackDataUris: [
+        "data:image/png;base64,AAA",
+        "data:image/png;base64,BBB",
+        "data:image/png;base64,CCC",
+      ],
     });
     expect(svg).toContain("data:image/png;base64,AAA");
     expect(svg).toContain("data:image/png;base64,BBB");
@@ -223,13 +242,21 @@ describe("buildShareCardSvg", () => {
   });
 
   it("keeps the existing album (title+subtitle+metadata) cover size unchanged on portrait cards", () => {
-    const { svg } = buildShareCardSvg({ ...withCover, aspectRatio: "9:16", includeTrackList: false });
+    const { svg } = buildShareCardSvg({
+      ...withCover,
+      aspectRatio: "9:16",
+      includeTrackList: false,
+    });
     // 1080 * 0.72 * min(1.5, 1920/1080/1.33) = 1080 * 0.72 * 1.3363... rounds to 1039
     expect(coverPixelWidth(svg)).toBe(1039);
   });
 
   it("sizes cover to half the card width with symmetric padding on 1:1 cards so content is vertically centered", () => {
-    const { svg } = buildShareCardSvg({ ...withCover, aspectRatio: "1:1", includeTrackList: false });
+    const { svg } = buildShareCardSvg({
+      ...withCover,
+      aspectRatio: "1:1",
+      includeTrackList: false,
+    });
     // 1080 * 0.50 = 540px
     expect(coverPixelWidth(svg)).toBe(540);
     // Symmetric padding (cardPad 65px on all sides, no watermark)
@@ -245,10 +272,26 @@ describe("buildShareCardSvg", () => {
   });
 
   it("shrinks the cover as a long track list needs more of the frame for itself", () => {
-    const shortList = Array.from({ length: 10 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}` }));
-    const longList = Array.from({ length: 50 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}` }));
-    const short = buildShareCardSvg({ ...withCover, aspectRatio: "1:1", tracks: shortList, includeTrackList: true });
-    const long = buildShareCardSvg({ ...withCover, aspectRatio: "1:1", tracks: longList, includeTrackList: true });
+    const shortList = Array.from({ length: 10 }, (_, i) => ({
+      number: i + 1,
+      title: `Track ${i + 1}`,
+    }));
+    const longList = Array.from({ length: 50 }, (_, i) => ({
+      number: i + 1,
+      title: `Track ${i + 1}`,
+    }));
+    const short = buildShareCardSvg({
+      ...withCover,
+      aspectRatio: "1:1",
+      tracks: shortList,
+      includeTrackList: true,
+    });
+    const long = buildShareCardSvg({
+      ...withCover,
+      aspectRatio: "1:1",
+      tracks: longList,
+      includeTrackList: true,
+    });
     expect(coverPixelWidth(long.svg)).toBeLessThan(coverPixelWidth(short.svg));
   });
 
@@ -300,7 +343,10 @@ describe("buildStatsShareCardSvg", () => {
 
   it("renders each aspect ratio at its declared pixel dimensions", () => {
     for (const ratio of SHARE_ASPECT_RATIOS) {
-      const { svg, width, height } = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: ratio.id });
+      const { svg, width, height } = buildStatsShareCardSvg({
+        ...baseStatsOptions,
+        aspectRatio: ratio.id,
+      });
       expect(width).toBe(ratio.width);
       expect(height).toBe(ratio.height);
       expect(svg).toContain(`width="${ratio.width}"`);
@@ -342,11 +388,23 @@ describe("buildStatsShareCardSvg", () => {
     const items = (secondary: string | null) =>
       Array.from({ length: 5 }, (_, i) => ({ label: `Item ${i}`, secondary }));
     const sections = (secondary: string | null) =>
-      ["Top Artists", "Top Albums", "Top Songs", "Top Genres"].map((title) => ({ title, items: items(secondary) }));
-    const titleSize = (svg: string) => Number(svg.match(/font-size:(\d+)px;font-weight:800;color:[^;]+;text-align:center/)![1]);
+      ["Top Artists", "Top Albums", "Top Songs", "Top Genres"].map((title) => ({
+        title,
+        items: items(secondary),
+      }));
+    const titleSize = (svg: string) =>
+      Number(svg.match(/font-size:(\d+)px;font-weight:800;color:[^;]+;text-align:center/)![1]);
     for (const ratio of SHARE_ASPECT_RATIOS) {
-      const flat = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: ratio.id, sections: sections(null) });
-      const stacked = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: ratio.id, sections: sections("Artist") });
+      const flat = buildStatsShareCardSvg({
+        ...baseStatsOptions,
+        aspectRatio: ratio.id,
+        sections: sections(null),
+      });
+      const stacked = buildStatsShareCardSvg({
+        ...baseStatsOptions,
+        aspectRatio: ratio.id,
+        sections: sections("Artist"),
+      });
       expect(titleSize(stacked.svg)).toBeLessThanOrEqual(titleSize(flat.svg));
     }
   });
@@ -474,9 +532,14 @@ describe("share card proportional bars (#1475)", () => {
       aspectRatio: "4:3",
       includeTrackList: true,
       coverDataUri: null,
-      tracks: [{ number: 1, title: "Pop", percent: 100 }, { number: 2, title: "Rock", percent: 40 }],
+      tracks: [
+        { number: 1, title: "Pop", percent: 100 },
+        { number: 2, title: "Rock", percent: 40 },
+      ],
     });
-    expect(withBars.svg).toContain("linear-gradient(90deg,rgba(255,255,255,0.16) 40%,transparent 40%)");
+    expect(withBars.svg).toContain(
+      "linear-gradient(90deg,rgba(255,255,255,0.16) 40%,transparent 40%)",
+    );
     const without = buildShareCardSvg({
       ...baseOptions,
       aspectRatio: "4:3",
@@ -501,7 +564,11 @@ describe("buildMosaicCoverHtml", () => {
   });
 
   it("renders 1 full tile + 1 quarter tile for 2 covers (1 quarter column)", () => {
-    const html = buildMosaicCoverHtml(null, ["data:image/png;base64,1", "data:image/png;base64,2"], 100);
+    const html = buildMosaicCoverHtml(
+      null,
+      ["data:image/png;base64,1", "data:image/png;base64,2"],
+      100,
+    );
     expect(html).toContain("grid-template-columns:repeat(3, 49px)");
     expect(html).toContain("width:151px;height:100px");
     expect(html).toContain('src="data:image/png;base64,1"');
@@ -512,7 +579,7 @@ describe("buildMosaicCoverHtml", () => {
     const html = buildMosaicCoverHtml(
       null,
       ["data:image/png;base64,1", "data:image/png;base64,2", "data:image/png;base64,3"],
-      100
+      100,
     );
     expect(html).toContain("grid-template-columns:repeat(3, 49px)");
     expect(html).toContain("width:151px;height:100px");
@@ -530,7 +597,7 @@ describe("buildMosaicCoverHtml", () => {
         "data:image/png;base64,3",
         "data:image/png;base64,4",
       ],
-      100
+      100,
     );
     expect(html).toContain("grid-template-columns:repeat(4, 49px)");
     expect(html).toContain("width:202px;height:100px");
@@ -546,7 +613,7 @@ describe("buildMosaicCoverHtml", () => {
         "data:image/png;base64,4",
         "data:image/png;base64,5",
       ],
-      100
+      100,
     );
     expect(html).toContain("grid-template-columns:repeat(4, 49px)");
     expect(html).toContain("width:202px;height:100px");
@@ -556,12 +623,24 @@ describe("buildMosaicCoverHtml", () => {
   it("gives every tile an explicit square pixel size so non-square art can't stretch its track", () => {
     const html = buildMosaicCoverHtml(
       null,
-      ["data:image/png;base64,1", "data:image/png;base64,2", "data:image/png;base64,3", "data:image/png;base64,4"],
-      100
+      [
+        "data:image/png;base64,1",
+        "data:image/png;base64,2",
+        "data:image/png;base64,3",
+        "data:image/png;base64,4",
+      ],
+      100,
     );
     expect(html).not.toMatch(/\dfr\b/);
-    const sizes = [...html.matchAll(/<img [^>]*style="width:([\d.]+)px;height:([\d.]+)px/g)].map((m) => [m[1], m[2]]);
-    expect(sizes).toEqual([["100", "100"], ["49", "49"], ["49", "49"], ["49", "49"]]);
+    const sizes = [...html.matchAll(/<img [^>]*style="width:([\d.]+)px;height:([\d.]+)px/g)].map(
+      (m) => [m[1], m[2]],
+    );
+    expect(sizes).toEqual([
+      ["100", "100"],
+      ["49", "49"],
+      ["49", "49"],
+      ["49", "49"],
+    ]);
   });
 
   it("caps the mosaic at 5 covers when more are supplied", () => {
@@ -575,7 +654,7 @@ describe("buildMosaicCoverHtml", () => {
         "data:image/png;base64,5",
         "data:image/png;base64,6",
       ],
-      100
+      100,
     );
     expect(html).toContain('src="data:image/png;base64,5"');
     expect(html).not.toContain('src="data:image/png;base64,6"');
@@ -586,7 +665,9 @@ describe("buildMosaicCoverHtml", () => {
     const html = buildMosaicCoverHtml(null, uris, 400, 400, { width: 600, height: 400 });
     expect(html).toMatch(/grid-template-rows:repeat\([34], /);
     for (const uri of uris) expect(html).toContain(`src="${uri}"`);
-    const [, w, h] = html.match(/;width:([\d.]+)px;height:([\d.]+)px;border-radius/)!.map(Number) as number[];
+    const [, w, h] = html
+      .match(/;width:([\d.]+)px;height:([\d.]+)px;border-radius/)!
+      .map(Number) as number[];
     expect(w).toBeLessThanOrEqual(600);
     expect(h).toBeLessThanOrEqual(400);
   });

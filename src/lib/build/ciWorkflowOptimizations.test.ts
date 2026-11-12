@@ -25,11 +25,14 @@ const codeqlWorkflow = fs.readFileSync(path.join(root, ".github/workflows/codeql
 const auditWorkflow = fs.readFileSync(path.join(root, ".github/workflows/audit.yml"), "utf-8");
 const tauriCargoToml = fs.readFileSync(path.join(root, "src-tauri/Cargo.toml"), "utf-8");
 const viteConfig = fs.readFileSync(path.join(root, "vite.config.js"), "utf-8");
-const scriptPath = path.join(root, "scripts/ci-should-run.sh");
-const bashExecutable =
-  process.platform === "win32" && fs.existsSync("C:\\Program Files\\Git\\bin\\bash.exe")
-    ? "C:\\Program Files\\Git\\bin\\bash.exe"
-    : "bash";
+// Run relative to `root` so bash never receives a Windows drive path.
+const scriptPath = "scripts/ci-should-run.sh";
+// On Windows, bare `bash` on PATH is often the WSL launcher (WindowsApps\bash.exe). It can't
+// read `C:/...` paths, and it drops env vars (GITHUB_OUTPUT, CI_CHANGED_FILES) that aren't in
+// WSLENV, so only Git Bash is usable there; without it the script tests are skipped.
+const gitBashPath = "C:\\Program Files\\Git\\bin\\bash.exe";
+const bashExecutable = process.platform === "win32" ? gitBashPath : "bash";
+const bashAvailable = process.platform !== "win32" || fs.existsSync(gitBashPath);
 
 type Scope = "frontend" | "backend" | "lean" | "actions";
 
@@ -44,7 +47,7 @@ function runScopeCheck(
   );
   fs.writeFileSync(tmpFile, "");
   try {
-    const stdout = execFileSync(bashExecutable, [scriptPath.replaceAll("\\", "/"), ...scopeArgs], {
+    const stdout = execFileSync(bashExecutable, [scriptPath, ...scopeArgs], {
       cwd: root,
       encoding: "utf-8",
       env: {
@@ -60,7 +63,9 @@ function runScopeCheck(
   }
 }
 
-describe("scripts/ci-should-run.sh: path-based CI scope filtering (#1824)", () => {
+const describeWithBash = bashAvailable ? describe : describe.skip;
+
+describeWithBash("scripts/ci-should-run.sh: path-based CI scope filtering (#1824)", () => {
   it("always returns true on non-PR events (push, schedule, workflow_dispatch)", () => {
     for (const event of ["push", "schedule", "workflow_dispatch", ""]) {
       for (const scope of ["frontend", "backend", "lean", "actions"] as const) {

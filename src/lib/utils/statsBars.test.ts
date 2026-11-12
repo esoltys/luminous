@@ -7,11 +7,21 @@ describe("statsBarPercents", () => {
   });
 
   it("scales minutes against the leader", () => {
-    expect(statsBarPercents([{ minutes: 80, play_count: 0 }, { minutes: 40, play_count: 0 }])).toEqual([100, 50]);
+    expect(
+      statsBarPercents([
+        { minutes: 80, play_count: 0 },
+        { minutes: 40, play_count: 0 },
+      ]),
+    ).toEqual([100, 50]);
   });
 
   it("falls back to play counts when the leader has no minutes", () => {
-    expect(statsBarPercents([{ minutes: 0, play_count: 10 }, { minutes: 0, play_count: 5 }])).toEqual([100, 50]);
+    expect(
+      statsBarPercents([
+        { minutes: 0, play_count: 10 },
+        { minutes: 0, play_count: 5 },
+      ]),
+    ).toEqual([100, 50]);
   });
 
   it("returns zeros when nothing has a metric", () => {

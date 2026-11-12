@@ -33,7 +33,7 @@
   let daypartPollTimer: ReturnType<typeof setInterval> | undefined;
 
   const topAlbumsTitle = $derived.by((): string => {
-    const base = i18n.t('home.topAlbums');
+    const base = i18n.t("home.topAlbums");
     return topAlbumsPeriodStart === null
       ? base
       : `${base} ${formatWeekRange(topAlbumsPeriodStart, i18n.currentLocale)}`;
@@ -41,10 +41,14 @@
 
   const timeOfDayGreeting = $derived.by((): string => {
     switch (daypartBucket) {
-      case "morning": return i18n.t("home.greetingMorning");
-      case "afternoon": return i18n.t("home.greetingAfternoon");
-      case "evening": return i18n.t("home.greetingEvening");
-      case "latenight": return i18n.t("home.greetingNight");
+      case "morning":
+        return i18n.t("home.greetingMorning");
+      case "afternoon":
+        return i18n.t("home.greetingAfternoon");
+      case "evening":
+        return i18n.t("home.greetingEvening");
+      case "latenight":
+        return i18n.t("home.greetingNight");
     }
   });
 
@@ -143,53 +147,64 @@
 </script>
 
 <div class="flex flex-col h-full w-full bg-brand-main overflow-hidden">
-  <div class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={"home"}>
+  <div
+    class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}"
+    use:rememberScroll={"home"}
+  >
     <div class="px-6 pt-6">
-      <h1 class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug py-0.5">
+      <h1
+        class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug py-0.5"
+      >
         {timeOfDayGreeting}
       </h1>
     </div>
 
     <div class="px-6 pt-4 space-y-12">
-    <LibraryFolderSuggestions />
-    {#if isLoading}
-      <div class="flex items-center justify-center h-64">
-        <div class="text-brand-text-secondary">{i18n.t('home.loading')}</div>
-      </div>
-    {:else}
-      <PinnedRow />
-
-      {#if topAlbums.length > 0 || featuredAlbums.length > 0 || recentlyAdded.length > 0}
-        <div class="grid grid-cols-1 @5xl:grid-cols-2 gap-8">
-          {#if recentlyAdded.length > 0}
-            <HomeRowList
-              title={i18n.t('home.recentlyAdded')}
-              items={recentlyAdded}
-              variant="added"
-              onHeaderClick={() => navigationStore.viewAutoPlaylist({ kind: "recently_added" })}
-            />
-          {/if}
-          {#if topAlbums.length > 0}
-            <TopTenList
-              title={topAlbumsTitle}
-              items={topAlbums}
-              kind="album"
-              secondaryFallback={i18n.t('collection.variousArtists')}
-              showDuration={false}
-              onHeaderClick={() => { navigationStore.activeTab = "stats"; }}
-            />
-          {:else if featuredAlbums.length > 0}
-            <HomeRowList title={i18n.t('home.exploreLibrary')} items={featuredAlbums} variant="added" />
-          {/if}
+      <LibraryFolderSuggestions />
+      {#if isLoading}
+        <div class="flex items-center justify-center h-64">
+          <div class="text-brand-text-secondary">{i18n.t("home.loading")}</div>
         </div>
-      {/if}
+      {:else}
+        <PinnedRow />
 
-      {#if topAlbums.length === 0 && recentlyAdded.length === 0}
-        <div class="flex items-center justify-center py-16">
-          <LibraryWelcome />
-        </div>
+        {#if topAlbums.length > 0 || featuredAlbums.length > 0 || recentlyAdded.length > 0}
+          <div class="grid grid-cols-1 @5xl:grid-cols-2 gap-8">
+            {#if recentlyAdded.length > 0}
+              <HomeRowList
+                title={i18n.t("home.recentlyAdded")}
+                items={recentlyAdded}
+                variant="added"
+                onHeaderClick={() => navigationStore.viewAutoPlaylist({ kind: "recently_added" })}
+              />
+            {/if}
+            {#if topAlbums.length > 0}
+              <TopTenList
+                title={topAlbumsTitle}
+                items={topAlbums}
+                kind="album"
+                secondaryFallback={i18n.t("collection.variousArtists")}
+                showDuration={false}
+                onHeaderClick={() => {
+                  navigationStore.activeTab = "stats";
+                }}
+              />
+            {:else if featuredAlbums.length > 0}
+              <HomeRowList
+                title={i18n.t("home.exploreLibrary")}
+                items={featuredAlbums}
+                variant="added"
+              />
+            {/if}
+          </div>
+        {/if}
+
+        {#if topAlbums.length === 0 && recentlyAdded.length === 0}
+          <div class="flex items-center justify-center py-16">
+            <LibraryWelcome />
+          </div>
+        {/if}
       {/if}
-    {/if}
     </div>
   </div>
 </div>

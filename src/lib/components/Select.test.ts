@@ -8,7 +8,8 @@ describe("Select.svelte", () => {
   it("renders select element with passed props and classes", () => {
     const handleChange = vi.fn();
     const children = createRawSnippet(() => ({
-      render: () => '<optgroup label="Opts"><option value="opt1">Option 1</option><option value="opt2">Option 2</option></optgroup>',
+      render: () =>
+        '<optgroup label="Opts"><option value="opt1">Option 1</option><option value="opt2">Option 2</option></optgroup>',
     }));
 
     const { getByRole } = render(Select, {
@@ -33,7 +34,8 @@ describe("Select.svelte", () => {
   it("handles change events", async () => {
     const handleChange = vi.fn();
     const children = createRawSnippet(() => ({
-      render: () => '<optgroup label="Opts"><option value="opt1">Option 1</option><option value="opt2">Option 2</option></optgroup>',
+      render: () =>
+        '<optgroup label="Opts"><option value="opt1">Option 1</option><option value="opt2">Option 2</option></optgroup>',
     }));
 
     const { getByRole } = render(Select, {

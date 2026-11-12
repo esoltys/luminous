@@ -33,7 +33,7 @@
     QuestionIcon as HelpCircle,
     StackIcon as Layers,
     LightningIcon as Lightning,
-    LightningSlashIcon as LightningSlash
+    LightningSlashIcon as LightningSlash,
   } from "phosphor-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
@@ -41,12 +41,12 @@
   let { width = 256, resizing = false }: { width?: number; resizing?: boolean } = $props();
 
   let isCollapsed = $derived(width < SIDEBAR_MIN_WIDTH_PX);
-  let showUpdateBadge = $derived(updaterStore.updateAvailable || updaterStore.installStatus === "ready-to-restart");
+  let showUpdateBadge = $derived(
+    updaterStore.updateAvailable || updaterStore.installStatus === "ready-to-restart",
+  );
   let showProfilePopover = $state(false);
   let isConnected = $derived(
-    musicbrainzStore.isLoggedIn ||
-    !!scrobblerStore.lastfmUsername ||
-    !!scrobblerStore.username
+    musicbrainzStore.isLoggedIn || !!scrobblerStore.lastfmUsername || !!scrobblerStore.username,
   );
   const scrobblingPaused = $derived(scrobblerStore.status === "paused");
   // Undefined unless paused, so the dot and title only carry text when the state differs from the default.
@@ -72,11 +72,15 @@
   $effect(() => {
     if (isCollapsed) {
       subItemsVisible = false;
-      const timer = setTimeout(() => { layoutCollapsed = true; }, 60);
+      const timer = setTimeout(() => {
+        layoutCollapsed = true;
+      }, 60);
       return () => clearTimeout(timer);
     } else {
       layoutCollapsed = false;
-      const timer = setTimeout(() => { subItemsVisible = true; }, 60);
+      const timer = setTimeout(() => {
+        subItemsVisible = true;
+      }, 60);
       return () => clearTimeout(timer);
     }
   });
@@ -107,8 +111,8 @@
   // same set as playlistsStore.customPlaylists, the hand-built ones that can take a drop.
   const customCategoryPlaylists = $derived(
     playlistsStore.playlists.filter(
-      (p) => (!p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)) && !p.is_queue
-    )
+      (p) => (!p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)) && !p.is_queue,
+    ),
   );
 
   $effect(() => {
@@ -135,15 +139,32 @@
   });
 
   $effect(() => () => clearTimeout(customExpandTimer));
-
 </script>
 
-<aside style="width: {width}px;" class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden transition-[width] duration-200 ease-out {themeStore.isGlassTheme ? 'glass-surface' : ''}" class:transition-none={resizing}>
-  <nav data-walkthrough-target="sidebar" class="{layoutCollapsed ? 'p-2' : 'p-4'} space-y-0.5 flex flex-col items-center flex-1 min-h-0 overflow-y-auto overflow-x-hidden [&>*]:shrink-0">
+<aside
+  style="width: {width}px;"
+  class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden transition-[width] duration-200 ease-out {themeStore.isGlassTheme
+    ? 'glass-surface'
+    : ''}"
+  class:transition-none={resizing}
+>
+  <nav
+    data-walkthrough-target="sidebar"
+    class="{layoutCollapsed
+      ? 'p-2'
+      : 'p-4'} space-y-0.5 flex flex-col items-center flex-1 min-h-0 overflow-y-auto overflow-x-hidden [&>*]:shrink-0"
+  >
     <button
-      onclick={() => { navigationStore.activeTab = "home"; }}
-      class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab === 'home' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-      title={i18n.t('sidebar.home')}
+      onclick={() => {
+        navigationStore.activeTab = "home";
+      }}
+      class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab ===
+      'home'
+        ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20'
+        : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
+        ? 'justify-center w-10 h-10 rounded-xl p-0'
+        : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+      title={i18n.t("sidebar.home")}
     >
       {#if layoutCollapsed}
         <Home class="w-5 h-5" />
@@ -151,7 +172,7 @@
         <div class="w-7 h-7 flex items-center justify-center shrink-0">
           <Home class="w-4 h-4 icon-align" />
         </div>
-        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.home')}</span>
+        <span class="truncate whitespace-nowrap">{i18n.t("sidebar.home")}</span>
       {/if}
     </button>
 
@@ -162,238 +183,366 @@
          narrates all of them, so an empty-library first-run tour would
          otherwise describe nav items the user can't see. -->
     {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0 || walkthroughStore.isActive}
-    <div class="w-full flex flex-col {layoutCollapsed ? 'items-center' : ''}">
-      <button
-        onclick={selectCollectionTab}
-        class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab === 'collection' && layoutCollapsed ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-        title={i18n.t('sidebar.collection')}
-      >
-        {#if layoutCollapsed}
-          {#if navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'artists'}
-            <Mic2 class="w-5 h-5" />
-          {:else if navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'albums'}
-            <DiscAlbum class="w-5 h-5" />
-          {:else if navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'songs'}
-            <Music class="w-5 h-5" />
-          {:else if navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'genres'}
-            <Tag class="w-5 h-5" />
-          {:else}
-            <Library class="w-5 h-5" />
-          {/if}
-        {:else}
-          <div class="w-7 h-7 flex items-center justify-center shrink-0">
-            {#if navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'artists'}
-              <Mic2 class="w-4 h-4 icon-align" />
-            {:else if navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'albums'}
-              <DiscAlbum class="w-4 h-4 icon-align" />
-            {:else if navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'songs'}
-              <Music class="w-4 h-4 icon-align" />
-            {:else if navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'genres'}
-              <Tag class="w-4 h-4 icon-align" />
+      <div class="w-full flex flex-col {layoutCollapsed ? 'items-center' : ''}">
+        <button
+          onclick={selectCollectionTab}
+          class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab ===
+            'collection' && layoutCollapsed
+            ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20'
+            : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
+            ? 'justify-center w-10 h-10 rounded-xl p-0'
+            : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+          title={i18n.t("sidebar.collection")}
+        >
+          {#if layoutCollapsed}
+            {#if navigationStore.activeTab === "collection" && navigationStore.activeSubTab === "artists"}
+              <Mic2 class="w-5 h-5" />
+            {:else if navigationStore.activeTab === "collection" && navigationStore.activeSubTab === "albums"}
+              <DiscAlbum class="w-5 h-5" />
+            {:else if navigationStore.activeTab === "collection" && navigationStore.activeSubTab === "songs"}
+              <Music class="w-5 h-5" />
+            {:else if navigationStore.activeTab === "collection" && navigationStore.activeSubTab === "genres"}
+              <Tag class="w-5 h-5" />
             {:else}
-              <Library class="w-4 h-4 icon-align" />
+              <Library class="w-5 h-5" />
             {/if}
-          </div>
-          <span class="truncate whitespace-nowrap">{i18n.t('sidebar.collection')}</span>
-        {/if}
-      </button>
-
-      {#if subItemsVisible}
-        <div class="pl-[9px] pr-1 py-0.5 space-y-0 border-l-2 border-brand-accent/30 ml-[calc(var(--sidebar-icon-axis)_-_1px)] my-0.5">
-          <button
-            onclick={() => { navigationStore.activeTab = "collection"; navigationStore.activeSubTab = "artists"; navigationStore.selectedArtistName = null; navigationStore.selectedAlbumName = null; }}
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'artists' && !navigationStore.selectedArtistName && !navigationStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
-          >
-            <div class="flex items-center gap-2 truncate">
-              <Mic2 class="w-3.5 h-3.5 icon-align" />
-              <span class="truncate">{i18n.t('sidebar.artists')}</span>
-            </div>
-            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({formatNumber(collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists)})
-            </span>
-          </button>
-
-          <button
-            onclick={() => { navigationStore.activeTab = "collection"; navigationStore.activeSubTab = "albums"; navigationStore.selectedArtistName = null; navigationStore.selectedAlbumName = null; }}
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'albums' && !navigationStore.selectedArtistName && !navigationStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
-          >
-            <div class="flex items-center gap-2 truncate">
-              <DiscAlbum class="w-3.5 h-3.5 icon-align" />
-              <span class="truncate">{i18n.t('sidebar.albums')}</span>
-            </div>
-            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({formatNumber(collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums)})
-            </span>
-          </button>
-
-          <button
-            onclick={() => { navigationStore.activeTab = "collection"; navigationStore.activeSubTab = "songs"; navigationStore.selectedArtistName = null; navigationStore.selectedAlbumName = null; }}
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'songs' && !navigationStore.selectedArtistName && !navigationStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
-          >
-            <div class="flex items-center gap-2 truncate">
-              <Music class="w-3.5 h-3.5 icon-align" />
-              <span class="truncate">{i18n.t('sidebar.songs')}</span>
-            </div>
-            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({formatNumber(collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs)})
-            </span>
-          </button>
-
-          <button
-            onclick={() => { navigationStore.activeTab = "collection"; navigationStore.activeSubTab = "genres"; navigationStore.selectedArtistName = null; navigationStore.selectedAlbumName = null; }}
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'genres' && !navigationStore.selectedArtistName && !navigationStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
-          >
-            <div class="flex items-center gap-2 truncate">
-              <Tag class="w-3.5 h-3.5 icon-align" />
-              <span class="truncate">{i18n.t('sidebar.genres')}</span>
-            </div>
-            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({formatNumber(tagsStore.allTags.length)})
-            </span>
-          </button>
-        </div>
-      {/if}
-    </div>
-
-    <div class="w-full flex flex-col {layoutCollapsed ? 'items-center' : ''}">
-      <button
-        onclick={selectPlaylistsTab}
-        class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab === 'playlists' && layoutCollapsed ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-        title={i18n.t('sidebar.playlists')}
-      >
-        {#if layoutCollapsed}
-          {#if navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'auto'}
-            <Sparkles class="w-5 h-5" />
           {:else}
-            <ListMusic class="w-5 h-5" />
+            <div class="w-7 h-7 flex items-center justify-center shrink-0">
+              {#if navigationStore.activeTab === "collection" && navigationStore.activeSubTab === "artists"}
+                <Mic2 class="w-4 h-4 icon-align" />
+              {:else if navigationStore.activeTab === "collection" && navigationStore.activeSubTab === "albums"}
+                <DiscAlbum class="w-4 h-4 icon-align" />
+              {:else if navigationStore.activeTab === "collection" && navigationStore.activeSubTab === "songs"}
+                <Music class="w-4 h-4 icon-align" />
+              {:else if navigationStore.activeTab === "collection" && navigationStore.activeSubTab === "genres"}
+                <Tag class="w-4 h-4 icon-align" />
+              {:else}
+                <Library class="w-4 h-4 icon-align" />
+              {/if}
+            </div>
+            <span class="truncate whitespace-nowrap">{i18n.t("sidebar.collection")}</span>
           {/if}
-        {:else}
-          <div class="w-7 h-7 flex items-center justify-center shrink-0">
-            {#if navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'auto'}
-              <Sparkles class="w-4 h-4 icon-align" />
-            {:else}
-              <ListMusic class="w-4 h-4 icon-align" />
-            {/if}
+        </button>
+
+        {#if subItemsVisible}
+          <div
+            class="pl-[9px] pr-1 py-0.5 space-y-0 border-l-2 border-brand-accent/30 ml-[calc(var(--sidebar-icon-axis)_-_1px)] my-0.5"
+          >
+            <button
+              onclick={() => {
+                navigationStore.activeTab = "collection";
+                navigationStore.activeSubTab = "artists";
+                navigationStore.selectedArtistName = null;
+                navigationStore.selectedAlbumName = null;
+              }}
+              class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+                'collection' &&
+              navigationStore.activeSubTab === 'artists' &&
+              !navigationStore.selectedArtistName &&
+              !navigationStore.selectedAlbumName
+                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            >
+              <div class="flex items-center gap-2 truncate">
+                <Mic2 class="w-3.5 h-3.5 icon-align" />
+                <span class="truncate">{i18n.t("sidebar.artists")}</span>
+              </div>
+              <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+                ({formatNumber(
+                  collectionStore.searchQuery.trim() !== ""
+                    ? collectionStore.filteredArtists.length
+                    : collectionStore.stats.total_artists,
+                )})
+              </span>
+            </button>
+
+            <button
+              onclick={() => {
+                navigationStore.activeTab = "collection";
+                navigationStore.activeSubTab = "albums";
+                navigationStore.selectedArtistName = null;
+                navigationStore.selectedAlbumName = null;
+              }}
+              class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+                'collection' &&
+              navigationStore.activeSubTab === 'albums' &&
+              !navigationStore.selectedArtistName &&
+              !navigationStore.selectedAlbumName
+                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            >
+              <div class="flex items-center gap-2 truncate">
+                <DiscAlbum class="w-3.5 h-3.5 icon-align" />
+                <span class="truncate">{i18n.t("sidebar.albums")}</span>
+              </div>
+              <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+                ({formatNumber(
+                  collectionStore.searchQuery.trim() !== ""
+                    ? collectionStore.filteredAlbums.length
+                    : collectionStore.stats.total_albums,
+                )})
+              </span>
+            </button>
+
+            <button
+              onclick={() => {
+                navigationStore.activeTab = "collection";
+                navigationStore.activeSubTab = "songs";
+                navigationStore.selectedArtistName = null;
+                navigationStore.selectedAlbumName = null;
+              }}
+              class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+                'collection' &&
+              navigationStore.activeSubTab === 'songs' &&
+              !navigationStore.selectedArtistName &&
+              !navigationStore.selectedAlbumName
+                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            >
+              <div class="flex items-center gap-2 truncate">
+                <Music class="w-3.5 h-3.5 icon-align" />
+                <span class="truncate">{i18n.t("sidebar.songs")}</span>
+              </div>
+              <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+                ({formatNumber(
+                  collectionStore.searchQuery.trim() !== ""
+                    ? collectionStore.filteredSongs.length
+                    : collectionStore.stats.total_songs,
+                )})
+              </span>
+            </button>
+
+            <button
+              onclick={() => {
+                navigationStore.activeTab = "collection";
+                navigationStore.activeSubTab = "genres";
+                navigationStore.selectedArtistName = null;
+                navigationStore.selectedAlbumName = null;
+              }}
+              class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+                'collection' &&
+              navigationStore.activeSubTab === 'genres' &&
+              !navigationStore.selectedArtistName &&
+              !navigationStore.selectedAlbumName
+                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            >
+              <div class="flex items-center gap-2 truncate">
+                <Tag class="w-3.5 h-3.5 icon-align" />
+                <span class="truncate">{i18n.t("sidebar.genres")}</span>
+              </div>
+              <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+                ({formatNumber(tagsStore.allTags.length)})
+              </span>
+            </button>
           </div>
-          <span class="truncate whitespace-nowrap">{i18n.t('sidebar.playlists')}</span>
         {/if}
-      </button>
+      </div>
 
-      {#if subItemsVisible}
-        <div class="pl-[9px] pr-1 py-0.5 space-y-0 border-l-2 border-brand-accent/30 ml-[calc(var(--sidebar-icon-axis)_-_1px)] my-0.5">
-          <button
-            onclick={() => openPlaylistsSubTab("auto")}
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'auto' && !navigationStore.selectedPlaylistId && !navigationStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
-          >
-            <div class="flex items-center gap-2 truncate">
-              <Sparkles class="w-3.5 h-3.5 icon-align" />
-              <span class="truncate">{i18n.t('sidebar.playlistsAuto')}</span>
+      <div class="w-full flex flex-col {layoutCollapsed ? 'items-center' : ''}">
+        <button
+          onclick={selectPlaylistsTab}
+          class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab ===
+            'playlists' && layoutCollapsed
+            ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20'
+            : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
+            ? 'justify-center w-10 h-10 rounded-xl p-0'
+            : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+          title={i18n.t("sidebar.playlists")}
+        >
+          {#if layoutCollapsed}
+            {#if navigationStore.activeTab === "playlists" && navigationStore.playlistsSubTab === "auto"}
+              <Sparkles class="w-5 h-5" />
+            {:else}
+              <ListMusic class="w-5 h-5" />
+            {/if}
+          {:else}
+            <div class="w-7 h-7 flex items-center justify-center shrink-0">
+              {#if navigationStore.activeTab === "playlists" && navigationStore.playlistsSubTab === "auto"}
+                <Sparkles class="w-4 h-4 icon-align" />
+              {:else}
+                <ListMusic class="w-4 h-4 icon-align" />
+              {/if}
             </div>
-            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({formatNumber(playlistsStore.visibleAutoPlaylistCount)})
-            </span>
-          </button>
+            <span class="truncate whitespace-nowrap">{i18n.t("sidebar.playlists")}</span>
+          {/if}
+        </button>
 
-          <button
-            onclick={() => openPlaylistsSubTab("custom")}
-            data-drop-target={playlistsStore.customPlaylists.length > 0 ? "custom-category" : undefined}
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'custom' && !navigationStore.selectedPlaylistId && !navigationStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {dragExpandedCustom || (songDrag.isDragging && songDrag.dropTarget?.kind === 'custom-category') ? 'ring-2 ring-brand-accent/60 bg-brand-accent/20 text-brand-text-primary font-semibold' : ''}"
+        {#if subItemsVisible}
+          <div
+            class="pl-[9px] pr-1 py-0.5 space-y-0 border-l-2 border-brand-accent/30 ml-[calc(var(--sidebar-icon-axis)_-_1px)] my-0.5"
           >
-            <div class="flex items-center gap-2 truncate">
-              <ListMusic class="w-3.5 h-3.5 icon-align" />
-              <span class="truncate">{i18n.t('sidebar.playlistsCustom')}</span>
-            </div>
-            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({formatNumber(customCategoryPlaylists.length)})
-            </span>
-          </button>
+            <button
+              onclick={() => openPlaylistsSubTab("auto")}
+              class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+                'playlists' &&
+              navigationStore.playlistsSubTab === 'auto' &&
+              !navigationStore.selectedPlaylistId &&
+              !navigationStore.selectedAutoPlaylist
+                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            >
+              <div class="flex items-center gap-2 truncate">
+                <Sparkles class="w-3.5 h-3.5 icon-align" />
+                <span class="truncate">{i18n.t("sidebar.playlistsAuto")}</span>
+              </div>
+              <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+                ({formatNumber(playlistsStore.visibleAutoPlaylistCount)})
+              </span>
+            </button>
 
-          <!-- Drop targets only: smart playlists are left out, since their rules decide what they hold
+            <button
+              onclick={() => openPlaylistsSubTab("custom")}
+              data-drop-target={playlistsStore.customPlaylists.length > 0
+                ? "custom-category"
+                : undefined}
+              class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+                'playlists' &&
+              navigationStore.playlistsSubTab === 'custom' &&
+              !navigationStore.selectedPlaylistId &&
+              !navigationStore.selectedAutoPlaylist
+                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {dragExpandedCustom ||
+              (songDrag.isDragging && songDrag.dropTarget?.kind === 'custom-category')
+                ? 'ring-2 ring-brand-accent/60 bg-brand-accent/20 text-brand-text-primary font-semibold'
+                : ''}"
+            >
+              <div class="flex items-center gap-2 truncate">
+                <ListMusic class="w-3.5 h-3.5 icon-align" />
+                <span class="truncate">{i18n.t("sidebar.playlistsCustom")}</span>
+              </div>
+              <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+                ({formatNumber(customCategoryPlaylists.length)})
+              </span>
+            </button>
+
+            <!-- Drop targets only: smart playlists are left out, since their rules decide what they hold
                and the backend's rule sync removes anything added by hand. -->
-          {#if dragExpandedCustom && playlistsStore.customPlaylists.length > 0}
-            <div class="pl-4 pr-1 py-0.5 space-y-0.5 border-l border-brand-accent/30 my-0.5" transition:slide={{ duration: 150 }}>
-              {#each playlistsStore.customPlaylists as pl (pl.id)}
-                <button
-                  type="button"
-                  data-drop-target="playlist"
-                  data-playlist-id={pl.id}
-                  data-playlist-name={pl.name}
-                  class="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] truncate transition-colors {songDrag.isDragging && songDrag.dropTarget?.kind === 'playlist' && songDrag.dropTarget.id === pl.id ? 'bg-brand-accent/30 text-brand-text-primary ring-2 ring-brand-accent font-semibold' : 'text-brand-text-secondary hover:bg-brand-accent/15'}"
-                  onclick={() => navigationStore.viewPlaylist(pl.id)}
-                >
-                  <span class="truncate">{pl.name}</span>
-                </button>
-              {/each}
-            </div>
-          {/if}
+            {#if dragExpandedCustom && playlistsStore.customPlaylists.length > 0}
+              <div
+                class="pl-4 pr-1 py-0.5 space-y-0.5 border-l border-brand-accent/30 my-0.5"
+                transition:slide={{ duration: 150 }}
+              >
+                {#each playlistsStore.customPlaylists as pl (pl.id)}
+                  <button
+                    type="button"
+                    data-drop-target="playlist"
+                    data-playlist-id={pl.id}
+                    data-playlist-name={pl.name}
+                    class="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] truncate transition-colors {songDrag.isDragging &&
+                    songDrag.dropTarget?.kind === 'playlist' &&
+                    songDrag.dropTarget.id === pl.id
+                      ? 'bg-brand-accent/30 text-brand-text-primary ring-2 ring-brand-accent font-semibold'
+                      : 'text-brand-text-secondary hover:bg-brand-accent/15'}"
+                    onclick={() => navigationStore.viewPlaylist(pl.id)}
+                  >
+                    <span class="truncate">{pl.name}</span>
+                  </button>
+                {/each}
+              </div>
+            {/if}
 
-          <button
-            onclick={async () => {
-              const queuePl = await playlistsStore.requireQueue();
-              playlistsStore.selectPlaylist(queuePl.id);
-              navigationStore.viewPlaylist(queuePl.id);
-            }}
-            data-drop-target="queue"
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === navigationStore.selectedPlaylistId)?.is_queue ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {songDrag.isDragging && songDrag.dropTarget?.kind === 'queue' ? 'bg-brand-accent/30 ring-2 ring-brand-accent text-brand-text-primary font-semibold' : ''}"
-          >
-            <div class="flex items-center gap-2 truncate">
-              <Layers class="w-3.5 h-3.5 icon-align" />
-              <span class="truncate">{i18n.t('playerBar.queueTitle', {}, 'Queue')}</span>
-            </div>
-            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({formatNumber(playlistsStore.queueTrackCount)})
-            </span>
-          </button>
-        </div>
-      {/if}
-    </div>
+            <button
+              onclick={async () => {
+                const queuePl = await playlistsStore.requireQueue();
+                playlistsStore.selectPlaylist(queuePl.id);
+                navigationStore.viewPlaylist(queuePl.id);
+              }}
+              data-drop-target="queue"
+              class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab ===
+                'playlists' &&
+              navigationStore.selectedPlaylistId &&
+              playlistsStore.playlists.find((p) => p.id === navigationStore.selectedPlaylistId)
+                ?.is_queue
+                ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+                : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {songDrag.isDragging &&
+              songDrag.dropTarget?.kind === 'queue'
+                ? 'bg-brand-accent/30 ring-2 ring-brand-accent text-brand-text-primary font-semibold'
+                : ''}"
+            >
+              <div class="flex items-center gap-2 truncate">
+                <Layers class="w-3.5 h-3.5 icon-align" />
+                <span class="truncate">{i18n.t("playerBar.queueTitle", {}, "Queue")}</span>
+              </div>
+              <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+                ({formatNumber(playlistsStore.queueTrackCount)})
+              </span>
+            </button>
+          </div>
+        {/if}
+      </div>
     {/if}
 
     <!-- Files stays on an empty library: it's where a new user adds music. -->
     <SidebarFilesSection collapsed={layoutCollapsed} showSubItems={subItemsVisible} />
 
     {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0 || walkthroughStore.isActive}
-    <button
-      onclick={() => { navigationStore.activeTab = "organize"; }}
-      class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab === 'organize' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-      title={i18n.t('sidebar.organize')}
-    >
-      {#if layoutCollapsed}
-        <Broom class="w-5 h-5" />
-      {:else}
-        <div class="w-7 h-7 flex items-center justify-center shrink-0">
-          <Broom class="w-4 h-4 icon-align" />
-        </div>
-        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.organize')}</span>
-      {/if}
-    </button>
+      <button
+        onclick={() => {
+          navigationStore.activeTab = "organize";
+        }}
+        class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab ===
+        'organize'
+          ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20'
+          : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
+          ? 'justify-center w-10 h-10 rounded-xl p-0'
+          : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+        title={i18n.t("sidebar.organize")}
+      >
+        {#if layoutCollapsed}
+          <Broom class="w-5 h-5" />
+        {:else}
+          <div class="w-7 h-7 flex items-center justify-center shrink-0">
+            <Broom class="w-4 h-4 icon-align" />
+          </div>
+          <span class="truncate whitespace-nowrap">{i18n.t("sidebar.organize")}</span>
+        {/if}
+      </button>
 
-    <button
-      onclick={() => { navigationStore.activeTab = "stats"; }}
-      class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab === 'stats' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-      title={i18n.t('sidebar.stats')}
-    >
-      {#if layoutCollapsed}
-        <BarChart2 class="w-5 h-5" />
-      {:else}
-        <div class="w-7 h-7 flex items-center justify-center shrink-0">
-          <BarChart2 class="w-4 h-4 icon-align" />
-        </div>
-        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.stats')}</span>
-      {/if}
-    </button>
+      <button
+        onclick={() => {
+          navigationStore.activeTab = "stats";
+        }}
+        class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab ===
+        'stats'
+          ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20'
+          : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
+          ? 'justify-center w-10 h-10 rounded-xl p-0'
+          : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+        title={i18n.t("sidebar.stats")}
+      >
+        {#if layoutCollapsed}
+          <BarChart2 class="w-5 h-5" />
+        {:else}
+          <div class="w-7 h-7 flex items-center justify-center shrink-0">
+            <BarChart2 class="w-4 h-4 icon-align" />
+          </div>
+          <span class="truncate whitespace-nowrap">{i18n.t("sidebar.stats")}</span>
+        {/if}
+      </button>
     {/if}
 
     <button
       data-walkthrough-target="library-folders"
-      onclick={() => { navigationStore.activeTab = "settings"; }}
-      class="relative flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-      title={showUpdateBadge ? `${i18n.t('sidebar.settings')} (${i18n.t('settings.updateAvailable', {}, 'Update available')})` : i18n.t('sidebar.settings')}
+      onclick={() => {
+        navigationStore.activeTab = "settings";
+      }}
+      class="relative flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab ===
+      'settings'
+        ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20'
+        : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
+        ? 'justify-center w-10 h-10 rounded-xl p-0'
+        : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+      title={showUpdateBadge
+        ? `${i18n.t("sidebar.settings")} (${i18n.t("settings.updateAvailable", {}, "Update available")})`
+        : i18n.t("sidebar.settings")}
     >
       {#if layoutCollapsed}
         <Settings class="w-5 h-5" />
         {#if showUpdateBadge}
-          <span class="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-current/20 border border-current/30 text-current flex items-center justify-center">
+          <span
+            class="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-current/20 border border-current/30 text-current flex items-center justify-center"
+          >
             <ArrowUp class="w-2.5 h-2.5 stroke-[2.5]" />
           </span>
         {/if}
@@ -401,9 +550,12 @@
         <div class="w-7 h-7 flex items-center justify-center shrink-0">
           <Settings class="w-4 h-4 icon-align" />
         </div>
-        <span class="truncate whitespace-nowrap flex-1 text-left">{i18n.t('sidebar.settings')}</span>
+        <span class="truncate whitespace-nowrap flex-1 text-left">{i18n.t("sidebar.settings")}</span
+        >
         {#if showUpdateBadge}
-          <span class="px-1.5 py-0.5 rounded-full bg-current/15 border border-current/25 text-current flex items-center gap-0.5 text-[10px] font-bold">
+          <span
+            class="px-1.5 py-0.5 rounded-full bg-current/15 border border-current/25 text-current flex items-center gap-0.5 text-[10px] font-bold"
+          >
             <ArrowUp class="w-3 h-3 stroke-[2.5]" />
           </span>
         {/if}
@@ -411,9 +563,16 @@
     </button>
 
     <button
-      onclick={() => { navigationStore.activeTab = "help"; }}
-      class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab === 'help' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-      title={i18n.t('sidebar.help')}
+      onclick={() => {
+        navigationStore.activeTab = "help";
+      }}
+      class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab ===
+      'help'
+        ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20'
+        : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
+        ? 'justify-center w-10 h-10 rounded-xl p-0'
+        : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+      title={i18n.t("sidebar.help")}
     >
       {#if layoutCollapsed}
         <HelpCircle class="w-5 h-5" />
@@ -421,61 +580,80 @@
         <div class="w-7 h-7 flex items-center justify-center shrink-0">
           <HelpCircle class="w-4 h-4 icon-align" />
         </div>
-        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.help')}</span>
+        <span class="truncate whitespace-nowrap">{i18n.t("sidebar.help")}</span>
       {/if}
     </button>
   </nav>
 
-
   <!-- Integrations / Profile Section; hidden while Offline (#1398) -->
   {#if prefs.onlineEnabled}
-  <div class="{layoutCollapsed ? 'p-2' : 'px-4 py-2'} border-t border-brand-border/40 w-full flex flex-col items-center">
-    {#if isConnected}
-      <button
-        bind:this={profileButtonEl}
-        onclick={() => { showProfilePopover = !showProfilePopover; }}
-        class="flex items-center gap-3 transition-colors duration-150 {showProfilePopover ? 'bg-brand-accent/20 text-brand-accent-text' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-        title={`${i18n.t('sidebar.connected', {}, 'Connected')}${pausedLabel ? ` – ${pausedLabel}` : ""}`}
-      >
-        <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
-          <!-- Inner wrapper anchors the status dot to the icon, not the w-7 slot. -->
-          <div class="relative flex items-center justify-center">
-            <Lightning class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0" />
-            <span
-              class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border {scrobblingPaused ? 'bg-transparent border-brand-text-primary' : 'bg-brand-text-primary border-brand-sidebar'}"
-              data-testid="musicbrainz-status-dot"
-              role={pausedLabel ? 'img' : undefined}
-              aria-label={pausedLabel}
-            ></span>
+    <div
+      class="{layoutCollapsed
+        ? 'p-2'
+        : 'px-4 py-2'} border-t border-brand-border/40 w-full flex flex-col items-center"
+    >
+      {#if isConnected}
+        <button
+          bind:this={profileButtonEl}
+          onclick={() => {
+            showProfilePopover = !showProfilePopover;
+          }}
+          class="flex items-center gap-3 transition-colors duration-150 {showProfilePopover
+            ? 'bg-brand-accent/20 text-brand-accent-text'
+            : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
+            ? 'justify-center w-10 h-10 rounded-xl p-0'
+            : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+          title={`${i18n.t("sidebar.connected", {}, "Connected")}${pausedLabel ? ` – ${pausedLabel}` : ""}`}
+        >
+          <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
+            <!-- Inner wrapper anchors the status dot to the icon, not the w-7 slot. -->
+            <div class="relative flex items-center justify-center">
+              <Lightning class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0" />
+              <span
+                class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border {scrobblingPaused
+                  ? 'bg-transparent border-brand-text-primary'
+                  : 'bg-brand-text-primary border-brand-sidebar'}"
+                data-testid="musicbrainz-status-dot"
+                role={pausedLabel ? "img" : undefined}
+                aria-label={pausedLabel}
+              ></span>
+            </div>
           </div>
-        </div>
-        {#if !layoutCollapsed}
-          <span class="truncate text-xs font-semibold text-brand-text-primary text-left flex-1 min-w-0">
-            {i18n.t('sidebar.connected', {}, 'Connected')}
-          </span>
-        {/if}
-      </button>
-    {:else}
-      <button
-        onclick={() => { navigationStore.openSettings("integrations"); }}
-        class="flex items-center gap-3 transition-colors duration-150 text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-        title={i18n.t('sidebar.connectIntegrations', {}, 'Connect...')}
-      >
-        <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
-          <LightningSlash class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4 icon-align'} shrink-0" />
-        </div>
-        {#if !layoutCollapsed}
-          <span class="text-left leading-tight min-w-0">{i18n.t('sidebar.connectIntegrations', {}, 'Connect...')}</span>
-        {/if}
-      </button>
-    {/if}
-  </div>
+          {#if !layoutCollapsed}
+            <span
+              class="truncate text-xs font-semibold text-brand-text-primary text-left flex-1 min-w-0"
+            >
+              {i18n.t("sidebar.connected", {}, "Connected")}
+            </span>
+          {/if}
+        </button>
+      {:else}
+        <button
+          onclick={() => {
+            navigationStore.openSettings("integrations");
+          }}
+          class="flex items-center gap-3 transition-colors duration-150 text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover {layoutCollapsed
+            ? 'justify-center w-10 h-10 rounded-xl p-0'
+            : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+          title={i18n.t("sidebar.connectIntegrations", {}, "Connect...")}
+        >
+          <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
+            <LightningSlash class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4 icon-align'} shrink-0" />
+          </div>
+          {#if !layoutCollapsed}
+            <span class="text-left leading-tight min-w-0"
+              >{i18n.t("sidebar.connectIntegrations", {}, "Connect...")}</span
+            >
+          {/if}
+        </button>
+      {/if}
+    </div>
 
-  <MusicBrainzProfilePopover
-    isOpen={showProfilePopover}
-    anchorEl={profileButtonEl}
-    onClose={() => (showProfilePopover = false)}
-  />
+    <MusicBrainzProfilePopover
+      isOpen={showProfilePopover}
+      anchorEl={profileButtonEl}
+      onClose={() => (showProfilePopover = false)}
+    />
   {/if}
 
   <!-- Bottom spacer for player bar -->

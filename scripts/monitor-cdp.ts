@@ -34,10 +34,7 @@ interface EvalResult {
 export class CdpClient {
   private ws: WebSocket | null = null;
   private nextId = 1;
-  private pending = new Map<
-    number,
-    { resolve: (val: any) => void; reject: (err: any) => void }
-  >();
+  private pending = new Map<number, { resolve: (val: any) => void; reject: (err: any) => void }>();
   private targetId: string | null = null;
 
   async connect(port = 9222): Promise<string> {
@@ -53,7 +50,7 @@ export class CdpClient {
           targets.find(
             (t) =>
               t.type === "page" &&
-              (t.title.includes("Luminous") || t.url.includes("localhost:1420"))
+              (t.title.includes("Luminous") || t.url.includes("localhost:1420")),
           ) ?? targets.find((t) => t.type === "page");
         if (target && target.webSocketDebuggerUrl) {
           wsUrl = target.webSocketDebuggerUrl;
@@ -87,7 +84,7 @@ export class CdpClient {
       throw new Error(
         `Failed to connect to CDP endpoint at http://127.0.0.1:${port}.\n` +
           `Is Luminous running in dev mode?\n` +
-          `  bun run tauri dev`
+          `  bun run tauri dev`,
       );
     }
 
@@ -179,7 +176,7 @@ export class CdpClient {
               targetId: this.targetId,
               message: JSON.stringify({ id, method, params }),
             },
-          })
+          }),
         );
       } else {
         this.ws!.send(JSON.stringify({ id, method, params }));
@@ -291,7 +288,7 @@ async function main() {
   if (opts.unminimize) {
     console.log("Restoring / unminimizing window...");
     const res = await client.eval(
-      `window.__TAURI_INTERNALS__ ? window.__TAURI_INTERNALS__.invoke('plugin:window|unminimize') : null`
+      `window.__TAURI_INTERNALS__ ? window.__TAURI_INTERNALS__.invoke('plugin:window|unminimize') : null`,
     );
     console.log(`Unminimize command executed in ${res.latencyMs}ms`);
     client.close();
@@ -300,11 +297,9 @@ async function main() {
 
   if (opts.minimize) {
     const duration = opts.durationSec ?? 10;
-    console.log(
-      `Minimizing window and monitoring responsiveness for ${duration}s...`
-    );
+    console.log(`Minimizing window and monitoring responsiveness for ${duration}s...`);
     const minRes = await client.eval(
-      `window.__TAURI_INTERNALS__ ? window.__TAURI_INTERNALS__.invoke('plugin:window|minimize') : null`
+      `window.__TAURI_INTERNALS__ ? window.__TAURI_INTERNALS__.invoke('plugin:window|minimize') : null`,
     );
     console.log(`Minimize invocation latency: ${minRes.latencyMs}ms`);
 
@@ -318,17 +313,17 @@ async function main() {
         client.eval("document.hidden"),
       ]);
       console.log(
-        `  [+${tick * opts.intervalSec}s] Title: '${titleRes.value}' | hidden: ${hiddenRes.value} | Latency: ${titleRes.latencyMs}ms`
+        `  [+${tick * opts.intervalSec}s] Title: '${titleRes.value}' | hidden: ${hiddenRes.value} | Latency: ${titleRes.latencyMs}ms`,
       );
     }
 
     console.log("Restoring window...");
     const restoreRes = await client.eval(
-      `window.__TAURI_INTERNALS__ ? window.__TAURI_INTERNALS__.invoke('plugin:window|unminimize') : null`
+      `window.__TAURI_INTERNALS__ ? window.__TAURI_INTERNALS__.invoke('plugin:window|unminimize') : null`,
     );
     const postTitle = await client.eval("document.title");
     console.log(
-      `Restored window in ${restoreRes.latencyMs}ms. Current title: '${postTitle.value}' (heartbeat: ${postTitle.latencyMs}ms)`
+      `Restored window in ${restoreRes.latencyMs}ms. Current title: '${postTitle.value}' (heartbeat: ${postTitle.latencyMs}ms)`,
     );
     client.close();
     return;
@@ -336,11 +331,11 @@ async function main() {
 
   if (opts.watch) {
     console.log(
-      `Monitoring renderer responsiveness every ${opts.intervalSec}s (Ctrl+C to stop)...`
+      `Monitoring renderer responsiveness every ${opts.intervalSec}s (Ctrl+C to stop)...`,
     );
     const startTime = Date.now();
     while (true) {
-      if (opts.durationSec && (Date.now() - startTime) >= opts.durationSec * 1000) {
+      if (opts.durationSec && Date.now() - startTime >= opts.durationSec * 1000) {
         break;
       }
       const [titleRes, hiddenRes] = await Promise.all([
@@ -349,7 +344,7 @@ async function main() {
       ]);
       const timestamp = new Date().toLocaleTimeString();
       console.log(
-        `[${timestamp}] Latency: ${titleRes.latencyMs.toFixed(1).padStart(5)}ms | Title: '${titleRes.value}' | hidden: ${hiddenRes.value}`
+        `[${timestamp}] Latency: ${titleRes.latencyMs.toFixed(1).padStart(5)}ms | Title: '${titleRes.value}' | hidden: ${hiddenRes.value}`,
       );
       await new Promise((r) => setTimeout(r, opts.intervalSec * 1000));
     }
@@ -372,7 +367,7 @@ async function main() {
 
   if (titleRes.latencyMs > 100) {
     console.warn(
-      `\nWARNING: High latency (${titleRes.latencyMs}ms). The renderer event loop may be under heavy load.`
+      `\nWARNING: High latency (${titleRes.latencyMs}ms). The renderer event loop may be under heavy load.`,
     );
   } else {
     console.log(`Health:         EXCELLENT (sub-100ms response)`);

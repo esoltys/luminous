@@ -60,13 +60,15 @@ function makePlaylist(overrides: Partial<Playlist> = {}): Playlist {
 describe("HomeRowList.svelte", () => {
   it("renders a rank numeral, title/year, and artist/rating for song rows in the rank variant", () => {
     const items: HomeItem[] = [{ type: "song", song: makeSong() }];
-    const { getByText, queryByText, container } = render(HomeRowList, { props: { items, variant: "rank" } });
+    const { getByText, queryByText, container } = render(HomeRowList, {
+      props: { items, variant: "rank" },
+    });
 
     expect(getByText("01")).toBeInTheDocument();
     expect(getByText("Wildflowers")).toBeInTheDocument();
     expect(getByText("1994")).toBeInTheDocument();
     expect(getByText("Tom Petty")).toBeInTheDocument();
-    expect(container.querySelector('[aria-pressed]')).toBeInTheDocument();
+    expect(container.querySelector("[aria-pressed]")).toBeInTheDocument();
     expect(queryByText("Song")).not.toBeInTheDocument();
   });
 
@@ -115,15 +117,25 @@ describe("HomeRowList.svelte", () => {
 
   it("labels dynamic playlists with their auto-playlist category", () => {
     const decadeItems: HomeItem[] = [
-      { type: "playlist", playlist: makePlaylist({ dynamic_enabled: true, dynamic_spec: "decade:1990s" }) },
+      {
+        type: "playlist",
+        playlist: makePlaylist({ dynamic_enabled: true, dynamic_spec: "decade:1990s" }),
+      },
     ];
-    const { getByText: getByTextDecade } = render(HomeRowList, { props: { items: decadeItems, variant: "rank" } });
+    const { getByText: getByTextDecade } = render(HomeRowList, {
+      props: { items: decadeItems, variant: "rank" },
+    });
     expect(getByTextDecade("Decade")).toBeInTheDocument();
 
     const genreItems: HomeItem[] = [
-      { type: "playlist", playlist: makePlaylist({ dynamic_enabled: true, dynamic_spec: "tag:Rock" }) },
+      {
+        type: "playlist",
+        playlist: makePlaylist({ dynamic_enabled: true, dynamic_spec: "tag:Rock" }),
+      },
     ];
-    const { getByText: getByTextGenre } = render(HomeRowList, { props: { items: genreItems, variant: "rank" } });
+    const { getByText: getByTextGenre } = render(HomeRowList, {
+      props: { items: genreItems, variant: "rank" },
+    });
     expect(getByTextGenre("Genre")).toBeInTheDocument();
   });
 
@@ -135,7 +147,9 @@ describe("HomeRowList.svelte", () => {
 
   it("renders the title heading when provided", () => {
     const items: HomeItem[] = [{ type: "song", song: makeSong() }];
-    const { getByText } = render(HomeRowList, { props: { title: "Top 5 Most Played", items, variant: "rank" } });
+    const { getByText } = render(HomeRowList, {
+      props: { title: "Top 5 Most Played", items, variant: "rank" },
+    });
 
     expect(getByText("Top 5 Most Played")).toBeInTheDocument();
   });

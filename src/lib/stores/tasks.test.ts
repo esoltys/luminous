@@ -92,7 +92,10 @@ describe("TasksStore", () => {
     const id1 = tasksStore.startTask({ label: "Processing songs (0/1)..." });
     const id2 = tasksStore.startTask({ label: "Обработка песен (0/2)…" });
     const id3 = tasksStore.startTask({ label: "Titel werden verarbeitet (1/5) ..." });
-    const id4 = tasksStore.startTask({ label: "Explicit task name (0/1)...", taskName: "Explicit" });
+    const id4 = tasksStore.startTask({
+      label: "Explicit task name (0/1)...",
+      taskName: "Explicit",
+    });
 
     // Toast messages verify the extracted taskName passed through
     const msg1 = toastStore.messages.find((m: any) => m.task?.taskId === id1);

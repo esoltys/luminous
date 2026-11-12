@@ -197,7 +197,8 @@ class ScrobblerStore {
       await this.saveSettings();
       return true;
     } catch (err: any) {
-      this.validationError = typeof err === "string" ? err : err?.message ?? i18n.t("listenbrainz.validateFailed");
+      this.validationError =
+        typeof err === "string" ? err : (err?.message ?? i18n.t("listenbrainz.validateFailed"));
       return false;
     } finally {
       this.isValidating = false;
@@ -209,13 +210,17 @@ class ScrobblerStore {
     this.flushSuccessMessage = null;
     try {
       const count = await invoke<number>("flush_scrobble_cache");
-      this.flushSuccessMessage = count > 0 ? i18n.plural("listenbrainz.submittedPending", count) : i18n.t("listenbrainz.queueEmpty");
+      this.flushSuccessMessage =
+        count > 0
+          ? i18n.plural("listenbrainz.submittedPending", count)
+          : i18n.t("listenbrainz.queueEmpty");
       await this.refreshCacheStatus();
       setTimeout(() => {
         this.flushSuccessMessage = null;
       }, 4000);
     } catch (err: any) {
-      this.lastError = typeof err === "string" ? err : err?.message ?? i18n.t("listenbrainz.flushFailed");
+      this.lastError =
+        typeof err === "string" ? err : (err?.message ?? i18n.t("listenbrainz.flushFailed"));
       await this.refreshCacheStatus();
     } finally {
       this.isFlushing = false;
@@ -244,7 +249,8 @@ class ScrobblerStore {
       this.lastfmPendingAuthUrl = res.auth_url;
       await openExternalUrl(res.auth_url);
     } catch (err: any) {
-      this.lastfmAuthError = typeof err === "string" ? err : err?.message ?? i18n.t("lastfm.authFailed");
+      this.lastfmAuthError =
+        typeof err === "string" ? err : (err?.message ?? i18n.t("lastfm.authFailed"));
     } finally {
       this.isStartingLastfm = false;
     }
@@ -266,7 +272,8 @@ class ScrobblerStore {
       await this.refreshCacheStatus();
       return true;
     } catch (err: any) {
-      this.lastfmAuthError = typeof err === "string" ? err : err?.message ?? i18n.t("lastfm.authFailed");
+      this.lastfmAuthError =
+        typeof err === "string" ? err : (err?.message ?? i18n.t("lastfm.authFailed"));
       return false;
     } finally {
       this.isFinishingLastfm = false;
@@ -307,7 +314,8 @@ class ScrobblerStore {
       this.syncRatingsResult = res;
       return res;
     } catch (err: any) {
-      this.syncRatingsError = typeof err === "string" ? err : err?.message ?? i18n.t("listenbrainz.syncRatingsError");
+      this.syncRatingsError =
+        typeof err === "string" ? err : (err?.message ?? i18n.t("listenbrainz.syncRatingsError"));
       return null;
     } finally {
       this.isSyncingRatings = false;

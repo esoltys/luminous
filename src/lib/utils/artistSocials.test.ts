@@ -25,19 +25,25 @@ describe("artistSocials", () => {
   it("resolves website URLs", () => {
     expect(resolveSocialUrl("website", "www.shaniatwain.com")).toBe("https://www.shaniatwain.com");
     expect(resolveSocialUrl("website", "http://example.com")).toBe("http://example.com");
-    expect(resolveSocialUrl("website", "https://shaniatwain.com/tour")).toBe("https://shaniatwain.com/tour");
+    expect(resolveSocialUrl("website", "https://shaniatwain.com/tour")).toBe(
+      "https://shaniatwain.com/tour",
+    );
   });
 
   it("resolves social handles to full URLs", () => {
     expect(resolveSocialUrl("bandcamp", "shaniatwain")).toBe("https://shaniatwain.bandcamp.com");
-    expect(resolveSocialUrl("soundcloud", "shaniatwain")).toBe("https://soundcloud.com/shaniatwain");
+    expect(resolveSocialUrl("soundcloud", "shaniatwain")).toBe(
+      "https://soundcloud.com/shaniatwain",
+    );
     expect(resolveSocialUrl("youtube", "@ShaniaTwain")).toBe("https://youtube.com/@ShaniaTwain");
     expect(resolveSocialUrl("youtube", "ShaniaTwain")).toBe("https://youtube.com/@ShaniaTwain");
     expect(resolveSocialUrl("instagram", "@shaniatwain")).toBe("https://instagram.com/shaniatwain");
     expect(resolveSocialUrl("instagram", "shaniatwain")).toBe("https://instagram.com/shaniatwain");
     expect(resolveSocialUrl("x", "@ShaniaTwain")).toBe("https://x.com/ShaniaTwain");
     expect(resolveSocialUrl("facebook", "ShaniaTwain")).toBe("https://facebook.com/ShaniaTwain");
-    expect(resolveSocialUrl("bluesky", "shaniatwain.bsky.social")).toBe("https://bsky.app/profile/shaniatwain.bsky.social");
+    expect(resolveSocialUrl("bluesky", "shaniatwain.bsky.social")).toBe(
+      "https://bsky.app/profile/shaniatwain.bsky.social",
+    );
     expect(resolveSocialUrl("threads", "@shaniatwain")).toBe("https://threads.net/@shaniatwain");
     expect(resolveSocialUrl("tiktok", "@shaniatwain")).toBe("https://tiktok.com/@shaniatwain");
   });
@@ -58,22 +64,35 @@ describe("artistSocials", () => {
     expect(formatDisplayLabel("allmusic", "https://allmusic.com/album/mw0001")).toBe("AllMusic");
     expect(formatDisplayLabel("wikidata", "https://wikidata.org/wiki/Q11649")).toBe("Wikidata");
     expect(formatDisplayLabel("songkick", "https://www.songkick.com/artists/123")).toBe("Songkick");
-    expect(formatDisplayLabel("setlistfm", "https://www.setlist.fm/setlists/123")).toBe("Setlist.fm");
-    expect(formatDisplayLabel("bandsintown", "https://www.bandsintown.com/a/123")).toBe("Bandsintown");
+    expect(formatDisplayLabel("setlistfm", "https://www.setlist.fm/setlists/123")).toBe(
+      "Setlist.fm",
+    );
+    expect(formatDisplayLabel("bandsintown", "https://www.bandsintown.com/a/123")).toBe(
+      "Bandsintown",
+    );
   });
 
   it("shows only the domain for URLs from unrecognized or generic platforms (#1133)", () => {
     expect(
-      formatDisplayLabel("other_databases", "https://rateyourmusic.com/release/album/dorothy/28-days-in-the-valley/")
+      formatDisplayLabel(
+        "other_databases",
+        "https://rateyourmusic.com/release/album/dorothy/28-days-in-the-valley/",
+      ),
     ).toBe("rateyourmusic.com");
     expect(
-      formatDisplayLabel("lyrics", "https://genius.com/albums/Dorothy/28-days-in-the-valley")
+      formatDisplayLabel("lyrics", "https://genius.com/albums/Dorothy/28-days-in-the-valley"),
     ).toBe("genius.com");
     expect(
-      formatDisplayLabel("custom", "https://pitchfork.com/reviews/albums/dorothy-28-days-in-the-valley/")
+      formatDisplayLabel(
+        "custom",
+        "https://pitchfork.com/reviews/albums/dorothy-28-days-in-the-valley/",
+      ),
     ).toBe("pitchfork.com");
     expect(
-      formatDisplayLabel("unrecognized_site", "https://subdomain.example.org/path/to/page?query=1#hash")
+      formatDisplayLabel(
+        "unrecognized_site",
+        "https://subdomain.example.org/path/to/page?query=1#hash",
+      ),
     ).toBe("subdomain.example.org");
   });
 
@@ -81,8 +100,8 @@ describe("artistSocials", () => {
     expect(
       formatDisplayLabel(
         "website",
-        "https://web.archive.org/web/19970131155102/http://www.vmg.co.uk/massive/index.html"
-      )
+        "https://web.archive.org/web/19970131155102/http://www.vmg.co.uk/massive/index.html",
+      ),
     ).toBe("Internet Archive");
   });
 
@@ -91,20 +110,26 @@ describe("artistSocials", () => {
       expect(
         normalizeWebsitePlatform(
           "website",
-          "https://web.archive.org/web/19970131155102/http://www.vmg.co.uk/massive/index.html"
-        )
+          "https://web.archive.org/web/19970131155102/http://www.vmg.co.uk/massive/index.html",
+        ),
       ).toBe("internet_archive");
     });
 
     it("does the same for 'lyrics', 'other_databases', and 'custom'", () => {
-      expect(normalizeWebsitePlatform("lyrics", "https://web.archive.org/web/2020/https://genius.com/x")).toBe(
-        "internet_archive"
-      );
       expect(
-        normalizeWebsitePlatform("other_databases", "https://web.archive.org/web/2020/https://vgmdb.net/x")
+        normalizeWebsitePlatform("lyrics", "https://web.archive.org/web/2020/https://genius.com/x"),
       ).toBe("internet_archive");
       expect(
-        normalizeWebsitePlatform("custom", "https://web.archive.org/web/2020/https://pitchfork.com/x")
+        normalizeWebsitePlatform(
+          "other_databases",
+          "https://web.archive.org/web/2020/https://vgmdb.net/x",
+        ),
+      ).toBe("internet_archive");
+      expect(
+        normalizeWebsitePlatform(
+          "custom",
+          "https://web.archive.org/web/2020/https://pitchfork.com/x",
+        ),
       ).toBe("internet_archive");
     });
 
@@ -113,9 +138,12 @@ describe("artistSocials", () => {
     });
 
     it("leaves other platform ids unchanged even against a web.archive.org URL", () => {
-      expect(normalizeWebsitePlatform("discogs", "https://web.archive.org/web/2020/https://discogs.com/x")).toBe(
-        "discogs"
-      );
+      expect(
+        normalizeWebsitePlatform(
+          "discogs",
+          "https://web.archive.org/web/2020/https://discogs.com/x",
+        ),
+      ).toBe("discogs");
     });
   });
 
@@ -125,8 +153,11 @@ describe("artistSocials", () => {
     it("prefers ArtistProfile.musicbrainz_artist_id over a stored social link", () => {
       expect(
         resolveArtistMbid(mbid, [
-          { platform: "musicbrainz", handle_or_url: "https://musicbrainz.org/artist/other-id-not-a-real-mbid" },
-        ])
+          {
+            platform: "musicbrainz",
+            handle_or_url: "https://musicbrainz.org/artist/other-id-not-a-real-mbid",
+          },
+        ]),
       ).toBe(mbid);
     });
 
@@ -134,14 +165,18 @@ describe("artistSocials", () => {
       expect(
         resolveArtistMbid(null, [
           { platform: "musicbrainz", handle_or_url: `https://musicbrainz.org/artist/${mbid}` },
-        ])
+        ]),
       ).toBe(mbid);
     });
 
     it("returns null when neither source has a recognizable MBID", () => {
       expect(resolveArtistMbid(null, null)).toBeNull();
       expect(resolveArtistMbid(undefined, [])).toBeNull();
-      expect(resolveArtistMbid("not-a-valid-mbid", [{ platform: "discogs", handle_or_url: "https://discogs.com/artist/1" }])).toBeNull();
+      expect(
+        resolveArtistMbid("not-a-valid-mbid", [
+          { platform: "discogs", handle_or_url: "https://discogs.com/artist/1" },
+        ]),
+      ).toBeNull();
     });
 
     it("derives MusicBrainz/Fanart.tv URLs from the resolved MBID", () => {
@@ -158,27 +193,39 @@ describe("artistSocials", () => {
   describe("deriveFanartTvUrl (#98/#761)", () => {
     it("derives a fanart.tv URL from a stored MusicBrainz link's MBID", () => {
       const url = deriveFanartTvUrl([
-        { platform: "musicbrainz", handle_or_url: "https://musicbrainz.org/artist/7249b899-8db8-43e7-9e6e-22f1e736024e" },
+        {
+          platform: "musicbrainz",
+          handle_or_url: "https://musicbrainz.org/artist/7249b899-8db8-43e7-9e6e-22f1e736024e",
+        },
       ]);
       expect(url).toBe("https://fanart.tv/artist/7249b899-8db8-43e7-9e6e-22f1e736024e");
     });
 
     it("lowercases a mixed-case MBID", () => {
       const url = deriveFanartTvUrl([
-        { platform: "musicbrainz", handle_or_url: "https://musicbrainz.org/artist/7249B899-8DB8-43E7-9E6E-22F1E736024E" },
+        {
+          platform: "musicbrainz",
+          handle_or_url: "https://musicbrainz.org/artist/7249B899-8DB8-43E7-9E6E-22F1E736024E",
+        },
       ]);
       expect(url).toBe("https://fanart.tv/artist/7249b899-8db8-43e7-9e6e-22f1e736024e");
     });
 
     it("returns null when there is no musicbrainz link", () => {
-      expect(deriveFanartTvUrl([{ platform: "discogs", handle_or_url: "https://discogs.com/artist/82343" }])).toBeNull();
+      expect(
+        deriveFanartTvUrl([
+          { platform: "discogs", handle_or_url: "https://discogs.com/artist/82343" },
+        ]),
+      ).toBeNull();
       expect(deriveFanartTvUrl([])).toBeNull();
       expect(deriveFanartTvUrl(undefined)).toBeNull();
       expect(deriveFanartTvUrl(null)).toBeNull();
     });
 
     it("returns null when the musicbrainz link has no recognizable MBID", () => {
-      expect(deriveFanartTvUrl([{ platform: "musicbrainz", handle_or_url: "not-a-valid-mbid" }])).toBeNull();
+      expect(
+        deriveFanartTvUrl([{ platform: "musicbrainz", handle_or_url: "not-a-valid-mbid" }]),
+      ).toBeNull();
     });
   });
 
@@ -191,29 +238,20 @@ describe("artistSocials", () => {
 
     it("identifies rateyourmusic.com URLs as blacklisted", () => {
       expect(
-        isBlacklistedLink("https://rateyourmusic.com/release/album/artist/album/", "other_databases")
+        isBlacklistedLink(
+          "https://rateyourmusic.com/release/album/artist/album/",
+          "other_databases",
+        ),
       ).toBe(true);
-      expect(
-        isBlacklistedLink("https://www.rateyourmusic.com/artist/name", "website")
-      ).toBe(true);
-      expect(
-        isBlacklistedLink("rateyourmusic.com/release/album/...", "custom")
-      ).toBe(true);
+      expect(isBlacklistedLink("https://www.rateyourmusic.com/artist/name", "website")).toBe(true);
+      expect(isBlacklistedLink("rateyourmusic.com/release/album/...", "custom")).toBe(true);
     });
 
     it("identifies twitter.com and x.com URLs as blacklisted", () => {
-      expect(
-        isBlacklistedLink("https://twitter.com/someartist", "custom")
-      ).toBe(true);
-      expect(
-        isBlacklistedLink("https://mobile.twitter.com/someartist", "website")
-      ).toBe(true);
-      expect(
-        isBlacklistedLink("https://x.com/someartist", "custom")
-      ).toBe(true);
-      expect(
-        isBlacklistedLink("https://www.x.com/someartist", "website")
-      ).toBe(true);
+      expect(isBlacklistedLink("https://twitter.com/someartist", "custom")).toBe(true);
+      expect(isBlacklistedLink("https://mobile.twitter.com/someartist", "website")).toBe(true);
+      expect(isBlacklistedLink("https://x.com/someartist", "custom")).toBe(true);
+      expect(isBlacklistedLink("https://www.x.com/someartist", "website")).toBe(true);
     });
 
     it("identifies 'x' and 'twitter' platforms as blacklisted regardless of handle/URL", () => {
@@ -223,24 +261,12 @@ describe("artistSocials", () => {
     });
 
     it("does not blacklist legitimate domains and platforms", () => {
-      expect(
-        isBlacklistedLink("https://www.discogs.com/release/123", "discogs")
-      ).toBe(false);
-      expect(
-        isBlacklistedLink("https://www.allmusic.com/album/mw0001", "allmusic")
-      ).toBe(false);
-      expect(
-        isBlacklistedLink("https://vgmdb.net/album/123", "other_databases")
-      ).toBe(false);
-      expect(
-        isBlacklistedLink("https://en.wikipedia.org/wiki/Album", "wikipedia")
-      ).toBe(false);
-      expect(
-        isBlacklistedLink("https://artist-official.com", "website")
-      ).toBe(false);
-      expect(
-        isBlacklistedLink("@artist", "instagram")
-      ).toBe(false);
+      expect(isBlacklistedLink("https://www.discogs.com/release/123", "discogs")).toBe(false);
+      expect(isBlacklistedLink("https://www.allmusic.com/album/mw0001", "allmusic")).toBe(false);
+      expect(isBlacklistedLink("https://vgmdb.net/album/123", "other_databases")).toBe(false);
+      expect(isBlacklistedLink("https://en.wikipedia.org/wiki/Album", "wikipedia")).toBe(false);
+      expect(isBlacklistedLink("https://artist-official.com", "website")).toBe(false);
+      expect(isBlacklistedLink("@artist", "instagram")).toBe(false);
     });
 
     it("handles null, undefined, or empty values gracefully", () => {

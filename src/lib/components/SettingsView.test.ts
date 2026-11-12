@@ -55,7 +55,10 @@ describe("SettingsView.svelte", () => {
 
     await fireEvent.click(getByText("UI Themes"));
 
-    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "themes" });
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+      key: "active_settings_tab",
+      value: "themes",
+    });
   });
 
   it("persists active tab as integrations when clicking Integrations tab", async () => {
@@ -65,7 +68,10 @@ describe("SettingsView.svelte", () => {
 
     await fireEvent.click(getByText("Integrations"));
 
-    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "integrations" });
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+      key: "active_settings_tab",
+      value: "integrations",
+    });
   });
 
   it("persists active tab as system when clicking System tab", async () => {
@@ -75,7 +81,10 @@ describe("SettingsView.svelte", () => {
 
     await fireEvent.click(getByText("System"));
 
-    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "system" });
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+      key: "active_settings_tab",
+      value: "system",
+    });
   });
 
   it("persists active tab as sources when clicking Sources tab", async () => {
@@ -85,6 +94,9 @@ describe("SettingsView.svelte", () => {
 
     await fireEvent.click(getByText("Sources"));
 
-    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "sources" });
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+      key: "active_settings_tab",
+      value: "sources",
+    });
   });
 });

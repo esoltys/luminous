@@ -90,7 +90,9 @@ describe("PinnedRow.svelte", () => {
     expect(getByText("My Best Songs")).toBeInTheDocument();
     expect(getByText("Favourite Songs")).toBeInTheDocument();
     expect(container.querySelectorAll("[data-pinned-index]")).toHaveLength(5);
-    expect(container.querySelector('[data-testid="card-section-grid"]')!.className).toContain("minmax(280px,1fr)");
+    expect(container.querySelector('[data-testid="card-section-grid"]')!.className).toContain(
+      "minmax(280px,1fr)",
+    );
   });
 
   it("saves the layout chosen with the header toggle", async () => {
@@ -125,7 +127,12 @@ describe("PinnedRow.svelte", () => {
 
     it("does not appear for a click that never moves", async () => {
       const { container } = render(PinnedRow);
-      await fireEvent.pointerDown(pinned(container, 2), { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
+      await fireEvent.pointerDown(pinned(container, 2), {
+        button: 0,
+        pointerId: 1,
+        clientX: 10,
+        clientY: 10,
+      });
       expect(screen.queryByTestId("pinned-drag-ghost")).toBeNull();
       await fireEvent.pointerUp(window);
       expect(screen.queryByTestId("pinned-drag-ghost")).toBeNull();
@@ -134,7 +141,12 @@ describe("PinnedRow.svelte", () => {
     it("follows the drag with the item's name and lights up only over another pin", async () => {
       const reorder = vi.spyOn(pinnedStore, "reorder").mockImplementation(async () => {});
       const { container } = render(PinnedRow);
-      await fireEvent.pointerDown(pinned(container, 2), { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
+      await fireEvent.pointerDown(pinned(container, 2), {
+        button: 0,
+        pointerId: 1,
+        clientX: 10,
+        clientY: 10,
+      });
 
       // Still over its own slot: dropping here changes nothing.
       document.elementFromPoint = () => pinned(container, 2);
@@ -265,9 +277,24 @@ describe("PinnedRow.svelte", () => {
   });
 
   it("navigates to a different custom playlist from Home when Queue was previously active", async () => {
-    const playlistA: Playlist = { id: 42, name: "Playlist A", is_queue: false, track_count: 10 } as Playlist;
-    const playlistB: Playlist = { id: 84, name: "Playlist B", is_queue: false, track_count: 5 } as Playlist;
-    const queuePlaylist: Playlist = { id: 1, name: "Queue", is_queue: true, track_count: 0 } as Playlist;
+    const playlistA: Playlist = {
+      id: 42,
+      name: "Playlist A",
+      is_queue: false,
+      track_count: 10,
+    } as Playlist;
+    const playlistB: Playlist = {
+      id: 84,
+      name: "Playlist B",
+      is_queue: false,
+      track_count: 5,
+    } as Playlist;
+    const queuePlaylist: Playlist = {
+      id: 1,
+      name: "Queue",
+      is_queue: true,
+      track_count: 0,
+    } as Playlist;
 
     playlistsStore.playlists = [queuePlaylist, playlistA, playlistB];
     pinnedStore.items = [

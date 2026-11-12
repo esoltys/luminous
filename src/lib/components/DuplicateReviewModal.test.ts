@@ -134,7 +134,9 @@ describe("DuplicateReviewModal.svelte", () => {
     // Check title and candidates
     expect(getAllByText("Airbag").length).toBeGreaterThan(0);
     expect(getByText("/music/Radiohead/OK Computer/01 - Airbag.flac")).toBeInTheDocument();
-    expect(getByText("/music/Radiohead/OK Computer/Duplicates/01 - Airbag.mp3")).toBeInTheDocument();
+    expect(
+      getByText("/music/Radiohead/OK Computer/Duplicates/01 - Airbag.mp3"),
+    ).toBeInTheDocument();
 
     // Candidate 1 is FLAC and recommended by default
     expect(getByText("Recommended")).toBeInTheDocument();

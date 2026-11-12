@@ -3,25 +3,25 @@ name: "Release Build"
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       flatpak_only:
-        description: 'Skip the Windows/Linux installer rebuild and only run the Flatpak build/publish job (for re-testing Flatpak packaging against an already-published release without touching its existing assets)'
+        description: "Skip the Windows/Linux installer rebuild and only run the Flatpak build/publish job (for re-testing Flatpak packaging against an already-published release without touching its existing assets)"
         type: boolean
         default: false
       linux_only:
-        description: 'Only rebuild the Linux installers (AppImage, .deb, .rpm) and replace them, and their latest.json entries, in the release (e.g. to rebuild an already-published release on the current Linux runner). Skips Windows and Flatpak.'
+        description: "Only rebuild the Linux installers (AppImage, .deb, .rpm) and replace them, and their latest.json entries, in the release (e.g. to rebuild an already-published release on the current Linux runner). Skips Windows and Flatpak."
         type: boolean
         default: false
       dry_run:
-        description: 'Build the Linux installers only and attach them to this workflow run as an artifact, without touching any release (to test a build before a linux_only run). Skips Windows and Flatpak.'
+        description: "Build the Linux installers only and attach them to this workflow run as an artifact, without touching any release (to test a build before a linux_only run). Skips Windows and Flatpak."
         type: boolean
         default: false
       tag:
-        description: 'Release tag to build, e.g. v3.0.0; its source is checked out. Defaults to the version in package.json (and, without linux_only, to the dispatching branch''s source).'
+        description: "Release tag to build, e.g. v3.0.0; its source is checked out. Defaults to the version in package.json (and, without linux_only, to the dispatching branch's source)."
         type: string
-        default: ''
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -389,4 +389,3 @@ jobs:
           else
             echo "No changes to the shared Flatpak repo, skipping push."
           fi
-

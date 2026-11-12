@@ -42,7 +42,7 @@
     CloudIcon as Cloud,
     CircleNotchIcon as LoaderCircle,
     PlaylistIcon as ListMusic,
-    ProhibitIcon as Prohibit
+    ProhibitIcon as Prohibit,
   } from "phosphor-svelte";
 
   let editingDirectory = $state<MusicDirectory | null>(null);
@@ -128,8 +128,12 @@
   function checkWebdavConnections() {
     for (const server of collectionStore.webdavServers) {
       invoke<boolean>("check_webdav_connection", { id: server.id })
-        .then((ok) => { webdavConnected[server.id] = ok; })
-        .catch(() => { webdavConnected[server.id] = false; });
+        .then((ok) => {
+          webdavConnected[server.id] = ok;
+        })
+        .catch(() => {
+          webdavConnected[server.id] = false;
+        });
     }
   }
 
@@ -147,7 +151,8 @@
   }
 
   // Fixed code from `remote_scheduler::SYNC_IN_PROGRESS`.
-  const isSyncInProgressError = (e: unknown) => String((e as any)?.message ?? e) === "sync-in-progress";
+  const isSyncInProgressError = (e: unknown) =>
+    String((e as any)?.message ?? e) === "sync-in-progress";
 
   function isServerSyncing(serverId: number): boolean {
     return syncingServerId === serverId || tasksStore.isTaskActive(`webdav-sync-${serverId}`);
@@ -164,10 +169,12 @@
       contextName: server.name,
     });
     try {
-      const stats = await invoke<{ added: number; updated: number; removed: number; errors: number }>(
-        "sync_webdav_server",
-        { id: server.id }
-      );
+      const stats = await invoke<{
+        added: number;
+        updated: number;
+        removed: number;
+        errors: number;
+      }>("sync_webdav_server", { id: server.id });
       syncFeedback = i18n.t("settings.webdavSyncComplete", {
         added: stats.added,
         updated: stats.updated,
@@ -199,18 +206,33 @@
   // breaks the total down (values come from get_library_stats).
   // GB at the headline's two decimals so the parts visibly add up to it.
   const formatDiskSize = (bytes: number) =>
-    bytes >= 1073741824 ? `${formatNumber(bytes / 1073741824, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GB` : formatFileSize(bytes);
+    bytes >= 1073741824
+      ? `${formatNumber(bytes / 1073741824, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GB`
+      : formatFileSize(bytes);
   const diskSizeLabel = $derived.by(() => {
-    const { total_filesize_bytes, album_art_bytes, artist_art_bytes, thumbnail_bytes } = collectionStore.stats;
-    const total = total_filesize_bytes + (album_art_bytes ?? 0) + (artist_art_bytes ?? 0) + (thumbnail_bytes ?? 0);
+    const { total_filesize_bytes, album_art_bytes, artist_art_bytes, thumbnail_bytes } =
+      collectionStore.stats;
+    const total =
+      total_filesize_bytes +
+      (album_art_bytes ?? 0) +
+      (artist_art_bytes ?? 0) +
+      (thumbnail_bytes ?? 0);
     return `${formatNumber(total / 1073741824, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GB`;
   });
   const diskSizeBreakdown = $derived(
     [
-      i18n.t('settings.statsSizeMusic', { size: formatDiskSize(collectionStore.stats.total_filesize_bytes) }),
-      i18n.t('settings.statsSizeAlbumArt', { size: formatDiskSize(collectionStore.stats.album_art_bytes) }),
-      i18n.t('settings.statsSizeArtistArt', { size: formatDiskSize(collectionStore.stats.artist_art_bytes) }),
-      i18n.t('settings.statsSizeThumbnails', { size: formatDiskSize(collectionStore.stats.thumbnail_bytes) }),
+      i18n.t("settings.statsSizeMusic", {
+        size: formatDiskSize(collectionStore.stats.total_filesize_bytes),
+      }),
+      i18n.t("settings.statsSizeAlbumArt", {
+        size: formatDiskSize(collectionStore.stats.album_art_bytes),
+      }),
+      i18n.t("settings.statsSizeArtistArt", {
+        size: formatDiskSize(collectionStore.stats.artist_art_bytes),
+      }),
+      i18n.t("settings.statsSizeThumbnails", {
+        size: formatDiskSize(collectionStore.stats.thumbnail_bytes),
+      }),
     ].join("\n"),
   );
 
@@ -228,8 +250,12 @@
   function checkSubsonicConnections() {
     for (const server of collectionStore.subsonicServers) {
       invoke("check_subsonic_connection", { id: server.id })
-        .then(() => { subsonicConnected[server.id] = true; })
-        .catch(() => { subsonicConnected[server.id] = false; });
+        .then(() => {
+          subsonicConnected[server.id] = true;
+        })
+        .catch(() => {
+          subsonicConnected[server.id] = false;
+        });
     }
   }
 
@@ -268,7 +294,8 @@
   }
 
   async function handleRemoveSubsonicServer(server: SubsonicServer) {
-    if (!(await confirm(i18n.t("settings.confirmRemoveSubsonicServer", { name: server.name })))) return;
+    if (!(await confirm(i18n.t("settings.confirmRemoveSubsonicServer", { name: server.name }))))
+      return;
     try {
       await invoke("delete_subsonic_server", { id: server.id });
       await loadSubsonicServers();
@@ -282,7 +309,9 @@
   function getSubsonicStatusText(server: SubsonicServer): string {
     if (isSubsonicSyncing(server)) return i18n.t("settings.webdavStatusSyncing");
     if (server.lastSyncedAt) {
-      return i18n.t("settings.webdavStatusSynced", { time: new Date(server.lastSyncedAt * 1000).toLocaleString() });
+      return i18n.t("settings.webdavStatusSynced", {
+        time: new Date(server.lastSyncedAt * 1000).toLocaleString(),
+      });
     }
     return i18n.t("settings.webdavStatusNeverSynced");
   }
@@ -304,11 +333,13 @@
     musicalAnalysisStore.init();
     loadWebdavServers();
     loadSubsonicServers();
-    hierarchySidecarStore.refresh().catch((e) => console.error("Failed to load the default library:", e));
+    hierarchySidecarStore
+      .refresh()
+      .catch((e) => console.error("Failed to load the default library:", e));
   });
 
   async function handleRemoveDirectory(path: string) {
-    if (await confirm(i18n.t('settings.confirmRemoveFolder', { path }))) {
+    if (await confirm(i18n.t("settings.confirmRemoveFolder", { path }))) {
       await collectionStore.removeDirectory(path);
       // Removing the default library's folder unlinks it backend-side.
       await hierarchySidecarStore.refresh().catch(() => {});
@@ -334,7 +365,7 @@
     } catch (e) {
       linkError = String(e);
       // The link was refused — put the picker back on what's actually linked.
-      select.value = hierarchySidecarStore.path ?? '';
+      select.value = hierarchySidecarStore.path ?? "";
     }
   }
 
@@ -352,9 +383,12 @@
   }
 
   function getWebdavStatusText(server: WebDavServer): string {
-    if (isServerSyncing(server.id) || server.syncStatus === "syncing") return i18n.t("settings.webdavStatusSyncing");
+    if (isServerSyncing(server.id) || server.syncStatus === "syncing")
+      return i18n.t("settings.webdavStatusSyncing");
     if (server.lastSyncedAt) {
-      return i18n.t("settings.webdavStatusSynced", { time: new Date(server.lastSyncedAt * 1000).toLocaleString() });
+      return i18n.t("settings.webdavStatusSynced", {
+        time: new Date(server.lastSyncedAt * 1000).toLocaleString(),
+      });
     }
     return i18n.t("settings.webdavStatusNeverSynced");
   }
@@ -368,20 +402,20 @@
   }
 
   function getPhaseDisplayName(phase: string | undefined): string {
-    if (!phase) return i18n.t('sidebar.scanning');
+    if (!phase) return i18n.t("sidebar.scanning");
     switch (phase) {
       case "discovering":
-        return i18n.t('settings.phaseDiscovering');
+        return i18n.t("settings.phaseDiscovering");
       case "reading_tags":
-        return i18n.t('settings.phaseReadingTags');
+        return i18n.t("settings.phaseReadingTags");
       case "checking_missing":
-        return i18n.t('settings.phaseCheckingMissing');
+        return i18n.t("settings.phaseCheckingMissing");
       case "resolving_artwork":
-        return i18n.t('settings.phaseResolvingArtwork');
+        return i18n.t("settings.phaseResolvingArtwork");
       case "updating":
-        return i18n.t('settings.phaseUpdating');
+        return i18n.t("settings.phaseUpdating");
       case "done":
-        return i18n.t('settings.phaseDone');
+        return i18n.t("settings.phaseDone");
       default:
         return phase;
     }
@@ -395,55 +429,74 @@
         <Folder class="w-5 h-5" />
       </div>
       <div class="space-y-1 min-w-0">
-        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.watchedFoldersTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.watchedFoldersSubtitle')}</p>
+        <h3 class="font-bold text-sm text-brand-text-primary">
+          {i18n.t("settings.watchedFoldersTitle")}
+        </h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
+          {i18n.t("settings.watchedFoldersSubtitle")}
+        </p>
       </div>
     </div>
     <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="sm">
-      <Plus class="w-4 h-4" /> {i18n.t('settings.addFolder')}
+      <Plus class="w-4 h-4" />
+      {i18n.t("settings.addFolder")}
     </Button>
   </div>
 
   {#if loudnessStore.enabled && loudnessStore.analysisRemaining > 0}
-    <div class="flex items-center gap-2.5 bg-brand-accent/10 border border-brand-accent/30 rounded-xl px-4 py-2.5 text-xs text-brand-text-secondary">
+    <div
+      class="flex items-center gap-2.5 bg-brand-accent/10 border border-brand-accent/30 rounded-xl px-4 py-2.5 text-xs text-brand-text-secondary"
+    >
       <Activity class="w-4 h-4 text-brand-accent-text shrink-0" />
-      <span>{i18n.plural('settings.loudnessAnalysisActive', loudnessStore.analysisRemaining)}</span>
+      <span>{i18n.plural("settings.loudnessAnalysisActive", loudnessStore.analysisRemaining)}</span>
     </div>
   {/if}
 
   {#if prefs.detectTempoAndKey && musicalAnalysisStore.remaining > 0}
-    <div class="flex items-center gap-2.5 bg-brand-accent/10 border border-brand-accent/30 rounded-xl px-4 py-2.5 text-xs text-brand-text-secondary">
+    <div
+      class="flex items-center gap-2.5 bg-brand-accent/10 border border-brand-accent/30 rounded-xl px-4 py-2.5 text-xs text-brand-text-secondary"
+    >
       <Activity class="w-4 h-4 text-brand-accent-text shrink-0" />
-      <span>{i18n.plural('settings.musicalAnalysisActive', musicalAnalysisStore.remaining)}</span>
+      <span>{i18n.plural("settings.musicalAnalysisActive", musicalAnalysisStore.remaining)}</span>
     </div>
   {/if}
 
   <div class="space-y-2">
     {#each collectionStore.directories as dir}
-      <div class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors">
+      <div
+        class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors"
+      >
         <div class="flex items-center gap-3.5 min-w-0 flex-1">
           <div class="min-w-0 space-y-1">
             <div class="flex items-center gap-2.5 min-w-0">
               <LibraryBadge directory={dir} size="sm" />
               <p class="text-xs text-brand-text-secondary truncate" title={dir.path}>{dir.path}</p>
             </div>
-            <p class="text-xs" class:text-brand-text-secondary={dir.is_available !== false} class:text-brand-text-primary={dir.is_available === false}>
+            <p
+              class="text-xs"
+              class:text-brand-text-secondary={dir.is_available !== false}
+              class:text-brand-text-primary={dir.is_available === false}
+            >
               {#if dir.is_available === false}
                 <span class="flex items-center gap-1">
                   <AlertTriangle class="w-3 h-3" />
-                  {i18n.t('settings.folderItemUnavailable', {}, 'Unavailable (Drive disconnected?)')}
+                  {i18n.t(
+                    "settings.folderItemUnavailable",
+                    {},
+                    "Unavailable (Drive disconnected?)",
+                  )}
                   <button
                     type="button"
                     onclick={() => handleLocateDirectory(dir.path)}
                     class="ml-1.5 font-medium text-brand-accent-text hover:underline"
                   >
-                    {i18n.t('settings.folderLocate')}
+                    {i18n.t("settings.folderLocate")}
                   </button>
                 </span>
               {:else}
                 {collectionStore.watchFoldersRealtime
-                  ? i18n.t('settings.folderItemRecursive')
-                  : i18n.t('settings.folderItemRecursiveWatchOff')}
+                  ? i18n.t("settings.folderItemRecursive")
+                  : i18n.t("settings.folderItemRecursiveWatchOff")}
               {/if}
             </p>
           </div>
@@ -453,7 +506,7 @@
             onclick={() => collectionStore.startScan(false)}
             disabled={collectionStore.isScanning}
             class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors disabled:opacity-50"
-            title={i18n.t('settings.folderSyncNowHint')}
+            title={i18n.t("settings.folderSyncNowHint")}
           >
             {#if collectionStore.isScanning}
               <LoaderCircle class="w-4 h-4 animate-spin text-brand-accent-text" />
@@ -464,21 +517,23 @@
           <button
             onclick={() => handleCreateFolderPlaylist(dir)}
             class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors"
-            title={i18n.t('settings.folderCreatePlaylist', {}, 'Create Smart Playlist from folder')}
+            title={i18n.t("settings.folderCreatePlaylist", {}, "Create Smart Playlist from folder")}
           >
             <ListMusic class="w-4 h-4 text-brand-accent-text" />
           </button>
           <button
-            onclick={() => { editingDirectory = dir; }}
+            onclick={() => {
+              editingDirectory = dir;
+            }}
             class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors"
-            title={i18n.t('settings.folderItemEdit', {}, 'Edit folder details')}
+            title={i18n.t("settings.folderItemEdit", {}, "Edit folder details")}
           >
             <Edit3 class="w-4 h-4" />
           </button>
           <button
             onclick={() => handleRemoveDirectory(dir.path)}
             class="p-2 rounded-lg bg-brand-main hover:bg-brand-text-primary/10 text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-text-secondary transition-colors"
-            title={i18n.t('settings.folderItemStopWatch')}
+            title={i18n.t("settings.folderItemStopWatch")}
           >
             <Trash2 class="w-4 h-4 text-brand-accent-text" />
           </button>
@@ -489,19 +544,21 @@
     {#if collectionStore.directories.length > 0}
       <div class="flex items-center justify-between gap-4 pt-2">
         <div class="flex flex-col gap-0.5 min-w-0">
-          <label for="default-library-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.defaultLibraryLabel')}</label>
-          <p class="text-xs text-brand-text-secondary">{i18n.t('settings.defaultLibraryHint')}</p>
+          <label for="default-library-select" class="text-sm font-medium text-brand-text-primary"
+            >{i18n.t("settings.defaultLibraryLabel")}</label
+          >
+          <p class="text-xs text-brand-text-secondary">{i18n.t("settings.defaultLibraryHint")}</p>
           {#if defaultLibraryError}
             <InlineMessage role="alert">{defaultLibraryError}</InlineMessage>
           {/if}
         </div>
         <Select
           id="default-library-select"
-          value={hierarchySidecarStore.path ?? ''}
+          value={hierarchySidecarStore.path ?? ""}
           onchange={(e) => handleDefaultLibraryChange(e.currentTarget)}
           class="shrink-0 max-w-[45%] truncate bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
         >
-          <option value="">{i18n.t('settings.defaultLibraryNone')}</option>
+          <option value="">{i18n.t("settings.defaultLibraryNone")}</option>
           {#each collectionStore.directories as dir (dir.path)}
             <option value={dir.path}>{getDirectoryDisplayName(dir)}</option>
           {/each}
@@ -512,15 +569,23 @@
     {#if editingDirectory}
       <FolderEditModal
         directory={editingDirectory}
-        onClose={() => { editingDirectory = null; }}
+        onClose={() => {
+          editingDirectory = null;
+        }}
       />
     {/if}
 
     {#if collectionStore.directories.length === 0}
-      <div class="border border-dashed border-brand-border rounded-xl px-6 py-12 text-center text-brand-text-secondary">
+      <div
+        class="border border-dashed border-brand-border rounded-xl px-6 py-12 text-center text-brand-text-secondary"
+      >
         <Folder class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/50" />
-        <h4 class="font-semibold text-brand-text-primary mb-1">{i18n.t('settings.noFoldersTitle')}</h4>
-        <p class="text-xs text-brand-text-secondary mb-4 text-pretty">{i18n.t('settings.noFoldersText')}</p>
+        <h4 class="font-semibold text-brand-text-primary mb-1">
+          {i18n.t("settings.noFoldersTitle")}
+        </h4>
+        <p class="text-xs text-brand-text-secondary mb-4 text-pretty">
+          {i18n.t("settings.noFoldersText")}
+        </p>
       </div>
     {/if}
   </div>
@@ -534,8 +599,10 @@
         <Cloud class="w-5 h-5" />
       </div>
       <div class="space-y-1 min-w-0">
-        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.webdavTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.webdavSubtitle')}</p>
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("settings.webdavTitle")}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
+          {i18n.t("settings.webdavSubtitle")}
+        </p>
       </div>
     </div>
     <Button
@@ -546,15 +613,20 @@
       variant="primary"
       size="sm"
     >
-      <Plus class="w-4 h-4" /> {i18n.t('settings.addWebdavServer')}
+      <Plus class="w-4 h-4" />
+      {i18n.t("settings.addWebdavServer")}
     </Button>
   </div>
 
   {#if syncFeedback}
-    <div class="p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-secondary flex items-center justify-between">
+    <div
+      class="p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-secondary flex items-center justify-between"
+    >
       <span>{syncFeedback}</span>
       <button
-        onclick={() => { syncFeedback = null; }}
+        onclick={() => {
+          syncFeedback = null;
+        }}
         class="text-brand-text-secondary hover:text-brand-text-primary font-bold ml-2"
       >
         ✕
@@ -564,7 +636,9 @@
 
   <div class="space-y-2">
     {#each collectionStore.webdavServers as server (server.id)}
-      <div class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors">
+      <div
+        class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors"
+      >
         <div class="flex items-center gap-3.5 min-w-0 flex-1">
           <div class="min-w-0 space-y-1">
             <div class="flex items-center gap-2.5 min-w-0">
@@ -578,15 +652,22 @@
                 }}
                 size="sm"
               />
-              <p class="text-xs text-brand-text-secondary truncate" title={combineWebdavPath(server.url, server.remotePath)}>
+              <p
+                class="text-xs text-brand-text-secondary truncate"
+                title={combineWebdavPath(server.url, server.remotePath)}
+              >
                 {combineWebdavPath(server.url, server.remotePath)}
               </p>
             </div>
-            <p class="text-xs" class:text-brand-text-secondary={webdavConnected[server.id] !== false} class:text-brand-text-primary={webdavConnected[server.id] === false}>
+            <p
+              class="text-xs"
+              class:text-brand-text-secondary={webdavConnected[server.id] !== false}
+              class:text-brand-text-primary={webdavConnected[server.id] === false}
+            >
               {#if webdavConnected[server.id] === false}
                 <span class="flex items-center gap-1">
                   <AlertTriangle class="w-3 h-3" />
-                  {i18n.t('settings.webdavStatusDisconnected')}
+                  {i18n.t("settings.webdavStatusDisconnected")}
                 </span>
               {:else}
                 <span class="flex items-center gap-1">
@@ -608,7 +689,7 @@
             onclick={() => handleSyncWebdavServer(server)}
             disabled={isServerSyncing(server.id)}
             class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors disabled:opacity-50"
-            title={i18n.t('settings.webdavSyncBtn')}
+            title={i18n.t("settings.webdavSyncBtn")}
           >
             {#if isServerSyncing(server.id)}
               <LoaderCircle class="w-4 h-4 animate-spin text-brand-accent-text" />
@@ -622,14 +703,14 @@
               isWebdavModalOpen = true;
             }}
             class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors"
-            title={i18n.t('settings.webdavItemEdit')}
+            title={i18n.t("settings.webdavItemEdit")}
           >
             <Edit3 class="w-4 h-4" />
           </button>
           <button
             onclick={() => handleRemoveWebdavServer(server)}
             class="p-2 rounded-lg bg-brand-main hover:bg-brand-text-primary/10 text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-text-secondary transition-colors"
-            title={i18n.t('settings.confirmRemoveWebdavServer', { name: server.name })}
+            title={i18n.t("settings.confirmRemoveWebdavServer", { name: server.name })}
           >
             <Trash2 class="w-4 h-4 text-brand-accent-text" />
           </button>
@@ -638,10 +719,16 @@
     {/each}
 
     {#if collectionStore.webdavServers.length === 0}
-      <div class="border border-dashed border-brand-border rounded-xl px-6 py-8 text-center text-brand-text-secondary">
+      <div
+        class="border border-dashed border-brand-border rounded-xl px-6 py-8 text-center text-brand-text-secondary"
+      >
         <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary/50" />
-        <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">{i18n.t('settings.webdavNoServersTitle')}</h4>
-        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.webdavNoServersText')}</p>
+        <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">
+          {i18n.t("settings.webdavNoServersTitle")}
+        </h4>
+        <p class="text-xs text-brand-text-secondary text-pretty">
+          {i18n.t("settings.webdavNoServersText")}
+        </p>
       </div>
     {/if}
   </div>
@@ -650,7 +737,9 @@
 {#if isWebdavModalOpen}
   <WebDavModal
     server={editingWebdavServer}
-    onClose={() => { isWebdavModalOpen = false; }}
+    onClose={() => {
+      isWebdavModalOpen = false;
+    }}
     onSaved={() => {
       isWebdavModalOpen = false;
       loadWebdavServers();
@@ -666,8 +755,12 @@
         <Cloud class="w-5 h-5" />
       </div>
       <div class="space-y-1 min-w-0">
-        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.subsonicTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.subsonicSubtitle')}</p>
+        <h3 class="font-bold text-sm text-brand-text-primary">
+          {i18n.t("settings.subsonicTitle")}
+        </h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
+          {i18n.t("settings.subsonicSubtitle")}
+        </p>
       </div>
     </div>
     <Button
@@ -678,15 +771,20 @@
       variant="primary"
       size="sm"
     >
-      <Plus class="w-4 h-4" /> {i18n.t('settings.addSubsonicServer')}
+      <Plus class="w-4 h-4" />
+      {i18n.t("settings.addSubsonicServer")}
     </Button>
   </div>
 
   {#if subsonicSyncFeedback}
-    <div class="p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-secondary flex items-center justify-between">
+    <div
+      class="p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-secondary flex items-center justify-between"
+    >
       <span>{subsonicSyncFeedback}</span>
       <button
-        onclick={() => { subsonicSyncFeedback = null; }}
+        onclick={() => {
+          subsonicSyncFeedback = null;
+        }}
         class="text-brand-text-secondary hover:text-brand-text-primary font-bold ml-2"
       >
         ✕
@@ -696,7 +794,10 @@
 
   <div class="space-y-2">
     {#each collectionStore.subsonicServers as server (server.id)}
-      <div class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors" data-testid="subsonic-server-row">
+      <div
+        class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors"
+        data-testid="subsonic-server-row"
+      >
         <div class="flex items-center gap-3.5 min-w-0 flex-1">
           <div class="min-w-0 space-y-1">
             <div class="flex items-center gap-2.5 min-w-0">
@@ -710,15 +811,22 @@
                 }}
                 size="sm"
               />
-              <p class="text-xs text-brand-text-secondary truncate" title={getSubsonicServerLabel(server)}>
+              <p
+                class="text-xs text-brand-text-secondary truncate"
+                title={getSubsonicServerLabel(server)}
+              >
                 {getSubsonicServerLabel(server)}
               </p>
             </div>
-            <p class="text-xs" class:text-brand-text-secondary={subsonicConnected[server.id] !== false} class:text-brand-text-primary={subsonicConnected[server.id] === false}>
+            <p
+              class="text-xs"
+              class:text-brand-text-secondary={subsonicConnected[server.id] !== false}
+              class:text-brand-text-primary={subsonicConnected[server.id] === false}
+            >
               {#if subsonicConnected[server.id] === false}
                 <span class="flex items-center gap-1">
                   <AlertTriangle class="w-3 h-3" />
-                  {i18n.t('settings.webdavStatusDisconnected')}
+                  {i18n.t("settings.webdavStatusDisconnected")}
                 </span>
               {:else}
                 <span class="flex items-center gap-1">
@@ -740,8 +848,8 @@
             onclick={() => handleSyncSubsonicServer(server)}
             disabled={isSubsonicSyncing(server)}
             class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors disabled:opacity-50"
-            title={i18n.t('settings.webdavSyncBtn')}
-            aria-label={i18n.t('settings.webdavSyncBtn')}
+            title={i18n.t("settings.webdavSyncBtn")}
+            aria-label={i18n.t("settings.webdavSyncBtn")}
           >
             {#if isSubsonicSyncing(server)}
               <LoaderCircle class="w-4 h-4 animate-spin text-brand-accent-text" />
@@ -755,16 +863,16 @@
               isSubsonicModalOpen = true;
             }}
             class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors"
-            title={i18n.t('settings.subsonicItemEdit')}
-            aria-label={i18n.t('settings.subsonicItemEdit')}
+            title={i18n.t("settings.subsonicItemEdit")}
+            aria-label={i18n.t("settings.subsonicItemEdit")}
           >
             <Edit3 class="w-4 h-4" />
           </button>
           <button
             onclick={() => handleRemoveSubsonicServer(server)}
             class="p-2 rounded-lg bg-brand-main hover:bg-brand-text-primary/10 text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-text-secondary transition-colors"
-            title={i18n.t('settings.removeSubsonicServer')}
-            aria-label={i18n.t('settings.removeSubsonicServer')}
+            title={i18n.t("settings.removeSubsonicServer")}
+            aria-label={i18n.t("settings.removeSubsonicServer")}
           >
             <Trash2 class="w-4 h-4 text-brand-accent-text" />
           </button>
@@ -773,10 +881,16 @@
     {/each}
 
     {#if collectionStore.subsonicServers.length === 0}
-      <div class="border border-dashed border-brand-border rounded-xl px-6 py-8 text-center text-brand-text-secondary">
+      <div
+        class="border border-dashed border-brand-border rounded-xl px-6 py-8 text-center text-brand-text-secondary"
+      >
         <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary/50" />
-        <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">{i18n.t('settings.subsonicNoServersTitle')}</h4>
-        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.subsonicNoServersText')}</p>
+        <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">
+          {i18n.t("settings.subsonicNoServersTitle")}
+        </h4>
+        <p class="text-xs text-brand-text-secondary text-pretty">
+          {i18n.t("settings.subsonicNoServersText")}
+        </p>
       </div>
     {/if}
   </div>
@@ -785,7 +899,9 @@
 {#if isSubsonicModalOpen}
   <SubsonicModal
     server={editingSubsonicServer}
-    onClose={() => { isSubsonicModalOpen = false; }}
+    onClose={() => {
+      isSubsonicModalOpen = false;
+    }}
     onSaved={() => {
       isSubsonicModalOpen = false;
       loadSubsonicServers();
@@ -800,8 +916,10 @@
         <RefreshCw class="w-5 h-5" />
       </div>
       <div class="space-y-1 min-w-0">
-        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.rescanTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.rescanSubtitle')}</p>
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("settings.rescanTitle")}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
+          {i18n.t("settings.rescanSubtitle")}
+        </p>
       </div>
     </div>
   </div>
@@ -811,17 +929,28 @@
       <div class="flex justify-between items-center text-xs font-semibold text-brand-text-primary">
         <span class="flex items-center gap-2">
           <RefreshCw class="w-4 h-4 animate-spin text-brand-accent-text" />
-          {i18n.t('settings.scanningPhase', { phase: getPhaseDisplayName(collectionStore.scanProgress?.phase) })}
+          {i18n.t("settings.scanningPhase", {
+            phase: getPhaseDisplayName(collectionStore.scanProgress?.phase),
+          })}
         </span>
-        <span>{collectionStore.scanProgress?.scanned || 0} / {collectionStore.scanProgress?.total || 0}</span>
+        <span
+          >{collectionStore.scanProgress?.scanned || 0} / {collectionStore.scanProgress?.total ||
+            0}</span
+        >
       </div>
-      <div class="w-full bg-brand-sidebar rounded-full h-2 overflow-hidden border border-brand-border/40">
+      <div
+        class="w-full bg-brand-sidebar rounded-full h-2 overflow-hidden border border-brand-border/40"
+      >
         <div
           class="bg-brand-accent h-2 rounded-full transition-all duration-300"
-          style="width: {collectionStore.scanProgress?.total ? (collectionStore.scanProgress.scanned / collectionStore.scanProgress.total) * 100 : 0}%"
+          style="width: {collectionStore.scanProgress?.total
+            ? (collectionStore.scanProgress.scanned / collectionStore.scanProgress.total) * 100
+            : 0}%"
         ></div>
       </div>
-      <p class="text-xs text-brand-text-secondary truncate">{collectionStore.scanProgress?.current_path || ""}</p>
+      <p class="text-xs text-brand-text-secondary truncate">
+        {collectionStore.scanProgress?.current_path || ""}
+      </p>
     </div>
   {/if}
 
@@ -831,10 +960,10 @@
       disabled={collectionStore.isScanning}
       variant="primary"
       size="sm"
-      title={i18n.t('settings.incrementalRescanHint')}
+      title={i18n.t("settings.incrementalRescanHint")}
     >
       <RefreshCw class="w-4 h-4" />
-      {i18n.t('settings.incrementalRescanBtn')}
+      {i18n.t("settings.incrementalRescanBtn")}
     </Button>
 
     <Button
@@ -842,72 +971,92 @@
       disabled={collectionStore.isScanning}
       variant="secondary"
       size="sm"
-      title={i18n.t('settings.forceFullScanHint')}
+      title={i18n.t("settings.forceFullScanHint")}
     >
       <RotateCcw class="w-4 h-4 text-brand-accent-text" />
-      {i18n.t('settings.forceFullScanBtn')}
+      {i18n.t("settings.forceFullScanBtn")}
     </Button>
   </div>
 
   <div class="pt-3 space-y-4">
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.watchRealtimeLabel')}</span>
-        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.watchRealtimeHint')}</p>
+        <span class="text-sm font-medium text-brand-text-primary"
+          >{i18n.t("settings.watchRealtimeLabel")}</span
+        >
+        <p class="text-xs text-brand-text-secondary text-pretty">
+          {i18n.t("settings.watchRealtimeHint")}
+        </p>
       </div>
       <Toggle
         checked={collectionStore.watchFoldersRealtime}
         onchange={(v) => collectionStore.setWatchFoldersRealtime(v)}
-        label={i18n.t('settings.watchRealtimeLabel')}
+        label={i18n.t("settings.watchRealtimeLabel")}
       />
     </div>
 
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.scanOnStartupLabel')}</span>
-        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.scanOnStartupHint')}</p>
+        <span class="text-sm font-medium text-brand-text-primary"
+          >{i18n.t("settings.scanOnStartupLabel")}</span
+        >
+        <p class="text-xs text-brand-text-secondary text-pretty">
+          {i18n.t("settings.scanOnStartupHint")}
+        </p>
       </div>
       <Toggle
         checked={collectionStore.scanOnStartup}
         onchange={(v) => collectionStore.setScanOnStartup(v)}
-        label={i18n.t('settings.scanOnStartupLabel')}
+        label={i18n.t("settings.scanOnStartupLabel")}
       />
     </div>
 
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.autoOrganizeLabel')}</span>
-        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.autoOrganizeHint')}</p>
+        <span class="text-sm font-medium text-brand-text-primary"
+          >{i18n.t("settings.autoOrganizeLabel")}</span
+        >
+        <p class="text-xs text-brand-text-secondary text-pretty">
+          {i18n.t("settings.autoOrganizeHint")}
+        </p>
       </div>
       <Toggle
         checked={organizeStore.autoOrganize}
         onchange={handleToggleAutoOrganize}
-        label={i18n.t('settings.autoOrganizeLabel')}
+        label={i18n.t("settings.autoOrganizeLabel")}
       />
     </div>
 
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.saveArtworkToFoldersLabel')}</span>
-        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.saveArtworkToFoldersHint')}</p>
+        <span class="text-sm font-medium text-brand-text-primary"
+          >{i18n.t("settings.saveArtworkToFoldersLabel")}</span
+        >
+        <p class="text-xs text-brand-text-secondary text-pretty">
+          {i18n.t("settings.saveArtworkToFoldersHint")}
+        </p>
       </div>
       <Toggle
         checked={prefs.saveArtworkToFolders}
         onchange={handleToggleSaveArtwork}
         disabled={isSweepingArtwork}
-        label={i18n.t('settings.saveArtworkToFoldersLabel')}
+        label={i18n.t("settings.saveArtworkToFoldersLabel")}
       />
     </div>
 
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.detectTempoKeyLabel')}</span>
-        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.detectTempoKeyHint')}</p>
+        <span class="text-sm font-medium text-brand-text-primary"
+          >{i18n.t("settings.detectTempoKeyLabel")}</span
+        >
+        <p class="text-xs text-brand-text-secondary text-pretty">
+          {i18n.t("settings.detectTempoKeyHint")}
+        </p>
       </div>
       <Toggle
         checked={prefs.detectTempoAndKey}
         onchange={(v) => prefs.setDetectTempoAndKey(v)}
-        label={i18n.t('settings.detectTempoKeyLabel')}
+        label={i18n.t("settings.detectTempoKeyLabel")}
       />
     </div>
   </div>
@@ -917,69 +1066,99 @@
       <div class="text-xs text-brand-text-secondary flex items-center justify-between font-medium">
         <span class="flex items-center gap-1.5">
           <Clock class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
-          {i18n.t('settings.lastScanned', { time: collectionStore.lastScanTime })}
+          {i18n.t("settings.lastScanned", { time: collectionStore.lastScanTime })}
         </span>
       </div>
     {/if}
 
     <div class="grid grid-cols-2 @3xl:grid-cols-4 gap-4 text-xs">
-    <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-      <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsSongs')}</span>
-      <p class="text-base font-bold text-brand-text-primary mt-0.5">{formatNumber(collectionStore.stats.total_songs)}</p>
-    </div>
-    <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-      <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsAlbums')}</span>
-      <p class="text-base font-bold text-brand-text-primary mt-0.5">{formatNumber(collectionStore.stats.total_albums)}</p>
-    </div>
-    <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-      <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsArtists')}</span>
-      <p class="text-base font-bold text-brand-text-primary mt-0.5">{formatNumber(collectionStore.stats.total_artists)}</p>
-    </div>
-    <HelpTip
-      text={diskSizeBreakdown}
-      label={`${i18n.t('settings.statsSize')}: ${diskSizeLabel}`}
-      class="w-full bg-brand-main/40 border border-brand-border rounded-lg"
-    >
-      <div class="w-full p-3 text-left">
-        <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsSize')}</span>
-        <p class="text-base font-bold text-brand-text-primary mt-0.5">{diskSizeLabel}</p>
+      <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
+        <span class="text-xs text-brand-text-secondary uppercase font-semibold"
+          >{i18n.t("settings.statsSongs")}</span
+        >
+        <p class="text-base font-bold text-brand-text-primary mt-0.5">
+          {formatNumber(collectionStore.stats.total_songs)}
+        </p>
       </div>
-    </HelpTip>
+      <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
+        <span class="text-xs text-brand-text-secondary uppercase font-semibold"
+          >{i18n.t("settings.statsAlbums")}</span
+        >
+        <p class="text-base font-bold text-brand-text-primary mt-0.5">
+          {formatNumber(collectionStore.stats.total_albums)}
+        </p>
+      </div>
+      <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
+        <span class="text-xs text-brand-text-secondary uppercase font-semibold"
+          >{i18n.t("settings.statsArtists")}</span
+        >
+        <p class="text-base font-bold text-brand-text-primary mt-0.5">
+          {formatNumber(collectionStore.stats.total_artists)}
+        </p>
+      </div>
+      <HelpTip
+        text={diskSizeBreakdown}
+        label={`${i18n.t("settings.statsSize")}: ${diskSizeLabel}`}
+        class="w-full bg-brand-main/40 border border-brand-border rounded-lg"
+      >
+        <div class="w-full p-3 text-left">
+          <span class="text-xs text-brand-text-secondary uppercase font-semibold"
+            >{i18n.t("settings.statsSize")}</span
+          >
+          <p class="text-base font-bold text-brand-text-primary mt-0.5">{diskSizeLabel}</p>
+        </div>
+      </HelpTip>
+    </div>
   </div>
-</div>
 </div>
 
 <div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 space-y-4">
   <div class="flex items-center justify-between gap-4">
     <div class="flex items-center gap-3 min-w-0">
-      <div class="w-9 h-9 rounded-xl bg-brand-main border border-brand-border flex items-center justify-center shrink-0">
+      <div
+        class="w-9 h-9 rounded-xl bg-brand-main border border-brand-border flex items-center justify-center shrink-0"
+      >
         <Prohibit class="w-4 h-4 text-brand-accent-text" />
       </div>
       <div class="flex flex-col gap-0.5 min-w-0">
-        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.blockedMetadataTitle', {}, 'Blocked Online Metadata')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.blockedMetadataSubtitle', {}, 'Online matches you previously rejected. Unblocking allows the engine to associate them again.')}</p>
+        <h3 class="font-bold text-sm text-brand-text-primary">
+          {i18n.t("settings.blockedMetadataTitle", {}, "Blocked Online Metadata")}
+        </h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
+          {i18n.t(
+            "settings.blockedMetadataSubtitle",
+            {},
+            "Online matches you previously rejected. Unblocking allows the engine to associate them again.",
+          )}
+        </p>
       </div>
     </div>
     <Button
-      onclick={() => { showBlockedMetadataModal = true; }}
+      onclick={() => {
+        showBlockedMetadataModal = true;
+      }}
       variant="secondary"
       size="sm"
     >
-      {i18n.t('settings.manageBlockedMetadataBtn', {}, 'Manage Blocklist')}
+      {i18n.t("settings.manageBlockedMetadataBtn", {}, "Manage Blocklist")}
     </Button>
   </div>
 </div>
 
 {#if showBlockedMetadataModal}
-  <BlockedMetadataModal onClose={() => { showBlockedMetadataModal = false; }} />
+  <BlockedMetadataModal
+    onClose={() => {
+      showBlockedMetadataModal = false;
+    }}
+  />
 {/if}
 
 {#if showSidecarConfirmModal}
   <ConfirmDialog
-    title={i18n.t('settings.saveArtworkToFoldersModalTitle')}
-    message={i18n.t('settings.saveArtworkToFoldersModalMessage')}
-    confirmLabel={i18n.t('settings.saveArtworkToFoldersModalConfirm')}
-    cancelLabel={i18n.t('settings.saveArtworkToFoldersModalCancel')}
+    title={i18n.t("settings.saveArtworkToFoldersModalTitle")}
+    message={i18n.t("settings.saveArtworkToFoldersModalMessage")}
+    confirmLabel={i18n.t("settings.saveArtworkToFoldersModalConfirm")}
+    cancelLabel={i18n.t("settings.saveArtworkToFoldersModalCancel")}
     danger={false}
     onConfirm={handleConfirmSaveArtwork}
     onCancel={handleCancelSaveArtwork}
@@ -988,10 +1167,10 @@
 
 {#if showAutoOrganizeConfirmModal}
   <ConfirmDialog
-    title={i18n.t('organizer.confirmAutoOrganizeTitle')}
-    message={i18n.t('organizer.confirmAutoOrganizeMessage')}
-    confirmLabel={i18n.t('organizer.confirmAutoOrganizeBtn')}
-    cancelLabel={i18n.t('organizer.cancel')}
+    title={i18n.t("organizer.confirmAutoOrganizeTitle")}
+    message={i18n.t("organizer.confirmAutoOrganizeMessage")}
+    confirmLabel={i18n.t("organizer.confirmAutoOrganizeBtn")}
+    cancelLabel={i18n.t("organizer.cancel")}
     danger={false}
     onConfirm={() => {
       showAutoOrganizeConfirmModal = false;

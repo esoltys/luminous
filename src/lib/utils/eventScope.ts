@@ -48,19 +48,13 @@ export class EventScope {
    * while registration is pending, the unlistener will be triggered as soon
    * as the promise resolves to avoid leaking listeners.
    */
-  listen<T>(
-    event: EventName,
-    handler: EventCallback<T>,
-    options?: Options
-  ): Promise<UnlistenFn> {
+  listen<T>(event: EventName, handler: EventCallback<T>, options?: Options): Promise<UnlistenFn> {
     if (this.disposed) {
       return Promise.resolve(() => {});
     }
 
     const promise =
-      options !== undefined
-        ? listen<T>(event, handler, options)
-        : listen<T>(event, handler);
+      options !== undefined ? listen<T>(event, handler, options) : listen<T>(event, handler);
     promise
       .then((unlisten) => {
         if (this.disposed) {

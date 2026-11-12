@@ -19,11 +19,15 @@ async function startCheck() {
   let settle!: { resolve: (p: TagCleanupPreview) => void; reject: (e: unknown) => void };
   vi.mocked(invoke).mockImplementation((cmd) =>
     cmd === "preview_tag_cleanup"
-      ? new Promise((resolve, reject) => { settle = { resolve, reject }; })
+      ? new Promise((resolve, reject) => {
+          settle = { resolve, reject };
+        })
       : Promise.resolve(undefined),
   );
   tagCleanupStore.start();
-  await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith("preview_tag_cleanup", { songIds: [] }));
+  await vi.waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith("preview_tag_cleanup", { songIds: [] }),
+  );
   return settle;
 }
 
@@ -66,7 +70,9 @@ describe("tagCleanupStore", () => {
   it("removes in the background and reports when done", async () => {
     vi.mocked(invoke).mockResolvedValue({ cleaned_songs: 2, removed_fields: 3, errors: [] });
     tagCleanupStore.reviewOpen = true;
-    const removal = tagCleanupStore.remove([{ song_id: 1, fields: [{ kind: "encoder", value: "LAME" }] }]);
+    const removal = tagCleanupStore.remove([
+      { song_id: 1, fields: [{ kind: "encoder", value: "LAME" }] },
+    ]);
     expect(tagCleanupStore.reviewOpen).toBe(false);
     expect(tasksStore.isTaskActive("tag-cleanup-remove")).toBe(true);
 

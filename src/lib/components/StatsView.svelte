@@ -25,19 +25,23 @@
   let summary = $state<StatsSummary | null>(null);
   let loading = $state(true);
   let showShareModal = $state(false);
-  let shareSection = $state<{ title: string; kind: "artist" | "album" | "song" | "genre"; items: StatsTopItem[] } | null>(null);
+  let shareSection = $state<{
+    title: string;
+    kind: "artist" | "album" | "song" | "genre";
+    items: StatsTopItem[];
+  } | null>(null);
 
   const RANGES: { value: StatsRange; label: () => string }[] = [
     { value: "7d", label: () => i18n.t("stats.range7d", {}, "Past 7 Days") },
     { value: "28d", label: () => i18n.t("stats.range28d", {}, "Past 28 Days") },
-    { value: "1y", label: () => i18n.t("stats.range1y", {}, "Past Year") }
+    { value: "1y", label: () => i18n.t("stats.range1y", {}, "Past Year") },
   ];
 
   const CLOCK_BUCKETS: { key: DaypartBucket; label: () => string }[] = [
     { key: "morning", label: () => i18n.t("stats.clockMorning", {}, "Morning") },
     { key: "afternoon", label: () => i18n.t("stats.clockAfternoon", {}, "Afternoon") },
     { key: "evening", label: () => i18n.t("stats.clockEvening", {}, "Evening") },
-    { key: "latenight", label: () => i18n.t("stats.clockLateNight", {}, "Late Night") }
+    { key: "latenight", label: () => i18n.t("stats.clockLateNight", {}, "Late Night") },
   ];
 
   let rangeLabel = $derived(RANGES.find((r) => r.value === range)?.label() ?? range);
@@ -45,7 +49,7 @@
   let clockCounts = $derived(
     summary
       ? bucketListeningClock(summary.play_timestamps)
-      : { morning: 0, afternoon: 0, evening: 0, latenight: 0 }
+      : { morning: 0, afternoon: 0, evening: 0, latenight: 0 },
   );
   let maxClockCount = $derived(Math.max(1, ...Object.values(clockCounts)));
 
@@ -68,11 +72,19 @@
   });
 
   // Same order as the sidebar's Collection sub-tabs (Artists, Albums, Songs, Genres).
-  const SECTIONS: { key: keyof StatsSummary; kind: "artist" | "album" | "song" | "genre"; title: () => string }[] = [
-    { key: "top_artists", kind: "artist", title: () => i18n.t("stats.topArtists", {}, "Top Artists") },
+  const SECTIONS: {
+    key: keyof StatsSummary;
+    kind: "artist" | "album" | "song" | "genre";
+    title: () => string;
+  }[] = [
+    {
+      key: "top_artists",
+      kind: "artist",
+      title: () => i18n.t("stats.topArtists", {}, "Top Artists"),
+    },
     { key: "top_albums", kind: "album", title: () => i18n.t("stats.topAlbums", {}, "Top Albums") },
     { key: "top_songs", kind: "song", title: () => i18n.t("stats.topSongs", {}, "Top Songs") },
-    { key: "top_genres", kind: "genre", title: () => i18n.t("stats.topGenres", {}, "Top Genres") }
+    { key: "top_genres", kind: "genre", title: () => i18n.t("stats.topGenres", {}, "Top Genres") },
   ];
 
   function itemsFor(key: keyof StatsSummary): StatsTopItem[] {
@@ -101,8 +113,14 @@
   }
 </script>
 
-<div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
-  <div class="flex-1 overflow-y-auto px-6 pb-12" class:pb-28={!!playerStore.currentSong} use:rememberScroll={"stats"}>
+<div
+  class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative"
+>
+  <div
+    class="flex-1 overflow-y-auto px-6 pb-12"
+    class:pb-28={!!playerStore.currentSong}
+    use:rememberScroll={"stats"}
+  >
     <div class="pt-4 pb-4">
       <div class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
@@ -112,7 +130,9 @@
                 range = r.value;
                 if (typeof window !== "undefined") localStorage.setItem("stats_range", r.value);
               }}
-              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {range === r.value ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"
+              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {range === r.value
+                ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20'
+                : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"
             >
               {r.label()}
             </button>
@@ -124,7 +144,9 @@
               {i18n.plural("stats.totalMinutes", summary.total_minutes)}
             </span>
             <button
-              onclick={() => { showShareModal = true; }}
+              onclick={() => {
+                showShareModal = true;
+              }}
               title={i18n.t("shareModal.menuItem")}
               class="flex items-center justify-center w-8 h-8 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer"
             >
@@ -148,7 +170,7 @@
                 morning: CLOCK_BUCKETS[0].label(),
                 afternoon: CLOCK_BUCKETS[1].label(),
                 evening: CLOCK_BUCKETS[2].label(),
-                latenight: CLOCK_BUCKETS[3].label()
+                latenight: CLOCK_BUCKETS[3].label(),
               }}
             />
           </div>
@@ -157,7 +179,11 @@
               <div class="flex flex-col items-center gap-0.5">
                 <span class="text-xs text-brand-text-secondary text-center">{bucket.label()}</span>
                 <span class="text-xs text-brand-text-primary font-medium">
-                  {i18n.t("stats.minuteCount", { count: clockCounts[bucket.key] ?? 0 }, `${clockCounts[bucket.key] ?? 0} min`)}
+                  {i18n.t(
+                    "stats.minuteCount",
+                    { count: clockCounts[bucket.key] ?? 0 },
+                    `${clockCounts[bucket.key] ?? 0} min`,
+                  )}
                 </span>
               </div>
             {/each}
@@ -170,7 +196,7 @@
       <div class="flex items-center justify-center h-64">
         <LoadingSpinner label={i18n.t("stats.loading", {}, "Loading stats...")} />
       </div>
-    {:else if (!loading && (!summary || summary.play_timestamps.length === 0))}
+    {:else if !loading && (!summary || summary.play_timestamps.length === 0)}
       <div class="flex items-center justify-center h-64 text-brand-text-secondary text-sm">
         {i18n.t("stats.empty", {}, "No listening history for this range yet.")}
       </div>
@@ -184,7 +210,13 @@
                 items={itemsFor(section.key)}
                 kind={section.kind}
                 showAccentBars={true}
-                onShareClick={() => { shareSection = { title: section.title(), kind: section.kind, items: itemsFor(section.key) }; }}
+                onShareClick={() => {
+                  shareSection = {
+                    title: section.title(),
+                    kind: section.kind,
+                    items: itemsFor(section.key),
+                  };
+                }}
               />
             </div>
           {/each}
@@ -197,13 +229,23 @@
 {#if showShareModal && summary}
   <ShareModal
     entity={{ kind: "stats", summary, range, rangeLabel }}
-    onClose={() => { showShareModal = false; }}
+    onClose={() => {
+      showShareModal = false;
+    }}
   />
 {/if}
 
 {#if shareSection}
   <ShareModal
-    entity={{ kind: "stats-section", sectionTitle: shareSection.title, sectionKind: shareSection.kind, rangeLabel, items: shareSection.items }}
-    onClose={() => { shareSection = null; }}
+    entity={{
+      kind: "stats-section",
+      sectionTitle: shareSection.title,
+      sectionKind: shareSection.kind,
+      rangeLabel,
+      items: shareSection.items,
+    }}
+    onClose={() => {
+      shareSection = null;
+    }}
   />
 {/if}

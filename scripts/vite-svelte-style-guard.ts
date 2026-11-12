@@ -22,14 +22,19 @@ export function svelteVirtualStyleGuard(): Plugin {
     apply: "serve",
     enforce: "pre",
     async load(id) {
-      if (!id.includes(".svelte") || !(id.includes("?svelte&type=style") || id.includes("&type=style"))) {
+      if (
+        !id.includes(".svelte") ||
+        !(id.includes("?svelte&type=style") || id.includes("&type=style"))
+      ) {
         return;
       }
       const file = id.split("?", 1)[0];
       const compiledCss = () => this.getModuleInfo(file)?.meta.svelte?.css;
       if (!compiledCss()) {
         // `apply: "serve"`, so this is always the dev server's environment.
-        await (this.environment as DevEnvironment).transformRequest(`/@fs/${file.replace(/^\//, "")}`);
+        await (this.environment as DevEnvironment).transformRequest(
+          `/@fs/${file.replace(/^\//, "")}`,
+        );
       }
       // Compiled CSS: leave it to vite-plugin-svelte. None (a stale request
       // for a component that no longer has a <style>): serve it empty.

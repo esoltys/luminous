@@ -16,19 +16,25 @@ describe("getArtistCoverStack", () => {
         { sample_song_id: 1, art_manual: null, art_automatic: null, art_embedded: false },
         { sample_song_id: 2, art_manual: "covers/b.jpg", art_automatic: null, art_embedded: false },
       ],
-      []
+      [],
     );
 
-    expect(result).toEqual([{ songId: 2, artEmbedded: false, artAutomatic: null, artManual: "covers/b.jpg" }]);
+    expect(result).toEqual([
+      { songId: 2, artEmbedded: false, artAutomatic: null, artManual: "covers/b.jpg" },
+    ]);
   });
 
   it("falls back to song covers when no album has art", () => {
     const result = getArtistCoverStack(
       [{ sample_song_id: 1, art_manual: null, art_automatic: null, art_embedded: false }],
-      [{ id: 10, art_manual: "covers/song.jpg", art_automatic: null, art_embedded: false }]
+      [{ id: 10, art_manual: "covers/song.jpg", art_automatic: null, art_embedded: false }],
     );
 
-    expect(result).toEqual(songsToCoverStack([{ id: 10, art_manual: "covers/song.jpg", art_automatic: null, art_embedded: false }]));
+    expect(result).toEqual(
+      songsToCoverStack([
+        { id: 10, art_manual: "covers/song.jpg", art_automatic: null, art_embedded: false },
+      ]),
+    );
   });
 
   it("returns an empty array when the artist has no art anywhere", () => {
@@ -42,8 +48,14 @@ describe("getArtistCoverStack", () => {
         { sample_song_id: 43, art_manual: null, art_automatic: null, art_embedded: false },
       ],
       [
-        { id: 42, album: "WebDAV Album 1", art_manual: null, art_automatic: null, art_embedded: false },
-      ]
+        {
+          id: 42,
+          album: "WebDAV Album 1",
+          art_manual: null,
+          art_automatic: null,
+          art_embedded: false,
+        },
+      ],
     );
 
     expect(result).toEqual([
@@ -57,7 +69,14 @@ describe("getArtistCoverStack", () => {
       { id: 1, album: "Album One", art_manual: null, art_automatic: null, art_embedded: false },
       { id: 2, album: "album one", art_manual: null, art_automatic: null, art_embedded: false },
       { id: 3, album: "Album Two", art_manual: null, art_automatic: null, art_embedded: false },
-      { id: 4, album: "Album Three", art_manual: null, art_automatic: null, art_embedded: false, art_unset: true },
+      {
+        id: 4,
+        album: "Album Three",
+        art_manual: null,
+        art_automatic: null,
+        art_embedded: false,
+        art_unset: true,
+      },
     ]);
 
     expect(result).toEqual([
@@ -113,7 +132,9 @@ describe("coverRequestUrl sizing (#1528)", () => {
     expect(coverRequestUrl(url, { devicePixels: 72 })).toBe(`${url}?w=256`);
     expect(coverRequestUrl(url, { devicePixels: 256 })).toBe(`${url}?w=256`);
     expect(coverRequestUrl(url, { devicePixels: 360 })).toBe(`${url}?w=384`);
-    expect(coverRequestUrl("luminous-art://album-1.jpg", { devicePixels: 300 })).toBe("luminous-art://album-1.jpg?w=384");
+    expect(coverRequestUrl("luminous-art://album-1.jpg", { devicePixels: 300 })).toBe(
+      "luminous-art://album-1.jpg?w=384",
+    );
   });
 
   it("uses the unsized copy for a box bigger than the largest, or one not measured", () => {
@@ -141,28 +162,35 @@ describe("coverRequestUrl sizing (#1528)", () => {
 
 describe("coverRequestUrl versioning (#1755)", () => {
   it("adds the version alone or after the size", () => {
-    expect(coverRequestUrl("luminous-art://album-1.jpg", { version: 3 })).toBe("luminous-art://album-1.jpg?v=3");
-    expect(coverRequestUrl("http://luminous-art.localhost/album-1.jpg", { devicePixels: 200, version: 2 })).toBe(
-      "http://luminous-art.localhost/album-1.jpg?w=256&v=2"
+    expect(coverRequestUrl("luminous-art://album-1.jpg", { version: 3 })).toBe(
+      "luminous-art://album-1.jpg?v=3",
     );
+    expect(
+      coverRequestUrl("http://luminous-art.localhost/album-1.jpg", {
+        devicePixels: 200,
+        version: 2,
+      }),
+    ).toBe("http://luminous-art.localhost/album-1.jpg?w=256&v=2");
   });
 
   it("versions originals it doesn't size", () => {
-    expect(coverRequestUrl("luminous-art://local/D%3A%2Fcover.jpg", { devicePixels: 200, version: 1 })).toBe(
-      "luminous-art://local/D%3A%2Fcover.jpg?v=1"
-    );
+    expect(
+      coverRequestUrl("luminous-art://local/D%3A%2Fcover.jpg", { devicePixels: 200, version: 1 }),
+    ).toBe("luminous-art://local/D%3A%2Fcover.jpg?v=1");
   });
 
   it("starts the query after a folder-art path that holds a literal ?", () => {
     expect(coverRequestUrl("luminous-art://thumb/a?b.jpg", { devicePixels: 200, version: 1 })).toBe(
-      "luminous-art://thumb/a?b.jpg?v=1"
+      "luminous-art://thumb/a?b.jpg?v=1",
     );
   });
 
   it("leaves URLs alone at version 0, and remote or mock URLs always", () => {
-    expect(coverRequestUrl("luminous-art://album-1.jpg", { version: 0 })).toBe("luminous-art://album-1.jpg");
+    expect(coverRequestUrl("luminous-art://album-1.jpg", { version: 0 })).toBe(
+      "luminous-art://album-1.jpg",
+    );
     expect(coverRequestUrl("https://is1-ssl.mzstatic.com/image/600x600.jpg", { version: 4 })).toBe(
-      "https://is1-ssl.mzstatic.com/image/600x600.jpg"
+      "https://is1-ssl.mzstatic.com/image/600x600.jpg",
     );
     expect(coverRequestUrl("/covers/album-1.jpg", { version: 4 })).toBe("/covers/album-1.jpg");
   });

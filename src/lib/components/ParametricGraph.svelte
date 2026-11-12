@@ -28,15 +28,46 @@
     onremove: (idx: number) => void;
   }
 
-  let { bands, selected, ranges, active, response, bandResponse, onselect, onchange, onadd, onremove }: Props =
-    $props();
+  let {
+    bands,
+    selected,
+    ranges,
+    active,
+    response,
+    bandResponse,
+    onselect,
+    onchange,
+    onadd,
+    onremove,
+  }: Props = $props();
 
   let plot: HTMLDivElement | undefined = $state();
 
-  const KIND_STYLES: Record<ParametricKind, { fill: string; border: string; stroke: string; area: string; text: string }> = {
-    peak: { fill: "bg-brand-accent", border: "border-brand-accent", stroke: "stroke-brand-accent", area: "fill-brand-accent", text: "text-brand-accent-contrast" },
-    low_shelf: { fill: "bg-brand-gold", border: "border-brand-gold", stroke: "stroke-brand-gold", area: "fill-brand-gold", text: "text-neutral-900" },
-    high_shelf: { fill: "bg-sky-400", border: "border-sky-400", stroke: "stroke-sky-400", area: "fill-sky-400", text: "text-neutral-900" },
+  const KIND_STYLES: Record<
+    ParametricKind,
+    { fill: string; border: string; stroke: string; area: string; text: string }
+  > = {
+    peak: {
+      fill: "bg-brand-accent",
+      border: "border-brand-accent",
+      stroke: "stroke-brand-accent",
+      area: "fill-brand-accent",
+      text: "text-brand-accent-contrast",
+    },
+    low_shelf: {
+      fill: "bg-brand-gold",
+      border: "border-brand-gold",
+      stroke: "stroke-brand-gold",
+      area: "fill-brand-gold",
+      text: "text-neutral-900",
+    },
+    high_shelf: {
+      fill: "bg-sky-400",
+      border: "border-sky-400",
+      stroke: "stroke-sky-400",
+      area: "fill-sky-400",
+      text: "text-neutral-900",
+    },
   };
 
   const KIND_LABEL_KEYS: Record<ParametricKind, string> = {
@@ -91,7 +122,10 @@
     if (rect.width === 0 || rect.height === 0) return null;
     const unit = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const y = ((e.clientY - rect.top) / rect.height) * PLOT_HEIGHT;
-    return { freq: clampFreq(unitToFreq(unit, ranges.freq)), gain: clampGain(yToDb(y, ranges.gain_db)) };
+    return {
+      freq: clampFreq(unitToFreq(unit, ranges.freq)),
+      gain: clampGain(yToDb(y, ranges.gain_db)),
+    };
   }
 
   let dragging: number | null = null;
@@ -208,17 +242,42 @@
 </script>
 
 <div class="flex flex-col gap-2">
-  <div class="bg-brand-main border border-brand-border rounded-xl p-3 pl-9 pb-6 relative select-none">
+  <div
+    class="bg-brand-main border border-brand-border rounded-xl p-3 pl-9 pb-6 relative select-none"
+  >
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="relative h-56 md:h-64" bind:this={plot} ondblclick={onPlotDblClick} data-testid="eq-plot">
-      <svg class="absolute inset-0 w-full h-full overflow-visible" viewBox="0 0 100 {PLOT_HEIGHT}" preserveAspectRatio="none" aria-hidden="true">
+    <div
+      class="relative h-56 md:h-64"
+      bind:this={plot}
+      ondblclick={onPlotDblClick}
+      data-testid="eq-plot"
+    >
+      <svg
+        class="absolute inset-0 w-full h-full overflow-visible"
+        viewBox="0 0 100 {PLOT_HEIGHT}"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
         {#each decades as f}
-          <line x1={xPct(f)} x2={xPct(f)} y1="0" y2={PLOT_HEIGHT} class="stroke-brand-border" stroke-width="1" vector-effect="non-scaling-stroke" />
+          <line
+            x1={xPct(f)}
+            x2={xPct(f)}
+            y1="0"
+            y2={PLOT_HEIGHT}
+            class="stroke-brand-border"
+            stroke-width="1"
+            vector-effect="non-scaling-stroke"
+          />
         {/each}
         {#each gainLines as g}
           <line
-            x1="0" x2="100" y1={dbToY(g, ranges.gain_db)} y2={dbToY(g, ranges.gain_db)}
-            class="stroke-brand-border" stroke-width="1" vector-effect="non-scaling-stroke"
+            x1="0"
+            x2="100"
+            y1={dbToY(g, ranges.gain_db)}
+            y2={dbToY(g, ranges.gain_db)}
+            class="stroke-brand-border"
+            stroke-width="1"
+            vector-effect="non-scaling-stroke"
             stroke-dasharray={g === 0 ? undefined : "3 3"}
           />
         {/each}
@@ -255,14 +314,20 @@
           aria-pressed={selected === idx}
           class="absolute w-5 h-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 flex items-center justify-center text-[9px] font-bold cursor-grab active:cursor-grabbing outline-none touch-none
             {style.border}
-            {band.enabled ? `${style.fill} ${style.text}` : 'bg-brand-main text-brand-text-secondary opacity-60'}
-            {selected === idx ? 'ring-2 ring-brand-text-primary ring-offset-2 ring-offset-brand-main z-10' : 'focus-visible:ring-2 focus-visible:ring-brand-text-primary'}"
+            {band.enabled
+            ? `${style.fill} ${style.text}`
+            : 'bg-brand-main text-brand-text-secondary opacity-60'}
+            {selected === idx
+            ? 'ring-2 ring-brand-text-primary ring-offset-2 ring-offset-brand-main z-10'
+            : 'focus-visible:ring-2 focus-visible:ring-brand-text-primary'}"
           style="left: {xPct(band.freq)}%; top: {yPct(band.gain_db)}%;"
           onpointerdown={(e) => onNodePointerDown(e, idx)}
           onpointermove={(e) => onNodePointerMove(e, idx)}
           onpointerup={onNodePointerUp}
           onpointercancel={onNodePointerUp}
-          onfocus={() => { if (selected !== idx) onselect(idx); }}
+          onfocus={() => {
+            if (selected !== idx) onselect(idx);
+          }}
           onkeydown={(e) => onNodeKeyDown(e, idx)}
           use:wheelQ={idx}
         >
@@ -272,20 +337,30 @@
     </div>
 
     <!-- Axis labels, positioned on the same scales as the plot. -->
-    <div class="absolute left-9 right-3 bottom-1 h-4 text-[9px] font-mono text-brand-text-secondary/70 pointer-events-none" aria-hidden="true">
+    <div
+      class="absolute left-9 right-3 bottom-1 h-4 text-[9px] font-mono text-brand-text-secondary/70 pointer-events-none"
+      aria-hidden="true"
+    >
       {#each axisFreqs as f}
         <span class="absolute -translate-x-1/2" style="left: {xPct(f)}%">{formatFreq(f)}</span>
       {/each}
     </div>
-    <div class="absolute left-0 w-8 top-3 h-56 md:h-64 text-[9px] font-mono text-brand-text-secondary/70 pointer-events-none" aria-hidden="true">
+    <div
+      class="absolute left-0 w-8 top-3 h-56 md:h-64 text-[9px] font-mono text-brand-text-secondary/70 pointer-events-none"
+      aria-hidden="true"
+    >
       {#each [ranges.gain_db.max, 0, ranges.gain_db.min] as g}
-        <span class="absolute right-1 -translate-y-1/2" style="top: {yPct(g)}%">{formatGain(g)}</span>
+        <span class="absolute right-1 -translate-y-1/2" style="top: {yPct(g)}%"
+          >{formatGain(g)}</span
+        >
       {/each}
     </div>
   </div>
 
   <div class="flex items-start justify-between gap-4 flex-wrap px-1">
-    <p class="text-xs text-brand-text-secondary text-pretty flex-1 min-w-48">{i18n.t("equalizer.graphHint")}</p>
+    <p class="text-xs text-brand-text-secondary text-pretty flex-1 min-w-48">
+      {i18n.t("equalizer.graphHint")}
+    </p>
     <ul class="flex items-center gap-3 text-xs text-brand-text-secondary">
       {#each Object.keys(KIND_STYLES) as ParametricKind[] as kind}
         <li class="flex items-center gap-1.5">

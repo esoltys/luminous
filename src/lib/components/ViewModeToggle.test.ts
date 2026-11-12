@@ -21,8 +21,14 @@ describe("ViewModeToggle", () => {
   });
 
   it("exposes the walkthrough anchor when given one", () => {
-    const { container } = render(ViewModeToggle, { mode: "cards", onChange: vi.fn(), walkthroughTarget: "collection-view" });
+    const { container } = render(ViewModeToggle, {
+      mode: "cards",
+      onChange: vi.fn(),
+      walkthroughTarget: "collection-view",
+    });
 
-    expect(container.querySelector('[data-walkthrough-target="collection-view"]')).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-walkthrough-target="collection-view"]'),
+    ).toBeInTheDocument();
   });
 });

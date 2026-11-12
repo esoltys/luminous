@@ -99,12 +99,17 @@
         currentContent: draft,
       });
       lastSyncedValue = draft;
-      toastStore.show(i18n.t("markdownEditor.openedToast", {}, "Opened in external editor"), "info");
+      toastStore.show(
+        i18n.t("markdownEditor.openedToast", {}, "Opened in external editor"),
+        "info",
+      );
     } catch (e) {
       console.error("Failed to open external editor:", e);
       toastStore.show(
-        typeof e === "string" ? e : i18n.t("markdownEditor.openErrorToast", {}, "Failed to open external editor"),
-        "error"
+        typeof e === "string"
+          ? e
+          : i18n.t("markdownEditor.openErrorToast", {}, "Failed to open external editor"),
+        "error",
       );
     } finally {
       isOpeningExternal = false;
@@ -165,7 +170,9 @@
       aria-label={title}
     >
       <!-- Header -->
-      <div class="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-brand-border bg-brand-sidebar shrink-0 gap-3">
+      <div
+        class="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-brand-border bg-brand-sidebar shrink-0 gap-3"
+      >
         <div class="flex items-center gap-2.5 min-w-0 flex-1">
           <Pencil class="w-4 h-4 text-brand-accent shrink-0" />
           <h2 class="text-sm sm:text-base font-bold text-brand-text-primary truncate">
@@ -176,11 +183,16 @@
         <!-- Controls: Tabs, External Open, Close -->
         <div class="flex items-center gap-2 shrink-0">
           <!-- Edit / Preview Mode Switcher -->
-          <div class="flex items-center rounded-lg bg-brand-main/60 p-0.5 border border-brand-border text-xs">
+          <div
+            class="flex items-center rounded-lg bg-brand-main/60 p-0.5 border border-brand-border text-xs"
+          >
             <button
               type="button"
-              onclick={() => { mode = "edit"; }}
-              class="flex items-center gap-1 px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer {mode === 'edit'
+              onclick={() => {
+                mode = "edit";
+              }}
+              class="flex items-center gap-1 px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer {mode ===
+              'edit'
                 ? 'bg-brand-accent text-brand-accent-contrast shadow-sm'
                 : 'text-brand-text-secondary hover:text-brand-text-primary'}"
             >
@@ -189,8 +201,11 @@
             </button>
             <button
               type="button"
-              onclick={() => { mode = "preview"; }}
-              class="flex items-center gap-1 px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer {mode === 'preview'
+              onclick={() => {
+                mode = "preview";
+              }}
+              class="flex items-center gap-1 px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer {mode ===
+              'preview'
                 ? 'bg-brand-accent text-brand-accent-contrast shadow-sm'
                 : 'text-brand-text-secondary hover:text-brand-text-primary'}"
             >
@@ -205,10 +220,16 @@
             onclick={handleOpenExternal}
             disabled={isOpeningExternal}
             class="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-brand-border bg-brand-main/40 hover:bg-brand-main text-brand-text-primary hover:border-brand-accent/50 transition-colors disabled:opacity-50 cursor-pointer"
-            title={i18n.t("markdownEditor.openExternalTooltip", {}, "Open this Markdown file in your default system editor")}
+            title={i18n.t(
+              "markdownEditor.openExternalTooltip",
+              {},
+              "Open this Markdown file in your default system editor",
+            )}
           >
             <ExternalLink class="w-3.5 h-3.5 text-brand-accent" />
-            <span class="hidden sm:inline">{i18n.t("markdownEditor.openExternal", {}, "Open in external editor")}</span>
+            <span class="hidden sm:inline"
+              >{i18n.t("markdownEditor.openExternal", {}, "Open in external editor")}</span
+            >
           </button>
 
           <!-- Close Button -->
@@ -225,10 +246,18 @@
 
       <!-- Conflict Banner if File Changed on Disk -->
       {#if hasConflict}
-        <div class="px-4 py-2.5 bg-brand-text-primary/10 border-b border-brand-border flex items-center justify-between gap-3 text-xs text-brand-text-primary shrink-0">
+        <div
+          class="px-4 py-2.5 bg-brand-text-primary/10 border-b border-brand-border flex items-center justify-between gap-3 text-xs text-brand-text-primary shrink-0"
+        >
           <div class="flex items-center gap-2 min-w-0">
             <Warning class="w-4 h-4 text-brand-text-primary shrink-0" />
-            <span class="truncate">{i18n.t("markdownEditor.conflictDetected", {}, "This file was modified on disk by an external editor.")}</span>
+            <span class="truncate"
+              >{i18n.t(
+                "markdownEditor.conflictDetected",
+                {},
+                "This file was modified on disk by an external editor.",
+              )}</span
+            >
           </div>
           <div class="flex items-center gap-2 shrink-0">
             <button
@@ -255,11 +284,17 @@
         {#if mode === "edit"}
           <textarea
             bind:value={draft}
-            placeholder={i18n.t("markdownEditor.placeholder", {}, "Write markdown bio or description here...")}
+            placeholder={i18n.t(
+              "markdownEditor.placeholder",
+              {},
+              "Write markdown bio or description here...",
+            )}
             class="w-full h-full p-4 rounded-lg bg-brand-main/60 border border-brand-border text-brand-text-primary text-sm font-mono leading-relaxed placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none overflow-y-auto transition-colors"
           ></textarea>
         {:else}
-          <div class="w-full h-full p-6 rounded-lg bg-brand-main/40 border border-brand-border overflow-y-auto">
+          <div
+            class="w-full h-full p-6 rounded-lg bg-brand-main/40 border border-brand-border overflow-y-auto"
+          >
             {#if draft.trim()}
               <MarkdownBio text={draft} disableClamp={true} />
             {:else}
@@ -272,18 +307,37 @@
       </div>
 
       <!-- Formatting Cheatsheet -->
-      <div class="px-4 sm:px-6 py-2 border-t border-brand-border/60 bg-brand-sidebar/40 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-text-secondary select-none shrink-0">
-        <span class="font-medium text-brand-text-secondary/70">{i18n.t("markdownEditor.syntaxTitle", {}, "Formatting:")}</span>
-        <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">**{i18n.t("markdownEditor.bold", {}, "bold")}**</code>
-        <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">*{i18n.t("markdownEditor.italic", {}, "italic")}*</code>
-        <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">[{i18n.t("markdownEditor.linkText", {}, "link")}](url)</code>
-        <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">https://...</code>
+      <div
+        class="px-4 sm:px-6 py-2 border-t border-brand-border/60 bg-brand-sidebar/40 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-text-secondary select-none shrink-0"
+      >
+        <span class="font-medium text-brand-text-secondary/70"
+          >{i18n.t("markdownEditor.syntaxTitle", {}, "Formatting:")}</span
+        >
+        <code
+          class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary"
+          >**{i18n.t("markdownEditor.bold", {}, "bold")}**</code
+        >
+        <code
+          class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary"
+          >*{i18n.t("markdownEditor.italic", {}, "italic")}*</code
+        >
+        <code
+          class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary"
+          >[{i18n.t("markdownEditor.linkText", {}, "link")}](url)</code
+        >
+        <code
+          class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary"
+          >https://...</code
+        >
       </div>
 
       <!-- Footer -->
-      <div class="flex items-center justify-between px-4 sm:px-6 py-3 border-t border-brand-border bg-brand-sidebar shrink-0">
+      <div
+        class="flex items-center justify-between px-4 sm:px-6 py-3 border-t border-brand-border bg-brand-sidebar shrink-0"
+      >
         <div class="text-xs text-brand-text-secondary font-mono">
-          {draft.length} {draft.length === 1 ? "char" : "chars"}
+          {draft.length}
+          {draft.length === 1 ? "char" : "chars"}
         </div>
         <div class="flex items-center gap-2">
           <Button variant="secondary" size="sm" onclick={handleClose}>

@@ -18,7 +18,10 @@ const hooks: Partial<ScreenHooks> = {};
  * component state). Returns an unregister function for the screen's teardown.
  * Screens call this behind `import.meta.env.DEV`, so release builds never load it.
  */
-export function registerScreenHook<K extends keyof ScreenHooks>(name: K, hook: ScreenHooks[K]): () => void {
+export function registerScreenHook<K extends keyof ScreenHooks>(
+  name: K,
+  hook: ScreenHooks[K],
+): () => void {
   hooks[name] = hook;
   return () => {
     if (hooks[name] === hook) delete hooks[name];
@@ -35,7 +38,10 @@ const SCREEN_FOR: Record<keyof ScreenHooks, string> = {
   openEqualizerPresetMenu: "Settings → Equalizer in parametric mode",
 };
 
-async function hook<K extends keyof ScreenHooks>(name: K, wait: ScriptWaitApi): Promise<ScreenHooks[K]> {
+async function hook<K extends keyof ScreenHooks>(
+  name: K,
+  wait: ScriptWaitApi,
+): Promise<ScreenHooks[K]> {
   // A screen registers its hooks just after it mounts (a dynamic import), so give a screen that
   // was only just opened a moment to appear before saying it isn't there.
   await wait.forState(() => !!hooks[name], 2000).catch(() => {});
@@ -53,7 +59,9 @@ export function closeSearchIfOpen(): void {
 export function createScreensController(wait: ScriptWaitApi): ScriptScreensApi {
   return {
     async search(query) {
-      await (await hook("search", wait))(query);
+      await (
+        await hook("search", wait)
+      )(query);
       await wait.settled();
     },
     async setSort(surface, field, ascending) {
@@ -65,11 +73,15 @@ export function createScreensController(wait: ScriptWaitApi): ScriptScreensApi {
       await wait.settled();
     },
     async setEqualizerMode(mode) {
-      await (await hook("setEqualizerMode", wait))(mode);
+      await (
+        await hook("setEqualizerMode", wait)
+      )(mode);
       await wait.settled();
     },
     async selectEqualizerPreset(name) {
-      await (await hook("selectEqualizerPreset", wait))(name);
+      await (
+        await hook("selectEqualizerPreset", wait)
+      )(name);
       await wait.settled();
     },
     async openEqualizerPresetMenu() {

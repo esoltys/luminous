@@ -7,7 +7,7 @@
     ArrowSquareOutIcon as OpenInPicard,
     ChartBarIcon as BarChart2,
     ShareNetworkIcon as Share,
-    RadioIcon as Radio
+    RadioIcon as Radio,
   } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
@@ -35,14 +35,7 @@
     onClose: () => void;
   }
 
-  let {
-    x,
-    y,
-    artistName,
-    onPlay,
-    onAddToQueue,
-    onClose,
-  }: Props = $props();
+  let { x, y, artistName, onPlay, onAddToQueue, onClose }: Props = $props();
 
   let showShareModal = $state(false);
   // Same reasoning as AlbumContextMenu: hide the menu (and its outside-click
@@ -92,97 +85,114 @@
 </script>
 
 {#if menuVisible}
-<ContextMenu {x} {y} {onClose}>
-  <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
-    {artistName || i18n.t("collection.unknownArtist")}
-  </div>
+  <ContextMenu {x} {y} {onClose}>
+    <div
+      class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate"
+    >
+      {artistName || i18n.t("collection.unknownArtist")}
+    </div>
 
-  <ContextMenuItem
-    icon={Play}
-    accent
-    label={i18n.t("playlists.contextMenuPlayArtist", {}, "Play Artist")}
-    onclick={async () => {
-      if (onPlay) {
-        onPlay();
-      } else {
-        await queueArtistAsPlaylist(artistName);
-      }
-      onClose();
-    }}
-  />
-
-  <ContextMenuItem
-    icon={Layers}
-    label={i18n.t("playlists.contextMenuAddQueue", {}, "Add to Queue")}
-    onclick={async () => {
-      if (onAddToQueue) {
-        onAddToQueue();
-      } else {
-        await addArtistToQueue(artistName);
-      }
-      onClose();
-    }}
-  />
-
-  <ContextMenuItem
-    icon={Radio}
-    label={i18n.t("playlists.contextMenuStartArtistRadio", {}, "Start Artist Radio")}
-    onclick={async () => {
-      await startArtistRadio(artistName);
-      onClose();
-    }}
-  />
-
-  <AddToPlaylistSubmenu
-    onSelectPlaylist={handleAddToCustomPlaylist}
-    onCreatePlaylist={handleCreateAndAddToPlaylist}
-    {onClose}
-  />
-
-  {#if artistName}
-    <AddToDeviceMenuItem
-      source={{ kind: "artist", name: artistName }}
-      sourceName={artistName}
-      {onClose}
-    />
-  {/if}
-
-  {#if artistName}
-    <ContextMenuDivider />
     <ContextMenuItem
-      icon={OpenInPicard}
-      label={i18n.t("picard.openInPicard")}
-      onclick={async () => { await handleOpenInPicard(); onClose(); }}
-      disabled={!picardStore.available}
-      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
-    />
-    <ContextMenuItem
-      icon={Share}
-      label={i18n.t("shareModal.menuItem")}
-      onclick={() => { menuVisible = false; showShareModal = true; }}
-    />
-    <ContextMenuDivider />
-    <ContextMenuItem
-      icon={pinnedStore.isPinned("artist", artistName) ? PinOff : Pin}
-      label={pinnedStore.isPinned("artist", artistName)
-        ? i18n.t("playlists.contextMenuUnpinHome")
-        : i18n.t("playlists.contextMenuPinHome")}
-      onclick={() => {
-        pinnedStore.toggle("artist", artistName);
+      icon={Play}
+      accent
+      label={i18n.t("playlists.contextMenuPlayArtist", {}, "Play Artist")}
+      onclick={async () => {
+        if (onPlay) {
+          onPlay();
+        } else {
+          await queueArtistAsPlaylist(artistName);
+        }
         onClose();
       }}
     />
+
     <ContextMenuItem
-      icon={BarChart2}
-      label={statsExclusionsStore.isExcluded("artist", artistName)
-        ? i18n.t("stats.includeInStats")
-        : i18n.t("stats.excludeFromStats")}
-      onclick={() => { handleToggleStatsExcluded(); onClose(); }}
+      icon={Layers}
+      label={i18n.t("playlists.contextMenuAddQueue", {}, "Add to Queue")}
+      onclick={async () => {
+        if (onAddToQueue) {
+          onAddToQueue();
+        } else {
+          await addArtistToQueue(artistName);
+        }
+        onClose();
+      }}
     />
-  {/if}
-</ContextMenu>
+
+    <ContextMenuItem
+      icon={Radio}
+      label={i18n.t("playlists.contextMenuStartArtistRadio", {}, "Start Artist Radio")}
+      onclick={async () => {
+        await startArtistRadio(artistName);
+        onClose();
+      }}
+    />
+
+    <AddToPlaylistSubmenu
+      onSelectPlaylist={handleAddToCustomPlaylist}
+      onCreatePlaylist={handleCreateAndAddToPlaylist}
+      {onClose}
+    />
+
+    {#if artistName}
+      <AddToDeviceMenuItem
+        source={{ kind: "artist", name: artistName }}
+        sourceName={artistName}
+        {onClose}
+      />
+    {/if}
+
+    {#if artistName}
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={OpenInPicard}
+        label={i18n.t("picard.openInPicard")}
+        onclick={async () => {
+          await handleOpenInPicard();
+          onClose();
+        }}
+        disabled={!picardStore.available}
+        title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+      />
+      <ContextMenuItem
+        icon={Share}
+        label={i18n.t("shareModal.menuItem")}
+        onclick={() => {
+          menuVisible = false;
+          showShareModal = true;
+        }}
+      />
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={pinnedStore.isPinned("artist", artistName) ? PinOff : Pin}
+        label={pinnedStore.isPinned("artist", artistName)
+          ? i18n.t("playlists.contextMenuUnpinHome")
+          : i18n.t("playlists.contextMenuPinHome")}
+        onclick={() => {
+          pinnedStore.toggle("artist", artistName);
+          onClose();
+        }}
+      />
+      <ContextMenuItem
+        icon={BarChart2}
+        label={statsExclusionsStore.isExcluded("artist", artistName)
+          ? i18n.t("stats.includeInStats")
+          : i18n.t("stats.excludeFromStats")}
+        onclick={() => {
+          handleToggleStatsExcluded();
+          onClose();
+        }}
+      />
+    {/if}
+  </ContextMenu>
 {/if}
 
 {#if showShareModal}
-  <ShareModal entity={{ kind: "artist", artistName }} onClose={() => { showShareModal = false; onClose(); }} />
+  <ShareModal
+    entity={{ kind: "artist", artistName }}
+    onClose={() => {
+      showShareModal = false;
+      onClose();
+    }}
+  />
 {/if}

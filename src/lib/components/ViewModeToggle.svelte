@@ -20,15 +20,21 @@
   class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1"
 >
   <span
-    class="absolute top-1 bottom-1 left-1 w-7 h-7 rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {mode === 'rows' ? 'translate-x-[30px]' : 'translate-x-0'}"
+    class="absolute top-1 bottom-1 left-1 w-7 h-7 rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {mode ===
+    'rows'
+      ? 'translate-x-[30px]'
+      : 'translate-x-0'}"
     aria-hidden="true"
   ></span>
   <button
     type="button"
     onclick={() => onChange("cards")}
-    class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {mode === 'cards' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-    title={i18n.t('collection.viewCards')}
-    aria-label={i18n.t('collection.viewCards')}
+    class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {mode ===
+    'cards'
+      ? 'text-white'
+      : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+    title={i18n.t("collection.viewCards")}
+    aria-label={i18n.t("collection.viewCards")}
     aria-pressed={mode === "cards"}
   >
     <LayoutGrid class="w-4 h-4" />
@@ -36,9 +42,12 @@
   <button
     type="button"
     onclick={() => onChange("rows")}
-    class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {mode === 'rows' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-    title={i18n.t('collection.viewRows')}
-    aria-label={i18n.t('collection.viewRows')}
+    class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {mode ===
+    'rows'
+      ? 'text-white'
+      : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+    title={i18n.t("collection.viewRows")}
+    aria-label={i18n.t("collection.viewRows")}
     aria-pressed={mode === "rows"}
   >
     <Rows3 class="w-4 h-4" />

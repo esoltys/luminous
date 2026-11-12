@@ -9,7 +9,10 @@ const items = createRawSnippet(() => ({
 
 describe("CardSection", () => {
   it("renders the title and its children inside a responsive grid", () => {
-    const { getByText, getByTestId } = render(CardSection, { title: "Featured Albums", children: items });
+    const { getByText, getByTestId } = render(CardSection, {
+      title: "Featured Albums",
+      children: items,
+    });
 
     expect(getByText("Featured Albums")).toBeInTheDocument();
     const grid = getByTestId("card-section-grid");
@@ -24,7 +27,11 @@ describe("CardSection", () => {
   });
 
   it("uses wider, tighter grid tracks in rows mode", () => {
-    const { getByTestId } = render(CardSection, { title: "Albums", viewMode: "rows", children: items });
+    const { getByTestId } = render(CardSection, {
+      title: "Albums",
+      viewMode: "rows",
+      children: items,
+    });
 
     const grid = getByTestId("card-section-grid");
     expect(grid.className).toContain("minmax(280px,1fr)");
@@ -42,7 +49,12 @@ describe("CardSection", () => {
 
   it("renders a Cards/Rows toggle that reports the chosen mode", async () => {
     const onViewModeChange = vi.fn();
-    const { getByRole } = render(CardSection, { title: "Albums", viewMode: "cards", onViewModeChange, children: items });
+    const { getByRole } = render(CardSection, {
+      title: "Albums",
+      viewMode: "cards",
+      onViewModeChange,
+      children: items,
+    });
 
     expect(getByRole("button", { name: "Card view" })).toHaveAttribute("aria-pressed", "true");
     await fireEvent.click(getByRole("button", { name: "Row view" }));

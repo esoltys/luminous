@@ -1,5 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ArtistEvent, ArtistProfile, AlbumProfile, Song, SongContextEnrichment } from "../types";
+import type {
+  ArtistEvent,
+  ArtistProfile,
+  AlbumProfile,
+  Song,
+  SongContextEnrichment,
+} from "../types";
 import { collectionStore } from "./collection.svelte";
 import { i18n } from "./i18n.svelte";
 import { prefs } from "./prefs.svelte";
@@ -81,13 +87,19 @@ const hasMbid = (id: string | null | undefined) => !!id && id.trim().length > 0;
 function representativeSong(kind: "album" | "artist", songs: Song[]): Song | undefined {
   const preferred =
     kind === "artist"
-      ? songs.find((s) => hasMbid(s.musicbrainz_artist_id) || hasMbid(s.musicbrainz_album_artist_id))
+      ? songs.find(
+          (s) => hasMbid(s.musicbrainz_artist_id) || hasMbid(s.musicbrainz_album_artist_id),
+        )
       : songs.find((s) => hasMbid(s.musicbrainz_release_group_id));
   return preferred ?? songs[0];
 }
 
 /** The subject for a viewed album or artist, or null if it has no songs to look it up by. */
-export function entitySubject(kind: "album" | "artist", name: string, songs: Song[]): ContextSubject | null {
+export function entitySubject(
+  kind: "album" | "artist",
+  name: string,
+  songs: Song[],
+): ContextSubject | null {
   const song = representativeSong(kind, songs);
   return song ? { kind, key: `${kind}:${name}`, name, song } : null;
 }
@@ -103,7 +115,7 @@ interface Entry {
 function linkItems(
   website: string | null | undefined,
   links: { platform: string; handle_or_url: string }[] | undefined,
-  extra: Omit<LinkItem, "isOfficial">[]
+  extra: Omit<LinkItem, "isOfficial">[],
 ): LinkItem[] {
   const items: LinkItem[] = [];
   if (website?.trim() && !isBlacklistedLink(website, "website")) {
@@ -149,10 +161,13 @@ function listenbrainz(subject: ContextSubject): { url: string; rows: ListenBrain
     {
       label: t("listenbrainzArtistLabel", "Artist"),
       id: song.musicbrainz_artist_id ?? "",
-      url: song.musicbrainz_artist_id ? `https://listenbrainz.org/artist/${song.musicbrainz_artist_id}/` : "",
+      url: song.musicbrainz_artist_id
+        ? `https://listenbrainz.org/artist/${song.musicbrainz_artist_id}/`
+        : "",
       name: song.artist ?? undefined,
     },
-    ...(song.musicbrainz_album_artist_id && song.musicbrainz_album_artist_id !== song.musicbrainz_artist_id
+    ...(song.musicbrainz_album_artist_id &&
+    song.musicbrainz_album_artist_id !== song.musicbrainz_artist_id
       ? [
           {
             label: t("listenbrainzAlbumArtistLabel", "Album Artist"),
@@ -201,7 +216,7 @@ export class ContextView {
 
   constructor(
     private readonly getSubject: () => ContextSubject | null,
-    private readonly options: ContextViewOptions
+    private readonly options: ContextViewOptions,
   ) {
     // Selection changes far more often than tracks do (arrowing through rows), so debounce the fetch.
     $effect(() => {
@@ -247,7 +262,11 @@ export class ContextView {
     const ctx = this.context;
     if (!ctx) return null;
     if (ctx.critiquebrainz_rating != null) {
-      return { rating: ctx.critiquebrainz_rating, count: ctx.critiquebrainz_review_count || null, source: "critiquebrainz" };
+      return {
+        rating: ctx.critiquebrainz_rating,
+        count: ctx.critiquebrainz_review_count || null,
+        source: "critiquebrainz",
+      };
     }
     if (ctx.mb_rating != null) {
       return { rating: ctx.mb_rating, count: ctx.mb_rating_votes || null, source: "musicbrainz" };
@@ -261,11 +280,22 @@ export class ContextView {
     const ctx = this.context;
     const sections: InfoSection[] = [];
     const artistProfile: ArtistProfile | undefined =
-      subject.kind === "album" ? undefined : collectionStore.getArtistProfile(subject.kind === "artist" ? subject.name : subject.song.artist);
+      subject.kind === "album"
+        ? undefined
+        : collectionStore.getArtistProfile(
+            subject.kind === "artist" ? subject.name : subject.song.artist,
+          );
     const albumProfile: AlbumProfile | undefined =
       subject.kind === "album" ? collectionStore.getAlbumProfile(subject.name) : undefined;
 
-    if (subject.kind !== "album" && ctx && (ctx.artist_begin_date || ctx.artist_end_date || ctx.artist_begin_area_name || ctx.artist_area_name)) {
+    if (
+      subject.kind !== "album" &&
+      ctx &&
+      (ctx.artist_begin_date ||
+        ctx.artist_end_date ||
+        ctx.artist_begin_area_name ||
+        ctx.artist_area_name)
+    ) {
       sections.push({ id: "facts", context: ctx });
     }
 
@@ -278,7 +308,12 @@ export class ContextView {
       if (own) {
         sections.push({ id: "bio", text: own, source: "profile" });
       } else if (ctx?.wikipedia_extract) {
-        sections.push({ id: "bio", text: ctx.wikipedia_extract, source: "wikipedia", wikipediaUrl: ctx.wikipedia_page_url });
+        sections.push({
+          id: "bio",
+          text: ctx.wikipedia_extract,
+          source: "wikipedia",
+          wikipediaUrl: ctx.wikipedia_page_url,
+        });
       }
     }
 
@@ -287,7 +322,8 @@ export class ContextView {
       subject.song.musicbrainz_artist_id?.trim() ||
       null;
     if (prefs.onlineEnabled && this.wantsEvents(subject)) {
-      const linkFor = (platform: string) => artistProfile?.social_links?.find((l) => l.platform === platform)?.handle_or_url ?? null;
+      const linkFor = (platform: string) =>
+        artistProfile?.social_links?.find((l) => l.platform === platform)?.handle_or_url ?? null;
       const songkickUrl = linkFor("songkick");
       const setlistfmUrl = linkFor("setlistfm");
       const bandsintownUrl = linkFor("bandsintown");
@@ -311,8 +347,19 @@ export class ContextView {
       const fanart = deriveFanartTvUrlFromMbid(artistMbid);
       // MusicBrainz stays here: an artist has no Technical tab, which is where its block lives for a song.
       const items = linkItems(artistProfile?.website, artistProfile?.social_links, [
-        ...(musicbrainz ? [{ key: "musicbrainz-derived", platform: "musicbrainz", url: musicbrainz, label: "MusicBrainz" }] : []),
-        ...(fanart ? [{ key: "fanart-tv", platform: "fanart_tv", url: fanart, label: "Fanart.tv" }] : []),
+        ...(musicbrainz
+          ? [
+              {
+                key: "musicbrainz-derived",
+                platform: "musicbrainz",
+                url: musicbrainz,
+                label: "MusicBrainz",
+              },
+            ]
+          : []),
+        ...(fanart
+          ? [{ key: "fanart-tv", platform: "fanart_tv", url: fanart, label: "Fanart.tv" }]
+          : []),
       ]);
       if (items.length > 0) sections.push({ id: "links", items });
     } else if (subject.kind === "album") {
@@ -378,15 +425,27 @@ class ContextStore {
     if (existing) return existing;
 
     const patch = (p: Partial<Entry>) => {
-      this.entries[key] = { ...(this.entries[key] ?? { loadingContext: false, loadingEvents: false, error: "" }), ...p };
+      this.entries[key] = {
+        ...(this.entries[key] ?? { loadingContext: false, loadingEvents: false, error: "" }),
+        ...p,
+      };
     };
     const songId = subject.song.id;
     const run = (async () => {
-      patch({ loadingContext: needContext, loadingEvents: needEvents, ...(needContext ? { error: "" } : {}) });
+      patch({
+        loadingContext: needContext,
+        loadingEvents: needEvents,
+        ...(needContext ? { error: "" } : {}),
+      });
       const context = needContext
-        ? invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh: force, locale: i18n.currentLocale }).then(
+        ? invoke<SongContextEnrichment>("get_song_context", {
+            songId,
+            forceRefresh: force,
+            locale: i18n.currentLocale,
+          }).then(
             (data) => patch({ context: data, loadingContext: false }),
-            (e) => patch({ error: e instanceof Error ? e.message : String(e), loadingContext: false })
+            (e) =>
+              patch({ error: e instanceof Error ? e.message : String(e), loadingContext: false }),
           )
         : Promise.resolve();
       const events = needEvents
@@ -396,7 +455,7 @@ class ContextStore {
             ...(force ? { forceRefresh: true } : {}),
           }).then(
             (data) => patch({ events: data || [], loadingEvents: false }),
-            () => patch({ events: [], loadingEvents: false })
+            () => patch({ events: [], loadingEvents: false }),
           )
         : Promise.resolve();
       await Promise.all([context, events]);
@@ -410,7 +469,10 @@ class ContextStore {
    * For callers that curate data and only need it fresh, without reading sections themselves.
    * A missing subject (an album/artist with no songs) has nothing to refresh.
    */
-  async refresh(subject: ContextSubject | null, events = subject?.kind === "artist"): Promise<void> {
+  async refresh(
+    subject: ContextSubject | null,
+    events = subject?.kind === "artist",
+  ): Promise<void> {
     if (subject && prefs.onlineEnabled) await this.ensure(subject, { events, force: true });
   }
 

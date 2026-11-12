@@ -31,15 +31,22 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   onclick={onClick}
-  oncontextmenu={(e) => { (oncontextmenu || onContextMenu)?.(e); }}
+  oncontextmenu={(e) => {
+    (oncontextmenu || onContextMenu)?.(e);
+  }}
   class="{widthClass} h-full bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 group relative"
 >
-  <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden">
+  <div
+    class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden"
+  >
     {@render cover()}
   </div>
 
   <button
-    onclick={(e) => { e.stopPropagation(); onClick(); }}
+    onclick={(e) => {
+      e.stopPropagation();
+      onClick();
+    }}
     class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-colors duration-150 text-left truncate w-full"
     {title}
   >
@@ -50,7 +57,9 @@
       {subtitleLabel}
     </div>
   {/if}
-  <div class="flex items-center justify-between mt-1.5 text-xs leading-[22px] text-brand-text-secondary">
+  <div
+    class="flex items-center justify-between mt-1.5 text-xs leading-[22px] text-brand-text-secondary"
+  >
     <span class="truncate">{updatedLabel}</span>
     <span class="shrink-0">{i18n.plural("playlists.songsCount", trackCount)}</span>
   </div>

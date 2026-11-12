@@ -26,7 +26,15 @@ describe("CollectionStore - search and tag filtering", () => {
           return {};
         case "search_songs":
           if (args?.query === "Rock") {
-            return [{ id: 1, title: "Rock Track 1", artist: "Rock Band", album: "Rock Album", filetype: "MP3" }];
+            return [
+              {
+                id: 1,
+                title: "Rock Track 1",
+                artist: "Rock Band",
+                album: "Rock Album",
+                filetype: "MP3",
+              },
+            ];
           }
           return [];
         default:
@@ -49,11 +57,11 @@ describe("CollectionStore - search and tag filtering", () => {
   it("filters albums and artists by search query", () => {
     collectionStore.albums = [
       { album: "Dark Side", artist: "Pink Floyd" } as AlbumItem,
-      { album: "Abbey Road", artist: "The Beatles" } as AlbumItem
+      { album: "Abbey Road", artist: "The Beatles" } as AlbumItem,
     ];
     collectionStore.artists = [
       { name: "Pink Floyd" } as ArtistItem,
-      { name: "The Beatles" } as ArtistItem
+      { name: "The Beatles" } as ArtistItem,
     ];
 
     collectionStore.searchQuery = "beatles";
@@ -91,7 +99,10 @@ describe("CollectionStore - search and tag filtering", () => {
     // Explicit tag search
     collectionStore.searchQuery = "artist-tag:canadian";
     expect(collectionStore.filteredArtists).toHaveLength(2);
-    expect(collectionStore.filteredArtists.map((a) => a.name)).toEqual(["Shania Twain", "Celine Dion"]);
+    expect(collectionStore.filteredArtists.map((a) => a.name)).toEqual([
+      "Shania Twain",
+      "Celine Dion",
+    ]);
 
     collectionStore.searchQuery = "tag:country";
     expect(collectionStore.filteredArtists).toHaveLength(1);
@@ -163,7 +174,7 @@ describe("CollectionStore - search and tag filtering", () => {
     collectionStore.addRecentSearch({
       kind: "query",
       title: "Pink Floyd",
-      query: "Pink Floyd"
+      query: "Pink Floyd",
     });
     expect(collectionStore.recentSearches).toHaveLength(1);
     expect(collectionStore.recentSearches[0].title).toBe("Pink Floyd");
@@ -172,12 +183,12 @@ describe("CollectionStore - search and tag filtering", () => {
     collectionStore.addRecentSearch({
       kind: "artist",
       title: "The Beatles",
-      subtitle: "Artist"
+      subtitle: "Artist",
     });
     collectionStore.addRecentSearch({
       kind: "query",
       title: "Pink Floyd",
-      query: "Pink Floyd"
+      query: "Pink Floyd",
     });
     expect(collectionStore.recentSearches).toHaveLength(2);
     expect(collectionStore.recentSearches[0].title).toBe("Pink Floyd");
@@ -187,7 +198,7 @@ describe("CollectionStore - search and tag filtering", () => {
       collectionStore.addRecentSearch({
         kind: "query",
         title: `Search ${i}`,
-        query: `Search ${i}`
+        query: `Search ${i}`,
       });
     }
     expect(collectionStore.recentSearches).toHaveLength(10);
@@ -197,7 +208,7 @@ describe("CollectionStore - search and tag filtering", () => {
     const itemToRemove = collectionStore.recentSearches[0];
     collectionStore.removeRecentSearch(itemToRemove.id);
     expect(collectionStore.recentSearches).toHaveLength(9);
-    expect(collectionStore.recentSearches.some(r => r.id === itemToRemove.id)).toBe(false);
+    expect(collectionStore.recentSearches.some((r) => r.id === itemToRemove.id)).toBe(false);
 
     // Clear all
     collectionStore.clearRecentSearches();

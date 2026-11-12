@@ -35,7 +35,10 @@ describe("TagCleanupDialog.svelte", () => {
 
   it("lists each removable field with its value, ticked by default", async () => {
     vi.mocked(invoke).mockResolvedValueOnce(preview);
-    const { getByText, getAllByRole } = render(TagCleanupDialog, { songIds: [7], onClose: vi.fn() });
+    const { getByText, getAllByRole } = render(TagCleanupDialog, {
+      songIds: [7],
+      onClose: vi.fn(),
+    });
 
     await waitFor(() => expect(getByText("LAME 3.99r")).toBeInTheDocument());
     expect(invoke).toHaveBeenCalledWith("preview_tag_cleanup", { songIds: [7] });
@@ -67,7 +70,10 @@ describe("TagCleanupDialog.svelte", () => {
 
   it("disables removal when everything is unticked", async () => {
     vi.mocked(invoke).mockResolvedValueOnce(preview);
-    const { getByText, getAllByRole } = render(TagCleanupDialog, { songIds: [7], onClose: vi.fn() });
+    const { getByText, getAllByRole } = render(TagCleanupDialog, {
+      songIds: [7],
+      onClose: vi.fn(),
+    });
 
     await waitFor(() => expect(getByText("LAME 3.99r")).toBeInTheDocument());
     for (const box of getAllByRole("checkbox")) await fireEvent.click(box);
@@ -90,7 +96,10 @@ describe("TagCleanupDialog.svelte", () => {
         skipped: 0,
       })
       .mockResolvedValueOnce({ cleaned_songs: 3, removed_fields: 3, errors: [] });
-    const { getByText, getAllByRole, queryByText } = render(TagCleanupDialog, { songIds: [1, 2, 3], onClose });
+    const { getByText, getAllByRole, queryByText } = render(TagCleanupDialog, {
+      songIds: [1, 2, 3],
+      onClose,
+    });
 
     await waitFor(() => expect(getByText("P.M.I.A")).toBeInTheDocument());
     expect(getAllByRole("checkbox")).toHaveLength(2);
@@ -103,7 +112,10 @@ describe("TagCleanupDialog.svelte", () => {
     expect(onClose).toHaveBeenCalled();
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith("apply_tag_cleanup", {
-        selections: [1, 2, 3].map((id) => ({ song_id: id, fields: [{ kind: "encoded_by", value: "P.M.I.A" }] })),
+        selections: [1, 2, 3].map((id) => ({
+          song_id: id,
+          fields: [{ kind: "encoded_by", value: "P.M.I.A" }],
+        })),
       }),
     );
   });
@@ -114,7 +126,9 @@ describe("TagCleanupDialog.svelte", () => {
     const onClose = vi.fn();
     const { getByText } = render(TagCleanupDialog, { songIds: [], onClose });
 
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith("preview_tag_cleanup", { songIds: [] }));
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("preview_tag_cleanup", { songIds: [] }),
+    );
     await fireEvent.click(getByText("Run in Background"));
     expect(onClose).toHaveBeenCalled();
     await fireEvent.click(getByText("Cancel"));

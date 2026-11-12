@@ -131,7 +131,9 @@ describe("ArtistContextMenu.svelte", () => {
     });
 
     await fireEvent.click(getByText("Don't Include in Stats"));
-    await vi.waitFor(() => expect(statsExclusionsStore.isExcluded("artist", "Radiohead")).toBe(true));
+    await vi.waitFor(() =>
+      expect(statsExclusionsStore.isExcluded("artist", "Radiohead")).toBe(true),
+    );
   });
 
   it("Share Card hides the menu without closing, so the share dialog can open", async () => {

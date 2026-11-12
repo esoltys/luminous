@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { LOCALES, MANUAL_LANGUAGES, legalDocUrl, manualLanguageForLocale, resolveLocale } from "./index";
+import {
+  LOCALES,
+  MANUAL_LANGUAGES,
+  legalDocUrl,
+  manualLanguageForLocale,
+  resolveLocale,
+} from "./index";
 
 describe("resolveLocale", () => {
   it("prefers the exact locale", () => {
@@ -35,10 +41,14 @@ describe("legal documents", () => {
   ] as const;
 
   it("links each locale to its language's section", () => {
-    expect(legalDocUrl("terms", "en-US")).toBe("https://github.com/esoltys/luminous/blob/main/TERMS.md#english");
-    expect(legalDocUrl("privacy", "fr")).toBe("https://github.com/esoltys/luminous/blob/main/PRIVACY.md#fran%C3%A7ais");
+    expect(legalDocUrl("terms", "en-US")).toBe(
+      "https://github.com/esoltys/luminous/blob/main/TERMS.md#english",
+    );
+    expect(legalDocUrl("privacy", "fr")).toBe(
+      "https://github.com/esoltys/luminous/blob/main/PRIVACY.md#fran%C3%A7ais",
+    );
     expect(legalDocUrl("terms", "uk")).toBe(
-      "https://github.com/esoltys/luminous/blob/main/TERMS.md#" + encodeURIComponent("українська")
+      "https://github.com/esoltys/luminous/blob/main/TERMS.md#" + encodeURIComponent("українська"),
     );
   });
 
@@ -48,14 +58,22 @@ describe("legal documents", () => {
 
     it(`${file} has one section per language, matching the anchors the app links to`, () => {
       const anchors = sections.map((s) => s.split("\n")[0].trim().toLowerCase());
-      const expected = LOCALES.map((def) => decodeURIComponent(legalDocUrl(doc, def.tag).split("#")[1]));
+      const expected = LOCALES.map((def) =>
+        decodeURIComponent(legalDocUrl(doc, def.tag).split("#")[1]),
+      );
       expect(new Set(anchors)).toEqual(new Set(expected));
       expect(anchors).toHaveLength(MANUAL_LANGUAGES.length);
-      expect(new Set(LOCALES.map((def) => manualLanguageForLocale(def.tag)))).toEqual(new Set(MANUAL_LANGUAGES));
+      expect(new Set(LOCALES.map((def) => manualLanguageForLocale(def.tag)))).toEqual(
+        new Set(MANUAL_LANGUAGES),
+      );
     });
 
     it(`${file} sections share one structure`, () => {
-      const shape = (s: string) => s.split("\n").filter((l) => /^#{3,4} /.test(l)).map((l) => l.match(/^#+/)![0] + (l.match(/^#### (\d+)\./)?.[1] ?? ""));
+      const shape = (s: string) =>
+        s
+          .split("\n")
+          .filter((l) => /^#{3,4} /.test(l))
+          .map((l) => l.match(/^#+/)![0] + (l.match(/^#### (\d+)\./)?.[1] ?? ""));
       const [first, ...rest] = sections.map(shape);
       for (const other of rest) expect(other).toEqual(first);
     });

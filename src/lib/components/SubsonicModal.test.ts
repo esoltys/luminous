@@ -42,9 +42,15 @@ function callsOf(cmd: string) {
   return vi.mocked(invoke).mock.calls.filter(([c]) => c === cmd);
 }
 
-async function fillNewServer(getByPlaceholderText: (t: string) => HTMLElement, password = "pw", url = "https://music.example.com") {
+async function fillNewServer(
+  getByPlaceholderText: (t: string) => HTMLElement,
+  password = "pw",
+  url = "https://music.example.com",
+) {
   await fireEvent.input(getByPlaceholderText("e.g. Home Navidrome"), { target: { value: "Home" } });
-  await fireEvent.input(getByPlaceholderText("https://music.example.com"), { target: { value: url } });
+  await fireEvent.input(getByPlaceholderText("https://music.example.com"), {
+    target: { value: url },
+  });
   await fireEvent.input(getByPlaceholderText("Username"), { target: { value: "me" } });
   if (password) {
     await fireEvent.input(getByPlaceholderText("Password"), { target: { value: password } });
@@ -71,7 +77,11 @@ describe("SubsonicModal.svelte", () => {
 
   it("shows the server type and version after a successful connection test", async () => {
     mockCommands({
-      test_subsonic_connection: () => ({ serverType: "navidrome", serverVersion: "0.53.3", extensions: [] }),
+      test_subsonic_connection: () => ({
+        serverType: "navidrome",
+        serverVersion: "0.53.3",
+        extensions: [],
+      }),
     });
     const { getByPlaceholderText, getByRole, findByTestId } = render(SubsonicModal, {
       props: { server: null, onClose: vi.fn(), onSaved: vi.fn() },
@@ -87,7 +97,9 @@ describe("SubsonicModal.svelte", () => {
       authMode: "token",
       id: null,
     });
-    expect(await findByTestId("subsonic-test-success")).toHaveTextContent("Connected to navidrome 0.53.3.");
+    expect(await findByTestId("subsonic-test-success")).toHaveTextContent(
+      "Connected to navidrome 0.53.3.",
+    );
   });
 
   it("shows the backend error when the connection test fails", async () => {
@@ -104,7 +116,7 @@ describe("SubsonicModal.svelte", () => {
     await fireEvent.click(getByRole("button", { name: "Test Connection" }));
 
     expect(await findByTestId("subsonic-test-failed")).toHaveTextContent(
-      "Connection failed: Wrong username or password"
+      "Connection failed: Wrong username or password",
     );
     expect(queryByTestId("subsonic-use-password")).toBeNull();
   });
@@ -115,9 +127,12 @@ describe("SubsonicModal.svelte", () => {
         throw { message: "This server doesn't support token sign-in", code: 41 };
       },
     });
-    const { getByPlaceholderText, getByRole, findByTestId, getByLabelText, queryByTestId } = render(SubsonicModal, {
-      props: { server: null, onClose: vi.fn(), onSaved: vi.fn() },
-    });
+    const { getByPlaceholderText, getByRole, findByTestId, getByLabelText, queryByTestId } = render(
+      SubsonicModal,
+      {
+        props: { server: null, onClose: vi.fn(), onSaved: vi.fn() },
+      },
+    );
 
     await fillNewServer(getByPlaceholderText);
     await fireEvent.click(getByRole("button", { name: "Test Connection" }));
@@ -145,9 +160,12 @@ describe("SubsonicModal.svelte", () => {
   });
 
   it("offers API key sign-in only when the server advertises it", async () => {
-    const { getByPlaceholderText, getByLabelText, queryByRole, findByRole } = render(SubsonicModal, {
-      props: { server: null, onClose: vi.fn(), onSaved: vi.fn() },
-    });
+    const { getByPlaceholderText, getByLabelText, queryByRole, findByRole } = render(
+      SubsonicModal,
+      {
+        props: { server: null, onClose: vi.fn(), onSaved: vi.fn() },
+      },
+    );
     await fillNewServer(getByPlaceholderText);
     await waitFor(() => expect(callsOf("get_subsonic_auth_support").length).toBeGreaterThan(0));
     expect(queryByRole("option", { name: "API key" })).toBeNull();
@@ -166,13 +184,11 @@ describe("SubsonicModal.svelte", () => {
   it("signs in with only an API key, sending no username", async () => {
     mockCommands(
       { save_subsonic_server: () => ({ ...existing, authMode: "apiKey", username: "" }) },
-      true
+      true,
     );
     const onSaved = vi.fn();
-    const { getByPlaceholderText, getByLabelText, getByRole, findByRole, queryByPlaceholderText } = render(
-      SubsonicModal,
-      { props: { server: null, onClose: vi.fn(), onSaved } }
-    );
+    const { getByPlaceholderText, getByLabelText, getByRole, findByRole, queryByPlaceholderText } =
+      render(SubsonicModal, { props: { server: null, onClose: vi.fn(), onSaved } });
 
     await fillNewServer(getByPlaceholderText, "");
     await findByRole("option", { name: "API key" });
@@ -184,7 +200,10 @@ describe("SubsonicModal.svelte", () => {
     await fireEvent.click(getByRole("button", { name: "Add Server" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    const [, args] = callsOf("save_subsonic_server")[0] as [string, { input: Record<string, unknown> }];
+    const [, args] = callsOf("save_subsonic_server")[0] as [
+      string,
+      { input: Record<string, unknown> },
+    ];
     expect(args.input).toMatchObject({ username: "", password: "key-123", authMode: "apiKey" });
   });
 
@@ -203,7 +222,7 @@ describe("SubsonicModal.svelte", () => {
     await fireEvent.click(getByRole("button", { name: "Add Server" }));
 
     expect(await findByTestId("subsonic-save-failed")).toHaveTextContent(
-      "Couldn't save server: URL must start with http:// or https://"
+      "Couldn't save server: URL must start with http:// or https://",
     );
     expect(onSaved).not.toHaveBeenCalled();
   });
@@ -215,14 +234,24 @@ describe("SubsonicModal.svelte", () => {
       props: { server: existing, onClose: vi.fn(), onSaved },
     });
 
-    const password = getByPlaceholderText("Leave blank to keep the current password") as HTMLInputElement;
+    const password = getByPlaceholderText(
+      "Leave blank to keep the current password",
+    ) as HTMLInputElement;
     expect(password.value).toBe("");
 
     await fireEvent.click(getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    const [, args] = callsOf("save_subsonic_server")[0] as [string, { input: Record<string, unknown> }];
-    expect(args.input).toMatchObject({ id: 4, name: "Home Navidrome", username: "me", authMode: "token" });
+    const [, args] = callsOf("save_subsonic_server")[0] as [
+      string,
+      { input: Record<string, unknown> },
+    ];
+    expect(args.input).toMatchObject({
+      id: 4,
+      name: "Home Navidrome",
+      username: "me",
+      authMode: "token",
+    });
     expect(args.input.password ?? null).toBeNull();
   });
 
@@ -254,7 +283,10 @@ describe("SubsonicModal.svelte", () => {
     await fireEvent.click(getByRole("button", { name: "Add Server" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    const [, args] = callsOf("save_subsonic_server")[0] as [string, { input: Record<string, unknown> }];
+    const [, args] = callsOf("save_subsonic_server")[0] as [
+      string,
+      { input: Record<string, unknown> },
+    ];
     expect(args.input).toMatchObject({ autoSyncEnabled: true });
   });
 
@@ -271,8 +303,10 @@ describe("SubsonicModal.svelte", () => {
     await fireEvent.click(getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    const [, args] = callsOf("save_subsonic_server")[0] as [string, { input: Record<string, unknown> }];
+    const [, args] = callsOf("save_subsonic_server")[0] as [
+      string,
+      { input: Record<string, unknown> },
+    ];
     expect(args.input).toMatchObject({ autoSyncEnabled: false });
   });
 });
-

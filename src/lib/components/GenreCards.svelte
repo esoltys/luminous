@@ -3,7 +3,12 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { genreColorHsl, genreColorHslBright, genreColorHslDark, getGenreColorChoices } from "../utils/genrePalette";
+  import {
+    genreColorHsl,
+    genreColorHslBright,
+    genreColorHslDark,
+    getGenreColorChoices,
+  } from "../utils/genrePalette";
   import { portal } from "../utils/portal";
   import { startPointerDrag, type PointerDragHandle } from "../utils/pointerDrag";
   import { themeStore } from "../stores/theme.svelte";
@@ -78,7 +83,9 @@
     }
   }
 
-  let contextMenuTarget = $state<{ x: number; y: number; name: string; isRoot: boolean } | null>(null);
+  let contextMenuTarget = $state<{ x: number; y: number; name: string; isRoot: boolean } | null>(
+    null,
+  );
   let renamingTag = $state<string | null>(null);
   let renameValue = $state("");
   let deleteConfirmName = $state<string | null>(null);
@@ -108,8 +115,12 @@
     if (!from || !into || into === from) return;
     const count = await tagsStore.mergeTags(from, into);
     toastStore.show(
-      i18n.t("songTags.renameToast", { count, name: into }, `Renamed to "${into}" (${count} songs updated)`),
-      "success"
+      i18n.t(
+        "songTags.renameToast",
+        { count, name: into },
+        `Renamed to "${into}" (${count} songs updated)`,
+      ),
+      "success",
     );
   }
 
@@ -118,18 +129,20 @@
     deleteConfirmName = null;
     if (!name) return;
     const count = await tagsStore.deleteTags([name]);
-    toastStore.show(
-      i18n.plural("songTags.deleteToast", count),
-      "success"
-    );
+    toastStore.show(i18n.plural("songTags.deleteToast", count), "success");
   }
 
   /** Sorts both the cards themselves and each card's own children — display
    * only, doesn't touch the persisted drag-reorder sort_order. */
   let sortedHierarchy = $derived.by(() => {
     const dir = sortAsc ? 1 : -1;
-    const cmp = (a: { name: string; song_count: number }, b: { name: string; song_count: number }) =>
-      sortField === "name" ? a.name.localeCompare(b.name) * dir : (a.song_count - b.song_count) * dir;
+    const cmp = (
+      a: { name: string; song_count: number },
+      b: { name: string; song_count: number },
+    ) =>
+      sortField === "name"
+        ? a.name.localeCompare(b.name) * dir
+        : (a.song_count - b.song_count) * dir;
     return tagsStore.hierarchy
       .map((g) => ({ ...g, children: [...g.children].sort(cmp) }))
       .sort(cmp);
@@ -195,7 +208,7 @@
       onMove: handlePointerMove,
       onDrop: handleDrop,
       onTap: handleTap,
-      onCancel: endDrag
+      onCancel: endDrag,
     });
     if (!tagDrag) return;
     // Right-click (and middle-click) never reach here: calling preventDefault on any
@@ -222,7 +235,11 @@
     const headerEl = el?.closest<HTMLElement>("[data-card-header]");
     const cardEl = el?.closest<HTMLElement>("[data-card-name]");
     if (chipEl) {
-      dropTarget = { kind: "chip", group: chipEl.dataset.chipGroup!, chip: chipEl.dataset.chipKey! };
+      dropTarget = {
+        kind: "chip",
+        group: chipEl.dataset.chipGroup!,
+        chip: chipEl.dataset.chipKey!,
+      };
     } else if (headerEl) {
       dropTarget = { kind: "header", group: headerEl.dataset.cardHeader! };
     } else if (cardEl) {
@@ -244,7 +261,11 @@
   }
 
   let dropApplies = $derived(
-    draggedCard ? cardDropApplies(draggedCard, dropTarget) : draggedChip ? chipDropAction(draggedChip, dropTarget) !== null : false
+    draggedCard
+      ? cardDropApplies(draggedCard, dropTarget)
+      : draggedChip
+        ? chipDropAction(draggedChip, dropTarget) !== null
+        : false,
   );
 
   // Barely moved — treat the whole gesture as a plain click on the chip rather than a drag, so
@@ -291,26 +312,43 @@
 
 <div class="grid grid-cols-1 @xl:grid-cols-2 @5xl:grid-cols-3 gap-3">
   {#each sortedHierarchy as group (group.name)}
-    {@const cardHighlighted = (dropTarget?.kind === 'card' || dropTarget?.kind === 'header') && dropTarget.group === group.name && (draggedChip || draggedCard)}
+    {@const cardHighlighted =
+      (dropTarget?.kind === "card" || dropTarget?.kind === "header") &&
+      dropTarget.group === group.name &&
+      (draggedChip || draggedCard)}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       data-card-name={group.name}
       onclick={(e) => handleCardClick(e, group.name)}
-      class="rounded-lg bg-brand-sidebar border-2 overflow-hidden transition-[opacity,box-shadow,border-color,transform] cursor-pointer {draggedCard === group.name ? 'opacity-40' : ''} {cardHighlighted ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5' : ''}"
-      style={cardHighlighted ? '' : `border-color: ${genreColorHsl(group.color_index)}`}
+      class="rounded-lg bg-brand-sidebar border-2 overflow-hidden transition-[opacity,box-shadow,border-color,transform] cursor-pointer {draggedCard ===
+      group.name
+        ? 'opacity-40'
+        : ''} {cardHighlighted
+        ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5'
+        : ''}"
+      style={cardHighlighted ? "" : `border-color: ${genreColorHsl(group.color_index)}`}
     >
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         data-card-header={group.name}
         oncontextmenu={(e) => openContextMenu(e, group.name, true)}
-        class="flex items-center gap-2 px-3 py-2.5 transition-colors {dropTarget?.kind === 'header' && dropTarget.group === group.name ? 'bg-brand-accent/25' : ''}"
+        class="flex items-center gap-2 px-3 py-2.5 transition-colors {dropTarget?.kind ===
+          'header' && dropTarget.group === group.name
+          ? 'bg-brand-accent/25'
+          : ''}"
       >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span
           onpointerdown={(e) => handleCardPointerDown(e, group.name)}
-          class="shrink-0 touch-none genre-drag-handle {draggedCard === group.name ? 'is-dragging' : ''} text-brand-text-secondary/50 hover:text-brand-text-secondary"
-          title={i18n.t("songTags.dragCardTooltip", {}, "Drag to make this a sub-genre of another card")}
+          class="shrink-0 touch-none genre-drag-handle {draggedCard === group.name
+            ? 'is-dragging'
+            : ''} text-brand-text-secondary/50 hover:text-brand-text-secondary"
+          title={i18n.t(
+            "songTags.dragCardTooltip",
+            {},
+            "Drag to make this a sub-genre of another card",
+          )}
         >
           <GripVertical class="w-3.5 h-3.5" />
         </span>
@@ -364,7 +402,12 @@
             data-chip-group={group.name}
             onpointerdown={(e) => handleChipPointerDown(e, child.name, group.name)}
             oncontextmenu={(e) => openContextMenu(e, child.name, false)}
-            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] genre-drag-handle {draggedChip?.name === child.name ? 'is-dragging opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : ''}"
+            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] genre-drag-handle {draggedChip?.name ===
+            child.name
+              ? 'is-dragging opacity-40'
+              : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name
+              ? 'ring-4 ring-brand-accent scale-110'
+              : ''}"
             style={`border-color: ${genreColorHsl(group.color_index)};`}
           >
             {#if renamingTag === child.name}
@@ -439,7 +482,10 @@
     <ColorPicker
       choices={genreColorChoices}
       value={group ? String(group.color_index) : null}
-      onChange={(v) => { tagsStore.setGroupColor(colorPopoverFor!, Number(v)); colorPopoverFor = null; }}
+      onChange={(v) => {
+        tagsStore.setGroupColor(colorPopoverFor!, Number(v));
+        colorPopoverFor = null;
+      }}
       size="sm"
       columns={5}
     />
@@ -453,10 +499,16 @@
     name={contextMenuTarget.name}
     isRoot={contextMenuTarget.isRoot}
     onRename={() => startRename(contextMenuTarget!.name)}
-    onPromote={contextMenuTarget.isRoot ? undefined : () => tagsStore.promoteTag(contextMenuTarget!.name)}
+    onPromote={contextMenuTarget.isRoot
+      ? undefined
+      : () => tagsStore.promoteTag(contextMenuTarget!.name)}
     onAlias={() => tagsStore.openAliasDialog(contextMenuTarget!.name)}
-    onDelete={() => { deleteConfirmName = contextMenuTarget!.name; }}
-    onClose={() => { contextMenuTarget = null; }}
+    onDelete={() => {
+      deleteConfirmName = contextMenuTarget!.name;
+    }}
+    onClose={() => {
+      contextMenuTarget = null;
+    }}
   />
 {/if}
 
@@ -467,7 +519,9 @@
     confirmLabel={i18n.t("songTags.deleteBtn", {}, "Delete")}
     cancelLabel={i18n.t("songTags.cancelBtn", {}, "Cancel")}
     onConfirm={confirmDeleteTag}
-    onCancel={() => { deleteConfirmName = null; }}
+    onCancel={() => {
+      deleteConfirmName = null;
+    }}
   />
 {/if}
 

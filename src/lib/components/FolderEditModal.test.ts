@@ -32,7 +32,9 @@ describe("FolderEditModal.svelte", () => {
   });
 
   it("closes after a successful save", async () => {
-    const update = vi.spyOn(collectionStore, "updateDirectoryMetadata").mockResolvedValue(undefined);
+    const update = vi
+      .spyOn(collectionStore, "updateDirectoryMetadata")
+      .mockResolvedValue(undefined);
     const onClose = vi.fn();
     render(FolderEditModal, { directory, onClose });
 
@@ -77,7 +79,9 @@ describe("FolderEditModal.svelte", () => {
 
     await fireEvent.click(screen.getByRole("button", { name: "Change Location…" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Change Location…" })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Change Location…" })).toBeEnabled(),
+    );
     expect(onClose).not.toHaveBeenCalled();
   });
 });

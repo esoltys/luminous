@@ -1,4 +1,10 @@
-import { CloudIcon, DeviceMobileSpeakerIcon, FolderIcon, HardDrivesIcon, UsbIcon } from "phosphor-svelte";
+import {
+  CloudIcon,
+  DeviceMobileSpeakerIcon,
+  FolderIcon,
+  HardDrivesIcon,
+  UsbIcon,
+} from "phosphor-svelte";
 import type { ConnectedDevice, FileSource } from "../../types";
 
 /** The icon that stands for a kind of source. */

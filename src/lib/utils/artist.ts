@@ -24,7 +24,7 @@ export function getArtistSongs(songs: Song[], name: string | null): Song[] {
   return songs.filter(
     (s) =>
       (s.album_artist && sameArtist(s.album_artist, name)) ||
-      (s.artist && sameArtist(s.artist, name))
+      (s.artist && sameArtist(s.artist, name)),
   );
 }
 
@@ -40,7 +40,7 @@ export function formatTrackNumber(
   track: number | null | undefined,
   disc: number | null | undefined,
   discCount: number,
-  fallbackIndex: number
+  fallbackIndex: number,
 ): string {
   const trackNum = track !== undefined && track !== null ? track : fallbackIndex + 1;
   if (discCount > 1) {
@@ -92,7 +92,7 @@ const EP_MAX_DURATION_NANOSEC = 30 * 60 * 1_000_000_000;
 export function classifyRelease(
   trackCount: number,
   discCount: number | null | undefined,
-  totalDurationNanosec: number | null | undefined
+  totalDurationNanosec: number | null | undefined,
 ): ReleaseCategory {
   if ((discCount ?? 1) > 1) return "set";
   if (trackCount === 1) return "single";
@@ -105,7 +105,7 @@ const GRADIENTS = [
   "from-rose-600 to-orange-600",
   "from-emerald-600 to-teal-600",
   "from-cyan-600 to-blue-600",
-  "from-amber-600 to-red-600"
+  "from-amber-600 to-red-600",
 ];
 
 /** Deterministic fallback gradient for an artist/playlist with no cover art. */

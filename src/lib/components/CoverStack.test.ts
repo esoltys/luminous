@@ -73,7 +73,9 @@ describe("CoverStack.svelte", () => {
       artist_portrait_uri: null,
       band_logo_uri: null,
       fanart_uri: null,
-      items: [{ category: "primary_cover", uri: "luminous-art://local/C:/Music/Artist/Album/cover.jpg" }],
+      items: [
+        { category: "primary_cover", uri: "luminous-art://local/C:/Music/Artist/Album/cover.jpg" },
+      ],
     };
 
     beforeEach(() => {
@@ -139,7 +141,7 @@ describe("CoverStack.svelte", () => {
       await waitFor(() =>
         expect(invokeMock).toHaveBeenCalledWith("open_artwork_path", {
           path: "C:/Music/Artist/Album/cover.jpg",
-        })
+        }),
       );
     });
 

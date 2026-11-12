@@ -37,17 +37,31 @@ describe("SongContextMenu.svelte", () => {
   });
 
   describe("View in Files", () => {
-    const target = { source: { kind: "folder", id: 1 }, path: ["Radiohead", "OK Computer"], selectedName: "02 Paranoid Android.flac", exact: true };
+    const target = {
+      source: { kind: "folder", id: 1 },
+      path: ["Radiohead", "OK Computer"],
+      selectedName: "02 Paranoid Android.flac",
+      exact: true,
+    };
 
     function locateReturns(result: unknown) {
-      vi.mocked(invoke).mockImplementation(async (cmd: string) => (cmd === "locate_song_in_files" ? result : null));
+      vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+        cmd === "locate_song_in_files" ? result : null,
+      );
     }
 
     it("opens the song's place in Files", async () => {
       locateReturns(target);
       const openInFiles = vi.spyOn(navigationStore, "openInFiles").mockImplementation(() => {});
       const onClose = vi.fn();
-      render(SongContextMenu, { x: 0, y: 0, song: localSong, onPlay: () => {}, onGoToAlbum: () => {}, onClose });
+      render(SongContextMenu, {
+        x: 0,
+        y: 0,
+        song: localSong,
+        onPlay: () => {},
+        onGoToAlbum: () => {},
+        onClose,
+      });
 
       await fireEvent.click(await screen.findByText("View in Files"));
       expect(invoke).toHaveBeenCalledWith("locate_song_in_files", { songId: 1 });
@@ -58,7 +72,14 @@ describe("SongContextMenu.svelte", () => {
 
     it("sits right after Go to Album", async () => {
       locateReturns(target);
-      render(SongContextMenu, { x: 0, y: 0, song: localSong, onPlay: () => {}, onGoToAlbum: () => {}, onClose: () => {} });
+      render(SongContextMenu, {
+        x: 0,
+        y: 0,
+        song: localSong,
+        onPlay: () => {},
+        onGoToAlbum: () => {},
+        onClose: () => {},
+      });
       await screen.findByText("View in Files");
 
       const labels = screen.getAllByRole("menuitem").map((item) => item.textContent?.trim());
@@ -68,13 +89,23 @@ describe("SongContextMenu.svelte", () => {
     it("is hidden for a song with no place in Files", async () => {
       locateReturns(null);
       render(SongContextMenu, { x: 0, y: 0, song: localSong, onPlay: () => {}, onClose: () => {} });
-      await waitFor(() => expect(invoke).toHaveBeenCalledWith("locate_song_in_files", { songId: 1 }));
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith("locate_song_in_files", { songId: 1 }),
+      );
       expect(screen.queryByText("View in Files")).not.toBeInTheDocument();
     });
 
     it("isn't offered for several songs", () => {
       locateReturns(target);
-      render(SongContextMenu, { x: 0, y: 0, song: localSong, selectedCount: 2, selectedSongIds: [1, 2], onPlay: () => {}, onClose: () => {} });
+      render(SongContextMenu, {
+        x: 0,
+        y: 0,
+        song: localSong,
+        selectedCount: 2,
+        selectedSongIds: [1, 2],
+        onPlay: () => {},
+        onClose: () => {},
+      });
       expect(invoke).not.toHaveBeenCalledWith("locate_song_in_files", expect.anything());
     });
   });
@@ -106,7 +137,10 @@ describe("SongContextMenu.svelte", () => {
     const item = await screen.findByText("Open in Picard");
     const button = item.closest("button");
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute("title", "Open in Picard isn't available for songs on a remote server");
+    expect(button).toHaveAttribute(
+      "title",
+      "Open in Picard isn't available for songs on a remote server",
+    );
   });
 
   it("disables Open in Picard for a song synced from an OpenSubsonic server", async () => {
@@ -173,15 +207,39 @@ describe("SongContextMenu.svelte", () => {
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute(
       "title",
-      "MusicBrainz Picard not found. Install it from picard.musicbrainz.org, or set a custom path in Settings."
+      "MusicBrainz Picard not found. Install it from picard.musicbrainz.org, or set a custom path in Settings.",
     );
   });
 
   it("renders Add to Playlist and opens submenu listing custom playlists", async () => {
     playlistsStore.playlists = [
-      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
-      { id: 20, name: "Indie Pop", track_count: 5, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
-      { id: 30, name: "Heavy Metal", track_count: 12, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
+      {
+        id: 10,
+        name: "Queue",
+        track_count: 0,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: true,
+      },
+      {
+        id: 20,
+        name: "Indie Pop",
+        track_count: 5,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
+      {
+        id: 30,
+        name: "Heavy Metal",
+        track_count: 12,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
     ];
     playlistsStore.pinnedPlaylistId = null;
 
@@ -208,9 +266,33 @@ describe("SongContextMenu.svelte", () => {
     const onClose = vi.fn();
 
     playlistsStore.playlists = [
-      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
-      { id: 20, name: "Active Playlist", track_count: 5, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
-      { id: 30, name: "Target Playlist", track_count: 12, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
+      {
+        id: 10,
+        name: "Queue",
+        track_count: 0,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: true,
+      },
+      {
+        id: 20,
+        name: "Active Playlist",
+        track_count: 5,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
+      {
+        id: 30,
+        name: "Target Playlist",
+        track_count: 12,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
     ];
     playlistsStore.pinnedPlaylistId = 20;
 
@@ -234,8 +316,24 @@ describe("SongContextMenu.svelte", () => {
 
   it("marks active custom playlist with an Active badge", async () => {
     playlistsStore.playlists = [
-      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
-      { id: 20, name: "Road Trip", track_count: 5, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
+      {
+        id: 10,
+        name: "Queue",
+        track_count: 0,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: true,
+      },
+      {
+        id: 20,
+        name: "Road Trip",
+        track_count: 5,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
     ];
     playlistsStore.pinnedPlaylistId = 20;
 
@@ -255,8 +353,24 @@ describe("SongContextMenu.svelte", () => {
 
   it("displays No custom playlists when user has no custom playlists", async () => {
     playlistsStore.playlists = [
-      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
-      { id: 20, name: "Rock Genre", track_count: 5, created: 0, updated: 0, dynamic_enabled: true, is_queue: false },
+      {
+        id: 10,
+        name: "Queue",
+        track_count: 0,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: true,
+      },
+      {
+        id: 20,
+        name: "Rock Genre",
+        track_count: 5,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: true,
+        is_queue: false,
+      },
     ];
     playlistsStore.pinnedPlaylistId = null;
 
@@ -280,8 +394,24 @@ describe("SongContextMenu.svelte", () => {
     const onClose = vi.fn();
 
     playlistsStore.playlists = [
-      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
-      { id: 20, name: "Favorites", track_count: 2, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
+      {
+        id: 10,
+        name: "Queue",
+        track_count: 0,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: true,
+      },
+      {
+        id: 20,
+        name: "Favorites",
+        track_count: 2,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
     ];
     playlistsStore.pinnedPlaylistId = null;
 
@@ -319,7 +449,15 @@ describe("SongContextMenu.svelte", () => {
     const onClose = vi.fn();
 
     playlistsStore.playlists = [
-      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
+      {
+        id: 10,
+        name: "Queue",
+        track_count: 0,
+        created: 0,
+        updated: 0,
+        dynamic_enabled: false,
+        is_queue: true,
+      },
     ];
     playlistsStore.pinnedPlaylistId = null;
 

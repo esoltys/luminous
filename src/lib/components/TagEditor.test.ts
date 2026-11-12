@@ -42,7 +42,18 @@ describe("TagEditor.svelte", () => {
       if (cmd === "set_song_rating") return 5;
       if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
       if (cmd === "get_all_artist_profiles" || cmd === "get_all_album_profiles") return [];
-      if (cmd === "get_playlists") return [{ id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 0, is_queue: true }];
+      if (cmd === "get_playlists")
+        return [
+          {
+            id: 1,
+            name: "Queue",
+            dynamic_enabled: false,
+            created: 0,
+            updated: 0,
+            track_count: 0,
+            is_queue: true,
+          },
+        ];
       return null;
     });
   });
@@ -76,9 +87,7 @@ describe("TagEditor.svelte", () => {
       return null;
     });
     const { findByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
-    expect(
-      await findByText(/changes are saved in Luminous only/i)
-    ).toBeInTheDocument();
+    expect(await findByText(/changes are saved in Luminous only/i)).toBeInTheDocument();
   });
 
   it("shows no remote-source note for a local song", async () => {
@@ -168,10 +177,13 @@ describe("TagEditor.svelte", () => {
     await fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("save_song_tags", expect.objectContaining({
-        songId: 10,
-        title: "Updated Track Title",
-      }));
+      expect(invoke).toHaveBeenCalledWith(
+        "save_song_tags",
+        expect.objectContaining({
+          songId: 10,
+          title: "Updated Track Title",
+        }),
+      );
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
@@ -180,7 +192,11 @@ describe("TagEditor.svelte", () => {
   it("adds a chip to the Artist field and saves it delimited alongside the original", async () => {
     const onClose = vi.fn();
     const onSave = vi.fn();
-    const { getByLabelText, getByRole, getByText } = render(TagEditor, { songId: 10, onClose, onSave });
+    const { getByLabelText, getByRole, getByText } = render(TagEditor, {
+      songId: 10,
+      onClose,
+      onSave,
+    });
 
     await waitFor(() => {
       expect(getByText("Original Artist")).toBeInTheDocument();
@@ -196,10 +212,13 @@ describe("TagEditor.svelte", () => {
     await fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("save_song_tags", expect.objectContaining({
-        songId: 10,
-        artist: "Original Artist; Second Artist",
-      }));
+      expect(invoke).toHaveBeenCalledWith(
+        "save_song_tags",
+        expect.objectContaining({
+          songId: 10,
+          artist: "Original Artist; Second Artist",
+        }),
+      );
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
@@ -257,7 +276,13 @@ describe("TagEditor.svelte", () => {
 
   it("loads and saves metadata for an unindexed file by path (#1887)", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "get_file_song_details") return { ...mockSongDetails, id: 0, path: "C:/Music/unscanned.flac", title: "Unscanned Track" };
+      if (cmd === "get_file_song_details")
+        return {
+          ...mockSongDetails,
+          id: 0,
+          path: "C:/Music/unscanned.flac",
+          title: "Unscanned Track",
+        };
       if (cmd === "save_file_tags") return null;
       if (cmd === "scan_source_folder") return null;
       return null;
@@ -276,7 +301,9 @@ describe("TagEditor.svelte", () => {
     });
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("get_file_song_details", { path: "C:/Music/unscanned.flac" });
+      expect(invoke).toHaveBeenCalledWith("get_file_song_details", {
+        path: "C:/Music/unscanned.flac",
+      });
     });
 
     const titleInput = getByLabelText("Song Title") as HTMLInputElement;
@@ -286,10 +313,13 @@ describe("TagEditor.svelte", () => {
     await fireEvent.click(getByRole("button", { name: /save/i }));
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("save_file_tags", expect.objectContaining({
-        path: "C:/Music/unscanned.flac",
-        title: "Updated Unscanned Track",
-      }));
+      expect(invoke).toHaveBeenCalledWith(
+        "save_file_tags",
+        expect.objectContaining({
+          path: "C:/Music/unscanned.flac",
+          title: "Updated Unscanned Track",
+        }),
+      );
     });
     expect(invoke).toHaveBeenCalledWith("scan_source_folder", {
       source: { kind: "folder", id: 1 },
@@ -325,7 +355,9 @@ describe("TagEditor.svelte", () => {
     expect(getByText("Source")).toBeInTheDocument();
     expect(getByText("FLAC")).toBeInTheDocument();
     expect(getByText("12.0 MB")).toBeInTheDocument();
-    expect(getByText(new RegExp(`No recorded changes since ${formatDate(1700000000)}`))).toBeInTheDocument();
+    expect(
+      getByText(new RegExp(`No recorded changes since ${formatDate(1700000000)}`)),
+    ).toBeInTheDocument();
   });
 
   it("renders luminous and scan change events with old_value → new_value and batch note", async () => {
@@ -429,7 +461,10 @@ describe("TagEditor.svelte", () => {
       return null;
     });
 
-    const { getByText, findByText, queryByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    const { getByText, findByText, queryByText } = render(TagEditor, {
+      songId: 10,
+      onClose: vi.fn(),
+    });
 
     await findByText("History");
     expect(getByText("All (2)")).toBeInTheDocument();
@@ -483,7 +518,10 @@ describe("TagEditor.svelte", () => {
       return null;
     });
 
-    const { getByText, findByText, queryByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    const { getByText, findByText, queryByText } = render(TagEditor, {
+      songId: 10,
+      onClose: vi.fn(),
+    });
 
     await findByText("History");
     expect(getByText("All (1)")).toBeInTheDocument();
@@ -534,7 +572,10 @@ describe("TagEditor.svelte", () => {
       return null;
     });
 
-    const { getByText, findByText, queryByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    const { getByText, findByText, queryByText } = render(TagEditor, {
+      songId: 10,
+      onClose: vi.fn(),
+    });
 
     await findByText("History");
     expect(getByText("Clear History")).toBeInTheDocument();
@@ -546,7 +587,9 @@ describe("TagEditor.svelte", () => {
     });
 
     await waitFor(() => {
-      expect(getByText(new RegExp(`No recorded changes since ${formatDate(1700000000)}`))).toBeInTheDocument();
+      expect(
+        getByText(new RegExp(`No recorded changes since ${formatDate(1700000000)}`)),
+      ).toBeInTheDocument();
     });
     expect(queryByText("Clear History")).not.toBeInTheDocument();
   });
@@ -560,7 +603,10 @@ describe("TagEditor.svelte", () => {
       return null;
     });
 
-    const { queryByText, findByText, unmount } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    const { queryByText, findByText, unmount } = render(TagEditor, {
+      songId: 10,
+      onClose: vi.fn(),
+    });
     await findByText(/changes are saved in Luminous only/i);
     expect(queryByText("History")).not.toBeInTheDocument();
     unmount();
@@ -623,7 +669,10 @@ describe("TagEditor.svelte", () => {
       return null;
     });
 
-    const { getByText, findByText, getAllByRole } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    const { getByText, findByText, getAllByRole } = render(TagEditor, {
+      songId: 10,
+      onClose: vi.fn(),
+    });
     await findByText("History");
     expect(historyCallCount).toBe(1);
 

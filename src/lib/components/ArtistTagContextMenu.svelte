@@ -2,7 +2,7 @@
   import {
     PencilSimpleIcon as Pencil,
     ArrowLineUpIcon as ArrowUpToLine,
-    TrashIcon as Trash2
+    TrashIcon as Trash2,
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -26,21 +26,29 @@
 </script>
 
 <ContextMenu {x} {y} {onClose}>
-  <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
+  <div
+    class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate"
+  >
     {name}
   </div>
 
   <ContextMenuItem
     icon={Pencil}
     label={i18n.t("songTags.renameTag", {}, "Rename")}
-    onclick={() => { onRename(); onClose(); }}
+    onclick={() => {
+      onRename();
+      onClose();
+    }}
   />
 
   {#if !isRoot && onPromote}
     <ContextMenuItem
       icon={ArrowUpToLine}
       label={i18n.t("songTags.promoteArtistTag", {}, "Promote to top-level tag")}
-      onclick={() => { onPromote?.(); onClose(); }}
+      onclick={() => {
+        onPromote?.();
+        onClose();
+      }}
     />
   {/if}
 
@@ -50,6 +58,9 @@
     icon={Trash2}
     destructive
     label={i18n.t("songTags.deleteBtn", {}, "Delete")}
-    onclick={() => { onDelete(); onClose(); }}
+    onclick={() => {
+      onDelete();
+      onClose();
+    }}
   />
 </ContextMenu>

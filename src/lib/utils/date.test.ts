@@ -94,4 +94,3 @@ describe("formatWeekRange", () => {
     expect(formatWeekRange(crossMonth, "fr")).toBe("sept. 27-oct. 3");
   });
 });
-

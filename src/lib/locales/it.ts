@@ -25,7 +25,7 @@ export const it = {
     connected: "Connesso",
     scrobblingPaused: "Scrobbling in pausa",
     pinned: "Fissati",
-    files: "File"
+    files: "File",
   },
   files: {
     addSource: "Aggiungi una cartella o un server",
@@ -44,7 +44,7 @@ export const it = {
       albumArt: "Copertina",
       notAudio: "Non audio",
       excluded: "Escluso",
-      notFromLuminous: "Non di Luminous"
+      notFromLuminous: "Non di Luminous",
     },
     emptyFolder: "Questa cartella è vuota.",
     sourceGone: "Questa sorgente non è più disponibile.",
@@ -62,34 +62,35 @@ export const it = {
     scanNudge: "Scansiona",
     summaryFiles: {
       one: "{count} file, {size}.",
-      other: "{count} file, {size}."
+      other: "{count} file, {size}.",
     },
     summaryFilesNoSize: {
       one: "{count} file.",
-      other: "{count} file."
+      other: "{count} file.",
     },
     summaryInLibrary: {
       one: "{count} è nella tua libreria.",
-      other: "{count} sono nella tua libreria."
+      other: "{count} sono nella tua libreria.",
     },
     summaryUnscanned: {
       one: "{count} file non è nella tua libreria —",
-      other: "{count} file non sono nella tua libreria —"
+      other: "{count} file non sono nella tua libreria —",
     },
     songCount: {
       one: "{count} brano",
-      other: "{count} brani"
+      other: "{count} brani",
     },
     kind: {
       folder: "Cartella musicale",
       subsonic: "Server multimediale",
       webdav: "Server WebDAV",
-      device: "Dispositivo"
+      device: "Dispositivo",
     },
     nothingToPlay: "Nessun file di questa cartella è ancora nella tua libreria.",
     playFailed: "Impossibile riprodurre questa cartella.",
     notInLibrary: "Questo file non è nella tua libreria.",
-    notInLibraryScan: "Questo file non è ancora nella tua libreria. Scansiona questa cartella per aggiungerlo.",
+    notInLibraryScan:
+      "Questo file non è ancora nella tua libreria. Scansiona questa cartella per aggiungerlo.",
     alreadySyncing: "{folder} è già nella sincronizzazione di {device}.",
     addedToSync: "{folder} aggiunta alla sincronizzazione di {device}.",
     addToSyncFailed: "Impossibile aggiungere questa cartella alla sincronizzazione di {device}.",
@@ -101,36 +102,39 @@ export const it = {
     copyPaths: "Copia percorsi",
     pathsCopied: {
       one: "{count} percorso copiato.",
-      other: "{count} percorsi copiati."
+      other: "{count} percorsi copiati.",
     },
     copyFailed: "Impossibile copiare negli appunti.",
     open: "Apri",
-    noAppToOpen: "Nessuna app è configurata per aprire i file {type}, quindi viene mostrato nella sua cartella.",
+    noAppToOpen:
+      "Nessuna app è configurata per aprire i file {type}, quindi viene mostrato nella sua cartella.",
     openFailed: "Impossibile aprire questo file.",
     hiddenFiles: {
       one: "{count} altro file non è mostrato.",
-      other: "Altri {count} file non sono mostrati."
+      other: "Altri {count} file non sono mostrati.",
     },
     queueFailed: "Impossibile aggiungere questa cartella alla coda.",
     playlistFailed: "Impossibile creare una playlist da questa cartella.",
     skippedScan: {
       one: "{count} file non è ancora nella tua libreria: scansiona questa cartella per includerlo.",
-      other: "{count} file non sono ancora nella tua libreria: scansiona questa cartella per includerli."
+      other:
+        "{count} file non sono ancora nella tua libreria: scansiona questa cartella per includerli.",
     },
     skipped: {
       one: "{count} file non è nella tua libreria ed è stato escluso.",
-      other: "{count} file non sono nella tua libreria e sono stati esclusi."
+      other: "{count} file non sono nella tua libreria e sono stati esclusi.",
     },
     selectedFiles: {
       one: "{selected} di {count} file selezionato, {size}.",
-      other: "{selected} di {count} file selezionati, {size}."
+      other: "{selected} di {count} file selezionati, {size}.",
     },
     selectedFilesNoSize: {
       one: "{selected} di {count} file selezionato.",
-      other: "{selected} di {count} file selezionati."
+      other: "{selected} di {count} file selezionati.",
     },
     viewInFiles: "Mostra in File",
-    movedShowingNearest: "Non si trova più dove Luminous l'ha visto l'ultima volta. Viene mostrata la cartella più vicina ancora esistente.",
+    movedShowingNearest:
+      "Non si trova più dove Luminous l'ha visto l'ultima volta. Viene mostrata la cartella più vicina ancora esistente.",
     filterPlaceholder: "Filtra {folder}…",
     filterCountBadge: "{matched} di {total}",
     clearFilter: "Cancella filtro",
@@ -141,15 +145,17 @@ export const it = {
     filterEmptyTitle: "Nulla in questa cartella corrisponde a {query}.",
     filterEmptyHint: {
       one: "Cancella il filtro per vedere {count} file, oppure modificalo per cercare altro.",
-      other: "Cancella il filtro per vedere tutti i {count} file, oppure modificalo per cercare altro."
+      other:
+        "Cancella il filtro per vedere tutti i {count} file, oppure modificalo per cercare altro.",
     },
     filterMatchSummary: {
       one: "{matched} di {count} file corrisponde al filtro.",
-      other: "{matched} di {count} file corrispondono al filtro."
+      other: "{matched} di {count} file corrispondono al filtro.",
     },
     editTags: "Modifica tag",
     editTagsForFolder: "Modifica tag per la cartella",
-    savedAndScanning: "Tag salvati. Scansione di {folder} in corso per aggiungere {file} alla tua libreria."
+    savedAndScanning:
+      "Tag salvati. Scansione di {folder} in corso per aggiungere {file} alla tua libreria.",
   },
   devices: {
     tabFiles: "File",
@@ -159,7 +165,8 @@ export const it = {
     rename: "Rinomina dispositivo",
     ejectNamed: "Espelli {device}",
     ejected: "Ora puoi scollegare {device}.",
-    ejectInUse: "Impossibile espellere {device}: un altro programma sta usando dei file al suo interno. Chiudilo e riprova.",
+    ejectInUse:
+      "Impossibile espellere {device}: un altro programma sta usando dei file al suo interno. Chiudilo e riprova.",
     ejectFailed: "Impossibile espellere {device}. Riprova tra un momento.",
     stopSync: "Interrompi sincronizzazione",
     stopSyncNamed: "Interrompi la sincronizzazione con {device}",
@@ -178,34 +185,37 @@ export const it = {
     gauge: {
       music: {
         one: "Musica {size}, {count} brano",
-        other: "Musica {size}, {count} brani"
+        other: "Musica {size}, {count} brani",
       },
       other: "Altri file {size}",
       free: "Libero {size}",
-      reserve: "Riservato al dispositivo {size}"
+      reserve: "Riservato al dispositivo {size}",
     },
     selected: {
       one: "{count} selezionato",
-      other: "{count} selezionati"
+      other: "{count} selezionati",
     },
-    onlyRemovesOwn: "La sincronizzazione rimuove solo i file che ha copiato qui. Ciò che hai aggiunto in altro modo resta.",
+    onlyRemovesOwn:
+      "La sincronizzazione rimuove solo i file che ha copiato qui. Ciò che hai aggiunto in altro modo resta.",
     play: "Riproduci",
     notPlayable: "Da questa scheda si possono riprodurre solo i brani copiati qui da Luminous.",
     deleteFromDevice: "Elimina dal dispositivo",
     deleteTitle: {
       one: "Eliminare {count} elemento da {device}?",
-      other: "Eliminare {count} elementi da {device}?"
+      other: "Eliminare {count} elementi da {device}?",
     },
-    deleteMessage: "I file vengono eliminati subito da {device}. I brani ancora selezionati nella scheda Sincronizzazione torneranno alla prossima sincronizzazione.",
+    deleteMessage:
+      "I file vengono eliminati subito da {device}. I brani ancora selezionati nella scheda Sincronizzazione torneranno alla prossima sincronizzazione.",
     deleted: {
       one: "{count} elemento eliminato da {device}.",
-      other: "{count} elementi eliminati da {device}."
+      other: "{count} elementi eliminati da {device}.",
     },
     deleteFailed: "Impossibile eliminare questi file da {device}.",
     deleteWhileSyncing: "Attendi la fine della sincronizzazione con {device}, poi elimina.",
     whatGoesOn: "Cosa va su {device}",
     sizeAfterConverting: "Dimensione sul dispositivo dopo la conversione",
-    nothingSelected: "Non va ancora niente su questo dispositivo. Aggiungi playlist, artisti o una cartella.",
+    nothingSelected:
+      "Non va ancora niente su questo dispositivo. Aggiungi playlist, artisti o una cartella.",
     groupPlaylists: "Playlist",
     groupArtists: "Artisti e album",
     groupFolders: "Cartelle",
@@ -214,7 +224,7 @@ export const it = {
     albumBy: "{album} di {artist}",
     cappedFit: {
       one: "Limitata a {cap}: entra {count} brano",
-      other: "Limitata a {cap}: entrano i primi {count} brani"
+      other: "Limitata a {cap}: entrano i primi {count} brani",
     },
     autoPlaylistSongs: "Playlist automatica, {songs}",
     folderSongs: "Cartella, {songs}",
@@ -238,11 +248,11 @@ export const it = {
     removeItemFromSyncFailed: "Impossibile rimuovere «{name}» dalla sincronizzazione di {device}.",
     addedSongsToSync: {
       one: "{count} brano aggiunto alla sincronizzazione di {device}.",
-      other: "{count} brani aggiunti alla sincronizzazione di {device}."
+      other: "{count} brani aggiunti alla sincronizzazione di {device}.",
     },
     removedSongsFromSync: {
       one: "{count} brano rimosso dalla sincronizzazione di {device}.",
-      other: "{count} brani rimossi dalla sincronizzazione di {device}."
+      other: "{count} brani rimossi dalla sincronizzazione di {device}.",
     },
     inSync: "Sincronizzato",
     how: "Come",
@@ -250,17 +260,21 @@ export const it = {
     songsYouUnselect: "Brani deselezionati",
     removeFromDevice: "Rimuovi dal dispositivo",
     leaveOnDevice: "Lascia sul dispositivo",
-    removeHint: "{device} contiene esattamente ciò che è selezionato. I brani che escono da una playlist lasciano il dispositivo alla prossima sincronizzazione.",
+    removeHint:
+      "{device} contiene esattamente ciò che è selezionato. I brani che escono da una playlist lasciano il dispositivo alla prossima sincronizzazione.",
     leaveHint: "I brani deselezionati restano su {device}. Vengono copiati solo i brani nuovi.",
     convert: "Converti",
     convertMode: {
       unsupported: "Solo ciò che {device} non può riprodurre",
       saveSpace: "Anche tutto ciò che diventa più piccolo",
-      never: "Niente, copia così com'è"
+      never: "Niente, copia così com'è",
     },
-    convertCacheHint: "Le copie convertite restano su questo computer, così la prossima sincronizzazione è veloce.",
-    convertNeverHint: "I file vengono copiati così come sono. {device} potrebbe non riprodurne alcuni.",
-    convertSubstituted: "{format} non è disponibile su questo computer, quindi i file vengono convertiti in {actual}.",
+    convertCacheHint:
+      "Le copie convertite restano su questo computer, così la prossima sincronizzazione è veloce.",
+    convertNeverHint:
+      "I file vengono copiati così come sono. {device} potrebbe non riprodurne alcuni.",
+    convertSubstituted:
+      "{format} non è disponibile su questo computer, quindi i file vengono convertiti in {actual}.",
     convertDeviceMayNotPlay: "{device} potrebbe non riprodurre {format}.",
     foldersOnDevice: "Cartelle sul dispositivo",
     playlistFiles: "File delle playlist",
@@ -268,7 +282,7 @@ export const it = {
       m3u8: "M3U8 nella cartella {folder}",
       m3uAscii: "M3U in ASCII semplice, in {folder}",
       pls: "PLS nella cartella {folder}",
-      none: "Nessun file di playlist"
+      none: "Nessun file di playlist",
     },
     more: "Altro: dimensione delle copertine, separatori di percorso, spazio da lasciare libero",
     artSize: "Dimensione delle copertine",
@@ -280,7 +294,8 @@ export const it = {
     spaceToKeepFree: "Spazio da lasciare libero",
     projectionFits: "Ci sta. {copy} da copiare, {remove} da rimuovere, {free} liberi dopo.",
     projectionTooBig: "Non ci sta: {over} di troppo. Deseleziona qualcosa.",
-    projectionTooBigLeave: "Non ci sta: {over} di troppo. Deseleziona qualcosa o passa a Rimuovi dal dispositivo.",
+    projectionTooBigLeave:
+      "Non ci sta: {over} di troppo. Deseleziona qualcosa o passa a Rimuovi dal dispositivo.",
     previewChanges: "Vedi le modifiche",
     previewFailed: "Impossibile pianificare la sincronizzazione con {device}.",
     backToSettings: "Torna alle impostazioni di sincronizzazione di {device}",
@@ -289,15 +304,15 @@ export const it = {
     verdictTooBig: "{over} di troppo per {device}",
     summaryCopy: {
       one: "{count} brano da copiare.",
-      other: "{count} brani da copiare."
+      other: "{count} brani da copiare.",
     },
     summaryCopyConverted: {
       one: "{count} brano da copiare, di cui {converted} convertito in {target}.",
-      other: "{count} brani da copiare, di cui {converted} convertiti in {target}."
+      other: "{count} brani da copiare, di cui {converted} convertiti in {target}.",
     },
     summaryRemove: {
       one: "{count} brano lascia il dispositivo.",
-      other: "{count} brani lasciano il dispositivo."
+      other: "{count} brani lasciano il dispositivo.",
     },
     fixConvertSaves: "Convertire tutto in {target} fa risparmiare circa {saving}.",
     fixUncheckLargest: "Deseleziona {item}, l'elemento più grande con {size}.",
@@ -310,15 +325,15 @@ export const it = {
     legendOther: "Non musica: {size}",
     listCopy: {
       one: "Copia {count} brano, {size}",
-      other: "Copia {count} brani, {size}"
+      other: "Copia {count} brani, {size}",
     },
     listRemove: {
       one: "Rimuovi {count} brano, {size}",
-      other: "Rimuovi {count} brani, {size}"
+      other: "Rimuovi {count} brani, {size}",
     },
     listUpdate: {
       one: "Aggiorna {count} brano",
-      other: "Aggiorna {count} brani"
+      other: "Aggiorna {count} brani",
     },
     showAllCopy: "Mostra tutti i brani da copiare",
     showAllRemove: "Mostra tutti i brani da rimuovere",
@@ -326,7 +341,7 @@ export const it = {
     playlistsRow: "Playlist",
     playlistFilesRewritten: {
       one: "{count} file riscritto",
-      other: "{count} file riscritti"
+      other: "{count} file riscritti",
     },
     othersLeftAlone: "I file aggiunti a {device} in altro modo non vengono toccati.",
     reasonFolder: "Cartella",
@@ -338,7 +353,7 @@ export const it = {
       playlist: "Playlist deselezionata",
       artist: "Artista deselezionato",
       album: "Album deselezionato",
-      folder: "Cartella deselezionata"
+      folder: "Cartella deselezionata",
     },
     reasonDeleted: "Eliminato dalla libreria",
     reasonTags: "Tag modificati",
@@ -349,7 +364,8 @@ export const it = {
     changeSelection: "Modifica la selezione",
     startSync: "Avvia sincronizzazione",
     convertEverything: "Converti tutto in {target}",
-    planChanged: "{device} è cambiato dall'anteprima. Controlla il nuovo piano, poi avvia di nuovo la sincronizzazione.",
+    planChanged:
+      "{device} è cambiato dall'anteprima. Controlla il nuovo piano, poi avvia di nuovo la sincronizzazione.",
     alreadySyncing: "{device} è già in sincronizzazione.",
     startFailed: "Impossibile avviare la sincronizzazione con {device}.",
     songsOf: "{done} di {total} brani",
@@ -365,22 +381,23 @@ export const it = {
     lessThanAMinute: "Meno di un minuto",
     minutesLeft: {
       one: "Circa {count} minuto rimanente",
-      other: "Circa {count} minuti rimanenti"
+      other: "Circa {count} minuti rimanenti",
     },
-    stoppingKeeps: "Interrompendo restano tutti i brani già copiati. Tieni {device} collegato finché la sincronizzazione non termina.",
+    stoppingKeeps:
+      "Interrompendo restano tutti i brani già copiati. Tieni {device} collegato finché la sincronizzazione non termina.",
     syncDone: "Sincronizzazione con {device} completata.",
     syncDoneWithFailures: {
       one: "Sincronizzazione con {device} completata, ma {count} brano non è stato copiato.",
-      other: "Sincronizzazione con {device} completata, ma {count} brani non sono stati copiati."
+      other: "Sincronizzazione con {device} completata, ma {count} brani non sono stati copiati.",
     },
     syncStopped: {
       one: "Sincronizzazione con {device} interrotta. È stato copiato {count} brano.",
-      other: "Sincronizzazione con {device} interrotta. Sono stati copiati {count} brani."
+      other: "Sincronizzazione con {device} interrotta. Sono stati copiati {count} brani.",
     },
-    syncFailed: "La sincronizzazione con {device} si è interrotta per un errore."
+    syncFailed: "La sincronizzazione con {device} si è interrotta per un errore.",
   },
   topNav: {
-    filterExample: "ad es. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
+    filterExample: 'ad es. rating:>=4 year:<2000 genre:jazz "miles davis"',
     fileFilterSupported: "File supportati",
     fileFilterAudio: "File audio",
     fileFilterPlaylists: "Playlist",
@@ -393,7 +410,7 @@ export const it = {
     searching: "Ricerca in corso...",
     tracksCount: {
       one: "{count} brano",
-      other: "{count} brani"
+      other: "{count} brani",
     },
     clearSearch: "Cancella ricerca",
     recentSearches: "Ricerche recenti",
@@ -412,13 +429,14 @@ export const it = {
     rightPanelRail: "Barra informazioni",
     searchQuerySubtitle: "Query di ricerca",
     createSmartPlaylistFromSearch: "Crea playlist intelligente dalla ricerca",
-    createSmartPlaylistFromSearchHint: "Precompila il generatore con le regole della ricerca attiva",
+    createSmartPlaylistFromSearchHint:
+      "Precompila il generatore con le regole della ricerca attiva",
     openBuilder: "Apri generatore →",
     filterSyntaxHint: "💡 Suggerimento sulla sintassi dei filtri",
     filterFieldsLabel: "Campi:",
     filterOperatorsLabel: "Operatori:",
     removeRecentSearchTooltip: "Rimuovi dalle ricerche recenti",
-    filesAndFolders: "File e cartelle"
+    filesAndFolders: "File e cartelle",
   },
   home: {
     greetingMorning: "Buongiorno",
@@ -436,32 +454,35 @@ export const it = {
     chartPeak: "Picco n. {peak}",
     chartWeeksCount: {
       one: "{count} settimana",
-      other: "{count} settimane"
+      other: "{count} settimane",
     },
     recentlyAdded: "Aggiunti di recente",
     pinned: "Fissati",
     exploreLibrary: "Esplora la tua libreria",
     emptyState: "Aggiungi della musica per vedere le tue raccolte personalizzate",
     suggestTitle: "Aggiungi le cartelle da cui riproduci",
-    suggestHint: "Aggiungi una cartella per sfogliarla per artista, album o genere. Cronologia di ascolto e valutazioni restano con ogni brano.",
+    suggestHint:
+      "Aggiungi una cartella per sfogliarla per artista, album o genere. Cronologia di ascolto e valutazioni restano con ogni brano.",
     suggestSongs: {
       one: "{count} brano riprodotto",
-      other: "{count} brani riprodotti"
+      other: "{count} brani riprodotti",
     },
     suggestAdd: "Aggiungi alla libreria",
     suggestAddNamed: "Aggiungi {folder} alla tua libreria",
     suggestNotNow: "Non ora",
     suggestNotNowNamed: "Non ora per {folder}",
-    suggestHide: "Nascondi i suggerimenti"
+    suggestHide: "Nascondi i suggerimenti",
   },
   emptyLibrary: {
     playHeading: "Ascolta musica",
     openFiles: "Apri file",
     playFolder: "Riproduci una cartella",
-    dropHint: "Oppure trascina file e cartelle in qualsiasi punto di questa finestra per riprodurli.",
+    dropHint:
+      "Oppure trascina file e cartelle in qualsiasi punto di questa finestra per riprodurli.",
     libraryHeading: "Crea una libreria",
     addFolder: "Aggiungi cartella alla libreria",
-    libraryHint: "Aggiungi una cartella per sfogliarla per album, artista o genere.\nLuminous la mantiene sincronizzata quando i file cambiano."
+    libraryHint:
+      "Aggiungi una cartella per sfogliarla per album, artista o genere.\nLuminous la mantiene sincronizzata quando i file cambiano.",
   },
   welcome: {
     title: "Benvenuto in Luminous",
@@ -471,16 +492,16 @@ export const it = {
     termsOfService: "Termini di servizio",
     and: "e l'",
     privacyPolicy: "Informativa sulla privacy",
-    language: "Lingua"
+    language: "Lingua",
   },
   dbNewerThanApp: {
     title: "Database di una versione più recente",
-    text: "Questa libreria è stata aperta l'ultima volta da una versione più recente di Luminous (database v{dbVersion}, questa app supporta la v{appVersion}). Le tue cartelle e i tuoi brani sono ancora al loro posto: aggiorna Luminous per rivederli."
+    text: "Questa libreria è stata aperta l'ultima volta da una versione più recente di Luminous (database v{dbVersion}, questa app supporta la v{appVersion}). Le tue cartelle e i tuoi brani sono ancora al loro posto: aggiorna Luminous per rivederli.",
   },
   collection: {
     externalChangesToast: {
       one: "{name}: {count} traccia modificata all'esterno di Luminous",
-      other: "{name}: {count} tracce modificate all'esterno di Luminous"
+      other: "{name}: {count} tracce modificate all'esterno di Luminous",
     },
     alphabetScrubberLabel: "Indice alfabetico",
     jumpToLetter: "Vai alla lettera {letter}",
@@ -493,18 +514,19 @@ export const it = {
     languages: "Lingue",
     showingSongs: {
       one: "{count} brano visualizzato",
-      other: "{count} brani visualizzati"
+      other: "{count} brani visualizzati",
     },
     showingAlbums: {
       one: "{count} album visualizzato",
-      other: "{count} album visualizzati"
+      other: "{count} album visualizzati",
     },
     showingArtists: {
       one: "{count} artista visualizzato",
-      other: "{count} artisti visualizzati"
+      other: "{count} artisti visualizzati",
     },
     noSongsTitle: "Nessun brano trovato",
-    noSongsSearchEmpty: "Non è stato trovato alcun brano corrispondente a «{query}». Prova a modificare le parole chiave.",
+    noSongsSearchEmpty:
+      "Non è stato trovato alcun brano corrispondente a «{query}». Prova a modificare le parole chiave.",
     clearSearchFilter: "Rimuovi filtro di ricerca",
     tableHeaderTrack: "#",
     tableHeaderTitle: "Titolo",
@@ -558,7 +580,7 @@ export const it = {
     sortGenreDesc: "Ordina: genere (Z-A)",
     albumsCount: {
       one: "{count} album",
-      other: "{count} album"
+      other: "{count} album",
     },
     selectPlaylistFirstAlert: "Seleziona o crea prima una playlist dalla scheda Playlist.",
     albumPlaylistName: "Album: {name}",
@@ -619,7 +641,7 @@ export const it = {
     tableHeaderLibrary: "Libreria",
     tableHeaderLastPlayed: "Ultima riproduzione",
     noTracksMatchQuery: "Nessun brano corrisponde alla tua ricerca:",
-    resetSearchFilters: "Reimposta ricerca e filtri"
+    resetSearchFilters: "Reimposta ricerca e filtri",
   },
   settings: {
     textFilesFilter: "Testo",
@@ -637,7 +659,8 @@ export const it = {
     musicbrainzVerifyFailed: "Impossibile verificare il codice di autorizzazione",
     musicbrainzStatsFailed: "Impossibile caricare le statistiche di MusicBrainz",
     blockedMetadataTitle: "Metadati online bloccati",
-    blockedMetadataSubtitle: "Corrispondenze online rifiutate in precedenza. Lo sblocco consente nuovamente l'associazione automatica.",
+    blockedMetadataSubtitle:
+      "Corrispondenze online rifiutate in precedenza. Lo sblocco consente nuovamente l'associazione automatica.",
     blockedMetadataEmpty: "Nessun metadato bloccato.",
     manageBlockedMetadataBtn: "Gestisci elenco di blocco",
     unblockBtn: "Sblocca",
@@ -665,7 +688,8 @@ export const it = {
     aboutDiscussions: "Community su Reddit",
     aboutIssues: "Segnalazioni su GitHub",
     aboutInfluences: "Influenze e ringraziamenti",
-    aboutInfluencesText: "Ispirato a lettori multimediali open source e indipendenti: Audacious, Strawberry Music Player, Elisa (KDE) e MusicBee.",
+    aboutInfluencesText:
+      "Ispirato a lettori multimediali open source e indipendenti: Audacious, Strawberry Music Player, Elisa (KDE) e MusicBee.",
     aboutDedication: "❤️ alle mie ragazze: Nicole, Brooke e Rachel",
     aboutCreatedByPrefix: "Creato da ",
     aboutCreatedBySuffix: " nei Kootenays, Columbia Britannica, Canada",
@@ -680,52 +704,65 @@ export const it = {
     ratingStyleHeart: "Cuore (preferito)",
     ratingStyleStars: "5 stelle",
     ratingStyleBoth: "Entrambi (cuore e 5 stelle)",
-    ratingStyleHint: "Scegli Cuore per contrassegnare i brani preferiti, 5 stelle per valutazioni a mezza stella oppure Entrambi per mostrare cuori e stelle affiancati. Le valutazioni degli album usano sempre 5 stelle.",
+    ratingStyleHint:
+      "Scegli Cuore per contrassegnare i brani preferiti, 5 stelle per valutazioni a mezza stella oppure Entrambi per mostrare cuori e stelle affiancati. Le valutazioni degli album usano sempre 5 stelle.",
     weekStart: "Inizia la settimana di",
     weekStartSunday: "Domenica",
     weekStartMonday: "Lunedì",
-    weekStartHint: "Scegli quale giorno considerare l'inizio della settimana per classifiche e statistiche settimanali.",
+    weekStartHint:
+      "Scegli quale giorno considerare l'inizio della settimana per classifiche e statistiche settimanali.",
     minimizeToTrayLabel: "Riduci nell'area di notifica",
-    minimizeToTrayHint: "Chiudi la finestra per nascondere Luminous nell'area di notifica invece di uscire.",
+    minimizeToTrayHint:
+      "Chiudi la finestra per nascondere Luminous nell'area di notifica invece di uscire.",
     launchAtLoginLabel: "Avvia all'accesso",
     launchAtLoginHint: "Avvia Luminous automaticamente quando accedi.",
     defaultPlayerLabel: "Imposta Luminous come lettore musicale predefinito",
-    defaultPlayerHint: "Apri le app predefinite di Windows e scegli quali tipi di file aprire con Luminous.",
+    defaultPlayerHint:
+      "Apri le app predefinite di Windows e scegli quali tipi di file aprire con Luminous.",
     defaultPlayerButton: "Apri app predefinite",
     defaultPlayerError: "Impossibile aprire le app predefinite di Windows",
     exportDiagnosticsLabel: "Esporta diagnostica",
-    exportDiagnosticsHint: "Salva un file di log con gli arresti anomali e gli errori recenti da allegare a una segnalazione.",
+    exportDiagnosticsHint:
+      "Salva un file di log con gli arresti anomali e gli errori recenti da allegare a una segnalazione.",
     exportDiagnosticsSuccess: "Diagnostica esportata",
     exportDiagnosticsError: "Esportazione della diagnostica non riuscita",
     dataStorageLabel: "Posizione di archiviazione dei dati",
-    dataStorageHint: "Cartella in cui Luminous archivia il database della libreria, la cache delle copertine e le preferenze.",
+    dataStorageHint:
+      "Cartella in cui Luminous archivia il database della libreria, la cache delle copertine e le preferenze.",
     dataStoragePortableBadge: "Modalità portatile",
     dataStorageStandardBadge: "Modalità standard",
     dataStorageCopyButton: "Copia percorso",
     dataStorageCopiedToast: "Percorso della cartella dati copiato negli appunti",
     audioOutputTitle: "Uscita audio",
-    audioOutputSubtitle: "Configura il dispositivo di uscita, il driver e le impostazioni hardware.",
+    audioOutputSubtitle:
+      "Configura il dispositivo di uscita, il driver e le impostazioni hardware.",
     audioBackendLabel: "Modalità di uscita",
-    audioBackendHint: "Scegli tra l'audio di sistema condiviso e lo streaming diretto all'hardware. L'hardware diretto ignora il volume di sistema, quindi la riproduzione va in pausa quando si passa a esso.",
+    audioBackendHint:
+      "Scegli tra l'audio di sistema condiviso e lo streaming diretto all'hardware. L'hardware diretto ignora il volume di sistema, quindi la riproduzione va in pausa quando si passa a esso.",
     audioBackendShared: "Audio condiviso (predefinito di sistema)",
     audioBackendAsio: "Hardware diretto (ASIO)",
     audioBackendExclusive: "Modalità esclusiva (WASAPI)",
     audioBackendAlsa: "Hardware diretto (ALSA)",
     audioDeviceLabel: "Dispositivo di uscita",
-    audioDeviceHint: "Seleziona la scheda audio o il convertitore digitale-analogico (DAC) per la riproduzione.",
+    audioDeviceHint:
+      "Seleziona la scheda audio o il convertitore digitale-analogico (DAC) per la riproduzione.",
     audioDeviceDefault: "Dispositivo di uscita predefinito",
     audioDeviceDisconnected: "{name} (disconnesso)",
     audioOutputPlayingShared: "Riproduzione tramite audio condiviso per ora.",
     volumeSafetyLabel: "Limite di volume",
-    volumeSafetyHint: "Limita il volume massimo in uscita per proteggere l'udito e le apparecchiature ad alto guadagno.",
+    volumeSafetyHint:
+      "Limita il volume massimo in uscita per proteggere l'udito e le apparecchiature ad alto guadagno.",
     volumeSafetyCeilingLabel: "Soglia di sicurezza",
-    volumeSafetyCeilingHint: "Imposta il livello massimo raggiungibile da cursore del volume, scorciatoie e manopole del dispositivo.",
+    volumeSafetyCeilingHint:
+      "Imposta il livello massimo raggiungibile da cursore del volume, scorciatoie e manopole del dispositivo.",
     audioAsioControlPanelBtn: "Apri pannello di controllo del driver",
-    audioAsioControlPanelHint: "Regola le dimensioni del buffer hardware e le impostazioni del clock nel pannello nativo del driver.",
+    audioAsioControlPanelHint:
+      "Regola le dimensioni del buffer hardware e le impostazioni del clock nel pannello nativo del driver.",
     audioAsioNoDevices: "Nessun driver hardware ASIO rilevato.",
     audioAlsaNoDevices: "Nessun dispositivo audio hardware trovato.",
     audioRefreshDevicesBtn: "Aggiorna dispositivi",
-    audioRefreshDevicesHint: "Esegui una nuova scansione delle schede audio e dei driver disponibili.",
+    audioRefreshDevicesHint:
+      "Esegui una nuova scansione delle schede audio e dei driver disponibili.",
     appAndUpdatesTitle: "Applicazione e aggiornamenti",
     updateCheckNowBtn: "Verifica aggiornamenti",
     updateChecking: "Verifica in corso...",
@@ -769,12 +806,14 @@ export const it = {
     updateAutoSupportedFooter: "aggiornamento automatico supportato",
     updateNotifyOnlyFooter: "solo notifica, installa manualmente",
     updateNotifyOnlyAppImageFooter: "solo notifica, scarica la nuova AppImage",
-    updateNotifyOnlyPortableFooter: "solo notifica, scarica il nuovo file ZIP della versione portatile",
+    updateNotifyOnlyPortableFooter:
+      "solo notifica, scarica il nuovo file ZIP della versione portatile",
     releaseNotesLink: "Note di rilascio",
     updateManagedByStoreDesc: "Gli aggiornamenti vengono installati automaticamente.",
     updateViewInStore: "Visualizza in Microsoft Store",
     updateManagedByPackageManagerTitle: "Gestito dal gestore di pacchetti",
-    updateManagedByPackageManagerDesc: "Gli aggiornamenti dell'installazione {format} sono gestiti dal gestore di pacchetti del sistema.",
+    updateManagedByPackageManagerDesc:
+      "Gli aggiornamenti dell'installazione {format} sono gestiti dal gestore di pacchetti del sistema.",
     addFolder: "Aggiungi cartella",
     folderItemRecursive: "Monitoraggio delle modifiche della cartella",
     folderItemRecursiveWatchOff: "Scansione ricorsiva (monitoraggio in tempo reale disattivato)",
@@ -785,11 +824,12 @@ export const it = {
     folderLocate: "Individua…",
     folderLocation: "Posizione",
     folderChangeLocation: "Cambia posizione…",
-    folderLocateHint: "Indica la nuova posizione di questa cartella se la lettera dell'unità è cambiata o hai spostato la musica. I brani mantengono conteggi di riproduzione, valutazioni e playlist.",
+    folderLocateHint:
+      "Indica la nuova posizione di questa cartella se la lettera dell'unità è cambiata o hai spostato la musica. I brani mantengono conteggi di riproduzione, valutazioni e playlist.",
     folderLocateDialogTitle: "Seleziona la nuova posizione della cartella",
     folderLocateSuccess: {
       one: "{count} brano ricollegato a {path}",
-      other: "{count} brani ricollegati a {path}"
+      other: "{count} brani ricollegati a {path}",
     },
     folderLocateFailedPrefix: "Impossibile ricollegare la cartella: ",
     editFolderTitle: "Modifica dettagli della cartella",
@@ -822,16 +862,20 @@ export const it = {
     badgeColorIndigo: "Indaco",
     loudnessAnalysisActive: {
       one: "La normalizzazione del volume sta analizzando in background {count} brano: può sembrare una scansione anche quando il monitoraggio delle cartelle è disattivato. Disattivala nella scheda Equalizzatore per interromperla.",
-      other: "La normalizzazione del volume sta analizzando in background {count} brani: può sembrare una scansione anche quando il monitoraggio delle cartelle è disattivato. Disattivala nella scheda Equalizzatore per interromperla."
+      other:
+        "La normalizzazione del volume sta analizzando in background {count} brani: può sembrare una scansione anche quando il monitoraggio delle cartelle è disattivato. Disattivala nella scheda Equalizzatore per interromperla.",
     },
     musicalAnalysisActive: {
       one: "Rilevamento di tempo e tonalità per {count} brano in background: può sembrare una scansione anche quando il monitoraggio delle cartelle è disattivato. Compila solo i tag BPM e tonalità vuoti. Disattiva «Rileva tempo e tonalità» per interromperlo.",
-      other: "Rilevamento di tempo e tonalità per {count} brani in background: può sembrare una scansione anche quando il monitoraggio delle cartelle è disattivato. Compila solo i tag BPM e tonalità vuoti. Disattiva «Rileva tempo e tonalità» per interromperlo."
+      other:
+        "Rilevamento di tempo e tonalità per {count} brani in background: può sembrare una scansione anche quando il monitoraggio delle cartelle è disattivato. Compila solo i tag BPM e tonalità vuoti. Disattiva «Rileva tempo e tonalità» per interromperlo.",
     },
     detectTempoKeyLabel: "Rileva tempo e tonalità",
-    detectTempoKeyHint: "Compila i tag BPM e tonalità mancanti analizzando i brani in background. Legge ogni brano una volta, e può richiedere tempo con raccolte grandi o unità di rete.",
+    detectTempoKeyHint:
+      "Compila i tag BPM e tonalità mancanti analizzando i brani in background. Legge ogni brano una volta, e può richiedere tempo con raccolte grandi o unità di rete.",
     noFoldersTitle: "Nessuna cartella monitorata",
-    noFoldersText: "Fai clic su «Aggiungi cartella» qui sopra per aggiungere la tua cartella musicale.",
+    noFoldersText:
+      "Fai clic su «Aggiungi cartella» qui sopra per aggiungere la tua cartella musicale.",
     dynamicThemes: "Temi dinamici",
     predefinedThemes: "Temi predefiniti",
     customThemes: "Temi personalizzati",
@@ -846,14 +890,20 @@ export const it = {
     addonDownloading: "Download in corso…",
     addonOwned: "Posseduto",
     addonTryAgain: "Riprova",
-    addonDescriptionMothman: "Un minuscolo criptide danza lungo il bordo superiore della barra del lettore.",
-    addonError_offline: "Impossibile raggiungere il server dei componenti aggiuntivi. Controlla la connessione e riprova.",
-    addonError_not_entitled: "Lo Store non è riuscito a confermare che possiedi questo componente aggiuntivo. Verifica gli acquisti, poi riprova.",
+    addonDescriptionMothman:
+      "Un minuscolo criptide danza lungo il bordo superiore della barra del lettore.",
+    addonError_offline:
+      "Impossibile raggiungere il server dei componenti aggiuntivi. Controlla la connessione e riprova.",
+    addonError_not_entitled:
+      "Lo Store non è riuscito a confermare che possiedi questo componente aggiuntivo. Verifica gli acquisti, poi riprova.",
     addonError_store: "Microsoft Store non ha risposto. Riprova tra un attimo.",
-    addonError_upstream: "Il servizio dei componenti aggiuntivi ha dei problemi. Riprova più tardi.",
+    addonError_upstream:
+      "Il servizio dei componenti aggiuntivi ha dei problemi. Riprova più tardi.",
     addonError_rate_limited: "Troppi tentativi. Attendi un minuto, poi riprova.",
-    addonError_bundle: "Il download non ha superato la verifica. Riprova o contatta l'assistenza se continua a non riuscire.",
-    addonError_unsupported_api: "Questo componente aggiuntivo richiede una versione più recente di Luminous. Aggiorna per usarlo.",
+    addonError_bundle:
+      "Il download non ha superato la verifica. Riprova o contatta l'assistenza se continua a non riuscire.",
+    addonError_unsupported_api:
+      "Questo componente aggiuntivo richiede una versione più recente di Luminous. Aggiorna per usarlo.",
     addonError_reconfirm: "Connettiti a Internet una volta per riconfermare l'acquisto.",
     addonError_internal: "Qualcosa è andato storto. Riprova.",
     luminousFootnote: "I colori cambiano in base alla copertina dell'album in riproduzione",
@@ -886,7 +936,8 @@ export const it = {
     applyTheme: "Applica tema",
     livePreviewInfo: "Fai clic su «Applica tema» per vedere l'anteprima dei colori in tempo reale!",
     selectMusicDirectory: "Seleziona cartella musicale",
-    confirmRemoveFolder: "Smettere di monitorare la cartella: {path}?\nI brani di questa cartella non verranno rimossi dalle tue playlist, ma saranno contrassegnati come non disponibili.",
+    confirmRemoveFolder:
+      "Smettere di monitorare la cartella: {path}?\nI brani di questa cartella non verranno rimossi dalle tue playlist, ma saranno contrassegnati come non disponibili.",
     enterThemeNameAlert: "Inserisci un nome per il tuo tema personalizzato.",
     mainViewDescription: "Tonalità principale dell'area di lavoro",
     sidebarDescription: "Tonalità di risalto del pannello di navigazione",
@@ -918,18 +969,20 @@ export const it = {
     lightBgTooltip: "Sfondo chiaro: usa un testo scuro per il contrasto",
     darkBgTooltip: "Sfondo scuro: usa un testo chiaro per il contrasto",
     manageLibrary: "Gestisci libreria",
-    scanProgressClickHint: "Scansione in corso: fai clic per aprire le impostazioni delle cartelle monitorate",
+    scanProgressClickHint:
+      "Scansione in corso: fai clic per aprire le impostazioni delle cartelle monitorate",
     rescanTitle: "Scansione e manutenzione della libreria",
-    rescanSubtitle: "Esegui scansioni incrementali o complete e configura la scansione automatica in background.",
+    rescanSubtitle:
+      "Esegui scansioni incrementali o complete e configura la scansione automatica in background.",
     lastScanned: "Ultima scansione: {time}",
     importFinishedToast: {
       one: "{count} brano aggiunto",
-      other: "{count} brani aggiunti"
+      other: "{count} brani aggiunti",
     },
     batchProcessingToast: "Elaborazione dei brani ({current}/{total})...",
     batchProcessingDoneToast: {
       one: "{count} brano aggiornato",
-      other: "{count} brani aggiornati"
+      other: "{count} brani aggiornati",
     },
     scanningPhase: "Fase: {phase}",
     phaseDiscovering: "Individuazione dei file",
@@ -939,30 +992,38 @@ export const it = {
     phaseUpdating: "Aggiornamento della libreria",
     phaseDone: "Completato",
     incrementalRescanBtn: "Riesegui scansione libreria",
-    incrementalRescanHint: "Cerca file nuovi, modificati o rimossi nelle cartelle monitorate, saltando quelli la cui data di modifica non è cambiata",
+    incrementalRescanHint:
+      "Cerca file nuovi, modificati o rimossi nelle cartelle monitorate, saltando quelli la cui data di modifica non è cambiata",
     forceFullScanBtn: "Forza scansione completa",
-    forceFullScanHint: "Rileggi metadati e copertine di tutti i file audio, ignorando le date di modifica dei file",
+    forceFullScanHint:
+      "Rileggi metadati e copertine di tutti i file audio, ignorando le date di modifica dei file",
     pruneMissingBtn: "Pulisci libreria",
     pruneMissingHint: "Rimuovi brani mancanti, cartelle vuote e voci duplicate",
     contextEnrichmentIntegrationTitle: "Servizi online",
-    contextEnrichmentDesc: "Disattiva per usare Luminous completamente offline: nessuna richiesta a servizi esterni per copertine, testi, biografie, scrobbling o aggiornamenti. Le librerie Subsonic e WebDAV continuano a funzionare.",
+    contextEnrichmentDesc:
+      "Disattiva per usare Luminous completamente offline: nessuna richiesta a servizi esterni per copertine, testi, biografie, scrobbling o aggiornamenti. Le librerie Subsonic e WebDAV continuano a funzionare.",
     onlineLabel: "Online",
     offlineLabel: "Offline",
     fanartIntegration: "Integrazione con fanart.tv",
     fanartDesc1: "Luminous usa ",
-    fanartDesc2: " per recuperare foto degli artisti, loghi delle band, sfondi di intestazione, copertine degli album e immagini dei dischi quando non ne trova in locale. Luminous fornisce una chiave predefinita; se non è configurata alcuna chiave, ricorre a Deezer e Wikidata per le foto degli artisti.",
+    fanartDesc2:
+      " per recuperare foto degli artisti, loghi delle band, sfondi di intestazione, copertine degli album e immagini dei dischi quando non ne trova in locale. Luminous fornisce una chiave predefinita; se non è configurata alcuna chiave, ricorre a Deezer e Wikidata per le foto degli artisti.",
     fanartApiKeyLabel: "Chiave API",
-    fanartDefaultKeyActive: "Utilizzo della chiave fanart.tv predefinita di Luminous. Puoi inserire la tua chiave personale qui sotto per sostituirla.",
+    fanartDefaultKeyActive:
+      "Utilizzo della chiave fanart.tv predefinita di Luminous. Puoi inserire la tua chiave personale qui sotto per sostituirla.",
     fanartCustomKeyActive: "La tua chiave API personale è attiva",
     fanartClearKeyBtn: "Ripristina predefinito",
     fanartEnvKeyFound: "È stata trovata una chiave API nella variabile d'ambiente {env}.",
-    fanartPlaceholder: "Facoltativo: inserisci la chiave API personale per sostituire quella predefinita",
+    fanartPlaceholder:
+      "Facoltativo: inserisci la chiave API personale per sostituire quella predefinita",
     fanartGetKeyLink: "Ottieni la tua chiave API",
     fanartValidateBtn: "Convalida e salva",
     fanartImagesLabel: "Immagini da recuperare",
-    fanartImagesHint: "Disattiva un tipo per smettere di recuperarlo automaticamente e nascondere le copie già recuperate. Le immagini nelle tue cartelle musicali vengono sempre mostrate.",
+    fanartImagesHint:
+      "Disattiva un tipo per smettere di recuperarlo automaticamente e nascondere le copie già recuperate. Le immagini nelle tue cartelle musicali vengono sempre mostrate.",
     fanartFetchPhoto: "Foto dell'artista",
-    fanartFetchPhotoHint: "Recupera una foto per le schede degli artisti e per l'intestazione dell'artista, da Deezer o Wikidata se non c'è una chiave API",
+    fanartFetchPhotoHint:
+      "Recupera una foto per le schede degli artisti e per l'intestazione dell'artista, da Deezer o Wikidata se non c'è una chiave API",
     fanartFetchLogo: "Logo della band",
     fanartFetchLogoHint: "Recupera il logo della band mostrato nell'intestazione dell'artista",
     fanartFetchBackground: "Sfondo di intestazione",
@@ -972,30 +1033,39 @@ export const it = {
     fanartFetchDiscArt: "Immagine del disco",
     fanartFetchDiscArtHint: "Recupera l'immagine del disco da aggiungere alle copertine dell'album",
     pruneCompleteMsg: "Pulizia completata: {count} brani mancanti",
-    pruneCompleteMsgWithFolders: "Pulizia completata: {count} brani mancanti e {folders} cartelle vuote rimosse",
-    pruneCompleteMsgWithDuplicates: "Pulizia completata: {count} brani mancanti e {duplicates} duplicati uniti",
-    pruneCompleteMsgWithFoldersAndDuplicates: "Pulizia completata: {count} brani mancanti, {folders} cartelle vuote rimosse e {duplicates} duplicati uniti",
+    pruneCompleteMsgWithFolders:
+      "Pulizia completata: {count} brani mancanti e {folders} cartelle vuote rimosse",
+    pruneCompleteMsgWithDuplicates:
+      "Pulizia completata: {count} brani mancanti e {duplicates} duplicati uniti",
+    pruneCompleteMsgWithFoldersAndDuplicates:
+      "Pulizia completata: {count} brani mancanti, {folders} cartelle vuote rimosse e {duplicates} duplicati uniti",
     watchRealtimeLabel: "Monitoraggio delle cartelle in tempo reale",
-    watchRealtimeHint: "Monitora automaticamente le cartelle musicali per rilevare file aggiunti, modificati o eliminati.",
+    watchRealtimeHint:
+      "Monitora automaticamente le cartelle musicali per rilevare file aggiunti, modificati o eliminati.",
     defaultLibraryLabel: "Libreria predefinita",
-    defaultLibraryHint: "Conserva le gerarchie dei tag di generi e artisti in questa cartella, così seguono la libreria in una nuova posizione o su un altro computer.",
+    defaultLibraryHint:
+      "Conserva le gerarchie dei tag di generi e artisti in questa cartella, così seguono la libreria in una nuova posizione o su un altro computer.",
     defaultLibraryNone: "Nessuna",
     defaultLibraryFileBroken: "Il file della gerarchia dei generi in {path} è danneggiato.",
     defaultLibraryUnavailable: "{path} non è disponibile.",
     defaultLibraryChangeFailed: "Impossibile cambiare la libreria predefinita.",
     scanOnStartupLabel: "Riesegui scansione libreria all'avvio",
-    scanOnStartupHint: "Esegui una scansione incrementale automaticamente a ogni avvio di Luminous.",
+    scanOnStartupHint:
+      "Esegui una scansione incrementale automaticamente a ogni avvio di Luminous.",
     autoOrganizeLabel: "Organizza automaticamente nuovi file e modifiche ai tag",
-    autoOrganizeHint: "Organizza i file automaticamente in background con il modello attivo quando arrivano nuovi brani o vengono modificati i tag.",
+    autoOrganizeHint:
+      "Organizza i file automaticamente in background con il modello attivo quando arrivano nuovi brani o vengono modificati i tag.",
     saveArtworkToFoldersLabel: "Salva le copertine accanto alla musica",
-    saveArtworkToFoldersHint: "Salva copertine degli album, foto degli artisti, loghi delle band e banner direttamente nelle cartelle musicali come cover.jpg, artist.jpg, logo.png e banner.jpg.",
+    saveArtworkToFoldersHint:
+      "Salva copertine degli album, foto degli artisti, loghi delle band e banner direttamente nelle cartelle musicali come cover.jpg, artist.jpg, logo.png e banner.jpg.",
     saveArtworkToFoldersModalTitle: "Esporta le copertine nelle cartelle musicali",
-    saveArtworkToFoldersModalMessage: "Attivando questa opzione, le copertine degli album (cover.jpg), le foto degli artisti (artist.jpg), i loghi delle band (logo.png) e i banner (banner.jpg) presenti nella cache verranno esportati direttamente nelle tue cartelle musicali locali. Le cartelle condivise e le immagini esistenti non verranno sovrascritte. Vuoi procedere?",
+    saveArtworkToFoldersModalMessage:
+      "Attivando questa opzione, le copertine degli album (cover.jpg), le foto degli artisti (artist.jpg), i loghi delle band (logo.png) e i banner (banner.jpg) presenti nella cache verranno esportati direttamente nelle tue cartelle musicali locali. Le cartelle condivise e le immagini esistenti non verranno sovrascritte. Vuoi procedere?",
     saveArtworkToFoldersModalConfirm: "Esporta copertine",
     saveArtworkToFoldersModalCancel: "Annulla",
     artworkSweepSuccess: {
       one: "{count} file di copertina esportato nelle cartelle musicali.",
-      other: "{count} file di copertine esportati nelle cartelle musicali."
+      other: "{count} file di copertine esportati nelle cartelle musicali.",
     },
     artworkSweepNone: "Nessuna copertina nella cache da esportare nelle cartelle.",
     statsSongs: "Brani",
@@ -1021,7 +1091,8 @@ export const it = {
     webdavStatusDisconnected: "Disconnesso (server non raggiungibile?)",
     webdavNextSyncIn: "Prossima sincronizzazione automatica tra {minutes} min",
     folderSyncNowBtn: "Sincronizza ora",
-    folderSyncNowHint: "Esegui subito una scansione incrementale per rilevare le modifiche di questa cartella.",
+    folderSyncNowHint:
+      "Esegui subito una scansione incrementale per rilevare le modifiche di questa cartella.",
     webdavName: "Nome del server",
     webdavNamePlaceholder: "es. Il mio Nextcloud, NAS di casa",
     webdavUrl: "URL del server",
@@ -1032,7 +1103,8 @@ export const it = {
     webdavPasswordPlaceholder: "Password o token app (facoltativo)",
     webdavRemotePath: "Percorso della cartella remota",
     webdavAutoSyncLabel: "Sincronizzazione automatica",
-    webdavAutoSyncHint: "Sincronizza periodicamente questo server per trovare nuovi brani senza fare clic su Sincronizza ora.",
+    webdavAutoSyncHint:
+      "Sincronizza periodicamente questo server per trovare nuovi brani senza fare clic su Sincronizza ora.",
     webdavSyncIntervalLabel: "Sincronizza ogni (minuti)",
     webdavTestBtn: "Verifica connessione",
     webdavTesting: "Verifica in corso...",
@@ -1040,15 +1112,20 @@ export const it = {
     webdavTestFailed: "Connessione non riuscita: {error}",
     webdavSyncBtn: "Sincronizza ora",
     webdavSyncing: "Sincronizzazione in corso...",
-    webdavSyncComplete: "Sincronizzazione terminata: {added} aggiunti, {updated} aggiornati, {errors} errori.",
-    webdavSyncErrorsHint: "Consulta Esporta diagnostica nelle impostazioni per vedere i file non riusciti.",
+    webdavSyncComplete:
+      "Sincronizzazione terminata: {added} aggiunti, {updated} aggiornati, {errors} errori.",
+    webdavSyncErrorsHint:
+      "Consulta Esporta diagnostica nelle impostazioni per vedere i file non riusciti.",
     syncAlreadyRunning: "{name} è già in sincronizzazione. Attendi che finisca.",
     webdavNoServersTitle: "Nessun server WebDAV configurato",
-    webdavNoServersText: "Aggiungi un server WebDAV qui sopra per riprodurre audio remoto senza montare unità.",
-    confirmRemoveWebdavServer: "Rimuovere il server WebDAV «{name}» e tutti gli elementi nella cache associati?",
+    webdavNoServersText:
+      "Aggiungi un server WebDAV qui sopra per riprodurre audio remoto senza montare unità.",
+    confirmRemoveWebdavServer:
+      "Rimuovere il server WebDAV «{name}» e tutti gli elementi nella cache associati?",
     saveWebdavServer: "Salva modifiche",
     subsonicTitle: "Server multimediali",
-    subsonicSubtitle: "Connettiti a Navidrome, Gonic o a qualsiasi server OpenSubsonic per riprodurne la libreria in streaming.",
+    subsonicSubtitle:
+      "Connettiti a Navidrome, Gonic o a qualsiasi server OpenSubsonic per riprodurne la libreria in streaming.",
     addSubsonicServer: "Aggiungi server",
     editSubsonicServer: "Modifica server multimediale",
     subsonicItemEdit: "Modifica dettagli del server multimediale",
@@ -1062,39 +1139,46 @@ export const it = {
     subsonicPasswordPlaceholder: "Password",
     subsonicPasswordKeepPlaceholder: "Lascia vuoto per mantenere la password attuale",
     subsonicAuthMode: "Metodo di accesso",
-    subsonicAuthModeHint: "Mantieni Token a meno che il server non lo rifiuti: scegli Password per i server che memorizzano password con hash, oppure Chiave API se il server te ne ha rilasciata una",
+    subsonicAuthModeHint:
+      "Mantieni Token a meno che il server non lo rifiuti: scegli Password per i server che memorizzano password con hash, oppure Chiave API se il server te ne ha rilasciata una",
     subsonicAuthToken: "Token (consigliato)",
     subsonicAuthPassword: "Password (legacy)",
     subsonicAuthApiKey: "Chiave API",
     subsonicApiKey: "Chiave API",
     subsonicApiKeyPlaceholder: "Chiave API",
     subsonicApiKeyKeepPlaceholder: "Lascia vuoto per mantenere la chiave API attuale",
-    subsonicAuthHttpWarning: "Questo server usa http:// non protetto, quindi la password viene inviata senza crittografia. Usa https:// se il server lo supporta.",
+    subsonicAuthHttpWarning:
+      "Questo server usa http:// non protetto, quindi la password viene inviata senza crittografia. Usa https:// se il server lo supporta.",
     subsonicUsePasswordAuth: "Usa l'accesso con password",
     subsonicReportPlaysLabel: "Segnala le riproduzioni",
-    subsonicReportPlaysHint: "Invia le riproduzioni a questo server. Disattiva se il server le inoltra già a ListenBrainz o Last.fm e Luminous le registra (scrobbling) a sua volta, per evitare di contare ogni riproduzione due volte.",
+    subsonicReportPlaysHint:
+      "Invia le riproduzioni a questo server. Disattiva se il server le inoltra già a ListenBrainz o Last.fm e Luminous le registra (scrobbling) a sua volta, per evitare di contare ogni riproduzione due volte.",
     subsonicTestSuccess: "Connesso a {server}.",
     subsonicTestSuccessUnknown: "Connessione riuscita!",
-    subsonicSyncComplete: "{added} aggiunti, {updated} aggiornati, {removed} rimossi, {errors} errori",
+    subsonicSyncComplete:
+      "{added} aggiunti, {updated} aggiornati, {removed} rimossi, {errors} errori",
     subsonicSyncFailed: "Impossibile sincronizzare {name}: {error}",
     subsonicSaveFailed: "Impossibile salvare il server: {error}",
     subsonicNoServersTitle: "Nessun server multimediale connesso",
-    subsonicNoServersText: "Aggiungi un server Navidrome o un altro server OpenSubsonic qui sopra per riprodurne la libreria in streaming.",
-    confirmRemoveSubsonicServer: "Rimuovere il server multimediale «{name}»? I suoi brani restano nella libreria, contrassegnati come non disponibili.",
+    subsonicNoServersText:
+      "Aggiungi un server Navidrome o un altro server OpenSubsonic qui sopra per riprodurne la libreria in streaming.",
+    confirmRemoveSubsonicServer:
+      "Rimuovere il server multimediale «{name}»? I suoi brani restano nella libreria, contrassegnati come non disponibili.",
     removeSubsonicServer: "Rimuovi server multimediale",
     saving: "Salvataggio in corso...",
-    watchedFoldersSubtitle: "Gestisci le cartelle da analizzare per trovare file musicali."
+    watchedFoldersSubtitle: "Gestisci le cartelle da analizzare per trovare file musicali.",
   },
   playlists: {
     queuePlaylistDefaultName: "Playlist della coda",
     title: "Playlist",
     untitledPlaylistName: "Playlist senza titolo",
-    reservedPlaylistName: "«{name}» è riservato alla playlist integrata Coda. Scegli un nome diverso.",
+    reservedPlaylistName:
+      "«{name}» è riservato alla playlist integrata Coda. Scegli un nome diverso.",
     noPlaylistsTitle: "Nessuna playlist",
     noPlaylistsText: "Fai clic su «Nuova playlist» qui sopra per creare la tua prima playlist.",
     showingPlaylists: {
       one: "{count} playlist visualizzata",
-      other: "{count} playlist visualizzate"
+      other: "{count} playlist visualizzate",
     },
     newPlaylistBtn: "Nuova playlist",
     newSmartPlaylistBtn: "Nuova playlist intelligente",
@@ -1118,7 +1202,8 @@ export const it = {
     activePlaylistTitle: "Playlist",
     emptyPlaylistTitle: "Questa playlist è vuota.",
     emptyQueueText: "La coda è vuota.",
-    emptyPlaylistText: "Aggiungi brani a questa playlist facendo clic sull'icona «+» accanto a qualsiasi brano nella vista Raccolta.",
+    emptyPlaylistText:
+      "Aggiungi brani a questa playlist facendo clic sull'icona «+» accanto a qualsiasi brano nella vista Raccolta.",
     playPlaylistTooltip: "Riproduci l'intera playlist",
     clearPlaylistTooltip: "Rimuovi tutti i brani",
     deletePlaylistTooltip: "Elimina playlist",
@@ -1135,7 +1220,7 @@ export const it = {
     removeFromPlaylist: "Rimuovi dalla playlist",
     songsCount: {
       one: "{count} brano",
-      other: "{count} brani"
+      other: "{count} brani",
     },
     unknownGenre: "Genere sconosciuto",
     mixedGenre: "Misto",
@@ -1148,7 +1233,7 @@ export const it = {
     moreActionsTooltip: "Altre azioni",
     removeUnavailableTooltip: {
       one: "Rimuovi dalla playlist {count} brano non disponibile",
-      other: "Rimuovi dalla playlist tutti i {count} brani non disponibili"
+      other: "Rimuovi dalla playlist tutti i {count} brani non disponibili",
     },
     removeUnavailableBtn: "Rimuovi {count} non disponibili",
     fileNotFoundTooltip: "File non trovato sul disco",
@@ -1157,7 +1242,7 @@ export const it = {
     relinkMissingBtn: "Ricollega {count} non disponibili",
     relinkMissingToast: {
       one: "{count} brano ricollegato.",
-      other: "{count} brani ricollegati."
+      other: "{count} brani ricollegati.",
     },
     relinkMissingNone: "Nessun brano corrispondente trovato nella libreria.",
     importPlaylistBtn: "Importa playlist",
@@ -1174,11 +1259,11 @@ export const it = {
     clearFilter: "Cancella filtro",
     removeDuplicatesTooltip: {
       one: "Rimuovi dalla playlist {count} file duplicato",
-      other: "Rimuovi dalla playlist tutti i {count} file duplicati"
+      other: "Rimuovi dalla playlist tutti i {count} file duplicati",
     },
     removeDuplicatesBtn: {
       one: "Rimuovi {count} file duplicato",
-      other: "Rimuovi {count} file duplicati"
+      other: "Rimuovi {count} file duplicati",
     },
     duplicateTrackFlag: "File duplicato",
     selectedCount: "{count} selezionati",
@@ -1195,10 +1280,14 @@ export const it = {
     populationModeTooltipDiscover: "Fai emergere i brani meno ascoltati della libreria",
     populationModeTooltipDeepCuts: "Brani che non hai mai ascoltato o quasi",
     populationModeEmptyAll: "Nessun brano disponibile in questa categoria.",
-    populationModeEmptyFavourites: "Nessun brano preferito trovato in questa categoria. Assegna un cuore ad alcuni brani o cambia modalità di riempimento.",
-    populationModeEmptyFamiliar: "Nessun brano essenziale trovato in questa categoria per ora. Ascolta altri brani o cambia modalità di riempimento.",
-    populationModeEmptyDiscover: "Hai ascoltato tutte le scoperte! Cambia modalità di riempimento o usa Aggiorna per una nuova selezione.",
-    populationModeEmptyDeepCuts: "Hai ascoltato tutti i tesori nascosti! Cambia modalità di riempimento o usa Aggiorna per ascoltarne altri.",
+    populationModeEmptyFavourites:
+      "Nessun brano preferito trovato in questa categoria. Assegna un cuore ad alcuni brani o cambia modalità di riempimento.",
+    populationModeEmptyFamiliar:
+      "Nessun brano essenziale trovato in questa categoria per ora. Ascolta altri brani o cambia modalità di riempimento.",
+    populationModeEmptyDiscover:
+      "Hai ascoltato tutte le scoperte! Cambia modalità di riempimento o usa Aggiorna per una nuova selezione.",
+    populationModeEmptyDeepCuts:
+      "Hai ascoltato tutti i tesori nascosti! Cambia modalità di riempimento o usa Aggiorna per ascoltarne altri.",
     genreAutoPlaylist: "Genere",
     artistTagAutoPlaylist: "Tag artista",
     decadeAutoPlaylist: "Decennio",
@@ -1227,35 +1316,37 @@ export const it = {
     relativeJustNow: "Adesso",
     relativeMinutesAgo: {
       one: "{count} minuto fa",
-      other: "{count} minuti fa"
+      other: "{count} minuti fa",
     },
     relativeHoursAgo: {
       one: "{count} ora fa",
-      other: "{count} ore fa"
+      other: "{count} ore fa",
     },
     relativeToday: "Oggi",
     relativeYesterday: "Ieri",
     relativeDaysAgo: {
       one: "{count} giorno fa",
-      other: "{count} giorni fa"
+      other: "{count} giorni fa",
     },
     relativeWeeksAgo: {
       one: "{count} settimana fa",
-      other: "{count} settimane fa"
+      other: "{count} settimane fa",
     },
     relativeMonthsAgo: {
       one: "{count} mese fa",
-      other: "{count} mesi fa"
+      other: "{count} mesi fa",
     },
     relativeYearsAgo: {
       one: "{count} anno fa",
-      other: "{count} anni fa"
+      other: "{count} anni fa",
     },
     makeActiveBtn: "Rendi attiva",
     activeBadgeLabel: "Attiva",
     refreshPlaylistBtn: "Aggiorna playlist",
-    refreshAutoPlaylistTooltip: "Aggiorna la playlist automatica con una nuova selezione di brani della libreria",
-    refreshAllPlaylistsTooltip: "Aggiorna tutte le playlist automatiche e intelligenti con i brani più recenti della libreria",
+    refreshAutoPlaylistTooltip:
+      "Aggiorna la playlist automatica con una nuova selezione di brani della libreria",
+    refreshAllPlaylistsTooltip:
+      "Aggiorna tutte le playlist automatiche e intelligenti con i brani più recenti della libreria",
     playSelected: "Riproduci selezionati",
     removeSelected: "Rimuovi selezionati",
     clearSelection: "Deseleziona tutto",
@@ -1282,7 +1373,8 @@ export const it = {
     sizeLimitBtn: "Limite di spazio",
     sizeLimitSetBtn: "Limite {limit}",
     sizeLimitTitle: "Limite di spazio",
-    sizeLimitHint: "Scegli quanto spazio possono occupare i brani in cima a questa playlist, come la capacità di una chiavetta USB. Una linea tratteggiata indica dove smettono di starci.",
+    sizeLimitHint:
+      "Scegli quanto spazio possono occupare i brani in cima a questa playlist, come la capacità di una chiavetta USB. Una linea tratteggiata indica dove smettono di starci.",
     sizeLimitCustomPlaceholder: "Dimensione personalizzata",
     sizeLimitSetCustom: "Imposta",
     sizeLimitSmartNote: "Aggiorna riordina questa playlist e può cambiare quali brani ci stanno.",
@@ -1292,10 +1384,11 @@ export const it = {
     sizeLimitMeasuring: "Misurazione delle dimensioni…",
     sizeLimitDeviceLabel: "Conta le dimensioni per",
     sizeLimitDeviceNone: "File così come sono",
-    sizeLimitDeviceHint: "Conta ogni brano con la dimensione che avrà su questo dispositivo dopo la conversione. Le dimensioni sono stimate finché il brano non viene convertito.",
+    sizeLimitDeviceHint:
+      "Conta ogni brano con la dimensione che avrà su questo dispositivo dopo la conversione. Le dimensioni sono stimate finché il brano non viene convertito.",
     sizeLimitBreak: {
       one: "Limite {limit} · {count} brano sopra ci sta · {below} sotto",
-      other: "Limite {limit} · {count} brani sopra ci stanno · {below} sotto"
+      other: "Limite {limit} · {count} brani sopra ci stanno · {below} sotto",
     },
     saveQueuePrompt: "Inserisci un nome per la nuova playlist personalizzata:",
     contextMenuRemove: "Rimuovi dalla playlist",
@@ -1308,7 +1401,8 @@ export const it = {
     contextMenuIncludeInPlaylists: "Includi nelle playlist",
     markedNotIncluded: "{name} escluso",
     unmarkedNotIncluded: "{name} incluso di nuovo nelle playlist",
-    notIncludedBadgeTooltip: "Escluso dalle playlist automatiche e dal riempimento della riproduzione automatica",
+    notIncludedBadgeTooltip:
+      "Escluso dalle playlist automatiche e dal riempimento della riproduzione automatica",
     noFilterResults: "Nessun brano corrisponde a «{query}»",
     editSmartPlaylistBtn: "Modifica regole",
     smartRulePlaylistLabel: "Playlist con regole intelligenti",
@@ -1317,7 +1411,7 @@ export const it = {
     saveRenameTooltip: "Salva",
     historyCleared: "Cronologia di riproduzione cancellata",
     saveQueueNameLabel: "Nome della playlist",
-    saveQueueNamePlaceholder: "La mia playlist"
+    saveQueueNamePlaceholder: "La mia playlist",
   },
   lyrics: {
     title: "Testi",
@@ -1327,7 +1421,8 @@ export const it = {
     searchOnline: "Cerca online...",
     instrumentalTitle: "Brano strumentale",
     instrumentalSubtitle: "Questo brano è contrassegnato come strumentale",
-    instrumentalDesc: "Questo brano è contrassegnato come strumentale. La ricerca online dei testi viene saltata.",
+    instrumentalDesc:
+      "Questo brano è contrassegnato come strumentale. La ricerca online dei testi viene saltata.",
     instrumentalBadge: "Strumentale",
     markInstrumental: "Contrassegna come strumentale",
     unmarkInstrumental: "Rimuovi contrassegno strumentale",
@@ -1336,8 +1431,10 @@ export const it = {
     offsetSeconds: "{seconds} s",
     offsetEarlier: "Mostra i testi 0,5 s prima",
     offsetLater: "Mostra i testi 0,5 s dopo",
-    offsetHelp: "Correggi la sincronizzazione dei testi di questo brano se anticipano o seguono la musica. Fai clic sul valore per riportarlo a zero.",
-    lyricsHelpText: "Contrassegna questo brano come strumentale se non ha testo: altrimenti Luminous continua a cercarlo online.",
+    offsetHelp:
+      "Correggi la sincronizzazione dei testi di questo brano se anticipano o seguono la musica. Fai clic sul valore per riportarlo a zero.",
+    lyricsHelpText:
+      "Contrassegna questo brano come strumentale se non ha testo: altrimenti Luminous continua a cercarlo online.",
     searchLyricsTitle: "Cerca testi online",
     searchLyricsBtn: "Cerca",
     importLrcBtn: "Importa LRC",
@@ -1351,8 +1448,10 @@ export const it = {
     editorPlaceholder: "Incolla qui il testo LRC sincronizzato o semplice...",
     saveFailedPrefix: "Salvataggio del testo non riuscito: ",
     noOnlineResults: "Nessun testo trovato presso alcun fornitore online.",
-    offlineNoLyrics: "Nessun testo salvato per questo brano. Attiva «Online» in Impostazioni › Integrazioni per cercarlo.",
-    insufficientMetadata: "Informazioni sul brano (artista/titolo) insufficienti per cercare il testo online.",
+    offlineNoLyrics:
+      "Nessun testo salvato per questo brano. Attiva «Online» in Impostazioni › Integrazioni per cercarlo.",
+    insufficientMetadata:
+      "Informazioni sul brano (artista/titolo) insufficienti per cercare il testo online.",
     sourceHelpLabel: "Fonte del testo",
     sourceEmbedded: "Incorporato",
     sourceEmbeddedTip: "Caricato dai tag dei metadati del file audio",
@@ -1364,9 +1463,11 @@ export const it = {
     sourceCached: "In cache",
     sourceCachedTip: "Memorizzato nel database della raccolta locale",
     rejectMatch: "Rifiuta corrispondenza",
-    rejectMatchTooltip: "Rifiuta il testo online non corretto e impedisci questa corrispondenza in futuro",
+    rejectMatchTooltip:
+      "Rifiuta il testo online non corretto e impedisci questa corrispondenza in futuro",
     rejectMatchSuccess: "Corrispondenza testo rifiutata e bloccata",
-    rejectMatchConfirm: "Sei sicuro di voler rifiutare questo testo? Non verrà più scaricato automaticamente per questo brano."
+    rejectMatchConfirm:
+      "Sei sicuro di voler rifiutare questo testo? Non verrà più scaricato automaticamente per questo brano.",
   },
   stats: {
     title: "Statistiche",
@@ -1388,13 +1489,13 @@ export const it = {
     noData: "Nessun dato per questo intervallo.",
     totalMinutes: {
       one: "{count} minuto di ascolto",
-      other: "{count} minuti di ascolto"
+      other: "{count} minuti di ascolto",
     },
     minuteCount: "{count} min",
     minuteUnderOne: "< 1 min",
     playsCount: {
       one: "{count} riproduzione",
-      other: "{count} riproduzioni"
+      other: "{count} riproduzioni",
     },
     excludeFromStats: "Non includere nelle statistiche",
     includeInStats: "Includi nelle statistiche",
@@ -1405,19 +1506,19 @@ export const it = {
     heatmapLongestStreak: "Serie più lunga",
     heatmapStreakDays: {
       one: "{count} giorno",
-      other: "{count} giorni"
+      other: "{count} giorni",
     },
     heatmapStatus: "{date} — {minutes} min",
     heatmapLegendLess: "Meno",
-    heatmapLegendMore: "Più"
+    heatmapLegendMore: "Più",
   },
   help: {
-    loading: "Caricamento del manuale utente..."
+    loading: "Caricamento del manuale utente...",
   },
   tray: {
     playPause: "Riproduci/Pausa",
     showHideWindow: "Mostra/nascondi Luminous",
-    quit: "Esci"
+    quit: "Esci",
   },
   playerBar: {
     previous: "Brano precedente",
@@ -1433,9 +1534,12 @@ export const it = {
     shuffleArtists: "Artisti",
     shuffleOffDesc: "Riproduci i brani nel loro ordine normale",
     shuffleAllDesc: "Riproduci tutti i brani in ordine casuale",
-    shuffleInsideAlbumDesc: "Riproduci gli album nel loro ordine normale, ma mescola i brani all'interno di ogni album",
-    shuffleAlbumsDesc: "Riproduci gli album in ordine casuale, ma mantieni in ordine i brani di ogni album",
-    shuffleArtistsDesc: "Riproduci tutti i brani di un artista prima di passare a un nuovo artista scelto a caso",
+    shuffleInsideAlbumDesc:
+      "Riproduci gli album nel loro ordine normale, ma mescola i brani all'interno di ogni album",
+    shuffleAlbumsDesc:
+      "Riproduci gli album in ordine casuale, ma mantieni in ordine i brani di ogni album",
+    shuffleArtistsDesc:
+      "Riproduci tutti i brani di un artista prima di passare a un nuovo artista scelto a caso",
     repeatOff: "No",
     repeatSong: "Brano",
     repeatAlbum: "Album",
@@ -1462,7 +1566,8 @@ export const it = {
     visualizerTooltip: "Attiva/disattiva il visualizzatore audio",
     seekbarModeWaveform: "Modalità forma d'onda: fai clic per passare alle bande di frequenza",
     seekbarModeBands: "Modalità bande di frequenza: fai clic per passare alla forma d'onda",
-    bandsLegend: "Bande di frequenza: blu = basse (bassi), ambra = medie (voci/rullanti/solisti), bianco = alte (hi-hat/piatti/transienti); le bande più alte trasportano più energia",
+    bandsLegend:
+      "Bande di frequenza: blu = basse (bassi), ambra = medie (voci/rullanti/solisti), bianco = alte (hi-hat/piatti/transienti); le bande più alte trasportano più energia",
     songLabel: "Brano",
     artistLabel: "Artista",
     albumLabel: "Album",
@@ -1476,7 +1581,7 @@ export const it = {
     channels71: "Surround 7.1",
     channelsCount: {
       one: "{count} canale",
-      other: "{count} canali"
+      other: "{count} canali",
     },
     releasedLabel: "Pubblicazione",
     genreLabel: "Genere",
@@ -1529,7 +1634,7 @@ export const it = {
     mbRatingLabel: "Valutazione della community",
     mbRatingVotes: {
       one: "({count} voto)",
-      other: "({count} voti)"
+      other: "({count} voti)",
     },
     critiquebrainzSectionLabel: "CritiqueBrainz",
     critiquebrainzRatingLabel: "Valutazione della community",
@@ -1542,33 +1647,43 @@ export const it = {
     contextReadLess: "Mostra meno",
     contextEmptyTitle: "Ancora nessun dettaglio per questo brano",
     contextEmptyTitleEntity: "Ancora nessun dettaglio trovato",
-    contextEmptyDesc: "Luminous mostra ciò che è salvato nei tag del brano. Compilali e appariranno qui.",
+    contextEmptyDesc:
+      "Luminous mostra ciò che è salvato nei tag del brano. Compilali e appariranno qui.",
     contextEditTags: "Modifica tag",
     contextOpenFolderInPicard: "Apri cartella in Picard",
     contextGetPicard: "Scarica MusicBrainz Picard",
-    contextPicardNotInstalled: "Picard non è installato o non è stato trovato. È gratuito e inserisce i tag dal database di MusicBrainz.",
+    contextPicardNotInstalled:
+      "Picard non è installato o non è stato trovato. È gratuito e inserisce i tag dal database di MusicBrainz.",
     contextLearnEnrichment: "Scopri come ottenere metadati e biografie",
     contextRetry: "Riprova",
     contextLoading: "Recupero del contesto in corso…",
-    contextFetchError: "Impossibile recuperare i dati di contesto. Controlla la connessione e riprova.",
-    contextOffline: "Offline. Attiva «Online» in Impostazioni › Integrazioni per recuperare biografie e contesto.",
+    contextFetchError:
+      "Impossibile recuperare i dati di contesto. Controlla la connessione e riprova.",
+    contextOffline:
+      "Offline. Attiva «Online» in Impostazioni › Integrazioni per recuperare biografie e contesto.",
     trackSkippedToast: "Impossibile riprodurre «{title}»: file non trovato. Brano saltato.",
-    outputUnavailableToast: 'Uscita audio non disponibile. Collega un dispositivo e premi riproduci.',
-    outputFallbackDeviceInUse: "Impossibile avviare {mode}: un'altra app sta usando il dispositivo. Riproduzione tramite audio condiviso per ora.",
-    outputFallbackExclusiveDisabled: "Impossibile avviare {mode}: Windows non consente il controllo esclusivo di questo dispositivo. Attivalo nelle proprietà audio del dispositivo (scheda Avanzate). Riproduzione tramite audio condiviso per ora.",
-    outputFallbackFormatUnsupported: "Impossibile avviare {mode}: il dispositivo non accetta alcun formato stereo che Luminous possa inviare. Riproduzione tramite audio condiviso per ora.",
-    outputFallbackUnavailable: "Impossibile avviare {mode}. Riproduzione tramite audio condiviso per ora.",
+    outputUnavailableToast:
+      "Uscita audio non disponibile. Collega un dispositivo e premi riproduci.",
+    outputFallbackDeviceInUse:
+      "Impossibile avviare {mode}: un'altra app sta usando il dispositivo. Riproduzione tramite audio condiviso per ora.",
+    outputFallbackExclusiveDisabled:
+      "Impossibile avviare {mode}: Windows non consente il controllo esclusivo di questo dispositivo. Attivalo nelle proprietà audio del dispositivo (scheda Avanzate). Riproduzione tramite audio condiviso per ora.",
+    outputFallbackFormatUnsupported:
+      "Impossibile avviare {mode}: il dispositivo non accetta alcun formato stereo che Luminous possa inviare. Riproduzione tramite audio condiviso per ora.",
+    outputFallbackUnavailable:
+      "Impossibile avviare {mode}. Riproduzione tramite audio condiviso per ora.",
     outputFallbackRetry: "Riprova",
-    outputRestored: "{mode} funziona di nuovo. Controlla il volume, poi premi Riproduci per continuare.",
+    outputRestored:
+      "{mode} funziona di nuovo. Controlla il volume, poi premi Riproduci per continuare.",
     tracksSkippedToast: {
       one: "{count} brano non disponibile saltato.",
-      other: "{count} brani non disponibili saltati."
+      other: "{count} brani non disponibili saltati.",
     },
     trackSkippedRemoteToast: "Impossibile riprodurre «{title}»: {message}. Brano saltato.",
     openNothingPlayable: "Nessun file audio supportato da riprodurre.",
     playSongFailed: "Impossibile riprodurre questo brano.",
     noSongPlaying: "Nessun brano in riproduzione",
-    menuTooltip: "Menu del brano"
+    menuTooltip: "Menu del brano",
   },
   miniplayer: {
     title: "Miniplayer",
@@ -1585,17 +1700,17 @@ export const it = {
     library: "Libreria",
     tracksPlayed: {
       one: "{count} brano riprodotto",
-      other: "{count} brani riprodotti"
+      other: "{count} brani riprodotti",
     },
     dropToPlay: "oppure trascina file audio per riprodurli",
     queueProgress: "{current}/{total}",
-    queueProgressAria: "Traccia {current} di {total}"
+    queueProgressAria: "Traccia {current} di {total}",
   },
 
   chipInput: {
     removeItem: "Rimuovi {value}",
     dragToReorder: "Trascina per riordinare",
-    add: "Aggiungi"
+    add: "Aggiungi",
   },
   tagEditor: {
     title: "Modifica tag del brano",
@@ -1606,10 +1721,12 @@ export const it = {
     trackField: "Numero di traccia",
     yearField: "Anno",
     originalYearField: "Anno originale",
-    originalYearTooltip: "Anno della pubblicazione originale, se si tratta di una ristampa o di una rimasterizzazione",
+    originalYearTooltip:
+      "Anno della pubblicazione originale, se si tratta di una ristampa o di una rimasterizzazione",
     genreField: "Genere",
     genrePlaceholder: "Aggiungi un genere...",
-    genreTooltip: "Il primo valore è considerato il genere principale nella scheda Generi, gli altri ne sono sottogeneri.",
+    genreTooltip:
+      "Il primo valore è considerato il genere principale nella scheda Generi, gli altri ne sono sottogeneri.",
     languageField: "Lingua",
     languagePlaceholder: "Aggiungi un codice lingua...",
     languageTooltip: "Codice lingua ISO 639 (es. en, ja, it)",
@@ -1622,11 +1739,14 @@ export const it = {
     locationField: "Posizione",
     openFolderBtn: "Apri cartella",
     openFolderFailedPrefix: "Impossibile aprire la cartella: ",
-    remoteSourceNote: "Questo brano si trova su un server remoto. Le modifiche vengono salvate solo in Luminous: il file sul server non verrà modificato.",
-    cueTrackNote: "I tag di questa traccia provengono dal suo file CUE, non dal file stesso, quindi per ora non possono essere modificati qui.",
+    remoteSourceNote:
+      "Questo brano si trova su un server remoto. Le modifiche vengono salvate solo in Luminous: il file sul server non verrà modificato.",
+    cueTrackNote:
+      "I tag di questa traccia provengono dal suo file CUE, non dal file stesso, quindi per ora non possono essere modificati qui.",
     albumArtistField: "Artista dell'album",
     albumArtistPlaceholder: "Aggiungi un artista dell'album...",
-    albumArtistTooltip: "Artista principale accreditato per l'intero album, utile per le compilation",
+    albumArtistTooltip:
+      "Artista principale accreditato per l'intero album, utile per le compilation",
     composerField: "Compositore",
     composerPlaceholder: "Aggiungi un compositore...",
     discField: "Disco",
@@ -1647,18 +1767,21 @@ export const it = {
     artworkNotEmbedded: "Nessuna copertina incorporata",
     clearArtBtn: "Rimuovi copertina",
     clearArtConfirmTitle: "Rimuovere la copertina incorporata?",
-    clearArtConfirmMessage: "Questa operazione rimuove la copertina incorporata dal file stesso. Il brano ripiegherà sull'immagine della cartella o su un segnaposto.",
+    clearArtConfirmMessage:
+      "Questa operazione rimuove la copertina incorporata dal file stesso. Il brano ripiegherà sull'immagine della cartella o su un segnaposto.",
     clearArtSuccess: "Copertina incorporata rimossa",
     clearArtFailedPrefix: "Rimozione della copertina non riuscita: ",
     rejectRemoteCoverBtn: "Rifiuta copertina remota",
-    rejectRemoteCoverTooltip: "Rifiuta questa corrispondenza di copertina online e impediscine il download futuro",
+    rejectRemoteCoverTooltip:
+      "Rifiuta questa corrispondenza di copertina online e impediscine il download futuro",
     rejectRemoteCoverSuccess: "Copertina remota rifiutata e bloccata",
     historyHeading: "Cronologia",
     historySourceHeading: "Sorgente",
     historyImported: "Importato",
     historyFormat: "Formato",
     historyFileSize: "Dimensione",
-    historyTimestampHint: "Timestamp e origini delle modifiche ai tag. Le modifiche esterne vengono rilevate tramite la data di modifica del file durante la scansione; esegui una scansione completa per rilevare le modifiche che hanno mantenuto la data del file.",
+    historyTimestampHint:
+      "Timestamp e origini delle modifiche ai tag. Le modifiche esterne vengono rilevate tramite la data di modifica del file durante la scansione; esegui una scansione completa per rilevare le modifiche che hanno mantenuto la data del file.",
     clearHistoryBtn: "Cancella cronologia",
     historyEmptyValue: "(vuoto)",
     historyActorScan: "Rilevato durante la scansione",
@@ -1674,26 +1797,28 @@ export const it = {
     restoreBatchBtn: "Ripristina tutto",
     restoreBatchTooltip: "Ripristina tutti i brani modificati in questa modifica",
     restoreAlreadyCurrent: "Il valore del tag è già attuale",
-    restoreSuccess: '«{field}» ripristinato a «{value}»',
+    restoreSuccess: "«{field}» ripristinato a «{value}»",
     restoreBatchSuccess: "Tag ripristinati per {count} brani",
     restoreBatchPartial: "{restored} brani ripristinati, {skipped} non disponibili saltati",
     restoreNoOp: "Il valore del tag è già attuale",
     restoreFailed: "Impossibile ripristinare il tag",
     compilationField: "Raccolta",
-    commentField: "Commento"
+    commentField: "Commento",
   },
   albumTagEditor: {
     title: "Modifica tag dell'album",
     locationField: "Posizione",
     openFolderBtn: "Apri cartella",
     openFolderFailedPrefix: "Impossibile aprire la cartella: ",
-    remoteSourceNote: "Questo album si trova su un server remoto. Le modifiche vengono salvate solo in Luminous: i file sul server non verranno modificati.",
+    remoteSourceNote:
+      "Questo album si trova su un server remoto. Le modifiche vengono salvate solo in Luminous: i file sul server non verranno modificati.",
     albumField: "Titolo dell'album",
     albumArtistField: "Artista dell'album",
     albumArtistPlaceholder: "Aggiungi un artista dell'album...",
     genreField: "Genere",
     genrePlaceholder: "Aggiungi un genere...",
-    genreTooltip: "Il primo valore è considerato il genere principale nella scheda Generi, gli altri ne sono sottogeneri.",
+    genreTooltip:
+      "Il primo valore è considerato il genere principale nella scheda Generi, gli altri ne sono sottogeneri.",
     languageField: "Lingua",
     languagePlaceholder: "Aggiungi un codice lingua...",
     languageTooltip: "Codice lingua ISO 639 (es. en, ja, it)",
@@ -1703,14 +1828,14 @@ export const it = {
     mixedValues: "Valori misti",
     tracksAffected: {
       one: "Si applica a {count} brano",
-      other: "Si applica a {count} brani"
+      other: "Si applica a {count} brani",
     },
     cancelBtn: "Annulla",
     saveBtn: "Salva tag",
     saving: "Salvataggio dei tag dell'album in corso...",
     saveSuccess: {
       one: "Tag dell'album aggiornati per {count} brano",
-      other: "Tag dell'album aggiornati per {count} brani"
+      other: "Tag dell'album aggiornati per {count} brani",
     },
     saveFailedPrefix: "Salvataggio dei tag dell'album non riuscito: ",
     artworkField: "Copertina",
@@ -1718,13 +1843,14 @@ export const it = {
     artworkNotEmbedded: "Nessuna copertina incorporata",
     clearArtBtn: "Rimuovi copertina incorporata",
     clearArtConfirmTitle: "Rimuovere la copertina incorporata?",
-    clearArtConfirmMessage: "Questa operazione rimuove la copertina incorporata dal file di ogni traccia di questo album. Le tracce ripiegheranno sull'immagine della cartella o su un segnaposto.",
+    clearArtConfirmMessage:
+      "Questa operazione rimuove la copertina incorporata dal file di ogni traccia di questo album. Le tracce ripiegheranno sull'immagine della cartella o su un segnaposto.",
     clearingArt: "Rimozione della copertina in corso...",
     clearArtSuccess: {
       one: "Copertina incorporata rimossa per {count} brano",
-      other: "Copertina incorporata rimossa per {count} brani"
+      other: "Copertina incorporata rimossa per {count} brani",
     },
-    clearArtFailedPrefix: "Rimozione della copertina dell'album non riuscita: "
+    clearArtFailedPrefix: "Rimozione della copertina dell'album non riuscita: ",
   },
   equalizer: {
     title: "Equalizzatore grafico a 10 bande",
@@ -1760,33 +1886,45 @@ export const it = {
     exportSuccess: "«{name}» esportato come profilo EQ parametrico",
     exportError: "Impossibile esportare il profilo: {error}",
     importPanelLabel: "Importa un profilo per cuffie",
-    importHint: "Carica un profilo di correzione per cuffie: su AutoEq scegli EqualizerAPO ParametricEq come app di equalizzazione e scarica il file delle impostazioni. Viene salvato in I miei preset e applicato subito.",
+    importHint:
+      "Carica un profilo di correzione per cuffie: su AutoEq scegli EqualizerAPO ParametricEq come app di equalizzazione e scarica il file delle impostazioni. Viene salvato in I miei preset e applicato subito.",
     importAutoEqLink: "Trova le tue cuffie su AutoEq",
     importChooseFile: "Scegli file…",
     importFileFilter: "Profilo EQ parametrico",
     importOrPaste: "oppure incolla il profilo qui sotto",
     importTextLabel: "Testo del profilo",
-    importPlaceholder: "Preamp: -6.2 dB\nFilter 1: ON LSC Fc 105 Hz Gain 5.5 dB Q 0.70\nFilter 2: ON PK Fc 180 Hz Gain -3.1 dB Q 0.53",
+    importPlaceholder:
+      "Preamp: -6.2 dB\nFilter 1: ON LSC Fc 105 Hz Gain 5.5 dB Q 0.70\nFilter 2: ON PK Fc 180 Hz Gain -3.1 dB Q 0.53",
     importSubmit: "Importa",
-    importErrorEmpty: "Questo profilo non contiene filtri. Incolla o scegli un profilo EQ parametrico.",
+    importErrorEmpty:
+      "Questo profilo non contiene filtri. Incolla o scegli un profilo EQ parametrico.",
     importErrorTooManyFilters: {
       one: "Questo profilo contiene {count} filtro, ma l'equalizzatore ne supporta al massimo {max}.",
-      other: "Questo profilo contiene {count} filtri, ma l'equalizzatore ne supporta al massimo {max}."
+      other:
+        "Questo profilo contiene {count} filtri, ma l'equalizzatore ne supporta al massimo {max}.",
     },
-    importErrorUnsupportedFilters: "Filtri non supportati: {filters}. Rimuovili oppure esporta il profilo da AutoEq, che usa solo filtri peak (PK), low-shelf (LSC) e high-shelf (HSC).",
+    importErrorUnsupportedFilters:
+      "Filtri non supportati: {filters}. Rimuovili oppure esporta il profilo da AutoEq, che usa solo filtri peak (PK), low-shelf (LSC) e high-shelf (HSC).",
     importErrorFilterAt: "{kind} (riga {line})",
-    importErrorUnsupportedLine: "La riga {line} non è una riga Preamp o Filter, quindi il profilo non può essere riprodotto esattamente.",
-    importErrorMalformed: "Impossibile leggere la riga {line}. Verifica che indichi Fc, Gain e Q con valori numerici.",
-    importErrorOutOfRange: "Riga {line}: {field} {value} è fuori dall'intervallo supportato ({min} – {max}).",
-    importErrorPreampOutOfRange: "Il preamp di {value} dB è fuori dall'intervallo supportato ({min} – {max} dB).",
-    importErrorFileTooLarge: "Questo file è troppo grande per essere un profilo EQ (limite {kb} KB).",
-    importErrorReadFailed: "Impossibile leggere questo file. Verifica che sia un profilo in testo semplice.",
+    importErrorUnsupportedLine:
+      "La riga {line} non è una riga Preamp o Filter, quindi il profilo non può essere riprodotto esattamente.",
+    importErrorMalformed:
+      "Impossibile leggere la riga {line}. Verifica che indichi Fc, Gain e Q con valori numerici.",
+    importErrorOutOfRange:
+      "Riga {line}: {field} {value} è fuori dall'intervallo supportato ({min} – {max}).",
+    importErrorPreampOutOfRange:
+      "Il preamp di {value} dB è fuori dall'intervallo supportato ({min} – {max} dB).",
+    importErrorFileTooLarge:
+      "Questo file è troppo grande per essere un profilo EQ (limite {kb} KB).",
+    importErrorReadFailed:
+      "Impossibile leggere questo file. Verifica che sia un profilo in testo semplice.",
     importErrorGeneric: "Impossibile importare il profilo.",
     preamp: "Preamplificazione",
     enableEq: "Attiva EQ",
     subtitle: "Modella la risposta in frequenza con una cascata di filtri peak a 10 bande",
     titleParametric: "Equalizzatore parametrico",
-    subtitleParametric: "Applica correzioni precise con il tipo di filtro, il guadagno e il Q di ogni banda",
+    subtitleParametric:
+      "Applica correzioni precise con il tipo di filtro, il guadagno e il Q di ogni banda",
     modeLabel: "Modalità",
     modeGraphic: "10 bande",
     modeParametric: "Parametrico",
@@ -1801,13 +1939,15 @@ export const it = {
     addBand: "Aggiungi banda",
     removeBand: "Rimuovi banda {n}",
     enableBand: "Attiva banda {n}",
-    graphHint: "Trascina un nodo per impostare frequenza e guadagno, scorri sopra di esso per cambiare il Q oppure fai doppio clic sul grafico per aggiungere una banda. Con un nodo selezionato, usa i tasti freccia, Pag su/giù per il Q e Canc per rimuoverlo.",
+    graphHint:
+      "Trascina un nodo per impostare frequenza e guadagno, scorri sopra di esso per cambiare il Q oppure fai doppio clic sul grafico per aggiungere una banda. Con un nodo selezionato, usa i tasti freccia, Pag su/giù per il Q e Canc per rimuoverlo.",
     nodeAriaLabel: "Banda {n}: {type}, {freq}, {gain} dB, Q {q}",
-    isoStandard: "ISO 266:1997"
+    isoStandard: "ISO 266:1997",
   },
   loudness: {
     title: "Normalizzazione del volume",
-    subtitle: "Uniforma il volume percepito tra i brani con l'analisi EBU R128, usando i tag ReplayGain come riserva",
+    subtitle:
+      "Uniforma il volume percepito tra i brani con l'analisi EBU R128, usando i tag ReplayGain come riserva",
     enable: "Attiva",
     targetLevel: "Livello di destinazione",
     mode: "Normalizza per",
@@ -1817,27 +1957,30 @@ export const it = {
     fallbackGainHint: "Applicato quando un brano non ha né l'analisi R128 né un tag ReplayGain",
     analyzing: {
       one: "Analisi della libreria: brani rimanenti {count}",
-      other: "Analisi della libreria: brani rimanenti {count}"
+      other: "Analisi della libreria: brani rimanenti {count}",
     },
     analyzed: "Tutti i brani analizzati",
     analysisPaused: {
       one: "Brani non ancora analizzati: {count}. Attiva per analizzarli in background",
-      other: "Brani non ancora analizzati: {count}. Attiva per analizzarli in background"
-    }
+      other: "Brani non ancora analizzati: {count}. Attiva per analizzarli in background",
+    },
   },
   fades: {
     title: "Dissolvenze e dissolvenza incrociata",
-    subtitle: "Applica una dissolvenza del volume in pausa/arresto e una dissolvenza incrociata tra i brani in coda",
+    subtitle:
+      "Applica una dissolvenza del volume in pausa/arresto e una dissolvenza incrociata tra i brani in coda",
     fadePause: "Dissolvenza in pausa/arresto",
     fadePauseHint: "Abbassa gradualmente il volume quando metti in pausa o arresti la riproduzione",
     fadeDuration: "Durata della dissolvenza",
     crossfadeManual: "Dissolvenza incrociata manuale",
     crossfadeManualHint: "Applica la dissolvenza incrociata quando salti o cambi brano manualmente",
     crossfadeAuto: "Dissolvenza incrociata automatica",
-    crossfadeAutoHint: "Applica la dissolvenza incrociata automaticamente quando un brano sta per finire",
+    crossfadeAutoHint:
+      "Applica la dissolvenza incrociata automaticamente quando un brano sta per finire",
     crossfadeDuration: "Durata della dissolvenza incrociata",
     suppressSameAlbum: "Mantieni la riproduzione senza interruzioni nello stesso album",
-    suppressSameAlbumHint: "Salta la dissolvenza incrociata automatica tra brani consecutivi dello stesso album"
+    suppressSameAlbumHint:
+      "Salta la dissolvenza incrociata automatica tra brani consecutivi dello stesso album",
   },
   themes: {
     "dynamic-artwork": "✨ Luminous",
@@ -1849,7 +1992,7 @@ export const it = {
     sabrina: "Sabrina",
     "terminal-green": "Verde terminale",
     driftwood: "Legno di mare",
-    foxglove: "Digitale purpurea"
+    foxglove: "Digitale purpurea",
   },
   artistDetail: {
     backToArtists: "Vedi artisti",
@@ -1862,19 +2005,22 @@ export const it = {
     editArtistDetails: "Modifica dettagli dell'artista",
     editArtistTooltip: "Modifica dettagli, sito web, tag e link dell'artista",
     refresh: "Aggiorna artista",
-    refreshTooltip: "Esegui di nuovo la scansione di metadati, immagini locali e biografia di questo artista",
+    refreshTooltip:
+      "Esegui di nuovo la scansione di metadati, immagini locali e biografia di questo artista",
     refreshSuccess: "Immagini e biografia dell'artista aggiornate",
     refreshError: "Aggiornamento dell'artista non riuscito",
     retrieveArtistDetails: "Recupera dettagli dell'artista",
-    retrieveArtistDetailsTooltip: "Recupera da MusicBrainz i link a Discogs, AllMusic, Wikidata, IMDb e ai social",
+    retrieveArtistDetailsTooltip:
+      "Recupera da MusicBrainz i link a Discogs, AllMusic, Wikidata, IMDb e ai social",
     retrieveArtistDetailsNoMbidTooltip: "Nessun ID artista MusicBrainz trovato per questo artista",
     retrieveDetailsSuccess: {
       one: "{count} link aggiunto da MusicBrainz",
-      other: "{count} link aggiunti da MusicBrainz"
+      other: "{count} link aggiunti da MusicBrainz",
     },
     retrieveDetailsNoResults: "Nessun dettaglio aggiuntivo trovato su MusicBrainz",
     retrieveArtistImage: "Recupera immagine dell'artista",
-    retrieveArtistImageTooltip: "Recupera foto, logo e sfondo dell'artista da fanart.tv, oppure una foto da Wikidata",
+    retrieveArtistImageTooltip:
+      "Recupera foto, logo e sfondo dell'artista da fanart.tv, oppure una foto da Wikidata",
     retrieveImageSuccessFanart: "Immagine dell'artista recuperata da fanart.tv",
     retrieveArtworkSuccessFanart: "Immagini dell'artista recuperate da fanart.tv",
     retrieveImageSuccessWikidata: "Immagine dell'artista recuperata da Wikidata",
@@ -1902,7 +2048,7 @@ export const it = {
     discSet: "Cofanetto da {count} dischi",
     noReleasesFound: "Nessuna pubblicazione trovata.",
     playlistsFeaturing: "Playlist con {artist}",
-    compilationsFeaturing: "Compilation con {artist}"
+    compilationsFeaturing: "Compilation con {artist}",
   },
   artistInfo: {
     panelTitle: "Informazioni sull'artista",
@@ -1912,7 +2058,7 @@ export const it = {
     country: "Paese",
     died: "Morte",
     disbanded: "Scioglimento",
-    lessThanOneYearAgo: "<1 anno fa"
+    lessThanOneYearAgo: "<1 anno fa",
   },
   artistEvents: {
     panelTitle: "Prossimi concerti ed eventi",
@@ -1931,7 +2077,7 @@ export const it = {
     pagination: "{start}–{end} di {total}",
     previousPage: "Pagina precedente",
     nextPage: "Pagina successiva",
-    dateTba: "Da definire"
+    dateTba: "Da definire",
   },
   artistProfileEditor: {
     title: "Modifica dettagli dell'artista",
@@ -1940,13 +2086,15 @@ export const it = {
     bio: "Informazioni / Biografia",
     bioPlaceholder: "Aggiungi una biografia o delle note sul background di questo artista...",
     tags: "Tag solo per l'artista",
-    tagsNote: "Aggiungi tag per tutto ciò che il genere non copre già: non vengono scritti nei tuoi file.",
+    tagsNote:
+      "Aggiungi tag per tutto ciò che il genere non copre già: non vengono scritti nei tuoi file.",
     tagDupesGenreTooltip: "«{tag}» è già un tag di genere: non serve aggiungerlo qui",
     tagInputPlaceholder: "Aggiungi un tag e premi Invio...",
     addTagBtn: "Aggiungi",
     socialLinks: "Link",
     addLinkBtn: "Aggiungi link",
-    noLinks: "Nessun link aggiunto. Fai clic su «Aggiungi link» per collegare profili social o di streaming.",
+    noLinks:
+      "Nessun link aggiunto. Fai clic su «Aggiungi link» per collegare profili social o di streaming.",
     customLink: "Link personalizzato",
     platform: "Piattaforma",
     linkValue: "Nome utente o URL",
@@ -1959,19 +2107,21 @@ export const it = {
     goToTagTooltip: "Sfoglia {tag}",
     removeLinkTooltip: "Rimuovi link",
     editMarkdownBtn: "Modifica Markdown",
-    editMarkdownTooltip: "Apri l'editor Markdown ampio"
+    editMarkdownTooltip: "Apri l'editor Markdown ampio",
   },
   albumProfileEditor: {
     title: "Modifica dettagli dell'album",
     website: "Pagina ufficiale / Negozio",
     websitePlaceholder: "https://artista.com/album o www.artista.com/album",
     description: "Descrizione e note di copertina",
-    descriptionPlaceholder: "Aggiungi il background dell'album, le note di copertina, i dettagli di registrazione o le recensioni (sono supportati i link Markdown, ad es. [Recensione](https://...))...",
+    descriptionPlaceholder:
+      "Aggiungi il background dell'album, le note di copertina, i dettagli di registrazione o le recensioni (sono supportati i link Markdown, ad es. [Recensione](https://...))...",
     addTagBtn: "Aggiungi",
     removeTagTooltip: "Rimuovi {tag}",
     links: "Link di pubblicazione e fonti",
     addLinkBtn: "Aggiungi link",
-    noLinks: "Nessun link di pubblicazione aggiunto. Fai clic su «Aggiungi link» per collegare Bandcamp, Discogs, recensioni o link di streaming.",
+    noLinks:
+      "Nessun link di pubblicazione aggiunto. Fai clic su «Aggiungi link» per collegare Bandcamp, Discogs, recensioni o link di streaming.",
     customLink: "Link personalizzato",
     platform: "Piattaforma",
     linkValue: "URL o ID",
@@ -1982,7 +2132,7 @@ export const it = {
     savedError: "Salvataggio dei dettagli dell'album non riuscito",
     removeLinkTooltip: "Rimuovi link",
     editMarkdownBtn: "Modifica Markdown",
-    editMarkdownTooltip: "Apri l'editor Markdown ampio"
+    editMarkdownTooltip: "Apri l'editor Markdown ampio",
   },
   markdownEditor: {
     edit: "Modifica",
@@ -2003,7 +2153,7 @@ export const it = {
     syntaxTitle: "Formattazione:",
     bold: "grassetto",
     italic: "corsivo",
-    linkText: "link"
+    linkText: "link",
   },
   albumDetail: {
     discHeading: "Disco {disc}",
@@ -2021,14 +2171,17 @@ export const it = {
     refreshSuccess: "Metadati e copertine dell'album aggiornati",
     refreshError: "Aggiornamento dei metadati dell'album non riuscito",
     retrieveAlbumDetails: "Recupera dettagli dell'album",
-    retrieveAlbumDetailsTooltip: "Recupera da MusicBrainz i link a Discogs, AllMusic, Wikidata e ai testi, e da fanart.tv la copertina e l'immagine del disco",
-    retrieveAlbumDetailsNoMbidTooltip: "Nessun ID del gruppo di pubblicazioni MusicBrainz trovato per questo album",
+    retrieveAlbumDetailsTooltip:
+      "Recupera da MusicBrainz i link a Discogs, AllMusic, Wikidata e ai testi, e da fanart.tv la copertina e l'immagine del disco",
+    retrieveAlbumDetailsNoMbidTooltip:
+      "Nessun ID del gruppo di pubblicazioni MusicBrainz trovato per questo album",
     communityRating: "Valutazione della community",
     reviewOnCritiqueBrainz: "Recensione su CritiqueBrainz",
-    reviewOnCritiqueBrainzTooltip: "Apri questo album su CritiqueBrainz per leggere o scrivere recensioni",
+    reviewOnCritiqueBrainzTooltip:
+      "Apri questo album su CritiqueBrainz per leggere o scrivere recensioni",
     retrieveDetailsSuccess: {
       one: "{count} link aggiunto da MusicBrainz",
-      other: "{count} link aggiunti da MusicBrainz"
+      other: "{count} link aggiunti da MusicBrainz",
     },
     retrieveDetailsNoResults: "Nessun dettaglio aggiuntivo trovato su MusicBrainz",
     retrieveDetailsError: "Recupero dei dettagli dell'album non riuscito",
@@ -2042,12 +2195,12 @@ export const it = {
     contextComplete: "{context} completato",
     tracksPlayed: {
       one: "{count} brano riprodotto",
-      other: "{count} brani riprodotti"
+      other: "{count} brani riprodotti",
     },
     shuffleLibrary: "Riproduci libreria in ordine casuale",
     replay: "Riascolta",
     exitImmersive: "Esci dalla modalità immersiva",
-    dropToPlay: "Trascina i brani in qualsiasi punto per riprodurli"
+    dropToPlay: "Trascina i brani in qualsiasi punto per riprodurli",
   },
   shareModal: {
     menuItem: "Scheda da condividere...",
@@ -2068,7 +2221,7 @@ export const it = {
     copyError: "Copia della scheda da condividere non riuscita",
     saveDialogTitle: "Salva scheda da condividere",
     saveSuccess: "Scheda da condividere salvata",
-    saveError: "Salvataggio della scheda da condividere non riuscito"
+    saveError: "Salvataggio della scheda da condividere non riuscito",
   },
   rating: {
     label: "Valutazione",
@@ -2078,7 +2231,7 @@ export const it = {
     clearTooltip: "Cancella valutazione",
     hateTooltip: "Brano non gradito",
     clearHateTooltip: "Annulla «non mi piace»",
-    hateAction: "Non mi piace"
+    hateAction: "Non mi piace",
   },
   common: {
     closeDialog: "Chiudi la finestra di dialogo",
@@ -2087,7 +2240,7 @@ export const it = {
     openImages: "Apri immagini",
     openImagesCount: {
       one: "Apri {count} immagine",
-      other: "Apri {count} immagini"
+      other: "Apri {count} immagini",
     },
     enableLogoPulse: "Fai clic per attivare la pulsazione del logo",
     disableLogoPulse: "Fai clic per disattivare la pulsazione del logo",
@@ -2107,7 +2260,7 @@ export const it = {
     active: "Attivo",
     paused: "In pausa",
     inactive: "Inattivo",
-    create: "Crea"
+    create: "Crea",
   },
   sortOverrides: {
     heading: "Sostituzioni di ordinamento («Ordina come»)",
@@ -2130,40 +2283,41 @@ export const it = {
     hz: "Hz",
     khz: "kHz",
     db: "dB",
-    lufs: "LUFS"
+    lufs: "LUFS",
   },
   toast: {
     copyError: "Copia l'errore negli appunti",
     copied: "Copiato negli appunti",
-    dismiss: "Chiudi notifica"
+    dismiss: "Chiudi notifica",
   },
   osNotification: {
-    appUpdated: "Luminous è stato aggiornato alla v{version}"
+    appUpdated: "Luminous è stato aggiornato alla v{version}",
   },
   songTags: {
     groupNamePlaceholder: "ad es. Premiati",
     genresTabDescription: {
       one: "{count} genere visualizzato",
-      other: "{count} generi visualizzati"
+      other: "{count} generi visualizzati",
     },
     viewGenre: "Genere",
     viewTags: "Tag",
     emptyTitle: "Ancora nessun tag",
-    emptySubtitle: "Fai clic con il pulsante destro su un brano e scegli Modifica tag per assegnargli un genere: il primo valore è la categoria principale, gli altri sono sottogeneri.",
+    emptySubtitle:
+      "Fai clic con il pulsante destro su un brano e scegli Modifica tag per assegnargli un genere: il primo valore è la categoria principale, gli altri sono sottogeneri.",
     songCount: {
       one: "{count} brano",
-      other: "{count} brani"
+      other: "{count} brani",
     },
     playAll: {
       one: "Riproduci {count} brano",
-      other: "Riproduci tutti i {count} brani"
+      other: "Riproduci tutti i {count} brani",
     },
     editSongTooltip: "Modifica brano",
     editAlbumTooltip: "Modifica album",
     goToGenreTooltip: "Sfoglia {genre}",
     artistCount: {
       one: "{count} artista",
-      other: "{count} artisti"
+      other: "{count} artisti",
     },
     artistTagsHeading: "Tag degli artisti",
     songTagsHeading: "Tag dei brani",
@@ -2186,11 +2340,11 @@ export const it = {
     groupToast: "{count} tag raggruppati in «{name}»",
     deleteToast: {
       one: "Eliminato ({count} brano aggiornato)",
-      other: "Eliminato ({count} brani aggiornati)"
+      other: "Eliminato ({count} brani aggiornati)",
     },
     artistDeleteToast: {
       one: "Eliminato ({count} artista aggiornato)",
-      other: "Eliminato ({count} artisti aggiornati)"
+      other: "Eliminato ({count} artisti aggiornati)",
     },
     renameTag: "Rinomina",
     promoteTag: "Promuovi a genere di primo livello",
@@ -2199,11 +2353,13 @@ export const it = {
     artistRenameToast: "Rinominato in «{name}» ({count} artisti aggiornati)",
     deleteConfirmMessage: {
       one: "Rimuovere {count} tag da ogni brano che lo contiene? L'operazione non può essere annullata.",
-      other: "Rimuovere {count} tag da ogni brano che li contiene? L'operazione non può essere annullata."
+      other:
+        "Rimuovere {count} tag da ogni brano che li contiene? L'operazione non può essere annullata.",
     },
     artistDeleteConfirmMessage: {
       one: "Rimuovere {count} tag da ogni artista che lo contiene? L'operazione non può essere annullata.",
-      other: "Rimuovere {count} tag da ogni artista che li contiene? L'operazione non può essere annullata."
+      other:
+        "Rimuovere {count} tag da ogni artista che li contiene? L'operazione non può essere annullata.",
     },
     deleteBtn: "Elimina",
     cancelBtn: "Annulla",
@@ -2221,8 +2377,8 @@ export const it = {
     manageAliasNamed: "Gestisci alias {alias}",
     aliasSongCount: {
       one: "{count} brano",
-      other: "{count} brani"
-    }
+      other: "{count} brani",
+    },
   },
   tagCleanup: {
     action: "Ripulisci i tag…",
@@ -2230,9 +2386,11 @@ export const it = {
     hint: "Rimuovi commenti promozionali, indicazioni del codificatore e altri tag superflui da tutta la libreria",
     checking: "Controllo dei tag…",
     checkingProgress: "Controllo dei tag… {checked} di {total}",
-    intro: "Togli la spunta a ciò che vuoi tenere. Titolo, artista, album, testo, copertina e gli altri tag principali non vengono mai modificati.",
+    intro:
+      "Togli la spunta a ciò che vuoi tenere. Titolo, artista, album, testo, copertina e gli altri tag principali non vengono mai modificati.",
     nothingFound: "Nessun tag superfluo trovato.",
-    skipped: "Tracce che non è stato possibile controllare (file CUE, file remoti o illeggibili): {count}",
+    skipped:
+      "Tracce che non è stato possibile controllare (file CUE, file remoti o illeggibili): {count}",
     kindPromoComment: "Commento promozionale",
     kindEncoder: "Codificatore",
     kindEncodedBy: "Codificato da",
@@ -2260,9 +2418,11 @@ export const it = {
     chipFolderSeparator: "Separatore di cartelle",
     chipConditionalDisc: "Prefisso del disco condizionale",
     chipConditionalDiscSubtitle: "Sottotitolo del disco condizionale",
-    chipTrack: "N. traccia (2 cifre: 01, 09, 11). Alternative: %track3 (3 cifre: 001), %rawtrack (senza zeri: 1)",
+    chipTrack:
+      "N. traccia (2 cifre: 01, 09, 11). Alternative: %track3 (3 cifre: 001), %rawtrack (senza zeri: 1)",
     chipOptionalTrack: "N. traccia facoltativo (2 cifre). Alternative: {%track3 }, {%rawtrack }",
-    chipOptionalTrackDot: "N. traccia facoltativo con punto (2 cifre). Alternative: {%track3. }, {%rawtrack. }",
+    chipOptionalTrackDot:
+      "N. traccia facoltativo con punto (2 cifre). Alternative: {%track3. }, {%rawtrack. }",
     chipTitle: "Titolo",
     chipYear: "Anno",
     chipGenre: "Genere",
@@ -2292,7 +2452,8 @@ export const it = {
     asciiOnly: "Converti lettere accentate e punteggiatura",
     cleanEmptyDirs: "Elimina le cartelle di origine vuote",
     moveExtraFiles: "Sposta i file associati (copertine, testi, log, file CUE)",
-    statusSummary: "Stato: {errors} errori, {missingTags} tag mancanti, {duplicates} duplicati, {ready} pronti",
+    statusSummary:
+      "Stato: {errors} errori, {missingTags} tag mancanti, {duplicates} duplicati, {ready} pronti",
     colSource: "Posizione precedente",
     colDestination: "Nuova posizione",
     colStatus: "Stato",
@@ -2303,17 +2464,18 @@ export const it = {
     statusError: "Errore",
     summaryReady: {
       one: "{count} brano da organizzare",
-      other: "{count} brani da organizzare"
+      other: "{count} brani da organizzare",
     },
     summaryWaitingOnCuration: {
       one: "{count} brano in attesa di tag o revisione",
-      other: "{count} brani in attesa di tag o revisione"
+      other: "{count} brani in attesa di tag o revisione",
     },
     filterAll: "Tutti ({count})",
     filterReady: "Pronti da spostare ({count})",
     filterNeedsTags: "Tag mancanti ({count})",
     filterDuplicates: "Copie duplicate ({count})",
-    collisionDiskNotice: "Il file di destinazione esiste già sul disco. Questo brano verrà indirizzato alla cartella Duplicates per evitarne la sovrascrittura.",
+    collisionDiskNotice:
+      "Il file di destinazione esiste già sul disco. Questo brano verrà indirizzato alla cartella Duplicates per evitarne la sovrascrittura.",
     filterErrors: "Errori ({count})",
     includeMissingTagsToggle: "Includi brani con tag mancanti",
     customizeSummaryBtn: "Personalizza…",
@@ -2324,20 +2486,21 @@ export const it = {
     unknownTrack: "Titolo sconosciuto",
     nothingToOrganize: "Niente da organizzare!",
     autoOrganizeToggle: "Organizzazione automatica",
-    autoOrganizeToggleTooltip: "Organizza i file automaticamente in background quando arrivano nuovi brani o vengono modificati i tag",
+    autoOrganizeToggleTooltip:
+      "Organizza i file automaticamente in background quando arrivano nuovi brani o vengono modificati i tag",
     autoOrganizeSuccess: {
       one: "{count} file organizzato automaticamente",
-      other: "{count} file organizzati automaticamente"
+      other: "{count} file organizzati automaticamente",
     },
     toastDuplicatesDetected: {
       one: "{count} file duplicato rilevato durante l'organizzazione automatica",
-      other: "{count} file duplicati rilevati durante l'organizzazione automatica"
+      other: "{count} file duplicati rilevati durante l'organizzazione automatica",
     },
     cancel: "Annulla",
     applyButton: "Organizza musica",
     applySuccess: {
       one: "{count} file riorganizzato correttamente",
-      other: "{count} file riorganizzati correttamente"
+      other: "{count} file riorganizzati correttamente",
     },
     organizeFilesTooltip: "Organizza i file con un modello basato sui tag",
     organizeEntireLibrary: "Organizza",
@@ -2346,7 +2509,8 @@ export const it = {
     noChangingFilesMatch: "Nessun file da riorganizzare.",
     resizeOriginalColumn: "Ridimensiona la colonna del percorso originale",
     resizeTargetColumn: "Ridimensiona la colonna del percorso di destinazione",
-    resizeColumnHint: "Trascina per ridimensionare la colonna, fai doppio clic per adattarla al contenuto",
+    resizeColumnHint:
+      "Trascina per ridimensionare la colonna, fai doppio clic per adattarla al contenuto",
     noPathRecorded: "(Nessun percorso registrato)",
     unknownError: "Errore sconosciuto",
     applying: "Applicazione in corso...",
@@ -2355,58 +2519,67 @@ export const it = {
     confirmApplyTitle: "Organizza file",
     confirmApplyMessage: "Stai per spostare {files} in {folders}.",
     confirmApplyCleanDirs: "Le cartelle di origine vuote verranno eliminate.",
-    confirmApplyMoveExtra: "Anche i file correlati (copertine, testi e fogli CUE) verranno spostati.",
-    confirmApplyAutoOrganize: "L'organizzazione automatica adotterà questo modello per tutti i brani futuri.",
+    confirmApplyMoveExtra:
+      "Anche i file correlati (copertine, testi e fogli CUE) verranno spostati.",
+    confirmApplyAutoOrganize:
+      "L'organizzazione automatica adotterà questo modello per tutti i brani futuri.",
     confirmApplyCustomDest: "Cartella di destinazione: {path}",
     confirmApplyBtn: "Organizza file",
     confirmAutoOrganizeTitle: "Attiva organizzazione automatica",
-    confirmAutoOrganizeMessage: "L'attivazione dell'organizzazione automatica riorganizzerà immediatamente i brani esistenti nella libreria in base al modello corrente e sposterà automaticamente i file sul disco ogni volta che i tag vengono aggiornati o viene aggiunta nuova musica. Vuoi davvero attivare l'organizzazione automatica?",
+    confirmAutoOrganizeMessage:
+      "L'attivazione dell'organizzazione automatica riorganizzerà immediatamente i brani esistenti nella libreria in base al modello corrente e sposterà automaticamente i file sul disco ogni volta che i tag vengono aggiornati o viene aggiunta nuova musica. Vuoi davvero attivare l'organizzazione automatica?",
     confirmAutoOrganizeBtn: "Attiva organizzazione automatica",
     filesCount: {
       one: "{count} file",
-      other: "{count} file"
+      other: "{count} file",
     },
     foldersCount: {
       one: "{count} cartella",
-      other: "{count} cartelle"
+      other: "{count} cartelle",
     },
     draftModifiedBadge: "Modello modificato — organizzazione automatica in pausa",
-    revertDraftBtn: "Ripristina"
+    revertDraftBtn: "Ripristina",
   },
   musicbrainz: {
-    integrationDesc: "è un database musicale collaborativo che cataloga le uscite di tutto il mondo, assegnando ai tuoi brani identificatori universali (MBID) per biografie di artisti accurate, abbinamento delle copertine e scrobbling senza interruzioni."
+    integrationDesc:
+      "è un database musicale collaborativo che cataloga le uscite di tutto il mondo, assegnando ai tuoi brani identificatori universali (MBID) per biografie di artisti accurate, abbinamento delle copertine e scrobbling senza interruzioni.",
   },
   picard: {
     openInPicard: "Apri in Picard",
     openAllInPicard: "Apri tutti in Picard",
     openSelectedInPicard: "Apri {count} in Picard",
-    notFoundTooltip: "MusicBrainz Picard non trovato. Installalo da picard.musicbrainz.org oppure imposta un percorso personalizzato in Impostazioni.",
+    notFoundTooltip:
+      "MusicBrainz Picard non trovato. Installalo da picard.musicbrainz.org oppure imposta un percorso personalizzato in Impostazioni.",
     remoteNotSupportedTooltip: "Apri in Picard non è disponibile per i brani su un server remoto",
     integrationTitle: "MusicBrainz Picard",
-    integrationDesc: "è un programma open source che identifica i file musicali tramite la loro impronta audio digitale univoca, compilando automaticamente i dettagli mancanti dei brani, le copertine e nomi di file ordinati grazie a un'enorme enciclopedia creata dalla community.",
+    integrationDesc:
+      "è un programma open source che identifica i file musicali tramite la loro impronta audio digitale univoca, compilando automaticamente i dettagli mancanti dei brani, le copertine e nomi di file ordinati grazie a un'enorme enciclopedia creata dalla community.",
     foundAt: "Trovato in {path}",
-    notFound: "Non trovato: installalo da picard.musicbrainz.org oppure imposta un percorso personalizzato qui sotto.",
+    notFound:
+      "Non trovato: installalo da picard.musicbrainz.org oppure imposta un percorso personalizzato qui sotto.",
     customPathLabel: "Percorso personalizzato (facoltativo)",
     customPathPlaceholder: "C:\\Program Files\\MusicBrainz Picard\\picard.exe",
     customPathPlaceholderLinux: "/var/lib/flatpak/exports/bin/org.musicbrainz.Picard",
     browseBtn: "Sfoglia...",
     recheckTooltip: "Cerca di nuovo Picard",
     missingPlaylistLabel: "Playlist automatica degli ID MusicBrainz mancanti",
-    missingPlaylistHint: "Mostra una playlist automatica dei brani della libreria senza ID MusicBrainz, per taggarli facilmente in Picard"
+    missingPlaylistHint:
+      "Mostra una playlist automatica dei brani della libreria senza ID MusicBrainz, per taggarli facilmente in Picard",
   },
   listenbrainz: {
     tokenRequired: "Inserisci un token utente",
     validateFailed: "Impossibile convalidare il token",
     submittedPending: {
       one: "{count} ascolto in sospeso inviato",
-      other: "{count} ascolti in sospeso inviati"
+      other: "{count} ascolti in sospeso inviati",
     },
     queueEmpty: "La coda è vuota",
     flushFailed: "Invio non riuscito",
     syncRatingsError: "Impossibile sincronizzare le valutazioni",
     connectFailed: "Impossibile connettersi a ListenBrainz",
     integrationTitle: "Scrobbler ListenBrainz",
-    integrationDesc: "è un diario musicale open source e senza scopo di lucro che tiene traccia di ogni brano che ascolti nelle varie app («scrobbling») e ti permette di esplorare le tue abitudini di ascolto senza vendere i tuoi dati personali.",
+    integrationDesc:
+      "è un diario musicale open source e senza scopo di lucro che tiene traccia di ogni brano che ascolti nelle varie app («scrobbling») e ti permette di esplorare le tue abitudini di ascolto senza vendere i tuoi dati personali.",
     enableLabel: "Attiva lo scrobbling su ListenBrainz",
     enableHint: "Invia gli ascolti completati al tuo profilo ListenBrainz",
     userTokenLabel: "Token utente",
@@ -2424,29 +2597,36 @@ export const it = {
     cacheEmpty: "La cache offline è vuota",
     cachePending: {
       one: "Ascolti in attesa nella cache offline: {count}",
-      other: "Ascolti in attesa nella cache offline: {count}"
+      other: "Ascolti in attesa nella cache offline: {count}",
     },
-    cacheDesc: "Gli ascolti registrati senza connessione a Internet vengono messi in coda e inviati automaticamente.",
+    cacheDesc:
+      "Gli ascolti registrati senza connessione a Internet vengono messi in coda e inviati automaticamente.",
     syncNowBtn: "Sincronizza ora",
     critiquebrainzUserLabel: "Profilo CritiqueBrainz",
-    critiquebrainzUserHint: "Incolla l'URL del tuo profilo su critiquebrainz.org o il tuo ID utente per recuperare le valutazioni a stelle",
+    critiquebrainzUserHint:
+      "Incolla l'URL del tuo profilo su critiquebrainz.org o il tuo ID utente per recuperare le valutazioni a stelle",
     critiquebrainzUserPlaceholder: "https://critiquebrainz.org/user/...",
     syncRatingsLabel: "Sincronizza le valutazioni",
-    syncRatingsHint: "Recupera da ListenBrainz e CritiqueBrainz i tuoi brani amati, odiati e le valutazioni a stelle, e invia i brani amati locali",
+    syncRatingsHint:
+      "Recupera da ListenBrainz e CritiqueBrainz i tuoi brani amati, odiati e le valutazioni a stelle, e invia i brani amati locali",
     syncRatingsBtn: "Sincronizza valutazioni",
     syncingRatingsBtn: "Sincronizzazione in corso...",
-    syncRatingsSuccess: "Recuperati: {loved} amati, {hated} odiati, {songRatings} valutazioni di brani e {albumRatings} valutazioni di album; inviati a ListenBrainz: {pushed}",
+    syncRatingsSuccess:
+      "Recuperati: {loved} amati, {hated} odiati, {songRatings} valutazioni di brani e {albumRatings} valutazioni di album; inviati a ListenBrainz: {pushed}",
     syncRatingsFailed: "(invio non riuscito: {failed})",
-    syncRatingsNoCritiquebrainz: "Le valutazioni a stelle non sono state recuperate: aggiungi qui sopra il tuo profilo CritiqueBrainz."
+    syncRatingsNoCritiquebrainz:
+      "Le valutazioni a stelle non sono state recuperate: aggiungi qui sopra il tuo profilo CritiqueBrainz.",
   },
   lastfm: {
     integrationTitle: "Scrobbler Last.fm",
-    integrationDesc: "è un servizio di scoperta musicale che registra i brani ascoltati per offrire statistiche personalizzate, classifiche settimanali e consigli sugli artisti.",
+    integrationDesc:
+      "è un servizio di scoperta musicale che registra i brani ascoltati per offrire statistiche personalizzate, classifiche settimanali e consigli sugli artisti.",
     connectLabel: "Connetti Last.fm",
     connectHint: "Autorizza Luminous nel browser per inviare gli ascolti al tuo profilo Last.fm",
     connectBtn: "Connetti Last.fm",
     authPendingTitle: "In attesa di autorizzazione nel browser",
-    authPendingDesc: "Fai clic su «Yes, allow access» nella pagina di autorizzazione di Last.fm nel browser, quindi fai clic su Completa accesso qui sotto.",
+    authPendingDesc:
+      "Fai clic su «Yes, allow access» nella pagina di autorizzazione di Last.fm nel browser, quindi fai clic su Completa accesso qui sotto.",
     finishAuthBtn: "Completa accesso",
     cancelAuthBtn: "Annulla",
     authFailed: "Autorizzazione con Last.fm non riuscita",
@@ -2457,18 +2637,21 @@ export const it = {
     lovedTracksHint: "Sincronizza i brani preferiti con i brani piaciuti su Last.fm",
     syncLovedBtn: "Sincronizza brani preferiti",
     syncingLovedBtn: "Sincronizzazione in corso...",
-    syncLovedSuccess: "Brani preferiti sincronizzati con Last.fm: {loved} scaricati, {pushed} inviati",
+    syncLovedSuccess:
+      "Brani preferiti sincronizzati con Last.fm: {loved} scaricati, {pushed} inviati",
     cacheEmpty: "La cache non in linea è vuota",
     cachePending: {
       one: "{count} ascolto in sospeso nella cache non in linea",
-      other: "{count} ascolti in sospeso nella cache non in linea"
+      other: "{count} ascolti in sospeso nella cache non in linea",
     },
-    cacheDesc: "Gli ascolti registrati senza connessione internet vengono accodati e inviati automaticamente.",
-    syncNowBtn: "Sincronizza ora"
+    cacheDesc:
+      "Gli ascolti registrati senza connessione internet vengono accodati e inviati automaticamente.",
+    syncNowBtn: "Sincronizza ora",
   },
   discord: {
     integrationTitle: "Discord Rich Presence",
-    integrationDesc: "mostra il brano in riproduzione e il tuo stato di ascolto direttamente sul tuo profilo Discord usando la comunicazione locale tra processi (IPC).",
+    integrationDesc:
+      "mostra il brano in riproduzione e il tuo stato di ascolto direttamente sul tuo profilo Discord usando la comunicazione locale tra processi (IPC).",
     enableLabel: "Attiva Discord Rich Presence",
     enableHint: "Trasmetti a Discord il brano corrente e l'avanzamento della riproduzione",
     statusConnected: "Connesso a Discord",
@@ -2480,7 +2663,8 @@ export const it = {
     showTimeHint: "Mostra su Discord un timer in tempo reale dell'avanzamento del brano",
     recheckTooltip: "Verifica la connessione a Discord",
     applicationIdLabel: "ID applicazione",
-    applicationIdHint: "Identificatore pubblico dell'applicazione registrata usato per Rich Presence"
+    applicationIdHint:
+      "Identificatore pubblico dell'applicazione registrata usato per Rich Presence",
   },
   smartPlaylistBuilder: {
     fallbackName: "Playlist intelligente",
@@ -2560,7 +2744,7 @@ export const it = {
     removeRuleTooltip: "Rimuovi regola",
     cancel: "Annulla",
     updateBtn: "Aggiorna playlist intelligente",
-    createBtn: "Crea playlist intelligente"
+    createBtn: "Crea playlist intelligente",
   },
   shortcuts: {
     title: "Scorciatoie da tastiera",
@@ -2586,19 +2770,20 @@ export const it = {
     toggleMiniplayer: "Attiva/disattiva miniplayer",
     openSettings: "Apri Impostazioni",
     showShortcuts: "Mostra questo elenco",
-    footnote: "Anche i pulsanti laterali del mouse e gli appositi tasti avanti/indietro del browser scorrono la cronologia. Anche i tasti multimediali della tastiera o del dispositivo controllano la riproduzione."
+    footnote:
+      "Anche i pulsanti laterali del mouse e gli appositi tasti avanti/indietro del browser scorrono la cronologia. Anche i tasti multimediali della tastiera o del dispositivo controllano la riproduzione.",
   },
   celebrations: {
     firstLaunch: "Benvenuto in Luminous v{version}!",
     newVersion: "Aggiornato a Luminous v{version}",
     milestone: {
       one: "{count} brano nella tua libreria!",
-      other: "{count} brani nella tua libreria!"
+      other: "{count} brani nella tua libreria!",
     },
     firstFolder: "Prima cartella musicale aggiunta!",
     contextComplete: "{name} completato",
     queueComplete: "La coda è terminata",
-    playlistCreated: "Playlist «{name}» creata"
+    playlistCreated: "Playlist «{name}» creata",
   },
   dragDrop: {
     overlayReplaceTitle: "Rilascia per sostituire la coda e riprodurre",
@@ -2607,15 +2792,15 @@ export const it = {
     overlayAppendHint: "La riproduzione non verrà interrotta",
     playingSongs: {
       one: "Riproduzione di {count} brano",
-      other: "Riproduzione di {count} brani"
+      other: "Riproduzione di {count} brani",
     },
     addedSongs: {
       one: "{count} brano aggiunto alla coda",
-      other: "{count} brani aggiunti alla coda"
+      other: "{count} brani aggiunti alla coda",
     },
     nothingToAdd: "Nessun file audio supportato da aggiungere.",
     queueFailed: "Impossibile aggiungere alla coda.",
-    playlistFailed: "Impossibile aggiungere a {name}."
+    playlistFailed: "Impossibile aggiungere a {name}.",
   },
   walkthrough: {
     takeTour: "Fai un rapido tour",
@@ -2628,37 +2813,44 @@ export const it = {
     steps: {
       sidebar: {
         title: "Naviga nella tua libreria",
-        description: "Passa da qui a Home, Raccolta, Playlist, File, Statistiche, Impostazioni e Guida."
+        description:
+          "Passa da qui a Home, Raccolta, Playlist, File, Statistiche, Impostazioni e Guida.",
       },
       topNavigation: {
         title: "Trova e apri la musica",
-        description: "Cerca nella libreria oppure scegli Apri… per riprodurre file da qualsiasi punto del computer. Usa le frecce per tornare dove eri, come in un browser web."
+        description:
+          "Cerca nella libreria oppure scegli Apri… per riprodurre file da qualsiasi punto del computer. Usa le frecce per tornare dove eri, come in un browser web.",
       },
       collectionView: {
         title: "Sfoglia la tua raccolta",
-        description: "Passa dalla vista a schede a quella a righe mentre sfogli Album o Artisti."
+        description: "Passa dalla vista a schede a quella a righe mentre sfogli Album o Artisti.",
       },
       playerBarCover: {
         title: "Copertina",
-        description: "Fai clic sulla copertina per passare alla vista immersiva, una visione a schermo intero di ciò che stai ascoltando."
+        description:
+          "Fai clic sulla copertina per passare alla vista immersiva, una visione a schermo intero di ciò che stai ascoltando.",
       },
       playerBarControls: {
         title: "Controlli di riproduzione",
-        description: "Da qui puoi riprodurre, mettere in pausa, saltare, cercare nel brano e alternare casuale o ripeti."
+        description:
+          "Da qui puoi riprodurre, mettere in pausa, saltare, cercare nel brano e alternare casuale o ripeti.",
       },
       playerBarToolbar: {
         title: "Menu del brano, testi, coda, info e miniplayer",
-        description: "Apri il menu del brano, passa ai Testi, consulta la Coda, mostra il pannello informazioni o passa al Miniplayer flottante, oltre al volume, tutto qui."
+        description:
+          "Apri il menu del brano, passa ai Testi, consulta la Coda, mostra il pannello informazioni o passa al Miniplayer flottante, oltre al volume, tutto qui.",
       },
       rightPanel: {
         title: "Dettagli del brano",
-        description: "Consulta la biografia dell'artista del brano corrente, i link a MusicBrainz e i dettagli tecnici come formato e bitrate."
+        description:
+          "Consulta la biografia dell'artista del brano corrente, i link a MusicBrainz e i dettagli tecnici come formato e bitrate.",
       },
       libraryFolders: {
         title: "Rendi Luminous tuo",
-        description: "Apri Impostazioni per aggiungere cartelle musicali e server, scegliere tema e lingua e collegare le integrazioni."
-      }
-    }
+        description:
+          "Apri Impostazioni per aggiungere cartelle musicali e server, scegliere tema e lingua e collegare le integrazioni.",
+      },
+    },
   },
   tasks: {
     taskFailed: "Attività non riuscita",
@@ -2669,7 +2861,8 @@ export const it = {
     allDone: "Attività completate",
     syncingWebdav: "Sincronizzazione di {name}…",
     syncingWebdavCount: "Sincronizzazione di {name} ({count} elementi)…",
-    syncingWebdavDaily: "Controllo completo giornaliero di {name} ({count} elementi), una volta al giorno, quindi questa esecuzione è più lenta…",
+    syncingWebdavDaily:
+      "Controllo completo giornaliero di {name} ({count} elementi), una volta al giorno, quindi questa esecuzione è più lenta…",
     savingAlbumTags: "Salvataggio dei tag di {album}…",
     savingTags: "Salvataggio dei tag…",
     albumTagsSaved: "Tag di {album} salvati",
@@ -2682,7 +2875,7 @@ export const it = {
     scanPhaseCheckingMissing: "verifica dei brani mancanti",
     scanPhaseResolvingArtwork: "ricerca delle copertine",
     scanPhaseUpdating: "aggiornamento della libreria",
-    processingSongs: "Elaborazione dei brani"
+    processingSongs: "Elaborazione dei brani",
   },
   audioPipeline: {
     channelsStereo: "Stereo (2 can.)",
@@ -2699,7 +2892,8 @@ export const it = {
     tierLqDesc: "Formato con perdita inferiore a 256 kbps",
     tierSqDesc: "Formato con perdita a 256 kbps o superiore",
     tierHqDesc: "Formato senza perdita",
-    tierHiResDesc: "Formato senza perdita con frequenza di campionamento superiore a 48 kHz o profondità di bit superiore a 16 bit",
+    tierHiResDesc:
+      "Formato senza perdita con frequenza di campionamento superiore a 48 kHz o profondità di bit superiore a 16 bit",
     stageInput: "Ingresso",
     stageProcessing: "Elaborazione",
     stageOutput: "Uscita",
@@ -2743,41 +2937,46 @@ export const it = {
     modalTitle: "Accedi a MusicBrainz",
     modalSubtitle: "Collega il tuo account per gestire integrazioni e scrobbling",
     waitingForBrowser: "In attesa dell'autorizzazione nel browser…",
-    browserPromptDesc: "Accedi a MusicBrainz e approva l'accesso. Questa finestra si aggiornerà automaticamente.",
+    browserPromptDesc:
+      "Accedi a MusicBrainz e approva l'accesso. Questa finestra si aggiornerà automaticamente.",
     enterCodeManually: "Oppure incolla il codice di verifica:",
     codePlaceholder: "Incolla qui il codice…",
     submitCode: "Invia",
-    privacyNotice: "Luminous usa questa connessione solo per comunicare con le API ufficiali di MusicBrainz e ListenBrainz. Credenziali e token restano esclusivamente sul tuo dispositivo e i tuoi dati personali non vengono mai tracciati, raccolti o condivisi.",
+    privacyNotice:
+      "Luminous usa questa connessione solo per comunicare con le API ufficiali di MusicBrainz e ListenBrainz. Credenziali e token restano esclusivamente sul tuo dispositivo e i tuoi dati personali non vengono mai tracciati, raccolti o condivisi.",
     loginWithMb: "Accedi con MusicBrainz",
     noAccountPrompt: "Non hai un account?",
     createAccountLink: "Crea un account",
     scrobbling: "Scrobbling",
-    listenbrainzPromptDesc: "Registra automaticamente la tua cronologia di ascolto su ListenBrainz con il tuo token utente (scrobbling).",
+    listenbrainzPromptDesc:
+      "Registra automaticamente la tua cronologia di ascolto su ListenBrainz con il tuo token utente (scrobbling).",
     listenbrainzProfile: "Profilo ascoltatore ListenBrainz",
     lastfmProfile: "Profilo ascoltatore Last.fm",
     musicbrainzProfile: "Profilo editor MusicBrainz",
     integrationSettings: "Impostazioni di integrazione",
     aboutMusicBrainz: "Informazioni su MusicBrainz",
-    logout: "Esci"
+    logout: "Esci",
   },
   safeguard: {
     toastMessage: {
       one: "Impossibile trovare {count} brano in '{folder}'. Mantenuto nella tua libreria.",
-      other: "Impossibile trovare {count} brani in '{folder}'. Mantenuti nella tua libreria."
+      other: "Impossibile trovare {count} brani in '{folder}'. Mantenuti nella tua libreria.",
     },
     reviewBtn: "Esamina",
     dialogTitle: "Cartella o unità mancante?",
     dialogMessage: {
       one: "Impossibile trovare {count} su {total} brano in '{folder}'. Ciò si verifica in genere quando un'unità esterna o una cartella viene scollegata o rinominata.\n\nVuoi mantenerlo nella libreria fino alla riconnessione o rimuoverlo?",
-      other: "Impossibile trovare {count} su {total} brani in '{folder}'. Ciò si verifica in genere quando un'unità esterna o una cartella viene scollegata o rinominata.\n\nVuoi mantenerli nella libreria fino alla riconnessione o rimuoverli?"
+      other:
+        "Impossibile trovare {count} su {total} brani in '{folder}'. Ciò si verifica in genere quando un'unità esterna o una cartella viene scollegata o rinominata.\n\nVuoi mantenerli nella libreria fino alla riconnessione o rimuoverli?",
     },
     keepSongsBtn: "Mantieni brani",
-    confirmRemoveBtn: "Rimuovi brani"
+    confirmRemoveBtn: "Rimuovi brani",
   },
   curation: {
     compareDuplicatesBtn: "Confronta",
     duplicateModalTitle: "Confronta copie duplicate",
-    duplicateModalSubtitle: "Seleziona quale edizione conservare. Cronologia di ascolto, valutazioni e presenze nelle playlist verranno trasferite nella copia scelta.",
+    duplicateModalSubtitle:
+      "Seleziona quale edizione conservare. Cronologia di ascolto, valutazioni e presenze nelle playlist verranno trasferite nella copia scelta.",
     groupNavigator: "Duplicato {current} di {total}",
     prevGroup: "Duplicato precedente",
     nextGroup: "Duplicato successivo",
@@ -2802,13 +3001,13 @@ export const it = {
     reassuranceHeader: "Cosa verrà trasferito nella copia conservata:",
     reassurancePlays: {
       one: "+{count} riproduzione dalla copia rimossa",
-      other: "+{count} riproduzioni dalle copie rimosse"
+      other: "+{count} riproduzioni dalle copie rimosse",
     },
     reassuranceRating: "Valutazione aggiornata ({rating}★)",
     reassuranceLoved: "Lo stato di preferito verrà trasferito",
     reassurancePlaylists: {
       one: "{count} posto nelle playlist",
-      other: "{count} posti nelle playlist"
+      other: "{count} posti nelle playlist",
     },
     reassuranceTags: "Tag aggiuntivi: {tags}",
     reassuranceClean: "Entrambe le copie condividono la stessa cronologia e gli stessi tag.",
@@ -2817,8 +3016,10 @@ export const it = {
     keepBothEditTags: "Mantieni entrambi — Modifica tag",
     preserveEditionBtn: "Conserva questa edizione",
     confirmMergeTitle: "Conferma conservazione edizione",
-    confirmMergeMessageDisk: "Sei sicuro di voler conservare questa edizione?\n\nCronologia, valutazioni, tag e presenze nelle playlist delle copie rimosse verranno trasferiti in essa, e il file ridondante verrà eliminato definitivamente dal disco.",
-    confirmMergeMessageDbOnly: "Sei sicuro di voler conservare questa edizione?\n\nCronologia, valutazioni, tag e presenze nelle playlist delle copie rimosse verranno trasferiti in essa, e la voce ridondante verrà rimossa dal database (i file sul disco non verranno toccati).",
+    confirmMergeMessageDisk:
+      "Sei sicuro di voler conservare questa edizione?\n\nCronologia, valutazioni, tag e presenze nelle playlist delle copie rimosse verranno trasferiti in essa, e il file ridondante verrà eliminato definitivamente dal disco.",
+    confirmMergeMessageDbOnly:
+      "Sei sicuro di voler conservare questa edizione?\n\nCronologia, valutazioni, tag e presenze nelle playlist delle copie rimosse verranno trasferiti in essa, e la voce ridondante verrà rimossa dal database (i file sul disco non verranno toccati).",
     confirmMergeBtn: "Conserva edizione",
     cancelBtn: "Annulla",
     allResolvedTitle: "Tutti i duplicati risolti",
@@ -2832,31 +3033,34 @@ export const it = {
     shelfIncompleteHint: "Questi album hanno numeri di traccia mancanti o duplicati.",
     unnumberedTracksBadge: {
       one: "{count} traccia non numerata",
-      other: "{count} tracce non numerate"
+      other: "{count} tracce non numerate",
     },
     duplicateTrackNumbersBadge: {
       one: "{count} numero di traccia duplicato",
-      other: "{count} numeri di traccia duplicati"
+      other: "{count} numeri di traccia duplicati",
     },
     openInPicardBtn: "Apri in Picard",
     shelfMissingCoreTitle: {
       one: "{count} traccia priva di tag di base",
-      other: "{count} tracce prive di tag di base"
+      other: "{count} tracce prive di tag di base",
     },
-    shelfMissingCoreHint: "I brani privi di titolo, artista o album non possono essere organizzati in cartelle strutturate.",
+    shelfMissingCoreHint:
+      "I brani privi di titolo, artista o album non possono essere organizzati in cartelle strutturate.",
     reviewMissingMetadataBtn: "Controlla tag mancanti",
     shelfDuplicatesTitle: {
       one: "{count} gruppo di registrazioni duplicate",
-      other: "{count} gruppi di registrazioni duplicate"
+      other: "{count} gruppi di registrazioni duplicate",
     },
     shelfDuplicatesHint: "Rilevate più copie della stessa registrazione musicale nella collezione.",
     reviewDuplicatesBtn: "Confronta duplicati",
     shelfProvenanceTitle: "Avvisi di provenienza audio",
-    shelfProvenanceHint: "Tracce lossless segnalate per sospetta transcodifica con perdita o sovracampionamento.",
+    shelfProvenanceHint:
+      "Tracce lossless segnalate per sospetta transcodifica con perdita o sovracampionamento.",
     shelfProvenanceBadge: "Sospetta transcodifica",
     shelfCorruptTitle: "File audio corrotti o illeggibili",
-    shelfCorruptHint: "Tracce con errori di decodifica del flusso, verifica del contenitore o convalida del checksum",
+    shelfCorruptHint:
+      "Tracce con errori di decodifica del flusso, verifica del contenitore o convalida del checksum",
     showAllWithCount: "Mostra tutto ({count})",
-    showLess: "Mostra meno"
-  }
+    showLess: "Mostra meno",
+  },
 };

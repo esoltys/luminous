@@ -40,17 +40,29 @@ describe("dateOpChoice", () => {
 
 describe("applyDateOpChoice", () => {
   it("seeds a window when switching from a day, so the rule stays valid", () => {
-    expect(applyDateOpChoice("within", { op: ">=", value: "2026-01-31" })).toEqual({ op: ">=", value: "-30d" });
-    expect(applyDateOpChoice("outside", { op: "=", value: "" })).toEqual({ op: "<", value: "-30d" });
+    expect(applyDateOpChoice("within", { op: ">=", value: "2026-01-31" })).toEqual({
+      op: ">=",
+      value: "-30d",
+    });
+    expect(applyDateOpChoice("outside", { op: "=", value: "" })).toEqual({
+      op: "<",
+      value: "-30d",
+    });
   });
 
   it("keeps the window when flipping between in / not in the last", () => {
-    expect(applyDateOpChoice("outside", { op: ">=", value: "-2w" })).toEqual({ op: "<", value: "-2w" });
+    expect(applyDateOpChoice("outside", { op: ">=", value: "-2w" })).toEqual({
+      op: "<",
+      value: "-2w",
+    });
   });
 
   it("clears an offset when switching to a day comparison, but keeps a day", () => {
     expect(applyDateOpChoice("<=", { op: ">=", value: "-2w" })).toEqual({ op: "<=", value: "" });
-    expect(applyDateOpChoice("<=", { op: ">=", value: "2026-01-31" })).toEqual({ op: "<=", value: "2026-01-31" });
+    expect(applyDateOpChoice("<=", { op: ">=", value: "2026-01-31" })).toEqual({
+      op: "<=",
+      value: "2026-01-31",
+    });
   });
 });
 

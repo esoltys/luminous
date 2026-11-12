@@ -16,7 +16,7 @@
     sm: "w-8 h-8",
     md: "w-12 h-12",
     lg: "w-16 h-16",
-    xl: "w-20 h-20"
+    xl: "w-20 h-20",
   };
 
   let isPulsingEnabled = $state(true);
@@ -170,8 +170,8 @@
   type="button"
   onclick={togglePulsing}
   class="bg-transparent border-none p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent rounded-full overflow-hidden isolate"
-  title={isPulsingEnabled ? i18n.t('common.disableLogoPulse') : i18n.t('common.enableLogoPulse')}
-  aria-label={i18n.t('common.toggleLogoPulsing')}
+  title={isPulsingEnabled ? i18n.t("common.disableLogoPulse") : i18n.t("common.enableLogoPulse")}
+  aria-label={i18n.t("common.toggleLogoPulsing")}
 >
   {#if isResting}
     <!-- Resting: the crisp brand mark (docs/luminous-mark.svg) — no blur,
@@ -182,8 +182,24 @@
       class="{sizeMap[size]} {className} select-none"
       aria-hidden="true"
     >
-      <circle cx="100" cy="100" r="77" stroke={BRAND_INDIGO} stroke-width="14" fill="none" opacity="1" />
-      <circle cx="100" cy="100" r="92" stroke={BRAND_GOLD} stroke-width="8" fill="none" opacity="1" />
+      <circle
+        cx="100"
+        cy="100"
+        r="77"
+        stroke={BRAND_INDIGO}
+        stroke-width="14"
+        fill="none"
+        opacity="1"
+      />
+      <circle
+        cx="100"
+        cy="100"
+        r="92"
+        stroke={BRAND_GOLD}
+        stroke-width="8"
+        fill="none"
+        opacity="1"
+      />
       <circle cx="100" cy="100" r="68" fill={BRAND_SILHOUETTE} />
       <circle cx="150.6" cy="59.6" r="17.4" fill={BRAND_BURST} />
     </svg>
@@ -195,23 +211,47 @@
       style="filter: saturate({saturationVal});"
       aria-hidden="true"
     >
-      <svg class="layer" viewBox="-40 -40 280 280" style="transform: scale({glowScale}); opacity: {glowOpacity};">
+      <svg
+        class="layer"
+        viewBox="-40 -40 280 280"
+        style="transform: scale({glowScale}); opacity: {glowOpacity};"
+      >
         <defs>
           <filter id="glowBlurOuter-{uid}" x="-30%" y="-30%" width="160%" height="160%">
             <feGaussianBlur stdDeviation="22" />
           </filter>
         </defs>
-        <circle data-layer="glow" cx="100" cy="100" r={GLOW_BASE_R} fill="var(--color-accent)" filter="url(#glowBlurOuter-{uid})" />
+        <circle
+          data-layer="glow"
+          cx="100"
+          cy="100"
+          r={GLOW_BASE_R}
+          fill="var(--color-accent)"
+          filter="url(#glowBlurOuter-{uid})"
+        />
       </svg>
 
       {#each [{ width: 12, weight: 1 - midIntensity }, { width: 24, weight: midIntensity }] as rim (rim.width)}
-        <svg class="layer" viewBox="-40 -40 280 280" style="opacity: {innerRimOpacity * rim.weight};">
+        <svg
+          class="layer"
+          viewBox="-40 -40 280 280"
+          style="opacity: {innerRimOpacity * rim.weight};"
+        >
           <defs>
             <filter id="rimBlur-{uid}-{rim.width}" x="-15%" y="-15%" width="130%" height="130%">
               <feGaussianBlur stdDeviation="3" />
             </filter>
           </defs>
-          <circle data-layer="rim" cx="100" cy="100" r="77" stroke="var(--color-accent)" stroke-width={rim.width} fill="none" filter="url(#rimBlur-{uid}-{rim.width})" />
+          <circle
+            data-layer="rim"
+            cx="100"
+            cy="100"
+            r="77"
+            stroke="var(--color-accent)"
+            stroke-width={rim.width}
+            fill="none"
+            filter="url(#rimBlur-{uid}-{rim.width})"
+          />
         </svg>
       {/each}
 
@@ -222,7 +262,16 @@
               <feGaussianBlur stdDeviation="3" />
             </filter>
           </defs>
-          <circle data-layer="ring" cx="100" cy="100" r="92" stroke="var(--color-accent-hover)" stroke-width={ring.width} fill="none" filter="url(#ringBlur-{uid}-{ring.width})" />
+          <circle
+            data-layer="ring"
+            cx="100"
+            cy="100"
+            r="92"
+            stroke="var(--color-accent-hover)"
+            stroke-width={ring.width}
+            fill="none"
+            filter="url(#ringBlur-{uid}-{ring.width})"
+          />
         </svg>
       {/each}
 
@@ -230,13 +279,24 @@
         <circle cx="100" cy="100" r="68" fill={BRAND_SILHOUETTE} />
       </svg>
 
-      <svg class="layer" viewBox="-40 -40 280 280" style="transform-origin: {BURST_ORIGIN}; transform: scale({burstScale}); opacity: {burstOpacity};">
+      <svg
+        class="layer"
+        viewBox="-40 -40 280 280"
+        style="transform-origin: {BURST_ORIGIN}; transform: scale({burstScale}); opacity: {burstOpacity};"
+      >
         <defs>
           <filter id="burstBlur-{uid}" x="-40%" y="-40%" width="180%" height="180%">
             <feGaussianBlur stdDeviation="10" />
           </filter>
         </defs>
-        <circle data-layer="burst" cx="150.6" cy="59.6" r={BURST_BASE_R} fill={BRAND_BURST} filter="url(#burstBlur-{uid})" />
+        <circle
+          data-layer="burst"
+          cx="150.6"
+          cy="59.6"
+          r={BURST_BASE_R}
+          fill={BRAND_BURST}
+          filter="url(#burstBlur-{uid})"
+        />
       </svg>
 
       <svg class="layer" viewBox="-40 -40 280 280">

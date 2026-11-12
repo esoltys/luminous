@@ -7,9 +7,9 @@ import {
   resolveLocale,
   type Locale,
   type ManualLanguage,
-} from '../locales';
-import { invoke } from '@tauri-apps/api/core';
-import { SEEN_SETTING_KEY } from './welcome.svelte';
+} from "../locales";
+import { invoke } from "@tauri-apps/api/core";
+import { SEEN_SETTING_KEY } from "./welcome.svelte";
 
 export type { Locale };
 
@@ -41,11 +41,14 @@ class I18nStore {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       const saved = settings?.language;
       const migrating = settings?.[LANGUAGE_TAGS_KEY] !== "1";
-      const locale = saved ? (migrating ? legacyLanguageToLocale(saved) : null) ?? (isLocale(saved) ? saved : null) : null;
+      const locale = saved
+        ? ((migrating ? legacyLanguageToLocale(saved) : null) ?? (isLocale(saved) ? saved : null))
+        : null;
       if (locale) this.currentLocale = locale;
       else if (!saved && settings?.[SEEN_SETTING_KEY] !== "true") this.adoptSystemLocale();
       if (migrating) {
-        if (locale) void invoke("set_app_setting", { key: "language", value: locale }).catch(() => {});
+        if (locale)
+          void invoke("set_app_setting", { key: "language", value: locale }).catch(() => {});
         void invoke("set_app_setting", { key: LANGUAGE_TAGS_KEY, value: "1" }).catch(() => {});
       }
       // Only once the saved locale is known: a failed load must not replace a good
@@ -54,7 +57,7 @@ class I18nStore {
     } catch (e) {
       console.error("Failed to load language settings:", e);
     } finally {
-      if (typeof document !== 'undefined') {
+      if (typeof document !== "undefined") {
         document.documentElement.lang = this.currentLocale;
       }
       this.pushNativeLabels();
@@ -67,14 +70,19 @@ class I18nStore {
    * Never runs for returning users, so an upgrade cannot switch the language they already have.
    */
   private adoptSystemLocale() {
-    const preferred = typeof navigator === "undefined" ? [] : navigator.languages?.length ? navigator.languages : [navigator.language ?? ""];
+    const preferred =
+      typeof navigator === "undefined"
+        ? []
+        : navigator.languages?.length
+          ? navigator.languages
+          : [navigator.language ?? ""];
     this.currentLocale = resolveLocale(preferred);
     void invoke("set_app_setting", { key: "language", value: this.currentLocale }).catch(() => {});
   }
 
   async setLocale(locale: Locale) {
     this.currentLocale = locale;
-    if (typeof document !== 'undefined') {
+    if (typeof document !== "undefined") {
       document.documentElement.lang = locale;
     }
     this.pushNativeLabels();
@@ -112,17 +120,17 @@ class I18nStore {
   }
 
   t(key: string, vars: Record<string, any> = {}, fallback?: string): string {
-    const keys = key.split('.');
+    const keys = key.split(".");
     let value: any;
     for (const catalog of catalogChain(this.currentLocale)) {
       value = catalog;
       for (const k of keys) {
-        value = value && typeof value === 'object' ? value[k] : undefined;
+        value = value && typeof value === "object" ? value[k] : undefined;
       }
-      if (typeof value === 'string') break;
+      if (typeof value === "string") break;
     }
 
-    if (typeof value !== 'string') {
+    if (typeof value !== "string") {
       return fallback !== undefined ? fallback : key;
     }
 
@@ -138,14 +146,16 @@ class I18nStore {
    */
   plural(key: string, count: number, vars: Record<string, any> = {}, fallback?: string): string {
     const category = pluralCategory(this.currentLocale, count);
-    const keys = key.split('.');
+    const keys = key.split(".");
     for (const catalog of catalogChain(this.currentLocale)) {
       let value: any = catalog;
       for (const k of keys) {
-        value = value && typeof value === 'object' ? value[k] : undefined;
+        value = value && typeof value === "object" ? value[k] : undefined;
       }
-      const form = value && typeof value === 'object' ? (value[category] ?? value.other) : undefined;
-      if (typeof form === 'string') return interpolate(form, { count: formatNumber(count), ...vars });
+      const form =
+        value && typeof value === "object" ? (value[category] ?? value.other) : undefined;
+      if (typeof form === "string")
+        return interpolate(form, { count: formatNumber(count), ...vars });
     }
     return fallback !== undefined ? fallback : key;
   }

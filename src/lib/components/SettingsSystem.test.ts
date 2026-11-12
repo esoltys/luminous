@@ -28,13 +28,43 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
     if (cmd === "get_audio_output_devices") {
       return Promise.resolve([
-        { id: "def-1", name: "Speakers (Realtek Audio)", backend: "cpal", is_default: true, connected: true },
+        {
+          id: "def-1",
+          name: "Speakers (Realtek Audio)",
+          backend: "cpal",
+          is_default: true,
+          connected: true,
+        },
         { id: "usb-1", name: "USB DAC", backend: "cpal", is_default: false, connected: true },
-        { id: "def-1", name: "Speakers (Realtek Audio)", backend: "wasapi_exclusive", is_default: true, connected: true },
-        { id: "usb-1", name: "USB DAC", backend: "wasapi_exclusive", is_default: false, connected: true },
+        {
+          id: "def-1",
+          name: "Speakers (Realtek Audio)",
+          backend: "wasapi_exclusive",
+          is_default: true,
+          connected: true,
+        },
+        {
+          id: "usb-1",
+          name: "USB DAC",
+          backend: "wasapi_exclusive",
+          is_default: false,
+          connected: true,
+        },
         { id: "asio-1", name: "FlexASIO", backend: "asio", is_default: false, connected: true },
-        { id: "hw:CARD=PCH,DEV=0", name: "HDA Intel PCH — ALC289 Analog", backend: "alsa", is_default: false, connected: true },
-        { id: "hw:CARD=EarPods,DEV=0", name: "EarPods — USB Audio", backend: "alsa", is_default: false, connected: true },
+        {
+          id: "hw:CARD=PCH,DEV=0",
+          name: "HDA Intel PCH — ALC289 Analog",
+          backend: "alsa",
+          is_default: false,
+          connected: true,
+        },
+        {
+          id: "hw:CARD=EarPods,DEV=0",
+          name: "EarPods — USB Audio",
+          backend: "alsa",
+          is_default: false,
+          connected: true,
+        },
       ]);
     }
     if (cmd === "get_audio_output_settings") {
@@ -125,7 +155,9 @@ describe("SettingsSystem.svelte", () => {
     const { findByText } = render(SettingsSystem);
 
     expect(await findByText("Audio Output")).toBeInTheDocument();
-    expect(await findByText("Speakers (Realtek Audio) (Default Output Device)")).toBeInTheDocument();
+    expect(
+      await findByText("Speakers (Realtek Audio) (Default Output Device)"),
+    ).toBeInTheDocument();
   });
 
   it("handles switching output backend and device", async () => {
@@ -227,8 +259,20 @@ describe("SettingsSystem.svelte", () => {
     await findByRole("option", { name: "Speakers (Realtek Audio) (Default Output Device)" });
     // The backend lists the chosen device under its last known name.
     prefs.audioOutputDevices = [
-      { id: "hw:CARD=PCH,DEV=0", name: "HDA Intel PCH — ALC289 Analog", backend: "alsa", is_default: false, connected: true },
-      { id: "hw:CARD=EarPods,DEV=0", name: "EarPods — USB Audio", backend: "alsa", is_default: false, connected: false },
+      {
+        id: "hw:CARD=PCH,DEV=0",
+        name: "HDA Intel PCH — ALC289 Analog",
+        backend: "alsa",
+        is_default: false,
+        connected: true,
+      },
+      {
+        id: "hw:CARD=EarPods,DEV=0",
+        name: "EarPods — USB Audio",
+        backend: "alsa",
+        is_default: false,
+        connected: false,
+      },
     ];
     prefs.audioOutputConfig = { backend: "alsa", device_id: "hw:CARD=EarPods,DEV=0" };
     flushSync();
@@ -245,7 +289,9 @@ describe("SettingsSystem.svelte", () => {
     prefs.audioOutputDevices = [];
     const devicesAndSettings = vi.mocked(invoke).getMockImplementation();
     vi.mocked(invoke).mockImplementation((cmd: string) =>
-      Promise.resolve(cmd === "get_audio_output_settings" ? { backend: "alsa", device_id: null } : [])
+      Promise.resolve(
+        cmd === "get_audio_output_settings" ? { backend: "alsa", device_id: null } : [],
+      ),
     );
     const { findByText } = render(SettingsSystem);
 

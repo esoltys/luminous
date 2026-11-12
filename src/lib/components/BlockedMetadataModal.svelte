@@ -11,7 +11,7 @@
     XIcon as X,
     ProhibitIcon as Prohibit,
     TrashIcon as Trash,
-    ShieldSlashIcon as ShieldSlash
+    ShieldSlashIcon as ShieldSlash,
   } from "phosphor-svelte";
 
   interface Props {
@@ -55,12 +55,20 @@
 </script>
 
 <Modal {onClose} maxWidth="max-w-2xl">
-  <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
+  <div
+    class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main"
+  >
     <div class="flex items-center gap-2">
       <Prohibit class="w-4 h-4 text-brand-accent-text" />
-      <h3 class="text-sm font-bold">{i18n.t('settings.blockedMetadataTitle', {}, 'Blocked Online Metadata')}</h3>
+      <h3 class="text-sm font-bold">
+        {i18n.t("settings.blockedMetadataTitle", {}, "Blocked Online Metadata")}
+      </h3>
     </div>
-    <button onclick={onClose} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer" aria-label={i18n.t('settings.cancel', {}, 'Close')}>
+    <button
+      onclick={onClose}
+      class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+      aria-label={i18n.t("settings.cancel", {}, "Close")}
+    >
       <X class="w-4 h-4" />
     </button>
   </div>
@@ -68,24 +76,34 @@
   <div class="flex-1 overflow-y-auto p-6 max-h-[calc(100vh-250px)]">
     {#if isLoading}
       <div class="py-12 flex justify-center items-center">
-        <LoadingSpinner label={i18n.t('common.loading', {}, 'Loading…')} size="sm" />
+        <LoadingSpinner label={i18n.t("common.loading", {}, "Loading…")} size="sm" />
       </div>
     {:else if rejections.length === 0}
-      <div class="py-12 text-center text-brand-text-secondary text-xs flex flex-col items-center gap-2">
+      <div
+        class="py-12 text-center text-brand-text-secondary text-xs flex flex-col items-center gap-2"
+      >
         <ShieldSlash class="w-8 h-8 opacity-40" />
-        <p>{i18n.t('settings.blockedMetadataEmpty', {}, 'No blocked metadata matches.')}</p>
+        <p>{i18n.t("settings.blockedMetadataEmpty", {}, "No blocked metadata matches.")}</p>
       </div>
     {:else}
       <div class="space-y-2">
         <p class="text-xs text-brand-text-secondary pb-2">
-          {i18n.t('settings.blockedMetadataSubtitle', {}, 'Online matches you previously rejected. Unblocking allows the engine to associate them again.')}
+          {i18n.t(
+            "settings.blockedMetadataSubtitle",
+            {},
+            "Online matches you previously rejected. Unblocking allows the engine to associate them again.",
+          )}
         </p>
-        <div class="border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border bg-brand-main">
+        <div
+          class="border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border bg-brand-main"
+        >
           {#each rejections as r (r.id)}
             <div class="flex items-center justify-between gap-4 p-3 text-xs">
               <div class="flex flex-col min-w-0">
                 <div class="flex items-center gap-2">
-                  <span class="font-semibold text-brand-text-primary uppercase tracking-wide text-[11px] px-1.5 py-0.5 rounded bg-brand-sidebar border border-brand-border">
+                  <span
+                    class="font-semibold text-brand-text-primary uppercase tracking-wide text-[11px] px-1.5 py-0.5 rounded bg-brand-sidebar border border-brand-border"
+                  >
                     {r.category}
                   </span>
                   <span class="text-brand-text-primary font-medium">{r.provider}</span>
@@ -110,7 +128,7 @@
                 size="sm"
               >
                 <Trash class="w-3.5 h-3.5" />
-                {i18n.t('settings.unblockBtn', {}, 'Unblock')}
+                {i18n.t("settings.unblockBtn", {}, "Unblock")}
               </Button>
             </div>
           {/each}

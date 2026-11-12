@@ -3,7 +3,7 @@
     PlayIcon as Play,
     StackIcon as Layers,
     PushPinIcon as Pin,
-    PushPinSlashIcon as PinOff
+    PushPinSlashIcon as PinOff,
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
@@ -25,21 +25,15 @@
     onClose: () => void;
   }
 
-  let {
-    x,
-    y,
-    autoPlaylist,
-    label,
-    onPlay,
-    onAddToQueue,
-    onClose,
-  }: Props = $props();
+  let { x, y, autoPlaylist, label, onPlay, onAddToQueue, onClose }: Props = $props();
 
   let refKey = $derived(autoPlaylistRefKeyFor(autoPlaylist));
 </script>
 
 <ContextMenu {x} {y} {onClose}>
-  <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
+  <div
+    class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate"
+  >
     {label}
   </div>
 

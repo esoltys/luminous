@@ -111,20 +111,18 @@ describe("OrganizeFiles safeguards", () => {
 
     expect(
       await findByText((content) =>
-        content.includes("You are about to move 2 files into 1 folder.")
-      )
+        content.includes("You are about to move 2 files into 1 folder."),
+      ),
+    ).toBeInTheDocument();
+
+    expect(
+      await findByText((content) => content.includes("Empty source folders will be deleted.")),
     ).toBeInTheDocument();
 
     expect(
       await findByText((content) =>
-        content.includes("Empty source folders will be deleted.")
-      )
-    ).toBeInTheDocument();
-
-    expect(
-      await findByText((content) =>
-        content.includes("Companion files (artwork, lyrics, and cue sheets) will also be moved.")
-      )
+        content.includes("Companion files (artwork, lyrics, and cue sheets) will also be moved."),
+      ),
     ).toBeInTheDocument();
 
     // Cancel closes dialog without applying
@@ -134,9 +132,7 @@ describe("OrganizeFiles safeguards", () => {
 
     await waitFor(() => {
       expect(
-        queryByText((content) =>
-          content.includes("You are about to move 2 files into 1 folder.")
-        )
+        queryByText((content) => content.includes("You are about to move 2 files into 1 folder.")),
       ).not.toBeInTheDocument();
     });
     expect(invoke).not.toHaveBeenCalledWith("apply_organize", expect.anything());
@@ -178,7 +174,7 @@ describe("OrganizeFiles safeguards", () => {
       expect.objectContaining({
         clean_empty_dirs: true,
         move_extra_files: true,
-      })
+      }),
     );
   });
 
@@ -203,8 +199,8 @@ describe("OrganizeFiles safeguards", () => {
     expect(dialogTitles.length).toBeGreaterThanOrEqual(1);
     expect(
       await findByText((content) =>
-        content.includes("You are about to move 2 files into 1 folder.")
-      )
+        content.includes("You are about to move 2 files into 1 folder."),
+      ),
     ).toBeInTheDocument();
   });
 
@@ -217,7 +213,13 @@ describe("OrganizeFiles safeguards", () => {
       }
       if (cmd === "preview_organize") {
         return Promise.resolve([
-          { song_id: 1, from_path: "/music/a.mp3", to_path: "/music/Rock/a.mp3", status: "ok", error_message: null },
+          {
+            song_id: 1,
+            from_path: "/music/a.mp3",
+            to_path: "/music/Rock/a.mp3",
+            status: "ok",
+            error_message: null,
+          },
         ]);
       }
       return Promise.resolve(null);
@@ -384,8 +386,8 @@ describe("OrganizeFiles safeguards", () => {
     // Default: only 1 file is about to move (un-tagged track held back)
     expect(
       await findByText((content) =>
-        content.includes("You are about to move 1 file into 1 folder.")
-      )
+        content.includes("You are about to move 1 file into 1 folder."),
+      ),
     ).toBeInTheDocument();
 
     // Cancel dialog
@@ -404,9 +406,7 @@ describe("OrganizeFiles safeguards", () => {
 
     // Now 2 files are included
     expect(
-      await findByText((content) =>
-        content.includes("You are about to move 2 files")
-      )
+      await findByText((content) => content.includes("You are about to move 2 files")),
     ).toBeInTheDocument();
 
     // Confirm dialog applies both items
@@ -456,4 +456,3 @@ describe("OrganizeFiles safeguards", () => {
     });
   });
 });
-

@@ -59,8 +59,10 @@ export function applyDateOpChoice(
   current: { op: string; value: string },
 ): { op: string; value: string } {
   const wasRelative = parseRelative(current.value) !== null;
-  if (choice === "within") return { op: ">=", value: wasRelative ? current.value : DEFAULT_RELATIVE };
-  if (choice === "outside") return { op: "<", value: wasRelative ? current.value : DEFAULT_RELATIVE };
+  if (choice === "within")
+    return { op: ">=", value: wasRelative ? current.value : DEFAULT_RELATIVE };
+  if (choice === "outside")
+    return { op: "<", value: wasRelative ? current.value : DEFAULT_RELATIVE };
   return { op: choice, value: wasRelative ? "" : current.value };
 }
 

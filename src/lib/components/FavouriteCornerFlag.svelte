@@ -23,8 +23,8 @@
 
 <div
   class="absolute top-0 right-0 z-10 pointer-events-none drop-shadow-sm {currentSize.wrapper} {customClass}"
-  title={i18n.t('rating.favoriteTooltip')}
-  aria-label={i18n.t('rating.favoriteTooltip')}
+  title={i18n.t("rating.favoriteTooltip")}
+  aria-label={i18n.t("rating.favoriteTooltip")}
   data-testid="favourite-corner-flag"
 >
   <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">

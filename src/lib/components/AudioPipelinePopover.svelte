@@ -6,10 +6,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
-  import {
-    XIcon as X,
-    PulseIcon as Activity,
-  } from "phosphor-svelte";
+  import { XIcon as X, PulseIcon as Activity } from "phosphor-svelte";
 
   interface Props {
     isOpen: boolean;
@@ -52,7 +49,10 @@
     left = Math.max(16, Math.min(left, window.innerWidth - popoverWidth - 16));
 
     // Anchor transform-origin directly on the triggering badge's horizontal center
-    const originX = Math.max(20, Math.min(Math.round(rect.left + rect.width / 2 - left), popoverWidth - 20));
+    const originX = Math.max(
+      20,
+      Math.min(Math.round(rect.left + rect.width / 2 - left), popoverWidth - 20),
+    );
 
     if (placeAbove) {
       // Anchor bottom edge above the trigger element with a clean margin
@@ -68,7 +68,7 @@
   }
 
   let popoverStyle = $derived.by(() => {
-    const parts: string[] = ['width: 380px'];
+    const parts: string[] = ["width: 380px"];
     if (coords.bottom !== undefined) {
       parts.push(`bottom: ${coords.bottom}px`);
       parts.push(`transform-origin: ${coords.originX}px bottom`);
@@ -78,7 +78,7 @@
     }
     parts.push(`left: ${coords.left}px`);
     parts.push(`max-height: ${coords.maxHeight}px`);
-    return parts.join('; ');
+    return parts.join("; ");
   });
 
   // Hand-rolled rather than motion.ts's scale/fly because the bloom grows
@@ -154,14 +154,16 @@
     class="fixed z-[100] acrylic-float border border-brand-border/60 rounded-xl shadow-2xl overflow-hidden flex flex-col"
     role="dialog"
     aria-modal="true"
-    aria-label={i18n.t('audioPipeline.title', {}, 'Audio Pipeline')}
+    aria-label={i18n.t("audioPipeline.title", {}, "Audio Pipeline")}
   >
     <!-- Header -->
-    <div class="flex items-center justify-between px-4 py-3 border-b border-brand-border/40 bg-brand-bg/50 shrink-0">
+    <div
+      class="flex items-center justify-between px-4 py-3 border-b border-brand-border/40 bg-brand-bg/50 shrink-0"
+    >
       <div class="flex items-center gap-2">
         <Activity class="w-4 h-4 text-brand-text-primary" />
         <h2 class="text-xs font-bold uppercase tracking-wider text-brand-text-primary">
-          {i18n.t('audioPipeline.title', {}, 'Audio Pipeline')}
+          {i18n.t("audioPipeline.title", {}, "Audio Pipeline")}
         </h2>
       </div>
 
@@ -169,8 +171,8 @@
         type="button"
         onclick={onClose}
         class="p-1 rounded-md text-brand-text-primary hover:bg-brand-border/40 transition-colors"
-        title={i18n.t('audioPipeline.close', {}, 'Close audio pipeline')}
-        aria-label={i18n.t('audioPipeline.close', {}, 'Close audio pipeline')}
+        title={i18n.t("audioPipeline.close", {}, "Close audio pipeline")}
+        aria-label={i18n.t("audioPipeline.close", {}, "Close audio pipeline")}
       >
         <X class="w-3.5 h-3.5" />
       </button>

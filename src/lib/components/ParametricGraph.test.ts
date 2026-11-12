@@ -13,7 +13,13 @@ const ranges: EqRanges = {
   min_bands: 1,
 };
 
-const peak = (freq: number, gain_db = 0, q = 1): ParametricBand => ({ kind: "peak", freq, gain_db, q, enabled: true });
+const peak = (freq: number, gain_db = 0, q = 1): ParametricBand => ({
+  kind: "peak",
+  freq,
+  gain_db,
+  q,
+  enabled: true,
+});
 
 function setup(bands: ParametricBand[] = [peak(60), peak(1000)]) {
   const props = {
@@ -35,7 +41,17 @@ function setup(bands: ParametricBand[] = [peak(60), peak(1000)]) {
 
 function mockPlotBox(plot: HTMLElement) {
   plot.getBoundingClientRect = () =>
-    ({ left: 0, top: 0, width: 300, height: 200, right: 300, bottom: 200, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+    ({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 200,
+      right: 300,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }) as DOMRect;
   return plot;
 }
 
@@ -46,9 +62,15 @@ describe("ParametricGraph.svelte", () => {
       peak(1000, -2.5, 1.4),
       { kind: "high_shelf", freq: 8000, gain_db: 2, q: 0.71, enabled: false },
     ]);
-    expect(getByRole("button", { name: "Band 1: Low shelf, 105 Hz, +3.0 dB, Q 0.71" })).toBeInTheDocument();
-    expect(getByRole("button", { name: "Band 2: Peak, 1000 Hz, -2.5 dB, Q 1.40" })).toBeInTheDocument();
-    expect(getByRole("button", { name: "Band 3: High shelf, 8000 Hz, +2.0 dB, Q 0.71" })).toBeInTheDocument();
+    expect(
+      getByRole("button", { name: "Band 1: Low shelf, 105 Hz, +3.0 dB, Q 0.71" }),
+    ).toBeInTheDocument();
+    expect(
+      getByRole("button", { name: "Band 2: Peak, 1000 Hz, -2.5 dB, Q 1.40" }),
+    ).toBeInTheDocument();
+    expect(
+      getByRole("button", { name: "Band 3: High shelf, 8000 Hz, +2.0 dB, Q 0.71" }),
+    ).toBeInTheDocument();
 
     // Node 0: low shelf (gold fill) uses high-contrast dark text
     expect(node(0).className).toContain("text-neutral-900");
@@ -121,7 +143,10 @@ describe("ParametricGraph.svelte", () => {
 
   it("does not add past the band limit, or when double-clicking a node", async () => {
     const full = setup([peak(60), peak(1000), peak(8000)]);
-    await fireEvent.dblClick(mockPlotBox(full.getByTestId("eq-plot")), { clientX: 150, clientY: 100 });
+    await fireEvent.dblClick(mockPlotBox(full.getByTestId("eq-plot")), {
+      clientX: 150,
+      clientY: 100,
+    });
     expect(full.props.onadd).not.toHaveBeenCalled();
     full.unmount();
 

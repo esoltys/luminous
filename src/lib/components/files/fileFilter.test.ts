@@ -6,14 +6,14 @@ function entry(
   name: string,
   isDir = false,
   status: FileEntry["status"] = "inLibrary",
-  fileType: string | null = null
+  fileType: string | null = null,
 ): FileEntry {
   return {
     name,
     isDir,
     size: isDir ? null : 1000,
     modified: null,
-    fileType: fileType ?? (isDir ? null : name.split(".").pop()?.toUpperCase() ?? null),
+    fileType: fileType ?? (isDir ? null : (name.split(".").pop()?.toUpperCase() ?? null)),
     kind: isDir ? null : "audio",
     opensInApp: false,
     status,

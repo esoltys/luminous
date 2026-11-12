@@ -21,9 +21,27 @@ function mockEntry(overrides: Partial<FileEntry>): FileEntry {
 describe("fileSorting", () => {
   const folderA = mockEntry({ name: "Albums", isDir: true, size: null, fileType: null });
   const folderZ = mockEntry({ name: "Z-Archive", isDir: true, size: null, fileType: null });
-  const track1 = mockEntry({ name: "01 Intro.flac", isDir: false, size: 5000, fileType: "FLAC", status: "inLibrary" });
-  const track2 = mockEntry({ name: "02 Solo.mp3", isDir: false, size: 2000, fileType: "MP3", status: "notScanned" });
-  const track3 = mockEntry({ name: "cover.jpg", isDir: false, size: 10000, fileType: "JPG", status: "albumArt" });
+  const track1 = mockEntry({
+    name: "01 Intro.flac",
+    isDir: false,
+    size: 5000,
+    fileType: "FLAC",
+    status: "inLibrary",
+  });
+  const track2 = mockEntry({
+    name: "02 Solo.mp3",
+    isDir: false,
+    size: 2000,
+    fileType: "MP3",
+    status: "notScanned",
+  });
+  const track3 = mockEntry({
+    name: "cover.jpg",
+    isDir: false,
+    size: 10000,
+    fileType: "JPG",
+    status: "albumArt",
+  });
 
   const allEntries = [track2, folderZ, track1, folderA, track3];
 
@@ -54,9 +72,9 @@ describe("fileSorting", () => {
     expect(sorted.map((e) => e.name)).toEqual([
       "Albums",
       "Z-Archive",
-      "02 Solo.mp3",   // 2000
+      "02 Solo.mp3", // 2000
       "01 Intro.flac", // 5000
-      "cover.jpg",     // 10000
+      "cover.jpg", // 10000
     ]);
   });
 
@@ -65,9 +83,9 @@ describe("fileSorting", () => {
     expect(sorted.map((e) => e.name)).toEqual([
       "Albums",
       "Z-Archive",
-      "cover.jpg",     // 10000
+      "cover.jpg", // 10000
       "01 Intro.flac", // 5000
-      "02 Solo.mp3",   // 2000
+      "02 Solo.mp3", // 2000
     ]);
   });
 
@@ -78,18 +96,14 @@ describe("fileSorting", () => {
       "Albums",
       "01 Intro.flac", // FLAC
       "03 Outro.flac", // FLAC
-      "cover.jpg",     // JPG
-      "02 Solo.mp3",   // MP3
+      "cover.jpg", // JPG
+      "02 Solo.mp3", // MP3
     ]);
   });
 
   it("sorts by status ascending using custom label resolver", () => {
     const getStatusLabel = (e: FileEntry) => (e.status === "inLibrary" ? "A-InLib" : "B-Other");
     const sorted = sortFileEntries([track1, track2, folderA], "status", true, getStatusLabel);
-    expect(sorted.map((e) => e.name)).toEqual([
-      "Albums",
-      "01 Intro.flac",
-      "02 Solo.mp3",
-    ]);
+    expect(sorted.map((e) => e.name)).toEqual(["Albums", "01 Intro.flac", "02 Solo.mp3"]);
   });
 });

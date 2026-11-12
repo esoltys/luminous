@@ -53,7 +53,9 @@ describe("BlockedMetadataModal.svelte", () => {
       return null;
     });
 
-    const { getByText, getAllByText, queryByText } = render(BlockedMetadataModal, { onClose: () => {} });
+    const { getByText, getAllByText, queryByText } = render(BlockedMetadataModal, {
+      onClose: () => {},
+    });
 
     await waitFor(() => {
       expect(getByText("lrclib")).toBeInTheDocument();

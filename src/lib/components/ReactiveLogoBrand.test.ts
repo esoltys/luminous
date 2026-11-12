@@ -41,7 +41,7 @@ describe("ReactiveLogoBrand.svelte", () => {
     expect(burstCore?.getAttribute("fill")).toBe("#FFFFFF");
 
     // No glow, burst halo or blur filters at rest
-    expect(container.querySelector('[data-layer]')).toBeNull();
+    expect(container.querySelector("[data-layer]")).toBeNull();
     expect(container.querySelector("filter")).toBeNull();
   });
 
@@ -83,11 +83,15 @@ describe("ReactiveLogoBrand.svelte", () => {
     // Ambient glow and burst halo are active, blurred, visible layers
     const glow = container.querySelector('circle[data-layer="glow"]');
     expect(glow?.getAttribute("filter")).toMatch(/^url\(#glowBlurOuter-/);
-    expect(parseFloat((glow?.parentElement as unknown as SVGElement).style.opacity)).toBeGreaterThan(0);
+    expect(
+      parseFloat((glow?.parentElement as unknown as SVGElement).style.opacity),
+    ).toBeGreaterThan(0);
 
     const burst = container.querySelector('circle[data-layer="burst"]');
     expect(burst?.getAttribute("filter")).toMatch(/^url\(#burstBlur-/);
-    expect(parseFloat((burst?.parentElement as unknown as SVGElement).style.opacity)).toBeGreaterThan(0);
+    expect(
+      parseFloat((burst?.parentElement as unknown as SVGElement).style.opacity),
+    ).toBeGreaterThan(0);
   });
 
   it("drives the playing layers only through transform and opacity, never SVG geometry", () => {
@@ -97,7 +101,8 @@ describe("ReactiveLogoBrand.svelte", () => {
     // Blurred content is fixed-size; the audio reaches it only via layer style
     expect(container.querySelector('circle[data-layer="glow"]')?.getAttribute("r")).toBe("112");
     expect(container.querySelector('circle[data-layer="burst"]')?.getAttribute("r")).toBe("31");
-    const glowLayer = container.querySelector('circle[data-layer="glow"]')?.parentElement as unknown as SVGElement;
+    const glowLayer = container.querySelector('circle[data-layer="glow"]')
+      ?.parentElement as unknown as SVGElement;
     expect(glowLayer.style.transform).toMatch(/^scale\(/);
   });
 
@@ -107,7 +112,9 @@ describe("ReactiveLogoBrand.svelte", () => {
 
     const button = getByRole("button");
     // Initially playing: active visualizer
-    expect(container.querySelector('circle[data-layer="rim"]')?.getAttribute("stroke")).toBe("var(--color-accent)");
+    expect(container.querySelector('circle[data-layer="rim"]')?.getAttribute("stroke")).toBe(
+      "var(--color-accent)",
+    );
 
     // Toggle pulsing off
     await fireEvent.click(button);
@@ -122,6 +129,6 @@ describe("ReactiveLogoBrand.svelte", () => {
     expect(eclipseRing?.getAttribute("stroke")).toBe("#FFB648");
     expect(eclipseRing?.getAttribute("filter")).toBeNull();
 
-    expect(container.querySelector('[data-layer]')).toBeNull();
+    expect(container.querySelector("[data-layer]")).toBeNull();
   });
 });

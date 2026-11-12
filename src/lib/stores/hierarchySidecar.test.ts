@@ -10,7 +10,7 @@ const LIBRARY = "D:\\Music";
 
 function mockStatus(status: { path: string | null; error: string | null }) {
   vi.mocked(invoke).mockImplementation(async (cmd: string) =>
-    cmd === "get_default_library" ? status : null
+    cmd === "get_default_library" ? status : null,
   );
 }
 
@@ -50,7 +50,9 @@ describe("hierarchySidecarStore", () => {
     expect(hierarchySidecarStore.errorText).toBeNull();
 
     emit("unsupported version 2");
-    expect(hierarchySidecarStore.errorText).toBe(`The genre hierarchy file in ${LIBRARY} is broken.`);
+    expect(hierarchySidecarStore.errorText).toBe(
+      `The genre hierarchy file in ${LIBRARY} is broken.`,
+    );
     expect(toastStore.messages).toHaveLength(1);
     expect(toastStore.messages[0].text).not.toContain("unsupported version");
   });

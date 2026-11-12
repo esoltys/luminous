@@ -9,7 +9,6 @@ import { pinnedStore } from "../stores/pinned.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { Song, AlbumItem, ArtistItem } from "../types";
 
-
 describe("CollectionView.svelte", () => {
   const mockSongs: Song[] = [
     {
@@ -168,7 +167,7 @@ describe("CollectionView.svelte", () => {
       const mounted = queryAllByText(/^Artist \d{4}$/).length;
       expect(mounted).toBeGreaterThan(0);
       expect(mounted).toBeLessThan(100);
-    }
+    },
   );
 
   it("renders Sort: Genre options in Artists sub-tab", () => {
@@ -239,7 +238,7 @@ describe("CollectionView.svelte", () => {
 
       await vi.waitFor(() => expect(pinnedStore.isPinned("artist", "Band A")).toBe(false));
       expect(navigationStore.selectedArtistName).toBeNull();
-    }
+    },
   );
 
   it("defaults to Cards view in Albums sub-tab", () => {

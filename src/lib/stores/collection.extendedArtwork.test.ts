@@ -113,13 +113,18 @@ describe("CollectionStore - extended artwork (#98/#759)", () => {
     const invokeMock = vi.mocked(invoke);
     const result = await collectionStore.getExtendedArtworkForArtist(undefined);
     expect(result.count).toBe(0);
-    expect(invokeMock).not.toHaveBeenCalledWith("get_extended_artwork_for_artist", expect.anything());
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      "get_extended_artwork_for_artist",
+      expect.anything(),
+    );
   });
 
   it("opens an artwork path via the open_artwork_path command", async () => {
     const invokeMock = vi.mocked(invoke).mockResolvedValue(undefined);
     await collectionStore.openArtworkPath("C:/Music/Artist/Album/cover.jpg");
-    expect(invokeMock).toHaveBeenCalledWith("open_artwork_path", { path: "C:/Music/Artist/Album/cover.jpg" });
+    expect(invokeMock).toHaveBeenCalledWith("open_artwork_path", {
+      path: "C:/Music/Artist/Album/cover.jpg",
+    });
   });
 });
 
@@ -152,7 +157,10 @@ describe("CollectionStore - fanart.tv album art (#1277)", () => {
 
     await collectionStore.retrieveAlbumArt("Oceanborn", { onlyMissing: true });
 
-    expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", { album: "Oceanborn", onlyMissing: true });
+    expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", {
+      album: "Oceanborn",
+      onlyMissing: true,
+    });
     expect(collectionStore.albumProfiles["oceanborn"]?.disc_fetched).toBe(true);
     expect(collectionStore.coverArtVersion).toBe(version + 1);
     expect(collectionStore.extendedArtworkBySong).toEqual({});

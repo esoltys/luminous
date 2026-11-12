@@ -9,7 +9,7 @@ const FIXTURE: AddonTheme = {
   id: "fixture-addon",
   name: "Fixture Add-on",
   colors: { ...LUMINOUS_DARK_COLORS, "color-accent": "#12ab34" },
-  overlayEntry: "overlay.html"
+  overlayEntry: "overlay.html",
 };
 
 describe("AddonsStore", () => {
@@ -64,9 +64,13 @@ describe("AddonsStore", () => {
     await addons.init();
     expect(addons.prices[FIXTURE.id]).toBeUndefined();
     handlers["addon-price-defined"]({
-      payload: { id: FIXTURE.id, formatted: "$4.99", isFree: false } as never
+      payload: { id: FIXTURE.id, formatted: "$4.99", isFree: false } as never,
     });
-    expect(addons.prices[FIXTURE.id]).toEqual({ id: FIXTURE.id, formatted: "$4.99", isFree: false });
+    expect(addons.prices[FIXTURE.id]).toEqual({
+      id: FIXTURE.id,
+      formatted: "$4.99",
+      isFree: false,
+    });
   });
 });
 
@@ -119,7 +123,7 @@ describe("ThemeStore with add-ons", () => {
     expect(theme.pendingAddonThemeId).toBe(FIXTURE.id);
     expect(invoke).not.toHaveBeenCalledWith(
       "set_app_setting",
-      expect.objectContaining({ key: "active_theme_id" })
+      expect.objectContaining({ key: "active_theme_id" }),
     );
   });
 
@@ -179,7 +183,7 @@ describe("ThemeStore with add-ons", () => {
         id: "mine",
         name: "Mine",
         colors: { ...LUMINOUS_DARK_COLORS },
-        isCustom: true
+        isCustom: true,
       });
       expect(theme.currentTheme.id).toBe("mine");
       expect(theme.pendingAddonThemeId).toBeNull();

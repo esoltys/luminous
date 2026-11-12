@@ -4,7 +4,11 @@
   import { themeStore } from "../lib/stores/theme.svelte";
   import { addonsStore } from "../lib/stores/addons.svelte";
   import { collectionStore } from "../lib/stores/collection.svelte";
-  import { navigationStore, type ActiveTab, type ActiveSubTab } from "../lib/stores/navigation.svelte";
+  import {
+    navigationStore,
+    type ActiveTab,
+    type ActiveSubTab,
+  } from "../lib/stores/navigation.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
   import { playlistsStore } from "../lib/stores/playlists.svelte";
   import { shouldSkipGlobalShortcut } from "../lib/utils/globalShortcuts";
@@ -20,7 +24,9 @@
     switch (event.code) {
       case "Space":
         event.preventDefault();
-        playerStore.togglePlayPause().catch((err) => console.error("Failed to toggle playback:", err));
+        playerStore
+          .togglePlayPause()
+          .catch((err) => console.error("Failed to toggle playback:", err));
         break;
       case "ArrowLeft":
         event.preventDefault();
@@ -32,19 +38,27 @@
         break;
       case "ArrowUp":
         event.preventDefault();
-        playerStore.adjustVolume(VOLUME_STEP).catch((err) => console.error("Failed to increase volume:", err));
+        playerStore
+          .adjustVolume(VOLUME_STEP)
+          .catch((err) => console.error("Failed to increase volume:", err));
         break;
       case "ArrowDown":
         event.preventDefault();
-        playerStore.adjustVolume(-VOLUME_STEP).catch((err) => console.error("Failed to decrease volume:", err));
+        playerStore
+          .adjustVolume(-VOLUME_STEP)
+          .catch((err) => console.error("Failed to decrease volume:", err));
         break;
       case "PageUp":
         event.preventDefault();
-        playerStore.seekRelative(-SEEK_STEP_NS).catch((err) => console.error("Failed to seek backward:", err));
+        playerStore
+          .seekRelative(-SEEK_STEP_NS)
+          .catch((err) => console.error("Failed to seek backward:", err));
         break;
       case "PageDown":
         event.preventDefault();
-        playerStore.seekRelative(SEEK_STEP_NS).catch((err) => console.error("Failed to seek forward:", err));
+        playerStore
+          .seekRelative(SEEK_STEP_NS)
+          .catch((err) => console.error("Failed to seek forward:", err));
         break;
     }
   }
@@ -69,9 +83,11 @@
               invoke("set_app_setting", { key: "active_tab", value: "settings" }).catch((err) => {
                 console.error("Failed to save migrated active_tab:", err);
               });
-              invoke("set_app_setting", { key: "active_settings_tab", value: "equalizer" }).catch((err) => {
-                console.error("Failed to save migrated active_settings_tab:", err);
-              });
+              invoke("set_app_setting", { key: "active_settings_tab", value: "equalizer" }).catch(
+                (err) => {
+                  console.error("Failed to save migrated active_settings_tab:", err);
+                },
+              );
             } else {
               navigationStore.activeTab = settings.active_tab as ActiveTab;
             }
@@ -95,15 +111,20 @@
 
   $effect(() => {
     if (isInitialized) {
-      invoke("set_app_setting", { key: "active_tab", value: navigationStore.activeTab }).catch((err) => {
-        console.error("Failed to save active_tab:", err);
-      });
+      invoke("set_app_setting", { key: "active_tab", value: navigationStore.activeTab }).catch(
+        (err) => {
+          console.error("Failed to save active_tab:", err);
+        },
+      );
     }
   });
 
   $effect(() => {
     if (isInitialized) {
-      invoke("set_app_setting", { key: "active_sub_tab", value: navigationStore.activeSubTab }).catch((err) => {
+      invoke("set_app_setting", {
+        key: "active_sub_tab",
+        value: navigationStore.activeSubTab,
+      }).catch((err) => {
         console.error("Failed to save active_sub_tab:", err);
       });
     }

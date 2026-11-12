@@ -235,7 +235,9 @@
     {#if !disableClamp && needsClamp}
       <button
         type="button"
-        onclick={() => { isExpanded = !isExpanded; }}
+        onclick={() => {
+          isExpanded = !isExpanded;
+        }}
         class="mt-1 text-xs font-semibold text-brand-accent hover:underline inline-flex items-center gap-0.5 cursor-pointer select-none"
       >
         {isExpanded

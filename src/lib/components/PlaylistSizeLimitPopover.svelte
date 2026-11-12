@@ -28,10 +28,26 @@
     onClose: () => void;
   }
 
-  let { isOpen, anchorEl, limitBytes, deviceId, deviceLabel, refreshReorders, onApply, onClose }: Props = $props();
+  let {
+    isOpen,
+    anchorEl,
+    limitBytes,
+    deviceId,
+    deviceLabel,
+    refreshReorders,
+    onApply,
+    onClose,
+  }: Props = $props();
 
   /** Common USB stick / SD card capacities. */
-  const PRESETS = [2 * STORAGE_GB, 4 * STORAGE_GB, 8 * STORAGE_GB, 16 * STORAGE_GB, 32 * STORAGE_GB, 64 * STORAGE_GB];
+  const PRESETS = [
+    2 * STORAGE_GB,
+    4 * STORAGE_GB,
+    8 * STORAGE_GB,
+    16 * STORAGE_GB,
+    32 * STORAGE_GB,
+    64 * STORAGE_GB,
+  ];
   const WIDTH_PX = 320;
 
   let popoverEl = $state<HTMLDivElement | null>(null);
@@ -53,7 +69,9 @@
 
   let customBytes = $derived.by(() => {
     const n = customValue === "" ? NaN : Number(customValue);
-    return Number.isFinite(n) && n > 0 ? Math.round(n * (customUnit === "GB" ? STORAGE_GB : STORAGE_MB)) : null;
+    return Number.isFinite(n) && n > 0
+      ? Math.round(n * (customUnit === "GB" ? STORAGE_GB : STORAGE_MB))
+      : null;
   });
 
   function updatePosition() {
@@ -103,7 +121,11 @@
   }
 </script>
 
-<svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} onresize={updatePosition} />
+<svelte:window
+  onclick={handleWindowClick}
+  onkeydown={handleWindowKeydown}
+  onresize={updatePosition}
+/>
 
 {#if isOpen}
   <div
@@ -126,7 +148,9 @@
         <X class="w-4 h-4" />
       </button>
     </div>
-    <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t("playlists.sizeLimitHint")}</p>
+    <p class="text-xs text-brand-text-secondary leading-relaxed">
+      {i18n.t("playlists.sizeLimitHint")}
+    </p>
 
     <label class="flex flex-col gap-1.5 text-xs font-medium text-brand-text-primary">
       {i18n.t("playlists.sizeLimitDeviceLabel")}
@@ -142,7 +166,9 @@
       </Select>
     </label>
     {#if chosenDevice}
-      <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t("playlists.sizeLimitDeviceHint")}</p>
+      <p class="text-xs text-brand-text-secondary leading-relaxed">
+        {i18n.t("playlists.sizeLimitDeviceHint")}
+      </p>
     {/if}
 
     <div class="grid grid-cols-3 gap-2">
@@ -152,8 +178,8 @@
           aria-pressed={limitBytes === bytes}
           class="rounded-full border px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer
             {limitBytes === bytes
-              ? 'border-brand-accent bg-brand-accent/15 text-brand-accent-text'
-              : 'border-brand-border/60 hover:bg-brand-main text-brand-text-primary'}"
+            ? 'border-brand-accent bg-brand-accent/15 text-brand-accent-text'
+            : 'border-brand-border/60 hover:bg-brand-main text-brand-text-primary'}"
         >
           {formatStorageSize(bytes)}
         </button>
@@ -185,7 +211,9 @@
     </div>
 
     {#if refreshReorders}
-      <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t("playlists.sizeLimitSmartNote")}</p>
+      <p class="text-xs text-brand-text-secondary leading-relaxed">
+        {i18n.t("playlists.sizeLimitSmartNote")}
+      </p>
     {/if}
 
     {#if limitBytes !== null}

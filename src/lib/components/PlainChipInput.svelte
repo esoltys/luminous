@@ -28,7 +28,10 @@
   function handleAdd() {
     const raw = draft.trim().replace(/^,+|,+$/g, "");
     if (!raw) return;
-    const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    const parts = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     let next = [...chips];
     for (const part of parts) {
       if (!next.some((c) => c.toLowerCase() === part.toLowerCase())) {
@@ -59,12 +62,14 @@
   {#if chips.length > 0}
     <div class="flex flex-wrap gap-1.5">
       {#each chips as chip, idx (chip)}
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25">
+        <span
+          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25"
+        >
           <span>{chip}</span>
           <button
             type="button"
             onclick={() => handleRemove(idx)}
-            disabled={disabled}
+            {disabled}
             class="hover:text-brand-text-primary focus:outline-none cursor-pointer disabled:opacity-40"
             title={i18n.t("chipInput.removeItem", { value: chip })}
           >

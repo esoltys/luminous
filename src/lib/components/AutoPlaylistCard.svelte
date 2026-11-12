@@ -16,7 +16,19 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart" | "language";
+    kind:
+      | "favourites"
+      | "recently_added"
+      | "most_played"
+      | "history"
+      | "genre"
+      | "decade"
+      | "bpm"
+      | "artist_tag"
+      | "missing_metadata"
+      | "missing_musicbrainz"
+      | "daypart"
+      | "language";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -53,7 +65,14 @@
 
   let displayLabel = $derived.by(() => {
     if (
-      (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart" || kind === "language") &&
+      (kind === "genre" ||
+        kind === "decade" ||
+        kind === "bpm" ||
+        kind === "artist_tag" ||
+        kind === "missing_metadata" ||
+        kind === "missing_musicbrainz" ||
+        kind === "daypart" ||
+        kind === "language") &&
       playlistId !== undefined
     ) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
@@ -93,41 +112,56 @@
     const currentTrackCount = trackCount;
 
     const request =
-      (k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "daypart" || k === "language") && pid !== undefined
+      (k === "genre" ||
+        k === "decade" ||
+        k === "bpm" ||
+        k === "artist_tag" ||
+        k === "daypart" ||
+        k === "language") &&
+      pid !== undefined
         ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
-            items.filter((item) => !!item.song).map((item) => item.song as Song)
+            items.filter((item) => !!item.song).map((item) => item.song as Song),
           )
         : k === "daypart"
           ? Promise.resolve([])
-        : k === "missing_musicbrainz"
-          ? (pid !== undefined
+          : k === "missing_musicbrainz"
+            ? pid !== undefined
               ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
-                  items.filter((item) => !!item.song).map((item) => item.song as Song)
+                  items.filter((item) => !!item.song).map((item) => item.song as Song),
                 )
-              : invoke<Song[]>("get_songs_missing_musicbrainz_id", { limit: 50 }))
-          : k === "missing_metadata"
-            ? (pid !== undefined
+              : invoke<Song[]>("get_songs_missing_musicbrainz_id", { limit: 50 })
+            : k === "missing_metadata"
+              ? pid !== undefined
                 ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
-                    items.filter((item) => !!item.song).map((item) => item.song as Song)
+                    items.filter((item) => !!item.song).map((item) => item.song as Song),
                   )
-                : invoke<Song[]>("get_songs_missing_metadata", { limit: 50 }))
-        : k === "favourites"
-          ? invoke<Song[]>("get_favourite_songs")
-          : k === "recently_added"
-            ? invoke<Song[]>("get_recently_added_songs", { limit: 50 })
-            : k === "most_played"
-              ? invoke<Song[]>("get_most_played_songs", { limit: 50 })
-              : k === "history"
-                ? invoke<Song[]>("get_recently_played_songs", { limit: 50 })
-                : k === "decade"
-                ? invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 })
-                : k === "bpm"
-                  ? invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 })
-                  : k === "artist_tag"
-                    ? invoke<Song[]>("get_songs_by_artist_tag", { tag: at ?? "", limit: 50 })
-                    : k === "language"
-                      ? invoke<Song[]>("get_songs_by_language", { code: l ?? "", limit: 50 })
-                      : invoke<Song[]>("get_songs_by_curated_tag", { tagName: g ?? "", limit: 50 });
+                : invoke<Song[]>("get_songs_missing_metadata", { limit: 50 })
+              : k === "favourites"
+                ? invoke<Song[]>("get_favourite_songs")
+                : k === "recently_added"
+                  ? invoke<Song[]>("get_recently_added_songs", { limit: 50 })
+                  : k === "most_played"
+                    ? invoke<Song[]>("get_most_played_songs", { limit: 50 })
+                    : k === "history"
+                      ? invoke<Song[]>("get_recently_played_songs", { limit: 50 })
+                      : k === "decade"
+                        ? invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 })
+                        : k === "bpm"
+                          ? invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 })
+                          : k === "artist_tag"
+                            ? invoke<Song[]>("get_songs_by_artist_tag", {
+                                tag: at ?? "",
+                                limit: 50,
+                              })
+                            : k === "language"
+                              ? invoke<Song[]>("get_songs_by_language", {
+                                  code: l ?? "",
+                                  limit: 50,
+                                })
+                              : invoke<Song[]>("get_songs_by_curated_tag", {
+                                  tagName: g ?? "",
+                                  limit: 50,
+                                });
 
     request
       .then((res) => {
@@ -155,7 +189,13 @@
 
   let updatedLabel = $derived.by(() => {
     if (
-      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "missing_musicbrainz" && kind !== "daypart") ||
+      (kind !== "genre" &&
+        kind !== "decade" &&
+        kind !== "bpm" &&
+        kind !== "artist_tag" &&
+        kind !== "missing_metadata" &&
+        kind !== "missing_musicbrainz" &&
+        kind !== "daypart") ||
       updated === undefined
     )
       return null;

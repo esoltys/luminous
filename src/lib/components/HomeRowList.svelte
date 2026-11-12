@@ -86,8 +86,18 @@
       const isDecade = playlist.dynamic_spec?.startsWith("decade:") ?? false;
       navigationStore.viewAutoPlaylist(
         isDecade
-          ? { kind: "decade", decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
-          : { kind: "genre", genre: playlist.dynamic_spec?.replace(/^tag:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
+          ? {
+              kind: "decade",
+              decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name,
+              playlistId: playlist.id,
+              updated: playlist.updated,
+            }
+          : {
+              kind: "genre",
+              genre: playlist.dynamic_spec?.replace(/^tag:/, "") ?? playlist.name,
+              playlistId: playlist.id,
+              updated: playlist.updated,
+            },
       );
       return;
     }
@@ -101,7 +111,11 @@
     } else if (item.type === "song") {
       playerStore.playSong(item.song.id);
     } else if (item.type === "album") {
-      navigationStore.viewAlbum(item.album.album || "", undefined, item.album.album_key ?? undefined);
+      navigationStore.viewAlbum(
+        item.album.album || "",
+        undefined,
+        item.album.album_key ?? undefined,
+      );
     } else if (item.type === "playlist") {
       openPlaylist(item.playlist);
     }
@@ -152,7 +166,12 @@
         tabindex="0"
         onclick={() => openItem(item)}
         oncontextmenu={(e) => handleContextMenu(e, item)}
-        onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openItem(item); } }}
+        onkeydown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openItem(item);
+          }
+        }}
         class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
       >
         {#if variant === "rank"}
@@ -191,16 +210,33 @@
         {#if item.type === "album" || item.type === "song"}
           <div class="min-w-0 flex-1 flex flex-col gap-0.5">
             <div class="flex items-center justify-between gap-2">
-              <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{titleFor(item)}</p>
-              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{yearFor(item)}</span>
+              <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
+                {titleFor(item)}
+              </p>
+              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0"
+                >{yearFor(item)}</span
+              >
             </div>
             <div class="flex items-center justify-between gap-2">
-              <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{subtitleFor(item)}</p>
+              <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">
+                {subtitleFor(item)}
+              </p>
               <span class="shrink-0">
                 {#if item.type === "song"}
-                  <SongRating rating={item.song.rating} loved={item.song.loved} onRate={(r) => rateSong(item.song, r)} onSetLoved={(l) => setLoved(item.song, l)} size="sm" />
+                  <SongRating
+                    rating={item.song.rating}
+                    loved={item.song.loved}
+                    onRate={(r) => rateSong(item.song, r)}
+                    onSetLoved={(l) => setLoved(item.song, l)}
+                    size="sm"
+                  />
                 {:else}
-                  <SongRating isAlbum rating={item.album.rating} onRate={(r) => rateAlbum(item.album, r)} size="sm" />
+                  <SongRating
+                    isAlbum
+                    rating={item.album.rating}
+                    onRate={(r) => rateAlbum(item.album, r)}
+                    size="sm"
+                  />
                 {/if}
               </span>
             </div>
@@ -208,12 +244,20 @@
         {:else}
           <div class="min-w-0 flex-1 flex flex-col gap-0.5">
             <div class="flex items-center justify-between gap-2">
-              <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{titleFor(item)}</p>
-              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{trailingLabel(item)}</span>
+              <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
+                {titleFor(item)}
+              </p>
+              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0"
+                >{trailingLabel(item)}</span
+              >
             </div>
             <div class="flex items-center justify-between gap-2">
-              <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{subtitleFor(item)}</p>
-              <span class="text-xs text-brand-text-secondary truncate shrink-0">{trackCountFor(item)}</span>
+              <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">
+                {subtitleFor(item)}
+              </p>
+              <span class="text-xs text-brand-text-secondary truncate shrink-0"
+                >{trackCountFor(item)}</span
+              >
             </div>
           </div>
         {/if}
@@ -221,7 +265,9 @@
     {/each}
 
     {#if items.length === 0}
-      <p class="text-sm text-brand-text-secondary px-3 py-6 text-center">{i18n.t('home.emptyState')}</p>
+      <p class="text-sm text-brand-text-secondary px-3 py-6 text-center">
+        {i18n.t("home.emptyState")}
+      </p>
     {/if}
   </div>
 </div>
@@ -235,6 +281,8 @@
     onPlay={() => playerStore.playSong(song.id)}
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
-    onClose={() => { contextMenuState = null; }}
+    onClose={() => {
+      contextMenuState = null;
+    }}
   />
 {/if}

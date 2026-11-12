@@ -10,7 +10,7 @@ export interface ContrastResult {
   ratio: number;
   wcagAA: boolean;
   wcagAAA: boolean;
-  level: 'fail' | 'AA' | 'AAA';
+  level: "fail" | "AA" | "AAA";
 }
 
 /**
@@ -24,7 +24,7 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
     ? {
         r: parseInt(result[1], 16),
         g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
+        b: parseInt(result[3], 16),
       }
     : { r: 0, g: 0, b: 0 };
 }
@@ -121,7 +121,7 @@ export function checkWcagCompliance(foreground: string, background: string): Con
     ratio: Math.round(ratio * 100) / 100,
     wcagAA: ratio >= 4.5,
     wcagAAA: ratio >= 7,
-    level: ratio >= 7 ? 'AAA' : ratio >= 4.5 ? 'AA' : 'fail'
+    level: ratio >= 7 ? "AAA" : ratio >= 4.5 ? "AA" : "fail",
   };
 }
 
@@ -142,7 +142,7 @@ export function checkWcagCompliance(foreground: string, background: string): Con
 export function pickAccessibleOnColor(backgroundColor: string): string {
   const { r, g, b } = hexToRgb(backgroundColor);
   const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness > 128 ? '#000000' : '#ffffff';
+  return brightness > 128 ? "#000000" : "#ffffff";
 }
 
 const HEX6_PATTERN = /^#?[0-9a-f]{6}$/i;
@@ -209,7 +209,11 @@ export function clampForContrast(hex: string, backgroundHex: string, minRatio = 
  * @param minDelta Minimum required lightness delta (0.0 to 1.0, defaults to 0.12)
  * @returns Lightness-separated hex color string
  */
-export function ensureLightnessSeparation(hex: string, backgroundHex: string, minDelta = 0.12): string {
+export function ensureLightnessSeparation(
+  hex: string,
+  backgroundHex: string,
+  minDelta = 0.12,
+): string {
   if (!HEX6_PATTERN.test(hex) || !HEX6_PATTERN.test(backgroundHex)) return hex;
 
   const fgHsl = hexToHsl(hex);
@@ -313,12 +317,13 @@ export function hslToRgb(h: number, s: number, l: number): { r: number; g: numbe
   return {
     r: Math.round(hueToRgb(p, q, hNorm + 1 / 3) * 255),
     g: Math.round(hueToRgb(p, q, hNorm) * 255),
-    b: Math.round(hueToRgb(p, q, hNorm - 1 / 3) * 255)
+    b: Math.round(hueToRgb(p, q, hNorm - 1 / 3) * 255),
   };
 }
 
 /** One of the six Android Palette / Spotify-style UI color roles. */
-export type Archetype = 'vibrant' | 'lightVibrant' | 'darkVibrant' | 'muted' | 'lightMuted' | 'darkMuted';
+export type Archetype =
+  "vibrant" | "lightVibrant" | "darkVibrant" | "muted" | "lightMuted" | "darkMuted";
 
 interface ArchetypeTarget {
   targetS: number;
@@ -340,7 +345,7 @@ export const ARCHETYPE_TARGETS: Record<Archetype, ArchetypeTarget> = {
   darkVibrant: { targetS: 1.0, minS: 0.35, maxS: 1.0, targetL: 0.26, minL: 0.0, maxL: 0.45 },
   muted: { targetS: 0.3, minS: 0.0, maxS: 0.4, targetL: 0.5, minL: 0.3, maxL: 0.7 },
   lightMuted: { targetS: 0.3, minS: 0.0, maxS: 0.4, targetL: 0.74, minL: 0.55, maxL: 1.0 },
-  darkMuted: { targetS: 0.3, minS: 0.0, maxS: 0.4, targetL: 0.26, minL: 0.0, maxL: 0.45 }
+  darkMuted: { targetS: 0.3, minS: 0.0, maxS: 0.4, targetL: 0.26, minL: 0.0, maxL: 0.45 },
 };
 
 const WEIGHT_SATURATION = 0.6;
@@ -355,7 +360,12 @@ const WEIGHT_POPULATION = 0.1;
  * the exact failure mode that made naive dominant-color extraction lose
  * small vibrant accents on mostly-black covers).
  */
-export function scoreSwatch(hsl: HSL, population: number, maxPopulation: number, target: ArchetypeTarget): number {
+export function scoreSwatch(
+  hsl: HSL,
+  population: number,
+  maxPopulation: number,
+  target: ArchetypeTarget,
+): number {
   const { s, l } = hsl;
   if (s < target.minS || s > target.maxS || l < target.minL || l > target.maxL) {
     return 0;
@@ -380,10 +390,15 @@ export interface Swatch {
   population: number;
 }
 
-type RgbChannel = 'r' | 'g' | 'b';
+type RgbChannel = "r" | "g" | "b";
 
 function widestChannel(box: ColorCount[]): { axis: RgbChannel; range: number } {
-  let minR = 255, maxR = 0, minG = 255, maxG = 0, minB = 255, maxB = 0;
+  let minR = 255,
+    maxR = 0,
+    minG = 255,
+    maxG = 0,
+    minB = 255,
+    maxB = 0;
   for (const c of box) {
     if (c.r < minR) minR = c.r;
     if (c.r > maxR) maxR = c.r;
@@ -393,7 +408,9 @@ function widestChannel(box: ColorCount[]): { axis: RgbChannel; range: number } {
     if (c.b > maxB) maxB = c.b;
   }
   const ranges: Record<RgbChannel, number> = { r: maxR - minR, g: maxG - minG, b: maxB - minB };
-  const axis = (Object.keys(ranges) as RgbChannel[]).reduce((a, b) => (ranges[b] > ranges[a] ? b : a));
+  const axis = (Object.keys(ranges) as RgbChannel[]).reduce((a, b) =>
+    ranges[b] > ranges[a] ? b : a,
+  );
   return { axis, range: ranges[axis] };
 }
 
@@ -413,7 +430,7 @@ export function quantizeMedianCut(colors: ColorCount[], maxSwatches: number): Sw
 
   while (boxes.length < maxSwatches) {
     let splitIdx = -1;
-    let splitAxis: RgbChannel = 'r';
+    let splitAxis: RgbChannel = "r";
     let widestRange = 0;
 
     for (let i = 0; i < boxes.length; i++) {
@@ -447,8 +464,11 @@ export function quantizeMedianCut(colors: ColorCount[], maxSwatches: number): Sw
   }
 
   return boxes
-    .map(box => {
-      let rSum = 0, gSum = 0, bSum = 0, population = 0;
+    .map((box) => {
+      let rSum = 0,
+        gSum = 0,
+        bSum = 0,
+        population = 0;
       for (const c of box) {
         rSum += c.r * c.count;
         gSum += c.g * c.count;
@@ -459,7 +479,7 @@ export function quantizeMedianCut(colors: ColorCount[], maxSwatches: number): Sw
         r: Math.round(rSum / population),
         g: Math.round(gSum / population),
         b: Math.round(bSum / population),
-        population
+        population,
       };
     })
     .sort((a, b) => b.population - a.population);
@@ -482,7 +502,7 @@ export function extractArchetypes(swatches: Swatch[]): Record<Archetype, Swatch 
     return result;
   }
 
-  const maxPopulation = Math.max(...swatches.map(s => s.population));
+  const maxPopulation = Math.max(...swatches.map((s) => s.population));
 
   for (const [key, target] of Object.entries(ARCHETYPE_TARGETS) as [Archetype, ArchetypeTarget][]) {
     let best: Swatch | null = null;
@@ -499,14 +519,14 @@ export function extractArchetypes(swatches: Swatch[]): Record<Archetype, Swatch 
   }
 
   if (!result.vibrant) {
-    result.vibrant = swatches.reduce((max, s) => (s.population > max.population ? s : max), swatches[0]);
+    result.vibrant = swatches.reduce(
+      (max, s) => (s.population > max.population ? s : max),
+      swatches[0],
+    );
   }
 
   return result;
 }
-
-
-
 
 /** The 8-value palette shape every predefined/custom theme uses (structurally identical to theme.svelte.ts's ThemeColors — kept separate here to avoid a circular import). */
 export interface GeneratedThemePalette {
@@ -540,23 +560,43 @@ export function generatePaletteFromSeed(seedHex: string): GeneratedThemePalette 
 
   const bgSaturation = Math.min(seedHsl.s * 0.35, 0.25);
   const bgMain = { h: seedHsl.h, s: bgSaturation, l: BG_MAIN_LIGHTNESS };
-  const bgSidebar = { h: seedHsl.h, s: bgSaturation, l: Math.max(0, BG_MAIN_LIGHTNESS + BG_SIDEBAR_DELTA) };
-  const bgPlayerbar = { h: seedHsl.h, s: bgSaturation, l: Math.max(0, BG_MAIN_LIGHTNESS + BG_PLAYERBAR_DELTA) };
-  const border = { h: seedHsl.h, s: bgSaturation, l: Math.min(1, BG_MAIN_LIGHTNESS + BORDER_DELTA) };
+  const bgSidebar = {
+    h: seedHsl.h,
+    s: bgSaturation,
+    l: Math.max(0, BG_MAIN_LIGHTNESS + BG_SIDEBAR_DELTA),
+  };
+  const bgPlayerbar = {
+    h: seedHsl.h,
+    s: bgSaturation,
+    l: Math.max(0, BG_MAIN_LIGHTNESS + BG_PLAYERBAR_DELTA),
+  };
+  const border = {
+    h: seedHsl.h,
+    s: bgSaturation,
+    l: Math.min(1, BG_MAIN_LIGHTNESS + BORDER_DELTA),
+  };
 
   const accentSaturation = Math.max(seedHsl.s, 0.55);
   const accentLightness = Math.min(Math.max(seedHsl.l, 0.45), 0.65);
   const accent = { h: seedHsl.h, s: accentSaturation, l: accentLightness };
-  const accentHover = { h: seedHsl.h, s: accentSaturation, l: Math.min(0.85, accentLightness + ACCENT_HOVER_DELTA) };
+  const accentHover = {
+    h: seedHsl.h,
+    s: accentSaturation,
+    l: Math.min(0.85, accentLightness + ACCENT_HOVER_DELTA),
+  };
 
   let textPrimary = { h: seedHsl.h, s: 0.15, l: 0.97 };
   let textSecondary = { h: seedHsl.h, s: 0.12, l: 0.82 };
 
-  const backgroundHexes = [toHex(hslToRgb(bgMain.h, bgMain.s, bgMain.l)), toHex(hslToRgb(bgSidebar.h, bgSidebar.s, bgSidebar.l)), toHex(hslToRgb(bgPlayerbar.h, bgPlayerbar.s, bgPlayerbar.l))];
+  const backgroundHexes = [
+    toHex(hslToRgb(bgMain.h, bgMain.s, bgMain.l)),
+    toHex(hslToRgb(bgSidebar.h, bgSidebar.s, bgSidebar.l)),
+    toHex(hslToRgb(bgPlayerbar.h, bgPlayerbar.s, bgPlayerbar.l)),
+  ];
 
-  const meetsAA = (hsl: {h: number, s: number, l: number}) => {
+  const meetsAA = (hsl: { h: number; s: number; l: number }) => {
     const hex = toHex(hslToRgb(hsl.h, hsl.s, hsl.l));
-    return backgroundHexes.every(bg => checkWcagCompliance(hex, bg).wcagAA);
+    return backgroundHexes.every((bg) => checkWcagCompliance(hex, bg).wcagAA);
   };
 
   for (let i = 0; i < MAX_PALETTE_TEXT_ADJUST_STEPS && !meetsAA(textPrimary); i++) {
@@ -581,6 +621,6 @@ export function generatePaletteFromSeed(seedHex: string): GeneratedThemePalette 
     "color-accent-hover": toHex(hslToRgb(accentHover.h, accentHover.s, accentHover.l)),
     "color-text-primary": toHex(hslToRgb(textPrimary.h, textPrimary.s, textPrimary.l)),
     "color-text-secondary": toHex(hslToRgb(textSecondary.h, textSecondary.s, textSecondary.l)),
-    "color-border": toHex(hslToRgb(border.h, border.s, border.l))
+    "color-border": toHex(hslToRgb(border.h, border.s, border.l)),
   };
 }

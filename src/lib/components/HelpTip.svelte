@@ -90,7 +90,9 @@
     const existing = target.getAttribute("aria-describedby")?.split(/\s+/).filter(Boolean) ?? [];
     target.setAttribute("aria-describedby", [...existing, descriptionId].join(" "));
     return () => {
-      const remaining = (target.getAttribute("aria-describedby") ?? "").split(/\s+/).filter((id) => id && id !== descriptionId);
+      const remaining = (target.getAttribute("aria-describedby") ?? "")
+        .split(/\s+/)
+        .filter((id) => id && id !== descriptionId);
       if (remaining.length) target.setAttribute("aria-describedby", remaining.join(" "));
       else target.removeAttribute("aria-describedby");
     };
@@ -102,8 +104,14 @@
   type="button"
   aria-label={label ?? text}
   aria-describedby={label ? descriptionId : undefined}
-  class="inline-flex items-center justify-center {onclick ? '' : 'cursor-help'} focus-visible:outline focus-visible:outline-1 focus-visible:outline-brand-accent {children ? '' : 'rounded-sm text-brand-text-secondary/50 hover:text-brand-text-secondary focus-visible:text-brand-text-secondary'} {className}"
-  onpointerenter={(e) => { if (e.pointerType === "mouse") show(); }}
+  class="inline-flex items-center justify-center {onclick
+    ? ''
+    : 'cursor-help'} focus-visible:outline focus-visible:outline-1 focus-visible:outline-brand-accent {children
+    ? ''
+    : 'rounded-sm text-brand-text-secondary/50 hover:text-brand-text-secondary focus-visible:text-brand-text-secondary'} {className}"
+  onpointerenter={(e) => {
+    if (e.pointerType === "mouse") show();
+  }}
   onpointerleave={hide}
   onfocus={onFocus}
   onblur={hide}
@@ -123,7 +131,9 @@
     use:portal
     use:clampToViewport
     aria-hidden="true"
-    class="fixed z-[130] w-max max-w-xs -translate-x-1/2 px-2.5 py-1.5 rounded-md border border-brand-border bg-brand-sidebar text-brand-text-primary text-xs font-normal normal-case tracking-normal leading-snug shadow-xl pointer-events-none whitespace-pre-line {position.placeAbove ? '-translate-y-full' : ''}"
+    class="fixed z-[130] w-max max-w-xs -translate-x-1/2 px-2.5 py-1.5 rounded-md border border-brand-border bg-brand-sidebar text-brand-text-primary text-xs font-normal normal-case tracking-normal leading-snug shadow-xl pointer-events-none whitespace-pre-line {position.placeAbove
+      ? '-translate-y-full'
+      : ''}"
     style="left: {position.left}px; top: {position.top}px;"
   >
     {text}

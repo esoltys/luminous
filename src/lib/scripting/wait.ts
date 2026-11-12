@@ -12,7 +12,7 @@ export function createWaitController(): ScriptWaitApi {
     async forEvent<T = unknown>(
       eventName: string,
       predicate?: (payload: T) => boolean,
-      timeoutMs = 10000
+      timeoutMs = 10000,
     ): Promise<T> {
       return new Promise<T>((resolve, reject) => {
         let unlistenFn: (() => void) | null = null;
@@ -135,7 +135,10 @@ export function createWaitController(): ScriptWaitApi {
                 img.removeEventListener("load", finish);
                 img.removeEventListener("error", finish);
                 if (typeof img.decode === "function") {
-                  img.decode().catch(() => {}).finally(() => resolve());
+                  img
+                    .decode()
+                    .catch(() => {})
+                    .finally(() => resolve());
                 } else {
                   resolve();
                 }
@@ -144,7 +147,7 @@ export function createWaitController(): ScriptWaitApi {
               img.addEventListener("error", finish, { once: true });
               timer = setTimeout(finish, Math.min(2000, remainingTime()));
             });
-          })
+          }),
         );
       }
 

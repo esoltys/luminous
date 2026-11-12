@@ -1,6 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createEventScope } from "../utils/eventScope";
-import type { GenreAlias, GenreGroup, LanguageSummary, QueuePopulationMode, Song, Tag, TagGroup, TagGroupChild } from "../types";
+import type {
+  GenreAlias,
+  GenreGroup,
+  LanguageSummary,
+  QueuePopulationMode,
+  Song,
+  Tag,
+  TagGroup,
+  TagGroupChild,
+} from "../types";
 export type { TagGroup, TagGroupChild };
 
 /**
@@ -62,7 +71,9 @@ class TagsStore {
   ensureArtistHierarchyLoaded() {
     if (this.artistHierarchyLoadStarted) return;
     this.artistHierarchyLoadStarted = true;
-    this.loadArtistHierarchy().catch((e) => console.error("Failed to load artist tag hierarchy:", e));
+    this.loadArtistHierarchy().catch((e) =>
+      console.error("Failed to load artist tag hierarchy:", e),
+    );
   }
 
   async setArtistGroupColor(name: string, colorIndex: number) {
@@ -277,13 +288,21 @@ class TagsStore {
     return invoke<Song[]>("get_songs_without_genre", { limit, mode });
   }
 
-  async getSongsByLanguage(language: string, limit?: number, mode?: QueuePopulationMode): Promise<Song[]> {
+  async getSongsByLanguage(
+    language: string,
+    limit?: number,
+    mode?: QueuePopulationMode,
+  ): Promise<Song[]> {
     return invoke<Song[]>("get_songs_by_language", { language, limit, mode });
   }
 
   /** Any-position match — used by the flat Tags view, where a tag click is a
    * plain search over every song carrying that value anywhere. */
-  async getSongsByTag(tagName: string, limit?: number, mode?: QueuePopulationMode): Promise<Song[]> {
+  async getSongsByTag(
+    tagName: string,
+    limit?: number,
+    mode?: QueuePopulationMode,
+  ): Promise<Song[]> {
     return invoke<Song[]>("get_songs_by_tag", { tagName, limit, mode });
   }
 
@@ -292,7 +311,11 @@ class TagsStore {
    * on what `name` currently is in the hierarchy. Used as the sub-threshold
    * fallback (no backing playlist row yet) for a genre auto-playlist's
    * click-through. */
-  async getSongsByCuratedTag(tagName: string, limit?: number, mode?: QueuePopulationMode): Promise<Song[]> {
+  async getSongsByCuratedTag(
+    tagName: string,
+    limit?: number,
+    mode?: QueuePopulationMode,
+  ): Promise<Song[]> {
     return invoke<Song[]>("get_songs_by_curated_tag", { tagName, limit, mode });
   }
 

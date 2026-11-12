@@ -24,7 +24,9 @@ export function createAppearanceController(wait: ScriptWaitApi): ScriptAppearanc
 
     async setLocale(locale: string): Promise<void> {
       if (!isLocale(locale)) {
-        throw new Error(`Unknown locale "${locale}"; supported: ${LOCALES.map((l) => l.tag).join(", ")}.`);
+        throw new Error(
+          `Unknown locale "${locale}"; supported: ${LOCALES.map((l) => l.tag).join(", ")}.`,
+        );
       }
       await i18n.setLocale(locale);
       await wait.settled();

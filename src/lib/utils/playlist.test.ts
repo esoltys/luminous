@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { autoContinueRunStarts, getDaypartMixLabel, getDaypartMixSourceLabel, getPlaylistDisplayName, getPopulationModeSuffix, isAutoContinueItem } from "./playlist";
+import {
+  autoContinueRunStarts,
+  getDaypartMixLabel,
+  getDaypartMixSourceLabel,
+  getPlaylistDisplayName,
+  getPopulationModeSuffix,
+  isAutoContinueItem,
+} from "./playlist";
 import type { Playlist, PlaylistItem } from "../types";
 import { i18n } from "../stores/i18n.svelte";
 
@@ -191,8 +198,14 @@ describe("playlist utils", () => {
 });
 
 describe("Auto Continue rows (#1235)", () => {
-  const item = (uuid: string, metadata?: string): PlaylistItem =>
-    ({ id: 0, playlist_id: 1, position: 0, item_type: "song", uuid, additional_metadata: metadata });
+  const item = (uuid: string, metadata?: string): PlaylistItem => ({
+    id: 0,
+    playlist_id: 1,
+    position: 0,
+    item_type: "song",
+    uuid,
+    additional_metadata: metadata,
+  });
   const AUTO = '{"autoContinue":true}';
 
   it("recognises only rows tagged autoContinue", () => {
@@ -212,8 +225,12 @@ describe("Moment Mix label", () => {
   it("localizes the bucket name from dynamic_spec, not the stored English name", () => {
     i18n.currentLocale = "it";
     try {
-      expect(getDaypartMixLabel("daypart:afternoon:2026-10-05:Deep Cuts", "Afternoon Mix")).toBe("Mix del pomeriggio");
-      expect(getDaypartMixLabel("daypart:latenight:2026-10-05:", "Late Night Mix")).toBe("Mix della notte");
+      expect(getDaypartMixLabel("daypart:afternoon:2026-10-05:Deep Cuts", "Afternoon Mix")).toBe(
+        "Mix del pomeriggio",
+      );
+      expect(getDaypartMixLabel("daypart:latenight:2026-10-05:", "Late Night Mix")).toBe(
+        "Mix della notte",
+      );
     } finally {
       i18n.currentLocale = "en-CA";
     }
@@ -233,7 +250,9 @@ describe("getDaypartMixSourceLabel", () => {
   });
 
   it("shows Explore Your Library for the random-fill marker", () => {
-    expect(getDaypartMixSourceLabel("daypart:latenight:2026-10-12:")).toBe(i18n.t("home.exploreLibrary"));
+    expect(getDaypartMixSourceLabel("daypart:latenight:2026-10-12:")).toBe(
+      i18n.t("home.exploreLibrary"),
+    );
   });
 
   it("returns null for a non-daypart or missing spec", () => {

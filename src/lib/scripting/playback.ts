@@ -24,19 +24,20 @@ export function createPlaybackController(wait: ScriptWaitApi): ScriptPlaybackApi
         }
 
         const results = await invoke<Song[]>("search_songs", { query, limit: 100 });
-        const matched = results.find((s) => {
-          if (target.artist && s.artist?.toLowerCase() !== target.artist.toLowerCase()) {
-            return false;
-          }
-          if (target.title && s.title?.toLowerCase() !== target.title.toLowerCase()) {
-            return false;
-          }
-          return true;
-        }) ?? results[0];
+        const matched =
+          results.find((s) => {
+            if (target.artist && s.artist?.toLowerCase() !== target.artist.toLowerCase()) {
+              return false;
+            }
+            if (target.title && s.title?.toLowerCase() !== target.title.toLowerCase()) {
+              return false;
+            }
+            return true;
+          }) ?? results[0];
 
         if (!matched) {
           throw new Error(
-            `No matching song found in collection for title "${target.title}"${target.artist ? ` by "${target.artist}"` : ""}`
+            `No matching song found in collection for title "${target.title}"${target.artist ? ` by "${target.artist}"` : ""}`,
           );
         }
         songId = matched.id;
@@ -47,7 +48,7 @@ export function createPlaybackController(wait: ScriptWaitApi): ScriptPlaybackApi
       // Await confirmation from backend that the song has started playing
       await wait.forState(
         () => playerStore.state === "playing" && playerStore.currentSong?.id === songId,
-        15000
+        15000,
       );
 
       if (!playerStore.currentSong) {

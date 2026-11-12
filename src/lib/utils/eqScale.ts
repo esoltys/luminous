@@ -81,4 +81,3 @@ export function splinePath(db: number[], gainRange: SettingRange): string {
   }
   return d;
 }
-

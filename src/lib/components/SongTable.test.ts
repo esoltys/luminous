@@ -194,18 +194,23 @@ describe("SongTable.svelte — Library column (#1842)", () => {
   }
 
   it("labels a file opened from outside the library", () => {
-    const { getByText } = renderTable([{ key: "1", song: song(1, "opened_file", "E:/Lorde/a.flac") }]);
+    const { getByText } = renderTable([
+      { key: "1", song: song(1, "opened_file", "E:/Lorde/a.flac") },
+    ]);
     expect(getByText("Not in library")).toBeInTheDocument();
   });
 
   it("doesn't label a library song outside any known folder", () => {
-    const { queryByText } = renderTable([{ key: "1", song: song(1, "local_file", "/elsewhere/a.flac") }]);
+    const { queryByText } = renderTable([
+      { key: "1", song: song(1, "local_file", "/elsewhere/a.flac") },
+    ]);
     expect(queryByText("Not in library")).not.toBeInTheDocument();
   });
 });
 
 describe("SongTable.svelte — info sidebar selection", () => {
-  const song = (id: number) => ({ id, title: `Song ${id}`, source: "local_file", filetype: "MP3" }) as Song;
+  const song = (id: number) =>
+    ({ id, title: `Song ${id}`, source: "local_file", filetype: "MP3" }) as Song;
 
   function renderTable(rows: SongTableRow[], selectedKeys: Set<string>) {
     return render(SongTable, {
@@ -229,7 +234,10 @@ describe("SongTable.svelte — info sidebar selection", () => {
   beforeEach(() => inspectorStore.clearAll());
 
   it("reports a single selected song and clears when the table unmounts", () => {
-    const rows = [{ key: "1", song: song(1) }, { key: "2", song: song(2) }];
+    const rows = [
+      { key: "1", song: song(1) },
+      { key: "2", song: song(2) },
+    ];
     const { unmount } = renderTable(rows, new Set(["2"]));
     expect(inspectorStore.subject).toMatchObject({ source: "selection", song: { id: 2 } });
     unmount();
@@ -237,12 +245,14 @@ describe("SongTable.svelte — info sidebar selection", () => {
   });
 
   it("reports nothing for a multi-selection", () => {
-    const rows = [{ key: "1", song: song(1) }, { key: "2", song: song(2) }];
+    const rows = [
+      { key: "1", song: song(1) },
+      { key: "2", song: song(2) },
+    ];
     renderTable(rows, new Set(["1", "2"]));
     expect(inspectorStore.subject).toBeNull();
   });
 });
-
 
 describe("SongTable.svelte — windowing (#1898)", () => {
   const song = (id: number): Song => ({
@@ -311,18 +321,34 @@ describe("SongTable.svelte — windowing (#1898)", () => {
     const rowHeight = parseFloat((drawn[0] as HTMLElement).style.height);
     // The sizer's height is the whole list, whatever window is drawn, so a window swap can't shrink the page.
     expect(parseFloat(sizer.style.height)).toBe(5000 * rowHeight);
-    expect(parseFloat(block.style.top)).toBe(Number((drawn[0] as HTMLElement).dataset.key) * rowHeight);
+    expect(parseFloat(block.style.top)).toBe(
+      Number((drawn[0] as HTMLElement).dataset.key) * rowHeight,
+    );
   });
 
   it("moves the window when its scrolling ancestor scrolls", async () => {
     const rows = Array.from({ length: 5000 }, (_, i) => ({ key: String(i), song: song(i) }));
     const { container, scroller } = renderInScroller(rows);
     // jsdom has no layout: place the table body as a real scroller would.
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
       const top = this === scroller ? 0 : -scroller.scrollTop;
-      return { top, bottom: top, left: 0, right: 0, width: 0, height: 0, x: 0, y: top, toJSON() {} } as DOMRect;
+      return {
+        top,
+        bottom: top,
+        left: 0,
+        right: 0,
+        width: 0,
+        height: 0,
+        x: 0,
+        y: top,
+        toJSON() {},
+      } as DOMRect;
     });
-    const rowHeight = parseFloat((container.querySelector("[data-song-row]") as HTMLElement).style.height);
+    const rowHeight = parseFloat(
+      (container.querySelector("[data-song-row]") as HTMLElement).style.height,
+    );
 
     scroller.scrollTop = 3000 * rowHeight;
     scroller.dispatchEvent(new Event("scroll"));
@@ -348,7 +374,9 @@ describe("SongTable.svelte — windowing (#1898)", () => {
     expect(container.querySelector('[data-key="3000"]')).toBeNull();
 
     (component as unknown as { scrollToKey: (key: string) => void }).scrollToKey("3000");
-    const rowHeight = parseFloat((container.querySelector("[data-song-row]") as HTMLElement).style.height);
+    const rowHeight = parseFloat(
+      (container.querySelector("[data-song-row]") as HTMLElement).style.height,
+    );
     expect(scroller.scrollTop).toBeGreaterThan(2999 * rowHeight);
   });
 });
@@ -384,7 +412,8 @@ describe("SongTable.svelte — dragging songs out (#1974)", () => {
   function placeTarget(attrs: Record<string, string>) {
     const el = document.createElement("button");
     Object.assign(el.dataset, attrs);
-    el.getBoundingClientRect = () => ({ left: 10, right: 110, top: 20, bottom: 60, width: 100, height: 40 }) as DOMRect;
+    el.getBoundingClientRect = () =>
+      ({ left: 10, right: 110, top: 20, bottom: 60, width: 100, height: 40 }) as DOMRect;
     document.body.appendChild(el);
   }
   const OVER_TARGET = { clientX: 50, clientY: 40 };

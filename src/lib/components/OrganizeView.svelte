@@ -12,7 +12,12 @@
   import TagCleanupDialog from "./TagCleanupDialog.svelte";
   import { tagCleanupStore } from "../stores/tagCleanup.svelte";
   import { onDestroy } from "svelte";
-  import { EraserIcon as Eraser, ArrowsClockwiseIcon as RefreshCw, BroomIcon as Broom, StarIcon as Star } from "phosphor-svelte";
+  import {
+    EraserIcon as Eraser,
+    ArrowsClockwiseIcon as RefreshCw,
+    BroomIcon as Broom,
+    StarIcon as Star,
+  } from "phosphor-svelte";
 
   const PRUNE_MESSAGE_DURATION_MS = 8000;
 
@@ -27,7 +32,9 @@
   let showConfirmAutoOrganize = $state(false);
 
   // Leaving Organize with the tag review open sends its check to the background.
-  onDestroy(() => { if (tagCleanupStore.reviewOpen) tagCleanupStore.close(); });
+  onDestroy(() => {
+    if (tagCleanupStore.reviewOpen) tagCleanupStore.close();
+  });
 
   function handleToggleAutoOrganize(enabled: boolean) {
     if (enabled) {
@@ -45,24 +52,44 @@
     }
     const { deletedSongs, removedFolders, mergedDuplicates } = result;
     if (removedFolders > 0 && mergedDuplicates > 0) {
-      pruneMsg = i18n.t('settings.pruneCompleteMsgWithFoldersAndDuplicates', { count: deletedSongs, folders: removedFolders, duplicates: mergedDuplicates });
+      pruneMsg = i18n.t("settings.pruneCompleteMsgWithFoldersAndDuplicates", {
+        count: deletedSongs,
+        folders: removedFolders,
+        duplicates: mergedDuplicates,
+      });
     } else if (mergedDuplicates > 0) {
-      pruneMsg = i18n.t('settings.pruneCompleteMsgWithDuplicates', { count: deletedSongs, duplicates: mergedDuplicates });
+      pruneMsg = i18n.t("settings.pruneCompleteMsgWithDuplicates", {
+        count: deletedSongs,
+        duplicates: mergedDuplicates,
+      });
     } else if (removedFolders > 0) {
-      pruneMsg = i18n.t('settings.pruneCompleteMsgWithFolders', { count: deletedSongs, folders: removedFolders });
+      pruneMsg = i18n.t("settings.pruneCompleteMsgWithFolders", {
+        count: deletedSongs,
+        folders: removedFolders,
+      });
     } else {
-      pruneMsg = i18n.t('settings.pruneCompleteMsg', { count: deletedSongs });
+      pruneMsg = i18n.t("settings.pruneCompleteMsg", { count: deletedSongs });
     }
     organizeRefreshKey++;
-    setTimeout(() => { pruneMsg = null; }, PRUNE_MESSAGE_DURATION_MS);
+    setTimeout(() => {
+      pruneMsg = null;
+    }, PRUNE_MESSAGE_DURATION_MS);
   }
 </script>
 
-<div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
-  <div class="flex-1 overflow-y-auto px-6 pb-12" class:pb-28={!!playerStore.currentSong} use:rememberScroll={"organize"}>
+<div
+  class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative"
+>
+  <div
+    class="flex-1 overflow-y-auto px-6 pb-12"
+    class:pb-28={!!playerStore.currentSong}
+    use:rememberScroll={"organize"}
+  >
     <div class="pt-4 pb-4 flex items-start justify-between gap-4">
       {#if organizeReadyCount === 0 && organizePendingCount === 0 && curationCount === 0}
-        <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
+        <span
+          class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap"
+        >
           <span class="relative inline-flex shrink-0">
             <span class="absolute inset-0 rounded-full anim-gold-ring"></span>
             <Star weight="fill" class="w-5 h-5 anim-milestone-bounce" />
@@ -70,12 +97,16 @@
           {i18n.t("organizer.nothingToOrganize")}
         </span>
       {:else if organizeReadyCount === 0 && (organizePendingCount > 0 || curationCount > 0)}
-        <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
+        <span
+          class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap"
+        >
           <Broom class="w-5 h-5 shrink-0" />
           {i18n.plural("organizer.summaryWaitingOnCuration", organizePendingCount + curationCount)}
         </span>
       {:else}
-        <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
+        <span
+          class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap"
+        >
           <Broom class="w-5 h-5 shrink-0" />
           {i18n.plural("organizer.summaryReady", organizeReadyCount)}
         </span>
@@ -99,7 +130,9 @@
 
         <Button
           variant="primary"
-          onclick={() => { organizeApplyRequestKey++; }}
+          onclick={() => {
+            organizeApplyRequestKey++;
+          }}
           disabled={!organizeCanApply || organizeIsApplying}
         >
           {#if organizeIsApplying}
@@ -128,27 +161,39 @@
       <CurationShelf
         refreshKey={organizeRefreshKey}
         bind:totalCurationCount={curationCount}
-        onChanged={() => { organizeRefreshKey++; }}
+        onChanged={() => {
+          organizeRefreshKey++;
+        }}
       />
 
       <!-- Lightweight inline maintenance actions — deliberately not their own bordered card. -->
       <div class="max-w-3xl mx-auto flex flex-wrap items-center gap-3 px-1">
-        <Button onclick={handlePruneMissing} disabled={collectionStore.isScanning} variant="secondary" size="sm">
+        <Button
+          onclick={handlePruneMissing}
+          disabled={collectionStore.isScanning}
+          variant="secondary"
+          size="sm"
+        >
           <Eraser class="w-4 h-4" />
-          {i18n.t('settings.pruneMissingBtn')}
+          {i18n.t("settings.pruneMissingBtn")}
         </Button>
-        <span class="text-xs text-brand-text-secondary">{i18n.t('settings.pruneMissingHint')}</span>
+        <span class="text-xs text-brand-text-secondary">{i18n.t("settings.pruneMissingHint")}</span>
 
         {#if pruneMsg}
           <span class="text-xs text-brand-accent-text font-medium transition-all">{pruneMsg}</span>
         {/if}
       </div>
       <div class="max-w-3xl mx-auto flex flex-wrap items-center gap-3 px-1">
-        <Button onclick={() => tagCleanupStore.start()} disabled={collectionStore.isScanning || tagCleanupStore.removing} variant="secondary" size="sm">
+        <Button
+          onclick={() => tagCleanupStore.start()}
+          disabled={collectionStore.isScanning || tagCleanupStore.removing}
+          variant="secondary"
+          size="sm"
+        >
           <Broom class="w-4 h-4" />
-          {i18n.t('tagCleanup.action')}
+          {i18n.t("tagCleanup.action")}
         </Button>
-        <span class="text-xs text-brand-text-secondary">{i18n.t('tagCleanup.hint')}</span>
+        <span class="text-xs text-brand-text-secondary">{i18n.t("tagCleanup.hint")}</span>
       </div>
     </div>
   </div>

@@ -53,9 +53,7 @@ describe("StarRating", () => {
     const { container } = render(StarRating, { rating: 2.5 });
     const overlays = container.querySelectorAll("span.absolute");
     expect(overlays).toHaveLength(3);
-    const widths = Array.from(overlays).map(
-      (el) => (el as HTMLElement).style.width
-    );
+    const widths = Array.from(overlays).map((el) => (el as HTMLElement).style.width);
     expect(widths).toEqual(["100%", "100%", "50%"]);
   });
 

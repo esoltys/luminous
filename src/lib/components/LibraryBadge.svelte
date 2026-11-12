@@ -23,12 +23,7 @@
     class?: string;
   }
 
-  let {
-    directory,
-    size = "sm",
-    showName = true,
-    class: className = "",
-  }: Props = $props();
+  let { directory, size = "sm", showName = true, class: className = "" }: Props = $props();
 
   const ICONS: Record<string, Component<any>> = {
     folder: FolderIcon,
@@ -44,7 +39,7 @@
   };
 
   let IconComponent = $derived(
-    directory.icon && ICONS[directory.icon] ? ICONS[directory.icon] : FolderIcon
+    directory.icon && ICONS[directory.icon] ? ICONS[directory.icon] : FolderIcon,
   );
 
   let displayName = $derived(getDirectoryDisplayName(directory));
@@ -55,7 +50,7 @@
   let badgeStyle = $derived(
     customColor
       ? `border-color: ${customColor};`
-      : `border-color: color-mix(in srgb, var(--color-brand-accent) 25%, var(--color-brand-sidebar));`
+      : `border-color: color-mix(in srgb, var(--color-brand-accent) 25%, var(--color-brand-sidebar));`,
   );
 </script>
 
@@ -67,12 +62,18 @@
     {isUnavailable ? 'opacity-70 border-dashed border-brand-border' : ''}
     {className}"
   style={badgeStyle}
-  title={isUnavailable ? `${displayName} (Disconnected) — ${directory.path}` : `${displayName} — ${directory.path}`}
+  title={isUnavailable
+    ? `${displayName} (Disconnected) — ${directory.path}`
+    : `${displayName} — ${directory.path}`}
 >
   {#if isUnavailable}
-    <WarningIcon class="{size === 'xs' ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} text-brand-text-primary shrink-0" />
+    <WarningIcon
+      class="{size === 'xs' ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} text-brand-text-primary shrink-0"
+    />
   {:else}
-    <IconComponent class="{size === 'xs' ? 'w-2.5 h-2.5' : size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} shrink-0" />
+    <IconComponent
+      class="{size === 'xs' ? 'w-2.5 h-2.5' : size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} shrink-0"
+    />
   {/if}
   {#if showName}
     <span class="truncate">{displayName}</span>

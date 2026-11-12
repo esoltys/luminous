@@ -24,11 +24,17 @@ function songsIn(source: FileSource, path: string[]): Promise<Song[]> {
 }
 
 /** Plays a folder's songs, from `startSongId` when given (else the first). */
-export async function playFolder(source: FileSource, path: string[], name: string, startSongId?: number) {
+export async function playFolder(
+  source: FileSource,
+  path: string[],
+  name: string,
+  startSongId?: number,
+) {
   try {
     const songs = await songsIn(source, path);
     // A song the folder query didn't return (it can lag a rescan) still plays, alone.
-    const ids = songs.length > 0 ? songs.map((s) => s.id) : startSongId !== undefined ? [startSongId] : [];
+    const ids =
+      songs.length > 0 ? songs.map((s) => s.id) : startSongId !== undefined ? [startSongId] : [];
     if (ids.length === 0) {
       toastStore.show(i18n.t("files.nothingToPlay"), "info");
       return;
@@ -65,7 +71,10 @@ export async function playlistFromFolder(source: FileSource, path: string[], nam
       return;
     }
     const playlist = await playlistsStore.createPlaylist(name);
-    await playlistsStore.addSongsToPlaylist(playlist.id, songs.map((s) => s.id));
+    await playlistsStore.addSongsToPlaylist(
+      playlist.id,
+      songs.map((s) => s.id),
+    );
     toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlist.name }));
   } catch (err) {
     console.error("Failed to create a playlist from a folder:", err);
@@ -84,11 +93,18 @@ export async function scanFolder(source: FileSource, path: string[]) {
 }
 
 /** Adds the folder at `location`, a local path, to a device's sync selection. */
-export async function addFolderToDeviceSync(device: ConnectedDevice, location: string, name: string) {
+export async function addFolderToDeviceSync(
+  device: ConnectedDevice,
+  location: string,
+  name: string,
+) {
   const deviceLabel = deviceName(device);
   try {
     if (!(await devicesStore.addFolderToSync(device.id, location))) {
-      toastStore.show(i18n.t("files.alreadySyncing", { folder: name, device: deviceLabel }), "info");
+      toastStore.show(
+        i18n.t("files.alreadySyncing", { folder: name, device: deviceLabel }),
+        "info",
+      );
       return;
     }
     toastStore.show(i18n.t("files.addedToSync", { folder: name, device: deviceLabel }), "success");
@@ -100,7 +116,9 @@ export async function addFolderToDeviceSync(device: ConnectedDevice, location: s
 
 /** "Show in File Explorer", "Show in Finder" or "Show in file manager". */
 export function revealLabel(): string {
-  return i18n.t(isWindows ? "files.revealWindows" : isLinux ? "files.revealLinux" : "files.revealMac");
+  return i18n.t(
+    isWindows ? "files.revealWindows" : isLinux ? "files.revealLinux" : "files.revealMac",
+  );
 }
 
 /** Shows a local file or folder selected in the system file manager. */
@@ -117,9 +135,15 @@ export async function reveal(location: string) {
  * the file manager instead, and a toast says why. */
 export async function openFile(source: FileSource, path: string[], entry: FileEntry) {
   try {
-    const outcome = await invoke<"opened" | "revealed">("open_source_file", { source, path: [...path, entry.name] });
+    const outcome = await invoke<"opened" | "revealed">("open_source_file", {
+      source,
+      path: [...path, entry.name],
+    });
     if (outcome === "revealed") {
-      toastStore.show(i18n.t("files.noAppToOpen", { type: `.${(entry.fileType ?? "").toLowerCase()}` }), "info");
+      toastStore.show(
+        i18n.t("files.noAppToOpen", { type: `.${(entry.fileType ?? "").toLowerCase()}` }),
+        "info",
+      );
     }
   } catch (err) {
     console.error("Failed to open a file:", err);

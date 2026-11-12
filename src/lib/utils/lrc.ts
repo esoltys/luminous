@@ -42,16 +42,23 @@ function segmentWordCue(
   text: string,
   cueStartRawMs: number,
   cueNextRawMs: number | undefined,
-  totalOffset: number
+  totalOffset: number,
 ): LyricWord[] {
-  if (typeof Intl !== "undefined" && Intl.Segmenter && CJK_THAI_REGEX.test(text) && !/\s/.test(text.trim()) && text.trim().length > 1) {
+  if (
+    typeof Intl !== "undefined" &&
+    Intl.Segmenter &&
+    CJK_THAI_REGEX.test(text) &&
+    !/\s/.test(text.trim()) &&
+    text.trim().length > 1
+  ) {
     try {
       const segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
       const segments = Array.from(segmenter.segment(text));
       if (segments.length > 1) {
-        const duration = cueNextRawMs !== undefined && cueNextRawMs > cueStartRawMs
-          ? cueNextRawMs - cueStartRawMs
-          : 0;
+        const duration =
+          cueNextRawMs !== undefined && cueNextRawMs > cueStartRawMs
+            ? cueNextRawMs - cueStartRawMs
+            : 0;
 
         return segments.map((seg) => {
           const frac = seg.index / text.length;
@@ -146,7 +153,7 @@ export function parseLrc(lyricsText: string, userOffsetMs: number = 0): ParsedLr
         const prefix = lineContent.slice(0, wordTags[0].index);
         if (prefix.trim().length > 0) {
           extractedWords.push(
-            ...segmentWordCue(prefix, firstLineRawMs, wordTags[0].rawMs, totalOffset)
+            ...segmentWordCue(prefix, firstLineRawMs, wordTags[0].rawMs, totalOffset),
           );
         }
       }
@@ -161,7 +168,7 @@ export function parseLrc(lyricsText: string, userOffsetMs: number = 0): ParsedLr
 
         if (text.length > 0) {
           extractedWords.push(
-            ...segmentWordCue(text, currentTag.rawMs, nextTag?.rawMs, totalOffset)
+            ...segmentWordCue(text, currentTag.rawMs, nextTag?.rawMs, totalOffset),
           );
         }
       }
@@ -178,12 +185,13 @@ export function parseLrc(lyricsText: string, userOffsetMs: number = 0): ParsedLr
 
       if (baseWords && baseWords.length > 0) {
         const delta = lineRawMs - lineMatches[0].timeMs;
-        const adjustedWords = delta === 0
-          ? baseWords
-          : baseWords.map((w) => ({
-              timeMs: Math.max(0, w.timeMs + delta),
-              text: w.text,
-            }));
+        const adjustedWords =
+          delta === 0
+            ? baseWords
+            : baseWords.map((w) => ({
+                timeMs: Math.max(0, w.timeMs + delta),
+                text: w.text,
+              }));
 
         parsedLines.push({
           timeMs: lineEffectiveMs,

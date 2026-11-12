@@ -66,13 +66,21 @@ describe("TagsStore", () => {
 
   it("fetches songs by tag (any position)", async () => {
     const songs = await tagsStore.getSongsByTag("Metal", 50);
-    expect(invoke).toHaveBeenCalledWith("get_songs_by_tag", { tagName: "Metal", limit: 50, mode: undefined });
+    expect(invoke).toHaveBeenCalledWith("get_songs_by_tag", {
+      tagName: "Metal",
+      limit: 50,
+      mode: undefined,
+    });
     expect(songs).toHaveLength(1);
   });
 
   it("fetches songs by curated tag (group-vs-child dispatch, #548)", async () => {
     const songs = await tagsStore.getSongsByCuratedTag("Metal", 50);
-    expect(invoke).toHaveBeenCalledWith("get_songs_by_curated_tag", { tagName: "Metal", limit: 50, mode: undefined });
+    expect(invoke).toHaveBeenCalledWith("get_songs_by_curated_tag", {
+      tagName: "Metal",
+      limit: 50,
+      mode: undefined,
+    });
     expect(songs).toHaveLength(1);
   });
 
@@ -89,18 +97,27 @@ describe("TagsStore", () => {
 
   it("reparents, promotes, and reorders a tag, refreshing the hierarchy each time", async () => {
     await tagsStore.reparentTag("Symphonic Metal", "Ambient");
-    expect(invoke).toHaveBeenCalledWith("reparent_tag", { tagName: "Symphonic Metal", newGroupName: "Ambient" });
+    expect(invoke).toHaveBeenCalledWith("reparent_tag", {
+      tagName: "Symphonic Metal",
+      newGroupName: "Ambient",
+    });
 
     await tagsStore.promoteTag("Symphonic Metal");
     expect(invoke).toHaveBeenCalledWith("promote_tag", { tagName: "Symphonic Metal" });
 
     await tagsStore.reorderTagInGroup("Symphonic Metal", 0);
-    expect(invoke).toHaveBeenCalledWith("reorder_tag_in_group", { tagName: "Symphonic Metal", newIndex: 0 });
+    expect(invoke).toHaveBeenCalledWith("reorder_tag_in_group", {
+      tagName: "Symphonic Metal",
+      newIndex: 0,
+    });
   });
 
   it("merges tags and returns the affected song count", async () => {
     const count = await tagsStore.mergeTags("Prog Metal", "Progressive Metal");
-    expect(invoke).toHaveBeenCalledWith("merge_tags", { from: "Prog Metal", into: "Progressive Metal" });
+    expect(invoke).toHaveBeenCalledWith("merge_tags", {
+      from: "Prog Metal",
+      into: "Progressive Metal",
+    });
     expect(count).toBe(2);
   });
 
@@ -121,7 +138,10 @@ describe("TagsStore genre alias lookups (#1994)", () => {
   });
 
   it("lists the aliases of a canonical genre regardless of case", () => {
-    expect(tagsStore.aliasesOf("progressive rock").map((a) => a.alias)).toEqual(["Prog Rock", "prog-rock"]);
+    expect(tagsStore.aliasesOf("progressive rock").map((a) => a.alias)).toEqual([
+      "Prog Rock",
+      "prog-rock",
+    ]);
   });
 
   it("has no aliases for an unaliased genre or for an alias itself", () => {

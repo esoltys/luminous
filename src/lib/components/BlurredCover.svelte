@@ -50,7 +50,17 @@
       // object-fit: cover — the centered square, like the <img> this replaces
       const side = Math.min(img.naturalWidth, img.naturalHeight);
       ctx.clearRect(0, 0, SIZE, SIZE);
-      ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, SIZE, SIZE);
+      ctx.drawImage(
+        img,
+        (img.naturalWidth - side) / 2,
+        (img.naturalHeight - side) / 2,
+        side,
+        side,
+        0,
+        0,
+        SIZE,
+        SIZE,
+      );
       try {
         // object-fit: cover scales the square canvas by its larger drawn side
         const drawnPx = Math.max(target.clientWidth, target.clientHeight) || 1000;
@@ -69,4 +79,11 @@
   });
 </script>
 
-<canvas bind:this={canvas} width={SIZE} height={SIZE} class="object-cover {className}" {style} aria-hidden="true"></canvas>
+<canvas
+  bind:this={canvas}
+  width={SIZE}
+  height={SIZE}
+  class="object-cover {className}"
+  {style}
+  aria-hidden="true"
+></canvas>

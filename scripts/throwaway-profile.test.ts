@@ -51,8 +51,12 @@ describe("throwaway-profile", () => {
     const defaultProfile = new AppProfile();
     try {
       const db = new Database(defaultProfile.dbPath, { readonly: true });
-      const welcome = db.query("SELECT value FROM app_state WHERE key = 'welcome_seen'").get() as { value: string };
-      const subTab = db.query("SELECT value FROM app_state WHERE key = 'active_sub_tab'").get() as { value: string };
+      const welcome = db.query("SELECT value FROM app_state WHERE key = 'welcome_seen'").get() as {
+        value: string;
+      };
+      const subTab = db.query("SELECT value FROM app_state WHERE key = 'active_sub_tab'").get() as {
+        value: string;
+      };
       db.close();
       expect(welcome.value).toBe("true");
       expect(subTab.value).toBe("songs");
@@ -69,9 +73,15 @@ describe("throwaway-profile", () => {
     });
     try {
       const db = new Database(customProfile.dbPath, { readonly: true });
-      const welcome = db.query("SELECT value FROM app_state WHERE key = 'welcome_seen'").get() as { value: string };
-      const subTab = db.query("SELECT value FROM app_state WHERE key = 'active_sub_tab'").get() as { value: string };
-      const custom = db.query("SELECT value FROM app_state WHERE key = 'custom_flag'").get() as { value: string };
+      const welcome = db.query("SELECT value FROM app_state WHERE key = 'welcome_seen'").get() as {
+        value: string;
+      };
+      const subTab = db.query("SELECT value FROM app_state WHERE key = 'active_sub_tab'").get() as {
+        value: string;
+      };
+      const custom = db.query("SELECT value FROM app_state WHERE key = 'custom_flag'").get() as {
+        value: string;
+      };
       db.close();
       expect(welcome.value).toBe("true"); // retained from DEFAULT_APP_STATE
       expect(subTab.value).toBe("albums"); // overridden by caller
@@ -84,7 +94,9 @@ describe("throwaway-profile", () => {
       });
 
       const db2 = new Database(customProfile.dbPath, { readonly: true });
-      const customUpdated = db2.query("SELECT value FROM app_state WHERE key = 'custom_flag'").get() as { value: string };
+      const customUpdated = db2
+        .query("SELECT value FROM app_state WHERE key = 'custom_flag'")
+        .get() as { value: string };
       db2.close();
       expect(customUpdated.value).toBe("updated");
 
@@ -134,9 +146,15 @@ describe("throwaway-profile", () => {
       profile.cue(playableSong as SongRecord);
 
       const dbVerify = new Database(profile.dbPath, { readonly: true });
-      const lastSongId = dbVerify.query("SELECT value FROM app_state WHERE key = 'last_song_id'").get() as { value: string };
-      const lastPos = dbVerify.query("SELECT value FROM app_state WHERE key = 'last_position_nanosec'").get() as { value: string };
-      const lastPlaylist = dbVerify.query("SELECT value FROM app_state WHERE key = 'last_playlist_id'").get() as { value: string };
+      const lastSongId = dbVerify
+        .query("SELECT value FROM app_state WHERE key = 'last_song_id'")
+        .get() as { value: string };
+      const lastPos = dbVerify
+        .query("SELECT value FROM app_state WHERE key = 'last_position_nanosec'")
+        .get() as { value: string };
+      const lastPlaylist = dbVerify
+        .query("SELECT value FROM app_state WHERE key = 'last_playlist_id'")
+        .get() as { value: string };
       dbVerify.close();
 
       expect(lastSongId.value).toBe("42");
@@ -175,7 +193,8 @@ describe("throwaway-profile", () => {
         db.close();
       }
     };
-    const keysOf = (dbPath: string) => rows<{ key: string }>(dbPath, "SELECT key FROM app_state").map((r) => r.key);
+    const keysOf = (dbPath: string) =>
+      rows<{ key: string }>(dbPath, "SELECT key FROM app_state").map((r) => r.key);
 
     it("copies stats and settings, drops outward integrations, never writes the source", async () => {
       const source = new AppProfile();
@@ -212,14 +231,21 @@ describe("throwaway-profile", () => {
       const config = { auto_organize: true, template: "%albumartist/%title", preset: "default" };
       source.writeAppState({ organize_config: JSON.stringify(config) });
       const db = new Database(source.dbPath);
-      db.exec("CREATE TABLE subsonic_scrobble_queue (server_id INTEGER, remote_id TEXT, listened_at INTEGER)");
+      db.exec(
+        "CREATE TABLE subsonic_scrobble_queue (server_id INTEGER, remote_id TEXT, listened_at INTEGER)",
+      );
       db.exec("INSERT INTO subsonic_scrobble_queue VALUES (1, 't0', 1700000000)");
       db.close();
 
       const clone = new AppProfile({ cloneFrom: source.dbPath });
       try {
         const read = (p: AppProfile) =>
-          JSON.parse(rows<{ value: string }>(p.dbPath, "SELECT value FROM app_state WHERE key = 'organize_config'")[0].value);
+          JSON.parse(
+            rows<{ value: string }>(
+              p.dbPath,
+              "SELECT value FROM app_state WHERE key = 'organize_config'",
+            )[0].value,
+          );
         expect(read(clone)).toEqual({ ...config, auto_organize: false });
         expect(read(source).auto_organize).toBe(true);
         expect(rows(clone.dbPath, "SELECT * FROM subsonic_scrobble_queue")).toEqual([]);
@@ -234,7 +260,9 @@ describe("throwaway-profile", () => {
       const source = new AppProfile();
       const db = new Database(source.dbPath);
       db.exec("CREATE TABLE songs (id INTEGER PRIMARY KEY, path TEXT, title TEXT)");
-      db.exec("CREATE TABLE song_stats (song_id INTEGER PRIMARY KEY REFERENCES songs(id) ON DELETE CASCADE, plays INTEGER)");
+      db.exec(
+        "CREATE TABLE song_stats (song_id INTEGER PRIMARY KEY REFERENCES songs(id) ON DELETE CASCADE, plays INTEGER)",
+      );
       const insert = db.query("INSERT INTO songs (path, title) VALUES (?, ?)");
       insert.run("G:\\Music\\Cannons\\song.flac", "I Get Weak");
       insert.run("C:\\src\\luminous\\src-tauri\\tests\\fixtures\\audio\\song_alpha.mp3", "Alpha");
@@ -244,7 +272,9 @@ describe("throwaway-profile", () => {
 
       const clone = new AppProfile({ cloneFrom: source.dbPath });
       try {
-        expect(rows<{ title: string }>(clone.dbPath, "SELECT title FROM songs")).toEqual([{ title: "I Get Weak" }]);
+        expect(rows<{ title: string }>(clone.dbPath, "SELECT title FROM songs")).toEqual([
+          { title: "I Get Weak" },
+        ]);
         expect(rows(clone.dbPath, "SELECT song_id FROM song_stats")).toEqual([{ song_id: 1 }]);
         expect(rows(source.dbPath, "SELECT id FROM songs").length).toBe(3);
       } finally {
@@ -263,7 +293,10 @@ describe("throwaway-profile", () => {
       const b = new AppProfile({ cloneFrom: chosen.dbPath });
       try {
         const value = (p: AppProfile) =>
-          rows<{ value: string }>(p.dbPath, "SELECT value FROM app_state WHERE key = 'default_library_path'")[0]?.value;
+          rows<{ value: string }>(
+            p.dbPath,
+            "SELECT value FROM app_state WHERE key = 'default_library_path'",
+          )[0]?.value;
         expect(value(a)).toBe("");
         expect(value(b)).toBe("Z:/Music");
       } finally {
@@ -272,7 +305,9 @@ describe("throwaway-profile", () => {
     });
 
     it("refuses a missing source", () => {
-      expect(() => new AppProfile({ cloneFrom: path.join("nope", "luminous.db") })).toThrow(/No database to clone/);
+      expect(() => new AppProfile({ cloneFrom: path.join("nope", "luminous.db") })).toThrow(
+        /No database to clone/,
+      );
     });
   });
 });

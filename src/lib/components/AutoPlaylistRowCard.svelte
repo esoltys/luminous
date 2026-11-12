@@ -10,7 +10,19 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart" | "language";
+    kind:
+      | "favourites"
+      | "recently_added"
+      | "most_played"
+      | "history"
+      | "genre"
+      | "decade"
+      | "bpm"
+      | "artist_tag"
+      | "missing_metadata"
+      | "missing_musicbrainz"
+      | "daypart"
+      | "language";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -23,11 +35,31 @@
     oncontextmenu?: (e: MouseEvent) => void;
   }
 
-  let { label, kind, genre, artistTag, decade, bpm, language, playlistId, updated, trackCount, onClick, oncontextmenu }: Props = $props();
+  let {
+    label,
+    kind,
+    genre,
+    artistTag,
+    decade,
+    bpm,
+    language,
+    playlistId,
+    updated,
+    trackCount,
+    onClick,
+    oncontextmenu,
+  }: Props = $props();
 
   let displayLabel = $derived.by(() => {
     if (
-      (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart" || kind === "language") &&
+      (kind === "genre" ||
+        kind === "decade" ||
+        kind === "bpm" ||
+        kind === "artist_tag" ||
+        kind === "missing_metadata" ||
+        kind === "missing_musicbrainz" ||
+        kind === "daypart" ||
+        kind === "language") &&
       playlistId !== undefined
     ) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
@@ -55,7 +87,14 @@
 
   let updatedLabel = $derived.by(() => {
     if (
-      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "missing_musicbrainz" && kind !== "daypart" && kind !== "language") ||
+      (kind !== "genre" &&
+        kind !== "decade" &&
+        kind !== "bpm" &&
+        kind !== "artist_tag" &&
+        kind !== "missing_metadata" &&
+        kind !== "missing_musicbrainz" &&
+        kind !== "daypart" &&
+        kind !== "language") ||
       updated === undefined
     )
       return null;
@@ -71,13 +110,17 @@
   class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
 >
   <div
-    class="relative shrink-0 w-11 h-11 flex items-center justify-center overflow-hidden border {getPlaylistCardTheme(kind).tintClass}"
+    class="relative shrink-0 w-11 h-11 flex items-center justify-center overflow-hidden border {getPlaylistCardTheme(
+      kind,
+    ).tintClass}"
   >
     <PlaylistKindIcon {kind} sizeClass="w-5 h-5" />
   </div>
 
   <div class="min-w-0 flex-1">
-    <p class="truncate text-sm font-semibold text-brand-text-primary" title={displayLabel}>{displayLabel}</p>
+    <p class="truncate text-sm font-semibold text-brand-text-primary" title={displayLabel}>
+      {displayLabel}
+    </p>
     <p class="truncate text-xs text-brand-text-secondary font-medium">{subtitleLabel}</p>
   </div>
 

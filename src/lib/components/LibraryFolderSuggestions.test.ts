@@ -25,7 +25,8 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn((cmd: string) => {
     if (cmd === "get_suggested_library_folders") return Promise.resolve(mockFolders);
     // collectionStore initializes itself on module load and expects this shape.
-    if (cmd === "get_library_snapshot") return Promise.resolve({ songs: [], albums: [], artists: [] });
+    if (cmd === "get_library_snapshot")
+      return Promise.resolve({ songs: [], albums: [], artists: [] });
     return Promise.resolve([]);
   }),
 }));
@@ -111,7 +112,8 @@ describe("LibraryFolderSuggestions.svelte", () => {
       render(LibraryFolderSuggestions);
       await vi.advanceTimersByTimeAsync(0);
       const calls = () =>
-        vi.mocked(invoke).mock.calls.filter(([cmd]) => cmd === "get_suggested_library_folders").length;
+        vi.mocked(invoke).mock.calls.filter(([cmd]) => cmd === "get_suggested_library_folders")
+          .length;
       const initial = calls();
 
       listenCallbacks["library-changed"]({ payload: null });

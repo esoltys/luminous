@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { boxBlurRGBA } from "./boxBlur";
 
-function image(width: number, height: number, fill: (x: number, y: number) => number): Uint8ClampedArray {
+function image(
+  width: number,
+  height: number,
+  fill: (x: number, y: number) => number,
+): Uint8ClampedArray {
   const data = new Uint8ClampedArray(width * height * 4);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {

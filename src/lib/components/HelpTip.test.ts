@@ -9,7 +9,11 @@ const HINT = "The first value is treated as the main genre.";
 
 // The popover is the only place the hint is *visible*; it's portalled to body.
 function visibleHint(): HTMLElement | null {
-  return Array.from(document.body.querySelectorAll<HTMLElement>("[aria-hidden='true']")).find((el) => el.textContent?.trim() === HINT) ?? null;
+  return (
+    Array.from(document.body.querySelectorAll<HTMLElement>("[aria-hidden='true']")).find(
+      (el) => el.textContent?.trim() === HINT,
+    ) ?? null
+  );
 }
 
 describe("HelpTip.svelte", () => {

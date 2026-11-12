@@ -16,7 +16,7 @@ const GENRE_PALETTE_HUES = [226, 262, 298, 334, 10, 46, 82, 118, 154, 190] as co
  */
 export function resolveGenreColorIndex(
   hierarchy: TagGroup[] | undefined | null,
-  name: string | undefined | null
+  name: string | undefined | null,
 ): number | undefined {
   if (!Array.isArray(hierarchy) || !name) return undefined;
   const direct = hierarchy.find((g) => g.name === name);
@@ -42,7 +42,11 @@ export function getGenreColorChoices(): ColorChoice[] {
 }
 
 export function genreColorHsl(colorIndex: number): string {
-  const hue = GENRE_PALETTE_HUES[((colorIndex % GENRE_PALETTE_HUES.length) + GENRE_PALETTE_HUES.length) % GENRE_PALETTE_HUES.length];
+  const hue =
+    GENRE_PALETTE_HUES[
+      ((colorIndex % GENRE_PALETTE_HUES.length) + GENRE_PALETTE_HUES.length) %
+        GENRE_PALETTE_HUES.length
+    ];
   return `hsl(${hue}, 38%, 58%)`;
 }
 
@@ -53,7 +57,11 @@ export function genreColorHsl(colorIndex: number): string {
  * Only legible on a dark theme's near-black chip fill — see
  * `genreColorHslDark` for the light-theme counterpart. */
 export function genreColorHslBright(colorIndex: number): string {
-  const hue = GENRE_PALETTE_HUES[((colorIndex % GENRE_PALETTE_HUES.length) + GENRE_PALETTE_HUES.length) % GENRE_PALETTE_HUES.length];
+  const hue =
+    GENRE_PALETTE_HUES[
+      ((colorIndex % GENRE_PALETTE_HUES.length) + GENRE_PALETTE_HUES.length) %
+        GENRE_PALETTE_HUES.length
+    ];
   return `hsl(${hue}, 60%, 76%)`;
 }
 
@@ -63,6 +71,10 @@ export function genreColorHslBright(colorIndex: number): string {
  * color would be nearly invisible; this stays dark enough to read clearly
  * as text/border against that pale fill. */
 export function genreColorHslDark(colorIndex: number): string {
-  const hue = GENRE_PALETTE_HUES[((colorIndex % GENRE_PALETTE_HUES.length) + GENRE_PALETTE_HUES.length) % GENRE_PALETTE_HUES.length];
+  const hue =
+    GENRE_PALETTE_HUES[
+      ((colorIndex % GENRE_PALETTE_HUES.length) + GENRE_PALETTE_HUES.length) %
+        GENRE_PALETTE_HUES.length
+    ];
   return `hsl(${hue}, 55%, 30%)`;
 }

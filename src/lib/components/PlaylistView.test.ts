@@ -11,7 +11,9 @@ import type { Playlist, PlaylistItem, PlaylistSizeFit } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
   // Lists for every command except the size-limit answer, which is an object or null.
-  invoke: vi.fn().mockImplementation(async (cmd: string) => (cmd === "get_playlist_size_fit" ? null : [])),
+  invoke: vi
+    .fn()
+    .mockImplementation(async (cmd: string) => (cmd === "get_playlist_size_fit" ? null : [])),
 }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
 
@@ -202,7 +204,10 @@ describe("PlaylistView.svelte", () => {
 
     it("drops the divider when the Queue is sorted, since the added songs are no longer a run", async () => {
       playlistsStore.playlists = [queue];
-      playlistsStore.activePlaylistTracks = [mockTracks[0], { ...mockTracks[1], additional_metadata: AUTO }];
+      playlistsStore.activePlaylistTracks = [
+        mockTracks[0],
+        { ...mockTracks[1], additional_metadata: AUTO },
+      ];
       const { getByText, queryByRole } = render(PlaylistView);
       await fireEvent.click(getByText("Title").closest("button")!);
       expect(queryByRole("separator", { name: "Auto Continue" })).toBeNull();
@@ -248,7 +253,9 @@ describe("PlaylistView.svelte", () => {
     const moveSpy = vi.spyOn(playlistsStore, "moveItems").mockResolvedValue();
     const { getByText } = render(PlaylistView);
     const rowOne = getByText("Track One").closest("[data-song-row]")! as HTMLElement;
-    document.elementFromPoint = vi.fn().mockReturnValue(getByText("Track Three").closest("[data-song-row]"));
+    document.elementFromPoint = vi
+      .fn()
+      .mockReturnValue(getByText("Track Three").closest("[data-song-row]"));
 
     await fireEvent.pointerDown(rowOne, { button: 0, clientX: 0, clientY: 0 });
     await fireEvent.pointerMove(window, { clientX: 0, clientY: 20 });
@@ -268,7 +275,9 @@ describe("PlaylistView.svelte", () => {
       playlistsStore.playlists = [{ ...mockPlaylist, sort_field: "rating", sort_asc: false }];
       playlistsStore.activePlaylistTracks = [mockTracks[2], mockTracks[0], mockTracks[1]];
       await Promise.resolve();
-      const titles = getAllByRole("row").slice(1).map((r) => r.textContent);
+      const titles = getAllByRole("row")
+        .slice(1)
+        .map((r) => r.textContent);
       expect(titles[0]).toContain("Track Three");
       expect(titles[2]).toContain("Track Two");
     });
@@ -302,10 +311,14 @@ describe("PlaylistView.svelte", () => {
 
     it("draws a page break above the first song that doesn't fit, and dims nothing", async () => {
       const { findByRole, getByRole, getByText } = render(PlaylistView);
-      const brk = await findByRole("separator", { name: "16 GB limit · 2 songs above fit · 7.6 GB below" });
+      const brk = await findByRole("separator", {
+        name: "16 GB limit · 2 songs above fit · 7.6 GB below",
+      });
       expect(brk).toHaveAttribute("data-divider-variant", "break");
       expect(brk.nextElementSibling).toHaveTextContent("Track Three");
-      expect(getByText("Track Three").closest("[data-song-row]")!.className).not.toContain("opacity-50");
+      expect(getByText("Track Three").closest("[data-song-row]")!.className).not.toContain(
+        "opacity-50",
+      );
       expect(getByText("12.4 GB of 16 GB used")).toBeInTheDocument();
       expect(getByRole("button", { name: /Limit 16 GB/ })).toBeInTheDocument();
     });
@@ -336,7 +349,10 @@ describe("PlaylistView.svelte", () => {
       const { getByRole } = render(PlaylistView);
       await fireEvent.click(getByRole("button", { name: /Limit 16 GB/ }));
       const dialog = getByRole("dialog", { name: "Size limit" });
-      expect(within(dialog).getByRole("button", { name: "16 GB" })).toHaveAttribute("aria-pressed", "true");
+      expect(within(dialog).getByRole("button", { name: "16 GB" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
 
       await fireEvent.click(within(dialog).getByRole("button", { name: "2 GB" }));
       expect(setLimitSpy).toHaveBeenCalledWith(1, 2_000_000_000, null);
@@ -357,7 +373,9 @@ describe("PlaylistView.svelte", () => {
     });
 
     it("names the device when the sizes are converted ones", async () => {
-      playlistsStore.playlists = [{ ...mockPlaylist, size_limit_bytes: fit.limit_bytes, size_limit_device: "vol-1" }];
+      playlistsStore.playlists = [
+        { ...mockPlaylist, size_limit_bytes: fit.limit_bytes, size_limit_device: "vol-1" },
+      ];
       fitAnswer = { ...fit, device_id: "vol-1", device_name: "HiBy R1" };
       const { findByText } = render(PlaylistView);
       expect(await findByText("12.4 GB of 16 GB used on HiBy R1")).toBeInTheDocument();
@@ -365,7 +383,7 @@ describe("PlaylistView.svelte", () => {
 
     it("says the sizes are being measured until the answer arrives", () => {
       vi.mocked(invoke).mockImplementation(async (cmd: string) =>
-        cmd === "get_playlist_size_fit" ? new Promise(() => {}) : []
+        cmd === "get_playlist_size_fit" ? new Promise(() => {}) : [],
       );
       const { getByText } = render(PlaylistView);
       expect(getByText("Measuring sizes…")).toBeInTheDocument();
@@ -380,14 +398,17 @@ describe("PlaylistView.svelte", () => {
 
     it("re-measures for a connected device picked in the popover", async () => {
       vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-        if (cmd === "get_connected_devices") return [{ id: "vol-1", defaultName: "HiBy R1", profile: { nickname: null } }];
+        if (cmd === "get_connected_devices")
+          return [{ id: "vol-1", defaultName: "HiBy R1", profile: { nickname: null } }];
         return answerCommands(cmd);
       });
       const setLimitSpy = vi.spyOn(playlistsStore, "setSizeLimit").mockResolvedValue();
       const { getByRole, findByRole } = render(PlaylistView);
       await fireEvent.click(getByRole("button", { name: /Limit 16 GB/ }));
       await findByRole("option", { name: "HiBy R1" });
-      await fireEvent.change(getByRole("combobox", { name: "Count sizes for" }), { target: { value: "vol-1" } });
+      await fireEvent.change(getByRole("combobox", { name: "Count sizes for" }), {
+        target: { value: "vol-1" },
+      });
       expect(setLimitSpy).toHaveBeenCalledWith(1, 16_000_000_000, "vol-1");
     });
 
@@ -523,8 +544,13 @@ describe("PlaylistView.svelte", () => {
       playlistsStore.activePlaylistTracks = [...mockTracks, missing, fileMissing];
       const { getByText, getByTitle, getAllByTitle, queryByText } = render(PlaylistView);
 
-      const titled = (tip: string) => getAllByTitle(tip).map((el) => el.textContent).join(" ");
-      expect(titled("Song is no longer in your library. Relink it from the playlist menu.")).toContain("Gone Song");
+      const titled = (tip: string) =>
+        getAllByTitle(tip)
+          .map((el) => el.textContent)
+          .join(" ");
+      expect(
+        titled("Song is no longer in your library. Relink it from the playlist menu."),
+      ).toContain("Gone Song");
       expect(titled("File not found on disk")).toContain("Track Two");
 
       await fireEvent.click(getByTitle("More actions"));
@@ -536,7 +562,7 @@ describe("PlaylistView.svelte", () => {
     it("asks the backend to relink and refetches the playlist when some were", async () => {
       playlistsStore.activePlaylistTracks = [...mockTracks, missing];
       vi.mocked(invoke).mockImplementation(async (cmd: string) =>
-        cmd === "relink_missing_playlist_items" ? 1 : answerCommands(cmd)
+        cmd === "relink_missing_playlist_items" ? 1 : answerCommands(cmd),
       );
       const selectSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockResolvedValue();
       const { getByText, getByTitle } = render(PlaylistView);
@@ -673,4 +699,3 @@ describe("PlaylistView.svelte", () => {
     expect(getByText("My Playlist")).toBeInTheDocument();
   });
 });
-

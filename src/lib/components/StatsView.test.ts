@@ -10,10 +10,50 @@ import type { StatsSummary } from "../types";
 function makeSummary(range: StatsSummary["range"]): StatsSummary {
   return {
     range,
-    top_songs: [{ key: "1", label: "Song A", secondary: "Artist A", play_count: 5, minutes: 25, excluded: false, album: "Album A" }],
-    top_albums: [{ key: "Album A", label: "Album A", secondary: "Artist A", play_count: 3, minutes: 15, excluded: false, album: null }],
-    top_artists: [{ key: "Artist A", label: "Artist A", secondary: null, play_count: 5, minutes: 25, excluded: false, album: null }],
-    top_genres: [{ key: "Rock", label: "Rock", secondary: null, play_count: 5, minutes: 25, excluded: false, album: null }],
+    top_songs: [
+      {
+        key: "1",
+        label: "Song A",
+        secondary: "Artist A",
+        play_count: 5,
+        minutes: 25,
+        excluded: false,
+        album: "Album A",
+      },
+    ],
+    top_albums: [
+      {
+        key: "Album A",
+        label: "Album A",
+        secondary: "Artist A",
+        play_count: 3,
+        minutes: 15,
+        excluded: false,
+        album: null,
+      },
+    ],
+    top_artists: [
+      {
+        key: "Artist A",
+        label: "Artist A",
+        secondary: null,
+        play_count: 5,
+        minutes: 25,
+        excluded: false,
+        album: null,
+      },
+    ],
+    top_genres: [
+      {
+        key: "Rock",
+        label: "Rock",
+        secondary: null,
+        play_count: 5,
+        minutes: 25,
+        excluded: false,
+        album: null,
+      },
+    ],
     play_timestamps: [1_700_000_000, 1_700_003_600],
     total_minutes: 42,
   };
@@ -38,7 +78,9 @@ describe("StatsView.svelte", () => {
 
   it("fetches the 7-day range on mount and renders Top 10 sections", async () => {
     const { getByText, getAllByText } = render(StatsView);
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("get_stats_summary", { range: "7d" }));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("get_stats_summary", { range: "7d" }),
+    );
     await waitFor(() => expect(getByText("Song A")).toBeInTheDocument());
     expect(getByText("Album A")).toBeInTheDocument();
     // "Artist A" appears twice: as the song row's secondary line and as the Top Artists entry.
@@ -60,18 +102,24 @@ describe("StatsView.svelte", () => {
 
   it("refetches when the range switcher changes", async () => {
     const { getByText } = render(StatsView);
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("get_stats_summary", { range: "7d" }));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("get_stats_summary", { range: "7d" }),
+    );
 
     await fireEvent.click(getByText("Past 28 Days"));
 
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("get_stats_summary", { range: "28d" }));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("get_stats_summary", { range: "28d" }),
+    );
     expect(localStorage.getItem("stats_range")).toBe("28d");
   });
 
   it("restores the previously selected range from localStorage on mount", async () => {
     localStorage.setItem("stats_range", "1y");
     render(StatsView);
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("get_stats_summary", { range: "1y" }));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("get_stats_summary", { range: "1y" }),
+    );
   });
 
   it("navigates to the artist detail page when a Top Artists row is clicked", async () => {
@@ -121,7 +169,9 @@ describe("StatsView.svelte", () => {
     });
 
     const { getByText } = render(StatsView);
-    await waitFor(() => expect(getByText("No listening history for this range yet.")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(getByText("No listening history for this range yet.")).toBeInTheDocument(),
+    );
   });
 });
 
@@ -132,7 +182,9 @@ describe("bucketListeningClock", () => {
     const evening = new Date(2026, 5, 15, 19, 0, 0, 0);
     const lateNight = new Date(2026, 5, 15, 2, 0, 0, 0);
 
-    const timestamps = [morning, afternoon, evening, lateNight].map((d) => Math.floor(d.getTime() / 1000));
+    const timestamps = [morning, afternoon, evening, lateNight].map((d) =>
+      Math.floor(d.getTime() / 1000),
+    );
     const counts = bucketListeningClock(timestamps);
 
     expect(counts.morning).toBe(1);
@@ -142,7 +194,12 @@ describe("bucketListeningClock", () => {
   });
 
   it("returns zero counts for an empty timestamp list", () => {
-    expect(bucketListeningClock([])).toEqual({ morning: 0, afternoon: 0, evening: 0, latenight: 0 });
+    expect(bucketListeningClock([])).toEqual({
+      morning: 0,
+      afternoon: 0,
+      evening: 0,
+      latenight: 0,
+    });
   });
 
   it("agrees with getDaypartBucket at the evening/late-night boundary (21:00)", () => {

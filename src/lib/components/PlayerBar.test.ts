@@ -236,7 +236,7 @@ describe("PlayerBar.svelte", () => {
     const shuffleSpy = vi.spyOn(playerStore, "setShuffleMode").mockImplementation(async () => {});
     const { getAllByTitle } = render(PlayerBar);
 
-    const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
+    const shuffleBtn = getAllByTitle(/shuffle/i).find((el) => el.querySelector("svg"))!;
     await fireEvent.click(shuffleBtn);
 
     expect(shuffleSpy).toHaveBeenCalledWith("all");
@@ -246,7 +246,7 @@ describe("PlayerBar.svelte", () => {
     const repeatSpy = vi.spyOn(playerStore, "setRepeatMode").mockImplementation(async () => {});
     const { getAllByTitle } = render(PlayerBar);
 
-    const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
+    const repeatBtn = getAllByTitle(/repeat/i).find((el) => el.querySelector("svg"))!;
     await fireEvent.click(repeatBtn);
 
     expect(repeatSpy).toHaveBeenCalledWith("track");
@@ -257,8 +257,8 @@ describe("PlayerBar.svelte", () => {
     playerStore.repeatMode = "off";
     const { getAllByTitle, rerender } = render(PlayerBar);
 
-    const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
-    const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
+    const shuffleBtn = getAllByTitle(/shuffle/i).find((el) => el.querySelector("svg"))!;
+    const repeatBtn = getAllByTitle(/repeat/i).find((el) => el.querySelector("svg"))!;
 
     // "all" shuffle and "off" repeat show only the base transport icon
     expect(shuffleBtn.querySelectorAll("svg").length).toBe(1);
@@ -280,8 +280,12 @@ describe("PlayerBar.svelte", () => {
     playerStore.repeatMode = "playlist";
     const { getAllByTitle } = render(PlayerBar);
 
-    expect(getAllByTitle(/before moving to a new, randomly selected artist/i).length).toBeGreaterThan(0);
-    expect(getAllByTitle(/loop the current queue or playlist indefinitely/i).length).toBeGreaterThan(0);
+    expect(
+      getAllByTitle(/before moving to a new, randomly selected artist/i).length,
+    ).toBeGreaterThan(0);
+    expect(
+      getAllByTitle(/loop the current queue or playlist indefinitely/i).length,
+    ).toBeGreaterThan(0);
   });
 
   it("does not exit or enter immersive mode from the cover click while width has force-engaged it", async () => {
@@ -311,15 +315,17 @@ describe("PlayerBar.svelte", () => {
     const { getAllByTitle, getByTitle, queryByTitle, container, unmount } = render(PlayerBar);
 
     // Full tier has shuffle, repeat, seek row, right toolbar (with volume & miniplayer)
-    const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
-    const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
+    const shuffleBtn = getAllByTitle(/shuffle/i).find((el) => el.querySelector("svg"))!;
+    const repeatBtn = getAllByTitle(/repeat/i).find((el) => el.querySelector("svg"))!;
     expect(shuffleBtn).toBeInTheDocument();
     expect(repeatBtn).toBeInTheDocument();
     const volumeSlider = container.querySelector('input[type="range"]');
     expect(volumeSlider).toBeInTheDocument();
     const rightColumn = container.querySelector('[data-walkthrough-target="player-bar-toolbar"]');
     expect(rightColumn).toBeInTheDocument();
-    const seekRow = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("gap-2.5"))!;
+    const seekRow = Array.from(container.querySelectorAll("div")).find((d) =>
+      d.className.includes("gap-2.5"),
+    )!;
     expect(seekRow).toBeInTheDocument();
 
     // In Full tier, only the right-column PiP toggle is rendered
@@ -337,13 +343,19 @@ describe("PlayerBar.svelte", () => {
 
     // Compact tier (<640px):
     windowLayoutStore.viewportWidth = 600;
-    const { getAllByTitle: getCompactAll, queryByTitle: queryCompactByTitle, container: compactContainer } = render(PlayerBar);
+    const {
+      getAllByTitle: getCompactAll,
+      queryByTitle: queryCompactByTitle,
+      container: compactContainer,
+    } = render(PlayerBar);
 
     // Shuffle, repeat, seek row, and right toolbar unmounted in Compact tier
     expect(queryCompactByTitle(/shuffle/i)).toBeNull();
     expect(queryCompactByTitle(/repeat/i)).toBeNull();
     expect(compactContainer.querySelector('input[type="range"]')).toBeNull();
-    expect(compactContainer.querySelector('[data-walkthrough-target="player-bar-toolbar"]')).toBeNull();
+    expect(
+      compactContainer.querySelector('[data-walkthrough-target="player-bar-toolbar"]'),
+    ).toBeNull();
 
     // Transport PiP toggle takes over in Compact tier so PiP mode is always accessible
     expect(getCompactAll(/picture-in-picture/i).length).toBe(1);
@@ -351,7 +363,9 @@ describe("PlayerBar.svelte", () => {
 
   it("handles mute toggle correctly", async () => {
     playerStore.volume = 0.8;
-    const volSpy = vi.spyOn(playerStore, "setVolume").mockImplementation(async (v) => { playerStore.volume = v; });
+    const volSpy = vi.spyOn(playerStore, "setVolume").mockImplementation(async (v) => {
+      playerStore.volume = v;
+    });
 
     const { getByRole } = render(PlayerBar);
     const volumeBtn = getByRole("button", { name: /^volume$/i });
@@ -451,7 +465,9 @@ describe("PlayerBar.svelte", () => {
   it("navigates to the Queue when the Queue button is clicked", async () => {
     playerStore.currentSong = mockSong;
     vi.spyOn(playlistsStore, "requireQueue").mockResolvedValue(mockQueue);
-    const selectPlaylistSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockImplementation(async () => {});
+    const selectPlaylistSpy = vi
+      .spyOn(playlistsStore, "selectPlaylist")
+      .mockImplementation(async () => {});
     const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
 
     const { getByTitle } = render(PlayerBar);
@@ -465,7 +481,9 @@ describe("PlayerBar.svelte", () => {
     playerStore.currentSong = mockSong;
     windowLayoutStore.immersiveMode = true;
     vi.spyOn(playlistsStore, "requireQueue").mockResolvedValue(mockQueue);
-    const selectPlaylistSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockImplementation(async () => {});
+    const selectPlaylistSpy = vi
+      .spyOn(playlistsStore, "selectPlaylist")
+      .mockImplementation(async () => {});
     const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
     const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
 

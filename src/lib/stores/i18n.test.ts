@@ -28,9 +28,11 @@ describe("I18nStore", () => {
 
   describe("saved language migration", () => {
     const mockSettings = (settings: Record<string, string>) =>
-      vi.mocked(invoke).mockImplementation(async (cmd: string) =>
-        cmd === "get_all_app_settings" ? settings : null
-      );
+      vi
+        .mocked(invoke)
+        .mockImplementation(async (cmd: string) =>
+          cmd === "get_all_app_settings" ? settings : null,
+        );
 
     it("aliases a pre-registry value and writes the tag plus the marker back", async () => {
       mockSettings({ language: "fr" });
@@ -45,15 +47,24 @@ describe("I18nStore", () => {
       await i18n.init();
       expect(i18n.currentLocale).toBe("en-CA");
       expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "language_tags", value: "1" });
-      expect(invoke).not.toHaveBeenCalledWith("set_app_setting", expect.objectContaining({ key: "language" }));
+      expect(invoke).not.toHaveBeenCalledWith(
+        "set_app_setting",
+        expect.objectContaining({ key: "language" }),
+      );
     });
 
     it("reads a tag as-is once the marker is set, without writing anything", async () => {
       mockSettings({ language: "fr-CA", language_tags: "1" });
       await i18n.init();
       expect(i18n.currentLocale).toBe("fr-CA");
-      expect(invoke).not.toHaveBeenCalledWith("set_app_setting", expect.objectContaining({ key: "language" }));
-      expect(invoke).not.toHaveBeenCalledWith("set_app_setting", expect.objectContaining({ key: "language_tags" }));
+      expect(invoke).not.toHaveBeenCalledWith(
+        "set_app_setting",
+        expect.objectContaining({ key: "language" }),
+      );
+      expect(invoke).not.toHaveBeenCalledWith(
+        "set_app_setting",
+        expect.objectContaining({ key: "language_tags" }),
+      );
     });
 
     it("does not alias a bare legacy value once the marker is set", async () => {
@@ -96,14 +107,18 @@ describe("I18nStore", () => {
     i18n.currentLocale = "en-CA";
     expect(i18n.t("settings.tabGeneral")).toBe("General");
     expect(i18n.t("lyrics.fetching")).toBe("Fetching lyrics...");
-    expect(i18n.t("lyrics.plainTextNotice")).toBe("Synced lyrics not available. Showing plain text.");
+    expect(i18n.t("lyrics.plainTextNotice")).toBe(
+      "Synced lyrics not available. Showing plain text.",
+    );
     expect(i18n.t("playerBar.songLabel")).toBe("Song");
     expect(i18n.t("playerBar.bitrateLabel")).toBe("Bitrate");
 
     i18n.currentLocale = "fr-CA";
     expect(i18n.t("settings.tabGeneral")).toBe("Général");
     expect(i18n.t("lyrics.fetching")).toBe("Récupération des paroles...");
-    expect(i18n.t("lyrics.plainTextNotice")).toBe("Paroles synchronisées non disponibles. Affichage du texte brut.");
+    expect(i18n.t("lyrics.plainTextNotice")).toBe(
+      "Paroles synchronisées non disponibles. Affichage du texte brut.",
+    );
     expect(i18n.t("playerBar.songLabel")).toBe("Chanson");
     expect(i18n.t("playerBar.bitrateLabel")).toBe("Débit");
   });
@@ -156,7 +171,9 @@ describe("I18nStore", () => {
 
     it("passes extra variables through", () => {
       i18n.currentLocale = "en-CA";
-      expect(i18n.plural("settings.folderLocateSuccess", 1, { path: "D:\Music" })).toBe("Re-linked 1 song to D:\Music");
+      expect(i18n.plural("settings.folderLocateSuccess", 1, { path: "D:\Music" })).toBe(
+        "Re-linked 1 song to D:\Music",
+      );
     });
 
     it("returns the key or the explicit fallback when the key is missing or not counted", () => {
@@ -180,12 +197,16 @@ describe("I18nStore", () => {
   it("should format numbers with options like signDisplay", () => {
     i18n.currentLocale = "en-CA";
     expect(formatNumber(1.5, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("+1.5");
-    expect(formatNumber(-1.5, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("-1.5");
+    expect(formatNumber(-1.5, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe(
+      "-1.5",
+    );
     expect(formatNumber(0.0, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("0.0");
 
     i18n.currentLocale = "fr-CA";
     expect(formatNumber(1.5, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("+1,5");
-    expect(formatNumber(-1.5, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("-1,5");
+    expect(formatNumber(-1.5, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe(
+      "-1,5",
+    );
     expect(formatNumber(0.0, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("0,0");
   });
 
@@ -223,7 +244,9 @@ describe("manual language", () => {
 
   it("ignores a manual_language value saved by an earlier version", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) =>
-      cmd === "get_all_app_settings" ? { language: "es", language_tags: "1", manual_language: "FR" } : null
+      cmd === "get_all_app_settings"
+        ? { language: "es", language_tags: "1", manual_language: "FR" }
+        : null,
     );
     await i18n.init();
     expect(i18n.manualLanguage).toBe("ES");
@@ -254,7 +277,7 @@ describe("native labels", () => {
 
   it("pushes them on launch too, so a saved language reaches the tray", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) =>
-      cmd === "get_all_app_settings" ? { language: "es", language_tags: "1" } : null
+      cmd === "get_all_app_settings" ? { language: "es", language_tags: "1" } : null,
     );
     await i18n.init();
     expect(invoke).toHaveBeenCalledWith("set_native_labels", {
@@ -281,7 +304,10 @@ describe("native labels", () => {
       });
       vi.spyOn(console, "error").mockImplementation(() => {});
       await i18n.init();
-      expect(invoke).not.toHaveBeenCalledWith("set_app_setting", expect.objectContaining({ key: "update_notification_template" }));
+      expect(invoke).not.toHaveBeenCalledWith(
+        "set_app_setting",
+        expect.objectContaining({ key: "update_notification_template" }),
+      );
     });
 
     it("re-caches it when the language changes", async () => {
@@ -296,9 +322,11 @@ describe("native labels", () => {
 
 describe("first launch language", () => {
   const mockSettings = (settings: Record<string, string>) =>
-    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
-      cmd === "get_all_app_settings" ? settings : null
-    );
+    vi
+      .mocked(invoke)
+      .mockImplementation(async (cmd: string) =>
+        cmd === "get_all_app_settings" ? settings : null,
+      );
 
   beforeEach(() => {
     vi.clearAllMocks();

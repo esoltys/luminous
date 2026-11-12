@@ -1,5 +1,6 @@
 <script lang="ts" module>
-  export type ButtonVariant = "primary" | "secondary" | "accent-soft" | "info" | "warning" | "destructive";
+  export type ButtonVariant =
+    "primary" | "secondary" | "accent-soft" | "info" | "warning" | "destructive";
   export type ButtonSize = "md" | "sm";
 </script>
 
@@ -34,12 +35,15 @@
   }: Props = $props();
 
   const variantClasses: Record<ButtonVariant, string> = {
-    primary: "bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast shadow-md shadow-brand-accent/20",
-    secondary: "bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary",
+    primary:
+      "bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast shadow-md shadow-brand-accent/20",
+    secondary:
+      "bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary",
     "accent-soft":
       "border border-brand-accent/60 bg-brand-accent/10 hover:bg-brand-accent text-brand-accent-text hover:text-brand-accent-contrast shadow-sm",
     info: "bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:text-purple-300",
-    warning: "bg-brand-text-primary/10 hover:bg-brand-text-primary/15 border border-brand-border text-brand-text-primary hover:text-brand-text-secondary",
+    warning:
+      "bg-brand-text-primary/10 hover:bg-brand-text-primary/15 border border-brand-border text-brand-text-primary hover:text-brand-text-secondary",
     destructive:
       "border border-brand-accent/60 bg-brand-accent/10 hover:bg-brand-accent text-brand-accent-text hover:text-brand-accent-contrast shadow-sm",
   };
@@ -57,7 +61,9 @@
   {title}
   aria-label={ariaLabel}
   aria-pressed={pressed}
-  class="flex items-center justify-center rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed {sizeClasses[size]} {variantClasses[variant]} {className}"
+  class="flex items-center justify-center rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed {sizeClasses[
+    size
+  ]} {variantClasses[variant]} {className}"
 >
   {@render children()}
 </button>

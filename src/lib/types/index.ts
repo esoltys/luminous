@@ -54,11 +54,7 @@ export function isLosslessFileType(filetype: FileType): boolean {
 }
 
 export type ProvenanceVerdict =
-  | "authentic"
-  | "authentic_hires"
-  | "suspected_lossy"
-  | "suspected_upsampled"
-  | "padded_bit_depth";
+  "authentic" | "authentic_hires" | "suspected_lossy" | "suspected_upsampled" | "padded_bit_depth";
 
 export interface SongProvenance {
   song_id: number;
@@ -329,7 +325,12 @@ export interface DeviceProfile {
   supportedFormats: string[];
   maxSampleRate: number;
   maxBitDepth: number;
-  convert: { mode: ConvertMode; format: TargetFormat; bitrateKbps: number; maxArtPx: number | null };
+  convert: {
+    mode: ConvertMode;
+    format: TargetFormat;
+    bitrateKbps: number;
+    maxArtPx: number | null;
+  };
   layout: {
     folderTemplate: string;
     playlistFormat: PlaylistFileFormat;
@@ -406,13 +407,15 @@ export interface FolderSearchResult {
 }
 
 /** What a file or folder is to the library. Word it in the UI; never show the code. */
-export type FileEntryStatus = "inLibrary" | "notScanned" | "albumArt" | "notAudio" | "excluded" | "notFromLuminous";
+export type FileEntryStatus =
+  "inLibrary" | "notScanned" | "albumArt" | "notAudio" | "excluded" | "notFromLuminous";
 
 /** The tag a Subsonic folder's songs lack; such a folder's name is empty. Word it with `shownName`. */
 export type MissingTag = "artist" | "album";
 
 /** What a file is, by its type; the backend lists no file of any other type (#1885). */
-export type FileKind = "audio" | "image" | "lyrics" | "notes" | "pdf" | "cueSheet" | "log" | "playlist";
+export type FileKind =
+  "audio" | "image" | "lyrics" | "notes" | "pdf" | "cueSheet" | "log" | "playlist";
 
 export interface FileEntry {
   /** Its identity in a path; empty only for a `missingTag` folder. */
@@ -578,7 +581,12 @@ export interface SyncProgress {
   deviceId: string;
   step:
     | { kind: "removing" }
-    | { kind: "converting"; song: SyncSongLabel; format: "aac" | "mp3" | "opus"; bitrateKbps: number }
+    | {
+        kind: "converting";
+        song: SyncSongLabel;
+        format: "aac" | "mp3" | "opus";
+        bitrateKbps: number;
+      }
     | { kind: "copying"; song: SyncSongLabel }
     | { kind: "writingPlaylists" }
     | { kind: "writingFolderArt" }
@@ -622,7 +630,8 @@ export type QueuePopulationMode = "all" | "favourites" | "familiar" | "discover"
 export type ShuffleMode = "off" | "all" | "inside_album" | "albums" | "artists";
 export type RepeatMode = "off" | "track" | "album" | "playlist" | "intro";
 export type PlayState = "stopped" | "playing" | "paused";
-export type LoudnessGainSource = "disabled" | "analyzed" | "replay_gain" | "dynamic_range_log" | "fallback";
+export type LoudnessGainSource =
+  "disabled" | "analyzed" | "replay_gain" | "dynamic_range_log" | "fallback";
 export type QualityTier = "lq" | "sq" | "hq" | "hi-res";
 
 export interface AudioPipelineInfo {
@@ -666,10 +675,7 @@ export type AudioBackendKind = "cpal" | "asio" | "wasapi_exclusive" | "alsa";
 
 /** Why a bit-perfect backend fell back to shared output (`audio-output-fallback`). */
 export type OutputFallbackReason =
-  | "device_in_use"
-  | "exclusive_mode_disabled"
-  | "format_unsupported"
-  | "unavailable";
+  "device_in_use" | "exclusive_mode_disabled" | "format_unsupported" | "unavailable";
 
 export interface OutputFallbackPayload {
   requested: AudioBackendKind;
@@ -860,19 +866,10 @@ export interface ArtworkSweepProgressPayload {
 
 /** Why a scan was started; only labels it in the diagnostics export's timing log. */
 export type ScanReason =
-  | "startup"
-  | "manual"
-  | "folder_added"
-  | "folder_removed"
-  | "folder_relocated";
+  "startup" | "manual" | "folder_added" | "folder_removed" | "folder_relocated";
 
 export type ScanPhase =
-  | "discovering"
-  | "reading_tags"
-  | "checking_missing"
-  | "resolving_artwork"
-  | "updating"
-  | "done";
+  "discovering" | "reading_tags" | "checking_missing" | "resolving_artwork" | "updating" | "done";
 
 export interface ScanProgress {
   phase: ScanPhase;
@@ -1308,7 +1305,19 @@ export interface LanguageSummary {
  * Played/History have no backing playlist row, so `playlistId`/`updated` are
  * absent for those kinds. */
 export interface AutoPlaylistItem {
-  kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart" | "language";
+  kind:
+    | "favourites"
+    | "recently_added"
+    | "most_played"
+    | "history"
+    | "genre"
+    | "decade"
+    | "bpm"
+    | "artist_tag"
+    | "missing_metadata"
+    | "missing_musicbrainz"
+    | "daypart"
+    | "language";
   genre?: string;
   artistTag?: string;
   decade?: string;
@@ -1395,9 +1404,7 @@ export interface RecentSearchItem {
   timestamp: number;
 }
 
-export type RadioSeed =
-  | { type: "song"; songId: number }
-  | { type: "artist"; artist: string };
+export type RadioSeed = { type: "song"; songId: number } | { type: "artist"; artist: string };
 
 export interface RadioResult {
   songIds: number[];
@@ -1407,16 +1414,10 @@ export interface RadioResult {
 }
 
 export type LyricsSource =
-  | 'embedded'
-  | 'sidecar'
-  | 'lrclib'
-  | 'netease'
-  | 'lyrics_ovh'
-  | 'manual'
-  | 'unknown';
+  "embedded" | "sidecar" | "lrclib" | "netease" | "lyrics_ovh" | "manual" | "unknown";
 
 export function isOnlineLyricsSource(source?: LyricsSource | string | null): boolean {
-  return source === 'lrclib' || source === 'netease' || source === 'lyrics_ovh';
+  return source === "lrclib" || source === "netease" || source === "lyrics_ovh";
 }
 
 export interface LyricsPayload {
@@ -1495,15 +1496,9 @@ export interface CurationOverview {
   corrupt_songs: CorruptSongItem[];
 }
 
-
-
 /** Kind of removable tag cruft (#1939); mirrors `luminous_metadata::CruftKind`. */
 export type CruftKind =
-  | "promo_comment"
-  | "encoder"
-  | "encoded_by"
-  | "itunes_normalization"
-  | "id3v1_duplicate";
+  "promo_comment" | "encoder" | "encoded_by" | "itunes_normalization" | "id3v1_duplicate";
 
 /** One removable tag field and its current value. */
 export interface CruftField {
@@ -1566,8 +1561,7 @@ export interface SongTagHistory {
 }
 
 export type RestoreTarget =
-  | { type: "entry"; historyId: number }
-  | { type: "batch"; batchId: string };
+  { type: "entry"; historyId: number } | { type: "batch"; batchId: string };
 
 export interface RestoreTagHistoryResult {
   restoredTracks: number;
@@ -1575,5 +1569,3 @@ export interface RestoreTagHistoryResult {
   skippedTracks: number;
   errors: string[];
 }
-
-

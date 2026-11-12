@@ -212,7 +212,9 @@ describe("TopTenList.svelte", () => {
       },
     });
 
-    const movementIndicators = getAllByRole("button").filter((b) => /Rising|Steady|New|Re-entry|Falling/.test(b.getAttribute("aria-label") ?? ""));
+    const movementIndicators = getAllByRole("button").filter((b) =>
+      /Rising|Steady|New|Re-entry|Falling/.test(b.getAttribute("aria-label") ?? ""),
+    );
     expect(movementIndicators).toHaveLength(1);
     expect(movementIndicators[0]).toHaveAccessibleName("Rising · 2 weeks");
   });

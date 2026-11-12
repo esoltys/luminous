@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { resolveArtUrl, getCoverArtUrl, pinnedRefKeyFor, autoPlaylistRefKeyFor, type PinnedItem } from "./index";
+import {
+  resolveArtUrl,
+  getCoverArtUrl,
+  pinnedRefKeyFor,
+  autoPlaylistRefKeyFor,
+  type PinnedItem,
+} from "./index";
 
 describe("resolveArtUrl", () => {
   it("returns null for null, undefined, or empty string", () => {
@@ -45,7 +51,7 @@ describe("autoPlaylistRefKeyFor", () => {
     expect(autoPlaylistRefKeyFor({ kind: "decade", decade: "1980s" })).toBe("decade:1980s");
     expect(autoPlaylistRefKeyFor({ kind: "bpm", bpm: "60-90" })).toBe("bpm:60-90");
     expect(autoPlaylistRefKeyFor({ kind: "artist_tag", artistTag: "Progressive Metal" })).toBe(
-      "artist_tag:Progressive Metal"
+      "artist_tag:Progressive Metal",
     );
     expect(autoPlaylistRefKeyFor({ kind: "language", language: "eng" })).toBe("language:eng");
   });
@@ -55,7 +61,9 @@ describe("pinnedRefKeyFor", () => {
   it("dispatches each PinnedItem type to its identifying key", () => {
     expect(pinnedRefKeyFor({ type: "song", song: { id: 7 } as any })).toBe("7");
     expect(pinnedRefKeyFor({ type: "album", album: { album: "Album A" } as any })).toBe("Album A");
-    expect(pinnedRefKeyFor({ type: "artist", artist: { name: "Artist A" } as any })).toBe("Artist A");
+    expect(pinnedRefKeyFor({ type: "artist", artist: { name: "Artist A" } as any })).toBe(
+      "Artist A",
+    );
     expect(pinnedRefKeyFor({ type: "playlist", playlist: { id: 3 } as any })).toBe("3");
     const autoPlaylistItem: PinnedItem = {
       type: "auto_playlist",

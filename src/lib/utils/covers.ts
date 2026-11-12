@@ -9,7 +9,7 @@ import { albumKey } from "./albumKey";
 function resolveLocalOrFetched(
   localUri: string | null | undefined,
   fetchedFilename: string | null | undefined,
-  fetchedEnabled: boolean
+  fetchedEnabled: boolean,
 ): string | null {
   return (
     getCoverArtUrl(localUri) ??
@@ -28,7 +28,7 @@ function resolveLocalOrFetched(
  */
 export function resolveArtistPortraitUrl(
   localPortraitUri: string | null | undefined,
-  fetchedImageFilename: string | null | undefined
+  fetchedImageFilename: string | null | undefined,
 ): string | null {
   return resolveLocalOrFetched(localPortraitUri, fetchedImageFilename, prefs.fanartFetchPhoto);
 }
@@ -36,7 +36,7 @@ export function resolveArtistPortraitUrl(
 /** The artist header's band logo: a local logo file, else a fanart.tv one (#1276). */
 export function resolveArtistLogoUrl(
   localLogoUri: string | null | undefined,
-  fetchedLogoFilename: string | null | undefined
+  fetchedLogoFilename: string | null | undefined,
 ): string | null {
   return resolveLocalOrFetched(localLogoUri, fetchedLogoFilename, prefs.fanartFetchLogo);
 }
@@ -44,9 +44,13 @@ export function resolveArtistLogoUrl(
 /** The artist header's backdrop: a local fanart file, else a fanart.tv banner (#1276). */
 export function resolveArtistBackgroundUrl(
   localFanartUri: string | null | undefined,
-  fetchedBackgroundFilename: string | null | undefined
+  fetchedBackgroundFilename: string | null | undefined,
 ): string | null {
-  return resolveLocalOrFetched(localFanartUri, fetchedBackgroundFilename, prefs.fanartFetchBackground);
+  return resolveLocalOrFetched(
+    localFanartUri,
+    fetchedBackgroundFilename,
+    prefs.fanartFetchBackground,
+  );
 }
 
 /** Smaller copies `luminous-art://` serves on request (`?w=<px>`, #1528), so a
@@ -76,14 +80,16 @@ const ART_URL_PREFIXES = ["http://luminous-art.localhost/", "luminous-art://"];
  */
 export function coverRequestUrl(
   url: string,
-  { devicePixels = 0, version = 0 }: { devicePixels?: number; version?: number } = {}
+  { devicePixels = 0, version = 0 }: { devicePixels?: number; version?: number } = {},
 ): string {
   const prefix = ART_URL_PREFIXES.find((p) => url.startsWith(p));
   if (!prefix) return url;
   const params: string[] = [];
   const rest = url.slice(prefix.length).replace(/^localhost\//, "");
-  const sizable = !rest.startsWith("local/") && !rest.startsWith("embedded/") && !rest.includes("?");
-  const edge = devicePixels > 0 && sizable ? SIZED_COVER_EDGES.find((e) => e >= devicePixels) : undefined;
+  const sizable =
+    !rest.startsWith("local/") && !rest.startsWith("embedded/") && !rest.includes("?");
+  const edge =
+    devicePixels > 0 && sizable ? SIZED_COVER_EDGES.find((e) => e >= devicePixels) : undefined;
   if (edge) params.push(`w=${edge}`);
   if (version > 0) params.push(`v=${version}`);
   // A `?` already in `url` is part of a folder-art path, so the query always starts fresh.
@@ -175,19 +181,17 @@ export function songsToCoverStack(songs: CoverSource[], max = 6): CoverStackItem
 export function getArtistCoverStack(
   artistAlbums: AlbumCoverSource[],
   artistSongs: CoverSource[],
-  max = 6
+  max = 6,
 ): CoverStackItem[] {
   const mappedAlbums = artistAlbums.map(albumToCoverItem);
 
-  const albumCovers = mappedAlbums.filter(
-    (c) => c.artManual || c.artAutomatic || c.artEmbedded
-  );
+  const albumCovers = mappedAlbums.filter((c) => c.artManual || c.artAutomatic || c.artEmbedded);
   if (albumCovers.length > 0) {
     return albumCovers.slice(0, max);
   }
 
   const songsWithKnownArt = artistSongs.filter(
-    (s) => s.art_manual || s.art_automatic || s.art_embedded
+    (s) => s.art_manual || s.art_automatic || s.art_embedded,
   );
   if (songsWithKnownArt.length > 0) {
     return songsToCoverStack(songsWithKnownArt, max);

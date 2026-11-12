@@ -25,7 +25,10 @@ function makeAlbum(overrides: Partial<AlbumItem> = {}): AlbumItem {
   };
 }
 
-function makeTopAlbum(overrides: Partial<TopAlbumItem> = {}, albumOverrides: Partial<AlbumItem> = {}): TopAlbumItem {
+function makeTopAlbum(
+  overrides: Partial<TopAlbumItem> = {},
+  albumOverrides: Partial<AlbumItem> = {},
+): TopAlbumItem {
   return {
     album: makeAlbum({ album: "Full Moon Fever", sample_song_id: 1, ...albumOverrides }),
     rank: 1,
@@ -61,7 +64,8 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "get_recently_added") return Promise.resolve(mockRecentlyAdded);
     if (cmd === "get_featured_albums") return Promise.resolve(mockFeaturedAlbums);
     // collectionStore initializes itself on module load and expects this shape.
-    if (cmd === "get_library_snapshot") return Promise.resolve({ songs: [], albums: [], artists: [] });
+    if (cmd === "get_library_snapshot")
+      return Promise.resolve({ songs: [], albums: [], artists: [] });
     return Promise.resolve([]);
   }),
 }));
@@ -155,7 +159,9 @@ describe("HomeView.svelte", () => {
   });
 
   it("shows the chart week's compact date range in the Top Albums heading", async () => {
-    mockTopAlbums = [makeTopAlbum({ period_start: 1_700_000_000 }, { album: "Chart Topper", artist: "Tom Petty" })];
+    mockTopAlbums = [
+      makeTopAlbum({ period_start: 1_700_000_000 }, { album: "Chart Topper", artist: "Tom Petty" }),
+    ];
     render(HomeView);
 
     await waitFor(() => {

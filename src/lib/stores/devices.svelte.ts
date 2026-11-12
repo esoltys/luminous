@@ -1,5 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ConnectedDevice, DeviceSyncState, SyncPlan, SyncProgress, SyncSettings, SyncSummary, SyncSource } from "../types";
+import type {
+  ConnectedDevice,
+  DeviceSyncState,
+  SyncPlan,
+  SyncProgress,
+  SyncSettings,
+  SyncSummary,
+  SyncSource,
+} from "../types";
 import { deviceName } from "../utils/devices";
 import { createEventScope } from "../utils/eventScope";
 import { i18n } from "./i18n.svelte";
@@ -29,14 +37,19 @@ class DevicesStore {
 
   private async init() {
     try {
-      await this.events.listen<ConnectedDevice[]>("devices-changed", (event) => this.setDevices(event.payload));
+      await this.events.listen<ConnectedDevice[]>("devices-changed", (event) =>
+        this.setDevices(event.payload),
+      );
       await this.events.listen<SyncProgress>("device-sync-progress", (event) => {
         const progress = event.payload;
         this.progress[progress.deviceId] = progress;
         const state = this.syncStates[progress.deviceId];
-        if (state && !state.running) this.syncStates[progress.deviceId] = { ...state, running: true };
+        if (state && !state.running)
+          this.syncStates[progress.deviceId] = { ...state, running: true };
       });
-      await this.events.listen<SyncSummary>("device-sync-finished", (event) => this.finished(event.payload));
+      await this.events.listen<SyncSummary>("device-sync-finished", (event) =>
+        this.finished(event.payload),
+      );
       const devices = await invoke<ConnectedDevice[]>("get_connected_devices");
       this.setDevices(Array.isArray(devices) ? devices : []);
       this.loaded = true;
@@ -126,7 +139,7 @@ class DevicesStore {
     const existing = new Set(
       state.settings.sources
         .filter((s): s is { kind: "song"; id: number } => s.kind === "song")
-        .map((s) => s.id)
+        .map((s) => s.id),
     );
     return songIds.every((id) => existing.has(id));
   }
@@ -165,7 +178,11 @@ class DevicesStore {
    * Adds `source` to `device`'s sync and displays a toast confirming addition,
    * reporting when it is already syncing, or reporting failure.
    */
-  async addToDeviceSync(device: ConnectedDevice, source: SyncSource, name: string): Promise<boolean> {
+  async addToDeviceSync(
+    device: ConnectedDevice,
+    source: SyncSource,
+    name: string,
+  ): Promise<boolean> {
     const deviceLabel = deviceName(device);
     try {
       if (!(await this.addSourceToSync(device.id, source))) {
@@ -176,7 +193,10 @@ class DevicesStore {
       return true;
     } catch (err) {
       console.error("Failed to add source to device sync:", err);
-      toastStore.show(i18n.t("devices.addItemToSyncFailed", { name, device: deviceLabel }), "error");
+      toastStore.show(
+        i18n.t("devices.addItemToSyncFailed", { name, device: deviceLabel }),
+        "error",
+      );
       return false;
     }
   }
@@ -184,17 +204,27 @@ class DevicesStore {
   /**
    * Removes `source` from `device`'s sync and displays a toast confirming removal.
    */
-  async removeFromDeviceSync(device: ConnectedDevice, source: SyncSource, name: string): Promise<boolean> {
+  async removeFromDeviceSync(
+    device: ConnectedDevice,
+    source: SyncSource,
+    name: string,
+  ): Promise<boolean> {
     const deviceLabel = deviceName(device);
     try {
       if (!(await this.removeSourceFromSync(device.id, source))) {
         return false;
       }
-      toastStore.show(i18n.t("devices.removedItemFromSync", { name, device: deviceLabel }), "success");
+      toastStore.show(
+        i18n.t("devices.removedItemFromSync", { name, device: deviceLabel }),
+        "success",
+      );
       return true;
     } catch (err) {
       console.error("Failed to remove source from device sync:", err);
-      toastStore.show(i18n.t("devices.removeItemFromSyncFailed", { name, device: deviceLabel }), "error");
+      toastStore.show(
+        i18n.t("devices.removeItemFromSyncFailed", { name, device: deviceLabel }),
+        "error",
+      );
       return false;
     }
   }
@@ -213,7 +243,7 @@ class DevicesStore {
   async addSongsToSync(
     deviceOrId: ConnectedDevice | string,
     songIds: number[],
-    name?: string
+    name?: string,
   ): Promise<boolean> {
     const deviceId = typeof deviceOrId === "string" ? deviceOrId : deviceOrId.id;
     const device = typeof deviceOrId === "string" ? this.device(deviceId) : deviceOrId;
@@ -224,14 +254,17 @@ class DevicesStore {
     const existing = new Set(
       state.settings.sources
         .filter((s): s is { kind: "song"; id: number } => s.kind === "song")
-        .map((s) => s.id)
+        .map((s) => s.id),
     );
     const newSources: SyncSource[] = songIds
       .filter((id) => !existing.has(id))
       .map((id) => ({ kind: "song", id }));
 
     if (newSources.length === 0) {
-      toastStore.show(i18n.t("devices.itemAlreadyInSync", { name: itemName, device: deviceLabel }), "info");
+      toastStore.show(
+        i18n.t("devices.itemAlreadyInSync", { name: itemName, device: deviceLabel }),
+        "info",
+      );
       return false;
     }
 
@@ -244,7 +277,7 @@ class DevicesStore {
         count: newSources.length,
         device: deviceLabel,
       }),
-      "success"
+      "success",
     );
     return true;
   }
@@ -255,7 +288,7 @@ class DevicesStore {
   async removeSongsFromSync(
     deviceOrId: ConnectedDevice | string,
     songIds: number[],
-    name?: string
+    name?: string,
   ): Promise<boolean> {
     const deviceId = typeof deviceOrId === "string" ? deviceOrId : deviceOrId.id;
     const device = typeof deviceOrId === "string" ? this.device(deviceId) : deviceOrId;
@@ -264,7 +297,7 @@ class DevicesStore {
     const state = await invoke<DeviceSyncState>("get_device_sync_state", { deviceId });
     const toRemove = new Set(songIds);
     const filtered = state.settings.sources.filter(
-      (s) => !(s.kind === "song" && toRemove.has(s.id))
+      (s) => !(s.kind === "song" && toRemove.has(s.id)),
     );
     const removedCount = state.settings.sources.length - filtered.length;
     if (removedCount === 0) return false;
@@ -278,7 +311,7 @@ class DevicesStore {
         count: removedCount,
         device: deviceLabel,
       }),
-      "success"
+      "success",
     );
     return true;
   }
@@ -291,7 +324,7 @@ class DevicesStore {
     device: ConnectedDevice,
     source?: SyncSource,
     sourceName?: string,
-    songIds?: number[]
+    songIds?: number[],
   ): Promise<boolean> {
     if (songIds && songIds.length > 0) {
       if (this.areSongsInSync(device.id, songIds)) {
@@ -321,11 +354,14 @@ class DevicesStore {
           summary.failures.length > 0
             ? i18n.plural("devices.syncDoneWithFailures", summary.failures.length, { device: name })
             : i18n.t("devices.syncDone", { device: name }),
-          summary.failures.length > 0 ? "warning" : "success"
+          summary.failures.length > 0 ? "warning" : "success",
         );
         break;
       case "stopped":
-        toastStore.show(i18n.plural("devices.syncStopped", summary.songsWritten, { device: name }), "info");
+        toastStore.show(
+          i18n.plural("devices.syncStopped", summary.songsWritten, { device: name }),
+          "info",
+        );
         break;
       case "failed":
         toastStore.show(i18n.t("devices.syncFailed", { device: name }), "error");
@@ -357,8 +393,10 @@ class DevicesStore {
     } catch (err) {
       const code = String(err);
       toastStore.show(
-        i18n.t(code === "device-in-use" ? "devices.ejectInUse" : "devices.ejectFailed", { device: name }),
-        "error"
+        i18n.t(code === "device-in-use" ? "devices.ejectInUse" : "devices.ejectFailed", {
+          device: name,
+        }),
+        "error",
       );
     }
   }

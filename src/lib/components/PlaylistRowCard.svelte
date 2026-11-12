@@ -1,7 +1,5 @@
 <script lang="ts">
-  import {
-    PlaylistIcon as ListMusic
-  } from "phosphor-svelte";
+  import { PlaylistIcon as ListMusic } from "phosphor-svelte";
   import type { Playlist } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
@@ -14,7 +12,8 @@
     playlist,
     onClick,
     oncontextmenu,
-  }: { playlist: Playlist; onClick: () => void; oncontextmenu?: (e: MouseEvent) => void } = $props();
+  }: { playlist: Playlist; onClick: () => void; oncontextmenu?: (e: MouseEvent) => void } =
+    $props();
 
   let cardTitle = $derived(getPlaylistDisplayName(playlist));
 
@@ -27,7 +26,7 @@
         ? "decade"
         : isSmartPlaylistSpec(playlist.dynamic_spec)
           ? "smart"
-          : "genre"
+          : "genre",
   );
 
   let isQueue = $derived(playlist.is_queue);
@@ -51,7 +50,7 @@
 >
   <div
     class="relative shrink-0 w-11 h-11 flex items-center justify-center overflow-hidden border {isQueue
-      ? getPlaylistCardTheme("queue").tintClass
+      ? getPlaylistCardTheme('queue').tintClass
       : autoKind
         ? getPlaylistCardTheme(autoKind).tintClass
         : 'bg-brand-main border-brand-border/60'}"
@@ -66,7 +65,9 @@
   </div>
 
   <div class="min-w-0 flex-1">
-    <p class="truncate text-sm font-semibold text-brand-text-primary" title={cardTitle}>{cardTitle}</p>
+    <p class="truncate text-sm font-semibold text-brand-text-primary" title={cardTitle}>
+      {cardTitle}
+    </p>
     {#if subtitleLabel}
       <p class="truncate text-xs text-brand-text-secondary font-medium">{subtitleLabel}</p>
     {/if}

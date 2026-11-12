@@ -27,7 +27,9 @@
 
   // Which storage is synced only matters when there is a choice.
   const target = $derived(
-    plan && device.storages.length > 1 ? device.storages.find((s) => s.id === plan.storageId) : undefined
+    plan && device.storages.length > 1
+      ? device.storages.find((s) => s.id === plan.storageId)
+      : undefined,
   );
 
   const verdict = $derived.by(() => {
@@ -40,11 +42,13 @@
         free: formatStorageSize(Math.max(0, s.freeAfterBytes)),
       });
     }
-    return i18n.t(unselected === "leave" ? "devices.projectionTooBigLeave" : "devices.projectionTooBig", {
-      over: formatStorageSize(plan.shortfall?.bytes ?? 0),
-    });
+    return i18n.t(
+      unselected === "leave" ? "devices.projectionTooBigLeave" : "devices.projectionTooBig",
+      {
+        over: formatStorageSize(plan.shortfall?.bytes ?? 0),
+      },
+    );
   });
-
 </script>
 
 <div class="flex flex-col gap-2.5 min-w-0" data-testid="sync-projection">
@@ -52,7 +56,9 @@
     <span class="min-w-0 text-xs text-brand-text-secondary">
       {target ? i18n.t("devices.syncingTo", { storage: storageName(device, target) }) : ""}
     </span>
-    <span class="text-xs font-semibold {plan ? 'text-brand-text-primary' : 'text-brand-text-secondary'}">
+    <span
+      class="text-xs font-semibold {plan ? 'text-brand-text-primary' : 'text-brand-text-secondary'}"
+    >
       {#if plan}
         {verdict}
       {:else if failed}

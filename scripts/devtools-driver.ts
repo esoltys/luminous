@@ -92,8 +92,7 @@ export class DevtoolsDriver implements AsyncDisposable {
    * the document is fully loaded, and window.__TAURI_INTERNALS__ is ready.
    */
   static async connect(options?: number | ConnectOptions): Promise<DevtoolsDriver> {
-    const opts: ConnectOptions =
-      typeof options === "number" ? { port: options } : (options ?? {});
+    const opts: ConnectOptions = typeof options === "number" ? { port: options } : (options ?? {});
     const port = opts.port ?? DEFAULT_CDP_PORT;
     const host = opts.host ?? "127.0.0.1";
     const timeoutMs = opts.timeoutMs ?? 30_000;
@@ -122,7 +121,7 @@ export class DevtoolsDriver implements AsyncDisposable {
 
     throw new Error(
       `Failed to connect to Luminous DevTools at http://${host}:${port} within ${timeoutMs}ms.` +
-        (lastError ? ` Last error: ${lastError.message}` : "")
+        (lastError ? ` Last error: ${lastError.message}` : ""),
     );
   }
 
@@ -135,8 +134,7 @@ export class DevtoolsDriver implements AsyncDisposable {
     return (
       targets.find(
         (t) =>
-          t.type === "page" &&
-          (t.title.includes("Luminous") || t.url.includes("localhost:1420"))
+          t.type === "page" && (t.title.includes("Luminous") || t.url.includes("localhost:1420")),
       ) ??
       targets.find((t) => t.type === "page") ??
       null
@@ -155,8 +153,8 @@ export class DevtoolsDriver implements AsyncDisposable {
           if (msg.error) {
             handler.reject(
               new Error(
-                `CDP method ${handler.method} failed: ${msg.error.message ?? JSON.stringify(msg.error)}`
-              )
+                `CDP method ${handler.method} failed: ${msg.error.message ?? JSON.stringify(msg.error)}`,
+              ),
             );
           } else {
             handler.resolve(msg.result);
@@ -197,10 +195,7 @@ export class DevtoolsDriver implements AsyncDisposable {
   }
 
   private async enableDomains(): Promise<void> {
-    await Promise.all([
-      this.send("Runtime.enable"),
-      this.send("Page.enable"),
-    ]);
+    await Promise.all([this.send("Runtime.enable"), this.send("Page.enable")]);
   }
 
   private async isPageReady(): Promise<boolean> {
@@ -247,10 +242,12 @@ export class DevtoolsDriver implements AsyncDisposable {
           return internals.invoke(c, a);
         },
         cmd,
-        args
+        args,
       );
     } catch (err) {
-      throw new Error(`invoke('${cmd}') failed: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(
+        `invoke('${cmd}') failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -273,7 +270,7 @@ export class DevtoolsDriver implements AsyncDisposable {
         throw new Error(
           res.exceptionDetails.exception?.description ??
             res.exceptionDetails.text ??
-            "Evaluation failed"
+            "Evaluation failed",
         );
       }
       return res?.result?.value as T;
@@ -297,7 +294,7 @@ export class DevtoolsDriver implements AsyncDisposable {
       throw new Error(
         res.exceptionDetails.exception?.description ??
           res.exceptionDetails.text ??
-          "Evaluation failed"
+          "Evaluation failed",
       );
     }
     return res?.result?.value as T;
@@ -387,7 +384,9 @@ export class DevtoolsDriver implements AsyncDisposable {
 
           const cleanup = () => {
             if (registeredEventId !== null) {
-              internals.invoke("plugin:event|unlisten", { event, eventId: registeredEventId }).catch(() => {});
+              internals
+                .invoke("plugin:event|unlisten", { event, eventId: registeredEventId })
+                .catch(() => {});
               registeredEventId = null;
             }
           };
@@ -428,7 +427,7 @@ export class DevtoolsDriver implements AsyncDisposable {
         });
       },
       eventName,
-      timeoutMs
+      timeoutMs,
     );
   }
 
@@ -437,7 +436,7 @@ export class DevtoolsDriver implements AsyncDisposable {
    */
   async waitForCondition(
     predicate: () => boolean | Promise<boolean>,
-    options?: WaitForConditionOptions
+    options?: WaitForConditionOptions,
   ): Promise<void> {
     const timeoutMs = options?.timeoutMs ?? 10_000;
     const intervalMs = options?.intervalMs ?? 100;
@@ -451,9 +450,7 @@ export class DevtoolsDriver implements AsyncDisposable {
       await sleep(intervalMs);
     }
 
-    throw new Error(
-      options?.message ?? `Timed out waiting for condition after ${timeoutMs}ms`
-    );
+    throw new Error(options?.message ?? `Timed out waiting for condition after ${timeoutMs}ms`);
   }
 
   /**
