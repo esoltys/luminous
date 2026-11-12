@@ -1029,6 +1029,7 @@ export const en = {
     suggestFoldersHint:
       "Show a card on Home offering to add the folders of files you've opened to your library.",
     suggestFoldersReset: "Reset",
+    suggestFoldersResetTitle: "Reset ignored folders",
     suggestFoldersResetDone: "Ignored folders will be suggested again.",
     autoOrganizeLabel: "Auto-Organize New Files & Tag Updates",
     autoOrganizeHint:

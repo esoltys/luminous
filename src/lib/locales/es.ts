@@ -1055,6 +1055,7 @@ export const es = {
     suggestFoldersHint:
       "Muestra en Inicio una tarjeta que propone agregar a tu biblioteca las carpetas de los archivos que has abierto.",
     suggestFoldersReset: "Restablecer",
+    suggestFoldersResetTitle: "Restablecer carpetas ignoradas",
     suggestFoldersResetDone: "Las carpetas ignoradas se volverán a sugerir.",
     autoOrganizeLabel: "Organizar automáticamente archivos nuevos y cambios de etiquetas",
     autoOrganizeHint:

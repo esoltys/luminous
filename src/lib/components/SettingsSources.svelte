@@ -1102,7 +1102,12 @@
         </p>
       </div>
       <div class="flex items-center gap-3 shrink-0">
-        <Button onclick={handleResetIgnoredFolders} size="sm">
+        <Button
+          onclick={handleResetIgnoredFolders}
+          size="sm"
+          title={i18n.t("settings.suggestFoldersResetTitle")}
+          aria-label={i18n.t("settings.suggestFoldersResetTitle")}
+        >
           {i18n.t("settings.suggestFoldersReset")}
         </Button>
         <Toggle

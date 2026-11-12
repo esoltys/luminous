@@ -1067,6 +1067,7 @@ export const fr: DeepStringRecord<typeof en> = {
     suggestFoldersHint:
       "Affiche sur l'accueil une carte qui propose d'ajouter à votre bibliothèque les dossiers des fichiers que vous avez ouverts.",
     suggestFoldersReset: "Réinitialiser",
+    suggestFoldersResetTitle: "Réinitialiser les dossiers ignorés",
     suggestFoldersResetDone: "Les dossiers ignorés seront de nouveau suggérés.",
     autoOrganizeLabel: "Auto-organisation des nouveaux fichiers et étiquettes",
     autoOrganizeHint:

@@ -381,7 +381,7 @@ describe("SettingsSources.svelte - folder suggestions toggle", () => {
     const { findByLabelText, findByRole } = render(SettingsSources);
     await waitFor(async () => expect(await findByLabelText(LABEL)).toBeEnabled());
 
-    await fireEvent.click(await findByRole("button", { name: "Reset" }));
+    await fireEvent.click(await findByRole("button", { name: "Reset ignored folders" }));
 
     expect(invoke).toHaveBeenCalledWith("reset_library_folder_suggestion_dismissals");
     expect(invoke).not.toHaveBeenCalledWith(

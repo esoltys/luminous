@@ -1131,6 +1131,7 @@ export const uk = {
     suggestFoldersHint:
       "Показувати на головній картку з пропозицією додати до медіатеки папки відкритих вами файлів.",
     suggestFoldersReset: "Скинути",
+    suggestFoldersResetTitle: "Скинути ігноровані папки",
     suggestFoldersResetDone: "Ігноровані папки знову пропонуватимуться.",
     autoOrganizeLabel: "Автоматично впорядковувати нові файли й оновлення тегів",
     autoOrganizeHint:

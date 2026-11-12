@@ -1058,6 +1058,7 @@ export const de = {
     suggestFoldersHint:
       "Zeigt auf der Startseite eine Karte, die vorschlägt, die Ordner geöffneter Dateien zur Mediathek hinzuzufügen.",
     suggestFoldersReset: "Zurücksetzen",
+    suggestFoldersResetTitle: "Ignorierte Ordner zurücksetzen",
     suggestFoldersResetDone: "Ignorierte Ordner werden wieder vorgeschlagen.",
     autoOrganizeLabel: "Neue Dateien und Tag-Änderungen automatisch organisieren",
     autoOrganizeHint:

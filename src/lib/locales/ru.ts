@@ -1135,6 +1135,7 @@ export const ru = {
     suggestFoldersHint:
       "Показывать на главной карточку с предложением добавить в медиатеку папки открытых вами файлов.",
     suggestFoldersReset: "Сбросить",
+    suggestFoldersResetTitle: "Сбросить игнорируемые папки",
     suggestFoldersResetDone: "Игнорируемые папки снова будут предлагаться.",
     autoOrganizeLabel: "Автоупорядочение новых файлов и изменений тегов",
     autoOrganizeHint:

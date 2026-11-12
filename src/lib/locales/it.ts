@@ -1056,6 +1056,7 @@ export const it = {
     suggestFoldersHint:
       "Mostra in Home una scheda che propone di aggiungere alla libreria le cartelle dei file che hai aperto.",
     suggestFoldersReset: "Ripristina",
+    suggestFoldersResetTitle: "Ripristina cartelle ignorate",
     suggestFoldersResetDone: "Le cartelle ignorate verranno suggerite di nuovo.",
     autoOrganizeLabel: "Organizza automaticamente nuovi file e modifiche ai tag",
     autoOrganizeHint:
