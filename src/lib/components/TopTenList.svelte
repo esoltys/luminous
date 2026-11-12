@@ -208,8 +208,8 @@
 
 {#snippet rankSnippet(rank: number)}
   <span
-    class="shrink-0 text-center font-bold text-brand-text-secondary tabular-nums {plain
-      ? 'w-8 text-lg'
+    class="block shrink-0 text-center font-bold text-brand-text-secondary tabular-nums {plain
+      ? 'w-10 text-lg'
       : 'w-8 text-sm'}"
   >
     {plain ? rank : String(rank).padStart(2, "0")}
@@ -220,7 +220,7 @@
   {@const label = movementLabel(item, rank)}
   {#if label}
     <span
-      class="shrink-0 text-xs font-medium text-brand-text-secondary whitespace-nowrap"
+      class="shrink-0 text-xs leading-5 font-medium text-brand-text-secondary whitespace-nowrap"
       title={i18n.plural("home.chartWeeksCount", item.weeks_on_chart ?? 1)}
     >
       {label}
@@ -307,8 +307,12 @@
             {#snippet rankPrefix()}
               {@render rankSnippet(i + 1)}
             {/snippet}
+            <!-- Cover-height box with the text pinned to its top, so the word sits on the
+                 same line as the year instead of floating in the middle of the row. -->
             {#snippet movementSuffix()}
-              {@render movementSnippet(item, i + 1)}
+              <div class="h-11 pt-0.5">
+                {@render movementSnippet(item, i + 1)}
+              </div>
             {/snippet}
             <AlbumRowCard
               album={albumItem}
