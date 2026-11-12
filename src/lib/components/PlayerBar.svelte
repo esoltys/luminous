@@ -18,6 +18,7 @@
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
   import LinkButton from "./LinkButton.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import ContextMenuItem from "./ContextMenuItem.svelte";
   import TagEditor from "./TagEditor.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { openInPicard } from "../utils/picard";
@@ -57,7 +58,7 @@
     PlaylistIcon as ListMusic,
     MusicNotesIcon as Music,
     InfoIcon as Info,
-    ListIcon as Menu,
+    DotsThreeIcon as MoreHorizontal,
     SubtitlesIcon as Lyrics,
     StackIcon as Layers,
   } from "phosphor-svelte";
@@ -226,7 +227,8 @@
     windowLayoutStore.toggleImmersiveMode();
   }
 
-  // New playbar button row (#876): Menu/Lyrics/Queue/Info/Miniplayer.
+  // Playbar right cluster (#876, #2042): spectrum, Queue, volume and a "more" button whose
+  // song menu also carries Lyrics, Song info, Mini-player and the seek bar mode.
   let contextMenuState = $state<{ x: number; y: number } | null>(null);
   let editingSongId = $state<number | null>(null);
 
@@ -324,7 +326,7 @@
     ? 'glass-surface'
     : ''} {windowLayoutStore.isPlaybarOnlyMode
     ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none'
-    : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-[2rem]'}"
+    : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-full'}"
 >
   {#if themeStore.activeAddon?.overlayEntry}
     <AddonOverlay addon={themeStore.activeAddon} />
@@ -509,7 +511,7 @@
         <button
           onclick={() => windowLayoutStore.toggleMiniplayerMode()}
           class="text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
-          title={i18n.t("miniplayer.toggleTooltip", {}, "Picture-in-Picture Mode (Ctrl+M)")}
+          title={i18n.t("miniplayer.toggleTooltip", {}, "Mini-player (Ctrl+M)")}
         >
           <PictureInPicture class="w-4 h-4" />
         </button>
@@ -525,27 +527,6 @@
           <WaveformSeekBar />
         </div>
         <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
-        <button
-          onclick={() => prefs.toggleSeekBarMode()}
-          class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
-          title={prefs.seekBarMode === "waveform"
-            ? i18n.t(
-                "playerBar.seekbarModeWaveform",
-                {},
-                "Waveform mode — click to switch to frequency bands",
-              )
-            : i18n.t(
-                "playerBar.seekbarModeBands",
-                {},
-                "Frequency bands mode — click to switch to waveform",
-              )}
-        >
-          {#if prefs.seekBarMode === "waveform"}
-            <AudioWaveform class="w-3 h-3" />
-          {:else}
-            <Palette class="w-3 h-3" />
-          {/if}
-        </button>
       </div>
     {/if}
   </div>
@@ -553,33 +534,13 @@
   {#if !windowLayoutStore.isPlayerBarCompact}
     <div
       data-walkthrough-target="player-bar-toolbar"
-      class="flex flex-col items-center gap-1.5 flex-shrink-0 md:w-1/3 md:min-w-[200px] max-w-xs"
+      class="flex items-center justify-end flex-shrink-0 md:w-1/3 md:min-w-[200px] max-w-xs"
     >
-      <div class="h-5 flex items-center gap-3 md:gap-5">
-        <button
-          onmousedown={() => (menuWasOpenOnPress = contextMenuState !== null)}
-          onclick={openCurrentSongMenu}
-          disabled={!playerStore.currentSong}
-          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
-          title={i18n.t("playerBar.menuTooltip")}
-        >
-          <Menu class="w-5 h-5" />
-        </button>
+      <div class="h-7 flex items-center gap-3">
         {#if !windowLayoutStore.isRightPanelAutoHidden}
-          <button
-            transition:collapseFade={{ duration: 250 }}
-            onclick={() => {
-              windowLayoutStore.exitImmersiveMode();
-              navigationStore.activeTab = "lyrics";
-            }}
-            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {navigationStore.activeTab ===
-            'lyrics'
-              ? 'text-brand-accent-text'
-              : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-            title={i18n.t("sidebar.lyrics")}
-          >
-            <Lyrics class="w-5 h-5" />
-          </button>
+          <div transition:collapseFade={{ duration: 250 }} class="w-24 h-7 block flex-shrink-0">
+            <SpectrumVisualizer />
+          </div>
         {/if}
         <button
           onclick={navigateToQueue}
@@ -592,33 +553,6 @@
         >
           <Layers class="w-5 h-5" />
         </button>
-        {#if !windowLayoutStore.isRightPanelAutoHidden}
-          <button
-            transition:collapseFade={{ duration: 250 }}
-            onclick={handleInfoClick}
-            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {windowLayoutStore.rightPanelVisible
-              ? 'text-brand-accent-text'
-              : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-            title={i18n.t("topNav.toggleRightPanel")}
-          >
-            <Info class="w-5 h-5" />
-          </button>
-        {/if}
-        <button
-          onclick={() => windowLayoutStore.toggleMiniplayerMode()}
-          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-          title={i18n.t("miniplayer.toggleTooltip", {}, "Picture-in-Picture Mode (Ctrl+M)")}
-        >
-          <PictureInPicture class="w-5 h-5" />
-        </button>
-      </div>
-
-      <div class="h-7 flex items-center gap-2">
-        {#if !windowLayoutStore.isRightPanelAutoHidden}
-          <div transition:collapseFade={{ duration: 250 }} class="w-24 h-7 block flex-shrink-0">
-            <SpectrumVisualizer />
-          </div>
-        {/if}
         <button
           onclick={toggleMute}
           class="inline-flex items-center justify-center text-brand-text-secondary hover:text-brand-text-primary transition-colors"
@@ -645,6 +579,17 @@
           aria-label={i18n.t("playerBar.volumeSlider")}
           title={i18n.t("playerBar.volumeWithValue", { value: Math.round(volumePercent) })}
         />
+        <button
+          onmousedown={() => (menuWasOpenOnPress = contextMenuState !== null)}
+          onclick={openCurrentSongMenu}
+          disabled={!playerStore.currentSong}
+          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          title={i18n.t("playerBar.menuTooltip")}
+          aria-haspopup="menu"
+          aria-expanded={contextMenuState !== null}
+        >
+          <MoreHorizontal weight="bold" class="w-5 h-5" />
+        </button>
       </div>
     </div>
   {/if}
@@ -678,7 +623,47 @@
     onClose={() => {
       contextMenuState = null;
     }}
-  />
+  >
+    {#snippet trailing()}
+      <ContextMenuItem
+        icon={Lyrics}
+        label={i18n.t("sidebar.lyrics")}
+        onclick={() => {
+          windowLayoutStore.exitImmersiveMode();
+          navigationStore.activeTab = "lyrics";
+          contextMenuState = null;
+        }}
+      />
+      <ContextMenuItem
+        icon={Info}
+        label={i18n.t("playerBar.menuSongInfo", {}, "Song info")}
+        shortcut="Ctrl+I"
+        onclick={() => {
+          handleInfoClick();
+          contextMenuState = null;
+        }}
+      />
+      <ContextMenuItem
+        icon={PictureInPicture}
+        label={i18n.t("playerBar.menuMiniplayer", {}, "Mini-player")}
+        shortcut="Ctrl+M"
+        onclick={() => {
+          windowLayoutStore.toggleMiniplayerMode();
+          contextMenuState = null;
+        }}
+      />
+      <ContextMenuItem
+        icon={prefs.seekBarMode === "waveform" ? Palette : AudioWaveform}
+        label={prefs.seekBarMode === "waveform"
+          ? i18n.t("playerBar.menuSeekbarBands", {}, "Seek bar: frequency bands")
+          : i18n.t("playerBar.menuSeekbarWaveform", {}, "Seek bar: waveform")}
+        onclick={() => {
+          prefs.toggleSeekBarMode();
+          contextMenuState = null;
+        }}
+      />
+    {/snippet}
+  </SongContextMenu>
 {/if}
 
 {#if editingSongId !== null}

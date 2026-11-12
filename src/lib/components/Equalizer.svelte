@@ -700,7 +700,7 @@
               aria-expanded={presetMenuPos !== null}
               class="flex items-center justify-center w-6 h-6 -mr-2 rounded-full text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shrink-0 cursor-pointer"
             >
-              <MoreHorizontal class="w-4 h-4" />
+              <MoreHorizontal weight="bold" class="w-4 h-4" />
             </button>
           {/if}
         </div>

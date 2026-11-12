@@ -1565,8 +1565,6 @@ export const es = {
     lyricsTooltip: "Mostrar el panel de letras",
     equalizerTooltip: "Mostrar la configuración del ecualizador",
     visualizerTooltip: "Alternar el visualizador de audio",
-    seekbarModeWaveform: "Modo de forma de onda: haz clic para cambiar a bandas de frecuencia",
-    seekbarModeBands: "Modo de bandas de frecuencia: haz clic para cambiar a forma de onda",
     bandsLegend:
       "Bandas de frecuencia: azul = graves, ámbar = medios (voces, cajas, solos), blanco = agudos (platillos, transitorios); las bandas más altas tienen más energía",
     songLabel: "Canción",
@@ -1589,7 +1587,7 @@ export const es = {
     composerLabel: "Compositor",
     restoreInterface: "Restaurar la interfaz completa",
     formatLabel: "Formato",
-    miniplayer: "Minirreproductor imagen en imagen",
+    miniplayer: "Minirreproductor",
     loudnessLabel: "Sonoridad",
     loudnessSourceAnalyzed: "Análisis R128",
     loudnessSourceReplayGain: "Etiqueta ReplayGain",
@@ -1685,10 +1683,14 @@ export const es = {
     playSongFailed: "No se pudo reproducir esta pista.",
     noSongPlaying: "No hay ninguna canción en reproducción",
     menuTooltip: "Menú de la canción",
+    menuSongInfo: "Información de la canción",
+    menuMiniplayer: "Minirreproductor",
+    menuSeekbarBands: "Barra de búsqueda: bandas de frecuencia",
+    menuSeekbarWaveform: "Barra de búsqueda: forma de onda",
   },
   miniplayer: {
     title: "Minirreproductor",
-    toggleTooltip: "Modo imagen en imagen (Ctrl+M)",
+    toggleTooltip: "Minirreproductor (Ctrl+M)",
     exit: "Restaurar la ventana completa (Ctrl+M)",
     dragHint: "Arrastrar ventana",
     showLyrics: "Mostrar letra en vivo",
@@ -2840,9 +2842,9 @@ export const es = {
           "Reproduce, pausa, salta, avanza o retrocede, y alterna el modo aleatorio o de repetición desde aquí.",
       },
       playerBarToolbar: {
-        title: "Menú de la canción, letras, cola, información y minirreproductor",
+        title: "Cola, volumen y más",
         description:
-          "Abre el menú de la canción, ve a Letras, consulta tu cola, muestra el panel de información o cambia al minirreproductor flotante; el volumen también está aquí.",
+          "Abre tu cola, ajusta el volumen o abre el menú para Letras, Información de la canción, el minirreproductor y más.",
       },
       rightPanel: {
         title: "Detalles de la pista",

@@ -783,7 +783,7 @@
             title={i18n.t("playlists.moreActionsTooltip", {}, "More actions")}
             class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs cursor-pointer"
           >
-            <MoreHorizontal class="w-4 h-4" />
+            <MoreHorizontal weight="bold" class="w-4 h-4" />
           </button>
         </div>
       </div>
