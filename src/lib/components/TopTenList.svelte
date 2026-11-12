@@ -223,7 +223,7 @@
        in any locale at this size; longer text is cut short and still readable in the tooltip. -->
   {#if alignedColumn}
     <span
-      class="block w-36 shrink-0 truncate text-xs leading-5 font-medium text-brand-text-secondary"
+      class="block w-36 shrink-0 truncate text-right text-xs leading-5 font-medium text-brand-text-secondary"
       title={label
         ? `${label} · ${i18n.plural("home.chartWeeksCount", item.weeks_on_chart ?? 1)}`
         : undefined}
