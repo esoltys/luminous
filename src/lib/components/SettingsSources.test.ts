@@ -375,4 +375,19 @@ describe("SettingsSources.svelte - folder suggestions toggle", () => {
     });
     vi.mocked(invoke).mockImplementation(base);
   });
+
+  it("resets ignored folders without touching the on/off state", async () => {
+    const base = mockHidden(false);
+    const { findByLabelText, findByRole } = render(SettingsSources);
+    await waitFor(async () => expect(await findByLabelText(LABEL)).toBeEnabled());
+
+    await fireEvent.click(await findByRole("button", { name: "Reset" }));
+
+    expect(invoke).toHaveBeenCalledWith("reset_library_folder_suggestion_dismissals");
+    expect(invoke).not.toHaveBeenCalledWith(
+      "set_library_folder_suggestions_hidden",
+      expect.anything(),
+    );
+    vi.mocked(invoke).mockImplementation(base);
+  });
 });

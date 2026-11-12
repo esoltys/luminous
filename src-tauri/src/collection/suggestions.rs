@@ -140,6 +140,15 @@ pub fn dismiss_folder(conn: &rusqlite::Connection, path: &str) -> Result<()> {
     Ok(())
 }
 
+/// Forget every ignored folder, so each is offered again.
+pub fn reset_dismissed(conn: &rusqlite::Connection) -> Result<()> {
+    conn.execute(
+        "DELETE FROM app_state WHERE key = ?1",
+        params![DISMISSED_KEY],
+    )?;
+    Ok(())
+}
+
 /// Whether the user has turned suggestions off (the Home card's "Hide
 /// suggestions" link, or the Settings toggle).
 pub fn is_hidden(conn: &rusqlite::Connection) -> Result<bool> {
@@ -309,6 +318,21 @@ mod tests {
         set_hidden(&conn, true).unwrap();
         assert!(is_hidden(&conn).unwrap());
         assert!(suggested_folders(&conn, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn reset_offers_ignored_folders_again() {
+        let f = fixture();
+        let conn = f.db.pool.get().unwrap();
+        let dir = f.root.join("music");
+        open_file(&conn, &dir, "a.mp3", None);
+        dismiss_folder(&conn, &dir.to_string_lossy()).unwrap();
+        assert!(suggested_folders(&conn, 10).unwrap().is_empty());
+
+        reset_dismissed(&conn).unwrap();
+        assert_eq!(suggested_folders(&conn, 10).unwrap().len(), 1);
+        // Idempotent when nothing is ignored.
+        reset_dismissed(&conn).unwrap();
     }
 
     #[test]

@@ -1054,6 +1054,8 @@ export const es = {
     suggestFoldersLabel: "Sugerir carpetas para agregar a la biblioteca",
     suggestFoldersHint:
       "Muestra en Inicio una tarjeta que propone agregar a tu biblioteca las carpetas de los archivos que has abierto.",
+    suggestFoldersReset: "Restablecer",
+    suggestFoldersResetDone: "Las carpetas ignoradas se volverán a sugerir.",
     autoOrganizeLabel: "Organizar automáticamente archivos nuevos y cambios de etiquetas",
     autoOrganizeHint:
       "Organiza los archivos en segundo plano con tu plantilla activa cuando llegan pistas nuevas o se editan etiquetas.",

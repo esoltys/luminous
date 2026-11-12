@@ -1066,6 +1066,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     suggestFoldersLabel: "Suggérer des dossiers à ajouter à la bibliothèque",
     suggestFoldersHint:
       "Affiche sur l'accueil une carte qui propose d'ajouter à votre bibliothèque les dossiers des fichiers que vous avez ouverts.",
+    suggestFoldersReset: "Réinitialiser",
+    suggestFoldersResetDone: "Les dossiers ignorés seront de nouveau suggérés.",
     autoOrganizeLabel: "Organisation automatique des nouveaux fichiers et balises",
     autoOrganizeHint:
       "Organisez automatiquement les fichiers en arrière-plan selon votre modèle actif lors de l'arrivée de nouvelles pistes ou de l'enregistrement d'balises.",

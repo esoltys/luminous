@@ -124,6 +124,20 @@ pub async fn dismiss_library_folder_suggestion(
     Ok(())
 }
 
+/// "Reset" in Settings: every folder ignored with "Ignore folder" is offered
+/// again. Does not change whether suggestions are on or off.
+#[tauri::command]
+pub async fn reset_library_folder_suggestion_dismissals(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    crate::db::run_blocking(&state.db, crate::collection::suggestions::reset_dismissed)
+        .await
+        .map_err(|e| e.to_string())?;
+    let _ = app.emit("library-folder-suggestions-changed", ());
+    Ok(())
+}
+
 /// Whether folder suggestions are turned off (Settings toggle's source of truth).
 #[tauri::command]
 pub async fn get_library_folder_suggestions_hidden(

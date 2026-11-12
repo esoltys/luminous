@@ -349,6 +349,12 @@
     );
   }
 
+  function handleResetIgnoredFolders() {
+    invoke("reset_library_folder_suggestion_dismissals")
+      .then(() => toastStore.show(i18n.t("settings.suggestFoldersResetDone"), "success"))
+      .catch((err) => console.error("Failed to reset ignored folders:", err));
+  }
+
   onMount(() => {
     loudnessStore.init();
     musicalAnalysisStore.init();
@@ -1095,12 +1101,17 @@
           {i18n.t("settings.suggestFoldersHint")}
         </p>
       </div>
-      <Toggle
-        checked={suggestFolders === true}
-        disabled={suggestFolders === null}
-        onchange={handleToggleSuggestFolders}
-        label={i18n.t("settings.suggestFoldersLabel")}
-      />
+      <div class="flex items-center gap-3 shrink-0">
+        <Button onclick={handleResetIgnoredFolders} size="sm">
+          {i18n.t("settings.suggestFoldersReset")}
+        </Button>
+        <Toggle
+          checked={suggestFolders === true}
+          disabled={suggestFolders === null}
+          onchange={handleToggleSuggestFolders}
+          label={i18n.t("settings.suggestFoldersLabel")}
+        />
+      </div>
     </div>
   </div>
 

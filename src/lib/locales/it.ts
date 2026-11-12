@@ -1055,6 +1055,8 @@ export const it = {
     suggestFoldersLabel: "Suggerisci cartelle da aggiungere alla libreria",
     suggestFoldersHint:
       "Mostra in Home una scheda che propone di aggiungere alla libreria le cartelle dei file che hai aperto.",
+    suggestFoldersReset: "Ripristina",
+    suggestFoldersResetDone: "Le cartelle ignorate verranno suggerite di nuovo.",
     autoOrganizeLabel: "Organizza automaticamente nuovi file e modifiche ai tag",
     autoOrganizeHint:
       "Organizza i file automaticamente in background con il modello attivo quando arrivano nuovi brani o vengono modificati i tag.",

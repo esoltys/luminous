@@ -1412,6 +1412,7 @@ pub fn run() {
             commands::collection::get_directories,
             commands::collection::get_suggested_library_folders,
             commands::collection::dismiss_library_folder_suggestion,
+            commands::collection::reset_library_folder_suggestion_dismissals,
             commands::collection::get_library_folder_suggestions_hidden,
             commands::collection::set_library_folder_suggestions_hidden,
             commands::collection::update_directory_metadata,

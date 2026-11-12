@@ -1057,6 +1057,8 @@ export const de = {
     suggestFoldersLabel: "Ordner zum Hinzufügen zur Mediathek vorschlagen",
     suggestFoldersHint:
       "Zeigt auf der Startseite eine Karte, die vorschlägt, die Ordner geöffneter Dateien zur Mediathek hinzuzufügen.",
+    suggestFoldersReset: "Zurücksetzen",
+    suggestFoldersResetDone: "Ignorierte Ordner werden wieder vorgeschlagen.",
     autoOrganizeLabel: "Neue Dateien und Tag-Änderungen automatisch organisieren",
     autoOrganizeHint:
       "Dateien im Hintergrund mit der aktiven Vorlage organisieren, wenn neue Titel hinzukommen oder Tags bearbeitet werden.",

@@ -1028,6 +1028,8 @@ export const en = {
     suggestFoldersLabel: "Suggest folders to add to the library",
     suggestFoldersHint:
       "Show a card on Home offering to add the folders of files you've opened to your library.",
+    suggestFoldersReset: "Reset",
+    suggestFoldersResetDone: "Ignored folders will be suggested again.",
     autoOrganizeLabel: "Auto-Organize New Files & Tag Updates",
     autoOrganizeHint:
       "Organize files automatically in the background using your active template when new tracks arrive or tags are edited.",
