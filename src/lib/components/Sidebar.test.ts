@@ -11,6 +11,8 @@ import { i18n } from "../stores/i18n.svelte";
 import { musicbrainzStore } from "../stores/musicbrainz.svelte";
 import { scrobblerStore } from "../stores/scrobbler.svelte";
 import { filesStore } from "../stores/files.svelte";
+import { prefs } from "../stores/prefs.svelte";
+import { updaterStore } from "../stores/updater.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
@@ -188,6 +190,63 @@ describe("Sidebar.svelte", () => {
 
       await fireEvent.click(connectBtn);
       expect(openSettingsSpy).toHaveBeenCalledWith("integrations");
+    });
+  });
+
+  // Settings and Help live in a fixed footer so pins and file sources can never scroll
+  // them out of view (#2040).
+  describe("fixed footer (#2040)", () => {
+    afterEach(() => {
+      prefs.onlineEnabled = true;
+      updaterStore.updateAvailable = false;
+    });
+
+    it.each([256, 64])(
+      "renders Settings and Help outside the scrolling nav at width %i",
+      (width) => {
+        const { container, getByTitle } = render(Sidebar, { props: { width } });
+        const nav = container.querySelector("nav")!;
+        expect(nav).toHaveClass("overflow-y-auto");
+        for (const title of ["Settings", "Help"]) {
+          const btn = getByTitle(title);
+          expect(nav.contains(btn)).toBe(false);
+          expect(container.querySelector('[data-testid="sidebar-footer"]')!.contains(btn)).toBe(
+            true,
+          );
+        }
+      },
+    );
+
+    it("keeps Stats in the scrolling nav", () => {
+      const { container, getByTitle } = render(Sidebar, { props: { width: 256 } });
+      expect(container.querySelector("nav")!.contains(getByTitle("Stats"))).toBe(true);
+    });
+
+    it("still shows Settings and Help while Offline, without the Connect row", () => {
+      prefs.onlineEnabled = false;
+      const { getByTitle, queryByTitle } = render(Sidebar, { props: { width: 256 } });
+      expect(getByTitle("Settings")).toBeInTheDocument();
+      expect(getByTitle("Help")).toBeInTheDocument();
+      expect(queryByTitle("Connect...")).toBeNull();
+    });
+
+    it("keeps the walkthrough target on Settings and switches tabs on click", async () => {
+      const { getByTitle } = render(Sidebar, { props: { width: 256 } });
+      const settings = getByTitle("Settings");
+      expect(settings).toHaveAttribute("data-walkthrough-target", "library-folders");
+
+      await fireEvent.click(settings);
+      expect(navigationStore.activeTab).toBe("settings");
+      await fireEvent.click(getByTitle("Help"));
+      expect(navigationStore.activeTab).toBe("help");
+    });
+
+    it.each([256, 64])("shows the update badge on Settings at width %i", (width) => {
+      updaterStore.updateAvailable = true;
+      const { getByTitle } = render(Sidebar, { props: { width } });
+      const settings = getByTitle(/^Settings \(/);
+      // The gear icon plus the arrow badge.
+      expect(settings.querySelectorAll("svg")).toHaveLength(2);
     });
   });
 });
