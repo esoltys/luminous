@@ -546,9 +546,12 @@
   </div>
 
   {#if !windowLayoutStore.isPlayerBarCompact}
+    <!-- Takes the room the two fixed thirds leave (md:flex-1), not a third of its own: three
+         thirds plus the footer gaps overshoot the padding, which pushed this right-aligned
+         cluster toward the dock edge instead of matching the cover's inset. -->
     <div
       data-walkthrough-target="player-bar-toolbar"
-      class="flex items-center justify-end flex-shrink-0 md:w-1/3 md:min-w-[200px] max-w-xs"
+      class="flex items-center justify-end flex-shrink-0 md:flex-1 md:min-w-[200px] max-w-xs"
     >
       <div class="h-7 flex items-center gap-3">
         {#if !windowLayoutStore.isDockSpectrumHidden}
