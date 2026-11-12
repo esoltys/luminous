@@ -16,9 +16,9 @@
 export const POINTER_DRAG_THRESHOLD_PX = 4;
 
 /** Descendants that handle their own pointer input; a press on one never starts a drag. */
-export const INTERACTIVE_SELECTOR = "button, a, input, select, textarea, [data-interactive]";
+const INTERACTIVE_SELECTOR = "button, a, input, select, textarea, [data-interactive]";
 
-export interface Point {
+interface Point {
   x: number;
   y: number;
 }
