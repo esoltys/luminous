@@ -2,6 +2,7 @@
   import type { AutoPlaylistItem, PinnedItem, PinnedItemType } from "../types";
   import { pinnedRefKeyFor } from "../types";
   import { pinnedStore } from "../stores/pinned.svelte";
+  import { startPointerDrag, type PointerDragHandle } from "../utils/pointerDrag";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -132,18 +133,13 @@
   // (AlbumCard/ArtistCard/etc.'s own root), so capture is deferred until a
   // drag is actually armed — capturing eagerly on every pointerdown, as
   // SongTable does, retargets the *click* event to this wrapper too and
-  // silently swallows every nested card's click.
-  const POINTER_DRAG_THRESHOLD_PX = 4;
+  // silently swallows every nested card's click. Hence `captureOn: "arm"` below.
 
   let draggedIndex = $state<number | null>(null);
   let dragOverIndex = $state<number | null>(null);
-  let pointerDragArmed = false;
   /** Cursor position for the drag ghost; set only once a drag is armed, so a click never shows it. */
   let ghostPos = $state<{ x: number; y: number } | null>(null);
-  let pointerDragStartX = 0;
-  let pointerDragStartY = 0;
-  let pointerDragPointerId: number | null = null;
-  let pointerDragEl: HTMLElement | null = null;
+  let cardDrag: PointerDragHandle | null = null;
 
   // Drag indices are positions in visibleItems; hidden (empty) pins keep
   // their place in the full order around the moved card.
@@ -158,62 +154,33 @@
     pinnedStore.reorder(order);
   }
 
-  // Eats the single click that follows a committed drag, so releasing the
-  // pointer over a different card doesn't also open that card.
-  function suppressOneClick(e: MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
-  function handleCardPointerDown(e: PointerEvent, index: number) {
-    if (e.button !== 0) return;
-    const target = e.target as HTMLElement;
-    if (target.closest("button, a, input, select, textarea, [data-interactive]")) return;
-    pointerDragArmed = false;
-    pointerDragStartX = e.clientX;
-    pointerDragStartY = e.clientY;
-    pointerDragPointerId = e.pointerId;
-    pointerDragEl = e.currentTarget as HTMLElement;
-    draggedIndex = index;
-    window.addEventListener("pointermove", handlePointerDragMove);
-    window.addEventListener("pointerup", handlePointerDragUp);
-  }
-
-  function handlePointerDragMove(e: PointerEvent) {
-    if (draggedIndex === null) return;
-    if (!pointerDragArmed) {
-      const dx = e.clientX - pointerDragStartX;
-      const dy = e.clientY - pointerDragStartY;
-      if (Math.hypot(dx, dy) < POINTER_DRAG_THRESHOLD_PX) return;
-      pointerDragArmed = true;
-      // Only once an actual drag is confirmed: pin subsequent pointer events
-      // to this element/JS loop so WebView2 can't hijack the in-progress
-      // gesture into a native OS drag (which — with dragDropEnabled on —
-      // would otherwise surface the "drop files to queue" overlay).
-      if (pointerDragEl && pointerDragPointerId !== null) {
-        pointerDragEl.setPointerCapture?.(pointerDragPointerId);
-      }
-    }
-    ghostPos = { x: e.clientX, y: e.clientY };
-    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-pinned-index]") as HTMLElement | null;
-    const idx = el?.dataset.pinnedIndex;
-    dragOverIndex = idx !== undefined ? Number(idx) : null;
-  }
-
-  function handlePointerDragUp() {
-    window.removeEventListener("pointermove", handlePointerDragMove);
-    window.removeEventListener("pointerup", handlePointerDragUp);
-    if (pointerDragArmed && dragOverIndex !== null) {
-      commitReorder(dragOverIndex);
-      window.addEventListener("click", suppressOneClick, { capture: true, once: true });
-    }
+  function resetDrag() {
     draggedIndex = null;
     dragOverIndex = null;
     ghostPos = null;
-    pointerDragArmed = false;
-    pointerDragPointerId = null;
-    pointerDragEl = null;
+    cardDrag = null;
   }
+
+  function handleCardPointerDown(e: PointerEvent, index: number) {
+    cardDrag = startPointerDrag(e, {
+      captureOn: "arm",
+      onMove: (pos) => {
+        ghostPos = pos;
+        const el = document.elementFromPoint(pos.x, pos.y)?.closest("[data-pinned-index]") as HTMLElement | null;
+        const idx = el?.dataset.pinnedIndex;
+        dragOverIndex = idx !== undefined ? Number(idx) : null;
+      },
+      onDrop: () => {
+        if (dragOverIndex !== null) commitReorder(dragOverIndex);
+        resetDrag();
+      },
+      onTap: resetDrag,
+      onCancel: resetDrag
+    });
+    if (cardDrag) draggedIndex = index;
+  }
+
+  $effect(() => () => cardDrag?.cancel());
 
   let contextMenuState = $state<{ x: number; y: number; item: PinnedItem } | null>(null);
 
