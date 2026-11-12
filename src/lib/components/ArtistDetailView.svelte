@@ -41,12 +41,12 @@
     DownloadSimpleIcon as RetrieveDetails,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
-    DotsThreeIcon as MoreHorizontal,
     ChartBarIcon as BarChart2,
     ShareNetworkIcon as Share,
     ImageIcon as RetrieveImage,
     RadioIcon as Radio,
   } from "phosphor-svelte";
+  import MoreIcon from "./MoreIcon.svelte";
   import { contextStore, entitySubject } from "../stores/context.svelte";
   import { startArtistRadio } from "../utils/playlist";
   import ShareModal from "./ShareModal.svelte";
@@ -833,7 +833,7 @@
             title={i18n.t("playlists.moreActionsTooltip", {}, "More actions")}
             class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs cursor-pointer"
           >
-            <MoreHorizontal weight="bold" class="w-4 h-4" />
+            <MoreIcon class="w-4 h-4" />
           </button>
         </div>
       </div>

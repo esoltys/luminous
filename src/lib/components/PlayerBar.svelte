@@ -58,10 +58,10 @@
     PlaylistIcon as ListMusic,
     MusicNotesIcon as Music,
     InfoIcon as Info,
-    DotsThreeIcon as MoreHorizontal,
     SubtitlesIcon as Lyrics,
     StackIcon as Layers,
   } from "phosphor-svelte";
+  import MoreIcon from "./MoreIcon.svelte";
 
   let volumePercent = $derived(playerStore.volume * 100);
   let volumeSliderStyle = $derived(
@@ -227,13 +227,19 @@
     windowLayoutStore.toggleImmersiveMode();
   }
 
-  // Playbar right cluster (#876, #2042): spectrum, Queue, volume and a "more" button whose
-  // song menu also carries Lyrics, Song info, Mini-player and the seek bar mode.
   // Locale-appropriate name of the Ctrl key ("Strg" in German), as the user guide writes it.
   const ctrlKey = $derived(i18n.t("playerBar.ctrlKey", {}, "Ctrl"));
 
+  // The song menu behind the "more" button (#876, #2042). Besides the song actions it carries
+  // Lyrics, Song info, Mini-player and the seek bar mode, which the dock no longer shows.
   let contextMenuState = $state<{ x: number; y: number } | null>(null);
   let editingSongId = $state<number | null>(null);
+
+  /** Runs a dock-specific menu item's action, then closes the menu. */
+  function chooseMenuItem(action: () => void) {
+    action();
+    contextMenuState = null;
+  }
 
   // The open menu closes itself on any outside mousedown, which runs before this
   // button's click; remember the state at press time so the click toggles it shut.
@@ -332,7 +338,7 @@
     aria-haspopup="menu"
     aria-expanded={contextMenuState !== null}
   >
-    <MoreHorizontal weight="bold" class={iconClass} />
+    <MoreIcon class={iconClass} />
   </button>
 {/snippet}
 
@@ -638,30 +644,24 @@
         <ContextMenuItem
           icon={Lyrics}
           label={i18n.t("sidebar.lyrics")}
-          onclick={() => {
-            windowLayoutStore.exitImmersiveMode();
-            navigationStore.activeTab = "lyrics";
-            contextMenuState = null;
-          }}
+          onclick={() =>
+            chooseMenuItem(() => {
+              windowLayoutStore.exitImmersiveMode();
+              navigationStore.activeTab = "lyrics";
+            })}
         />
         <ContextMenuItem
           icon={Info}
           label={i18n.t("playerBar.menuSongInfo", {}, "Song info")}
           shortcut={`${ctrlKey}+I`}
-          onclick={() => {
-            handleInfoClick();
-            contextMenuState = null;
-          }}
+          onclick={() => chooseMenuItem(handleInfoClick)}
         />
       {/if}
       <ContextMenuItem
         icon={PictureInPicture}
         label={i18n.t("playerBar.menuMiniplayer", {}, "Mini-player")}
         shortcut={`${ctrlKey}+M`}
-        onclick={() => {
-          windowLayoutStore.toggleMiniplayerMode();
-          contextMenuState = null;
-        }}
+        onclick={() => chooseMenuItem(() => windowLayoutStore.toggleMiniplayerMode())}
       />
       {#if !windowLayoutStore.isPlayerBarCompact}
         <ContextMenuItem
@@ -669,10 +669,7 @@
           label={prefs.seekBarMode === "waveform"
             ? i18n.t("playerBar.menuSeekbarBands", {}, "Seek bar: frequency bands")
             : i18n.t("playerBar.menuSeekbarWaveform", {}, "Seek bar: waveform")}
-          onclick={() => {
-            prefs.toggleSeekBarMode();
-            contextMenuState = null;
-          }}
+          onclick={() => chooseMenuItem(() => prefs.toggleSeekBarMode())}
         />
       {/if}
     {/snippet}

@@ -14,7 +14,7 @@
     title?: string;
     /** The item is what Enter or double-click on the row does: bold, with an Enter hint. */
     isDefault?: boolean;
-    /** Keyboard shortcut shown at the row's right edge, e.g. "Ctrl+M". Display only. */
+    /** Keyboard shortcut shown at the row's right edge, e.g. "Ctrl+M". Display only; an `isDefault` row shows its Enter hint instead. */
     shortcut?: string;
   }
 

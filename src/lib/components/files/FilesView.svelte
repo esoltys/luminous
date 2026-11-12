@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { PlayIcon, DotsThreeIcon, PlusIcon, CaretRightIcon } from "phosphor-svelte";
+  import { PlayIcon, PlusIcon, CaretRightIcon } from "phosphor-svelte";
+  import MoreIcon from "../MoreIcon.svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { filesStore, sourceKey } from "../../stores/files.svelte";
   import { sourceIcon } from "./sourceIcon";
@@ -275,7 +276,7 @@
             title={i18n.t("files.folderActions")}
             aria-label={i18n.t("files.folderActions")}
           >
-            <DotsThreeIcon weight="bold" class="w-5 h-5" />
+            <MoreIcon class="w-5 h-5" />
           </button>
         </div>
       </header>

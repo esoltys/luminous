@@ -10,13 +10,13 @@
     PulseIcon as Activity,
     ArrowsLeftRightIcon as ArrowLeftRight,
     ArrowSquareOutIcon as ExternalLink,
-    DotsThreeIcon as MoreHorizontal,
     FloppyDiskIcon as Save,
     FolderOpenIcon as FileImport,
     ExportIcon as FileExport,
     PencilSimpleIcon as Pencil,
     TrashIcon as Trash2,
   } from "phosphor-svelte";
+  import MoreIcon from "./MoreIcon.svelte";
   import Toggle from "./Toggle.svelte";
   import InlineMessage from "./InlineMessage.svelte";
   import Select from "./Select.svelte";
@@ -700,7 +700,7 @@
               aria-expanded={presetMenuPos !== null}
               class="flex items-center justify-center w-6 h-6 -mr-2 rounded-full text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shrink-0 cursor-pointer"
             >
-              <MoreHorizontal weight="bold" class="w-4 h-4" />
+              <MoreIcon class="w-4 h-4" />
             </button>
           {/if}
         </div>
