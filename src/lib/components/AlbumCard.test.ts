@@ -63,16 +63,19 @@ describe("AlbumCard.svelte", () => {
       if (cmd === "set_album_rating") throw new Error("db locked");
       return defaultInvoke(cmd, args);
     });
-    // Explicit baseline: earlier tests mutate the shared `mockAlbum.rating`.
-    const album = { ...mockAlbum, rating: -1 };
-    const { getByLabelText } = render(AlbumCard, { props: { album } });
+    try {
+      // Explicit baseline: earlier tests mutate the shared `mockAlbum.rating`.
+      const album = { ...mockAlbum, rating: -1 };
+      const { getByLabelText } = render(AlbumCard, { props: { album } });
 
-    await fireEvent.click(getByLabelText("Rate 4 of 5"));
+      await fireEvent.click(getByLabelText("Rate 4 of 5"));
 
-    await vi.waitFor(() => expect(error).toHaveBeenCalled());
-    expect(album.rating).toBe(-1);
-    error.mockRestore();
-    vi.mocked(invoke).mockImplementation(defaultInvoke);
+      await vi.waitFor(() => expect(error).toHaveBeenCalled());
+      expect(album.rating).toBe(-1);
+    } finally {
+      error.mockRestore();
+      vi.mocked(invoke).mockImplementation(defaultInvoke);
+    }
   });
 
   it("navigates to album when album title is clicked", async () => {

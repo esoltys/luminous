@@ -58,7 +58,7 @@
     /**
      * The album's current rating (-1 = unrated). Omit to leave the rating row out, e.g. when
      * `albumName` is a placeholder rather than the real album name. The rating is written with
-     * `set_album_rating`; every view showing the album follows the backend's `album-stats-changed`
+     * `rateAlbum` (utils/stats); every view showing the album follows the backend's `album-stats-changed`
      * event, so hosts need no callback.
      */
     rating?: number;
