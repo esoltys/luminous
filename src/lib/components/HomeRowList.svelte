@@ -161,7 +161,7 @@
     </h2>
   {/if}
 
-  <div class="flex-1 flex flex-col gap-2">
+  <div class="flex-1 flex flex-col {appearance === 'plain' ? '' : 'gap-2'}">
     {#each items as item, i (keyFor(item))}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
