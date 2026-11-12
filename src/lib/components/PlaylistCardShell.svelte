@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { PLAIN_TILE_COVER, useCardAppearance } from "../utils/cardAppearance";
 
   let {
     widthClass = "w-full",
@@ -25,6 +26,13 @@
     cover: Snippet;
     footer?: Snippet;
   } = $props();
+
+  const plain = useCardAppearance() === "plain";
+
+  // Plain tiles fold the kind and the song count onto one line ("Moment mix, 299 songs").
+  const plainDetail = $derived(
+    [subtitleLabel, i18n.plural("playlists.songsCount", trackCount)].filter(Boolean).join(", "),
+  );
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -34,10 +42,14 @@
   oncontextmenu={(e) => {
     (oncontextmenu || onContextMenu)?.(e);
   }}
-  class="{widthClass} h-full bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 group relative"
+  class="{widthClass} h-full flex flex-col text-left group relative {plain
+    ? ''
+    : 'bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200'}"
 >
   <div
-    class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden"
+    class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden {plain
+      ? PLAIN_TILE_COVER
+      : ''}"
   >
     {@render cover()}
   </div>
@@ -52,17 +64,23 @@
   >
     {title}
   </button>
-  {#if subtitleLabel}
+  {#if plain}
     <div class="text-xs text-brand-text-secondary truncate w-full mt-0.5 font-medium">
-      {subtitleLabel}
+      {plainDetail}
+    </div>
+  {:else}
+    {#if subtitleLabel}
+      <div class="text-xs text-brand-text-secondary truncate w-full mt-0.5 font-medium">
+        {subtitleLabel}
+      </div>
+    {/if}
+    <div
+      class="flex items-center justify-between mt-1.5 text-xs leading-[22px] text-brand-text-secondary"
+    >
+      <span class="truncate">{updatedLabel}</span>
+      <span class="shrink-0">{i18n.plural("playlists.songsCount", trackCount)}</span>
     </div>
   {/if}
-  <div
-    class="flex items-center justify-between mt-1.5 text-xs leading-[22px] text-brand-text-secondary"
-  >
-    <span class="truncate">{updatedLabel}</span>
-    <span class="shrink-0">{i18n.plural("playlists.songsCount", trackCount)}</span>
-  </div>
 
   {#if footer}
     {@render footer()}

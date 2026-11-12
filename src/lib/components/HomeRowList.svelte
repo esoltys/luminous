@@ -15,6 +15,9 @@
   import { i18n } from "../stores/i18n.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import { CaretRightIcon as ChevronRight } from "phosphor-svelte";
+  import { rowClasses, rowListGap, useCardAppearance } from "../utils/cardAppearance";
+
+  const appearance = useCardAppearance();
 
   interface Props {
     title?: string;
@@ -158,7 +161,7 @@
     </h2>
   {/if}
 
-  <div class="flex-1 flex flex-col gap-2">
+  <div class="flex-1 flex flex-col {rowListGap(appearance)}">
     {#each items as item, i (keyFor(item))}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -173,7 +176,7 @@
             openItem(item);
           }
         }}
-        class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
+        class={rowClasses(appearance)}
       >
         {#if variant === "rank"}
           <div class="w-14 shrink-0 flex flex-col items-center gap-0.5">

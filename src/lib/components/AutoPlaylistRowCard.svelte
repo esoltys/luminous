@@ -7,6 +7,9 @@
   import { getPlaylistDisplayName } from "../utils/playlist";
   import { getLanguageDisplayName } from "../utils/language";
   import { formatBpmRange, toTitleCase } from "../utils/formatters";
+  import { rowClasses, useCardAppearance } from "../utils/cardAppearance";
+
+  const appearance = useCardAppearance();
 
   interface Props {
     label: string;
@@ -104,11 +107,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<div
-  onclick={onClick}
-  {oncontextmenu}
-  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
->
+<div onclick={onClick} {oncontextmenu} class={rowClasses(appearance)}>
   <div
     class="relative shrink-0 w-11 h-11 flex items-center justify-center overflow-hidden border {getPlaylistCardTheme(
       kind,

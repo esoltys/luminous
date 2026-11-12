@@ -9,7 +9,6 @@
   import { listen } from "@tauri-apps/api/event";
   import type { AlbumStatsPayload, SongStatsPayload } from "../utils/stats";
   import CoverArt from "./CoverArt.svelte";
-  import HelpTip from "./HelpTip.svelte";
   import SongRating from "./SongRating.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
@@ -17,18 +16,16 @@
   import ArtistRowCard from "./ArtistRowCard.svelte";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
-  import {
-    CaretRightIcon as ChevronRight,
-    TrendUpIcon,
-    TrendDownIcon,
-    AsteriskIcon,
-    ArrowCounterClockwiseIcon,
-    MinusIcon,
-    ShareNetworkIcon as Share,
-  } from "phosphor-svelte";
+  import { CaretRightIcon as ChevronRight, ShareNetworkIcon as Share } from "phosphor-svelte";
+  import { rowListGap, useCardAppearance } from "../utils/cardAppearance";
+
+  const appearance = useCardAppearance();
+  const plain = appearance === "plain";
 
   interface Props {
     title?: string;
+    /** Quieter text after the title (e.g. the week's date range on Home). */
+    titleSuffix?: string;
     items: StatsTopItem[];
     kind: "album" | "song" | "artist" | "genre";
     emptyText?: string;
@@ -48,6 +45,7 @@
 
   let {
     title,
+    titleSuffix,
     items,
     kind,
     emptyText,
@@ -57,6 +55,11 @@
     onHeaderClick,
     onShareClick,
   }: Props = $props();
+
+  // Plain album rows carry the rank and the movement word inside the row, so the one
+  // hairline under each row spans the whole line, rank included. Every other layout keeps
+  // the rank beside the row.
+  const rankInsideRow = $derived(plain && kind === "album");
 
   // Relative scaling for proportional accent bars (#1475)
   const barPercents = $derived(statsBarPercents(items));
@@ -177,55 +180,58 @@
     };
   });
 
-  /** Tooltip for the weekly chart movement icon (#662): trend and weeks on chart
-   * (peak rank is shown directly under the rank number, so it's left out here). */
-  function movementTooltip(item: StatsTopItem): string {
-    const movementLabels: Record<NonNullable<StatsTopItem["movement"]>, string> = {
-      new: i18n.t("home.chartNew", {}, "New"),
-      reentry: i18n.t("home.chartReentry", {}, "Re-entry"),
-      rising: i18n.t("home.chartRising", {}, "Rising"),
-      falling: i18n.t("home.chartFalling", {}, "Falling"),
-      steady: i18n.t("home.chartSteady", {}, "Steady"),
-    };
-    const weeks = item.weeks_on_chart ?? 1;
-    const weeksLabel = i18n.plural("home.chartWeeksCount", weeks);
-    return `${movementLabels[item.movement ?? "steady"]} · ${weeksLabel}`;
+  /** How an album moved on the weekly chart (#662), in words so no meaning rests on a
+   * tooltip or an icon. Steady albums (and lists with no chart data) say nothing. */
+  function movementLabel(item: StatsTopItem, rank: number): string | null {
+    switch (item.movement) {
+      case "new":
+        return i18n.t("home.chartNewThisWeek", {}, "New this week");
+      case "reentry":
+        return i18n.t("home.chartReentry", {}, "Re-entry");
+      case "rising":
+      case "falling": {
+        const rising = item.movement === "rising";
+        const places = item.previous_rank == null ? 0 : Math.abs(item.previous_rank - rank);
+        if (places === 0) {
+          return rising
+            ? i18n.t("home.chartRising", {}, "Rising")
+            : i18n.t("home.chartFalling", {}, "Falling");
+        }
+        return rising
+          ? i18n.t("home.chartUp", { count: places }, `Up ${places}`)
+          : i18n.t("home.chartDown", { count: places }, `Down ${places}`);
+      }
+      default:
+        return null;
+    }
   }
 </script>
 
-{#snippet rankSnippet(item: StatsTopItem, rank: number)}
-  <div class="w-8 shrink-0 flex flex-col items-center">
-    <span class="text-center text-sm font-bold text-brand-text-secondary tabular-nums">
-      {String(rank).padStart(2, "0")}
-    </span>
-    {#if item.movement}
-      <span class="text-center text-[10px] font-normal text-brand-text-secondary/60 tabular-nums">
-        {item.movement === "new"
-          ? "—"
-          : i18n.t(
-              "home.chartPeak",
-              { peak: item.peak_rank ?? rank },
-              `Peak #${item.peak_rank ?? rank}`,
-            )}
-      </span>
-    {/if}
-  </div>
+{#snippet rankSnippet(rank: number)}
+  <span
+    class="block shrink-0 text-center font-bold text-brand-text-secondary tabular-nums {plain
+      ? 'w-10 text-lg'
+      : 'w-8 text-sm'}"
+  >
+    {plain ? rank : String(rank).padStart(2, "0")}
+  </span>
 {/snippet}
 
-{#snippet movementSnippet(item: StatsTopItem)}
-  <HelpTip text={movementTooltip(item)} class="w-5 shrink-0">
-    {#if item.movement === "rising"}
-      <TrendUpIcon class="w-4 h-4 text-brand-text-primary" weight="bold" />
-    {:else if item.movement === "falling"}
-      <TrendDownIcon class="w-4 h-4 text-brand-text-primary" weight="bold" />
-    {:else if item.movement === "new"}
-      <AsteriskIcon class="w-4 h-4 text-brand-accent-text" weight="bold" />
-    {:else if item.movement === "reentry"}
-      <ArrowCounterClockwiseIcon class="w-4 h-4 text-brand-accent-text" weight="bold" />
-    {:else}
-      <MinusIcon class="w-4 h-4 text-brand-text-secondary" />
-    {/if}
-  </HelpTip>
+{#snippet movementSnippet(item: StatsTopItem, rank: number, alignedColumn: boolean = false)}
+  {@const label = movementLabel(item, rank)}
+  <!-- alignedColumn reserves one fixed width for every row, empty for steady albums, so the
+       years beside it line up whatever the message says. The width fits the longest message
+       in any locale at this size; anything longer is cut short with an ellipsis. -->
+  {#if label || alignedColumn}
+    <span
+      class="shrink-0 text-xs leading-5 font-medium text-brand-text-secondary {alignedColumn
+        ? 'block w-36 truncate text-right'
+        : 'whitespace-nowrap'}"
+      title={label ? i18n.plural("home.chartWeeksCount", item.weeks_on_chart ?? 1) : undefined}
+    >
+      {label ?? ""}
+    </span>
+  {/if}
 {/snippet}
 
 {#snippet durationSnippet(item: StatsTopItem)}
@@ -255,10 +261,18 @@
           class="group flex items-center gap-1 text-xl font-semibold text-brand-text-primary hover:text-brand-accent-text transition-colors"
         >
           {title}
+          {#if titleSuffix}
+            <span class="text-sm font-normal text-brand-text-secondary ml-1">{titleSuffix}</span>
+          {/if}
           <ChevronRight class="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
       {:else}
-        <h2 class="text-xl font-semibold text-brand-text-primary">{title}</h2>
+        <h2 class="text-xl font-semibold text-brand-text-primary">
+          {title}
+          {#if titleSuffix}
+            <span class="text-sm font-normal text-brand-text-secondary ml-1">{titleSuffix}</span>
+          {/if}
+        </h2>
       {/if}
       {#if onShareClick}
         <button
@@ -273,14 +287,13 @@
     </div>
   {/if}
 
-  <div class="flex-1 flex flex-col gap-2">
+  <div class="flex-1 flex flex-col {rowListGap(appearance)}">
     {#each items as item, i (item.key)}
       {@const itemPercent = getItemPercent(item)}
       <div class="flex items-center gap-3">
-        {#if item.movement}
-          {@render movementSnippet(item)}
+        {#if !rankInsideRow}
+          {@render rankSnippet(i + 1)}
         {/if}
-        {@render rankSnippet(item, i + 1)}
 
         <div class="min-w-0 flex-1">
           {#if kind === "album"}
@@ -297,8 +310,18 @@
               disc_count: 0,
               total_duration_nanosec: 0,
             }}
+            {#snippet rankPrefix()}
+              {@render rankSnippet(i + 1)}
+            {/snippet}
+            <!-- Rendered on the row's year line, so the word shares the year's baseline whatever
+                 height the row's rating slot gives the text column. -->
+            {#snippet movementNote()}
+              {@render movementSnippet(item, i + 1, true)}
+            {/snippet}
             <AlbumRowCard
               album={albumItem}
+              prefix={rankInsideRow ? rankPrefix : undefined}
+              yearNote={rankInsideRow ? movementNote : undefined}
               progressPercent={showAccentBars ? itemPercent : undefined}
               onclick={() => openItem(item)}
               onRate={(r) => {
@@ -425,6 +448,10 @@
             </div>
           {/if}
         </div>
+
+        {#if !rankInsideRow}
+          {@render movementSnippet(item, i + 1)}
+        {/if}
 
         {#if showDuration}
           {@render durationSnippet(item)}

@@ -5,6 +5,9 @@
   import CoverStack from "./CoverStack.svelte";
   import GenreChips from "./GenreChips.svelte";
   import { getArtistCoverStack, resolveArtistPortraitUrl } from "../utils/covers";
+  import { PLAIN_TILE_COVER, useCardAppearance } from "../utils/cardAppearance";
+
+  const plain = useCardAppearance() === "plain";
 
   interface Props {
     artist: ArtistItem;
@@ -68,10 +71,14 @@
       customClick?.(e as unknown as MouseEvent);
     }
   }}
-  class="artist-card group h-full bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-start text-left outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
+  class="artist-card group h-full flex flex-col items-start text-left select-none {plain
+    ? 'focus-visible:outline-none'
+    : 'bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200'}"
 >
   <div
-    class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden"
+    class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden {plain
+      ? PLAIN_TILE_COVER
+      : ''}"
   >
     {#if artistPortraitUrl}
       <div
@@ -104,15 +111,17 @@
   <span class="text-xs text-brand-text-secondary font-medium truncate w-full mt-0.5 text-left">
     {i18n.plural("playlists.songsCount", artist.song_count)}
   </span>
-  <div class="w-full mt-1.5 flex justify-start">
-    {#if hasGenre}
-      <GenreChips genre={artist.genre} />
-    {:else}
-      <span class="text-xs text-brand-text-secondary font-medium truncate text-left">
-        {i18n.t("artistDetail.unknownGenre")}
-      </span>
-    {/if}
-  </div>
+  {#if !plain}
+    <div class="w-full mt-1.5 flex justify-start">
+      {#if hasGenre}
+        <GenreChips genre={artist.genre} />
+      {:else}
+        <span class="text-xs text-brand-text-secondary font-medium truncate text-left">
+          {i18n.t("artistDetail.unknownGenre")}
+        </span>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>

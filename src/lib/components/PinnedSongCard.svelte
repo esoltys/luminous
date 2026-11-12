@@ -2,6 +2,9 @@
   import type { Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import { PLAIN_TILE_COVER, useCardAppearance } from "../utils/cardAppearance";
+
+  const plain = useCardAppearance() === "plain";
 
   interface Props {
     song: Song;
@@ -18,10 +21,14 @@
 <div
   {onclick}
   oncontextmenu={(e) => oncontextmenu?.(e)}
-  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-b-xl overflow-hidden flex flex-col group relative select-none cursor-pointer"
+  class="{widthClass} flex flex-col group relative select-none cursor-pointer {plain
+    ? ''
+    : 'bg-brand-sidebar border border-brand-border/60 rounded-b-xl overflow-hidden'}"
 >
   <div
-    class="aspect-square bg-brand-main flex items-center justify-center text-brand-accent-text relative overflow-hidden w-full"
+    class="aspect-square bg-brand-main flex items-center justify-center text-brand-accent-text relative overflow-hidden w-full {plain
+      ? PLAIN_TILE_COVER
+      : ''}"
   >
     <CoverArt
       songId={song.id}
@@ -31,7 +38,7 @@
       sizeClass="w-full h-full"
     />
   </div>
-  <div class="p-3.5 flex flex-col flex-1">
+  <div class="flex flex-col flex-1 {plain ? 'pt-3' : 'p-3.5'}">
     <p
       class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-colors duration-150 truncate w-full"
     >
@@ -41,7 +48,9 @@
       {song.artist || i18n.t("collection.unknownArtist")}
     </p>
   </div>
-  <div
-    class="absolute inset-0 rounded-b-xl ring-2 ring-inset ring-transparent group-hover:ring-brand-accent transition-[box-shadow] duration-200 pointer-events-none"
-  ></div>
+  {#if !plain}
+    <div
+      class="absolute inset-0 rounded-b-xl ring-2 ring-inset ring-transparent group-hover:ring-brand-accent transition-[box-shadow] duration-200 pointer-events-none"
+    ></div>
+  {/if}
 </div>

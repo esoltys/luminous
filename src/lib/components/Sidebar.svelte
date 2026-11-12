@@ -166,7 +166,7 @@
       {/if}
     {:else}
       <div class="w-7 h-7 flex items-center justify-center shrink-0">
-        <Icon class="w-4 h-4 icon-align" />
+        <Icon class="w-4 h-4" />
       </div>
       <span class="truncate whitespace-nowrap flex-1 text-left">{label}</span>
       {#if opts.updateBadge}
@@ -251,7 +251,7 @@
               )}
             >
               <div class="flex items-center gap-2 truncate">
-                <Mic2 class="w-3.5 h-3.5 icon-align" />
+                <Mic2 class="w-3.5 h-3.5" />
                 <span class="truncate">{i18n.t("sidebar.artists")}</span>
               </div>
             </button>
@@ -271,7 +271,7 @@
               )}
             >
               <div class="flex items-center gap-2 truncate">
-                <DiscAlbum class="w-3.5 h-3.5 icon-align" />
+                <DiscAlbum class="w-3.5 h-3.5" />
                 <span class="truncate">{i18n.t("sidebar.albums")}</span>
               </div>
             </button>
@@ -291,7 +291,7 @@
               )}
             >
               <div class="flex items-center gap-2 truncate">
-                <Music class="w-3.5 h-3.5 icon-align" />
+                <Music class="w-3.5 h-3.5" />
                 <span class="truncate">{i18n.t("sidebar.songs")}</span>
               </div>
             </button>
@@ -311,7 +311,7 @@
               )}
             >
               <div class="flex items-center gap-2 truncate">
-                <Tag class="w-3.5 h-3.5 icon-align" />
+                <Tag class="w-3.5 h-3.5" />
                 <span class="truncate">{i18n.t("sidebar.genres")}</span>
               </div>
             </button>
@@ -351,7 +351,7 @@
               )}
             >
               <div class="flex items-center gap-2 truncate">
-                <Sparkles class="w-3.5 h-3.5 icon-align" />
+                <Sparkles class="w-3.5 h-3.5" />
                 <span class="truncate">{i18n.t("sidebar.playlistsAuto")}</span>
               </div>
             </button>
@@ -372,7 +372,7 @@
                 : ''}"
             >
               <div class="flex items-center gap-2 truncate">
-                <ListMusic class="w-3.5 h-3.5 icon-align" />
+                <ListMusic class="w-3.5 h-3.5" />
                 <span class="truncate">{i18n.t("sidebar.playlistsCustom")}</span>
               </div>
             </button>
@@ -478,7 +478,7 @@
           title={i18n.t("sidebar.connectIntegrations", {}, "Connect...")}
         >
           <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
-            <LightningSlash class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4 icon-align'} shrink-0" />
+            <LightningSlash class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0" />
           </div>
           {#if !layoutCollapsed}
             <span class="text-left leading-tight min-w-0"
@@ -510,14 +510,6 @@
      this value together with those paddings. */
   aside {
     --sidebar-icon-axis: 26px;
-  }
-
-  /* Icons sit in a flex row centered against label text, but text's visible
-     glyphs sit lower than its line box center (line-height leading above/below
-     cap height isn't symmetric), so a geometrically-centered icon reads as too
-     high. Nudge down by half the leading to match the text's optical center. */
-  :global(.icon-align) {
-    margin-top: calc((1lh - 1em) / 2);
   }
 
   /* Nothing ever renders behind this panel but the flat bg-main canvas,

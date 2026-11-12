@@ -2,6 +2,9 @@
   import type { Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import { rowClasses, useCardAppearance } from "../utils/cardAppearance";
+
+  const appearance = useCardAppearance();
 
   interface Props {
     song: Song;
@@ -24,7 +27,7 @@
       onclick?.(e as unknown as MouseEvent);
     }
   }}
-  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full relative overflow-hidden"
+  class="{rowClasses(appearance)} cursor-pointer w-full relative overflow-hidden"
 >
   <div class="shrink-0 overflow-hidden">
     <CoverArt
