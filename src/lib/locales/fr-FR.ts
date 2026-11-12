@@ -447,7 +447,18 @@ export const frFR: DeepStringRecord<typeof en> = {
     recentlyAdded: "Ajoutés récemment",
     pinned: "Épinglé",
     exploreLibrary: "Explorez votre bibliothèque",
-    emptyState: "Commencez à ajouter de la musique pour voir vos collections personnalisées"
+    emptyState: "Commencez à ajouter de la musique pour voir vos collections personnalisées",
+    suggestTitle: "Ajoutez les dossiers que vous écoutez",
+    suggestHint: "Ajoutez un dossier pour le parcourir par artiste, album ou genre. L'historique d'écoute et les notes de chaque morceau sont conservés.",
+    suggestSongs: {
+      one: "{count} morceau écouté",
+      other: "{count} morceaux écoutés"
+    },
+    suggestAdd: "Ajouter à la bibliothèque",
+    suggestAddNamed: "Ajouter {folder} à votre bibliothèque",
+    suggestNotNow: "Pas maintenant",
+    suggestNotNowNamed: "Pas maintenant pour {folder}",
+    suggestHide: "Masquer les suggestions"
   },
   emptyLibrary: {
     playHeading: "Écouter de la musique",

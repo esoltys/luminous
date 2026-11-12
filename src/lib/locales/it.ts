@@ -441,7 +441,18 @@ export const it = {
     recentlyAdded: "Aggiunti di recente",
     pinned: "Fissati",
     exploreLibrary: "Esplora la tua libreria",
-    emptyState: "Aggiungi della musica per vedere le tue raccolte personalizzate"
+    emptyState: "Aggiungi della musica per vedere le tue raccolte personalizzate",
+    suggestTitle: "Aggiungi le cartelle da cui riproduci",
+    suggestHint: "Aggiungi una cartella per sfogliarla per artista, album o genere. Cronologia di ascolto e valutazioni restano con ogni brano.",
+    suggestSongs: {
+      one: "{count} brano riprodotto",
+      other: "{count} brani riprodotti"
+    },
+    suggestAdd: "Aggiungi alla libreria",
+    suggestAddNamed: "Aggiungi {folder} alla tua libreria",
+    suggestNotNow: "Non ora",
+    suggestNotNowNamed: "Non ora per {folder}",
+    suggestHide: "Nascondi i suggerimenti"
   },
   emptyLibrary: {
     playHeading: "Ascolta musica",

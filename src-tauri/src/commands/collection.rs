@@ -92,6 +92,51 @@ pub async fn relocate_directory(
     Ok(result)
 }
 
+/// Folders of files the user opened from outside the library that could be
+/// added to it (#1871). Everything — unplugged drives, watched and dismissed
+/// folders — is filtered here, so the UI shows exactly what comes back.
+#[tauri::command]
+pub async fn get_suggested_library_folders(
+    limit: usize,
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::collection::suggestions::SuggestedFolder>, String> {
+    crate::db::run_blocking(&state.db, move |conn| {
+        crate::collection::suggestions::suggested_folders(conn, limit)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// "Not now" on one suggested folder. Emits `library-folder-suggestions-changed`
+/// so every open surface refetches instead of assuming the write landed.
+#[tauri::command]
+pub async fn dismiss_library_folder_suggestion(
+    app: AppHandle,
+    path: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    crate::db::run_blocking(&state.db, move |conn| {
+        crate::collection::suggestions::dismiss_folder(conn, &path)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    let _ = app.emit("library-folder-suggestions-changed", ());
+    Ok(())
+}
+
+/// "Hide suggestions": no folder is offered again.
+#[tauri::command]
+pub async fn hide_library_folder_suggestions(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    crate::db::run_blocking(&state.db, crate::collection::suggestions::hide_all)
+        .await
+        .map_err(|e| e.to_string())?;
+    let _ = app.emit("library-folder-suggestions-changed", ());
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn get_directories(state: State<'_, AppState>) -> Result<Vec<MusicDirectory>, String> {
     crate::collection::with_collection_scanner(state.db.clone(), |scanner| {

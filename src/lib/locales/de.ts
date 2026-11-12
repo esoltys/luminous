@@ -441,7 +441,18 @@ export const de = {
     recentlyAdded: "Zuletzt hinzugefügt",
     pinned: "Angeheftet",
     exploreLibrary: "Mediathek entdecken",
-    emptyState: "Füge Musik hinzu, um deine persönlichen Sammlungen zu sehen"
+    emptyState: "Füge Musik hinzu, um deine persönlichen Sammlungen zu sehen",
+    suggestTitle: "Füge die Ordner hinzu, aus denen du abspielst",
+    suggestHint: "Füge einen Ordner hinzu, um ihn nach Interpret, Album oder Genre zu durchsuchen. Wiedergabeverlauf und Bewertungen bleiben bei jedem Titel erhalten.",
+    suggestSongs: {
+      one: "{count} Titel abgespielt",
+      other: "{count} Titel abgespielt"
+    },
+    suggestAdd: "Zur Mediathek hinzufügen",
+    suggestAddNamed: "{folder} zu deiner Mediathek hinzufügen",
+    suggestNotNow: "Nicht jetzt",
+    suggestNotNowNamed: "Nicht jetzt für {folder}",
+    suggestHide: "Vorschläge ausblenden"
   },
   emptyLibrary: {
     playHeading: "Musik abspielen",

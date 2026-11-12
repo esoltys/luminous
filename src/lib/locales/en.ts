@@ -441,7 +441,18 @@ export const en = {
     recentlyAdded: "Recently Added",
     pinned: "Pinned",
     exploreLibrary: "Explore Your Library",
-    emptyState: "Start adding music to see your personalized collections"
+    emptyState: "Start adding music to see your personalized collections",
+    suggestTitle: "Add the folders you play from",
+    suggestHint: "Add a folder to browse it by artist, album, or genre. Your play history and ratings stay with each song.",
+    suggestSongs: {
+      one: "{count} song played",
+      other: "{count} songs played"
+    },
+    suggestAdd: "Add to Library",
+    suggestAddNamed: "Add {folder} to your library",
+    suggestNotNow: "Not now",
+    suggestNotNowNamed: "Not now for {folder}",
+    suggestHide: "Hide suggestions"
   },
   emptyLibrary: {
     playHeading: "Play music",

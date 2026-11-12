@@ -11,6 +11,7 @@
   import TopTenList from "./TopTenList.svelte";
   import PinnedRow from "./PinnedRow.svelte";
   import LibraryWelcome from "./LibraryWelcome.svelte";
+  import LibraryFolderSuggestions from "./LibraryFolderSuggestions.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { getDaypartBucket } from "../utils/daypart";
@@ -150,6 +151,7 @@
     </div>
 
     <div class="px-6 pt-4 space-y-12">
+    <LibraryFolderSuggestions />
     {#if isLoading}
       <div class="flex items-center justify-center h-64">
         <div class="text-brand-text-secondary">{i18n.t('home.loading')}</div>

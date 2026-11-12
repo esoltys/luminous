@@ -441,7 +441,18 @@ export const es = {
     recentlyAdded: "Agregadas recientemente",
     pinned: "Anclados",
     exploreLibrary: "Explora tu biblioteca",
-    emptyState: "Agrega música para ver tus colecciones personalizadas"
+    emptyState: "Agrega música para ver tus colecciones personalizadas",
+    suggestTitle: "Agrega las carpetas que reproduces",
+    suggestHint: "Agrega una carpeta para explorarla por artista, álbum o género. El historial de reproducción y las valoraciones se conservan en cada canción.",
+    suggestSongs: {
+      one: "{count} canción reproducida",
+      other: "{count} canciones reproducidas"
+    },
+    suggestAdd: "Agregar a la biblioteca",
+    suggestAddNamed: "Agregar {folder} a tu biblioteca",
+    suggestNotNow: "Ahora no",
+    suggestNotNowNamed: "Ahora no para {folder}",
+    suggestHide: "Ocultar sugerencias"
   },
   emptyLibrary: {
     playHeading: "Reproduce música",

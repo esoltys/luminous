@@ -736,6 +736,14 @@ export interface MusicDirectory extends BadgeSource {
   id: number;
 }
 
+/** A folder of files opened from outside the library that could be added to it (#1871). */
+export interface SuggestedFolder {
+  path: string;
+  song_count: number;
+  /** Most recent play of any file in the folder, Unix seconds. */
+  last_played: number | null;
+}
+
 export interface MassRemovalIncident {
   id: string;
   directory_id?: number | null;
