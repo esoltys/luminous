@@ -66,6 +66,7 @@ describe("AlbumContextMenu.svelte - rating", () => {
     );
     const onClose = vi.fn();
     render(AlbumContextMenu, { ...baseProps, rating: -1, onClose });
+    expect(await screen.findByText("Rating:")).toBeInTheDocument();
 
     await fireEvent.click(await screen.findByLabelText("Rate 4 of 5"));
 

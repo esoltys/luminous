@@ -190,6 +190,16 @@
       {albumName || i18n.t("collection.unknownAlbum")}
     </div>
 
+    {#if albumName && rating !== undefined}
+      <div class="px-3 py-1.5 flex items-center gap-2.5" role="menuitem" tabindex="-1">
+        <span class="text-brand-text-secondary"
+          >{i18n.t("rating.label")}{i18n.currentLocale.startsWith("fr") ? " :" : ":"}</span
+        >
+        <StarRating rating={currentRating} onRate={handleRate} size="md" />
+      </div>
+      <ContextMenuDivider />
+    {/if}
+
     <ContextMenuItem
       icon={Play}
       accent
@@ -218,12 +228,6 @@
       onCreatePlaylist={handleCreateAndAddToPlaylist}
       {onClose}
     />
-
-    {#if albumName && rating !== undefined}
-      <div class="px-3 py-1.5 flex items-center gap-2.5" role="menuitem" tabindex="-1">
-        <StarRating rating={currentRating} onRate={handleRate} size="md" />
-      </div>
-    {/if}
 
     {#if albumName}
       <AddToDeviceMenuItem
