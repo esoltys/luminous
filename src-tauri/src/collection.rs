@@ -1141,6 +1141,13 @@ impl CollectionScanner {
     }
 
     /// Extended variant of `scan_all_core` that receives mass-removal incident events.
+    ///
+    /// Only the gate wait and the remote cover fetch run on the async
+    /// runtime. Everything else (walk, tag reads, DB writes, local cover art)
+    /// is `scan_blocking`, run on a blocking thread so a scan of a large
+    /// library never occupies a runtime worker (#2030). The blocking body
+    /// sends its progress and incident events over a channel and this driver
+    /// calls the callbacks, in order, so they need not be `Send + 'static`.
     pub async fn scan_all_core_ext(
         &self,
         app_data_dir: PathBuf,
@@ -1148,10 +1155,12 @@ impl CollectionScanner {
         silent: bool,
         resolve_remote_art: bool,
         mut on_progress: impl FnMut(ScanProgress),
-        on_incident: impl FnMut(MassRemovalIncident, Vec<i64>) + Send,
+        mut on_incident: impl FnMut(MassRemovalIncident, Vec<i64>) + Send,
     ) -> Result<ScanReport> {
         // One scan at a time, library-wide (#1873). Held to the end of the
-        // function. A skipped scan emits no `scan-progress` event: a stray
+        // function, so across the blocking task below: callers never cancel a
+        // scan, and the permit borrows the gate so it can't move into the
+        // task. A skipped scan emits no `scan-progress` event: a stray
         // `done` would clear the UI's scanning state while the scan that made
         // this one redundant is still running.
         let Some(_scan_permit) = self.db.scan_gate.acquire(self.scope.is_none()).await else {
@@ -1162,6 +1171,148 @@ impl CollectionScanner {
             });
         };
         let scan_started = Instant::now();
+
+        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel();
+        let incident_tx = events_tx.clone();
+        let scanner = CollectionScanner {
+            db: Arc::clone(&self.db),
+            scope: self.scope.clone(),
+        };
+        let task = tokio::task::spawn_blocking(move || {
+            scanner.scan_blocking(
+                app_data_dir,
+                force,
+                silent,
+                resolve_remote_art,
+                |progress| {
+                    let _ = events_tx.send(ScanEvent::Progress(progress));
+                },
+                move |incident, ids| {
+                    let _ = incident_tx.send(ScanEvent::Incident(incident, ids));
+                },
+            )
+        });
+        // Ends when the task returns (or panics) and drops both senders.
+        while let Some(event) = events_rx.recv().await {
+            match event {
+                ScanEvent::Progress(progress) => on_progress(progress),
+                ScanEvent::Incident(incident, ids) => on_incident(incident, ids),
+            }
+        }
+        let pending = match task.await.context("library scan task panicked")?? {
+            LocalScan::Finished(report) => return Ok(report),
+            LocalScan::Pending(pending) => pending,
+        };
+        let mut report = self.finish_scan(pending, silent, &mut on_progress).await;
+        report.total_ms = scan_started.elapsed().as_millis();
+        Ok(report)
+    }
+
+    /// The async tail of a scan: remote cover lookups for albums the blocking
+    /// pass found no local art for, the covers-cache sweep, and `Done`.
+    async fn finish_scan(
+        &self,
+        pending: PendingScan,
+        silent: bool,
+        on_progress: &mut impl FnMut(ScanProgress),
+    ) -> ScanReport {
+        let PendingScan {
+            mut report,
+            cover_manager,
+            remote_candidates,
+            artwork_started,
+            total,
+            total_updating_items,
+            default_dir_context,
+        } = pending;
+
+        // Progress keeps the counter at `total` so the bar never moves
+        // backwards; only the label changes.
+        report.remote_art_fetches = remote_candidates.len();
+        for candidate in remote_candidates {
+            on_progress(ScanProgress {
+                phase: ScanPhase::ResolvingArtwork,
+                scanned: total_updating_items,
+                total: total_updating_items,
+                current_path: Some(candidate.display_desc),
+                silent,
+                directory_name: candidate.dir_name,
+                directory_id: candidate.dir_id,
+                external_changes: 0,
+            });
+            tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+
+            if let Ok(Some(filename)) = cover_manager.fetch_remote_cover(candidate.song_id).await {
+                self.set_album_art_automatic(
+                    &filename,
+                    &candidate.effective_artist,
+                    &candidate.comp_key,
+                    &candidate.raw_key,
+                );
+            }
+        }
+
+        report.artwork_albums = total_updating_items as usize;
+        report.artwork_ms = artwork_started.elapsed().as_millis();
+
+        // Prune orphaned covers-cache files and shrink ones cached at full
+        // resolution before #1272. The grace period spares files a concurrent
+        // WebDAV/Subsonic sync has written but not yet recorded on its row.
+        match tokio::task::spawn_blocking(move || {
+            cover_manager.sweep_cache(std::time::Duration::from_secs(10 * 60))
+        })
+        .await
+        {
+            Ok(Ok(swept)) if swept.pruned > 0 || swept.recompressed > 0 => log::info!(
+                "Covers cache sweep: pruned {} orphaned, recompressed {}, reclaimed {} bytes",
+                swept.pruned,
+                swept.recompressed,
+                swept.bytes_reclaimed
+            ),
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => log::warn!("Covers cache sweep failed: {e}"),
+            Err(e) => log::warn!("Covers cache sweep task failed: {e}"),
+        }
+
+        // Done
+        on_progress(ScanProgress {
+            phase: ScanPhase::Done,
+            scanned: total,
+            total,
+            current_path: None,
+            silent,
+            directory_name: default_dir_context.1,
+            directory_id: default_dir_context.0,
+            external_changes: report.external_changes,
+        });
+
+        report
+    }
+
+    /// Points every song of an album at an automatically resolved cover (a
+    /// best-effort write: a failure just leaves the album without art).
+    fn set_album_art_automatic(&self, art: &str, artist: &str, comp_key: &str, raw_key: &str) {
+        if let Ok(conn) = self.db.pool.get() {
+            let _ = conn.execute(
+                "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND (album_key = ?3 OR album_key = ?4)",
+                params![art, artist, comp_key, raw_key],
+            );
+        }
+    }
+
+    /// The synchronous part of a scan, run on a blocking thread by
+    /// `scan_all_core_ext` with the scan permit held. Reports through the
+    /// plain callbacks; the async driver finishes the scan (remote cover
+    /// fetch, cache sweep, `Done`) from the returned [`LocalScan`].
+    fn scan_blocking(
+        &self,
+        app_data_dir: PathBuf,
+        force: bool,
+        silent: bool,
+        resolve_remote_art: bool,
+        mut on_progress: impl FnMut(ScanProgress),
+        on_incident: impl FnMut(MassRemovalIncident, Vec<i64>),
+    ) -> Result<LocalScan> {
         let dirs = self.get_directories()?;
         let mut report = ScanReport {
             force,
@@ -1182,7 +1333,7 @@ impl CollectionScanner {
                 directory_id: None,
                 external_changes: 0,
             });
-            return Ok(report);
+            return Ok(LocalScan::Finished(report));
         }
 
         let default_dir_context = if dirs.len() == 1 {
@@ -1581,7 +1732,7 @@ impl CollectionScanner {
 
         let total_updating_items = albums_to_resolve.len() as u64;
 
-        let mut remote_fetch_count = 0;
+        let mut remote_candidates: Vec<RemoteArtCandidate> = Vec::new();
         for (idx, (song_id, path_str, effective_artist, album, art_embedded)) in
             albums_to_resolve.into_iter().enumerate()
         {
@@ -1604,9 +1755,9 @@ impl CollectionScanner {
                 phase: ScanPhase::ResolvingArtwork,
                 scanned: updating_scanned,
                 total: total_updating_items,
-                current_path: Some(display_desc),
+                current_path: Some(display_desc.clone()),
                 silent,
-                directory_name: art_dir_name,
+                directory_name: art_dir_name.clone(),
                 directory_id: art_dir_id,
                 external_changes: 0,
             });
@@ -1622,12 +1773,12 @@ impl CollectionScanner {
             let raw_key = crate::album_key::album_key(&album);
             let try_folder_art = || {
                 let folder_art_path = cover_manager.scan_folder_art(path)?;
-                if let Ok(conn) = self.db.pool.get() {
-                    let _ = conn.execute(
-                        "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND (album_key = ?3 OR album_key = ?4)",
-                        params![folder_art_path.to_string_lossy(), effective_artist, comp_key, raw_key],
-                    );
-                }
+                self.set_album_art_automatic(
+                    &folder_art_path.to_string_lossy(),
+                    &effective_artist,
+                    &comp_key,
+                    &raw_key,
+                );
                 Some(())
             };
 
@@ -1639,12 +1790,12 @@ impl CollectionScanner {
                 if let Ok(Some(cached_filename)) =
                     cover_manager.extract_embedded_art(path, &effective_artist, &album)
                 {
-                    if let Ok(conn) = self.db.pool.get() {
-                        let _ = conn.execute(
-                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND (album_key = ?3 OR album_key = ?4)",
-                            params![cached_filename, effective_artist, comp_key, raw_key],
-                        );
-                    }
+                    self.set_album_art_automatic(
+                        &cached_filename,
+                        &effective_artist,
+                        &comp_key,
+                        &raw_key,
+                    );
                     resolved = true;
                 }
             }
@@ -1653,60 +1804,69 @@ impl CollectionScanner {
                 resolved = try_folder_art().is_some();
             }
 
-            // Last, try remote fetch (limit to 50 to avoid long scans / rate limits)
-            if !resolved && resolve_remote_art && remote_fetch_count < 50 {
-                remote_fetch_count += 1;
-                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
-
-                if let Ok(Some(filename)) = cover_manager.fetch_remote_cover(song_id).await {
-                    if let Ok(conn) = self.db.pool.get() {
-                        let _ = conn.execute(
-                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND (album_key = ?3 OR album_key = ?4)",
-                            params![filename, effective_artist, comp_key, raw_key],
-                        );
-                    }
-                }
+            // Still unresolved: leave it for the async remote lookup.
+            if !resolved && resolve_remote_art && remote_candidates.len() < REMOTE_ART_FETCH_LIMIT {
+                remote_candidates.push(RemoteArtCandidate {
+                    song_id,
+                    effective_artist,
+                    comp_key,
+                    raw_key,
+                    display_desc,
+                    dir_id: art_dir_id,
+                    dir_name: art_dir_name,
+                });
             }
         }
 
-        report.artwork_albums = total_updating_items as usize;
-        report.remote_art_fetches = remote_fetch_count;
-        report.artwork_ms = artwork_started.elapsed().as_millis();
-
-        // Prune orphaned covers-cache files and shrink ones cached at full
-        // resolution before #1272. The grace period spares files a concurrent
-        // WebDAV/Subsonic sync has written but not yet recorded on its row.
-        match tokio::task::spawn_blocking(move || {
-            cover_manager.sweep_cache(std::time::Duration::from_secs(10 * 60))
-        })
-        .await
-        {
-            Ok(Ok(swept)) if swept.pruned > 0 || swept.recompressed > 0 => log::info!(
-                "Covers cache sweep: pruned {} orphaned, recompressed {}, reclaimed {} bytes",
-                swept.pruned,
-                swept.recompressed,
-                swept.bytes_reclaimed
-            ),
-            Ok(Ok(_)) => {}
-            Ok(Err(e)) => log::warn!("Covers cache sweep failed: {e}"),
-            Err(e) => log::warn!("Covers cache sweep task failed: {e}"),
-        }
-
-        // Done
-        on_progress(ScanProgress {
-            phase: ScanPhase::Done,
-            scanned: total,
+        Ok(LocalScan::Pending(PendingScan {
+            report,
+            cover_manager,
+            remote_candidates,
+            artwork_started,
             total,
-            current_path: None,
-            silent,
-            directory_name: default_dir_context.1,
-            directory_id: default_dir_context.0,
-            external_changes: report.external_changes,
-        });
-
-        report.total_ms = scan_started.elapsed().as_millis();
-        Ok(report)
+            total_updating_items,
+            default_dir_context,
+        }))
     }
+}
+
+/// Most albums one scan looks up remotely, to avoid long scans and rate limits.
+const REMOTE_ART_FETCH_LIMIT: usize = 50;
+
+/// What the blocking scan hands back to the async driver.
+enum LocalScan {
+    /// No watched folders: nothing to do, and `Done` was already emitted.
+    Finished(ScanReport),
+    /// The local passes ran; the driver does the remote lookups and wraps up.
+    Pending(PendingScan),
+}
+
+struct PendingScan {
+    report: ScanReport,
+    cover_manager: CoverManager,
+    /// Albums with no local art, at most `REMOTE_ART_FETCH_LIMIT`; empty when
+    /// remote art is off.
+    remote_candidates: Vec<RemoteArtCandidate>,
+    artwork_started: Instant,
+    total: u64,
+    total_updating_items: u64,
+    default_dir_context: (Option<i64>, Option<String>),
+}
+
+struct RemoteArtCandidate {
+    song_id: i64,
+    effective_artist: String,
+    comp_key: String,
+    raw_key: String,
+    display_desc: String,
+    dir_id: Option<i64>,
+    dir_name: Option<String>,
+}
+
+/// An event from the blocking scan, relayed in order to the caller's callbacks.
+enum ScanEvent {
+    Progress(ScanProgress),
+    Incident(MassRemovalIncident, Vec<i64>),
 }
 
 // ---------------------------------------------------------------------------
@@ -3305,6 +3465,47 @@ mod tests {
         drop(full_scan);
         let scoped = run(2, CollectionScanner::new(Arc::clone(&db)), true).await;
         assert!(!scoped.skipped, "runs once no full scan holds the gate");
+    }
+
+    /// #2030: a scan must not hold the runtime thread while it works. On the
+    /// single-threaded test runtime, a task spawned before the scan can only
+    /// run if the scan yields; scanning inline delivered every progress event
+    /// before the task ever got a turn.
+    #[tokio::test]
+    async fn test_scan_lets_other_tasks_run() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let music_dir = temp_dir.path().join("music");
+        std::fs::create_dir_all(&music_dir).unwrap();
+        for i in 0..5 {
+            write_test_wav(&music_dir.join(format!("song{i}.wav")));
+        }
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&music_dir.to_string_lossy()).unwrap();
+
+        let other_task_ran = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = Arc::clone(&other_task_ran);
+        let other_task = tokio::spawn(async move {
+            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+
+        let mut ran_before_first_event = None;
+        scanner
+            .scan_all_core(temp_dir.path().to_path_buf(), false, false, false, |_| {
+                ran_before_first_event.get_or_insert_with(|| {
+                    other_task_ran.load(std::sync::atomic::Ordering::SeqCst)
+                });
+            })
+            .await
+            .unwrap();
+        other_task.await.unwrap();
+
+        assert_eq!(
+            ran_before_first_event,
+            Some(true),
+            "the scan ran inline instead of yielding the runtime thread"
+        );
     }
 
     #[tokio::test]
