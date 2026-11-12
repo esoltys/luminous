@@ -59,6 +59,34 @@ describe("RightPanel.svelte", () => {
     contextStore.clearAll();
   });
 
+  // The panel opens on Information (#2039); these tests exercise the Technical tab.
+  function renderTechnical() {
+    const result = render(RightPanel);
+    result.getByRole("button", { name: /^technical$/i }).click();
+    flushSync();
+    return result;
+  }
+
+  it("opens on the Information tab when no tab choice was saved (#2039)", () => {
+    playerStore.currentSong = mockSong;
+    playerStore.audioPipeline = mockAudioPipeline;
+    const { getByRole, queryByText } = render(RightPanel);
+
+    expect(getByRole("button", { name: /^information$/i }).className).toContain("bg-brand-accent");
+    expect(queryByText("Bit-perfect")).not.toBeInTheDocument();
+  });
+
+  it("restores a saved Technical tab choice (#2039)", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === "get_all_app_settings" ? { right_panel_active_tab: "technical" } : null,
+    );
+    playerStore.currentSong = mockSong;
+    playerStore.audioPipeline = mockAudioPipeline;
+    const { findByText } = render(RightPanel);
+
+    expect(await findByText("Bit-perfect")).toBeInTheDocument();
+  });
+
   it("renders an unpin button while pinned and a pin button while unpinned", async () => {
     const onTogglePin = vi.fn();
     const pinned = render(RightPanel, { props: { pinned: true, onTogglePin } });
@@ -126,7 +154,7 @@ describe("RightPanel.svelte", () => {
   it("renders audio pipeline stages on Technical tab when audioPipeline is set", () => {
     playerStore.currentSong = mockSong;
     playerStore.audioPipeline = mockAudioPipeline;
-    const { getByText, getAllByText } = render(RightPanel);
+    const { getByText, getAllByText } = renderTechnical();
 
     expect(getByText("Input")).toBeInTheDocument();
     expect(getByText("Processing")).toBeInTheDocument();
@@ -139,7 +167,7 @@ describe("RightPanel.svelte", () => {
   it("renders bitrate in pipeline", () => {
     playerStore.currentSong = mockSong;
     playerStore.audioPipeline = { ...mockAudioPipeline, input_bitrate_kbps: 245 };
-    const { getByText } = render(RightPanel);
+    const { getByText } = renderTechnical();
 
     expect(getByText("245 kbps")).toBeInTheDocument();
   });
@@ -147,7 +175,7 @@ describe("RightPanel.svelte", () => {
   it("renders Mono channel info in pipeline when channels is 1", () => {
     playerStore.currentSong = mockSong;
     playerStore.audioPipeline = { ...mockAudioPipeline, input_channels: 1 };
-    const { getByText } = render(RightPanel);
+    const { getByText } = renderTechnical();
 
     expect(getByText("Mono (1 ch)")).toBeInTheDocument();
   });
@@ -155,7 +183,7 @@ describe("RightPanel.svelte", () => {
   it("renders Stereo channel info in pipeline when channels is 2", () => {
     playerStore.currentSong = mockSong;
     playerStore.audioPipeline = { ...mockAudioPipeline, input_channels: 2 };
-    const { getAllByText } = render(RightPanel);
+    const { getAllByText } = renderTechnical();
 
     expect(getAllByText("Stereo (2 ch)").length).toBeGreaterThan(0);
   });
@@ -174,7 +202,7 @@ describe("RightPanel.svelte", () => {
       musicbrainz_artist_id: "artist-uuid",
       musicbrainz_album_artist_id: "album-artist-uuid",
     };
-    const { getByAltText, getByText, queryByText } = render(RightPanel);
+    const { getByAltText, getByText, queryByText } = renderTechnical();
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Test Artist")).toBeInTheDocument();
@@ -211,7 +239,7 @@ describe("RightPanel.svelte", () => {
       ...mockSong,
       musicbrainz_recording_id: "recording-uuid",
     };
-    const { getByText } = render(RightPanel);
+    const { getByText } = renderTechnical();
 
     await fireEvent.click(getByText("Test Track Title"));
 
@@ -227,7 +255,7 @@ describe("RightPanel.svelte", () => {
       barcode: "4988011329586",
       catalog_number: "PHCR-1144",
     };
-    const { getByAltText, getByText, queryByText } = render(RightPanel);
+    const { getByAltText, getByText, queryByText } = renderTechnical();
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Album")).toBeInTheDocument();
@@ -241,7 +269,7 @@ describe("RightPanel.svelte", () => {
       ...mockSong,
       barcode: "4988011329586",
     };
-    const { getByAltText, getByText, queryByText } = render(RightPanel);
+    const { getByAltText, getByText, queryByText } = renderTechnical();
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Barcode")).toBeInTheDocument();
@@ -303,7 +331,7 @@ describe("RightPanel.svelte", () => {
 
   it("shows the File Path row on the Technicals tab", () => {
     playerStore.currentSong = mockSong;
-    const { getByText } = render(RightPanel);
+    const { getByText } = renderTechnical();
 
     expect(getByText("File Path:")).toBeInTheDocument();
     expect(getByText("/music/test.flac")).toBeInTheDocument();
@@ -495,7 +523,7 @@ describe("RightPanel.svelte", () => {
 
   it("shows Unverified badge on Technical tab for lossless song without cached provenance", async () => {
     playerStore.currentSong = mockSong;
-    const { getByTestId, queryByRole } = render(RightPanel);
+    const { getByTestId, queryByRole } = renderTechnical();
     const row = getByTestId("provenance-row");
     expect(row).toHaveTextContent("Format");
     expect(row).toHaveTextContent("Unverified");
@@ -522,7 +550,7 @@ describe("RightPanel.svelte", () => {
     });
 
     playerStore.currentSong = mockSong;
-    const { findByText } = render(RightPanel);
+    const { findByText } = renderTechnical();
     const badge = await findByText(/Authentic Lossless/);
     expect(badge).toBeInTheDocument();
   });
@@ -546,14 +574,14 @@ describe("RightPanel.svelte", () => {
     });
 
     playerStore.currentSong = mockSong;
-    const { findByText, queryByRole } = render(RightPanel);
+    const { findByText, queryByRole } = renderTechnical();
     expect(await findByText("(stale)")).toBeInTheDocument();
     expect(queryByRole("button", { name: "Re-verify" })).toBeNull();
   });
 
   it("hides provenance actions for lossy tracks", async () => {
     playerStore.currentSong = { ...mockSong, filetype: "MP3" };
-    const { getByTestId, queryByText } = render(RightPanel);
+    const { getByTestId, queryByText } = renderTechnical();
     const row = getByTestId("provenance-row");
     expect(row).toHaveTextContent("MP3");
     expect(queryByText("Unverified")).toBeNull();

@@ -70,10 +70,10 @@
       scrollContainer.scrollTop = 0;
     }
   });
-  // Technicals is the default tab until the user's own choice loads from
-  // app_state (below) — it's the pre-existing content users already relied
-  // on seeing immediately (format/bitrate/etc.).
-  let activeTab = $state<"context" | "technical">("technical");
+  // Information is the default tab until the user's own choice loads from
+  // app_state (below): it's what most listeners expect on first contact, and
+  // the Technical view reads as an audio-engineering tool.
+  let activeTab = $state<"context" | "technical">("context");
   let effectiveTab = $derived(isEntitySubject ? "context" : activeTab);
 
   function setActiveTab(tab: "context" | "technical") {
