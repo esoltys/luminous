@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CollectionHeader from "./CollectionHeader.svelte";
   import ViewModeToggle from "./ViewModeToggle.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
@@ -494,6 +495,20 @@
   let tableRows = $derived(
     navigationStore.activeSubTab === "songs" ? filteredSongs.map(songToRow) : [],
   );
+
+  let isSearchActive = $derived(collectionStore.searchQuery.trim() !== "");
+
+  function countSubtitle(
+    baseKey: string,
+    filteredKey: string,
+    matched: number,
+    total: number,
+  ): string {
+    if (isSearchActive) {
+      return i18n.plural(filteredKey, total, { matched: i18n.formatNumber(matched) });
+    }
+    return i18n.plural(baseKey, matched);
+  }
 </script>
 
 {#snippet songsEmptyState()}
@@ -525,13 +540,17 @@
 {:else}
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
     {#if navigationStore.activeSubTab === "songs"}
-      <div class="px-6 pt-4 pb-2 flex-shrink-0">
-        <div class="h-9 flex items-center justify-between">
-          <div class="text-xs text-brand-text-secondary font-medium">
-            {i18n.plural("collection.showingSongs", filteredSongs.length)}
-          </div>
-
-          <div class="flex items-center gap-2">
+      <div class="flex-shrink-0">
+        <CollectionHeader
+          title={i18n.t("sidebar.songs")}
+          subtitle={countSubtitle(
+            "collection.songCount",
+            "collection.songCountFiltered",
+            filteredSongs.length,
+            collectionStore.songs.length,
+          )}
+        >
+          {#snippet actions()}
             <div class="relative">
               <Select
                 value={`${sortField}-${sortAsc}`}
@@ -548,12 +567,12 @@
                 {/each}
               </Select>
             </div>
-          </div>
-        </div>
+          {/snippet}
+        </CollectionHeader>
       </div>
 
       <div
-        class="flex-1 px-6 pt-2 overflow-hidden flex flex-col {playerStore.currentSong
+        class="flex-1 px-6 overflow-hidden flex flex-col {playerStore.currentSong
           ? 'pb-28'
           : 'pb-6'}"
       >
@@ -599,104 +618,98 @@
       <div class="flex-1 min-h-0 flex flex-col {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
         <div class="relative flex-1 min-h-0 flex flex-col">
           <div
-            class="flex-1 pl-6 pr-8 overflow-y-auto min-h-0"
+            class="flex-1 overflow-y-auto min-h-0"
             use:rememberScroll={`collection:${navigationStore.activeSubTab}`}
           >
-            <div class="sticky top-0 z-20 bg-brand-main pt-3">
-              <div class="h-12 flex items-center justify-between">
-                <div class="text-xs text-brand-text-secondary font-medium">
-                  {#if navigationStore.activeSubTab === "albums"}
-                    {i18n.plural("collection.showingAlbums", sortedAlbums.length)}
-                  {:else}
-                    {i18n.plural("collection.showingArtists", sortedArtists.length)}
-                  {/if}
-                </div>
-
-                <div class="flex items-center gap-2">
-                  <ViewModeToggle
-                    mode={activeViewMode}
-                    onChange={setActiveViewMode}
-                    walkthroughTarget="collection-view"
-                  />
-                  {#if navigationStore.activeSubTab === "albums"}
-                    <div class="relative">
-                      <Select
-                        value={`${albumSortField}-${albumSortAsc}`}
-                        onchange={(e) => {
-                          const [field, asc] = e.currentTarget.value.split("-");
-                          albumSortField = field as
-                            "album" | "artist" | "year" | "rating" | "added";
-                          albumSortAsc = asc === "true";
-                        }}
-                        class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+            <CollectionHeader
+              title={navigationStore.activeSubTab === "albums"
+                ? i18n.t("sidebar.albums")
+                : i18n.t("sidebar.artists")}
+              subtitle={navigationStore.activeSubTab === "albums"
+                ? countSubtitle(
+                    "collection.albumCount",
+                    "collection.albumCountFiltered",
+                    sortedAlbums.length,
+                    collectionStore.albums.length,
+                  )
+                : countSubtitle(
+                    "collection.artistCount",
+                    "collection.artistCountFiltered",
+                    sortedArtists.length,
+                    collectionStore.artists.length,
+                  )}
+            >
+              {#snippet actions()}
+                <ViewModeToggle
+                  mode={activeViewMode}
+                  onChange={setActiveViewMode}
+                  walkthroughTarget="collection-view"
+                />
+                {#if navigationStore.activeSubTab === "albums"}
+                  <div class="relative">
+                    <Select
+                      value={`${albumSortField}-${albumSortAsc}`}
+                      onchange={(e) => {
+                        const [field, asc] = e.currentTarget.value.split("-");
+                        albumSortField = field as "album" | "artist" | "year" | "rating" | "added";
+                        albumSortAsc = asc === "true";
+                      }}
+                      class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                    >
+                      <option value="album-true">▲ {i18n.t("collection.tableHeaderAlbum")}</option>
+                      <option value="album-false">▼ {i18n.t("collection.tableHeaderAlbum")}</option>
+                      <option value="artist-true">▲ {i18n.t("collection.tableHeaderArtist")}</option
                       >
-                        <option value="album-true">▲ {i18n.t("collection.tableHeaderAlbum")}</option
-                        >
-                        <option value="album-false"
-                          >▼ {i18n.t("collection.tableHeaderAlbum")}</option
-                        >
-                        <option value="artist-true"
-                          >▲ {i18n.t("collection.tableHeaderArtist")}</option
-                        >
-                        <option value="artist-false"
-                          >▼ {i18n.t("collection.tableHeaderArtist")}</option
-                        >
-                        <option value="year-true">▲ {i18n.t("collection.tableHeaderYear")}</option>
-                        <option value="year-false">▼ {i18n.t("collection.tableHeaderYear")}</option>
-                        <option value="rating-true"
-                          >▲ {i18n.t("collection.tableHeaderRating")}</option
-                        >
-                        <option value="rating-false"
-                          >▼ {i18n.t("collection.tableHeaderRating")}</option
-                        >
-                        <option value="added-true"
-                          >▲ {i18n.t("collection.sortDateAddedLabel")}</option
-                        >
-                        <option value="added-false"
-                          >▼ {i18n.t("collection.sortDateAddedLabel")}</option
-                        >
-                      </Select>
-                    </div>
-                  {:else if navigationStore.activeSubTab === "artists"}
-                    <div class="relative">
-                      <Select
-                        value={`${artistSortField}-${artistSortAsc}`}
-                        onchange={(e) => {
-                          const [field, asc] = e.currentTarget.value.split("-");
-                          artistSortField = field as
-                            "name" | "genre" | "song_count" | "total_playcount";
-                          artistSortAsc = asc === "true";
-                        }}
-                        class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                      <option value="artist-false"
+                        >▼ {i18n.t("collection.tableHeaderArtist")}</option
                       >
-                        <option value="name-true">▲ {i18n.t("collection.tableHeaderArtist")}</option
-                        >
-                        <option value="name-false"
-                          >▼ {i18n.t("collection.tableHeaderArtist")}</option
-                        >
-                        <option value="genre-true">▲ {i18n.t("collection.tableHeaderGenre")}</option
-                        >
-                        <option value="genre-false"
-                          >▼ {i18n.t("collection.tableHeaderGenre")}</option
-                        >
-                        <option value="song_count-true"
-                          >▲ {i18n.t("collection.sortLabelSongs")}</option
-                        >
-                        <option value="song_count-false"
-                          >▼ {i18n.t("collection.sortLabelSongs")}</option
-                        >
-                        <option value="total_playcount-true"
-                          >▲ {i18n.t("collection.sortLabelPopularity")}</option
-                        >
-                        <option value="total_playcount-false"
-                          >▼ {i18n.t("collection.sortLabelPopularity")}</option
-                        >
-                      </Select>
-                    </div>
-                  {/if}
-                </div>
-              </div>
-            </div>
+                      <option value="year-true">▲ {i18n.t("collection.tableHeaderYear")}</option>
+                      <option value="year-false">▼ {i18n.t("collection.tableHeaderYear")}</option>
+                      <option value="rating-true">▲ {i18n.t("collection.tableHeaderRating")}</option
+                      >
+                      <option value="rating-false"
+                        >▼ {i18n.t("collection.tableHeaderRating")}</option
+                      >
+                      <option value="added-true">▲ {i18n.t("collection.sortDateAddedLabel")}</option
+                      >
+                      <option value="added-false"
+                        >▼ {i18n.t("collection.sortDateAddedLabel")}</option
+                      >
+                    </Select>
+                  </div>
+                {:else if navigationStore.activeSubTab === "artists"}
+                  <div class="relative">
+                    <Select
+                      value={`${artistSortField}-${artistSortAsc}`}
+                      onchange={(e) => {
+                        const [field, asc] = e.currentTarget.value.split("-");
+                        artistSortField = field as
+                          "name" | "genre" | "song_count" | "total_playcount";
+                        artistSortAsc = asc === "true";
+                      }}
+                      class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                    >
+                      <option value="name-true">▲ {i18n.t("collection.tableHeaderArtist")}</option>
+                      <option value="name-false">▼ {i18n.t("collection.tableHeaderArtist")}</option>
+                      <option value="genre-true">▲ {i18n.t("collection.tableHeaderGenre")}</option>
+                      <option value="genre-false">▼ {i18n.t("collection.tableHeaderGenre")}</option>
+                      <option value="song_count-true"
+                        >▲ {i18n.t("collection.sortLabelSongs")}</option
+                      >
+                      <option value="song_count-false"
+                        >▼ {i18n.t("collection.sortLabelSongs")}</option
+                      >
+                      <option value="total_playcount-true"
+                        >▲ {i18n.t("collection.sortLabelPopularity")}</option
+                      >
+                      <option value="total_playcount-false"
+                        >▼ {i18n.t("collection.sortLabelPopularity")}</option
+                      >
+                    </Select>
+                  </div>
+                {/if}
+              {/snippet}
+            </CollectionHeader>
 
             {#snippet albumEmptyState()}
               {#if sortedAlbums.length === 0 && collectionStore.searchQuery}
@@ -740,7 +753,7 @@
               {/if}
             {/snippet}
 
-            <div class="pt-2">
+            <div class="pl-6 pr-8">
               {#if navigationStore.activeSubTab === "albums"}
                 {#if activeViewMode === "rows"}
                   {#if sortedAlbums.length === 0}
@@ -773,7 +786,7 @@
                       key={albumKey}
                       minColumnWidth={180}
                       gap={24}
-                      estimateRowHeight={(w) => w + 90}
+                      estimateRowHeight={(w) => w + 64}
                     >
                       {#snippet item(album)}
                         <AlbumCard
@@ -835,7 +848,7 @@
             </div>
           </div>
           {#if (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") || (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists")}
-            <div class="absolute right-2.5 top-[68px] bottom-2 pointer-events-auto z-20">
+            <div class="absolute right-2.5 top-20 bottom-2 pointer-events-auto z-20">
               {#if navigationStore.activeSubTab === "albums"}
                 <AlphabetScrubber
                   items={sortedAlbums}

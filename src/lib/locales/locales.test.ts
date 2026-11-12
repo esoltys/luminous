@@ -118,6 +118,8 @@ const IDENTICAL_OK_FR = new Set([
   "audioPipeline.outputFormat", // "Format"
   "auth.scrobbling", // "Scrobbling"
   "collection.albums", // "Albums ({count})"
+  "collection.albumCount", // "{count} albums"
+  "collection.genreCount", // "{count} genres"
   "collection.albumsCount", // "{count} albums"
   "collection.columnActions", // "Actions"
   "collection.columnAlbum", // "Album"

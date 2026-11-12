@@ -512,17 +512,33 @@ export const es = {
     albums: "Álbumes ({count})",
     songs: "Canciones ({count})",
     languages: "Idiomas",
-    showingSongs: {
-      one: "Mostrando {count} canción",
-      other: "Mostrando {count} canciones",
+    songCount: {
+      one: "{count} canción",
+      other: "{count} canciones",
     },
-    showingAlbums: {
-      one: "Mostrando {count} álbum",
-      other: "Mostrando {count} álbumes",
+    songCountFiltered: {
+      one: "{matched} de {count} canción",
+      other: "{matched} de {count} canciones",
     },
-    showingArtists: {
-      one: "Mostrando {count} artista",
-      other: "Mostrando {count} artistas",
+    albumCount: {
+      one: "{count} álbum",
+      other: "{count} álbumes",
+    },
+    albumCountFiltered: {
+      one: "{matched} de {count} álbum",
+      other: "{matched} de {count} álbumes",
+    },
+    artistCount: {
+      one: "{count} artista",
+      other: "{count} artistas",
+    },
+    artistCountFiltered: {
+      one: "{matched} de {count} artista",
+      other: "{matched} de {count} artistas",
+    },
+    genreCount: {
+      one: "{count} género",
+      other: "{count} géneros",
     },
     noSongsTitle: "No se encontraron canciones",
     noSongsSearchEmpty:
@@ -1181,9 +1197,11 @@ export const es = {
       "«{name}» está reservado para la lista de reproducción integrada Cola. Elige otro nombre.",
     noPlaylistsTitle: "No hay listas de reproducción",
     noPlaylistsText: "Haz clic en «Nueva lista de reproducción» para crear la primera.",
-    showingPlaylists: {
-      one: "Mostrando {count} lista de reproducción",
-      other: "Mostrando {count} listas de reproducción",
+    autoTitle: "Listas automáticas",
+    customTitle: "Listas personalizadas",
+    playlistCount: {
+      one: "{count} lista de reproducción",
+      other: "{count} listas de reproducción",
     },
     newPlaylistBtn: "Nueva lista de reproducción",
     newSmartPlaylistBtn: "Nueva lista inteligente",

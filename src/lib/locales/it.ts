@@ -512,17 +512,33 @@ export const it = {
     albums: "Album ({count})",
     songs: "Brani ({count})",
     languages: "Lingue",
-    showingSongs: {
-      one: "{count} brano visualizzato",
-      other: "{count} brani visualizzati",
+    songCount: {
+      one: "{count} brano",
+      other: "{count} brani",
     },
-    showingAlbums: {
-      one: "{count} album visualizzato",
-      other: "{count} album visualizzati",
+    songCountFiltered: {
+      one: "{matched} di {count} brano",
+      other: "{matched} di {count} brani",
     },
-    showingArtists: {
-      one: "{count} artista visualizzato",
-      other: "{count} artisti visualizzati",
+    albumCount: {
+      one: "{count} album",
+      other: "{count} album",
+    },
+    albumCountFiltered: {
+      one: "{matched} di {count} album",
+      other: "{matched} di {count} album",
+    },
+    artistCount: {
+      one: "{count} artista",
+      other: "{count} artisti",
+    },
+    artistCountFiltered: {
+      one: "{matched} di {count} artista",
+      other: "{matched} di {count} artisti",
+    },
+    genreCount: {
+      one: "{count} genere",
+      other: "{count} generi",
     },
     noSongsTitle: "Nessun brano trovato",
     noSongsSearchEmpty:
@@ -1182,9 +1198,11 @@ export const it = {
       "«{name}» è riservato alla playlist integrata Coda. Scegli un nome diverso.",
     noPlaylistsTitle: "Nessuna playlist",
     noPlaylistsText: "Fai clic su «Nuova playlist» qui sopra per creare la tua prima playlist.",
-    showingPlaylists: {
-      one: "{count} playlist visualizzata",
-      other: "{count} playlist visualizzate",
+    autoTitle: "Playlist automatiche",
+    customTitle: "Playlist personalizzate",
+    playlistCount: {
+      one: "{count} playlist",
+      other: "{count} playlist",
     },
     newPlaylistBtn: "Nuova playlist",
     newSmartPlaylistBtn: "Nuova playlist intelligente",
