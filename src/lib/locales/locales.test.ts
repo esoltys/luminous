@@ -396,7 +396,6 @@ const IDENTICAL_OK_DE = new Set<string>([
   "units.khz",
   "units.db",
   "units.lufs",
-  "home.chartPeak", // "Peak #{peak}", left untranslated as chart UIs commonly do
   "sidebar.genres",
   "sidebar.scanningPhaseLabel",
   "collection.tableHeaderTrack",

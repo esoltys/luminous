@@ -15,6 +15,9 @@
   import { i18n } from "../stores/i18n.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import { CaretRightIcon as ChevronRight } from "phosphor-svelte";
+  import { rowClasses, useCardAppearance } from "../utils/cardAppearance";
+
+  const appearance = useCardAppearance();
 
   interface Props {
     title?: string;
@@ -173,7 +176,7 @@
             openItem(item);
           }
         }}
-        class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
+        class={rowClasses(appearance)}
       >
         {#if variant === "rank"}
           <div class="w-14 shrink-0 flex flex-col items-center gap-0.5">

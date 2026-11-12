@@ -16,6 +16,10 @@
   import { rememberScroll } from "../utils/scrollMemory";
   import { getDaypartBucket } from "../utils/daypart";
   import { formatWeekRange } from "../utils/date";
+  import { provideCardAppearance } from "../utils/cardAppearance";
+
+  // Home drops the filled, bordered box from every tile and list row beneath it (#2044).
+  provideCardAppearance("plain");
 
   let topAlbums = $state<StatsTopItem[]>([]);
   let topAlbumsPeriodStart = $state<number | null>(null);
@@ -32,12 +36,11 @@
   let daypartBucket = $state(getDaypartBucket());
   let daypartPollTimer: ReturnType<typeof setInterval> | undefined;
 
-  const topAlbumsTitle = $derived.by((): string => {
-    const base = i18n.t("home.topAlbums");
-    return topAlbumsPeriodStart === null
-      ? base
-      : `${base} ${formatWeekRange(topAlbumsPeriodStart, i18n.currentLocale)}`;
-  });
+  const topAlbumsRange = $derived(
+    topAlbumsPeriodStart === null
+      ? undefined
+      : formatWeekRange(topAlbumsPeriodStart, i18n.currentLocale),
+  );
 
   const timeOfDayGreeting = $derived.by((): string => {
     switch (daypartBucket) {
@@ -180,7 +183,8 @@
             {/if}
             {#if topAlbums.length > 0}
               <TopTenList
-                title={topAlbumsTitle}
+                title={i18n.t("home.topAlbums")}
+                titleSuffix={topAlbumsRange}
                 items={topAlbums}
                 kind="album"
                 secondaryFallback={i18n.t("collection.variousArtists")}

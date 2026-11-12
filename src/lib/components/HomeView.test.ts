@@ -139,7 +139,7 @@ describe("HomeView.svelte", () => {
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText(/^Top Albums/)).toBeInTheDocument();
+      expect(screen.getByText(/^Top albums this week/)).toBeInTheDocument();
       expect(screen.getByText("Chart Topper")).toBeInTheDocument();
     });
     expect(screen.queryByText("Explore Your Library")).not.toBeInTheDocument();
@@ -150,23 +150,62 @@ describe("HomeView.svelte", () => {
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText(/^Top Albums/)).toBeInTheDocument();
+      expect(screen.getByText(/^Top albums this week/)).toBeInTheDocument();
     });
 
-    screen.getByText(/^Top Albums/).click();
+    screen.getByText(/^Top albums this week/).click();
 
     expect(navigationStore.activeTab).toBe("stats");
   });
 
-  it("shows the chart week's compact date range in the Top Albums heading", async () => {
+  it("shows the chart week's compact date range as a quieter suffix on the Top Albums heading", async () => {
     mockTopAlbums = [
       makeTopAlbum({ period_start: 1_700_000_000 }, { album: "Chart Topper", artist: "Tom Petty" }),
     ];
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText("Top Albums Nov 14-20")).toBeInTheDocument();
+      expect(screen.getByText("Nov 14-20")).toBeInTheDocument();
     });
+    expect(screen.getByText(/^Top albums this week/)).toBeInTheDocument();
+  });
+
+  it("draws list rows without a box, separated by a hairline", async () => {
+    mockTopAlbums = [makeTopAlbum({}, { album: "Chart Topper" })];
+    render(HomeView);
+
+    await waitFor(() => {
+      expect(screen.getByText("Chart Topper")).toBeInTheDocument();
+    });
+
+    const row = screen.getByText("Chart Topper").closest('[role="button"]');
+    expect(row).not.toBeNull();
+    expect(row!.classList).not.toContain("bg-brand-sidebar");
+    expect(row!.classList).not.toContain("rounded-lg");
+    expect(row!.classList).toContain("border-b");
+  });
+
+  it("ranks Top Albums with a plain number and says in words how an album moved", async () => {
+    mockTopAlbums = [
+      makeTopAlbum({ rank: 1, movement: "new" }, { album: "Fresh One" }),
+      makeTopAlbum({ rank: 2, movement: "rising", previous_rank: 4 }, { album: "Climber" }),
+      makeTopAlbum({ rank: 3, movement: "falling", previous_rank: 2 }, { album: "Slider" }),
+      makeTopAlbum({ rank: 4, movement: "steady", previous_rank: 4 }, { album: "Holder" }),
+    ];
+    render(HomeView);
+
+    await waitFor(() => {
+      expect(screen.getByText("Fresh One")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.queryByText("01")).not.toBeInTheDocument();
+    expect(screen.getByText("New this week")).toBeInTheDocument();
+    expect(screen.getByText("Up 2")).toBeInTheDocument();
+    expect(screen.getByText("Down 1")).toBeInTheDocument();
+    // Steady albums say nothing, and the old "Peak #n" line is gone.
+    expect(screen.queryByText("Steady")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Peak/)).not.toBeInTheDocument();
   });
 
   it("refreshes curated data when a scan-progress 'done' event fires", async () => {

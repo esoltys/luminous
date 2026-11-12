@@ -11,6 +11,9 @@
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import BoxSetDiscIcons from "./BoxSetDiscIcons.svelte";
   import GenreChips from "./GenreChips.svelte";
+  import { PLAIN_TILE_COVER, useCardAppearance } from "../utils/cardAppearance";
+
+  const plain = useCardAppearance() === "plain";
 
   interface Props {
     album: AlbumItem;
@@ -77,10 +80,14 @@
   onclick={handleCardClick}
   ondblclick={handleCardDblClick}
   oncontextmenu={(e) => customContextMenu?.(e)}
-  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-b-xl overflow-hidden flex flex-col group relative select-none"
+  class="{widthClass} flex flex-col group relative select-none {plain
+    ? ''
+    : 'bg-brand-sidebar border border-brand-border/60 rounded-b-xl overflow-hidden'}"
 >
   <div
-    class="aspect-square bg-brand-main flex items-center justify-center text-brand-accent-text relative overflow-hidden w-full"
+    class="aspect-square bg-brand-main flex items-center justify-center text-brand-accent-text relative overflow-hidden w-full {plain
+      ? PLAIN_TILE_COVER
+      : ''}"
   >
     <CoverStack
       covers={covers && covers.length > 0 ? covers : [albumToCoverItem(album)]}
@@ -93,7 +100,7 @@
       <BoxSetDiscIcons discCount={album.disc_count} size="md" />
     {/if}
   </div>
-  <div class="p-3.5 flex flex-col flex-1">
+  <div class="flex flex-col flex-1 {plain ? 'pt-3' : 'p-3.5'}">
     <LinkButton
       onclick={(e) => {
         e.stopPropagation();
@@ -129,26 +136,32 @@
       {/if}
       <span class="text-xs text-brand-text-secondary font-medium shrink-0">{album.year || ""}</span>
     </div>
-    <!-- min-h-6 matches the compact genre chip's h-6, so the stars sit at the same height whether
-         or not the album has a genre (#1757). The chip's wrapper is flex so the inline chip adds
-         no line-box gap below it. -->
-    <div
-      data-testid="album-card-genre-row"
-      class="flex items-center justify-between mt-0.5 gap-2 min-h-6"
-    >
-      <div class="flex min-w-0"><GenreChips genre={album.genre} /></div>
-      <span class="shrink-0"
-        ><SongRating
-          isAlbum
-          revealOnInteract
-          rating={currentRating}
-          onRate={handleRate}
-          size="sm"
-        /></span
+    <!-- Plain tiles (Home) stop at one line of detail; the genre chips and stars stay in the
+         boxed card, and the rating stays reachable from the album menu and the album page. -->
+    {#if !plain}
+      <!-- min-h-6 matches the compact genre chip's h-6, so the stars sit at the same height whether
+           or not the album has a genre (#1757). The chip's wrapper is flex so the inline chip adds
+           no line-box gap below it. -->
+      <div
+        data-testid="album-card-genre-row"
+        class="flex items-center justify-between mt-0.5 gap-2 min-h-6"
       >
-    </div>
+        <div class="flex min-w-0"><GenreChips genre={album.genre} /></div>
+        <span class="shrink-0"
+          ><SongRating
+            isAlbum
+            revealOnInteract
+            rating={currentRating}
+            onRate={handleRate}
+            size="sm"
+          /></span
+        >
+      </div>
+    {/if}
   </div>
-  <div
-    class="absolute inset-0 rounded-b-xl ring-2 ring-inset ring-transparent group-hover:ring-brand-accent transition-[box-shadow] duration-200 pointer-events-none"
-  ></div>
+  {#if !plain}
+    <div
+      class="absolute inset-0 rounded-b-xl ring-2 ring-inset ring-transparent group-hover:ring-brand-accent transition-[box-shadow] duration-200 pointer-events-none"
+    ></div>
+  {/if}
 </div>

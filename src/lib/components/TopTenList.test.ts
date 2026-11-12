@@ -177,7 +177,7 @@ describe("TopTenList.svelte", () => {
     expect(onHeaderClick).toHaveBeenCalledOnce();
   });
 
-  it("shows a keyboard-reachable movement indicator for chart items but not for items without movement data", () => {
+  it("says how a chart album moved in words, and nothing for items without movement data", () => {
     const items: StatsTopItem[] = [
       {
         key: "album_1",
@@ -205,21 +205,20 @@ describe("TopTenList.svelte", () => {
       },
     ];
 
-    const { getAllByRole } = render(TopTenList, {
+    const { getByText, queryByText } = render(TopTenList, {
       props: {
         items,
         kind: "album",
       },
     });
 
-    const movementIndicators = getAllByRole("button").filter((b) =>
-      /Rising|Steady|New|Re-entry|Falling/.test(b.getAttribute("aria-label") ?? ""),
-    );
-    expect(movementIndicators).toHaveLength(1);
-    expect(movementIndicators[0]).toHaveAccessibleName("Rising · 2 weeks");
+    // Rank 1 now, rank 3 last week: up two places. The weeks on chart live in the tooltip only.
+    const movement = getByText("Up 2");
+    expect(movement).toHaveAttribute("title", "2 weeks");
+    expect(queryByText(/^(Rising|Steady|Falling)$|Peak/)).not.toBeInTheDocument();
   });
 
-  it("labels an album back on the chart after missing last week as a re-entry with its peak", () => {
+  it("labels an album back on the chart after missing last week as a re-entry", () => {
     const items: StatsTopItem[] = [
       {
         key: "album_1",
@@ -237,10 +236,10 @@ describe("TopTenList.svelte", () => {
       },
     ];
 
-    const { getByRole, getByText } = render(TopTenList, { props: { items, kind: "album" } });
+    const { getByText, queryByText } = render(TopTenList, { props: { items, kind: "album" } });
 
-    expect(getByRole("button", { name: "Re-entry · 2 weeks" })).toBeInTheDocument();
-    expect(getByText("Peak #2")).toBeInTheDocument();
+    expect(getByText("Re-entry")).toHaveAttribute("title", "2 weeks");
+    expect(queryByText(/Peak/)).not.toBeInTheDocument();
   });
 
   it("renders custom emptyText when items array is empty", () => {
