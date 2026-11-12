@@ -44,10 +44,10 @@
       customClick(e);
     } else {
       if (album.album_key) {
-      navigationStore.viewAlbum(album.album || "", undefined, album.album_key);
-    } else {
-      navigationStore.viewAlbum(album.album || "");
-    }
+        navigationStore.viewAlbum(album.album || "", undefined, album.album_key);
+      } else {
+        navigationStore.viewAlbum(album.album || "");
+      }
     }
   }
 
@@ -76,7 +76,12 @@
   onclick={handleClick}
   ondblclick={handleDblClick}
   oncontextmenu={(e) => customContextMenu?.(e)}
-  onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleClick(e as unknown as MouseEvent); } }}
+  onkeydown={(e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleClick(e as unknown as MouseEvent);
+    }
+  }}
   class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full relative overflow-hidden"
 >
   {#if typeof progressPercent === "number" && progressPercent > 0}
@@ -108,14 +113,22 @@
 
   <div class="relative z-10 min-w-0 flex-1 flex flex-col gap-0.5">
     <div class="flex items-center justify-between gap-2 min-w-0">
-      <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{album.album || i18n.t('collection.unknownAlbum')}</p>
+      <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
+        {album.album || i18n.t("collection.unknownAlbum")}
+      </p>
       {#if album.year}
-        <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{album.year}</span>
+        <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0"
+          >{album.year}</span
+        >
       {/if}
     </div>
     <div class="flex items-center justify-between gap-2 min-w-0">
-      <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{album.artist || i18n.t('collection.variousArtists')}</p>
-      <span class="shrink-0" onclick={(e) => e.stopPropagation()}><SongRating isAlbum rating={currentRating} onRate={rateAlbum} size="sm" /></span>
+      <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">
+        {album.artist || i18n.t("collection.variousArtists")}
+      </p>
+      <span class="shrink-0" onclick={(e) => e.stopPropagation()}
+        ><SongRating isAlbum rating={currentRating} onRate={rateAlbum} size="sm" /></span
+      >
     </div>
   </div>
 

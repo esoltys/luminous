@@ -18,8 +18,8 @@
         { keys: ["↑"], label: i18n.t("shortcuts.volumeUp") },
         { keys: ["↓"], label: i18n.t("shortcuts.volumeDown") },
         { keys: ["Page Up"], label: i18n.t("shortcuts.seekBack") },
-        { keys: ["Page Down"], label: i18n.t("shortcuts.seekForward") }
-      ]
+        { keys: ["Page Down"], label: i18n.t("shortcuts.seekForward") },
+      ],
     },
     {
       title: i18n.t("shortcuts.groupNavigation"),
@@ -30,8 +30,8 @@
         { keys: ["Esc"], label: i18n.t("shortcuts.closeSearch") },
         { keys: ["Ctrl", "O"], label: i18n.t("shortcuts.openSong") },
         { keys: ["Ctrl", "["], label: i18n.t("shortcuts.goBack") },
-        { keys: ["Ctrl", "]"], label: i18n.t("shortcuts.goForward") }
-      ]
+        { keys: ["Ctrl", "]"], label: i18n.t("shortcuts.goForward") },
+      ],
     },
     {
       title: i18n.t("shortcuts.groupLayout"),
@@ -41,19 +41,23 @@
         { keys: ["Ctrl", "I"], label: i18n.t("shortcuts.toggleRightPanel") },
         { keys: ["Ctrl", "M"], label: i18n.t("shortcuts.toggleMiniplayer") },
         { keys: ["Ctrl", ","], label: i18n.t("shortcuts.openSettings") },
-        { keys: ["Ctrl", "/"], label: i18n.t("shortcuts.showShortcuts") }
-      ]
-    }
+        { keys: ["Ctrl", "/"], label: i18n.t("shortcuts.showShortcuts") },
+      ],
+    },
   ]);
 </script>
 
 <Modal {onClose} closeOnBackdropClick ariaLabelledby="shortcuts-modal-title" class="max-h-[85vh]">
-  <div class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50 shrink-0">
+  <div
+    class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50 shrink-0"
+  >
     <div class="flex items-center gap-2.5">
       <div class="p-2 rounded-xl bg-brand-accent/20 text-brand-accent-text">
         <Keyboard class="w-5 h-5" />
       </div>
-      <h2 id="shortcuts-modal-title" class="text-base font-bold text-brand-text-primary">{i18n.t("shortcuts.title")}</h2>
+      <h2 id="shortcuts-modal-title" class="text-base font-bold text-brand-text-primary">
+        {i18n.t("shortcuts.title")}
+      </h2>
     </div>
     <button
       onclick={onClose}
@@ -66,13 +70,19 @@
   <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
     {#each groups as group (group.title)}
       <div>
-        <h3 class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider mb-2">{group.title}</h3>
-        <div class="rounded-xl border border-brand-border/60 divide-y divide-brand-border/40 overflow-hidden">
+        <h3 class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider mb-2">
+          {group.title}
+        </h3>
+        <div
+          class="rounded-xl border border-brand-border/60 divide-y divide-brand-border/40 overflow-hidden"
+        >
           {#each group.entries as entry (entry.keys.join("+"))}
             <div class="flex items-center justify-between gap-4 px-4 py-2.5 bg-brand-main/30">
               <div class="flex items-center gap-1.5 shrink-0">
                 {#each entry.keys as key (key)}
-                  <kbd class="min-w-[1.75rem] px-2 py-1 rounded-lg bg-brand-main border border-brand-border text-xs font-semibold text-brand-text-primary text-center">
+                  <kbd
+                    class="min-w-[1.75rem] px-2 py-1 rounded-lg bg-brand-main border border-brand-border text-xs font-semibold text-brand-text-primary text-center"
+                  >
                     {key}
                   </kbd>
                 {/each}

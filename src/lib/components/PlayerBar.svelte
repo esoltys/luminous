@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { fly, prefersReducedMotion } from '../utils/motion';
-  import { cubicOut } from 'svelte/easing';
+  import { fly, prefersReducedMotion } from "../utils/motion";
+  import { cubicOut } from "svelte/easing";
   import { playerStore } from "../stores/player.svelte";
   import { setVolumeFromSlider, volumeSliderBackground } from "../volumeSlider";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -59,14 +59,13 @@
     InfoIcon as Info,
     ListIcon as Menu,
     SubtitlesIcon as Lyrics,
-    StackIcon as Layers
+    StackIcon as Layers,
   } from "phosphor-svelte";
 
-
-
-
   let volumePercent = $derived(playerStore.volume * 100);
-  let volumeSliderStyle = $derived(volumeSliderBackground(playerStore.volume, playerStore.volumeSafety));
+  let volumeSliderStyle = $derived(
+    volumeSliderBackground(playerStore.volume, playerStore.volumeSafety),
+  );
 
   function handleSeek(e: Event) {
     const input = e.target as HTMLInputElement;
@@ -97,7 +96,13 @@
   }
 
   function cycleShuffle() {
-    const modes: import("../types").ShuffleMode[] = ["off", "all", "inside_album", "albums", "artists"];
+    const modes: import("../types").ShuffleMode[] = [
+      "off",
+      "all",
+      "inside_album",
+      "albums",
+      "artists",
+    ];
     const currentIdx = modes.indexOf(playerStore.shuffleMode);
     const nextIdx = (currentIdx + 1) % modes.length;
     playerStore.setShuffleMode(modes[nextIdx]);
@@ -112,21 +117,31 @@
 
   function shuffleModeLabel(mode: import("../types").ShuffleMode): string {
     switch (mode) {
-      case "off": return i18n.t('playerBar.shuffleOff');
-      case "all": return i18n.t('playerBar.shuffleAll');
-      case "inside_album": return i18n.t('playerBar.shuffleInsideAlbum');
-      case "albums": return i18n.t('playerBar.shuffleAlbums');
-      case "artists": return i18n.t('playerBar.shuffleArtists');
+      case "off":
+        return i18n.t("playerBar.shuffleOff");
+      case "all":
+        return i18n.t("playerBar.shuffleAll");
+      case "inside_album":
+        return i18n.t("playerBar.shuffleInsideAlbum");
+      case "albums":
+        return i18n.t("playerBar.shuffleAlbums");
+      case "artists":
+        return i18n.t("playerBar.shuffleArtists");
     }
   }
 
   function repeatModeLabel(mode: import("../types").RepeatMode): string {
     switch (mode) {
-      case "off": return i18n.t('playerBar.repeatOff');
-      case "track": return i18n.t('playerBar.repeatSong');
-      case "album": return i18n.t('playerBar.repeatAlbum');
-      case "playlist": return i18n.t('playerBar.repeatPlaylist');
-      default: return mode;
+      case "off":
+        return i18n.t("playerBar.repeatOff");
+      case "track":
+        return i18n.t("playerBar.repeatSong");
+      case "album":
+        return i18n.t("playerBar.repeatAlbum");
+      case "playlist":
+        return i18n.t("playerBar.repeatPlaylist");
+      default:
+        return mode;
     }
   }
 
@@ -134,21 +149,31 @@
   // what the mode does, not just its name.
   function shuffleModeDescription(mode: import("../types").ShuffleMode): string {
     switch (mode) {
-      case "off": return i18n.t('playerBar.shuffleOffDesc');
-      case "all": return i18n.t('playerBar.shuffleAllDesc');
-      case "inside_album": return i18n.t('playerBar.shuffleInsideAlbumDesc');
-      case "albums": return i18n.t('playerBar.shuffleAlbumsDesc');
-      case "artists": return i18n.t('playerBar.shuffleArtistsDesc');
+      case "off":
+        return i18n.t("playerBar.shuffleOffDesc");
+      case "all":
+        return i18n.t("playerBar.shuffleAllDesc");
+      case "inside_album":
+        return i18n.t("playerBar.shuffleInsideAlbumDesc");
+      case "albums":
+        return i18n.t("playerBar.shuffleAlbumsDesc");
+      case "artists":
+        return i18n.t("playerBar.shuffleArtistsDesc");
     }
   }
 
   function repeatModeDescription(mode: import("../types").RepeatMode): string {
     switch (mode) {
-      case "off": return i18n.t('playerBar.repeatOffDesc');
-      case "track": return i18n.t('playerBar.repeatSongDesc');
-      case "album": return i18n.t('playerBar.repeatAlbumDesc');
-      case "playlist": return i18n.t('playerBar.repeatPlaylistDesc');
-      default: return "";
+      case "off":
+        return i18n.t("playerBar.repeatOffDesc");
+      case "track":
+        return i18n.t("playerBar.repeatSongDesc");
+      case "album":
+        return i18n.t("playerBar.repeatAlbumDesc");
+      case "playlist":
+        return i18n.t("playerBar.repeatPlaylistDesc");
+      default:
+        return "";
     }
   }
 
@@ -159,24 +184,32 @@
   // so it stays legible. Reuses the same Phosphor icons as the rest of the app.
   function shuffleTypeIcon(mode: import("../types").ShuffleMode) {
     switch (mode) {
-      case "inside_album": return DiscAlbum;
-      case "albums": return DiscAlbum;
-      case "artists": return Mic2;
-      default: return null;
+      case "inside_album":
+        return DiscAlbum;
+      case "albums":
+        return DiscAlbum;
+      case "artists":
+        return Mic2;
+      default:
+        return null;
     }
   }
 
   function repeatTypeIcon(mode: import("../types").RepeatMode) {
     switch (mode) {
-      case "track": return Music;
-      case "album": return DiscAlbum;
-      case "playlist": return ListMusic;
-      default: return null;
+      case "track":
+        return Music;
+      case "album":
+        return DiscAlbum;
+      case "playlist":
+        return ListMusic;
+      default:
+        return null;
     }
   }
 
   let coverTitle = $derived(
-    playerStore.currentSong ? i18n.t('playerBar.immersiveTitle', {}, 'Immersive Mode') : ""
+    playerStore.currentSong ? i18n.t("playerBar.immersiveTitle", {}, "Immersive Mode") : "",
   );
 
   // Cover art now only toggles Immersive View (#876) — navigating to the
@@ -208,7 +241,6 @@
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     contextMenuState = { x: rect.left, y: rect.top };
   }
-
 
   async function navigateToQueue() {
     windowLayoutStore.exitImmersiveMode();
@@ -244,12 +276,12 @@
     {
       duration = 250,
       easing = cubicOut,
-      marginSide = node.nextElementSibling ? 'right' : 'left',
+      marginSide = node.nextElementSibling ? "right" : "left",
     }: {
       duration?: number;
       easing?: (t: number) => number;
-      marginSide?: 'left' | 'right';
-    } = {}
+      marginSide?: "left" | "right";
+    } = {},
   ) {
     const style = getComputedStyle(node);
     const parentStyle = node.parentElement ? getComputedStyle(node.parentElement) : null;
@@ -259,7 +291,7 @@
     const width = parseFloat(style.width) || node.getBoundingClientRect().width || 20;
     const paddingLeft = parseFloat(style.paddingLeft) || 0;
     const paddingRight = parseFloat(style.paddingRight) || 0;
-    const marginProp = marginSide === 'left' ? 'margin-left' : 'margin-right';
+    const marginProp = marginSide === "left" ? "margin-left" : "margin-right";
 
     return {
       // Animates layout width, like `slide` — so under reduced motion it
@@ -276,20 +308,31 @@
         padding-right: ${t * paddingRight}px;
         ${marginProp}: -${(1 - t) * gap}px;
         white-space: nowrap;
-        pointer-events: ${t < 0.1 ? 'none' : 'auto'};
+        pointer-events: ${t < 0.1 ? "none" : "auto"};
       `,
     };
   }
 </script>
 
 <footer
-  transition:fly={{ y: 40, duration: windowLayoutStore.isPlaybarOnlyMode ? 0 : 300, easing: cubicOut }}
-  class="relative bg-brand-playerbar flex items-center justify-between gap-3 px-5 md:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme ? 'glass-surface' : ''} {windowLayoutStore.isPlaybarOnlyMode ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none' : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-[2rem]'}"
+  transition:fly={{
+    y: 40,
+    duration: windowLayoutStore.isPlaybarOnlyMode ? 0 : 300,
+    easing: cubicOut,
+  }}
+  class="relative bg-brand-playerbar flex items-center justify-between gap-3 px-5 md:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme
+    ? 'glass-surface'
+    : ''} {windowLayoutStore.isPlaybarOnlyMode
+    ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none'
+    : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-[2rem]'}"
 >
   {#if themeStore.activeAddon?.overlayEntry}
     <AddonOverlay addon={themeStore.activeAddon} />
   {/if}
-  <div data-walkthrough-target="player-bar-cover" class="flex items-center gap-3 min-w-0 flex-1 md:w-1/3 md:flex-none md:min-w-[200px] max-w-sm">
+  <div
+    data-walkthrough-target="player-bar-cover"
+    class="flex items-center gap-3 min-w-0 flex-1 md:w-1/3 md:flex-none md:min-w-[200px] max-w-sm"
+  >
     <button
       onclick={handleCoverClick}
       disabled={!playerStore.currentSong}
@@ -306,7 +349,10 @@
     </button>
     <div class="flex flex-col truncate">
       <div class="flex items-center gap-2">
-        <span class="text-sm font-semibold text-brand-text-primary truncate" title={playerStore.currentSong?.title}>
+        <span
+          class="text-sm font-semibold text-brand-text-primary truncate"
+          title={playerStore.currentSong?.title}
+        >
           {playerStore.currentSongDisplayTitle}
         </span>
         {#if playerStore.currentSong}
@@ -327,7 +373,7 @@
             navigationStore.viewAlbum(playerStore.currentSong?.album || "");
           }}
           class="text-xs text-brand-text-secondary/70 truncate"
-          title={i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album })}
+          title={i18n.t("collection.filterByAlbum", { album: playerStore.currentSong.album })}
         >
           {playerStore.currentSong.album}
         </LinkButton>
@@ -337,38 +383,52 @@
           onclick={(e) => {
             e.stopPropagation();
             windowLayoutStore.exitImmersiveMode();
-            navigationStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || "");
+            navigationStore.viewArtist(
+              playerStore.currentSong?.album_artist?.trim() ||
+                playerStore.currentSong?.artist ||
+                "",
+            );
           }}
           class="text-xs text-brand-text-secondary/70 truncate"
-          title={i18n.t('collection.filterByArtist', { artist: playerStore.currentSong.artist })}
+          title={i18n.t("collection.filterByArtist", { artist: playerStore.currentSong.artist })}
         >
           {playerStore.currentSong.artist}
         </LinkButton>
       {:else}
         <span class="text-xs text-brand-text-secondary/70 truncate">
-          {playerStore.currentSong ? i18n.t('collection.unknownArtist') : ""}
+          {playerStore.currentSong ? i18n.t("collection.unknownArtist") : ""}
         </span>
       {/if}
     </div>
   </div>
 
-  <div data-walkthrough-target="player-bar-controls" class="flex flex-col items-center gap-1.5 min-w-0 flex-1 xs:ml-auto sm:ml-0 md:w-1/3 md:flex-none max-w-[600px]">
+  <div
+    data-walkthrough-target="player-bar-controls"
+    class="flex flex-col items-center gap-1.5 min-w-0 flex-1 xs:ml-auto sm:ml-0 md:w-1/3 md:flex-none max-w-[600px]"
+  >
     <div class="flex items-center gap-3 md:gap-5">
       {#if !windowLayoutStore.isRightPanelAutoHidden}
-        <div transition:collapseFade={{ duration: 250 }} class="relative inline-flex items-center flex-shrink-0">
-          {#if playerStore.shuffleMode !== 'off'}
+        <div
+          transition:collapseFade={{ duration: 250 }}
+          class="relative inline-flex items-center flex-shrink-0"
+        >
+          {#if playerStore.shuffleMode !== "off"}
             <button
               onclick={cycleShuffle}
               class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
-              title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+              title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
             >
-              {i18n.t('playerBar.shuffle')} {shuffleModeLabel(playerStore.shuffleMode)}
+              {i18n.t("playerBar.shuffle")}
+              {shuffleModeLabel(playerStore.shuffleMode)}
             </button>
           {/if}
           <button
             onclick={cycleShuffle}
-            class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-            title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+            class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.shuffleMode !==
+            'off'
+              ? 'text-brand-accent-text font-bold'
+              : 'text-brand-text-secondary/50'}"
+            title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
           >
             {#if shuffleTypeIcon(playerStore.shuffleMode)}
               {@const ShuffleTypeIcon = shuffleTypeIcon(playerStore.shuffleMode)}
@@ -379,15 +439,19 @@
         </div>
       {/if}
 
-      <button onclick={() => playerStore.previous()} class="hidden xs:block text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.previous')}>
+      <button
+        onclick={() => playerStore.previous()}
+        class="hidden xs:block text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+        title={i18n.t("playerBar.previous")}
+      >
         <SkipBack class="w-5 h-5 fill-current" />
       </button>
 
-      {#if playerStore.state === 'playing'}
+      {#if playerStore.state === "playing"}
         <button
           onclick={() => playerStore.pause()}
           class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors"
-          title={i18n.t('playerBar.pause')}
+          title={i18n.t("playerBar.pause")}
         >
           <Pause class="w-4 h-4 fill-current" />
         </button>
@@ -395,22 +459,32 @@
         <button
           onclick={() => playerStore.resume()}
           class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors"
-          title={i18n.t('playerBar.play')}
+          title={i18n.t("playerBar.play")}
         >
           <Play class="w-4 h-4 fill-current" />
         </button>
       {/if}
 
-      <button onclick={() => playerStore.next()} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.next')}>
+      <button
+        onclick={() => playerStore.next()}
+        class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+        title={i18n.t("playerBar.next")}
+      >
         <SkipForward class="w-5 h-5 fill-current" />
       </button>
 
       {#if !windowLayoutStore.isRightPanelAutoHidden}
-        <div transition:collapseFade={{ duration: 250 }} class="relative inline-flex items-center flex-shrink-0">
+        <div
+          transition:collapseFade={{ duration: 250 }}
+          class="relative inline-flex items-center flex-shrink-0"
+        >
           <button
             onclick={cycleRepeat}
-            class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-            title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+            class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !==
+            'off'
+              ? 'text-brand-accent-text font-bold'
+              : 'text-brand-text-secondary/50'}"
+            title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
           >
             <Repeat class="w-4 h-4" />
             {#if repeatTypeIcon(playerStore.repeatMode)}
@@ -418,13 +492,14 @@
               <RepeatTypeIcon class="w-4 h-4" />
             {/if}
           </button>
-          {#if playerStore.repeatMode !== 'off'}
+          {#if playerStore.repeatMode !== "off"}
             <button
               onclick={cycleRepeat}
               class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
-              title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+              title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
             >
-              {i18n.t('playerBar.repeat')} {repeatModeLabel(playerStore.repeatMode)}
+              {i18n.t("playerBar.repeat")}
+              {repeatModeLabel(playerStore.repeatMode)}
             </button>
           {/if}
         </div>
@@ -434,18 +509,15 @@
         <button
           onclick={() => windowLayoutStore.toggleMiniplayerMode()}
           class="text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
-          title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
+          title={i18n.t("miniplayer.toggleTooltip", {}, "Picture-in-Picture Mode (Ctrl+M)")}
         >
           <PictureInPicture class="w-4 h-4" />
         </button>
       {/if}
-
     </div>
 
     {#if !windowLayoutStore.isPlayerBarCompact}
-      <div
-        class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60"
-      >
+      <div class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
         <!-- Quality indicator badge (opens pipeline popover on click) -->
         <QualityBadge />
         <span>{formatDuration(playerStore.positionNanosec)}</span>
@@ -456,11 +528,19 @@
         <button
           onclick={() => prefs.toggleSeekBarMode()}
           class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
-          title={prefs.seekBarMode === 'waveform'
-            ? i18n.t('playerBar.seekbarModeWaveform', {}, 'Waveform mode — click to switch to frequency bands')
-            : i18n.t('playerBar.seekbarModeBands', {}, 'Frequency bands mode — click to switch to waveform')}
+          title={prefs.seekBarMode === "waveform"
+            ? i18n.t(
+                "playerBar.seekbarModeWaveform",
+                {},
+                "Waveform mode — click to switch to frequency bands",
+              )
+            : i18n.t(
+                "playerBar.seekbarModeBands",
+                {},
+                "Frequency bands mode — click to switch to waveform",
+              )}
         >
-          {#if prefs.seekBarMode === 'waveform'}
+          {#if prefs.seekBarMode === "waveform"}
             <AudioWaveform class="w-3 h-3" />
           {:else}
             <Palette class="w-3 h-3" />
@@ -481,7 +561,7 @@
           onclick={openCurrentSongMenu}
           disabled={!playerStore.currentSong}
           class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
-          title={i18n.t('playerBar.menuTooltip')}
+          title={i18n.t("playerBar.menuTooltip")}
         >
           <Menu class="w-5 h-5" />
         </button>
@@ -492,8 +572,11 @@
               windowLayoutStore.exitImmersiveMode();
               navigationStore.activeTab = "lyrics";
             }}
-            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {navigationStore.activeTab === 'lyrics' ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-            title={i18n.t('sidebar.lyrics')}
+            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {navigationStore.activeTab ===
+            'lyrics'
+              ? 'text-brand-accent-text'
+              : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            title={i18n.t("sidebar.lyrics")}
           >
             <Lyrics class="w-5 h-5" />
           </button>
@@ -501,8 +584,11 @@
         <button
           onclick={navigateToQueue}
           data-drop-target="queue"
-          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors {songDrag.isDragging && songDrag.dropTarget?.kind === 'queue' ? 'text-brand-accent-text scale-110' : ''}"
-          title={i18n.t('playerBar.queueTitle', {}, 'Queue')}
+          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors {songDrag.isDragging &&
+          songDrag.dropTarget?.kind === 'queue'
+            ? 'text-brand-accent-text scale-110'
+            : ''}"
+          title={i18n.t("playerBar.queueTitle", {}, "Queue")}
         >
           <Layers class="w-5 h-5" />
         </button>
@@ -510,8 +596,10 @@
           <button
             transition:collapseFade={{ duration: 250 }}
             onclick={handleInfoClick}
-            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {windowLayoutStore.rightPanelVisible ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-            title={i18n.t('topNav.toggleRightPanel')}
+            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {windowLayoutStore.rightPanelVisible
+              ? 'text-brand-accent-text'
+              : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            title={i18n.t("topNav.toggleRightPanel")}
           >
             <Info class="w-5 h-5" />
           </button>
@@ -519,7 +607,7 @@
         <button
           onclick={() => windowLayoutStore.toggleMiniplayerMode()}
           class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-          title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
+          title={i18n.t("miniplayer.toggleTooltip", {}, "Picture-in-Picture Mode (Ctrl+M)")}
         >
           <PictureInPicture class="w-5 h-5" />
         </button>
@@ -531,7 +619,11 @@
             <SpectrumVisualizer />
           </div>
         {/if}
-        <button onclick={toggleMute} class="inline-flex items-center justify-center text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.volume')}>
+        <button
+          onclick={toggleMute}
+          class="inline-flex items-center justify-center text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          title={i18n.t("playerBar.volume")}
+        >
           {#if isMuted || playerStore.volume === 0}
             <VolumeX class="w-4 h-4" />
           {:else}
@@ -550,8 +642,8 @@
           onkeyup={releaseVolumeFocus}
           class="volume-slider w-20 h-1 rounded-lg outline-none"
           style={volumeSliderStyle}
-          aria-label={i18n.t('playerBar.volumeSlider')}
-          title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
+          aria-label={i18n.t("playerBar.volumeSlider")}
+          title={i18n.t("playerBar.volumeWithValue", { value: Math.round(volumePercent) })}
         />
       </div>
     </div>
@@ -566,18 +658,35 @@
     {song}
     onPlay={() => playerStore.playSong(song.id)}
     onAddToPlaylist={() => playlistsStore.addSongsToActiveTarget([song.id], song.title || "Song")}
-    onGoToArtist={song.artist ? () => { windowLayoutStore.exitImmersiveMode(); navigationStore.viewArtist(song.album_artist?.trim() || song.artist || ""); } : undefined}
-    onGoToAlbum={song.album ? () => { windowLayoutStore.exitImmersiveMode(); navigationStore.viewAlbum(song.album || ""); } : undefined}
-    onEditTags={() => { windowLayoutStore.exitImmersiveMode(); editingSongId = song.id; }}
+    onGoToArtist={song.artist
+      ? () => {
+          windowLayoutStore.exitImmersiveMode();
+          navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "");
+        }
+      : undefined}
+    onGoToAlbum={song.album
+      ? () => {
+          windowLayoutStore.exitImmersiveMode();
+          navigationStore.viewAlbum(song.album || "");
+        }
+      : undefined}
+    onEditTags={() => {
+      windowLayoutStore.exitImmersiveMode();
+      editingSongId = song.id;
+    }}
     onOpenInPicard={() => openInPicard([song.id])}
-    onClose={() => { contextMenuState = null; }}
+    onClose={() => {
+      contextMenuState = null;
+    }}
   />
 {/if}
 
 {#if editingSongId !== null}
   <TagEditor
     songId={editingSongId}
-    onClose={() => { editingSongId = null; }}
+    onClose={() => {
+      editingSongId = null;
+    }}
     onSave={handleTagEditorSaved}
   />
 {/if}
@@ -604,7 +713,10 @@
     background-color: var(--bg-playerbar, #191b23) !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 35px 4px var(--color-accent), 0 0 90px 12px var(--color-accent) !important;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.5),
+      0 0 35px 4px var(--color-accent),
+      0 0 90px 12px var(--color-accent) !important;
   }
 
   /* Liquid-glass "shine": a light-catching specular highlight on top of the

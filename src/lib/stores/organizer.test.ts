@@ -96,7 +96,7 @@ describe("organizeStore", () => {
     expect(toastStore.show).toHaveBeenCalledWith(
       expect.stringContaining("8"),
       "success",
-      TOAST_DURATION_MS
+      TOAST_DURATION_MS,
     );
   });
 
@@ -104,10 +104,7 @@ describe("organizeStore", () => {
     organizeStore.handleResult({ moved_count: 0, duplicates_count: 2, errors: [] });
 
     // Duplicates toast fires immediately and omits durationMs (sticky)
-    expect(toastStore.show).toHaveBeenCalledWith(
-      expect.stringContaining("2"),
-      "warning"
-    );
+    expect(toastStore.show).toHaveBeenCalledWith(expect.stringContaining("2"), "warning");
   });
 
   it("shows sticky error notification when file move errors occur", () => {
@@ -118,10 +115,7 @@ describe("organizeStore", () => {
     });
 
     // Error toast fires immediately and omits durationMs (sticky)
-    expect(toastStore.show).toHaveBeenCalledWith(
-      expect.stringContaining("1"),
-      "error"
-    );
+    expect(toastStore.show).toHaveBeenCalledWith(expect.stringContaining("1"), "error");
   });
 
   it("remains silent when 0 files were moved and no duplicates/errors", () => {
@@ -150,7 +144,12 @@ describe("organizeStore", () => {
         // collision item
         { from_path: "/music/e.mp3", to_path: "/music/artist/e.mp3", status: "collision" },
         // collision masked as ok with error message
-        { from_path: "/music/f.mp3", to_path: "/music/artist/f.mp3", status: "ok", error_message: "Collision" },
+        {
+          from_path: "/music/f.mp3",
+          to_path: "/music/artist/f.mp3",
+          status: "ok",
+          error_message: "Collision",
+        },
         // error item
         { from_path: "/music/g.mp3", to_path: "/music/artist/g.mp3", status: "error" },
       ];

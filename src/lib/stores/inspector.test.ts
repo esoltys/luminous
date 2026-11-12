@@ -14,7 +14,8 @@ import { inspectorStore } from "./inspector.svelte";
 import { navigationStore } from "./navigation.svelte";
 import { playerStore } from "./player.svelte";
 
-const song = (id: number, extra: Partial<Song> = {}) => ({ id, title: `Song ${id}`, ...extra }) as Song;
+const song = (id: number, extra: Partial<Song> = {}) =>
+  ({ id, title: `Song ${id}`, ...extra }) as Song;
 
 async function settle() {
   flushSync();
@@ -48,13 +49,21 @@ describe("inspectorStore", () => {
 
   it("falls back to the playing song", () => {
     playerStore.currentSong = song(1);
-    expect(inspectorStore.subject).toMatchObject({ kind: "song", source: "playing", song: { id: 1 } });
+    expect(inspectorStore.subject).toMatchObject({
+      kind: "song",
+      source: "playing",
+      song: { id: 1 },
+    });
   });
 
   it("a selected song beats the playing song", () => {
     playerStore.currentSong = song(1);
     inspectorStore.setSelection("album-view", song(2));
-    expect(inspectorStore.subject).toMatchObject({ kind: "song", source: "selection", song: { id: 2 } });
+    expect(inspectorStore.subject).toMatchObject({
+      kind: "song",
+      source: "selection",
+      song: { id: 2 },
+    });
   });
 
   it("clearing the selection returns to the playing song; clearing an unknown view is a no-op", () => {
@@ -77,19 +86,31 @@ describe("inspectorStore", () => {
     playerStore.currentSong = song(1);
     navigationStore.selectedAlbumName = "Dark Side";
     await settle();
-    expect(inspectorStore.subject).toMatchObject({ kind: "album", source: "view", key: "album:Dark Side", song: { id: 100 } });
+    expect(inspectorStore.subject).toMatchObject({
+      kind: "album",
+      source: "view",
+      key: "album:Dark Side",
+      song: { id: 100 },
+    });
   });
 
   it("describes the viewed artist when no album is open", async () => {
     navigationStore.selectedArtistName = "Pink Floyd";
     await settle();
-    expect(inspectorStore.subject).toMatchObject({ kind: "artist", source: "view", key: "artist:Pink Floyd", song: { id: 200 } });
+    expect(inspectorStore.subject).toMatchObject({
+      kind: "artist",
+      source: "view",
+      key: "artist:Pink Floyd",
+      song: { id: 200 },
+    });
   });
 
   it("prefers a song with MusicBrainz IDs as the representative of an artist or album", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "get_songs_by_artist") return [song(1), song(2, { musicbrainz_artist_id: "artist-mbid" })];
-      if (cmd === "get_songs_by_album") return [song(3), song(4, { musicbrainz_release_group_id: "rg-mbid" })];
+      if (cmd === "get_songs_by_artist")
+        return [song(1), song(2, { musicbrainz_artist_id: "artist-mbid" })];
+      if (cmd === "get_songs_by_album")
+        return [song(3), song(4, { musicbrainz_release_group_id: "rg-mbid" })];
       return null;
     });
     navigationStore.selectedArtistName = "Pink Floyd";
@@ -104,7 +125,11 @@ describe("inspectorStore", () => {
     navigationStore.selectedAlbumName = "Dark Side";
     await settle();
     inspectorStore.setSelection("album-view", song(5));
-    expect(inspectorStore.subject).toMatchObject({ kind: "song", source: "selection", song: { id: 5 } });
+    expect(inspectorStore.subject).toMatchObject({
+      kind: "song",
+      source: "selection",
+      song: { id: 5 },
+    });
   });
 
   it("ignores a viewed entity while another tab is active", async () => {
@@ -172,7 +197,11 @@ describe("inspectorStore", () => {
       expect(inspectorStore.subject?.source).not.toBe("playing");
 
       inspectorStore.showPlaying();
-      expect(inspectorStore.subject).toMatchObject({ kind: "song", source: "playing", song: { id: 1 } });
+      expect(inspectorStore.subject).toMatchObject({
+        kind: "song",
+        source: "playing",
+        song: { id: 1 },
+      });
     });
 
     it("holds when a table re-reports the same selection, but yields to a different song", () => {

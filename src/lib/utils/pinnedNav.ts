@@ -1,11 +1,5 @@
 import type { Component } from "svelte";
-import type {
-  AutoPlaylistItem,
-  PinnedItem,
-  PinnedItemType,
-  ArtistItem,
-  Playlist,
-} from "../types";
+import type { AutoPlaylistItem, PinnedItem, PinnedItemType, ArtistItem, Playlist } from "../types";
 import { pinnedRefKeyFor } from "../types";
 import { navigationStore } from "../stores/navigation.svelte";
 import { playerStore } from "../stores/player.svelte";
@@ -97,7 +91,9 @@ export function autoPlaylistLabel(ap: AutoPlaylistItem): string {
     }
     default: {
       const pl = playlistsStore.playlists.find((p) => p.id === ap.playlistId);
-      return pl ? getPlaylistDisplayName(pl) : (ap.genre ?? ap.decade ?? ap.bpm ?? ap.artistTag ?? ap.kind);
+      return pl
+        ? getPlaylistDisplayName(pl)
+        : (ap.genre ?? ap.decade ?? ap.bpm ?? ap.artistTag ?? ap.kind);
     }
   }
 }
@@ -151,7 +147,8 @@ export function toNavigablePin(item: PinnedItem): NavigablePin {
       const subtitle = item.album.artist || i18n.t("collection.variousArtists");
       const isActive =
         navigationStore.activeTab === "collection" &&
-        navigationStore.selectedAlbumName !== null && sameAlbum(navigationStore.selectedAlbumName, item.album.album);
+        navigationStore.selectedAlbumName !== null &&
+        sameAlbum(navigationStore.selectedAlbumName, item.album.album);
       return {
         id,
         rawItem: item,

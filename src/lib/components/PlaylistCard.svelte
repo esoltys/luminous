@@ -3,7 +3,7 @@
   import {
     PlaylistIcon as ListMusic,
     BroadcastIcon as Radio,
-    SparkleIcon as Sparkles
+    SparkleIcon as Sparkles,
   } from "phosphor-svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { Playlist, PlaylistItem } from "../types";
@@ -62,10 +62,10 @@
     !playlist.dynamic_enabled
       ? null
       : playlist.dynamic_spec?.startsWith("decade:")
-      ? "decade"
-      : isSmartPlaylistSpec(playlist.dynamic_spec)
-      ? "smart"
-      : "genre"
+        ? "decade"
+        : isSmartPlaylistSpec(playlist.dynamic_spec)
+          ? "smart"
+          : "genre",
   );
 
   let subtitleLabel = $derived.by(() => {
@@ -106,7 +106,12 @@
   {/if}
 
   {#if autoKind === "smart"}
-    <CardBadge icon={Sparkles} label={i18n.t("playlists.smartBadgeLabel")} title={i18n.t("playlists.smartRuleBasedTooltip")} colorClass={smartTheme.badgeColorClass} />
+    <CardBadge
+      icon={Sparkles}
+      label={i18n.t("playlists.smartBadgeLabel")}
+      title={i18n.t("playlists.smartRuleBasedTooltip")}
+      colorClass={smartTheme.badgeColorClass}
+    />
   {/if}
 {/snippet}
 
@@ -114,17 +119,22 @@
   {#if !playlist.dynamic_enabled}
     {#if !isActive}
       <button
-        onclick={(e) => { e.stopPropagation(); playlistsStore.pinPlaylist(playlist.id); }}
+        onclick={(e) => {
+          e.stopPropagation();
+          playlistsStore.pinPlaylist(playlist.id);
+        }}
         class="mt-2.5 w-full py-1 px-2.5 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-secondary hover:border-transparent transition-colors duration-150 flex items-center justify-center gap-1.5 shadow-xs"
-        title={i18n.t('playlists.makeActiveBtn')}
+        title={i18n.t("playlists.makeActiveBtn")}
       >
         <Radio class="w-3.5 h-3.5 text-brand-accent-text group-hover:text-current" />
-        <span>{i18n.t('playlists.makeActiveBtn')}</span>
+        <span>{i18n.t("playlists.makeActiveBtn")}</span>
       </button>
     {:else}
-      <div class="mt-2.5 w-full py-1 px-2.5 text-xs font-semibold rounded-lg bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30 flex items-center justify-center gap-1.5 select-none">
+      <div
+        class="mt-2.5 w-full py-1 px-2.5 text-xs font-semibold rounded-lg bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30 flex items-center justify-center gap-1.5 select-none"
+      >
         <Radio class="w-3.5 h-3.5 text-brand-accent-text animate-pulse" />
-        <span>{i18n.t('playlists.activeBadgeLabel')}</span>
+        <span>{i18n.t("playlists.activeBadgeLabel")}</span>
       </div>
     {/if}
   {/if}

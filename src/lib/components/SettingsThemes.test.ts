@@ -27,15 +27,21 @@ describe("SettingsThemes.svelte", () => {
     const { findByText } = render(SettingsThemes);
     const addons = await findByText("Add-on Supporter Themes");
     const predefined = await findByText("Predefined Themes");
-    expect(addons.compareDocumentPosition(predefined) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      addons.compareDocumentPosition(predefined) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     addonsStore.statuses = {};
   });
 
   it("renders Dynamic Themes row and footnotes for Luminous and System", async () => {
     const { findByText } = render(SettingsThemes);
     expect(await findByText("Dynamic Themes")).toBeInTheDocument();
-    expect(await findByText("Colors shift to match whatever album art is playing now")).toBeInTheDocument();
-    expect(await findByText("Switches between light and dark to match your OS")).toBeInTheDocument();
+    expect(
+      await findByText("Colors shift to match whatever album art is playing now"),
+    ).toBeInTheDocument();
+    expect(
+      await findByText("Switches between light and dark to match your OS"),
+    ).toBeInTheDocument();
   });
 
   it("renders a Light/Dark/System segmented control scoped to the System theme card", async () => {
@@ -84,10 +90,12 @@ describe("SettingsThemes.svelte", () => {
 
     await fireEvent.click(importBtns[0]);
 
-    expect(open).toHaveBeenCalledWith(expect.objectContaining({
-      multiple: false,
-      filters: [{ name: "Theme (*.json)", extensions: ["json"] }],
-    }));
+    expect(open).toHaveBeenCalledWith(
+      expect.objectContaining({
+        multiple: false,
+        filters: [{ name: "Theme (*.json)", extensions: ["json"] }],
+      }),
+    );
     expect(importSpy).toHaveBeenCalledWith("/path/to/Retrowave.json");
   });
 
@@ -109,10 +117,12 @@ describe("SettingsThemes.svelte", () => {
 
     await fireEvent.click(exportBtn);
 
-    expect(save).toHaveBeenCalledWith(expect.objectContaining({
-      defaultPath: "Vaporwave.json",
-      filters: [{ name: "Theme (*.json)", extensions: ["json"] }],
-    }));
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultPath: "Vaporwave.json",
+        filters: [{ name: "Theme (*.json)", extensions: ["json"] }],
+      }),
+    );
     expect(exportSpy).toHaveBeenCalledWith(customTheme, "/path/to/exported-vapor.json");
   });
 

@@ -1,11 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import {
-    BroomIcon as Broom,
-    WarningIcon as AlertTriangle,
-    XIcon as X,
-  } from "phosphor-svelte";
+  import { BroomIcon as Broom, WarningIcon as AlertTriangle, XIcon as X } from "phosphor-svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
@@ -36,7 +32,13 @@
   };
 
   /** Section order: the fields most likely to be someone's note first. */
-  const KIND_ORDER: CruftKind[] = ["promo_comment", "encoded_by", "encoder", "itunes_normalization", "id3v1_duplicate"];
+  const KIND_ORDER: CruftKind[] = [
+    "promo_comment",
+    "encoded_by",
+    "encoder",
+    "itunes_normalization",
+    "id3v1_duplicate",
+  ];
 
   /**
    * Kinds whose value is one row per track (an ID3v1 summary, an iTunNORM hex
@@ -82,7 +84,10 @@
       kind,
       groups: [...groups.values()]
         .filter((g) => g.kind === kind)
-        .sort((a, b) => b.entries.length - a.entries.length || (a.value ?? "").localeCompare(b.value ?? "")),
+        .sort(
+          (a, b) =>
+            b.entries.length - a.entries.length || (a.value ?? "").localeCompare(b.value ?? ""),
+        ),
     })).filter((section) => section.groups.length > 0);
   });
 
@@ -98,8 +103,12 @@
     // A few files read in a moment, so only the library check needs the store.
     if (library) return;
     invoke<TagCleanupPreview>("preview_tag_cleanup", { songIds })
-      .then((result) => { ownPreview = result; })
-      .catch((e) => { ownError = String(e); });
+      .then((result) => {
+        ownPreview = result;
+      })
+      .catch((e) => {
+        ownError = String(e);
+      });
   });
 
   async function handleApply() {
@@ -119,8 +128,10 @@
   }
 </script>
 
-<Modal onClose={onClose} maxWidth="max-w-xl" ariaLabelledby="tag-cleanup-title">
-  <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
+<Modal {onClose} maxWidth="max-w-xl" ariaLabelledby="tag-cleanup-title">
+  <div
+    class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main"
+  >
     <div class="flex items-center gap-2">
       <Broom class="w-4 h-4 text-brand-accent-text" />
       <h3 id="tag-cleanup-title" class="text-sm font-bold">{i18n.t("tagCleanup.title")}</h3>
@@ -144,7 +155,10 @@
       <div class="py-12 flex flex-col items-center justify-center gap-3">
         <LoadingSpinner
           label={progress
-            ? i18n.t("tagCleanup.checkingProgress", { checked: progress.checked, total: progress.total })
+            ? i18n.t("tagCleanup.checkingProgress", {
+                checked: progress.checked,
+                total: progress.total,
+              })
             : i18n.t("tagCleanup.checking")}
           size="sm"
         />
@@ -156,17 +170,27 @@
       <div class="flex flex-col gap-4">
         {#each sections as section (section.kind)}
           <section class="flex flex-col gap-1.5">
-            <h4 class="font-semibold text-brand-text-primary">{i18n.t(KIND_LABEL_KEYS[section.kind])}</h4>
+            <h4 class="font-semibold text-brand-text-primary">
+              {i18n.t(KIND_LABEL_KEYS[section.kind])}
+            </h4>
             {#each section.groups as group (group.key)}
               {@const descriptionKey = KIND_DESCRIPTION_KEYS[group.kind]}
-              <label class="flex items-start gap-2.5 rounded-lg border border-brand-border bg-brand-main px-3 py-2 cursor-pointer">
+              <label
+                class="flex items-start gap-2.5 rounded-lg border border-brand-border bg-brand-main px-3 py-2 cursor-pointer"
+              >
                 <input
                   type="checkbox"
                   class="mt-0.5 rounded accent-brand-accent"
                   checked={!kept[group.key]}
-                  onchange={(e) => { kept[group.key] = !(e.currentTarget as HTMLInputElement).checked; }}
+                  onchange={(e) => {
+                    kept[group.key] = !(e.currentTarget as HTMLInputElement).checked;
+                  }}
                 />
-                <span class="flex-1 min-w-0 break-all select-text {group.value === '' ? 'italic text-brand-text-secondary' : 'text-brand-text-primary'}">
+                <span
+                  class="flex-1 min-w-0 break-all select-text {group.value === ''
+                    ? 'italic text-brand-text-secondary'
+                    : 'text-brand-text-primary'}"
+                >
                   {#if descriptionKey}
                     {i18n.t(descriptionKey)}
                   {:else if group.value === ""}
@@ -176,7 +200,9 @@
                   {/if}
                 </span>
                 {#if group.entries.length > 1}
-                  <span class="shrink-0 tabular-nums text-brand-text-secondary">×{formatNumber(group.entries.length)}</span>
+                  <span class="shrink-0 tabular-nums text-brand-text-secondary"
+                    >×{formatNumber(group.entries.length)}</span
+                  >
                 {/if}
               </label>
             {/each}
@@ -185,11 +211,15 @@
       </div>
     {/if}
     {#if preview && preview.skipped > 0}
-      <p class="mt-4 text-brand-text-secondary">{i18n.t("tagCleanup.skipped", { count: preview.skipped })}</p>
+      <p class="mt-4 text-brand-text-secondary">
+        {i18n.t("tagCleanup.skipped", { count: preview.skipped })}
+      </p>
     {/if}
   </div>
 
-  <div class="h-16 flex items-center justify-end gap-2 px-6 border-t border-brand-border shrink-0 bg-brand-main">
+  <div
+    class="h-16 flex items-center justify-end gap-2 px-6 border-t border-brand-border shrink-0 bg-brand-main"
+  >
     {#if preview && preview.songs.length > 0}
       <Button onclick={onClose} variant="secondary" size="sm">
         {i18n.t("tagCleanup.cancelBtn")}
@@ -201,9 +231,13 @@
       <Button onclick={() => tagCleanupStore.cancel()} variant="secondary" size="sm">
         {i18n.t("tagCleanup.cancelBtn")}
       </Button>
-      <Button onclick={onClose} variant="primary" size="sm">{i18n.t("tagCleanup.backgroundBtn")}</Button>
+      <Button onclick={onClose} variant="primary" size="sm"
+        >{i18n.t("tagCleanup.backgroundBtn")}</Button
+      >
     {:else}
-      <Button onclick={onClose} variant="secondary" size="sm">{i18n.t("tagCleanup.closeBtn")}</Button>
+      <Button onclick={onClose} variant="secondary" size="sm"
+        >{i18n.t("tagCleanup.closeBtn")}</Button
+      >
     {/if}
   </div>
 </Modal>

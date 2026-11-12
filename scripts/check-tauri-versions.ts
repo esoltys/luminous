@@ -83,7 +83,11 @@ export function parseBunLock(content: string): Map<string, string> {
           if (atIdx > 0) {
             map.set(pkgName, val.slice(atIdx + 1));
           }
-        } else if (val && typeof val === "object" && typeof (val as Record<string, unknown>).version === "string") {
+        } else if (
+          val &&
+          typeof val === "object" &&
+          typeof (val as Record<string, unknown>).version === "string"
+        ) {
           map.set(pkgName, (val as Record<string, string>).version);
         }
       }
@@ -175,18 +179,28 @@ export function checkTauriVersions(bunLockContent: string, cargoLockContent: str
  */
 export function formatMismatches(mismatches: Mismatch[]): string {
   const lines: string[] = [];
-  lines.push(`✖ Found ${mismatches.length} Tauri version mismatch${mismatches.length === 1 ? "" : "es"} between bun.lock and Cargo.lock:`);
+  lines.push(
+    `✖ Found ${mismatches.length} Tauri version mismatch${mismatches.length === 1 ? "" : "es"} between bun.lock and Cargo.lock:`,
+  );
   lines.push("");
 
   for (const m of mismatches) {
     if (m.errorType === "missing_crate") {
-      lines.push(`  • ${m.npmPackage} (${m.npmVersion}) has no matching '${m.crateName}' crate in Cargo.lock`);
+      lines.push(
+        `  • ${m.npmPackage} (${m.npmVersion}) has no matching '${m.crateName}' crate in Cargo.lock`,
+      );
       lines.push(`    Add the crate to src-tauri/Cargo.toml or remove the npm package.`);
     } else {
-      lines.push(`  • ${m.npmPackage} (npm: ${m.npmVersion}) ↔ ${m.crateName} (crate: ${m.crateVersion})`);
-      lines.push(`    Major/minor version mismatch. Tauri requires npm and crate versions to match in major.minor.`);
+      lines.push(
+        `  • ${m.npmPackage} (npm: ${m.npmVersion}) ↔ ${m.crateName} (crate: ${m.crateVersion})`,
+      );
+      lines.push(
+        `    Major/minor version mismatch. Tauri requires npm and crate versions to match in major.minor.`,
+      );
       lines.push(`    Fix options:`);
-      lines.push(`      Update crate: cd src-tauri && cargo update -p ${m.crateName} --precise ${m.npmVersion}`);
+      lines.push(
+        `      Update crate: cd src-tauri && cargo update -p ${m.crateName} --precise ${m.npmVersion}`,
+      );
       lines.push(`      Update npm:   bun add ${m.npmPackage}@^${m.crateVersion}`);
     }
     lines.push("");
@@ -219,14 +233,19 @@ export function main() {
     process.exit(1);
   }
 
-  console.log(`✔ Tauri version check passed: ${checked.length} paired package(s) match major.minor:`);
+  console.log(
+    `✔ Tauri version check passed: ${checked.length} paired package(s) match major.minor:`,
+  );
   for (const pair of checked) {
-    console.log(`  • ${pair.npmPackage} (${pair.npmVersion}) ↔ ${pair.crateName} (${pair.crateVersion})`);
+    console.log(
+      `  • ${pair.npmPackage} (${pair.npmVersion}) ↔ ${pair.crateName} (${pair.crateVersion})`,
+    );
   }
 }
 
 const isMain =
-  (typeof import.meta !== "undefined" && Boolean((import.meta as unknown as { main?: boolean }).main)) ||
+  (typeof import.meta !== "undefined" &&
+    Boolean((import.meta as unknown as { main?: boolean }).main)) ||
   (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]));
 
 if (isMain) {

@@ -3,39 +3,37 @@ import { isSmartPlaylistSpec, parseSearchRules, stripEnclosingQuotes } from "./f
 
 describe("stripEnclosingQuotes", () => {
   it("strips double enclosing quotes from file picker paths", () => {
-    expect(
-      stripEnclosingQuotes('""/home/esoltys/Music/Shortwave/SomaFM PopTron""')
-    ).toBe("/home/esoltys/Music/Shortwave/SomaFM PopTron");
+    expect(stripEnclosingQuotes('""/home/esoltys/Music/Shortwave/SomaFM PopTron""')).toBe(
+      "/home/esoltys/Music/Shortwave/SomaFM PopTron",
+    );
   });
 
   it("strips single enclosing quotes", () => {
-    expect(
-      stripEnclosingQuotes('"/home/esoltys/Music/Shortwave/SomaFM PopTron"')
-    ).toBe("/home/esoltys/Music/Shortwave/SomaFM PopTron");
-    expect(
-      stripEnclosingQuotes("'/home/esoltys/Music/Shortwave/SomaFM PopTron'")
-    ).toBe("/home/esoltys/Music/Shortwave/SomaFM PopTron");
+    expect(stripEnclosingQuotes('"/home/esoltys/Music/Shortwave/SomaFM PopTron"')).toBe(
+      "/home/esoltys/Music/Shortwave/SomaFM PopTron",
+    );
+    expect(stripEnclosingQuotes("'/home/esoltys/Music/Shortwave/SomaFM PopTron'")).toBe(
+      "/home/esoltys/Music/Shortwave/SomaFM PopTron",
+    );
   });
 
   it("preserves internal quotes in path names", () => {
     expect(
       stripEnclosingQuotes(
-        '""/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC""'
-      )
+        '""/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC""',
+      ),
     ).toBe('/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC');
   });
 
   it("preserves internal quotes on Windows paths", () => {
     expect(
-      stripEnclosingQuotes(
-        '""C:\\Music\\Shortwave\\CKLZ-FM 104.7 "The Lizard" Kelowna, BC""'
-      )
+      stripEnclosingQuotes('""C:\\Music\\Shortwave\\CKLZ-FM 104.7 "The Lizard" Kelowna, BC""'),
     ).toBe('C:\\Music\\Shortwave\\CKLZ-FM 104.7 "The Lizard" Kelowna, BC');
   });
 
   it("leaves unquoted paths untouched", () => {
     expect(
-      stripEnclosingQuotes('/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC')
+      stripEnclosingQuotes('/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC'),
     ).toBe('/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC');
   });
 });
@@ -84,9 +82,7 @@ describe("isSmartPlaylistSpec", () => {
 describe("parseSearchRules", () => {
   it("normalizes artist-tag filter to artist_tag with contains operator", () => {
     const rules = parseSearchRules("artist-tag:canadian");
-    expect(rules).toEqual([
-      { field: "artist_tag", op: "contains", value: "canadian" },
-    ]);
+    expect(rules).toEqual([{ field: "artist_tag", op: "contains", value: "canadian" }]);
   });
 
   it("normalizes lang alias to language with contains or explicit operator", () => {
@@ -99,7 +95,7 @@ describe("parseSearchRules", () => {
   });
 
   it("normalizes folder, subfolder, directory, path filters to folder", () => {
-    expect(parseSearchRules("folder:\"Radio Downloads\"")).toEqual([
+    expect(parseSearchRules('folder:"Radio Downloads"')).toEqual([
       { field: "folder", op: "contains", value: "Radio Downloads" },
     ]);
     expect(parseSearchRules("path:Downloads/Metal")).toEqual([
@@ -108,24 +104,22 @@ describe("parseSearchRules", () => {
   });
 
   it("parses folder with equals operator and strips outer quotes", () => {
-    expect(
-      parseSearchRules('folder:="/home/esoltys/Music/Shortwave/SomaFM PopTron"')
-    ).toEqual([
+    expect(parseSearchRules('folder:="/home/esoltys/Music/Shortwave/SomaFM PopTron"')).toEqual([
       { field: "folder", op: "=", value: "/home/esoltys/Music/Shortwave/SomaFM PopTron" },
     ]);
   });
 
   it("parses folder with double-quoted path and equals operator", () => {
-    expect(
-      parseSearchRules('folder:=""/home/esoltys/Music/Shortwave/SomaFM PopTron""')
-    ).toEqual([
+    expect(parseSearchRules('folder:=""/home/esoltys/Music/Shortwave/SomaFM PopTron""')).toEqual([
       { field: "folder", op: "=", value: "/home/esoltys/Music/Shortwave/SomaFM PopTron" },
     ]);
   });
 
   it("parses folder with internal quotes and equals operator", () => {
     expect(
-      parseSearchRules('folder:="/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \\"The Lizard\\" Kelowna, BC"')
+      parseSearchRules(
+        'folder:="/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \\"The Lizard\\" Kelowna, BC"',
+      ),
     ).toEqual([
       {
         field: "folder",
@@ -138,8 +132,8 @@ describe("parseSearchRules", () => {
   it("recovers and strips accumulated triple quotes while preserving equals operator", () => {
     expect(
       parseSearchRules(
-        'folder:="\\"\\"\\"/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \\"The Lizard\\" Kelowna, BC\\"\\"\\""'
-      )
+        'folder:="\\"\\"\\"/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \\"The Lizard\\" Kelowna, BC\\"\\"\\""',
+      ),
     ).toEqual([
       {
         field: "folder",
@@ -163,9 +157,7 @@ describe("technical predicates", () => {
       { field: "year", op: ">=", value: "1970" },
       { field: "year", op: "<=", value: "1979" },
     ]);
-    expect(parseSearchRules("added:-30d..")).toEqual([
-      { field: "added", op: ">=", value: "-30d" },
-    ]);
+    expect(parseSearchRules("added:-30d..")).toEqual([{ field: "added", op: ">=", value: "-30d" }]);
     expect(parseSearchRules("bitrate:..192k")).toEqual([
       { field: "bitrate", op: "<=", value: "192k" },
     ]);

@@ -38,7 +38,7 @@
   const otherCustomPlaylists = $derived(
     activeCustom
       ? playlistsStore.customPlaylists.filter((p) => p.id !== activeCustom.id)
-      : playlistsStore.customPlaylists
+      : playlistsStore.customPlaylists,
   );
 
   function openSubmenu() {
@@ -50,7 +50,9 @@
       const rect = submenuTriggerEl.getBoundingClientRect();
       opensLeft = rect.right + 208 + VIEWPORT_EDGE_PADDING_PX > window.innerWidth;
       const dockClearance = playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0;
-      opensUp = rect.top + SUBMENU_MAX_HEIGHT_PX > window.innerHeight - dockClearance - VIEWPORT_EDGE_PADDING_PX;
+      opensUp =
+        rect.top + SUBMENU_MAX_HEIGHT_PX >
+        window.innerHeight - dockClearance - VIEWPORT_EDGE_PADDING_PX;
     }
     isSubmenuOpen = true;
   }
@@ -85,7 +87,9 @@
   async function handleConfirmCreatePlaylist() {
     const trimmed = newPlaylistName.trim();
     showNewPlaylistModal = false;
-    await onCreatePlaylist(trimmed || i18n.t("playlists.untitledPlaylistName", {}, "Untitled Playlist"));
+    await onCreatePlaylist(
+      trimmed || i18n.t("playlists.untitledPlaylistName", {}, "Untitled Playlist"),
+    );
     onClose();
   }
 
@@ -103,7 +107,9 @@
 >
   <button
     type="button"
-    class="w-full text-left px-3 py-1.5 flex items-center gap-2.5 transition-colors hover:bg-brand-main hover:text-brand-text-primary {isSubmenuOpen ? 'bg-brand-main text-brand-text-primary' : 'text-brand-text-primary'}"
+    class="w-full text-left px-3 py-1.5 flex items-center gap-2.5 transition-colors hover:bg-brand-main hover:text-brand-text-primary {isSubmenuOpen
+      ? 'bg-brand-main text-brand-text-primary'
+      : 'text-brand-text-primary'}"
     role="menuitem"
     aria-haspopup="menu"
     aria-expanded={isSubmenuOpen}
@@ -119,13 +125,21 @@
     }}
   >
     <ListPlus class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary" />
-    <span class="flex-1">{i18n.t("playlists.contextMenuAddToPlaylistGeneric", {}, "Add to Playlist")}</span>
-    <CaretRight class="w-3 h-3 shrink-0 text-brand-text-secondary/70 {isSubmenuOpen ? 'text-brand-text-primary' : ''}" />
+    <span class="flex-1"
+      >{i18n.t("playlists.contextMenuAddToPlaylistGeneric", {}, "Add to Playlist")}</span
+    >
+    <CaretRight
+      class="w-3 h-3 shrink-0 text-brand-text-secondary/70 {isSubmenuOpen
+        ? 'text-brand-text-primary'
+        : ''}"
+    />
   </button>
 
   {#if isSubmenuOpen}
     <div
-      class="absolute z-50 w-52 max-h-60 overflow-y-auto bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none {opensLeft ? 'right-[calc(100%-2px)]' : 'left-[calc(100%-2px)]'} {opensUp ? 'bottom-0' : 'top-0'}"
+      class="absolute z-50 w-52 max-h-60 overflow-y-auto bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none {opensLeft
+        ? 'right-[calc(100%-2px)]'
+        : 'left-[calc(100%-2px)]'} {opensUp ? 'bottom-0' : 'top-0'}"
       role="menu"
       tabindex="-1"
       onmouseenter={openSubmenu}
@@ -150,8 +164,13 @@
             role="menuitem"
           >
             <Radio class="w-3.5 h-3.5 shrink-0 text-brand-accent-text" />
-            <span class="truncate flex-1 font-medium text-brand-text-primary" title={activeCustom.name}>{activeCustom.name}</span>
-            <span class="text-[9px] text-brand-accent-text font-semibold uppercase px-1 py-0.5 rounded bg-brand-accent/15 shrink-0">
+            <span
+              class="truncate flex-1 font-medium text-brand-text-primary"
+              title={activeCustom.name}>{activeCustom.name}</span
+            >
+            <span
+              class="text-[9px] text-brand-accent-text font-semibold uppercase px-1 py-0.5 rounded bg-brand-accent/15 shrink-0"
+            >
               {i18n.t("playlists.activeBadgeLabel", {}, "Active")}
             </span>
           </button>
@@ -160,7 +179,7 @@
           {/if}
         {/if}
 
-        {#each (activeCustom ? otherCustomPlaylists : playlistsStore.customPlaylists) as pl (pl.id)}
+        {#each activeCustom ? otherCustomPlaylists : playlistsStore.customPlaylists as pl (pl.id)}
           <button
             type="button"
             onclick={() => handleSelect(pl)}
@@ -189,15 +208,28 @@
 </div>
 
 {#if showNewPlaylistModal}
-  <Modal onClose={() => { showNewPlaylistModal = false; onClose(); }} maxWidth="max-w-sm">
-    <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
+  <Modal
+    onClose={() => {
+      showNewPlaylistModal = false;
+      onClose();
+    }}
+    maxWidth="max-w-sm"
+  >
+    <div
+      class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main"
+    >
       <div class="flex items-center gap-2">
         <ListPlus class="w-4 h-4 text-brand-accent-text" />
-        <h3 class="text-sm font-bold">{i18n.t("playlists.newPlaylistModalTitle", {}, "New Playlist")}</h3>
+        <h3 class="text-sm font-bold">
+          {i18n.t("playlists.newPlaylistModalTitle", {}, "New Playlist")}
+        </h3>
       </div>
       <button
         type="button"
-        onclick={() => { showNewPlaylistModal = false; onClose(); }}
+        onclick={() => {
+          showNewPlaylistModal = false;
+          onClose();
+        }}
         class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
       >
         <X class="w-4 h-4" />
@@ -227,7 +259,13 @@
         class="w-full bg-brand-sidebar border border-brand-border rounded-lg px-3 py-2 text-sm text-brand-text-primary focus:outline-none focus:border-brand-accent transition-colors"
       />
       <div class="flex justify-end gap-2 mt-2">
-        <Button variant="secondary" onclick={() => { showNewPlaylistModal = false; onClose(); }}>
+        <Button
+          variant="secondary"
+          onclick={() => {
+            showNewPlaylistModal = false;
+            onClose();
+          }}
+        >
           {i18n.t("common.cancel", {}, "Cancel")}
         </Button>
         <Button variant="primary" onclick={handleConfirmCreatePlaylist}>

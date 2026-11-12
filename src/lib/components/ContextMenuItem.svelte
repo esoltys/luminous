@@ -16,7 +16,17 @@
     isDefault?: boolean;
   }
 
-  let { icon: Icon, label, onclick, onmouseenter, accent = false, destructive = false, disabled = false, title, isDefault = false }: Props = $props();
+  let {
+    icon: Icon,
+    label,
+    onclick,
+    onmouseenter,
+    accent = false,
+    destructive = false,
+    disabled = false,
+    title,
+    isDefault = false,
+  }: Props = $props();
 </script>
 
 <button
@@ -34,10 +44,18 @@
   role="menuitem"
 >
   <Icon
-    class="w-3.5 h-3.5 shrink-0 {disabled ? 'text-brand-text-secondary/50' : destructive ? 'text-brand-text-primary' : accent ? 'text-brand-accent-text' : 'text-brand-text-secondary'}"
+    class="w-3.5 h-3.5 shrink-0 {disabled
+      ? 'text-brand-text-secondary/50'
+      : destructive
+        ? 'text-brand-text-primary'
+        : accent
+          ? 'text-brand-accent-text'
+          : 'text-brand-text-secondary'}"
   />
   <span class:font-semibold={isDefault}>{label}</span>
   {#if isDefault}
-    <kbd class="ml-auto pl-4 font-sans text-[11px] text-brand-text-secondary" aria-hidden="true">↵</kbd>
+    <kbd class="ml-auto pl-4 font-sans text-[11px] text-brand-text-secondary" aria-hidden="true"
+      >↵</kbd
+    >
   {/if}
 </button>

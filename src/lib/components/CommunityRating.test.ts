@@ -13,7 +13,9 @@ describe("CommunityRating.svelte", () => {
   });
 
   it("omits count when count is null, undefined, or 0", () => {
-    const { getByText, queryByText } = render(CommunityRating, { props: { rating: 3.0, count: 0 } });
+    const { getByText, queryByText } = render(CommunityRating, {
+      props: { rating: 3.0, count: 0 },
+    });
 
     expect(getByText("Community Rating")).toBeInTheDocument();
     expect(queryByText(/\(\d+\)/)).toBeNull();

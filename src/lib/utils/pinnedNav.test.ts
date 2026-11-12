@@ -98,7 +98,10 @@ describe("pinnedNav.ts", () => {
 
   it("gives pinned auto-playlists the same icon as their card theme", () => {
     for (const kind of ["genre", "decade", "daypart"] as const) {
-      const pin = toNavigablePin({ type: "auto_playlist", autoPlaylist: { kind, trackCount: 3 } } as PinnedItem);
+      const pin = toNavigablePin({
+        type: "auto_playlist",
+        autoPlaylist: { kind, trackCount: 3 },
+      } as PinnedItem);
       const theme = getPlaylistCardTheme(kind);
       expect(pin.icon).toBe(theme.icon);
     }
@@ -138,7 +141,9 @@ describe("pinnedNav.ts", () => {
     const viewAlbumSpy = vi.spyOn(navigationStore, "viewAlbum").mockImplementation(() => {});
     const viewArtistSpy = vi.spyOn(navigationStore, "viewArtist").mockImplementation(() => {});
     const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
-    const viewAutoPlaylistSpy = vi.spyOn(navigationStore, "viewAutoPlaylist").mockImplementation(() => {});
+    const viewAutoPlaylistSpy = vi
+      .spyOn(navigationStore, "viewAutoPlaylist")
+      .mockImplementation(() => {});
 
     toNavigablePin(songItem).open();
     expect(playSongSpy).toHaveBeenCalledWith(42);
@@ -153,7 +158,9 @@ describe("pinnedNav.ts", () => {
     expect(viewPlaylistSpy).toHaveBeenCalledWith(7);
 
     toNavigablePin(autoPlaylistItem).open();
-    expect(viewAutoPlaylistSpy).toHaveBeenCalledWith(expect.objectContaining({ kind: "favourites" }));
+    expect(viewAutoPlaylistSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "favourites" }),
+    );
   });
 
   it("filters out empty playlists when projecting multiple items", () => {

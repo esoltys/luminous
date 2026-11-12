@@ -3,7 +3,11 @@
   import type { Snippet } from "svelte";
   import { playerStore } from "../stores/player.svelte";
   import { portal } from "../utils/portal";
-  import { CONTEXT_MENU_WIDTH_PX, VIEWPORT_EDGE_PADDING_PX, PLAYER_DOCK_CLEARANCE_PX } from "../constants";
+  import {
+    CONTEXT_MENU_WIDTH_PX,
+    VIEWPORT_EDGE_PADDING_PX,
+    PLAYER_DOCK_CLEARANCE_PX,
+  } from "../constants";
 
   interface Props {
     x: number;

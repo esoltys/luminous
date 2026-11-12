@@ -54,18 +54,16 @@
   let isApiKey = $derived(authMode === "apiKey");
   // The stored secret only carries over between token and password sign-in;
   // switching to or from an API key needs a new one.
-  let storedSecretFits = $derived(
-    !!server && (server.authMode === "apiKey") === isApiKey
-  );
+  let storedSecretFits = $derived(!!server && (server.authMode === "apiKey") === isApiKey);
   // A new server can't be tested or saved without a secret; an existing one
   // falls back to its stored one.
   let hasCredentials = $derived(
-    !!url.trim() && (isApiKey || !!username.trim()) && (!!password || storedSecretFits)
+    !!url.trim() && (isApiKey || !!username.trim()) && (!!password || storedSecretFits),
   );
   let canSave = $derived(!!name.trim() && hasCredentials);
   let showApiKeyOption = $derived(apiKeySupported || isApiKey);
   let showHttpWarning = $derived(
-    authMode === "password" && url.trim().toLowerCase().startsWith("http://")
+    authMode === "password" && url.trim().toLowerCase().startsWith("http://"),
   );
   let suggestPassword = $derived(authMode === "token" && testErrorCode === 41);
 
@@ -79,7 +77,9 @@
     let stale = false;
     const timer = setTimeout(async () => {
       try {
-        const support = await invoke<{ apiKey: boolean }>("get_subsonic_auth_support", { url: target });
+        const support = await invoke<{ apiKey: boolean }>("get_subsonic_auth_support", {
+          url: target,
+        });
         if (!stale) apiKeySupported = support.apiKey;
       } catch {
         if (!stale) apiKeySupported = false;
@@ -113,9 +113,7 @@
       : i18n.t("settings.subsonicTestSuccessUnknown");
   });
 
-  const dockClearance = $derived(
-    playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0
-  );
+  const dockClearance = $derived(playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0);
 
   function errorText(err: unknown): string {
     return typeof err === "string" ? err : (err as any)?.message || String(err);
@@ -189,13 +187,17 @@
 <div
   class="fixed inset-0 z-50 flex items-center justify-center acrylic-scrim p-4"
   style="padding-bottom: {dockClearance + 16}px"
-  onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+  onclick={(e) => {
+    if (e.target === e.currentTarget) onClose();
+  }}
 >
   <div
     class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col"
     style="max-height: min(90vh, calc(100vh - {dockClearance + 32}px))"
   >
-    <div class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50">
+    <div
+      class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50"
+    >
       <div class="flex items-center gap-2.5 min-w-0">
         <div class="p-2 rounded-xl bg-brand-accent/20 text-brand-accent-text shrink-0">
           <CloudIcon class="w-5 h-5" />
@@ -204,7 +206,9 @@
           <h2 class="text-base font-bold text-brand-text-primary truncate">
             {server ? i18n.t("settings.editSubsonicServer") : i18n.t("settings.addSubsonicServer")}
           </h2>
-          <p class="text-xs text-brand-text-secondary/70 truncate">{i18n.t("settings.subsonicSubtitle")}</p>
+          <p class="text-xs text-brand-text-secondary/70 truncate">
+            {i18n.t("settings.subsonicSubtitle")}
+          </p>
         </div>
       </div>
       <button
@@ -220,7 +224,10 @@
     <form onsubmit={handleSubmit} class="p-6 flex-1 overflow-y-auto flex flex-col gap-4">
       <div class="grid grid-cols-2 gap-3">
         <div class="space-y-1.5">
-          <label for="subsonic-name" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+          <label
+            for="subsonic-name"
+            class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+          >
             {i18n.t("settings.subsonicName")}
           </label>
           <Input
@@ -232,7 +239,10 @@
         </div>
 
         <div class="space-y-1.5">
-          <label for="subsonic-url" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+          <label
+            for="subsonic-url"
+            class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+          >
             {i18n.t("settings.subsonicUrl")}
           </label>
           <Input
@@ -245,7 +255,10 @@
       </div>
 
       <div class="space-y-1.5">
-        <label for="subsonic-auth-mode" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+        <label
+          for="subsonic-auth-mode"
+          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+        >
           {i18n.t("settings.subsonicAuthMode")}
         </label>
         <Select
@@ -260,12 +273,19 @@
             <option value="apiKey">{i18n.t("settings.subsonicAuthApiKey")}</option>
           {/if}
         </Select>
-        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t("settings.subsonicAuthModeHint")}</p>
+        <p class="text-xs text-brand-text-secondary text-pretty">
+          {i18n.t("settings.subsonicAuthModeHint")}
+        </p>
       </div>
 
       {#if showHttpWarning}
-        <div class="flex items-start gap-2 p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-primary" data-testid="subsonic-http-warning">
-          <WarningCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)] text-brand-text-secondary" />
+        <div
+          class="flex items-start gap-2 p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-primary"
+          data-testid="subsonic-http-warning"
+        >
+          <WarningCircle
+            class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)] text-brand-text-secondary"
+          />
           <span>{i18n.t("settings.subsonicAuthHttpWarning")}</span>
         </div>
       {/if}
@@ -273,7 +293,10 @@
       <div class="grid {isApiKey ? 'grid-cols-1' : 'grid-cols-2'} gap-3">
         {#if !isApiKey}
           <div class="space-y-1.5">
-            <label for="subsonic-username" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+            <label
+              for="subsonic-username"
+              class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+            >
               {i18n.t("settings.subsonicUsername")}
             </label>
             <Input
@@ -286,7 +309,10 @@
         {/if}
 
         <div class="space-y-1.5">
-          <label for="subsonic-password" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+          <label
+            for="subsonic-password"
+            class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+          >
             {isApiKey ? i18n.t("settings.subsonicApiKey") : i18n.t("settings.subsonicPassword")}
           </label>
           <Input
@@ -294,12 +320,12 @@
             type="password"
             bind:value={password}
             placeholder={storedSecretFits
-              ? (isApiKey
+              ? isApiKey
                 ? i18n.t("settings.subsonicApiKeyKeepPlaceholder")
-                : i18n.t("settings.subsonicPasswordKeepPlaceholder"))
-              : (isApiKey
+                : i18n.t("settings.subsonicPasswordKeepPlaceholder")
+              : isApiKey
                 ? i18n.t("settings.subsonicApiKeyPlaceholder")
-                : i18n.t("settings.subsonicPasswordPlaceholder"))}
+                : i18n.t("settings.subsonicPasswordPlaceholder")}
             required={!storedSecretFits}
           />
         </div>
@@ -309,44 +335,59 @@
       <div class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 space-y-3">
         <div class="flex items-center justify-between gap-4">
           <div class="flex flex-col gap-0.5 min-w-0">
-            <span class="text-sm font-medium text-brand-text-primary">{i18n.t("settings.webdavAutoSyncLabel")}</span>
-            <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t("settings.webdavAutoSyncHint")}</p>
+            <span class="text-sm font-medium text-brand-text-primary"
+              >{i18n.t("settings.webdavAutoSyncLabel")}</span
+            >
+            <p class="text-xs text-brand-text-secondary text-pretty">
+              {i18n.t("settings.webdavAutoSyncHint")}
+            </p>
           </div>
           <Toggle
             checked={autoSyncEnabled}
-            onchange={(v) => { autoSyncEnabled = v; }}
+            onchange={(v) => {
+              autoSyncEnabled = v;
+            }}
             label={i18n.t("settings.webdavAutoSyncLabel")}
           />
         </div>
         {#if autoSyncEnabled}
           <div class="space-y-1.5">
-            <label for="subsonic-sync-interval" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+            <label
+              for="subsonic-sync-interval"
+              class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+            >
               {i18n.t("settings.webdavSyncIntervalLabel")}
             </label>
-            <Input
-              id="subsonic-sync-interval"
-              type="number"
-              bind:value={syncIntervalMinutes}
-            />
+            <Input id="subsonic-sync-interval" type="number" bind:value={syncIntervalMinutes} />
           </div>
         {/if}
       </div>
 
       <!-- Play reporting -->
-      <div class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 flex items-center justify-between gap-4">
+      <div
+        class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 flex items-center justify-between gap-4"
+      >
         <div class="flex flex-col gap-0.5 min-w-0">
-          <span class="text-sm font-medium text-brand-text-primary">{i18n.t("settings.subsonicReportPlaysLabel")}</span>
-          <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t("settings.subsonicReportPlaysHint")}</p>
+          <span class="text-sm font-medium text-brand-text-primary"
+            >{i18n.t("settings.subsonicReportPlaysLabel")}</span
+          >
+          <p class="text-xs text-brand-text-secondary text-pretty">
+            {i18n.t("settings.subsonicReportPlaysHint")}
+          </p>
         </div>
         <Toggle
           checked={reportPlays}
-          onchange={(v) => { reportPlays = v; }}
+          onchange={(v) => {
+            reportPlays = v;
+          }}
           label={i18n.t("settings.subsonicReportPlaysLabel")}
         />
       </div>
 
       <!-- Live Preview -->
-      <div class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 flex items-center justify-between gap-4">
+      <div
+        class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 flex items-center justify-between gap-4"
+      >
         <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("settings.folderPreview")}
         </span>
@@ -357,7 +398,9 @@
 
       <!-- Icon Selection -->
       <div>
-        <span class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2">
+        <span
+          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2"
+        >
           {i18n.t("settings.folderIcon")}
         </span>
         <div class="grid grid-cols-5 gap-2">
@@ -366,15 +409,18 @@
             {@const isSelected = selectedIcon === choice.id}
             <button
               type="button"
-              onclick={() => { selectedIcon = choice.id; }}
+              onclick={() => {
+                selectedIcon = choice.id;
+              }}
               class="flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all duration-150 gap-1
                 {isSelected
-                  ? 'bg-brand-accent/20 border-brand-accent text-brand-accent-text ring-1 ring-brand-accent'
-                  : 'bg-brand-main/40 border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-border'}"
+                ? 'bg-brand-accent/20 border-brand-accent text-brand-accent-text ring-1 ring-brand-accent'
+                : 'bg-brand-main/40 border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-border'}"
               title={i18n.t(choice.label)}
             >
               <Icon class="w-5 h-5" />
-              <span class="text-[10px] font-medium truncate max-w-full">{i18n.t(choice.label)}</span>
+              <span class="text-[10px] font-medium truncate max-w-full">{i18n.t(choice.label)}</span
+              >
             </button>
           {/each}
         </div>
@@ -382,20 +428,36 @@
 
       <!-- Color Selection -->
       <div>
-        <span class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2">
+        <span
+          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2"
+        >
           {i18n.t("settings.folderColor")}
         </span>
-        <ColorPicker choices={BADGE_COLOR_CHOICES} value={selectedColor} onChange={(v) => { selectedColor = v; }} />
+        <ColorPicker
+          choices={BADGE_COLOR_CHOICES}
+          value={selectedColor}
+          onChange={(v) => {
+            selectedColor = v;
+          }}
+        />
       </div>
 
       {#if testProbe}
-        <div class="flex items-start gap-2 p-3 bg-brand-accent/10 border border-brand-accent/30 rounded-xl text-xs text-brand-accent-text" data-testid="subsonic-test-success">
+        <div
+          class="flex items-start gap-2 p-3 bg-brand-accent/10 border border-brand-accent/30 rounded-xl text-xs text-brand-accent-text"
+          data-testid="subsonic-test-success"
+        >
           <CheckCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
           <span>{testSuccessText}</span>
         </div>
       {:else if testError !== null}
-        <div class="flex items-start gap-2 p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-primary" data-testid="subsonic-test-failed">
-          <WarningCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)] text-brand-text-secondary" />
+        <div
+          class="flex items-start gap-2 p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-primary"
+          data-testid="subsonic-test-failed"
+        >
+          <WarningCircle
+            class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)] text-brand-text-secondary"
+          />
           <div class="flex flex-col items-start gap-2">
             <span>{i18n.t("settings.webdavTestFailed", { error: testError })}</span>
             {#if suggestPassword}
@@ -413,8 +475,13 @@
       {/if}
 
       {#if saveError !== null}
-        <div class="flex items-start gap-2 p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-primary" data-testid="subsonic-save-failed">
-          <WarningCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)] text-brand-text-secondary" />
+        <div
+          class="flex items-start gap-2 p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-primary"
+          data-testid="subsonic-save-failed"
+        >
+          <WarningCircle
+            class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)] text-brand-text-secondary"
+          />
           <span>{i18n.t("settings.subsonicSaveFailed", { error: saveError })}</span>
         </div>
       {/if}

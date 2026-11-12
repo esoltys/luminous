@@ -76,9 +76,7 @@ describe("AlbumTagEditor.svelte", () => {
       songIds: [101, 102],
       onClose: vi.fn(),
     });
-    expect(
-      await findByText(/changes are saved in Luminous only/i)
-    ).toBeInTheDocument();
+    expect(await findByText(/changes are saved in Luminous only/i)).toBeInTheDocument();
   });
 
   it("shows no remote-source note for a local album", async () => {
@@ -216,7 +214,9 @@ describe("AlbumTagEditor.svelte", () => {
 
     await fireEvent.click(getByRole("button", { name: /save tags/i }));
 
-    await waitFor(() => expect(savedEdit()).toMatchObject({ genre: set("Rock; Jazz Fusion"), album: KEEP }));
+    await waitFor(() =>
+      expect(savedEdit()).toMatchObject({ genre: set("Rock; Jazz Fusion"), album: KEEP }),
+    );
   });
 
   it("removes a genre chip via its remove button", async () => {
@@ -255,7 +255,9 @@ describe("AlbumTagEditor.svelte", () => {
 
     await fireEvent.click(getByRole("button", { name: /save tags/i }));
 
-    await waitFor(() => expect(savedEdit()).toMatchObject({ albumArtist: set("Artist A; Artist B") }));
+    await waitFor(() =>
+      expect(savedEdit()).toMatchObject({ albumArtist: set("Artist A; Artist B") }),
+    );
   });
 
   it("allows clearing the Disc input field to save null disc", async () => {
@@ -297,7 +299,7 @@ describe("AlbumTagEditor.svelte", () => {
     await fireEvent.click(getByRole("button", { name: /save tags/i }));
 
     await waitFor(() =>
-      expect(savedEdit()).toMatchObject({ disc: KEEP, discSubtitle: set("  Deluxe  ") })
+      expect(savedEdit()).toMatchObject({ disc: KEEP, discSubtitle: set("  Deluxe  ") }),
     );
   });
 
@@ -325,7 +327,10 @@ describe("AlbumTagEditor.svelte", () => {
     await fireEvent.click(getByRole("button", { name: /save tags/i }));
 
     await waitFor(() => {
-      expect(savedEdit()).toMatchObject({ albumArtist: set("Various Artists"), compilation: set(true) });
+      expect(savedEdit()).toMatchObject({
+        albumArtist: set("Various Artists"),
+        compilation: set(true),
+      });
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
@@ -442,8 +447,26 @@ describe("AlbumTagEditor.svelte", () => {
 
   it("pre-populates fields with consensus metadata from songs when opened without initial values", async () => {
     collectionStore.songs = [
-      { id: 201, album: "Punisher", album_artist: "Phoebe Bridgers", genre: "Indie Rock", year: 2020, disc: 1, compilation: false, art_embedded: true } as any,
-      { id: 202, album: "Punisher", album_artist: "Phoebe Bridgers", genre: "Indie Rock", year: 2020, disc: 1, compilation: false, art_embedded: true } as any,
+      {
+        id: 201,
+        album: "Punisher",
+        album_artist: "Phoebe Bridgers",
+        genre: "Indie Rock",
+        year: 2020,
+        disc: 1,
+        compilation: false,
+        art_embedded: true,
+      } as any,
+      {
+        id: 202,
+        album: "Punisher",
+        album_artist: "Phoebe Bridgers",
+        genre: "Indie Rock",
+        year: 2020,
+        disc: 1,
+        compilation: false,
+        art_embedded: true,
+      } as any,
     ];
 
     const { getByLabelText, getByText } = render(AlbumTagEditor, {

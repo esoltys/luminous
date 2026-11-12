@@ -2,8 +2,20 @@ import { describe, it, expect } from "vitest";
 import { getPlaylistCardTheme, type PlaylistCardThemeKind } from "./playlistCardTheme";
 
 const KINDS: PlaylistCardThemeKind[] = [
-  "queue", "genre", "decade", "smart", "bpm", "artist_tag", "favourites", "recently_added",
-  "most_played", "history", "missing_metadata", "missing_musicbrainz", "daypart", "language",
+  "queue",
+  "genre",
+  "decade",
+  "smart",
+  "bpm",
+  "artist_tag",
+  "favourites",
+  "recently_added",
+  "most_played",
+  "history",
+  "missing_metadata",
+  "missing_musicbrainz",
+  "daypart",
+  "language",
 ];
 
 describe("playlistCardTheme", () => {

@@ -70,11 +70,18 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
   // wins unless a gapped grid has much bigger tiles.
   const effective = (unit: number, empty: number) => unit / (1 + 0.35 * empty);
   // Ordinary ranking: most covers shown, then the biggest tiles (discounting empty cells).
-  const fitsBetter = (unit: number, empty: number, shown: number, cur: MosaicLayout, curEmpty: number) =>
+  const fitsBetter = (
+    unit: number,
+    empty: number,
+    shown: number,
+    cur: MosaicLayout,
+    curEmpty: number,
+  ) =>
     shown > cur.shown ||
     (shown === cur.shown &&
       (effective(unit, empty) > effective(cur.unit, curEmpty) + 0.5 ||
-        (Math.abs(effective(unit, empty) - effective(cur.unit, curEmpty)) <= 0.5 && empty < curEmpty)));
+        (Math.abs(effective(unit, empty) - effective(cur.unit, curEmpty)) <= 0.5 &&
+          empty < curEmpty)));
   // `fillBox` ranking: area covered, near-ties going to the grid showing more covers.
   const fillsBetter = (weighted: number, shown: number, cur: MosaicLayout, curWeighted: number) =>
     weighted > curWeighted * 1.02 || (weighted >= curWeighted / 1.02 && shown > cur.shown);
@@ -84,7 +91,10 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
     for (let rows = heroSpan; rows <= maxRows; rows++) {
       for (let cols = heroSpan; cols <= maxCols; cols++) {
         const slots = cols * rows - heroSpan * heroSpan;
-        const unit = Math.min((width - (cols - 1) * gap) / cols, (height - (rows - 1) * gap) / rows);
+        const unit = Math.min(
+          (width - (cols - 1) * gap) / cols,
+          (height - (rows - 1) * gap) / rows,
+        );
         if (!(unit > 0) || unit < minTile) continue;
         const shown = Math.min(slots, quarterCount);
         const empty = slots - shown;
@@ -92,7 +102,11 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
         const gridArea = (cols * unit + (cols - 1) * gap) * (rows * unit + (rows - 1) * gap);
         // Showing every cover counts for 20% more area, so a grid only drops one for a clearly bigger fill.
         const weighted = gridArea * (shown === quarterCount ? 1.2 : 1);
-        const better = !best || (opts.fillBox ? fillsBetter(weighted, shown, best, bestWeighted) : fitsBetter(unit, empty, shown, best, bestEmpty));
+        const better =
+          !best ||
+          (opts.fillBox
+            ? fillsBetter(weighted, shown, best, bestWeighted)
+            : fitsBetter(unit, empty, shown, best, bestEmpty));
         if (better) {
           best = {
             cols,

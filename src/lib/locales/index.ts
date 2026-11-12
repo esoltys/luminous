@@ -74,7 +74,9 @@ export function catalogChain(tag: string): Messages[] {
 /** A locale's name in its own language, e.g. "Français (Canada)". */
 export function localeLabel(tag: string): string {
   try {
-    const name = new Intl.DisplayNames(tag, { type: "language", languageDisplay: "standard" }).of(tag);
+    const name = new Intl.DisplayNames(tag, { type: "language", languageDisplay: "standard" }).of(
+      tag,
+    );
     if (name) return name.charAt(0).toLocaleUpperCase(tag) + name.slice(1);
   } catch {
     // Intl.DisplayNames unavailable or tag rejected: fall through to the bare tag.
@@ -110,7 +112,10 @@ export function resolveLocale(preferred: readonly string[]): Locale {
   for (const raw of preferred) {
     const lower = raw.toLowerCase();
     const language = lower.split("-")[0];
-    const match = find(lower) ?? find(language) ?? tags.find((tag) => tag.toLowerCase().split("-")[0] === language);
+    const match =
+      find(lower) ??
+      find(language) ??
+      tags.find((tag) => tag.toLowerCase().split("-")[0] === language);
     if (match) return match;
   }
   return BASE_LOCALE;

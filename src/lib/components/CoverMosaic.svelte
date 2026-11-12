@@ -73,7 +73,7 @@
   }: Props = $props();
 
   let hasHero = $derived(!!heroImageUrl);
-  let bigCover = $derived(hasHero ? null : (covers ?? [])[0] ?? null);
+  let bigCover = $derived(hasHero ? null : ((covers ?? [])[0] ?? null));
   let hasBigTile = $derived(hasHero || !!bigCover);
   // When a hero image supplies the big tile, every cover is a quarter-tile
   // candidate; otherwise covers[0] was already used as the big tile above.
@@ -90,7 +90,9 @@
   // width/height ratio, e.g. 2 quarters => (2+1)/2 = 1.5, 4 quarters => (2+2)/2 = 2.
   let ratio = $derived(quarterCovers.length === 0 ? 1 : (2 + quarterCols) / 2);
 
-  let tileClass = $derived(`w-full h-full ${hoverEffect ? "group-hover:scale-105 transition-transform duration-300" : ""}`);
+  let tileClass = $derived(
+    `w-full h-full ${hoverEffect ? "group-hover:scale-105 transition-transform duration-300" : ""}`,
+  );
 
   /** Width is derived from the rendered height via JS (ResizeObserver), not CSS
    * `aspect-ratio` (see the sizeClass doc comment above for why the bottom-up
@@ -148,7 +150,7 @@
           maxRows: 4,
           maxCols: 8,
         })
-      : null
+      : null,
   );
   // With no quarter covers (or nothing fitting) the big tile stands alone, as a square.
   let fitSoloEdge = $derived(Math.max(0, Math.min(measuredHeight, measuredBoxWidth)));
@@ -162,8 +164,16 @@
 
 {#snippet bigTile()}
   {#if hasHero}
-    <div class="{tileClass} relative overflow-hidden bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary shrink-0">
-      <img src={heroImageUrl} crossorigin="anonymous" alt={heroImageAlt || i18n.t('common.albumArtAlt')} loading="lazy" class="w-full h-full object-cover object-top" />
+    <div
+      class="{tileClass} relative overflow-hidden bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary shrink-0"
+    >
+      <img
+        src={heroImageUrl}
+        crossorigin="anonymous"
+        alt={heroImageAlt || i18n.t("common.albumArtAlt")}
+        loading="lazy"
+        class="w-full h-full object-cover object-top"
+      />
     </div>
   {:else if bigCover}
     <CoverArt
@@ -186,8 +196,14 @@
 -->
 <div
   bind:this={rootEl}
-  class="{sizeClass} select-none {fit ? `w-full flex-1 min-w-0 flex items-center ${align === 'end' ? 'justify-end' : 'justify-start'}` : 'shrink-0'}"
-  style={fit ? `min-width: ${measuredHeight}px;` : measuredWidth > 0 ? `width: ${measuredWidth}px;` : `aspect-ratio: ${ratio};`}
+  class="{sizeClass} select-none {fit
+    ? `w-full flex-1 min-w-0 flex items-center ${align === 'end' ? 'justify-end' : 'justify-start'}`
+    : 'shrink-0'}"
+  style={fit
+    ? `min-width: ${measuredHeight}px;`
+    : measuredWidth > 0
+      ? `width: ${measuredWidth}px;`
+      : `aspect-ratio: ${ratio};`}
 >
   {#if fit && hasBigTile}
     {#if fitLayout}
@@ -195,7 +211,10 @@
         class="grid shrink-0 shadow-xl"
         style="grid-template-columns: repeat({fitLayout.cols}, {fitLayout.unit}px); grid-template-rows: repeat({fitLayout.rows}, {fitLayout.unit}px); gap: {MOSAIC_GAP}px; width: {fitLayout.width}px; height: {fitLayout.height}px;"
       >
-        <div class="min-w-0 min-h-0" style="grid-area: 1 / 1 / span {fitLayout.heroSpan} / span {fitLayout.heroSpan};">
+        <div
+          class="min-w-0 min-h-0"
+          style="grid-area: 1 / 1 / span {fitLayout.heroSpan} / span {fitLayout.heroSpan};"
+        >
           {@render bigTile()}
         </div>
         {#each quarterCovers.slice(0, fitLayout.shown) as cover, i (i)}
@@ -212,17 +231,30 @@
       </div>
     {:else}
       <!-- Not measured yet, no covers to grid, or nothing fits `minTile`: the big tile alone, as a square. -->
-      <div class="shrink-0 {fitSoloEdge > 0 ? '' : 'h-full aspect-square'}" style={fitSoloEdge > 0 ? `width: ${fitSoloEdge}px; height: ${fitSoloEdge}px;` : ""}>
+      <div
+        class="shrink-0 {fitSoloEdge > 0 ? '' : 'h-full aspect-square'}"
+        style={fitSoloEdge > 0 ? `width: ${fitSoloEdge}px; height: ${fitSoloEdge}px;` : ""}
+      >
         {@render bigTile()}
       </div>
     {/if}
   {:else if !hasBigTile}
     {#if fallbackName}
-      <div class="w-full h-full bg-gradient-to-br {getArtistGradient(fallbackName)} rounded-full flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md">
+      <div
+        class="w-full h-full bg-gradient-to-br {getArtistGradient(
+          fallbackName,
+        )} rounded-full flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md"
+      >
         {fallbackName.charAt(0).toUpperCase()}
       </div>
     {:else}
-      <CoverArt songId={undefined} artEmbedded={false} artAutomatic={null} artManual={null} sizeClass={tileClass} />
+      <CoverArt
+        songId={undefined}
+        artEmbedded={false}
+        artAutomatic={null}
+        artManual={null}
+        sizeClass={tileClass}
+      />
     {/if}
   {:else if quarterCovers.length === 0}
     {@render bigTile()}

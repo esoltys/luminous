@@ -8,7 +8,9 @@ type RegisterScreenHook = typeof registerScreenHook;
  * drops the whole branch, this helper and the screens module included, from release builds:
  * `$effect(() => { if (!import.meta.env.DEV) return; return onDevScreenHooks((hook) => [...]); })`.
  */
-export function onDevScreenHooks(register: (hook: RegisterScreenHook) => Array<() => void>): () => void {
+export function onDevScreenHooks(
+  register: (hook: RegisterScreenHook) => Array<() => void>,
+): () => void {
   let unregister: Array<() => void> = [];
   let unmounted = false;
   import("./screens").then(({ registerScreenHook }) => {

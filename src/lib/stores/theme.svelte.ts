@@ -15,7 +15,7 @@ import {
   extractArchetypes,
   checkWcagCompliance,
   generatePaletteFromSeed,
-  type ColorCount
+  type ColorCount,
 } from "../utils/colorUtils";
 import { LIGHTNESS_STEP } from "../constants";
 import { prefersReducedMotion } from "../utils/motion";
@@ -86,7 +86,7 @@ export const LUMINOUS_DARK_COLORS: ThemeColors = {
   "color-accent-hover": "#626fe8",
   "color-text-primary": "#f1f3f8",
   "color-text-secondary": "#a6adc4",
-  "color-border": "#3d3d34"
+  "color-border": "#3d3d34",
 };
 
 export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
@@ -97,7 +97,7 @@ export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
   "color-accent-hover": "#3a45b0",
   "color-text-primary": "#16181d",
   "color-text-secondary": "#5a6072",
-  "color-border": "#cdc7b8"
+  "color-border": "#cdc7b8",
 };
 
 const HEX6 = /^#[0-9a-f]{6}$/i;
@@ -113,19 +113,21 @@ const HEX6 = /^#[0-9a-f]{6}$/i;
 export function withReadableText(colors: ThemeColors): ThemeColors {
   const surfaces = [colors["bg-main"], colors["bg-sidebar"], colors["bg-playerbar"]];
   if (!surfaces.every((c) => HEX6.test(c))) return colors;
-  const passes = (text: string) => HEX6.test(text) && surfaces.every((bg) => checkWcagCompliance(text, bg).wcagAA);
+  const passes = (text: string) =>
+    HEX6.test(text) && surfaces.every((bg) => checkWcagCompliance(text, bg).wcagAA);
   if (passes(colors["color-text-primary"]) && passes(colors["color-text-secondary"])) return colors;
 
   const light = LUMINOUS_LIGHT_COLORS;
   const dark = LUMINOUS_DARK_COLORS;
   const [first, second] = isLightColor(colors["bg-main"]) ? [light, dark] : [dark, light];
-  const pair = [first, second].find(
-    (p) => passes(p["color-text-primary"]) && passes(p["color-text-secondary"])
-  ) ?? first;
+  const pair =
+    [first, second].find(
+      (p) => passes(p["color-text-primary"]) && passes(p["color-text-secondary"]),
+    ) ?? first;
   return {
     ...colors,
     "color-text-primary": pair["color-text-primary"],
-    "color-text-secondary": pair["color-text-secondary"]
+    "color-text-secondary": pair["color-text-secondary"],
   };
 }
 
@@ -180,7 +182,12 @@ export const CHROME_SATURATION = 1.8;
  * effects, the reactive logo, the playbar spectrum) and showed up as
  * banding/pulsing in the sidebar.
  */
-export function flatGlassColor(tintHex: string, alpha: number, backdropHex: string, saturation = CHROME_SATURATION): string {
+export function flatGlassColor(
+  tintHex: string,
+  alpha: number,
+  backdropHex: string,
+  saturation = CHROME_SATURATION,
+): string {
   const { r, g, b } = hexToRgb(backdropHex);
   const s = saturation;
   // Filter Effects `saturate()` matrix, applied in sRGB like the browser's
@@ -190,7 +197,9 @@ export function flatGlassColor(tintHex: string, alpha: number, backdropHex: stri
   const sb = (0.213 - 0.213 * s) * r + (0.715 - 0.715 * s) * g + (0.072 + 0.928 * s) * b;
   const tint = hexToRgb(tintHex);
   const over = (t: number, back: number) =>
-    Math.round(Math.min(255, Math.max(0, t * alpha + Math.min(255, Math.max(0, back)) * (1 - alpha))));
+    Math.round(
+      Math.min(255, Math.max(0, t * alpha + Math.min(255, Math.max(0, back)) * (1 - alpha))),
+    );
   return rgbToHex(over(tint.r, sr), over(tint.g, sg), over(tint.b, sb));
 }
 
@@ -248,7 +257,7 @@ const RUBY_RED_COLORS: ThemeColors = {
   "color-accent-hover": "#f06090",
   "color-text-primary": "#ffffff",
   "color-text-secondary": "#e2e8f0",
-  "color-border": "#974a5f"
+  "color-border": "#974a5f",
 };
 
 const RUBY_RED_SEED = "#e11d48";
@@ -274,7 +283,7 @@ const METALLIC_COLORS: ThemeColors = {
   "color-accent-hover": "#b7a267",
   "color-text-primary": "#ffffff",
   "color-text-secondary": "#e2e8f0",
-  "color-border": "#af9350"
+  "color-border": "#af9350",
 };
 
 const SABRINA_COLORS: ThemeColors = {
@@ -285,7 +294,7 @@ const SABRINA_COLORS: ThemeColors = {
   "color-accent-hover": "#E9B787",
   "color-text-primary": "#ffffff",
   "color-text-secondary": "#e2e8f0",
-  "color-border": "#917053"
+  "color-border": "#917053",
 };
 
 const TERMINAL_GREEN_COLORS: ThemeColors = {
@@ -296,7 +305,7 @@ const TERMINAL_GREEN_COLORS: ThemeColors = {
   "color-accent-hover": "#34d399",
   "color-text-primary": "#f0fdfa",
   "color-text-secondary": "#99f6e4",
-  "color-border": "#264842"
+  "color-border": "#264842",
 };
 
 /**
@@ -313,7 +322,7 @@ const DRIFTWOOD_COLORS: ThemeColors = {
   "color-accent-hover": "#62361e",
   "color-text-primary": "#16181d",
   "color-text-secondary": "#565c6e",
-  "color-border": "#997766"
+  "color-border": "#997766",
 };
 
 const FOXGLOVE_COLORS: ThemeColors = {
@@ -324,7 +333,7 @@ const FOXGLOVE_COLORS: ThemeColors = {
   "color-accent-hover": "#b4b7db",
   "color-text-primary": "#ffffff",
   "color-text-secondary": "#e2e8f0",
-  "color-border": "#853f4e"
+  "color-border": "#853f4e",
 };
 
 export const PREDEFINED_THEMES: Theme[] = [
@@ -339,54 +348,54 @@ export const PREDEFINED_THEMES: Theme[] = [
       "color-accent-hover": "var(--color-artwork-accent-hover)",
       "color-text-primary": "#ffffff",
       "color-text-secondary": "#e2e8f0",
-      "color-border": "var(--color-artwork-border)"
-    }
+      "color-border": "var(--color-artwork-border)",
+    },
   },
   {
     id: "system",
     name: "System",
-    colors: { ...LUMINOUS_DARK_COLORS }
+    colors: { ...LUMINOUS_DARK_COLORS },
   },
   {
     id: "ruby-red",
     name: "Ruby Red",
-    colors: { ...RUBY_RED_COLORS }
+    colors: { ...RUBY_RED_COLORS },
   },
   {
     id: "nordic-blue",
     name: "Nordic Blue",
-    colors: { ...NORDIC_BLUE_COLORS }
+    colors: { ...NORDIC_BLUE_COLORS },
   },
   {
     id: "retro-amber",
     name: "Retro Amber",
-    colors: generatePaletteFromSeed(RETRO_AMBER_SEED)
+    colors: generatePaletteFromSeed(RETRO_AMBER_SEED),
   },
   {
     id: "metallic",
     name: "Metallic",
-    colors: { ...METALLIC_COLORS }
+    colors: { ...METALLIC_COLORS },
   },
   {
     id: "sabrina",
     name: "Sabrina",
-    colors: { ...SABRINA_COLORS }
+    colors: { ...SABRINA_COLORS },
   },
   {
     id: "terminal-green",
     name: "Terminal Green",
-    colors: { ...TERMINAL_GREEN_COLORS }
+    colors: { ...TERMINAL_GREEN_COLORS },
   },
   {
     id: "driftwood",
     name: "Driftwood",
-    colors: { ...DRIFTWOOD_COLORS }
+    colors: { ...DRIFTWOOD_COLORS },
   },
   {
     id: "foxglove",
     name: "Foxglove",
-    colors: { ...FOXGLOVE_COLORS }
-  }
+    colors: { ...FOXGLOVE_COLORS },
+  },
 ];
 
 const ARTWORK_TEXT_PRIMARY_DARK = "#ffffff";
@@ -400,10 +409,18 @@ const ARTWORK_TEXT_SECONDARY_LIGHT = "#5a6072";
  * "Save as Custom Theme") and applyActiveTheme (the live-rendered CSS
  * vars) so the two can't drift apart again (#156).
  */
-function getArtworkTextColors(artColors: ExtractedColors): Pick<ThemeColors, "color-text-primary" | "color-text-secondary"> {
+function getArtworkTextColors(
+  artColors: ExtractedColors,
+): Pick<ThemeColors, "color-text-primary" | "color-text-secondary"> {
   return artColors.isLight
-    ? { "color-text-primary": ARTWORK_TEXT_PRIMARY_LIGHT, "color-text-secondary": ARTWORK_TEXT_SECONDARY_LIGHT }
-    : { "color-text-primary": ARTWORK_TEXT_PRIMARY_DARK, "color-text-secondary": ARTWORK_TEXT_SECONDARY_DARK };
+    ? {
+        "color-text-primary": ARTWORK_TEXT_PRIMARY_LIGHT,
+        "color-text-secondary": ARTWORK_TEXT_SECONDARY_LIGHT,
+      }
+    : {
+        "color-text-primary": ARTWORK_TEXT_PRIMARY_DARK,
+        "color-text-secondary": ARTWORK_TEXT_SECONDARY_DARK,
+      };
 }
 
 type Rgb = { r: number; g: number; b: number };
@@ -455,7 +472,10 @@ function lightenUntilReadable(rgb: Rgb): Rgb {
 export function buildExtractedColors(colorCounts: ColorCount[]): ExtractedColors {
   const swatches = quantizeMedianCut(colorCounts, 24);
   const archetypes = extractArchetypes(swatches);
-  const dominant = swatches.reduce((max, s) => (s.population > max.population ? s : max), swatches[0]);
+  const dominant = swatches.reduce(
+    (max, s) => (s.population > max.population ? s : max),
+    swatches[0],
+  );
 
   // Derive all 6 Android Palette archetypes with fallbacks
   const vibrant = archetypes.vibrant || dominant;
@@ -467,7 +487,7 @@ export function buildExtractedColors(colorCounts: ColorCount[]): ExtractedColors
 
   // Determine if cover art is light ($L > 0.40$)
   const dominantHsl = rgbToHsl(dominant.r, dominant.g, dominant.b);
-  const isLight = dominantHsl.l > 0.40;
+  const isLight = dominantHsl.l > 0.4;
 
   // Map 6 archetypes to UI panel surfaces based on Light vs Dark Glass Mode
   let primaryRgb: Rgb;
@@ -478,19 +498,19 @@ export function buildExtractedColors(colorCounts: ColorCount[]): ExtractedColors
   let borderRgb: Rgb;
 
   if (isLight) {
-    primaryRgb = lightenUntilReadable(clampLightness(lightMuted, 0.70, 0.95));
-    sidebarRgb = lightenUntilReadable(clampLightness(lightVibrant, 0.65, 0.90));
+    primaryRgb = lightenUntilReadable(clampLightness(lightMuted, 0.7, 0.95));
+    sidebarRgb = lightenUntilReadable(clampLightness(lightVibrant, 0.65, 0.9));
     playerbarRgb = lightenUntilReadable(clampLightness(lightMuted, 0.68, 0.92));
     accentRgb = clampLightness(vibrant, 0.35, 0.65);
     accentHoverRgb = clampLightness(darkVibrant, 0.25, 0.55);
-    borderRgb = clampLightness(muted, 0.50, 0.80);
+    borderRgb = clampLightness(muted, 0.5, 0.8);
   } else {
     primaryRgb = darkenUntilReadable(clampLightness(darkMuted, 0.0, 0.35));
-    sidebarRgb = darkenUntilReadable(clampLightness(darkVibrant, 0.0, 0.30));
+    sidebarRgb = darkenUntilReadable(clampLightness(darkVibrant, 0.0, 0.3));
     playerbarRgb = darkenUntilReadable(clampLightness(darkMuted, 0.0, 0.32));
     accentRgb = clampLightness(vibrant, 0.35, 0.75);
     accentHoverRgb = clampLightness(lightVibrant, 0.45, 0.85);
-    borderRgb = clampLightness(muted, 0.20, 0.50);
+    borderRgb = clampLightness(muted, 0.2, 0.5);
   }
 
   const primaryHex = rgbToHex(primaryRgb.r, primaryRgb.g, primaryRgb.b);
@@ -538,7 +558,7 @@ export function buildExtractedColors(colorCounts: ColorCount[]): ExtractedColors
     playerbar: rgbToHex(playerbarRgb.r, playerbarRgb.g, playerbarRgb.b),
     accent: rgbToHex(accentRgb.r, accentRgb.g, accentRgb.b),
     accentHover: rgbToHex(accentHoverRgb.r, accentHoverRgb.g, accentHoverRgb.b),
-    border: rgbToHex(borderRgb.r, borderRgb.g, borderRgb.b)
+    border: rgbToHex(borderRgb.r, borderRgb.g, borderRgb.b),
   };
 }
 
@@ -590,10 +610,12 @@ export function extractColorsFromImage(imgUrl: string): Promise<ExtractedColors>
           return;
         }
 
-        const colorCounts: ColorCount[] = Array.from(colorBuckets.entries()).map(([key, bucketCount]) => {
-          const [r, g, b] = key.split(",").map(Number);
-          return { r, g, b, count: bucketCount };
-        });
+        const colorCounts: ColorCount[] = Array.from(colorBuckets.entries()).map(
+          ([key, bucketCount]) => {
+            const [r, g, b] = key.split(",").map(Number);
+            return { r, g, b, count: bucketCount };
+          },
+        );
 
         resolve(buildExtractedColors(colorCounts));
       } catch (e) {
@@ -624,7 +646,7 @@ function getFallbackColors(): ExtractedColors {
     playerbar: "#2b303c",
     accent: "#88c0d0",
     accentHover: "#8fbcbb",
-    border: "#3b4252"
+    border: "#3b4252",
   };
 }
 
@@ -684,7 +706,11 @@ export class ThemeStore {
             this.pendingAddonThemeId = themeId;
           }
         }
-        if (settings.color_scheme_mode === "light" || settings.color_scheme_mode === "dark" || settings.color_scheme_mode === "system") {
+        if (
+          settings.color_scheme_mode === "light" ||
+          settings.color_scheme_mode === "dark" ||
+          settings.color_scheme_mode === "system"
+        ) {
           this.colorSchemeMode = settings.color_scheme_mode;
         }
       }
@@ -749,19 +775,22 @@ export class ThemeStore {
     const entry = ADDON_CATALOG.find((e) => e.id === id);
     if (!entry) return null;
     const state = this.addons.statuses[id]?.state;
-    const undecided = state === undefined || state === "purchasing" || state === "downloading" || state === "owned";
+    const undecided =
+      state === undefined || state === "purchasing" || state === "downloading" || state === "owned";
     return undecided ? { id: entry.id, name: entry.name, colors: entry.colors } : null;
   }
 
   get currentTheme(): Theme {
     const provisional = this.provisionalAddonTheme;
     if (provisional) return provisional;
-    const predefined = PREDEFINED_THEMES.find(t => t.id === this.activeThemeId);
+    const predefined = PREDEFINED_THEMES.find((t) => t.id === this.activeThemeId);
     if (predefined) return predefined;
-    const custom = this.customThemes.find(t => t.id === this.activeThemeId);
+    const custom = this.customThemes.find((t) => t.id === this.activeThemeId);
     if (custom) return custom;
-    const addon = this.addons.isUsable(this.activeThemeId) ? this.addons.asTheme(this.activeThemeId) : undefined;
-    return addon || PREDEFINED_THEMES.find(t => t.id === "system") || PREDEFINED_THEMES[0];
+    const addon = this.addons.isUsable(this.activeThemeId)
+      ? this.addons.asTheme(this.activeThemeId)
+      : undefined;
+    return addon || PREDEFINED_THEMES.find((t) => t.id === "system") || PREDEFINED_THEMES[0];
   }
 
   /** The active add-on theme when one is selected and usable, else null. */
@@ -770,7 +799,10 @@ export class ThemeStore {
   }
 
   private isBuiltInThemeId(themeId: string): boolean {
-    return PREDEFINED_THEMES.some(t => t.id === themeId) || this.customThemes.some(t => t.id === themeId);
+    return (
+      PREDEFINED_THEMES.some((t) => t.id === themeId) ||
+      this.customThemes.some((t) => t.id === themeId)
+    );
   }
 
   /**
@@ -824,7 +856,7 @@ export class ThemeStore {
         "color-accent": artColors.accent,
         "color-accent-hover": artColors.accentHover,
         "color-border": artColors.border,
-        ...getArtworkTextColors(artColors)
+        ...getArtworkTextColors(artColors),
       };
     }
     return theme.isCustom ? withReadableText(theme.colors) : theme.colors;
@@ -840,7 +872,7 @@ export class ThemeStore {
   }
 
   async addCustomTheme(theme: Theme) {
-    const existingIndex = this.customThemes.findIndex(t => t.id === theme.id);
+    const existingIndex = this.customThemes.findIndex((t) => t.id === theme.id);
     if (existingIndex >= 0) {
       this.customThemes[existingIndex] = theme;
     } else {
@@ -850,13 +882,19 @@ export class ThemeStore {
     this.activeThemeId = theme.id;
     this.applyActiveTheme();
 
-    await invoke("set_app_setting", { key: "custom_themes", value: JSON.stringify(this.customThemes) });
+    await invoke("set_app_setting", {
+      key: "custom_themes",
+      value: JSON.stringify(this.customThemes),
+    });
     await invoke("set_app_setting", { key: "active_theme_id", value: theme.id });
   }
 
   async deleteCustomTheme(themeId: string) {
-    this.customThemes = this.customThemes.filter(t => t.id !== themeId);
-    await invoke("set_app_setting", { key: "custom_themes", value: JSON.stringify(this.customThemes) });
+    this.customThemes = this.customThemes.filter((t) => t.id !== themeId);
+    await invoke("set_app_setting", {
+      key: "custom_themes",
+      value: JSON.stringify(this.customThemes),
+    });
 
     if (this.activeThemeId === themeId) {
       await this.setTheme("system");
@@ -876,7 +914,11 @@ export class ThemeStore {
       "color-border",
     ];
     for (const key of requiredColors) {
-      if (!imported.colors || typeof imported.colors[key] !== "string" || !imported.colors[key].trim()) {
+      if (
+        !imported.colors ||
+        typeof imported.colors[key] !== "string" ||
+        !imported.colors[key].trim()
+      ) {
         throw new Error(`Missing or invalid color: ${key}`);
       }
     }
@@ -939,14 +981,17 @@ export class ThemeStore {
   resetArtworkColors(skipApplyActiveTheme = false) {
     this.artworkColors = null;
     if (typeof document === "undefined") return;
-    this.writeArtworkVars({
-      primary: "#2e3440",
-      sidebar: "#242933",
-      playerbar: "#2b303c",
-      accent: "#88c0d0",
-      accentHover: "#8fbcbb",
-      border: "#3b4252"
-    }, skipApplyActiveTheme);
+    this.writeArtworkVars(
+      {
+        primary: "#2e3440",
+        sidebar: "#242933",
+        playerbar: "#2b303c",
+        accent: "#88c0d0",
+        accentHover: "#8fbcbb",
+        border: "#3b4252",
+      },
+      skipApplyActiveTheme,
+    );
   }
 
   /**
@@ -955,7 +1000,10 @@ export class ThemeStore {
    * commit as the rest of the theme (see commitThemeChange()) — written
    * before it, they'd already show in the crossfade's "old" snapshot.
    */
-  private writeArtworkVars(colors: Omit<ExtractedColors, "isLight">, skipApplyActiveTheme: boolean) {
+  private writeArtworkVars(
+    colors: Omit<ExtractedColors, "isLight">,
+    skipApplyActiveTheme: boolean,
+  ) {
     const write = () => {
       const root = document.documentElement;
       root.style.setProperty("--color-artwork-primary", colors.primary);
@@ -1037,10 +1085,17 @@ export class ThemeStore {
     root.style.setProperty("--glass-solid-sidebar", flatGlassColor(bgSidebar, alpha, bgMain));
     root.style.setProperty("--acrylic-chrome-opacity", `${alpha * 100}%`);
     root.style.setProperty("--acrylic-float-opacity", `${floatAlpha(isDark) * 100}%`);
-    root.style.setProperty("--glass-border-color", isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)");
+    root.style.setProperty(
+      "--glass-border-color",
+      isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)",
+    );
 
-    const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
-    const highlight = isDark ? "inset 0 1px 0 rgba(255, 255, 255, 0.14)" : "inset 0 1px 0 rgba(255, 255, 255, 0.9)";
+    const elevation = isDark
+      ? "0 8px 32px rgba(0, 0, 0, 0.45)"
+      : "0 8px 32px rgba(15, 15, 20, 0.10)";
+    const highlight = isDark
+      ? "inset 0 1px 0 rgba(255, 255, 255, 0.14)"
+      : "inset 0 1px 0 rgba(255, 255, 255, 0.9)";
     // The top nav paints the two halves separately (its own compositor layer
     // for the elevation), so they are the source of truth; --glass-shadow
     // composes them for every other panel.
@@ -1113,7 +1168,11 @@ export class ThemeStore {
       }
     };
 
-    const animate = this.hasAppliedTheme && !this.committingTheme && this.supportsViewTransitions() && !prefersReducedMotion();
+    const animate =
+      this.hasAppliedTheme &&
+      !this.committingTheme &&
+      this.supportsViewTransitions() &&
+      !prefersReducedMotion();
     this.hasAppliedTheme = true;
     if (this.supportsViewTransitions()) {
       // Turns off the @property morph (see app.css) — the crossfade
@@ -1151,8 +1210,12 @@ export class ThemeStore {
     // effectively active (OS preference, or a pinned Light/Dark mode), not
     // the static preview colors on the theme entry.
     const colors = isLuminous
-      ? (this.effectiveColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS)
-      : theme.isCustom ? withReadableText(theme.colors) : theme.colors;
+      ? this.effectiveColorScheme === "dark"
+        ? LUMINOUS_DARK_COLORS
+        : LUMINOUS_LIGHT_COLORS
+      : theme.isCustom
+        ? withReadableText(theme.colors)
+        : theme.colors;
 
     // Heuristically derived, not hand-picked: text rendered directly on
     // the accent color (active nav items, filled buttons) needs contrast
@@ -1162,9 +1225,10 @@ export class ThemeStore {
     // sync with the active accent. Dynamic Artwork's `color-accent` is a
     // CSS var reference (not a literal hex), so resolve it to the real
     // extracted color first.
-    const resolvedAccent = theme.id === "dynamic-artwork"
-      ? (this.artworkColors || getFallbackColors()).accent
-      : colors["color-accent"];
+    const resolvedAccent =
+      theme.id === "dynamic-artwork"
+        ? (this.artworkColors || getFallbackColors()).accent
+        : colors["color-accent"];
 
     // "Accent Text" — the only accent-derived color allowed on text/icons
     // (everything else must be Primary or Secondary text). Unlike
@@ -1176,21 +1240,26 @@ export class ThemeStore {
     // not the translucent accent-tinted surfaces (badges, hover states) text
     // often actually renders on. Both bg-main and accent-hover need the same
     // dynamic-artwork CSS-var-reference resolution as resolvedAccent above.
-    const resolvedBgMain = theme.id === "dynamic-artwork"
-      ? (this.artworkColors || getFallbackColors()).primary
-      : colors["bg-main"];
-    const resolvedBgSidebar = theme.id === "dynamic-artwork"
-      ? (this.artworkColors || getFallbackColors()).sidebar
-      : colors["bg-sidebar"];
-    const resolvedBgPlayerbar = theme.id === "dynamic-artwork"
-      ? (this.artworkColors || getFallbackColors()).playerbar
-      : colors["bg-playerbar"];
-    const resolvedAccentHover = theme.id === "dynamic-artwork"
-      ? (this.artworkColors || getFallbackColors()).accentHover
-      : colors["color-accent-hover"];
-    const resolvedBorder = theme.id === "dynamic-artwork"
-      ? (this.artworkColors || getFallbackColors()).border
-      : colors["color-border"];
+    const resolvedBgMain =
+      theme.id === "dynamic-artwork"
+        ? (this.artworkColors || getFallbackColors()).primary
+        : colors["bg-main"];
+    const resolvedBgSidebar =
+      theme.id === "dynamic-artwork"
+        ? (this.artworkColors || getFallbackColors()).sidebar
+        : colors["bg-sidebar"];
+    const resolvedBgPlayerbar =
+      theme.id === "dynamic-artwork"
+        ? (this.artworkColors || getFallbackColors()).playerbar
+        : colors["bg-playerbar"];
+    const resolvedAccentHover =
+      theme.id === "dynamic-artwork"
+        ? (this.artworkColors || getFallbackColors()).accentHover
+        : colors["color-accent-hover"];
+    const resolvedBorder =
+      theme.id === "dynamic-artwork"
+        ? (this.artworkColors || getFallbackColors()).border
+        : colors["color-border"];
 
     // Non-text UI components (graphs, curves, nodes, sliders) require >= 3:1 contrast against bg-main (WCAG 2.1 SC 1.4.11).
     const safeAccent = clampForContrast(resolvedAccent, resolvedBgMain, 3.0);
@@ -1200,11 +1269,16 @@ export class ThemeStore {
     const accentText = clampForContrast(resolvedAccent, resolvedBgMain, 4.5);
     const accentTextHover = clampForContrast(resolvedAccentHover, resolvedBgMain, 4.5);
 
-    const artworkTextColors = theme.id === "dynamic-artwork"
-      ? getArtworkTextColors(this.artworkColors || getFallbackColors())
-      : null;
-    const textPrimary = artworkTextColors ? artworkTextColors["color-text-primary"] : colors["color-text-primary"];
-    const textSecondary = artworkTextColors ? artworkTextColors["color-text-secondary"] : colors["color-text-secondary"];
+    const artworkTextColors =
+      theme.id === "dynamic-artwork"
+        ? getArtworkTextColors(this.artworkColors || getFallbackColors())
+        : null;
+    const textPrimary = artworkTextColors
+      ? artworkTextColors["color-text-primary"]
+      : colors["color-text-primary"];
+    const textSecondary = artworkTextColors
+      ? artworkTextColors["color-text-secondary"]
+      : colors["color-text-secondary"];
 
     let styleEl = document.getElementById("luminous-theme-style");
     if (!styleEl) {

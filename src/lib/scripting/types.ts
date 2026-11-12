@@ -17,9 +17,19 @@ export interface ScriptContract {
 }
 
 // Copies of app types, checked against the originals in contract.test.ts.
-export type ScriptTab = "home" | "collection" | "playlists" | "files" | "settings" | "lyrics" | "stats" | "organize" | "help";
+export type ScriptTab =
+  | "home"
+  | "collection"
+  | "playlists"
+  | "files"
+  | "settings"
+  | "lyrics"
+  | "stats"
+  | "organize"
+  | "help";
 export type ScriptSubTab = "songs" | "albums" | "artists" | "genres";
-export type ScriptSettingsTab = "general" | "system" | "sources" | "integrations" | "themes" | "equalizer" | "about";
+export type ScriptSettingsTab =
+  "general" | "system" | "sources" | "integrations" | "themes" | "equalizer" | "about";
 export type ScriptAutoPlaylistKind =
   | "favourites"
   | "recently_added"
@@ -249,7 +259,7 @@ export interface ScriptWaitApi {
   forEvent<T = unknown>(
     eventName: string,
     predicate?: (payload: T) => boolean,
-    timeoutMs?: number
+    timeoutMs?: number,
   ): Promise<T>;
 
   /**
@@ -276,7 +286,14 @@ export interface ScriptWaitApi {
 }
 
 /** A grid that can show its items as cards or rows. */
-export type ScriptViewSurface = "albums" | "artists" | "playlistsAuto" | "playlistsCustom" | "genres" | "pinned" | "artistReleases";
+export type ScriptViewSurface =
+  | "albums"
+  | "artists"
+  | "playlistsAuto"
+  | "playlistsCustom"
+  | "genres"
+  | "pinned"
+  | "artistReleases";
 
 /**
  * Persistent view preferences scenes need to set without clicking through menus.
@@ -291,7 +308,9 @@ export interface ScriptViewApi {
   /** Switches the Organize view to a custom template pattern. */
   setOrganizeTemplate(template: string): Promise<void>;
   /** Opens the smart-playlist builder on Playlists → Custom, pre-filled with rules. */
-  openSmartPlaylistBuilder(rules?: Array<{ field: string; op: string; value: string }>): Promise<void>;
+  openSmartPlaylistBuilder(
+    rules?: Array<{ field: string; op: string; value: string }>,
+  ): Promise<void>;
 }
 
 /**
@@ -300,7 +319,11 @@ export interface ScriptViewApi {
  */
 export interface ScriptScreensApi {
   /** Sorts the Collection songs, albums or artists view, as its sort menu does. Needs the Collection tab on screen. */
-  setSort(surface: "songs" | "albums" | "artists", field: string, ascending: boolean): Promise<void>;
+  setSort(
+    surface: "songs" | "albums" | "artists",
+    field: string,
+    ascending: boolean,
+  ): Promise<void>;
   /** Types into the top search box as a user would, opening its dropdown. */
   search(query: string): Promise<void>;
   /** Opens the album tag editor from the open album's detail view. */

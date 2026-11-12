@@ -19,8 +19,13 @@ const source: FileSource = { kind: "folder", id: 1 };
 
 const KIND: Record<string, FileKind> = { flac: "audio", jpg: "image", txt: "notes" };
 
-function entry(name: string, isDir: boolean, status: FileEntry["status"] = null, songId: number | null = null): FileEntry {
-  const kind = isDir ? null : KIND[name.split(".").pop()!] ?? null;
+function entry(
+  name: string,
+  isDir: boolean,
+  status: FileEntry["status"] = null,
+  songId: number | null = null,
+): FileEntry {
+  const kind = isDir ? null : (KIND[name.split(".").pop()!] ?? null);
   return {
     name,
     isDir,
@@ -144,7 +149,10 @@ describe("FilesView.svelte", () => {
   it("does not show scan nudge on excluded or non-local folders", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "list_source_dir") {
-        const l = listing([entry("01 Opening.flac", false, "inLibrary", 7), entry("02 Encore.flac", false, "notScanned")]);
+        const l = listing([
+          entry("01 Opening.flac", false, "inLibrary", 7),
+          entry("02 Encore.flac", false, "notScanned"),
+        ]);
         l.excluded = true;
         return l;
       }

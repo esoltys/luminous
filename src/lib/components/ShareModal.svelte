@@ -19,10 +19,22 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { extractColorsFromImage, themeStore } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { getCoverArtUrl, resolveArtUrl, type Song, type StatsSummary, type StatsRange, type StatsTopItem } from "../types";
+  import {
+    getCoverArtUrl,
+    resolveArtUrl,
+    type Song,
+    type StatsSummary,
+    type StatsRange,
+    type StatsTopItem,
+  } from "../types";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
   import { statsBarPercents } from "../utils/statsBars";
-  import { songsToCoverStack, getArtistCoverStack, resolveArtistPortraitUrl, type CoverStackItem } from "../utils/covers";
+  import {
+    songsToCoverStack,
+    getArtistCoverStack,
+    resolveArtistPortraitUrl,
+    type CoverStackItem,
+  } from "../utils/covers";
   import { bucketListeningClock } from "../utils/listeningClock";
   import type { DaypartBucket } from "../utils/daypart";
   import {
@@ -119,12 +131,18 @@
 
   $effect(() => {
     if (!settingsLoaded) return;
-    void invoke("set_app_setting", { key: SETTING_INCLUDE_TRACK_LIST, value: String(includeTrackList) });
+    void invoke("set_app_setting", {
+      key: SETTING_INCLUDE_TRACK_LIST,
+      value: String(includeTrackList),
+    });
   });
 
   $effect(() => {
     if (!settingsLoaded) return;
-    void invoke("set_app_setting", { key: SETTING_INCLUDE_LIBRARY_INFO, value: String(includeLibraryInfo) });
+    void invoke("set_app_setting", {
+      key: SETTING_INCLUDE_LIBRARY_INFO,
+      value: String(includeLibraryInfo),
+    });
   });
 
   $effect(() => {
@@ -136,7 +154,9 @@
   // artist and stats cards never show one, and a stats-section card's list
   // *is* the whole card, so it's always shown with no toggle to hide it.
   let showTrackListToggle = $derived(entity.kind === "album" || entity.kind === "playlist");
-  let effectiveIncludeTrackList = $derived(entity.kind === "stats-section" ? true : showTrackListToggle && includeTrackList);
+  let effectiveIncludeTrackList = $derived(
+    entity.kind === "stats-section" ? true : showTrackListToggle && includeTrackList,
+  );
   // The artist/playlist cards' metadata line (album/track counts, duration)
   // is "library data" that can be toggled off for users who just want a
   // clean name-and-image card — independent of the playlist card's own
@@ -146,7 +166,9 @@
   let showBarsToggle = $derived(entity.kind === "stats" || entity.kind === "stats-section");
 
   let albumItem = $derived(
-    entity.kind === "album" ? collectionStore.albums.find((a) => sameAlbum(a.album, entity.albumName)) || null : null
+    entity.kind === "album"
+      ? collectionStore.albums.find((a) => sameAlbum(a.album, entity.albumName)) || null
+      : null,
   );
   let albumSongs = $state<Song[]>([]);
 
@@ -187,7 +209,7 @@
       if (!cancelled) {
         artistPortraitUrl = resolveArtistPortraitUrl(
           res?.artist_portrait_uri,
-          collectionStore.getArtistProfile(name)?.fetched_image_filename
+          collectionStore.getArtistProfile(name)?.fetched_image_filename,
         );
       }
     });
@@ -196,7 +218,9 @@
     };
   });
 
-  let artistAlbums = $derived(entity.kind === "artist" ? getArtistAlbums(collectionStore.albums, entity.artistName) : []);
+  let artistAlbums = $derived(
+    entity.kind === "artist" ? getArtistAlbums(collectionStore.albums, entity.artistName) : [],
+  );
   // "Album count" means full albums/box-sets, matching ArtistDetailView's
   // fullAlbums+sets split — EPs and singles are real releases but users
   // reported the raw artistAlbums.length (which includes them) reading as
@@ -205,7 +229,7 @@
     artistAlbums.filter((a) => {
       const category = classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec);
       return category === "album" || category === "set";
-    }).length
+    }).length,
   );
 
   // Songs backing the entity-card path (album/playlist/artist) — the stats
@@ -233,12 +257,21 @@
 
   let trackCards = $derived<ShareCardTrack[]>(
     entity.kind === "stats-section"
-      ? withBarPercents(entity.items.slice(0, 10)).map((it, i) => ({ number: i + 1, title: it.label, secondary: it.secondary, percent: includeBars ? it.percent : null }))
+      ? withBarPercents(entity.items.slice(0, 10)).map((it, i) => ({
+          number: i + 1,
+          title: it.label,
+          secondary: it.secondary,
+          percent: includeBars ? it.percent : null,
+        }))
       : entity.kind === "playlist"
-        // A playlist spans multiple artists, unlike an album, so each row
-        // needs its own artist to be legible on its own.
-        ? sortedTracks.map((s, i) => ({ number: i + 1, title: s.title || "", secondary: s.artist || s.album_artist || "" }))
-        : sortedTracks.map((s) => ({ number: s.track ?? null, title: s.title || "" }))
+        ? // A playlist spans multiple artists, unlike an album, so each row
+          // needs its own artist to be legible on its own.
+          sortedTracks.map((s, i) => ({
+            number: i + 1,
+            title: s.title || "",
+            secondary: s.artist || s.album_artist || "",
+          }))
+        : sortedTracks.map((s) => ({ number: s.track ?? null, title: s.title || "" })),
   );
 
   let totalDurationLabel = $derived.by(() => {
@@ -275,13 +308,9 @@
     const parts: string[] = [];
     if (entity.kind === "album" && albumItem?.year) parts.push(String(albumItem.year));
     if (entity.kind === "artist") {
-      parts.push(
-        i18n.plural("collection.albumsCount", artistFullAlbumCount)
-      );
+      parts.push(i18n.plural("collection.albumsCount", artistFullAlbumCount));
     }
-    parts.push(
-      i18n.plural("playlists.songsCount", songs.length)
-    );
+    parts.push(i18n.plural("playlists.songsCount", songs.length));
     if (totalDurationLabel) parts.push(totalDurationLabel);
     return parts.join(" • ");
   });
@@ -324,7 +353,7 @@
     const artwork = await collectionStore.getExtendedArtworkForArtist(name);
     const portrait = resolveArtistPortraitUrl(
       artwork?.artist_portrait_uri,
-      collectionStore.getArtistProfile(name)?.fetched_image_filename
+      collectionStore.getArtistProfile(name)?.fetched_image_filename,
     );
     if (portrait) return portrait;
     const stack = getArtistCoverStack(getArtistAlbums(collectionStore.albums, name), [], 1);
@@ -341,7 +370,7 @@
   async function resolveTopItemsCoverUrls(
     items: StatsTopItem[],
     kind: "artist" | "album" | "song" | "genre",
-    maxCovers = MOSAIC_FIT_MAX_COVERS
+    maxCovers = MOSAIC_FIT_MAX_COVERS,
   ): Promise<string[]> {
     if (kind === "genre") return [];
     const candidates = items.slice(0, 10);
@@ -355,8 +384,8 @@
                 artManual: it.art_manual,
                 artAutomatic: it.art_automatic,
                 artEmbedded: it.art_embedded,
-              })
-            )
+              }),
+            ),
           );
     return urls.filter((u): u is string => !!u).slice(0, maxCovers);
   }
@@ -387,7 +416,9 @@
         // the mosaic quarter tiles (or the fanned stack behind it). When no
         // portrait exists, the album covers themselves form the stack/mosaic.
         const stackItems = getArtistCoverStack(artistAlbums, artistSongs, MOSAIC_FIT_MAX_COVERS);
-        const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter((u): u is string => !!u);
+        const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter(
+          (u): u is string => !!u,
+        );
         if (!cancelled) {
           if (artistPortraitUrl) {
             coverUrl = artistPortraitUrl;
@@ -399,7 +430,9 @@
         }
       } else if (entity.kind === "playlist") {
         const stackItems = songsToCoverStack(entity.songs, MOSAIC_FIT_MAX_COVERS);
-        const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter((u): u is string => !!u);
+        const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter(
+          (u): u is string => !!u,
+        );
         if (!cancelled) {
           coverUrl = urls[0] ?? null;
           coverStackUrls = urls;
@@ -435,12 +468,18 @@
     // Check if the currently playing track/album matches what we are sharing
     const currentSong = playerStore.currentSong;
     const matchesCurrent =
-      (entity.kind === "album" && currentSong?.album && sameAlbum(entity.albumName, currentSong.album)) ||
-      (entity.kind === "artist" && currentSong?.artist && entity.artistName.toLowerCase() === currentSong.artist.toLowerCase());
+      (entity.kind === "album" &&
+        currentSong?.album &&
+        sameAlbum(entity.albumName, currentSong.album)) ||
+      (entity.kind === "artist" &&
+        currentSong?.artist &&
+        entity.artistName.toLowerCase() === currentSong.artist.toLowerCase());
 
     if (matchesCurrent && themeStore.artworkColors) {
       const art = themeStore.artworkColors;
-      backgroundColors = [art.vibrant, art.darkVibrant, art.lightVibrant, art.muted].filter((c): c is string => !!c);
+      backgroundColors = [art.vibrant, art.darkVibrant, art.lightVibrant, art.muted].filter(
+        (c): c is string => !!c,
+      );
       primaryColor = art.primary;
     }
 
@@ -468,9 +507,12 @@
         if (imageSource) {
           const colors = await extractColorsFromImage(imageSource);
           if (!cancelled) {
-            backgroundColors = [colors.vibrant, colors.darkVibrant, colors.lightVibrant, colors.muted].filter(
-              (c): c is string => !!c
-            );
+            backgroundColors = [
+              colors.vibrant,
+              colors.darkVibrant,
+              colors.lightVibrant,
+              colors.muted,
+            ].filter((c): c is string => !!c);
             primaryColor = colors.primary;
           }
         }
@@ -522,13 +564,17 @@
       statsAlbumsCoverStack = albumDataUris.filter((u): u is string => !!u);
       statsSongsCoverStack = songDataUris.filter((u): u is string => !!u);
 
-      const topCover = statsAlbumsCoverStack[0] ?? statsArtistsCoverStack[0] ?? statsSongsCoverStack[0];
+      const topCover =
+        statsAlbumsCoverStack[0] ?? statsArtistsCoverStack[0] ?? statsSongsCoverStack[0];
       if (topCover && !backgroundColors) {
         extractColorsFromImage(topCover).then((colors) => {
           if (!cancelled) {
-            backgroundColors = [colors.vibrant, colors.darkVibrant, colors.lightVibrant, colors.muted].filter(
-              (c): c is string => !!c
-            );
+            backgroundColors = [
+              colors.vibrant,
+              colors.darkVibrant,
+              colors.lightVibrant,
+              colors.muted,
+            ].filter((c): c is string => !!c);
             primaryColor = colors.primary;
           }
         });
@@ -543,11 +589,27 @@
     if (entity.kind !== "stats") return [];
     const s = entity.summary;
     const toItems = (items: StatsTopItem[]) =>
-      withBarPercents(items.slice(0, 5)).map((it) => ({ label: it.label, secondary: it.secondary, percent: includeBars ? it.percent : null }));
+      withBarPercents(items.slice(0, 5)).map((it) => ({
+        label: it.label,
+        secondary: it.secondary,
+        percent: includeBars ? it.percent : null,
+      }));
     return [
-      { title: i18n.t("stats.topArtists", {}, "Top Artists"), items: toItems(s.top_artists), coverStackDataUris: statsArtistsCoverStack },
-      { title: i18n.t("stats.topAlbums", {}, "Top Albums"), items: toItems(s.top_albums), coverStackDataUris: statsAlbumsCoverStack },
-      { title: i18n.t("stats.topSongs", {}, "Top Songs"), items: toItems(s.top_songs), coverStackDataUris: statsSongsCoverStack },
+      {
+        title: i18n.t("stats.topArtists", {}, "Top Artists"),
+        items: toItems(s.top_artists),
+        coverStackDataUris: statsArtistsCoverStack,
+      },
+      {
+        title: i18n.t("stats.topAlbums", {}, "Top Albums"),
+        items: toItems(s.top_albums),
+        coverStackDataUris: statsAlbumsCoverStack,
+      },
+      {
+        title: i18n.t("stats.topSongs", {}, "Top Songs"),
+        items: toItems(s.top_songs),
+        coverStackDataUris: statsSongsCoverStack,
+      },
       { title: i18n.t("stats.topGenres", {}, "Top Genres"), items: toItems(s.top_genres) },
     ];
   });
@@ -581,7 +643,7 @@
           sections: statsSections,
           clockBuckets: statsClockBuckets,
         },
-        scale
+        scale,
       );
     }
     return rasterizeShareCard(
@@ -599,7 +661,7 @@
         tracks: trackCards,
         includeTrackList: effectiveIncludeTrackList,
       },
-      scale
+      scale,
     );
   }
 
@@ -716,12 +778,16 @@
   </div>
 
   <div class="p-5 flex flex-col gap-4">
-    <div class="flex items-center justify-center bg-brand-main rounded-lg border border-brand-border p-4 min-h-[280px]">
+    <div
+      class="flex items-center justify-center bg-brand-main rounded-lg border border-brand-border p-4 min-h-[280px]"
+    >
       {#if previewUrl}
         <img
           src={previewUrl}
           alt={i18n.t("shareModal.previewAlt")}
-          class="max-w-full max-h-[50vh] rounded-lg shadow-2xl {rendering ? 'opacity-70' : ''} transition-opacity"
+          class="max-w-full max-h-[50vh] rounded-lg shadow-2xl {rendering
+            ? 'opacity-70'
+            : ''} transition-opacity"
         />
       {:else}
         <div class="text-sm text-brand-text-secondary">{i18n.t("shareModal.rendering")}</div>
@@ -730,11 +796,14 @@
 
     <div class="flex flex-col gap-3">
       <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-semibold text-brand-text-secondary mr-1">{i18n.t("shareModal.aspectRatioLabel")}</span>
+        <span class="text-xs font-semibold text-brand-text-secondary mr-1"
+          >{i18n.t("shareModal.aspectRatioLabel")}</span
+        >
         {#each SHARE_ASPECT_RATIOS as ratio (ratio.id)}
           <button
             onclick={() => (aspectRatio = ratio.id)}
-            class="px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer {aspectRatio === ratio.id
+            class="px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer {aspectRatio ===
+            ratio.id
               ? 'bg-brand-accent text-brand-accent-contrast border-brand-accent'
               : 'border-brand-border text-brand-text-secondary hover:bg-brand-main'}"
           >
@@ -745,11 +814,14 @@
 
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2">
-          <span class="text-xs font-semibold text-brand-text-secondary mr-1">{i18n.t("shareModal.themeLabel")}</span>
+          <span class="text-xs font-semibold text-brand-text-secondary mr-1"
+            >{i18n.t("shareModal.themeLabel")}</span
+          >
           <button
             onclick={() => (theme = "dark")}
             title={i18n.t("shareModal.themeDark")}
-            class="flex items-center justify-center w-8 h-8 rounded-full border transition-colors cursor-pointer {theme === 'dark'
+            class="flex items-center justify-center w-8 h-8 rounded-full border transition-colors cursor-pointer {theme ===
+            'dark'
               ? 'bg-brand-accent text-brand-accent-contrast border-brand-accent'
               : 'border-brand-border text-brand-text-secondary hover:bg-brand-main'}"
           >
@@ -758,7 +830,8 @@
           <button
             onclick={() => (theme = "light")}
             title={i18n.t("shareModal.themeLight")}
-            class="flex items-center justify-center w-8 h-8 rounded-full border transition-colors cursor-pointer {theme === 'light'
+            class="flex items-center justify-center w-8 h-8 rounded-full border transition-colors cursor-pointer {theme ===
+            'light'
               ? 'bg-brand-accent text-brand-accent-contrast border-brand-accent'
               : 'border-brand-border text-brand-text-secondary hover:bg-brand-main'}"
           >
@@ -768,7 +841,9 @@
 
         {#if showTrackListToggle}
           <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap">{i18n.t("shareModal.trackListToggle")}</span>
+            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
+              >{i18n.t("shareModal.trackListToggle")}</span
+            >
             <Toggle
               checked={includeTrackList}
               onchange={(v) => (includeTrackList = v)}
@@ -779,7 +854,9 @@
         {/if}
         {#if showBarsToggle}
           <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap">{i18n.t("shareModal.barsToggle")}</span>
+            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
+              >{i18n.t("shareModal.barsToggle")}</span
+            >
             <Toggle
               checked={includeBars}
               onchange={(v) => (includeBars = v)}
@@ -790,7 +867,9 @@
         {/if}
         {#if showLibraryToggle}
           <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap">{i18n.t("shareModal.libraryToggle")}</span>
+            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
+              >{i18n.t("shareModal.libraryToggle")}</span
+            >
             <Toggle
               checked={includeLibraryInfo}
               onchange={(v) => (includeLibraryInfo = v)}

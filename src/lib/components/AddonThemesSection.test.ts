@@ -7,7 +7,7 @@ import { addonsStore, type AddonState } from "../stores/addons.svelte";
 import { themeStore } from "../stores/theme.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue(undefined)
+  invoke: vi.fn().mockResolvedValue(undefined),
 }));
 
 function setState(state: AddonState, error?: string) {
@@ -147,12 +147,12 @@ describe("AddonThemesSection.svelte", () => {
         "color-accent-hover": "#555555",
         "color-border": "#666666",
         "color-text-primary": "#ffffff",
-        "color-text-secondary": "#eeeeee"
-      }
+        "color-text-secondary": "#eeeeee",
+      },
     });
     const { container } = render(AddonThemesSection);
     const swatches = [...container.querySelectorAll("[data-addon-card] .h-8 > div")].map(
-      (el) => (el as HTMLElement).style.backgroundColor
+      (el) => (el as HTMLElement).style.backgroundColor,
     );
     expect(swatches).toEqual([
       "rgb(17, 17, 17)",
@@ -160,7 +160,7 @@ describe("AddonThemesSection.svelte", () => {
       "rgb(51, 51, 51)",
       "rgb(68, 68, 68)",
       "rgb(85, 85, 85)",
-      "rgb(102, 102, 102)"
+      "rgb(102, 102, 102)",
     ]);
   });
 });

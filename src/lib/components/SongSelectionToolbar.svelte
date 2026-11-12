@@ -22,7 +22,7 @@
   class:bottom-28={!!playerStore.currentSong}
 >
   <span class="text-brand-accent-text font-bold">
-    {i18n.t('playlists.selectedCount', { count })}
+    {i18n.t("playlists.selectedCount", { count })}
   </span>
   <div class="h-4 w-px bg-brand-border/60"></div>
   <button
@@ -30,7 +30,7 @@
     class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors"
   >
     <Play class="w-3.5 h-3.5 fill-current text-brand-accent-text" />
-    <span>{i18n.t('playlists.playSelected')}</span>
+    <span>{i18n.t("playlists.playSelected")}</span>
   </button>
   <button
     onclick={onAddToPlaylist}
@@ -39,8 +39,10 @@
     <Plus class="w-3.5 h-3.5 text-brand-accent-text" />
     <span>
       {playlistsStore.activeCustomPlaylist
-        ? i18n.t('playlists.contextMenuAddToPlaylist', { name: getPlaylistDisplayName(playlistsStore.activeCustomPlaylist) })
-        : i18n.t('playlists.contextMenuAddToPlaylistDefault')}
+        ? i18n.t("playlists.contextMenuAddToPlaylist", {
+            name: getPlaylistDisplayName(playlistsStore.activeCustomPlaylist),
+          })
+        : i18n.t("playlists.contextMenuAddToPlaylistDefault")}
     </span>
   </button>
   <div class="h-4 w-px bg-brand-border/60"></div>
@@ -48,6 +50,6 @@
     onclick={onClear}
     class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
   >
-    {i18n.t('playlists.clearSelection')}
+    {i18n.t("playlists.clearSelection")}
   </button>
 </div>

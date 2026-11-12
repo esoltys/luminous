@@ -16,11 +16,7 @@ const BEEPER_API_URL = "http://127.0.0.1:23373";
 
 // Helper to get Beeper access token and self-chat ID from local AppData
 async function getBeeperClient() {
-  const dbPath = path.join(
-    process.env.APPDATA || "",
-    "BeeperTexts",
-    "account.db"
-  );
+  const dbPath = path.join(process.env.APPDATA || "", "BeeperTexts", "account.db");
   if (!fs.existsSync(dbPath)) {
     throw new Error(`Beeper database not found at ${dbPath}`);
   }
@@ -35,18 +31,17 @@ async function getBeeperClient() {
 
   // Query chats to find the self-chat (Eric / isSelfRoom)
   const res = await fetch(`${BEEPER_API_URL}/v1/chats`, {
-    headers: { Authorization: `Bearer ${token}` }
+    headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
     throw new Error(`Failed to fetch Beeper chats: ${res.status}`);
   }
   const data = (await res.json()) as any;
   const chats = data.items || [];
-  
+
   // Find a chat that has Eric as self-room or participant
-  const selfChat = chats.find((c: any) => 
-    c.participants?.items?.every((p: any) => p.isSelf) || 
-    c.title === "Eric"
+  const selfChat = chats.find(
+    (c: any) => c.participants?.items?.every((p: any) => p.isSelf) || c.title === "Eric",
   );
 
   if (!selfChat) {
@@ -60,17 +55,19 @@ async function getBeeperClient() {
       const sendRes = await fetch(`${BEEPER_API_URL}/v1/chats/${selfChat.id}/messages`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text }),
       });
       if (!sendRes.ok) {
-        console.error(`[Beeper] Failed to send notification: ${sendRes.status} ${await sendRes.text()}`);
+        console.error(
+          `[Beeper] Failed to send notification: ${sendRes.status} ${await sendRes.text()}`,
+        );
       } else {
         console.log(`[Beeper] Notification sent: "${text.split("\n")[0]}"`);
       }
-    }
+    },
   };
 }
 
@@ -82,7 +79,7 @@ function runCommand(cmd: string) {
 async function main() {
   const args = process.argv.slice(2);
   const isPushEnabled = args.includes("--push");
-  const versionArg = args.find(a => !a.startsWith("-"));
+  const versionArg = args.find((a) => !a.startsWith("-"));
 
   if (!versionArg) {
     console.error("Usage: bun run scripts/release.ts <version> [--push]");
@@ -138,7 +135,9 @@ async function main() {
 
     // Notify of tag creation
     if (beeper) {
-      await beeper.sendNotification(`🚀 **Luminous Release Prepared locally**\nTag \`${tagName}\` created. Ready to build.`);
+      await beeper.sendNotification(
+        `🚀 **Luminous Release Prepared locally**\nTag \`${tagName}\` created. Ready to build.`,
+      );
     }
 
     if (!isPushEnabled) {
@@ -160,18 +159,23 @@ async function main() {
     runCommand(`git push origin ${tagName}`);
 
     if (beeper) {
-      await beeper.sendNotification(`📦 **GitHub Action Build Triggered**\nRelease build for \`${tagName}\` has been pushed and is starting.`);
+      await beeper.sendNotification(
+        `📦 **GitHub Action Build Triggered**\nRelease build for \`${tagName}\` has been pushed and is starting.`,
+      );
     }
 
     console.log("\n--- Monitoring GitHub Action Build ---");
     console.log("Waiting for build to appear on GitHub...");
-    
+
     // Poll for the run to show up
     let runId = "";
     for (let i = 0; i < 10; i++) {
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, 3000));
       try {
-        const runJson = execSync(`gh run list --branch ${tagName} --limit 1 --json databaseId,status,conclusion`, { encoding: "utf-8" });
+        const runJson = execSync(
+          `gh run list --branch ${tagName} --limit 1 --json databaseId,status,conclusion`,
+          { encoding: "utf-8" },
+        );
         const runs = JSON.parse(runJson);
         if (runs && runs.length > 0) {
           runId = runs[0].databaseId.toString();
@@ -184,9 +188,13 @@ async function main() {
     }
 
     if (!runId) {
-      console.warn("[WARNING] Could not find triggered GitHub run. Please check GitHub Actions manually.");
+      console.warn(
+        "[WARNING] Could not find triggered GitHub run. Please check GitHub Actions manually.",
+      );
       if (beeper) {
-        await beeper.sendNotification(`⚠️ **Build Monitor Warning**\nCould not find run for tag \`${tagName}\` on GitHub. Please check actions page.`);
+        await beeper.sendNotification(
+          `⚠️ **Build Monitor Warning**\nCould not find run for tag \`${tagName}\` on GitHub. Please check actions page.`,
+        );
       }
       return;
     }
@@ -196,9 +204,11 @@ async function main() {
     let completed = false;
     let success = false;
     while (!completed) {
-      await new Promise(r => setTimeout(r, 15000)); // Poll every 15s
+      await new Promise((r) => setTimeout(r, 15000)); // Poll every 15s
       try {
-        const runJson = execSync(`gh run view ${runId} --json status,conclusion`, { encoding: "utf-8" });
+        const runJson = execSync(`gh run view ${runId} --json status,conclusion`, {
+          encoding: "utf-8",
+        });
         const run = JSON.parse(runJson);
         console.log(`Polling run ${runId}: status=${run.status}, conclusion=${run.conclusion}`);
         if (run.status === "completed") {
@@ -213,12 +223,15 @@ async function main() {
     // Final notification
     if (beeper) {
       if (success) {
-        await beeper.sendNotification(`✅ **Luminous Release Build Succeeded!**\nBuild for \`${tagName}\` completed successfully.\nLinux and Windows artifacts are drafted on GitHub.`);
+        await beeper.sendNotification(
+          `✅ **Luminous Release Build Succeeded!**\nBuild for \`${tagName}\` completed successfully.\nLinux and Windows artifacts are drafted on GitHub.`,
+        );
       } else {
-        await beeper.sendNotification(`❌ **Luminous Release Build Failed!**\nBuild for \`${tagName}\` failed.\nView logs here: https://github.com/${getRepoName()}/actions/runs/${runId}`);
+        await beeper.sendNotification(
+          `❌ **Luminous Release Build Failed!**\nBuild for \`${tagName}\` failed.\nView logs here: https://github.com/${getRepoName()}/actions/runs/${runId}`,
+        );
       }
     }
-
   } catch (err: any) {
     console.error(`\n[Error] Release script failed: ${err.message}`);
     if (beeper) {

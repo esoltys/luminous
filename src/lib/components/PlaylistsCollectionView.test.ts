@@ -108,7 +108,9 @@ describe("PlaylistsCollectionView.svelte - Decades Auto Playlists", () => {
     ];
 
     const { getByTitle } = render(PlaylistsCollectionView);
-    const refreshButton = getByTitle("Refresh all auto-playlists and Smart Playlists with the latest songs from your library");
+    const refreshButton = getByTitle(
+      "Refresh all auto-playlists and Smart Playlists with the latest songs from your library",
+    );
 
     await fireEvent.click(refreshButton);
 
@@ -140,7 +142,7 @@ describe("PlaylistsCollectionView.svelte - Decades Auto Playlists", () => {
     expect(morningMixEl).toBeInTheDocument();
     expect(favSongsEl).toBeInTheDocument();
     expect(
-      morningMixEl.compareDocumentPosition(favSongsEl) & Node.DOCUMENT_POSITION_FOLLOWING
+      morningMixEl.compareDocumentPosition(favSongsEl) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 

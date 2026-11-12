@@ -15,7 +15,7 @@
   let iframeSrc = $derived(
     targetSection
       ? `/luminous-user-guide-${i18n.manualLanguage}.html#${targetSection}`
-      : `/luminous-user-guide-${i18n.manualLanguage}.html`
+      : `/luminous-user-guide-${i18n.manualLanguage}.html`,
   );
 
   $effect(() => {
@@ -52,21 +52,25 @@
 
 <div class="relative flex flex-col h-full overflow-hidden bg-brand-main">
   {#if isLoading}
-    <div class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-brand-main">
-      <LoadingSpinner label={i18n.t('help.loading', {}, "Loading user guide...")} />
+    <div
+      class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-brand-main"
+    >
+      <LoadingSpinner label={i18n.t("help.loading", {}, "Loading user guide...")} />
     </div>
   {/if}
   <div class="absolute top-4 right-6 z-20">
     <Button onclick={() => walkthroughStore.start()} variant="secondary" size="sm">
       <Compass class="w-3.5 h-3.5" />
-      {i18n.t('walkthrough.restartTour', {}, 'Restart Feature Walkthrough')}
+      {i18n.t("walkthrough.restartTour", {}, "Restart Feature Walkthrough")}
     </Button>
   </div>
   <iframe
     bind:this={frameElement}
     src={iframeSrc}
-    title={i18n.t('sidebar.help')}
-    class="flex-1 w-full h-full border-0 transition-opacity duration-150 {isLoading ? 'opacity-0' : 'opacity-100'}"
+    title={i18n.t("sidebar.help")}
+    class="flex-1 w-full h-full border-0 transition-opacity duration-150 {isLoading
+      ? 'opacity-0'
+      : 'opacity-100'}"
     onload={(e) => {
       const frame = e.currentTarget as HTMLIFrameElement;
       try {

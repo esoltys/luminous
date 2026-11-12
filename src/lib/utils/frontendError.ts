@@ -1,32 +1,40 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from "@tauri-apps/api/core";
 
 /**
  * Returns true for known benign engine warnings/events that should not be forwarded
  * to the crash log (e.g. ResizeObserver loop notices, ViewTransition aborts).
  */
-export function isBenignFrontendError(message: string | undefined | null, error?: unknown): boolean {
+export function isBenignFrontendError(
+  message: string | undefined | null,
+  error?: unknown,
+): boolean {
   if (!message && !error) return false;
-  const msg = message || (error instanceof Error ? error.message : String(error ?? ''));
+  const msg = message || (error instanceof Error ? error.message : String(error ?? ""));
 
   // Benign ResizeObserver loop notifications (dispatched to window.onerror by browser engine)
   // e.g. "ResizeObserver loop completed with undelivered notifications."
   // or "ResizeObserver loop limit exceeded"
-  if (msg.includes('ResizeObserver loop')) {
+  if (msg.includes("ResizeObserver loop")) {
     return true;
   }
 
   // Expected ViewTransition aborts from rapid navigation or user interaction
   // e.g. "Transition was skipped. New ViewTransition started" / "skipTransition() called"
-  if (msg.includes('Transition was skipped') || msg.includes('skipTransition()')) {
+  if (msg.includes("Transition was skipped") || msg.includes("skipTransition()")) {
     return true;
   }
 
-  if (error && typeof error === 'object' && 'name' in error && (error as { name?: string }).name === 'AbortError') {
-    const errorMsg = 'message' in error ? String((error as { message?: unknown }).message) : '';
+  if (
+    error &&
+    typeof error === "object" &&
+    "name" in error &&
+    (error as { name?: string }).name === "AbortError"
+  ) {
+    const errorMsg = "message" in error ? String((error as { message?: unknown }).message) : "";
     if (
-      errorMsg.includes('Transition was skipped') ||
-      errorMsg.includes('skipTransition()') ||
-      errorMsg.toLowerCase().includes('transition')
+      errorMsg.includes("Transition was skipped") ||
+      errorMsg.includes("skipTransition()") ||
+      errorMsg.toLowerCase().includes("transition")
     ) {
       return true;
     }
@@ -50,7 +58,7 @@ export class FrontendErrorReporter {
 
   constructor(
     private send: LogFrontendErrorSender = (message, stack) =>
-      invoke('log_frontend_error', { message, stack })
+      invoke("log_frontend_error", { message, stack }),
   ) {}
 
   public report(message: string, stack?: string, error?: unknown) {

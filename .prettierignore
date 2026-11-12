@@ -1,0 +1,17 @@
+node_modules
+build
+.svelte-kit
+src-tauri
+crates
+target
+static
+docs/user-guide
+bun.lock
+Cargo.lock
+*.md
+*.html
+*.woff2
+*.svg
+flatpak
+verification
+.claude

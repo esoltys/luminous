@@ -16,7 +16,17 @@ let cardHeight: number | ((n: number) => number) = 0;
 const observers: Array<() => void> = [];
 
 function rect(top: number, height: number): DOMRect {
-  return { top, height, bottom: top + height, left: 0, right: viewWidth, width: viewWidth, x: 0, y: top, toJSON: () => ({}) };
+  return {
+    top,
+    height,
+    bottom: top + height,
+    left: 0,
+    right: viewWidth,
+    width: viewWidth,
+    x: 0,
+    y: top,
+    toJSON: () => ({}),
+  };
 }
 
 beforeEach(() => {
@@ -32,19 +42,28 @@ beforeEach(() => {
   });
   document.body.append(scroller);
 
-  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) {
+  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (
+    this: HTMLElement,
+  ) {
     return this === scroller || this.parentElement === scroller ? viewWidth : 0;
   });
-  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (
+    this: HTMLElement,
+  ) {
     return this === scroller ? VIEW_HEIGHT : 0;
   });
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+    this: HTMLElement,
+  ) {
     if (this === scroller) return rect(0, VIEW_HEIGHT);
     if (this.parentElement === scroller) return rect(-scrollY, 0);
     if (this.dataset.card !== undefined) {
-      const natural = typeof cardHeight === "number" ? cardHeight : cardHeight(Number(this.textContent));
+      const natural =
+        typeof cardHeight === "number" ? cardHeight : cardHeight(Number(this.textContent));
       // A `minmax(<H>px, auto)` row track stretches the card to at least H.
-      const floor = Number(/minmax\(([\d.]+)px/.exec(this.parentElement?.style.gridAutoRows ?? "")?.[1] ?? 0);
+      const floor = Number(
+        /minmax\(([\d.]+)px/.exec(this.parentElement?.style.gridAutoRows ?? "")?.[1] ?? 0,
+      );
       return rect(0, Math.max(natural, floor));
     }
     return rect(0, 0);
@@ -58,7 +77,7 @@ beforeEach(() => {
       }
       unobserve() {}
       disconnect() {}
-    }
+    },
   );
 });
 
@@ -99,7 +118,8 @@ function scrollTo(y: number) {
   flushSync();
 }
 
-const mounted = () => [...scroller.querySelectorAll("[data-card]")].map((el) => Number(el.textContent));
+const mounted = () =>
+  [...scroller.querySelectorAll("[data-card]")].map((el) => Number(el.textContent));
 const grid = () => scroller.firstElementChild as HTMLElement;
 const rows = () => grid().firstElementChild as HTMLElement;
 

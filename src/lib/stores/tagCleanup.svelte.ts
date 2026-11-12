@@ -69,9 +69,15 @@ class TagCleanupStore {
       taskName: i18n.t("tagCleanup.title"),
       total: selections.length,
     });
-    const unlisten = await listen<{ done: number; total: number }>("tag-cleanup-apply-progress", (event) => {
-      tasksStore.updateTask(REMOVE_TASK_ID, { current: event.payload.done, total: event.payload.total });
-    });
+    const unlisten = await listen<{ done: number; total: number }>(
+      "tag-cleanup-apply-progress",
+      (event) => {
+        tasksStore.updateTask(REMOVE_TASK_ID, {
+          current: event.payload.done,
+          total: event.payload.total,
+        });
+      },
+    );
     try {
       const result = await invoke<TagCleanupResult>("apply_tag_cleanup", { selections });
       tasksStore.completeTask(
@@ -83,7 +89,10 @@ class TagCleanupStore {
       );
       if (result.errors.length > 0) {
         console.warn("Tag clean-up errors:", result.errors);
-        toastStore.show(i18n.t("tagCleanup.partialErrors", { count: formatNumber(result.errors.length) }), "error");
+        toastStore.show(
+          i18n.t("tagCleanup.partialErrors", { count: formatNumber(result.errors.length) }),
+          "error",
+        );
       }
     } catch (e) {
       tasksStore.failTask(REMOVE_TASK_ID, i18n.t("tagCleanup.failedPrefix") + String(e));
@@ -100,12 +109,18 @@ class TagCleanupStore {
 
   private async check() {
     this.checking = true;
-    const unlisten = await listen<{ checked: number; total: number }>("tag-cleanup-progress", (event) => {
-      this.progress = event.payload;
-      if (tasksStore.isTaskActive(TASK_ID)) {
-        tasksStore.updateTask(TASK_ID, { current: event.payload.checked, total: event.payload.total });
-      }
-    });
+    const unlisten = await listen<{ checked: number; total: number }>(
+      "tag-cleanup-progress",
+      (event) => {
+        this.progress = event.payload;
+        if (tasksStore.isTaskActive(TASK_ID)) {
+          tasksStore.updateTask(TASK_ID, {
+            current: event.payload.checked,
+            total: event.payload.total,
+          });
+        }
+      },
+    );
     try {
       const preview = await invoke<TagCleanupPreview>("preview_tag_cleanup", { songIds: [] });
       if (this.reviewOpen) {

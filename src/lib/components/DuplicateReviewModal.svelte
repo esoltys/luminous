@@ -19,7 +19,13 @@
   import TagEditor from "./TagEditor.svelte";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
-  import { formatBitDepth, formatDate, formatDuration, formatFileSize, formatSampleRate } from "../utils/formatters";
+  import {
+    formatBitDepth,
+    formatDate,
+    formatDuration,
+    formatFileSize,
+    formatSampleRate,
+  } from "../utils/formatters";
   import type { DuplicateCandidate, DuplicateTrackGroup, FileNavigationTarget } from "../types";
 
   interface Props {
@@ -54,9 +60,7 @@
     if (groups) {
       activeGroups = [...groups];
       if (initialSongId !== null) {
-        const idx = groups.findIndex((g) =>
-          g.candidates.some((c) => c.song.id === initialSongId)
-        );
+        const idx = groups.findIndex((g) => g.candidates.some((c) => c.song.id === initialSongId));
         if (idx !== -1) {
           currentGroupIndex = idx;
           userSelectedKeepId = initialSongId;
@@ -69,7 +73,7 @@
           activeGroups = fetched;
           if (initialSongId !== null) {
             const idx = fetched.findIndex((g) =>
-              g.candidates.some((c) => c.song.id === initialSongId)
+              g.candidates.some((c) => c.song.id === initialSongId),
             );
             if (idx !== -1) {
               currentGroupIndex = idx;
@@ -90,46 +94,36 @@
   let candidates = $derived(currentGroup?.candidates ?? []);
 
   let selectedKeepId = $derived.by(() => {
-    if (
-      userSelectedKeepId !== null &&
-      candidates.some((c) => c.song.id === userSelectedKeepId)
-    ) {
+    if (userSelectedKeepId !== null && candidates.some((c) => c.song.id === userSelectedKeepId)) {
       return userSelectedKeepId;
     }
     return candidates[0]?.song.id ?? null;
   });
 
   let keptCandidate = $derived(
-    candidates.find((c) => c.song.id === selectedKeepId) ?? candidates[0]
+    candidates.find((c) => c.song.id === selectedKeepId) ?? candidates[0],
   );
-  let retiredCandidates = $derived(
-    candidates.filter((c) => c.song.id !== keptCandidate?.song.id)
-  );
+  let retiredCandidates = $derived(candidates.filter((c) => c.song.id !== keptCandidate?.song.id));
 
   // Reassurance calculations
-  let extraPlays = $derived(
-    retiredCandidates.reduce((acc, c) => acc + (c.song.playcount || 0), 0)
-  );
+  let extraPlays = $derived(retiredCandidates.reduce((acc, c) => acc + (c.song.playcount || 0), 0));
   let highestRetiredRating = $derived(
-    retiredCandidates.reduce((max, c) => Math.max(max, c.song.rating || 0), 0)
+    retiredCandidates.reduce((max, c) => Math.max(max, c.song.rating || 0), 0),
   );
   let ratingUpgrade = $derived(
     keptCandidate && highestRetiredRating > (keptCandidate.song.rating || 0)
       ? highestRetiredRating
-      : null
+      : null,
   );
   let lovedUpgrade = $derived(
-    keptCandidate?.song.loved !== 1 &&
-      retiredCandidates.some((c) => c.song.loved === 1)
+    keptCandidate?.song.loved !== 1 && retiredCandidates.some((c) => c.song.loved === 1),
   );
   let extraPlaylists = $derived(
-    retiredCandidates.reduce((acc, c) => acc + (c.playlist_count || 0), 0)
+    retiredCandidates.reduce((acc, c) => acc + (c.playlist_count || 0), 0),
   );
   let additionalTags = $derived.by(() => {
     if (!keptCandidate) return [];
-    const keptLower = new Set(
-      (keptCandidate.tags || []).map((t) => t.trim().toLowerCase())
-    );
+    const keptLower = new Set((keptCandidate.tags || []).map((t) => t.trim().toLowerCase()));
     const added: string[] = [];
     const seen = new Set<string>();
     for (const ret of retiredCandidates) {
@@ -148,7 +142,7 @@
       ratingUpgrade !== null ||
       lovedUpgrade ||
       extraPlaylists > 0 ||
-      additionalTags.length > 0
+      additionalTags.length > 0,
   );
 
   function prevGroup() {
@@ -167,10 +161,7 @@
 
   async function handleViewInFiles(songId: number) {
     try {
-      const target = await invoke<FileNavigationTarget | null>(
-        "locate_song_in_files",
-        { songId }
-      );
+      const target = await invoke<FileNavigationTarget | null>("locate_song_in_files", { songId });
       if (target) {
         navigationStore.openInFiles(target);
         onClose();
@@ -231,9 +222,13 @@
 {#if open}
   <Modal {onClose} maxWidth="max-w-4xl" class="h-[90vh] max-h-[850px] flex flex-col">
     <!-- Modal Header -->
-    <div class="h-16 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-sidebar">
+    <div
+      class="h-16 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-sidebar"
+    >
       <div class="flex items-center gap-3 min-w-0">
-        <div class="w-8 h-8 rounded-lg bg-brand-accent/15 text-brand-accent-text flex items-center justify-center shrink-0">
+        <div
+          class="w-8 h-8 rounded-lg bg-brand-accent/15 text-brand-accent-text flex items-center justify-center shrink-0"
+        >
           <MusicNote class="w-4 h-4" />
         </div>
         <div class="min-w-0">
@@ -248,7 +243,9 @@
 
       <div class="flex items-center gap-2 shrink-0">
         {#if activeGroups.length > 1}
-          <div class="flex items-center gap-1.5 px-2 py-1 rounded bg-brand-main border border-brand-border text-xs text-brand-text-secondary mr-2">
+          <div
+            class="flex items-center gap-1.5 px-2 py-1 rounded bg-brand-main border border-brand-border text-xs text-brand-text-secondary mr-2"
+          >
             <span>
               {i18n.t("curation.groupNavigator", {
                 current: currentGroupIndex + 1,
@@ -297,7 +294,9 @@
         </div>
       {:else if activeGroups.length === 0}
         <div class="h-64 flex flex-col items-center justify-center text-center space-y-3">
-          <div class="w-12 h-12 rounded-full bg-brand-accent/15 text-brand-accent-text flex items-center justify-center">
+          <div
+            class="w-12 h-12 rounded-full bg-brand-accent/15 text-brand-accent-text flex items-center justify-center"
+          >
             <Check class="w-6 h-6" />
           </div>
           <h3 class="text-sm font-bold text-brand-text-primary">
@@ -334,9 +333,15 @@
             <div
               role="button"
               tabindex="0"
-              onclick={() => { userSelectedKeepId = candidate.song.id; }}
-              onkeydown={(e) => { if (e.key === ' ' || e.key === 'Enter') userSelectedKeepId = candidate.song.id; }}
-              class="relative rounded-xl border p-4 transition-all text-left flex flex-col justify-between cursor-pointer {isSelected ? 'bg-brand-accent/5 border-brand-accent ring-1 ring-brand-accent shadow-md' : 'bg-brand-main border-brand-border hover:border-brand-border/80'}"
+              onclick={() => {
+                userSelectedKeepId = candidate.song.id;
+              }}
+              onkeydown={(e) => {
+                if (e.key === " " || e.key === "Enter") userSelectedKeepId = candidate.song.id;
+              }}
+              class="relative rounded-xl border p-4 transition-all text-left flex flex-col justify-between cursor-pointer {isSelected
+                ? 'bg-brand-accent/5 border-brand-accent ring-1 ring-brand-accent shadow-md'
+                : 'bg-brand-main border-brand-border hover:border-brand-border/80'}"
             >
               <div class="space-y-4">
                 <!-- Card Header -->
@@ -354,12 +359,16 @@
                         {candidate.song.title || currentGroup.title}
                       </span>
                       {#if isRecommended}
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border border-brand-border bg-brand-sidebar text-brand-text-secondary">
+                        <span
+                          class="px-1.5 py-0.5 rounded text-[10px] font-medium border border-brand-border bg-brand-sidebar text-brand-text-secondary"
+                        >
                           {i18n.t("curation.recommendedBadge")}
                         </span>
                       {/if}
                       {#if isSelected}
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand-accent text-brand-accent-contrast">
+                        <span
+                          class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand-accent text-brand-accent-contrast"
+                        >
                           {i18n.t("curation.selectedToPreserve")}
                         </span>
                       {/if}
@@ -373,26 +382,39 @@
                     </div>
 
                     <div class="text-[10px] text-brand-text-secondary/70 truncate">
-                      {i18n.t("curation.trackDisc", { track: candidate.song.track || "—", disc: candidate.song.disc || "1" })}
+                      {i18n.t("curation.trackDisc", {
+                        track: candidate.song.track || "—",
+                        disc: candidate.song.disc || "1",
+                      })}
                     </div>
                   </div>
                 </div>
 
                 <!-- Section: Audio Specs -->
-                <div class="bg-brand-sidebar/60 rounded-lg p-3 border border-brand-border/40 space-y-2">
-                  <div class="text-[10px] font-bold uppercase tracking-wider text-brand-text-secondary flex items-center justify-between">
+                <div
+                  class="bg-brand-sidebar/60 rounded-lg p-3 border border-brand-border/40 space-y-2"
+                >
+                  <div
+                    class="text-[10px] font-bold uppercase tracking-wider text-brand-text-secondary flex items-center justify-between"
+                  >
                     <span>{i18n.t("curation.sectionAudio")}</span>
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-main border border-brand-border/60 text-brand-text-primary">
+                    <span
+                      class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-main border border-brand-border/60 text-brand-text-primary"
+                    >
                       {formatFormatBadge(candidate.song.filetype)}
                     </span>
                   </div>
 
                   <div class="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span class="text-[10px] text-brand-text-secondary block">{i18n.t("curation.qualityLabel")}</span>
+                      <span class="text-[10px] text-brand-text-secondary block"
+                        >{i18n.t("curation.qualityLabel")}</span
+                      >
                       <span class="font-medium text-brand-text-primary">
                         {#if candidate.song.bitdepth && candidate.song.samplerate}
-                          {formatBitDepth(candidate.song.bitdepth)} / {formatSampleRate(candidate.song.samplerate)}
+                          {formatBitDepth(candidate.song.bitdepth)} / {formatSampleRate(
+                            candidate.song.samplerate,
+                          )}
                         {:else if candidate.song.bitrate}
                           {candidate.song.bitrate} kbps
                         {:else}
@@ -402,15 +424,21 @@
                     </div>
 
                     <div>
-                      <span class="text-[10px] text-brand-text-secondary block">{i18n.t("curation.sizeDurationLabel")}</span>
+                      <span class="text-[10px] text-brand-text-secondary block"
+                        >{i18n.t("curation.sizeDurationLabel")}</span
+                      >
                       <span class="font-medium text-brand-text-primary">
-                        {formatFileSize(candidate.song.filesize)} • {formatDuration(candidate.song.length_nanosec)}
+                        {formatFileSize(candidate.song.filesize)} • {formatDuration(
+                          candidate.song.length_nanosec,
+                        )}
                       </span>
                     </div>
                   </div>
 
-                  {#if candidate.provenance && candidate.provenance !== 'authentic'}
-                    <div class="flex items-center gap-1.5 text-[11px] text-brand-text-primary bg-brand-sidebar px-2 py-1 rounded border border-brand-border">
+                  {#if candidate.provenance && candidate.provenance !== "authentic"}
+                    <div
+                      class="flex items-center gap-1.5 text-[11px] text-brand-text-primary bg-brand-sidebar px-2 py-1 rounded border border-brand-border"
+                    >
                       <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-brand-accent-text" />
                       <span class="truncate">
                         {i18n.t("curation.provenanceWarning", { provenance: candidate.provenance })}
@@ -420,33 +448,49 @@
                 </div>
 
                 <!-- Section: Location -->
-                <div class="bg-brand-sidebar/60 rounded-lg p-3 border border-brand-border/40 space-y-1.5">
+                <div
+                  class="bg-brand-sidebar/60 rounded-lg p-3 border border-brand-border/40 space-y-1.5"
+                >
                   <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-brand-text-secondary">
+                    <span
+                      class="text-[10px] font-bold uppercase tracking-wider text-brand-text-secondary"
+                    >
                       {i18n.t("curation.sectionLocation")}
                     </span>
                     <button
                       type="button"
-                      onclick={(e) => { e.stopPropagation(); handleViewInFiles(candidate.song.id); }}
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        handleViewInFiles(candidate.song.id);
+                      }}
                       class="text-[10px] text-brand-accent hover:underline flex items-center gap-1 font-medium"
                     >
                       <Folder class="w-3 h-3" />
                       <span>{i18n.t("curation.viewInFiles")}</span>
                     </button>
                   </div>
-                  <p class="text-[11px] text-brand-text-secondary font-mono truncate" title={candidate.song.path}>
+                  <p
+                    class="text-[11px] text-brand-text-secondary font-mono truncate"
+                    title={candidate.song.path}
+                  >
                     {candidate.song.path || "—"}
                   </p>
                 </div>
 
                 <!-- Section: History & Tags -->
-                <div class="bg-brand-sidebar/60 rounded-lg p-3 border border-brand-border/40 space-y-2">
+                <div
+                  class="bg-brand-sidebar/60 rounded-lg p-3 border border-brand-border/40 space-y-2"
+                >
                   <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-brand-text-secondary block">
+                    <span
+                      class="text-[10px] font-bold uppercase tracking-wider text-brand-text-secondary block"
+                    >
                       {i18n.t("curation.sectionHistory")}
                     </span>
                     {#if candidate.song.loved === 1}
-                      <span class="flex items-center gap-1 text-[11px] text-brand-text-primary font-medium">
+                      <span
+                        class="flex items-center gap-1 text-[11px] text-brand-text-primary font-medium"
+                      >
                         <Heart class="w-3.5 h-3.5 fill-brand-accent-text text-brand-accent-text" />
                         <span>{i18n.t("curation.favouriteLabel")}</span>
                       </span>
@@ -455,18 +499,27 @@
 
                   <div class="grid grid-cols-3 gap-2 text-xs">
                     <div>
-                      <span class="text-[10px] text-brand-text-secondary block">{i18n.t("curation.playCountLabel")}</span>
+                      <span class="text-[10px] text-brand-text-secondary block"
+                        >{i18n.t("curation.playCountLabel")}</span
+                      >
                       <span class="font-medium text-brand-text-primary tabular-nums">
                         {candidate.song.playcount || 0}
                       </span>
                     </div>
 
                     <div>
-                      <span class="text-[10px] text-brand-text-secondary block">{i18n.t("curation.ratingLabel")}</span>
+                      <span class="text-[10px] text-brand-text-secondary block"
+                        >{i18n.t("curation.ratingLabel")}</span
+                      >
                       <span class="font-medium text-brand-text-primary flex items-center gap-0.5">
                         {#if candidate.song.rating && candidate.song.rating > 0}
                           <Star class="w-3 h-3 text-brand-accent-text fill-brand-accent-text" />
-                          <span>{formatNumber(candidate.song.rating * 5, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+                          <span
+                            >{formatNumber(candidate.song.rating * 5, {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 1,
+                            })}</span
+                          >
                         {:else}
                           <span class="text-brand-text-secondary">—</span>
                         {/if}
@@ -474,26 +527,36 @@
                     </div>
 
                     <div>
-                      <span class="text-[10px] text-brand-text-secondary block">{i18n.t("curation.playlistCountLabel")}</span>
+                      <span class="text-[10px] text-brand-text-secondary block"
+                        >{i18n.t("curation.playlistCountLabel")}</span
+                      >
                       <span class="font-medium text-brand-text-primary tabular-nums">
                         {candidate.playlist_count}
                       </span>
                     </div>
                   </div>
 
-                  <div class="flex items-center justify-between text-xs pt-1 border-t border-brand-border/20">
-                    <span class="text-[10px] text-brand-text-secondary">{i18n.t("curation.dateAddedLabel")}</span>
+                  <div
+                    class="flex items-center justify-between text-xs pt-1 border-t border-brand-border/20"
+                  >
+                    <span class="text-[10px] text-brand-text-secondary"
+                      >{i18n.t("curation.dateAddedLabel")}</span
+                    >
                     <span class="text-[11px] text-brand-text-secondary tabular-nums">
                       {formatDate(candidate.song.added)}
                     </span>
                   </div>
 
                   <div class="pt-1">
-                    <span class="text-[10px] text-brand-text-secondary block mb-1">{i18n.t("curation.tagsLabel")}</span>
+                    <span class="text-[10px] text-brand-text-secondary block mb-1"
+                      >{i18n.t("curation.tagsLabel")}</span
+                    >
                     {#if candidate.tags && candidate.tags.length > 0}
                       <div class="flex items-center gap-1 flex-wrap">
                         {#each candidate.tags as tag}
-                          <span class="px-1.5 py-0.5 rounded bg-brand-main border border-brand-border/60 text-[10px] text-brand-text-secondary flex items-center gap-1">
+                          <span
+                            class="px-1.5 py-0.5 rounded bg-brand-main border border-brand-border/60 text-[10px] text-brand-text-secondary flex items-center gap-1"
+                          >
                             <Tag class="w-2.5 h-2.5" />
                             <span>{tag}</span>
                           </span>
@@ -513,7 +576,10 @@
                 <Button
                   size="sm"
                   variant={isSelected ? "primary" : "secondary"}
-                  onclick={(e) => { e.stopPropagation(); userSelectedKeepId = candidate.song.id; }}
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    userSelectedKeepId = candidate.song.id;
+                  }}
                   class="w-full justify-center"
                 >
                   {#if isSelected}
@@ -546,7 +612,12 @@
                   {/if}
                   {#if ratingUpgrade !== null}
                     <li>
-                      {i18n.t("curation.reassuranceRating", { rating: formatNumber(ratingUpgrade * 5, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}
+                      {i18n.t("curation.reassuranceRating", {
+                        rating: formatNumber(ratingUpgrade * 5, {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        }),
+                      })}
                     </li>
                   {/if}
                   {#if lovedUpgrade}
@@ -556,7 +627,9 @@
                   {/if}
                   {#if extraPlaylists > 0}
                     <li>
-                      {i18n.plural("curation.reassurancePlaylists", extraPlaylists, { count: extraPlaylists })}
+                      {i18n.plural("curation.reassurancePlaylists", extraPlaylists, {
+                        count: extraPlaylists,
+                      })}
                     </li>
                   {/if}
                   {#if additionalTags.length > 0}
@@ -595,7 +668,9 @@
 
     <!-- Modal Footer -->
     {#if activeGroups.length > 0 && currentGroup}
-      <div class="px-6 py-4 border-t border-brand-border shrink-0 bg-brand-sidebar flex items-center justify-between gap-3">
+      <div
+        class="px-6 py-4 border-t border-brand-border shrink-0 bg-brand-sidebar flex items-center justify-between gap-3"
+      >
         <Button
           variant="secondary"
           size="sm"
@@ -612,7 +687,9 @@
             variant="primary"
             size="sm"
             disabled={!selectedKeepId || isResolving}
-            onclick={() => { showConfirmMerge = true; }}
+            onclick={() => {
+              showConfirmMerge = true;
+            }}
           >
             {i18n.t("curation.preserveEditionBtn")}
           </Button>
@@ -626,12 +703,16 @@
 {#if showConfirmMerge}
   <ConfirmDialog
     title={i18n.t("curation.confirmMergeTitle")}
-    message={deleteFilesFromDisk ? i18n.t("curation.confirmMergeMessageDisk") : i18n.t("curation.confirmMergeMessageDbOnly")}
+    message={deleteFilesFromDisk
+      ? i18n.t("curation.confirmMergeMessageDisk")
+      : i18n.t("curation.confirmMergeMessageDbOnly")}
     confirmLabel={i18n.t("curation.confirmMergeBtn")}
     cancelLabel={i18n.t("curation.cancelBtn")}
     danger={deleteFilesFromDisk}
     onConfirm={executeResolve}
-    onCancel={() => { showConfirmMerge = false; }}
+    onCancel={() => {
+      showConfirmMerge = false;
+    }}
   />
 {/if}
 
@@ -639,7 +720,9 @@
 {#if tagEditorSongId !== null}
   <TagEditor
     songId={tagEditorSongId}
-    onClose={() => { tagEditorSongId = null; }}
+    onClose={() => {
+      tagEditorSongId = null;
+    }}
     onSave={() => {
       tagEditorSongId = null;
       onResolved?.();

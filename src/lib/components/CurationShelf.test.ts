@@ -146,7 +146,9 @@ describe("CurationShelf.svelte", () => {
   });
 
   it("renders missing core metadata card and clicking button calls navigationStore.viewAutoPlaylist", async () => {
-    const viewAutoPlaylistSpy = vi.spyOn(navigationStore, "viewAutoPlaylist").mockImplementation(() => {});
+    const viewAutoPlaylistSpy = vi
+      .spyOn(navigationStore, "viewAutoPlaylist")
+      .mockImplementation(() => {});
 
     const overviewMissingCore: CurationOverview = {
       ...emptyOverview,
@@ -344,7 +346,9 @@ describe("CurationShelf.svelte", () => {
 
     expect(await findByTestId("curation-corrupt-section")).toBeInTheDocument();
     expect(await findByText("Broken Track")).toBeInTheDocument();
-    expect(await findByText("FLAC stream checksum mismatch (corrupted audio frame)")).toBeInTheDocument();
+    expect(
+      await findByText("FLAC stream checksum mismatch (corrupted audio frame)"),
+    ).toBeInTheDocument();
 
     const viewFilesBtn = await findByText("View in Files");
     await fireEvent.click(viewFilesBtn);

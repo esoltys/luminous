@@ -52,13 +52,13 @@ describe("ProvenanceStore", () => {
       expect.objectContaining({
         total: 3,
         contextName: "Test Album",
-      })
+      }),
     );
 
     expect(completeSpy).toHaveBeenCalledWith(
       expect.stringContaining("provenance-"),
       "Audio authenticity verification complete",
-      4000
+      4000,
     );
   });
 });

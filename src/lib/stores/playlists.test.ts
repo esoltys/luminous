@@ -9,8 +9,24 @@ describe("PlaylistsStore", () => {
   let eventCallbacks: Record<string, Function> = {};
 
   const mockPlaylists: Playlist[] = [
-    { id: 101, name: "Favorites", track_count: 3, created: 1700000000, updated: 1700000000, dynamic_enabled: false, is_queue: false },
-    { id: 102, name: "Workout", track_count: 5, created: 1700000001, updated: 1700000001, dynamic_enabled: false, is_queue: false }
+    {
+      id: 101,
+      name: "Favorites",
+      track_count: 3,
+      created: 1700000000,
+      updated: 1700000000,
+      dynamic_enabled: false,
+      is_queue: false,
+    },
+    {
+      id: 102,
+      name: "Workout",
+      track_count: 5,
+      created: 1700000001,
+      updated: 1700000001,
+      dynamic_enabled: false,
+      is_queue: false,
+    },
   ];
 
   const mockTracks: PlaylistItem[] = [
@@ -20,7 +36,7 @@ describe("PlaylistsStore", () => {
       position: 0,
       item_type: "song",
       uuid: "item-1",
-      song: { id: 10, title: "Energy Song", artist: "Artist A", rating: 4, playcount: 5 } as any
+      song: { id: 10, title: "Energy Song", artist: "Artist A", rating: 4, playcount: 5 } as any,
     },
     {
       id: 2,
@@ -28,8 +44,8 @@ describe("PlaylistsStore", () => {
       position: 1,
       item_type: "song",
       uuid: "item-2",
-      song: { id: 20, title: "Run Song", artist: "Artist B", rating: 5, playcount: 12 } as any
-    }
+      song: { id: 20, title: "Run Song", artist: "Artist B", rating: 5, playcount: 12 } as any,
+    },
   ];
 
   beforeEach(() => {
@@ -52,7 +68,12 @@ describe("PlaylistsStore", () => {
         case "validate_playlist_name":
           return { valid: true, reason: null };
         case "create_playlist":
-          return { id: 103, name: args?.name || "New Playlist", track_count: 0, created_at: "2026-01-03" };
+          return {
+            id: 103,
+            name: args?.name || "New Playlist",
+            track_count: 0,
+            created_at: "2026-01-03",
+          };
         case "undo_playlist":
         case "redo_playlist":
           return true;
@@ -73,7 +94,10 @@ describe("PlaylistsStore", () => {
     expect(playlistsStore.activePlaylistId).toBe(101);
     expect(playlistsStore.activePlaylistTracks).toHaveLength(2);
     expect(invoke).toHaveBeenCalledWith("get_playlist_tracks", { playlistId: 101 });
-    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_playlist_id", value: "101" });
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+      key: "active_playlist_id",
+      value: "101",
+    });
   });
 
   it("creates a new playlist and selects it", async () => {
@@ -138,14 +162,33 @@ describe("PlaylistsStore", () => {
 
     await playlistsStore.addSongsToPlaylist(101, [10, 20, 30]);
 
-    expect(invoke).toHaveBeenCalledWith("add_to_playlist", { playlistId: 101, songIds: [10, 20, 30] });
+    expect(invoke).toHaveBeenCalledWith("add_to_playlist", {
+      playlistId: 101,
+      songIds: [10, 20, 30],
+    });
     expect(invoke).toHaveBeenCalledWith("get_playlist_tracks", { playlistId: 101 });
   });
 
   it("adds songs to the Queue via addSongsToActiveTarget when nothing custom is pinned", async () => {
     playlistsStore.playlists = [
-      { id: 101, name: "Queue", track_count: 0, created: 1700000000, updated: 1700000000, dynamic_enabled: false, is_queue: true },
-      { id: 102, name: "Favorites", track_count: 3, created: 1700000001, updated: 1700000001, dynamic_enabled: false, is_queue: false },
+      {
+        id: 101,
+        name: "Queue",
+        track_count: 0,
+        created: 1700000000,
+        updated: 1700000000,
+        dynamic_enabled: false,
+        is_queue: true,
+      },
+      {
+        id: 102,
+        name: "Favorites",
+        track_count: 3,
+        created: 1700000001,
+        updated: 1700000001,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
     ];
     playlistsStore.pinnedPlaylistId = null;
 
@@ -157,8 +200,24 @@ describe("PlaylistsStore", () => {
 
   it("adds songs to the pinned custom playlist via addSongsToActiveTarget", async () => {
     playlistsStore.playlists = [
-      { id: 101, name: "Queue", track_count: 0, created: 1700000000, updated: 1700000000, dynamic_enabled: false, is_queue: true },
-      { id: 102, name: "Favorites", track_count: 3, created: 1700000001, updated: 1700000001, dynamic_enabled: false, is_queue: false },
+      {
+        id: 101,
+        name: "Queue",
+        track_count: 0,
+        created: 1700000000,
+        updated: 1700000000,
+        dynamic_enabled: false,
+        is_queue: true,
+      },
+      {
+        id: 102,
+        name: "Favorites",
+        track_count: 3,
+        created: 1700000001,
+        updated: 1700000001,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
     ];
     playlistsStore.pinnedPlaylistId = 102;
 
@@ -172,7 +231,10 @@ describe("PlaylistsStore", () => {
     playlistsStore.activePlaylistId = 101;
 
     await playlistsStore.removeItemsFromPlaylist(101, ["item-1"]);
-    expect(invoke).toHaveBeenCalledWith("remove_from_playlist", { playlistId: 101, uuids: ["item-1"] });
+    expect(invoke).toHaveBeenCalledWith("remove_from_playlist", {
+      playlistId: 101,
+      uuids: ["item-1"],
+    });
   });
 
   it("moves items in front of a row, showing the new order before the backend answers", async () => {
@@ -189,7 +251,11 @@ describe("PlaylistsStore", () => {
 
     await playlistsStore.moveItems(101, ["item-3"], "item-1");
 
-    expect(invoke).toHaveBeenCalledWith("move_playlist_items", { playlistId: 101, uuids: ["item-3"], beforeUuid: "item-1" });
+    expect(invoke).toHaveBeenCalledWith("move_playlist_items", {
+      playlistId: 101,
+      uuids: ["item-3"],
+      beforeUuid: "item-1",
+    });
     expect(shownWhileMoving).toEqual(["item-3", "item-1", "item-2"]);
     expect(invoke).toHaveBeenCalledWith("get_playlist_tracks", { playlistId: 101 });
   });
@@ -219,9 +285,27 @@ describe("PlaylistsStore", () => {
   it("imports playlist and selects it", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "import_playlist") {
-        return { id: 104, name: "Imported Rocks", track_count: 2, created: 1700000002, dynamic_enabled: false, is_queue: false };
+        return {
+          id: 104,
+          name: "Imported Rocks",
+          track_count: 2,
+          created: 1700000002,
+          dynamic_enabled: false,
+          is_queue: false,
+        };
       }
-      if (cmd === "get_playlists") return [...mockPlaylists, { id: 104, name: "Imported Rocks", track_count: 2, created: 1700000002, dynamic_enabled: false, is_queue: false }];
+      if (cmd === "get_playlists")
+        return [
+          ...mockPlaylists,
+          {
+            id: 104,
+            name: "Imported Rocks",
+            track_count: 2,
+            created: 1700000002,
+            dynamic_enabled: false,
+            is_queue: false,
+          },
+        ];
       if (cmd === "get_playlist_tracks") return [];
       return null;
     });
@@ -233,22 +317,36 @@ describe("PlaylistsStore", () => {
 
   it("exports playlist", async () => {
     await playlistsStore.exportPlaylist(101, "/path/to/exported.m3u8", true);
-    expect(invoke).toHaveBeenCalledWith("export_playlist", { playlistId: 101, exportPath: "/path/to/exported.m3u8", relative: true });
+    expect(invoke).toHaveBeenCalledWith("export_playlist", {
+      playlistId: 101,
+      exportPath: "/path/to/exported.m3u8",
+      relative: true,
+    });
   });
 
   it("persists a playlist's sort and refetches its tracks in the new order", async () => {
     playlistsStore.activePlaylistId = 101;
     await playlistsStore.setSort(101, "title", false);
-    expect(invoke).toHaveBeenCalledWith("set_playlist_sort", { playlistId: 101, field: "title", asc: false });
+    expect(invoke).toHaveBeenCalledWith("set_playlist_sort", {
+      playlistId: 101,
+      field: "title",
+      asc: false,
+    });
     expect(invoke).toHaveBeenCalledWith("get_playlist_tracks", { playlistId: 101 });
   });
 
   it("sets a size limit and reloads the playlists, so views showing it re-measure", async () => {
-    vi.mocked(invoke).mockImplementation(async (cmd: string) => (cmd === "get_playlists" ? mockPlaylists : null));
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === "get_playlists" ? mockPlaylists : null,
+    );
 
     await playlistsStore.setSizeLimit(101, 10, "vol-1");
 
-    expect(invoke).toHaveBeenCalledWith("set_playlist_size_limit", { playlistId: 101, limitBytes: 10, deviceId: "vol-1" });
+    expect(invoke).toHaveBeenCalledWith("set_playlist_size_limit", {
+      playlistId: 101,
+      limitBytes: 10,
+      deviceId: "vol-1",
+    });
     expect(invoke).toHaveBeenCalledWith("get_playlists");
   });
 
@@ -277,8 +375,24 @@ describe("PlaylistsStore", () => {
 
   it("returns activeCustomPlaylist when the pinned playlist is a custom playlist", async () => {
     playlistsStore.playlists = [
-      { id: 101, name: "Favorites", track_count: 3, created: 1700000000, updated: 1700000000, dynamic_enabled: false, is_queue: false },
-      { id: 102, name: "80s Rock", track_count: 10, created: 1700000001, updated: 1700000001, dynamic_enabled: true, is_queue: false },
+      {
+        id: 101,
+        name: "Favorites",
+        track_count: 3,
+        created: 1700000000,
+        updated: 1700000000,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
+      {
+        id: 102,
+        name: "80s Rock",
+        track_count: 10,
+        created: 1700000001,
+        updated: 1700000001,
+        dynamic_enabled: true,
+        is_queue: false,
+      },
     ];
     playlistsStore.pinnedPlaylistId = 101;
     expect(playlistsStore.activeCustomPlaylist?.name).toBe("Favorites");
@@ -292,8 +406,24 @@ describe("PlaylistsStore", () => {
 
   it("falls back to the Queue playlist as the default Active playlist when nothing is pinned", async () => {
     playlistsStore.playlists = [
-      { id: 101, name: "Queue", track_count: 0, created: 1700000000, updated: 1700000000, dynamic_enabled: false, is_queue: true },
-      { id: 102, name: "Favorites", track_count: 3, created: 1700000001, updated: 1700000001, dynamic_enabled: false, is_queue: false },
+      {
+        id: 101,
+        name: "Queue",
+        track_count: 0,
+        created: 1700000000,
+        updated: 1700000000,
+        dynamic_enabled: false,
+        is_queue: true,
+      },
+      {
+        id: 102,
+        name: "Favorites",
+        track_count: 3,
+        created: 1700000001,
+        updated: 1700000001,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
     ];
     playlistsStore.pinnedPlaylistId = null;
     expect(playlistsStore.effectivePinnedPlaylistId).toBe(101);
@@ -306,7 +436,15 @@ describe("PlaylistsStore", () => {
 
   it("does not change pinnedPlaylistId merely from selectPlaylist (viewing)", async () => {
     playlistsStore.playlists = [
-      { id: 101, name: "Favorites", track_count: 3, created: 1700000000, updated: 1700000000, dynamic_enabled: false, is_queue: false },
+      {
+        id: 101,
+        name: "Favorites",
+        track_count: 3,
+        created: 1700000000,
+        updated: 1700000000,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
     ];
     playlistsStore.pinnedPlaylistId = null;
     await playlistsStore.selectPlaylist(101);
@@ -319,10 +457,42 @@ describe("PlaylistsStore", () => {
 
   it("filters out dynamic playlists and queue in customPlaylists", () => {
     playlistsStore.playlists = [
-      { id: 1, name: "Queue", track_count: 0, created: 1700000000, updated: 1700000000, dynamic_enabled: false, is_queue: true },
-      { id: 2, name: "80s Rock", track_count: 10, created: 1700000001, updated: 1700000001, dynamic_enabled: true, is_queue: false },
-      { id: 3, name: "Road Trip", track_count: 5, created: 1700000002, updated: 1700000002, dynamic_enabled: false, is_queue: false },
-      { id: 4, name: "Chill Beats", track_count: 8, created: 1700000003, updated: 1700000003, dynamic_enabled: false, is_queue: false },
+      {
+        id: 1,
+        name: "Queue",
+        track_count: 0,
+        created: 1700000000,
+        updated: 1700000000,
+        dynamic_enabled: false,
+        is_queue: true,
+      },
+      {
+        id: 2,
+        name: "80s Rock",
+        track_count: 10,
+        created: 1700000001,
+        updated: 1700000001,
+        dynamic_enabled: true,
+        is_queue: false,
+      },
+      {
+        id: 3,
+        name: "Road Trip",
+        track_count: 5,
+        created: 1700000002,
+        updated: 1700000002,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
+      {
+        id: 4,
+        name: "Chill Beats",
+        track_count: 8,
+        created: 1700000003,
+        updated: 1700000003,
+        dynamic_enabled: false,
+        is_queue: false,
+      },
     ];
     expect(playlistsStore.customPlaylists.map((p) => p.name)).toEqual(["Road Trip", "Chill Beats"]);
   });
@@ -334,7 +504,15 @@ describe("PlaylistsStore", () => {
         switch (cmd) {
           case "get_playlists":
             return [
-              { id: 1, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
+              {
+                id: 1,
+                name: "Queue",
+                track_count: 0,
+                created: 0,
+                updated: 0,
+                dynamic_enabled: false,
+                is_queue: true,
+              },
               ...mockPlaylists,
             ];
           case "get_favourite_songs":

@@ -16,7 +16,10 @@ export function matchesSongSearch(song: Song | undefined, rawQuery: string): boo
   // Structured artist-tag or genre-tag search
   const tagMatch = q.match(/^(?:artist[-_]?tags?|artisttags?|tags?):(.+)$/i);
   if (tagMatch) {
-    const tagQuery = tagMatch[1].replace(/^['"]|['"]$/g, "").trim().toLowerCase();
+    const tagQuery = tagMatch[1]
+      .replace(/^['"]|['"]$/g, "")
+      .trim()
+      .toLowerCase();
     if (!tagQuery) return true;
     const artistName = (song.album_artist || song.artist)?.toLowerCase();
     if (artistName) {

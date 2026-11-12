@@ -43,7 +43,10 @@ export function formatArtistDate(dateStr?: string | null, locale = "en"): string
  * Computes how many full years have elapsed from a MusicBrainz date string
  * (`YYYY-MM-DD`, `YYYY-MM`, or `YYYY`) up to `referenceDate` (defaults to now).
  */
-export function getYearsAgo(dateStr?: string | null, referenceDate: Date = new Date()): number | null {
+export function getYearsAgo(
+  dateStr?: string | null,
+  referenceDate: Date = new Date(),
+): number | null {
   if (!dateStr || !dateStr.trim()) return null;
   const parts = dateStr.trim().split("-");
   const year = parseInt(parts[0], 10);
@@ -93,7 +96,7 @@ export function formatRelativeYears(years: number): string {
 export function formatArtistLifeEvent(
   dateStr?: string | null,
   locale = "en",
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
 ): string {
   if (!dateStr || !dateStr.trim()) return "";
   const formatted = formatArtistDate(dateStr, locale);
@@ -133,7 +136,7 @@ export function getArtistAreaLinks(
   beginAreaName?: string | null,
   beginAreaMbid?: string | null,
   areaName?: string | null,
-  areaMbid?: string | null
+  areaMbid?: string | null,
 ): AreaLinkItem[] {
   const items: AreaLinkItem[] = [];
   const cleanBegin = beginAreaName?.trim() || "";

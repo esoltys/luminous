@@ -53,7 +53,10 @@
   });
   let artistProfile = $derived(collectionStore.getArtistProfile(artist.name));
   let artistPortraitUrl = $derived(
-    resolveArtistPortraitUrl(artistArtwork?.artist_portrait_uri, artistProfile?.fetched_image_filename)
+    resolveArtistPortraitUrl(
+      artistArtwork?.artist_portrait_uri,
+      artistProfile?.fetched_image_filename,
+    ),
   );
 </script>
 
@@ -64,7 +67,12 @@
   tabindex="0"
   onclick={(e) => customClick?.(e)}
   oncontextmenu={(e) => customContextMenu?.(e)}
-  onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); customClick?.(e as unknown as MouseEvent); } }}
+  onkeydown={(e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      customClick?.(e as unknown as MouseEvent);
+    }
+  }}
   class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full relative overflow-hidden"
 >
   {#if typeof progressPercent === "number" && progressPercent > 0}
@@ -83,11 +91,13 @@
 
   <div class="relative z-10 shrink-0 overflow-hidden">
     {#if artistPortraitUrl}
-      <div class="w-11 h-11 relative overflow-hidden bg-brand-sidebar border border-brand-border shrink-0">
+      <div
+        class="w-11 h-11 relative overflow-hidden bg-brand-sidebar border border-brand-border shrink-0"
+      >
         <img
           src={artistPortraitUrl}
           crossorigin="anonymous"
-          alt={artist.name || i18n.t('collection.unknownArtist')}
+          alt={artist.name || i18n.t("collection.unknownArtist")}
           class="w-full h-full object-cover"
         />
       </div>
@@ -104,18 +114,26 @@
 
   <div class="relative z-10 min-w-0 flex-1 flex flex-col gap-0.5">
     <div class="flex items-center justify-between gap-2">
-      <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{artist.name || i18n.t('collection.unknownArtist')}</p>
+      <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
+        {artist.name || i18n.t("collection.unknownArtist")}
+      </p>
     </div>
     <div class="min-w-0">
       {#if hasGenre}
         <GenreChips genre={artist.genre} />
       {:else}
-        <p class="truncate text-xs text-brand-text-secondary font-medium">{i18n.t('artistDetail.unknownGenre')}</p>
+        <p class="truncate text-xs text-brand-text-secondary font-medium">
+          {i18n.t("artistDetail.unknownGenre")}
+        </p>
       {/if}
     </div>
   </div>
 
-  <p class="relative z-10 text-xs text-brand-text-secondary font-medium tabular-nums truncate shrink-0 text-right">{i18n.plural("playlists.songsCount", artist.song_count)}</p>
+  <p
+    class="relative z-10 text-xs text-brand-text-secondary font-medium tabular-nums truncate shrink-0 text-right"
+  >
+    {i18n.plural("playlists.songsCount", artist.song_count)}
+  </p>
 
   {#if suffix}
     <div class="relative z-10">

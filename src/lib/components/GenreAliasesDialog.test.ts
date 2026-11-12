@@ -41,7 +41,9 @@ describe("GenreAliasesDialog", () => {
   it("adds a trimmed alias and clears the form", async () => {
     render(GenreAliasesDialog, { props: { onClose: vi.fn() } });
     await fireEvent.input(screen.getByLabelText("Alias"), { target: { value: " prog-rock " } });
-    await fireEvent.input(screen.getByLabelText("Treat as"), { target: { value: "Progressive Rock" } });
+    await fireEvent.input(screen.getByLabelText("Treat as"), {
+      target: { value: "Progressive Rock" },
+    });
     await fireEvent.click(screen.getByText("Add"));
 
     await waitFor(() =>
@@ -50,7 +52,9 @@ describe("GenreAliasesDialog", () => {
         canonical: "Progressive Rock",
       }),
     );
-    await waitFor(() => expect((screen.getByLabelText("Alias") as HTMLInputElement).value).toBe(""));
+    await waitFor(() =>
+      expect((screen.getByLabelText("Alias") as HTMLInputElement).value).toBe(""),
+    );
   });
 
   it("removes an alias", async () => {

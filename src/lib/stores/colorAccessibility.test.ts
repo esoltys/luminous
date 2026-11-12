@@ -1,6 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, withReadableText, buildExtractedColors } from "./theme.svelte";
-import { checkWcagCompliance, pickAccessibleOnColor, calculateContrastRatio, hexToHsl } from "../utils/colorUtils";
+import {
+  PREDEFINED_THEMES,
+  LUMINOUS_DARK_COLORS,
+  LUMINOUS_LIGHT_COLORS,
+  withReadableText,
+  buildExtractedColors,
+} from "./theme.svelte";
+import {
+  checkWcagCompliance,
+  pickAccessibleOnColor,
+  calculateContrastRatio,
+  hexToHsl,
+} from "../utils/colorUtils";
 
 describe("PREDEFINED_THEMES", () => {
   it("has dynamic-artwork (✨ Luminous) as the first theme in the list", () => {
@@ -9,21 +20,23 @@ describe("PREDEFINED_THEMES", () => {
   });
 
   it("does not include the removed Luminous Violet theme", () => {
-    expect(PREDEFINED_THEMES.some(t => t.id === "luminous-violet")).toBe(false);
+    expect(PREDEFINED_THEMES.some((t) => t.id === "luminous-violet")).toBe(false);
   });
 
   it("includes the new System auto-theme", () => {
-    expect(PREDEFINED_THEMES.some(t => t.id === "system")).toBe(true);
+    expect(PREDEFINED_THEMES.some((t) => t.id === "system")).toBe(true);
   });
 
   it("still includes Nordic Blue (only Luminous Violet was removed)", () => {
-    expect(PREDEFINED_THEMES.some(t => t.id === "nordic-blue")).toBe(true);
+    expect(PREDEFINED_THEMES.some((t) => t.id === "nordic-blue")).toBe(true);
   });
 });
 
 const staticThemes = [
   ["Luminous light", LUMINOUS_LIGHT_COLORS],
-  ...PREDEFINED_THEMES.filter(t => t.id !== "dynamic-artwork").map(t => [t.name, t.colors] as const)
+  ...PREDEFINED_THEMES.filter((t) => t.id !== "dynamic-artwork").map(
+    (t) => [t.name, t.colors] as const,
+  ),
 ] as const;
 
 describe.each(staticThemes)("%s palette accessibility", (_scheme, palette) => {
@@ -48,15 +61,18 @@ describe("accent color contrast against bg-main (WCAG 1.4.11 non-text threshold 
 });
 
 describe("border lightness separation against bg-main (>= 12% lightness delta)", () => {
-  it.each(staticThemes)("%s: border maintains >= 12% lightness delta against bg-main", (_name, colors) => {
-    const bgHsl = hexToHsl(colors["bg-main"]);
-    const borderHsl = hexToHsl(colors["color-border"]);
-    expect(Math.abs(borderHsl.l - bgHsl.l)).toBeGreaterThanOrEqual(0.12);
-  });
+  it.each(staticThemes)(
+    "%s: border maintains >= 12% lightness delta against bg-main",
+    (_name, colors) => {
+      const bgHsl = hexToHsl(colors["bg-main"]);
+      const borderHsl = hexToHsl(colors["color-border"]);
+      expect(Math.abs(borderHsl.l - bgHsl.l)).toBeGreaterThanOrEqual(0.12);
+    },
+  );
 });
 
 describe("on-accent text contrast (heuristically derived, not hand-picked)", () => {
-  const themesWithLiteralAccent = PREDEFINED_THEMES.filter(t => t.id !== "dynamic-artwork");
+  const themesWithLiteralAccent = PREDEFINED_THEMES.filter((t) => t.id !== "dynamic-artwork");
 
   // pickAccessibleOnColor now picks by perceived brightness (YIQ) rather
   // than by whichever of white/black has the marginally higher WCAG ratio
@@ -66,21 +82,24 @@ describe("on-accent text contrast (heuristically derived, not hand-picked)", () 
   // on screen. Perceptual brightness gets this right at the cost of the
   // strict 4.5:1 text minimum for those near-boundary colors, so the floor
   // checked here is WCAG 1.4.11's 3:1 non-text/large-text threshold instead.
-  it.each(themesWithLiteralAccent.map(t => [t.name, t.colors["color-accent"]] as const))(
+  it.each(themesWithLiteralAccent.map((t) => [t.name, t.colors["color-accent"]] as const))(
     "%s: picks a text color that clears the 3:1 non-text threshold against its own accent",
     (_name, accent) => {
       const onColor = pickAccessibleOnColor(accent);
       expect(checkWcagCompliance(onColor, accent).ratio).toBeGreaterThanOrEqual(3);
-    }
+    },
   );
 
   it.each([
     ["Luminous dark", LUMINOUS_DARK_COLORS["color-accent"]],
-    ["Luminous light", LUMINOUS_LIGHT_COLORS["color-accent"]]
-  ])("%s: picks a text color that clears the 3:1 non-text threshold against its own accent", (_name, accent) => {
-    const onColor = pickAccessibleOnColor(accent);
-    expect(checkWcagCompliance(onColor, accent).ratio).toBeGreaterThanOrEqual(3);
-  });
+    ["Luminous light", LUMINOUS_LIGHT_COLORS["color-accent"]],
+  ])(
+    "%s: picks a text color that clears the 3:1 non-text threshold against its own accent",
+    (_name, accent) => {
+      const onColor = pickAccessibleOnColor(accent);
+      expect(checkWcagCompliance(onColor, accent).ratio).toBeGreaterThanOrEqual(3);
+    },
+  );
 
   it("picks white for a dark accent and black for a light accent", () => {
     expect(pickAccessibleOnColor("#1a1a2e")).toBe("#ffffff");
@@ -98,14 +117,19 @@ describe("withReadableText (theme builder)", () => {
       ...LUMINOUS_DARK_COLORS,
       "bg-main": "#eee9df",
       "bg-sidebar": "#e5e0d4",
-      "bg-playerbar": "#e5e0d4"
+      "bg-playerbar": "#e5e0d4",
     });
     expect(out["color-text-primary"]).toBe(LUMINOUS_LIGHT_COLORS["color-text-primary"]);
     expect(out["color-text-secondary"]).toBe(LUMINOUS_LIGHT_COLORS["color-text-secondary"]);
   });
 
   it("swaps dark text for light when the user picks dark backgrounds", () => {
-    const out = withReadableText({ ...LUMINOUS_LIGHT_COLORS, "bg-main": "#101010", "bg-sidebar": "#181818", "bg-playerbar": "#181818" });
+    const out = withReadableText({
+      ...LUMINOUS_LIGHT_COLORS,
+      "bg-main": "#101010",
+      "bg-sidebar": "#181818",
+      "bg-playerbar": "#181818",
+    });
     expect(out["color-text-primary"]).toBe(LUMINOUS_DARK_COLORS["color-text-primary"]);
   });
 

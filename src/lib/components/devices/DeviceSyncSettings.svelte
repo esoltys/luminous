@@ -8,7 +8,13 @@
   import { collectionStore } from "../../stores/collection.svelte";
   import { i18n, formatNumber } from "../../stores/i18n.svelte";
   import { formatStorageSize, STORAGE_GB } from "../../utils/formatters";
-  import { conversionLabel, deviceName, FORMAT_LABELS, storageName, syncStorage } from "../../utils/devices";
+  import {
+    conversionLabel,
+    deviceName,
+    FORMAT_LABELS,
+    storageName,
+    syncStorage,
+  } from "../../utils/devices";
   import type {
     ConnectedDevice,
     ConvertMode,
@@ -60,7 +66,12 @@
   /** Everything listed, checked or not: the saved selection plus what was unchecked here. */
   let listed = $state<SyncSource[]>([]);
   let capabilities = $state<TranscodeCapabilities | null>(null);
-  let conversion = $state<{ substituted: boolean; devicePlays: boolean; format: TargetFormat; bitrateKbps: number } | null>(null);
+  let conversion = $state<{
+    substituted: boolean;
+    devicePlays: boolean;
+    format: TargetFormat;
+    bitrateKbps: number;
+  } | null>(null);
   let examplePath = $state<string | null>(null);
   let moreOpen = $state(false);
   let picker = $state<"playlists" | "artists" | "albums" | null>(null);
@@ -68,7 +79,9 @@
   let albumQuery = $state("");
 
   /** The profile as edited here; saved after a pause, then echoed back by `devices-changed`. */
-  let draft = $state<DeviceProfile>(untrack(() => structuredClone($state.snapshot(device.profile))));
+  let draft = $state<DeviceProfile>(
+    untrack(() => structuredClone($state.snapshot(device.profile))),
+  );
   let draftDirty = false;
   let profileTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -103,10 +116,14 @@
     const request = ++profileRequest;
     const timer = setTimeout(() => {
       invoke<typeof conversion>("get_conversion_target", { profile })
-        .then((target) => { if (request === profileRequest) conversion = target; })
+        .then((target) => {
+          if (request === profileRequest) conversion = target;
+        })
         .catch((err) => console.error("Failed to read the conversion target:", err));
       invoke<string | null>("preview_device_path", { profile, songId: null })
-        .then((path) => { if (request === profileRequest) examplePath = path; })
+        .then((path) => {
+          if (request === profileRequest) examplePath = path;
+        })
         .catch((err) => console.error("Failed to preview the device path:", err));
     }, PREVIEW_DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -152,7 +169,8 @@
 
   // Selection.
   const sourceKey = (source: SyncSource) => JSON.stringify(source);
-  const isChecked = (source: SyncSource) => !!settings?.sources.some((s) => sourceKey(s) === sourceKey(source));
+  const isChecked = (source: SyncSource) =>
+    !!settings?.sources.some((s) => sourceKey(s) === sourceKey(source));
 
   function toggle(source: SyncSource) {
     if (!settings) return;
@@ -170,7 +188,11 @@
 
   async function addFolder() {
     try {
-      const selected = await open({ directory: true, multiple: false, title: i18n.t("devices.addFolder") });
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: i18n.t("devices.addFolder"),
+      });
       if (selected && typeof selected === "string") add({ kind: "folder", path: selected });
     } catch (err) {
       console.error("Failed to pick a folder:", err);
@@ -206,7 +228,10 @@
       case "library":
         return i18n.t("devices.wholeLibrary");
       case "playlist":
-        return playlistsStore.playlists.find((p) => p.id === source.id)?.name ?? i18n.t("devices.deletedPlaylist");
+        return (
+          playlistsStore.playlists.find((p) => p.id === source.id)?.name ??
+          i18n.t("devices.deletedPlaylist")
+        );
       case "autoPlaylist":
         return source.name ?? source.autoType;
       case "artist":
@@ -231,13 +256,19 @@
   function detail(source: SyncSource, size: SyncSourceSize | undefined): string {
     if (!size) return "";
     if (size.capBytes !== null) {
-      return i18n.plural("devices.cappedFit", size.songs, { cap: formatStorageSize(size.capBytes), count: formatNumber(size.songs) });
+      return i18n.plural("devices.cappedFit", size.songs, {
+        cap: formatStorageSize(size.capBytes),
+        count: formatNumber(size.songs),
+      });
     }
     const songs = i18n.plural("files.songCount", size.songs, { count: formatNumber(size.songs) });
     if (source.kind === "autoPlaylist") {
       return i18n.t("devices.autoPlaylistSongs", { songs });
     }
-    if (source.kind === "playlist" && playlistsStore.playlists.find((p) => p.id === source.id)?.dynamic_enabled) {
+    if (
+      source.kind === "playlist" &&
+      playlistsStore.playlists.find((p) => p.id === source.id)?.dynamic_enabled
+    ) {
       return i18n.t("devices.autoPlaylistSongs", { songs });
     }
     if (source.kind === "song") {
@@ -246,29 +277,54 @@
     return source.kind === "folder" ? i18n.t("devices.folderSongs", { songs }) : songs;
   }
 
-  const groups = $derived([
-    { key: "playlists", label: i18n.t("devices.groupPlaylists"), sources: listed.filter((s) => s.kind === "playlist" || s.kind === "autoPlaylist" || s.kind === "library") },
-    { key: "artists", label: i18n.t("devices.groupArtists"), sources: listed.filter((s) => s.kind === "artist" || s.kind === "album") },
-    { key: "songs", label: i18n.t("devices.groupSongs"), sources: listed.filter((s) => s.kind === "song") },
-    { key: "folders", label: i18n.t("devices.groupFolders"), sources: listed.filter((s) => s.kind === "folder") },
-  ].filter((g) => g.sources.length > 0));
+  const groups = $derived(
+    [
+      {
+        key: "playlists",
+        label: i18n.t("devices.groupPlaylists"),
+        sources: listed.filter(
+          (s) => s.kind === "playlist" || s.kind === "autoPlaylist" || s.kind === "library",
+        ),
+      },
+      {
+        key: "artists",
+        label: i18n.t("devices.groupArtists"),
+        sources: listed.filter((s) => s.kind === "artist" || s.kind === "album"),
+      },
+      {
+        key: "songs",
+        label: i18n.t("devices.groupSongs"),
+        sources: listed.filter((s) => s.kind === "song"),
+      },
+      {
+        key: "folders",
+        label: i18n.t("devices.groupFolders"),
+        sources: listed.filter((s) => s.kind === "folder"),
+      },
+    ].filter((g) => g.sources.length > 0),
+  );
 
   // The pickers list alphabetically, ignoring case, with numbers in order.
   const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-  const virtualAutoPlaylists = $derived([
-    { autoType: "favourites", name: i18n.t("playlists.autoFavourites") },
-    { autoType: "recently_added", name: i18n.t("playlists.autoRecentlyAdded") },
-    { autoType: "most_played", name: i18n.t("playlists.autoMostPlayed") },
-  ].filter((ap) => !listed.some((s) => s.kind === "autoPlaylist" && s.autoType === ap.autoType)));
+  const virtualAutoPlaylists = $derived(
+    [
+      { autoType: "favourites", name: i18n.t("playlists.autoFavourites") },
+      { autoType: "recently_added", name: i18n.t("playlists.autoRecentlyAdded") },
+      { autoType: "most_played", name: i18n.t("playlists.autoMostPlayed") },
+    ].filter((ap) => !listed.some((s) => s.kind === "autoPlaylist" && s.autoType === ap.autoType)),
+  );
   const playlistChoices = $derived(
     playlistsStore.playlists
       .filter((p) => !p.is_queue && !listed.some((s) => s.kind === "playlist" && s.id === p.id))
-      .sort((a, b) => collator.compare(a.name, b.name))
+      .sort((a, b) => collator.compare(a.name, b.name)),
   );
   const artistChoices = $derived.by(() => {
     const q = artistQuery.trim().toLowerCase();
     return collectionStore.artists
-      .filter((a): a is typeof a & { name: string } => !!a.name && (!q || a.name.toLowerCase().includes(q)))
+      .filter(
+        (a): a is typeof a & { name: string } =>
+          !!a.name && (!q || a.name.toLowerCase().includes(q)),
+      )
       .filter((a) => !listed.some((s) => s.kind === "artist" && s.name === a.name))
       .sort((a, b) => collator.compare(a.name, b.name))
       .slice(0, 50);
@@ -276,7 +332,13 @@
   const albumChoices = $derived.by(() => {
     const q = albumQuery.trim().toLowerCase();
     return collectionStore.albums
-      .filter((a): a is typeof a & { album: string } => !!a.album && (!q || a.album.toLowerCase().includes(q) || (a.artist ? a.artist.toLowerCase().includes(q) : false)))
+      .filter(
+        (a): a is typeof a & { album: string } =>
+          !!a.album &&
+          (!q ||
+            a.album.toLowerCase().includes(q) ||
+            (a.artist ? a.artist.toLowerCase().includes(q) : false)),
+      )
       .filter((a) => !listed.some((s) => s.kind === "album" && s.album === a.album))
       .sort((a, b) => collator.compare(a.album, b.album))
       .slice(0, 50);
@@ -284,7 +346,9 @@
 
   // How.
   const formats = $derived(capabilities?.formats ?? []);
-  const bitrates = $derived(formats.find((f) => f.format === draft.convert.format)?.bitratesKbps ?? []);
+  const bitrates = $derived(
+    formats.find((f) => f.format === draft.convert.format)?.bitratesKbps ?? [],
+  );
   const CONVERT_MODES: ConvertMode[] = ["unsupported", "saveSpace", "never"];
   const ART_SIZES = [null, 1000, 500, 300];
 
@@ -297,11 +361,18 @@
       });
     }
     if (conversion && !conversion.devicePlays) {
-      return i18n.t("devices.convertDeviceMayNotPlay", { device: name, format: FORMAT_LABELS[conversion.format] });
+      return i18n.t("devices.convertDeviceMayNotPlay", {
+        device: name,
+        format: FORMAT_LABELS[conversion.format],
+      });
     }
     return i18n.t("devices.convertCacheHint");
   });
-  const convertWarns = $derived(draft.convert.mode !== "never" && !!conversion && (conversion.substituted || !conversion.devicePlays));
+  const convertWarns = $derived(
+    draft.convert.mode !== "never" &&
+      !!conversion &&
+      (conversion.substituted || !conversion.devicePlays),
+  );
 
   const playlistFolder = $derived(`/${draft.playlistsPath.replace(/^[/\\]+/, "")}`);
   const reserveGb = $derived(Math.round((draft.reserveBytes / STORAGE_GB) * 10) / 10);
@@ -318,33 +389,57 @@
         <!-- What -->
         <section class="min-w-0 flex flex-col gap-3">
           <div class="flex items-baseline justify-between gap-3">
-            <h2 class="text-base font-bold text-brand-text-primary">{i18n.t("devices.whatGoesOn", { device: name })}</h2>
-            <span class="text-xs text-brand-text-secondary">{i18n.t("devices.sizeAfterConverting")}</span>
+            <h2 class="text-base font-bold text-brand-text-primary">
+              {i18n.t("devices.whatGoesOn", { device: name })}
+            </h2>
+            <span class="text-xs text-brand-text-secondary"
+              >{i18n.t("devices.sizeAfterConverting")}</span
+            >
           </div>
           {#if listed.length === 0}
             <p class="text-sm text-brand-text-secondary">{i18n.t("devices.nothingSelected")}</p>
           {/if}
           {#each groups as group (group.key)}
             <div class="flex flex-col">
-              <h3 class="text-xs font-semibold text-brand-text-secondary px-2 py-1">{group.label}</h3>
+              <h3 class="text-xs font-semibold text-brand-text-secondary px-2 py-1">
+                {group.label}
+              </h3>
               {#each group.sources as source (sourceKey(source))}
                 {@const size = sizeOf(source)}
                 {@const checked = isChecked(source)}
-                <label class="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-brand-accent/5 cursor-pointer">
-                  <input type="checkbox" class="w-4 h-4 accent-[var(--color-brand-accent)] shrink-0" {checked} onchange={() => toggle(source)} />
+                <label
+                  class="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-brand-accent/5 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    class="w-4 h-4 accent-[var(--color-brand-accent)] shrink-0"
+                    {checked}
+                    onchange={() => toggle(source)}
+                  />
                   <span class="flex-1 min-w-0">
-                    <span class="block text-sm text-brand-text-primary truncate">{title(source)}</span>
+                    <span class="block text-sm text-brand-text-primary truncate"
+                      >{title(source)}</span
+                    >
                     {#if checked && size}
-                      <span class="block text-xs truncate {size.capBytes !== null ? 'text-brand-accent-text' : 'text-brand-text-secondary'}">{detail(source, size)}</span>
+                      <span
+                        class="block text-xs truncate {size.capBytes !== null
+                          ? 'text-brand-accent-text'
+                          : 'text-brand-text-secondary'}">{detail(source, size)}</span
+                      >
                     {/if}
                   </span>
-                  <span class="text-xs tabular-nums text-brand-text-secondary shrink-0">{checked && size ? formatStorageSize(size.bytes) : ""}</span>
+                  <span class="text-xs tabular-nums text-brand-text-secondary shrink-0"
+                    >{checked && size ? formatStorageSize(size.bytes) : ""}</span
+                  >
                 </label>
               {/each}
             </div>
           {/each}
           <div class="flex flex-wrap gap-2 relative">
-            <Button size="sm" onclick={() => (picker = picker === "playlists" ? null : "playlists")}>
+            <Button
+              size="sm"
+              onclick={() => (picker = picker === "playlists" ? null : "playlists")}
+            >
               <PlusIcon class="w-3.5 h-3.5" />{i18n.t("devices.addPlaylists")}
             </Button>
             <Button size="sm" onclick={() => (picker = picker === "artists" ? null : "artists")}>
@@ -357,7 +452,10 @@
               <PlusIcon class="w-3.5 h-3.5" />{i18n.t("devices.addFolder")}
             </Button>
             {#if picker}
-              <div class="absolute left-0 top-full mt-1 z-20 w-72 max-h-72 flex flex-col rounded-lg border border-brand-border/60 bg-brand-sidebar shadow-xl p-1" role="listbox">
+              <div
+                class="absolute left-0 top-full mt-1 z-20 w-72 max-h-72 flex flex-col rounded-lg border border-brand-border/60 bg-brand-sidebar shadow-xl p-1"
+                role="listbox"
+              >
                 {#if picker === "artists"}
                   <input
                     type="search"
@@ -376,22 +474,44 @@
                 <div class="overflow-y-auto">
                   {#if picker === "playlists"}
                     {#if !listed.some((s) => s.kind === "library")}
-                      <button class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10" onclick={() => add({ kind: "library" })}>{i18n.t("devices.wholeLibrary")}</button>
+                      <button
+                        class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10"
+                        onclick={() => add({ kind: "library" })}
+                        >{i18n.t("devices.wholeLibrary")}</button
+                      >
                     {/if}
                     {#each virtualAutoPlaylists as ap (ap.autoType)}
-                      <button class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate font-medium text-brand-accent-text" onclick={() => add({ kind: "autoPlaylist", autoType: ap.autoType, name: ap.name })}>{ap.name}</button>
+                      <button
+                        class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate font-medium text-brand-accent-text"
+                        onclick={() =>
+                          add({ kind: "autoPlaylist", autoType: ap.autoType, name: ap.name })}
+                        >{ap.name}</button
+                      >
                     {/each}
                     {#each playlistChoices as p (p.id)}
-                      <button class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate" onclick={() => add({ kind: "playlist", id: p.id })}>{p.name}</button>
+                      <button
+                        class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate"
+                        onclick={() => add({ kind: "playlist", id: p.id })}>{p.name}</button
+                      >
                     {/each}
                   {:else if picker === "artists"}
                     {#each artistChoices as a (a.name)}
-                      <button class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate" onclick={() => add({ kind: "artist", name: a.name })}>{a.name}</button>
+                      <button
+                        class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate"
+                        onclick={() => add({ kind: "artist", name: a.name })}>{a.name}</button
+                      >
                     {/each}
                   {:else if picker === "albums"}
                     {#each albumChoices as a (a.album)}
-                      <button class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate" onclick={() => add({ kind: "album", album: a.album, artist: a.artist ?? "" })}>
-                        {i18n.t("devices.albumBy", { album: a.album, artist: a.artist || i18n.t("collection.unknownArtist") })}
+                      <button
+                        class="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-brand-accent/10 truncate"
+                        onclick={() =>
+                          add({ kind: "album", album: a.album, artist: a.artist ?? "" })}
+                      >
+                        {i18n.t("devices.albumBy", {
+                          album: a.album,
+                          artist: a.artist || i18n.t("collection.unknownArtist"),
+                        })}
                       </button>
                     {/each}
                   {/if}
@@ -402,16 +522,22 @@
         </section>
 
         <!-- How -->
-        <section class="min-w-0 flex flex-col gap-4 @3xl:border-l @3xl:border-brand-border/40 @3xl:pl-8">
+        <section
+          class="min-w-0 flex flex-col gap-4 @3xl:border-l @3xl:border-brand-border/40 @3xl:pl-8"
+        >
           <h2 class="text-base font-bold text-brand-text-primary">{i18n.t("devices.how")}</h2>
 
           {#if device.storages.length > 1}
             <div class="flex flex-col gap-1.5">
-              <label for="sync-storage" class="text-sm font-semibold text-brand-text-primary">{i18n.t("devices.syncToStorage")}</label>
+              <label for="sync-storage" class="text-sm font-semibold text-brand-text-primary"
+                >{i18n.t("devices.syncToStorage")}</label
+              >
               <Select
                 id="sync-storage"
                 value={target?.id ?? ""}
-                onchange={(e) => { if (settings) settings.storageId = e.currentTarget.value; }}
+                onchange={(e) => {
+                  if (settings) settings.storageId = e.currentTarget.value;
+                }}
                 class="w-full px-3 py-2 pr-8 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm"
               >
                 {#each device.storages as s (s.id)}
@@ -422,43 +548,68 @@
           {/if}
 
           <div class="flex flex-col gap-1.5">
-            <span class="text-sm font-semibold text-brand-text-primary" id="unselected-label">{i18n.t("devices.songsYouUnselect")}</span>
-            <div class="grid grid-cols-2 rounded-lg bg-brand-main/60 border border-brand-border/40 p-0.5" role="radiogroup" aria-labelledby="unselected-label">
+            <span class="text-sm font-semibold text-brand-text-primary" id="unselected-label"
+              >{i18n.t("devices.songsYouUnselect")}</span
+            >
+            <div
+              class="grid grid-cols-2 rounded-lg bg-brand-main/60 border border-brand-border/40 p-0.5"
+              role="radiogroup"
+              aria-labelledby="unselected-label"
+            >
               {#each ["remove", "leave"] as const as mode (mode)}
                 <button
-                  class="px-3 py-1.5 rounded-md text-sm font-semibold transition-colors {settings.unselected === mode ? 'bg-brand-accent/20 text-brand-text-primary' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                  class="px-3 py-1.5 rounded-md text-sm font-semibold transition-colors {settings.unselected ===
+                  mode
+                    ? 'bg-brand-accent/20 text-brand-text-primary'
+                    : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                   role="radio"
                   aria-checked={settings.unselected === mode}
-                  onclick={() => { if (settings) settings.unselected = mode; }}
-                >{i18n.t(mode === "remove" ? "devices.removeFromDevice" : "devices.leaveOnDevice")}</button>
+                  onclick={() => {
+                    if (settings) settings.unselected = mode;
+                  }}
+                  >{i18n.t(
+                    mode === "remove" ? "devices.removeFromDevice" : "devices.leaveOnDevice",
+                  )}</button
+                >
               {/each}
             </div>
             <p class="text-xs text-brand-text-secondary">
-              {i18n.t(settings.unselected === "remove" ? "devices.removeHint" : "devices.leaveHint", { device: name })}
+              {i18n.t(
+                settings.unselected === "remove" ? "devices.removeHint" : "devices.leaveHint",
+                { device: name },
+              )}
             </p>
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label for="convert-mode" class="text-sm font-semibold text-brand-text-primary">{i18n.t("devices.convert")}</label>
+            <label for="convert-mode" class="text-sm font-semibold text-brand-text-primary"
+              >{i18n.t("devices.convert")}</label
+            >
             <Select
               id="convert-mode"
               value={draft.convert.mode}
-              onchange={(e) => editProfile((p) => (p.convert.mode = e.currentTarget.value as ConvertMode))}
+              onchange={(e) =>
+                editProfile((p) => (p.convert.mode = e.currentTarget.value as ConvertMode))}
               class="w-full px-3 py-2 pr-8 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm"
             >
               {#each CONVERT_MODES as mode (mode)}
-                <option value={mode}>{i18n.t(`devices.convertMode.${mode}`, { device: name })}</option>
+                <option value={mode}
+                  >{i18n.t(`devices.convertMode.${mode}`, { device: name })}</option
+                >
               {/each}
             </Select>
             {#if draft.convert.mode !== "never"}
               <div class="grid grid-cols-2 gap-2">
                 <Select
                   value={draft.convert.format}
-                  onchange={(e) => editProfile((p) => {
-                    p.convert.format = e.currentTarget.value as TargetFormat;
-                    const offered = formats.find((f) => f.format === p.convert.format)?.bitratesKbps ?? [];
-                    if (offered.length > 0 && !offered.includes(p.convert.bitrateKbps)) p.convert.bitrateKbps = offered[offered.length - 1];
-                  })}
+                  onchange={(e) =>
+                    editProfile((p) => {
+                      p.convert.format = e.currentTarget.value as TargetFormat;
+                      const offered =
+                        formats.find((f) => f.format === p.convert.format)?.bitratesKbps ?? [];
+                      if (offered.length > 0 && !offered.includes(p.convert.bitrateKbps))
+                        p.convert.bitrateKbps = offered[offered.length - 1];
+                    })}
                   class="w-full px-3 py-2 pr-8 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm"
                 >
                   {#each formats as f (f.format)}
@@ -467,7 +618,8 @@
                 </Select>
                 <Select
                   value={String(draft.convert.bitrateKbps)}
-                  onchange={(e) => editProfile((p) => (p.convert.bitrateKbps = Number(e.currentTarget.value)))}
+                  onchange={(e) =>
+                    editProfile((p) => (p.convert.bitrateKbps = Number(e.currentTarget.value)))}
                   class="w-full px-3 py-2 pr-8 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm"
                 >
                   {#each bitrates as kbps (kbps)}
@@ -476,14 +628,22 @@
                 </Select>
               </div>
             {/if}
-            <p class="text-xs flex gap-1.5 {convertWarns ? 'text-brand-text-primary' : 'text-brand-text-secondary'}">
+            <p
+              class="text-xs flex gap-1.5 {convertWarns
+                ? 'text-brand-text-primary'
+                : 'text-brand-text-secondary'}"
+            >
               {#if convertWarns}<WarningIcon class="w-3.5 h-3.5 shrink-0 mt-px" />{/if}
               <span>{convertHint}</span>
             </p>
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label for="device-folder-template" class="text-sm font-semibold text-brand-text-primary">{i18n.t("devices.foldersOnDevice")}</label>
+            <label
+              for="device-folder-template"
+              class="text-sm font-semibold text-brand-text-primary"
+              >{i18n.t("devices.foldersOnDevice")}</label
+            >
             <TemplateInput
               id="device-folder-template"
               value={draft.layout.folderTemplate}
@@ -495,15 +655,24 @@
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label for="playlist-files" class="text-sm font-semibold text-brand-text-primary">{i18n.t("devices.playlistFiles")}</label>
+            <label for="playlist-files" class="text-sm font-semibold text-brand-text-primary"
+              >{i18n.t("devices.playlistFiles")}</label
+            >
             <Select
               id="playlist-files"
               value={draft.layout.playlistFormat}
-              onchange={(e) => editProfile((p) => (p.layout.playlistFormat = e.currentTarget.value as DeviceProfile["layout"]["playlistFormat"]))}
+              onchange={(e) =>
+                editProfile(
+                  (p) =>
+                    (p.layout.playlistFormat = e.currentTarget
+                      .value as DeviceProfile["layout"]["playlistFormat"]),
+                )}
               class="w-full px-3 py-2 pr-8 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm"
             >
               {#each ["m3u8", "m3uAscii", "pls", "none"] as const as format (format)}
-                <option value={format}>{i18n.t(`devices.playlistFormat.${format}`, { folder: playlistFolder })}</option>
+                <option value={format}
+                  >{i18n.t(`devices.playlistFormat.${format}`, { folder: playlistFolder })}</option
+                >
               {/each}
             </Select>
           </div>
@@ -519,24 +688,43 @@
             </button>
             {#if moreOpen}
               <div class="flex flex-col gap-1.5">
-                <label for="art-size" class="text-sm font-semibold text-brand-text-primary">{i18n.t("devices.artSize")}</label>
+                <label for="art-size" class="text-sm font-semibold text-brand-text-primary"
+                  >{i18n.t("devices.artSize")}</label
+                >
                 <Select
                   id="art-size"
                   value={String(draft.convert.maxArtPx ?? "")}
-                  onchange={(e) => editProfile((p) => (p.convert.maxArtPx = e.currentTarget.value ? Number(e.currentTarget.value) : null))}
+                  onchange={(e) =>
+                    editProfile(
+                      (p) =>
+                        (p.convert.maxArtPx = e.currentTarget.value
+                          ? Number(e.currentTarget.value)
+                          : null),
+                    )}
                   class="w-full px-3 py-2 pr-8 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm"
                 >
                   {#each ART_SIZES as px (px ?? "keep")}
-                    <option value={String(px ?? "")}>{px === null ? i18n.t("devices.artKeep") : i18n.t("devices.artPx", { px })}</option>
+                    <option value={String(px ?? "")}
+                      >{px === null
+                        ? i18n.t("devices.artKeep")
+                        : i18n.t("devices.artPx", { px })}</option
+                    >
                   {/each}
                 </Select>
               </div>
               <div class="flex flex-col gap-1.5">
-                <label for="path-separator" class="text-sm font-semibold text-brand-text-primary">{i18n.t("devices.pathSeparator")}</label>
+                <label for="path-separator" class="text-sm font-semibold text-brand-text-primary"
+                  >{i18n.t("devices.pathSeparator")}</label
+                >
                 <Select
                   id="path-separator"
                   value={draft.layout.pathSeparator}
-                  onchange={(e) => editProfile((p) => (p.layout.pathSeparator = e.currentTarget.value as DeviceProfile["layout"]["pathSeparator"]))}
+                  onchange={(e) =>
+                    editProfile(
+                      (p) =>
+                        (p.layout.pathSeparator = e.currentTarget
+                          .value as DeviceProfile["layout"]["pathSeparator"]),
+                    )}
                   class="w-full px-3 py-2 pr-8 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm"
                 >
                   <option value="slash">{i18n.t("devices.separatorSlash")}</option>
@@ -544,7 +732,9 @@
                 </Select>
               </div>
               <div class="flex flex-col gap-1.5">
-                <label for="reserve" class="text-sm font-semibold text-brand-text-primary">{i18n.t("devices.spaceToKeepFree")}</label>
+                <label for="reserve" class="text-sm font-semibold text-brand-text-primary"
+                  >{i18n.t("devices.spaceToKeepFree")}</label
+                >
                 <div class="flex items-center gap-2">
                   <input
                     id="reserve"
@@ -552,7 +742,14 @@
                     min="0"
                     step="0.5"
                     value={reserveGb}
-                    onchange={(e) => editProfile((p) => (p.reserveBytes = Math.max(0, Math.round(Number(e.currentTarget.value) * STORAGE_GB))))}
+                    onchange={(e) =>
+                      editProfile(
+                        (p) =>
+                          (p.reserveBytes = Math.max(
+                            0,
+                            Math.round(Number(e.currentTarget.value) * STORAGE_GB),
+                          )),
+                      )}
                     class="w-24 px-3 py-2 rounded-lg bg-brand-main/60 border border-brand-border/60 text-sm tabular-nums"
                   />
                   <span class="text-sm text-brand-text-secondary">GB</span>
@@ -566,4 +763,8 @@
   {/if}
 </div>
 
-<svelte:window onclick={(e) => { if (picker && !(e.target as HTMLElement).closest('[role="listbox"], button')) picker = null; }} />
+<svelte:window
+  onclick={(e) => {
+    if (picker && !(e.target as HTMLElement).closest('[role="listbox"], button')) picker = null;
+  }}
+/>

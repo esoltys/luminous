@@ -48,13 +48,26 @@
               count: formatNumber(usage.musicSongs),
             }),
           },
-          { tone: "other" as const, label: i18n.t("devices.gauge.other", { size: formatStorageSize(usage.otherBytes) }) },
-          { tone: "free" as const, label: i18n.t("devices.gauge.free", { size: formatStorageSize(usage.freeBytes) }) },
+          {
+            tone: "other" as const,
+            label: i18n.t("devices.gauge.other", { size: formatStorageSize(usage.otherBytes) }),
+          },
+          {
+            tone: "free" as const,
+            label: i18n.t("devices.gauge.free", { size: formatStorageSize(usage.freeBytes) }),
+          },
           ...(usage.reserveBytes > 0
-            ? [{ tone: "reserve" as const, label: i18n.t("devices.gauge.reserve", { size: formatStorageSize(usage.reserveBytes) }) }]
+            ? [
+                {
+                  tone: "reserve" as const,
+                  label: i18n.t("devices.gauge.reserve", {
+                    size: formatStorageSize(usage.reserveBytes),
+                  }),
+                },
+              ]
             : []),
         ]
-      : []
+      : [],
   );
 </script>
 
@@ -63,7 +76,9 @@
     <div class="min-w-0">{@render switcher?.()}</div>
     <div class="flex items-center gap-1 text-xs text-brand-text-secondary">
       <span>{storage.filesystem}.</span>
-      <span class="font-semibold text-brand-text-primary">{i18n.t("devices.free", { size: formatStorageSize(storage.freeBytes) })}</span>
+      <span class="font-semibold text-brand-text-primary"
+        >{i18n.t("devices.free", { size: formatStorageSize(storage.freeBytes) })}</span
+      >
     </div>
   </div>
   {#if usage}

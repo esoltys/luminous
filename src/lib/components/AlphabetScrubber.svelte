@@ -44,7 +44,7 @@
     const clampedY = Math.max(0, Math.min(clientY - rect.top, rect.height - 1));
     const secIndex = Math.min(
       indexData.sections.length - 1,
-      Math.floor((clampedY / rect.height) * indexData.sections.length)
+      Math.floor((clampedY / rect.height) * indexData.sections.length),
     );
     const section = indexData.sections[secIndex];
     if (section) {

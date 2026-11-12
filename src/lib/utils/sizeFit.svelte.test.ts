@@ -7,7 +7,9 @@ import type { Playlist, PlaylistItem, PlaylistSizeFit } from "../types";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
 
-const items = ["a", "b"].map((uuid, i) => ({ id: i, playlist_id: 7, position: i, item_type: "song", uuid }) as PlaylistItem);
+const items = ["a", "b"].map(
+  (uuid, i) => ({ id: i, playlist_id: 7, position: i, item_type: "song", uuid }) as PlaylistItem,
+);
 const playlist = (over: Partial<Playlist> = {}): Playlist => ({
   id: 7,
   name: "Run",
@@ -41,7 +43,7 @@ function track(source: SizeLimitSource) {
   cleanups.push(
     $effect.root(() => {
       tracker = new PlaylistSizeLimit(() => state);
-    })
+    }),
   );
   flushSync();
   return { tracker, state };
@@ -53,7 +55,9 @@ describe("PlaylistSizeLimit (#344)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     pending = [];
-    vi.mocked(invoke).mockImplementation(() => new Promise((resolve) => pending.push(resolve as never)));
+    vi.mocked(invoke).mockImplementation(
+      () => new Promise((resolve) => pending.push(resolve as never)),
+    );
   });
 
   afterEach(() => {

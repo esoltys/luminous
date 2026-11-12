@@ -63,7 +63,7 @@ class TasksStore {
 
   overallProgress = $derived.by(() => {
     const runningWithProgress = this.activeTasks.filter(
-      (t) => typeof t.progress === "number" && !isNaN(t.progress)
+      (t) => typeof t.progress === "number" && !isNaN(t.progress),
     );
     if (runningWithProgress.length === 0) return null;
     const sum = runningWithProgress.reduce((acc, t) => acc + (t.progress ?? 0), 0);

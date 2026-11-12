@@ -26,7 +26,7 @@ describe("HelpView.svelte", () => {
 
   it("opens a web link in the system browser instead of the iframe", async () => {
     const doc = await renderGuide(
-      '<p>Look up your model on <a href="https://autoeq.app" target="_blank" rel="noopener"><b>AutoEq</b></a></p>'
+      '<p>Look up your model on <a href="https://autoeq.app" target="_blank" rel="noopener"><b>AutoEq</b></a></p>',
     );
     const click = new MouseEvent("click", { bubbles: true, cancelable: true });
     doc.querySelector("b")!.dispatchEvent(click);
@@ -35,7 +35,9 @@ describe("HelpView.svelte", () => {
   });
 
   it("leaves in-page anchors to the guide", async () => {
-    const doc = await renderGuide('<a href="#equalizer">Equalizer</a><h2 id="equalizer">Equalizer</h2>');
+    const doc = await renderGuide(
+      '<a href="#equalizer">Equalizer</a><h2 id="equalizer">Equalizer</h2>',
+    );
     const click = new MouseEvent("click", { bubbles: true, cancelable: true });
     doc.querySelector("a")!.dispatchEvent(click);
     expect(openExternalUrl).not.toHaveBeenCalled();

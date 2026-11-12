@@ -31,7 +31,7 @@ export interface WebDavMatchResult {
 export function matchWebDavPath(
   songPath: string | null | undefined,
   serverUrl: string | null | undefined,
-  remotePath: string | null | undefined
+  remotePath: string | null | undefined,
 ): WebDavMatchResult {
   const safeServerUrl = serverUrl?.trim() ?? "";
   const safeRemotePath = remotePath?.trim() ?? "/";

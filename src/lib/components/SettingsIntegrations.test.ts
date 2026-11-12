@@ -136,7 +136,9 @@ describe("SettingsIntegrations.svelte", () => {
     });
 
     const { findByText } = render(SettingsIntegrations);
-    expect(await findByText(/found in the FANART_API_KEY environment variable/)).toBeInTheDocument();
+    expect(
+      await findByText(/found in the FANART_API_KEY environment variable/),
+    ).toBeInTheDocument();
   });
 
   it("shows the Luminous default key badge when has_build_key is true and no custom key is set", async () => {

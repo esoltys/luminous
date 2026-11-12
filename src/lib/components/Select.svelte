@@ -12,7 +12,14 @@
     children: Snippet;
   }
 
-  let { value, onchange, id, class: className = "", chevronPosition = "0.625rem", children }: Props = $props();
+  let {
+    value,
+    onchange,
+    id,
+    class: className = "",
+    chevronPosition = "0.625rem",
+    children,
+  }: Props = $props();
 </script>
 
 <!--

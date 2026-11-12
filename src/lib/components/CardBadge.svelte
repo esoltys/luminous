@@ -11,7 +11,13 @@
     colorClass?: string;
   }
 
-  let { icon: Icon, label, title, spin = false, colorClass = "bg-brand-accent text-brand-accent-contrast" }: Props = $props();
+  let {
+    icon: Icon,
+    label,
+    title,
+    spin = false,
+    colorClass = "bg-brand-accent text-brand-accent-contrast",
+  }: Props = $props();
 </script>
 
 <div

@@ -44,9 +44,11 @@
 </script>
 
 <div
-  class="flex items-center gap-0.5 {rating <= 0 && !hoverValue ? 'opacity-40' : ''} transition-opacity"
+  class="flex items-center gap-0.5 {rating <= 0 && !hoverValue
+    ? 'opacity-40'
+    : ''} transition-opacity"
   role="group"
-  aria-label={i18n.t('rating.label')}
+  aria-label={i18n.t("rating.label")}
   onmouseleave={() => (hoverValue = null)}
 >
   {#if onRate}
@@ -55,8 +57,8 @@
       disabled={rating <= 0}
       onclick={handleClear}
       class="block text-brand-text-primary/50 hover:text-brand-text-primary transition-colors disabled:cursor-default disabled:pointer-events-none"
-      title={i18n.t('rating.clearTooltip')}
-      aria-label={i18n.t('rating.clearTooltip')}
+      title={i18n.t("rating.clearTooltip")}
+      aria-label={i18n.t("rating.clearTooltip")}
     >
       <CircleSlash class={clearClass} />
     </button>
@@ -70,8 +72,8 @@
         if (onRate) hoverValue = valueAt(star, e);
       }}
       class="relative block {onRate ? '' : 'cursor-default'} disabled:pointer-events-none"
-      title={onRate ? i18n.t('rating.setTooltip', { value: hoverValue ?? star }) : undefined}
-      aria-label={i18n.t('rating.setTooltip', { value: star })}
+      title={onRate ? i18n.t("rating.setTooltip", { value: hoverValue ?? star }) : undefined}
+      aria-label={i18n.t("rating.setTooltip", { value: star })}
     >
       <Star class="{starClass} text-brand-text-primary/50" />
       {#if fillFraction(star) > 0}

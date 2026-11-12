@@ -73,7 +73,10 @@
   async function handleBulkAddToPlaylist() {
     if (selectedKeys.size === 0) return;
     if (playlistsStore.activeCustomPlaylist) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, Array.from(selectedKeys, Number));
+      await playlistsStore.addSongsToPlaylist(
+        playlistsStore.activeCustomPlaylist.id,
+        Array.from(selectedKeys, Number),
+      );
     } else {
       toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
     }
@@ -83,7 +86,10 @@
     if (selectedKeys.size === 0) return;
     const selectedList = filteredSongs.filter((s) => selectedKeys.has(String(s.id)));
     if (selectedList.length > 0) {
-      playerStore.playSongs(selectedList.map((s) => s.id), 0);
+      playerStore.playSongs(
+        selectedList.map((s) => s.id),
+        0,
+      );
     }
   }
 
@@ -118,7 +124,9 @@
     return map;
   });
 
-  let collator = $derived(new Intl.Collator(i18n.currentLocale, { numeric: true, sensitivity: "base" }));
+  let collator = $derived(
+    new Intl.Collator(i18n.currentLocale, { numeric: true, sensitivity: "base" }),
+  );
 
   let artistSongsIndex = $derived.by(() => {
     if (navigationStore.activeSubTab !== "artists") return new Map<string, Song[]>();
@@ -154,7 +162,7 @@
 
   // Albums and Artists each remember their own Cards/Rows view mode.
   let activeViewMode = $derived(
-    navigationStore.activeSubTab === "albums" ? prefs.albumsViewMode : prefs.artistsViewMode
+    navigationStore.activeSubTab === "albums" ? prefs.albumsViewMode : prefs.artistsViewMode,
   );
 
   function setActiveViewMode(mode: CollectionViewMode) {
@@ -166,15 +174,16 @@
   }
 
   let sortField = $state<keyof Song>(
-    (typeof window !== "undefined" && localStorage.getItem("sort_song_field") as keyof Song) || "title"
+    (typeof window !== "undefined" && (localStorage.getItem("sort_song_field") as keyof Song)) ||
+      "title",
   );
   let sortAsc = $state(
-    typeof window !== "undefined" ? localStorage.getItem("sort_song_asc") !== "false" : true
+    typeof window !== "undefined" ? localStorage.getItem("sort_song_asc") !== "false" : true,
   );
 
   // Sort dropdown options: only sortable columns currently visible via ColumnSelector.
   let sortableColumns = $derived(
-    SONG_TABLE_COLUMNS.filter((col) => col.field && collectionStore.visibleColumns[col.key])
+    SONG_TABLE_COLUMNS.filter((col) => col.field && collectionStore.visibleColumns[col.key]),
   );
 
   $effect(() => {
@@ -185,7 +194,11 @@
     if (field === "title") {
       val = song.titlesort?.trim() || song.title;
     } else if (field === "artist") {
-      val = song.album_artist_sort?.trim() || song.artistsort?.trim() || song.album_artist || song.artist;
+      val =
+        song.album_artist_sort?.trim() ||
+        song.artistsort?.trim() ||
+        song.album_artist ||
+        song.artist;
     } else if (field === "album") {
       val = song.albumsort?.trim() || song.album;
     } else if (field === "composer") {
@@ -240,10 +253,10 @@
       const saved = localStorage.getItem("sort_album_field");
       if (saved === "track_count") return "album";
       return (saved as "album" | "artist" | "year" | "rating" | "added") || "album";
-    })()
+    })(),
   );
   let albumSortAsc = $state(
-    typeof window !== "undefined" ? localStorage.getItem("sort_album_asc") !== "false" : true
+    typeof window !== "undefined" ? localStorage.getItem("sort_album_asc") !== "false" : true,
   );
 
   let artistSortField = $state<"name" | "genre" | "song_count" | "total_playcount">(
@@ -252,10 +265,10 @@
       const saved = localStorage.getItem("sort_artist_field");
       if (saved === "album_count") return "genre";
       return (saved as "name" | "genre" | "song_count" | "total_playcount") || "name";
-    })()
+    })(),
   );
   let artistSortAsc = $state(
-    typeof window !== "undefined" ? localStorage.getItem("sort_artist_asc") !== "false" : true
+    typeof window !== "undefined" ? localStorage.getItem("sort_artist_asc") !== "false" : true,
   );
 
   $effect(() => {
@@ -329,12 +342,18 @@
     const asc = artistSortAsc;
 
     return list.sort((a, b) => {
-      let valA: unknown = field === "genre"
-        ? (a.genre?.trim() || i18n.t('artistDetail.unknownGenre'))
-        : (field === "name" ? (a.sort_artist?.trim() || a.name) : a[field]);
-      let valB: unknown = field === "genre"
-        ? (b.genre?.trim() || i18n.t('artistDetail.unknownGenre'))
-        : (field === "name" ? (b.sort_artist?.trim() || b.name) : b[field]);
+      let valA: unknown =
+        field === "genre"
+          ? a.genre?.trim() || i18n.t("artistDetail.unknownGenre")
+          : field === "name"
+            ? a.sort_artist?.trim() || a.name
+            : a[field];
+      let valB: unknown =
+        field === "genre"
+          ? b.genre?.trim() || i18n.t("artistDetail.unknownGenre")
+          : field === "name"
+            ? b.sort_artist?.trim() || b.name
+            : b[field];
 
       if (valA === null || valA === undefined) return asc ? 1 : -1;
       if (valB === null || valB === undefined) return asc ? -1 : 1;
@@ -354,11 +373,20 @@
   let artistGrid = $state<ReturnType<typeof VirtualCardGrid> | undefined>(undefined);
 
   const ALPHABETICAL_SONG_FIELDS = new Set<keyof Song>([
-    "title", "artist", "album", "album_artist", "composer", "genre", "grouping", "path",
+    "title",
+    "artist",
+    "album",
+    "album_artist",
+    "composer",
+    "genre",
+    "grouping",
+    "path",
   ]);
   let isSongSortAlphabetical = $derived(ALPHABETICAL_SONG_FIELDS.has(sortField));
   let isAlbumSortAlphabetical = $derived(albumSortField === "album" || albumSortField === "artist");
-  let isArtistSortAlphabetical = $derived(artistSortField === "name" || artistSortField === "genre");
+  let isArtistSortAlphabetical = $derived(
+    artistSortField === "name" || artistSortField === "genre",
+  );
 
   function getSongAlphabetKey(row: SongTableRow): string {
     if (!row.song) return "";
@@ -381,13 +409,36 @@
   }
 
   // Default column widths (px or fr) — used when no saved width exists for a column.
-  const COLLECTION_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
-    track: "48px", title: "2fr", artist: "1.5fr", album: "1.5fr",
-    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px", originalyear: "60px",
-    genre: "1.2fr", grouping: "1.2fr", bpm: "60px", initial_key: "60px",
-    bitrate: "70px", samplerate: "75px", bitdepth: "65px", channels: "70px",
-    filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
-    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", library: "130px", actions: "80px",
+  const COLLECTION_COL_DEFAULTS: Partial<
+    Record<keyof typeof collectionStore.visibleColumns, string>
+  > = {
+    track: "48px",
+    title: "2fr",
+    artist: "1.5fr",
+    album: "1.5fr",
+    composer: "1.5fr",
+    album_artist: "1.5fr",
+    format: "64px",
+    year: "60px",
+    originalyear: "60px",
+    genre: "1.2fr",
+    grouping: "1.2fr",
+    bpm: "60px",
+    initial_key: "60px",
+    bitrate: "70px",
+    samplerate: "75px",
+    bitdepth: "65px",
+    channels: "70px",
+    filesize: "75px",
+    rating: "96px",
+    playcount: "70px",
+    skipcount: "70px",
+    lastplayed: "90px",
+    added: "90px",
+    duration: "80px",
+    path: "2fr",
+    library: "130px",
+    actions: "80px",
   };
 
   function toggleSort(field: keyof Song) {
@@ -441,7 +492,7 @@
   }
 
   let tableRows = $derived(
-    navigationStore.activeSubTab === "songs" ? filteredSongs.map(songToRow) : []
+    navigationStore.activeSubTab === "songs" ? filteredSongs.map(songToRow) : [],
   );
 </script>
 
@@ -449,10 +500,13 @@
   {#if filteredSongs.length === 0 && collectionStore.searchQuery}
     <SearchEmptyState
       icon={Music}
-      title={i18n.t('collection.noSongsTitle')}
-      matchQueryText={i18n.t('collection.noTracksMatchQuery')}
+      title={i18n.t("collection.noSongsTitle")}
+      matchQueryText={i18n.t("collection.noTracksMatchQuery")}
       query={collectionStore.searchQuery}
-      onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+      onReset={() => {
+        collectionStore.searchQuery = "";
+        collectionStore.search("");
+      }}
     />
   {:else}
     <!-- Library has no songs at all yet (no watched folders) — a distinct
@@ -462,302 +516,357 @@
 {/snippet}
 
 {#if navigationStore.selectedAlbumName !== null}
-  <AlbumDetailView albumName={navigationStore.selectedAlbumName} albumKey={navigationStore.selectedAlbumKey} />
+  <AlbumDetailView
+    albumName={navigationStore.selectedAlbumName}
+    albumKey={navigationStore.selectedAlbumKey}
+  />
 {:else if navigationStore.selectedArtistName !== null}
   <ArtistDetailView artistName={navigationStore.selectedArtistName} />
 {:else}
-<div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-  {#if navigationStore.activeSubTab === "songs"}
-    <div class="px-6 pt-4 pb-2 flex-shrink-0">
-      <div class="h-9 flex items-center justify-between">
-        <div class="text-xs text-brand-text-secondary font-medium">
-          {i18n.plural("collection.showingSongs", filteredSongs.length)}
-        </div>
-
-        <div class="flex items-center gap-2">
-          <div class="relative">
-            <Select
-              value={`${sortField}-${sortAsc}`}
-              onchange={(e) => {
-                const [field, asc] = e.currentTarget.value.split("-");
-                sortField = field as keyof Song;
-                sortAsc = asc === "true";
-              }}
-              class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-            >
-              {#each sortableColumns as col (col.key)}
-                <option value="{col.field}-true">▲ {i18n.t(col.label)}</option>
-                <option value="{col.field}-false">▼ {i18n.t(col.label)}</option>
-              {/each}
-            </Select>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="flex-1 px-6 pt-2 overflow-hidden flex flex-col {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <div class="relative flex-1 min-h-0 flex">
-        <div class="flex-1 overflow-y-auto border border-brand-border rounded-lg bg-brand-sidebar/40 min-h-0" use:rememberScroll={"collection:songs"}>
-          <SongTable
-            bind:this={songTable}
-            rows={tableRows}
-            mode="track"
-            leadingColumnWidth="36px"
-            colDefaults={COLLECTION_COL_DEFAULTS}
-            {sortField}
-            {sortAsc}
-            onToggleSort={(f) => toggleSort(f as keyof Song)}
-            bind:selectedKeys
-            onRowDoubleClick={(row) => row.song && handlePlaySong(row.song)}
-            onRowContextMenu={handleRowContextMenu}
-            onRate={rateSong}
-            onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
-            onEditTags={(song) => openTagEditor(song.id)}
-            emptyState={songsEmptyState}
-          />
-        </div>
-        {#if isSongSortAlphabetical}
-          <div class="absolute right-2.5 top-12 bottom-3 pointer-events-auto z-20">
-            <AlphabetScrubber
-              items={tableRows}
-              getKey={getSongAlphabetKey}
-              ascending={sortAsc}
-              locale={i18n.currentLocale}
-              onjump={(index) => songTable?.scrollToIndex(index)}
-            />
-          </div>
-        {/if}
-      </div>
-    </div>
-
-  {:else if navigationStore.activeSubTab === "genres"}
-    <GenreBrowseView />
-  {:else}
-    <div class="flex-1 min-h-0 flex flex-col {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <div class="relative flex-1 min-h-0 flex flex-col">
-        <div class="flex-1 pl-6 pr-8 overflow-y-auto min-h-0" use:rememberScroll={`collection:${navigationStore.activeSubTab}`}>
-        <div class="sticky top-0 z-20 bg-brand-main pt-3">
-        <div class="h-12 flex items-center justify-between">
+  <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
+    {#if navigationStore.activeSubTab === "songs"}
+      <div class="px-6 pt-4 pb-2 flex-shrink-0">
+        <div class="h-9 flex items-center justify-between">
           <div class="text-xs text-brand-text-secondary font-medium">
-            {#if navigationStore.activeSubTab === "albums"}
-              {i18n.plural("collection.showingAlbums", sortedAlbums.length)}
-            {:else}
-              {i18n.plural("collection.showingArtists", sortedArtists.length)}
-            {/if}
+            {i18n.plural("collection.showingSongs", filteredSongs.length)}
           </div>
 
           <div class="flex items-center gap-2">
-            <ViewModeToggle mode={activeViewMode} onChange={setActiveViewMode} walkthroughTarget="collection-view" />
-            {#if navigationStore.activeSubTab === "albums"}
-              <div class="relative">
-                <Select
-                  value={`${albumSortField}-${albumSortAsc}`}
-                  onchange={(e) => {
-                    const [field, asc] = e.currentTarget.value.split("-");
-                    albumSortField = field as "album" | "artist" | "year" | "rating" | "added";
-                    albumSortAsc = asc === "true";
-                  }}
-                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-                >
-                  <option value="album-true">▲ {i18n.t('collection.tableHeaderAlbum')}</option>
-                  <option value="album-false">▼ {i18n.t('collection.tableHeaderAlbum')}</option>
-                  <option value="artist-true">▲ {i18n.t('collection.tableHeaderArtist')}</option>
-                  <option value="artist-false">▼ {i18n.t('collection.tableHeaderArtist')}</option>
-                  <option value="year-true">▲ {i18n.t('collection.tableHeaderYear')}</option>
-                  <option value="year-false">▼ {i18n.t('collection.tableHeaderYear')}</option>
-                  <option value="rating-true">▲ {i18n.t('collection.tableHeaderRating')}</option>
-                  <option value="rating-false">▼ {i18n.t('collection.tableHeaderRating')}</option>
-                  <option value="added-true">▲ {i18n.t('collection.sortDateAddedLabel')}</option>
-                  <option value="added-false">▼ {i18n.t('collection.sortDateAddedLabel')}</option>
-                </Select>
-              </div>
-            {:else if navigationStore.activeSubTab === "artists"}
-              <div class="relative">
-                <Select
-                  value={`${artistSortField}-${artistSortAsc}`}
-                  onchange={(e) => {
-                    const [field, asc] = e.currentTarget.value.split("-");
-                    artistSortField = field as "name" | "genre" | "song_count" | "total_playcount";
-                    artistSortAsc = asc === "true";
-                  }}
-                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-                >
-                  <option value="name-true">▲ {i18n.t('collection.tableHeaderArtist')}</option>
-                  <option value="name-false">▼ {i18n.t('collection.tableHeaderArtist')}</option>
-                  <option value="genre-true">▲ {i18n.t('collection.tableHeaderGenre')}</option>
-                  <option value="genre-false">▼ {i18n.t('collection.tableHeaderGenre')}</option>
-                  <option value="song_count-true">▲ {i18n.t('collection.sortLabelSongs')}</option>
-                  <option value="song_count-false">▼ {i18n.t('collection.sortLabelSongs')}</option>
-                  <option value="total_playcount-true">▲ {i18n.t('collection.sortLabelPopularity')}</option>
-                  <option value="total_playcount-false">▼ {i18n.t('collection.sortLabelPopularity')}</option>
-                </Select>
-              </div>
-            {/if}
+            <div class="relative">
+              <Select
+                value={`${sortField}-${sortAsc}`}
+                onchange={(e) => {
+                  const [field, asc] = e.currentTarget.value.split("-");
+                  sortField = field as keyof Song;
+                  sortAsc = asc === "true";
+                }}
+                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+              >
+                {#each sortableColumns as col (col.key)}
+                  <option value="{col.field}-true">▲ {i18n.t(col.label)}</option>
+                  <option value="{col.field}-false">▼ {i18n.t(col.label)}</option>
+                {/each}
+              </Select>
+            </div>
           </div>
         </div>
       </div>
 
-      {#snippet albumEmptyState()}
-        {#if sortedAlbums.length === 0 && collectionStore.searchQuery}
-          <div class="col-span-full py-16 text-center">
-            <SearchEmptyState
-              icon={DiscAlbum}
-              title={i18n.t('collection.noAlbumsTitle')}
-              matchQueryText={i18n.t('collection.noAlbumsMatchQuery')}
-              query={collectionStore.searchQuery}
-              onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+      <div
+        class="flex-1 px-6 pt-2 overflow-hidden flex flex-col {playerStore.currentSong
+          ? 'pb-28'
+          : 'pb-6'}"
+      >
+        <div class="relative flex-1 min-h-0 flex">
+          <div
+            class="flex-1 overflow-y-auto border border-brand-border rounded-lg bg-brand-sidebar/40 min-h-0"
+            use:rememberScroll={"collection:songs"}
+          >
+            <SongTable
+              bind:this={songTable}
+              rows={tableRows}
+              mode="track"
+              leadingColumnWidth="36px"
+              colDefaults={COLLECTION_COL_DEFAULTS}
+              {sortField}
+              {sortAsc}
+              onToggleSort={(f) => toggleSort(f as keyof Song)}
+              bind:selectedKeys
+              onRowDoubleClick={(row) => row.song && handlePlaySong(row.song)}
+              onRowContextMenu={handleRowContextMenu}
+              onRate={rateSong}
+              onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
+              onEditTags={(song) => openTagEditor(song.id)}
+              emptyState={songsEmptyState}
             />
           </div>
-        {:else if sortedAlbums.length === 0}
-          <div class="col-span-full py-16 text-center">
-            <LibraryWelcome />
-          </div>
-        {/if}
-      {/snippet}
-
-      {#snippet artistEmptyState()}
-        {#if sortedArtists.length === 0 && collectionStore.searchQuery}
-          <div class="col-span-full py-16 text-center">
-            <SearchEmptyState
-              icon={Mic2}
-              title={i18n.t('collection.noArtistsTitle')}
-              matchQueryText={i18n.t('collection.noArtistsMatchQuery')}
-              query={collectionStore.searchQuery}
-              onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
-            />
-          </div>
-        {:else if sortedArtists.length === 0}
-          <div class="col-span-full py-16 text-center">
-            <LibraryWelcome />
-          </div>
-        {/if}
-      {/snippet}
-
-      <div class="pt-2">
-        {#if navigationStore.activeSubTab === "albums"}
-        {#if activeViewMode === "rows"}
-          {#if sortedAlbums.length === 0}
-            <div class="grid">{@render albumEmptyState()}</div>
-          {:else}
-            <VirtualCardGrid
-              bind:this={albumGrid}
-              items={sortedAlbums}
-              key={albumKey}
-              minColumnWidth={280}
-              gap={8}
-              fit
-              estimateRowHeight={() => 72}
-            >
-              {#snippet item(album)}
-                <AlbumRowCard
-                  {album}
-                  oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
-                />
-              {/snippet}
-            </VirtualCardGrid>
+          {#if isSongSortAlphabetical}
+            <div class="absolute right-2.5 top-12 bottom-3 pointer-events-auto z-20">
+              <AlphabetScrubber
+                items={tableRows}
+                getKey={getSongAlphabetKey}
+                ascending={sortAsc}
+                locale={i18n.currentLocale}
+                onjump={(index) => songTable?.scrollToIndex(index)}
+              />
+            </div>
           {/if}
-        {:else}
-          {#if sortedAlbums.length === 0}
-            <div class="grid">{@render albumEmptyState()}</div>
-          {:else}
-            <VirtualCardGrid
-              bind:this={albumGrid}
-              items={sortedAlbums}
-              key={albumKey}
-              minColumnWidth={180}
-              gap={24}
-              estimateRowHeight={(w) => w + 90}
-            >
-              {#snippet item(album)}
-                <AlbumCard
-                  {album}
-                  widthClass="w-full"
-                  oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
-                />
-              {/snippet}
-            </VirtualCardGrid>
-          {/if}
-        {/if}
-        {:else if navigationStore.activeSubTab === "artists"}
-        <!-- Virtualized like Albums: every mounted artist card looks up its
+        </div>
+      </div>
+    {:else if navigationStore.activeSubTab === "genres"}
+      <GenreBrowseView />
+    {:else}
+      <div class="flex-1 min-h-0 flex flex-col {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
+        <div class="relative flex-1 min-h-0 flex flex-col">
+          <div
+            class="flex-1 pl-6 pr-8 overflow-y-auto min-h-0"
+            use:rememberScroll={`collection:${navigationStore.activeSubTab}`}
+          >
+            <div class="sticky top-0 z-20 bg-brand-main pt-3">
+              <div class="h-12 flex items-center justify-between">
+                <div class="text-xs text-brand-text-secondary font-medium">
+                  {#if navigationStore.activeSubTab === "albums"}
+                    {i18n.plural("collection.showingAlbums", sortedAlbums.length)}
+                  {:else}
+                    {i18n.plural("collection.showingArtists", sortedArtists.length)}
+                  {/if}
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <ViewModeToggle
+                    mode={activeViewMode}
+                    onChange={setActiveViewMode}
+                    walkthroughTarget="collection-view"
+                  />
+                  {#if navigationStore.activeSubTab === "albums"}
+                    <div class="relative">
+                      <Select
+                        value={`${albumSortField}-${albumSortAsc}`}
+                        onchange={(e) => {
+                          const [field, asc] = e.currentTarget.value.split("-");
+                          albumSortField = field as
+                            "album" | "artist" | "year" | "rating" | "added";
+                          albumSortAsc = asc === "true";
+                        }}
+                        class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                      >
+                        <option value="album-true">▲ {i18n.t("collection.tableHeaderAlbum")}</option
+                        >
+                        <option value="album-false"
+                          >▼ {i18n.t("collection.tableHeaderAlbum")}</option
+                        >
+                        <option value="artist-true"
+                          >▲ {i18n.t("collection.tableHeaderArtist")}</option
+                        >
+                        <option value="artist-false"
+                          >▼ {i18n.t("collection.tableHeaderArtist")}</option
+                        >
+                        <option value="year-true">▲ {i18n.t("collection.tableHeaderYear")}</option>
+                        <option value="year-false">▼ {i18n.t("collection.tableHeaderYear")}</option>
+                        <option value="rating-true"
+                          >▲ {i18n.t("collection.tableHeaderRating")}</option
+                        >
+                        <option value="rating-false"
+                          >▼ {i18n.t("collection.tableHeaderRating")}</option
+                        >
+                        <option value="added-true"
+                          >▲ {i18n.t("collection.sortDateAddedLabel")}</option
+                        >
+                        <option value="added-false"
+                          >▼ {i18n.t("collection.sortDateAddedLabel")}</option
+                        >
+                      </Select>
+                    </div>
+                  {:else if navigationStore.activeSubTab === "artists"}
+                    <div class="relative">
+                      <Select
+                        value={`${artistSortField}-${artistSortAsc}`}
+                        onchange={(e) => {
+                          const [field, asc] = e.currentTarget.value.split("-");
+                          artistSortField = field as
+                            "name" | "genre" | "song_count" | "total_playcount";
+                          artistSortAsc = asc === "true";
+                        }}
+                        class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                      >
+                        <option value="name-true">▲ {i18n.t("collection.tableHeaderArtist")}</option
+                        >
+                        <option value="name-false"
+                          >▼ {i18n.t("collection.tableHeaderArtist")}</option
+                        >
+                        <option value="genre-true">▲ {i18n.t("collection.tableHeaderGenre")}</option
+                        >
+                        <option value="genre-false"
+                          >▼ {i18n.t("collection.tableHeaderGenre")}</option
+                        >
+                        <option value="song_count-true"
+                          >▲ {i18n.t("collection.sortLabelSongs")}</option
+                        >
+                        <option value="song_count-false"
+                          >▼ {i18n.t("collection.sortLabelSongs")}</option
+                        >
+                        <option value="total_playcount-true"
+                          >▲ {i18n.t("collection.sortLabelPopularity")}</option
+                        >
+                        <option value="total_playcount-false"
+                          >▼ {i18n.t("collection.sortLabelPopularity")}</option
+                        >
+                      </Select>
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            </div>
+
+            {#snippet albumEmptyState()}
+              {#if sortedAlbums.length === 0 && collectionStore.searchQuery}
+                <div class="col-span-full py-16 text-center">
+                  <SearchEmptyState
+                    icon={DiscAlbum}
+                    title={i18n.t("collection.noAlbumsTitle")}
+                    matchQueryText={i18n.t("collection.noAlbumsMatchQuery")}
+                    query={collectionStore.searchQuery}
+                    onReset={() => {
+                      collectionStore.searchQuery = "";
+                      collectionStore.search("");
+                    }}
+                  />
+                </div>
+              {:else if sortedAlbums.length === 0}
+                <div class="col-span-full py-16 text-center">
+                  <LibraryWelcome />
+                </div>
+              {/if}
+            {/snippet}
+
+            {#snippet artistEmptyState()}
+              {#if sortedArtists.length === 0 && collectionStore.searchQuery}
+                <div class="col-span-full py-16 text-center">
+                  <SearchEmptyState
+                    icon={Mic2}
+                    title={i18n.t("collection.noArtistsTitle")}
+                    matchQueryText={i18n.t("collection.noArtistsMatchQuery")}
+                    query={collectionStore.searchQuery}
+                    onReset={() => {
+                      collectionStore.searchQuery = "";
+                      collectionStore.search("");
+                    }}
+                  />
+                </div>
+              {:else if sortedArtists.length === 0}
+                <div class="col-span-full py-16 text-center">
+                  <LibraryWelcome />
+                </div>
+              {/if}
+            {/snippet}
+
+            <div class="pt-2">
+              {#if navigationStore.activeSubTab === "albums"}
+                {#if activeViewMode === "rows"}
+                  {#if sortedAlbums.length === 0}
+                    <div class="grid">{@render albumEmptyState()}</div>
+                  {:else}
+                    <VirtualCardGrid
+                      bind:this={albumGrid}
+                      items={sortedAlbums}
+                      key={albumKey}
+                      minColumnWidth={280}
+                      gap={8}
+                      fit
+                      estimateRowHeight={() => 72}
+                    >
+                      {#snippet item(album)}
+                        <AlbumRowCard
+                          {album}
+                          oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+                        />
+                      {/snippet}
+                    </VirtualCardGrid>
+                  {/if}
+                {:else}
+                  {#if sortedAlbums.length === 0}
+                    <div class="grid">{@render albumEmptyState()}</div>
+                  {:else}
+                    <VirtualCardGrid
+                      bind:this={albumGrid}
+                      items={sortedAlbums}
+                      key={albumKey}
+                      minColumnWidth={180}
+                      gap={24}
+                      estimateRowHeight={(w) => w + 90}
+                    >
+                      {#snippet item(album)}
+                        <AlbumCard
+                          {album}
+                          widthClass="w-full"
+                          oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+                        />
+                      {/snippet}
+                    </VirtualCardGrid>
+                  {/if}
+                {/if}
+              {:else if navigationStore.activeSubTab === "artists"}
+                <!-- Virtualized like Albums: every mounted artist card looks up its
              portrait and loads covers, so mounting a 15k-artist library at once
              floods the backend and stalls the UI for minutes (#1968). -->
-        {#if sortedArtists.length === 0}
-          <div class="grid">{@render artistEmptyState()}</div>
-        {:else if activeViewMode === "rows"}
-          <VirtualCardGrid
-            bind:this={artistGrid}
-            items={sortedArtists}
-            key={artistKey}
-            minColumnWidth={280}
-            gap={8}
-            fit
-            estimateRowHeight={() => 66}
-          >
-            {#snippet item(artist)}
-              <ArtistRowCard
-                {artist}
-                artistAlbums={getArtistAlbumsFor(artist.name)}
-                artistSongs={getArtistSongsFor(artist.name)}
-                onclick={() => navigationStore.viewArtist(artist.name || "")}
-                oncontextmenu={(e) => handleArtistContextMenu(e, artist)}
-              />
-            {/snippet}
-          </VirtualCardGrid>
-        {:else}
-          <VirtualCardGrid
-            bind:this={artistGrid}
-            items={sortedArtists}
-            key={artistKey}
-            minColumnWidth={180}
-            gap={24}
-            estimateRowHeight={(w) => w + 60}
-          >
-            {#snippet item(artist)}
-              <ArtistCard
-                {artist}
-                artistAlbums={getArtistAlbumsFor(artist.name)}
-                artistSongs={getArtistSongsFor(artist.name)}
-                onclick={() => navigationStore.viewArtist(artist.name || "")}
-                oncontextmenu={(e) => handleArtistContextMenu(e, artist)}
-              />
-            {/snippet}
-          </VirtualCardGrid>
-        {/if}
-        {/if}
-      </div>
-      </div>
-      {#if (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") || (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists")}
-        <div class="absolute right-2.5 top-[68px] bottom-2 pointer-events-auto z-20">
-          {#if navigationStore.activeSubTab === "albums"}
-            <AlphabetScrubber
-              items={sortedAlbums}
-              getKey={getAlbumSortKey}
-              ascending={albumSortAsc}
-              locale={i18n.currentLocale}
-              onjump={(index) => albumGrid?.scrollToIndex(index)}
-            />
-          {:else}
-            <AlphabetScrubber
-              items={sortedArtists}
-              getKey={getArtistSortKey}
-              ascending={artistSortAsc}
-              locale={i18n.currentLocale}
-              onjump={(index) => artistGrid?.scrollToIndex(index)}
-            />
+                {#if sortedArtists.length === 0}
+                  <div class="grid">{@render artistEmptyState()}</div>
+                {:else if activeViewMode === "rows"}
+                  <VirtualCardGrid
+                    bind:this={artistGrid}
+                    items={sortedArtists}
+                    key={artistKey}
+                    minColumnWidth={280}
+                    gap={8}
+                    fit
+                    estimateRowHeight={() => 66}
+                  >
+                    {#snippet item(artist)}
+                      <ArtistRowCard
+                        {artist}
+                        artistAlbums={getArtistAlbumsFor(artist.name)}
+                        artistSongs={getArtistSongsFor(artist.name)}
+                        onclick={() => navigationStore.viewArtist(artist.name || "")}
+                        oncontextmenu={(e) => handleArtistContextMenu(e, artist)}
+                      />
+                    {/snippet}
+                  </VirtualCardGrid>
+                {:else}
+                  <VirtualCardGrid
+                    bind:this={artistGrid}
+                    items={sortedArtists}
+                    key={artistKey}
+                    minColumnWidth={180}
+                    gap={24}
+                    estimateRowHeight={(w) => w + 60}
+                  >
+                    {#snippet item(artist)}
+                      <ArtistCard
+                        {artist}
+                        artistAlbums={getArtistAlbumsFor(artist.name)}
+                        artistSongs={getArtistSongsFor(artist.name)}
+                        onclick={() => navigationStore.viewArtist(artist.name || "")}
+                        oncontextmenu={(e) => handleArtistContextMenu(e, artist)}
+                      />
+                    {/snippet}
+                  </VirtualCardGrid>
+                {/if}
+              {/if}
+            </div>
+          </div>
+          {#if (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") || (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists")}
+            <div class="absolute right-2.5 top-[68px] bottom-2 pointer-events-auto z-20">
+              {#if navigationStore.activeSubTab === "albums"}
+                <AlphabetScrubber
+                  items={sortedAlbums}
+                  getKey={getAlbumSortKey}
+                  ascending={albumSortAsc}
+                  locale={i18n.currentLocale}
+                  onjump={(index) => albumGrid?.scrollToIndex(index)}
+                />
+              {:else}
+                <AlphabetScrubber
+                  items={sortedArtists}
+                  getKey={getArtistSortKey}
+                  ascending={artistSortAsc}
+                  locale={i18n.currentLocale}
+                  onjump={(index) => artistGrid?.scrollToIndex(index)}
+                />
+              {/if}
+            </div>
           {/if}
         </div>
-      {/if}
       </div>
-    </div>
-  {/if}
-</div>
+    {/if}
+  </div>
 {/if}
 
 {#if editingSongId !== null}
   <TagEditor
     songId={editingSongId}
-    onClose={() => { editingSongId = null; }}
+    onClose={() => {
+      editingSongId = null;
+    }}
     onSave={handleTagEditorSaved}
   />
 {/if}
@@ -768,14 +877,17 @@
     songIds={batchEditSongs.map((s) => s.id)}
     initialTracks={batchEditSongs}
     hasEmbeddedArt={batchEditSongs.some((s) => s.art_embedded)}
-    onClose={() => { batchEditSongs = null; }}
+    onClose={() => {
+      batchEditSongs = null;
+    }}
     onSave={handleTagEditorSaved}
   />
 {/if}
 
 {#if contextMenuState}
   {@const song = contextMenuState.song}
-  {@const selectedSongs = selectedKeys.size > 1 ? filteredSongs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
+  {@const selectedSongs =
+    selectedKeys.size > 1 ? filteredSongs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
   <SongContextMenu
     x={contextMenuState.x}
     y={contextMenuState.y}
@@ -800,9 +912,14 @@
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
-    onEditBatchTags={() => { batchEditSongs = selectedSongs ?? null; }}
-    onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
-    onClose={() => { contextMenuState = null; }}
+    onEditBatchTags={() => {
+      batchEditSongs = selectedSongs ?? null;
+    }}
+    onOpenInPicard={() =>
+      openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
+    onClose={() => {
+      contextMenuState = null;
+    }}
   />
 {/if}
 
@@ -823,13 +940,15 @@
       const playable = songs.filter((s) => !s.not_included);
       if (playable.length > 0) {
         await playlistsStore.addSongsToActiveTarget(
-          playable.map(s => s.id),
-          album.album || i18n.t("collection.unknownAlbum")
+          playable.map((s) => s.id),
+          album.album || i18n.t("collection.unknownAlbum"),
         );
       }
     }}
     onGoToArtist={album.artist ? () => navigationStore.viewArtist(album.artist || "") : undefined}
-    onClose={() => { albumContextMenuState = null; }}
+    onClose={() => {
+      albumContextMenuState = null;
+    }}
   />
 {/if}
 
@@ -838,14 +957,21 @@
     x={artistContextMenuState.x}
     y={artistContextMenuState.y}
     artistName={artistContextMenuState.artist.name || ""}
-    onClose={() => { artistContextMenuState = null; }}
+    onClose={() => {
+      artistContextMenuState = null;
+    }}
   />
 {/if}
 
-{#if selectedKeys.size > 0 && navigationStore.activeSubTab === 'songs'}
-  <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 acrylic-float border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
+{#if selectedKeys.size > 0 && navigationStore.activeSubTab === "songs"}
+  <div
+    data-floating-toolbar="true"
+    class="absolute left-1/2 -translate-x-1/2 z-40 acrylic-float border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold"
+    class:bottom-6={!playerStore.currentSong}
+    class:bottom-28={!!playerStore.currentSong}
+  >
     <span class="text-brand-accent-text font-bold">
-      {i18n.t('playlists.selectedCount', { count: selectedKeys.size })}
+      {i18n.t("playlists.selectedCount", { count: selectedKeys.size })}
     </span>
     <div class="h-4 w-px bg-brand-border/60"></div>
     <button
@@ -853,7 +979,7 @@
       class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors"
     >
       <Play class="w-3.5 h-3.5 fill-current text-brand-accent-text" />
-      <span>{i18n.t('playlists.playSelected')}</span>
+      <span>{i18n.t("playlists.playSelected")}</span>
     </button>
     <button
       onclick={handleBulkAddToPlaylist}
@@ -862,16 +988,20 @@
       <Plus class="w-3.5 h-3.5 text-brand-accent-text" />
       <span>
         {playlistsStore.activeCustomPlaylist
-          ? i18n.t('playlists.contextMenuAddToPlaylist', { name: getPlaylistDisplayName(playlistsStore.activeCustomPlaylist) })
-          : i18n.t('playlists.contextMenuAddToPlaylistDefault')}
+          ? i18n.t("playlists.contextMenuAddToPlaylist", {
+              name: getPlaylistDisplayName(playlistsStore.activeCustomPlaylist),
+            })
+          : i18n.t("playlists.contextMenuAddToPlaylistDefault")}
       </span>
     </button>
     <div class="h-4 w-px bg-brand-border/60"></div>
     <button
-      onclick={() => { selectedKeys = new Set(); }}
+      onclick={() => {
+        selectedKeys = new Set();
+      }}
       class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
     >
-      {i18n.t('playlists.clearSelection')}
+      {i18n.t("playlists.clearSelection")}
     </button>
   </div>
 {/if}
@@ -892,4 +1022,3 @@
     border-radius: 3px;
   }
 </style>
-

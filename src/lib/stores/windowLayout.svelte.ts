@@ -33,7 +33,7 @@ class WindowLayoutStore {
   rightPanelWidth = $state<number>(288);
   immersiveMode = $state<boolean>(false);
   isMiniplayer = $state<boolean>(
-    typeof window !== "undefined" && localStorage.getItem("layout_isMiniplayer") === "true"
+    typeof window !== "undefined" && localStorage.getItem("layout_isMiniplayer") === "true",
   );
   // Guards enter/exitMiniplayerMode against overlapping calls: isMiniplayer
   // flips synchronously, but the window resize/decoration IPC call it
@@ -70,7 +70,9 @@ class WindowLayoutStore {
       if (savedSidebar !== null) this.sidebarOpen = savedSidebar === "true";
 
       // A layout saved before pinning existed stored the docked state as "open".
-      const savedRight = localStorage.getItem("layout_rightPanelPinned") ?? localStorage.getItem("layout_rightPanelOpen");
+      const savedRight =
+        localStorage.getItem("layout_rightPanelPinned") ??
+        localStorage.getItem("layout_rightPanelOpen");
       if (savedRight !== null) this.rightPanelPinned = savedRight === "true";
 
       const savedSidebarWidth = localStorage.getItem("layout_sidebarWidth");
@@ -172,8 +174,10 @@ class WindowLayoutStore {
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_savedWindowWidth", this.savedWindowWidth.toString());
       localStorage.setItem("layout_savedWindowHeight", this.savedWindowHeight.toString());
-      if (this.savedWindowX !== null) localStorage.setItem("layout_savedWindowX", this.savedWindowX.toString());
-      if (this.savedWindowY !== null) localStorage.setItem("layout_savedWindowY", this.savedWindowY.toString());
+      if (this.savedWindowX !== null)
+        localStorage.setItem("layout_savedWindowX", this.savedWindowX.toString());
+      if (this.savedWindowY !== null)
+        localStorage.setItem("layout_savedWindowY", this.savedWindowY.toString());
     }
   }
 
@@ -185,8 +189,10 @@ class WindowLayoutStore {
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_miniplayerWidth", this.miniplayerWidth.toString());
       localStorage.setItem("layout_miniplayerHeight", this.miniplayerHeight.toString());
-      if (this.miniplayerX !== null) localStorage.setItem("layout_miniplayerX", this.miniplayerX.toString());
-      if (this.miniplayerY !== null) localStorage.setItem("layout_miniplayerY", this.miniplayerY.toString());
+      if (this.miniplayerX !== null)
+        localStorage.setItem("layout_miniplayerX", this.miniplayerX.toString());
+      if (this.miniplayerY !== null)
+        localStorage.setItem("layout_miniplayerY", this.miniplayerY.toString());
     }
   }
 
@@ -302,9 +308,12 @@ class WindowLayoutStore {
   private async captureCurrentWindowGeometry() {
     if (this.miniplayerTransitionInFlight) return;
     try {
-      const geo = await invoke<{ width: number; height: number; x: number | null; y: number | null }>(
-        "get_window_geometry"
-      );
+      const geo = await invoke<{
+        width: number;
+        height: number;
+        x: number | null;
+        y: number | null;
+      }>("get_window_geometry");
       if (!geo) return;
       if (this.isMiniplayer) {
         this.setMiniplayerGeometry(geo.width, geo.height, geo.x, geo.y);

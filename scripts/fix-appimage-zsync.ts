@@ -50,7 +50,8 @@ function sha1OfFile(filePath: string): string {
   try {
     const chunk = Buffer.alloc(1 << 20);
     let read: number;
-    while ((read = fs.readSync(fd, chunk, 0, chunk.length, null)) > 0) hash.update(chunk.subarray(0, read));
+    while ((read = fs.readSync(fd, chunk, 0, chunk.length, null)) > 0)
+      hash.update(chunk.subarray(0, read));
   } finally {
     fs.closeSync(fd);
   }
@@ -64,14 +65,19 @@ function sha1OfFile(filePath: string): string {
 export function verifyZsync(zsyncPath: string, appImagePath: string, assetName: string): void {
   const headers = readZsyncHeaders(fs.readFileSync(zsyncPath));
   const problems: string[] = [];
-  if (headers.get("Filename") !== assetName) problems.push(`Filename is "${headers.get("Filename")}"`);
+  if (headers.get("Filename") !== assetName)
+    problems.push(`Filename is "${headers.get("Filename")}"`);
   if (headers.get("URL") !== assetName) problems.push(`URL is "${headers.get("URL")}"`);
   const size = fs.statSync(appImagePath).size;
-  if (headers.get("Length") !== String(size)) problems.push(`Length is ${headers.get("Length")}, AppImage is ${size} bytes`);
+  if (headers.get("Length") !== String(size))
+    problems.push(`Length is ${headers.get("Length")}, AppImage is ${size} bytes`);
   const sha1 = sha1OfFile(appImagePath);
-  if (headers.get("SHA-1")?.toLowerCase() !== sha1) problems.push(`SHA-1 is ${headers.get("SHA-1")}, AppImage is ${sha1}`);
+  if (headers.get("SHA-1")?.toLowerCase() !== sha1)
+    problems.push(`SHA-1 is ${headers.get("SHA-1")}, AppImage is ${sha1}`);
   if (problems.length) {
-    throw new Error(`${path.basename(zsyncPath)} doesn't match ${assetName}: ${problems.join("; ")}`);
+    throw new Error(
+      `${path.basename(zsyncPath)} doesn't match ${assetName}: ${problems.join("; ")}`,
+    );
   }
 }
 
@@ -88,7 +94,10 @@ const runZsyncmake: ZsyncmakeRunner = (args) => {
  * @returns The .zsync files written.
  * @throws If the directory holds no AppImage, or a generated .zsync doesn't verify.
  */
-export function generateAppImageZsyncs(directory: string, run: ZsyncmakeRunner = runZsyncmake): string[] {
+export function generateAppImageZsyncs(
+  directory: string,
+  run: ZsyncmakeRunner = runZsyncmake,
+): string[] {
   if (!fs.existsSync(directory)) throw new Error(`Directory not found: ${directory}`);
   const appImages = fs.readdirSync(directory).filter((f) => f.endsWith(".AppImage"));
   if (appImages.length === 0) throw new Error(`No .AppImage files found in ${directory}`);

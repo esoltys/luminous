@@ -10,7 +10,8 @@
 
   /** The playlist header's size-limit button and its popover. `deviceName`
    * names the limit's device while it's unplugged (`PlaylistSizeLimit`). */
-  let { playlist, deviceName = null }: { playlist: Playlist; deviceName?: string | null } = $props();
+  let { playlist, deviceName = null }: { playlist: Playlist; deviceName?: string | null } =
+    $props();
 
   let isOpen = $state(false);
   let anchorEl = $state<HTMLElement | null>(null);
@@ -21,10 +22,18 @@
   {#if playlist.size_limit_bytes}
     <Button onclick={() => (isOpen = !isOpen)} variant="accent-soft">
       <Usb class="w-4 h-4" />
-      <span>{i18n.t("playlists.sizeLimitSetBtn", { limit: formatStorageSize(playlist.size_limit_bytes) })}</span>
+      <span
+        >{i18n.t("playlists.sizeLimitSetBtn", {
+          limit: formatStorageSize(playlist.size_limit_bytes),
+        })}</span
+      >
     </Button>
   {:else}
-    <IconActionButton onclick={() => (isOpen = !isOpen)} title={i18n.t("playlists.sizeLimitBtn")} class="shrink-0">
+    <IconActionButton
+      onclick={() => (isOpen = !isOpen)}
+      title={i18n.t("playlists.sizeLimitBtn")}
+      class="shrink-0"
+    >
       {#snippet icon()}<Usb class="w-4 h-4" />{/snippet}
     </IconActionButton>
   {/if}

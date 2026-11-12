@@ -17,9 +17,7 @@
   let buttonEl: HTMLButtonElement | undefined = $state();
 
   // Tri-state: 1 = loved, 0 = neutral, -1 = hated
-  let lovedState = $derived(
-    loved !== undefined ? loved : (favorite ? 1 : 0)
-  );
+  let lovedState = $derived(loved !== undefined ? loved : favorite ? 1 : 0);
 
   // Only the moment the user actually favourites a song should pulse — triggered
   // directly on user click when favouriting.
@@ -70,7 +68,9 @@
       next = 1;
       justFavorited = true;
       burstRing();
-      setTimeout(() => { justFavorited = false; }, 320);
+      setTimeout(() => {
+        justFavorited = false;
+      }, 320);
     }
     emitChange(next);
   }
@@ -95,15 +95,15 @@
       ? 'text-brand-accent-text/80 hover:text-brand-text-primary'
       : 'text-brand-text-primary/60 hover:text-brand-accent-text'}"
   title={lovedState === 1
-    ? i18n.t('rating.unfavoriteTooltip', {}, 'Remove from favourites')
+    ? i18n.t("rating.unfavoriteTooltip", {}, "Remove from favourites")
     : lovedState === -1
-      ? i18n.t('rating.clearHateTooltip', {}, 'Clear dislike')
-      : i18n.t('rating.favoriteTooltip', {}, 'Add to favourites')}
+      ? i18n.t("rating.clearHateTooltip", {}, "Clear dislike")
+      : i18n.t("rating.favoriteTooltip", {}, "Add to favourites")}
   aria-label={lovedState === 1
-    ? i18n.t('rating.unfavoriteTooltip', {}, 'Remove from favourites')
+    ? i18n.t("rating.unfavoriteTooltip", {}, "Remove from favourites")
     : lovedState === -1
-      ? i18n.t('rating.clearHateTooltip', {}, 'Clear dislike')
-      : i18n.t('rating.favoriteTooltip', {}, 'Add to favourites')}
+      ? i18n.t("rating.clearHateTooltip", {}, "Clear dislike")
+      : i18n.t("rating.favoriteTooltip", {}, "Add to favourites")}
   aria-pressed={lovedState === 1}
 >
   {#if lovedState === -1}

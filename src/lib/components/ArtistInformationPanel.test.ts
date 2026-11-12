@@ -58,7 +58,7 @@ describe("ArtistInformationPanel", () => {
 
     // Check row order: Born, Died, City/Region, Country
     const labels = Array.from(
-      container.querySelectorAll(".flex.items-start.justify-between > span:first-child")
+      container.querySelectorAll(".flex.items-start.justify-between > span:first-child"),
     ).map((el) => el.textContent?.trim());
     expect(labels).toEqual(["Born", "Died", "City/Region", "Country"]);
 
@@ -95,7 +95,7 @@ describe("ArtistInformationPanel", () => {
 
     // Check row order: Formed, Disbanded, City/Region, Country
     const labels = Array.from(
-      container.querySelectorAll(".flex.items-start.justify-between > span:first-child")
+      container.querySelectorAll(".flex.items-start.justify-between > span:first-child"),
     ).map((el) => el.textContent?.trim());
     expect(labels).toEqual(["Formed", "Disbanded", "City/Region", "Country"]);
 

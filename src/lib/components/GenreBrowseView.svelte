@@ -1,10 +1,6 @@
 <script lang="ts">
   import ViewModeToggle from "./ViewModeToggle.svelte";
-  import {
-    TagIcon,
-    PlusIcon as Plus,
-    GitMergeIcon as GitMerge
-  } from "phosphor-svelte";
+  import { TagIcon, PlusIcon as Plus, GitMergeIcon as GitMerge } from "phosphor-svelte";
   import { onMount } from "svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -53,8 +49,12 @@
     }
     if (tagsToReparent.length > 0) {
       toastStore.show(
-        i18n.t("songTags.groupToast", { count: tagsToReparent.length, name: groupName }, `Grouped ${tagsToReparent.length} tags under "${groupName}"`),
-        "success"
+        i18n.t(
+          "songTags.groupToast",
+          { count: tagsToReparent.length, name: groupName },
+          `Grouped ${tagsToReparent.length} tags under "${groupName}"`,
+        ),
+        "success",
       );
     }
   }
@@ -66,11 +66,17 @@
   onMount(() => {
     let unlistenHierarchy: (() => void) | undefined;
     let unlistenArtistHierarchy: (() => void) | undefined;
-    tagsStore.listenForHierarchyChanges().then((fn) => { unlistenHierarchy = fn; });
-    tagsStore.listenForArtistHierarchyChanges().then((fn) => { unlistenArtistHierarchy = fn; });
+    tagsStore.listenForHierarchyChanges().then((fn) => {
+      unlistenHierarchy = fn;
+    });
+    tagsStore.listenForArtistHierarchyChanges().then((fn) => {
+      unlistenArtistHierarchy = fn;
+    });
     tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
     tagsStore.loadArtistTags().catch((e) => console.error("Failed to load artist tags:", e));
-    tagsStore.loadArtistHierarchy().catch((e) => console.error("Failed to load artist tag hierarchy:", e));
+    tagsStore
+      .loadArtistHierarchy()
+      .catch((e) => console.error("Failed to load artist tag hierarchy:", e));
     tagsStore.loadLanguages().catch((e) => console.error("Failed to load languages:", e));
     return () => {
       unlistenHierarchy?.();
@@ -110,105 +116,124 @@
 </script>
 
 <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-    <div class="sticky top-0 z-20 bg-brand-main pt-3">
-      <div class="h-10 flex items-center justify-between mb-2">
-        {#if totalArtistTagCount > 0}
-          <Button onclick={() => { showNewGroupDialog = true; }} variant="primary" title={i18n.t('songTags.newArtistGroup', {}, 'New Group')}>
-            <Plus class="w-4 h-4" />
-            <span>{i18n.t('songTags.newArtistGroup', {}, 'New Group')}</span>
-          </Button>
-        {:else}
-          <div></div>
-        {/if}
-        <div class="flex items-center gap-2">
-          <Button onclick={() => tagsStore.openAliasDialog()} variant="secondary" title={i18n.t('songTags.manageAliases', {}, 'Manage Aliases')}>
-            <GitMerge class="w-4 h-4" />
-            <span>{i18n.t('songTags.manageAliases', {}, 'Manage Aliases')}</span>
-          </Button>
-          <!-- Cards / rows toggle -->
-          <ViewModeToggle mode={prefs.genreCardsViewMode} onChange={(m) => prefs.setGenreCardsViewMode(m)} />
-          <!-- Sort dropdown -->
-          <div class="relative">
-            <Select
-              value={`${prefs.genreSortField}-${prefs.genreSortAsc}`}
-              onchange={(e) => {
-                const [field, asc] = e.currentTarget.value.split("-");
-                prefs.setGenreSortField(field as GenreSortField);
-                prefs.setGenreSortAsc(asc === "true");
-              }}
-              class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+  <div class="sticky top-0 z-20 bg-brand-main pt-3">
+    <div class="h-10 flex items-center justify-between mb-2">
+      {#if totalArtistTagCount > 0}
+        <Button
+          onclick={() => {
+            showNewGroupDialog = true;
+          }}
+          variant="primary"
+          title={i18n.t("songTags.newArtistGroup", {}, "New Group")}
+        >
+          <Plus class="w-4 h-4" />
+          <span>{i18n.t("songTags.newArtistGroup", {}, "New Group")}</span>
+        </Button>
+      {:else}
+        <div></div>
+      {/if}
+      <div class="flex items-center gap-2">
+        <Button
+          onclick={() => tagsStore.openAliasDialog()}
+          variant="secondary"
+          title={i18n.t("songTags.manageAliases", {}, "Manage Aliases")}
+        >
+          <GitMerge class="w-4 h-4" />
+          <span>{i18n.t("songTags.manageAliases", {}, "Manage Aliases")}</span>
+        </Button>
+        <!-- Cards / rows toggle -->
+        <ViewModeToggle
+          mode={prefs.genreCardsViewMode}
+          onChange={(m) => prefs.setGenreCardsViewMode(m)}
+        />
+        <!-- Sort dropdown -->
+        <div class="relative">
+          <Select
+            value={`${prefs.genreSortField}-${prefs.genreSortAsc}`}
+            onchange={(e) => {
+              const [field, asc] = e.currentTarget.value.split("-");
+              prefs.setGenreSortField(field as GenreSortField);
+              prefs.setGenreSortAsc(asc === "true");
+            }}
+            class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+          >
+            <option value="name-true">▲ {i18n.t("songTags.sortName", {}, "Name")}</option>
+            <option value="name-false">▼ {i18n.t("songTags.sortName", {}, "Name")}</option>
+            <option value="count-true"
+              >▲ {i18n.t("songTags.sortSongCount", {}, "Song Count")}</option
             >
-              <option value="name-true">▲ {i18n.t('songTags.sortName', {}, 'Name')}</option>
-              <option value="name-false">▼ {i18n.t('songTags.sortName', {}, 'Name')}</option>
-              <option value="count-true">▲ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
-              <option value="count-false">▼ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
-            </Select>
-          </div>
+            <option value="count-false"
+              >▼ {i18n.t("songTags.sortSongCount", {}, "Song Count")}</option
+            >
+          </Select>
         </div>
       </div>
     </div>
+  </div>
 
-    {#if totalArtistTagCount > 0}
-      <div class="mb-6">
-        <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
-          {i18n.t("songTags.artistTagsHeading", {}, "Artist Tags")}
-        </h2>
-        <ArtistTagCards
-          hierarchy={artistOnlyHierarchy}
-          onOpenTag={openArtistTag}
-          sortField={prefs.genreSortField}
-          sortAsc={prefs.genreSortAsc}
-          compact={prefs.genreCardsViewMode === "rows"}
-        />
-      </div>
-    {/if}
-
-    {#if tagsStore.languages.length > 0}
-      <div class="mb-6">
-        <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
-          {i18n.t("collection.languages", {}, "Languages")}
-        </h2>
-        <LanguageCards
-          onOpenLanguage={openLanguage}
-          sortField={prefs.genreSortField}
-          sortAsc={prefs.genreSortAsc}
-          compact={prefs.genreCardsViewMode === "rows"}
-        />
-      </div>
-    {/if}
-
-    {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0 && tagsStore.artistTags.length === 0 && tagsStore.languages.length === 0}
-      <div class="py-16">
-        <EmptyState
-          icon={TagIcon}
-          title={i18n.t("songTags.emptyTitle", {}, "No tags yet")}
-          subtitle={i18n.t(
-            "songTags.emptySubtitle",
-            {},
-            "Right-click a song and choose Edit Tags to give it a genre — the first value is its main category, the rest are subgenres."
-          )}
-        />
-      </div>
-    {:else}
-      <h2 class="text-xl font-semibold text-brand-text-primary mb-3">
-        {i18n.t("songTags.songTagsHeading", {}, "Song Tags")}
+  {#if totalArtistTagCount > 0}
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
+        {i18n.t("songTags.artistTagsHeading", {}, "Artist Tags")}
       </h2>
-      <GenreCards
-        onOpenMainTag={openMainTag}
-        onOpenGenreEdge={openGenreEdge}
+      <ArtistTagCards
+        hierarchy={artistOnlyHierarchy}
+        onOpenTag={openArtistTag}
         sortField={prefs.genreSortField}
         sortAsc={prefs.genreSortAsc}
         compact={prefs.genreCardsViewMode === "rows"}
-        noGenreCount={tagsStore.noGenreCount}
-        onOpenNoGenre={openNoGenre}
       />
-    {/if}
+    </div>
+  {/if}
+
+  {#if tagsStore.languages.length > 0}
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
+        {i18n.t("collection.languages", {}, "Languages")}
+      </h2>
+      <LanguageCards
+        onOpenLanguage={openLanguage}
+        sortField={prefs.genreSortField}
+        sortAsc={prefs.genreSortAsc}
+        compact={prefs.genreCardsViewMode === "rows"}
+      />
+    </div>
+  {/if}
+
+  {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0 && tagsStore.artistTags.length === 0 && tagsStore.languages.length === 0}
+    <div class="py-16">
+      <EmptyState
+        icon={TagIcon}
+        title={i18n.t("songTags.emptyTitle", {}, "No tags yet")}
+        subtitle={i18n.t(
+          "songTags.emptySubtitle",
+          {},
+          "Right-click a song and choose Edit Tags to give it a genre — the first value is its main category, the rest are subgenres.",
+        )}
+      />
+    </div>
+  {:else}
+    <h2 class="text-xl font-semibold text-brand-text-primary mb-3">
+      {i18n.t("songTags.songTagsHeading", {}, "Song Tags")}
+    </h2>
+    <GenreCards
+      onOpenMainTag={openMainTag}
+      onOpenGenreEdge={openGenreEdge}
+      sortField={prefs.genreSortField}
+      sortAsc={prefs.genreSortAsc}
+      compact={prefs.genreCardsViewMode === "rows"}
+      noGenreCount={tagsStore.noGenreCount}
+      onOpenNoGenre={openNoGenre}
+    />
+  {/if}
 </div>
 
 {#if showNewGroupDialog}
   <CreateArtistTagGroupDialog
     onConfirm={(name) => handleCreateGroup(name, [])}
-    onCancel={() => { showNewGroupDialog = false; }}
+    onCancel={() => {
+      showNewGroupDialog = false;
+    }}
   />
 {/if}
 

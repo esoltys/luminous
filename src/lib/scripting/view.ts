@@ -37,7 +37,9 @@ export function createViewController(wait: ScriptWaitApi): ScriptViewApi {
       // Remote callers pass plain strings, so the key is checked at run time as well.
       const key = column;
       if (!(key in collectionStore.visibleColumns)) {
-        throw new Error(`Unknown song-table column "${column}". Valid: ${Object.keys(collectionStore.visibleColumns).join(", ")}`);
+        throw new Error(
+          `Unknown song-table column "${column}". Valid: ${Object.keys(collectionStore.visibleColumns).join(", ")}`,
+        );
       }
       if (collectionStore.visibleColumns[key] !== visible) collectionStore.toggleColumn(key);
       await wait.settled();

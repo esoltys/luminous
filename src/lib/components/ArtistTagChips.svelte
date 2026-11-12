@@ -29,7 +29,7 @@
     <button
       type="button"
       onclick={(e) => goToTag(e, tags[0])}
-      title={i18n.t('artistProfileEditor.goToTagTooltip', { tag: tags[0] }, `Browse ${tags[0]}`)}
+      title={i18n.t("artistProfileEditor.goToTagTooltip", { tag: tags[0] }, `Browse ${tags[0]}`)}
       class="{chipClass} gap-1 min-w-0 max-w-full {className}"
     >
       <span class="truncate min-w-0">{tags[0]}</span>
@@ -43,7 +43,7 @@
         <button
           type="button"
           onclick={(e) => goToTag(e, tag)}
-          title={i18n.t('artistProfileEditor.goToTagTooltip', { tag }, `Browse ${tag}`)}
+          title={i18n.t("artistProfileEditor.goToTagTooltip", { tag }, `Browse ${tag}`)}
           class="{chipClass} max-w-64"
         >
           <span class="truncate">{tag}</span>

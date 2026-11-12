@@ -36,11 +36,7 @@
     onChanged?: () => void;
   }
 
-  let {
-    refreshKey = 0,
-    totalCurationCount = $bindable(0),
-    onChanged,
-  }: Props = $props();
+  let { refreshKey = 0, totalCurationCount = $bindable(0), onChanged }: Props = $props();
 
   let overview = $state<CurationOverview | null>(null);
   let isLoading = $state(false);
@@ -98,7 +94,7 @@
       (overview?.missing_core_tags_count ?? 0) +
       (overview?.duplicate_groups.length ?? 0) +
       (overview?.suspected_provenance_songs.length ?? 0) +
-      (overview?.corrupt_songs?.length ?? 0)
+      (overview?.corrupt_songs?.length ?? 0),
   );
 
   // Sync bindable totalCurationCount to parent OrganizeView
@@ -111,7 +107,7 @@
       ? showAllUnillustrated
         ? overview.unillustrated_albums
         : overview.unillustrated_albums.slice(0, INITIAL_VISIBLE_COUNT)
-      : []
+      : [],
   );
 
   let displayedIncomplete = $derived(
@@ -119,7 +115,7 @@
       ? showAllIncomplete
         ? overview.incomplete_albums
         : overview.incomplete_albums.slice(0, INITIAL_VISIBLE_COUNT)
-      : []
+      : [],
   );
 
   function toAlbumItem(album: CurationAlbumItem): AlbumItem {
@@ -170,7 +166,9 @@
               <h3 class="text-sm font-bold text-brand-text-primary">
                 {i18n.t("curation.shelfUnillustratedTitle")}
               </h3>
-              <span class="text-xs px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text font-semibold">
+              <span
+                class="text-xs px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text font-semibold"
+              >
                 {overview.unillustrated_albums.length}
               </span>
             </div>
@@ -182,10 +180,7 @@
 
         <div class="grid grid-cols-1 @3xl:grid-cols-2 gap-3">
           {#each displayedUnillustrated as album (album.album_key)}
-            <AlbumRowCard
-              album={toAlbumItem(album)}
-              onclick={() => openAlbumEditor(album)}
-            >
+            <AlbumRowCard album={toAlbumItem(album)} onclick={() => openAlbumEditor(album)}>
               {#snippet suffix()}
                 <Button
                   variant="secondary"
@@ -207,11 +202,15 @@
             <Button
               variant="secondary"
               size="sm"
-              onclick={() => { showAllUnillustrated = !showAllUnillustrated; }}
+              onclick={() => {
+                showAllUnillustrated = !showAllUnillustrated;
+              }}
             >
               {showAllUnillustrated
                 ? i18n.t("curation.showLess")
-                : i18n.t("curation.showAllWithCount", { count: overview.unillustrated_albums.length })}
+                : i18n.t("curation.showAllWithCount", {
+                    count: overview.unillustrated_albums.length,
+                  })}
             </Button>
           </div>
         {/if}
@@ -230,7 +229,9 @@
               <h3 class="text-sm font-bold text-brand-text-primary">
                 {i18n.t("curation.shelfIncompleteTitle")}
               </h3>
-              <span class="text-xs px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text font-semibold">
+              <span
+                class="text-xs px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text font-semibold"
+              >
                 {overview.incomplete_albums.length}
               </span>
             </div>
@@ -249,12 +250,22 @@
               {#snippet suffix()}
                 <div class="flex items-center gap-2 flex-wrap justify-end">
                   {#if album.unnumbered_count > 0}
-                    <span class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap">
-                      {i18n.plural("curation.unnumberedTracksBadge", album.unnumbered_count, { count: album.unnumbered_count })}
+                    <span
+                      class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap"
+                    >
+                      {i18n.plural("curation.unnumberedTracksBadge", album.unnumbered_count, {
+                        count: album.unnumbered_count,
+                      })}
                     </span>
                   {:else if album.duplicate_track_number_count > 0}
-                    <span class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap">
-                      {i18n.plural("curation.duplicateTrackNumbersBadge", album.duplicate_track_number_count, { count: album.duplicate_track_number_count })}
+                    <span
+                      class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap"
+                    >
+                      {i18n.plural(
+                        "curation.duplicateTrackNumbersBadge",
+                        album.duplicate_track_number_count,
+                        { count: album.duplicate_track_number_count },
+                      )}
                     </span>
                   {/if}
 
@@ -282,7 +293,9 @@
             <Button
               variant="secondary"
               size="sm"
-              onclick={() => { showAllIncomplete = !showAllIncomplete; }}
+              onclick={() => {
+                showAllIncomplete = !showAllIncomplete;
+              }}
             >
               {showAllIncomplete
                 ? i18n.t("curation.showLess")
@@ -301,7 +314,9 @@
       >
         <div class="min-w-0 flex-1">
           <h3 class="text-sm font-bold text-brand-text-primary">
-            {i18n.plural("curation.shelfMissingCoreTitle", overview.missing_core_tags_count, { count: overview.missing_core_tags_count })}
+            {i18n.plural("curation.shelfMissingCoreTitle", overview.missing_core_tags_count, {
+              count: overview.missing_core_tags_count,
+            })}
           </h3>
           <p class="text-xs text-brand-text-secondary mt-0.5">
             {i18n.t("curation.shelfMissingCoreHint")}
@@ -325,7 +340,9 @@
       >
         <div class="min-w-0 flex-1">
           <h3 class="text-sm font-bold text-brand-text-primary">
-            {i18n.plural("curation.shelfDuplicatesTitle", overview.duplicate_groups.length, { count: overview.duplicate_groups.length })}
+            {i18n.plural("curation.shelfDuplicatesTitle", overview.duplicate_groups.length, {
+              count: overview.duplicate_groups.length,
+            })}
           </h3>
           <p class="text-xs text-brand-text-secondary mt-0.5">
             {i18n.t("curation.shelfDuplicatesHint")}
@@ -334,7 +351,9 @@
         <Button
           variant="secondary"
           size="sm"
-          onclick={() => { showDuplicateModal = true; }}
+          onclick={() => {
+            showDuplicateModal = true;
+          }}
         >
           {i18n.t("curation.reviewDuplicatesBtn")}
         </Button>
@@ -353,7 +372,9 @@
               <h3 class="text-sm font-bold text-brand-text-primary">
                 {i18n.t("curation.shelfProvenanceTitle")}
               </h3>
-              <span class="text-xs px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text font-semibold">
+              <span
+                class="text-xs px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text font-semibold"
+              >
                 {overview.suspected_provenance_songs.length}
               </span>
             </div>
@@ -371,7 +392,9 @@
                   <span class="text-sm font-medium text-brand-text-primary truncate">
                     {song.title || i18n.t("collection.unknownTitle")}
                   </span>
-                  <span class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap">
+                  <span
+                    class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap"
+                  >
                     {song.provenance || i18n.t("curation.shelfProvenanceBadge")}
                   </span>
                 </div>
@@ -379,11 +402,7 @@
                   {song.artist || i18n.t("collection.unknownArtist")}
                 </p>
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onclick={() => locateInFiles(song.id)}
-              >
+              <Button variant="secondary" size="sm" onclick={() => locateInFiles(song.id)}>
                 <Folder class="w-3.5 h-3.5" />
                 <span>{i18n.t("curation.viewInFiles")}</span>
               </Button>
@@ -405,7 +424,9 @@
               <h3 class="text-sm font-bold text-brand-text-primary">
                 {i18n.t("curation.shelfCorruptTitle")}
               </h3>
-              <span class="text-xs px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text font-semibold">
+              <span
+                class="text-xs px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text font-semibold"
+              >
                 {overview.corrupt_songs.length}
               </span>
             </div>
@@ -423,7 +444,9 @@
                   <span class="text-sm font-medium text-brand-text-primary truncate">
                     {song.title || i18n.t("collection.unknownTitle")}
                   </span>
-                  <span class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-text-primary/10 text-brand-text-primary font-medium whitespace-nowrap">
+                  <span
+                    class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-text-primary/10 text-brand-text-primary font-medium whitespace-nowrap"
+                  >
                     {song.error_detail}
                   </span>
                 </div>
@@ -431,11 +454,7 @@
                   {song.artist || i18n.t("collection.unknownArtist")}
                 </p>
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onclick={() => locateInFiles(song.id)}
-              >
+              <Button variant="secondary" size="sm" onclick={() => locateInFiles(song.id)}>
                 <Folder class="w-3.5 h-3.5" />
                 <span>{i18n.t("curation.viewInFiles")}</span>
               </Button>
@@ -456,7 +475,9 @@
     hasEmbeddedArt={editingAlbum.art_embedded}
     initialArtAutomatic={editingAlbum.art_automatic}
     initialArtManual={editingAlbum.art_manual}
-    onClose={() => { editingAlbum = null; }}
+    onClose={() => {
+      editingAlbum = null;
+    }}
     onSaved={() => {
       editingAlbum = null;
       fetchOverview();
@@ -468,7 +489,9 @@
 {#if showDuplicateModal && overview?.duplicate_groups}
   <DuplicateReviewModal
     groups={overview.duplicate_groups}
-    onClose={() => { showDuplicateModal = false; }}
+    onClose={() => {
+      showDuplicateModal = false;
+    }}
     onResolved={() => {
       showDuplicateModal = false;
       fetchOverview();

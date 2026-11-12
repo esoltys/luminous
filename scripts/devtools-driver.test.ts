@@ -49,28 +49,28 @@ describe("devtools-driver", () => {
                   JSON.stringify({
                     id: msg.id,
                     result: { result: { type: "boolean", value: true } },
-                  })
+                  }),
                 );
               } else if (msg.params.expression === "globalThis") {
                 ws.send(
                   JSON.stringify({
                     id: msg.id,
                     result: { result: { objectId: "global-obj-1" } },
-                  })
+                  }),
                 );
               } else if (msg.params.expression === "1 + 1") {
                 ws.send(
                   JSON.stringify({
                     id: msg.id,
                     result: { result: { type: "number", value: 2 } },
-                  })
+                  }),
                 );
               } else {
                 ws.send(
                   JSON.stringify({
                     id: msg.id,
                     result: { result: { type: "string", value: "ok" } },
-                  })
+                  }),
                 );
               }
             } else if (msg.method === "Runtime.callFunctionOn") {
@@ -79,8 +79,10 @@ describe("devtools-driver", () => {
                 ws.send(
                   JSON.stringify({
                     id: msg.id,
-                    result: { result: { value: { event: eventName, payload: { track: "Midnight City" } } } },
-                  })
+                    result: {
+                      result: { value: { event: eventName, payload: { track: "Midnight City" } } },
+                    },
+                  }),
                 );
               } else if (msg.params.functionDeclaration?.includes("invoke")) {
                 const cmd = msg.params.arguments?.[0]?.value;
@@ -88,17 +90,16 @@ describe("devtools-driver", () => {
                   JSON.stringify({
                     id: msg.id,
                     result: { result: { value: { status: "invoked", cmd } } },
-                  })
+                  }),
                 );
               } else {
                 const sum =
-                  (msg.params.arguments?.[0]?.value ?? 0) +
-                  (msg.params.arguments?.[1]?.value ?? 0);
+                  (msg.params.arguments?.[0]?.value ?? 0) + (msg.params.arguments?.[1]?.value ?? 0);
                 ws.send(
                   JSON.stringify({
                     id: msg.id,
                     result: { result: { value: sum } },
-                  })
+                  }),
                 );
               }
             } else if (msg.method === "Page.captureScreenshot") {
@@ -109,7 +110,7 @@ describe("devtools-driver", () => {
                 JSON.stringify({
                   id: msg.id,
                   result: { data: pngBase64 },
-                })
+                }),
               );
             } else if (msg.method === "Emulation.setDeviceMetricsOverride") {
               ws.send(JSON.stringify({ id: msg.id, result: {} }));
@@ -193,23 +194,28 @@ describe("devtools-driver", () => {
           (m) =>
             m.method === "Emulation.setDeviceMetricsOverride" &&
             m.params.width === 1920 &&
-            m.params.height === 1080
-        )
+            m.params.height === 1080,
+        ),
       ).toBe(true);
 
       // Closing should automatically clear device metrics
       await driver.close();
 
-      expect(
-        receivedMethods.some((m) => m.method === "Emulation.clearDeviceMetricsOverride")
-      ).toBe(true);
+      expect(receivedMethods.some((m) => m.method === "Emulation.clearDeviceMetricsOverride")).toBe(
+        true,
+      );
     });
 
     it("waits for Tauri events", async () => {
       const driver = await DevtoolsDriver.connect({ port: serverPort, timeoutMs: 5000 });
       try {
-        const payload = await driver.waitForEvent<{ track: string }>("track-changed", { timeoutMs: 2000 });
-        expect(payload).toEqual({ event: "track-changed", payload: { track: "Midnight City" } } as any);
+        const payload = await driver.waitForEvent<{ track: string }>("track-changed", {
+          timeoutMs: 2000,
+        });
+        expect(payload).toEqual({
+          event: "track-changed",
+          payload: { track: "Midnight City" },
+        } as any);
       } finally {
         await driver.close();
       }
@@ -231,9 +237,9 @@ describe("devtools-driver", () => {
         await using driver = await DevtoolsDriver.connect({ port: serverPort, timeoutMs: 5000 });
         await driver.setWindowSize(800, 600);
       }
-      expect(
-        receivedMethods.some((m) => m.method === "Emulation.clearDeviceMetricsOverride")
-      ).toBe(true);
+      expect(receivedMethods.some((m) => m.method === "Emulation.clearDeviceMetricsOverride")).toBe(
+        true,
+      );
     });
 
     it("reloads page and awaits readiness", async () => {

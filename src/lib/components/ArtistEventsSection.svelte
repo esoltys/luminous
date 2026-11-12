@@ -84,19 +84,17 @@
         if (a.begin_date) return -1;
         if (b.begin_date) return 1;
         return a.name.localeCompare(b.name);
-      })
+      }),
   );
 
   let totalPages = $derived(Math.ceil(upcomingEvents.length / pageSize));
-  let pagedUpcomingEvents = $derived(
-    upcomingEvents.slice(page * pageSize, (page + 1) * pageSize)
-  );
+  let pagedUpcomingEvents = $derived(upcomingEvents.slice(page * pageSize, (page + 1) * pageSize));
 
   let pastEvents = $derived(
     events
       .filter((e) => e.begin_date && e.begin_date < todayStr)
       .slice()
-      .sort((a, b) => (b.begin_date ?? "").localeCompare(a.begin_date ?? ""))
+      .sort((a, b) => (b.begin_date ?? "").localeCompare(a.begin_date ?? "")),
   );
 
   function parseDateParts(dateStr?: string | null) {
@@ -114,7 +112,10 @@
         month = new Intl.DateTimeFormat(i18n.currentLocale, {
           month: "short",
           timeZone: "UTC",
-        }).format(d).toUpperCase().replace(/\.$/, "");
+        })
+          .format(d)
+          .toUpperCase()
+          .replace(/\.$/, "");
       }
     }
 
@@ -129,15 +130,15 @@
   }
 
   let effectiveSongkickUrl = $derived(
-    songkickUrl || `https://www.songkick.com/search?query=${encodeURIComponent(artistName)}`
+    songkickUrl || `https://www.songkick.com/search?query=${encodeURIComponent(artistName)}`,
   );
 
   let effectiveBandsintownUrl = $derived(
-    bandsintownUrl || `https://www.bandsintown.com/a/${encodeURIComponent(artistName)}`
+    bandsintownUrl || `https://www.bandsintown.com/a/${encodeURIComponent(artistName)}`,
   );
 
   let effectiveSetlistfmUrl = $derived(
-    setlistfmUrl || `https://www.setlist.fm/search?query=${encodeURIComponent(artistName)}`
+    setlistfmUrl || `https://www.setlist.fm/search?query=${encodeURIComponent(artistName)}`,
   );
 </script>
 
@@ -155,8 +156,13 @@
         title={musicbrainzUrl}
       >
         <Ticket class="w-3.5 h-3.5 text-brand-accent shrink-0" />
-        <span class="underline decoration-brand-text-secondary/40 group-hover/mb:decoration-brand-accent">{i18n.t("artistEvents.panelTitle", {}, "Upcoming Concerts & Events")}</span>
-        <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/mb:opacity-100 transition-opacity shrink-0" />
+        <span
+          class="underline decoration-brand-text-secondary/40 group-hover/mb:decoration-brand-accent"
+          >{i18n.t("artistEvents.panelTitle", {}, "Upcoming Concerts & Events")}</span
+        >
+        <ExternalLink
+          class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/mb:opacity-100 transition-opacity shrink-0"
+        />
       </button>
     {:else}
       <div class="flex items-center gap-2 min-w-0">
@@ -192,136 +198,150 @@
               class="col-start-1 row-start-1 space-y-2 w-full"
             >
               {#each pagedUpcomingEvents as event (event.id)}
-            {@const { month, day, year } = parseDateParts(event.begin_date)}
-            {@const primaryTicketUrl = event.ticket_urls?.[0]}
-            {@const primaryEventUrl = event.event_urls?.[0]}
-            <div
-              class="flex items-start justify-between gap-3 p-2.5 rounded-lg border border-brand-border/50 bg-brand-main/40 hover:bg-brand-main/70 transition-colors"
-            >
-              <!-- Date Badge -->
-              <div
-                class="flex flex-col items-center justify-center shrink-0 w-11 h-12 rounded bg-brand-sidebar border border-brand-border text-center select-none"
-              >
-                {#if !month && !day && !year}
-                  <Calendar class="w-4 h-4 text-brand-accent mb-0.5" />
-                  <span class="text-[9px] font-bold text-brand-text-secondary uppercase tracking-wider leading-none">
-                    {i18n.t("artistEvents.dateTba", {}, "TBA")}
-                  </span>
-                {:else if !month && !day && year}
-                  <Calendar class="w-3.5 h-3.5 text-brand-accent mb-0.5" />
-                  <span class="text-[10px] font-bold text-brand-text-primary leading-none">
-                    {year}
-                  </span>
-                {:else}
-                  {#if month}
-                    <span class="text-[9px] font-bold tracking-wider text-brand-accent uppercase leading-none mt-1">
-                      {month}
-                    </span>
-                  {/if}
-                  {#if day}
-                    <span class="text-sm font-extrabold text-brand-text-primary leading-tight">
-                      {day}
-                    </span>
-                  {:else if year}
-                    <span class="text-[10px] font-semibold text-brand-text-secondary leading-tight">
-                      {year}
-                    </span>
-                  {/if}
-                  {#if day && year}
-                    <span class="text-[8px] font-medium text-brand-text-secondary leading-none mb-0.5">
-                      {year}
-                    </span>
-                  {/if}
-                {/if}
-              </div>
+                {@const { month, day, year } = parseDateParts(event.begin_date)}
+                {@const primaryTicketUrl = event.ticket_urls?.[0]}
+                {@const primaryEventUrl = event.event_urls?.[0]}
+                <div
+                  class="flex items-start justify-between gap-3 p-2.5 rounded-lg border border-brand-border/50 bg-brand-main/40 hover:bg-brand-main/70 transition-colors"
+                >
+                  <!-- Date Badge -->
+                  <div
+                    class="flex flex-col items-center justify-center shrink-0 w-11 h-12 rounded bg-brand-sidebar border border-brand-border text-center select-none"
+                  >
+                    {#if !month && !day && !year}
+                      <Calendar class="w-4 h-4 text-brand-accent mb-0.5" />
+                      <span
+                        class="text-[9px] font-bold text-brand-text-secondary uppercase tracking-wider leading-none"
+                      >
+                        {i18n.t("artistEvents.dateTba", {}, "TBA")}
+                      </span>
+                    {:else if !month && !day && year}
+                      <Calendar class="w-3.5 h-3.5 text-brand-accent mb-0.5" />
+                      <span class="text-[10px] font-bold text-brand-text-primary leading-none">
+                        {year}
+                      </span>
+                    {:else}
+                      {#if month}
+                        <span
+                          class="text-[9px] font-bold tracking-wider text-brand-accent uppercase leading-none mt-1"
+                        >
+                          {month}
+                        </span>
+                      {/if}
+                      {#if day}
+                        <span class="text-sm font-extrabold text-brand-text-primary leading-tight">
+                          {day}
+                        </span>
+                      {:else if year}
+                        <span
+                          class="text-[10px] font-semibold text-brand-text-secondary leading-tight"
+                        >
+                          {year}
+                        </span>
+                      {/if}
+                      {#if day && year}
+                        <span
+                          class="text-[8px] font-medium text-brand-text-secondary leading-none mb-0.5"
+                        >
+                          {year}
+                        </span>
+                      {/if}
+                    {/if}
+                  </div>
 
-              <!-- Event Details -->
-              <div class="flex-1 min-w-0 flex flex-col gap-1">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="font-medium text-brand-text-primary text-xs leading-snug">
-                    {event.name}
-                  </span>
-                  {#if event.disambiguation}
-                    <span class="text-[10px] text-brand-text-secondary/70">
-                      ({event.disambiguation})
-                    </span>
-                  {/if}
-                  {#if event.event_type}
-                    <span
-                      class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-sidebar border border-brand-border text-brand-text-primary uppercase tracking-wider select-none"
-                    >
-                      {event.event_type}
-                    </span>
-                  {/if}
-                  {#if event.cancelled}
-                    <span
-                      class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-text-primary/10 border border-dashed border-brand-border text-brand-text-primary uppercase tracking-wider select-none"
-                    >
-                      {i18n.t("artistEvents.cancelled", {}, "Cancelled")}
-                    </span>
-                  {/if}
+                  <!-- Event Details -->
+                  <div class="flex-1 min-w-0 flex flex-col gap-1">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span class="font-medium text-brand-text-primary text-xs leading-snug">
+                        {event.name}
+                      </span>
+                      {#if event.disambiguation}
+                        <span class="text-[10px] text-brand-text-secondary/70">
+                          ({event.disambiguation})
+                        </span>
+                      {/if}
+                      {#if event.event_type}
+                        <span
+                          class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-sidebar border border-brand-border text-brand-text-primary uppercase tracking-wider select-none"
+                        >
+                          {event.event_type}
+                        </span>
+                      {/if}
+                      {#if event.cancelled}
+                        <span
+                          class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-text-primary/10 border border-dashed border-brand-border text-brand-text-primary uppercase tracking-wider select-none"
+                        >
+                          {i18n.t("artistEvents.cancelled", {}, "Cancelled")}
+                        </span>
+                      {/if}
+                    </div>
+
+                    <!-- Venue & Location -->
+                    {#if event.venue_name || event.venue_city || event.venue_country}
+                      <div
+                        class="flex items-center gap-1 text-[11px] text-brand-text-secondary truncate"
+                      >
+                        <MapPin class="w-3 h-3 text-brand-text-secondary/70 shrink-0" />
+                        <span class="truncate">
+                          {#if event.venue_name}
+                            <span class="font-medium text-brand-text-secondary"
+                              >{event.venue_name}</span
+                            >
+                          {/if}
+                          {#if event.venue_name && (event.venue_city || event.venue_country)}
+                            <span class="mx-1">•</span>
+                          {/if}
+                          {#if event.venue_city && event.venue_country}
+                            <span>{event.venue_city}, {event.venue_country}</span>
+                          {:else}
+                            <span>{event.venue_city || event.venue_country || ""}</span>
+                          {/if}
+                        </span>
+                      </div>
+                    {/if}
+
+                    {#if event.time}
+                      <div class="flex items-center gap-1 text-[10px] text-brand-text-secondary/70">
+                        <Clock class="w-2.5 h-2.5 shrink-0" />
+                        <span>{event.time}</span>
+                      </div>
+                    {/if}
+                  </div>
+
+                  <!-- Action button (Tickets or Event Link) -->
+                  <div class="shrink-0 flex items-center self-center">
+                    {#if primaryTicketUrl}
+                      <button
+                        type="button"
+                        onclick={() => onOpenUrl?.(primaryTicketUrl)}
+                        class="px-2.5 py-1 rounded bg-brand-accent/15 text-brand-accent hover:bg-brand-accent hover:text-white text-[11px] font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        title={primaryTicketUrl}
+                      >
+                        <Ticket class="w-3 h-3" />
+                        <span>{i18n.t("artistEvents.viewTickets", {}, "Tickets")}</span>
+                      </button>
+                    {:else if primaryEventUrl}
+                      <button
+                        type="button"
+                        onclick={() => onOpenUrl?.(primaryEventUrl)}
+                        class="px-2.5 py-1 rounded border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-[11px] font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        title={primaryEventUrl}
+                      >
+                        <ExternalLink class="w-3 h-3" />
+                        <span>{i18n.t("artistEvents.viewDetails", {}, "Details")}</span>
+                      </button>
+                    {/if}
+                  </div>
                 </div>
-
-                <!-- Venue & Location -->
-                {#if event.venue_name || event.venue_city || event.venue_country}
-                  <div class="flex items-center gap-1 text-[11px] text-brand-text-secondary truncate">
-                    <MapPin class="w-3 h-3 text-brand-text-secondary/70 shrink-0" />
-                    <span class="truncate">
-                      {#if event.venue_name}
-                        <span class="font-medium text-brand-text-secondary">{event.venue_name}</span>
-                      {/if}
-                      {#if event.venue_name && (event.venue_city || event.venue_country)}
-                        <span class="mx-1">•</span>
-                      {/if}
-                      {#if event.venue_city && event.venue_country}
-                        <span>{event.venue_city}, {event.venue_country}</span>
-                      {:else}
-                        <span>{event.venue_city || event.venue_country || ""}</span>
-                      {/if}
-                    </span>
-                  </div>
-                {/if}
-
-                {#if event.time}
-                  <div class="flex items-center gap-1 text-[10px] text-brand-text-secondary/70">
-                    <Clock class="w-2.5 h-2.5 shrink-0" />
-                    <span>{event.time}</span>
-                  </div>
-                {/if}
-              </div>
-
-              <!-- Action button (Tickets or Event Link) -->
-              <div class="shrink-0 flex items-center self-center">
-                {#if primaryTicketUrl}
-                  <button
-                    type="button"
-                    onclick={() => onOpenUrl?.(primaryTicketUrl)}
-                    class="px-2.5 py-1 rounded bg-brand-accent/15 text-brand-accent hover:bg-brand-accent hover:text-white text-[11px] font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
-                    title={primaryTicketUrl}
-                  >
-                    <Ticket class="w-3 h-3" />
-                    <span>{i18n.t("artistEvents.viewTickets", {}, "Tickets")}</span>
-                  </button>
-                {:else if primaryEventUrl}
-                  <button
-                    type="button"
-                    onclick={() => onOpenUrl?.(primaryEventUrl)}
-                    class="px-2.5 py-1 rounded border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-[11px] font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
-                    title={primaryEventUrl}
-                  >
-                    <ExternalLink class="w-3 h-3" />
-                    <span>{i18n.t("artistEvents.viewDetails", {}, "Details")}</span>
-                  </button>
-                {/if}
-              </div>
-            </div>
-          {/each}
+              {/each}
             </div>
           {/key}
         </div>
 
         {#if totalPages > 1}
-          <div class="flex items-center justify-between text-[11px] text-brand-text-secondary/70 pt-1 px-0.5 select-none">
+          <div
+            class="flex items-center justify-between text-[11px] text-brand-text-secondary/70 pt-1 px-0.5 select-none"
+          >
             <span>
               {i18n.t("artistEvents.pagination", {
                 start: page * pageSize + 1,
@@ -369,7 +389,11 @@
             <span>
               {showPast
                 ? i18n.t("artistEvents.hidePastEvents", {}, "Hide past events")
-                : i18n.t("artistEvents.showPastEvents", { count: pastEvents.length }, `Show past events (${pastEvents.length})`)}
+                : i18n.t(
+                    "artistEvents.showPastEvents",
+                    { count: pastEvents.length },
+                    `Show past events (${pastEvents.length})`,
+                  )}
             </span>
           </button>
 
@@ -412,7 +436,9 @@
       {/if}
 
       <!-- Quick Platform Links -->
-      <div class="pt-2 border-t border-brand-border/30 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+      <div
+        class="pt-2 border-t border-brand-border/30 flex flex-wrap items-center justify-between gap-2 text-[11px]"
+      >
         <span class="text-brand-text-secondary/60">
           {i18n.t("artistEvents.otherPlatforms", {}, "Find tickets and tour dates on:")}
         </span>

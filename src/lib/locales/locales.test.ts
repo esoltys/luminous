@@ -9,7 +9,17 @@ import { frFR } from "./fr-FR";
 import { it as itMessages } from "./it";
 import { ru } from "./ru";
 import { uk } from "./uk";
-import { BASE_LOCALE, LOCALES, MANUAL_LANGUAGES, catalogChain, isLocale, legacyLanguageToLocale, localeLabel, localePickerGroups, manualLanguageForLocale } from "./index";
+import {
+  BASE_LOCALE,
+  LOCALES,
+  MANUAL_LANGUAGES,
+  catalogChain,
+  isLocale,
+  legacyLanguageToLocale,
+  localeLabel,
+  localePickerGroups,
+  manualLanguageForLocale,
+} from "./index";
 
 const PLURAL_CATEGORIES = new Set(["zero", "one", "two", "few", "many", "other"]);
 
@@ -42,12 +52,16 @@ function flatten(obj: Record<string, any>, prefix = ""): Record<string, string> 
 }
 
 /** Dotted path -> category -> text for every plural object in a catalog. */
-function collectPlurals(obj: Record<string, any>, prefix = ""): Record<string, Record<string, string>> {
+function collectPlurals(
+  obj: Record<string, any>,
+  prefix = "",
+): Record<string, Record<string, string>> {
   const result: Record<string, Record<string, string>> = {};
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key;
     if (isPluralObject(value)) result[fullKey] = value;
-    else if (value !== null && typeof value === "object" && !Array.isArray(value)) Object.assign(result, collectPlurals(value, fullKey));
+    else if (value !== null && typeof value === "object" && !Array.isArray(value))
+      Object.assign(result, collectPlurals(value, fullKey));
   }
   return result;
 }
@@ -592,79 +606,91 @@ const CATALOGS = [
   { name: "German", tag: "de", file: "de.ts", messages: de, identicalOk: IDENTICAL_OK_DE },
   { name: "Spanish", tag: "es", file: "es.ts", messages: es, identicalOk: IDENTICAL_OK_ES },
   { name: "French", tag: "fr-CA", file: "fr.ts", messages: fr, identicalOk: IDENTICAL_OK_FR },
-  { name: "French (France)", tag: "fr", file: "fr-FR.ts", messages: frFR, identicalOk: IDENTICAL_OK_FR },
+  {
+    name: "French (France)",
+    tag: "fr",
+    file: "fr-FR.ts",
+    messages: frFR,
+    identicalOk: IDENTICAL_OK_FR,
+  },
   { name: "Italian", tag: "it", file: "it.ts", messages: itMessages, identicalOk: IDENTICAL_OK_IT },
   { name: "Ukrainian", tag: "uk", file: "uk.ts", messages: uk, identicalOk: IDENTICAL_OK_UK },
   { name: "Russian", tag: "ru", file: "ru.ts", messages: ru, identicalOk: IDENTICAL_OK_RU },
 ];
 
-describe.each(CATALOGS)("Locale translation completeness and integrity: $name", ({ name, tag, file, messages, identicalOk }) => {
-  const flatEn = flatten(en);
-  const flatLoc = flatten(messages);
+describe.each(CATALOGS)(
+  "Locale translation completeness and integrity: $name",
+  ({ name, tag, file, messages, identicalOk }) => {
+    const flatEn = flatten(en);
+    const flatLoc = flatten(messages);
 
-  it(`every key in en.ts has a corresponding translation in ${file}`, () => {
-    const missing = Object.keys(flatEn).filter((key) => !(key in flatLoc));
-    expect(
-      missing,
-      `Missing ${name} translations in src/lib/locales/${file} for the following keys:\n${missing.map((k) => `  - ${k}`).join("\n")}`
-    ).toEqual([]);
-  });
-
-  it(`${file} contains no stale keys that do not exist in en.ts`, () => {
-    const stale = Object.keys(flatLoc).filter((key) => !(key in flatEn));
-    expect(
-      stale,
-      `Stale keys found in src/lib/locales/${file} that no longer exist in en.ts:\n${stale.map((k) => `  - ${k}`).join("\n")}`
-    ).toEqual([]);
-  });
-
-  it(`${file} values differ from en.ts unless explicitly allowlisted`, () => {
-    const untranslated = Object.keys(flatEn).filter((key) => {
-      return key in flatLoc && flatEn[key] === flatLoc[key] && !identicalOk.has(key);
+    it(`every key in en.ts has a corresponding translation in ${file}`, () => {
+      const missing = Object.keys(flatEn).filter((key) => !(key in flatLoc));
+      expect(
+        missing,
+        `Missing ${name} translations in src/lib/locales/${file} for the following keys:\n${missing.map((k) => `  - ${k}`).join("\n")}`,
+      ).toEqual([]);
     });
 
-    expect(
-      untranslated,
-      `The following ${name} translations are identical to English. If this is legitimately the same word in ${name} (or a symbol/brand name), add the key to that locale's identical-text allowlist in src/lib/locales/locales.test.ts:\n${untranslated
-        .map((k) => `  - ${k}: "${flatEn[k]}"`)
-        .join("\n")}`
-    ).toEqual([]);
-  });
-
-  it("every allowlisted key is still identical and exists in en.ts", () => {
-    const unneeded = [...identicalOk].filter((key) => {
-      return !(key in flatEn) || !(key in flatLoc) || flatEn[key] !== flatLoc[key];
+    it(`${file} contains no stale keys that do not exist in en.ts`, () => {
+      const stale = Object.keys(flatLoc).filter((key) => !(key in flatEn));
+      expect(
+        stale,
+        `Stale keys found in src/lib/locales/${file} that no longer exist in en.ts:\n${stale.map((k) => `  - ${k}`).join("\n")}`,
+      ).toEqual([]);
     });
 
-    expect(
-      unneeded,
-      `The following ${name} allowlist keys no longer match or no longer exist; remove them from the allowlist in src/lib/locales/locales.test.ts:\n${unneeded
-        .map((k) => `  - ${k}`)
-        .join("\n")}`
-    ).toEqual([]);
-  });
+    it(`${file} values differ from en.ts unless explicitly allowlisted`, () => {
+      const untranslated = Object.keys(flatEn).filter((key) => {
+        return key in flatLoc && flatEn[key] === flatLoc[key] && !identicalOk.has(key);
+      });
 
-  it(`interpolation placeholder tokens match between en.ts and ${file}`, () => {
-    const mismatches: { key: string; enTokens: string[]; locTokens: string[] }[] = [];
+      expect(
+        untranslated,
+        `The following ${name} translations are identical to English. If this is legitimately the same word in ${name} (or a symbol/brand name), add the key to that locale's identical-text allowlist in src/lib/locales/locales.test.ts:\n${untranslated
+          .map((k) => `  - ${k}: "${flatEn[k]}"`)
+          .join("\n")}`,
+      ).toEqual([]);
+    });
 
-    for (const key of Object.keys(flatEn)) {
-      if (key in flatLoc) {
-        const enTokens = extractPlaceholders(flatEn[key]);
-        const locTokens = extractPlaceholders(flatLoc[key]);
-        if (enTokens.join(",") !== locTokens.join(",")) {
-          mismatches.push({ key, enTokens, locTokens });
+    it("every allowlisted key is still identical and exists in en.ts", () => {
+      const unneeded = [...identicalOk].filter((key) => {
+        return !(key in flatEn) || !(key in flatLoc) || flatEn[key] !== flatLoc[key];
+      });
+
+      expect(
+        unneeded,
+        `The following ${name} allowlist keys no longer match or no longer exist; remove them from the allowlist in src/lib/locales/locales.test.ts:\n${unneeded
+          .map((k) => `  - ${k}`)
+          .join("\n")}`,
+      ).toEqual([]);
+    });
+
+    it(`interpolation placeholder tokens match between en.ts and ${file}`, () => {
+      const mismatches: { key: string; enTokens: string[]; locTokens: string[] }[] = [];
+
+      for (const key of Object.keys(flatEn)) {
+        if (key in flatLoc) {
+          const enTokens = extractPlaceholders(flatEn[key]);
+          const locTokens = extractPlaceholders(flatLoc[key]);
+          if (enTokens.join(",") !== locTokens.join(",")) {
+            mismatches.push({ key, enTokens, locTokens });
+          }
         }
       }
-    }
 
-    expect(
-      mismatches,
-      `Interpolation placeholders mismatch between en.ts and ${file}:\n${mismatches
-        .map((m) => `  - ${m.key}: en has [${m.enTokens.join(", ")}], ${name} has [${m.locTokens.join(", ")}]`)
-        .join("\n")}`
-    ).toEqual([]);
-  });
-});
+      expect(
+        mismatches,
+        `Interpolation placeholders mismatch between en.ts and ${file}:\n${mismatches
+          .map(
+            (m) =>
+              `  - ${m.key}: en has [${m.enTokens.join(", ")}], ${name} has [${m.locTokens.join(", ")}]`,
+          )
+          .join("\n")}`,
+      ).toEqual([]);
+    });
+  },
+);
 
 describe.each([
   { name: "English (US)", tag: "en-US", file: "en-US.ts", messages: enUS },
@@ -683,48 +709,58 @@ describe.each([
 
   it(`${file} keeps the same {placeholder} tokens as en.ts`, () => {
     const mismatches = Object.keys(flatLoc).filter(
-      (key) => extractPlaceholders(flatLoc[key]).join(",") !== extractPlaceholders(flatEn[key] ?? "").join(","),
+      (key) =>
+        extractPlaceholders(flatLoc[key]).join(",") !==
+        extractPlaceholders(flatEn[key] ?? "").join(","),
     );
     expect(mismatches).toEqual([]);
   });
 
   it("falls back to the Canadian English base", () => {
-    const def = (LOCALES as readonly { tag: string; fallback?: string }[]).find((l) => l.tag === tag);
+    const def = (LOCALES as readonly { tag: string; fallback?: string }[]).find(
+      (l) => l.tag === tag,
+    );
     expect(def?.fallback).toBe(BASE_LOCALE);
   });
 });
 
-describe.each([{ name: "English", tag: "en-CA", file: "en.ts", messages: en }, ...CATALOGS])("Plural forms: $name", ({ tag, file, messages }) => {
-  const enPlurals = collectPlurals(en);
-  const locPlurals = collectPlurals(messages);
+describe.each([{ name: "English", tag: "en-CA", file: "en.ts", messages: en }, ...CATALOGS])(
+  "Plural forms: $name",
+  ({ tag, file, messages }) => {
+    const enPlurals = collectPlurals(en);
+    const locPlurals = collectPlurals(messages);
 
-  it(`${file} counts exactly the same keys as en.ts, as plural objects`, () => {
-    expect(Object.keys(locPlurals).sort()).toEqual(Object.keys(enPlurals).sort());
-  });
+    it(`${file} counts exactly the same keys as en.ts, as plural objects`, () => {
+      expect(Object.keys(locPlurals).sort()).toEqual(Object.keys(enPlurals).sort());
+    });
 
-  it(`${file} supplies every plural category ${tag} uses, and no unknown ones`, () => {
-    const required = requiredCategories(tag);
-    const allowed = new Set(new Intl.PluralRules(tag).resolvedOptions().pluralCategories);
-    const problems: string[] = [];
-    for (const [key, forms] of Object.entries(locPlurals)) {
-      const have = new Set(Object.keys(forms));
-      for (const c of required) if (!have.has(c)) problems.push(`${key}: missing "${c}"`);
-      for (const c of have) if (!allowed.has(c as Intl.LDMLPluralRule) && c !== "other") problems.push(`${key}: "${c}" is not a ${tag} plural category`);
-    }
-    expect(problems).toEqual([]);
-  });
-
-  it(`every ${file} plural form carries the same {placeholder} tokens as the English other form`, () => {
-    const mismatches: string[] = [];
-    for (const [key, forms] of Object.entries(locPlurals)) {
-      const expected = extractPlaceholders(enPlurals[key]?.other ?? "").join(",");
-      for (const [category, text] of Object.entries(forms)) {
-        if (extractPlaceholders(text).join(",") !== expected) mismatches.push(`${key}.${category}`);
+    it(`${file} supplies every plural category ${tag} uses, and no unknown ones`, () => {
+      const required = requiredCategories(tag);
+      const allowed = new Set(new Intl.PluralRules(tag).resolvedOptions().pluralCategories);
+      const problems: string[] = [];
+      for (const [key, forms] of Object.entries(locPlurals)) {
+        const have = new Set(Object.keys(forms));
+        for (const c of required) if (!have.has(c)) problems.push(`${key}: missing "${c}"`);
+        for (const c of have)
+          if (!allowed.has(c as Intl.LDMLPluralRule) && c !== "other")
+            problems.push(`${key}: "${c}" is not a ${tag} plural category`);
       }
-    }
-    expect(mismatches).toEqual([]);
-  });
-});
+      expect(problems).toEqual([]);
+    });
+
+    it(`every ${file} plural form carries the same {placeholder} tokens as the English other form`, () => {
+      const mismatches: string[] = [];
+      for (const [key, forms] of Object.entries(locPlurals)) {
+        const expected = extractPlaceholders(enPlurals[key]?.other ?? "").join(",");
+        for (const [category, text] of Object.entries(forms)) {
+          if (extractPlaceholders(text).join(",") !== expected)
+            mismatches.push(`${key}.${category}`);
+        }
+      }
+      expect(mismatches).toEqual([]);
+    });
+  },
+);
 
 describe("Locale validation helper functions", () => {
   it("flatten flattens nested objects into dotted key paths", () => {
@@ -732,13 +768,13 @@ describe("Locale validation helper functions", () => {
       section: {
         title: "Hello",
         nested: {
-          deep: "World"
-        }
-      }
+          deep: "World",
+        },
+      },
     };
     expect(flatten(input)).toEqual({
       "section.title": "Hello",
-      "section.nested.deep": "World"
+      "section.nested.deep": "World",
     });
   });
 
@@ -746,7 +782,7 @@ describe("Locale validation helper functions", () => {
     expect(extractPlaceholders("Hello {name}, you have {count} messages from {name}!")).toEqual([
       "{count}",
       "{name}",
-      "{name}"
+      "{name}",
     ]);
     expect(extractPlaceholders("Plain string without variables")).toEqual([]);
   });
@@ -828,16 +864,25 @@ describe("Manual language", () => {
 
   it("ships a guide for every registered locale", () => {
     // A locale added without a guide would silently show the English manual.
-    const guides = import.meta.glob("/docs/user-guide/luminous-user-guide-*.html", { query: "?raw", import: "default" });
+    const guides = import.meta.glob("/docs/user-guide/luminous-user-guide-*.html", {
+      query: "?raw",
+      import: "default",
+    });
     // The guide files, MANUAL_LANGUAGES and guide.js's lightbox labels must name the same languages.
     const onDisk = Object.keys(guides).map((f) => f.match(/luminous-user-guide-(\w+)\.html$/)![1]);
     expect([...MANUAL_LANGUAGES].sort()).toEqual(onDisk.sort());
     for (const code of MANUAL_LANGUAGES) {
-      expect(guideScript.includes(`${code.toLowerCase()}: { fit:`), `guide.js has no labels for ${code}`).toBe(true);
+      expect(
+        guideScript.includes(`${code.toLowerCase()}: { fit:`),
+        `guide.js has no labels for ${code}`,
+      ).toBe(true);
     }
     for (const { tag } of LOCALES) {
       const code = manualLanguageForLocale(tag);
-      expect(guides[`/docs/user-guide/luminous-user-guide-${code}.html`], `${tag} -> ${code}`).toBeDefined();
+      expect(
+        guides[`/docs/user-guide/luminous-user-guide-${code}.html`],
+        `${tag} -> ${code}`,
+      ).toBeDefined();
       if (tag.split("-")[0] !== "en") expect(code, `${tag} has no guide of its own`).not.toBe("EN");
     }
   });
@@ -846,18 +891,26 @@ describe("Manual language", () => {
 describe("Inline-fallback keys", () => {
   it("every i18n.t call with an inline English fallback names a key that exists in en.ts", () => {
     // A key that is only in the call site's fallback can never be translated.
-    const sources = import.meta.glob(["/src/**/*.svelte", "/src/**/*.ts", "!/src/**/*.test.ts", "!/src/lib/locales/**"], {
-      query: "?raw",
-      import: "default",
-      eager: true,
-    }) as Record<string, string>;
+    const sources = import.meta.glob(
+      ["/src/**/*.svelte", "/src/**/*.ts", "!/src/**/*.test.ts", "!/src/lib/locales/**"],
+      {
+        query: "?raw",
+        import: "default",
+        eager: true,
+      },
+    ) as Record<string, string>;
     const flatEn = flatten(en);
     const missing: string[] = [];
     for (const [file, text] of Object.entries(sources)) {
-      for (const m of text.matchAll(/i18n\.t\(\s*["'`]([\w.-]+)["'`]\s*,\s*\{[^}]*\}\s*,\s*["'`]/g)) {
+      for (const m of text.matchAll(
+        /i18n\.t\(\s*["'`]([\w.-]+)["'`]\s*,\s*\{[^}]*\}\s*,\s*["'`]/g,
+      )) {
         if (!(m[1] in flatEn)) missing.push(`${file}: ${m[1]}`);
       }
     }
-    expect(missing, `Keys used with an inline fallback but missing from en.ts:\n${missing.join("\n")}`).toEqual([]);
+    expect(
+      missing,
+      `Keys used with an inline fallback but missing from en.ts:\n${missing.join("\n")}`,
+    ).toEqual([]);
   });
 });

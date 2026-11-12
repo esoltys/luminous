@@ -6,7 +6,14 @@
   import { i18n, formatNumber } from "../../stores/i18n.svelte";
   import { formatStorageSize } from "../../utils/formatters";
   import { conversionLabel, deviceName, deviceStorage, storageName } from "../../utils/devices";
-  import type { ConnectedDevice, SyncChangeList, SyncItem, SyncPlan, SyncReason, SyncSourceRef } from "../../types";
+  import type {
+    ConnectedDevice,
+    SyncChangeList,
+    SyncItem,
+    SyncPlan,
+    SyncReason,
+    SyncSourceRef,
+  } from "../../types";
   import Button from "../Button.svelte";
   import DeviceStorageBar from "./DeviceStorageBar.svelte";
   import DeviceStorageLegend from "./DeviceStorageLegend.svelte";
@@ -36,7 +43,9 @@
   const name = $derived(deviceName(device));
   const storage = $derived(plan.storage);
   const target = $derived(
-    plan.conversionTarget ? conversionLabel(plan.conversionTarget.format, plan.conversionTarget.bitrateKbps) : ""
+    plan.conversionTarget
+      ? conversionLabel(plan.conversionTarget.format, plan.conversionTarget.bitrateKbps)
+      : "",
   );
 
   const storageLabel = $derived.by(() => {
@@ -49,27 +58,37 @@
 
   const headline = $derived(
     storage.fits
-      ? i18n.t("devices.verdictFits", { free: formatStorageSize(Math.max(0, storage.freeAfterBytes)) })
-      : i18n.t("devices.verdictTooBig", { over: formatStorageSize(plan.shortfall?.bytes ?? 0), device: name })
+      ? i18n.t("devices.verdictFits", {
+          free: formatStorageSize(Math.max(0, storage.freeAfterBytes)),
+        })
+      : i18n.t("devices.verdictTooBig", {
+          over: formatStorageSize(plan.shortfall?.bytes ?? 0),
+          device: name,
+        }),
   );
 
   const summary = $derived.by(() => {
     if (!storage.fits) {
       const parts: string[] = [];
       const saving = plan.shortfall?.convertAllSavingBytes;
-      if (saving && target) parts.push(i18n.t("devices.fixConvertSaves", { target, saving: formatStorageSize(saving) }));
+      if (saving && target)
+        parts.push(
+          i18n.t("devices.fixConvertSaves", { target, saving: formatStorageSize(saving) }),
+        );
       const largest = plan.shortfall?.largestSource;
       if (largest) {
         parts.push(
           i18n.t(parts.length > 0 ? "devices.fixOrUncheckLargest" : "devices.fixUncheckLargest", {
             item: sourceName(largest.source),
             size: formatStorageSize(largest.bytes),
-          })
+          }),
         );
       }
       return parts.join(" ");
     }
-    const parts = [i18n.plural("devices.summaryCopy", plan.copy.songs, { count: formatNumber(plan.copy.songs) })];
+    const parts = [
+      i18n.plural("devices.summaryCopy", plan.copy.songs, { count: formatNumber(plan.copy.songs) }),
+    ];
     if (plan.convertedSongs > 0 && target) {
       parts[0] = i18n.plural("devices.summaryCopyConverted", plan.copy.songs, {
         count: formatNumber(plan.copy.songs),
@@ -77,7 +96,12 @@
         target,
       });
     }
-    if (plan.remove.songs > 0) parts.push(i18n.plural("devices.summaryRemove", plan.remove.songs, { count: formatNumber(plan.remove.songs) }));
+    if (plan.remove.songs > 0)
+      parts.push(
+        i18n.plural("devices.summaryRemove", plan.remove.songs, {
+          count: formatNumber(plan.remove.songs),
+        }),
+      );
     return parts.join(" ");
   });
 
@@ -104,7 +128,9 @@
       case "leftSource":
         return i18n.t("devices.reasonLeft", { source: sourceName(r.source) });
       case "unselected":
-        return r.source ? i18n.t(`devices.reasonUnchecked.${r.source.kind}`) : i18n.t("devices.reasonUnchecked.library");
+        return r.source
+          ? i18n.t(`devices.reasonUnchecked.${r.source.kind}`)
+          : i18n.t("devices.reasonUnchecked.library");
       case "deletedFromLibrary":
         return i18n.t("devices.reasonDeleted");
       case "tagsChanged":
@@ -134,7 +160,10 @@
 
   async function showAll(list: ListKey) {
     try {
-      expanded[list] = await invoke<SyncItem[]>("get_device_sync_items", { planId: plan.planId, list });
+      expanded[list] = await invoke<SyncItem[]>("get_device_sync_items", {
+        planId: plan.planId,
+        list,
+      });
     } catch (err) {
       if (String(err) === "sync-plan-stale") await replan();
       else console.error("Failed to read sync items:", err);
@@ -145,19 +174,27 @@
     {
       key: "copy",
       list: plan.copy,
-      heading: i18n.plural("devices.listCopy", plan.copy.songs, { count: formatNumber(plan.copy.songs), size: formatStorageSize(plan.copy.bytes) }),
+      heading: i18n.plural("devices.listCopy", plan.copy.songs, {
+        count: formatNumber(plan.copy.songs),
+        size: formatStorageSize(plan.copy.bytes),
+      }),
       more: i18n.t("devices.showAllCopy"),
     },
     {
       key: "remove",
       list: plan.remove,
-      heading: i18n.plural("devices.listRemove", plan.remove.songs, { count: formatNumber(plan.remove.songs), size: formatStorageSize(plan.remove.bytes) }),
+      heading: i18n.plural("devices.listRemove", plan.remove.songs, {
+        count: formatNumber(plan.remove.songs),
+        size: formatStorageSize(plan.remove.bytes),
+      }),
       more: i18n.t("devices.showAllRemove"),
     },
     {
       key: "update",
       list: plan.update,
-      heading: i18n.plural("devices.listUpdate", plan.update.songs, { count: formatNumber(plan.update.songs) }),
+      heading: i18n.plural("devices.listUpdate", plan.update.songs, {
+        count: formatNumber(plan.update.songs),
+      }),
       more: i18n.t("devices.showAllUpdate"),
     },
   ]);
@@ -203,7 +240,12 @@
         await replan().catch((e) => console.error("Failed to plan again:", e));
       } else {
         console.error("Failed to start device sync:", err);
-        toastStore.show(i18n.t(code === "sync-in-progress" ? "devices.alreadySyncing" : "devices.startFailed", { device: name }), "error");
+        toastStore.show(
+          i18n.t(code === "sync-in-progress" ? "devices.alreadySyncing" : "devices.startFailed", {
+            device: name,
+          }),
+          "error",
+        );
       }
     } finally {
       busy = false;
@@ -214,25 +256,54 @@
 <div class="flex-1 min-h-0 flex flex-col gap-5" data-testid="device-sync-preview">
   <div class="flex-1 min-h-0 overflow-y-auto pr-6 flex flex-col gap-5">
     <header>
-      <button class="flex items-center gap-1 text-sm text-brand-accent-text hover:text-brand-accent-text-hover" onclick={onback}>
+      <button
+        class="flex items-center gap-1 text-sm text-brand-accent-text hover:text-brand-accent-text-hover"
+        onclick={onback}
+      >
         <CaretLeftIcon class="w-3.5 h-3.5" />{i18n.t("devices.backToSettings", { device: name })}
       </button>
-      <h1 class="text-3xl font-heading font-bold text-brand-text-primary leading-snug">{i18n.t("devices.reviewTitle", { device: name })}</h1>
+      <h1 class="text-3xl font-heading font-bold text-brand-text-primary leading-snug">
+        {i18n.t("devices.reviewTitle", { device: name })}
+      </h1>
     </header>
 
     <div>
-      <p class="text-4xl font-heading font-bold leading-tight text-brand-text-primary" data-testid="sync-verdict">{headline}</p>
+      <p
+        class="text-4xl font-heading font-bold leading-tight text-brand-text-primary"
+        data-testid="sync-verdict"
+      >
+        {headline}
+      </p>
       {#if summary}<p class="mt-2 text-sm text-brand-text-secondary">{summary}</p>{/if}
     </div>
 
     <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2">
       <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t("devices.now")}</span>
-      <DeviceStorageBar slices={nowSlices} capacityBytes={storage.capacityBytes} reserveBytes={storage.reserveBytes} scaleBytes={scale} height="h-10" label={i18n.t("devices.now")} />
-      <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t("devices.afterSync")}</span>
-      <DeviceStorageBar slices={afterSlices} capacityBytes={storage.capacityBytes} reserveBytes={storage.reserveBytes} scaleBytes={scale} height="h-10" label={headline} />
+      <DeviceStorageBar
+        slices={nowSlices}
+        capacityBytes={storage.capacityBytes}
+        reserveBytes={storage.reserveBytes}
+        scaleBytes={scale}
+        height="h-10"
+        label={i18n.t("devices.now")}
+      />
+      <span class="text-xs font-semibold text-brand-text-secondary"
+        >{i18n.t("devices.afterSync")}</span
+      >
+      <DeviceStorageBar
+        slices={afterSlices}
+        capacityBytes={storage.capacityBytes}
+        reserveBytes={storage.reserveBytes}
+        scaleBytes={scale}
+        height="h-10"
+        label={headline}
+      />
       <span></span>
       <div class="relative h-4 text-[11px] font-semibold text-brand-text-primary">
-        <span class="absolute top-0 -translate-x-full whitespace-nowrap" style:left="{(storage.capacityBytes / Math.max(1, scale)) * 100}%">{storageLabel}</span>
+        <span
+          class="absolute top-0 -translate-x-full whitespace-nowrap"
+          style:left="{(storage.capacityBytes / Math.max(1, scale)) * 100}%">{storageLabel}</span
+        >
       </div>
       <span></span>
       <DeviceStorageLegend items={legend} />
@@ -246,23 +317,38 @@
             <h2 class="text-sm font-bold text-brand-text-primary mb-1">{heading}</h2>
             <ul class="flex flex-col">
               {#each items as item, i (item.path + i)}
-                <li class="flex items-baseline justify-between gap-3 py-1.5 border-b border-brand-border/30 text-sm">
+                <li
+                  class="flex items-baseline justify-between gap-3 py-1.5 border-b border-brand-border/30 text-sm"
+                >
                   <span class="truncate text-brand-text-primary">{itemLabel(item)}</span>
-                  <span class="shrink-0 text-xs text-brand-text-secondary">{reason(item.reason)}</span>
+                  <span class="shrink-0 text-xs text-brand-text-secondary"
+                    >{reason(item.reason)}</span
+                  >
                 </li>
               {/each}
               {#if key === "update" && playlistFiles > 0}
-                <li class="flex items-baseline justify-between gap-3 py-1.5 border-b border-brand-border/30 text-sm">
+                <li
+                  class="flex items-baseline justify-between gap-3 py-1.5 border-b border-brand-border/30 text-sm"
+                >
                   <span class="text-brand-text-primary">{i18n.t("devices.playlistsRow")}</span>
-                  <span class="shrink-0 text-xs text-brand-text-secondary">{i18n.plural("devices.playlistFilesRewritten", playlistFiles, { count: formatNumber(playlistFiles) })}</span>
+                  <span class="shrink-0 text-xs text-brand-text-secondary"
+                    >{i18n.plural("devices.playlistFilesRewritten", playlistFiles, {
+                      count: formatNumber(playlistFiles),
+                    })}</span
+                  >
                 </li>
               {/if}
             </ul>
             {#if !expanded[key] && list.songs > list.items.length}
-              <button class="self-start mt-2 text-sm text-brand-accent-text hover:text-brand-accent-text-hover" onclick={() => showAll(key)}>{more}</button>
+              <button
+                class="self-start mt-2 text-sm text-brand-accent-text hover:text-brand-accent-text-hover"
+                onclick={() => showAll(key)}>{more}</button
+              >
             {/if}
             {#if key === "update"}
-              <p class="mt-2 text-xs text-brand-text-secondary">{i18n.t("devices.othersLeftAlone", { device: name })}</p>
+              <p class="mt-2 text-xs text-brand-text-secondary">
+                {i18n.t("devices.othersLeftAlone", { device: name })}
+              </p>
             {/if}
           </section>
         {/each}
@@ -270,13 +356,19 @@
     </div>
   </div>
 
-  <footer class="mr-6 shrink-0 flex items-center justify-end gap-2 border-t border-brand-border/40 pt-4">
+  <footer
+    class="mr-6 shrink-0 flex items-center justify-end gap-2 border-t border-brand-border/40 pt-4"
+  >
     {#if storage.fits}
       <Button onclick={onback}>{i18n.t("devices.changeSelection")}</Button>
-      <Button variant="primary" onclick={start} disabled={busy}>{i18n.t("devices.startSync")}</Button>
+      <Button variant="primary" onclick={start} disabled={busy}
+        >{i18n.t("devices.startSync")}</Button
+      >
     {:else}
       {#if plan.shortfall?.convertAllSavingBytes && target}
-        <Button onclick={convertEverything} disabled={busy}>{i18n.t("devices.convertEverything", { target })}</Button>
+        <Button onclick={convertEverything} disabled={busy}
+          >{i18n.t("devices.convertEverything", { target })}</Button
+        >
       {/if}
       <Button variant="primary" onclick={onback}>{i18n.t("devices.changeSelection")}</Button>
     {/if}

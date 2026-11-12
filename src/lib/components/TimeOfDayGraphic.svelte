@@ -22,7 +22,7 @@
     BUCKETS.map((key) => {
       const ratio = max > 0 ? (counts[key] ?? 0) / max : 0;
       return Math.max(0, Math.min(1, ratio)) * H;
-    })
+    }),
   );
 
   // The reveal height drives both the mask rects and the outline polyline
@@ -58,7 +58,13 @@
   });
 </script>
 
-<svg viewBox="0 0 {W} {H}" class="w-full h-auto block rounded-lg" preserveAspectRatio="xMidYMid meet" role="img" aria-label={labels.morning}>
+<svg
+  viewBox="0 0 {W} {H}"
+  class="w-full h-auto block rounded-lg"
+  preserveAspectRatio="xMidYMid meet"
+  role="img"
+  aria-label={labels.morning}
+>
   <defs>
     <linearGradient id="tod-sky-morning" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#aecbdb" />
@@ -139,7 +145,13 @@
 
       <!-- arc across the sky -->
       <path d="M 55 352 Q 500 -55 945 352" fill="none" stroke="url(#tod-arc)" stroke-width="5" />
-      <path d="M 85 352 Q 500 -18 915 352" fill="none" stroke="url(#tod-arc)" stroke-width="2" opacity="0.7" />
+      <path
+        d="M 85 352 Q 500 -18 915 352"
+        fill="none"
+        stroke="url(#tod-arc)"
+        stroke-width="2"
+        opacity="0.7"
+      />
 
       <!-- clouds, morning band -->
       <g fill="#fbf6e8" opacity="0.85">
@@ -156,7 +168,11 @@
       <circle cx="890" cy="110" r="26" fill="#f3ecd0" mask="url(#tod-moon-mask)" />
 
       <!-- ground -->
-      <path d="M 0 {HORIZON_Y} Q 125 {HORIZON_Y - 14} 250 {HORIZON_Y - 4} T 500 {HORIZON_Y - 10} T 750 {HORIZON_Y - 2} T {W} {HORIZON_Y - 12} V {H} H 0 Z" fill="url(#tod-ground)" />
+      <path
+        d="M 0 {HORIZON_Y} Q 125 {HORIZON_Y - 14} 250 {HORIZON_Y - 4} T 500 {HORIZON_Y -
+          10} T 750 {HORIZON_Y - 2} T {W} {HORIZON_Y - 12} V {H} H 0 Z"
+        fill="url(#tod-ground)"
+      />
     </g>
   </defs>
 

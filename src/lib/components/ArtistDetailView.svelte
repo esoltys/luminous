@@ -45,12 +45,19 @@
     ChartBarIcon as BarChart2,
     ShareNetworkIcon as Share,
     ImageIcon as RetrieveImage,
-    RadioIcon as Radio
+    RadioIcon as Radio,
   } from "phosphor-svelte";
   import { contextStore, entitySubject } from "../stores/context.svelte";
   import { startArtistRadio } from "../utils/playlist";
   import ShareModal from "./ShareModal.svelte";
-  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse } from "../types";
+  import type {
+    Song,
+    Playlist,
+    AlbumItem,
+    PlayContext,
+    ArtistProfile,
+    ExtendedArtworkResponse,
+  } from "../types";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
   import {
     albumToCoverItem,
@@ -117,7 +124,9 @@
   // previous run of this action), or resolvable from a tagged song.
   let hasMusicbrainzArtistId = $derived(
     !!artistProfile?.musicbrainz_artist_id ||
-      songs.some((s) => (s.musicbrainz_artist_id ?? s.musicbrainz_album_artist_id ?? "").trim().length > 0)
+      songs.some(
+        (s) => (s.musicbrainz_artist_id ?? s.musicbrainz_album_artist_id ?? "").trim().length > 0,
+      ),
   );
 
   // Everything fetched about the artist (facts, bio, events, links) lives in contextStore and shows
@@ -139,14 +148,20 @@
     };
   });
   let artistPortraitUrl = $derived(
-    resolveArtistPortraitUrl(artistArtwork?.artist_portrait_uri, artistProfile?.fetched_image_filename)
+    resolveArtistPortraitUrl(
+      artistArtwork?.artist_portrait_uri,
+      artistProfile?.fetched_image_filename,
+    ),
   );
   let mosaicSpareWidth = $state(0);
   let bandLogoUrl = $derived(
-    resolveArtistLogoUrl(artistArtwork?.band_logo_uri, artistProfile?.fetched_logo_filename)
+    resolveArtistLogoUrl(artistArtwork?.band_logo_uri, artistProfile?.fetched_logo_filename),
   );
   let fanartBannerUrl = $derived(
-    resolveArtistBackgroundUrl(artistArtwork?.fanart_uri, artistProfile?.fetched_background_filename)
+    resolveArtistBackgroundUrl(
+      artistArtwork?.fanart_uri,
+      artistProfile?.fetched_background_filename,
+    ),
   );
 
   function handleTagClick(tag: string) {
@@ -174,7 +189,10 @@
     if (selectedKeys.size === 0) return;
     const selectedList = singleSongs.filter((s) => selectedKeys.has(String(s.id)));
     if (selectedList.length > 0) {
-      playerStore.playSongs(selectedList.map((s) => s.id), 0);
+      playerStore.playSongs(
+        selectedList.map((s) => s.id),
+        0,
+      );
     }
   }
 
@@ -210,7 +228,9 @@
         contextStore.refresh(infoSubject),
       ]);
       artistArtwork = artwork;
-      toastStore.show(i18n.t("artistDetail.refreshSuccess", {}, "Artist artwork and bio refreshed"));
+      toastStore.show(
+        i18n.t("artistDetail.refreshSuccess", {}, "Artist artwork and bio refreshed"),
+      );
     } catch (err) {
       console.error("Failed to refresh artist:", err);
       toastStore.show(i18n.t("artistDetail.refreshError", {}, "Failed to refresh artist"), "error");
@@ -228,7 +248,11 @@
     if (retrievingAll || !hasMusicbrainzArtistId) return;
     retrievingAll = true;
     const taskId = `artist-enrichment-${artistName.toLowerCase()}`;
-    const taskName = i18n.t("artistDetail.retrievingArtistTask", {}, "Retrieving artist information");
+    const taskName = i18n.t(
+      "artistDetail.retrievingArtistTask",
+      {},
+      "Retrieving artist information",
+    );
     tasksStore.startTask({
       id: taskId,
       label: i18n.t("artistDetail.retrievingDetails", {}, "Retrieving artist details..."),
@@ -262,7 +286,7 @@
 
       tasksStore.completeTask(
         taskId,
-        i18n.t("artistDetail.enrichmentComplete", {}, "Artist information retrieved")
+        i18n.t("artistDetail.enrichmentComplete", {}, "Artist information retrieved"),
       );
     } catch (err) {
       console.error("Failed to retrieve artist data:", err);
@@ -295,7 +319,12 @@
     lastAutoFetchedArtist = currentArtist;
     const detailsFetched = !!profile?.details_fetched;
     collectionStore.isContextEnrichmentEnabled().then((enabled) => {
-      if (!enabled || retrievingAll || tasksStore.isTaskActive(`artist-enrichment-${currentArtist.toLowerCase()}`)) return;
+      if (
+        !enabled ||
+        retrievingAll ||
+        tasksStore.isTaskActive(`artist-enrichment-${currentArtist.toLowerCase()}`)
+      )
+        return;
       if (detailsFetched) {
         // Details are done — quietly fill in just the missing images.
         collectionStore.retrieveArtistImage(currentArtist, { onlyMissing: true }).catch((e) => {
@@ -321,9 +350,14 @@
     });
     try {
       const result = await collectionStore.retrieveArtistDetails(artistName);
-      const label = result.added_count > 1
+      const label =
+        result.added_count > 1
           ? i18n.plural("artistDetail.retrieveDetailsSuccess", result.added_count)
-          : i18n.t("artistDetail.retrieveDetailsNoResults", {}, "No additional details found on MusicBrainz");
+          : i18n.t(
+              "artistDetail.retrieveDetailsNoResults",
+              {},
+              "No additional details found on MusicBrainz",
+            );
       tasksStore.completeTask(taskId, label);
     } catch (err) {
       console.error("Failed to retrieve artist details:", err);
@@ -349,11 +383,23 @@
     try {
       const result = await collectionStore.retrieveArtistImage(artistName);
       const label = result.uri
-        ? (result.source === "fanart"
-            ? i18n.t("artistDetail.retrieveImageSuccessFanart", {}, "Artist image retrieved from fanart.tv")
-            : i18n.t("artistDetail.retrieveImageSuccessWikidata", {}, "Artist image retrieved from Wikidata"))
+        ? result.source === "fanart"
+          ? i18n.t(
+              "artistDetail.retrieveImageSuccessFanart",
+              {},
+              "Artist image retrieved from fanart.tv",
+            )
+          : i18n.t(
+              "artistDetail.retrieveImageSuccessWikidata",
+              {},
+              "Artist image retrieved from Wikidata",
+            )
         : result.logo_uri || result.background_uri
-          ? i18n.t("artistDetail.retrieveArtworkSuccessFanart", {}, "Artist artwork retrieved from fanart.tv")
+          ? i18n.t(
+              "artistDetail.retrieveArtworkSuccessFanart",
+              {},
+              "Artist artwork retrieved from fanart.tv",
+            )
           : i18n.t("artistDetail.retrieveImageNoResults", {}, "No artist image found");
       tasksStore.completeTask(taskId, label);
     } catch (err) {
@@ -378,7 +424,9 @@
     // empty page.
     if (songs.length === 0 && editedSongId !== null) {
       try {
-        const details = await invoke<{ artist: string; album_artist: string }>("get_song_details", { songId: editedSongId });
+        const details = await invoke<{ artist: string; album_artist: string }>("get_song_details", {
+          songId: editedSongId,
+        });
         const newArtist = details.album_artist || details.artist;
         if (newArtist && newArtist !== artistName) {
           navigationStore.selectedArtistName = newArtist;
@@ -421,9 +469,7 @@
   // Artists with no proper album releases (loose singles only) have nothing
   // in `albums` to draw covers from — fall back to the songs' own art.
   let headerCovers = $derived(
-    albums.length > 0
-      ? albums.map(albumToCoverItem)
-      : songsToCoverStack(songs)
+    albums.length > 0 ? albums.map(albumToCoverItem) : songsToCoverStack(songs),
   );
 
   $effect(() => {
@@ -436,12 +482,14 @@
       invoke<Song[]>("get_songs_by_artist", { artist: requested }),
       invoke<Playlist[]>("get_playlists_by_artist", { artist: requested }),
       invoke<AlbumItem[]>("get_compilations_by_artist", { artist: requested }),
-      invoke<ArtistProfile>("get_artist_profile", { artist: requested })
+      invoke<ArtistProfile>("get_artist_profile", { artist: requested }),
     ])
       .then(([fetchedSongs, fetchedPlaylists, fetchedCompilations, fetchedProfile]) => {
         if (requested !== artistName) return;
         songs = Array.isArray(fetchedSongs) ? fetchedSongs : [];
-        playlists = Array.isArray(fetchedPlaylists) ? fetchedPlaylists.filter((p) => !p.is_queue) : [];
+        playlists = Array.isArray(fetchedPlaylists)
+          ? fetchedPlaylists.filter((p) => !p.is_queue)
+          : [];
         compilations = Array.isArray(fetchedCompilations) ? fetchedCompilations : [];
         if (fetchedProfile?.artist_key) {
           collectionStore.artistProfiles[fetchedProfile.artist_key.toLowerCase()] = fetchedProfile;
@@ -503,10 +551,26 @@
   // app, so the discography tabs agree with how a release is labeled
   // elsewhere: multi-disc releases are "Sets" regardless of duration, then
   // Albums/EPs by total duration (EP = under 30 minutes) and Singles by track count.
-  let sets = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "set"));
-  let fullAlbums = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "album"));
-  let eps = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "ep"));
-  let singles = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "single"));
+  let sets = $derived(
+    albums.filter(
+      (a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "set",
+    ),
+  );
+  let fullAlbums = $derived(
+    albums.filter(
+      (a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "album",
+    ),
+  );
+  let eps = $derived(
+    albums.filter(
+      (a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "ep",
+    ),
+  );
+  let singles = $derived(
+    albums.filter(
+      (a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "single",
+    ),
+  );
 
   // One Cards/Rows toggle serves every release and playlist section; it sits
   // on the header of the top-most one that is showing.
@@ -519,16 +583,16 @@
           ? "eps"
           : compilations.length > 0
             ? "compilations"
-            : "playlists"
+            : "playlists",
   );
 
   function viewModeChangeFor(section: string) {
-    return section === viewModeSection ? (mode: CollectionViewMode) => prefs.setArtistReleasesViewMode(mode) : undefined;
+    return section === viewModeSection
+      ? (mode: CollectionViewMode) => prefs.setArtistReleasesViewMode(mode)
+      : undefined;
   }
 
-  let songsText = $derived(
-    i18n.plural("playlists.songsCount", songs.length)
-  );
+  let songsText = $derived(i18n.plural("playlists.songsCount", songs.length));
 
   // Songs with no album tag at all are excluded from get_albums() entirely
   // (it requires a non-empty album), so they'd never surface via `albums`/
@@ -540,13 +604,15 @@
   // off entirely, even though the loose songs and real albums are disjoint
   // sets and can coexist).
   let looseSongs = $derived(
-    songs.filter((s) => !s.album).sort((a, b) => (a.title || "").localeCompare(b.title || ""))
+    songs.filter((s) => !s.album).sort((a, b) => (a.title || "").localeCompare(b.title || "")),
   );
 
   // Grouped singles are AlbumItems (track_count === 1), but they render as a
   // song table alongside loose singles — resolve each back to its one song.
   let singleSongs = $derived([
-    ...singles.map((a) => songs.find((s) => sameAlbum(s.album, a.album))).filter((s): s is Song => s !== undefined),
+    ...singles
+      .map((a) => songs.find((s) => sameAlbum(s.album, a.album)))
+      .filter((s): s is Song => s !== undefined),
     ...looseSongs,
   ]);
 
@@ -562,14 +628,36 @@
   // Mirrors AlbumDetailView/CollectionView/PlaylistView/AutoPlaylistDetailView's
   // identical formula so this table's columns match what's shown everywhere else.
   // Default column widths (px or fr) — used when no saved width exists for a column.
-  const ARTIST_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
-    track: "48px", title: "2fr", artist: "1.5fr", album: "1.5fr",
-    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px", originalyear: "60px",
-    genre: "1.2fr", grouping: "1.2fr", bpm: "60px", initial_key: "60px",
-    bitrate: "70px", samplerate: "75px", bitdepth: "65px", channels: "70px",
-    filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
-    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", library: "130px", actions: "80px",
-  };
+  const ARTIST_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> =
+    {
+      track: "48px",
+      title: "2fr",
+      artist: "1.5fr",
+      album: "1.5fr",
+      composer: "1.5fr",
+      album_artist: "1.5fr",
+      format: "64px",
+      year: "60px",
+      originalyear: "60px",
+      genre: "1.2fr",
+      grouping: "1.2fr",
+      bpm: "60px",
+      initial_key: "60px",
+      bitrate: "70px",
+      samplerate: "75px",
+      bitdepth: "65px",
+      channels: "70px",
+      filesize: "75px",
+      rating: "96px",
+      playcount: "70px",
+      skipcount: "70px",
+      lastplayed: "90px",
+      added: "90px",
+      duration: "80px",
+      path: "2fr",
+      library: "130px",
+      actions: "80px",
+    };
 
   let singleDiscCount = $derived(singleSongs.reduce((max, s) => Math.max(max, s.disc ?? 1), 1));
 
@@ -599,8 +687,18 @@
       const isDecade = playlist.dynamic_spec?.startsWith("decade:") ?? false;
       navigationStore.viewAutoPlaylist(
         isDecade
-          ? { kind: "decade", decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
-          : { kind: "genre", genre: playlist.dynamic_spec?.replace(/^tag:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
+          ? {
+              kind: "decade",
+              decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name,
+              playlistId: playlist.id,
+              updated: playlist.updated,
+            }
+          : {
+              kind: "genre",
+              genre: playlist.dynamic_spec?.replace(/^tag:/, "") ?? playlist.name,
+              playlistId: playlist.id,
+              updated: playlist.updated,
+            },
       );
       return;
     }
@@ -616,7 +714,13 @@
     if (playableSongs.length === 0) return;
     const queuePl = await playlistsStore.requireQueue();
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(playableSongs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
+    await playerStore.playSongs(
+      playableSongs.map((s) => s.id),
+      0,
+      queuePl?.id,
+      undefined,
+      "Queue",
+    );
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
       navigationStore.viewPlaylist(queuePl.id);
@@ -645,27 +749,51 @@
   }
 </script>
 
-<div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full" use:rememberScroll={`artist-detail:${artistName}`}>
-  <div class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
+<div
+  class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full"
+  use:rememberScroll={`artist-detail:${artistName}`}
+>
+  <div
+    class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isDetailHeaderCollapsed
+      ? 'py-3'
+      : 'pt-6 pb-6'}"
+  >
     {#if fanartBannerUrl && !windowLayoutStore.isDetailHeaderCollapsed}
       <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <img src={fanartBannerUrl} crossorigin="anonymous" alt="" class="w-full h-full object-cover opacity-25" />
-        <div class="absolute inset-0 bg-gradient-to-t from-brand-main via-brand-main/70 to-brand-main/30"></div>
+        <img
+          src={fanartBannerUrl}
+          crossorigin="anonymous"
+          alt=""
+          class="w-full h-full object-cover opacity-25"
+        />
+        <div
+          class="absolute inset-0 bg-gradient-to-t from-brand-main via-brand-main/70 to-brand-main/30"
+        ></div>
       </div>
     {/if}
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 min-w-0 max-w-xl">
         {#if !windowLayoutStore.isDetailHeaderCollapsed}
-        <h1 class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
+          <h1
+            class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5"
+          >
+            {artistName}
+          </h1>
 
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium">
-          <span>{songsText}</span>
-          <span>•</span>
-          <span>{totalDurationLabel}</span>
-        </div>
+          <div
+            class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium"
+          >
+            <span>{songsText}</span>
+            <span>•</span>
+            <span>{totalDurationLabel}</span>
+          </div>
         {/if}
 
-        <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'} select-none">
+        <div
+          class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed
+            ? ''
+            : 'mt-3'} select-none"
+        >
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
             onShufflePlay={handleShufflePlay}
@@ -693,7 +821,9 @@
             {/snippet}
           </IconActionButton>
           <IconActionButton
-            onclick={() => { showShareModal = true; }}
+            onclick={() => {
+              showShareModal = true;
+            }}
             title={i18n.t("shareModal.menuItem")}
           >
             {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
@@ -725,7 +855,16 @@
           {/if}
           {#if artistPortraitUrl || headerCovers.length > 0}
             <!-- Fills the header's spare width: more albums = more columns/rows, never overflowing (#1496). -->
-            <CoverMosaic covers={headerCovers} heroImageUrl={artistPortraitUrl} heroImageAlt={artistName} sizeClass="h-36" fit align="end" maxCovers={16} bind:spareWidth={mosaicSpareWidth} />
+            <CoverMosaic
+              covers={headerCovers}
+              heroImageUrl={artistPortraitUrl}
+              heroImageAlt={artistName}
+              sizeClass="h-36"
+              fit
+              align="end"
+              maxCovers={16}
+              bind:spareWidth={mosaicSpareWidth}
+            />
           {/if}
         </div>
       {/if}
@@ -746,7 +885,7 @@
 
     {#if sets.length > 0}
       <CardSection
-        title={i18n.t('artistDetail.setsFilter', { count: sets.length })}
+        title={i18n.t("artistDetail.setsFilter", { count: sets.length })}
         viewMode={prefs.artistReleasesViewMode}
         onViewModeChange={viewModeChangeFor("sets")}
       >
@@ -772,7 +911,7 @@
 
     {#if fullAlbums.length > 0}
       <CardSection
-        title={i18n.t('artistDetail.albumsFilter', { count: fullAlbums.length })}
+        title={i18n.t("artistDetail.albumsFilter", { count: fullAlbums.length })}
         viewMode={prefs.artistReleasesViewMode}
         onViewModeChange={viewModeChangeFor("albums")}
       >
@@ -798,7 +937,7 @@
 
     {#if eps.length > 0}
       <CardSection
-        title={i18n.t('artistDetail.epsFilter', { count: eps.length })}
+        title={i18n.t("artistDetail.epsFilter", { count: eps.length })}
         viewMode={prefs.artistReleasesViewMode}
         onViewModeChange={viewModeChangeFor("eps")}
       >
@@ -824,8 +963,12 @@
 
     {#if singleSongs.length > 0}
       <div class="flex flex-col gap-3">
-        <h2 class="text-xl font-semibold text-brand-text-primary">{i18n.t('artistDetail.singlesFilter', { count: singleSongs.length })}</h2>
-        <div class="border border-brand-border rounded-lg acrylic-chrome shadow-2xl overflow-hidden">
+        <h2 class="text-xl font-semibold text-brand-text-primary">
+          {i18n.t("artistDetail.singlesFilter", { count: singleSongs.length })}
+        </h2>
+        <div
+          class="border border-brand-border rounded-lg acrylic-chrome shadow-2xl overflow-hidden"
+        >
           <SongTable
             rows={singleTableRows}
             mode="track"
@@ -847,14 +990,16 @@
     {/if}
 
     {#if albums.length === 0 && singleSongs.length === 0 && !loading}
-      <p class="text-xs text-brand-text-secondary py-8 text-center">{i18n.t('artistDetail.noReleasesFound')}</p>
+      <p class="text-xs text-brand-text-secondary py-8 text-center">
+        {i18n.t("artistDetail.noReleasesFound")}
+      </p>
     {/if}
   </div>
 
   {#if compilations.length > 0}
     <div class="px-6 pt-10">
       <CardSection
-        title={i18n.t('artistDetail.compilationsFeaturing', { artist: artistName })}
+        title={i18n.t("artistDetail.compilationsFeaturing", { artist: artistName })}
         viewMode={prefs.artistReleasesViewMode}
         onViewModeChange={viewModeChangeFor("compilations")}
       >
@@ -882,7 +1027,7 @@
   {#if playlists.length > 0}
     <div class="px-6 pt-10 {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
       <CardSection
-        title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}
+        title={i18n.t("artistDetail.playlistsFeaturing", { artist: artistName })}
         viewMode={prefs.artistReleasesViewMode}
         onViewModeChange={viewModeChangeFor("playlists")}
       >
@@ -906,7 +1051,7 @@
       </CardSection>
     </div>
   {:else}
-    <div class="{playerStore.currentSong ? 'pb-28' : 'pb-6'}"></div>
+    <div class={playerStore.currentSong ? "pb-28" : "pb-6"}></div>
   {/if}
 </div>
 
@@ -921,8 +1066,17 @@
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
       const playable = songs.filter((s) => !s.not_included);
       if (playable.length > 0) {
-        const context: PlayContext = { type: "album", album: album.album || "", albumArtist: album.artist || undefined };
-        playerStore.playSongs(playable.map(s => s.id), 0, undefined, context);
+        const context: PlayContext = {
+          type: "album",
+          album: album.album || "",
+          albumArtist: album.artist || undefined,
+        };
+        playerStore.playSongs(
+          playable.map((s) => s.id),
+          0,
+          undefined,
+          context,
+        );
       }
     }}
     onAddToPlaylist={async () => {
@@ -930,13 +1084,17 @@
       const playable = songs.filter((s) => !s.not_included);
       if (playable.length > 0) {
         await playlistsStore.addSongsToActiveTarget(
-          playable.map(s => s.id),
-          album.album || i18n.t("collection.unknownAlbum")
+          playable.map((s) => s.id),
+          album.album || i18n.t("collection.unknownAlbum"),
         );
       }
     }}
-    onGoToArtist={album.artist && album.artist !== artistName ? () => navigationStore.viewArtist(album.artist || "") : undefined}
-    onClose={() => { albumContextMenuState = null; }}
+    onGoToArtist={album.artist && album.artist !== artistName
+      ? () => navigationStore.viewArtist(album.artist || "")
+      : undefined}
+    onClose={() => {
+      albumContextMenuState = null;
+    }}
   />
 {/if}
 
@@ -945,13 +1103,16 @@
     x={playlistContextMenuState.x}
     y={playlistContextMenuState.y}
     playlist={playlistContextMenuState.playlist}
-    onClose={() => { playlistContextMenuState = null; }}
+    onClose={() => {
+      playlistContextMenuState = null;
+    }}
   />
 {/if}
 
 {#if singleContextMenuState}
   {@const song = singleContextMenuState.song}
-  {@const selectedSongs = selectedKeys.size > 1 ? singleSongs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
+  {@const selectedSongs =
+    selectedKeys.size > 1 ? singleSongs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
   <SongContextMenu
     x={singleContextMenuState.x}
     y={singleContextMenuState.y}
@@ -974,9 +1135,14 @@
       }
     }}
     onEditTags={() => openTagEditor(song.id)}
-    onEditBatchTags={() => { batchEditSongs = selectedSongs ?? null; }}
-    onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
-    onClose={() => { singleContextMenuState = null; }}
+    onEditBatchTags={() => {
+      batchEditSongs = selectedSongs ?? null;
+    }}
+    onOpenInPicard={() =>
+      openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
+    onClose={() => {
+      singleContextMenuState = null;
+    }}
   />
 {/if}
 
@@ -984,25 +1150,39 @@
   <ContextMenu
     x={overflowMenuPos.x}
     y={overflowMenuPos.y}
-    onClose={() => { overflowMenuPos = null; }}
+    onClose={() => {
+      overflowMenuPos = null;
+    }}
   >
     <ContextMenuItem
       icon={Edit3}
       label={i18n.t("artistDetail.editArtistDetails", {}, "Edit Artist Details")}
-      onclick={() => { isEditorOpen = true; overflowMenuPos = null; }}
+      onclick={() => {
+        isEditorOpen = true;
+        overflowMenuPos = null;
+      }}
     />
     <ContextMenuItem
       icon={RefreshCw}
       label={i18n.t("artistDetail.refresh", {}, "Refresh Artist")}
-      title={i18n.t('artistDetail.refreshTooltip')}
-      onclick={() => { handleRescanArtist(); overflowMenuPos = null; }}
+      title={i18n.t("artistDetail.refreshTooltip")}
+      onclick={() => {
+        handleRescanArtist();
+        overflowMenuPos = null;
+      }}
       disabled={loading || collectionStore.isScanning || refreshing}
     />
     <ContextMenuItem
       icon={OpenInPicard}
       label={i18n.t("picard.openAllInPicard")}
-      onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
-      disabled={loading || songs.length === 0 || !picardStore.available || songs.every(isRemoteSource)}
+      onclick={() => {
+        handleOpenAllInPicard();
+        overflowMenuPos = null;
+      }}
+      disabled={loading ||
+        songs.length === 0 ||
+        !picardStore.available ||
+        songs.every(isRemoteSource)}
       title={!picardStore.available
         ? i18n.t("picard.notFoundTooltip")
         : songs.length > 0 && songs.every(isRemoteSource)
@@ -1010,39 +1190,75 @@
           : undefined}
     />
     {#if prefs.onlineEnabled}
-    <ContextMenuItem
-      icon={RetrieveDetails}
-      label={i18n.t("artistDetail.retrieveArtistDetails", {}, "Retrieve Artist Details")}
-      title={hasMusicbrainzArtistId ? i18n.t("artistDetail.retrieveArtistDetailsTooltip", {}, "Fetch Discogs, AllMusic, Wikidata, IMDb and social links from MusicBrainz") : i18n.t("artistDetail.retrieveArtistDetailsNoMbidTooltip", {}, "No MusicBrainz artist ID found for this artist")}
-      onclick={() => { handleRetrieveArtistDetails(); overflowMenuPos = null; }}
-      disabled={loading || retrievingDetails || !hasMusicbrainzArtistId}
-    />
-    <ContextMenuItem
-      icon={RetrieveImage}
-      label={i18n.t("artistDetail.retrieveArtistImage", {}, "Retrieve Artist Image")}
-      title={hasMusicbrainzArtistId ? i18n.t("artistDetail.retrieveArtistImageTooltip", {}, "Retrieve an artist portrait from fanart.tv or Wikidata") : i18n.t("artistDetail.retrieveArtistDetailsNoMbidTooltip", {}, "No MusicBrainz artist ID found for this artist")}
-      onclick={() => { handleRetrieveArtistImage(); overflowMenuPos = null; }}
-      disabled={loading || retrievingImage || !hasMusicbrainzArtistId}
-    />
+      <ContextMenuItem
+        icon={RetrieveDetails}
+        label={i18n.t("artistDetail.retrieveArtistDetails", {}, "Retrieve Artist Details")}
+        title={hasMusicbrainzArtistId
+          ? i18n.t(
+              "artistDetail.retrieveArtistDetailsTooltip",
+              {},
+              "Fetch Discogs, AllMusic, Wikidata, IMDb and social links from MusicBrainz",
+            )
+          : i18n.t(
+              "artistDetail.retrieveArtistDetailsNoMbidTooltip",
+              {},
+              "No MusicBrainz artist ID found for this artist",
+            )}
+        onclick={() => {
+          handleRetrieveArtistDetails();
+          overflowMenuPos = null;
+        }}
+        disabled={loading || retrievingDetails || !hasMusicbrainzArtistId}
+      />
+      <ContextMenuItem
+        icon={RetrieveImage}
+        label={i18n.t("artistDetail.retrieveArtistImage", {}, "Retrieve Artist Image")}
+        title={hasMusicbrainzArtistId
+          ? i18n.t(
+              "artistDetail.retrieveArtistImageTooltip",
+              {},
+              "Retrieve an artist portrait from fanart.tv or Wikidata",
+            )
+          : i18n.t(
+              "artistDetail.retrieveArtistDetailsNoMbidTooltip",
+              {},
+              "No MusicBrainz artist ID found for this artist",
+            )}
+        onclick={() => {
+          handleRetrieveArtistImage();
+          overflowMenuPos = null;
+        }}
+        disabled={loading || retrievingImage || !hasMusicbrainzArtistId}
+      />
     {/if}
     <ContextMenuItem
       icon={BarChart2}
       label={statsExclusionsStore.isExcluded("artist", artistName)
         ? i18n.t("stats.includeInStats")
         : i18n.t("stats.excludeFromStats")}
-      onclick={() => { handleToggleStatsExcluded(); overflowMenuPos = null; }}
+      onclick={() => {
+        handleToggleStatsExcluded();
+        overflowMenuPos = null;
+      }}
     />
   </ContextMenu>
 {/if}
 
 {#if showShareModal}
-  <ShareModal entity={{ kind: "artist", artistName }} onClose={() => { showShareModal = false; }} />
+  <ShareModal
+    entity={{ kind: "artist", artistName }}
+    onClose={() => {
+      showShareModal = false;
+    }}
+  />
 {/if}
 
 {#if editingSongId !== null}
   <TagEditor
     songId={editingSongId}
-    onClose={() => { editingSongId = null; }}
+    onClose={() => {
+      editingSongId = null;
+    }}
     onSave={handleTagEditorSaved}
   />
 {/if}
@@ -1053,7 +1269,9 @@
     songIds={batchEditSongs.map((s) => s.id)}
     initialTracks={batchEditSongs}
     hasEmbeddedArt={batchEditSongs.some((s) => s.art_embedded)}
-    onClose={() => { batchEditSongs = null; }}
+    onClose={() => {
+      batchEditSongs = null;
+    }}
     onSave={handleTagEditorSaved}
   />
 {/if}
@@ -1061,7 +1279,9 @@
 <ArtistProfileEditor
   {artistName}
   isOpen={isEditorOpen}
-  onClose={() => { isEditorOpen = false; }}
+  onClose={() => {
+    isEditorOpen = false;
+  }}
 />
 
 {#if selectedKeys.size > 0}
@@ -1069,7 +1289,8 @@
     count={selectedKeys.size}
     onPlaySelected={handlePlaySelected}
     onAddToPlaylist={handleBulkAddSinglesToPlaylist}
-    onClear={() => { selectedKeys = new Set(); }}
+    onClear={() => {
+      selectedKeys = new Set();
+    }}
   />
 {/if}
-

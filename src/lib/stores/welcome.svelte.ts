@@ -26,7 +26,7 @@ class WelcomeStore {
     if (this.hasSeen) return;
     this.hasSeen = true;
     invoke("set_app_setting", { key: SEEN_SETTING_KEY, value: "true" }).catch((e) =>
-      console.error("Failed to persist welcome-screen state:", e)
+      console.error("Failed to persist welcome-screen state:", e),
     );
   }
 }

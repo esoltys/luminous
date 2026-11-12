@@ -81,7 +81,7 @@ describe("artistInfo utils", () => {
 
     it("combines absolute date and relative duration", () => {
       expect(formatArtistLifeEvent("1965-08-28", "en", fixedNow)).toBe(
-        "August 28, 1965 (61 years ago)"
+        "August 28, 1965 (61 years ago)",
       );
     });
 
@@ -108,12 +108,7 @@ describe("artistInfo utils", () => {
 
   describe("getArtistAreaLinks", () => {
     it("returns both begin area and area when different", () => {
-      const links = getArtistAreaLinks(
-        "Windsor",
-        "area-uuid-1",
-        "Canada",
-        "area-uuid-2"
-      );
+      const links = getArtistAreaLinks("Windsor", "area-uuid-1", "Canada", "area-uuid-2");
       expect(links).toEqual([
         { name: "Windsor", url: "https://musicbrainz.org/area/area-uuid-1" },
         { name: "Canada", url: "https://musicbrainz.org/area/area-uuid-2" },
@@ -121,12 +116,7 @@ describe("artistInfo utils", () => {
     });
 
     it("deduplicates when begin area and area are identical", () => {
-      const links = getArtistAreaLinks(
-        "Singapore",
-        "area-uuid-sg",
-        "Singapore",
-        "area-uuid-sg"
-      );
+      const links = getArtistAreaLinks("Singapore", "area-uuid-sg", "Singapore", "area-uuid-sg");
       expect(links).toEqual([
         { name: "Singapore", url: "https://musicbrainz.org/area/area-uuid-sg" },
       ]);
@@ -142,9 +132,7 @@ describe("artistInfo utils", () => {
 
     it("handles only country present", () => {
       const links = getArtistAreaLinks(null, null, "Canada", "area-uuid-ca");
-      expect(links).toEqual([
-        { name: "Canada", url: "https://musicbrainz.org/area/area-uuid-ca" },
-      ]);
+      expect(links).toEqual([{ name: "Canada", url: "https://musicbrainz.org/area/area-uuid-ca" }]);
     });
   });
 });

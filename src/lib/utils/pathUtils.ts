@@ -129,7 +129,7 @@ export function getAlbumFolderPath(paths: string[]): string {
   for (let i = 0; i < minLength; i++) {
     const seg = normalizedFolders[0][i];
     const matchesAll = normalizedFolders.every((parts) =>
-      isWindows ? parts[i].toLowerCase() === seg.toLowerCase() : parts[i] === seg
+      isWindows ? parts[i].toLowerCase() === seg.toLowerCase() : parts[i] === seg,
     );
     if (matchesAll) {
       commonSegments.push(seg);

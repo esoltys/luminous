@@ -89,7 +89,7 @@ export function generateEllipseGradientSvg(options: EllipseGradientOptions = {})
         `<radialGradient id="${gradientId}" fx="${fx.toFixed(4)}" fy="${fy.toFixed(4)}">` +
           `<stop offset="0%" stop-color="${color}"/>` +
           `<stop offset="100%" stop-color="${color}" stop-opacity="0"/>` +
-        `</radialGradient>`
+          `</radialGradient>`,
       );
       layerOrder.push({ color, gradientId });
     }
@@ -115,7 +115,7 @@ export function generateEllipseGradientSvg(options: EllipseGradientOptions = {})
       `<rect x="0" y="0" width="100%" height="100%" fill="url(#${gradientId})" ` +
         `transform="translate(${center} ${center}) scale(${scaleX.toFixed(4)} ${scaleY.toFixed(4)}) ` +
         `skewX(${skew.toFixed(4)}) rotate(${rotate.toFixed(4)}) translate(${dx.toFixed(4)} ${dy.toFixed(4)}) ` +
-        `translate(${-center} ${-center})"/>`
+        `translate(${-center} ${-center})"/>`,
     );
   }
 
@@ -123,9 +123,9 @@ export function generateEllipseGradientSvg(options: EllipseGradientOptions = {})
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ` +
     `width="${width}" height="${height}" viewBox="0 0 ${size} ${size}" ` +
     `style="filter:saturate(${saturation}%)" preserveAspectRatio="xMidYMid slice">` +
-      `<defs>${gradientDefs.join("")}</defs>` +
-      `<rect x="0" y="0" width="100%" height="100%" fill="${backgroundColor}"/>` +
-      layerRects.join("") +
+    `<defs>${gradientDefs.join("")}</defs>` +
+    `<rect x="0" y="0" width="100%" height="100%" fill="${backgroundColor}"/>` +
+    layerRects.join("") +
     `</svg>`
   );
 }

@@ -90,9 +90,21 @@ describe("AlphabetScrubber.svelte (#1973)", () => {
 
   it("derives Cyrillic alphabet when collection has Cyrillic items", () => {
     const cyrillicItems = [
-      "Аквариум", "Би-2", "Воскресение", "Гражданская Оборона", "ДДТ",
-      "Земфира", "Кино", "Ленинград", "Мумий Тролль", "Наутилус Помпилиус",
-      "Океан Ельзи", "Пикник", "Руки Вверх", "Сплин", "Чайф"
+      "Аквариум",
+      "Би-2",
+      "Воскресение",
+      "Гражданская Оборона",
+      "ДДТ",
+      "Земфира",
+      "Кино",
+      "Ленинград",
+      "Мумий Тролль",
+      "Наутилус Помпилиус",
+      "Океан Ельзи",
+      "Пикник",
+      "Руки Вверх",
+      "Сплин",
+      "Чайф",
     ];
     const { getAllByRole } = render(AlphabetScrubber, {
       items: cyrillicItems,
@@ -111,9 +123,21 @@ describe("AlphabetScrubber.svelte (#1973)", () => {
 
   it("derives Spanish alphabet with Ñ when collection has Spanish items", () => {
     const spanishItems = [
-      "Alejandro", "Barón Rojo", "Camela", "Duncan Dhu", "Estopa",
-      "Fito", "Heroes del Silencio", "Ivan Ferreiro", "Jarabe de Palo", "Kiko Veneno",
-      "Los Secretos", "M Clan", "Nacho Vegas", "Ñu", "Zahara"
+      "Alejandro",
+      "Barón Rojo",
+      "Camela",
+      "Duncan Dhu",
+      "Estopa",
+      "Fito",
+      "Heroes del Silencio",
+      "Ivan Ferreiro",
+      "Jarabe de Palo",
+      "Kiko Veneno",
+      "Los Secretos",
+      "M Clan",
+      "Nacho Vegas",
+      "Ñu",
+      "Zahara",
     ];
     const { getAllByRole } = render(AlphabetScrubber, {
       items: spanishItems,

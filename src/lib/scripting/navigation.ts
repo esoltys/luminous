@@ -1,4 +1,10 @@
-import { navigationStore, type ActiveTab, type ActiveSubTab, type SettingsTab, type AutoPlaylistRef } from "../stores/navigation.svelte";
+import {
+  navigationStore,
+  type ActiveTab,
+  type ActiveSubTab,
+  type SettingsTab,
+  type AutoPlaylistRef,
+} from "../stores/navigation.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import type { ScriptNavigationApi, ScriptWaitApi } from "./types";
 import { sameAlbum } from "../utils/albumKey";
@@ -57,14 +63,17 @@ export function createNavigationController(wait: ScriptWaitApi): ScriptNavigatio
     async settings(section: SettingsTab = "general"): Promise<void> {
       navigationStore.openSettings(section);
       await wait.settled();
-      await wait.forState(
-        () => navigationStore.activeTab === "settings" && navigationStore.settingsSubTab === section,
-        3000
-      ).catch((err: Error) => {
-        throw new Error(
-          `${err.message} (wanted settings/${section}, got ${navigationStore.activeTab}/${navigationStore.settingsSubTab})`
-        );
-      });
+      await wait
+        .forState(
+          () =>
+            navigationStore.activeTab === "settings" && navigationStore.settingsSubTab === section,
+          3000,
+        )
+        .catch((err: Error) => {
+          throw new Error(
+            `${err.message} (wanted settings/${section}, got ${navigationStore.activeTab}/${navigationStore.settingsSubTab})`,
+          );
+        });
     },
   };
 }

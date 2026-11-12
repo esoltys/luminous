@@ -7,8 +7,8 @@ describe("CreateArtistTagGroupDialog", () => {
     render(CreateArtistTagGroupDialog, {
       props: {
         onConfirm: vi.fn(),
-        onCancel: vi.fn()
-      }
+        onCancel: vi.fn(),
+      },
     });
 
     expect(screen.getByText("Create Tag Group")).toBeTruthy();
@@ -20,8 +20,8 @@ describe("CreateArtistTagGroupDialog", () => {
       props: {
         initialTags: ["Juno Award", "Grammy Award"],
         onConfirm: vi.fn(),
-        onCancel: vi.fn()
-      }
+        onCancel: vi.fn(),
+      },
     });
 
     expect(screen.getByText("Group Selected Tags")).toBeTruthy();
@@ -36,8 +36,8 @@ describe("CreateArtistTagGroupDialog", () => {
       props: {
         initialTags: ["Juno Award"],
         onConfirm,
-        onCancel: vi.fn()
-      }
+        onCancel: vi.fn(),
+      },
     });
 
     const input = screen.getByPlaceholderText("e.g. Award-Winning");
@@ -54,8 +54,8 @@ describe("CreateArtistTagGroupDialog", () => {
     render(CreateArtistTagGroupDialog, {
       props: {
         onConfirm: vi.fn(),
-        onCancel
-      }
+        onCancel,
+      },
     });
 
     const cancelBtn = screen.getByText("Cancel");

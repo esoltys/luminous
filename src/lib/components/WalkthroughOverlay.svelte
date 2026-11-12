@@ -2,7 +2,11 @@
   import { walkthroughStore } from "../stores/walkthrough.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
-  import { XIcon as X, CaretLeftIcon as ChevronLeft, CaretRightIcon as ChevronRight } from "phosphor-svelte";
+  import {
+    XIcon as X,
+    CaretLeftIcon as ChevronLeft,
+    CaretRightIcon as ChevronRight,
+  } from "phosphor-svelte";
 
   const SPOTLIGHT_PADDING = 8;
   const POPOVER_GAP = 16;
@@ -64,8 +68,14 @@
         left = targetRect.left + targetRect.width / 2 - popoverRect.width / 2;
         break;
     }
-    top = Math.min(Math.max(top, VIEWPORT_MARGIN), window.innerHeight - popoverRect.height - VIEWPORT_MARGIN);
-    left = Math.min(Math.max(left, VIEWPORT_MARGIN), window.innerWidth - popoverRect.width - VIEWPORT_MARGIN);
+    top = Math.min(
+      Math.max(top, VIEWPORT_MARGIN),
+      window.innerHeight - popoverRect.height - VIEWPORT_MARGIN,
+    );
+    left = Math.min(
+      Math.max(left, VIEWPORT_MARGIN),
+      window.innerWidth - popoverRect.width - VIEWPORT_MARGIN,
+    );
     popoverPos = { top, left };
   }
 
@@ -120,7 +130,11 @@
   }
 </script>
 
-<svelte:window onresize={handleWindowChange} onscroll={handleWindowChange} onkeydown={handleKeydown} />
+<svelte:window
+  onresize={handleWindowChange}
+  onscroll={handleWindowChange}
+  onkeydown={handleKeydown}
+/>
 
 {#if walkthroughStore.isActive && targetRect && walkthroughStore.currentStep}
   <div use:portal class="fixed inset-0 z-[110] select-none" role="presentation">
@@ -138,12 +152,22 @@
           />
         </mask>
       </defs>
-      <rect x="0" y="0" width="100%" height="100%" fill="black" fill-opacity="0.75" mask="url(#walkthrough-spotlight-mask)" />
+      <rect
+        x="0"
+        y="0"
+        width="100%"
+        height="100%"
+        fill="black"
+        fill-opacity="0.75"
+        mask="url(#walkthrough-spotlight-mask)"
+      />
     </svg>
 
     <div
       class="absolute border-2 border-brand-accent rounded-xl pointer-events-none transition-[top,left,width,height] duration-200"
-      style="top: {targetRect.top - SPOTLIGHT_PADDING}px; left: {targetRect.left - SPOTLIGHT_PADDING}px; width: {targetRect.width + SPOTLIGHT_PADDING * 2}px; height: {targetRect.height + SPOTLIGHT_PADDING * 2}px;"
+      style="top: {targetRect.top - SPOTLIGHT_PADDING}px; left: {targetRect.left -
+        SPOTLIGHT_PADDING}px; width: {targetRect.width +
+        SPOTLIGHT_PADDING * 2}px; height: {targetRect.height + SPOTLIGHT_PADDING * 2}px;"
     ></div>
 
     <div
@@ -161,8 +185,8 @@
         <button
           onclick={() => walkthroughStore.skip()}
           class="text-brand-text-secondary hover:text-brand-text-primary p-1 -m-1 rounded-lg hover:bg-brand-main/80 transition-colors shrink-0"
-          title={i18n.t('walkthrough.skip', {}, 'Skip')}
-          aria-label={i18n.t('walkthrough.skip', {}, 'Skip')}
+          title={i18n.t("walkthrough.skip", {}, "Skip")}
+          aria-label={i18n.t("walkthrough.skip", {}, "Skip")}
         >
           <X class="w-4 h-4" />
         </button>
@@ -173,10 +197,16 @@
       </p>
 
       <div class="flex items-center justify-between gap-x-3 gap-y-2 flex-wrap">
-        <div class="flex items-center gap-1.5" role="tablist" aria-label={i18n.t('walkthrough.progress', {}, 'Walkthrough progress')}>
+        <div
+          class="flex items-center gap-1.5"
+          role="tablist"
+          aria-label={i18n.t("walkthrough.progress", {}, "Walkthrough progress")}
+        >
           {#each walkthroughStore.availableSteps as step, i (step.id)}
             <span
-              class="h-1.5 rounded-full transition-all {i === walkthroughStore.currentAvailableIndex ? 'w-4 bg-brand-accent' : 'w-1.5 bg-brand-border'}"
+              class="h-1.5 rounded-full transition-all {i === walkthroughStore.currentAvailableIndex
+                ? 'w-4 bg-brand-accent'
+                : 'w-1.5 bg-brand-border'}"
             ></span>
           {/each}
         </div>
@@ -187,7 +217,7 @@
               class="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/80 transition-colors"
             >
               <ChevronLeft class="w-3.5 h-3.5" />
-              {i18n.t('walkthrough.back', {}, 'Back')}
+              {i18n.t("walkthrough.back", {}, "Back")}
             </button>
           {/if}
           <button
@@ -195,8 +225,8 @@
             class="flex items-center gap-1 px-4 py-1.5 rounded-full text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
           >
             {walkthroughStore.currentAvailableIndex === walkthroughStore.availableSteps.length - 1
-              ? i18n.t('walkthrough.finish', {}, 'Finish')
-              : i18n.t('walkthrough.next', {}, 'Next')}
+              ? i18n.t("walkthrough.finish", {}, "Finish")
+              : i18n.t("walkthrough.next", {}, "Next")}
             {#if walkthroughStore.currentAvailableIndex < walkthroughStore.availableSteps.length - 1}
               <ChevronRight class="w-3.5 h-3.5" />
             {/if}

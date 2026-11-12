@@ -16,7 +16,7 @@ export function sortFileEntries(
   entries: FileEntry[],
   column: FileSortColumn,
   asc: boolean,
-  getStatusLabel?: (entry: FileEntry) => string
+  getStatusLabel?: (entry: FileEntry) => string,
 ): FileEntry[] {
   const dir = asc ? 1 : -1;
   const folders = entries.filter((e) => e.isDir);

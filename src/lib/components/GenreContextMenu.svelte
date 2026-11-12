@@ -4,7 +4,7 @@
     ArrowLineUpIcon as ArrowUpToLine,
     TrashIcon as Trash2,
     ChartBarIcon as BarChart2,
-    GitMergeIcon as GitMerge
+    GitMergeIcon as GitMerge,
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
@@ -35,7 +35,9 @@
 </script>
 
 <ContextMenu {x} {y} {onClose}>
-  <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
+  <div
+    class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate"
+  >
     {name}
   </div>
 
@@ -43,20 +45,29 @@
     <ContextMenuItem
       icon={ArrowUpToLine}
       label={i18n.t("songTags.promoteTag", {}, "Promote to top-level genre")}
-      onclick={() => { onPromote?.(); onClose(); }}
+      onclick={() => {
+        onPromote?.();
+        onClose();
+      }}
     />
   {/if}
 
   <ContextMenuItem
     icon={Pencil}
     label={i18n.t("songTags.renameTag", {}, "Rename")}
-    onclick={() => { onRename(); onClose(); }}
+    onclick={() => {
+      onRename();
+      onClose();
+    }}
   />
 
   <ContextMenuItem
     icon={GitMerge}
     label={i18n.t("songTags.aliasToMenu", {}, "Alias to…")}
-    onclick={() => { onAlias(); onClose(); }}
+    onclick={() => {
+      onAlias();
+      onClose();
+    }}
   />
 
   <ContextMenuDivider />
@@ -66,7 +77,10 @@
     label={statsExclusionsStore.isExcluded("genre", name)
       ? i18n.t("stats.includeInStats")
       : i18n.t("stats.excludeFromStats")}
-    onclick={() => { handleToggleStatsExcluded(); onClose(); }}
+    onclick={() => {
+      handleToggleStatsExcluded();
+      onClose();
+    }}
   />
 
   <ContextMenuDivider />
@@ -75,6 +89,9 @@
     icon={Trash2}
     destructive
     label={i18n.t("songTags.deleteBtn", {}, "Delete")}
-    onclick={() => { onDelete(); onClose(); }}
+    onclick={() => {
+      onDelete();
+      onClose();
+    }}
   />
 </ContextMenu>

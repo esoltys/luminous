@@ -6,7 +6,12 @@ import { en } from "../locales/en";
 describe("tempoRule", () => {
   it("lists the six buckets slowest first", () => {
     expect(TEMPO_BUCKET_OPTIONS.map((o) => o.token)).toEqual([
-      "slow", "down-tempo", "mid-tempo", "uptempo", "high-energy", "extreme",
+      "slow",
+      "down-tempo",
+      "mid-tempo",
+      "uptempo",
+      "high-energy",
+      "extreme",
     ]);
   });
 
@@ -25,7 +30,11 @@ describe("tempoRule", () => {
 
   it("round-trips a serialised tempo rule back into the builder", () => {
     // The builder serialises `=` / `!=` rules as `field:<op>"value"`.
-    expect(parseSearchRules('tempo:="down-tempo"')).toEqual([{ field: "tempo", op: "=", value: "down-tempo" }]);
-    expect(parseSearchRules('tempo:!="extreme"')).toEqual([{ field: "tempo", op: "!=", value: "extreme" }]);
+    expect(parseSearchRules('tempo:="down-tempo"')).toEqual([
+      { field: "tempo", op: "=", value: "down-tempo" },
+    ]);
+    expect(parseSearchRules('tempo:!="extreme"')).toEqual([
+      { field: "tempo", op: "!=", value: "extreme" },
+    ]);
   });
 });

@@ -10,7 +10,7 @@
     buildLastNDays,
     computeStreaks,
     localDateKey,
-    type HeatmapCell
+    type HeatmapCell,
   } from "../utils/listeningHeatmap";
 
   interface Props {
@@ -92,9 +92,12 @@
   let visibleWeeks = $derived(
     mode === "heatmap"
       ? gridWidth > 0
-        ? Math.min(MAX_WEEKS, Math.max(MIN_WEEKS, Math.floor((gridWidth + GAP_PX) / (CELL_PX + GAP_PX))))
+        ? Math.min(
+            MAX_WEEKS,
+            Math.max(MIN_WEEKS, Math.floor((gridWidth + GAP_PX) / (CELL_PX + GAP_PX))),
+          )
         : MIN_WEEKS
-      : fixedWeeks
+      : fixedWeeks,
   );
 
   // The backend's `days` cutoff is an exact `now - days*86400s` timestamp,
@@ -130,7 +133,9 @@
       return;
     }
     barsRevealed = false;
-    const raf = requestAnimationFrame(() => { barsRevealed = true; });
+    const raf = requestAnimationFrame(() => {
+      barsRevealed = true;
+    });
     return () => cancelAnimationFrame(raf);
   });
 
@@ -140,9 +145,13 @@
   // data, different orientation. Always built at the full fetched range so
   // streak math sees it all; only the rendered `columns` below are trimmed
   // to what currently fits (heatmap) or fixed (calendar).
-  let rows = $derived(mode !== "bar" ? buildHeatmapGrid(dailyMinutes, fixedWeeks, prefs.weekStart) : []);
+  let rows = $derived(
+    mode !== "bar" ? buildHeatmapGrid(dailyMinutes, fixedWeeks, prefs.weekStart) : [],
+  );
   let allColumns = $derived(
-    mode !== "bar" ? Array.from({ length: fixedWeeks }, (_, col) => rows.map((row) => row[col])) : []
+    mode !== "bar"
+      ? Array.from({ length: fixedWeeks }, (_, col) => rows.map((row) => row[col]))
+      : [],
   );
   let columns = $derived(allColumns.slice(allColumns.length - visibleWeeks));
 
@@ -151,7 +160,9 @@
   // status line can default to it without a separate "today" fetch.
   let todayKey = localDateKey(new Date());
   let todayCell = $derived(
-    mode === "bar" ? (barDays.find((cell) => cell.date === todayKey) ?? null) : (rows.flat().find((cell) => cell.date === todayKey) ?? null)
+    mode === "bar"
+      ? (barDays.find((cell) => cell.date === todayKey) ?? null)
+      : (rows.flat().find((cell) => cell.date === todayKey) ?? null),
   );
   let displayCell = $derived(hovered ?? todayCell);
 
@@ -164,9 +175,11 @@
       ? rows.map((row) => {
           const cell = row[row.length - 1];
           if (!cell) return "";
-          return dateFromKey(cell.date).toLocaleDateString(i18n.currentLocale, { weekday: "short" });
+          return dateFromKey(cell.date).toLocaleDateString(i18n.currentLocale, {
+            weekday: "short",
+          });
         })
-      : []
+      : [],
   );
 
   // A column gets a month label when it contains that month's 1st.
@@ -175,9 +188,11 @@
       ? columns.map((column) => {
           const firstOfMonth = column.find((cell) => !cell.future && cell.date.endsWith("-01"));
           if (!firstOfMonth) return "";
-          return dateFromKey(firstOfMonth.date).toLocaleDateString(i18n.currentLocale, { month: "short" });
+          return dateFromKey(firstOfMonth.date).toLocaleDateString(i18n.currentLocale, {
+            month: "short",
+          });
         })
-      : []
+      : [],
   );
 
   // Calendar view's header row: full weekday names (not sparse, plenty of
@@ -185,8 +200,10 @@
   // read off the most recent week so the labels are always in sync with it.
   let calendarDayLabels = $derived(
     mode === "calendar" && columns.length > 0
-      ? columns[columns.length - 1].map((cell) => dateFromKey(cell.date).toLocaleDateString(i18n.currentLocale, { weekday: "short" }))
-      : []
+      ? columns[columns.length - 1].map((cell) =>
+          dateFromKey(cell.date).toLocaleDateString(i18n.currentLocale, { weekday: "short" }),
+        )
+      : [],
   );
 
   // The single highest-minutes day gets a star marker (a "special day"
@@ -212,13 +229,22 @@
   function cellStyle(cell: HeatmapCell): string {
     if (cell.future) return "background-color: transparent;";
     const opacity = LEVEL_OPACITY[cell.level];
-    if (opacity === 0) return "background-color: color-mix(in srgb, var(--color-brand-accent) 12%, transparent);";
+    if (opacity === 0)
+      return "background-color: color-mix(in srgb, var(--color-brand-accent) 12%, transparent);";
     return `background-color: color-mix(in srgb, var(--color-brand-accent) ${opacity}%, transparent);`;
   }
 
   function cellLabel(cell: HeatmapCell): string {
-    const date = dateFromKey(cell.date).toLocaleDateString(i18n.currentLocale, { weekday: "short", month: "short", day: "numeric" });
-    return i18n.t("stats.heatmapStatus", { date, minutes: cell.minutes }, `${date} — ${cell.minutes} min`);
+    const date = dateFromKey(cell.date).toLocaleDateString(i18n.currentLocale, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+    return i18n.t(
+      "stats.heatmapStatus",
+      { date, minutes: cell.minutes },
+      `${date} — ${cell.minutes} min`,
+    );
   }
 
   function streakLabel(days: number): string {
@@ -234,20 +260,30 @@
 </script>
 
 <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4">
-  <h2 class="text-xl font-semibold text-brand-text-primary">{i18n.t("stats.heatmapTitle", {}, "Listening Streak")}</h2>
+  <h2 class="text-xl font-semibold text-brand-text-primary">
+    {i18n.t("stats.heatmapTitle", {}, "Listening Streak")}
+  </h2>
 
   {#if events}
     <div class="flex items-center gap-4 mt-3">
       <FlameIcon weight="fill" class="w-8 h-8 text-brand-accent shrink-0" />
       <div class="flex items-center gap-4">
         <div>
-          <div class="text-2xl font-bold text-brand-text-primary leading-tight">{streakLabel(streaks.current)}</div>
-          <div class="text-xs text-brand-text-secondary">{i18n.t("stats.heatmapCurrentStreak", {}, "Current streak")}</div>
+          <div class="text-2xl font-bold text-brand-text-primary leading-tight">
+            {streakLabel(streaks.current)}
+          </div>
+          <div class="text-xs text-brand-text-secondary">
+            {i18n.t("stats.heatmapCurrentStreak", {}, "Current streak")}
+          </div>
         </div>
         <div class="w-px h-8 bg-brand-border"></div>
         <div>
-          <div class="text-2xl font-bold text-brand-text-primary leading-tight">{streakLabel(streaks.longest)}</div>
-          <div class="text-xs text-brand-text-secondary">{i18n.t("stats.heatmapLongestStreak", {}, "Longest streak")}</div>
+          <div class="text-2xl font-bold text-brand-text-primary leading-tight">
+            {streakLabel(streaks.longest)}
+          </div>
+          <div class="text-xs text-brand-text-secondary">
+            {i18n.t("stats.heatmapLongestStreak", {}, "Longest streak")}
+          </div>
         </div>
       </div>
     </div>
@@ -296,7 +332,9 @@
       </div>
     {:else if mode === "calendar"}
       <div class="mt-4">
-        <div class="grid grid-cols-7 gap-[3px] text-[10px] text-brand-text-secondary/70 leading-none mb-1">
+        <div
+          class="grid grid-cols-7 gap-[3px] text-[10px] text-brand-text-secondary/70 leading-none mb-1"
+        >
           {#each calendarDayLabels as label, i (i)}
             <div class="text-center">{label}</div>
           {/each}
@@ -321,9 +359,14 @@
                   onclick={() => !cell.future && (hovered = cell)}
                 >
                   {#if cell.date === peakDate}
-                    <StarIcon weight="fill" class="w-[28%] h-[28%] text-brand-text-primary drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]" />
+                    <StarIcon
+                      weight="fill"
+                      class="w-[28%] h-[28%] text-brand-text-primary drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]"
+                    />
                   {:else if !cell.future}
-                    <span class="text-xs font-medium leading-none text-brand-text-primary/70">{dateFromKey(cell.date).getDate()}</span>
+                    <span class="text-xs font-medium leading-none text-brand-text-primary/70"
+                      >{dateFromKey(cell.date).getDate()}</span
+                    >
                   {/if}
                   {#if !cell.future && cell.minutes > 0}
                     <span class="text-[9px] leading-none text-brand-text-primary/60">
@@ -365,7 +408,10 @@
                     onclick={() => !cell.future && (hovered = cell)}
                   >
                     {#if cell.date === peakDate}
-                      <StarIcon weight="fill" class="w-[9px] h-[9px] text-brand-text-primary drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]" />
+                      <StarIcon
+                        weight="fill"
+                        class="w-[9px] h-[9px] text-brand-text-primary drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]"
+                      />
                     {/if}
                   </button>
                 {/each}
@@ -385,7 +431,9 @@
     {/if}
 
     <div class="flex items-center justify-between gap-4 mt-3 pt-3 border-t border-brand-border/60">
-      <span class="text-xs text-brand-text-secondary truncate min-w-0">{displayCell ? cellLabel(displayCell) : ""}</span>
+      <span class="text-xs text-brand-text-secondary truncate min-w-0"
+        >{displayCell ? cellLabel(displayCell) : ""}</span
+      >
       <div class="flex items-center gap-1.5 text-[10px] text-brand-text-secondary/70 shrink-0">
         <span>{i18n.t("stats.heatmapLegendLess", {}, "Less")}</span>
         {#each LEVEL_OPACITY as opacity (opacity)}

@@ -25,14 +25,11 @@ if (!validation.valid) {
 // The guide reuses the app's own fonts rather than keeping a copy in docs/user-guide/.
 const FONT_DIRS = ["expose", "fira-sans"];
 
-const FILE_COPIES = [
-  "guide.css",
-  "guide.js",
-  "luminous-mark.svg",
-  "signature.svg",
-];
+const FILE_COPIES = ["guide.css", "guide.js", "luminous-mark.svg", "signature.svg"];
 
-const guides = fs.readdirSync(userGuideDir).filter((f) => /^luminous-user-guide-[A-Z]{2}\.html$/.test(f));
+const guides = fs
+  .readdirSync(userGuideDir)
+  .filter((f) => /^luminous-user-guide-[A-Z]{2}\.html$/.test(f));
 for (const file of [...guides, ...FILE_COPIES]) {
   fs.copyFileSync(path.join(userGuideDir, file), path.join(staticDir, file));
 }

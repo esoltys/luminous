@@ -193,12 +193,16 @@ describe("In-app scripting API", () => {
     it("sets theme, color scheme, and locale", async () => {
       const api = createScriptingApi();
 
-      const setThemeSpy = vi.spyOn(themeStore, "setTheme").mockImplementation(async (id: string) => {
-        themeStore.activeThemeId = id;
-      });
-      const setColorSchemeSpy = vi.spyOn(themeStore, "setColorSchemeMode").mockImplementation(async (mode) => {
-        themeStore.colorSchemeMode = mode;
-      });
+      const setThemeSpy = vi
+        .spyOn(themeStore, "setTheme")
+        .mockImplementation(async (id: string) => {
+          themeStore.activeThemeId = id;
+        });
+      const setColorSchemeSpy = vi
+        .spyOn(themeStore, "setColorSchemeMode")
+        .mockImplementation(async (mode) => {
+          themeStore.colorSchemeMode = mode;
+        });
       const setLocaleSpy = vi.spyOn(i18n, "setLocale").mockImplementation(async (locale) => {
         i18n.currentLocale = locale;
       });
@@ -219,7 +223,9 @@ describe("In-app scripting API", () => {
     it("rejects a locale the app doesn't ship without touching the current one", async () => {
       const api = createScriptingApi();
       const setLocaleSpy = vi.spyOn(i18n, "setLocale");
-      await expect(api.appearance.setLocale("xx-YY")).rejects.toThrow(/Unknown locale "xx-YY"; supported: .*fr-CA/);
+      await expect(api.appearance.setLocale("xx-YY")).rejects.toThrow(
+        /Unknown locale "xx-YY"; supported: .*fr-CA/,
+      );
       expect(setLocaleSpy).not.toHaveBeenCalled();
     });
 
@@ -269,8 +275,12 @@ describe("In-app scripting API", () => {
       let tagEditorSong: number | null = null;
 
       registerDialogHostControls({
-        openShortcuts: () => { shortcutsOpen = true; },
-        openTagEditor: (id) => { tagEditorSong = id; },
+        openShortcuts: () => {
+          shortcutsOpen = true;
+        },
+        openTagEditor: (id) => {
+          tagEditorSong = id;
+        },
         closeAll: () => {
           shortcutsOpen = false;
           tagEditorSong = null;
@@ -329,7 +339,9 @@ describe("In-app scripting API", () => {
 
     it("times out if condition is never satisfied", async () => {
       const api = createScriptingApi();
-      await expect(api.wait.forState(() => false, 50)).rejects.toThrow("Timed out waiting for state condition");
+      await expect(api.wait.forState(() => false, 50)).rejects.toThrow(
+        "Timed out waiting for state condition",
+      );
     });
   });
 
@@ -360,14 +372,18 @@ describe("In-app scripting API", () => {
       expect(collectionStore.visibleColumns.initial_key).toBe(true);
       await api.view.setColumnVisible("initial_key", false);
       expect(collectionStore.visibleColumns.initial_key).toBe(false);
-      await expect(api.view.setColumnVisible("nope" as never, true)).rejects.toThrow(/Unknown song-table column "nope"/);
+      await expect(api.view.setColumnVisible("nope" as never, true)).rejects.toThrow(
+        /Unknown song-table column "nope"/,
+      );
     });
 
     it("opens the smart-playlist builder with the given rules", async () => {
       const api = createScriptingApi();
       await api.view.openSmartPlaylistBuilder([{ field: "year", op: ">=", value: "1980" }]);
       expect(collectionStore.isSmartBuilderOpen).toBe(true);
-      expect(collectionStore.smartBuilderRules).toEqual([{ field: "year", op: ">=", value: "1980" }]);
+      expect(collectionStore.smartBuilderRules).toEqual([
+        { field: "year", op: ">=", value: "1980" },
+      ]);
 
       await api.dialogs.closeAll();
       expect(collectionStore.isSmartBuilderOpen).toBe(false);
@@ -385,19 +401,25 @@ describe("In-app scripting API", () => {
     it("calls a registered screen hook and stops after it unregisters", async () => {
       const api = createScriptingApi();
       const seen: string[] = [];
-      const off = registerScreenHook("search", async (q) => { seen.push(q); });
+      const off = registerScreenHook("search", async (q) => {
+        seen.push(q);
+      });
 
       await api.screens.search("evan");
       expect(seen).toEqual(["evan"]);
 
       off();
-      await expect(api.screens.search("x")).rejects.toThrow(/needs the top navigation bar on screen/);
+      await expect(api.screens.search("x")).rejects.toThrow(
+        /needs the top navigation bar on screen/,
+      );
     });
 
     it("closeAll closes the search dropdown when the search box is on screen", async () => {
       const api = createScriptingApi();
       let closed = 0;
-      const off = registerScreenHook("closeSearch", () => { closed++; });
+      const off = registerScreenHook("closeSearch", () => {
+        closed++;
+      });
 
       await api.dialogs.closeAll();
       expect(closed).toBe(1);
@@ -601,7 +623,7 @@ describe("In-app scripting API", () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       await expect(api.overlay.cursor.pointTo("#does-not-exist")).resolves.not.toThrow();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Target element not found for selector: "#does-not-exist"')
+        expect.stringContaining('Target element not found for selector: "#does-not-exist"'),
       );
       warnSpy.mockRestore();
     });

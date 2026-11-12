@@ -58,7 +58,7 @@
   let activeDescendant = $derived(
     isOpen && focusedIndex >= 0 && focusedIndex < selectableItems.length
       ? selectableItems[focusedIndex].id
-      : undefined
+      : undefined,
   );
 
   function openDropdown() {
@@ -224,7 +224,9 @@
       {/if}
     </div>
     <CaretDown
-      class="w-3 h-3 text-brand-text-secondary shrink-0 transition-transform duration-150 {isOpen ? 'rotate-180' : ''}"
+      class="w-3 h-3 text-brand-text-secondary shrink-0 transition-transform duration-150 {isOpen
+        ? 'rotate-180'
+        : ''}"
     />
   </button>
 
@@ -266,7 +268,15 @@
                       tabindex="-1"
                       aria-selected={isSelected}
                       aria-disabled={item.disabled}
-                      class="px-3 py-1.5 text-xs flex items-center justify-between gap-3 transition-colors {item.disabled ? 'text-brand-text-secondary/50 italic cursor-not-allowed' : 'cursor-pointer'} {isFocused && !item.disabled ? 'bg-brand-accent/20 text-brand-text-primary' : isSelected ? 'bg-brand-main text-brand-accent-text font-medium' : !item.disabled ? 'text-brand-text-primary hover:bg-brand-main/80' : ''}"
+                      class="px-3 py-1.5 text-xs flex items-center justify-between gap-3 transition-colors {item.disabled
+                        ? 'text-brand-text-secondary/50 italic cursor-not-allowed'
+                        : 'cursor-pointer'} {isFocused && !item.disabled
+                        ? 'bg-brand-accent/20 text-brand-text-primary'
+                        : isSelected
+                          ? 'bg-brand-main text-brand-accent-text font-medium'
+                          : !item.disabled
+                            ? 'text-brand-text-primary hover:bg-brand-main/80'
+                            : ''}"
                       onclick={() => selectItem(item)}
                       onkeydown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
@@ -301,7 +311,15 @@
               tabindex="-1"
               aria-selected={isSelected}
               aria-disabled={item.disabled}
-              class="px-3 py-1.5 text-xs flex items-center justify-between gap-3 transition-colors {item.disabled ? 'text-brand-text-secondary/50 italic cursor-not-allowed' : 'cursor-pointer'} {isFocused && !item.disabled ? 'bg-brand-accent/20 text-brand-text-primary' : isSelected ? 'bg-brand-main text-brand-accent-text font-medium' : !item.disabled ? 'text-brand-text-primary hover:bg-brand-main/80' : ''}"
+              class="px-3 py-1.5 text-xs flex items-center justify-between gap-3 transition-colors {item.disabled
+                ? 'text-brand-text-secondary/50 italic cursor-not-allowed'
+                : 'cursor-pointer'} {isFocused && !item.disabled
+                ? 'bg-brand-accent/20 text-brand-text-primary'
+                : isSelected
+                  ? 'bg-brand-main text-brand-accent-text font-medium'
+                  : !item.disabled
+                    ? 'text-brand-text-primary hover:bg-brand-main/80'
+                    : ''}"
               onclick={() => selectItem(item)}
               onkeydown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {

@@ -26,7 +26,17 @@
   import ContextMenuDivider from "../ContextMenuDivider.svelte";
   import SongContextMenu from "../SongContextMenu.svelte";
   import { shownName } from "./shownName";
-  import { addFolderToDeviceSync, copyPaths, openFile, playFolder, playlistFromFolder, queueFolder, reveal, revealLabel, scanFolder } from "./folderActions";
+  import {
+    addFolderToDeviceSync,
+    copyPaths,
+    openFile,
+    playFolder,
+    playlistFromFolder,
+    queueFolder,
+    reveal,
+    revealLabel,
+    scanFolder,
+  } from "./folderActions";
 
   /**
    * The context and overflow menu for rows and headers of the Files view
@@ -85,25 +95,35 @@
   } = $props();
 
   const isLocal = $derived(source.kind === "folder");
-  const childDir = $derived(!inColumn && entries.length === 1 && entries[0].isDir ? entries[0] : null);
+  const childDir = $derived(
+    !inColumn && entries.length === 1 && entries[0].isDir ? entries[0] : null,
+  );
   const isFolder = $derived(fromHeader || childDir !== null);
-  const songIds = $derived(fromHeader ? [] : entries.flatMap((e) => (e.songId !== null ? [e.songId] : [])));
-  const unscanned = $derived(fromHeader ? [] : entries.filter((e) => e.songId === null && e.status === "notScanned"));
-  const targetLocation = $derived(fromHeader ? folderLocation : childDir?.location ?? null);
+  const songIds = $derived(
+    fromHeader ? [] : entries.flatMap((e) => (e.songId !== null ? [e.songId] : [])),
+  );
+  const unscanned = $derived(
+    fromHeader ? [] : entries.filter((e) => e.songId === null && e.status === "notScanned"),
+  );
+  const targetLocation = $derived(fromHeader ? folderLocation : (childDir?.location ?? null));
   const locations = $derived(
     fromHeader
-      ? (targetLocation ? [targetLocation] : [])
-      : entries.flatMap((e) => (e.location !== null ? [e.location] : []))
+      ? targetLocation
+        ? [targetLocation]
+        : []
+      : entries.flatMap((e) => (e.location !== null ? [e.location] : [])),
   );
-  const unscannedLocations = $derived(unscanned.flatMap((e) => (e.location !== null ? [e.location] : [])));
+  const unscannedLocations = $derived(
+    unscanned.flatMap((e) => (e.location !== null ? [e.location] : [])),
+  );
   const single = $derived(fromHeader ? null : entries.length === 1 ? entries[0] : null);
-  const revealLocation = $derived(fromHeader ? targetLocation : single?.location ?? null);
+  const revealLocation = $derived(fromHeader ? targetLocation : (single?.location ?? null));
 
   /** What the song menu adds to its toasts when files were left out. */
   const skippedNotice = $derived(
     unscanned.length === 0
       ? undefined
-      : i18n.plural(isLocal ? "files.skippedScan" : "files.skipped", unscanned.length)
+      : i18n.plural(isLocal ? "files.skippedScan" : "files.skipped", unscanned.length),
   );
 
   let songs = $state<Song[] | null>(null);
@@ -122,15 +142,28 @@
     return () => (stale = true);
   });
 
-  const dirName = $derived(fromHeader ? folderName : childDir ? shownName(childDir.name, childDir.missingTag) : "");
+  const dirName = $derived(
+    fromHeader ? folderName : childDir ? shownName(childDir.name, childDir.missingTag) : "",
+  );
   const dirPath = $derived(fromHeader ? path : childDir ? [...path, childDir.name] : path);
   const canOpenSingle = $derived(single?.opensInApp ?? false);
   const canPlayOutside = $derived(songIds.length === 0 && unscannedLocations.length > 0);
   const canScanFiles = $derived(songIds.length === 0 && scannable && unscanned.length > 0);
-  const canScanDir = $derived(isLocal && (fromHeader ? scannable : childDir !== null && childDir.status !== "excluded"));
+  const canScanDir = $derived(
+    isLocal && (fromHeader ? scannable : childDir !== null && childDir.status !== "excluded"),
+  );
   const syncDevices = $derived(isLocal && targetLocation ? filesStore.devices : []);
-  const canEditUnscanned = $derived(isLocal && !inColumn && !single?.isDir && (single?.kind === "audio" || unscanned.length > 0));
-  const isEmpty = $derived(!isFolder && songIds.length === 0 && !canPlayOutside && !canScanFiles && !canEditUnscanned && locations.length === 0);
+  const canEditUnscanned = $derived(
+    isLocal && !inColumn && !single?.isDir && (single?.kind === "audio" || unscanned.length > 0),
+  );
+  const isEmpty = $derived(
+    !isFolder &&
+      songIds.length === 0 &&
+      !canPlayOutside &&
+      !canScanFiles &&
+      !canEditUnscanned &&
+      locations.length === 0,
+  );
 
   $effect(() => {
     if (isEmpty) onClose();
@@ -163,12 +196,20 @@
 </script>
 
 {#snippet header(text: string)}
-  <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">{text}</div>
+  <div
+    class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate"
+  >
+    {text}
+  </div>
 {/snippet}
 
 {#snippet fileItems()}
   {#if revealLocation}
-    <ContextMenuItem icon={FolderOpenIcon} label={revealLabel()} onclick={() => runAndClose(() => reveal(revealLocation))} />
+    <ContextMenuItem
+      icon={FolderOpenIcon}
+      label={revealLabel()}
+      onclick={() => runAndClose(() => reveal(revealLocation))}
+    />
   {/if}
   {#if locations.length > 0}
     <ContextMenuItem
@@ -183,20 +224,39 @@
   <ContextMenu {x} {y} {onClose}>
     {#if !fromHeader}
       {@render header(dirName)}
-      <ContextMenuItem icon={PlayIcon} accent label={i18n.t("files.playFolder")} onclick={() => runAndClose(() => playFolder(source, dirPath, dirName))} />
+      <ContextMenuItem
+        icon={PlayIcon}
+        accent
+        label={i18n.t("files.playFolder")}
+        onclick={() => runAndClose(() => playFolder(source, dirPath, dirName))}
+      />
     {/if}
-    <ContextMenuItem icon={StackIcon} label={i18n.t("playlists.contextMenuAddQueue")} onclick={() => runAndClose(() => queueFolder(source, dirPath, dirName))} />
-    <ContextMenuItem icon={PlusIcon} label={i18n.t("files.newPlaylistFromFolder")} onclick={() => runAndClose(() => playlistFromFolder(source, dirPath, dirName))} />
+    <ContextMenuItem
+      icon={StackIcon}
+      label={i18n.t("playlists.contextMenuAddQueue")}
+      onclick={() => runAndClose(() => queueFolder(source, dirPath, dirName))}
+    />
+    <ContextMenuItem
+      icon={PlusIcon}
+      label={i18n.t("files.newPlaylistFromFolder")}
+      onclick={() => runAndClose(() => playlistFromFolder(source, dirPath, dirName))}
+    />
     {#if canScanDir || syncDevices.length > 0}
       <ContextMenuDivider />
     {/if}
     {#if canScanDir}
-      <ContextMenuItem icon={ArrowsClockwiseIcon} label={i18n.t("files.scanFolder")} onclick={() => runAndClose(() => scanFolder(source, dirPath))} />
+      <ContextMenuItem
+        icon={ArrowsClockwiseIcon}
+        label={i18n.t("files.scanFolder")}
+        onclick={() => runAndClose(() => scanFolder(source, dirPath))}
+      />
     {/if}
     {#each syncDevices as device (device.id)}
       <ContextMenuItem
         icon={DeviceMobileSpeakerIcon}
-        label={syncDevices.length === 1 ? i18n.t("files.addToDeviceSync") : i18n.t("files.addToNamedDeviceSync", { device: deviceName(device) })}
+        label={syncDevices.length === 1
+          ? i18n.t("files.addToDeviceSync")
+          : i18n.t("files.addToNamedDeviceSync", { device: deviceName(device) })}
         onclick={() => runAndClose(() => addFolderToDeviceSync(device, targetLocation!, dirName))}
       />
     {/each}
@@ -205,22 +265,23 @@
       <ContextMenuItem
         icon={PencilSimpleIcon}
         label={i18n.t("files.editTagsForFolder")}
-        onclick={() => runAndClose(() => {
-          const folderEntry: FileEntry = childDir ?? {
-            name: path.length > 0 ? path[path.length - 1] : folderName,
-            isDir: true,
-            size: null,
-            modified: null,
-            fileType: null,
-            kind: null,
-            opensInApp: false,
-            status: null,
-            songId: null,
-            missingTag: null,
-            location: targetLocation,
-          };
-          onEditFolderTags?.(folderEntry, dirPath);
-        })}
+        onclick={() =>
+          runAndClose(() => {
+            const folderEntry: FileEntry = childDir ?? {
+              name: path.length > 0 ? path[path.length - 1] : folderName,
+              isDir: true,
+              size: null,
+              modified: null,
+              fileType: null,
+              kind: null,
+              opensInApp: false,
+              status: null,
+              songId: null,
+              missingTag: null,
+              location: targetLocation,
+            };
+            onEditFolderTags?.(folderEntry, dirPath);
+          })}
       />
       <ContextMenuItem
         icon={ArrowSquareOutIcon}
@@ -256,7 +317,8 @@
       notice={skippedNotice}
       showViewInFiles={false}
       onPlay={playSongs}
-      onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
+      onGoToArtist={() =>
+        navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
       onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
       onEditTags={() => onEditTags(song.id)}
       onEditBatchTags={() => onEditBatchTags?.(entries)}
@@ -270,9 +332,18 @@
   {/if}
 {:else if !isEmpty}
   <ContextMenu {x} {y} {onClose}>
-    {@render header(single ? shownName(single.name, single.missingTag) : i18n.t("playlists.selectedCount", { count: entries.length }))}
+    {@render header(
+      single
+        ? shownName(single.name, single.missingTag)
+        : i18n.t("playlists.selectedCount", { count: entries.length }),
+    )}
     {#if canOpenSingle}
-      <ContextMenuItem icon={ArrowSquareOutIcon} isDefault label={i18n.t("files.open")} onclick={() => runAndClose(() => openFile(source, path, single!))} />
+      <ContextMenuItem
+        icon={ArrowSquareOutIcon}
+        isDefault
+        label={i18n.t("files.open")}
+        onclick={() => runAndClose(() => openFile(source, path, single!))}
+      />
       <ContextMenuDivider />
     {/if}
     {#if canPlayOutside}
@@ -284,7 +355,11 @@
       />
     {/if}
     {#if canScanFiles}
-      <ContextMenuItem icon={ArrowsClockwiseIcon} label={i18n.t("files.scanFolder")} onclick={() => runAndClose(() => scanFolder(source, path))} />
+      <ContextMenuItem
+        icon={ArrowsClockwiseIcon}
+        label={i18n.t("files.scanFolder")}
+        onclick={() => runAndClose(() => scanFolder(source, path))}
+      />
     {/if}
     {#if isLocal && single?.isDir && single.location}
       <ContextMenuItem
@@ -305,10 +380,11 @@
       <ContextMenuItem
         icon={PencilSimpleIcon}
         label={i18n.t("files.editTags")}
-        onclick={() => runAndClose(() => {
-          if (single) onEditFileTags?.(single);
-          else onEditBatchTags?.(entries);
-        })}
+        onclick={() =>
+          runAndClose(() => {
+            if (single) onEditFileTags?.(single);
+            else onEditBatchTags?.(entries);
+          })}
       />
       <ContextMenuItem
         icon={ArrowSquareOutIcon}

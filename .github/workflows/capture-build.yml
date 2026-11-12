@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref (branch, tag, or commit SHA) to build'
+        description: "Git ref (branch, tag, or commit SHA) to build"
         type: string
-        default: ''
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

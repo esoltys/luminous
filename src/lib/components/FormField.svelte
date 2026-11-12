@@ -18,9 +18,16 @@
 
 <div class="flex flex-col gap-1 {span2 ? 'col-span-2' : ''}">
   <div class="flex items-center gap-1">
-    <label for={htmlFor} class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{label}</label>
+    <label
+      for={htmlFor}
+      class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{label}</label
+    >
     {#if tooltip}
-      <HelpTip text={tooltip} label={i18n.t("common.aboutField", { field: label })} describes={htmlFor} />
+      <HelpTip
+        text={tooltip}
+        label={i18n.t("common.aboutField", { field: label })}
+        describes={htmlFor}
+      />
     {/if}
   </div>
   {@render children()}

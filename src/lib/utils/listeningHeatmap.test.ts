@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { bucketDailyMinutes, buildHeatmapGrid, buildLastNDays, computeStreaks } from "./listeningHeatmap";
+import {
+  bucketDailyMinutes,
+  buildHeatmapGrid,
+  buildLastNDays,
+  computeStreaks,
+} from "./listeningHeatmap";
 import type { ListenEvent } from "../types";
 
 function unixSecondsFor(date: Date): number {
@@ -11,7 +16,7 @@ describe("bucketDailyMinutes", () => {
     const day = new Date(2026, 0, 15, 10, 0);
     const events: ListenEvent[] = [
       { played_at: unixSecondsFor(day), duration_secs: 200 },
-      { played_at: unixSecondsFor(new Date(2026, 0, 15, 22, 0)), duration_secs: 100 }
+      { played_at: unixSecondsFor(new Date(2026, 0, 15, 22, 0)), duration_secs: 100 },
     ];
     const result = bucketDailyMinutes(events);
     expect(result.get("2026-01-15")).toBe(5); // (200 + 100) / 60 = 5
@@ -20,7 +25,7 @@ describe("bucketDailyMinutes", () => {
   it("keeps different days separate", () => {
     const events: ListenEvent[] = [
       { played_at: unixSecondsFor(new Date(2026, 0, 15, 10, 0)), duration_secs: 180 },
-      { played_at: unixSecondsFor(new Date(2026, 0, 16, 10, 0)), duration_secs: 60 }
+      { played_at: unixSecondsFor(new Date(2026, 0, 16, 10, 0)), duration_secs: 60 },
     ];
     const result = bucketDailyMinutes(events);
     expect(result.get("2026-01-15")).toBe(3);
@@ -70,7 +75,7 @@ describe("buildHeatmapGrid", () => {
       ["2026-01-14", 15],
       ["2026-01-13", 45],
       ["2026-01-12", 90],
-      ["2026-01-11", 200]
+      ["2026-01-11", 200],
     ]);
     const grid = buildHeatmapGrid(dailyMinutes, 1, "sunday", new Date(2026, 0, 15));
     const byDate = new Map(grid.flat().map((c) => [c.date, c.level]));
@@ -117,7 +122,7 @@ describe("computeStreaks", () => {
     const dailyMinutes = new Map([
       ["2026-01-13", 10],
       ["2026-01-14", 10],
-      ["2026-01-15", 10]
+      ["2026-01-15", 10],
     ]);
     const result = computeStreaks(dailyMinutes, new Date(2026, 0, 15));
     expect(result.current).toBe(3);
@@ -127,7 +132,7 @@ describe("computeStreaks", () => {
   it("gives one day of grace when today has no listening yet", () => {
     const dailyMinutes = new Map([
       ["2026-01-13", 10],
-      ["2026-01-14", 10]
+      ["2026-01-14", 10],
     ]);
     const result = computeStreaks(dailyMinutes, new Date(2026, 0, 15));
     expect(result.current).toBe(2);
@@ -136,7 +141,7 @@ describe("computeStreaks", () => {
   it("resets current streak after a full missed day", () => {
     const dailyMinutes = new Map([
       ["2026-01-10", 10],
-      ["2026-01-15", 10]
+      ["2026-01-15", 10],
     ]);
     const result = computeStreaks(dailyMinutes, new Date(2026, 0, 15));
     expect(result.current).toBe(1);
@@ -148,7 +153,7 @@ describe("computeStreaks", () => {
       ["2026-01-02", 10],
       ["2026-01-03", 10],
       ["2026-01-04", 10],
-      ["2026-01-15", 10]
+      ["2026-01-15", 10],
     ]);
     const result = computeStreaks(dailyMinutes, new Date(2026, 0, 15));
     expect(result.current).toBe(1);

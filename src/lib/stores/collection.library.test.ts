@@ -77,23 +77,41 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
             total_artists: 2,
             total_albums: 2,
             total_duration_nanosec: 30000000000,
-            total_filesize_bytes: 50000000
+            total_filesize_bytes: 50000000,
           };
         case "get_library_snapshot":
           return {
             songs: [
-              { id: 1, title: "Rock Track 1", artist: "Rock Band", album: "Rock Album", filetype: "MP3" },
-              { id: 2, title: "Jazz Track 1", artist: "Jazz Quartet", album: "Jazz Album", filetype: "FLAC" },
-              { id: 3, title: "Vorbis Track", artist: "Indie Group", album: "Indie Album", filetype: "OGG_VORBIS" }
+              {
+                id: 1,
+                title: "Rock Track 1",
+                artist: "Rock Band",
+                album: "Rock Album",
+                filetype: "MP3",
+              },
+              {
+                id: 2,
+                title: "Jazz Track 1",
+                artist: "Jazz Quartet",
+                album: "Jazz Album",
+                filetype: "FLAC",
+              },
+              {
+                id: 3,
+                title: "Vorbis Track",
+                artist: "Indie Group",
+                album: "Indie Album",
+                filetype: "OGG_VORBIS",
+              },
             ],
             albums: [
               { album: "Rock Album", artist: "Rock Band", song_count: 5, year: 2020 },
-              { album: "Jazz Album", artist: "Jazz Quartet", song_count: 5, year: 2021 }
+              { album: "Jazz Album", artist: "Jazz Quartet", song_count: 5, year: 2021 },
             ],
             artists: [
               { name: "Rock Band", album_count: 1, song_count: 5 },
-              { name: "Jazz Quartet", album_count: 1, song_count: 5 }
-            ]
+              { name: "Jazz Quartet", album_count: 1, song_count: 5 },
+            ],
           };
         case "get_all_app_settings":
           return {};
@@ -138,7 +156,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     await collectionStore.refreshWebDavServers();
 
     const badge = collectionStore.getDirectoryForPath(
-      "http://test:test@127.0.0.1:8080/Music/BandCamp/Somniacs%20%26%20Crows%20Labyrinth/track.mp3"
+      "http://test:test@127.0.0.1:8080/Music/BandCamp/Somniacs%20%26%20Crows%20Labyrinth/track.mp3",
     );
 
     expect(badge).toBeDefined();
@@ -167,7 +185,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     ];
 
     const badge = collectionStore.getDirectoryForPath(
-      "https://webdav.files.fm/Remote%20Library/01%20Tell%20Me%20(U%20Want%20It).mp3"
+      "https://webdav.files.fm/Remote%20Library/01%20Tell%20Me%20(U%20Want%20It).mp3",
     );
 
     expect(badge).toBeDefined();
@@ -205,7 +223,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     ];
 
     const badge = collectionStore.getDirectoryForPath(
-      "https://webdav.files.fm/Music/HiRes/song.flac"
+      "https://webdav.files.fm/Music/HiRes/song.flac",
     );
 
     expect(badge?.id).toBe(-2);
@@ -214,7 +232,9 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
 
   it("returns undefined for a path matching neither a directory nor a WebDAV server", async () => {
     await collectionStore.refreshWebDavServers();
-    expect(collectionStore.getDirectoryForPath("http://example.com/other/track.mp3")).toBeUndefined();
+    expect(
+      collectionStore.getDirectoryForPath("http://example.com/other/track.mp3"),
+    ).toBeUndefined();
   });
 
   it("resolves an OpenSubsonic server as the Library badge for a subsonic:// path (#1164)", async () => {
@@ -268,7 +288,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
         total: 10,
         directory_name: "Fast SSD",
         directory_id: 1,
-      }
+      },
     });
     expect(collectionStore.scanProgress?.scanned).toBe(5);
     expect(collectionStore.isScanning).toBe(true);
@@ -286,7 +306,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
         total: 10,
         directory_name: "Fast SSD",
         directory_id: 1,
-      }
+      },
     });
     expect(activeTask?.label).toBe("Fast SSD: resolving artwork");
 
@@ -299,12 +319,18 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
         total: 10,
         directory_name: "Fast SSD",
         directory_id: 1,
-      }
+      },
     });
     expect(activeTask?.label).toBe("Fast SSD: checking missing tracks");
 
     eventCallbacks["scan-progress"]({
-      payload: { phase: "done", current_path: "", scanned: 10, total: 10, directory_name: "Fast SSD" }
+      payload: {
+        phase: "done",
+        current_path: "",
+        scanned: 10,
+        total: 10,
+        directory_name: "Fast SSD",
+      },
     });
     expect(collectionStore.isScanning).toBe(false);
     expect(collectionStore.lastScanTime).not.toBeNull();
@@ -324,7 +350,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
         directory_name: "Music",
         silent: false,
         external_changes: 3,
-      }
+      },
     });
 
     await vi.waitFor(() => {
@@ -341,7 +367,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
         directory_name: "Music",
         silent: false,
         external_changes: 0,
-      }
+      },
     });
     expect(toastSpy).not.toHaveBeenCalled();
 
@@ -355,7 +381,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
         directory_name: "Music",
         silent: true,
         external_changes: 5,
-      }
+      },
     });
     expect(toastSpy).not.toHaveBeenCalled();
     toastSpy.mockRestore();
@@ -389,33 +415,44 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     // 1. directory_name in payload
     expect(
       resolveScanLibraryName(
-        { phase: "reading_tags", scanned: 0, total: 0, silent: false, directory_name: "Explicit Name" },
-        [dirWithNickname, dirWithoutNickname]
-      )
+        {
+          phase: "reading_tags",
+          scanned: 0,
+          total: 0,
+          silent: false,
+          directory_name: "Explicit Name",
+        },
+        [dirWithNickname, dirWithoutNickname],
+      ),
     ).toBe("Explicit Name");
 
     // 2. directory_id matching
     expect(
       resolveScanLibraryName(
         { phase: "reading_tags", scanned: 0, total: 0, silent: false, directory_id: 1 },
-        [dirWithNickname, dirWithoutNickname]
-      )
+        [dirWithNickname, dirWithoutNickname],
+      ),
     ).toBe("Main Vault");
 
     // 3. current_path prefix matching
     expect(
       resolveScanLibraryName(
-        { phase: "reading_tags", scanned: 0, total: 0, silent: false, current_path: "/media/music/flac/artist/album/01.flac" },
-        [dirWithNickname, dirWithoutNickname]
-      )
+        {
+          phase: "reading_tags",
+          scanned: 0,
+          total: 0,
+          silent: false,
+          current_path: "/media/music/flac/artist/album/01.flac",
+        },
+        [dirWithNickname, dirWithoutNickname],
+      ),
     ).toBe("Main Vault");
 
     // 4. Single directory fallback
     expect(
-      resolveScanLibraryName(
-        { phase: "reading_tags", scanned: 0, total: 0, silent: false },
-        [dirWithNickname]
-      )
+      resolveScanLibraryName({ phase: "reading_tags", scanned: 0, total: 0, silent: false }, [
+        dirWithNickname,
+      ]),
     ).toBe("Main Vault");
   });
 
@@ -428,15 +465,33 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
   });
 
   it("handles pruneMissing songs call with force option", async () => {
-    vi.mocked(invoke).mockResolvedValueOnce({ deleted_songs: 3, removed_folders: 2, merged_duplicates: 1 } as any);
+    vi.mocked(invoke).mockResolvedValueOnce({
+      deleted_songs: 3,
+      removed_folders: 2,
+      merged_duplicates: 1,
+    } as any);
     const result = await collectionStore.pruneMissing();
     expect(invoke).toHaveBeenCalledWith("prune_missing_songs", { force: false });
-    expect(result).toEqual({ deletedSongs: 3, removedFolders: 2, mergedDuplicates: 1, blockedIncident: undefined });
+    expect(result).toEqual({
+      deletedSongs: 3,
+      removedFolders: 2,
+      mergedDuplicates: 1,
+      blockedIncident: undefined,
+    });
 
-    vi.mocked(invoke).mockResolvedValueOnce({ deleted_songs: 500, removed_folders: 10, merged_duplicates: 0 } as any);
+    vi.mocked(invoke).mockResolvedValueOnce({
+      deleted_songs: 500,
+      removed_folders: 10,
+      merged_duplicates: 0,
+    } as any);
     const forcedResult = await collectionStore.pruneMissing(true);
     expect(invoke).toHaveBeenCalledWith("prune_missing_songs", { force: true });
-    expect(forcedResult).toEqual({ deletedSongs: 500, removedFolders: 10, mergedDuplicates: 0, blockedIncident: undefined });
+    expect(forcedResult).toEqual({
+      deletedSongs: 500,
+      removedFolders: 10,
+      mergedDuplicates: 0,
+      blockedIncident: undefined,
+    });
   });
 
   it("handles mass removal safeguard in pruneMissing and activeMassRemovalIncident lifecycle", async () => {
@@ -517,9 +572,15 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
 
       await expect(collectionStore.relocateDirectoryDialog("E:\\Music")).resolves.toBe(true);
 
-      expect(invoke).toHaveBeenCalledWith("relocate_directory", { oldPath: "E:\\Music", newPath: "F:\\Music" });
+      expect(invoke).toHaveBeenCalledWith("relocate_directory", {
+        oldPath: "E:\\Music",
+        newPath: "F:\\Music",
+      });
       expect(invoke).toHaveBeenCalledWith("get_directories");
-      expect(invoke).toHaveBeenCalledWith("scan_directories", { force: false, reason: "folder_relocated" });
+      expect(invoke).toHaveBeenCalledWith("scan_directories", {
+        force: false,
+        reason: "folder_relocated",
+      });
       expect(toastStore.messages.map((m) => [m.text, m.variant])).toContainEqual([
         "Re-linked 1,200 songs to F:\\Music",
         "success",
@@ -551,11 +612,17 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
   it("toggles and persists watchFoldersRealtime and scanOnStartup settings", async () => {
     await collectionStore.setWatchFoldersRealtime(false);
     expect(collectionStore.watchFoldersRealtime).toBe(false);
-    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "watch_folders_realtime", value: "false" });
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+      key: "watch_folders_realtime",
+      value: "false",
+    });
 
     await collectionStore.setScanOnStartup(true);
     expect(collectionStore.scanOnStartup).toBe(true);
-    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "scan_on_startup", value: "true" });
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+      key: "scan_on_startup",
+      value: "true",
+    });
   });
 
   it("progressively hydrates remaining songs in chunks when total_songs exceeds initial chunk (#1811)", async () => {

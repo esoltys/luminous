@@ -156,9 +156,14 @@ export function readImageDimensions(filePath: string): { width: number; height: 
 /**
  * Extracts all screenshot image references and declared HTML dimensions from guide HTML files.
  */
-export function extractHtmlImageReferences(guideDir: string = USER_GUIDE_DIR): Record<string, GuideImageEntry[]> {
+export function extractHtmlImageReferences(
+  guideDir: string = USER_GUIDE_DIR,
+): Record<string, GuideImageEntry[]> {
   const result: Record<string, GuideImageEntry[]> = {};
-  const files = fs.readdirSync(guideDir).filter((f) => GUIDE_FILE_REGEX.test(f)).sort();
+  const files = fs
+    .readdirSync(guideDir)
+    .filter((f) => GUIDE_FILE_REGEX.test(f))
+    .sort();
 
   for (const file of files) {
     const langMatch = file.match(GUIDE_FILE_REGEX);
@@ -252,7 +257,7 @@ export function generateManifest(guideDir: string = USER_GUIDE_DIR): GuideManife
  */
 export function writeManifest(
   manifest: GuideManifest,
-  manifestPath: string = DEFAULT_MANIFEST_PATH
+  manifestPath: string = DEFAULT_MANIFEST_PATH,
 ): void {
   fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
@@ -427,4 +432,3 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log("[guide-manifest] All guide assets and manifest verified successfully.");
   }
 }
-

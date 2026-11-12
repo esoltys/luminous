@@ -123,7 +123,11 @@ describe("UpdaterStore", () => {
   });
 
   it("does not auto-install when the format does not support self-update", async () => {
-    updaterStore.installFormat = { format: "deb", human_name: "Debian Package (.deb)", supports_self_update: false };
+    updaterStore.installFormat = {
+      format: "deb",
+      human_name: "Debian Package (.deb)",
+      supports_self_update: false,
+    };
     const update = fakeUpdate({ version: "2.0.0" });
     vi.mocked(check).mockResolvedValueOnce(update);
     updaterStore.updateAutoInstall = true;
@@ -182,7 +186,11 @@ describe("UpdaterStore", () => {
       expect(variant).toBe("success");
       expect(durationMs).toBeUndefined();
       expect(url).toBeUndefined();
-      expect(action).toEqual({ label: expect.any(String), onClick: expect.any(Function), icon: "refresh" });
+      expect(action).toEqual({
+        label: expect.any(String),
+        onClick: expect.any(Function),
+        icon: "refresh",
+      });
     });
 
     it("wires the toast's restart action to restartNow(), which installs then relaunches", async () => {
@@ -223,7 +231,9 @@ describe("UpdaterStore", () => {
     // e.g. `pendingUpdate` got replaced by a fresh, not-yet-downloaded Update
     // object — the plugin's `install()` rejects with "called before download".
     const update = fakeUpdate({ version: "2.0.0" });
-    update.install = vi.fn().mockRejectedValue(new Error("Update.install called before Update.download"));
+    update.install = vi
+      .fn()
+      .mockRejectedValue(new Error("Update.install called before Update.download"));
     vi.mocked(check).mockResolvedValueOnce(update);
     await updaterStore.checkForUpdates();
     const showSpy = vi.spyOn(toastStore, "show");
@@ -263,7 +273,14 @@ describe("UpdaterStore", () => {
         expect(updaterStore.isExternallyManaged).toBe(true);
       }
 
-      for (const format of ["windows_setup", "appimage", "snap", "system_pkg", "linux_generic", "unknown"]) {
+      for (const format of [
+        "windows_setup",
+        "appimage",
+        "snap",
+        "system_pkg",
+        "linux_generic",
+        "unknown",
+      ]) {
         updaterStore.installFormat = { format, human_name: format, supports_self_update: false };
         expect(updaterStore.externallyManagedFormat).toBe(null);
         expect(updaterStore.isExternallyManaged).toBe(false);
@@ -274,7 +291,11 @@ describe("UpdaterStore", () => {
       const { invoke } = await import("@tauri-apps/api/core");
       vi.mocked(invoke).mockImplementation((cmd: string) => {
         if (cmd === "get_install_format") {
-          return Promise.resolve({ format: "msix", human_name: "Microsoft Store", supports_self_update: false });
+          return Promise.resolve({
+            format: "msix",
+            human_name: "Microsoft Store",
+            supports_self_update: false,
+          });
         }
         return Promise.resolve({});
       });

@@ -2,9 +2,9 @@ name: "CodeQL Advanced"
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   schedule:
-    - cron: '43 21 * * 6'
+    - cron: "43 21 * * 6"
   workflow_dispatch:
 
 concurrency:
@@ -24,46 +24,46 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - language: actions
-          build-mode: none
-          scope: actions
-        - language: javascript-typescript
-          build-mode: none
-          scope: frontend
-        - language: rust
-          build-mode: none
-          scope: backend
+          - language: actions
+            build-mode: none
+            scope: actions
+          - language: javascript-typescript
+            build-mode: none
+            scope: frontend
+          - language: rust
+            build-mode: none
+            scope: backend
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      with:
-        fetch-depth: 2
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 2
 
-    # Evaluates fail-open (true) on push to main, schedule, and workflow_dispatch,
-    # ensuring all analysis legs run unconditionally across full repository scans.
-    - name: Check if CodeQL analysis should run
-      id: scope
-      run: bash scripts/ci-should-run.sh ${{ matrix.scope }}
+      # Evaluates fail-open (true) on push to main, schedule, and workflow_dispatch,
+      # ensuring all analysis legs run unconditionally across full repository scans.
+      - name: Check if CodeQL analysis should run
+        id: scope
+        run: bash scripts/ci-should-run.sh ${{ matrix.scope }}
 
-    - name: Initialize CodeQL
-      if: steps.scope.outputs.run == 'true'
-      uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
-      with:
-        languages: ${{ matrix.language }}
-        build-mode: ${{ matrix.build-mode }}
-        # Exclude build output and third-party/static trees from source indexing:
-        config: |
-          paths-ignore:
-            - target/**
-            - node_modules/**
-            - build/**
-            - static/**
-            - verification/**
-            - docs/**
+      - name: Initialize CodeQL
+        if: steps.scope.outputs.run == 'true'
+        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # Exclude build output and third-party/static trees from source indexing:
+          config: |
+            paths-ignore:
+              - target/**
+              - node_modules/**
+              - build/**
+              - static/**
+              - verification/**
+              - docs/**
 
-    - name: Perform CodeQL Analysis
-      if: steps.scope.outputs.run == 'true'
-      uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
-      with:
-        category: "/language:${{matrix.language}}"
+      - name: Perform CodeQL Analysis
+        if: steps.scope.outputs.run == 'true'
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
+        with:
+          category: "/language:${{matrix.language}}"

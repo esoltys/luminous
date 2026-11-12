@@ -42,7 +42,9 @@ export function importErrorMessage(raw: unknown): string {
     case "malformed":
       return i18n.t("equalizer.importErrorMalformed", { line: err.line });
     case "out_of_range": {
-      const field = { freq: "equalizer.frequency", gain: "equalizer.gain", q: "equalizer.qFactor" }[err.field];
+      const field = { freq: "equalizer.frequency", gain: "equalizer.gain", q: "equalizer.qFactor" }[
+        err.field
+      ];
       return i18n.t("equalizer.importErrorOutOfRange", {
         line: err.line,
         field: i18n.t(field),

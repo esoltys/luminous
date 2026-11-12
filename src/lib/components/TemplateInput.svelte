@@ -51,7 +51,8 @@
 />
 
 <div class="flex flex-wrap items-center gap-1.5 pt-1">
-  <span class="text-[11px] text-brand-text-secondary mr-1">{i18n.t("organizer.placeholders")}:</span>
+  <span class="text-[11px] text-brand-text-secondary mr-1">{i18n.t("organizer.placeholders")}:</span
+  >
   {#each VARIABLE_CHIPS as chip}
     {@const shown = chip.label === "/" ? i18n.t("organizer.chipFolderLabel") : chip.label}
     <HelpTip

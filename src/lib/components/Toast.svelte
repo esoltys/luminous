@@ -12,7 +12,7 @@
     XIcon as X,
     ClipboardIcon as Clipboard,
     CheckIcon as Check,
-    ArrowsClockwiseIcon as RefreshCw
+    ArrowsClockwiseIcon as RefreshCw,
   } from "phosphor-svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -91,15 +91,17 @@
       out:fade={{ duration: 150 }}
       class="pointer-events-auto flex items-start gap-2.5 px-4 py-2.5 rounded-lg border shadow-2xl text-sm font-semibold max-w-md
         {toast.variant === 'error'
-          ? 'bg-brand-sidebar border-brand-text-primary text-brand-text-primary anim-warn-shake'
-          : toast.variant === 'warning'
-            ? 'bg-brand-sidebar border-brand-text-primary/50 text-brand-text-primary anim-warn-shake'
-            : toast.variant === 'milestone'
-              ? 'bg-[#1f1a12] border-brand-gold/50 text-brand-gold'
-              : 'bg-brand-sidebar border-brand-border text-brand-text-primary'}"
+        ? 'bg-brand-sidebar border-brand-text-primary text-brand-text-primary anim-warn-shake'
+        : toast.variant === 'warning'
+          ? 'bg-brand-sidebar border-brand-text-primary/50 text-brand-text-primary anim-warn-shake'
+          : toast.variant === 'milestone'
+            ? 'bg-[#1f1a12] border-brand-gold/50 text-brand-gold'
+            : 'bg-brand-sidebar border-brand-border text-brand-text-primary'}"
     >
       {#if toast.task}
-        <div class="relative w-4 h-4 shrink-0 flex items-center justify-center translate-y-[calc((1lh-1rem)/2)]">
+        <div
+          class="relative w-4 h-4 shrink-0 flex items-center justify-center translate-y-[calc((1lh-1rem)/2)]"
+        >
           {#if toast.task.status === "running"}
             {#if typeof toast.task.progress === "number"}
               <svg class="w-4 h-4 -rotate-90 origin-center shrink-0" viewBox="0 0 20 20">
@@ -122,7 +124,11 @@
                 />
               </svg>
             {:else}
-              <svg class="w-4 h-4 animate-spin text-brand-accent-text shrink-0" viewBox="0 0 20 20" fill="none">
+              <svg
+                class="w-4 h-4 animate-spin text-brand-accent-text shrink-0"
+                viewBox="0 0 20 20"
+                fill="none"
+              >
                 <circle
                   cx="10"
                   cy="10"
@@ -149,13 +155,17 @@
       {:else if toast.variant === "warning"}
         <AlertTriangle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
       {:else if toast.variant === "success"}
-        <span class="relative inline-flex w-4 h-4 shrink-0 items-center justify-center translate-y-[calc((1lh-1rem)/2)]">
+        <span
+          class="relative inline-flex w-4 h-4 shrink-0 items-center justify-center translate-y-[calc((1lh-1rem)/2)]"
+        >
           <span class="absolute inset-0 rounded-full anim-glow-ring"></span>
           <CheckCircle2 class="w-4 h-4 text-brand-accent-text anim-check-pop" />
         </span>
       {:else if toast.variant === "milestone"}
         {@const MilestoneIcon = MILESTONE_ICONS[toast.milestoneIcon ?? "checks"]}
-        <span class="relative inline-flex w-5 h-5 shrink-0 items-center justify-center translate-y-[calc((1lh-1.25rem)/2)]">
+        <span
+          class="relative inline-flex w-5 h-5 shrink-0 items-center justify-center translate-y-[calc((1lh-1.25rem)/2)]"
+        >
           <span class="absolute inset-0 rounded-full anim-gold-ring"></span>
           <MilestoneIcon
             class="w-5 h-5 text-brand-gold anim-milestone-bounce"
@@ -172,7 +182,9 @@
               class="text-pretty transition-all duration-200"
               class:text-brand-text-secondary={toast.task.status === "done"}
             >
-              {toast.task.status === "done" ? (toast.task.completedText || toast.task.taskName || toast.text) : toast.text}
+              {toast.task.status === "done"
+                ? toast.task.completedText || toast.task.taskName || toast.text
+                : toast.text}
             </span>
             {#if toast.task.status === "running" && toast.task.current !== undefined && toast.task.total !== undefined}
               <span class="text-xs font-mono text-brand-text-secondary shrink-0 select-none">
@@ -181,7 +193,9 @@
             {/if}
           </div>
           {#if toast.task.status === "running" && typeof toast.task.progress === "number"}
-            <div class="w-full bg-brand-main rounded-full h-1 overflow-hidden border border-brand-border/40 mt-1.5">
+            <div
+              class="w-full bg-brand-main rounded-full h-1 overflow-hidden border border-brand-border/40 mt-1.5"
+            >
               <div
                 class="bg-brand-accent h-1 rounded-full transition-all duration-300 ease-out"
                 style="width: {Math.min(100, Math.max(0, toast.task.progress * 100))}%"
@@ -220,11 +234,11 @@
             onclick={() => copyToClipboard(toast.id, toast.text)}
             class="opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded cursor-pointer"
             title={copiedToastId === toast.id
-              ? i18n.t('toast.copied', {}, 'Copied to clipboard')
-              : i18n.t('toast.copyError', {}, 'Copy error to clipboard')}
+              ? i18n.t("toast.copied", {}, "Copied to clipboard")
+              : i18n.t("toast.copyError", {}, "Copy error to clipboard")}
             aria-label={copiedToastId === toast.id
-              ? i18n.t('toast.copied', {}, 'Copied to clipboard')
-              : i18n.t('toast.copyError', {}, 'Copy error to clipboard')}
+              ? i18n.t("toast.copied", {}, "Copied to clipboard")
+              : i18n.t("toast.copyError", {}, "Copy error to clipboard")}
           >
             {#if copiedToastId === toast.id}
               <Check class="w-3.5 h-3.5 text-brand-accent-text" />
@@ -243,8 +257,8 @@
             toastStore.dismiss(toast.id);
           }}
           class="opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded cursor-pointer"
-          title={i18n.t('toast.dismiss', {}, 'Dismiss notification')}
-          aria-label={i18n.t('toast.dismiss', {}, 'Dismiss notification')}
+          title={i18n.t("toast.dismiss", {}, "Dismiss notification")}
+          aria-label={i18n.t("toast.dismiss", {}, "Dismiss notification")}
         >
           <X class="w-3.5 h-3.5" />
         </button>

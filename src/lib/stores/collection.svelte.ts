@@ -34,7 +34,12 @@ import type {
   FolderSearchResult,
 } from "../types";
 import { parseSubsonicPath } from "../utils/remoteSource";
-import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
+import {
+  applySongStats,
+  type SongStatsPayload,
+  applyAlbumStats,
+  type AlbumStatsPayload,
+} from "../utils/stats";
 import { navigationStore } from "./navigation.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { tagsStore } from "./tags.svelte";
@@ -115,7 +120,7 @@ export function getDirectoryDisplayName(dir: MusicDirectory): string {
 
 export function resolveScanLibraryName(
   payload: ScanProgress,
-  directories: MusicDirectory[]
+  directories: MusicDirectory[],
 ): string {
   if (payload.directory_name && payload.directory_name.trim().length > 0) {
     return payload.directory_name.trim();
@@ -131,7 +136,10 @@ export function resolveScanLibraryName(
       return normCur.startsWith(normDir);
     });
     if (matched) return getDirectoryDisplayName(matched);
-    const parent = payload.current_path.replace(/[\\/][^\\/]+$/, "").split(/[\\/]/).pop();
+    const parent = payload.current_path
+      .replace(/[\\/][^\\/]+$/, "")
+      .split(/[\\/]/)
+      .pop();
     if (parent && parent.trim().length > 0) {
       return parent.trim();
     }
@@ -191,7 +199,6 @@ class CollectionStore {
   dbSchemaStatus = $state<DbSchemaStatus | null>(null);
   isScanning = $state<boolean>(false);
   scanProgress = $state<ScanProgress | null>(null);
-
 
   /** Celebration moment states (issue #182) — consumed by Toast and layout. */
   isFirstLaunch = $state<boolean>(false);
@@ -287,7 +294,7 @@ class CollectionStore {
         }
       }
       return defaultCols;
-    })()
+    })(),
   );
 
   toggleColumn(column: keyof VisibleColumns) {
@@ -310,7 +317,7 @@ class CollectionStore {
         }
       }
       return {};
-    })()
+    })(),
   );
 
   setColumnWidth(column: keyof VisibleColumns, widthPx: number) {
@@ -337,7 +344,7 @@ class CollectionStore {
 
   openSmartBuilder(
     rules?: Array<{ field: string; op: string; value: string }>,
-    editing?: { id: number; name: string; populationMode?: QueuePopulationMode }
+    editing?: { id: number; name: string; populationMode?: QueuePopulationMode },
   ) {
     this.smartBuilderRules = rules || [];
     this.smartBuilderEditing = editing ?? null;
@@ -406,7 +413,9 @@ class CollectionStore {
           try {
             const { getVersion } = await import("@tauri-apps/api/app");
             appVersion = await getVersion();
-          } catch { /* not in Tauri context */ }
+          } catch {
+            /* not in Tauri context */
+          }
         }
         if (appVersion && settings.launched_version !== appVersion) {
           this.isFirstLaunch = true;
@@ -416,13 +425,23 @@ class CollectionStore {
           const isFirstEver = !settings.launched_version;
           setTimeout(() => {
             const msg = isFirstEver
-              ? i18n.t("celebrations.firstLaunch", { version: appVersion }, `Welcome to Luminous v${appVersion}!`)
-              : i18n.t("celebrations.newVersion", { version: appVersion }, `Updated to Luminous v${appVersion}`);
+              ? i18n.t(
+                  "celebrations.firstLaunch",
+                  { version: appVersion },
+                  `Welcome to Luminous v${appVersion}!`,
+                )
+              : i18n.t(
+                  "celebrations.newVersion",
+                  { version: appVersion },
+                  `Updated to Luminous v${appVersion}`,
+                );
             const releaseUrl = isFirstEver
               ? undefined
               : "https://github.com/esoltys/luminous/releases";
             toastStore.celebrate(msg, isFirstEver ? "star" : "sparkle", releaseUrl);
-            setTimeout(() => { this.isFirstLaunch = false; }, 700);
+            setTimeout(() => {
+              this.isFirstLaunch = false;
+            }, 700);
           }, 1200);
         }
       }
@@ -476,11 +495,9 @@ class CollectionStore {
 
             const externalChanges = event.payload.external_changes ?? 0;
             if (externalChanges > 0 && !event.payload.silent) {
-              const externalText = i18n.plural(
-                "collection.externalChangesToast",
-                externalChanges,
-                { name: libraryName }
-              );
+              const externalText = i18n.plural("collection.externalChangesToast", externalChanges, {
+                name: libraryName,
+              });
               toastStore.show(externalText, "info");
             }
 
@@ -489,15 +506,14 @@ class CollectionStore {
             // milestone toasts if an import jumps past several at once).
             const newTotal = this.stats.total_songs;
             const threshold = MILESTONE_THRESHOLDS.findLast(
-              (t) => songCountBeforeRefresh < t && newTotal >= t
+              (t) => songCountBeforeRefresh < t && newTotal >= t,
             );
             if (threshold !== undefined) {
               this.milestoneReached = threshold;
-              toastStore.celebrate(
-                i18n.plural("celebrations.milestone", threshold),
-                "flag"
-              );
-              setTimeout(() => { this.milestoneReached = null; }, 700);
+              toastStore.celebrate(i18n.plural("celebrations.milestone", threshold), "flag");
+              setTimeout(() => {
+                this.milestoneReached = null;
+              }, 700);
             }
           });
           this.refreshLibrary();
@@ -556,7 +572,10 @@ class CollectionStore {
       await this.events.listen<BatchProgress>("batch-processing-progress", (event) => {
         const { current_count, total_count } = event.payload;
         tasksStore.updateTask(WATCHER_TASK_ID, {
-          label: i18n.t("settings.batchProcessingToast", { current: current_count, total: total_count }),
+          label: i18n.t("settings.batchProcessingToast", {
+            current: current_count,
+            total: total_count,
+          }),
           current: current_count,
           total: total_count,
         });
@@ -574,21 +593,34 @@ class CollectionStore {
 
       // Track WebDAV synchronization (#682, #1083, #1087)
       await this.events.listen<WebDavSyncProgressPayload>("webdav-sync-progress", (event) => {
-        const { server_id, server_name, current_count, added, updated, errors, done, daily_check } = event.payload;
+        const { server_id, server_name, current_count, added, updated, errors, done, daily_check } =
+          event.payload;
         const taskId = `webdav-sync-${server_id}`;
         if (done) {
-          const summary = i18n.t("settings.webdavSyncComplete", {
-            added,
-            updated,
-            errors,
-          }, `Sync complete: ${added} added, ${updated} updated, ${errors} errors`);
+          const summary = i18n.t(
+            "settings.webdavSyncComplete",
+            {
+              added,
+              updated,
+              errors,
+            },
+            `Sync complete: ${added} added, ${updated} updated, ${errors} errors`,
+          );
           tasksStore.completeTask(taskId, `${server_name}: ${summary}`);
           this.refreshWebDavServers();
         } else {
           const label = daily_check
-            ? i18n.t("tasks.syncingWebdavDaily", { name: server_name, count: current_count }, `Daily full check of ${server_name} (${current_count} items)...`)
+            ? i18n.t(
+                "tasks.syncingWebdavDaily",
+                { name: server_name, count: current_count },
+                `Daily full check of ${server_name} (${current_count} items)...`,
+              )
             : current_count > 0
-              ? i18n.t("tasks.syncingWebdavCount", { name: server_name, count: current_count }, `Syncing ${server_name} (${current_count} items)...`)
+              ? i18n.t(
+                  "tasks.syncingWebdavCount",
+                  { name: server_name, count: current_count },
+                  `Syncing ${server_name} (${current_count} items)...`,
+                )
               : i18n.t("tasks.syncingWebdav", { name: server_name }, `Syncing ${server_name}...`);
 
           if (!tasksStore.isTaskActive(taskId)) {
@@ -614,21 +646,26 @@ class CollectionStore {
         if (done) {
           // An auto-sync that fails before its first progress event still
           // needs a task to fail.
-          if (!tasksStore.isTaskActive(taskId)) tasksStore.startTask({ id: taskId, label: serverName, contextName: serverName });
+          if (!tasksStore.isTaskActive(taskId))
+            tasksStore.startTask({ id: taskId, label: serverName, contextName: serverName });
           if (error) {
-            tasksStore.failTask(taskId, i18n.t("settings.subsonicSyncFailed", { name: serverName, error }));
+            tasksStore.failTask(
+              taskId,
+              i18n.t("settings.subsonicSyncFailed", { name: serverName, error }),
+            );
           } else {
             tasksStore.completeTask(
               taskId,
-              `${serverName}: ${i18n.t("settings.subsonicSyncComplete", { ...stats })}`
+              `${serverName}: ${i18n.t("settings.subsonicSyncComplete", { ...stats })}`,
             );
           }
           this.refreshSubsonicServers();
           return;
         }
-        const label = currentCount > 0
-          ? i18n.t("tasks.syncingWebdavCount", { name: serverName, count: currentCount })
-          : i18n.t("tasks.syncingWebdav", { name: serverName });
+        const label =
+          currentCount > 0
+            ? i18n.t("tasks.syncingWebdavCount", { name: serverName, count: currentCount })
+            : i18n.t("tasks.syncingWebdav", { name: serverName });
         if (!tasksStore.isTaskActive(taskId)) {
           tasksStore.startTask({ id: taskId, label, contextName: serverName });
         } else {
@@ -641,7 +678,10 @@ class CollectionStore {
         const { current, total, title, done } = event.payload;
         const taskId = "album-tag-save";
         if (done) {
-          tasksStore.completeTask(taskId, i18n.t("tasks.albumTagsSaved", { album: title }, `Saved tags for ${title}`));
+          tasksStore.completeTask(
+            taskId,
+            i18n.t("tasks.albumTagsSaved", { album: title }, `Saved tags for ${title}`),
+          );
         } else {
           if (!tasksStore.isTaskActive(taskId)) {
             tasksStore.startTask({
@@ -663,16 +703,13 @@ class CollectionStore {
         const taskId = "artwork-sweep";
         if (done) {
           if (tasksStore.isTaskActive(taskId)) {
-            tasksStore.completeTask(
-              taskId,
-              i18n.plural("settings.artworkSweepSuccess", current)
-            );
+            tasksStore.completeTask(taskId, i18n.plural("settings.artworkSweepSuccess", current));
           }
         } else {
           const label = i18n.t(
             "tasks.exportingArtworkCount",
             { current, total },
-            `Exporting artwork (${current}/${total})…`
+            `Exporting artwork (${current}/${total})…`,
           );
           if (!tasksStore.isTaskActive(taskId)) {
             tasksStore.startTask({
@@ -759,7 +796,7 @@ class CollectionStore {
 
   async updateDirectoryMetadata(
     id: number,
-    metadata: { nickname?: string | null; icon?: string | null; color?: string | null }
+    metadata: { nickname?: string | null; icon?: string | null; color?: string | null },
   ) {
     await invoke("update_directory_metadata", {
       id,
@@ -1091,7 +1128,7 @@ class CollectionStore {
    * same convention as `retrieveArtistDetails`. */
   async retrieveArtistImage(
     artistName: string,
-    options: { onlyMissing?: boolean } = {}
+    options: { onlyMissing?: boolean } = {},
   ): Promise<ArtistImageRetrievalResult> {
     const result = await invoke<ArtistImageRetrievalResult>("retrieve_artist_image", {
       artist: artistName,
@@ -1182,7 +1219,7 @@ class CollectionStore {
    * cache so cover stacks re-scan and count it. */
   async retrieveAlbumArt(
     albumName: string,
-    options: { onlyMissing?: boolean } = {}
+    options: { onlyMissing?: boolean } = {},
   ): Promise<AlbumArtRetrievalResult> {
     const result = await invoke<AlbumArtRetrievalResult>("retrieve_album_art", {
       album: albumName,
@@ -1250,7 +1287,10 @@ class CollectionStore {
    * match `artistProfiles`. Pass `force` to bypass the cache and re-scan —
    * used by the artist Rescan action (#867) to pick up a portrait/logo/
    * banner the user just added, replaced, or deleted on disk. */
-  async getExtendedArtworkForArtist(artistName: string | null | undefined, force = false): Promise<ExtendedArtworkResponse> {
+  async getExtendedArtworkForArtist(
+    artistName: string | null | undefined,
+    force = false,
+  ): Promise<ExtendedArtworkResponse> {
     if (!artistName) return EMPTY_EXTENDED_ARTWORK;
     const key = artistName.toLowerCase();
     const fetchKey = `artist:${key}`;
@@ -1263,7 +1303,9 @@ class CollectionStore {
       if (inFlight) return inFlight;
     }
 
-    const promise = invoke<ExtendedArtworkResponse>("get_extended_artwork_for_artist", { artist: artistName })
+    const promise = invoke<ExtendedArtworkResponse>("get_extended_artwork_for_artist", {
+      artist: artistName,
+    })
       .then((result) => {
         this.extendedArtworkByArtist = { ...this.extendedArtworkByArtist, [key]: result };
         return result;
@@ -1295,8 +1337,13 @@ class CollectionStore {
     // First watched folder celebration (#182, New tier).
     if (wasEmpty && this.directories.length > 0) {
       this.justAddedFirstFolder = true;
-      toastStore.show(i18n.t("celebrations.firstFolder", {}, "First music folder added!"), "success");
-      setTimeout(() => { this.justAddedFirstFolder = false; }, 400);
+      toastStore.show(
+        i18n.t("celebrations.firstFolder", {}, "First music folder added!"),
+        "success",
+      );
+      setTimeout(() => {
+        this.justAddedFirstFolder = false;
+      }, 400);
     }
 
     this.startScan(false, "folder_added");
@@ -1307,7 +1354,7 @@ class CollectionStore {
       const selected = await open({
         directory: true,
         multiple: false,
-        title: i18n.t('settings.selectMusicDirectory'),
+        title: i18n.t("settings.selectMusicDirectory"),
       });
       if (selected && typeof selected === "string") {
         await this.addDirectory(stripEnclosingQuotes(selected));
@@ -1329,7 +1376,10 @@ class CollectionStore {
     if (!selected || typeof selected !== "string") return false;
     const newPath = stripEnclosingQuotes(selected);
     try {
-      const result = await invoke<{ songs_relocated: number }>("relocate_directory", { oldPath, newPath });
+      const result = await invoke<{ songs_relocated: number }>("relocate_directory", {
+        oldPath,
+        newPath,
+      });
       await this.refreshDirectories();
       toastStore.show(
         i18n.plural("settings.folderLocateSuccess", result.songs_relocated, { path: newPath }),
@@ -1375,7 +1425,7 @@ class CollectionStore {
         onClick: () => {
           this.activeMassRemovalIncident = incident;
         },
-      }
+      },
     );
   }
 
@@ -1466,7 +1516,7 @@ class CollectionStore {
 
     // Deduplicate by title + kind
     const existingIndex = this.recentSearches.findIndex(
-      (r) => r.kind === item.kind && r.title.toLowerCase() === cleanTitle.toLowerCase()
+      (r) => r.kind === item.kind && r.title.toLowerCase() === cleanTitle.toLowerCase(),
     );
     if (existingIndex !== -1) {
       this.recentSearches.splice(existingIndex, 1);
@@ -1507,7 +1557,10 @@ class CollectionStore {
     // Check if query is structured search with artist-tag or tag
     const tagMatch = rawQuery.match(/^(?:artist[-_]?tags?|artisttags?|tags?):(.+)$/i);
     if (tagMatch) {
-      const tagQuery = tagMatch[1].replace(/^['"]|['"]$/g, "").trim().toLowerCase();
+      const tagQuery = tagMatch[1]
+        .replace(/^['"]|['"]$/g, "")
+        .trim()
+        .toLowerCase();
       if (!tagQuery) return this.albums;
       return this.albums.filter((album) => {
         if (!album.artist) return false;
@@ -1535,7 +1588,10 @@ class CollectionStore {
     // Check if query is structured search with artist-tag or tag
     const tagMatch = rawQuery.match(/^(?:artist[-_]?tags?|artisttags?|tags?):(.+)$/i);
     if (tagMatch) {
-      const tagQuery = tagMatch[1].replace(/^['"]|['"]$/g, "").trim().toLowerCase();
+      const tagQuery = tagMatch[1]
+        .replace(/^['"]|['"]$/g, "")
+        .trim()
+        .toLowerCase();
       if (!tagQuery) return this.artists;
       return this.artists.filter((artist) => {
         if (!artist.name) return false;

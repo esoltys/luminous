@@ -36,9 +36,7 @@ class StatsExclusionsStore {
   async refresh() {
     try {
       const pairs = await invoke<[string, string][]>("get_stats_exclusions");
-      this.keys = new Set(
-        (pairs ?? []).map(([type, key]) => `${type}:${normalizeKey(type, key)}`)
-      );
+      this.keys = new Set((pairs ?? []).map(([type, key]) => `${type}:${normalizeKey(type, key)}`));
     } catch (err) {
       console.error("Failed to load stats exclusions:", err);
     }
@@ -85,18 +83,17 @@ class StatsExclusionsStore {
     await this.setExcluded(entityType, entityKey, !this.isExcluded(entityType, entityKey));
   }
 
-  async toggleWithToast(
-    entityType: StatsEntityType,
-    entityKey: string,
-    displayName?: string
-  ) {
+  async toggleWithToast(entityType: StatsEntityType, entityKey: string, displayName?: string) {
     const excluded = !this.isExcluded(entityType, entityKey);
     await this.setExcluded(entityType, entityKey, excluded);
     const fallback =
-      entityType === "album" ? i18n.t("collection.unknownAlbum") :
-      entityType === "artist" ? i18n.t("collection.unknownArtist") :
-      entityType === "song" ? i18n.t("collection.unknownSong") :
-      entityKey;
+      entityType === "album"
+        ? i18n.t("collection.unknownAlbum")
+        : entityType === "artist"
+          ? i18n.t("collection.unknownArtist")
+          : entityType === "song"
+            ? i18n.t("collection.unknownSong")
+            : entityKey;
     const name = displayName || (entityKey ? entityKey : fallback);
     const message = excluded
       ? i18n.t("stats.excludedToast", { name })
@@ -115,8 +112,7 @@ export const statsExclusionsStore = new StatsExclusionsStore();
 export async function toggleStatsExcluded(
   entityType: StatsEntityType,
   entityKey: string,
-  displayName?: string
+  displayName?: string,
 ) {
   return statsExclusionsStore.toggleWithToast(entityType, entityKey, displayName);
 }
-

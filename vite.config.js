@@ -39,8 +39,7 @@ function safeTailwindcss() {
   return pluginArray.map((plugin) => {
     if (!plugin || !plugin.transform) return plugin;
     const rawTransform = plugin.transform;
-    const transformFn =
-      typeof rawTransform === "function" ? rawTransform : rawTransform.handler;
+    const transformFn = typeof rawTransform === "function" ? rawTransform : rawTransform.handler;
     if (typeof transformFn !== "function") return plugin;
 
     const wrappedTransform = async function (code, id, options) {
@@ -79,7 +78,10 @@ function phosphorBarrelOptimizer() {
   const require = createRequire(import.meta.url);
   let phosphorLibDir;
   try {
-    phosphorLibDir = path.resolve(path.dirname(require.resolve("phosphor-svelte/package.json")), "lib");
+    phosphorLibDir = path.resolve(
+      path.dirname(require.resolve("phosphor-svelte/package.json")),
+      "lib",
+    );
   } catch {
     phosphorLibDir = path.resolve(projectRoot, "node_modules/phosphor-svelte/lib");
   }

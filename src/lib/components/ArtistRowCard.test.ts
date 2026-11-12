@@ -103,7 +103,9 @@ describe("ArtistRowCard.svelte", () => {
 
     const portrait = await findByAltText("Dave Hawkins");
     expect(portrait.tagName).toBe("IMG");
-    expect(portrait.getAttribute("src")).toBe("luminous-art://local/C:/Music/Dave Hawkins/artist.jpg");
+    expect(portrait.getAttribute("src")).toBe(
+      "luminous-art://local/C:/Music/Dave Hawkins/artist.jpg",
+    );
   });
   it("forwards right-click to the oncontextmenu prop", async () => {
     const oncontextmenu = vi.fn();

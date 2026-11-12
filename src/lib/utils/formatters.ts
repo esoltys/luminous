@@ -64,7 +64,8 @@ export const STORAGE_MB = 1_000_000;
 export const STORAGE_GB = 1_000_000_000;
 
 export function formatStorageSize(bytes: number): string {
-  const [value, unit] = bytes >= STORAGE_GB ? [bytes / STORAGE_GB, "GB"] : [bytes / STORAGE_MB, "MB"];
+  const [value, unit] =
+    bytes >= STORAGE_GB ? [bytes / STORAGE_GB, "GB"] : [bytes / STORAGE_MB, "MB"];
   return `${formatNumber(value, { maximumFractionDigits: 1 })} ${unit}`;
 }
 
@@ -93,7 +94,7 @@ export function toTitleCase(str: string): string {
 export function formatWindowTitle(
   song?: { title?: string | null; artist?: string | null } | null,
   state?: PlayState,
-  appName = "Luminous"
+  appName = "Luminous",
 ): string {
   if (state !== "playing" || !song) {
     return appName;
@@ -108,4 +109,3 @@ export function formatWindowTitle(
   }
   return `${title} - ${appName}`;
 }
-

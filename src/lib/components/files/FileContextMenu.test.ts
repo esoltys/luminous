@@ -50,17 +50,20 @@ function song(id: number, title: string): Song {
 
 const library = { 7: song(7, "Opening"), 8: song(8, "Encore") } as Record<number, Song>;
 
-function open(entries: FileEntry[], over: {
-  source?: FileSource;
-  scannable?: boolean;
-  inColumn?: boolean;
-  fromHeader?: boolean;
-  folderLocation?: string | null;
-  onFolderSettings?: () => void;
-  onEditFileTags?: (entry: FileEntry) => void;
-  onEditFolderTags?: (dir: FileEntry, dirPath: string[]) => void;
-  onEditBatchTags?: (entries: FileEntry[]) => void;
-} = {}) {
+function open(
+  entries: FileEntry[],
+  over: {
+    source?: FileSource;
+    scannable?: boolean;
+    inColumn?: boolean;
+    fromHeader?: boolean;
+    folderLocation?: string | null;
+    onFolderSettings?: () => void;
+    onEditFileTags?: (entry: FileEntry) => void;
+    onEditFolderTags?: (dir: FileEntry, dirPath: string[]) => void;
+    onEditBatchTags?: (entries: FileEntry[]) => void;
+  } = {},
+) {
   const onClose = vi.fn();
   const onEditTags = vi.fn();
   const onEditFileTags = over.onEditFileTags ?? vi.fn();
@@ -87,7 +90,14 @@ function open(entries: FileEntry[], over: {
       onClose,
     },
   });
-  return { onClose, onEditTags, onEditFileTags, onEditFolderTags, onEditBatchTags, onFolderSettings };
+  return {
+    onClose,
+    onEditTags,
+    onEditFileTags,
+    onEditFolderTags,
+    onEditBatchTags,
+    onFolderSettings,
+  };
 }
 
 describe("FileContextMenu.svelte", () => {
@@ -101,20 +111,41 @@ describe("FileContextMenu.svelte", () => {
   });
 
   it("gives a folder the folder actions, acting on that folder", async () => {
-    const addToQueue = vi.spyOn(playlistsStore, "addSongsToQueue").mockResolvedValue(undefined as never);
-    open([entry("Disc 2", { isDir: true, status: null, fileType: null, location: "C:/Music/Live/Disc 2" })]);
+    const addToQueue = vi
+      .spyOn(playlistsStore, "addSongsToQueue")
+      .mockResolvedValue(undefined as never);
+    open([
+      entry("Disc 2", {
+        isDir: true,
+        status: null,
+        fileType: null,
+        location: "C:/Music/Live/Disc 2",
+      }),
+    ]);
 
-    for (const label of ["Play folder", "Add to Queue", "New playlist from folder", "Scan this folder", "Copy path"]) {
+    for (const label of [
+      "Play folder",
+      "Add to Queue",
+      "New playlist from folder",
+      "Scan this folder",
+      "Copy path",
+    ]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
     await fireEvent.click(screen.getByText("Add to Queue"));
     await waitFor(() => expect(addToQueue).toHaveBeenCalledWith([7, 8]));
-    expect(invoke).toHaveBeenCalledWith("get_source_songs", { source: folderSource, path: ["Live", "Disc 2"] });
+    expect(invoke).toHaveBeenCalledWith("get_source_songs", {
+      source: folderSource,
+      path: ["Live", "Disc 2"],
+    });
     addToQueue.mockRestore();
   });
 
   it("gives a folder in a folder column the file actions only", () => {
-    open([entry("Rock", { isDir: true, status: null, fileType: null, location: "C:/Music/Rock" })], { inColumn: true });
+    open(
+      [entry("Rock", { isDir: true, status: null, fileType: null, location: "C:/Music/Rock" })],
+      { inColumn: true },
+    );
 
     expect(screen.getAllByRole("menuitem").map((b) => b.textContent?.trim())).toEqual([
       "Edit tags for folder",
@@ -133,7 +164,9 @@ describe("FileContextMenu.svelte", () => {
   });
 
   it("acts on the library songs of a mixed selection and says how many files it left out", async () => {
-    const addToQueue = vi.spyOn(playlistsStore, "addSongsToQueue").mockResolvedValue(undefined as never);
+    const addToQueue = vi
+      .spyOn(playlistsStore, "addSongsToQueue")
+      .mockResolvedValue(undefined as never);
     const show = vi.spyOn(toastStore, "show");
     open([
       entry("01 Opening.flac", { status: "inLibrary", songId: 7 }),
@@ -144,7 +177,7 @@ describe("FileContextMenu.svelte", () => {
     await fireEvent.click(await screen.findByText("Add to Queue"));
     await waitFor(() => expect(addToQueue).toHaveBeenCalledWith([7, 8]));
     expect(show).toHaveBeenCalledWith(
-      "Added 2 songs to Queue. 1 file isn't in your library yet: scan this folder to include it."
+      "Added 2 songs to Queue. 1 file isn't in your library yet: scan this folder to include it.",
     );
     addToQueue.mockRestore();
     show.mockRestore();
@@ -162,22 +195,37 @@ describe("FileContextMenu.svelte", () => {
 
   it("leads a sidecar's menu with Open, which opens it in its app", async () => {
     vi.mocked(invoke).mockResolvedValue("opened");
-    open([entry("album.md", { status: "notAudio", kind: "notes", opensInApp: true, fileType: "MD" })]);
+    open([
+      entry("album.md", { status: "notAudio", kind: "notes", opensInApp: true, fileType: "MD" }),
+    ]);
 
     const items = screen.getAllByRole("menuitem");
     expect(items[0]).toHaveTextContent("Open");
     await fireEvent.click(items[0]);
-    expect(invoke).toHaveBeenCalledWith("open_source_file", { source: folderSource, path: ["Live", "album.md"] });
+    expect(invoke).toHaveBeenCalledWith("open_source_file", {
+      source: folderSource,
+      path: ["Live", "album.md"],
+    });
   });
 
   it("says why a sidecar was shown in its folder instead", async () => {
     vi.mocked(invoke).mockResolvedValue("revealed");
     const show = vi.spyOn(toastStore, "show");
-    open([entry("rip.cue", { status: "inLibrary", kind: "cueSheet", opensInApp: true, fileType: "CUE" })]);
+    open([
+      entry("rip.cue", {
+        status: "inLibrary",
+        kind: "cueSheet",
+        opensInApp: true,
+        fileType: "CUE",
+      }),
+    ]);
 
     await fireEvent.click(screen.getByText("Open"));
     await waitFor(() =>
-      expect(show).toHaveBeenCalledWith("No app is set up to open .cue files, so it's shown in its folder instead.", "info")
+      expect(show).toHaveBeenCalledWith(
+        "No app is set up to open .cue files, so it's shown in its folder instead.",
+        "info",
+      ),
     );
     show.mockRestore();
   });
@@ -203,12 +251,24 @@ describe("FileContextMenu.svelte", () => {
     expect(screen.getByText("Open in Picard")).toBeInTheDocument();
 
     await fireEvent.click(screen.getByText("Edit tags"));
-    expect(onEditFileTags).toHaveBeenCalledWith(expect.objectContaining({ name: "13 Unfurl (bonus).flac" }));
+    expect(onEditFileTags).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "13 Unfurl (bonus).flac" }),
+    );
   });
 
   it("offers Edit tags for folder and Open in Picard for a folder", async () => {
     const onEditFolderTags = vi.fn();
-    open([entry("2009 - Night Is the New Day", { isDir: true, status: null, fileType: null, location: "C:/Music/2009" })], { onEditFolderTags });
+    open(
+      [
+        entry("2009 - Night Is the New Day", {
+          isDir: true,
+          status: null,
+          fileType: null,
+          location: "C:/Music/2009",
+        }),
+      ],
+      { onEditFolderTags },
+    );
 
     expect(screen.getByText("Edit tags for folder")).toBeInTheDocument();
     expect(screen.getByText("Open in Picard")).toBeInTheDocument();
@@ -216,7 +276,7 @@ describe("FileContextMenu.svelte", () => {
     await fireEvent.click(screen.getByText("Edit tags for folder"));
     expect(onEditFolderTags).toHaveBeenCalledWith(
       expect.objectContaining({ name: "2009 - Night Is the New Day" }),
-      ["Live", "2009 - Night Is the New Day"]
+      ["Live", "2009 - Night Is the New Day"],
     );
   });
 
@@ -228,17 +288,22 @@ describe("FileContextMenu.svelte", () => {
     expect(screen.getByText("Open in Picard")).toBeInTheDocument();
 
     await fireEvent.click(screen.getByText("Edit tags"));
-    expect(onEditBatchTags).toHaveBeenCalledWith(expect.arrayContaining([
-      expect.objectContaining({ name: "01 Track.flac" }),
-      expect.objectContaining({ name: "02 Track.flac" }),
-    ]));
+    expect(onEditBatchTags).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "01 Track.flac" }),
+        expect.objectContaining({ name: "02 Track.flac" }),
+      ]),
+    );
   });
 
   it("doesn't open when there's nothing to offer (a sidecar on a server)", () => {
-    const { onClose } = open([entry("cover.jpg", { status: "albumArt", kind: "image", location: null })], {
-      source: { kind: "webdav", id: 2 },
-      scannable: false,
-    });
+    const { onClose } = open(
+      [entry("cover.jpg", { status: "albumArt", kind: "image", location: null })],
+      {
+        source: { kind: "webdav", id: 2 },
+        scannable: false,
+      },
+    );
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(onClose).toHaveBeenCalled();
   });
@@ -280,7 +345,7 @@ describe("FileContextMenu.svelte", () => {
     await fireEvent.click(screen.getByText("Edit tags for folder"));
     expect(onEditFolderTags).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Live", location: "C:/Music/Live" }),
-      ["Live"]
+      ["Live"],
     );
   });
 

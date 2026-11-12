@@ -101,7 +101,9 @@ describe("WalkthroughOverlay.svelte", () => {
     await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
 
     for (let i = 0; i < walkthroughStore.totalSteps; i++) {
-      await fireEvent.click(screen.getByText(i === walkthroughStore.totalSteps - 1 ? "Finish" : "Next"));
+      await fireEvent.click(
+        screen.getByText(i === walkthroughStore.totalSteps - 1 ? "Finish" : "Next"),
+      );
     }
 
     expect(walkthroughStore.isActive).toBe(false);

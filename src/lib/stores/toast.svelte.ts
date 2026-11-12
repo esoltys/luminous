@@ -51,13 +51,20 @@ class ToastStore {
     progress?: number;
   }): number {
     const existing = this.messages.find((m) => m.task?.taskId === options.taskId);
-    const progress = typeof options.progress === "number"
-      ? options.progress
-      : (typeof options.current === "number" && typeof options.total === "number" && options.total > 0)
-        ? options.current / options.total
-        : undefined;
+    const progress =
+      typeof options.progress === "number"
+        ? options.progress
+        : typeof options.current === "number" &&
+            typeof options.total === "number" &&
+            options.total > 0
+          ? options.current / options.total
+          : undefined;
 
-    const taskName = options.taskName || existing?.task?.taskName || options.text.replace(/\s*\([^)]*\)\s*(\.{3}|…|\.)?\s*$/, "").trim() || options.text;
+    const taskName =
+      options.taskName ||
+      existing?.task?.taskName ||
+      options.text.replace(/\s*\([^)]*\)\s*(\.{3}|…|\.)?\s*$/, "").trim() ||
+      options.text;
 
     if (existing) {
       this.scheduleDismiss(existing.id);
@@ -99,7 +106,7 @@ class ToastStore {
       current?: number;
       total?: number;
       progress?: number;
-    }
+    },
   ) {
     const msg = this.messages.find((m) => m.task?.taskId === taskId);
     if (!msg || !msg.task) return;
@@ -107,7 +114,12 @@ class ToastStore {
     const current = updates.current !== undefined ? updates.current : msg.task.current;
     const total = updates.total !== undefined ? updates.total : msg.task.total;
     let progress = updates.progress;
-    if (progress === undefined && typeof current === "number" && typeof total === "number" && total > 0) {
+    if (
+      progress === undefined &&
+      typeof current === "number" &&
+      typeof total === "number" &&
+      total > 0
+    ) {
       progress = current / total;
     }
     msg.task = {
@@ -122,11 +134,7 @@ class ToastStore {
   /**
    * Complete a task notification, transitioning it into the success/done state.
    */
-  completeTask(
-    taskId: string,
-    completedText?: string,
-    durationMs?: number
-  ) {
+  completeTask(taskId: string, completedText?: string, durationMs?: number) {
     const msg = this.messages.find((m) => m.task?.taskId === taskId);
     if (!msg || !msg.task) {
       if (completedText && completedText !== "Done") {
@@ -138,7 +146,8 @@ class ToastStore {
       ...msg.task,
       status: "done",
       progress: 1,
-      completedText: completedText && completedText !== "Done" ? completedText : msg.task.completedText,
+      completedText:
+        completedText && completedText !== "Done" ? completedText : msg.task.completedText,
     };
     msg.variant = "task";
     this.messages = [...this.messages];
@@ -182,7 +191,7 @@ class ToastStore {
     variant: ToastVariant = "info",
     durationMs?: number,
     url?: string,
-    action?: ToastAction
+    action?: ToastAction,
   ) {
     const id = this.nextId++;
     this.messages.push({ id, text, variant, url, action });
@@ -220,7 +229,10 @@ class ToastStore {
     if (timer) clearTimeout(timer);
     this.timers.delete(id);
     if (durationMs && durationMs > 0) {
-      this.timers.set(id, setTimeout(() => this.dismiss(id), durationMs));
+      this.timers.set(
+        id,
+        setTimeout(() => this.dismiss(id), durationMs),
+      );
     }
   }
 
@@ -245,7 +257,7 @@ class ToastStore {
     id: number,
     text: string,
     variant: ToastVariant = "success",
-    durationMs: number = TOAST_DURATION_MS
+    durationMs: number = TOAST_DURATION_MS,
   ) {
     if (!this.messages.some((m) => m.id === id)) {
       this.show(text, variant, durationMs);

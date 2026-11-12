@@ -35,7 +35,11 @@
   });
 </script>
 
-<div class="grid {compact ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2' : 'grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4'}">
+<div
+  class="grid {compact
+    ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2'
+    : 'grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4'}"
+>
   {#each sortedLanguages as item (item.code)}
     {@const displayName = getLanguageDisplayName(item.code)}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -46,15 +50,22 @@
     >
       {#if compact}
         <div class="flex items-center gap-3 px-3 py-2.5">
-          <div class="shrink-0 w-9 h-9 rounded-md flex items-center justify-center bg-gradient-to-br from-teal-600/30 to-emerald-600/30 text-brand-text-primary border border-teal-500/20">
+          <div
+            class="shrink-0 w-9 h-9 rounded-md flex items-center justify-center bg-gradient-to-br from-teal-600/30 to-emerald-600/30 text-brand-text-primary border border-teal-500/20"
+          >
             <Translate class="w-4 h-4" />
           </div>
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5">
-              <span class="text-sm font-semibold text-brand-text-primary truncate" title={displayName}>
+              <span
+                class="text-sm font-semibold text-brand-text-primary truncate"
+                title={displayName}
+              >
                 {displayName}
               </span>
-              <span class="text-[10px] uppercase font-mono font-bold px-1.5 py-0.5 rounded bg-brand-main/70 text-brand-text-secondary border border-brand-border/40 shrink-0">
+              <span
+                class="text-[10px] uppercase font-mono font-bold px-1.5 py-0.5 rounded bg-brand-main/70 text-brand-text-secondary border border-brand-border/40 shrink-0"
+              >
                 {item.code}
               </span>
             </div>
@@ -66,20 +77,31 @@
           </div>
         </div>
       {:else}
-        <div class="p-4 flex flex-col justify-between h-28 bg-gradient-to-br from-teal-600/10 via-transparent to-transparent">
+        <div
+          class="p-4 flex flex-col justify-between h-28 bg-gradient-to-br from-teal-600/10 via-transparent to-transparent"
+        >
           <div class="flex items-start justify-between gap-2">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-teal-600/30 to-emerald-600/30 text-brand-text-primary border border-teal-500/20 shadow-sm">
+            <div
+              class="w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-teal-600/30 to-emerald-600/30 text-brand-text-primary border border-teal-500/20 shadow-sm"
+            >
               <Translate class="w-5 h-5" />
             </div>
-            <span class="text-[11px] uppercase font-mono font-bold px-2 py-0.5 rounded-full bg-brand-main/80 text-brand-text-secondary border border-brand-border/60">
+            <span
+              class="text-[11px] uppercase font-mono font-bold px-2 py-0.5 rounded-full bg-brand-main/80 text-brand-text-secondary border border-brand-border/60"
+            >
               {item.code}
             </span>
           </div>
           <div>
-            <h3 class="text-base font-semibold text-brand-text-primary truncate" title={displayName}>
+            <h3
+              class="text-base font-semibold text-brand-text-primary truncate"
+              title={displayName}
+            >
               {displayName}
             </h3>
-            <div class="flex items-center gap-2 text-xs text-brand-text-secondary font-medium tabular-nums mt-0.5">
+            <div
+              class="flex items-center gap-2 text-xs text-brand-text-secondary font-medium tabular-nums mt-0.5"
+            >
               <span>{i18n.plural("playlists.songsCount", item.song_count)}</span>
               <span>•</span>
               <span>{i18n.plural("collection.albumsCount", item.album_count)}</span>

@@ -4,13 +4,13 @@ import { combineWebdavPath, matchWebDavPath } from "./webdavDisplay";
 describe("webdavDisplay - combineWebdavPath", () => {
   it("combines URL without trailing slash and remote path", () => {
     expect(combineWebdavPath("http://127.0.0.1:8080", "/Music/BandCamp/")).toBe(
-      "http://127.0.0.1:8080/Music/BandCamp/"
+      "http://127.0.0.1:8080/Music/BandCamp/",
     );
   });
 
   it("combines URL with trailing slash and remote path", () => {
     expect(combineWebdavPath("http://127.0.0.1:8080/", "/Music")).toBe(
-      "http://127.0.0.1:8080/Music"
+      "http://127.0.0.1:8080/Music",
     );
   });
 
@@ -29,7 +29,7 @@ describe("webdavDisplay - matchWebDavPath", () => {
     const result = matchWebDavPath(
       "https://webdav.files.fm/Remote%20Library/01%20Tell%20Me%20(U%20Want%20It).mp3",
       "https://webdav.files.fm/",
-      "/Remote Library"
+      "/Remote Library",
     );
 
     expect(result.matches).toBe(true);
@@ -41,7 +41,7 @@ describe("webdavDisplay - matchWebDavPath", () => {
     const result = matchWebDavPath(
       "http://user:secret@nas.local:8080/Music/track.flac",
       "http://nas.local:8080",
-      "/Music"
+      "/Music",
     );
 
     expect(result.matches).toBe(true);
@@ -52,7 +52,7 @@ describe("webdavDisplay - matchWebDavPath", () => {
     const result = matchWebDavPath(
       "http://nas.local:8080/track.flac",
       "http://nas.local:8080",
-      "/"
+      "/",
     );
 
     expect(result.matches).toBe(true);
@@ -62,7 +62,7 @@ describe("webdavDisplay - matchWebDavPath", () => {
     const result = matchWebDavPath(
       "http://nas.local:8080/Music2/track.flac",
       "http://nas.local:8080",
-      "/Music"
+      "/Music",
     );
 
     expect(result.matches).toBe(false);
@@ -70,15 +70,18 @@ describe("webdavDisplay - matchWebDavPath", () => {
 
   it("does not match different hosts or protocols", () => {
     expect(
-      matchWebDavPath("http://other.host/Music/track.mp3", "http://nas.local:8080", "/Music").matches
+      matchWebDavPath("http://other.host/Music/track.mp3", "http://nas.local:8080", "/Music")
+        .matches,
     ).toBe(false);
 
     expect(
-      matchWebDavPath("https://nas.local:8080/Music/track.mp3", "http://nas.local:8080", "/Music").matches
+      matchWebDavPath("https://nas.local:8080/Music/track.mp3", "http://nas.local:8080", "/Music")
+        .matches,
     ).toBe(false);
 
     expect(
-      matchWebDavPath("http://nas.local:9000/Music/track.mp3", "http://nas.local:8080", "/Music").matches
+      matchWebDavPath("http://nas.local:9000/Music/track.mp3", "http://nas.local:8080", "/Music")
+        .matches,
     ).toBe(false);
   });
 

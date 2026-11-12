@@ -45,7 +45,8 @@ export class PlaylistSizeLimit {
     if (!fit || !playlist || !items) return null;
     if (fit.limit_bytes !== playlist.size_limit_bytes) return null;
     if (fit.device_id !== (playlist.size_limit_device ?? null)) return null;
-    if (fit.order.length !== items.length || items.some((item, i) => item.uuid !== fit.order[i])) return null;
+    if (fit.order.length !== items.length || items.some((item, i) => item.uuid !== fit.order[i]))
+      return null;
     return fit;
   });
 
@@ -53,7 +54,9 @@ export class PlaylistSizeLimit {
    * "Measuring sizes…" until that's known, `null` with no limit. */
   readonly status = $derived.by((): string | null => {
     if (this.fit) return sizeLimitStats(this.fit);
-    return this.#source().playlist?.size_limit_bytes ? i18n.t("playlists.sizeLimitMeasuring") : null;
+    return this.#source().playlist?.size_limit_bytes
+      ? i18n.t("playlists.sizeLimitMeasuring")
+      : null;
   });
 
   /** The limit device's name from the latest answer, for showing it while unplugged. */
@@ -95,7 +98,10 @@ export class PlaylistSizeLimit {
 }
 
 function sizeLimitStats(fit: PlaylistSizeFit): string {
-  const values = { used: formatStorageSize(fit.fit_bytes), limit: formatStorageSize(fit.limit_bytes) };
+  const values = {
+    used: formatStorageSize(fit.fit_bytes),
+    limit: formatStorageSize(fit.limit_bytes),
+  };
   return fit.device_name
     ? i18n.t("playlists.sizeLimitStatsDevice", { ...values, device: fit.device_name })
     : i18n.t("playlists.sizeLimitStats", values);

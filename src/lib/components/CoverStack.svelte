@@ -82,9 +82,11 @@
 
   let openImagesPath = $derived(extractLocalArtworkPath(extendedArtwork?.primary_uri));
   let showExtendedArtworkUi = $derived(
-    extendedArtworkSongId !== undefined && covers.length <= 1 && !!openImagesPath
+    extendedArtworkSongId !== undefined && covers.length <= 1 && !!openImagesPath,
   );
-  let extraArtworkCount = $derived(extendedArtwork && extendedArtwork.count > 1 ? extendedArtwork.count : 0);
+  let extraArtworkCount = $derived(
+    extendedArtwork && extendedArtwork.count > 1 ? extendedArtwork.count : 0,
+  );
 
   async function handleOpenImages(e: MouseEvent) {
     e.stopPropagation();
@@ -123,7 +125,11 @@
   }
 </script>
 
-<div class="flex items-center {direction === 'left' ? 'justify-end' : 'justify-center'} w-full h-full my-auto select-none">
+<div
+  class="flex items-center {direction === 'left'
+    ? 'justify-end'
+    : 'justify-center'} w-full h-full my-auto select-none"
+>
   {#if activeCovers.length > 0}
     {#if activeCovers.length === 1}
       <div class="{sizeClass} overflow-hidden relative group/artwork">
@@ -136,7 +142,9 @@
         />
         {#if showExtendedArtworkUi}
           {#if extraArtworkCount > 0}
-            <div class="absolute top-1 left-1 z-10 px-2 py-1 rounded-full bg-black/70 text-white text-base leading-none font-semibold flex items-center gap-1 pointer-events-none">
+            <div
+              class="absolute top-1 left-1 z-10 px-2 py-1 rounded-full bg-black/70 text-white text-base leading-none font-semibold flex items-center gap-1 pointer-events-none"
+            >
               <ImagesIcon class="w-6 h-6" weight="fill" />
               {extraArtworkCount}
             </div>
@@ -150,7 +158,9 @@
               ? i18n.plural("common.openImagesCount", extraArtworkCount)
               : i18n.t("common.openImages")}
           >
-            <span class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-black/60 text-white text-sm font-medium">
+            <span
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-black/60 text-white text-sm font-medium"
+            >
               <ImagesIcon class="w-5 h-5" />
               {i18n.t("common.openImages")}
             </span>
@@ -161,8 +171,15 @@
       <div class="relative {sizeClass} flex items-center justify-center shrink-0">
         {#each activeCovers as cover, i (i)}
           <div
-            class="cover-item absolute {direction === 'left' ? 'bottom-0 right-0 w-28 h-28' : 'inset-0'} overflow-hidden border border-brand-border/60 shadow-xl transition-[transform,opacity] duration-300 {hoverEffect ? 'group-hover:scale-105' : ''}"
-            style="z-index: {10 - i}; transform: {getTransform(i, activeCovers.length)}; opacity: {getOpacity(i, activeCovers.length)};"
+            class="cover-item absolute {direction === 'left'
+              ? 'bottom-0 right-0 w-28 h-28'
+              : 'inset-0'} overflow-hidden border border-brand-border/60 shadow-xl transition-[transform,opacity] duration-300 {hoverEffect
+              ? 'group-hover:scale-105'
+              : ''}"
+            style="z-index: {10 - i}; transform: {getTransform(
+              i,
+              activeCovers.length,
+            )}; opacity: {getOpacity(i, activeCovers.length)};"
           >
             <CoverArt
               songId={cover.songId}
@@ -176,11 +193,23 @@
       </div>
     {/if}
   {:else if fallbackName}
-    <div class="w-24 h-24 bg-gradient-to-br {getArtistGradient(fallbackName)} rounded-full flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md shrink-0 {direction === 'left' ? 'ml-auto' : 'mx-auto'}">
+    <div
+      class="w-24 h-24 bg-gradient-to-br {getArtistGradient(
+        fallbackName,
+      )} rounded-full flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md shrink-0 {direction ===
+      'left'
+        ? 'ml-auto'
+        : 'mx-auto'}"
+    >
       {fallbackName ? fallbackName.charAt(0).toUpperCase() : "?"}
     </div>
   {:else}
-    <div class="{sizeClass} bg-brand-main flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative {direction === 'left' ? 'ml-auto' : 'mx-auto'}">
+    <div
+      class="{sizeClass} bg-brand-main flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative {direction ===
+      'left'
+        ? 'ml-auto'
+        : 'mx-auto'}"
+    >
       <CoverArt
         songId={undefined}
         artEmbedded={false}

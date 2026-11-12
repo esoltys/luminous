@@ -73,8 +73,8 @@ describe("Toast.svelte", () => {
 
     render(Toast);
 
-    const icons = [...document.querySelectorAll("[data-milestone-icon]")].map(
-      (el) => el.getAttribute("data-milestone-icon")
+    const icons = [...document.querySelectorAll("[data-milestone-icon]")].map((el) =>
+      el.getAttribute("data-milestone-icon"),
     );
     expect(icons).toEqual(["flag", "star", "checks"]);
   });
@@ -112,10 +112,16 @@ describe("Toast.svelte", () => {
 
   it("renders a toast action button and invokes its callback on click without dismissing the toast", async () => {
     const onClick = vi.fn();
-    const id = toastStore.show("Update downloaded — restart to finish installing.", "success", undefined, undefined, {
-      label: "Restart to Update",
-      onClick,
-    });
+    const id = toastStore.show(
+      "Update downloaded — restart to finish installing.",
+      "success",
+      undefined,
+      undefined,
+      {
+        label: "Restart to Update",
+        onClick,
+      },
+    );
 
     render(Toast);
 
@@ -172,10 +178,18 @@ describe("Toast.svelte", () => {
     render(Toast);
     expect(screen.getByText("Verifying audio authenticity for 13 tracks...")).toBeInTheDocument();
 
-    toastStore.completeTask("provenance-verify", "Audio authenticity verification complete for 13 tracks", 4000);
+    toastStore.completeTask(
+      "provenance-verify",
+      "Audio authenticity verification complete for 13 tracks",
+      4000,
+    );
     await tick();
 
-    expect(screen.getByText("Audio authenticity verification complete for 13 tracks")).toBeInTheDocument();
-    expect(screen.queryByText("Verifying audio authenticity for 13 tracks...")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Audio authenticity verification complete for 13 tracks"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Verifying audio authenticity for 13 tracks..."),
+    ).not.toBeInTheDocument();
   });
 });

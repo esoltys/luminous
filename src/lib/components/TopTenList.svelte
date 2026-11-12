@@ -200,7 +200,13 @@
     </span>
     {#if item.movement}
       <span class="text-center text-[10px] font-normal text-brand-text-secondary/60 tabular-nums">
-        {item.movement === "new" ? "—" : i18n.t("home.chartPeak", { peak: item.peak_rank ?? rank }, `Peak #${item.peak_rank ?? rank}`)}
+        {item.movement === "new"
+          ? "—"
+          : i18n.t(
+              "home.chartPeak",
+              { peak: item.peak_rank ?? rank },
+              `Peak #${item.peak_rank ?? rank}`,
+            )}
       </span>
     {/if}
   </div>
@@ -230,7 +236,11 @@
     >
       {item.minutes === 0 && item.play_count > 0
         ? i18n.t("stats.minuteUnderOne", {}, "< 1 min")
-        : i18n.t("stats.minuteCount", { count: formatNumber(item.minutes) }, `${formatNumber(item.minutes)} min`)}
+        : i18n.t(
+            "stats.minuteCount",
+            { count: formatNumber(item.minutes) },
+            `${formatNumber(item.minutes)} min`,
+          )}
     </span>
   </div>
 {/snippet}
@@ -291,7 +301,9 @@
               album={albumItem}
               progressPercent={showAccentBars ? itemPercent : undefined}
               onclick={() => openItem(item)}
-              onRate={(r) => { item.rating = r; }}
+              onRate={(r) => {
+                item.rating = r;
+              }}
             />
           {:else if kind === "artist"}
             {@const artist = collectionStore.artists.find((a) => a.name === item.label) ?? {
@@ -349,13 +361,20 @@
 
               <div class="relative z-10 min-w-0 flex-1 flex flex-col gap-0.5">
                 <div class="flex items-center justify-between gap-2">
-                  <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{item.label}</p>
+                  <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
+                    {item.label}
+                  </p>
                   {#if item.year}
-                    <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{item.year}</span>
+                    <span
+                      class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0"
+                      >{item.year}</span
+                    >
                   {/if}
                 </div>
                 <div class="flex items-center justify-between gap-2">
-                  <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{item.secondary || secondaryFallback || ""}</p>
+                  <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">
+                    {item.secondary || secondaryFallback || ""}
+                  </p>
                   <span class="shrink-0" onclick={(e) => e.stopPropagation()}>
                     <SongRating
                       rating={getItemRating(item)}
@@ -394,9 +413,13 @@
               {/if}
 
               <div class="relative z-10 min-w-0 flex-1 flex flex-col gap-0.5">
-                <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{item.label}</p>
+                <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
+                  {item.label}
+                </p>
                 {#if item.secondary || secondaryFallback}
-                  <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{item.secondary || secondaryFallback}</p>
+                  <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">
+                    {item.secondary || secondaryFallback}
+                  </p>
                 {/if}
               </div>
             </div>
@@ -410,7 +433,9 @@
     {/each}
 
     {#if items.length === 0}
-      <p class="text-sm text-brand-text-secondary px-3 py-6 text-center">{emptyText ?? i18n.t('stats.noData', {}, 'No data for this range.')}</p>
+      <p class="text-sm text-brand-text-secondary px-3 py-6 text-center">
+        {emptyText ?? i18n.t("stats.noData", {}, "No data for this range.")}
+      </p>
     {/if}
   </div>
 </div>
@@ -424,6 +449,8 @@
     onPlay={() => playerStore.playSong(song.id)}
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
-    onClose={() => { contextMenuState = null; }}
+    onClose={() => {
+      contextMenuState = null;
+    }}
   />
 {/if}

@@ -169,7 +169,7 @@ describe("Miniplayer.svelte", () => {
   it("adjusts volume via the slider and mutes/unmutes via the volume button", async () => {
     playerStore.currentSong = mockSong;
     vi.mocked(invoke).mockImplementation(async (cmd, args) =>
-      cmd === "set_volume" ? (args as { volume: number }).volume : null
+      cmd === "set_volume" ? (args as { volume: number }).volume : null,
     );
     const setVolumeSpy = vi.spyOn(playerStore, "setVolume");
 
@@ -420,6 +420,3 @@ describe("Miniplayer.svelte", () => {
     });
   });
 });
-
-
-

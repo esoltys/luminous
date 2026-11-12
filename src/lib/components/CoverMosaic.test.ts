@@ -86,7 +86,11 @@ describe("CoverMosaic.svelte", () => {
   describe("heroImageUrl", () => {
     it("renders the hero image alone as a single square tile when there are no covers", () => {
       const { container, getByAltText } = render(CoverMosaic, {
-        props: { heroImageUrl: "https://example.com/portrait.jpg", heroImageAlt: "Shania Twain", covers: [] },
+        props: {
+          heroImageUrl: "https://example.com/portrait.jpg",
+          heroImageAlt: "Shania Twain",
+          covers: [],
+        },
       });
 
       const hero = getByAltText("Shania Twain");
@@ -98,7 +102,11 @@ describe("CoverMosaic.svelte", () => {
     it("uses the hero image as the big tile and every cover as a quarter tile (none consumed as the big tile)", () => {
       const covers = [1, 2, 3, 4].map(cover);
       const { container, getByAltText } = render(CoverMosaic, {
-        props: { heroImageUrl: "https://example.com/portrait.jpg", heroImageAlt: "Shania Twain", covers },
+        props: {
+          heroImageUrl: "https://example.com/portrait.jpg",
+          heroImageAlt: "Shania Twain",
+          covers,
+        },
       });
 
       expect(getByAltText("Shania Twain")).toBeInTheDocument();
@@ -122,10 +130,21 @@ describe("CoverMosaic.svelte", () => {
 describe("CoverMosaic.svelte fit mode (#1496)", () => {
   function renderFit(count: number, box: { width: number; height: number }) {
     const spy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-      ...box, x: 0, y: 0, top: 0, left: 0, right: box.width, bottom: box.height, toJSON: () => ({}),
+      ...box,
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: box.width,
+      bottom: box.height,
+      toJSON: () => ({}),
     } as DOMRect);
     const result = render(CoverMosaic, {
-      props: { covers: Array.from({ length: count }, (_, i) => cover(i + 1)), fit: true, maxCovers: 16 },
+      props: {
+        covers: Array.from({ length: count }, (_, i) => cover(i + 1)),
+        fit: true,
+        maxCovers: 16,
+      },
     });
     spy.mockRestore();
     return result;
@@ -148,10 +167,21 @@ describe("CoverMosaic.svelte fit mode (#1496)", () => {
 
 describe("CoverMosaic.svelte spareWidth", () => {
   // A getter/setter props object is how a test stands in for `bind:spareWidth`.
-  function renderFit(count: number, box: { width: number; height: number }, align: "start" | "end" = "end") {
+  function renderFit(
+    count: number,
+    box: { width: number; height: number },
+    align: "start" | "end" = "end",
+  ) {
     let spare = -1;
     const spy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-      ...box, x: 0, y: 0, top: 0, left: 0, right: box.width, bottom: box.height, toJSON: () => ({}),
+      ...box,
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: box.width,
+      bottom: box.height,
+      toJSON: () => ({}),
     } as DOMRect);
     const { container } = render(CoverMosaic, {
       props: {
@@ -159,8 +189,12 @@ describe("CoverMosaic.svelte spareWidth", () => {
         fit: true,
         align,
         maxCovers: 16,
-        get spareWidth() { return spare; },
-        set spareWidth(v: number) { spare = v; },
+        get spareWidth() {
+          return spare;
+        },
+        set spareWidth(v: number) {
+          spare = v;
+        },
       },
     });
     spy.mockRestore();

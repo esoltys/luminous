@@ -4,7 +4,9 @@ import ArtistTagChips from "./ArtistTagChips.svelte";
 
 describe("ArtistTagChips", () => {
   it("renders compact format with +N badge when multiple tags are passed", () => {
-    render(ArtistTagChips, { props: { tags: ["canadian", "rock", "female vocalists"], variant: "compact" } });
+    render(ArtistTagChips, {
+      props: { tags: ["canadian", "rock", "female vocalists"], variant: "compact" },
+    });
 
     expect(screen.getByText("canadian")).toBeTruthy();
     expect(screen.getByText("+2")).toBeTruthy();

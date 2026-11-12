@@ -11,7 +11,7 @@
   --breakpoint-sm: 640px;
   --breakpoint-md: 768px;
   --breakpoint-lg: 1024px;
-  --font-heading: 'Expose', 'Fira Sans', system-ui, -apple-system, sans-serif;
+  --font-heading: "Expose", "Fira Sans", system-ui, -apple-system, sans-serif;
   --color-brand-main: var(--bg-main);
   --color-brand-sidebar: var(--bg-sidebar);
   --color-brand-playerbar: var(--bg-playerbar);
@@ -34,103 +34,103 @@
 
 /* Interpolatable color properties for smooth dynamic theme morphing */
 @property --color-artwork-primary {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #2e3440;
 }
 @property --color-artwork-sidebar {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #242933;
 }
 @property --color-artwork-playerbar {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #2b303c;
 }
 @property --color-artwork-accent {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #88c0d0;
 }
 @property --color-artwork-accent-hover {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #8fbcbb;
 }
 @property --color-artwork-border {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #3b4252;
 }
 @property --bg-main {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #191918;
 }
 @property --bg-sidebar {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #222220;
 }
 @property --bg-playerbar {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #2a2a27;
 }
 @property --color-accent {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #4f5bd5;
 }
 @property --color-accent-hover {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #626fe8;
 }
 @property --color-border {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #38382f;
 }
 @property --glass-bg-sidebar {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: rgba(34, 34, 32, 0.5);
 }
 @property --glass-bg-playerbar {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: rgba(42, 42, 39, 0.5);
 }
 @property --glass-solid-sidebar {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #1e1e1c;
 }
 
 @property --color-text-primary {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #f1f3f8;
 }
 @property --color-text-secondary {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #a6adc4;
 }
 @property --color-accent-contrast {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #000000;
 }
 @property --color-accent-text {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #707add;
 }
 @property --color-accent-text-hover {
-  syntax: '<color>';
+  syntax: "<color>";
   inherits: true;
   initial-value: #6b77e9;
 }
@@ -192,7 +192,11 @@
   body {
     background-color: var(--bg-main);
     color: var(--color-text-primary);
-    font-family: 'Fira Sans', system-ui, -apple-system, sans-serif;
+    font-family:
+      "Fira Sans",
+      system-ui,
+      -apple-system,
+      sans-serif;
     overflow: hidden;
     user-select: none;
   }
@@ -203,11 +207,19 @@
   html {
     cursor: default;
   }
-  *, ::before, ::after {
+  *,
+  ::before,
+  ::after {
     cursor: inherit;
   }
 
-  button, a, select, input, label, summary, [role="button"] {
+  button,
+  a,
+  select,
+  input,
+  label,
+  summary,
+  [role="button"] {
     cursor: default;
   }
 
@@ -318,7 +330,11 @@
 }
 
 .acrylic-chrome {
-  background-color: color-mix(in srgb, var(--acrylic-tint, var(--color-brand-sidebar)) var(--acrylic-chrome-opacity, 50%), transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--acrylic-tint, var(--color-brand-sidebar)) var(--acrylic-chrome-opacity, 50%),
+    transparent
+  );
   -webkit-backdrop-filter: var(--acrylic-chrome-filter);
   backdrop-filter: var(--acrylic-chrome-filter);
   will-change: backdrop-filter;
@@ -326,7 +342,11 @@
 }
 
 .acrylic-float {
-  background-color: color-mix(in srgb, var(--acrylic-tint, var(--color-brand-sidebar)) var(--acrylic-float-opacity, 70%), transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--acrylic-tint, var(--color-brand-sidebar)) var(--acrylic-float-opacity, 70%),
+    transparent
+  );
   -webkit-backdrop-filter: var(--acrylic-float-filter);
   backdrop-filter: var(--acrylic-float-filter);
   will-change: backdrop-filter;
@@ -411,7 +431,9 @@ footer.glass-surface {
   background: #ffffff;
   border: 2px solid var(--color-accent);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  transition: transform 0.1s, border-color 0.2s;
+  transition:
+    transform 0.1s,
+    border-color 0.2s;
 }
 
 .themed-range:not(:disabled)::-webkit-slider-thumb:hover {
@@ -426,7 +448,9 @@ footer.glass-surface {
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  transition: transform 0.1s, border-color 0.2s;
+  transition:
+    transform 0.1s,
+    border-color 0.2s;
 }
 
 .themed-range:not(:disabled)::-moz-range-thumb:hover {
@@ -439,11 +463,6 @@ footer.glass-surface {
   border-color: var(--color-border);
 }
 
-
-
-
-
-
 /* The native date picker is drawn by the OS: its popup follows the field's
    colour scheme (set per theme in ThemeStore), and its calendar glyph is a
    fixed colour that vanishes on dark themes, so repaint that with the field's
@@ -455,8 +474,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: currentColor;
   opacity: 0.7;
   cursor: pointer;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16ZM72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160v112Z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16ZM72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160v112Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16ZM72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160v112Z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16ZM72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160v112Z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 input[type="date"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;

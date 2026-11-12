@@ -70,7 +70,11 @@ describe("Equalizer.svelte", () => {
       if (cmd === "get_audio_setting_ranges") return defaultRanges;
       if (cmd === "get_loudness_analysis_remaining") return 0;
       if (cmd === "load_equalizer_preset")
-        return { ...defaultEqConfig, gains: [4, 3, 1, -1, -2, -1, 1, 3, 3.5, 3.5], active_preset: args.presetName };
+        return {
+          ...defaultEqConfig,
+          gains: [4, 3, 1, -1, -2, -1, 1, 3, 3.5, 3.5],
+          active_preset: args.presetName,
+        };
       if (cmd === "get_parametric_response") return args.frequencies.map(() => 0);
       if (cmd === "get_eq_preset_previews") {
         const freqs = args?.frequencies ?? [];
@@ -106,7 +110,9 @@ describe("Equalizer.svelte", () => {
     function curveYs(container: HTMLElement): number[] {
       const d = container.querySelector('[data-testid="eq-response"]')?.getAttribute("d") ?? "";
       // Every segment ends at "x y" — the on-curve sample points.
-      return [...d.matchAll(/(?:M|,)\s*([\d.]+) ([\d.-]+)(?=\s*(?:C|$))/g)].map((m) => Number(m[2]));
+      return [...d.matchAll(/(?:M|,)\s*([\d.]+) ([\d.-]+)(?=\s*(?:C|$))/g)].map((m) =>
+        Number(m[2]),
+      );
     }
 
     it("plots the backend's evaluated response instead of re-deriving it", async () => {
@@ -138,9 +144,12 @@ describe("Equalizer.svelte", () => {
         "apply_equalizer_config",
         expect.objectContaining({
           config: expect.objectContaining({
-            parametric: [expect.objectContaining({ freq: 60, gain_db: -6 }), expect.objectContaining({ freq: 1000 })],
+            parametric: [
+              expect.objectContaining({ freq: 60, gain_db: -6 }),
+              expect.objectContaining({ freq: 1000 }),
+            ],
           }),
-        })
+        }),
       );
     });
 
@@ -176,7 +185,9 @@ describe("Equalizer.svelte", () => {
       await waitFor(() => expect(echoes).toHaveLength(2));
       echoes[1]();
       await waitFor(() => expect(gain.value).toBe("7"));
-      const applies = vi.mocked(invoke).mock.calls.filter(([cmd]) => cmd === "apply_equalizer_config");
+      const applies = vi
+        .mocked(invoke)
+        .mock.calls.filter(([cmd]) => cmd === "apply_equalizer_config");
       expect(applies).toHaveLength(2);
     });
   });
@@ -238,12 +249,18 @@ describe("Equalizer.svelte", () => {
       const { picker, getByRole } = await renderPicker();
       await fireEvent.click(picker);
       const groups = [...getByRole("listbox").querySelectorAll('[role="group"]')].map((g) =>
-        g.getAttribute("aria-label")
+        g.getAttribute("aria-label"),
       );
       expect(groups).toEqual(["Built-in", "My presets"]);
       expect(picker).toHaveTextContent("Studio");
       await fireEvent.keyDown(window, { key: "Escape" });
-      expect(await presetActionNames()).toEqual(["Import…", "Export…", "Save as…", "Rename", "Delete"]);
+      expect(await presetActionNames()).toEqual([
+        "Import…",
+        "Export…",
+        "Save as…",
+        "Rename",
+        "Delete",
+      ]);
     });
 
     it("shows Custom once an edit's echo leaves the preset", async () => {
@@ -262,7 +279,7 @@ describe("Equalizer.svelte", () => {
       await waitFor(() =>
         expect(invoke).toHaveBeenCalledWith("export_parametric_profile", {
           path: "C:/eq/Studio ParametricEQ.txt",
-        })
+        }),
       );
       expect(vi.mocked(save).mock.calls[0][0]).toMatchObject({
         defaultPath: "Studio ParametricEQ.txt",
@@ -304,7 +321,7 @@ describe("Equalizer.svelte", () => {
       await fireEvent.input(getByLabelText("Preset name"), { target: { value: "studio" } });
       await fireEvent.click(getByRole("button", { name: "Save" }));
       await waitFor(() =>
-        expect(getByRole("alert")).toHaveTextContent("A preset with this name already exists")
+        expect(getByRole("alert")).toHaveTextContent("A preset with this name already exists"),
       );
       expect(getByLabelText("Preset name")).toHaveAttribute("aria-invalid", "true");
     });
@@ -322,7 +339,10 @@ describe("Equalizer.svelte", () => {
       expect(field.value).toBe("Studio");
       await fireEvent.input(field, { target: { value: "Studio monitors" } });
       await fireEvent.click(getByRole("button", { name: "Save" }));
-      expect(invoke).toHaveBeenCalledWith("rename_eq_user_preset", { id: 7, name: "Studio monitors" });
+      expect(invoke).toHaveBeenCalledWith("rename_eq_user_preset", {
+        id: 7,
+        name: "Studio monitors",
+      });
       await waitFor(() => expect(picker).toHaveTextContent("Studio monitors"));
     });
 
@@ -366,8 +386,11 @@ describe("Equalizer.svelte", () => {
 
       it("imports a chosen file under its headphone name and selects it", async () => {
         mockImport(() => imported);
-        vi.mocked(open).mockResolvedValue("C:\\Downloads\\Anker Soundcore Life Q20 ParametricEq.txt");
-        const { picker, getByRole, getByLabelText, getByText, queryByLabelText } = await renderPicker();
+        vi.mocked(open).mockResolvedValue(
+          "C:\\Downloads\\Anker Soundcore Life Q20 ParametricEq.txt",
+        );
+        const { picker, getByRole, getByLabelText, getByText, queryByLabelText } =
+          await renderPicker();
         await choosePresetAction("Import…");
         await fireEvent.click(getByRole("button", { name: "Choose file…" }));
         await waitFor(() => expect(getByLabelText("Profile text")).toHaveValue(profile));
@@ -392,10 +415,14 @@ describe("Equalizer.svelte", () => {
         });
         const { picker, getByRole, getByLabelText } = await renderPicker();
         await choosePresetAction("Import…");
-        await fireEvent.input(getByLabelText("Profile text"), { target: { value: "Filter: ON LP Fc 80 Hz" } });
+        await fireEvent.input(getByLabelText("Profile text"), {
+          target: { value: "Filter: ON LP Fc 80 Hz" },
+        });
         await fireEvent.input(getByLabelText("Preset name"), { target: { value: "Broken" } });
         await fireEvent.click(getByRole("button", { name: "Import" }));
-        await waitFor(() => expect(getByRole("alert")).toHaveTextContent("Unsupported filters: LP (line 2)"));
+        await waitFor(() =>
+          expect(getByRole("alert")).toHaveTextContent("Unsupported filters: LP (line 2)"),
+        );
         expect(getByLabelText("Preset name")).toHaveAttribute("aria-invalid", "true");
         expect(picker).toHaveTextContent("Studio");
       });
@@ -425,7 +452,9 @@ describe("Equalizer.svelte", () => {
       mockPresetBackend();
       state = { ...state, mode: "graphic10", active_preset: "Rock" };
       const { getByRole, queryByRole } = render(Equalizer);
-      await waitFor(() => expect(getByRole("combobox", { name: "Preset" })).toHaveTextContent("Rock"));
+      await waitFor(() =>
+        expect(getByRole("combobox", { name: "Preset" })).toHaveTextContent("Rock"),
+      );
       await fireEvent.click(getByRole("combobox", { name: "Preset" }));
       expect(getByRole("listbox").querySelectorAll('[role="group"]')).toHaveLength(1);
       expect(queryByRole("button", { name: "Preset actions" })).toBeNull();
@@ -468,7 +497,9 @@ describe("Equalizer.svelte", () => {
     });
     const { container } = render(Equalizer);
     await waitFor(() => {
-      const sliders = container.querySelectorAll<HTMLInputElement>('input[type="range"][orient="vertical"]');
+      const sliders = container.querySelectorAll<HTMLInputElement>(
+        'input[type="range"][orient="vertical"]',
+      );
       expect(sliders).toHaveLength(10);
       for (const s of sliders) {
         expect(s.min).toBe("-15");
@@ -496,7 +527,7 @@ describe("Equalizer.svelte", () => {
     await fireEvent.click(toggle!);
     expect(invoke).toHaveBeenCalledWith(
       "apply_equalizer_config",
-      expect.objectContaining({ config: expect.objectContaining({ enabled: false }) })
+      expect.objectContaining({ config: expect.objectContaining({ enabled: false }) }),
     );
   });
 
@@ -511,7 +542,7 @@ describe("Equalizer.svelte", () => {
 
     expect(invoke).toHaveBeenCalledWith(
       "apply_equalizer_config",
-      expect.objectContaining({ config: expect.objectContaining({ mode: "parametric" }) })
+      expect.objectContaining({ config: expect.objectContaining({ mode: "parametric" }) }),
     );
   });
 
@@ -533,9 +564,12 @@ describe("Equalizer.svelte", () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "get_equalizer_state") return engine;
       if (cmd === "list_eq_presets") return defaultPresets;
-      if (cmd === "get_eq_preset_previews") return defaultPresets.builtin.map((key) => ({ key, response_db: [] }));
-      if (cmd === "apply_equalizer_config") return (engine = { ...args.config, active_preset: null });
-      if (cmd === "load_equalizer_preset") return (engine = { ...engine, active_preset: args.presetName });
+      if (cmd === "get_eq_preset_previews")
+        return defaultPresets.builtin.map((key) => ({ key, response_db: [] }));
+      if (cmd === "apply_equalizer_config")
+        return (engine = { ...args.config, active_preset: null });
+      if (cmd === "load_equalizer_preset")
+        return (engine = { ...engine, active_preset: args.presetName });
       if (cmd === "get_loudness_settings") return defaultLoudness;
       if (cmd === "get_fade_settings") return defaultFadeSettings;
       if (cmd === "get_audio_setting_ranges") return defaultRanges;

@@ -41,12 +41,22 @@ describe("PlaylistContextMenu.svelte", () => {
     const item = await screen.findByText("Open in Picard");
     const button = item.closest("button");
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute("title", "Open in Picard isn't available for songs on a remote server");
+    expect(button).toHaveAttribute(
+      "title",
+      "Open in Picard isn't available for songs on a remote server",
+    );
   });
 
   it("offers Edit tags for a multi-entry selection only when batch editing is available", async () => {
     const onEditBatchTags = vi.fn();
-    const base = { x: 0, y: 0, selectedCount: 3, onPlay: () => {}, onRemove: () => {}, onClose: () => {} };
+    const base = {
+      x: 0,
+      y: 0,
+      selectedCount: 3,
+      onPlay: () => {},
+      onRemove: () => {},
+      onClose: () => {},
+    };
     const { unmount } = render(PlaylistContextMenu, base);
     expect(screen.queryByText("Edit tags")).not.toBeInTheDocument();
     unmount();
@@ -57,11 +67,26 @@ describe("PlaylistContextMenu.svelte", () => {
   });
 
   describe("View in Files", () => {
-    const target = { source: { kind: "folder", id: 1 }, path: ["Katatonia", "2006"], selectedName: "11 The Itch.flac", exact: true };
-    const props = { x: 0, y: 0, selectedCount: 1, songId: 7, onPlay: () => {}, onRemove: () => {}, onGoToAlbum: () => {} };
+    const target = {
+      source: { kind: "folder", id: 1 },
+      path: ["Katatonia", "2006"],
+      selectedName: "11 The Itch.flac",
+      exact: true,
+    };
+    const props = {
+      x: 0,
+      y: 0,
+      selectedCount: 1,
+      songId: 7,
+      onPlay: () => {},
+      onRemove: () => {},
+      onGoToAlbum: () => {},
+    };
 
     it("opens the entry's song in Files, right after Go to Album", async () => {
-      vi.mocked(invoke).mockImplementation(async (cmd: string) => (cmd === "locate_song_in_files" ? target : null));
+      vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+        cmd === "locate_song_in_files" ? target : null,
+      );
       const openInFiles = vi.spyOn(navigationStore, "openInFiles").mockImplementation(() => {});
       const onClose = vi.fn();
       render(PlaylistContextMenu, { ...props, onClose });
@@ -80,7 +105,9 @@ describe("PlaylistContextMenu.svelte", () => {
     it("is hidden when the song has no place in Files", async () => {
       vi.mocked(invoke).mockImplementation(async () => null);
       render(PlaylistContextMenu, { ...props, onClose: () => {} });
-      await waitFor(() => expect(invoke).toHaveBeenCalledWith("locate_song_in_files", { songId: 7 }));
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith("locate_song_in_files", { songId: 7 }),
+      );
       expect(screen.queryByText("View in Files")).not.toBeInTheDocument();
     });
   });

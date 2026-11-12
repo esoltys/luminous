@@ -16,18 +16,27 @@ export function conversionLabel(format: TargetFormat, bitrateKbps: number): stri
 }
 
 /** The device's storage `storageId` names, else its first (as the backend resolves an absent or stale id). */
-export function deviceStorage(device: ConnectedDevice, storageId: string | null | undefined): DeviceStorage | undefined {
+export function deviceStorage(
+  device: ConnectedDevice,
+  storageId: string | null | undefined,
+): DeviceStorage | undefined {
   return device.storages.find((s) => s.id === storageId) ?? device.storages[0];
 }
 
 /** The storage a device's sync writes to. */
-export function syncStorage(device: ConnectedDevice, settings: SyncSettings | undefined): DeviceStorage | undefined {
+export function syncStorage(
+  device: ConnectedDevice,
+  settings: SyncSettings | undefined,
+): DeviceStorage | undefined {
   return deviceStorage(device, settings?.storageId);
 }
 
 /** What a storage is called: its label, else "Storage 2" by position. */
 export function storageName(device: ConnectedDevice, storage: DeviceStorage): string {
-  return storage.label?.trim() || i18n.t("devices.storageNumbered", { n: device.storages.indexOf(storage) + 1 });
+  return (
+    storage.label?.trim() ||
+    i18n.t("devices.storageNumbered", { n: device.storages.indexOf(storage) + 1 })
+  );
 }
 
 /** Calls `onChange` when device `deviceId` connects, disconnects or has its

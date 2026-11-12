@@ -118,7 +118,9 @@
 
     function onPointerMove(moveEvent: PointerEvent) {
       const deltaX = moveEvent.clientX - startX;
-      layout.setRightPanelWidth(Math.max(RIGHT_PANEL_MIN_WIDTH_PX, Math.min(RIGHT_PANEL_MAX_WIDTH_PX, startWidth - deltaX)));
+      layout.setRightPanelWidth(
+        Math.max(RIGHT_PANEL_MIN_WIDTH_PX, Math.min(RIGHT_PANEL_MAX_WIDTH_PX, startWidth - deltaX)),
+      );
     }
 
     function onPointerUp() {
@@ -137,11 +139,15 @@
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       e.stopPropagation();
-      layout.setRightPanelWidth(Math.min(RIGHT_PANEL_MAX_WIDTH_PX, layout.rightPanelWidth + PANEL_RESIZE_STEP_PX));
+      layout.setRightPanelWidth(
+        Math.min(RIGHT_PANEL_MAX_WIDTH_PX, layout.rightPanelWidth + PANEL_RESIZE_STEP_PX),
+      );
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       e.stopPropagation();
-      layout.setRightPanelWidth(Math.max(RIGHT_PANEL_MIN_WIDTH_PX, layout.rightPanelWidth - PANEL_RESIZE_STEP_PX));
+      layout.setRightPanelWidth(
+        Math.max(RIGHT_PANEL_MIN_WIDTH_PX, layout.rightPanelWidth - PANEL_RESIZE_STEP_PX),
+      );
     }
   }
 </script>
@@ -154,7 +160,7 @@
     aria-valuenow={layout.rightPanelWidth}
     aria-valuemin={RIGHT_PANEL_MIN_WIDTH_PX}
     aria-valuemax={RIGHT_PANEL_MAX_WIDTH_PX}
-    aria-label={i18n.t('topNav.resizeRightPanel')}
+    aria-label={i18n.t("topNav.resizeRightPanel")}
     tabindex="0"
     class="relative w-1 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-colors self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent"
     onpointerdown={startResize}
@@ -166,9 +172,19 @@
 {/snippet}
 
 {#if docked}
-  <div transition:slide={{ axis: 'x', duration: instant ? 0 : PANEL_SLIDE_MS }} class="docked-surface h-full flex-shrink-0 flex overflow-hidden bg-brand-sidebar {themeStore.isGlassTheme ? 'glass-surface' : ''}">
+  <div
+    transition:slide={{ axis: "x", duration: instant ? 0 : PANEL_SLIDE_MS }}
+    class="docked-surface h-full flex-shrink-0 flex overflow-hidden bg-brand-sidebar {themeStore.isGlassTheme
+      ? 'glass-surface'
+      : ''}"
+  >
     {@render resizeHandle()}
-    <RightPanel isOpen={true} width={layout.rightPanelWidth} pinned={true} onTogglePin={togglePin} />
+    <RightPanel
+      isOpen={true}
+      width={layout.rightPanelWidth}
+      pinned={true}
+      onTogglePin={togglePin}
+    />
   </div>
 {/if}
 
@@ -178,7 +194,7 @@
   <div
     bind:this={railEl}
     role="group"
-    aria-label={i18n.t('topNav.rightPanelRail', {}, 'Info sidebar')}
+    aria-label={i18n.t("topNav.rightPanelRail", {}, "Info sidebar")}
     class="h-full w-9 flex-shrink-0 flex flex-col items-center pt-2 border-l border-brand-border bg-brand-sidebar"
     onpointerenter={onRailEnter}
     onpointerleave={cancelTimer}
@@ -186,8 +202,8 @@
     <button
       type="button"
       onclick={togglePin}
-      aria-label={i18n.t('topNav.pinRightPanel', {}, 'Pin info sidebar')}
-      title={i18n.t('topNav.pinRightPanel', {}, 'Pin info sidebar')}
+      aria-label={i18n.t("topNav.pinRightPanel", {}, "Pin info sidebar")}
+      title={i18n.t("topNav.pinRightPanel", {}, "Pin info sidebar")}
       class="p-1 rounded-md text-brand-text-secondary hover:text-brand-text-primary transition-colors"
     >
       <!-- Same glyph and size as the player bar's info button. -->
@@ -202,14 +218,23 @@
        length of the slide. -->
   <div
     bind:this={overlayEl}
-    transition:fly={{ x: layout.rightPanelWidth, duration: instant ? 0 : OVERLAY_SLIDE_MS, easing: cubicOut }}
+    transition:fly={{
+      x: layout.rightPanelWidth,
+      duration: instant ? 0 : OVERLAY_SLIDE_MS,
+      easing: cubicOut,
+    }}
     role="presentation"
     class="absolute right-0 top-0 bottom-0 z-40 flex shadow-2xl acrylic-float"
     onpointerenter={cancelTimer}
     onpointerleave={onOverlayLeave}
   >
     {@render resizeHandle()}
-    <RightPanel isOpen={true} width={layout.rightPanelWidth} pinned={false} onTogglePin={togglePin} />
+    <RightPanel
+      isOpen={true}
+      width={layout.rightPanelWidth}
+      pinned={false}
+      onTogglePin={togglePin}
+    />
   </div>
 {/if}
 

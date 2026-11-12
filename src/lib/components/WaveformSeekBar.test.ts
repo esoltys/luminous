@@ -47,7 +47,9 @@ describe("WaveformSeekBar.svelte", () => {
       // Let the async get_waveform_data invoke resolve and the resulting draw() run.
       await vi.waitFor(() => {
         flushSync();
-        expect(roundRectSpy.mock.calls.length + fillRectSpy.mock.calls.length).toBeGreaterThanOrEqual(5);
+        expect(
+          roundRectSpy.mock.calls.length + fillRectSpy.mock.calls.length,
+        ).toBeGreaterThanOrEqual(5);
       });
     } finally {
       HTMLCanvasElement.prototype.getContext = originalGetContext;

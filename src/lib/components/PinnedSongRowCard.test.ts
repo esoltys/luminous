@@ -33,7 +33,9 @@ describe("PinnedSongRowCard", () => {
   });
 
   it("falls back to unknown labels for missing tags", () => {
-    const { getByText } = render(PinnedSongRowCard, { song: { ...song, title: undefined, artist: undefined } as unknown as Song });
+    const { getByText } = render(PinnedSongRowCard, {
+      song: { ...song, title: undefined, artist: undefined } as unknown as Song,
+    });
 
     expect(getByText("Unknown Song")).toBeInTheDocument();
     expect(getByText("Unknown Artist")).toBeInTheDocument();

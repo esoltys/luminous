@@ -26,7 +26,9 @@ function walk(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) return walk(full);
-    return /\.(css|svelte|ts)$/.test(entry.name) && !/\.(test|spec)\.ts$/.test(entry.name) ? [full] : [];
+    return /\.(css|svelte|ts)$/.test(entry.name) && !/\.(test|spec)\.ts$/.test(entry.name)
+      ? [full]
+      : [];
   });
 }
 
@@ -42,7 +44,9 @@ for (const file of walk(SRC)) {
 }
 
 if (failures.length > 0) {
-  console.error("State-colour utilities found (use theme text colours + an icon/wording, #1878):\n");
+  console.error(
+    "State-colour utilities found (use theme text colours + an icon/wording, #1878):\n",
+  );
   console.error(failures.join("\n"));
   process.exit(1);
 }

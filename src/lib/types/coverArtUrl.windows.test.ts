@@ -7,7 +7,7 @@ import { getCoverArtUrl, resolveArtUrl } from "./index";
 describe("getCoverArtUrl on Windows", () => {
   it("rewrites cached art to the http luminous-art host unchanged", () => {
     expect(getCoverArtUrl("luminous-art://album-123.jpg")).toBe(
-      "http://luminous-art.localhost/album-123.jpg"
+      "http://luminous-art.localhost/album-123.jpg",
     );
   });
 

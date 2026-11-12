@@ -8,7 +8,11 @@
   import { picardStore } from "../stores/picard.svelte";
   import { openInPicard } from "../utils/picard";
   import { slide } from "../utils/motion";
-  import { organizeStore, computeOrganizeConsequences, type OrganizeConsequences } from "../stores/organizer.svelte";
+  import {
+    organizeStore,
+    computeOrganizeConsequences,
+    type OrganizeConsequences,
+  } from "../stores/organizer.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import { TOAST_DURATION_MS } from "../constants";
@@ -25,7 +29,7 @@
     CopySimpleIcon as Duplicate,
     XCircleIcon as ErrorIcon,
     PencilSimpleIcon as Edit3,
-    ArrowSquareOutIcon as OpenInPicard
+    ArrowSquareOutIcon as OpenInPicard,
   } from "phosphor-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import Toggle from "./Toggle.svelte";
@@ -95,12 +99,12 @@
   const DEFAULT_TEMPLATE = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
   function highlightPathHtml(path: string): string {
     if (!path) return "";
-    const escaped = path
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    const escaped = path.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-    return escaped.replace(/([/\\])/g, '<span class="text-brand-text-secondary font-bold px-0.5">$1</span>');
+    return escaped.replace(
+      /([/\\])/g,
+      '<span class="text-brand-text-secondary font-bold px-0.5">$1</span>',
+    );
   }
 
   // Template presets, mirroring how SettingsThemes.svelte offers predefined
@@ -109,7 +113,11 @@
   // extending TEMPLATE_PRESETS.
   const TEMPLATE_PRESETS = [
     { id: "default", labelKey: "organizer.presetDefault", template: DEFAULT_TEMPLATE },
-    { id: "alternative", labelKey: "organizer.presetAlternative", template: "%artist/%album (%year)/{CD %disc/}{%track-}%artist-%title" },
+    {
+      id: "alternative",
+      labelKey: "organizer.presetAlternative",
+      template: "%artist/%album (%year)/{CD %disc/}{%track-}%artist-%title",
+    },
   ] as const;
   type TemplatePresetId = (typeof TEMPLATE_PRESETS)[number]["id"] | "custom";
 
@@ -118,7 +126,7 @@
   let template = $derived(
     templatePreset === "custom"
       ? customTemplate
-      : (TEMPLATE_PRESETS.find((p) => p.id === templatePreset)?.template ?? DEFAULT_TEMPLATE)
+      : (TEMPLATE_PRESETS.find((p) => p.id === templatePreset)?.template ?? DEFAULT_TEMPLATE),
   );
 
   function selectPreset(id: TemplatePresetId) {
@@ -145,17 +153,67 @@
     title: string;
   }
   const PREVIEW_SAMPLES: PreviewSample[] = [
-    { album_artist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 1, title: "Airbag" },
-    { album_artist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 2, title: "Paranoid Android" },
-    { album_artist: "Daft Punk", artist: "Daft Punk", album: "Discovery", year: 2001, genre: "Electronic", track: 1, title: "One More Time" },
+    {
+      album_artist: "Radiohead",
+      artist: "Radiohead",
+      album: "OK Computer",
+      year: 1997,
+      genre: "Alternative Rock",
+      track: 1,
+      title: "Airbag",
+    },
+    {
+      album_artist: "Radiohead",
+      artist: "Radiohead",
+      album: "OK Computer",
+      year: 1997,
+      genre: "Alternative Rock",
+      track: 2,
+      title: "Paranoid Android",
+    },
+    {
+      album_artist: "Daft Punk",
+      artist: "Daft Punk",
+      album: "Discovery",
+      year: 2001,
+      genre: "Electronic",
+      track: 1,
+      title: "One More Time",
+    },
     // A track with no track number to demonstrate conditional track wrapping
     // ({%track }, {%track-}) omitting leading spaces or hyphens.
-    { album_artist: "Daft Punk", artist: "Daft Punk", album: "Aerodynamic", year: 2001, genre: "Electronic", title: "Aerodynamic (Remix)" },
+    {
+      album_artist: "Daft Punk",
+      artist: "Daft Punk",
+      album: "Aerodynamic",
+      year: 2001,
+      genre: "Electronic",
+      title: "Aerodynamic (Remix)",
+    },
     // A multi-disc album so the preview demonstrates the conditional
     // {CD %disc/} / {%disc-} blocks splitting into per-disc folders/prefixes,
     // and {%disctitle} blocks showing for the disc that has a subtitle.
-    { album_artist: "Pink Floyd", artist: "Pink Floyd", album: "The Wall", year: 1979, genre: "Rock", disc: 1, track: 1, title: "In The Flesh?" },
-    { album_artist: "Pink Floyd", artist: "Pink Floyd", album: "The Wall", year: 1979, genre: "Rock", disc: 2, disc_subtitle: "Side Three", track: 1, title: "Hey You" },
+    {
+      album_artist: "Pink Floyd",
+      artist: "Pink Floyd",
+      album: "The Wall",
+      year: 1979,
+      genre: "Rock",
+      disc: 1,
+      track: 1,
+      title: "In The Flesh?",
+    },
+    {
+      album_artist: "Pink Floyd",
+      artist: "Pink Floyd",
+      album: "The Wall",
+      year: 1979,
+      genre: "Rock",
+      disc: 2,
+      disc_subtitle: "Side Three",
+      track: 1,
+      title: "Hey You",
+    },
   ];
 
   interface PreviewTreeNode {
@@ -241,7 +299,7 @@
         replaceSpaces !== organizeStore.replaceSpaces ||
         asciiOnly !== organizeStore.asciiOnly ||
         cleanEmptyDirs !== organizeStore.cleanEmptyDirs ||
-        moveExtraFiles !== organizeStore.moveExtraFiles)
+        moveExtraFiles !== organizeStore.moveExtraFiles),
   );
 
   $effect(() => {
@@ -287,7 +345,9 @@
   // error_message (see organizer.rs's "Routed to Duplicates" messages). The
   // legacy "collision" status is kept here for forward compatibility but is
   // no longer actually emitted.
-  function getItemStatus(item: OrganizePreviewItem): "ok" | "unchanged" | "duplicate" | "missing_tag" | "error" {
+  function getItemStatus(
+    item: OrganizePreviewItem,
+  ): "ok" | "unchanged" | "duplicate" | "missing_tag" | "error" {
     const target = getItemObj(item);
     const s = String(target?.status || "").toLowerCase();
     if (s === "collision") return "duplicate";
@@ -316,7 +376,10 @@
 
     for (const p of allPaths) {
       while (prefix.length > 0 && !p.startsWith(prefix)) {
-        const sep = Math.max(prefix.slice(0, -1).lastIndexOf("/"), prefix.slice(0, -1).lastIndexOf("\\"));
+        const sep = Math.max(
+          prefix.slice(0, -1).lastIndexOf("/"),
+          prefix.slice(0, -1).lastIndexOf("\\"),
+        );
         if (sep >= 0) {
           prefix = prefix.slice(0, sep + 1);
         } else {
@@ -398,7 +461,9 @@
 
   // Untagged tracks (missing_tag) are held back by default; users can opt in via a toggle
   let includeMissingTags = $state(false);
-  let eligibleCount = $derived(readyCount + collisionCount + (includeMissingTags ? missingTagCount : 0));
+  let eligibleCount = $derived(
+    readyCount + collisionCount + (includeMissingTags ? missingTagCount : 0),
+  );
   let canApply = $derived(eligibleCount > 0 && !isLoading && !isApplying);
 
   $effect(() => {
@@ -434,7 +499,9 @@
 
   async function loadDuplicateSongIds() {
     try {
-      const groups = await invoke<import("../types").DuplicateTrackGroup[]>("get_duplicate_track_groups");
+      const groups = await invoke<import("../types").DuplicateTrackGroup[]>(
+        "get_duplicate_track_groups",
+      );
       duplicateSongIds = new Set(groups.flatMap((g) => g.candidates.map((c) => c.song.id)));
     } catch {
       duplicateSongIds = new Set();
@@ -443,7 +510,10 @@
 
   async function locateInFiles(songId: number) {
     try {
-      const target = await invoke<import("../types").FileNavigationTarget | null>("locate_song_in_files", { songId });
+      const target = await invoke<import("../types").FileNavigationTarget | null>(
+        "locate_song_in_files",
+        { songId },
+      );
       if (target) {
         navigationStore.openInFiles(target);
       }
@@ -454,7 +524,9 @@
 
   async function handleReviewDuplicate(songId: number) {
     try {
-      const groups = await invoke<import("../types").DuplicateTrackGroup[]>("get_duplicate_track_groups");
+      const groups = await invoke<import("../types").DuplicateTrackGroup[]>(
+        "get_duplicate_track_groups",
+      );
       const hasGroup = groups.some((g) => g.candidates.some((c) => c.song.id === songId));
       if (hasGroup) {
         reviewDuplicateSongId = songId;
@@ -511,14 +583,22 @@
     if (fields && fields.length > 0) {
       const fieldNames = fields.map((f) => {
         switch (f) {
-          case "title": return i18n.t("organizer.chipTitle");
-          case "artist": return i18n.t("organizer.chipArtist");
-          case "album": return i18n.t("organizer.chipAlbum");
-          case "year": return i18n.t("organizer.chipYear");
-          case "genre": return i18n.t("organizer.chipGenre");
-          case "track": return i18n.t("tagEditor.fieldTrack");
-          case "disc": return i18n.t("tagEditor.fieldDisc");
-          default: return f;
+          case "title":
+            return i18n.t("organizer.chipTitle");
+          case "artist":
+            return i18n.t("organizer.chipArtist");
+          case "album":
+            return i18n.t("organizer.chipAlbum");
+          case "year":
+            return i18n.t("organizer.chipYear");
+          case "genre":
+            return i18n.t("organizer.chipGenre");
+          case "track":
+            return i18n.t("tagEditor.fieldTrack");
+          case "disc":
+            return i18n.t("tagEditor.fieldDisc");
+          default:
+            return f;
         }
       });
       return `${i18n.t("organizer.statusMissingTag")}: ${fieldNames.join(", ")}`;
@@ -547,7 +627,12 @@
       if (!embedded) onClose?.();
     } else if (e.key === "Enter") {
       const target = e.target as HTMLElement;
-      if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA" || target.tagName === "INPUT") return;
+      if (
+        target.tagName === "BUTTON" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "INPUT"
+      )
+        return;
       if (!canApply || showConfirmApply) return;
       e.preventDefault();
       requestApply();
@@ -590,7 +675,8 @@
       await loadDuplicateSongIds();
     } catch (err: any) {
       console.error("Preview failed:", err);
-      errorMessage = typeof err === "string" ? err : err.message || i18n.t("organizer.previewFailed");
+      errorMessage =
+        typeof err === "string" ? err : err.message || i18n.t("organizer.previewFailed");
       items = [];
     } finally {
       isLoading = false;
@@ -626,7 +712,11 @@
 
   function requestApply() {
     if (!canApply || isApplying) return;
-    const consequences = computeOrganizeConsequences(items, { cleanEmptyDirs, moveExtraFiles, includeMissingTags });
+    const consequences = computeOrganizeConsequences(items, {
+      cleanEmptyDirs,
+      moveExtraFiles,
+      includeMissingTags,
+    });
     if (consequences.fileCount === 0) return;
     pendingConsequences = consequences;
     showConfirmApply = true;
@@ -663,7 +753,12 @@
     errorMessage = null;
 
     const itemsToApply = items
-      .filter((i) => i.status === "ok" || (includeMissingTags && (i.status === "missing_tag" || (i.status as any) === "missingtag")))
+      .filter(
+        (i) =>
+          i.status === "ok" ||
+          (includeMissingTags &&
+            (i.status === "missing_tag" || (i.status as any) === "missingtag")),
+      )
       .map((i) => ({
         song_id: i.song_id,
         from_path: i.from_path,
@@ -677,7 +772,7 @@
           items: itemsToApply,
           cleanEmptyDirs: cleanEmptyDirs,
           moveExtraFiles: moveExtraFiles,
-        }
+        },
       );
 
       // Persist confirmed template and options so future operations and Auto-Organize use them
@@ -696,14 +791,14 @@
         errorMessage = result.errors.join("; ");
         toastStore.show(
           i18n.t("organizer.toastErrors", { count: result.errors.length }),
-          "warning"
+          "warning",
         );
       } else {
         successMessage = i18n.plural("organizer.applySuccess", result.moved_count);
         toastStore.show(
           i18n.plural("organizer.applySuccess", result.moved_count),
           "success",
-          TOAST_DURATION_MS
+          TOAST_DURATION_MS,
         );
         onSuccess?.();
         // Leave the modal open so the user can see the result — refresh the
@@ -712,7 +807,8 @@
       }
     } catch (err: any) {
       console.error("Failed to apply organize:", err);
-      errorMessage = typeof err === "string" ? err : err.message || i18n.t("organizer.organizeFailed");
+      errorMessage =
+        typeof err === "string" ? err : err.message || i18n.t("organizer.organizeFailed");
     } finally {
       isApplying = false;
     }
@@ -728,18 +824,30 @@
 
 {#snippet scopeToggle()}
   {#if songIds.length > 0}
-    <div class="flex items-center justify-between bg-brand-sidebar/40 p-3 rounded-xl border border-brand-border/30">
+    <div
+      class="flex items-center justify-between bg-brand-sidebar/40 p-3 rounded-xl border border-brand-border/30"
+    >
       <span class="font-semibold text-brand-text-primary">{i18n.t("organizer.scopeLabel")}</span>
-      <div class="flex items-center gap-1.5 bg-brand-sidebar p-1 rounded-lg border border-brand-border/50">
+      <div
+        class="flex items-center gap-1.5 bg-brand-sidebar p-1 rounded-lg border border-brand-border/50"
+      >
         <button
-          onclick={() => { scope = "selection"; }}
-          class="px-3 py-1 rounded-md transition-colors {scope === 'selection' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          onclick={() => {
+            scope = "selection";
+          }}
+          class="px-3 py-1 rounded-md transition-colors {scope === 'selection'
+            ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm'
+            : 'text-brand-text-secondary hover:text-brand-text-primary'}"
         >
           {i18n.t("organizer.scopeSelection", { count: songIds.length })}
         </button>
         <button
-          onclick={() => { scope = "library"; }}
-          class="px-3 py-1 rounded-md transition-colors {scope === 'library' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          onclick={() => {
+            scope = "library";
+          }}
+          class="px-3 py-1 rounded-md transition-colors {scope === 'library'
+            ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm'
+            : 'text-brand-text-secondary hover:text-brand-text-primary'}"
         >
           {i18n.t("organizer.scopeLibrary", { count: items.length })}
         </button>
@@ -749,7 +857,11 @@
 {/snippet}
 
 {#snippet previewTreeNode(node: PreviewTreeNode)}
-  <div class="flex items-center gap-1.5 py-0.5 {node.isFile ? 'text-brand-text-secondary' : 'text-brand-text-primary font-medium'}">
+  <div
+    class="flex items-center gap-1.5 py-0.5 {node.isFile
+      ? 'text-brand-text-secondary'
+      : 'text-brand-text-primary font-medium'}"
+  >
     {#if node.isFile}
       <Music class="w-3 h-3 shrink-0 text-brand-text-secondary/70" />
     {:else}
@@ -769,7 +881,9 @@
 {#snippet templateSection()}
   <div class="space-y-4">
     {#if isDraftModified && organizeStore.autoOrganize}
-      <div class="flex items-center justify-between p-2.5 rounded-xl bg-brand-sidebar border border-brand-border/60 text-brand-text-primary">
+      <div
+        class="flex items-center justify-between p-2.5 rounded-xl bg-brand-sidebar border border-brand-border/60 text-brand-text-primary"
+      >
         <div class="flex items-center gap-2 min-w-0">
           <AlertTriangle class="w-4 h-4 shrink-0 text-brand-text-secondary" />
           <span class="text-xs font-medium truncate">
@@ -802,20 +916,34 @@
           type="button"
           onclick={() => selectPreset(preset.id)}
           aria-label={i18n.t(preset.labelKey)}
-          class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset === preset.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
+          class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset ===
+          preset.id
+            ? 'border-brand-accent shadow-md shadow-brand-accent/5'
+            : 'border-brand-border/60'}"
         >
-          <span class="font-semibold text-sm text-brand-text-primary block">{i18n.t(preset.labelKey)}</span>
-          <code class="text-[10px] text-brand-text-secondary font-mono truncate block mt-1">{preset.template}</code>
+          <span class="font-semibold text-sm text-brand-text-primary block"
+            >{i18n.t(preset.labelKey)}</span
+          >
+          <code class="text-[10px] text-brand-text-secondary font-mono truncate block mt-1"
+            >{preset.template}</code
+          >
         </button>
       {/each}
       <button
         type="button"
         onclick={() => selectPreset("custom")}
         aria-label={i18n.t("organizer.presetCustom")}
-        class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset === 'custom' ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
+        class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset ===
+        'custom'
+          ? 'border-brand-accent shadow-md shadow-brand-accent/5'
+          : 'border-brand-border/60'}"
       >
-        <span class="font-semibold text-sm text-brand-text-primary block">{i18n.t("organizer.presetCustom")}</span>
-        <span class="text-[10px] text-brand-text-secondary block mt-1">{i18n.t("organizer.presetCustomHint")}</span>
+        <span class="font-semibold text-sm text-brand-text-primary block"
+          >{i18n.t("organizer.presetCustom")}</span
+        >
+        <span class="text-[10px] text-brand-text-secondary block mt-1"
+          >{i18n.t("organizer.presetCustomHint")}</span
+        >
       </button>
     </div>
 
@@ -830,8 +958,12 @@
     {/if}
 
     <div>
-      <span class="text-[11px] text-brand-text-secondary font-semibold uppercase tracking-wider">{i18n.t("organizer.templateSampleOutputLabel")}</span>
-      <div class="mt-1.5 bg-brand-main/50 border border-brand-border/60 rounded-xl p-3 max-h-40 overflow-y-auto">
+      <span class="text-[11px] text-brand-text-secondary font-semibold uppercase tracking-wider"
+        >{i18n.t("organizer.templateSampleOutputLabel")}</span
+      >
+      <div
+        class="mt-1.5 bg-brand-main/50 border border-brand-border/60 rounded-xl p-3 max-h-40 overflow-y-auto"
+      >
         {#each previewTree as node (node.name + node.isFile)}
           {@render previewTreeNode(node)}
         {/each}
@@ -843,19 +975,33 @@
 {#snippet destinationSection()}
   <div class="space-y-4">
     <div>
-      <span class="block font-semibold text-brand-text-primary mb-1.5">{i18n.t("organizer.destinationDirLabel")}</span>
-      <div class="flex items-center gap-1.5 bg-brand-sidebar p-1 rounded-lg border border-brand-border/50 w-full">
+      <span class="block font-semibold text-brand-text-primary mb-1.5"
+        >{i18n.t("organizer.destinationDirLabel")}</span
+      >
+      <div
+        class="flex items-center gap-1.5 bg-brand-sidebar p-1 rounded-lg border border-brand-border/50 w-full"
+      >
         <button
           type="button"
-          onclick={() => { destinationMode = "original"; }}
-          class="flex-1 px-3 py-1.5 rounded-md transition-colors text-xs {destinationMode === 'original' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          onclick={() => {
+            destinationMode = "original";
+          }}
+          class="flex-1 px-3 py-1.5 rounded-md transition-colors text-xs {destinationMode ===
+          'original'
+            ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm'
+            : 'text-brand-text-secondary hover:text-brand-text-primary'}"
         >
           {i18n.t("organizer.destinationDefault")}
         </button>
         <button
           type="button"
-          onclick={() => { destinationMode = "custom"; }}
-          class="flex-1 px-3 py-1.5 rounded-md transition-colors text-xs {destinationMode === 'custom' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          onclick={() => {
+            destinationMode = "custom";
+          }}
+          class="flex-1 px-3 py-1.5 rounded-md transition-colors text-xs {destinationMode ===
+          'custom'
+            ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm'
+            : 'text-brand-text-secondary hover:text-brand-text-primary'}"
         >
           {i18n.t("organizer.destinationCustom")}
         </button>
@@ -885,7 +1031,9 @@
         <span>{i18n.t("organizer.moveExtraFiles")}</span>
         <Toggle
           checked={moveExtraFiles}
-          onchange={(v) => { moveExtraFiles = v; }}
+          onchange={(v) => {
+            moveExtraFiles = v;
+          }}
           label={i18n.t("organizer.moveExtraFiles")}
         />
       </div>
@@ -894,7 +1042,9 @@
         <span>{i18n.t("organizer.replaceSpaces")}</span>
         <Toggle
           checked={replaceSpaces}
-          onchange={(v) => { replaceSpaces = v; }}
+          onchange={(v) => {
+            replaceSpaces = v;
+          }}
           label={i18n.t("organizer.replaceSpaces")}
         />
       </div>
@@ -903,7 +1053,9 @@
         <span>{i18n.t("organizer.asciiOnly")}</span>
         <Toggle
           checked={asciiOnly}
-          onchange={(v) => { asciiOnly = v; }}
+          onchange={(v) => {
+            asciiOnly = v;
+          }}
           label={i18n.t("organizer.asciiOnly")}
         />
       </div>
@@ -918,23 +1070,36 @@
         <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Status filters">
           <button
             type="button"
-            onclick={() => { activeFilter = "all"; }}
-            class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'all' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
+            onclick={() => {
+              activeFilter = "all";
+            }}
+            class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'all'
+              ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm'
+              : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
           >
             {i18n.t("organizer.filterAll", { count: displayedItems.length })}
           </button>
           <button
             type="button"
-            onclick={() => { activeFilter = "ok"; }}
-            class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'ok' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
+            onclick={() => {
+              activeFilter = "ok";
+            }}
+            class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'ok'
+              ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm'
+              : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
           >
             {i18n.t("organizer.filterReady", { count: readyCount })}
           </button>
           {#if missingTagCount > 0}
             <button
               type="button"
-              onclick={() => { activeFilter = "missing_tag"; }}
-              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'missing_tag' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
+              onclick={() => {
+                activeFilter = "missing_tag";
+              }}
+              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter ===
+              'missing_tag'
+                ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm'
+                : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
             >
               {i18n.t("organizer.filterNeedsTags", { count: missingTagCount })}
             </button>
@@ -942,8 +1107,12 @@
           {#if collisionCount > 0}
             <button
               type="button"
-              onclick={() => { activeFilter = "duplicate"; }}
-              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'duplicate' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
+              onclick={() => {
+                activeFilter = "duplicate";
+              }}
+              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'duplicate'
+                ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm'
+                : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
             >
               {i18n.t("organizer.filterDuplicates", { count: collisionCount })}
             </button>
@@ -951,8 +1120,12 @@
           {#if errorCount > 0}
             <button
               type="button"
-              onclick={() => { activeFilter = "error"; }}
-              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'error' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
+              onclick={() => {
+                activeFilter = "error";
+              }}
+              class="px-2.5 py-1 rounded-lg text-xs transition-colors {activeFilter === 'error'
+                ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm'
+                : 'bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border/40'}"
             >
               {i18n.t("organizer.filterErrors", { count: errorCount })}
             </button>
@@ -964,7 +1137,9 @@
             <div class="flex items-center gap-2">
               <Toggle
                 checked={includeMissingTags}
-                onchange={(v) => { includeMissingTags = v; }}
+                onchange={(v) => {
+                  includeMissingTags = v;
+                }}
                 label={i18n.t("organizer.includeMissingTagsToggle")}
                 showOnOffLabel={false}
               />
@@ -982,14 +1157,18 @@
             title={i18n.t("organizer.refreshPreviewTooltip")}
             class="gap-1.5"
           >
-            <RefreshCw class="w-3.5 h-3.5 {isLoading ? 'animate-spin text-brand-accent-text' : ''}" />
+            <RefreshCw
+              class="w-3.5 h-3.5 {isLoading ? 'animate-spin text-brand-accent-text' : ''}"
+            />
             {i18n.t("organizer.refreshPreviewTooltip")}
           </Button>
         </div>
       </div>
     </div>
 
-    <div class="h-64 border border-brand-border/60 rounded-xl overflow-hidden bg-brand-sidebar/40 flex flex-col">
+    <div
+      class="h-64 border border-brand-border/60 rounded-xl overflow-hidden bg-brand-sidebar/40 flex flex-col"
+    >
       {#if items.length === 0}
         <div class="h-full flex items-center justify-center text-brand-text-secondary">
           {#if isLoading}
@@ -1004,8 +1183,13 @@
         </div>
       {:else}
         <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
-          <div style="min-width: {48 + 224 + fromColWidth + 24 + toColWidth + 140}px;" class="h-full flex flex-col">
-            <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0">
+          <div
+            style="min-width: {48 + 224 + fromColWidth + 24 + toColWidth + 140}px;"
+            class="h-full flex flex-col"
+          >
+            <div
+              class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0"
+            >
               <div class="w-12 shrink-0">{i18n.t("organizer.colStatus")}</div>
               <div class="w-56 shrink-0 pr-2">{i18n.t("organizer.chipTitle")}</div>
 
@@ -1058,18 +1242,25 @@
                   >
                     <div class="w-12 shrink-0">
                       {#if st === "ok"}
-                        <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30" title={i18n.t("organizer.statusOk")}>
+                        <span
+                          class="inline-flex items-center justify-center w-6 h-6 rounded bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30"
+                          title={i18n.t("organizer.statusOk")}
+                        >
                           <Check class="w-3.5 h-3.5" />
                           <span class="sr-only">{i18n.t("organizer.statusOk")}</span>
                         </span>
                       {:else if st === "unchanged"}
-                        <span class="px-2 py-0.5 rounded bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary">
+                        <span
+                          class="px-2 py-0.5 rounded bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary"
+                        >
                           {i18n.t("organizer.statusUnchanged")}
                         </span>
                       {:else if st === "duplicate"}
                         <HelpTip
                           text={item.error_message || i18n.t("organizer.statusCollision")}
-                          label={item.error_message ? i18n.t("organizer.statusCollision") : undefined}
+                          label={item.error_message
+                            ? i18n.t("organizer.statusCollision")
+                            : undefined}
                           class="w-6 h-6 rounded bg-brand-sidebar text-brand-text-secondary border border-brand-border/60"
                         >
                           <Duplicate class="w-3.5 h-3.5" />
@@ -1095,18 +1286,26 @@
 
                     <!-- Track identity -->
                     <div class="w-56 shrink-0 pr-3 min-w-0 flex flex-col justify-center">
-                      <span class="truncate font-medium text-brand-text-primary text-xs" title={displayTitle}>
+                      <span
+                        class="truncate font-medium text-brand-text-primary text-xs"
+                        title={displayTitle}
+                      >
                         {displayTitle}
                       </span>
                       {#if displaySubtitle}
-                        <span class="truncate text-[10px] text-brand-text-secondary" title={displaySubtitle}>
+                        <span
+                          class="truncate text-[10px] text-brand-text-secondary"
+                          title={displaySubtitle}
+                        >
                           {displaySubtitle}
                         </span>
                       {/if}
                     </div>
 
                     <div
-                      class="px-2 overflow-x-auto scrollbar-none shrink-0 {item.from_path ? 'text-brand-text-secondary' : 'text-brand-text-primary font-medium'}"
+                      class="px-2 overflow-x-auto scrollbar-none shrink-0 {item.from_path
+                        ? 'text-brand-text-secondary'
+                        : 'text-brand-text-primary font-medium'}"
                       style="width: {fromColWidth}px;"
                       title={item.from_path}
                     >
@@ -1118,15 +1317,21 @@
                     <div
                       class="px-2 overflow-x-auto scrollbar-none shrink-0 text-brand-text-primary font-medium"
                       style="width: {toColWidth}px;"
-                      title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
+                      title={item.error_message
+                        ? `${item.to_path ? item.to_path + " — " : ""}${item.error_message}`
+                        : item.to_path}
                     >
-                      {#if st === 'error'}
+                      {#if st === "error"}
                         <span class="text-brand-text-secondary font-medium">
-                          {item.error_message ? item.error_message : (displayTo || i18n.t("organizer.unknownError"))}
+                          {item.error_message
+                            ? item.error_message
+                            : displayTo || i18n.t("organizer.unknownError")}
                         </span>
-                      {:else if st === 'duplicate'}
+                      {:else if st === "duplicate"}
                         <span class="text-brand-text-secondary font-medium">
-                          {item.error_message ? shortenDuplicateMessage(item.error_message) : displayTo}
+                          {item.error_message
+                            ? shortenDuplicateMessage(item.error_message)
+                            : displayTo}
                         </span>
                       {:else}
                         {@html highlightPathHtml(displayTo)}
@@ -1134,12 +1339,17 @@
                     </div>
 
                     <!-- Hover quick actions -->
-                    <div class="ml-auto shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pl-2">
+                    <div
+                      class="ml-auto shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pl-2"
+                    >
                       {#if st === "duplicate"}
                         {#if duplicateSongIds.has(item.song_id)}
                           <button
                             type="button"
-                            onclick={(e) => { e.stopPropagation(); handleReviewDuplicate(item.song_id); }}
+                            onclick={(e) => {
+                              e.stopPropagation();
+                              handleReviewDuplicate(item.song_id);
+                            }}
                             class="px-2 py-1 rounded bg-brand-sidebar hover:bg-brand-main text-brand-text-primary text-[10px] font-semibold border border-brand-border/60 transition-colors flex items-center gap-1 shadow-sm"
                             title={i18n.t("curation.compareDuplicatesBtn")}
                           >
@@ -1149,7 +1359,10 @@
                         {:else}
                           <button
                             type="button"
-                            onclick={(e) => { e.stopPropagation(); locateInFiles(item.song_id); }}
+                            onclick={(e) => {
+                              e.stopPropagation();
+                              locateInFiles(item.song_id);
+                            }}
                             class="px-2 py-1 rounded bg-brand-sidebar hover:bg-brand-main text-brand-text-primary text-[10px] font-semibold border border-brand-border/60 transition-colors flex items-center gap-1 shadow-sm"
                             title={i18n.t("curation.viewInFiles")}
                           >
@@ -1160,7 +1373,10 @@
                       {/if}
                       <button
                         type="button"
-                        onclick={(e) => { e.stopPropagation(); openTagEditor(item.song_id); }}
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          openTagEditor(item.song_id);
+                        }}
                         class="px-2 py-1 rounded bg-brand-sidebar hover:bg-brand-accent hover:text-brand-accent-contrast text-brand-text-secondary text-[10px] font-medium border border-brand-border/60 transition-colors flex items-center gap-1 shadow-sm"
                         title={i18n.t("organizer.editTags")}
                       >
@@ -1170,7 +1386,10 @@
                       {#if picardStore.available}
                         <button
                           type="button"
-                          onclick={(e) => { e.stopPropagation(); handleOpenInPicard(item.song_id); }}
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            handleOpenInPicard(item.song_id);
+                          }}
                           class="px-2 py-1 rounded bg-brand-sidebar hover:bg-brand-accent hover:text-brand-accent-contrast text-brand-text-secondary text-[10px] font-medium border border-brand-border/60 transition-colors flex items-center gap-1 shadow-sm"
                           title={i18n.t("picard.openInPicard")}
                         >
@@ -1191,11 +1410,7 @@
 {/snippet}
 
 {#snippet applyButton()}
-  <Button
-    variant="primary"
-    onclick={requestApply}
-    disabled={!canApply}
-  >
+  <Button variant="primary" onclick={requestApply} disabled={!canApply}>
     {#if isApplying}
       <RefreshCw class="w-4 h-4 animate-spin" />
       <span>{i18n.t("organizer.applying")}</span>
@@ -1232,48 +1447,72 @@
 
       <!-- Unlike the sections below, this one isn't capped to max-w-3xl —
            the file list benefits from the extra width on wide windows. -->
-      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
+      <div
+        class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary"
+      >
         {@render previewSection()}
       </div>
 
       <!-- Collapsible Template & Destination Summary Bar -->
-      <div class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-4 flex items-center justify-between gap-4">
+      <div
+        class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-4 flex items-center justify-between gap-4"
+      >
         <div class="flex flex-wrap items-center gap-x-6 gap-y-2 min-w-0 flex-1">
           <div class="flex items-center gap-2 min-w-0">
-            <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider shrink-0">
+            <span
+              class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider shrink-0"
+            >
               {i18n.t("organizer.activeTemplateLabel")}:
             </span>
-            <code class="px-2 py-0.5 rounded bg-brand-main/60 border border-brand-border/60 text-xs font-mono text-brand-text-primary truncate">
+            <code
+              class="px-2 py-0.5 rounded bg-brand-main/60 border border-brand-border/60 text-xs font-mono text-brand-text-primary truncate"
+            >
               {template}
             </code>
           </div>
           <div class="flex items-center gap-2 min-w-0">
-            <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider shrink-0">
+            <span
+              class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider shrink-0"
+            >
               {i18n.t("organizer.activeDestinationLabel")}:
             </span>
             <span class="text-xs font-medium text-brand-text-primary truncate">
-              {destinationMode === "custom" && customDestinationDir ? customDestinationDir : i18n.t("organizer.destinationDefault")}
+              {destinationMode === "custom" && customDestinationDir
+                ? customDestinationDir
+                : i18n.t("organizer.destinationDefault")}
             </span>
           </div>
         </div>
         <Button
           variant="secondary"
           size="sm"
-          onclick={() => { isConfigExpanded = !isConfigExpanded; }}
+          onclick={() => {
+            isConfigExpanded = !isConfigExpanded;
+          }}
         >
-          {isConfigExpanded ? i18n.t("organizer.collapseSummaryBtn") : i18n.t("organizer.customizeSummaryBtn")}
+          {isConfigExpanded
+            ? i18n.t("organizer.collapseSummaryBtn")
+            : i18n.t("organizer.customizeSummaryBtn")}
         </Button>
       </div>
 
       {#if isConfigExpanded}
         <div transition:slide class="space-y-4">
-          <div class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
-            <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionTemplatePattern")}</h3>
+          <div
+            class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary"
+          >
+            <h3 class="font-bold text-sm text-brand-text-primary">
+              {i18n.t("organizer.sectionTemplatePattern")}
+            </h3>
             {@render templateSection()}
           </div>
 
-          <div class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
-            <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionDestinationOptions")}</h3>
+          <div
+            class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary"
+          >
+            <h3 class="font-bold text-sm text-brand-text-primary">
+              {i18n.t("organizer.sectionDestinationOptions")}
+            </h3>
             {@render destinationSection()}
           </div>
         </div>
@@ -1289,7 +1528,9 @@
       <div
         class="w-full max-w-4xl max-h-[90vh] bg-brand-sidebar border border-brand-border/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-brand-text-primary"
       >
-        <div class="px-6 py-4 border-b border-brand-border/40 flex items-center justify-between shrink-0">
+        <div
+          class="px-6 py-4 border-b border-brand-border/40 flex items-center justify-between shrink-0"
+        >
           <div class="flex items-center gap-3">
             <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text">
               <Folder class="w-5 h-5" />
@@ -1317,12 +1558,16 @@
           {@render scopeToggle()}
 
           <div>
-            <h3 class="font-bold text-sm text-brand-text-primary mb-3">{i18n.t("organizer.sectionTemplatePattern")}</h3>
+            <h3 class="font-bold text-sm text-brand-text-primary mb-3">
+              {i18n.t("organizer.sectionTemplatePattern")}
+            </h3>
             {@render templateSection()}
           </div>
 
           <div class="pt-2 border-t border-brand-border/40">
-            <h3 class="font-bold text-sm text-brand-text-primary mb-3 pt-3">{i18n.t("organizer.sectionDestinationOptions")}</h3>
+            <h3 class="font-bold text-sm text-brand-text-primary mb-3 pt-3">
+              {i18n.t("organizer.sectionDestinationOptions")}
+            </h3>
             {@render destinationSection()}
           </div>
 
@@ -1331,7 +1576,9 @@
           </div>
         </div>
 
-        <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-end shrink-0 bg-brand-sidebar/50">
+        <div
+          class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-end shrink-0 bg-brand-sidebar/50"
+        >
           <div class="flex items-center gap-3">
             {@render actionMessages()}
             <button
@@ -1367,7 +1614,13 @@
   {/if}
 
   {#if contextMenu}
-    <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => { contextMenu = null; }}>
+    <ContextMenu
+      x={contextMenu.x}
+      y={contextMenu.y}
+      onClose={() => {
+        contextMenu = null;
+      }}
+    >
       {#if getItemStatus(contextMenu.item) === "duplicate" && duplicateSongIds.has(contextMenu.item.song_id)}
         <ContextMenuItem
           icon={Duplicate}
@@ -1399,14 +1652,21 @@
           }}
         />
       {/if}
-      <ViewInFilesItem songId={contextMenu.item.song_id} onClose={() => { contextMenu = null; }} />
+      <ViewInFilesItem
+        songId={contextMenu.item.song_id}
+        onClose={() => {
+          contextMenu = null;
+        }}
+      />
     </ContextMenu>
   {/if}
 
   {#if editingSongId !== null}
     <TagEditor
       songId={editingSongId}
-      onClose={() => { editingSongId = null; }}
+      onClose={() => {
+        editingSongId = null;
+      }}
       onSave={handleTagEditorSaved}
     />
   {/if}
@@ -1414,7 +1674,9 @@
   {#if reviewDuplicateSongId !== null}
     <DuplicateReviewModal
       initialSongId={reviewDuplicateSongId}
-      onClose={() => { reviewDuplicateSongId = null; }}
+      onClose={() => {
+        reviewDuplicateSongId = null;
+      }}
       onResolved={() => {
         fetchPreview();
       }}

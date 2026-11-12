@@ -50,11 +50,16 @@
     };
   });
 
-  let artistProfile = $derived(pin.artist?.name ? collectionStore.getArtistProfile(pin.artist.name) : null);
+  let artistProfile = $derived(
+    pin.artist?.name ? collectionStore.getArtistProfile(pin.artist.name) : null,
+  );
   let artistPortraitUrl = $derived(
     pin.type === "artist"
-      ? resolveArtistPortraitUrl(artistArtwork?.artist_portrait_uri, artistProfile?.fetched_image_filename)
-      : null
+      ? resolveArtistPortraitUrl(
+          artistArtwork?.artist_portrait_uri,
+          artistProfile?.fetched_image_filename,
+        )
+      : null,
   );
 
   let artistFrontCover = $derived.by(() => {
@@ -81,7 +86,9 @@
   {onkeydown}
   ondragstart={(e) => e.preventDefault()}
   title={tooltipText}
-  class="relative group transition-colors select-none text-left cursor-grab active:cursor-grabbing {isDragged ? 'opacity-40' : ''} {collapsed
+  class="relative group transition-colors select-none text-left cursor-grab active:cursor-grabbing {isDragged
+    ? 'opacity-40'
+    : ''} {collapsed
     ? 'w-10 h-10 flex items-center justify-center rounded-xl mx-auto'
     : 'w-full flex items-center gap-3 px-3 py-1 rounded-lg'} {pin.isActive
     ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
@@ -89,19 +96,24 @@
 >
   {#if isDragOver}
     {#if collapsed}
-      <div class="absolute inset-0 rounded-xl ring-2 ring-brand-accent pointer-events-none z-10"></div>
+      <div
+        class="absolute inset-0 rounded-xl ring-2 ring-brand-accent pointer-events-none z-10"
+      ></div>
     {:else}
       <div
-        class="absolute left-1 right-1 h-0.5 bg-brand-accent rounded-full pointer-events-none z-10 {dropIndicatorPosition === 'bottom' ? '-bottom-0.5' : '-top-0.5'}"
+        class="absolute left-1 right-1 h-0.5 bg-brand-accent rounded-full pointer-events-none z-10 {dropIndicatorPosition ===
+        'bottom'
+          ? '-bottom-0.5'
+          : '-top-0.5'}"
       ></div>
     {/if}
   {/if}
 
   <!-- Artwork / Thumbnail Container (square with no rounded corners) -->
   <div
-    class="shrink-0 relative overflow-hidden flex items-center justify-center {tintClass ? `border ${tintClass}` : 'bg-brand-main/60'} {collapsed
-      ? 'w-8 h-8'
-      : 'w-7 h-7'}"
+    class="shrink-0 relative overflow-hidden flex items-center justify-center {tintClass
+      ? `border ${tintClass}`
+      : 'bg-brand-main/60'} {collapsed ? 'w-8 h-8' : 'w-7 h-7'}"
   >
     {#if pin.type === "song" || pin.type === "album"}
       <CoverArt
@@ -128,12 +140,18 @@
           sizeClass={collapsed ? "w-8 h-8" : "w-7 h-7"}
         />
       {:else}
-        <IconComponent class={collapsed ? "w-4 h-4 text-brand-text-secondary" : "w-3.5 h-3.5 text-brand-text-secondary"} />
+        <IconComponent
+          class={collapsed
+            ? "w-4 h-4 text-brand-text-secondary"
+            : "w-3.5 h-3.5 text-brand-text-secondary"}
+        />
       {/if}
     {:else if autoKind}
       <PlaylistKindIcon kind={autoKind} sizeClass={collapsed ? "w-4 h-4" : "w-3.5 h-3.5"} />
     {:else}
-      <IconComponent class={collapsed ? "w-4 h-4 text-brand-accent-text" : "w-3.5 h-3.5 text-brand-accent-text"} />
+      <IconComponent
+        class={collapsed ? "w-4 h-4 text-brand-accent-text" : "w-3.5 h-3.5 text-brand-accent-text"}
+      />
     {/if}
   </div>
 

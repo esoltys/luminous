@@ -17,8 +17,21 @@ export function stripEnclosingQuotes(str: string): string {
 
 /** Numeric and date fields whose value may be written as a `a..b` range. */
 const RANGE_FIELDS: ReadonlySet<string> = new Set([
-  "year", "originalyear", "bitrate", "samplerate", "sample_rate", "bitdepth", "bit_depth",
-  "bpm", "rating", "playcount", "skipcount", "added", "lastplayed", "duration", "channels",
+  "year",
+  "originalyear",
+  "bitrate",
+  "samplerate",
+  "sample_rate",
+  "bitdepth",
+  "bit_depth",
+  "bpm",
+  "rating",
+  "playcount",
+  "skipcount",
+  "added",
+  "lastplayed",
+  "duration",
+  "channels",
 ]);
 
 export function parseSearchRules(query: string): Rule[] {
@@ -144,24 +157,10 @@ export function parseSearchRules(query: string): Rule[] {
       rawVal = stripEnclosingQuotes(rawVal);
 
       let normalizedField = field;
-      if (
-        [
-          "artist_tag",
-          "artist-tag",
-          "artisttag",
-          "artist_tags",
-        ].includes(field)
-      ) {
+      if (["artist_tag", "artist-tag", "artisttag", "artist_tags"].includes(field)) {
         normalizedField = "artist_tag";
         if (!hasExplicitOp) op = "contains";
-      } else if (
-        [
-          "folder",
-          "subfolder",
-          "directory",
-          "path",
-        ].includes(field)
-      ) {
+      } else if (["folder", "subfolder", "directory", "path"].includes(field)) {
         normalizedField = "folder";
         if (!hasExplicitOp) op = "contains";
       } else if (
@@ -187,8 +186,10 @@ export function parseSearchRules(query: string): Rule[] {
       const range = RANGE_FIELDS.has(normalizedField) && !hasExplicitOp ? rawVal.split("..") : [];
       if (range.length === 2 && (range[0].trim() || range[1].trim())) {
         // `a..b` is shorthand for `>=a` and `<=b`; either end may be open.
-        if (range[0].trim()) rules.push({ field: normalizedField, op: ">=", value: range[0].trim() });
-        if (range[1].trim()) rules.push({ field: normalizedField, op: "<=", value: range[1].trim() });
+        if (range[0].trim())
+          rules.push({ field: normalizedField, op: ">=", value: range[0].trim() });
+        if (range[1].trim())
+          rules.push({ field: normalizedField, op: "<=", value: range[1].trim() });
       } else if (normalizedField && rawVal) {
         rules.push({ field: normalizedField, op, value: rawVal });
       }

@@ -13,7 +13,7 @@
     queueAlbumAsPlaylist,
     queueArtistAsPlaylist,
     queuePlaylistAsPlaylist,
-    queueAutoPlaylistAsPlaylist
+    queueAutoPlaylistAsPlaylist,
   } from "../utils/playlist";
   import { collectionStore } from "../stores/collection.svelte";
   import CardSection from "./CardSection.svelte";
@@ -76,7 +76,9 @@
       }
       default: {
         const pl = playlistsStore.playlists.find((p) => p.id === ap.playlistId);
-        return pl ? getPlaylistDisplayName(pl) : (ap.genre ?? ap.decade ?? ap.bpm ?? ap.artistTag ?? ap.kind);
+        return pl
+          ? getPlaylistDisplayName(pl)
+          : (ap.genre ?? ap.decade ?? ap.bpm ?? ap.artistTag ?? ap.kind);
       }
     }
   }
@@ -102,7 +104,11 @@
         playerStore.playSong(item.song.id);
         break;
       case "album":
-        navigationStore.viewAlbum(item.album.album || "", undefined, item.album.album_key ?? undefined);
+        navigationStore.viewAlbum(
+          item.album.album || "",
+          undefined,
+          item.album.album_key ?? undefined,
+        );
         break;
       case "artist":
         navigationStore.viewArtist(item.artist.name || "");
@@ -150,7 +156,10 @@
     const items = pinnedStore.items.filter((item) => item !== moved);
     const targetPos = items.indexOf(target);
     items.splice(targetIndex > draggedIndex ? targetPos + 1 : targetPos, 0, moved);
-    const order: Array<[PinnedItemType, string]> = items.map((item) => [item.type, pinnedRefKeyFor(item)]);
+    const order: Array<[PinnedItemType, string]> = items.map((item) => [
+      item.type,
+      pinnedRefKeyFor(item),
+    ]);
     pinnedStore.reorder(order);
   }
 
@@ -166,7 +175,9 @@
       captureOn: "arm",
       onMove: (pos) => {
         ghostPos = pos;
-        const el = document.elementFromPoint(pos.x, pos.y)?.closest("[data-pinned-index]") as HTMLElement | null;
+        const el = document
+          .elementFromPoint(pos.x, pos.y)
+          ?.closest("[data-pinned-index]") as HTMLElement | null;
         const idx = el?.dataset.pinnedIndex;
         dragOverIndex = idx !== undefined ? Number(idx) : null;
       },
@@ -175,7 +186,7 @@
         resetDrag();
       },
       onTap: resetDrag,
-      onCancel: resetDrag
+      onCancel: resetDrag,
     });
     if (cardDrag) draggedIndex = index;
   }
@@ -193,7 +204,7 @@
 
 {#if visibleItems.length > 0}
   <CardSection
-    title={i18n.t('home.pinned')}
+    title={i18n.t("home.pinned")}
     viewMode={prefs.pinnedViewMode}
     onViewModeChange={(m) => prefs.setPinnedViewMode(m)}
   >
@@ -206,7 +217,9 @@
           onpointerdown={(e) => handleCardPointerDown(e, index)}
           oncontextmenu={(e) => handleContextMenu(e, item)}
           ondragstart={(e) => e.preventDefault()}
-          class="relative transition-opacity cursor-grab active:cursor-grabbing {rows ? 'rounded-lg' : 'rounded-xl'} {draggedIndex === index ? 'opacity-40' : ''}"
+          class="relative transition-opacity cursor-grab active:cursor-grabbing {rows
+            ? 'rounded-lg'
+            : 'rounded-xl'} {draggedIndex === index ? 'opacity-40' : ''}"
         >
           {#if item.type === "album"}
             {#if rows}
@@ -300,7 +313,11 @@
             />
           {/if}
           {#if dragOverIndex === index && draggedIndex !== null && draggedIndex !== index}
-            <div class="absolute inset-0 bg-brand-accent/30 pointer-events-none {rows ? 'rounded-lg' : 'rounded-xl'}"></div>
+            <div
+              class="absolute inset-0 bg-brand-accent/30 pointer-events-none {rows
+                ? 'rounded-lg'
+                : 'rounded-xl'}"
+            ></div>
           {/if}
         </div>
       {/each}
@@ -340,8 +357,12 @@
       albumName={item.album.album || ""}
       artistName={item.album.artist || undefined}
       onPlay={() => queueAlbumAsPlaylist(item.album)}
-      onGoToArtist={item.album.artist ? () => navigationStore.viewArtist(item.album.artist!) : undefined}
-      onClose={() => { contextMenuState = null; }}
+      onGoToArtist={item.album.artist
+        ? () => navigationStore.viewArtist(item.album.artist!)
+        : undefined}
+      onClose={() => {
+        contextMenuState = null;
+      }}
     />
   {:else if item.type === "song"}
     <SongContextMenu
@@ -349,9 +370,15 @@
       y={contextMenuState.y}
       song={item.song}
       onPlay={() => playerStore.playSong(item.song.id)}
-      onGoToArtist={item.song.artist ? () => navigationStore.viewArtist(item.song.album_artist?.trim() || item.song.artist || "") : undefined}
-      onGoToAlbum={item.song.album ? () => navigationStore.viewAlbum(item.song.album || "") : undefined}
-      onClose={() => { contextMenuState = null; }}
+      onGoToArtist={item.song.artist
+        ? () => navigationStore.viewArtist(item.song.album_artist?.trim() || item.song.artist || "")
+        : undefined}
+      onGoToAlbum={item.song.album
+        ? () => navigationStore.viewAlbum(item.song.album || "")
+        : undefined}
+      onClose={() => {
+        contextMenuState = null;
+      }}
     />
   {:else if item.type === "artist"}
     <ArtistContextMenu
@@ -359,7 +386,9 @@
       y={contextMenuState.y}
       artistName={item.artist.name || ""}
       onPlay={() => queueArtistAsPlaylist(item.artist.name || "")}
-      onClose={() => { contextMenuState = null; }}
+      onClose={() => {
+        contextMenuState = null;
+      }}
     />
   {:else if item.type === "playlist"}
     <PlaylistCardContextMenu
@@ -367,7 +396,9 @@
       y={contextMenuState.y}
       playlist={item.playlist}
       onPlay={() => queuePlaylistAsPlaylist(item.playlist)}
-      onClose={() => { contextMenuState = null; }}
+      onClose={() => {
+        contextMenuState = null;
+      }}
     />
   {:else if item.type === "auto_playlist"}
     <AutoPlaylistContextMenu
@@ -375,8 +406,11 @@
       y={contextMenuState.y}
       autoPlaylist={item.autoPlaylist}
       label={autoPlaylistLabel(item.autoPlaylist)}
-      onPlay={() => queueAutoPlaylistAsPlaylist(item.autoPlaylist, autoPlaylistLabel(item.autoPlaylist))}
-      onClose={() => { contextMenuState = null; }}
+      onPlay={() =>
+        queueAutoPlaylistAsPlaylist(item.autoPlaylist, autoPlaylistLabel(item.autoPlaylist))}
+      onClose={() => {
+        contextMenuState = null;
+      }}
     />
   {/if}
 {/if}

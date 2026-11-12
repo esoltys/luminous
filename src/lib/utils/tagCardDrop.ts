@@ -24,7 +24,7 @@ export function cardDropApplies(card: string, target: TagCardDropTarget | null):
  */
 export function chipDropAction(
   chip: { name: string; fromGroup: string },
-  target: TagCardDropTarget | null
+  target: TagCardDropTarget | null,
 ): ChipDropAction | null {
   if (!target) return null;
   if (target.kind === "header") return target.group === chip.fromGroup ? "promote" : null;

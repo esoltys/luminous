@@ -20,7 +20,7 @@ export function isRemotePath(path: string | null | undefined): boolean {
  * and/or `path`, checking `source` first and falling back to the path.
  */
 export function isRemoteSource(
-  song: { source?: SongSource | null; path?: string | null } | null | undefined
+  song: { source?: SongSource | null; path?: string | null } | null | undefined,
 ): boolean {
   if (!song) return false;
   if (song.source && REMOTE_SOURCES.has(song.source)) return true;
@@ -29,7 +29,7 @@ export function isRemoteSource(
 
 /** Parses a `subsonic://{serverId}/{trackId}` path; `null` for anything else. */
 export function parseSubsonicPath(
-  path: string | null | undefined
+  path: string | null | undefined,
 ): { serverId: number; trackId: string } | null {
   const m = path?.match(/^subsonic:\/\/(\d+)\/(.+)$/i);
   if (!m) return null;
@@ -51,7 +51,10 @@ export function shortenQuotedUrls(text: string): string {
     const originEnd = withoutQuery.indexOf("/", withoutQuery.indexOf("//") + 2);
     if (originEnd === -1) return `'${withoutQuery}'`;
     const origin = withoutQuery.slice(0, originEnd);
-    const segments = withoutQuery.slice(originEnd + 1).split("/").filter(Boolean);
+    const segments = withoutQuery
+      .slice(originEnd + 1)
+      .split("/")
+      .filter(Boolean);
     let name = segments.pop() ?? "";
     if (name.length > MAX_FILENAME_CHARS) {
       name = `${name.slice(0, MAX_FILENAME_CHARS - 12)}…${name.slice(-11)}`;

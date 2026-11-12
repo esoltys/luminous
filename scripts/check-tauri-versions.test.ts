@@ -137,7 +137,9 @@ version = "2.5.1"
     });
 
     const errorMsg = formatMismatches(result.mismatches);
-    expect(errorMsg).toContain("@tauri-apps/plugin-updater (npm: 2.12.0) ↔ tauri-plugin-updater (crate: 2.11.0)");
+    expect(errorMsg).toContain(
+      "@tauri-apps/plugin-updater (npm: 2.12.0) ↔ tauri-plugin-updater (crate: 2.11.0)",
+    );
     expect(errorMsg).toContain("cargo update -p tauri-plugin-updater --precise 2.12.0");
     expect(errorMsg).toContain("bun add @tauri-apps/plugin-updater@^2.11.0");
   });

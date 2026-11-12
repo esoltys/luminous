@@ -1,6 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext, AudioPipelineInfo, RadioSeed, RadioResult, OutputFallbackPayload, OutputFallbackReason, AudioBackendKind, VolumeSafety } from "../types";
+import type {
+  PlaybackState,
+  Playlist,
+  PlaylistItem,
+  Song,
+  ShuffleMode,
+  RepeatMode,
+  PlayState,
+  LoudnessGainSource,
+  PlayContext,
+  AudioPipelineInfo,
+  RadioSeed,
+  RadioResult,
+  OutputFallbackPayload,
+  OutputFallbackReason,
+  AudioBackendKind,
+  VolumeSafety,
+} from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { createEventScope } from "../utils/eventScope";
 import { themeStore } from "./theme.svelte";
@@ -66,7 +83,7 @@ export class PlayerStore {
     return i18n.t(
       "miniplayer.queueProgress",
       { current: this.playlistIndex, total: this.playlistTotal },
-      `${this.playlistIndex}/${this.playlistTotal}`
+      `${this.playlistIndex}/${this.playlistTotal}`,
     );
   }
 
@@ -138,14 +155,21 @@ export class PlayerStore {
 
         // Queue completion celebration (#182, Milestone tier): fires when
         // playback stops naturally after the last track with nothing left.
-        if (wasPlaying && this.state === "stopped" && this.remainingPlaylistItems === 0 && !this.currentSong) {
+        if (
+          wasPlaying &&
+          this.state === "stopped" &&
+          this.remainingPlaylistItems === 0 &&
+          !this.currentSong
+        ) {
           this.queueJustCompleted = true;
 
           const playedPl =
             oldPlaylistId !== null && oldPlaylistId !== undefined
               ? playlistsStore.playlists.find((p) => p.id === oldPlaylistId)
               : undefined;
-          const isQueue = playedPl ? playedPl.is_queue : (!oldContextName || oldContextName === "Queue");
+          const isQueue = playedPl
+            ? playedPl.is_queue
+            : !oldContextName || oldContextName === "Queue";
 
           const sessionTracks =
             this._lastSessionSongIds.length > 0
@@ -169,11 +193,17 @@ export class PlayerStore {
             if (!windowLayoutStore.isMiniplayer && !windowLayoutStore.effectiveImmersiveMode) {
               const toastText = isQueue
                 ? i18n.t("celebrations.queueComplete", {}, "Your Queue is done")
-                : i18n.t("celebrations.contextComplete", { name: oldContextName }, `${oldContextName} complete`);
+                : i18n.t(
+                    "celebrations.contextComplete",
+                    { name: oldContextName },
+                    `${oldContextName} complete`,
+                  );
               toastStore.show(toastText, "milestone");
             }
           }
-          setTimeout(() => { this.queueJustCompleted = false; }, 650);
+          setTimeout(() => {
+            this.queueJustCompleted = false;
+          }, 650);
 
           if (isQueue) {
             const queuePl = playlistsStore.queuePlaylist;
@@ -193,17 +223,20 @@ export class PlayerStore {
         }
       });
 
-      await this.events.listen<{ song: Song | null; pipeline?: AudioPipelineInfo | null }>("track-changed", async (event) => {
-        this.currentSong = event.payload.song || undefined;
-        this.audioPipeline = event.payload.pipeline ?? null;
-        themeStore.updateArtworkColors(this.currentSong);
-        if (this.currentSong?.id) {
-          this.completedSession = null;
-          if (!this._playedSongIdsHistory.includes(this.currentSong.id)) {
-            this._playedSongIdsHistory.push(this.currentSong.id);
+      await this.events.listen<{ song: Song | null; pipeline?: AudioPipelineInfo | null }>(
+        "track-changed",
+        async (event) => {
+          this.currentSong = event.payload.song || undefined;
+          this.audioPipeline = event.payload.pipeline ?? null;
+          themeStore.updateArtworkColors(this.currentSong);
+          if (this.currentSong?.id) {
+            this.completedSession = null;
+            if (!this._playedSongIdsHistory.includes(this.currentSong.id)) {
+              this._playedSongIdsHistory.push(this.currentSong.id);
+            }
           }
-        }
-      });
+        },
+      );
 
       await this.events.listen<AudioPipelineInfo | null>("audio-pipeline-changed", (event) => {
         this.audioPipeline = event.payload;
@@ -222,28 +255,30 @@ export class PlayerStore {
         title: string | null;
         path: string | null;
         message: string;
-      }>(
-        "playback-error",
-        (event) => {
-          this._playbackErrorBatch.push({
-            title: event.payload.title || i18n.t("collection.unknownSong"),
-            path: event.payload.path,
-            message: event.payload.message,
-          });
-          if (this._playbackErrorTimer) clearTimeout(this._playbackErrorTimer);
-          this._playbackErrorTimer = setTimeout(() => this.flushPlaybackErrorToast(), 400);
-        }
-      );
+      }>("playback-error", (event) => {
+        this._playbackErrorBatch.push({
+          title: event.payload.title || i18n.t("collection.unknownSong"),
+          path: event.payload.path,
+          message: event.payload.message,
+        });
+        if (this._playbackErrorTimer) clearTimeout(this._playbackErrorTimer);
+        this._playbackErrorTimer = setTimeout(() => this.flushPlaybackErrorToast(), 400);
+      });
 
       // The output device couldn't be opened. The backend already parked the
       // track paused at its position; this just says why. Persistent (no
       // durationMs), and each failed retry replaces the previous toast
       // instead of stacking another one.
       await this.events.listen("audio-output-unavailable", () => {
-        if (this._outputUnavailableToastId !== null) toastStore.dismiss(this._outputUnavailableToastId);
+        if (this._outputUnavailableToastId !== null)
+          toastStore.dismiss(this._outputUnavailableToastId);
         this._outputUnavailableToastId = toastStore.show(
-          i18n.t("playerBar.outputUnavailableToast", undefined, "Audio output unavailable. Connect a device and press play."),
-          "error"
+          i18n.t(
+            "playerBar.outputUnavailableToast",
+            undefined,
+            "Audio output unavailable. Connect a device and press play.",
+          ),
+          "error",
         );
       });
 
@@ -264,7 +299,7 @@ export class PlayerStore {
             label: i18n.t("playerBar.outputFallbackRetry"),
             onClick: () => void prefs.reapplyAudioOutput().catch(() => {}),
             icon: "refresh",
-          }
+          },
         );
       });
 
@@ -288,7 +323,9 @@ export class PlayerStore {
         await this.openAndPlay([startupFile]);
       }
 
-      const initialPipeline = await invoke<AudioPipelineInfo | null>("get_audio_pipeline_info").catch(() => null);
+      const initialPipeline = await invoke<AudioPipelineInfo | null>(
+        "get_audio_pipeline_info",
+      ).catch(() => null);
       if (initialPipeline) {
         this.audioPipeline = initialPipeline;
       }
@@ -324,20 +361,25 @@ export class PlayerStore {
       const reason = message && shortenQuotedUrls(message.trim().replace(/[.\s]+$/, ""));
       if (isRemotePath(path) && reason) {
         toastStore.show(
-          i18n.t("playerBar.trackSkippedRemoteToast", { title, message: reason }, `Couldn't play "${title}" — ${reason}. Skipped.`),
-          "error"
+          i18n.t(
+            "playerBar.trackSkippedRemoteToast",
+            { title, message: reason },
+            `Couldn't play "${title}" — ${reason}. Skipped.`,
+          ),
+          "error",
         );
       } else {
         toastStore.show(
-          i18n.t("playerBar.trackSkippedToast", { title }, `Couldn't play "${title}" — file not found. Skipped.`),
-          "error"
+          i18n.t(
+            "playerBar.trackSkippedToast",
+            { title },
+            `Couldn't play "${title}" — file not found. Skipped.`,
+          ),
+          "error",
         );
       }
     } else {
-      toastStore.show(
-        i18n.plural("playerBar.tracksSkippedToast", failures.length),
-        "error"
-      );
+      toastStore.show(i18n.plural("playerBar.tracksSkippedToast", failures.length), "error");
     }
   }
 
@@ -398,15 +440,12 @@ export class PlayerStore {
     if (outcome.played === 0) {
       toastStore.show(
         i18n.t("playerBar.openNothingPlayable", {}, "No supported audio files found to play."),
-        "error"
+        "error",
       );
       return outcome;
     }
     if (outcome.skipped > 0) {
-      toastStore.show(
-        i18n.plural("playerBar.tracksSkippedToast", outcome.skipped),
-        "error"
-      );
+      toastStore.show(i18n.plural("playerBar.tracksSkippedToast", outcome.skipped), "error");
     }
     await playlistsStore.refreshPlaylists();
     const queuePl = await playlistsStore.requireQueue();
@@ -420,19 +459,18 @@ export class PlayerStore {
    * `openAndPlay`. Playback is left untouched. */
   async addPathsToQueue(paths: string[]) {
     this.completedSession = null;
-    const outcome = await invoke<{ added: number; skipped: number }>("add_paths_to_queue", { paths });
+    const outcome = await invoke<{ added: number; skipped: number }>("add_paths_to_queue", {
+      paths,
+    });
     if (outcome.added === 0) {
       toastStore.show(
         i18n.t("dragDrop.nothingToAdd", {}, "No supported audio files found to add."),
-        "error"
+        "error",
       );
       return outcome;
     }
     if (outcome.skipped > 0) {
-      toastStore.show(
-        i18n.plural("playerBar.tracksSkippedToast", outcome.skipped),
-        "error"
-      );
+      toastStore.show(i18n.plural("playerBar.tracksSkippedToast", outcome.skipped), "error");
     }
     await playlistsStore.refreshPlaylists();
     const qPl = playlistsStore.queuePlaylist;
@@ -447,21 +485,65 @@ export class PlayerStore {
       const selected = await open({
         multiple: true,
         directory: false,
-        title: i18n.t('topNav.openFilesTitle', {}, "Open Audio Files or Playlists"),
+        title: i18n.t("topNav.openFilesTitle", {}, "Open Audio Files or Playlists"),
         filters: [
           {
             name: i18n.t("topNav.fileFilterSupported"),
-            extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b", "m3u", "m3u8", "pls", "xspf"]
+            extensions: [
+              "mp3",
+              "flac",
+              "ogg",
+              "opus",
+              "m4a",
+              "aac",
+              "alac",
+              "wav",
+              "aiff",
+              "aif",
+              "wv",
+              "mpc",
+              "ape",
+              "tta",
+              "dsf",
+              "dff",
+              "asf",
+              "wma",
+              "m4b",
+              "m3u",
+              "m3u8",
+              "pls",
+              "xspf",
+            ],
           },
           {
             name: i18n.t("topNav.fileFilterAudio"),
-            extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b"]
+            extensions: [
+              "mp3",
+              "flac",
+              "ogg",
+              "opus",
+              "m4a",
+              "aac",
+              "alac",
+              "wav",
+              "aiff",
+              "aif",
+              "wv",
+              "mpc",
+              "ape",
+              "tta",
+              "dsf",
+              "dff",
+              "asf",
+              "wma",
+              "m4b",
+            ],
           },
           {
             name: i18n.t("topNav.fileFilterPlaylists"),
-            extensions: ["m3u", "m3u8", "pls", "xspf"]
-          }
-        ]
+            extensions: ["m3u", "m3u8", "pls", "xspf"],
+          },
+        ],
       });
 
       if (selected) {
@@ -483,7 +565,7 @@ export class PlayerStore {
       const selected = await open({
         multiple: true,
         directory: true,
-        title: i18n.t('emptyLibrary.playFolder'),
+        title: i18n.t("emptyLibrary.playFolder"),
       });
       if (selected) {
         const paths = Array.isArray(selected) ? selected : [selected];
@@ -496,7 +578,13 @@ export class PlayerStore {
     }
   }
 
-  async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext, contextName?: string) {
+  async playSongs(
+    songIds: number[],
+    startIndex: number,
+    playlistId?: number,
+    context?: PlayContext,
+    contextName?: string,
+  ) {
     this._lastSessionSongIds = [...songIds];
     this._playedSongIdsHistory = [];
     this.completedSession = null;
@@ -516,7 +604,12 @@ export class PlayerStore {
       this.activeContextName = undefined;
     }
 
-    await invoke("play_songs", { songIds, startIndex, playlistId: playlistId ?? null, context: context ?? null });
+    await invoke("play_songs", {
+      songIds,
+      startIndex,
+      playlistId: playlistId ?? null,
+      context: context ?? null,
+    });
 
     if (queuePl) {
       await playlistsStore.selectPlaylist(queuePl.id);
@@ -559,8 +652,8 @@ export class PlayerStore {
       i18n.t(
         "playlists.startRadioToast",
         { name: result.seedTitle, count: result.songCount },
-        `Started ${result.seedTitle} Radio (${result.songCount} songs)`
-      )
+        `Started ${result.seedTitle} Radio (${result.songCount} songs)`,
+      ),
     );
     return result;
   }
@@ -610,7 +703,12 @@ export class PlayerStore {
   async seek(positionNs: number) {
     const roundedNs = Math.round(positionNs);
     this.positionNanosec = roundedNs;
-    console.log("[PlayerStore] Seeking to nanoseconds (rounded):", roundedNs, "original float:", positionNs);
+    console.log(
+      "[PlayerStore] Seeking to nanoseconds (rounded):",
+      roundedNs,
+      "original float:",
+      positionNs,
+    );
     await invoke("seek_to", { positionNanosec: roundedNs });
   }
 
@@ -678,7 +776,7 @@ export class PlayerStore {
   async toggleLovedCurrent() {
     if (!this.currentSong) return;
     const current = this.currentSong.loved ?? 0;
-    const next = current === 1 ? 0 : (current === -1 ? 0 : 1);
+    const next = current === 1 ? 0 : current === -1 ? 0 : 1;
     await this.setLovedCurrent(next);
   }
 
