@@ -166,7 +166,9 @@
       {/if}
     {:else}
       <div class="w-7 h-7 flex items-center justify-center shrink-0">
-        <Icon class="w-4 h-4 icon-align" />
+        <!-- No .icon-align here: the icon already sits in a flex-centred box as tall as the line,
+             so the margin nudge that levels the small tree icons would push it below the label. -->
+        <Icon class="w-4 h-4" />
       </div>
       <span class="truncate whitespace-nowrap flex-1 text-left">{label}</span>
       {#if opts.updateBadge}
