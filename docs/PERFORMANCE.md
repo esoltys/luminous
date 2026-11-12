@@ -23,7 +23,7 @@ before/after a change, instead of relying on "it feels heavier." See #706.
   from before #1197 were taken in the developer's own profile and have `real`. Only compare rows of
   the same kind.
 - **Held constant between runs**: the window is on screen at a fixed size, the app launches fresh
-  into Collection → Songs with nothing selected, each scenario settles before sampling, and the
+  into Library → Songs with nothing selected, each scenario settles before sampling, and the
   recorded figure is the median of 5 readings. Each of these moves the numbers on its own: a
   minimized WebView2 reads ~100MB lower than a visible one, and the restored view alone shifted idle
   private bytes by ~26MB between otherwise identical runs. The library still grows over time, so
@@ -113,7 +113,7 @@ separate line, which isn't comparable with the scratch one.
 | Local | `idle` | Fresh launch over the scanned library, no playback |
 | Local | `after-full-scan` | Forced full rescan run to completion |
 | Local | `playback-eq-analyzer` | Baseline track playing with the equalizer and spectrum analyzer on |
-| Local | `album-grid` | Fresh launch into Collection → Albums, scrolled end to end, which generates every cover thumbnail |
+| Local | `album-grid` | Fresh launch into Library → Albums, scrolled end to end, which generates every cover thumbnail |
 | WebDAV | `webdav-sync`, `webdav-idle`, `webdav-playback` | First sync, idle after relaunch, streamed playback |
 | Subsonic | `subsonic-sync`, `subsonic-idle`, `subsonic-playback` | The same against an OpenSubsonic server (e.g. Navidrome) |
 

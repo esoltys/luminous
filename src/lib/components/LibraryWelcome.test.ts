@@ -26,7 +26,7 @@ describe("LibraryWelcome.svelte", () => {
   it("shows a loading state instead of offering a library before the first load", () => {
     collectionStore.libraryLoaded = false;
     render(LibraryWelcome);
-    expect(screen.getByRole("status")).toHaveTextContent("Loading your collection...");
+    expect(screen.getByRole("status")).toHaveTextContent("Loading your library...");
     expect(screen.queryByRole("button", { name: /Add Folder to Library/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Open Files/ })).toBeNull();
   });
