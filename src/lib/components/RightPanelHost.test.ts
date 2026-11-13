@@ -152,4 +152,11 @@ describe("RightPanelHost.svelte", () => {
     expect(queryByRole("group", { name: /info sidebar/i })).toBeNull();
     expect(queryByRole("separator")).toBeNull();
   });
+
+  it("applies rail-surface and glass-surface on the unpinned rail to match the left sidebar", () => {
+    const { getByRole } = renderUnpinned();
+    const rail = getByRole("group", { name: /info sidebar/i });
+    expect(rail).toHaveClass("rail-surface");
+    expect(rail).toHaveClass("glass-surface");
+  });
 });

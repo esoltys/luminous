@@ -89,13 +89,9 @@
       saturation: null,
     }),
   );
-  let dockRimGlow = $derived.by(() => {
-    const rimColor =
-      themeStore.artworkColors?.vibrant ??
-      themeStore.artworkColors?.accent ??
-      themeStore.resolvedColors["color-accent"];
-    return `0 0 24px 2px color-mix(in srgb, ${rimColor} ${isDarkTheme ? "48%" : "30%"}, transparent)`;
-  });
+  let dockRimGlow = $derived(
+    `0 0 24px 2px color-mix(in srgb, ${dockGlowColors[0]} ${isDarkTheme ? "48%" : "30%"}, transparent)`,
+  );
 
   function handleSeek(e: Event) {
     const input = e.target as HTMLInputElement;
@@ -744,13 +740,12 @@
      glow full-strength across the entire pill width and fade smoothly outward
      in all directions without pinching at the ends. */
   .dock-glow-wrapper {
-    -webkit-mask-image:
+    --dock-glow-outer-mask:
       linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%),
       linear-gradient(to bottom, transparent 0%, black 35%, black 65%, transparent 100%);
+    -webkit-mask-image: var(--dock-glow-outer-mask);
     -webkit-mask-composite: source-in;
-    mask-image:
-      linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%),
-      linear-gradient(to bottom, transparent 0%, black 35%, black 65%, transparent 100%);
+    mask-image: var(--dock-glow-outer-mask);
     mask-composite: intersect;
   }
 
@@ -758,7 +753,7 @@
      outer edge (no plateau at 48px/64px) so there is no visible seam above or
      around the dock while keeping the glass interior translucent. */
   .dock-glow-cutout {
-    -webkit-mask-image:
+    --dock-glow-cutout-mask:
       linear-gradient(
         to right,
         black 0%,
@@ -773,22 +768,9 @@
         rgba(0, 0, 0, 0.05) calc(100% - 56px),
         black 100%
       );
+    -webkit-mask-image: var(--dock-glow-cutout-mask);
     -webkit-mask-composite: source-over;
-    mask-image:
-      linear-gradient(
-        to right,
-        black 0%,
-        rgba(0, 0, 0, 0.05) 72px,
-        rgba(0, 0, 0, 0.05) calc(100% - 72px),
-        black 100%
-      ),
-      linear-gradient(
-        to bottom,
-        black 0%,
-        rgba(0, 0, 0, 0.05) 56px,
-        rgba(0, 0, 0, 0.05) calc(100% - 56px),
-        black 100%
-      );
+    mask-image: var(--dock-glow-cutout-mask);
     mask-composite: add;
   }
 
@@ -815,7 +797,9 @@
     background-color: var(--bg-playerbar, #191b23) !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.5),
+      var(--dock-rim-glow, none) !important;
   }
 
   /* Liquid-glass "shine": a light-catching specular highlight on top of the
