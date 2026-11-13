@@ -127,7 +127,7 @@ describe("VirtualCardGrid", () => {
   it("mounts only the rows near the viewport and reserves the full height", () => {
     renderGrid();
     // 1000px fits 5 columns of >=180px with 20px gaps; rows are 200 + 20 apart.
-    expect(rows().style.gridTemplateColumns).toBe("repeat(5, minmax(0, 1fr))");
+    expect(rows().style.gridTemplateColumns).toBe("repeat(5, minmax(0px, 1fr))");
     expect(grid().style.height).toBe(`${20 * 220 - 20}px`);
     // Rows 0-2 are on screen, plus 2 overscan rows below.
     expect(mounted()).toEqual(items.slice(0, 25));
@@ -206,18 +206,18 @@ describe("VirtualCardGrid", () => {
     viewWidth = 600;
     cardHeight = 250;
     remeasure();
-    expect(rows().style.gridTemplateColumns).toBe("repeat(3, minmax(0, 1fr))");
+    expect(rows().style.gridTemplateColumns).toBe("repeat(3, minmax(0px, 1fr))");
     expect(rows().style.gridAutoRows).toBe("minmax(250px, auto)");
   });
 
   it("stretches a short list across the row with fit", () => {
     renderGrid({ items: [1, 2, 3], fit: true });
-    expect(rows().style.gridTemplateColumns).toBe("repeat(3, minmax(0, 1fr))");
+    expect(rows().style.gridTemplateColumns).toBe("repeat(3, minmax(0px, 1fr))");
     expect(mounted()).toEqual([1, 2, 3]);
   });
 
   it("keeps the auto-fill columns for a short list without fit", () => {
     renderGrid({ items: [1, 2, 3] });
-    expect(rows().style.gridTemplateColumns).toBe("repeat(5, minmax(0, 1fr))");
+    expect(rows().style.gridTemplateColumns).toBe("repeat(5, minmax(0px, 1fr))");
   });
 });

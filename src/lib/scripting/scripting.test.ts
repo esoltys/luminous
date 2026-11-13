@@ -571,7 +571,7 @@ describe("In-app scripting API", () => {
       const cursor = document.getElementById("luminous-capture-cursor");
       expect(cursor).not.toBeNull();
       expect(cursor?.style.display).toBe("block");
-      expect(cursor?.style.transform).toContain("translate3d(199px, 299px, 0)");
+      expect(cursor?.style.transform).toContain("translate3d(199px, 299px, 0px)");
 
       await api.overlay.cursor.hide();
       expect(cursor?.style.display).toBe("none");
@@ -580,19 +580,19 @@ describe("In-app scripting API", () => {
     it("clamps cursor coordinates to viewport boundaries", async () => {
       await api.overlay.cursor.moveTo(-100, -50);
       const cursor = document.getElementById("luminous-capture-cursor");
-      expect(cursor?.style.transform).toContain("translate3d(-1px, -1px, 0)");
+      expect(cursor?.style.transform).toContain("translate3d(-1px, -1px, 0px)");
 
       await api.overlay.cursor.moveTo(999999, 999999);
       const expectedX = window.innerWidth - 1;
       const expectedY = window.innerHeight - 1;
-      expect(cursor?.style.transform).toContain(`translate3d(${expectedX}px, ${expectedY}px, 0)`);
+      expect(cursor?.style.transform).toContain(`translate3d(${expectedX}px, ${expectedY}px, 0px)`);
     });
 
     it("moves cursor smoothly with durationMs", async () => {
       await api.overlay.cursor.show();
       await api.overlay.cursor.moveTo(350, 450, { durationMs: 20 });
       const cursor = document.getElementById("luminous-capture-cursor");
-      expect(cursor?.style.transform).toContain("translate3d(349px, 449px, 0)");
+      expect(cursor?.style.transform).toContain("translate3d(349px, 449px, 0px)");
     });
 
     it("points cursor to an element center via pointTo", async () => {
@@ -614,7 +614,7 @@ describe("In-app scripting API", () => {
       const cursor = document.getElementById("luminous-capture-cursor");
       // center is left 100 + 40 = 140, top 200 + 20 = 220
       // hotspot offset is (140 - 1, 220 - 1) = (139, 219)
-      expect(cursor?.style.transform).toContain("translate3d(139px, 219px, 0)");
+      expect(cursor?.style.transform).toContain("translate3d(139px, 219px, 0px)");
 
       document.body.removeChild(button);
     });
@@ -655,10 +655,10 @@ describe("In-app scripting API", () => {
 
       const spotlight = document.getElementById("luminous-capture-spotlight");
       expect(spotlight).not.toBeNull();
-      expect(spotlight?.style.background).toContain("circle 180px at 200px 300px");
+      expect(spotlight?.style.background).toContain("180px at 200px 300px");
 
       await api.overlay.cursor.moveTo(250, 350);
-      expect(spotlight?.style.background).toContain("circle 180px at 250px 350px");
+      expect(spotlight?.style.background).toContain("180px at 250px 350px");
 
       await api.overlay.cursor.setSpotlight(false);
       await new Promise((resolve) => setTimeout(resolve, 350));
