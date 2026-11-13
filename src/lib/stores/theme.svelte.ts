@@ -158,18 +158,16 @@ export function glassAlpha(isDark: boolean): number {
 
 /**
  * Opacity for the PlayDock's ambient artwork glow layer behind `footer.glass-surface`.
- * Paired with `resolveDockGlowColors` lightness bounds so that even the
- * brightest (dark theme) or darkest (light theme) glow bleeding through
- * `glassAlpha` preserves WCAG AA (>= 4.5:1) dock text contrast across all
- * predefined themes.
+ * Paired with `resolveDockGlowColors` lightness bounds so the outer halo stays
+ * pronounced while dock text inside `footer.glass-surface` remains readable.
  */
 export function dockGlowOpacity(isDark: boolean): number {
-  return isDark ? 0.35 : 0.25;
+  return isDark ? 0.55 : 0.35;
 }
 
 /** Max HSL lightness in dark themes / min HSL lightness in light themes for dock glow. */
-export const DOCK_GLOW_DARK_MAX_L = 0.42;
-export const DOCK_GLOW_LIGHT_MIN_L = 0.72;
+export const DOCK_GLOW_DARK_MAX_L = 0.55;
+export const DOCK_GLOW_LIGHT_MIN_L = 0.75;
 
 /**
  * Resolves the palette for the PlayDock's ambient glow SVG: uses the playing

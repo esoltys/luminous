@@ -89,6 +89,13 @@
       saturation: null,
     }),
   );
+  let dockRimGlow = $derived.by(() => {
+    const rimColor =
+      themeStore.artworkColors?.vibrant ??
+      themeStore.artworkColors?.accent ??
+      themeStore.resolvedColors["color-accent"];
+    return `0 0 24px 2px color-mix(in srgb, ${rimColor} ${isDarkTheme ? "48%" : "30%"}, transparent)`;
+  });
 
   function handleSeek(e: Event) {
     const input = e.target as HTMLInputElement;
@@ -378,18 +385,21 @@
          over Queue/Album BlurredCover tables. Keyed on song + resolved colors
          so it cross-fades smoothly once artwork extraction finishes. -->
     <div
-      class="dock-glow-wrapper pointer-events-none select-none absolute -inset-x-10 -inset-y-6 z-0"
+      class="dock-glow-wrapper pointer-events-none select-none absolute -inset-x-16 -inset-y-12 z-0"
       style:opacity={dockGlowOpacity(isDarkTheme)}
       aria-hidden="true"
     >
-      {#key dockGlowKey}
-        <div class="dock-glow-svg absolute inset-0" transition:fade={{ duration: 300 }}>
-          {@html dockGlowSvg}
-        </div>
-      {/key}
+      <div class="dock-glow-cutout absolute inset-0">
+        {#key dockGlowKey}
+          <div class="dock-glow-svg absolute inset-0" transition:fade={{ duration: 300 }}>
+            {@html dockGlowSvg}
+          </div>
+        {/key}
+      </div>
     </div>
   {/if}
   <footer
+    style:--dock-rim-glow={dockRimGlow}
     class="relative z-10 bg-brand-playerbar flex items-center justify-between gap-3 px-5 md:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme
       ? 'glass-surface'
       : ''} {windowLayoutStore.isPlaybarOnlyMode
@@ -730,9 +740,64 @@
 {/if}
 
 <style>
+  /* Capsule-shaped outer falloff: two intersected linear gradients keep the
+     glow full-strength across the entire pill width and fade smoothly outward
+     in all directions without pinching at the ends. */
   .dock-glow-wrapper {
-    -webkit-mask-image: radial-gradient(ellipse 52% 58% at 50% 50%, black 35%, transparent 100%);
-    mask-image: radial-gradient(ellipse 52% 58% at 50% 50%, black 35%, transparent 100%);
+    -webkit-mask-image:
+      linear-gradient(to right, transparent 0%, black 9%, black 91%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(to right, transparent 0%, black 9%, black 91%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%);
+    mask-composite: intersect;
+  }
+
+  /* Hollow out the interior behind <footer> (inset 64px X, 48px Y) so the
+     translucent glass dock still blurs and shows scrolling content underneath
+     instead of an opaque glow slab. */
+  .dock-glow-cutout {
+    -webkit-mask-image:
+      linear-gradient(
+        to right,
+        black 0%,
+        black 64px,
+        rgba(0, 0, 0, 0.05) 80px,
+        rgba(0, 0, 0, 0.05) calc(100% - 80px),
+        black calc(100% - 64px),
+        black 100%
+      ),
+      linear-gradient(
+        to bottom,
+        black 0%,
+        black 48px,
+        rgba(0, 0, 0, 0.05) 60px,
+        rgba(0, 0, 0, 0.05) calc(100% - 60px),
+        black calc(100% - 48px),
+        black 100%
+      );
+    -webkit-mask-composite: source-over;
+    mask-image:
+      linear-gradient(
+        to right,
+        black 0%,
+        black 64px,
+        rgba(0, 0, 0, 0.05) 80px,
+        rgba(0, 0, 0, 0.05) calc(100% - 80px),
+        black calc(100% - 64px),
+        black 100%
+      ),
+      linear-gradient(
+        to bottom,
+        black 0%,
+        black 48px,
+        rgba(0, 0, 0, 0.05) 60px,
+        rgba(0, 0, 0, 0.05) calc(100% - 60px),
+        black calc(100% - 48px),
+        black 100%
+      );
+    mask-composite: add;
   }
 
   .dock-glow-svg :global(svg) {
@@ -747,7 +812,7 @@
     backdrop-filter: var(--acrylic-chrome-filter) !important;
     background-color: var(--glass-bg-playerbar) !important;
     border-color: var(--glass-border-color, var(--color-border)) !important;
-    box-shadow: var(--glass-shadow, none);
+    box-shadow: var(--glass-shadow, none), var(--dock-rim-glow, none);
   }
 
   /* No GPU compositing (WebKitGTK with GPU rendering disabled — see
