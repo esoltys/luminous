@@ -948,7 +948,7 @@
           onclick={() => selectPreset(preset.id)}
           aria-labelledby="preset-{preset.id}-label"
           aria-describedby="preset-{preset.id}-outline"
-          class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset ===
+          class="flex flex-col justify-start text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset ===
           preset.id
             ? 'border-brand-accent shadow-md shadow-brand-accent/5'
             : 'border-brand-border/60'}"
@@ -961,18 +961,25 @@
           <span id="preset-{preset.id}-outline" class="block mt-1.5 text-[11px]">
             {#each preset.outline as row, depth (row.labelKey)}
               <span
-                class="flex items-center gap-1.5 min-w-0 {row.optional
+                class="flex items-start gap-1.5 min-w-0 {row.optional
                   ? 'text-brand-text-secondary/70 italic'
                   : 'text-brand-text-secondary'}"
                 style:padding-inline-start="{depth * 0.75}rem"
               >
                 {#if row.kind === "file"}
-                  <Music aria-hidden="true" class="w-3 h-3 shrink-0 text-brand-text-secondary/70" />
+                  <Music
+                    aria-hidden="true"
+                    class="w-3 h-3 mt-0.5 shrink-0 text-brand-text-secondary/70"
+                  />
                 {:else}
-                  <Folder aria-hidden="true" class="w-3 h-3 shrink-0 text-brand-accent-text/80" />
+                  <Folder
+                    aria-hidden="true"
+                    class="w-3 h-3 mt-0.5 shrink-0 text-brand-accent-text/80"
+                  />
                 {/if}
-                <!-- The icons carry folder-vs-file visually; screen readers get it in words. -->
-                <span aria-hidden="true" class="truncate">{i18n.t(row.labelKey)}</span>
+                <!-- The icons carry folder-vs-file visually; screen readers get it in words.
+                     Labels wrap rather than truncate: the deepest row is the narrowest. -->
+                <span aria-hidden="true" class="min-w-0 break-words">{i18n.t(row.labelKey)}</span>
                 <span class="sr-only"
                   >{i18n.t(
                     row.kind === "file" ? "organizer.outlineFileSr" : "organizer.outlineFolderSr",
@@ -991,7 +998,7 @@
         type="button"
         onclick={() => selectPreset("custom")}
         aria-label={i18n.t("organizer.presetCustom")}
-        class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset ===
+        class="flex flex-col justify-start text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset ===
         'custom'
           ? 'border-brand-accent shadow-md shadow-brand-accent/5'
           : 'border-brand-border/60'}"
