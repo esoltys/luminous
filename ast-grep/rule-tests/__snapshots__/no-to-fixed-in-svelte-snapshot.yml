@@ -6,7 +6,7 @@ snapshots:
         style: primary
         start: 18
         end: 46
-  <span>{val.toFixed(1)}</span>:
+  "<span>{val.toFixed(1)}</span>":
     labels:
       - source: "{val.toFixed(1)}"
         style: primary

@@ -454,6 +454,15 @@
     return `grid-template-columns: ${cols.join(" ")}`;
   });
 
+  // Column-header button layouts; HEADER_META picks one per column. Weight and size come from the
+  // header row's `label-heading`, so the buttons only carry layout and hover.
+  const HEADER_BTN_LEFT =
+    "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 min-w-0 w-full";
+  const HEADER_BTN_CENTER_TEXT =
+    "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 min-w-0 w-full";
+  const HEADER_BTN_CENTER_ICON =
+    "flex items-center justify-center hover:text-brand-text-primary transition-colors min-w-0 w-full";
+
   interface HeaderMeta {
     i18nKey: string;
     className: string;
@@ -462,163 +471,135 @@
   const HEADER_META: Partial<Record<string, HeaderMeta>> = {
     track: {
       i18nKey: "collection.tableHeaderTrack",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-1rem)]",
     },
     title: {
       i18nKey: "collection.tableHeaderTitle",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-1rem)]",
     },
     artist: {
       i18nKey: "collection.tableHeaderArtist",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-1rem)]",
     },
     album: {
       i18nKey: "collection.tableHeaderAlbum",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-1rem)]",
     },
     composer: {
       i18nKey: "collection.tableHeaderComposer",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     album_artist: {
       i18nKey: "collection.tableHeaderAlbumArtist",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     artist_tag: {
       i18nKey: "collection.tableHeaderArtistTag",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     format: {
       i18nKey: "collection.tableHeaderFormat",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     year: {
       i18nKey: "collection.tableHeaderYear",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     originalyear: {
       i18nKey: "collection.tableHeaderOriginalYear",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     genre: {
       i18nKey: "collection.tableHeaderGenre",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     grouping: {
       i18nKey: "collection.tableHeaderGrouping",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     bpm: {
       i18nKey: "collection.tableHeaderBpm",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     initial_key: {
       i18nKey: "collection.tableHeaderInitialKey",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     musicbrainz_id: {
       i18nKey: "collection.tableHeaderMusicBrainzId",
-      className:
-        "flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_CENTER_ICON,
     },
     bitrate: {
       i18nKey: "collection.tableHeaderBitrate",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     samplerate: {
       i18nKey: "collection.tableHeaderSampleRate",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     bitdepth: {
       i18nKey: "collection.tableHeaderBitDepth",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     channels: {
       i18nKey: "collection.tableHeaderChannels",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     filesize: {
       i18nKey: "collection.tableHeaderFileSize",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     rating: {
       i18nKey: "collection.tableHeaderRating",
-      className:
-        "flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_CENTER_ICON,
     },
     playcount: {
       i18nKey: "collection.tableHeaderPlays",
-      className:
-        "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_CENTER_TEXT,
     },
     skipcount: {
       i18nKey: "collection.tableHeaderSkips",
-      className:
-        "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_CENTER_TEXT,
     },
     lastplayed: {
       i18nKey: "collection.tableHeaderLastPlayed",
-      className:
-        "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_CENTER_TEXT,
     },
     added: {
       i18nKey: "collection.tableHeaderAdded",
-      className:
-        "text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_CENTER_TEXT,
     },
     duration: {
       i18nKey: "",
-      className:
-        "flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_CENTER_ICON,
     },
     path: {
       i18nKey: "collection.tableHeaderPath",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
     library: {
       i18nKey: "collection.tableHeaderLibrary",
-      className:
-        "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full",
+      className: HEADER_BTN_LEFT,
       truncateClass: "max-w-[calc(100%-0.5rem)]",
     },
   };
@@ -791,7 +772,7 @@
     <div
       class="{secondaryColor(
         song,
-      )} truncate pr-2 min-w-0 text-xs font-semibold uppercase flex items-center gap-1"
+      )} truncate pr-2 min-w-0 text-xs font-semibold code-caps flex items-center gap-1"
     >
       <span>{song.filetype ? song.filetype.toUpperCase() : "—"}</span>
       {#if isLosslessFileType(song.filetype) && (verdict === "authentic" || verdict === "authentic_hires")}
@@ -1005,7 +986,7 @@
       role="separator"
       aria-label={row.dividerBefore}
       style:height="{DIVIDER_HEIGHT_PX}px"
-      class="flex items-end gap-3 px-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-brand-accent-text select-none"
+      class="label-small flex items-end gap-3 px-4 pb-1 text-brand-accent-text select-none"
     >
       <span>{row.dividerBefore}</span>
       <div class="h-px flex-1 bg-brand-accent/30"></div>
@@ -1052,7 +1033,7 @@
 
 <ColumnSelector bind:this={columnSelector} hideTrigger />
 <div
-  class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none"
+  class="label-heading sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-brand-text-secondary select-none"
 >
   <div
     role="row"
@@ -1066,7 +1047,7 @@
         active={sortField === positionSortField}
         {sortAsc}
         onclick={() => onToggleSort(positionSortField)}
-        class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0"
+        class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 min-w-0"
       >
         {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]"
             >{i18n.t("playlists.tableHeaderTrack")} {arrow}</span

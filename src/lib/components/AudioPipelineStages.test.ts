@@ -86,7 +86,7 @@ describe("AudioPipelineStages", () => {
       }),
     });
 
-    expect(getByText("Volume Control")).toBeInTheDocument();
+    expect(getByText("Volume control")).toBeInTheDocument();
     expect(getByText("Hardware (bit-perfect)")).toBeInTheDocument();
     expect(getByText("Bit-perfect")).toBeInTheDocument();
   });
@@ -99,7 +99,7 @@ describe("AudioPipelineStages", () => {
       }),
     });
 
-    expect(getByText("Volume Control")).toBeInTheDocument();
+    expect(getByText("Volume control")).toBeInTheDocument();
     expect(getByText("Software")).toBeInTheDocument();
   });
 });

@@ -507,7 +507,7 @@
       <div>
         <label
           for="smart-playlist-name-input"
-          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-1.5"
+          class="label-field block text-brand-text-secondary mb-1.5"
         >
           {i18n.t("smartPlaylistBuilder.nameLabel")}
         </label>
@@ -526,9 +526,7 @@
 
       <div>
         <div class="flex items-center justify-between mb-2">
-          <span
-            class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5"
-          >
+          <span class="label-field text-brand-text-secondary flex items-center gap-1.5">
             <SlidersHorizontal class="w-3.5 h-3.5 text-brand-accent-text" />
             {i18n.t("smartPlaylistBuilder.matchingRules")}
           </span>

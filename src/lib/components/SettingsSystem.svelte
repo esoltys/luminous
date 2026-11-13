@@ -920,7 +920,7 @@
     {/if}
 
     <div>
-      <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">
+      <h4 class="label-heading text-brand-text-secondary mb-3">
         {i18n.t("settings.updatePolicyTitle")}
       </h4>
       <div class="grid grid-cols-1 @xl:grid-cols-3 gap-3">

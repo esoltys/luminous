@@ -1,0 +1,12 @@
+id: no-uppercase-label
+valid:
+  - '<span class="label-field text-brand-text-secondary">Sample output</span>'
+  - '<h2 class="label-heading text-brand-text-primary">Now playing</h2>'
+  - '<span class="font-mono code-caps">FLAC</span>'
+  - '<span class="text-xs font-semibold">Uppercase letters are fine in prose</span>'
+  - '<input bind:value={colors["bg"]} maxlength="7" class="font-mono code-caps" />'
+invalid:
+  - '<input bind:value={colors["bg"]} maxlength="7" class="font-mono uppercase" />'
+  - '<span class="text-xs uppercase tracking-wider">Title</span>'
+  - '<h2 class="font-bold tracking-wide text-xs">Title</h2>'
+  - '<script lang="ts">const cls = "flex font-semibold uppercase min-w-0";</script>'

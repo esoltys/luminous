@@ -179,9 +179,7 @@
   {#if showValue}
     <div class="flex flex-col items-center mt-3 gap-0.5 pointer-events-none">
       {#if label}
-        <span class="text-[10px] font-bold text-brand-text-secondary uppercase tracking-wider"
-          >{label}</span
-        >
+        <span class="label-small text-brand-text-secondary">{label}</span>
       {/if}
       <span class="text-xs font-mono font-medium text-brand-text-primary">
         {value > 0 ? "+" : ""}{format(value)}{suffix ? ` ${suffix}` : ""}

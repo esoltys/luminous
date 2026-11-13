@@ -2059,7 +2059,7 @@ export const es = {
     unpinHome: "Desanclar de Inicio",
     artistInfo: "Información del artista",
     about: "Acerca de",
-    links: "ENLACES",
+    links: "Enlaces",
     showMore: "Mostrar más",
     showLess: "Mostrar menos",
     showAll: "Mostrar todo",

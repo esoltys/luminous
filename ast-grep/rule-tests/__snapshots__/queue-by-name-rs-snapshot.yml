@@ -1,6 +1,6 @@
 id: queue-by-name-rs
 snapshots:
-  if playlist.name != "queue" {}:
+  'if playlist.name != "queue" {}':
     labels:
       - source: playlist.name != "queue"
         style: primary

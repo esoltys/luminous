@@ -2162,7 +2162,7 @@ export const fr: DeepStringRecord<typeof en> = {
     unpinHome: "Détacher de l'accueil",
     artistInfo: "Infos artiste",
     about: "À propos",
-    links: "LIENS",
+    links: "Liens",
     showMore: "Afficher plus",
     showLess: "Afficher moins",
     showAll: "Afficher tout",

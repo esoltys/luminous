@@ -151,9 +151,7 @@
   </div>
 
   <div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 space-y-4">
-    <h4
-      class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase border-b border-brand-border pb-2"
-    >
+    <h4 class="label-heading text-brand-text-secondary border-b border-brand-border pb-2">
       {i18n.t("settings.aboutInfluences")}
     </h4>
 

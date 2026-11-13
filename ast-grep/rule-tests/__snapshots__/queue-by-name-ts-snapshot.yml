@@ -6,13 +6,13 @@ snapshots:
         style: primary
         start: 32
         end: 50
-  if ("Queue" == current.name) {}:
+  'if ("Queue" == current.name) {}':
     labels:
       - source: '"Queue" == current.name'
         style: primary
         start: 4
         end: 27
-  if (playlist.name !== 'queue') {}:
+  "if (playlist.name !== 'queue') {}":
     labels:
       - source: playlist.name !== 'queue'
         style: primary

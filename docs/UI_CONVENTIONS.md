@@ -75,6 +75,13 @@ Moved out of `AGENTS.md`; read this before any UI, animation, copy or locale cha
 
 - **No hand-typed versions, counts or dates in the UI**: derive them from one constant or the build.
 
+- **Sentence-case labels, no tracked uppercase**: labels, headings and column headers are sentence case in
+  every locale, including the English source string ("Sample rate", not "Sample Rate"). Hierarchy comes from
+  size, weight and colour via `label-field` (form labels), `label-heading` (section and column headers) and
+  `label-small` (chips, captions) in `src/app.css`, which set size and weight; add the colour at the call
+  site. Never use `uppercase` or `tracking-wide*`. Codes and abbreviations that are data rather than labels
+  (hex values, language codes, file types) use `code-caps`. Enforced by `no-uppercase-label`.
+
 - **A disabled or inert control is a defect**: don't ship a control whose value nothing consumes.
 
 - **Icon semantics**: Avoid icons that imply system-level tracking or achievement recording (e.g.,

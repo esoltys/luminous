@@ -70,7 +70,7 @@
   <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
     {#each groups as group (group.title)}
       <div>
-        <h3 class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider mb-2">
+        <h3 class="label-heading text-brand-text-secondary mb-2">
           {group.title}
         </h3>
         <div

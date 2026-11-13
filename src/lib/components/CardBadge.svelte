@@ -21,7 +21,7 @@
 </script>
 
 <div
-  class="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full {colorClass} text-[9px] font-bold tracking-wide shadow-lg select-none"
+  class="label-small absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full {colorClass} shadow-lg select-none"
   {title}
 >
   <Icon class="w-2.5 h-2.5 {spin ? 'animate-spin [animation-duration:3s]' : ''}" />

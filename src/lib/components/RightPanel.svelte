@@ -56,7 +56,7 @@
       case "artist":
         return i18n.t("playerBar.artistHeading", {}, "Artist");
       default:
-        return i18n.t("playerBar.nowPlayingHeading", {}, "Now Playing");
+        return i18n.t("playerBar.nowPlayingHeading", {}, "Now playing");
     }
   });
 
@@ -334,7 +334,7 @@
   >
     {#if currentSong}
       <div class="flex items-center justify-between gap-3">
-        <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
+        <h2 class="label-heading text-brand-text-secondary">
           {headingLabel}
         </h2>
         <!-- The panel follows what you look at; the return arrow marks this as the way back to what is playing, not a title. -->
@@ -349,7 +349,7 @@
         {#if !isPlayingSubject && playerStore.currentSong}
           {@render returnPill(
             () => inspectorStore.showPlaying(),
-            i18n.t("playerBar.nowPlayingHeading", {}, "Now Playing"),
+            i18n.t("playerBar.nowPlayingHeading", {}, "Now playing"),
           )}
         {/if}
       </div>
@@ -440,7 +440,7 @@
               >
               <div class="text-right min-w-0 flex flex-col items-end gap-1">
                 <div class="flex items-center gap-1.5 flex-wrap justify-end">
-                  <span class="font-semibold uppercase text-brand-text-primary"
+                  <span class="font-semibold code-caps text-brand-text-primary"
                     >{currentSong.filetype}</span
                   >
                   {#if isLosslessTrack}

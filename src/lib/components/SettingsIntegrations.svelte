@@ -252,10 +252,7 @@
   </div>
 
   <div class="flex flex-col gap-1.5">
-    <label
-      for="picard-custom-path-input"
-      class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-    >
+    <label for="picard-custom-path-input" class="label-field text-brand-text-secondary">
       {i18n.t("picard.customPathLabel")}
     </label>
     <div class="flex items-center gap-2">
@@ -345,10 +342,7 @@
     {#if !scrobblerStore.username}
       <div class="space-y-2 pt-2 border-t border-brand-border/60">
         <div class="flex items-center justify-between">
-          <label
-            for="listenbrainz-token-input"
-            class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-          >
+          <label for="listenbrainz-token-input" class="label-field text-brand-text-secondary">
             {i18n.t("listenbrainz.userTokenLabel")}
           </label>
           <button
@@ -898,10 +892,7 @@
 
     <div class="space-y-2 pt-2 border-t border-brand-border/60">
       <div class="flex items-center justify-between">
-        <label
-          for="fanart-key-input"
-          class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-        >
+        <label for="fanart-key-input" class="label-field text-brand-text-secondary">
           {i18n.t("settings.fanartApiKeyLabel")}
         </label>
         <button
@@ -985,7 +976,7 @@
 
     <div class="space-y-2 pt-2 border-t border-brand-border/60">
       <div class="space-y-0.5">
-        <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+        <span class="label-field text-brand-text-secondary">
           {i18n.t("settings.fanartImagesLabel")}
         </span>
         <p class="text-xs text-brand-text-secondary">{i18n.t("settings.fanartImagesHint")}</p>

@@ -604,7 +604,7 @@
                    under the cover art instead of sitting beside it. -->
                 <div class="hidden md:flex flex-col text-center md:text-left w-full max-w-md">
                   <span
-                    class="self-start px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
+                    class="label-heading self-start px-3 py-1 bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
                   >
                     {i18n.t("playerBar.nowPlaying")}
                   </span>

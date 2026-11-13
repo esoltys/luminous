@@ -648,9 +648,7 @@
                 <div
                   class="flex items-center justify-between px-2 py-1 mb-1 border-b border-brand-border/40 select-none"
                 >
-                  <span
-                    class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider"
-                  >
+                  <span class="label-heading text-brand-text-secondary">
                     {i18n.t("topNav.searchSuggestions", {}, "Suggestions")}
                   </span>
                   {#if collectionStore.searchLoading}
@@ -911,9 +909,7 @@
                       <div
                         class="flex items-center justify-between px-2 py-1 mb-1 border-b border-brand-border/40 select-none"
                       >
-                        <span
-                          class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider"
-                        >
+                        <span class="label-heading text-brand-text-secondary">
                           {i18n.t("topNav.filesAndFolders")}
                         </span>
                       </div>
@@ -959,9 +955,7 @@
             <div
               class="flex items-center justify-between px-2 py-1 mb-2 border-b border-brand-border/40 select-none"
             >
-              <span
-                class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider"
-              >
+              <span class="label-heading text-brand-text-secondary">
                 {i18n.t("topNav.recentSearches", {}, "Recent searches")}
               </span>
               {#if collectionStore.recentSearches.length > 0}

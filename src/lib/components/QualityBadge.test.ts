@@ -125,6 +125,6 @@ describe("QualityBadge.svelte", () => {
     await fireEvent.click(button);
 
     expect(getByRole("dialog")).toBeInTheDocument();
-    expect(getByText("Audio Pipeline")).toBeInTheDocument();
+    expect(getByText("Audio pipeline")).toBeInTheDocument();
   });
 });

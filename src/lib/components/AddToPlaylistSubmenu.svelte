@@ -169,7 +169,7 @@
               title={activeCustom.name}>{activeCustom.name}</span
             >
             <span
-              class="text-[9px] text-brand-accent-text font-semibold uppercase px-1 py-0.5 rounded bg-brand-accent/15 shrink-0"
+              class="label-small text-brand-accent-text px-1 py-0.5 rounded bg-brand-accent/15 shrink-0"
             >
               {i18n.t("playlists.activeBadgeLabel", {}, "Active")}
             </span>

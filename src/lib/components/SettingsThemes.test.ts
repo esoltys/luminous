@@ -22,11 +22,11 @@ describe("SettingsThemes.svelte", () => {
     themeStore.colorSchemeMode = "system";
   });
 
-  it("lists Add-on Supporter Themes above Predefined Themes", async () => {
+  it("lists Add-on supporter themes above Predefined Themes", async () => {
     addonsStore.applyEvent({ id: "mothman", state: "unowned" });
     const { findByText } = render(SettingsThemes);
-    const addons = await findByText("Add-on Supporter Themes");
-    const predefined = await findByText("Predefined Themes");
+    const addons = await findByText("Add-on supporter themes");
+    const predefined = await findByText("Predefined themes");
     expect(
       addons.compareDocumentPosition(predefined) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
@@ -35,7 +35,7 @@ describe("SettingsThemes.svelte", () => {
 
   it("renders Dynamic Themes row and footnotes for Luminous and System", async () => {
     const { findByText } = render(SettingsThemes);
-    expect(await findByText("Dynamic Themes")).toBeInTheDocument();
+    expect(await findByText("Dynamic themes")).toBeInTheDocument();
     expect(
       await findByText("Colors shift to match whatever album art is playing now"),
     ).toBeInTheDocument();
@@ -128,7 +128,7 @@ describe("SettingsThemes.svelte", () => {
 
   it("applies matching auto-fill responsive grid classes to predefined themes", async () => {
     const { findByText } = render(SettingsThemes);
-    const predefinedHeading = await findByText("Predefined Themes");
+    const predefinedHeading = await findByText("Predefined themes");
     const predefinedGrid = predefinedHeading.nextElementSibling;
     expect(predefinedGrid).not.toBeNull();
     expect(predefinedGrid?.className).toContain("grid-cols-[repeat(auto-fill,minmax(160px,1fr))]");

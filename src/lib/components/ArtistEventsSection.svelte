@@ -114,7 +114,6 @@
           timeZone: "UTC",
         })
           .format(d)
-          .toUpperCase()
           .replace(/\.$/, "");
       }
     }
@@ -210,9 +209,7 @@
                   >
                     {#if !month && !day && !year}
                       <Calendar class="w-4 h-4 text-brand-accent mb-0.5" />
-                      <span
-                        class="text-[9px] font-bold text-brand-text-secondary uppercase tracking-wider leading-none"
-                      >
+                      <span class="label-small text-brand-text-secondary leading-none">
                         {i18n.t("artistEvents.dateTba", {}, "TBA")}
                       </span>
                     {:else if !month && !day && year}
@@ -222,9 +219,7 @@
                       </span>
                     {:else}
                       {#if month}
-                        <span
-                          class="text-[9px] font-bold tracking-wider text-brand-accent uppercase leading-none mt-1"
-                        >
+                        <span class="label-small capitalize text-brand-accent leading-none mt-1">
                           {month}
                         </span>
                       {/if}
@@ -262,14 +257,14 @@
                       {/if}
                       {#if event.event_type}
                         <span
-                          class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-sidebar border border-brand-border text-brand-text-primary uppercase tracking-wider select-none"
+                          class="label-small px-1.5 py-0.5 rounded bg-brand-sidebar border border-brand-border text-brand-text-primary select-none"
                         >
                           {event.event_type}
                         </span>
                       {/if}
                       {#if event.cancelled}
                         <span
-                          class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-text-primary/10 border border-dashed border-brand-border text-brand-text-primary uppercase tracking-wider select-none"
+                          class="label-small px-1.5 py-0.5 rounded bg-brand-text-primary/10 border border-dashed border-brand-border text-brand-text-primary select-none"
                         >
                           {i18n.t("artistEvents.cancelled", {}, "Cancelled")}
                         </span>

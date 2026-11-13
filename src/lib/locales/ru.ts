@@ -2199,7 +2199,7 @@ export const ru = {
     unpinHome: "Открепить от главной",
     artistInfo: "Об исполнителе",
     about: "Описание",
-    links: "ССЫЛКИ",
+    links: "Ссылки",
     showMore: "Показать больше",
     showLess: "Показать меньше",
     showAll: "Показать все",

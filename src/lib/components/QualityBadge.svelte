@@ -72,7 +72,7 @@
   let styleClasses = $derived.by(() => {
     switch (tier) {
       case "hi-res":
-        return "bg-brand-accent text-brand-accent-contrast font-black tracking-wider shadow-sm hover:brightness-110";
+        return "bg-brand-accent text-brand-accent-contrast font-black shadow-sm hover:brightness-110";
       case "hq":
         return "bg-brand-accent/20 text-brand-accent-text border border-brand-accent/40 font-bold hover:bg-brand-accent/30";
       case "sq":
@@ -102,7 +102,7 @@
         { tier: label },
         `Audio quality: ${label} — click to view audio pipeline`,
       )}
-      class="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] uppercase leading-none rounded transition-all cursor-pointer select-none active:scale-95 {styleClasses} {className}"
+      class="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] code-caps leading-none rounded transition-all cursor-pointer select-none active:scale-95 {styleClasses} {className}"
       aria-label={i18n.t(
         "audioPipeline.badgeTooltip",
         { tier: label },
@@ -122,7 +122,7 @@
   {:else}
     <span
       title={tierDescription}
-      class="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] uppercase leading-none rounded select-none {styleClasses} {className}"
+      class="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] code-caps leading-none rounded select-none {styleClasses} {className}"
     >
       {label}
     </span>

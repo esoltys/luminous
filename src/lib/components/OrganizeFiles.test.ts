@@ -479,14 +479,14 @@ describe("OrganizeFiles safeguards", () => {
     expect(await findByText("Destination:")).toBeInTheDocument();
 
     // Full template section is collapsed by default in embedded mode
-    expect(queryByText("Sample Output")).not.toBeInTheDocument();
+    expect(queryByText("Sample output")).not.toBeInTheDocument();
 
     // Click "Customize…" button
     const customizeBtn = await findByRole("button", { name: "Customize…" });
     await fireEvent.click(customizeBtn);
 
     // Full section should now be visible
-    expect(await findByText("Sample Output")).toBeInTheDocument();
+    expect(await findByText("Sample output")).toBeInTheDocument();
     expect(await findByText("Done")).toBeInTheDocument();
 
     // Click "Done" collapses it back
@@ -494,7 +494,7 @@ describe("OrganizeFiles safeguards", () => {
     await fireEvent.click(doneBtn);
 
     await waitFor(() => {
-      expect(queryByText("Sample Output")).not.toBeInTheDocument();
+      expect(queryByText("Sample output")).not.toBeInTheDocument();
     });
   });
 
@@ -566,7 +566,7 @@ describe("OrganizeFiles safeguards", () => {
     await fireEvent.click(await findByRole("button", { name: "Customize…" }));
     await fireEvent.click(await findByRole("button", { name: "Custom" }));
     await fireEvent.click(await findByRole("button", { name: "Done" }));
-    await waitFor(() => expect(queryByText("Sample Output")).not.toBeInTheDocument());
+    await waitFor(() => expect(queryByText("Sample output")).not.toBeInTheDocument());
 
     const customBar = (await findByText("Template:")).parentElement!;
     expect(customBar.querySelector("code")).toHaveTextContent(

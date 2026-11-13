@@ -169,7 +169,7 @@ describe("SettingsSources.svelte - Media servers section", () => {
   });
 });
 
-describe("SettingsSources.svelte - Disk Size breakdown", () => {
+describe("SettingsSources.svelte - Disk size breakdown", () => {
   it("totals music and artwork, and breaks the total down in the card's hint", async () => {
     const { collectionStore } = await import("../stores/collection.svelte");
     collectionStore.stats = {
@@ -184,7 +184,7 @@ describe("SettingsSources.svelte - Disk Size breakdown", () => {
     };
     const { getByRole } = render(SettingsSources);
 
-    const card = getByRole("button", { name: "Disk Size: 2.10 GB" });
+    const card = getByRole("button", { name: "Disk size: 2.10 GB" });
     expect(card).toHaveClass("cursor-help");
     expect(card).toHaveAccessibleDescription(
       "Music files: 2.00 GB\nAlbum art: 25.0 MB\nArtist images: 64.0 MB\nFolder art thumbnails: 11.0 MB",

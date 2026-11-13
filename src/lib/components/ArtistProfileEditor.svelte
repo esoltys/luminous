@@ -200,10 +200,7 @@
         <!-- Bio Field -->
         <div class="flex flex-col gap-1.5">
           <div class="flex items-center justify-between">
-            <label
-              for="artist-bio"
-              class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-            >
+            <label for="artist-bio" class="label-field text-brand-text-secondary">
               {i18n.t("artistProfileEditor.bio", {}, "About / Biography")}
             </label>
             <button
@@ -239,7 +236,7 @@
         <div class="flex flex-col gap-2">
           <label
             for="artist-tags-input"
-            class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5"
+            class="label-field text-brand-text-secondary flex items-center gap-1.5"
           >
             <Mic class="w-3.5 h-3.5 text-brand-accent" />
             {i18n.t("artistProfileEditor.tags", {}, "Tags")}
@@ -314,7 +311,7 @@
         <div class="flex flex-col gap-1.5">
           <label
             for="artist-website"
-            class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5"
+            class="label-field text-brand-text-secondary flex items-center gap-1.5"
           >
             <Globe class="w-3.5 h-3.5 text-brand-accent" />
             {i18n.t("artistProfileEditor.website", {}, "Website")}
@@ -335,9 +332,7 @@
         <!-- Social & External Links -->
         <div class="flex flex-col gap-2.5">
           <div class="flex items-center justify-between">
-            <label
-              class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5"
-            >
+            <label class="label-field text-brand-text-secondary flex items-center gap-1.5">
               <LinkIcon class="w-3.5 h-3.5 text-brand-accent" />
               {i18n.t("artistProfileEditor.socialLinks", {}, "Links")}
             </label>

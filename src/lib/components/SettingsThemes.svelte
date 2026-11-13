@@ -201,8 +201,8 @@
     </div>
 
     <div>
-      <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">
-        {i18n.t("settings.dynamicThemes", {}, "Dynamic Themes")}
+      <h4 class="label-heading text-brand-text-secondary mb-3">
+        {i18n.t("settings.dynamicThemes", {}, "Dynamic themes")}
       </h4>
       <div class="grid grid-cols-1 @xl:grid-cols-2 gap-4">
         {#each DYNAMIC_THEMES as theme}
@@ -314,8 +314,8 @@
     <AddonThemesSection />
 
     <div>
-      <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">
-        {i18n.t("settings.predefinedThemes", {}, "Predefined Themes")}
+      <h4 class="label-heading text-brand-text-secondary mb-3">
+        {i18n.t("settings.predefinedThemes", {}, "Predefined themes")}
       </h4>
       <div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
         {#each STATIC_PREDEFINED_THEMES as theme}
@@ -377,7 +377,7 @@
     {#if themeStore.customThemes.length > 0}
       <div>
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">
+          <h3 class="label-heading text-brand-text-secondary">
             {i18n.t("settings.customThemes")}
           </h3>
           <Button onclick={handleImportTheme} variant="secondary" size="sm" class="h-7 text-xs">
@@ -548,7 +548,7 @@
               type="text"
               bind:value={customColors["bg-main"]}
               maxlength="7"
-              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase"
+              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono code-caps"
             />
           </div>
           <div class="flex flex-col min-w-0">
@@ -575,7 +575,7 @@
               type="text"
               bind:value={customColors["bg-sidebar"]}
               maxlength="7"
-              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase"
+              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono code-caps"
             />
           </div>
           <div class="flex flex-col min-w-0">
@@ -602,7 +602,7 @@
               type="text"
               bind:value={customColors["bg-playerbar"]}
               maxlength="7"
-              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase"
+              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono code-caps"
             />
           </div>
           <div class="flex flex-col min-w-0">
@@ -629,7 +629,7 @@
               type="text"
               bind:value={customColors["color-accent"]}
               maxlength="7"
-              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase"
+              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono code-caps"
             />
           </div>
           <div class="flex flex-col min-w-0">
@@ -656,7 +656,7 @@
               type="text"
               bind:value={customColors["color-accent-hover"]}
               maxlength="7"
-              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase"
+              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono code-caps"
             />
           </div>
           <div class="flex flex-col min-w-0">
@@ -683,7 +683,7 @@
               type="text"
               bind:value={customColors["color-border"]}
               maxlength="7"
-              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase"
+              class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono code-caps"
             />
           </div>
           <div class="flex flex-col min-w-0">

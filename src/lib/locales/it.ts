@@ -2060,7 +2060,7 @@ export const it = {
     unpinHome: "Rimuovi dalla Home",
     artistInfo: "Info sull'artista",
     about: "Informazioni",
-    links: "LINK",
+    links: "Link",
     showMore: "Mostra altro",
     showLess: "Mostra meno",
     showAll: "Mostra tutto",
