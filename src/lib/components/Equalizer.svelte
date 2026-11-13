@@ -964,10 +964,7 @@
         {/each}
       </div>
       <div class="flex justify-end px-1 -mt-2">
-        <HelpTip
-          text={i18n.t("equalizer.isoStandardHelp")}
-          label={i18n.t("common.aboutField", { field: i18n.t("equalizer.frequency") })}
-        />
+        <HelpTip text={i18n.t("equalizer.isoStandardHelp")} />
       </div>
     {:else if ranges}
       <ParametricGraph
@@ -1002,13 +999,13 @@
           <Activity class="w-5 h-5" />
         </div>
         <div class="space-y-1 min-w-0">
-          <h3 class="font-bold text-sm text-brand-text-primary flex items-center gap-1.5">
-            {i18n.t("loudness.title")}
+          <div class="flex items-center gap-1.5">
+            <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("loudness.title")}</h3>
             <HelpTip
               text={i18n.t("loudness.methodHelp")}
               label={i18n.t("common.aboutField", { field: i18n.t("loudness.title") })}
             />
-          </h3>
+          </div>
           <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
             {i18n.t("loudness.subtitle")}
           </p>

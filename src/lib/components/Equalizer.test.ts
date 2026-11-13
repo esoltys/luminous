@@ -618,14 +618,12 @@ describe("Equalizer.svelte", () => {
   it("keeps the ISO 266 standard behind a keyboard-reachable help tip in 10-band mode", async () => {
     const { getByRole, queryByText } = render(Equalizer);
     await waitFor(() => {
-      expect(getByRole("button", { name: /about frequency/i })).toHaveAccessibleDescription(
-        /ISO 266/,
-      );
+      expect(getByRole("button", { name: /ISO 266/ })).toBeInTheDocument();
     });
     expect(queryByText("ISO 266:1997")).not.toBeInTheDocument();
   });
 
-  it("keeps loudness method names behind a help tip, not in the visible subtitle", async () => {
+  it("explains the loudness method in a help tip and leads with the plain-language subtitle", async () => {
     const { getByRole, getByText } = render(Equalizer);
     await waitFor(() => {
       expect(
