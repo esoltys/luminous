@@ -2,10 +2,16 @@ id: no-uppercase-label
 snapshots:
   <h2 class="font-bold tracking-wide text-xs">Title</h2>:
     labels:
-      - source: font-bold tracking-wide text-xs
+      - source: <h2 class="font-bold tracking-wide text-xs">
         style: primary
-        start: 11
-        end: 42
+        start: 0
+        end: 44
+  '<input bind:value={colors["bg"]} maxlength="7" class="font-mono uppercase" />':
+    labels:
+      - source: <input bind:value={colors["bg"]} maxlength="7" class="font-mono uppercase" />
+        style: primary
+        start: 0
+        end: 77
   <script lang="ts">const cls = "flex font-semibold uppercase min-w-0";</script>:
     labels:
       - source: const cls = "flex font-semibold uppercase min-w-0";
@@ -14,7 +20,7 @@ snapshots:
         end: 69
   <span class="text-xs uppercase tracking-wider">Title</span>:
     labels:
-      - source: text-xs uppercase tracking-wider
+      - source: <span class="text-xs uppercase tracking-wider">
         style: primary
-        start: 13
-        end: 45
+        start: 0
+        end: 47

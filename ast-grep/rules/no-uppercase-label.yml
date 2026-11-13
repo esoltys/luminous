@@ -9,7 +9,14 @@ note: |
   that is not a label (hex value, language code, file type), use `code-caps`.
 rule:
   any:
-    - kind: attribute_value
-      regex: '(^|[\s"''`])(uppercase|tracking-(wide|wider|widest))($|[\s"''`])'
+    # Matched on the whole start tag, not the attribute value: the HTML parser
+    # mis-splits attributes after a Svelte expression containing quotes (e.g.
+    # `bind:value={colors["bg"]}`), which hides the `class` value from
+    # attribute_value matching.
+    - kind: start_tag
+      regex: &class-regex 'class\s*=\s*"([^"]*[\s{}''`])?(uppercase|tracking-(wide|wider|widest))([\s{}''`"]|$)'
+    - kind: self_closing_tag
+      regex: *class-regex
+    # Class strings in `<script>` blocks (e.g. per-column header class maps).
     - kind: raw_text
       regex: '"[^"]*\b(uppercase|tracking-(wide|wider|widest))\b[^"]*"'
