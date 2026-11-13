@@ -111,14 +111,45 @@
   // presets plus a "Custom" option that reveals a free-text field. The
   // picker structure below makes adding more presets later a matter of
   // extending TEMPLATE_PRESETS.
-  const TEMPLATE_PRESETS = [
-    { id: "default", labelKey: "organizer.presetDefault", template: DEFAULT_TEMPLATE },
+  //
+  // Preset cards never show the raw pattern (#2048). Each preset instead
+  // carries an `outline`: one row per path level, in words, with the last
+  // row the filename. `optional` marks a level that only exists for some
+  // songs (rendered muted). The outline is hand-written, so it must be
+  // updated whenever its `template` changes.
+  interface OutlineRow {
+    kind: "folder" | "file";
+    labelKey: string;
+    optional?: boolean;
+  }
+  const TEMPLATE_PRESETS: readonly {
+    id: "default" | "alternative";
+    labelKey: string;
+    template: string;
+    outline: readonly OutlineRow[];
+  }[] = [
+    {
+      id: "default",
+      labelKey: "organizer.presetDefault",
+      template: DEFAULT_TEMPLATE,
+      outline: [
+        { kind: "folder", labelKey: "organizer.outlineAlbumArtist" },
+        { kind: "folder", labelKey: "organizer.outlineYearAlbum" },
+        { kind: "file", labelKey: "organizer.outlineTrackTitle" },
+      ],
+    },
     {
       id: "alternative",
       labelKey: "organizer.presetAlternative",
       template: "%artist/%album (%year)/{CD %disc/}{%track-}%artist-%title",
+      outline: [
+        { kind: "folder", labelKey: "organizer.outlineArtist" },
+        { kind: "folder", labelKey: "organizer.outlineAlbumYear" },
+        { kind: "folder", labelKey: "organizer.outlineDiscFolder", optional: true },
+        { kind: "file", labelKey: "organizer.outlineTrackArtistTitle" },
+      ],
     },
-  ] as const;
+  ];
   type TemplatePresetId = (typeof TEMPLATE_PRESETS)[number]["id"] | "custom";
 
   let templatePreset = $state<TemplatePresetId>("default");
@@ -915,18 +946,45 @@
         <button
           type="button"
           onclick={() => selectPreset(preset.id)}
-          aria-label={i18n.t(preset.labelKey)}
+          aria-labelledby="preset-{preset.id}-label"
+          aria-describedby="preset-{preset.id}-outline"
           class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset ===
           preset.id
             ? 'border-brand-accent shadow-md shadow-brand-accent/5'
             : 'border-brand-border/60'}"
         >
-          <span class="font-semibold text-sm text-brand-text-primary block"
+          <span
+            id="preset-{preset.id}-label"
+            class="font-semibold text-sm text-brand-text-primary block"
             >{i18n.t(preset.labelKey)}</span
           >
-          <code class="text-[10px] text-brand-text-secondary font-mono truncate block mt-1"
-            >{preset.template}</code
-          >
+          <span id="preset-{preset.id}-outline" class="block mt-1.5 text-[11px]">
+            {#each preset.outline as row, depth (row.labelKey)}
+              <span
+                class="flex items-center gap-1.5 min-w-0 {row.optional
+                  ? 'text-brand-text-secondary/70 italic'
+                  : 'text-brand-text-secondary'}"
+                style:padding-inline-start="{depth * 0.75}rem"
+              >
+                {#if row.kind === "file"}
+                  <Music aria-hidden="true" class="w-3 h-3 shrink-0 text-brand-text-secondary/70" />
+                {:else}
+                  <Folder aria-hidden="true" class="w-3 h-3 shrink-0 text-brand-accent-text/80" />
+                {/if}
+                <!-- The icons carry folder-vs-file visually; screen readers get it in words. -->
+                <span aria-hidden="true" class="truncate">{i18n.t(row.labelKey)}</span>
+                <span class="sr-only"
+                  >{i18n.t(
+                    row.kind === "file" ? "organizer.outlineFileSr" : "organizer.outlineFolderSr",
+                    { name: i18n.t(row.labelKey) },
+                  )}</span
+                >
+              </span>
+              <!-- Word break between rows for the accessible description (rows are
+                   flex items, so this space is never painted). -->
+              {" "}
+            {/each}
+          </span>
         </button>
       {/each}
       <button
