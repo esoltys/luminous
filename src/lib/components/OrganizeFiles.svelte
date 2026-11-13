@@ -36,6 +36,11 @@
   import Button from "./Button.svelte";
   import HelpTip from "./HelpTip.svelte";
   import TemplateInput from "./TemplateInput.svelte";
+  import {
+    DEFAULT_ORGANIZE_TEMPLATE,
+    ORGANIZE_PRESETS,
+    type OrganizePreset,
+  } from "../utils/organizePresets";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import TagEditor from "./TagEditor.svelte";
@@ -96,7 +101,6 @@
   /** Embedded instances are always "open"; modal instances follow the isOpen prop. */
   let effectiveOpen = $derived(embedded || isOpen);
 
-  const DEFAULT_TEMPLATE = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
   function highlightPathHtml(path: string): string {
     if (!path) return "";
     const escaped = path.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -107,57 +111,24 @@
     );
   }
 
-  // Template presets, mirroring how SettingsThemes.svelte offers predefined
-  // presets plus a "Custom" option that reveals a free-text field. The
-  // picker structure below makes adding more presets later a matter of
-  // extending TEMPLATE_PRESETS.
-  //
-  // Preset cards never show the raw pattern (#2048). Each preset instead
-  // carries an `outline`: one row per path level, in words, with the last
-  // row the filename. `optional` marks a level that only exists for some
-  // songs (rendered muted). The outline is hand-written, so it must be
-  // updated whenever its `template` changes.
-  interface OutlineRow {
-    kind: "folder" | "file";
-    labelKey: string;
-    optional?: boolean;
+  // Preset cards plus a "Custom" card that reveals a free-text field. Preset
+  // cards describe their result as an outline in words, never the raw pattern
+  // (#2048); the pattern is only shown, editable, under Custom.
+  type TemplatePresetId = OrganizePreset["id"] | "custom";
+
+  function presetCardClass(selected: boolean): string {
+    return `flex flex-col justify-start text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 ${
+      selected ? "border-brand-accent shadow-md shadow-brand-accent/5" : "border-brand-border/60"
+    }`;
   }
-  const TEMPLATE_PRESETS: readonly {
-    id: "default" | "alternative";
-    labelKey: string;
-    template: string;
-    outline: readonly OutlineRow[];
-  }[] = [
-    {
-      id: "default",
-      labelKey: "organizer.presetDefault",
-      template: DEFAULT_TEMPLATE,
-      outline: [
-        { kind: "folder", labelKey: "organizer.outlineAlbumArtist" },
-        { kind: "folder", labelKey: "organizer.outlineYearAlbum" },
-        { kind: "file", labelKey: "organizer.outlineTrackTitle" },
-      ],
-    },
-    {
-      id: "alternative",
-      labelKey: "organizer.presetAlternative",
-      template: "%artist/%album (%year)/{CD %disc/}{%track-}%artist-%title",
-      outline: [
-        { kind: "folder", labelKey: "organizer.outlineArtist" },
-        { kind: "folder", labelKey: "organizer.outlineAlbumYear" },
-        { kind: "folder", labelKey: "organizer.outlineDiscFolder", optional: true },
-        { kind: "file", labelKey: "organizer.outlineTrackArtistTitle" },
-      ],
-    },
-  ];
-  type TemplatePresetId = (typeof TEMPLATE_PRESETS)[number]["id"] | "custom";
 
   let templatePreset = $state<TemplatePresetId>("default");
-  let customTemplate = $state(DEFAULT_TEMPLATE);
+  let customTemplate = $state(DEFAULT_ORGANIZE_TEMPLATE);
   let template = $derived(
     templatePreset === "custom"
       ? customTemplate
-      : (TEMPLATE_PRESETS.find((p) => p.id === templatePreset)?.template ?? DEFAULT_TEMPLATE),
+      : (ORGANIZE_PRESETS.find((p) => p.id === templatePreset)?.template ??
+          DEFAULT_ORGANIZE_TEMPLATE),
   );
 
   function selectPreset(id: TemplatePresetId) {
@@ -309,7 +280,7 @@
       initializedFromStore = true;
       templatePreset = (organizeStore.preset as TemplatePresetId) || "default";
       if (organizeStore.preset === "custom") {
-        customTemplate = organizeStore.template || DEFAULT_TEMPLATE;
+        customTemplate = organizeStore.template || DEFAULT_ORGANIZE_TEMPLATE;
       }
       replaceSpaces = organizeStore.replaceSpaces;
       asciiOnly = organizeStore.asciiOnly;
@@ -340,7 +311,7 @@
   function revertDraft() {
     templatePreset = (organizeStore.preset as TemplatePresetId) || "default";
     if (organizeStore.preset === "custom") {
-      customTemplate = organizeStore.template || DEFAULT_TEMPLATE;
+      customTemplate = organizeStore.template || DEFAULT_ORGANIZE_TEMPLATE;
     }
     replaceSpaces = organizeStore.replaceSpaces;
     asciiOnly = organizeStore.asciiOnly;
@@ -942,16 +913,13 @@
     {/if}
 
     <div class="grid grid-cols-1 @xl:grid-cols-3 gap-3">
-      {#each TEMPLATE_PRESETS as preset (preset.id)}
+      {#each ORGANIZE_PRESETS as preset (preset.id)}
         <button
           type="button"
           onclick={() => selectPreset(preset.id)}
           aria-labelledby="preset-{preset.id}-label"
           aria-describedby="preset-{preset.id}-outline"
-          class="flex flex-col justify-start text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset ===
-          preset.id
-            ? 'border-brand-accent shadow-md shadow-brand-accent/5'
-            : 'border-brand-border/60'}"
+          class={presetCardClass(templatePreset === preset.id)}
         >
           <span
             id="preset-{preset.id}-label"
@@ -987,8 +955,8 @@
                   )}</span
                 >
               </span>
-              <!-- Word break between rows for the accessible description (rows are
-                   flex items, so this space is never painted). -->
+              <!-- Word break between rows in the accessible description. Rows are
+                   block-level (display: flex), so this whitespace is never painted. -->
               {" "}
             {/each}
           </span>
@@ -998,15 +966,12 @@
         type="button"
         onclick={() => selectPreset("custom")}
         aria-label={i18n.t("organizer.presetCustom")}
-        class="flex flex-col justify-start text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset ===
-        'custom'
-          ? 'border-brand-accent shadow-md shadow-brand-accent/5'
-          : 'border-brand-border/60'}"
+        class={presetCardClass(templatePreset === "custom")}
       >
         <span class="font-semibold text-sm text-brand-text-primary block"
           >{i18n.t("organizer.presetCustom")}</span
         >
-        <span class="text-[10px] text-brand-text-secondary block mt-1"
+        <span class="text-[11px] text-brand-text-secondary block mt-1.5"
           >{i18n.t("organizer.presetCustomHint")}</span
         >
       </button>
