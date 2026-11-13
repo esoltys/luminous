@@ -212,7 +212,8 @@
       {@const rows = mode === "rows"}
       {#each visibleItems as item, index (keyFor(item))}
         <!-- [role=button] cards (ArtistCard) would otherwise show app.css's default arrow instead of
-             this wrapper's grab cursor. -->
+             this wrapper's grab cursor. :first-child stretches the card/row to the grid row height
+             without affecting the optional dragOverIndex overlay. -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           data-pinned-index={index}

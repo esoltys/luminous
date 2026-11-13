@@ -177,7 +177,7 @@
           <div
             class="cover-item absolute {direction === 'left'
               ? 'bottom-0 right-0 w-28 h-28'
-              : 'inset-0'} {activeCovers.length === 1
+              : 'inset-0'} {direction !== 'left' && activeCovers.length === 1
               ? 'rounded-[inherit]'
               : ''} overflow-hidden border border-brand-border/60 shadow-xl transition-[transform,opacity] duration-300 {hoverEffect
               ? 'group-hover:scale-105'

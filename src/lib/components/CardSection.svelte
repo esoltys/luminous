@@ -15,7 +15,7 @@
     /** When provided, a Cards/Rows toggle appears in the header. Omit it on
      * sections that share a mode with a sibling that owns the toggle. */
     onViewModeChange?: (mode: CollectionViewMode) => void;
-    /** Items for the current layout; each must fill its grid cell (`w-full`). */
+    /** Items for the current layout; each must fill its grid cell (`w-full`, and `h-full` to match the equalized `auto-rows-fr` row height). */
     children: Snippet<[CollectionViewMode]>;
   }
 
