@@ -219,7 +219,7 @@
           onpointerdown={(e) => handleCardPointerDown(e, index)}
           oncontextmenu={(e) => handleContextMenu(e, item)}
           ondragstart={(e) => e.preventDefault()}
-          class="relative transition-opacity cursor-grab active:cursor-grabbing [&_[role=button]]:cursor-[inherit] {rows
+          class="relative h-full [&>*:first-child]:h-full transition-opacity cursor-grab active:cursor-grabbing [&_[role=button]]:cursor-[inherit] {rows
             ? 'rounded-lg'
             : 'rounded-xl'} {draggedIndex === index ? 'opacity-40' : ''}"
         >

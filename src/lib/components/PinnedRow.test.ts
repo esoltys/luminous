@@ -315,4 +315,19 @@ describe("PinnedRow.svelte", () => {
     expect(navigationStore.selectedPlaylistId).toBe(84);
     expect(playlistsStore.activePlaylistId).toBe(84);
   });
+
+  it("stretches every pinned card and row to equal height across the grid", () => {
+    prefs.pinnedViewMode = "rows";
+    const { container } = render(PinnedRow);
+
+    const grid = container.querySelector('[data-testid="card-section-grid"]')!;
+    expect(grid.className).toContain("auto-rows-fr");
+
+    const wrappers = container.querySelectorAll("[data-pinned-index]");
+    expect(wrappers.length).toBeGreaterThan(0);
+    for (const wrapper of wrappers) {
+      expect(wrapper.className).toContain("h-full");
+      expect(wrapper.className).toContain("[&>*:first-child]:h-full");
+    }
+  });
 });

@@ -59,7 +59,7 @@
   {/if}
 
   <div
-    class="grid {viewMode === 'rows'
+    class="grid auto-rows-fr {viewMode === 'rows'
       ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2'
       : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6'}"
     data-testid="card-section-grid"
