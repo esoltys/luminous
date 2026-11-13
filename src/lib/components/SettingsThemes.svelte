@@ -202,7 +202,7 @@
 
     <div>
       <h4 class="label-heading text-brand-text-secondary mb-3">
-        {i18n.t("settings.dynamicThemes", {}, "Dynamic Themes")}
+        {i18n.t("settings.dynamicThemes", {}, "Dynamic themes")}
       </h4>
       <div class="grid grid-cols-1 @xl:grid-cols-2 gap-4">
         {#each DYNAMIC_THEMES as theme}
@@ -315,7 +315,7 @@
 
     <div>
       <h4 class="label-heading text-brand-text-secondary mb-3">
-        {i18n.t("settings.predefinedThemes", {}, "Predefined Themes")}
+        {i18n.t("settings.predefinedThemes", {}, "Predefined themes")}
       </h4>
       <div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
         {#each STATIC_PREDEFINED_THEMES as theme}

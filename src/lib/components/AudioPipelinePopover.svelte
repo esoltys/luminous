@@ -154,7 +154,7 @@
     class="fixed z-[100] acrylic-float border border-brand-border/60 rounded-xl shadow-2xl overflow-hidden flex flex-col"
     role="dialog"
     aria-modal="true"
-    aria-label={i18n.t("audioPipeline.title", {}, "Audio Pipeline")}
+    aria-label={i18n.t("audioPipeline.title", {}, "Audio pipeline")}
   >
     <!-- Header -->
     <div
@@ -163,7 +163,7 @@
       <div class="flex items-center gap-2">
         <Activity class="w-4 h-4 text-brand-text-primary" />
         <h2 class="label-heading text-brand-text-primary">
-          {i18n.t("audioPipeline.title", {}, "Audio Pipeline")}
+          {i18n.t("audioPipeline.title", {}, "Audio pipeline")}
         </h2>
       </div>
 

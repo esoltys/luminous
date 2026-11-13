@@ -123,7 +123,7 @@
 
         <div class="flex flex-col">
           <span class="label-small text-brand-text-secondary"
-            >{i18n.t("audioPipeline.sampleRate", {}, "Sample Rate")}</span
+            >{i18n.t("audioPipeline.sampleRate", {}, "Sample rate")}</span
           >
           <span class="text-brand-text-primary font-semibold"
             >{formatSampleRate(pipeline.input_sample_rate)}</span
@@ -132,7 +132,7 @@
 
         <div class="flex flex-col">
           <span class="label-small text-brand-text-secondary"
-            >{i18n.t("audioPipeline.bitDepth", {}, "Bit Depth")}</span
+            >{i18n.t("audioPipeline.bitDepth", {}, "Bit depth")}</span
           >
           <span class="text-brand-text-primary font-semibold"
             >{pipeline.input_bit_depth ? `${pipeline.input_bit_depth}-bit` : "16-bit / lossy"}</span
@@ -325,7 +325,7 @@
 
         <div class="col-span-2 flex flex-col">
           <span class="label-small text-brand-text-secondary"
-            >{i18n.t("audioPipeline.volumeMode", {}, "Volume Control")}</span
+            >{i18n.t("audioPipeline.volumeMode", {}, "Volume control")}</span
           >
           <span class="text-brand-text-primary font-semibold">
             {#if pipeline.output_hardware_volume}

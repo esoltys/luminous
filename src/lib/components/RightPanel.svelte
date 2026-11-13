@@ -56,7 +56,7 @@
       case "artist":
         return i18n.t("playerBar.artistHeading", {}, "Artist");
       default:
-        return i18n.t("playerBar.nowPlayingHeading", {}, "Now Playing");
+        return i18n.t("playerBar.nowPlayingHeading", {}, "Now playing");
     }
   });
 
@@ -349,7 +349,7 @@
         {#if !isPlayingSubject && playerStore.currentSong}
           {@render returnPill(
             () => inspectorStore.showPlaying(),
-            i18n.t("playerBar.nowPlayingHeading", {}, "Now Playing"),
+            i18n.t("playerBar.nowPlayingHeading", {}, "Now playing"),
           )}
         {/if}
       </div>
