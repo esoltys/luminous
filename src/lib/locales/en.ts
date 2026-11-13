@@ -464,14 +464,13 @@ export const en = {
     suggestHide: "Hide suggestions",
   },
   emptyLibrary: {
-    playHeading: "Play music",
-    openFiles: "Open Files",
-    playFolder: "Play a Folder",
+    title: "Play your music",
+    subtitle:
+      "Choose a folder to browse by album, artist, or genre. Luminous keeps it in sync as your files change.",
+    addFolder: "Add a folder",
+    openFiles: "Open files",
+    playFolder: "Play a folder",
     dropHint: "Or drop files and folders anywhere in this window to play them.",
-    libraryHeading: "Build a library",
-    addFolder: "Add Folder to Library",
-    libraryHint:
-      "Add a folder to browse by album, artist, or genre.\nLuminous keeps it in sync as your files change.",
   },
   welcome: {
     title: "Welcome to Luminous",

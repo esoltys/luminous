@@ -479,15 +479,14 @@ export const de = {
     suggestHide: "Vorschläge ausblenden",
   },
   emptyLibrary: {
-    playHeading: "Musik abspielen",
+    title: "Spiele deine Musik ab",
+    subtitle:
+      "Wähle einen Ordner aus, um nach Album, Interpret oder Genre zu stöbern. Luminous hält ihn aktuell, wenn sich deine Dateien ändern.",
+    addFolder: "Ordner hinzufügen",
     openFiles: "Dateien öffnen",
     playFolder: "Ordner abspielen",
     dropHint:
       "Oder Dateien und Ordner an eine beliebige Stelle in diesem Fenster ziehen, um sie abzuspielen.",
-    libraryHeading: "Mediathek aufbauen",
-    addFolder: "Ordner zur Mediathek hinzufügen",
-    libraryHint:
-      "Füge einen Ordner hinzu, um nach Album, Interpret oder Genre zu stöbern.\nLuminous hält ihn aktuell, wenn sich deine Dateien ändern.",
   },
   welcome: {
     title: "Willkommen bei Luminous",

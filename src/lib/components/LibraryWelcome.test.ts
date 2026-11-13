@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import LibraryWelcome from "./LibraryWelcome.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -27,22 +28,23 @@ describe("LibraryWelcome.svelte", () => {
     collectionStore.libraryLoaded = false;
     render(LibraryWelcome);
     expect(screen.getByRole("status")).toHaveTextContent("Loading your library...");
-    expect(screen.queryByRole("button", { name: /Add Folder to Library/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Open Files/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add a folder/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Open files/ })).toBeNull();
   });
 
-  it("offers playing files without a library alongside building one", () => {
+  it("offers adding a folder as primary alongside playing files without a library", () => {
     render(LibraryWelcome);
-    expect(screen.getByRole("button", { name: /Open Files/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Play a Folder/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Add Folder to Library/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Play your music" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add a folder/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open files/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Play a folder/ })).toBeInTheDocument();
   });
 
   it("plays a picked folder without adding it to the watched library", async () => {
     vi.mocked(open).mockResolvedValueOnce(["C:\\Music\\Album"]);
     render(LibraryWelcome);
 
-    await fireEvent.click(screen.getByRole("button", { name: /Play a Folder/ }));
+    await fireEvent.click(screen.getByRole("button", { name: /Play a folder/ }));
 
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith("open_and_play", { paths: ["C:\\Music\\Album"] });
@@ -52,16 +54,27 @@ describe("LibraryWelcome.svelte", () => {
     expect(invoke).not.toHaveBeenCalledWith("scan_directories", expect.anything());
   });
 
-  it("opens the audio file picker from Open Files", async () => {
+  it("opens the audio file picker from Open files", async () => {
     vi.mocked(open).mockResolvedValueOnce(null);
     render(LibraryWelcome);
 
-    await fireEvent.click(screen.getByRole("button", { name: /Open Files/ }));
+    await fireEvent.click(screen.getByRole("button", { name: /Open files/ }));
 
     await waitFor(() => {
       expect(open).toHaveBeenCalledWith(
         expect.objectContaining({ directory: false, multiple: true }),
       );
     });
+  });
+
+  it("opens the Getting Started help section from the Help link", async () => {
+    navigationStore.activeTab = "home";
+    navigationStore.helpSection = null;
+    render(LibraryWelcome);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Help" }));
+
+    expect(navigationStore.activeTab).toBe("help");
+    expect(navigationStore.helpSection).toBe("getting-started");
   });
 });

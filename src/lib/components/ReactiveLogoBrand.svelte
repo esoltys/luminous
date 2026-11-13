@@ -6,7 +6,7 @@
   import { acquireSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
 
   interface Props {
-    size?: "sm" | "md" | "lg" | "xl";
+    size?: "sm" | "md" | "lg" | "xl" | "2xl";
     className?: string;
   }
 
@@ -17,6 +17,7 @@
     md: "w-12 h-12",
     lg: "w-16 h-16",
     xl: "w-20 h-20",
+    "2xl": "w-28 h-28",
   };
 
   let isPulsingEnabled = $state(true);

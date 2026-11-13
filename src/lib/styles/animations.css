@@ -353,6 +353,22 @@
   animation: reduced-fade 150ms ease-out;
 }
 
+/* First-run / empty-library welcome mark entrance (Rare/first-run tier, plays once) */
+@keyframes welcome-mark-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.anim-welcome-mark {
+  animation: welcome-mark-enter 450ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* Reduced-motion fallback — every tier collapses to the same opacity fade;
    ring/glow/flash effects (no visible "shape" of their own beyond a shadow)
    are dropped entirely rather than faded. */
@@ -365,7 +381,8 @@
   .anim-slide-in-fade,
   .anim-milestone-bounce,
   .anim-shimmer-sweep,
-  .anim-warn-shake {
+  .anim-warn-shake,
+  .anim-welcome-mark {
     animation: reduced-fade 150ms ease-out;
   }
 
