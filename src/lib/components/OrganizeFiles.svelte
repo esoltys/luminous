@@ -1485,7 +1485,7 @@
       <div
         class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-4 flex items-center justify-between gap-4"
       >
-        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 min-w-0 flex-1">
+        <div class="flex flex-wrap items-start gap-x-6 gap-y-2 min-w-0 flex-1">
           <div class="flex items-start gap-2 min-w-0">
             <span
               class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider shrink-0"
