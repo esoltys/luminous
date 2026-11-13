@@ -1474,12 +1474,16 @@
       {/if}
 
       <!-- Unlike the sections below, this one isn't capped to max-w-3xl —
-           the file list benefits from the extra width on wide windows. -->
-      <div
-        class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary"
-      >
-        {@render previewSection()}
-      </div>
+           the file list benefits from the extra width on wide windows.
+           Hidden while no file would move: the page has nothing to show, and the
+           preview refetches by itself when the template, options or library change. -->
+      {#if displayedItems.length > 0}
+        <div
+          class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary"
+        >
+          {@render previewSection()}
+        </div>
+      {/if}
 
       <!-- Collapsible Template & Destination Summary Bar -->
       <div
