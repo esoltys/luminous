@@ -82,7 +82,7 @@
   >
     {#if artistPortraitUrl}
       <div
-        class="w-full h-full relative overflow-hidden bg-brand-sidebar border border-brand-border shrink-0"
+        class="w-full h-full relative overflow-hidden rounded-[inherit] bg-brand-sidebar border border-brand-border shrink-0"
       >
         <img
           src={artistPortraitUrl}

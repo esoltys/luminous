@@ -163,7 +163,7 @@
 
 <div
   bind:this={box}
-  class="{sizeClass} relative overflow-hidden bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary group shrink-0"
+  class="{sizeClass} relative overflow-hidden rounded-[inherit] bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary group shrink-0"
 >
   {#if displaySrc && boxPixels !== null && !hasFailed}
     <img
