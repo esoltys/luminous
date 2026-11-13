@@ -476,6 +476,10 @@ function withLightness(rgb: Rgb, l: number): Rgb {
   return hslToRgb(hsl.h, hsl.s, Math.min(1, Math.max(0, l)));
 }
 
+function lightnessOf(rgb: Rgb): number {
+  return rgbToHsl(rgb.r, rgb.g, rgb.b).l;
+}
+
 function clampLightness(rgb: Rgb, minL: number, maxL: number): Rgb {
   const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
   if (hsl.l >= minL && hsl.l <= maxL) return rgb;
@@ -514,6 +518,10 @@ function lightenUntilReadable(rgb: Rgb): Rgb {
   return candidate;
 }
 
+/** HSL lightness the sidebar and playerbar sit below the canvas (both cover polarities). */
+const SIDEBAR_STEP = 0.06;
+const PLAYERBAR_STEP = 0.02;
+
 export function buildExtractedColors(colorCounts: ColorCount[]): ExtractedColors {
   const swatches = quantizeMedianCut(colorCounts, 24);
   const archetypes = extractArchetypes(swatches);
@@ -542,20 +550,26 @@ export function buildExtractedColors(colorCounts: ColorCount[]): ExtractedColors
   let accentHoverRgb: Rgb;
   let borderRgb: Rgb;
 
+  // One-hue surfaces (#2051): the canvas, sidebar, playerbar and border all
+  // keep the canvas colour's hue and saturation and differ only in lightness.
+  // Only the accent pair may bring a second colour from the cover. The
+  // readability loops step lightness only, so they preserve the hue.
   if (isLight) {
     primaryRgb = lightenUntilReadable(clampLightness(lightMuted, 0.7, 0.95));
-    sidebarRgb = lightenUntilReadable(clampLightness(lightVibrant, 0.65, 0.9));
-    playerbarRgb = lightenUntilReadable(clampLightness(lightMuted, 0.68, 0.92));
+    const l = lightnessOf(primaryRgb);
+    sidebarRgb = lightenUntilReadable(withLightness(primaryRgb, l - SIDEBAR_STEP));
+    playerbarRgb = lightenUntilReadable(withLightness(primaryRgb, l - PLAYERBAR_STEP));
     accentRgb = clampLightness(vibrant, 0.35, 0.65);
     accentHoverRgb = clampLightness(darkVibrant, 0.25, 0.55);
-    borderRgb = clampLightness(muted, 0.5, 0.8);
+    borderRgb = withLightness(primaryRgb, lightnessOf(clampLightness(muted, 0.5, 0.8)));
   } else {
     primaryRgb = darkenUntilReadable(clampLightness(darkMuted, 0.0, 0.35));
-    sidebarRgb = darkenUntilReadable(clampLightness(darkVibrant, 0.0, 0.3));
-    playerbarRgb = darkenUntilReadable(clampLightness(darkMuted, 0.0, 0.32));
+    const l = lightnessOf(primaryRgb);
+    sidebarRgb = darkenUntilReadable(withLightness(primaryRgb, l - SIDEBAR_STEP));
+    playerbarRgb = darkenUntilReadable(withLightness(primaryRgb, l - PLAYERBAR_STEP));
     accentRgb = clampLightness(vibrant, 0.35, 0.75);
     accentHoverRgb = clampLightness(lightVibrant, 0.45, 0.85);
-    borderRgb = clampLightness(muted, 0.2, 0.5);
+    borderRgb = withLightness(primaryRgb, lightnessOf(clampLightness(muted, 0.2, 0.5)));
   }
 
   const primaryHex = rgbToHex(primaryRgb.r, primaryRgb.g, primaryRgb.b);
