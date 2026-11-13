@@ -2490,7 +2490,7 @@ export const de = {
     scopeSelection: "Ausgewählte Titel ({count})",
     scopeLibrary: "Gesamte Mediathek ({count})",
     destinationDirLabel: "Zielordner",
-    destinationDefault: "Standard: dieselbe Mediathek",
+    destinationDefault: "Dieselbe Mediathek",
     destinationCustom: "Benutzerdefiniert ...",
     browse: "Durchsuchen ...",
     replaceSpaces: "Leerzeichen durch Unterstriche ersetzen",

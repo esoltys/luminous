@@ -2631,7 +2631,7 @@ export const uk = {
     scopeSelection: "Вибрані пісні ({count})",
     scopeLibrary: "Уся бібліотека ({count})",
     destinationDirLabel: "Папка призначення",
-    destinationDefault: "За замовчуванням: та сама бібліотека",
+    destinationDefault: "Та сама бібліотека",
     destinationCustom: "Власна…",
     browse: "Огляд…",
     replaceSpaces: "Замінювати пробіли підкресленнями",

@@ -2480,7 +2480,7 @@ export const es = {
     scopeSelection: "Canciones seleccionadas ({count})",
     scopeLibrary: "Toda la biblioteca ({count})",
     destinationDirLabel: "Carpeta de destino",
-    destinationDefault: "Predeterminado: la misma biblioteca",
+    destinationDefault: "La misma biblioteca",
     destinationCustom: "Personalizado...",
     browse: "Examinar...",
     replaceSpaces: "Reemplazar espacios con guiones bajos",

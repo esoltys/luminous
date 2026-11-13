@@ -2641,7 +2641,7 @@ export const ru = {
     scopeSelection: "Выбранные песни ({count})",
     scopeLibrary: "Вся библиотека ({count})",
     destinationDirLabel: "Папка назначения",
-    destinationDefault: "По умолчанию: та же библиотека",
+    destinationDefault: "Та же библиотека",
     destinationCustom: "Другая…",
     browse: "Обзор…",
     replaceSpaces: "Заменять пробелы символами подчёркивания",
