@@ -12,6 +12,7 @@
   import { walkthroughStore } from "../stores/walkthrough.svelte";
   import Button from "./Button.svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
+  import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
 
   // A database last opened by a newer Luminous build looks identical to a
   // genuinely empty library (song queries naming a since-changed column just
@@ -25,7 +26,7 @@
      distinct from the "your search/filters matched nothing" empty states, which
      keep their own dashed-border treatment. -->
 <div
-  class="flex flex-col items-center justify-center max-w-md mx-auto text-center p-8 bg-brand-sidebar/40 rounded-xl border border-brand-border select-none"
+  class="flex flex-col items-center justify-center max-w-md mx-auto text-center px-6 py-8 select-none"
 >
   {#if dbNewer}
     <div
@@ -58,56 +59,43 @@
       <LoadingSpinner label={i18n.t("home.loading")} />
     </div>
   {:else}
-    <!-- The very first launch (before the tour has ever been completed) shows
-         the full-screen WelcomeScreen instead — this stays a plain, non-
-         "Welcome"-branded empty state so it doesn't duplicate that greeting
-         for returning users whose library later empties out (folders removed).
-         A library is optional: playing files straight from disk is offered
-         first, on equal footing, so nobody has to hand Luminous a folder to
-         scan just to hear a song. -->
-    <div class="w-full flex flex-col gap-5">
-      <section class="flex flex-col items-center gap-2">
-        <h4
-          class="text-[11px] font-semibold uppercase tracking-wider text-brand-text-secondary text-pretty"
-        >
-          {i18n.t("emptyLibrary.playHeading")}
-        </h4>
-        <div class="flex flex-wrap items-center justify-center gap-2">
-          <Button onclick={() => playerStore.openFileDialog()} variant="primary" size="sm">
-            <FileAudio class="w-3.5 h-3.5" />
-            {i18n.t("emptyLibrary.openFiles")}
-          </Button>
-          <Button onclick={() => playerStore.openFolderDialog()} variant="secondary" size="sm">
-            <FolderOpen class="w-3.5 h-3.5" />
-            {i18n.t("emptyLibrary.playFolder")}
-          </Button>
-        </div>
-        <p class="text-[11px] text-brand-text-secondary/80 leading-relaxed text-pretty">
-          {i18n.t("emptyLibrary.dropHint")}
-        </p>
-      </section>
-
-      <div class="h-px w-full bg-brand-border/60" aria-hidden="true"></div>
-
-      <section class="flex flex-col items-center gap-2">
-        <h4
-          class="text-[11px] font-semibold uppercase tracking-wider text-brand-text-secondary text-pretty"
-        >
-          {i18n.t("emptyLibrary.libraryHeading")}
-        </h4>
-        <Button onclick={() => collectionStore.addDirectoryDialog()} variant="secondary" size="sm">
-          <FolderPlus class="w-3.5 h-3.5" />
-          {i18n.t("emptyLibrary.addFolder")}
-        </Button>
-        <p
-          class="text-[11px] text-brand-text-secondary/80 leading-relaxed text-pretty whitespace-pre-line"
-        >
-          {i18n.t("emptyLibrary.libraryHint")}
-        </p>
-      </section>
+    <!-- Built around the Luminous mark: adding a folder is the primary path,
+         while playing files or a folder directly without a library stays
+         one click away as secondary actions (#2047). -->
+    <div class="anim-welcome-mark mb-5">
+      <ReactiveLogoBrand size="2xl" />
     </div>
 
-    <div class="flex items-center gap-3 mt-6 text-xs">
+    <h2
+      class="text-2xl @xl:text-3xl font-heading font-bold text-brand-text-primary leading-snug mb-2 text-balance"
+    >
+      {i18n.t("emptyLibrary.title")}
+    </h2>
+    <p class="text-sm text-brand-text-secondary leading-relaxed text-pretty mb-6">
+      {i18n.t("emptyLibrary.subtitle")}
+    </p>
+
+    <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="md">
+      <FolderPlus class="w-4 h-4" />
+      {i18n.t("emptyLibrary.addFolder")}
+    </Button>
+
+    <div class="flex flex-wrap items-center justify-center gap-2 mt-3">
+      <Button onclick={() => playerStore.openFileDialog()} variant="secondary" size="sm">
+        <FileAudio class="w-3.5 h-3.5" />
+        {i18n.t("emptyLibrary.openFiles")}
+      </Button>
+      <Button onclick={() => playerStore.openFolderDialog()} variant="secondary" size="sm">
+        <FolderOpen class="w-3.5 h-3.5" />
+        {i18n.t("emptyLibrary.playFolder")}
+      </Button>
+    </div>
+
+    <p class="text-xs text-brand-text-secondary/80 leading-relaxed text-pretty mt-5">
+      {i18n.t("emptyLibrary.dropHint")}
+    </p>
+
+    <div class="flex items-center gap-3 mt-3 text-xs">
       <button
         type="button"
         onclick={() => {

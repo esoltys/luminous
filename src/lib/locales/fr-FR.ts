@@ -484,14 +484,13 @@ export const frFR: DeepStringRecord<typeof en> = {
     suggestHide: "Masquer les suggestions",
   },
   emptyLibrary: {
-    playHeading: "Écouter de la musique",
+    title: "Ajoutez votre musique",
+    subtitle:
+      "Choisissez un dossier pour parcourir par album, artiste ou genre. Luminous le garde synchronisé quand vos fichiers changent.",
+    addFolder: "Ajouter un dossier",
     openFiles: "Ouvrir des fichiers",
     playFolder: "Lire un dossier",
     dropHint: "Ou déposez des fichiers et dossiers n'importe où dans cette fenêtre pour les lire.",
-    libraryHeading: "Créer une bibliothèque",
-    addFolder: "Ajouter un dossier à la bibliothèque",
-    libraryHint:
-      "Ajoutez un dossier pour parcourir par album, artiste ou genre.\nLuminous le garde synchronisé quand vos fichiers changent.",
   },
   welcome: {
     title: "Bienvenue dans Luminous",

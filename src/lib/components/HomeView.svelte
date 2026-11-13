@@ -28,6 +28,10 @@
   let isLoading = $state(true);
   let libraryChangedDebounce: ReturnType<typeof setTimeout> | undefined;
 
+  let showEmptyWelcome = $derived(
+    !isLoading && topAlbums.length === 0 && recentlyAdded.length === 0,
+  );
+
   /** Polled rather than computed once, so the greeting (and the Daypart Mix
    * pin's implicit "current bucket") actually flips while the user sits on
    * Home across a boundary, instead of only updating on the next unrelated
@@ -154,13 +158,15 @@
     class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}"
     use:rememberScroll={"home"}
   >
-    <div class="px-6 pt-6">
-      <h1
-        class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug py-0.5"
-      >
-        {timeOfDayGreeting}
-      </h1>
-    </div>
+    {#if !showEmptyWelcome}
+      <div class="px-6 pt-6">
+        <h1
+          class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug py-0.5"
+        >
+          {timeOfDayGreeting}
+        </h1>
+      </div>
+    {/if}
 
     <div class="px-6 pt-4 space-y-12">
       <LibraryFolderSuggestions />
@@ -203,8 +209,8 @@
           </div>
         {/if}
 
-        {#if topAlbums.length === 0 && recentlyAdded.length === 0}
-          <div class="flex items-center justify-center py-16">
+        {#if showEmptyWelcome}
+          <div class="flex items-center justify-center min-h-[65vh] py-8">
             <LibraryWelcome />
           </div>
         {/if}

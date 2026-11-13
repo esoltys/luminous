@@ -475,14 +475,13 @@ export const es = {
     suggestHide: "Ocultar sugerencias",
   },
   emptyLibrary: {
-    playHeading: "Reproduce música",
+    title: "Agrega tu música",
+    subtitle:
+      "Elige una carpeta para explorar por álbum, artista o género. Luminous la mantiene sincronizada cuando tus archivos cambian.",
+    addFolder: "Agregar carpeta",
     openFiles: "Abrir archivos",
     playFolder: "Reproducir una carpeta",
     dropHint: "O suelta archivos y carpetas en cualquier parte de esta ventana para reproducirlos.",
-    libraryHeading: "Crea una biblioteca",
-    addFolder: "Agregar carpeta a la biblioteca",
-    libraryHint:
-      "Agrega una carpeta para explorar por álbum, artista o género.\nLuminous la mantiene sincronizada cuando tus archivos cambian.",
   },
   welcome: {
     title: "Te damos la bienvenida a Luminous",

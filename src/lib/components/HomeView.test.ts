@@ -103,12 +103,13 @@ describe("HomeView.svelte", () => {
     });
   });
 
-  it("shows LibraryWelcome when the library is genuinely empty", async () => {
+  it("shows LibraryWelcome and hides the time-of-day greeting when the library is genuinely empty", async () => {
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText("Play music")).toBeInTheDocument();
+      expect(screen.getByText("Add your music")).toBeInTheDocument();
     });
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
   });
 
   it("does not show LibraryWelcome once recentlyAdded has content, even with zero plays", async () => {
@@ -119,7 +120,8 @@ describe("HomeView.svelte", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Full Moon Fever").length).toBeGreaterThan(0);
     });
-    expect(screen.queryByText("Play music")).not.toBeInTheDocument();
+    expect(screen.queryByText("Add your music")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
   });
 
   it("shows the Explore Your Library row when there is no play history, and hides it once there is", async () => {
