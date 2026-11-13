@@ -460,6 +460,16 @@
   let errorCount = $derived(items.filter((i) => getItemStatus(i) === "error").length);
   let missingTagCount = $derived(items.filter((i) => getItemStatus(i) === "missing_tag").length);
   let readyCount = $derived(items.filter((i) => getItemStatus(i) === "ok").length);
+  /**
+   * Whether the Organize page's preview card has anything of its own to show. A duplicate
+   * row doesn't count when its song is in a duplicate group, because the page's Compare
+   * Duplicates card already lists it. Other duplicate rows (two files whose new names
+   * clash) appear nowhere else, so they still do.
+   */
+  let previewHasOwnRows = $derived(
+    readyCount + missingTagCount + errorCount > 0 ||
+      items.some((i) => getItemStatus(i) === "duplicate" && !duplicateSongIds.has(i.song_id)),
+  );
   let pendingCount = $derived(missingTagCount + collisionCount + errorCount);
 
   // Untagged tracks (missing_tag) are held back by default; users can opt in via a toggle
@@ -674,8 +684,10 @@
           move_extra_files: moveExtraFiles,
         },
       });
-      items = res;
+      // Load duplicate groups before publishing the rows, so previewHasOwnRows never
+      // briefly counts shelf-covered duplicates and flashes the card.
       await loadDuplicateSongIds();
+      items = res;
     } catch (err: any) {
       console.error("Preview failed:", err);
       errorMessage =
@@ -1475,9 +1487,9 @@
 
       <!-- Unlike the sections below, this one isn't capped to max-w-3xl —
            the file list benefits from the extra width on wide windows.
-           Hidden while no file would move: the page has nothing to show, and the
-           preview refetches by itself when the template, options or library change. -->
-      {#if displayedItems.length > 0}
+           Hidden while it would be empty or list only duplicates (see previewHasOwnRows);
+           the preview refetches by itself when the template, options or library change. -->
+      {#if previewHasOwnRows}
         <div
           class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary"
         >

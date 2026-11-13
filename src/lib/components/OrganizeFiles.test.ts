@@ -498,15 +498,28 @@ describe("OrganizeFiles safeguards", () => {
     });
   });
 
-  it("hides the embedded preview card when no file would move", async () => {
+  // A duplicate the Compare Duplicates card already lists doesn't earn the preview card;
+  // a duplicate it doesn't list (a name clash) does.
+  it.each([
+    ["no file would move", "unchanged", [], false],
+    ["the only rows are duplicates the shelf lists", "collision", [1], false],
+    ["a duplicate row isn't in any duplicate group", "collision", [], true],
+  ])("embedded preview card when %s", async (_case, status, groupedSongIds, shown) => {
     vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "get_duplicate_track_groups") {
+        return Promise.resolve(
+          groupedSongIds.length > 0
+            ? [{ candidates: groupedSongIds.map((id) => ({ song: { id } })) }]
+            : [],
+        );
+      }
       if (cmd === "preview_organize") {
         return Promise.resolve([
           {
             song_id: 1,
             from_path: "/music/Artist/Album/01 Song.mp3",
-            to_path: "/music/Artist/Album/01 Song.mp3",
-            status: "unchanged",
+            to_path: "/music/Artist/Album/01 Song (copy).mp3",
+            status,
             error_message: null,
           },
         ]);
@@ -514,14 +527,21 @@ describe("OrganizeFiles safeguards", () => {
       return defaultInvokeHandler(cmd);
     });
 
-    const { findByText, queryByRole } = render(OrganizeFiles, { embedded: true, songIds: [] });
+    const { findByText, findByRole, queryByRole } = render(OrganizeFiles, {
+      embedded: true,
+      songIds: [],
+    });
 
     // The summary bar renders, and the preview has had time to resolve.
     await findByText("Template:");
     await waitFor(() =>
       expect(vi.mocked(invoke)).toHaveBeenCalledWith("preview_organize", expect.anything()),
     );
-    expect(queryByRole("button", { name: "Refresh Preview" })).not.toBeInTheDocument();
+    if (shown) {
+      expect(await findByRole("button", { name: "Refresh Preview" })).toBeInTheDocument();
+    } else {
+      expect(queryByRole("button", { name: "Refresh Preview" })).not.toBeInTheDocument();
+    }
   });
 
   it("shows the embedded preview card when files would move", async () => {
