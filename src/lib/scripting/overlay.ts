@@ -322,7 +322,7 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
 
       let html = "";
       if (options?.title) {
-        html += `<div style="font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-accent, #818cf8); margin-bottom: 4px;">${escapeHtml(options.title)}</div>`;
+        html += `<div style="font-weight: 600; font-size: 13px; color: var(--color-accent, #818cf8); margin-bottom: 4px;">${escapeHtml(options.title)}</div>`;
       }
       html += `<div style="font-size: 15px; font-weight: 500; line-height: 1.4;">${escapeHtml(text)}</div>`;
       el.innerHTML = html;

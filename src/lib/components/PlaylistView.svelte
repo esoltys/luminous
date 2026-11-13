@@ -1358,10 +1358,7 @@
       class="flex flex-col gap-4 p-6 bg-brand-sidebar"
     >
       <div class="flex flex-col gap-1.5">
-        <label
-          for="save-queue-name-input"
-          class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-        >
+        <label for="save-queue-name-input" class="label-field text-brand-text-secondary">
           {i18n.t("playlists.saveQueueNameLabel")}
         </label>
         <Input

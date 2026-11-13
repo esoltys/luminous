@@ -162,7 +162,7 @@
     >
       <div class="flex items-center gap-2">
         <Activity class="w-4 h-4 text-brand-text-primary" />
-        <h2 class="text-xs font-bold uppercase tracking-wider text-brand-text-primary">
+        <h2 class="label-heading text-brand-text-primary">
           {i18n.t("audioPipeline.title", {}, "Audio Pipeline")}
         </h2>
       </div>

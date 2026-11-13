@@ -395,7 +395,7 @@
                   class="bg-brand-sidebar/60 rounded-lg p-3 border border-brand-border/40 space-y-2"
                 >
                   <div
-                    class="text-[10px] font-bold uppercase tracking-wider text-brand-text-secondary flex items-center justify-between"
+                    class="label-small text-brand-text-secondary flex items-center justify-between"
                   >
                     <span>{i18n.t("curation.sectionAudio")}</span>
                     <span
@@ -452,9 +452,7 @@
                   class="bg-brand-sidebar/60 rounded-lg p-3 border border-brand-border/40 space-y-1.5"
                 >
                   <div class="flex items-center justify-between">
-                    <span
-                      class="text-[10px] font-bold uppercase tracking-wider text-brand-text-secondary"
-                    >
+                    <span class="label-small text-brand-text-secondary">
                       {i18n.t("curation.sectionLocation")}
                     </span>
                     <button
@@ -482,9 +480,7 @@
                   class="bg-brand-sidebar/60 rounded-lg p-3 border border-brand-border/40 space-y-2"
                 >
                   <div class="flex items-center justify-between">
-                    <span
-                      class="text-[10px] font-bold uppercase tracking-wider text-brand-text-secondary block"
-                    >
+                    <span class="label-small text-brand-text-secondary block">
                       {i18n.t("curation.sectionHistory")}
                     </span>
                     {#if candidate.song.loved === 1}

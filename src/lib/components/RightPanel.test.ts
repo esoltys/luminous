@@ -380,7 +380,7 @@ describe("RightPanel.svelte", () => {
 
     expect(getByText("Selected Track")).toBeInTheDocument();
     expect(getByText("Jazz")).toBeInTheDocument();
-    expect(queryByRole("heading", { name: "Now Playing" })).not.toBeInTheDocument();
+    expect(queryByRole("heading", { name: "Now playing" })).not.toBeInTheDocument();
     expect(queryByText("Processing")).not.toBeInTheDocument();
   });
 
@@ -397,23 +397,23 @@ describe("RightPanel.svelte", () => {
     inspectorStore.setSelection("album-view", { ...mockSong, id: 7 });
     const { getByRole, queryByRole } = render(RightPanel);
 
-    await fireEvent.click(getByRole("button", { name: "Now Playing" }));
+    await fireEvent.click(getByRole("button", { name: "Now playing" }));
 
-    expect(getByRole("heading", { name: "Now Playing" })).toBeInTheDocument();
-    expect(queryByRole("button", { name: "Now Playing" })).not.toBeInTheDocument();
+    expect(getByRole("heading", { name: "Now playing" })).toBeInTheDocument();
+    expect(queryByRole("button", { name: "Now playing" })).not.toBeInTheDocument();
     expect(queryByRole("heading", { name: "Selected Track" })).not.toBeInTheDocument();
   });
 
   it("offers no way back when the panel already shows Now Playing, or nothing is playing", () => {
     playerStore.currentSong = mockSong;
     const playing = render(RightPanel);
-    expect(playing.queryByRole("button", { name: "Now Playing" })).not.toBeInTheDocument();
+    expect(playing.queryByRole("button", { name: "Now playing" })).not.toBeInTheDocument();
     playing.unmount();
 
     playerStore.currentSong = undefined;
     inspectorStore.setSelection("album-view", mockSong);
     const idle = render(RightPanel);
-    expect(idle.queryByRole("button", { name: "Now Playing" })).not.toBeInTheDocument();
+    expect(idle.queryByRole("button", { name: "Now playing" })).not.toBeInTheDocument();
   });
 
   it("shows actionable empty state with Edit tags, Help link, and Get Picard when Picard is not installed", async () => {

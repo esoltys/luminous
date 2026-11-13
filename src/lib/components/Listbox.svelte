@@ -250,10 +250,7 @@
                 role="presentation"
                 class="pt-1 {groupIdx > 0 ? 'border-t border-brand-border/40 mt-1' : ''}"
               >
-                <div
-                  role="presentation"
-                  class="px-3 py-1 text-[10px] font-semibold tracking-wider uppercase text-brand-text-secondary/70"
-                >
+                <div role="presentation" class="label-small px-3 py-1 text-brand-text-secondary/70">
                   {group.label}
                 </div>
                 <ul role="group" aria-label={group.label}>

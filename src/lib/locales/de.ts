@@ -2068,7 +2068,7 @@ export const de = {
     unpinHome: "Von Start lösen",
     artistInfo: "Interpreteninfo",
     about: "Über",
-    links: "LINKS",
+    links: "Links",
     showMore: "Mehr anzeigen",
     showLess: "Weniger anzeigen",
     showAll: "Alle anzeigen",

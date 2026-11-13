@@ -491,7 +491,7 @@
             {#if playerStore.shuffleMode !== "off"}
               <button
                 onclick={cycleShuffle}
-                class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+                class="label-small absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-brand-accent-text hover:text-brand-text-primary transition-colors whitespace-nowrap"
                 title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
               >
                 {i18n.t("playerBar.shuffle")}
@@ -571,7 +571,7 @@
             {#if playerStore.repeatMode !== "off"}
               <button
                 onclick={cycleRepeat}
-                class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+                class="label-small absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-brand-accent-text hover:text-brand-text-primary transition-colors whitespace-nowrap"
                 title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
               >
                 {i18n.t("playerBar.repeat")}

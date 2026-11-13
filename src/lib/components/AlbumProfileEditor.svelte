@@ -323,7 +323,7 @@
         <!-- Location -->
         <div class="flex items-center gap-3">
           <div class="flex-1 flex flex-col gap-1 min-w-0">
-            <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+            <span class="label-field text-brand-text-secondary"
               >{i18n.t("albumTagEditor.locationField")}</span
             >
             <span class="text-xs text-brand-text-secondary break-all select-text"
@@ -353,7 +353,7 @@
             sizeClass="w-12 h-12 rounded"
           />
           <div class="flex-1 flex flex-col gap-1 min-w-0">
-            <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+            <span class="label-field text-brand-text-secondary"
               >{i18n.t("albumTagEditor.artworkField")}</span
             >
             <span class="text-xs text-brand-text-secondary">
@@ -441,7 +441,7 @@
           <div class="col-span-2 flex flex-col gap-2">
             <label
               for="album-tag-genre-input"
-              class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5"
+              class="label-field text-brand-text-secondary flex items-center gap-1.5"
             >
               <TagIcon class="w-3.5 h-3.5 text-brand-accent" />
               {i18n.t("albumTagEditor.genreField")}
@@ -554,10 +554,7 @@
       <!-- Description / Liner Notes Field -->
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
-          <label
-            for="album-description"
-            class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-          >
+          <label for="album-description" class="label-field text-brand-text-secondary">
             {i18n.t("albumProfileEditor.description", {}, "Description & Liner Notes")}
           </label>
           <button
@@ -593,7 +590,7 @@
       <div class="flex flex-col gap-1.5">
         <label
           for="album-website"
-          class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5"
+          class="label-field text-brand-text-secondary flex items-center gap-1.5"
         >
           <Globe class="w-3.5 h-3.5 text-brand-accent" />
           {i18n.t("albumProfileEditor.website", {}, "Official Page / Store")}
@@ -614,9 +611,7 @@
       <!-- Release Links (Bandcamp, Discogs, Spotify, etc.) -->
       <div class="flex flex-col gap-2.5">
         <div class="flex items-center justify-between">
-          <label
-            class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5"
-          >
+          <label class="label-field text-brand-text-secondary flex items-center gap-1.5">
             <LinkIcon class="w-3.5 h-3.5 text-brand-accent" />
             {i18n.t("albumProfileEditor.links", {}, "Release & Source Links")}
           </label>

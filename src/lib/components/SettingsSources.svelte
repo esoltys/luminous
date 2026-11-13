@@ -1132,23 +1132,20 @@
 
     <div class="grid grid-cols-2 @3xl:grid-cols-4 gap-4 text-xs">
       <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-        <span class="text-xs text-brand-text-secondary uppercase font-semibold"
-          >{i18n.t("settings.statsSongs")}</span
-        >
+        <span class="label-heading text-brand-text-secondary">{i18n.t("settings.statsSongs")}</span>
         <p class="text-base font-bold text-brand-text-primary mt-0.5">
           {formatNumber(collectionStore.stats.total_songs)}
         </p>
       </div>
       <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-        <span class="text-xs text-brand-text-secondary uppercase font-semibold"
-          >{i18n.t("settings.statsAlbums")}</span
+        <span class="label-heading text-brand-text-secondary">{i18n.t("settings.statsAlbums")}</span
         >
         <p class="text-base font-bold text-brand-text-primary mt-0.5">
           {formatNumber(collectionStore.stats.total_albums)}
         </p>
       </div>
       <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-        <span class="text-xs text-brand-text-secondary uppercase font-semibold"
+        <span class="label-heading text-brand-text-secondary"
           >{i18n.t("settings.statsArtists")}</span
         >
         <p class="text-base font-bold text-brand-text-primary mt-0.5">
@@ -1161,8 +1158,7 @@
         class="w-full bg-brand-main/40 border border-brand-border rounded-lg"
       >
         <div class="w-full p-3 text-left">
-          <span class="text-xs text-brand-text-secondary uppercase font-semibold"
-            >{i18n.t("settings.statsSize")}</span
+          <span class="label-heading text-brand-text-secondary">{i18n.t("settings.statsSize")}</span
           >
           <p class="text-base font-bold text-brand-text-primary mt-0.5">{diskSizeLabel}</p>
         </div>

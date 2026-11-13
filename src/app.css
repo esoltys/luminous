@@ -3,6 +3,28 @@
 @import "./lib/fonts/expose/expose.css";
 @import "./lib/fonts/fira-sans/fira-sans.css";
 
+/* Label typography (#2050). Labels and headings are sentence case; hierarchy
+   comes from size, weight and the colour the caller adds, never from
+   uppercase or letter-spacing (the `no-uppercase-label` lint enforces this).
+   Colour is deliberately left to the caller: these set size and weight only. */
+@utility label-field {
+  /* form-field labels */
+  @apply text-xs font-medium;
+}
+@utility label-heading {
+  /* section headings and table column headers */
+  @apply text-xs font-semibold;
+}
+@utility code-caps {
+  /* The one sanctioned uppercase: codes and abbreviations that are data, not
+     labels (hex values, language codes, file types, quality badges). */
+  text-transform: uppercase;
+}
+@utility label-small {
+  /* chips, captions and micro-labels; 11px floor so they stay legible without caps */
+  @apply text-[11px] font-semibold;
+}
+
 @theme {
   /* Window-size tiers (issue #1154). Pinned in px so they equal window.innerWidth exactly;
      mirrored by BREAKPOINT_*_PX in src/lib/constants.ts (breakpoints.test.ts keeps them equal).

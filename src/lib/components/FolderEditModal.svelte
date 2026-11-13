@@ -127,7 +127,7 @@
       <div
         class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 flex items-center justify-between gap-4"
       >
-        <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+        <span class="label-field text-brand-text-secondary">
           {i18n.t("settings.folderPreview")}
         </span>
         <div>
@@ -139,7 +139,7 @@
       <div>
         <label
           for="folder-nickname-input"
-          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-1.5"
+          class="label-field block text-brand-text-secondary mb-1.5"
         >
           {i18n.t("settings.folderNickname")}
         </label>
@@ -154,9 +154,7 @@
 
       <!-- Icon Selection -->
       <div>
-        <span
-          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2"
-        >
+        <span class="label-field block text-brand-text-secondary mb-2">
           {i18n.t("settings.folderIcon")}
         </span>
         <div class="grid grid-cols-5 gap-2">
@@ -184,9 +182,7 @@
 
       <!-- Color Selection -->
       <div>
-        <span
-          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2"
-        >
+        <span class="label-field block text-brand-text-secondary mb-2">
           {i18n.t("settings.folderColor")}
         </span>
         <ColorPicker
@@ -200,9 +196,7 @@
 
       <!-- Location -->
       <div>
-        <span
-          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-1.5"
-        >
+        <span class="label-field block text-brand-text-secondary mb-1.5">
           {i18n.t("settings.folderLocation")}
         </span>
         <div class="flex items-center justify-between gap-3">

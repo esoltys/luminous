@@ -1031,8 +1031,7 @@
       </div>
 
       <div class="flex flex-col items-center justify-center gap-1.5 h-full">
-        <span
-          class="text-[10px] font-bold text-brand-text-secondary uppercase tracking-wider text-center"
+        <span class="label-small text-brand-text-secondary text-center"
           >{i18n.t("loudness.mode")}</span
         >
         <div

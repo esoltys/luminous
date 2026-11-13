@@ -14,7 +14,7 @@
 {#if visible.length > 0}
   <div>
     <div class="flex items-center justify-between mb-3">
-      <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">
+      <h4 class="label-heading text-brand-text-secondary">
         {i18n.t("settings.addonThemes")}
       </h4>
       <button

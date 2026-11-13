@@ -256,7 +256,7 @@
           sizeClass="w-12 h-12 rounded"
         />
         <div class="flex-1 flex flex-col gap-1 min-w-0">
-          <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+          <span class="label-field text-brand-text-secondary"
             >{i18n.t("albumTagEditor.artworkField")}</span
           >
           <span class="text-xs text-brand-text-secondary">

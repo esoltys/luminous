@@ -153,10 +153,7 @@
     <form onsubmit={handleSubmit} class="p-6 flex-1 overflow-y-auto flex flex-col gap-4">
       <div class="grid grid-cols-2 gap-3">
         <div class="space-y-1.5">
-          <label
-            for="webdav-name"
-            class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-          >
+          <label for="webdav-name" class="label-field block text-brand-text-secondary">
             {i18n.t("settings.webdavName")}
           </label>
           <Input
@@ -168,10 +165,7 @@
         </div>
 
         <div class="space-y-1.5">
-          <label
-            for="webdav-url"
-            class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-          >
+          <label for="webdav-url" class="label-field block text-brand-text-secondary">
             {i18n.t("settings.webdavUrl")}
           </label>
           <Input
@@ -185,10 +179,7 @@
 
       <div class="grid grid-cols-2 gap-3">
         <div class="space-y-1.5">
-          <label
-            for="webdav-username"
-            class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-          >
+          <label for="webdav-username" class="label-field block text-brand-text-secondary">
             {i18n.t("settings.webdavUsername")}
           </label>
           <Input
@@ -199,10 +190,7 @@
         </div>
 
         <div class="space-y-1.5">
-          <label
-            for="webdav-password"
-            class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-          >
+          <label for="webdav-password" class="label-field block text-brand-text-secondary">
             {i18n.t("settings.webdavPassword")}
           </label>
           <Input
@@ -215,10 +203,7 @@
       </div>
 
       <div class="space-y-1.5">
-        <label
-          for="webdav-remote-path"
-          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-        >
+        <label for="webdav-remote-path" class="label-field block text-brand-text-secondary">
           {i18n.t("settings.webdavRemotePath")}
         </label>
         <Input id="webdav-remote-path" bind:value={remotePath} placeholder="/Music" />
@@ -245,10 +230,7 @@
         </div>
         {#if autoSyncEnabled}
           <div class="space-y-1.5">
-            <label
-              for="webdav-sync-interval"
-              class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-            >
+            <label for="webdav-sync-interval" class="label-field block text-brand-text-secondary">
               {i18n.t("settings.webdavSyncIntervalLabel")}
             </label>
             <Input id="webdav-sync-interval" type="number" bind:value={syncIntervalMinutes} />
@@ -260,7 +242,7 @@
       <div
         class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 flex items-center justify-between gap-4"
       >
-        <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+        <span class="label-field text-brand-text-secondary">
           {i18n.t("settings.folderPreview")}
         </span>
         <div>
@@ -270,9 +252,7 @@
 
       <!-- Icon Selection -->
       <div>
-        <span
-          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2"
-        >
+        <span class="label-field block text-brand-text-secondary mb-2">
           {i18n.t("settings.folderIcon")}
         </span>
         <div class="grid grid-cols-5 gap-2">
@@ -300,9 +280,7 @@
 
       <!-- Color Selection -->
       <div>
-        <span
-          class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2"
-        >
+        <span class="label-field block text-brand-text-secondary mb-2">
           {i18n.t("settings.folderColor")}
         </span>
         <ColorPicker

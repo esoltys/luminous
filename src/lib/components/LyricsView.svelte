@@ -529,9 +529,7 @@
       </div>
     {:else if isEditing}
       <div class="max-w-2xl mx-auto h-full flex flex-col gap-3">
-        <label
-          for="lyrics-editor"
-          class="text-xs font-bold text-brand-text-secondary/65 uppercase tracking-wider"
+        <label for="lyrics-editor" class="label-heading text-brand-text-secondary/65"
           >{i18n.t("lyrics.editorLabel", {}, "Lyrics Text (plain or LRC synced format)")}</label
         >
         <textarea

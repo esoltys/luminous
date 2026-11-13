@@ -64,7 +64,7 @@
                 {displayName}
               </span>
               <span
-                class="text-[10px] uppercase font-mono font-bold px-1.5 py-0.5 rounded bg-brand-main/70 text-brand-text-secondary border border-brand-border/40 shrink-0"
+                class="text-[10px] code-caps font-mono font-bold px-1.5 py-0.5 rounded bg-brand-main/70 text-brand-text-secondary border border-brand-border/40 shrink-0"
               >
                 {item.code}
               </span>
@@ -87,7 +87,7 @@
               <Translate class="w-5 h-5" />
             </div>
             <span
-              class="text-[11px] uppercase font-mono font-bold px-2 py-0.5 rounded-full bg-brand-main/80 text-brand-text-secondary border border-brand-border/60"
+              class="text-[11px] code-caps font-mono font-bold px-2 py-0.5 rounded-full bg-brand-main/80 text-brand-text-secondary border border-brand-border/60"
             >
               {item.code}
             </span>

@@ -706,7 +706,7 @@
       <div class="flex flex-col gap-4">
         <div class="flex items-center gap-3">
           <div class="flex-1 flex flex-col gap-1 min-w-0">
-            <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+            <span class="label-field text-brand-text-secondary"
               >{i18n.t("tagEditor.locationField")}</span
             >
             <span class="text-xs text-brand-text-secondary break-all select-text">{path}</span>
@@ -747,7 +747,7 @@
             <CoverArt {songId} sizeClass="w-12 h-12 rounded" />
           {/key}
           <div class="flex-1 flex flex-col gap-1 min-w-0">
-            <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
+            <span class="label-field text-brand-text-secondary"
               >{i18n.t("tagEditor.artworkField")}</span
             >
             <span class="text-xs text-brand-text-secondary">
@@ -1031,9 +1031,7 @@
           <!-- Rating (library-only, saves immediately) -->
           {#if songId != null}
             <div class="flex flex-col gap-1.5">
-              <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider"
-                >{i18n.t("rating.label")}</span
-              >
+              <span class="label-field text-brand-text-secondary">{i18n.t("rating.label")}</span>
               <SongRating
                 {rating}
                 {loved}
@@ -1148,9 +1146,7 @@
               <div class="p-3 pt-2 space-y-3 border-t border-brand-border/60 text-xs">
                 <!-- Source Block -->
                 <div class="space-y-1.5">
-                  <div
-                    class="font-semibold text-brand-text-primary text-[11px] uppercase tracking-wider"
-                  >
+                  <div class="label-small text-brand-text-primary">
                     {i18n.t("tagEditor.historySourceHeading")}
                   </div>
                   <div

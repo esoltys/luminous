@@ -96,7 +96,7 @@
 
 <div class="flex flex-col gap-2">
   <div
-    class="grid grid-cols-[1.5rem_minmax(6rem,1.4fr)_repeat(3,minmax(4rem,1fr))_auto_auto] gap-2 px-2 text-[10px] font-bold uppercase tracking-wider text-brand-text-secondary"
+    class="label-small grid grid-cols-[1.5rem_minmax(6rem,1.4fr)_repeat(3,minmax(4rem,1fr))_auto_auto] gap-2 px-2 text-brand-text-secondary"
     aria-hidden="true"
   >
     <span>#</span>

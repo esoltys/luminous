@@ -1,19 +1,18 @@
 id: audio-no-std-mutex
 snapshots:
-  ? |
-    struct S { state: Arc<std::sync::Mutex<u32>> }
-  : labels:
+  "struct S { state: Arc<std::sync::Mutex<u32>> }\n":
+    labels:
       - source: std::sync::Mutex
         style: primary
         start: 22
         end: 38
-  use std::sync::Mutex;:
+  "use std::sync::Mutex;":
     labels:
       - source: std::sync::Mutex
         style: primary
         start: 4
         end: 20
-  use std::sync::{Arc, Mutex};:
+  "use std::sync::{Arc, Mutex};":
     labels:
       - source: Mutex
         style: primary

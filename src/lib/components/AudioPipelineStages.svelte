@@ -89,14 +89,12 @@
     <!-- Stage 1: Input -->
     <div>
       <div class="flex items-center justify-between gap-2 mb-2">
-        <div
-          class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-text-primary"
-        >
+        <div class="label-heading flex items-center gap-1.5 text-brand-text-primary">
           <Cpu class="w-3.5 h-3.5 text-brand-text-primary" />
           <span>{i18n.t("audioPipeline.stageInput", {}, "Input")}</span>
         </div>
         <span
-          class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
+          class="label-small px-2 py-0.5 bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
         >
           {getQualityTierLabel(pipeline.quality_tier)}
         </span>
@@ -106,16 +104,16 @@
         class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30"
       >
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.codec", {}, "Codec")}</span
           >
-          <span class="text-brand-text-primary font-semibold uppercase"
+          <span class="text-brand-text-primary font-semibold code-caps"
             >{pipeline.input_format}</span
           >
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.bitrate", {}, "Bitrate")}</span
           >
           <span class="text-brand-text-primary font-semibold">
@@ -124,7 +122,7 @@
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.sampleRate", {}, "Sample Rate")}</span
           >
           <span class="text-brand-text-primary font-semibold"
@@ -133,7 +131,7 @@
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.bitDepth", {}, "Bit Depth")}</span
           >
           <span class="text-brand-text-primary font-semibold"
@@ -142,7 +140,7 @@
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.channels", {}, "Channels")}</span
           >
           <span class="text-brand-text-primary font-semibold"
@@ -151,7 +149,7 @@
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.decoder", {}, "Decoder")}</span
           >
           <span class="text-brand-text-primary font-semibold wrap-anywhere"
@@ -164,22 +162,20 @@
     <!-- Stage 2: Processing (DSP & Effects) -->
     <div>
       <div class="flex items-center justify-between gap-2 mb-2">
-        <div
-          class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-text-primary"
-        >
+        <div class="label-heading flex items-center gap-1.5 text-brand-text-primary">
           <Sliders class="w-3.5 h-3.5 text-brand-text-primary" />
           <span>{i18n.t("audioPipeline.stageProcessing", {}, "Processing")}</span>
         </div>
         {#if isBitPerfect}
           <span
-            class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full flex items-center gap-1"
+            class="label-small px-2 py-0.5 bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full flex items-center gap-1"
           >
             <Sparkles class="w-2.5 h-2.5 text-brand-text-primary" />
             {i18n.t("audioPipeline.bitPerfect", {}, "Bit-perfect")}
           </span>
         {:else if !unprocessed || !volumeNeutral}
           <span
-            class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
+            class="label-small px-2 py-0.5 bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
           >
             {i18n.t("audioPipeline.processed", {}, "Processed")}
           </span>
@@ -242,27 +238,25 @@
     <!-- Stage 3: Output -->
     <div>
       <div class="flex items-center justify-between gap-2 mb-2">
-        <div
-          class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-text-primary"
-        >
+        <div class="label-heading flex items-center gap-1.5 text-brand-text-primary">
           <Speaker class="w-3.5 h-3.5 text-brand-text-primary" />
           <span>{i18n.t("audioPipeline.stageOutput", {}, "Output")}</span>
         </div>
         {#if resampled}
           <span
-            class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
+            class="label-small px-2 py-0.5 bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
           >
             {i18n.t("audioPipeline.resampled", {}, "Resampled")}
           </span>
         {:else if sharedMixer}
           <span
-            class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
+            class="label-small px-2 py-0.5 bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
           >
             {i18n.t("audioPipeline.systemMixer", {}, "System mixer")}
           </span>
         {:else}
           <span
-            class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
+            class="label-small px-2 py-0.5 bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full"
           >
             {i18n.t("audioPipeline.directRate", {}, "Direct rate")}
           </span>
@@ -273,7 +267,7 @@
         class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30"
       >
         <div class="col-span-2 flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.outputDevice", {}, "Device")}</span
           >
           <span class="text-brand-text-primary font-semibold wrap-anywhere">
@@ -282,7 +276,7 @@
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.outputFormat", {}, "Format")}</span
           >
           <span class="text-brand-text-primary font-semibold">
@@ -291,7 +285,7 @@
         </div>
 
         <div class="flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.channels", {}, "Channels")}</span
           >
           <span class="text-brand-text-primary font-semibold">
@@ -300,7 +294,7 @@
         </div>
 
         <div class="col-span-2 flex flex-col pt-1 border-t border-brand-border/20">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.resampling", {}, "Resampling")}</span
           >
           <span class="text-brand-text-primary font-semibold">
@@ -323,14 +317,14 @@
         </div>
 
         <div class="col-span-2 flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.outputBackend", {}, "Backend")}</span
           >
           <span class="text-brand-text-primary font-semibold">{pipeline.output_backend}</span>
         </div>
 
         <div class="col-span-2 flex flex-col">
-          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary"
+          <span class="label-small text-brand-text-secondary"
             >{i18n.t("audioPipeline.volumeMode", {}, "Volume Control")}</span
           >
           <span class="text-brand-text-primary font-semibold">

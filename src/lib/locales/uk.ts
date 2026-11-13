@@ -2190,7 +2190,7 @@ export const uk = {
     unpinHome: "Відкріпити від головної",
     artistInfo: "Про виконавця",
     about: "Про виконавця",
-    links: "ПОСИЛАННЯ",
+    links: "Посилання",
     showMore: "Показати більше",
     showLess: "Показати менше",
     showAll: "Показати все",

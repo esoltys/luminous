@@ -141,9 +141,7 @@
       class="column-selector-menu fixed bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl p-3 z-50 w-64 overflow-y-auto flex flex-col gap-0.5 select-none custom-scrollbar"
       style="top: {menuTop}px; left: {menuLeft}px; max-height: {menuMaxHeight}px"
     >
-      <div
-        class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-1 pb-0.5"
-      >
+      <div class="label-small text-brand-accent-text px-2 pt-1 pb-0.5">
         {i18n.t("collection.columnSelectorVisible")}
       </div>
       {#if visibleInOrder.length === 0}
@@ -167,7 +165,7 @@
       {/if}
 
       <div
-        class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-2 pb-0.5 mt-1 border-t border-brand-border/30"
+        class="label-small text-brand-accent-text px-2 pt-2 pb-0.5 mt-1 border-t border-brand-border/30"
       >
         {i18n.t("collection.columnSelectorMetatags")}
       </div>
@@ -189,7 +187,7 @@
       {/each}
 
       <div
-        class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-2 pb-0.5 mt-1 border-t border-brand-border/30"
+        class="label-small text-brand-accent-text px-2 pt-2 pb-0.5 mt-1 border-t border-brand-border/30"
       >
         Luminous
       </div>

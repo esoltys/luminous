@@ -1005,7 +1005,7 @@
     {/if}
 
     <div>
-      <span class="text-[11px] text-brand-text-secondary font-semibold uppercase tracking-wider"
+      <span class="label-small text-brand-text-secondary"
         >{i18n.t("organizer.templateSampleOutputLabel")}</span
       >
       <div
@@ -1235,7 +1235,7 @@
             class="h-full flex flex-col"
           >
             <div
-              class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0"
+              class="label-small h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-brand-text-secondary select-none shrink-0"
             >
               <div class="w-12 shrink-0">{i18n.t("organizer.colStatus")}</div>
               <div class="w-56 shrink-0 pr-2">{i18n.t("organizer.chipTitle")}</div>
@@ -1510,9 +1510,7 @@
       >
         <div class="flex flex-wrap items-start gap-x-6 gap-y-2 min-w-0 flex-1">
           <div class="flex items-start gap-2 min-w-0">
-            <span
-              class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider shrink-0"
-            >
+            <span class="label-heading text-brand-text-secondary shrink-0">
               {i18n.t("organizer.activeTemplateLabel")}:
             </span>
             {#if activePreset}
@@ -1532,9 +1530,7 @@
             {/if}
           </div>
           <div class="flex items-center gap-2 min-w-0">
-            <span
-              class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider shrink-0"
-            >
+            <span class="label-heading text-brand-text-secondary shrink-0">
               {i18n.t("organizer.activeDestinationLabel")}:
             </span>
             <span class="text-xs font-medium text-brand-text-primary truncate">

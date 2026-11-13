@@ -102,7 +102,7 @@
               <div class="flex flex-col min-w-0">
                 <div class="flex items-center gap-2">
                   <span
-                    class="font-semibold text-brand-text-primary uppercase tracking-wide text-[11px] px-1.5 py-0.5 rounded bg-brand-sidebar border border-brand-border"
+                    class="label-small capitalize text-brand-text-primary px-1.5 py-0.5 rounded bg-brand-sidebar border border-brand-border"
                   >
                     {r.category}
                   </span>
