@@ -745,36 +745,32 @@
      in all directions without pinching at the ends. */
   .dock-glow-wrapper {
     -webkit-mask-image:
-      linear-gradient(to right, transparent 0%, black 9%, black 91%, transparent 100%),
-      linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%);
+      linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, black 35%, black 65%, transparent 100%);
     -webkit-mask-composite: source-in;
     mask-image:
-      linear-gradient(to right, transparent 0%, black 9%, black 91%, transparent 100%),
-      linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%);
+      linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, black 35%, black 65%, transparent 100%);
     mask-composite: intersect;
   }
 
-  /* Hollow out the interior behind <footer> (inset 64px X, 48px Y) so the
-     translucent glass dock still blurs and shows scrolling content underneath
-     instead of an opaque glow slab. */
+  /* Hollow out the interior behind <footer> with a gradual ramp from the
+     outer edge (no plateau at 48px/64px) so there is no visible seam above or
+     around the dock while keeping the glass interior translucent. */
   .dock-glow-cutout {
     -webkit-mask-image:
       linear-gradient(
         to right,
         black 0%,
-        black 64px,
-        rgba(0, 0, 0, 0.05) 80px,
-        rgba(0, 0, 0, 0.05) calc(100% - 80px),
-        black calc(100% - 64px),
+        rgba(0, 0, 0, 0.05) 72px,
+        rgba(0, 0, 0, 0.05) calc(100% - 72px),
         black 100%
       ),
       linear-gradient(
         to bottom,
         black 0%,
-        black 48px,
-        rgba(0, 0, 0, 0.05) 60px,
-        rgba(0, 0, 0, 0.05) calc(100% - 60px),
-        black calc(100% - 48px),
+        rgba(0, 0, 0, 0.05) 56px,
+        rgba(0, 0, 0, 0.05) calc(100% - 56px),
         black 100%
       );
     -webkit-mask-composite: source-over;
@@ -782,19 +778,15 @@
       linear-gradient(
         to right,
         black 0%,
-        black 64px,
-        rgba(0, 0, 0, 0.05) 80px,
-        rgba(0, 0, 0, 0.05) calc(100% - 80px),
-        black calc(100% - 64px),
+        rgba(0, 0, 0, 0.05) 72px,
+        rgba(0, 0, 0, 0.05) calc(100% - 72px),
         black 100%
       ),
       linear-gradient(
         to bottom,
         black 0%,
-        black 48px,
-        rgba(0, 0, 0, 0.05) 60px,
-        rgba(0, 0, 0, 0.05) calc(100% - 60px),
-        black calc(100% - 48px),
+        rgba(0, 0, 0, 0.05) 56px,
+        rgba(0, 0, 0, 0.05) calc(100% - 56px),
         black 100%
       );
     mask-composite: add;
