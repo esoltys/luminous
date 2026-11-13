@@ -195,7 +195,9 @@
     bind:this={railEl}
     role="group"
     aria-label={i18n.t("topNav.rightPanelRail", {}, "Info sidebar")}
-    class="h-full w-9 flex-shrink-0 flex flex-col items-center pt-2 border-l border-brand-border bg-brand-sidebar"
+    class="rail-surface h-full w-9 flex-shrink-0 flex flex-col items-center pt-2 border-l border-brand-border bg-brand-sidebar {themeStore.isGlassTheme
+      ? 'glass-surface'
+      : ''}"
     onpointerenter={onRailEnter}
     onpointerleave={cancelTimer}
   >
@@ -244,7 +246,8 @@
      backdrop-filter (see flatGlassColor() in theme.svelte.ts). Only the inset
      highlight of --glass-shadow: as before, when the panel inside this
      overflow-hidden wrapper carried it, the elevation stays off the content. */
-  .docked-surface.glass-surface {
+  .docked-surface.glass-surface,
+  .rail-surface.glass-surface {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
     background-color: var(--glass-solid-sidebar) !important;

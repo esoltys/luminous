@@ -22,8 +22,11 @@ export interface EllipseGradientOptions {
   layersPerColor?: number;
   /** Deterministic seed — same seed + options always produce the same SVG. */
   seed?: number | string;
-  /** CSS `saturate()` filter percentage applied to the whole gradient. */
-  saturation?: number;
+  /**
+   * CSS `saturate()` filter percentage applied to the whole gradient.
+   * Pass `null` (or `100`) to omit the CSS filter attribute altogether.
+   */
+  saturation?: number | null;
 }
 
 const DEFAULT_COLORS = ["#5135FF", "#FF5828", "#F69CFF", "#FFA50F"];
@@ -66,7 +69,9 @@ export function generateEllipseGradientSvg(options: EllipseGradientOptions = {})
   const height = options.height ?? size;
   const colors = options.colors && options.colors.length > 0 ? options.colors : DEFAULT_COLORS;
   const layersPerColor = options.layersPerColor ?? DEFAULT_LAYERS_PER_COLOR;
-  const saturation = options.saturation ?? DEFAULT_SATURATION;
+  const saturation = options.saturation === undefined ? DEFAULT_SATURATION : options.saturation;
+  const styleAttr =
+    saturation !== null && saturation !== 100 ? ` style="filter:saturate(${saturation}%)"` : "";
   const rng = createRng(options.seed);
 
   // Random per-call/per-seed prefix so multiple gradients inlined on the same
@@ -121,8 +126,8 @@ export function generateEllipseGradientSvg(options: EllipseGradientOptions = {})
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ` +
-    `width="${width}" height="${height}" viewBox="0 0 ${size} ${size}" ` +
-    `style="filter:saturate(${saturation}%)" preserveAspectRatio="xMidYMid slice">` +
+    `width="${width}" height="${height}" viewBox="0 0 ${size} ${size}"${styleAttr} ` +
+    `preserveAspectRatio="xMidYMid slice">` +
     `<defs>${gradientDefs.join("")}</defs>` +
     `<rect x="0" y="0" width="100%" height="100%" fill="${backgroundColor}"/>` +
     layerRects.join("") +

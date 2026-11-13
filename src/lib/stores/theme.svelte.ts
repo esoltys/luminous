@@ -152,8 +152,53 @@ export function hexToRgbaString(hex: string, alpha: number): string {
 }
 
 /** Glass panel tint alpha: dark themes 0.5, light themes 0.6. */
-function glassAlpha(isDark: boolean): number {
+export function glassAlpha(isDark: boolean): number {
   return isDark ? 0.5 : 0.6;
+}
+
+/**
+ * Opacity for the PlayDock's ambient artwork glow layer behind `footer.glass-surface`.
+ * Paired with `resolveDockGlowColors` lightness bounds so the outer halo stays
+ * pronounced while dock text inside `footer.glass-surface` remains readable.
+ */
+export function dockGlowOpacity(isDark: boolean): number {
+  return isDark ? 0.55 : 0.35;
+}
+
+/** Max HSL lightness in dark themes / min HSL lightness in light themes for dock glow. */
+export const DOCK_GLOW_DARK_MAX_L = 0.55;
+export const DOCK_GLOW_LIGHT_MIN_L = 0.75;
+
+/**
+ * Resolves the palette for the PlayDock's ambient glow SVG: uses the playing
+ * cover's extracted archetypes when available, falling back to the active
+ * theme's accent when no cover is present, and clamping lightness to the
+ * theme polarity so translucent dock text stays WCAG AA readable.
+ */
+export function resolveDockGlowColors(
+  artworkColors: ExtractedColors | null,
+  fallbackAccent: string,
+  isDark: boolean,
+): string[] {
+  const raw = artworkColors
+    ? [
+        artworkColors.vibrant,
+        artworkColors.darkVibrant,
+        artworkColors.lightVibrant,
+        artworkColors.muted,
+      ].filter((c): c is string => !!c)
+    : [];
+  const palette = raw.length > 0 ? raw : [artworkColors?.accent ?? fallbackAccent];
+
+  return palette.map((hex) => {
+    const { r, g, b } = hexToRgb(hex);
+    const hsl = rgbToHsl(r, g, b);
+    const clampedL = isDark
+      ? Math.min(hsl.l, DOCK_GLOW_DARK_MAX_L)
+      : Math.max(hsl.l, DOCK_GLOW_LIGHT_MIN_L);
+    const out = hslToRgb(hsl.h, hsl.s, clampedL);
+    return rgbToHex(out.r, out.g, out.b);
+  });
 }
 
 /**
@@ -1060,7 +1105,7 @@ export class ThemeStore {
       }
     `;
 
-    this.applyGlassVars(resolvedBgMain, resolvedBgSidebar, resolvedBgPlayerbar, resolvedAccent);
+    this.applyGlassVars(resolvedBgMain, resolvedBgSidebar, resolvedBgPlayerbar);
   }
 
   /**
@@ -1072,7 +1117,7 @@ export class ThemeStore {
    * separate from the opaque theme colors — alpha never reaches a color
    * picker, see hexToRgbaString(). All arguments must be literal hex.
    */
-  private applyGlassVars(bgMain: string, bgSidebar: string, bgPlayerbar: string, accent: string) {
+  private applyGlassVars(bgMain: string, bgSidebar: string, bgPlayerbar: string) {
     const root = document.documentElement;
     root.classList.toggle("theme-glass", true);
 
@@ -1102,17 +1147,6 @@ export class ThemeStore {
     root.style.setProperty("--glass-elevation", elevation);
     root.style.setProperty("--glass-highlight", highlight);
     root.style.setProperty("--glass-shadow", "var(--glass-elevation), var(--glass-highlight)");
-
-    // PlayDock-only accent glow — kept out of --glass-shadow above since
-    // the other three panels don't get it. Two-layer glow (tight bright
-    // core + wide soft halo) reads as an actual glow rather than a flat
-    // blurred outline. `accent` must be a literal hex: for Dynamic Artwork
-    // the theme's color-accent is a CSS var() reference string, and
-    // hexToRgbaString() fed that would silently fall back to black,
-    // rendering as an invisible glow.
-    const glowNear = `0 0 24px 2px ${hexToRgbaString(accent, isDark ? 0.45 : 0.28)}`;
-    const glowFar = `0 0 90px 10px ${hexToRgbaString(accent, isDark ? 0.28 : 0.16)}`;
-    root.style.setProperty("--glass-glow", `${glowNear}, ${glowFar}`);
   }
 
   /** Set while a theme change is being written, so nested applies join it. */
@@ -1303,8 +1337,7 @@ export class ThemeStore {
       }
     `;
 
-    // resolvedAccent (not colors["color-accent"]) — see applyGlassVars().
-    this.applyGlassVars(resolvedBgMain, resolvedBgSidebar, resolvedBgPlayerbar, safeAccent);
+    this.applyGlassVars(resolvedBgMain, resolvedBgSidebar, resolvedBgPlayerbar);
   }
 }
 

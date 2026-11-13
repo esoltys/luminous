@@ -9,6 +9,9 @@ import {
   flatGlassColor,
   CHROME_SATURATION,
   extractColorsFromImage,
+  resolveDockGlowColors,
+  DOCK_GLOW_DARK_MAX_L,
+  DOCK_GLOW_LIGHT_MIN_L,
   type Theme,
 } from "./theme.svelte";
 import { readFileSync } from "node:fs";
@@ -628,5 +631,58 @@ describe("custom themes saved with unreadable text", () => {
     expect(store.resolvedColors["color-text-primary"]).toBe(
       LUMINOUS_LIGHT_COLORS["color-text-primary"],
     );
+  });
+});
+
+describe("resolveDockGlowColors (#2046)", () => {
+  const lightnessOf = (hex: string) => {
+    const { r, g, b } = hexToRgb(hex);
+    return rgbToHsl(r, g, b).l;
+  };
+
+  it("uses artwork archetype palette when cover art is available and clamps lightness to dark theme bounds", () => {
+    const artwork = {
+      primary: "#111111",
+      sidebar: "#111111",
+      playerbar: "#111111",
+      accent: "#ff0000",
+      accentHover: "#ff3333",
+      border: "#333333",
+      vibrant: "#ff2222",
+      darkVibrant: "#550000",
+      lightVibrant: "#ffdddd",
+      muted: "#886666",
+    };
+
+    const colors = resolveDockGlowColors(artwork, "#4f5bd5", true);
+    expect(colors).toHaveLength(4);
+    for (const hex of colors) {
+      expect(lightnessOf(hex)).toBeLessThanOrEqual(DOCK_GLOW_DARK_MAX_L + 0.01);
+    }
+  });
+
+  it("lifts dark artwork colors to the light-theme minimum lightness when a light theme is active", () => {
+    const artwork = {
+      primary: "#111111",
+      sidebar: "#111111",
+      playerbar: "#111111",
+      accent: "#224488",
+      accentHover: "#335599",
+      border: "#333333",
+      vibrant: "#112244",
+      darkVibrant: "#050a14",
+    };
+
+    const colors = resolveDockGlowColors(artwork, "#4f5bd5", false);
+    expect(colors).toHaveLength(2);
+    for (const hex of colors) {
+      expect(lightnessOf(hex)).toBeGreaterThanOrEqual(DOCK_GLOW_LIGHT_MIN_L - 0.01);
+    }
+  });
+
+  it("falls back to the active theme accent when no artwork is present", () => {
+    const colors = resolveDockGlowColors(null, "#4f5bd5", true);
+    expect(colors).toHaveLength(1);
+    expect(lightnessOf(colors[0])).toBeLessThanOrEqual(DOCK_GLOW_DARK_MAX_L + 0.01);
   });
 });
