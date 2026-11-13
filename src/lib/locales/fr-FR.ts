@@ -1625,7 +1625,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     formatLabel: "Format",
     miniplayer: "Mini-lecteur",
     loudnessLabel: "Volume",
-    loudnessSourceAnalyzed: "Analyse R128",
+    loudnessSourceAnalyzed: "Analysée",
     loudnessSourceReplayGain: "Balise ReplayGain",
     loudnessSourceDynamicRangeLog: "Journal DR",
     loudnessSourceFallback: "Gain de secours",
@@ -2050,7 +2050,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     importErrorGeneric: "Impossible d'importer le profil.",
     preamp: "Préampli",
     enableEq: "Activer l'égaliseur",
-    subtitle: "Ajustez votre réponse en fréquence avec un filtre de crête en cascade à 10 bandes",
+    subtitle: "Augmentez ou réduisez les graves, les médiums et les aigus",
     titleParametric: "Égaliseur paramétrique",
     subtitleParametric:
       "Sculptez des corrections précises avec le type de filtre, le gain et le Q propres à chaque bande",
@@ -2071,19 +2071,20 @@ export const frFR: DeepStringRecord<typeof en> = {
     graphHint:
       "Faites glisser un point pour régler la fréquence et le gain, faites défiler dessus pour changer le Q, ou double-cliquez sur le graphique pour ajouter une bande. Point sélectionné : flèches, Page préc./suiv. pour le Q et Suppr pour le retirer.",
     nodeAriaLabel: "Bande {n} : {type}, {freq}, {gain} dB, Q {q}",
-    isoStandard: "ISO 266:1997",
+    isoStandardHelp: "Les fréquences centrales des bandes suivent la norme ISO 266.",
   },
   loudness: {
     title: "Normalisation du volume",
-    subtitle:
-      "Uniformisez le volume perçu entre les chansons grâce à l'analyse EBU R128, avec les balises ReplayGain en secours",
+    subtitle: "Écoutez toutes les chansons à un volume similaire",
+    methodHelp:
+      "Le volume est mesuré par l'analyse EBU R128. Les balises ReplayGain servent pour les chansons pas encore analysées.",
     enable: "Activer",
     targetLevel: "Niveau cible",
     mode: "Normaliser par",
     modeTrack: "Chanson",
     modeAlbum: "Album",
     fallbackGain: "Gain de secours",
-    fallbackGainHint: "Appliqué lorsqu'une chanson n'a ni analyse R128 ni balise ReplayGain",
+    fallbackGainHint: "Utilisé pour les chansons qui n'ont pas encore été analysées",
     analyzing: {
       one: "Analyse de la bibliothèque : {count} chanson restante",
       other: "Analyse de la bibliothèque : {count} chansons restantes",

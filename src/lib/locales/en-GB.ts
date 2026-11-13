@@ -28,10 +28,17 @@ export const enGB: Messages = {
     shuffleAlbumsDesc:
       "Play albums in a randomised order, but keep the tracks within each album in order",
     catalogNumberLabel: "Catalogue #",
+    loudnessSourceAnalyzed: "Analysed",
+  },
+  equalizer: {
+    isoStandardHelp: "Band centres follow the ISO 266 standard.",
   },
   loudness: {
     title: "Loudness Normalisation",
     mode: "Normalise by",
+    methodHelp:
+      "Volume is measured with EBU R128 analysis. ReplayGain tags are used for songs not yet analysed.",
+    fallbackGainHint: "Used for songs that haven't been analysed yet",
     analyzing: {
       one: "Analysing library: {count} song remaining",
       other: "Analysing library: {count} songs remaining",

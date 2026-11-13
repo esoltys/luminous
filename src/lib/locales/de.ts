@@ -1616,7 +1616,7 @@ export const de = {
     formatLabel: "Format",
     miniplayer: "Miniplayer",
     loudnessLabel: "Lautheit",
-    loudnessSourceAnalyzed: "R128-Analyse",
+    loudnessSourceAnalyzed: "Analysiert",
     loudnessSourceReplayGain: "ReplayGain-Tag",
     loudnessSourceDynamicRangeLog: "DR-Protokoll",
     loudnessSourceFallback: "Ersatzverstärkung",
@@ -1953,7 +1953,7 @@ export const de = {
     importErrorGeneric: "Das Profil konnte nicht importiert werden.",
     preamp: "Vorverstärkung",
     enableEq: "EQ aktivieren",
-    subtitle: "Den Frequenzgang mit einer Kaskade aus 10 Glockenfiltern formen",
+    subtitle: "Bässe, Mitten und Höhen anheben oder absenken",
     titleParametric: "Parametrischer Equalizer",
     subtitleParametric:
       "Präzise Korrekturen mit Filtertyp, Verstärkung und Güte (Q) jedes einzelnen Bands",
@@ -1974,20 +1974,20 @@ export const de = {
     graphHint:
       "Einen Knoten ziehen, um Frequenz und Verstärkung festzulegen, darauf scrollen, um Q zu ändern, oder doppelt in die Grafik klicken, um ein Band hinzuzufügen. Bei fokussiertem Knoten: Pfeiltasten, Bild auf/ab für Q und Entf zum Entfernen.",
     nodeAriaLabel: "Band {n}: {type}, {freq}, {gain} dB, Q {q}",
-    isoStandard: "ISO 266:1997",
+    isoStandardHelp: "Die Bandmitten folgen der Norm ISO 266.",
   },
   loudness: {
     title: "Lautheitsnormalisierung",
-    subtitle:
-      "Die wahrgenommene Lautstärke zwischen Titeln mit der EBU-R128-Analyse angleichen, mit ReplayGain-Tags als Ersatz",
+    subtitle: "Alle Titel in ähnlicher Lautstärke wiedergeben",
+    methodHelp:
+      "Die Lautstärke wird mit der EBU-R128-Analyse gemessen. Für noch nicht analysierte Titel werden ReplayGain-Tags verwendet.",
     enable: "Aktivieren",
     targetLevel: "Zielpegel",
     mode: "Normalisieren nach",
     modeTrack: "Titel",
     modeAlbum: "Album",
     fallbackGain: "Ersatzverstärkung",
-    fallbackGainHint:
-      "Wird angewendet, wenn ein Titel weder eine R128-Analyse noch einen ReplayGain-Tag hat",
+    fallbackGainHint: "Wird für Titel verwendet, die noch nicht analysiert wurden",
     analyzing: {
       one: "Mediathek wird analysiert: noch {count} Titel",
       other: "Mediathek wird analysiert: noch {count} Titel",

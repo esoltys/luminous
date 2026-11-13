@@ -593,7 +593,7 @@ describe("Equalizer.svelte", () => {
     const { getByLabelText } = render(Equalizer);
     let loudnessToggle: HTMLElement;
     await waitFor(() => {
-      loudnessToggle = getByLabelText(/loudness normalization/i);
+      loudnessToggle = getByLabelText(/^loudness normalization$/i);
       expect(loudnessToggle).toBeInTheDocument();
     });
 
@@ -615,10 +615,21 @@ describe("Equalizer.svelte", () => {
     expect(headerContainer).not.toHaveClass("flex-wrap");
   });
 
-  it("renders ISO 266:1997 footnote in 10-band graphic mode", async () => {
-    const { getByText } = render(Equalizer);
+  it("keeps the ISO 266 standard behind a keyboard-reachable help tip in 10-band mode", async () => {
+    const { getByRole, queryByText } = render(Equalizer);
     await waitFor(() => {
-      expect(getByText("ISO 266:1997")).toBeInTheDocument();
+      expect(getByRole("button", { name: /ISO 266/ })).toBeInTheDocument();
     });
+    expect(queryByText("ISO 266:1997")).not.toBeInTheDocument();
+  });
+
+  it("explains the loudness method in a help tip and leads with the plain-language subtitle", async () => {
+    const { getByRole, getByText } = render(Equalizer);
+    await waitFor(() => {
+      expect(
+        getByRole("button", { name: /about loudness normalization/i }),
+      ).toHaveAccessibleDescription(/EBU R128.*ReplayGain/);
+    });
+    expect(getByText("Play every song at a similar volume")).toBeInTheDocument();
   });
 });

@@ -1728,7 +1728,7 @@ export const uk = {
     formatLabel: "Формат",
     miniplayer: "Міні-плеєр",
     loudnessLabel: "Гучність",
-    loudnessSourceAnalyzed: "Аналіз R128",
+    loudnessSourceAnalyzed: "Проаналізовано",
     loudnessSourceReplayGain: "Тег ReplayGain",
     loudnessSourceDynamicRangeLog: "Журнал DR",
     loudnessSourceFallback: "Резервне посилення",
@@ -2070,7 +2070,7 @@ export const uk = {
     importErrorGeneric: "Не вдалося імпортувати профіль.",
     preamp: "Попереднє підсилення",
     enableEq: "Увімкнути еквалайзер",
-    subtitle: "Сформуйте частотну характеристику за допомогою 10 каскадних пікових фільтрів",
+    subtitle: "Підсилюйте або послаблюйте низькі, середні та високі частоти",
     titleParametric: "Параметричний еквалайзер",
     subtitleParametric:
       "Робіть точні корекції: кожна смуга має власний тип фільтра, підсилення та добротність",
@@ -2091,19 +2091,20 @@ export const uk = {
     graphHint:
       "Перетягніть вузол, щоб задати частоту й підсилення, прокрутіть колесо на ньому, щоб змінити добротність Q, або двічі клацніть графік, щоб додати смугу. Для вузла у фокусі використовуйте стрілки, Page Up/Down для Q і Delete, щоб вилучити його.",
     nodeAriaLabel: "Смуга {n}: {type}, {freq}, {gain} дБ, Q {q}",
-    isoStandard: "ISO 266:1997",
+    isoStandardHelp: "Центральні частоти смуг відповідають стандарту ISO 266.",
   },
   loudness: {
     title: "Нормалізація гучності",
-    subtitle:
-      "Вирівнюйте сприйману гучність пісень за аналізом EBU R128, з тегами ReplayGain як резервним варіантом",
+    subtitle: "Відтворюйте всі пісні з подібною гучністю",
+    methodHelp:
+      "Гучність вимірюється аналізом EBU R128. Для ще не проаналізованих пісень використовуються теги ReplayGain.",
     enable: "Увімкнути",
     targetLevel: "Цільовий рівень",
     mode: "Нормалізувати за",
     modeTrack: "Піснею",
     modeAlbum: "Альбомом",
     fallbackGain: "Резервне посилення",
-    fallbackGainHint: "Застосовується, коли пісня не має ні аналізу R128, ні тегу ReplayGain",
+    fallbackGainHint: "Використовується для пісень, які ще не проаналізовано",
     analyzing: {
       one: "Аналіз бібліотеки: залишилася {count} пісня",
       few: "Аналіз бібліотеки: залишилися {count} пісні",
