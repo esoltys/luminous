@@ -2495,7 +2495,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     scopeSelection: "Chansons sélectionnées ({count})",
     scopeLibrary: "Toute la bibliothèque ({count})",
     destinationDirLabel: "Dossier de destination",
-    destinationDefault: "Par défaut : même bibliothèque",
+    destinationDefault: "Même bibliothèque",
     destinationCustom: "Personnalisé...",
     browse: "Parcourir...",
     replaceSpaces: "Remplacer les espaces par des tirets bas (_)",

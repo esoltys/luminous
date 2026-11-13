@@ -25,18 +25,21 @@
    * categories (albums without cover art, albums with incomplete tracklists,
    * tracks missing core tags, duplicate recordings, and suspected provenance warnings).
    *
-   * When totalCurationCount is 0, nothing is rendered.
+   * When no category needs attention, nothing is rendered.
    */
   interface Props {
     /** Parent refresh trigger key; re-fetches overview when incremented. */
     refreshKey?: number;
-    /** Bound count of all items across all curation categories currently needing attention. */
-    totalCurationCount?: number;
+    /**
+     * Bound ids of the songs the shelf lists, each once. A duplicate group contributes only
+     * its extra copies: one song with one copy is one song to deal with, not two.
+     */
+    attentionSongIds?: number[];
     /** Callback fired when an inline editor or modal resolves or modifies data. */
     onChanged?: () => void;
   }
 
-  let { refreshKey = 0, totalCurationCount = $bindable(0), onChanged }: Props = $props();
+  let { refreshKey = 0, attentionSongIds = $bindable([]), onChanged }: Props = $props();
 
   let overview = $state<CurationOverview | null>(null);
   let isLoading = $state(false);
@@ -91,15 +94,26 @@
   let totalCount = $derived(
     (overview?.unillustrated_albums.length ?? 0) +
       (overview?.incomplete_albums.length ?? 0) +
-      (overview?.missing_core_tags_count ?? 0) +
+      (overview?.missing_core_tags_song_ids.length ?? 0) +
       (overview?.duplicate_groups.length ?? 0) +
       (overview?.suspected_provenance_songs.length ?? 0) +
       (overview?.corrupt_songs?.length ?? 0),
   );
 
-  // Sync bindable totalCurationCount to parent OrganizeView
   $effect(() => {
-    totalCurationCount = totalCount;
+    if (!overview) {
+      attentionSongIds = [];
+      return;
+    }
+    const ids = new Set<number>([
+      ...overview.unillustrated_albums.flatMap((a) => a.song_ids),
+      ...overview.incomplete_albums.flatMap((a) => a.song_ids),
+      ...overview.missing_core_tags_song_ids,
+      ...overview.duplicate_groups.flatMap((g) => g.candidates.slice(1).map((c) => c.song.id)),
+      ...overview.suspected_provenance_songs.map((s) => s.id),
+      ...(overview.corrupt_songs ?? []).map((s) => s.id),
+    ]);
+    attentionSongIds = [...ids];
   });
 
   let displayedUnillustrated = $derived(
@@ -307,16 +321,20 @@
     {/if}
 
     <!-- Category 3: Tracks Missing Core Metadata -->
-    {#if overview.missing_core_tags_count > 0}
+    {#if overview.missing_core_tags_song_ids.length > 0}
       <div
         class="flex flex-col @sm:flex-row items-start @sm:items-center justify-between gap-3 p-4 rounded-xl bg-brand-sidebar/40 border border-brand-border/60"
         data-testid="curation-missing-core-section"
       >
         <div class="min-w-0 flex-1">
           <h3 class="text-sm font-bold text-brand-text-primary">
-            {i18n.plural("curation.shelfMissingCoreTitle", overview.missing_core_tags_count, {
-              count: overview.missing_core_tags_count,
-            })}
+            {i18n.plural(
+              "curation.shelfMissingCoreTitle",
+              overview.missing_core_tags_song_ids.length,
+              {
+                count: overview.missing_core_tags_song_ids.length,
+              },
+            )}
           </h3>
           <p class="text-xs text-brand-text-secondary mt-0.5">
             {i18n.t("curation.shelfMissingCoreHint")}

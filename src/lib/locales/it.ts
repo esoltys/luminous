@@ -2479,7 +2479,7 @@ export const it = {
     scopeSelection: "Brani selezionati ({count})",
     scopeLibrary: "Intera libreria ({count})",
     destinationDirLabel: "Cartella di destinazione",
-    destinationDefault: "Predefinita: stessa libreria",
+    destinationDefault: "Stessa libreria",
     destinationCustom: "Personalizzata...",
     browse: "Sfoglia...",
     replaceSpaces: "Sostituisci gli spazi con trattini bassi",

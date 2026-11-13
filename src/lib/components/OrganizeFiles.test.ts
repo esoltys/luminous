@@ -497,4 +497,80 @@ describe("OrganizeFiles safeguards", () => {
       expect(queryByText("Sample Output")).not.toBeInTheDocument();
     });
   });
+
+  // A duplicate the Compare Duplicates card already lists doesn't earn the preview card;
+  // a duplicate it doesn't list (a name clash) does.
+  it.each([
+    ["no file would move", "unchanged", [], false],
+    ["the only rows are duplicates the shelf lists", "collision", [1], false],
+    ["a duplicate row isn't in any duplicate group", "collision", [], true],
+  ])("embedded preview card when %s", async (_case, status, groupedSongIds, shown) => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "get_duplicate_track_groups") {
+        return Promise.resolve(
+          groupedSongIds.length > 0
+            ? [{ candidates: groupedSongIds.map((id) => ({ song: { id } })) }]
+            : [],
+        );
+      }
+      if (cmd === "preview_organize") {
+        return Promise.resolve([
+          {
+            song_id: 1,
+            from_path: "/music/Artist/Album/01 Song.mp3",
+            to_path: "/music/Artist/Album/01 Song (copy).mp3",
+            status,
+            error_message: null,
+          },
+        ]);
+      }
+      return defaultInvokeHandler(cmd);
+    });
+
+    const { findByText, findByRole, queryByRole } = render(OrganizeFiles, {
+      embedded: true,
+      songIds: [],
+    });
+
+    // The summary bar renders, and the preview has had time to resolve.
+    await findByText("Template:");
+    await waitFor(() =>
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith("preview_organize", expect.anything()),
+    );
+    if (shown) {
+      expect(await findByRole("button", { name: "Refresh Preview" })).toBeInTheDocument();
+    } else {
+      expect(queryByRole("button", { name: "Refresh Preview" })).not.toBeInTheDocument();
+    }
+  });
+
+  it("shows the embedded preview card when files would move", async () => {
+    const { findByRole } = render(OrganizeFiles, { embedded: true, songIds: [] });
+
+    // defaultInvokeHandler's preview moves two files.
+    expect(await findByRole("button", { name: "Refresh Preview" })).toBeInTheDocument();
+  });
+
+  it("summarizes a preset as its outline and shows the raw pattern only for Custom", async () => {
+    const { findByText, findByRole, queryByText } = render(OrganizeFiles, {
+      embedded: true,
+      songIds: [],
+    });
+
+    const summaryBar = (await findByText("Template:")).parentElement!;
+    expect(summaryBar).toHaveTextContent("Default");
+    expect(summaryBar).toHaveTextContent("Album artist");
+    expect(summaryBar).toHaveTextContent("Track and title");
+    expect(summaryBar.textContent).not.toContain("%");
+
+    await fireEvent.click(await findByRole("button", { name: "Customize…" }));
+    await fireEvent.click(await findByRole("button", { name: "Custom" }));
+    await fireEvent.click(await findByRole("button", { name: "Done" }));
+    await waitFor(() => expect(queryByText("Sample Output")).not.toBeInTheDocument());
+
+    const customBar = (await findByText("Template:")).parentElement!;
+    expect(customBar.querySelector("code")).toHaveTextContent(
+      "%albumartist/{%year - }{%album/}{%disc-}{%track }%title",
+    );
+  });
 });

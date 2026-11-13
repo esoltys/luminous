@@ -2419,7 +2419,7 @@ export const en = {
     scopeSelection: "Selected Songs ({count})",
     scopeLibrary: "Entire Library ({count})",
     destinationDirLabel: "Destination Folder",
-    destinationDefault: "Default: Same Library",
+    destinationDefault: "Same Library",
     destinationCustom: "Custom...",
     browse: "Browse...",
     replaceSpaces: "Replace spaces with underscores",
