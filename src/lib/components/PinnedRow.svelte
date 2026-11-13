@@ -212,14 +212,15 @@
       {@const rows = mode === "rows"}
       {#each visibleItems as item, index (keyFor(item))}
         <!-- [role=button] cards (ArtistCard) would otherwise show app.css's default arrow instead of
-             this wrapper's grab cursor. -->
+             this wrapper's grab cursor. :first-child stretches the card/row to the grid row height
+             without affecting the optional dragOverIndex overlay. -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           data-pinned-index={index}
           onpointerdown={(e) => handleCardPointerDown(e, index)}
           oncontextmenu={(e) => handleContextMenu(e, item)}
           ondragstart={(e) => e.preventDefault()}
-          class="relative transition-opacity cursor-grab active:cursor-grabbing [&_[role=button]]:cursor-[inherit] {rows
+          class="relative h-full [&>*:first-child]:h-full transition-opacity cursor-grab active:cursor-grabbing [&_[role=button]]:cursor-[inherit] {rows
             ? 'rounded-lg'
             : 'rounded-xl'} {draggedIndex === index ? 'opacity-40' : ''}"
         >

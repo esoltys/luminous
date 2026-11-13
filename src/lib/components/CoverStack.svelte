@@ -172,12 +172,14 @@
         {/if}
       </div>
     {:else}
-      <div class="relative {sizeClass} flex items-center justify-center shrink-0">
+      <div class="relative {sizeClass} rounded-[inherit] flex items-center justify-center shrink-0">
         {#each activeCovers as cover, i (i)}
           <div
             class="cover-item absolute {direction === 'left'
               ? 'bottom-0 right-0 w-28 h-28'
-              : 'inset-0'} overflow-hidden border border-brand-border/60 shadow-xl transition-[transform,opacity] duration-300 {hoverEffect
+              : 'inset-0'} {direction !== 'left' && activeCovers.length === 1
+              ? 'rounded-[inherit]'
+              : ''} overflow-hidden border border-brand-border/60 shadow-xl transition-[transform,opacity] duration-300 {hoverEffect
               ? 'group-hover:scale-105'
               : ''}"
             style="z-index: {10 - i}; transform: {getTransform(
@@ -209,7 +211,7 @@
     </div>
   {:else}
     <div
-      class="{sizeClass} bg-brand-main flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative {direction ===
+      class="{sizeClass} bg-brand-main rounded-[inherit] flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative {direction ===
       'left'
         ? 'ml-auto'
         : 'mx-auto'}"
