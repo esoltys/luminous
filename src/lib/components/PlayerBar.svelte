@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly, prefersReducedMotion } from "../utils/motion";
+  import { fade, fly, prefersReducedMotion } from "../utils/motion";
   import { cubicOut } from "svelte/easing";
   import { playerStore } from "../stores/player.svelte";
   import { setVolumeFromSlider, volumeSliderBackground } from "../volumeSlider";
@@ -7,7 +7,9 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
-  import { themeStore } from "../stores/theme.svelte";
+  import { dockGlowOpacity, resolveDockGlowColors, themeStore } from "../stores/theme.svelte";
+  import { isLightColor } from "../utils/colorUtils";
+  import { generateEllipseGradientSvg } from "../utils/ellipseGradient";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { formatDuration } from "../utils/formatters";
   import { prefs } from "../stores/prefs.svelte";
@@ -66,6 +68,26 @@
   let volumePercent = $derived(playerStore.volume * 100);
   let volumeSliderStyle = $derived(
     volumeSliderBackground(playerStore.volume, playerStore.volumeSafety),
+  );
+
+  let isDarkTheme = $derived(!isLightColor(themeStore.resolvedColors["bg-main"]));
+  let dockGlowColors = $derived(
+    resolveDockGlowColors(
+      themeStore.artworkColors,
+      themeStore.resolvedColors["color-accent"],
+      isDarkTheme,
+    ),
+  );
+  let dockGlowKey = $derived(
+    `${playerStore.currentSong?.id ?? "none"}:${dockGlowColors.join(",")}`,
+  );
+  let dockGlowSvg = $derived.by(() =>
+    generateEllipseGradientSvg({
+      colors: dockGlowColors,
+      layersPerColor: 2,
+      seed: playerStore.currentSong?.id ?? "dock-glow",
+      saturation: null,
+    }),
   );
 
   function handleSeek(e: Event) {
@@ -342,271 +364,292 @@
   </button>
 {/snippet}
 
-<footer
+<div
   transition:fly={{
     y: 40,
     duration: windowLayoutStore.isPlaybarOnlyMode ? 0 : 300,
     easing: cubicOut,
   }}
-  class="relative bg-brand-playerbar flex items-center justify-between gap-3 px-5 md:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme
-    ? 'glass-surface'
-    : ''} {windowLayoutStore.isPlaybarOnlyMode
-    ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none'
-    : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-full'}"
+  class={windowLayoutStore.isPlaybarOnlyMode ? "w-full h-full" : "relative max-w-[1200px] mx-auto"}
 >
-  {#if themeStore.activeAddon?.overlayEntry}
-    <AddonOverlay addon={themeStore.activeAddon} />
-  {/if}
-  <div
-    data-walkthrough-target="player-bar-cover"
-    class="flex items-center gap-3 min-w-0 flex-1 md:w-1/3 md:flex-none md:min-w-[200px] max-w-sm"
-  >
-    <button
-      onclick={handleCoverClick}
-      disabled={!playerStore.currentSong}
-      class="group relative overflow-hidden focus:outline-hidden flex-shrink-0 disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-transform duration-200"
-      title={coverTitle}
+  {#if !windowLayoutStore.isPlaybarOnlyMode}
+    <!-- Scoped layered-ellipse SVG glow under the dock: filter-free and static
+         between track changes so it doesn't add per-frame blur/compositor cost
+         over Queue/Album BlurredCover tables. Keyed on song + resolved colors
+         so it cross-fades smoothly once artwork extraction finishes. -->
+    <div
+      class="dock-glow-wrapper pointer-events-none select-none absolute -inset-x-10 -inset-y-6 z-0"
+      style:opacity={dockGlowOpacity(isDarkTheme)}
+      aria-hidden="true"
     >
-      <CoverArt
-        songId={playerStore.currentSong?.id}
-        artEmbedded={playerStore.currentSong?.art_embedded}
-        artAutomatic={playerStore.currentSong?.art_automatic}
-        artManual={playerStore.currentSong?.art_manual}
-        sizeClass="w-12 h-12 transition-all duration-300 group-hover:scale-105"
-      />
-    </button>
-    <div class="flex flex-col truncate">
-      <div class="flex items-center gap-2">
-        <span
-          class="text-sm font-semibold text-brand-text-primary truncate"
-          title={playerStore.currentSong?.title}
-        >
-          {playerStore.currentSongDisplayTitle}
-        </span>
-        {#if playerStore.currentSong}
-          <SongRating
-            rating={playerStore.currentSong.rating}
-            loved={playerStore.currentSong.loved}
-            onRate={(r) => playerStore.rateCurrent(r)}
-            onSetLoved={(l) => playerStore.setLovedCurrent(l)}
-            size="sm"
-          />
+      {#key dockGlowKey}
+        <div class="dock-glow-svg absolute inset-0" transition:fade={{ duration: 300 }}>
+          {@html dockGlowSvg}
+        </div>
+      {/key}
+    </div>
+  {/if}
+  <footer
+    class="relative z-10 bg-brand-playerbar flex items-center justify-between gap-3 px-5 md:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme
+      ? 'glass-surface'
+      : ''} {windowLayoutStore.isPlaybarOnlyMode
+      ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none'
+      : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-full'}"
+  >
+    {#if themeStore.activeAddon?.overlayEntry}
+      <AddonOverlay addon={themeStore.activeAddon} />
+    {/if}
+    <div
+      data-walkthrough-target="player-bar-cover"
+      class="flex items-center gap-3 min-w-0 flex-1 md:w-1/3 md:flex-none md:min-w-[200px] max-w-sm"
+    >
+      <button
+        onclick={handleCoverClick}
+        disabled={!playerStore.currentSong}
+        class="group relative overflow-hidden focus:outline-hidden flex-shrink-0 disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-transform duration-200"
+        title={coverTitle}
+      >
+        <CoverArt
+          songId={playerStore.currentSong?.id}
+          artEmbedded={playerStore.currentSong?.art_embedded}
+          artAutomatic={playerStore.currentSong?.art_automatic}
+          artManual={playerStore.currentSong?.art_manual}
+          sizeClass="w-12 h-12 transition-all duration-300 group-hover:scale-105"
+        />
+      </button>
+      <div class="flex flex-col truncate">
+        <div class="flex items-center gap-2">
+          <span
+            class="text-sm font-semibold text-brand-text-primary truncate"
+            title={playerStore.currentSong?.title}
+          >
+            {playerStore.currentSongDisplayTitle}
+          </span>
+          {#if playerStore.currentSong}
+            <SongRating
+              rating={playerStore.currentSong.rating}
+              loved={playerStore.currentSong.loved}
+              onRate={(r) => playerStore.rateCurrent(r)}
+              onSetLoved={(l) => playerStore.setLovedCurrent(l)}
+              size="sm"
+            />
+          {/if}
+        </div>
+        {#if playerStore.currentSong?.album?.trim()}
+          <LinkButton
+            onclick={(e) => {
+              e.stopPropagation();
+              windowLayoutStore.exitImmersiveMode();
+              navigationStore.viewAlbum(playerStore.currentSong?.album || "");
+            }}
+            class="text-xs text-brand-text-secondary/70 truncate"
+            title={i18n.t("collection.filterByAlbum", { album: playerStore.currentSong.album })}
+          >
+            {playerStore.currentSong.album}
+          </LinkButton>
+        {/if}
+        {#if playerStore.currentSong?.artist}
+          <LinkButton
+            onclick={(e) => {
+              e.stopPropagation();
+              windowLayoutStore.exitImmersiveMode();
+              navigationStore.viewArtist(
+                playerStore.currentSong?.album_artist?.trim() ||
+                  playerStore.currentSong?.artist ||
+                  "",
+              );
+            }}
+            class="text-xs text-brand-text-secondary/70 truncate"
+            title={i18n.t("collection.filterByArtist", { artist: playerStore.currentSong.artist })}
+          >
+            {playerStore.currentSong.artist}
+          </LinkButton>
+        {:else}
+          <span class="text-xs text-brand-text-secondary/70 truncate">
+            {playerStore.currentSong ? i18n.t("collection.unknownArtist") : ""}
+          </span>
         {/if}
       </div>
-      {#if playerStore.currentSong?.album?.trim()}
-        <LinkButton
-          onclick={(e) => {
-            e.stopPropagation();
-            windowLayoutStore.exitImmersiveMode();
-            navigationStore.viewAlbum(playerStore.currentSong?.album || "");
-          }}
-          class="text-xs text-brand-text-secondary/70 truncate"
-          title={i18n.t("collection.filterByAlbum", { album: playerStore.currentSong.album })}
-        >
-          {playerStore.currentSong.album}
-        </LinkButton>
-      {/if}
-      {#if playerStore.currentSong?.artist}
-        <LinkButton
-          onclick={(e) => {
-            e.stopPropagation();
-            windowLayoutStore.exitImmersiveMode();
-            navigationStore.viewArtist(
-              playerStore.currentSong?.album_artist?.trim() ||
-                playerStore.currentSong?.artist ||
-                "",
-            );
-          }}
-          class="text-xs text-brand-text-secondary/70 truncate"
-          title={i18n.t("collection.filterByArtist", { artist: playerStore.currentSong.artist })}
-        >
-          {playerStore.currentSong.artist}
-        </LinkButton>
-      {:else}
-        <span class="text-xs text-brand-text-secondary/70 truncate">
-          {playerStore.currentSong ? i18n.t("collection.unknownArtist") : ""}
-        </span>
-      {/if}
     </div>
-  </div>
 
-  <div
-    data-walkthrough-target="player-bar-controls"
-    class="flex flex-col items-center gap-1.5 min-w-0 flex-1 xs:ml-auto sm:ml-0 md:w-1/3 md:flex-none max-w-[600px]"
-  >
-    <div class="flex items-center gap-3 md:gap-5">
-      {#if !windowLayoutStore.isRightPanelAutoHidden}
-        <div
-          transition:collapseFade={{ duration: 250 }}
-          class="relative inline-flex items-center flex-shrink-0"
-        >
-          {#if playerStore.shuffleMode !== "off"}
+    <div
+      data-walkthrough-target="player-bar-controls"
+      class="flex flex-col items-center gap-1.5 min-w-0 flex-1 xs:ml-auto sm:ml-0 md:w-1/3 md:flex-none max-w-[600px]"
+    >
+      <div class="flex items-center gap-3 md:gap-5">
+        {#if !windowLayoutStore.isRightPanelAutoHidden}
+          <div
+            transition:collapseFade={{ duration: 250 }}
+            class="relative inline-flex items-center flex-shrink-0"
+          >
+            {#if playerStore.shuffleMode !== "off"}
+              <button
+                onclick={cycleShuffle}
+                class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+                title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+              >
+                {i18n.t("playerBar.shuffle")}
+                {shuffleModeLabel(playerStore.shuffleMode)}
+              </button>
+            {/if}
             <button
               onclick={cycleShuffle}
-              class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+              class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.shuffleMode !==
+              'off'
+                ? 'text-brand-accent-text font-bold'
+                : 'text-brand-text-secondary/50'}"
               title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
             >
-              {i18n.t("playerBar.shuffle")}
-              {shuffleModeLabel(playerStore.shuffleMode)}
+              {#if shuffleTypeIcon(playerStore.shuffleMode)}
+                {@const ShuffleTypeIcon = shuffleTypeIcon(playerStore.shuffleMode)}
+                <ShuffleTypeIcon class="w-4 h-4" />
+              {/if}
+              <Shuffle class="w-4 h-4" />
             </button>
-          {/if}
-          <button
-            onclick={cycleShuffle}
-            class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.shuffleMode !==
-            'off'
-              ? 'text-brand-accent-text font-bold'
-              : 'text-brand-text-secondary/50'}"
-            title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
-          >
-            {#if shuffleTypeIcon(playerStore.shuffleMode)}
-              {@const ShuffleTypeIcon = shuffleTypeIcon(playerStore.shuffleMode)}
-              <ShuffleTypeIcon class="w-4 h-4" />
-            {/if}
-            <Shuffle class="w-4 h-4" />
-          </button>
-        </div>
-      {/if}
+          </div>
+        {/if}
 
-      <button
-        onclick={() => playerStore.previous()}
-        class="hidden xs:block text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-        title={i18n.t("playerBar.previous")}
-      >
-        <SkipBack class="w-5 h-5 fill-current" />
-      </button>
-
-      {#if playerStore.state === "playing"}
         <button
-          onclick={() => playerStore.pause()}
-          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors"
-          title={i18n.t("playerBar.pause")}
+          onclick={() => playerStore.previous()}
+          class="hidden xs:block text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          title={i18n.t("playerBar.previous")}
         >
-          <Pause class="w-4 h-4 fill-current" />
+          <SkipBack class="w-5 h-5 fill-current" />
         </button>
-      {:else}
-        <button
-          onclick={() => playerStore.resume()}
-          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors"
-          title={i18n.t("playerBar.play")}
-        >
-          <Play class="w-4 h-4 fill-current" />
-        </button>
-      {/if}
 
-      <button
-        onclick={() => playerStore.next()}
-        class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-        title={i18n.t("playerBar.next")}
-      >
-        <SkipForward class="w-5 h-5 fill-current" />
-      </button>
-
-      {#if !windowLayoutStore.isRightPanelAutoHidden}
-        <div
-          transition:collapseFade={{ duration: 250 }}
-          class="relative inline-flex items-center flex-shrink-0"
-        >
+        {#if playerStore.state === "playing"}
           <button
-            onclick={cycleRepeat}
-            class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !==
-            'off'
-              ? 'text-brand-accent-text font-bold'
-              : 'text-brand-text-secondary/50'}"
-            title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+            onclick={() => playerStore.pause()}
+            class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors"
+            title={i18n.t("playerBar.pause")}
           >
-            <Repeat class="w-4 h-4" />
-            {#if repeatTypeIcon(playerStore.repeatMode)}
-              {@const RepeatTypeIcon = repeatTypeIcon(playerStore.repeatMode)}
-              <RepeatTypeIcon class="w-4 h-4" />
-            {/if}
+            <Pause class="w-4 h-4 fill-current" />
           </button>
-          {#if playerStore.repeatMode !== "off"}
+        {:else}
+          <button
+            onclick={() => playerStore.resume()}
+            class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors"
+            title={i18n.t("playerBar.play")}
+          >
+            <Play class="w-4 h-4 fill-current" />
+          </button>
+        {/if}
+
+        <button
+          onclick={() => playerStore.next()}
+          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          title={i18n.t("playerBar.next")}
+        >
+          <SkipForward class="w-5 h-5 fill-current" />
+        </button>
+
+        {#if !windowLayoutStore.isRightPanelAutoHidden}
+          <div
+            transition:collapseFade={{ duration: 250 }}
+            class="relative inline-flex items-center flex-shrink-0"
+          >
             <button
               onclick={cycleRepeat}
-              class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+              class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !==
+              'off'
+                ? 'text-brand-accent-text font-bold'
+                : 'text-brand-text-secondary/50'}"
               title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
             >
-              {i18n.t("playerBar.repeat")}
-              {repeatModeLabel(playerStore.repeatMode)}
+              <Repeat class="w-4 h-4" />
+              {#if repeatTypeIcon(playerStore.repeatMode)}
+                {@const RepeatTypeIcon = repeatTypeIcon(playerStore.repeatMode)}
+                <RepeatTypeIcon class="w-4 h-4" />
+              {/if}
             </button>
-          {/if}
-        </div>
-      {/if}
+            {#if playerStore.repeatMode !== "off"}
+              <button
+                onclick={cycleRepeat}
+                class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+                title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+              >
+                {i18n.t("playerBar.repeat")}
+                {repeatModeLabel(playerStore.repeatMode)}
+              </button>
+            {/if}
+          </div>
+        {/if}
 
-      {#if windowLayoutStore.isPlayerBarCompact}
-        {@render moreButton("w-5 h-5")}
+        {#if windowLayoutStore.isPlayerBarCompact}
+          {@render moreButton("w-5 h-5")}
+        {/if}
+      </div>
+
+      {#if !windowLayoutStore.isPlayerBarCompact}
+        <div class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
+          <!-- Quality indicator badge (opens pipeline popover on click) -->
+          <QualityBadge />
+          <span>{formatDuration(playerStore.positionNanosec)}</span>
+          <div class="flex-1 flex flex-col gap-1">
+            <WaveformSeekBar />
+          </div>
+          <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
+        </div>
       {/if}
     </div>
 
     {#if !windowLayoutStore.isPlayerBarCompact}
-      <div class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
-        <!-- Quality indicator badge (opens pipeline popover on click) -->
-        <QualityBadge />
-        <span>{formatDuration(playerStore.positionNanosec)}</span>
-        <div class="flex-1 flex flex-col gap-1">
-          <WaveformSeekBar />
-        </div>
-        <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
-      </div>
-    {/if}
-  </div>
-
-  {#if !windowLayoutStore.isPlayerBarCompact}
-    <!-- Takes the room the two fixed thirds leave (md:flex-1), not a third of its own: three
+      <!-- Takes the room the two fixed thirds leave (md:flex-1), not a third of its own: three
          thirds plus the footer gaps overshoot the padding, which pushed this right-aligned
          cluster toward the dock edge instead of matching the cover's inset. -->
-    <div
-      data-walkthrough-target="player-bar-toolbar"
-      class="flex items-center justify-end flex-shrink-0 md:flex-1 md:min-w-[200px] max-w-xs"
-    >
-      <div class="h-7 flex items-center gap-3">
-        {#if !windowLayoutStore.isDockSpectrumHidden}
-          <div transition:collapseFade={{ duration: 250 }} class="w-24 h-7 block flex-shrink-0">
-            <SpectrumVisualizer />
-          </div>
-        {/if}
-        <button
-          onclick={navigateToQueue}
-          data-drop-target="queue"
-          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors {songDrag.isDragging &&
-          songDrag.dropTarget?.kind === 'queue'
-            ? 'text-brand-accent-text scale-110'
-            : ''}"
-          title={i18n.t("playerBar.queueTitle", {}, "Queue")}
-        >
-          <Layers class="w-5 h-5" />
-        </button>
-        <button
-          onclick={toggleMute}
-          class="inline-flex items-center justify-center text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-          title={i18n.t("playerBar.volume")}
-        >
-          {#if isMuted || playerStore.volume === 0}
-            <VolumeX class="w-4 h-4" />
-          {:else}
-            <Volume2 class="w-4 h-4" />
+      <div
+        data-walkthrough-target="player-bar-toolbar"
+        class="flex items-center justify-end flex-shrink-0 md:flex-1 md:min-w-[200px] max-w-xs"
+      >
+        <div class="h-7 flex items-center gap-3">
+          {#if !windowLayoutStore.isDockSpectrumHidden}
+            <div transition:collapseFade={{ duration: 250 }} class="w-24 h-7 block flex-shrink-0">
+              <SpectrumVisualizer />
+            </div>
           {/if}
-        </button>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={playerStore.volume}
-          oninput={handleVolumeChange}
-          onchange={releaseVolumeFocus}
-          onpointerup={releaseVolumeFocus}
-          onkeyup={releaseVolumeFocus}
-          class="volume-slider w-20 h-1 rounded-lg outline-none"
-          style={volumeSliderStyle}
-          aria-label={i18n.t("playerBar.volumeSlider")}
-          title={i18n.t("playerBar.volumeWithValue", { value: Math.round(volumePercent) })}
-        />
-        {@render moreButton("w-5 h-5")}
+          <button
+            onclick={navigateToQueue}
+            data-drop-target="queue"
+            class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors {songDrag.isDragging &&
+            songDrag.dropTarget?.kind === 'queue'
+              ? 'text-brand-accent-text scale-110'
+              : ''}"
+            title={i18n.t("playerBar.queueTitle", {}, "Queue")}
+          >
+            <Layers class="w-5 h-5" />
+          </button>
+          <button
+            onclick={toggleMute}
+            class="inline-flex items-center justify-center text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+            title={i18n.t("playerBar.volume")}
+          >
+            {#if isMuted || playerStore.volume === 0}
+              <VolumeX class="w-4 h-4" />
+            {:else}
+              <Volume2 class="w-4 h-4" />
+            {/if}
+          </button>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={playerStore.volume}
+            oninput={handleVolumeChange}
+            onchange={releaseVolumeFocus}
+            onpointerup={releaseVolumeFocus}
+            onkeyup={releaseVolumeFocus}
+            class="volume-slider w-20 h-1 rounded-lg outline-none"
+            style={volumeSliderStyle}
+            aria-label={i18n.t("playerBar.volumeSlider")}
+            title={i18n.t("playerBar.volumeWithValue", { value: Math.round(volumePercent) })}
+          />
+          {@render moreButton("w-5 h-5")}
+        </div>
       </div>
-    </div>
-  {/if}
-</footer>
+    {/if}
+  </footer>
+</div>
 
 {#if contextMenuState && playerStore.currentSong}
   {@const song = playerStore.currentSong}
@@ -687,31 +730,35 @@
 {/if}
 
 <style>
-  /* Accent glow: only the PlayDock gets it, not the other glass panels —
-     extends the shared --glass-shadow (elevation + highlight, app.css)
-     with --glass-glow (theme.svelte.ts) rather than baking the glow into
-     the shared variable itself. */
+  .dock-glow-wrapper {
+    -webkit-mask-image: radial-gradient(ellipse 52% 58% at 50% 50%, black 35%, transparent 100%);
+    mask-image: radial-gradient(ellipse 52% 58% at 50% 50%, black 35%, transparent 100%);
+  }
+
+  .dock-glow-svg :global(svg) {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
   :global(footer.glass-surface) {
     position: relative;
     -webkit-backdrop-filter: var(--acrylic-chrome-filter) !important;
     backdrop-filter: var(--acrylic-chrome-filter) !important;
     background-color: var(--glass-bg-playerbar) !important;
     border-color: var(--glass-border-color, var(--color-border)) !important;
-    box-shadow: var(--glass-shadow, none), var(--glass-glow, none);
+    box-shadow: var(--glass-shadow, none);
   }
 
   /* No GPU compositing (WebKitGTK with GPU rendering disabled — see
      ThemeStore.gpuCompositing, which sets the root class): backdrop-filter
-     doesn't render there, so the dock goes opaque with a stronger glow
-     instead of see-through. */
+     doesn't render there, so the dock goes opaque; the SVG glow layer
+     behind it still renders without GPU compositing. */
   :global(:root.no-gpu-compositing footer.glass-surface) {
     background-color: var(--bg-playerbar, #191b23) !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.5),
-      0 0 35px 4px var(--color-accent),
-      0 0 90px 12px var(--color-accent) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
   }
 
   /* Liquid-glass "shine": a light-catching specular highlight on top of the

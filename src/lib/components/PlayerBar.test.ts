@@ -665,6 +665,7 @@ describe("PlayerBar.svelte", () => {
     expect(footer).toHaveClass("border-none");
     expect(footer).not.toHaveClass("rounded-full");
     expect(footer).not.toHaveClass("border-brand-border");
+    expect(container.querySelector(".dock-glow-wrapper")).toBeNull();
     unmount();
 
     // Above 160px: returns to floating dock with half-circle ends and border
@@ -680,6 +681,9 @@ describe("PlayerBar.svelte", () => {
     expect(footerNormal).toHaveClass("border-brand-border");
     expect(footerNormal).toHaveClass("h-20");
     expect(footerNormal).toHaveClass("max-w-[1200px]");
+    const glowNormal = containerNormal.querySelector(".dock-glow-wrapper");
+    expect(glowNormal).not.toBeNull();
+    expect(glowNormal?.querySelector("svg")).not.toBeNull();
   });
 
   it("closes the song menu when its button is pressed again instead of reopening it", async () => {

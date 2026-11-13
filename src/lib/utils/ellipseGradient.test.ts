@@ -53,6 +53,18 @@ describe("generateEllipseGradientSvg", () => {
     const svg = generateEllipseGradientSvg({ seed: 1 });
     expect(svg).toMatch(/#5135FF|#FF5828|#F69CFF|#FFA50F/);
   });
+
+  it("omits CSS filter when saturation is null or 100", () => {
+    expect(generateEllipseGradientSvg({ seed: 1, saturation: null })).not.toContain(
+      "filter:saturate",
+    );
+    expect(generateEllipseGradientSvg({ seed: 1, saturation: 100 })).not.toContain(
+      "filter:saturate",
+    );
+    expect(generateEllipseGradientSvg({ seed: 1, saturation: 125 })).toContain(
+      "filter:saturate(125%)",
+    );
+  });
 });
 
 describe("ellipseGradientDataUri", () => {

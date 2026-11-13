@@ -5,12 +5,18 @@ import {
   LUMINOUS_LIGHT_COLORS,
   withReadableText,
   buildExtractedColors,
+  glassAlpha,
+  dockGlowOpacity,
+  resolveDockGlowColors,
 } from "./theme.svelte";
 import {
   checkWcagCompliance,
   pickAccessibleOnColor,
   calculateContrastRatio,
   hexToHsl,
+  hexToRgb,
+  rgbToHex,
+  isLightColor,
 } from "../utils/colorUtils";
 
 describe("PREDEFINED_THEMES", () => {
@@ -177,4 +183,33 @@ describe("monochromatic album cover contrast invariants (#1730)", () => {
     const borderHsl = hexToHsl(extracted.border);
     expect(Math.abs(borderHsl.l - primHsl.l)).toBeGreaterThanOrEqual(0.12);
   });
+});
+
+describe("PlayDock text contrast over translucent artwork glow (#2046)", () => {
+  const composite = (fgHex: string, fgAlpha: number, bgHex: string): string => {
+    const fg = hexToRgb(fgHex);
+    const bg = hexToRgb(bgHex);
+    return rgbToHex(
+      Math.round(fg.r * fgAlpha + bg.r * (1 - fgAlpha)),
+      Math.round(fg.g * fgAlpha + bg.g * (1 - fgAlpha)),
+      Math.round(fg.b * fgAlpha + bg.b * (1 - fgAlpha)),
+    );
+  };
+
+  it.each(staticThemes)(
+    "%s: primary and secondary dock text clear WCAG AA (>= 4.5:1) over worst-case clamped glow",
+    (_name, palette) => {
+      const isDark = !isLightColor(palette["bg-main"]);
+      // Feed extreme artwork colors (pure white & pure black) through resolveDockGlowColors
+      // to verify its lightness clamping protects dock text contrast.
+      const [worstCaseGlow] = resolveDockGlowColors(null, isDark ? "#ffffff" : "#000000", isDark);
+      const backdrop = composite(worstCaseGlow, dockGlowOpacity(isDark), palette["bg-main"]);
+      const effectiveDockBg = composite(palette["bg-playerbar"], glassAlpha(isDark), backdrop);
+
+      expect(checkWcagCompliance(palette["color-text-primary"], effectiveDockBg).wcagAA).toBe(true);
+      expect(checkWcagCompliance(palette["color-text-secondary"], effectiveDockBg).wcagAA).toBe(
+        true,
+      );
+    },
+  );
 });
