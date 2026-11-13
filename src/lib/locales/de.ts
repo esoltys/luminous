@@ -479,7 +479,7 @@ export const de = {
     suggestHide: "Vorschläge ausblenden",
   },
   emptyLibrary: {
-    title: "Musik hinzufügen",
+    title: "Spiele deine Musik ab",
     subtitle:
       "Wähle einen Ordner aus, um nach Album, Interpret oder Genre zu stöbern. Luminous hält ihn aktuell, wenn sich deine Dateien ändern.",
     addFolder: "Ordner hinzufügen",

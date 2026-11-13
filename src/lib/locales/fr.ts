@@ -484,7 +484,7 @@ export const fr: DeepStringRecord<typeof en> = {
     suggestHide: "Masquer les suggestions",
   },
   emptyLibrary: {
-    title: "Ajoutez votre musique",
+    title: "Faites jouer votre musique",
     subtitle:
       "Choisissez un dossier pour parcourir par album, artiste ou genre. Luminous le garde synchronisé quand vos fichiers changent.",
     addFolder: "Ajouter un dossier",

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import LibraryWelcome from "./LibraryWelcome.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -33,7 +34,7 @@ describe("LibraryWelcome.svelte", () => {
 
   it("offers adding a folder as primary alongside playing files without a library", () => {
     render(LibraryWelcome);
-    expect(screen.getByRole("heading", { name: "Add your music" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Play your music" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Add a folder/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Open files/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Play a folder/ })).toBeInTheDocument();
@@ -64,5 +65,16 @@ describe("LibraryWelcome.svelte", () => {
         expect.objectContaining({ directory: false, multiple: true }),
       );
     });
+  });
+
+  it("opens the Getting Started help section from the Help link", async () => {
+    navigationStore.activeTab = "home";
+    navigationStore.helpSection = null;
+    render(LibraryWelcome);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Help" }));
+
+    expect(navigationStore.activeTab).toBe("help");
+    expect(navigationStore.helpSection).toBe("getting-started");
   });
 });

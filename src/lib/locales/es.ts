@@ -475,7 +475,7 @@ export const es = {
     suggestHide: "Ocultar sugerencias",
   },
   emptyLibrary: {
-    title: "Agrega tu música",
+    title: "Reproduce tu música",
     subtitle:
       "Elige una carpeta para explorar por álbum, artista o género. Luminous la mantiene sincronizada cuando tus archivos cambian.",
     addFolder: "Agregar carpeta",

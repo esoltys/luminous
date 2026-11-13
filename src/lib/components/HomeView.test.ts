@@ -107,7 +107,7 @@ describe("HomeView.svelte", () => {
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText("Add your music")).toBeInTheDocument();
+      expect(screen.getByText("Play your music")).toBeInTheDocument();
     });
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
   });
@@ -120,7 +120,7 @@ describe("HomeView.svelte", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Full Moon Fever").length).toBeGreaterThan(0);
     });
-    expect(screen.queryByText("Add your music")).not.toBeInTheDocument();
+    expect(screen.queryByText("Play your music")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
   });
 

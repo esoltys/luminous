@@ -464,7 +464,7 @@ export const en = {
     suggestHide: "Hide suggestions",
   },
   emptyLibrary: {
-    title: "Add your music",
+    title: "Play your music",
     subtitle:
       "Choose a folder to browse by album, artist, or genre. Luminous keeps it in sync as your files change.",
     addFolder: "Add a folder",

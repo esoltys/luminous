@@ -474,7 +474,7 @@ export const it = {
     suggestHide: "Nascondi i suggerimenti",
   },
   emptyLibrary: {
-    title: "Aggiungi la tua musica",
+    title: "Ascolta la tua musica",
     subtitle:
       "Scegli una cartella per sfogliarla per album, artista o genere. Luminous la mantiene sincronizzata quando i file cambiano.",
     addFolder: "Aggiungi una cartella",

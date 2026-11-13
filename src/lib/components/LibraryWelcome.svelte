@@ -99,7 +99,7 @@
       <button
         type="button"
         onclick={() => {
-          navigationStore.activeTab = "help";
+          navigationStore.openHelp("getting-started");
         }}
         class="text-brand-text-secondary underline-offset-2 hover:underline hover:text-brand-accent-text transition-colors"
         >{i18n.t("sidebar.help")}</button
