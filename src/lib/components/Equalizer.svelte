@@ -21,6 +21,7 @@
   import InlineMessage from "./InlineMessage.svelte";
   import Select from "./Select.svelte";
   import Knob from "./Knob.svelte";
+  import HelpTip from "./HelpTip.svelte";
   import ParametricGraph from "./ParametricGraph.svelte";
   import ParametricBandStrip from "./ParametricBandStrip.svelte";
   import EqPresetPicker from "./EqPresetPicker.svelte";
@@ -962,9 +963,12 @@
           </div>
         {/each}
       </div>
-      <p class="text-xs text-brand-text-secondary px-1 -mt-2">
-        {i18n.t("equalizer.isoStandard")}
-      </p>
+      <div class="flex justify-end px-1 -mt-2">
+        <HelpTip
+          text={i18n.t("equalizer.isoStandardHelp")}
+          label={i18n.t("common.aboutField", { field: i18n.t("equalizer.frequency") })}
+        />
+      </div>
     {:else if ranges}
       <ParametricGraph
         bands={parametric}
@@ -998,7 +1002,13 @@
           <Activity class="w-5 h-5" />
         </div>
         <div class="space-y-1 min-w-0">
-          <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("loudness.title")}</h3>
+          <h3 class="font-bold text-sm text-brand-text-primary flex items-center gap-1.5">
+            {i18n.t("loudness.title")}
+            <HelpTip
+              text={i18n.t("loudness.methodHelp")}
+              label={i18n.t("common.aboutField", { field: i18n.t("loudness.title") })}
+            />
+          </h3>
           <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
             {i18n.t("loudness.subtitle")}
           </p>

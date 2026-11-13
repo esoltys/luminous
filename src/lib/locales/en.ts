@@ -1574,7 +1574,7 @@ export const en = {
     formatLabel: "Format",
     miniplayer: "Mini-player",
     loudnessLabel: "Loudness",
-    loudnessSourceAnalyzed: "R128 analysis",
+    loudnessSourceAnalyzed: "Analyzed",
     loudnessSourceReplayGain: "ReplayGain tag",
     loudnessSourceDynamicRangeLog: "DR Log",
     loudnessSourceFallback: "Fallback gain",
@@ -1898,7 +1898,7 @@ export const en = {
     importErrorGeneric: "Couldn't import the profile.",
     preamp: "Preamp",
     enableEq: "Enable EQ",
-    subtitle: "Shape your frequency response with a 10-band cascaded peaking filter",
+    subtitle: "Boost or cut bass, mids and treble",
     titleParametric: "Parametric Equalizer",
     subtitleParametric: "Sculpt precise corrections with each band's own filter type, gain and Q",
     modeLabel: "Mode",
@@ -1918,19 +1918,20 @@ export const en = {
     graphHint:
       "Drag a node to set frequency and gain, scroll on it to change Q, or double-click the graph to add a band. With a node focused, use the arrow keys, Page Up/Down for Q and Delete to remove it.",
     nodeAriaLabel: "Band {n}: {type}, {freq}, {gain} dB, Q {q}",
-    isoStandard: "ISO 266:1997",
+    isoStandardHelp: "Band centers follow the ISO 266 standard.",
   },
   loudness: {
     title: "Loudness Normalization",
-    subtitle:
-      "Even out perceived volume across songs using EBU R128 analysis, with ReplayGain tags as a fallback",
+    subtitle: "Play every song at a similar volume",
+    methodHelp:
+      "Volume is measured with EBU R128 analysis. ReplayGain tags are used for songs not yet analyzed.",
     enable: "Enable",
     targetLevel: "Target Level",
     mode: "Normalize by",
     modeTrack: "Song",
     modeAlbum: "Album",
     fallbackGain: "Fallback Gain",
-    fallbackGainHint: "Applied when a song has neither R128 analysis nor a ReplayGain tag",
+    fallbackGainHint: "Used for songs that haven't been analyzed yet",
     analyzing: {
       one: "Analyzing library: {count} song remaining",
       other: "Analyzing library: {count} songs remaining",

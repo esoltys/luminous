@@ -135,7 +135,6 @@ const IDENTICAL_OK_FR = new Set([
   "collection.tableHeaderTrack", // "#"
   "discord.integrationTitle", // "Discord Rich Presence"
   "equalizer.gain", // "Gain"
-  "equalizer.isoStandard", // "ISO 266:1997"
   "equalizer.jazzPreset", // "Jazz"
   "equalizer.modeLabel", // "Mode"
   "equalizer.popPreset", // "Pop"
@@ -276,7 +275,6 @@ const IDENTICAL_OK_IT = new Set<string>([
   "equalizer.kindPeak", // "Peak"
   "equalizer.kindLowShelf", // "Low shelf"
   "equalizer.kindHighShelf", // "High shelf"
-  "equalizer.isoStandard", // "ISO 266:1997"
   "loudness.modeAlbum", // "Album"
   "themes.dynamic-artwork", // "✨ Luminous"
   "themes.sabrina", // "Sabrina"
@@ -353,7 +351,6 @@ const IDENTICAL_OK_ES = new Set<string>([
   "equalizer.jazzPreset", // "Jazz"
   "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "equalizer.qFactor", // "Q"
-  "equalizer.isoStandard", // "ISO 266:1997"
   "themes.dynamic-artwork", // "✨ Luminous"
   "themes.sabrina", // "Sabrina"
   "artistEvents.festival", // "Festival"
@@ -467,7 +464,6 @@ const IDENTICAL_OK_DE = new Set<string>([
   "equalizer.importPlaceholder",
   "equalizer.qFactor",
   "equalizer.nodeAriaLabel",
-  "equalizer.isoStandard",
   "loudness.modeAlbum",
   "themes.dynamic-artwork",
   "themes.system",
@@ -541,7 +537,6 @@ const IDENTICAL_OK_UK = new Set<string>([
   "tagEditor.camelotHint", // "Camelot {code}"
   "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "equalizer.qFactor", // Q
-  "equalizer.isoStandard", // ISO 266:1997
   "themes.dynamic-artwork", // "✨ Luminous"
   "themes.sabrina", // a theme name
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
@@ -585,7 +580,6 @@ const IDENTICAL_OK_RU = new Set<string>([
   "tagEditor.camelotHint", // "Camelot {code}"
   "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "equalizer.qFactor", // Q
-  "equalizer.isoStandard", // ISO 266:1997
   "themes.dynamic-artwork", // "✨ Luminous"
   "themes.sabrina", // a theme name
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"

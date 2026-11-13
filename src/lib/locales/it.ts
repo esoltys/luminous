@@ -1611,7 +1611,7 @@ export const it = {
     formatLabel: "Formato",
     miniplayer: "Miniplayer",
     loudnessLabel: "Volume percepito",
-    loudnessSourceAnalyzed: "Analisi R128",
+    loudnessSourceAnalyzed: "Analizzato",
     loudnessSourceReplayGain: "Tag ReplayGain",
     loudnessSourceDynamicRangeLog: "Log DR",
     loudnessSourceFallback: "Guadagno di riserva",
@@ -1946,7 +1946,7 @@ export const it = {
     importErrorGeneric: "Impossibile importare il profilo.",
     preamp: "Preamplificazione",
     enableEq: "Attiva EQ",
-    subtitle: "Modella la risposta in frequenza con una cascata di filtri peak a 10 bande",
+    subtitle: "Aumenta o riduci bassi, medi e alti",
     titleParametric: "Equalizzatore parametrico",
     subtitleParametric:
       "Applica correzioni precise con il tipo di filtro, il guadagno e il Q di ogni banda",
@@ -1967,19 +1967,20 @@ export const it = {
     graphHint:
       "Trascina un nodo per impostare frequenza e guadagno, scorri sopra di esso per cambiare il Q oppure fai doppio clic sul grafico per aggiungere una banda. Con un nodo selezionato, usa i tasti freccia, Pag su/giù per il Q e Canc per rimuoverlo.",
     nodeAriaLabel: "Banda {n}: {type}, {freq}, {gain} dB, Q {q}",
-    isoStandard: "ISO 266:1997",
+    isoStandardHelp: "Le frequenze centrali delle bande seguono lo standard ISO 266.",
   },
   loudness: {
     title: "Normalizzazione del volume",
-    subtitle:
-      "Uniforma il volume percepito tra i brani con l'analisi EBU R128, usando i tag ReplayGain come riserva",
+    subtitle: "Riproduci tutti i brani con un volume simile",
+    methodHelp:
+      "Il volume viene misurato con l'analisi EBU R128. I tag ReplayGain si usano per i brani non ancora analizzati.",
     enable: "Attiva",
     targetLevel: "Livello di destinazione",
     mode: "Normalizza per",
     modeTrack: "Brano",
     modeAlbum: "Album",
     fallbackGain: "Guadagno di riserva",
-    fallbackGainHint: "Applicato quando un brano non ha né l'analisi R128 né un tag ReplayGain",
+    fallbackGainHint: "Usato per i brani non ancora analizzati",
     analyzing: {
       one: "Analisi della libreria: brani rimanenti {count}",
       other: "Analisi della libreria: brani rimanenti {count}",

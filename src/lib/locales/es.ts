@@ -1612,7 +1612,7 @@ export const es = {
     formatLabel: "Formato",
     miniplayer: "Minirreproductor",
     loudnessLabel: "Sonoridad",
-    loudnessSourceAnalyzed: "Análisis R128",
+    loudnessSourceAnalyzed: "Analizada",
     loudnessSourceReplayGain: "Etiqueta ReplayGain",
     loudnessSourceDynamicRangeLog: "Registro DR",
     loudnessSourceFallback: "Ganancia alternativa",
@@ -1944,8 +1944,7 @@ export const es = {
     importErrorGeneric: "No se pudo importar el perfil.",
     preamp: "Preamplificador",
     enableEq: "Activar ecualizador",
-    subtitle:
-      "Da forma a tu respuesta en frecuencia con un filtro de picos en cascada de 10 bandas",
+    subtitle: "Aumenta o reduce los graves, medios y agudos",
     titleParametric: "Ecualizador paramétrico",
     subtitleParametric:
       "Aplica correcciones precisas con el tipo de filtro, la ganancia y el Q de cada banda",
@@ -1966,19 +1965,20 @@ export const es = {
     graphHint:
       "Arrastra un nodo para ajustar la frecuencia y la ganancia, desplaza la rueda sobre él para cambiar el Q o haz doble clic en el gráfico para agregar una banda. Con un nodo enfocado, usa las teclas de flecha, Re Pág/Av Pág para el Q y Supr para quitarlo.",
     nodeAriaLabel: "Banda {n}: {type}, {freq}, {gain} dB, Q {q}",
-    isoStandard: "ISO 266:1997",
+    isoStandardHelp: "Las frecuencias centrales de las bandas siguen la norma ISO 266.",
   },
   loudness: {
     title: "Normalización de sonoridad",
-    subtitle:
-      "Iguala el volumen percibido entre canciones con el análisis EBU R128 y usa las etiquetas ReplayGain como alternativa",
+    subtitle: "Reproduce todas las canciones con un volumen similar",
+    methodHelp:
+      "El volumen se mide con el análisis EBU R128. Las etiquetas ReplayGain se usan para las canciones aún sin analizar.",
     enable: "Activar",
     targetLevel: "Nivel objetivo",
     mode: "Normalizar por",
     modeTrack: "Canción",
     modeAlbum: "Álbum",
     fallbackGain: "Ganancia alternativa",
-    fallbackGainHint: "Se aplica cuando una canción no tiene análisis R128 ni etiqueta ReplayGain",
+    fallbackGainHint: "Se usa para las canciones que aún no se han analizado",
     analyzing: {
       one: "Analizando la biblioteca: canciones restantes: {count}",
       other: "Analizando la biblioteca: canciones restantes: {count}",
