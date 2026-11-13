@@ -204,6 +204,48 @@ describe("OrganizeFiles safeguards", () => {
     ).toBeInTheDocument();
   });
 
+  it("describes presets as a folder/file outline instead of the raw pattern", async () => {
+    const { findByRole } = render(OrganizeFiles, {
+      isOpen: true,
+      embedded: false,
+      songIds: [1],
+    });
+
+    const defaultCard = await findByRole("button", { name: "Default" });
+    expect(defaultCard).toHaveAccessibleDescription(
+      "Folder: Album artist. Folder: Year - Album. File name: Track and title.",
+    );
+
+    const alternativeCard = await findByRole("button", { name: "Alternative" });
+    expect(alternativeCard).toHaveAccessibleDescription(
+      "Folder: Artist. Folder: Album (Year). Folder: Disc (multi-disc only). File name: Track, artist and title.",
+    );
+
+    // No pattern syntax anywhere on the preset cards.
+    for (const card of [defaultCard, alternativeCard]) {
+      expect(card.textContent).not.toContain("%");
+    }
+    // Custom isn't selected, so its pattern field isn't rendered either.
+    expect(document.querySelector("#template-input")).toBeNull();
+  });
+
+  it("seeds the Custom field with the previously selected preset's pattern", async () => {
+    const { findByRole } = render(OrganizeFiles, {
+      isOpen: true,
+      embedded: false,
+      songIds: [1],
+    });
+
+    await fireEvent.click(await findByRole("button", { name: "Alternative" }));
+    await fireEvent.click(await findByRole("button", { name: "Custom" }));
+
+    await waitFor(() => {
+      expect(document.querySelector<HTMLInputElement>("#template-input")?.value).toBe(
+        "%artist/%album (%year)/{CD %disc/}{%track-}%artist-%title",
+      );
+    });
+  });
+
   it("marks draft active without writing to SQLite when options change, and Revert restores store values", async () => {
     const setConfigSpy = vi.fn();
     vi.mocked(invoke).mockImplementation((cmd: string) => {

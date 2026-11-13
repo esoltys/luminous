@@ -3,6 +3,7 @@ import { createEventScope } from "../utils/eventScope";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
 import { TOAST_DURATION_MS } from "../constants";
+import { DEFAULT_ORGANIZE_TEMPLATE } from "../utils/organizePresets";
 
 interface OrganizeConfig {
   auto_organize: boolean;
@@ -72,8 +73,6 @@ interface AutoOrganizeResult {
   duplicates_count: number;
   errors: string[];
 }
-
-const DEFAULT_ORGANIZE_TEMPLATE = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
 
 class OrganizerStore {
   autoOrganize = $state<boolean>(false);

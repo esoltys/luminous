@@ -36,6 +36,11 @@
   import Button from "./Button.svelte";
   import HelpTip from "./HelpTip.svelte";
   import TemplateInput from "./TemplateInput.svelte";
+  import {
+    DEFAULT_ORGANIZE_TEMPLATE,
+    ORGANIZE_PRESETS,
+    type OrganizePreset,
+  } from "../utils/organizePresets";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import TagEditor from "./TagEditor.svelte";
@@ -96,7 +101,6 @@
   /** Embedded instances are always "open"; modal instances follow the isOpen prop. */
   let effectiveOpen = $derived(embedded || isOpen);
 
-  const DEFAULT_TEMPLATE = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
   function highlightPathHtml(path: string): string {
     if (!path) return "";
     const escaped = path.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -107,26 +111,24 @@
     );
   }
 
-  // Template presets, mirroring how SettingsThemes.svelte offers predefined
-  // presets plus a "Custom" option that reveals a free-text field. The
-  // picker structure below makes adding more presets later a matter of
-  // extending TEMPLATE_PRESETS.
-  const TEMPLATE_PRESETS = [
-    { id: "default", labelKey: "organizer.presetDefault", template: DEFAULT_TEMPLATE },
-    {
-      id: "alternative",
-      labelKey: "organizer.presetAlternative",
-      template: "%artist/%album (%year)/{CD %disc/}{%track-}%artist-%title",
-    },
-  ] as const;
-  type TemplatePresetId = (typeof TEMPLATE_PRESETS)[number]["id"] | "custom";
+  // Preset cards plus a "Custom" card that reveals a free-text field. Preset
+  // cards describe their result as an outline in words, never the raw pattern
+  // (#2048); the pattern is only shown, editable, under Custom.
+  type TemplatePresetId = OrganizePreset["id"] | "custom";
+
+  function presetCardClass(selected: boolean): string {
+    return `flex flex-col justify-start text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 ${
+      selected ? "border-brand-accent shadow-md shadow-brand-accent/5" : "border-brand-border/60"
+    }`;
+  }
 
   let templatePreset = $state<TemplatePresetId>("default");
-  let customTemplate = $state(DEFAULT_TEMPLATE);
+  let customTemplate = $state(DEFAULT_ORGANIZE_TEMPLATE);
   let template = $derived(
     templatePreset === "custom"
       ? customTemplate
-      : (TEMPLATE_PRESETS.find((p) => p.id === templatePreset)?.template ?? DEFAULT_TEMPLATE),
+      : (ORGANIZE_PRESETS.find((p) => p.id === templatePreset)?.template ??
+          DEFAULT_ORGANIZE_TEMPLATE),
   );
 
   function selectPreset(id: TemplatePresetId) {
@@ -278,7 +280,7 @@
       initializedFromStore = true;
       templatePreset = (organizeStore.preset as TemplatePresetId) || "default";
       if (organizeStore.preset === "custom") {
-        customTemplate = organizeStore.template || DEFAULT_TEMPLATE;
+        customTemplate = organizeStore.template || DEFAULT_ORGANIZE_TEMPLATE;
       }
       replaceSpaces = organizeStore.replaceSpaces;
       asciiOnly = organizeStore.asciiOnly;
@@ -309,7 +311,7 @@
   function revertDraft() {
     templatePreset = (organizeStore.preset as TemplatePresetId) || "default";
     if (organizeStore.preset === "custom") {
-      customTemplate = organizeStore.template || DEFAULT_TEMPLATE;
+      customTemplate = organizeStore.template || DEFAULT_ORGANIZE_TEMPLATE;
     }
     replaceSpaces = organizeStore.replaceSpaces;
     asciiOnly = organizeStore.asciiOnly;
@@ -911,37 +913,65 @@
     {/if}
 
     <div class="grid grid-cols-1 @xl:grid-cols-3 gap-3">
-      {#each TEMPLATE_PRESETS as preset (preset.id)}
+      {#each ORGANIZE_PRESETS as preset (preset.id)}
         <button
           type="button"
           onclick={() => selectPreset(preset.id)}
-          aria-label={i18n.t(preset.labelKey)}
-          class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset ===
-          preset.id
-            ? 'border-brand-accent shadow-md shadow-brand-accent/5'
-            : 'border-brand-border/60'}"
+          aria-labelledby="preset-{preset.id}-label"
+          aria-describedby="preset-{preset.id}-outline"
+          class={presetCardClass(templatePreset === preset.id)}
         >
-          <span class="font-semibold text-sm text-brand-text-primary block"
+          <span
+            id="preset-{preset.id}-label"
+            class="font-semibold text-sm text-brand-text-primary block"
             >{i18n.t(preset.labelKey)}</span
           >
-          <code class="text-[10px] text-brand-text-secondary font-mono truncate block mt-1"
-            >{preset.template}</code
-          >
+          <span id="preset-{preset.id}-outline" class="block mt-1.5 text-[11px]">
+            {#each preset.outline as row, depth (row.labelKey)}
+              <span
+                class="flex items-start gap-1.5 min-w-0 {row.optional
+                  ? 'text-brand-text-secondary/70 italic'
+                  : 'text-brand-text-secondary'}"
+                style:padding-inline-start="{depth * 0.75}rem"
+              >
+                {#if row.kind === "file"}
+                  <Music
+                    aria-hidden="true"
+                    class="w-3 h-3 mt-0.5 shrink-0 text-brand-text-secondary/70"
+                  />
+                {:else}
+                  <Folder
+                    aria-hidden="true"
+                    class="w-3 h-3 mt-0.5 shrink-0 text-brand-accent-text/80"
+                  />
+                {/if}
+                <!-- The icons carry folder-vs-file visually; screen readers get it in words.
+                     Labels wrap rather than truncate: the deepest row is the narrowest. -->
+                <span aria-hidden="true" class="min-w-0 break-words">{i18n.t(row.labelKey)}</span>
+                <span class="sr-only"
+                  >{i18n.t(
+                    row.kind === "file" ? "organizer.outlineFileSr" : "organizer.outlineFolderSr",
+                    { name: i18n.t(row.labelKey) },
+                  )}</span
+                >
+              </span>
+              <!-- Word break between rows in the accessible description. Rows are
+                   block-level (display: flex), so this whitespace is never painted. -->
+              {" "}
+            {/each}
+          </span>
         </button>
       {/each}
       <button
         type="button"
         onclick={() => selectPreset("custom")}
         aria-label={i18n.t("organizer.presetCustom")}
-        class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset ===
-        'custom'
-          ? 'border-brand-accent shadow-md shadow-brand-accent/5'
-          : 'border-brand-border/60'}"
+        class={presetCardClass(templatePreset === "custom")}
       >
         <span class="font-semibold text-sm text-brand-text-primary block"
           >{i18n.t("organizer.presetCustom")}</span
         >
-        <span class="text-[10px] text-brand-text-secondary block mt-1"
+        <span class="text-[11px] text-brand-text-secondary block mt-1.5"
           >{i18n.t("organizer.presetCustomHint")}</span
         >
       </button>
