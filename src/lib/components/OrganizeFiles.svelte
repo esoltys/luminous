@@ -73,7 +73,7 @@
     initialScope = "selection",
     refreshKey = 0,
     summaryReadyCount = $bindable(0),
-    summaryPendingCount = $bindable(0),
+    summaryPendingSongIds = $bindable([]),
     summaryCanApply = $bindable(false),
     summaryIsApplying = $bindable(false),
     applyRequestKey = 0,
@@ -89,7 +89,8 @@
     refreshKey?: number;
     /** Embedded mode only: mirrors readyCount/canApply/isApplying so the host page can render its own Apply control. */
     summaryReadyCount?: number;
-    summaryPendingCount?: number;
+    /** Embedded mode only: ids of songs held back for attention that only this preview reports (see pendingSongIds). */
+    summaryPendingSongIds?: number[];
     summaryCanApply?: boolean;
     summaryIsApplying?: boolean;
     /** Embedded mode only: bump this from the host page to trigger handleApply. */
@@ -461,16 +462,22 @@
   let missingTagCount = $derived(items.filter((i) => getItemStatus(i) === "missing_tag").length);
   let readyCount = $derived(items.filter((i) => getItemStatus(i) === "ok").length);
   /**
-   * Whether the Organize page's preview card has anything of its own to show. A duplicate
-   * row doesn't count when its song is in a duplicate group, because the page's Compare
-   * Duplicates card already lists it. Other duplicate rows (two files whose new names
-   * clash) appear nowhere else, so they still do.
+   * Songs held back for the user's attention that only this preview reports. A duplicate
+   * row is left out when its song is in a duplicate group, because the page's Compare
+   * Duplicates card already lists it; other duplicate rows (two files whose new names
+   * clash) appear nowhere else, so they stay.
    */
-  let previewHasOwnRows = $derived(
-    readyCount + missingTagCount + errorCount > 0 ||
-      items.some((i) => getItemStatus(i) === "duplicate" && !duplicateSongIds.has(i.song_id)),
+  let pendingSongIds = $derived(
+    items
+      .filter((i) => {
+        const status = getItemStatus(i);
+        if (status === "duplicate") return !duplicateSongIds.has(i.song_id);
+        return status === "missing_tag" || status === "error";
+      })
+      .map((i) => i.song_id),
   );
-  let pendingCount = $derived(missingTagCount + collisionCount + errorCount);
+  /** Whether the Organize page's preview card has anything of its own to show. */
+  let previewHasOwnRows = $derived(readyCount > 0 || pendingSongIds.length > 0);
 
   // Untagged tracks (missing_tag) are held back by default; users can opt in via a toggle
   let includeMissingTags = $state(false);
@@ -481,7 +488,7 @@
 
   $effect(() => {
     summaryReadyCount = readyCount;
-    summaryPendingCount = pendingCount;
+    summaryPendingSongIds = pendingSongIds;
     summaryCanApply = canApply;
     summaryIsApplying = isApplying;
   });

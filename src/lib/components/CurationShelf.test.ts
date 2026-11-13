@@ -19,7 +19,7 @@ describe("CurationShelf.svelte", () => {
   const emptyOverview: CurationOverview = {
     unillustrated_albums: [],
     incomplete_albums: [],
-    missing_core_tags_count: 0,
+    missing_core_tags_song_ids: [],
     suspected_provenance_songs: [],
     duplicate_groups: [],
     corrupt_songs: [],
@@ -152,7 +152,7 @@ describe("CurationShelf.svelte", () => {
 
     const overviewMissingCore: CurationOverview = {
       ...emptyOverview,
-      missing_core_tags_count: 7,
+      missing_core_tags_song_ids: Array.from({ length: 7 }, (_, i) => 9000 + i),
     };
 
     vi.mocked(invoke).mockImplementation((cmd: string) => {

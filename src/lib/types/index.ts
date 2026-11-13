@@ -1490,7 +1490,8 @@ export interface CorruptSongItem {
 export interface CurationOverview {
   unillustrated_albums: CurationAlbumItem[];
   incomplete_albums: IncompleteAlbumItem[];
-  missing_core_tags_count: number;
+  /** Songs missing title, artist or album. */
+  missing_core_tags_song_ids: number[];
   suspected_provenance_songs: Song[];
   duplicate_groups: DuplicateTrackGroup[];
   corrupt_songs: CorruptSongItem[];

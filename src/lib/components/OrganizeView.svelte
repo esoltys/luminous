@@ -24,8 +24,10 @@
   let pruneMsg = $state<string | null>(null);
   let organizeRefreshKey = $state(0);
   let organizeReadyCount = $state(0);
-  let organizePendingCount = $state(0);
-  let curationCount = $state(0);
+  let organizePendingSongIds = $state<number[]>([]);
+  let curationSongIds = $state<number[]>([]);
+  /** Songs waiting on tags or review, each counted once though the preview and shelf can both list it. */
+  let waitingSongCount = $derived(new Set([...organizePendingSongIds, ...curationSongIds]).size);
   let organizeCanApply = $state(false);
   let organizeIsApplying = $state(false);
   let organizeApplyRequestKey = $state(0);
@@ -86,7 +88,7 @@
     use:rememberScroll={"organize"}
   >
     <div class="pt-4 pb-4 flex items-start justify-between gap-4">
-      {#if organizeReadyCount === 0 && organizePendingCount === 0 && curationCount === 0}
+      {#if organizeReadyCount === 0 && waitingSongCount === 0}
         <span
           class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap"
         >
@@ -96,12 +98,12 @@
           </span>
           {i18n.t("organizer.nothingToOrganize")}
         </span>
-      {:else if organizeReadyCount === 0 && (organizePendingCount > 0 || curationCount > 0)}
+      {:else if organizeReadyCount === 0}
         <span
           class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap"
         >
           <Broom class="w-5 h-5 shrink-0" />
-          {i18n.plural("organizer.summaryWaitingOnCuration", organizePendingCount + curationCount)}
+          {i18n.plural("organizer.summaryWaitingOnCuration", waitingSongCount)}
         </span>
       {:else}
         <span
@@ -152,7 +154,7 @@
         initialScope="library"
         refreshKey={organizeRefreshKey}
         bind:summaryReadyCount={organizeReadyCount}
-        bind:summaryPendingCount={organizePendingCount}
+        bind:summaryPendingSongIds={organizePendingSongIds}
         bind:summaryCanApply={organizeCanApply}
         bind:summaryIsApplying={organizeIsApplying}
         applyRequestKey={organizeApplyRequestKey}
@@ -160,7 +162,7 @@
 
       <CurationShelf
         refreshKey={organizeRefreshKey}
-        bind:totalCurationCount={curationCount}
+        bind:attentionSongIds={curationSongIds}
         onChanged={() => {
           organizeRefreshKey++;
         }}

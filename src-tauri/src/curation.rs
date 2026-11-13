@@ -86,7 +86,9 @@ pub struct CorruptSongItem {
 pub struct CurationOverview {
     pub unillustrated_albums: Vec<CurationAlbumItem>,
     pub incomplete_albums: Vec<IncompleteAlbumItem>,
-    pub missing_core_tags_count: usize,
+    /// Ids of songs missing title, artist or album; the shelf shows the count, and the Organize
+    /// heading needs the ids to count each song once across sections.
+    pub missing_core_tags_song_ids: Vec<i64>,
     pub suspected_provenance_songs: Vec<Song>,
     pub duplicate_groups: Vec<DuplicateTrackGroup>,
     pub corrupt_songs: Vec<CorruptSongItem>,
@@ -227,7 +229,14 @@ pub(crate) fn query_unillustrated_albums(conn: &Connection) -> Result<Vec<Curati
 /// Single-track releases are intentionally excluded from missing track number checks.
 /// CUE sheet slices sharing the same file path with distinct `beginning_nanosec` values are
 /// recognized as valid sub-tracks and excluded from collision counts.
-pub(crate) fn query_incomplete_albums(conn: &Connection) -> Result<Vec<IncompleteAlbumItem>> {
+///
+/// `ignored_song_ids` are left out of the evaluation entirely: the overview passes the extra
+/// copies from duplicate groups, so an album whose only "problem" is a duplicate copy is
+/// reported once, under duplicates, and not again here.
+pub(crate) fn query_incomplete_albums(
+    conn: &Connection,
+    ignored_song_ids: &[i64],
+) -> Result<Vec<IncompleteAlbumItem>> {
     let sql = format!(
         "WITH {base_ctes},
         numbered_path_tracks AS (
@@ -245,6 +254,7 @@ pub(crate) fn query_incomplete_albums(conn: &Connection) -> Result<Vec<Incomplet
               AND loved != -1
               AND album_key IS NOT NULL AND TRIM(album_key) != ''
               AND track IS NOT NULL AND track > 0
+              AND id NOT IN (SELECT value FROM json_each(?1))
             GROUP BY album_key, COALESCE(disc, 1), track, path
         ),
         disc_track_counts AS (
@@ -272,6 +282,7 @@ pub(crate) fn query_incomplete_albums(conn: &Connection) -> Result<Vec<Incomplet
         LEFT JOIN top_album_genres tag ON songs.album_key = tag.album_key
         LEFT JOIN album_ratings ar ON songs.album_key = ar.album_key
         LEFT JOIN album_duplicate_counts adc ON songs.album_key = adc.album_key
+        WHERE songs.id NOT IN (SELECT value FROM json_each(?1))
         GROUP BY songs.album_key
         HAVING COUNT(*) >= 2
            AND (
@@ -284,9 +295,11 @@ pub(crate) fn query_incomplete_albums(conn: &Connection) -> Result<Vec<Incomplet
         local_sources = *LOCAL_SOURCES_SQL,
     );
 
+    let ignored = serde_json::to_string(ignored_song_ids)
+        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
     let mut stmt = conn.prepare(&sql)?;
     let albums = stmt
-        .query_map([], |row| {
+        .query_map([ignored], |row| {
             let album = row_to_curation_album_item(row)?;
             let unnumbered_count: i32 = row.get(13)?;
             let duplicate_track_number_count: i32 = row.get(14)?;
@@ -301,13 +314,13 @@ pub(crate) fn query_incomplete_albums(conn: &Connection) -> Result<Vec<Incomplet
     Ok(albums)
 }
 
-/// Counts local included library tracks missing any of the core tags: title, artist, or album.
+/// Ids of local included library tracks missing any of the core tags: title, artist, or album.
 ///
 /// Matches the predicate of `CollectionScanner::get_songs_missing_core_tags` to guarantee 1:1
 /// parity with the `Missing Metadata` auto-playlist (`missingmeta`, #367).
-pub(crate) fn query_missing_core_tags_count(conn: &Connection) -> Result<usize> {
+pub(crate) fn query_missing_core_tags_song_ids(conn: &Connection) -> Result<Vec<i64>> {
     let sql = format!(
-        "SELECT COUNT(*) FROM songs
+        "SELECT id FROM songs
          WHERE {}
            AND source IN ({local_sources})
            AND unavailable = 0
@@ -316,8 +329,11 @@ pub(crate) fn query_missing_core_tags_count(conn: &Connection) -> Result<usize> 
         crate::collection::MISSING_CORE_TAGS_SQL,
         local_sources = *LOCAL_SOURCES_SQL
     );
-    let count: i64 = conn.query_row(&sql, [], |r| r.get(0))?;
-    Ok(count.max(0) as usize)
+    let mut stmt = conn.prepare(&sql)?;
+    let ids = stmt
+        .query_map([], |r| r.get::<_, i64>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(ids)
 }
 
 /// Returns local lossless tracks flagged with suspected lossy transcode or upsampling warnings.
@@ -1090,20 +1106,30 @@ pub fn verify_library_integrity(app: &AppHandle, db: &Database) -> Result<usize>
 /// Computes the overall collection curation overview across local library files.
 ///
 /// Ensures album keys are up to date via `repair_album_keys` before executing groupings.
+/// Every candidate except each group's first (the copy a merge keeps by default; candidates
+/// are sorted best-first).
+fn extra_duplicate_copies(groups: &[DuplicateTrackGroup]) -> Vec<i64> {
+    groups
+        .iter()
+        .flat_map(|g| g.candidates.iter().skip(1).map(|c| c.song.id))
+        .collect()
+}
+
 pub fn compute_curation_overview(conn: &Connection) -> Result<CurationOverview> {
     crate::album_key::repair_album_keys(conn)?;
 
     let unillustrated_albums = query_unillustrated_albums(conn)?;
-    let incomplete_albums = query_incomplete_albums(conn)?;
-    let missing_core_tags_count = query_missing_core_tags_count(conn)?;
-    let suspected_provenance_songs = query_suspected_provenance_songs(conn)?;
     let duplicate_groups = query_duplicate_track_groups(conn)?;
+    let incomplete_albums =
+        query_incomplete_albums(conn, &extra_duplicate_copies(&duplicate_groups))?;
+    let missing_core_tags_song_ids = query_missing_core_tags_song_ids(conn)?;
+    let suspected_provenance_songs = query_suspected_provenance_songs(conn)?;
     let corrupt_songs = query_corrupt_songs(conn)?;
 
     Ok(CurationOverview {
         unillustrated_albums,
         incomplete_albums,
-        missing_core_tags_count,
+        missing_core_tags_song_ids,
         suspected_provenance_songs,
         duplicate_groups,
         corrupt_songs,
@@ -1135,7 +1161,7 @@ mod tests {
         let overview = compute_curation_overview(&conn).unwrap();
         assert!(overview.unillustrated_albums.is_empty());
         assert!(overview.incomplete_albums.is_empty());
-        assert_eq!(overview.missing_core_tags_count, 0);
+        assert!(overview.missing_core_tags_song_ids.is_empty());
         assert!(overview.suspected_provenance_songs.is_empty());
         assert!(overview.duplicate_groups.is_empty());
         assert!(overview.corrupt_songs.is_empty());
@@ -1445,7 +1471,7 @@ mod tests {
         upsert_song(&conn, &cue_slice_1).unwrap();
         upsert_song(&conn, &cue_slice_2).unwrap();
 
-        let incomplete = query_incomplete_albums(&conn).unwrap();
+        let incomplete = query_incomplete_albums(&conn, &[]).unwrap();
         assert_eq!(incomplete.len(), 2);
 
         let unnum_item = incomplete
@@ -1572,7 +1598,7 @@ mod tests {
         .unwrap();
 
         // Compare parity
-        let count = query_missing_core_tags_count(&conn).unwrap();
+        let count = query_missing_core_tags_song_ids(&conn).unwrap().len();
         let scanner_songs = scanner
             .get_songs_missing_core_tags(100, QueuePopulationMode::All)
             .unwrap();
@@ -1766,6 +1792,73 @@ mod tests {
         assert!(is_duplicates_folder(
             group.candidates[1].song.path.as_deref()
         ));
+    }
+
+    fn unnumbered_copy(path: &str, title: &str, album: &str) -> Song {
+        Song {
+            path: Some(path.to_string()),
+            title: Some(title.to_string()),
+            artist: Some("Balcony Sunrise".to_string()),
+            album: Some(album.to_string()),
+            length_nanosec: Some(180_000_000_000),
+            filetype: FileType::Mp3,
+            source: SongSource::LocalFile,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_overview_reports_a_duplicate_copy_once_not_also_as_an_incomplete_album() {
+        let (_temp, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        // One unnumbered single plus a copy of it in a sibling folder: the album only looks
+        // like an unnumbered two-track album because of the copy.
+        upsert_song(
+            &conn,
+            &unnumbered_copy("C:/Music/Back Home/Back Home.mp3", "Back Home", "Back Home"),
+        )
+        .unwrap();
+        upsert_song(
+            &conn,
+            &unnumbered_copy(
+                "C:/Music/Back Home - Copy/Back Home.mp3",
+                "Back Home",
+                "Back Home",
+            ),
+        )
+        .unwrap();
+
+        let overview = compute_curation_overview(&conn).unwrap();
+        assert_eq!(overview.duplicate_groups.len(), 1);
+        assert!(
+            overview.incomplete_albums.is_empty(),
+            "the copy is already reported under duplicates"
+        );
+    }
+
+    #[test]
+    fn test_overview_still_reports_an_incomplete_album_that_also_holds_a_duplicate() {
+        let (_temp, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        for (path, title) in [
+            ("C:/Music/Mixed/One.mp3", "One"),
+            ("C:/Music/Mixed/Two.mp3", "Two"),
+            ("C:/Music/Mixed/Three.mp3", "Three"),
+            ("C:/Music/Mixed - Copy/Three.mp3", "Three"),
+        ] {
+            upsert_song(&conn, &unnumbered_copy(path, title, "Mixed")).unwrap();
+        }
+
+        let overview = compute_curation_overview(&conn).unwrap();
+        assert_eq!(overview.duplicate_groups.len(), 1);
+        let album = overview
+            .incomplete_albums
+            .iter()
+            .find(|a| a.album.album == "Mixed")
+            .expect("three genuinely unnumbered tracks are still incomplete");
+        assert_eq!(album.unnumbered_count, 3, "the extra copy isn't counted");
     }
 
     #[test]

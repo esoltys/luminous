@@ -40,7 +40,7 @@ const { defaultInvokeHandler } = vi.hoisted(() => {
       return Promise.resolve({
         unillustrated_albums: [],
         incomplete_albums: [],
-        missing_core_tags_count: 0,
+        missing_core_tags_song_ids: [],
         suspected_provenance_songs: [],
         duplicate_groups: [],
       });
@@ -151,7 +151,7 @@ describe("OrganizeView header status", () => {
     });
   });
 
-  it("renders summaryWaitingOnCuration when ready and pending organize counts are 0 but curation shelf has items", async () => {
+  it("counts every song of a shelf album in the waiting header when nothing is ready to move", async () => {
     vi.mocked(invoke).mockImplementation((cmd: string) => {
       if (cmd === "preview_organize") {
         return Promise.resolve([]);
@@ -176,9 +176,62 @@ describe("OrganizeView header status", () => {
             },
           ],
           incomplete_albums: [],
-          missing_core_tags_count: 0,
+          missing_core_tags_song_ids: [],
           suspected_provenance_songs: [],
           duplicate_groups: [],
+        });
+      }
+      return defaultInvokeHandler(cmd);
+    });
+
+    const { findByText } = render(OrganizeView);
+
+    await waitFor(async () => {
+      expect(await findByText("2 songs waiting on tags or review")).toBeInTheDocument();
+    });
+  });
+
+  it("counts a duplicate's extra copy once, though the move list and shelf both report it", async () => {
+    const copy = { id: 213696, title: "Back Home" };
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "preview_organize") {
+        // The copy's new name clashes with the original's.
+        return Promise.resolve([
+          {
+            song_id: copy.id,
+            from_path: "/music/Back Home - Copy/Back Home.mp3",
+            to_path: "/music/Back Home/Back Home.mp3",
+            status: "collision",
+            error_message: null,
+          },
+        ]);
+      }
+      if (cmd === "get_duplicate_track_groups" || cmd === "get_curation_overview") {
+        const groups = [
+          {
+            group_key: "back-home",
+            title: "Back Home",
+            artist: "Balcony Sunrise",
+            album: "Back Home",
+            candidates: [
+              {
+                song: { id: 149, title: "Back Home" },
+                playlist_count: 0,
+                tags: [],
+                provenance: null,
+              },
+              { song: copy, playlist_count: 0, tags: [], provenance: null },
+            ],
+          },
+        ];
+        if (cmd === "get_duplicate_track_groups") return Promise.resolve(groups);
+        return Promise.resolve({
+          unillustrated_albums: [],
+          incomplete_albums: [],
+          missing_core_tags_song_ids: [],
+          suspected_provenance_songs: [],
+          duplicate_groups: groups,
+          corrupt_songs: [],
         });
       }
       return defaultInvokeHandler(cmd);
@@ -191,7 +244,7 @@ describe("OrganizeView header status", () => {
     });
   });
 
-  it("sums organizePendingCount and curationCount in waitingOnCuration header", async () => {
+  it("adds the move list's held-back songs to the shelf's in the waiting header", async () => {
     vi.mocked(invoke).mockImplementation((cmd: string) => {
       if (cmd === "preview_organize") {
         return Promise.resolve([
@@ -212,7 +265,7 @@ describe("OrganizeView header status", () => {
         return Promise.resolve({
           unillustrated_albums: [],
           incomplete_albums: [],
-          missing_core_tags_count: 2,
+          missing_core_tags_song_ids: [9000, 9001],
           suspected_provenance_songs: [],
           duplicate_groups: [],
         });
