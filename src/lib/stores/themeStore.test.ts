@@ -70,6 +70,52 @@ describe("buildExtractedColors (archetype-based artwork color extraction, #61)",
   });
 });
 
+describe("buildExtractedColors keeps surfaces to one hue (#2051)", () => {
+  const hueOf = (hex: string) => {
+    const { r, g, b } = hexToRgb(hex);
+    return rgbToHsl(r, g, b).h;
+  };
+  /** Largest circular distance (degrees) between any two hues. */
+  const hueSpread = (hexes: string[]) => {
+    const hues = hexes.map(hueOf);
+    let max = 0;
+    for (const a of hues) {
+      for (const b of hues) {
+        const d = Math.abs(a - b);
+        max = Math.max(max, Math.min(d, 360 - d));
+      }
+    }
+    return max;
+  };
+
+  // Golden Hour-style covers: a slate blue field plus rust brown, in both polarities.
+  const covers = {
+    "dark blue + brown": [
+      { r: 40, g: 56, b: 96, count: 800 },
+      { r: 120, g: 56, b: 24, count: 700 },
+      { r: 224, g: 160, b: 64, count: 60 },
+    ],
+    "light blue + brown": [
+      { r: 200, g: 208, b: 224, count: 900 },
+      { r: 248, g: 192, b: 112, count: 400 },
+      { r: 240, g: 144, b: 64, count: 200 },
+      { r: 96, g: 48, b: 16, count: 80 },
+    ],
+  };
+
+  for (const [name, counts] of Object.entries(covers)) {
+    it(`shares the canvas hue across primary, sidebar, playerbar and border (${name})`, () => {
+      const c = buildExtractedColors(counts);
+      expect(hueSpread([c.primary, c.sidebar, c.playerbar, c.border])).toBeLessThan(8);
+    });
+  }
+
+  it("still lets the accent take a different hue from the surfaces", () => {
+    const c = buildExtractedColors(covers["dark blue + brown"]);
+    expect(hueSpread([c.primary, c.accent])).toBeGreaterThan(8);
+  });
+});
+
 describe("HSL & Color Utilities", () => {
   it("blendToward correctly blends hex toward white and black", () => {
     const whiteBlended = blendToward("#000000", 255, 0.5);
