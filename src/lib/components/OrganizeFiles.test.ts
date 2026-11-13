@@ -497,4 +497,27 @@ describe("OrganizeFiles safeguards", () => {
       expect(queryByText("Sample Output")).not.toBeInTheDocument();
     });
   });
+
+  it("summarizes a preset as its outline and shows the raw pattern only for Custom", async () => {
+    const { findByText, findByRole, queryByText } = render(OrganizeFiles, {
+      embedded: true,
+      songIds: [],
+    });
+
+    const summaryBar = (await findByText("Template:")).parentElement!;
+    expect(summaryBar).toHaveTextContent("Default");
+    expect(summaryBar).toHaveTextContent("Album artist");
+    expect(summaryBar).toHaveTextContent("Track and title");
+    expect(summaryBar.textContent).not.toContain("%");
+
+    await fireEvent.click(await findByRole("button", { name: "Customize…" }));
+    await fireEvent.click(await findByRole("button", { name: "Custom" }));
+    await fireEvent.click(await findByRole("button", { name: "Done" }));
+    await waitFor(() => expect(queryByText("Sample Output")).not.toBeInTheDocument());
+
+    const customBar = (await findByText("Template:")).parentElement!;
+    expect(customBar.querySelector("code")).toHaveTextContent(
+      "%albumartist/{%year - }{%album/}{%disc-}{%track }%title",
+    );
+  });
 });
