@@ -755,7 +755,7 @@
       use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
     >
       <div
-        class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 acrylic-chrome [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isDetailHeaderCollapsed
+        class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isDetailHeaderCollapsed
           ? 'py-3'
           : 'pt-6 pb-6'} shrink-0"
       >

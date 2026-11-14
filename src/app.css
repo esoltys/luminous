@@ -351,12 +351,21 @@
   --acrylic-scrim-filter: blur(8px);
 }
 
-.acrylic-chrome {
+.acrylic-chrome,
+.acrylic-chrome-tint {
   background-color: color-mix(
     in srgb,
     var(--acrylic-tint, var(--color-brand-sidebar)) var(--acrylic-chrome-opacity, 50%),
     transparent
   );
+}
+
+/* Detail headers use .acrylic-chrome-tint instead of .acrylic-chrome: they sit
+   over already-blurred cover art (BlurredCover) and host portaled
+   acrylic-float menus that overlap their bottom edge, so dropping
+   backdrop-filter avoids overlapping backdrop-filter layers flickering in
+   WebView2 during reactive logo / spectrum frames (#2089). */
+.acrylic-chrome {
   -webkit-backdrop-filter: var(--acrylic-chrome-filter);
   backdrop-filter: var(--acrylic-chrome-filter);
   will-change: backdrop-filter;
