@@ -59,21 +59,24 @@ export function formatRelativeDate(timestampSec: number | undefined | null): str
 }
 
 /** Formats a chart week (as computed by the backend's `chart_week`, #662) as a
- * compact date range, e.g. "Sep 21-27" or "Sep 27-Oct 3" when crossing a
- * monthly boundary. The backend already resolved the week on the user's local
- * calendar and encodes its first date as that date's UTC midnight, so this
- * renders with `timeZone: "UTC"` to read the date back unshifted. */
+ * compact date range in the locale's own order and punctuation, e.g. "Sep 21 – 27"
+ * in English, "21–27 sept." in French and "21.–27. Sept." in German, and the
+ * longer form when the week crosses a month. `formatRange` owns the ordering and
+ * the range separator, so no locale's pattern is spelled out here. The backend
+ * already resolved the week on the user's local calendar and encodes its first
+ * date as that date's UTC midnight, so this renders with `timeZone: "UTC"` to
+ * read the date back unshifted. */
 export function formatWeekRange(periodStartSec: number, locale: string): string {
   const start = new Date(periodStartSec * 1000);
   const end = new Date((periodStartSec + 6 * 86_400) * 1000);
-  const fmtMonth = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });
-  const startMonth = fmtMonth.format(start);
-  const startDay = start.getUTCDate();
-  const endDay = end.getUTCDate();
-
-  if (start.getUTCMonth() === end.getUTCMonth()) {
-    return `${startMonth} ${startDay}-${endDay}`;
-  }
-  const endMonth = fmtMonth.format(end);
-  return `${startMonth} ${startDay}-${endMonth} ${endDay}`;
+  // A week that crosses New Year would otherwise print both years ("Dec 28, 2026 – Jan 3, 2027").
+  // Handing formatRange two dates in one year keeps it compact, and it still prints them in the
+  // order given, so only the year changes. This leaves `end` on the wrong calendar date on
+  // purpose; it is only ever used to build the string below.
+  end.setUTCFullYear(start.getUTCFullYear());
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).formatRange(start, end);
 }

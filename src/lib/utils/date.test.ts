@@ -72,25 +72,46 @@ describe("formatDateAdded", () => {
 });
 
 describe("formatWeekRange", () => {
-  it("formats dates in the same month compactly as 'MMM D-D'", () => {
-    const periodStart = Math.floor(Date.UTC(2026, 8, 21) / 1000);
-    expect(formatWeekRange(periodStart, "en")).toBe("Sep 21-27");
+  // The separator is an en dash, with or without spaces or thin spaces depending on the locale
+  // and ICU version, so these match the shape rather than the exact whitespace.
+  const DASH = "\\s*[–-]\\s*";
+  const weekOf = (y: number, m: number, d: number) => Math.floor(Date.UTC(y, m, d) / 1000);
+
+  it("formats a week inside one month with the month once", () => {
+    expect(formatWeekRange(weekOf(2026, 8, 21), "en")).toMatch(new RegExp(`^Sep 21${DASH}27$`));
   });
 
-  it("formats dates crossing monthly boundaries as 'MMM D-MMM D'", () => {
-    const periodStart = Math.floor(Date.UTC(2026, 8, 27) / 1000);
-    expect(formatWeekRange(periodStart, "en")).toBe("Sep 27-Oct 3");
+  it("names both months when the week crosses a month", () => {
+    expect(formatWeekRange(weekOf(2026, 8, 27), "en")).toMatch(new RegExp(`^Sep 27${DASH}Oct 3$`));
   });
 
-  it("formats dates crossing yearly boundaries as 'MMM D-MMM D'", () => {
-    const periodStart = Math.floor(Date.UTC(2026, 11, 28) / 1000);
-    expect(formatWeekRange(periodStart, "en")).toBe("Dec 28-Jan 3");
+  it("names both months when the week crosses a year", () => {
+    expect(formatWeekRange(weekOf(2026, 11, 28), "en")).toMatch(new RegExp(`^Dec 28${DASH}Jan 3$`));
   });
 
-  it("formats compactly with other locales such as French", () => {
-    const sameMonth = Math.floor(Date.UTC(2026, 8, 21) / 1000);
-    const crossMonth = Math.floor(Date.UTC(2026, 8, 27) / 1000);
-    expect(formatWeekRange(sameMonth, "fr")).toBe("sept. 21-27");
-    expect(formatWeekRange(crossMonth, "fr")).toBe("sept. 27-oct. 3");
+  it("puts the day first in French", () => {
+    expect(formatWeekRange(weekOf(2026, 10, 1), "fr")).toMatch(new RegExp(`^1${DASH}7 nov\\.$`));
+    expect(formatWeekRange(weekOf(2026, 8, 27), "fr")).toMatch(
+      new RegExp(`^27 sept\\.${DASH}3 oct\\.$`),
+    );
+  });
+
+  it("uses German ordinal days with the month after them", () => {
+    expect(formatWeekRange(weekOf(2026, 10, 1), "de")).toMatch(
+      new RegExp(`^1\\.${DASH}7\\. Nov\\.$`),
+    );
+  });
+
+  it("reads the date back unshifted whatever the local time zone", () => {
+    // 2026-11-01T00:00:00Z is still Oct 31 in the Americas; the range must start on the 1st.
+    // Pin a zone behind UTC so this fails on a UTC runner too if the date ever shifts.
+    const originalTz = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles";
+    try {
+      expect(formatWeekRange(weekOf(2026, 10, 1), "en-CA")).toMatch(/^Nov 1/);
+    } finally {
+      if (originalTz === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTz;
+    }
   });
 });
