@@ -1092,6 +1092,23 @@ class CollectionStore {
     return this.artistProfiles[artistName.toLowerCase()];
   }
 
+  /** Fetches the latest artist profile from SQLite and updates the in-memory
+   * cache so callers (e.g. ArtistProfileEditor) see external writes. */
+  async refreshArtistProfile(artistName: string): Promise<ArtistProfile | undefined> {
+    if (!artistName) return undefined;
+    const fresh = await Promise.resolve(
+      invoke<ArtistProfile>("get_artist_profile", { artist: artistName }),
+    );
+    if (fresh?.artist_key) {
+      this.artistProfiles = {
+        ...this.artistProfiles,
+        [fresh.artist_key.toLowerCase()]: fresh,
+      };
+      return fresh;
+    }
+    return undefined;
+  }
+
   async saveArtistProfile(profile: ArtistProfile): Promise<ArtistProfile> {
     const saved = await invoke<ArtistProfile>("set_artist_profile", { profile });
     if (saved?.artist_key) {

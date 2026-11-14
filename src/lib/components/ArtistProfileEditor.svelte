@@ -11,7 +11,6 @@
     PencilSimpleIcon as Pencil,
   } from "phosphor-svelte";
   import { untrack } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
   import Button from "./Button.svelte";
   import MarkdownEditor from "./MarkdownEditor.svelte";
   import { collectionStore } from "../stores/collection.svelte";
@@ -58,31 +57,28 @@
   let isSaving = $state(false);
   let isMarkdownEditorOpen = $state(false);
 
+  function applyProfileToForm(profile: ArtistProfile | undefined) {
+    website = profile?.website ?? "";
+    bio = profile?.bio ?? "";
+    tags = profile?.tags ? [...profile.tags] : [];
+    socialLinks = profile?.social_links ? profile.social_links.map((l) => ({ ...l })) : [];
+  }
+
   // Sync state when opened or artistName changes
   $effect(() => {
     if (isOpen) {
       const targetArtist = artistName;
-      const existing = untrack(() => collectionStore.getArtistProfile(targetArtist));
-      website = existing?.website ?? "";
-      bio = existing?.bio ?? "";
-      tags = existing?.tags ? [...existing.tags] : [];
-      socialLinks = existing?.social_links ? existing.social_links.map((l) => ({ ...l })) : [];
+      applyProfileToForm(untrack(() => collectionStore.getArtistProfile(targetArtist)));
       newTagInput = "";
 
       // Refresh from SQLite so external writes (e.g. MCP) aren't overwritten by a stale cache
       if (targetArtist) {
         let cancelled = false;
-        Promise.resolve(invoke<ArtistProfile>("get_artist_profile", { artist: targetArtist }))
+        collectionStore
+          .refreshArtistProfile(targetArtist)
           .then((fresh) => {
-            if (cancelled || !isOpen || artistName !== targetArtist || !fresh?.artist_key) return;
-            collectionStore.artistProfiles = {
-              ...collectionStore.artistProfiles,
-              [fresh.artist_key.toLowerCase()]: fresh,
-            };
-            website = fresh.website ?? "";
-            bio = fresh.bio ?? "";
-            tags = fresh.tags ? [...fresh.tags] : [];
-            socialLinks = fresh.social_links ? fresh.social_links.map((l) => ({ ...l })) : [];
+            if (cancelled || !isOpen || artistName !== targetArtist || !fresh) return;
+            applyProfileToForm(fresh);
           })
           .catch((err) => {
             console.error("Failed to refresh artist profile:", err);
