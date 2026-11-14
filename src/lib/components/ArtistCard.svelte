@@ -3,7 +3,6 @@
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import CoverStack from "./CoverStack.svelte";
-  import GenreChips from "./GenreChips.svelte";
   import { getArtistCoverStack, resolveArtistPortraitUrl } from "../utils/covers";
   import { PLAIN_TILE_COVER, PLAIN_TILE_RING, useCardAppearance } from "../utils/cardAppearance";
 
@@ -28,8 +27,6 @@
   }: Props = $props();
 
   let covers = $derived(getArtistCoverStack(artistAlbums, artistSongs));
-
-  let hasGenre = $derived(!!artist.genre?.trim());
 
   // Locally-discovered artist portrait (#98/#761) — replaces the album-art
   // CoverStack composite when found, since a real photo of the artist beats
@@ -117,17 +114,6 @@
   <span class="text-xs text-brand-text-secondary font-medium truncate w-full mt-0.5 text-left">
     {i18n.plural("playlists.songsCount", artist.song_count)}
   </span>
-  {#if !plain}
-    <div class="w-full mt-1.5 flex justify-start">
-      {#if hasGenre}
-        <GenreChips genre={artist.genre} />
-      {:else}
-        <span class="text-xs text-brand-text-secondary font-medium truncate text-left">
-          {i18n.t("artistDetail.unknownGenre")}
-        </span>
-      {/if}
-    </div>
-  {/if}
 </div>
 
 <style>

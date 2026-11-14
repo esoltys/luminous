@@ -63,24 +63,23 @@ describe("ArtistCard.svelte", () => {
     collectionStore.extendedArtworkByArtist = {};
   });
 
-  it("renders artist name, genre chip, and song count", () => {
-    const { getByText, getByRole } = render(ArtistCard, {
+  it("renders artist name and song count without genre chips", () => {
+    const { getByText, queryByRole, queryByText } = render(ArtistCard, {
       props: { artist: mockArtist, artistAlbums: [] },
     });
 
     expect(getByText("Dave Hawkins")).toBeInTheDocument();
-    const genreChip = getByRole("button", { name: "Rock" });
-    expect(genreChip).toBeInTheDocument();
-    expect(getByText("Rock")).toBeInTheDocument();
     expect(getByText("6 songs")).toBeInTheDocument();
+    expect(queryByRole("button", { name: "Rock" })).toBeNull();
+    expect(queryByText("Rock")).toBeNull();
   });
 
-  it("falls back to unknown genre text when artist has no genre", () => {
-    const { getByText } = render(ArtistCard, {
+  it("does not render unknown genre text when artist has no genre", () => {
+    const { queryByText } = render(ArtistCard, {
       props: { artist: { ...mockArtist, genre: undefined }, artistAlbums: [] },
     });
 
-    expect(getByText("Unknown genre")).toBeInTheDocument();
+    expect(queryByText("Unknown genre")).toBeNull();
   });
 
   it("renders cover artwork from artistAlbums when albums exist", () => {

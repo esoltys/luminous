@@ -138,14 +138,14 @@ describe("CollectionView.svelte", () => {
     expect(getByText("Album 1")).toBeInTheDocument();
   });
 
-  it("renders artists and their genre in Artists view sub-tab", () => {
+  it("renders artists without genre chips in Artists view sub-tab", () => {
     navigationStore.activeSubTab = "artists";
-    const { getByText } = render(CollectionView);
+    const { getByText, queryByText } = render(CollectionView);
 
     expect(getByText("Band A")).toBeInTheDocument();
-    expect(getByText("Rock")).toBeInTheDocument();
     expect(getByText("Band B")).toBeInTheDocument();
-    expect(getByText("Pop")).toBeInTheDocument();
+    expect(queryByText("Rock")).toBeNull();
+    expect(queryByText("Pop")).toBeNull();
   });
 
   // Every mounted artist card looks up its portrait and loads covers, so a
