@@ -3,7 +3,6 @@
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import CoverArt from "./CoverArt.svelte";
-  import GenreChips from "./GenreChips.svelte";
   import { getArtistCoverStack, resolveArtistPortraitUrl } from "../utils/covers";
   import { rowClasses, useCardAppearance } from "../utils/cardAppearance";
 
@@ -35,7 +34,6 @@
   // Same front-cover selection ArtistCard uses for its CoverStack (index 0 is
   // the front/topmost tile), so the row's single cover always matches it.
   let frontCover = $derived(getArtistCoverStack(artistAlbums, artistSongs, 1)[0]);
-  let hasGenre = $derived(!!artist.genre?.trim());
 
   // Locally-discovered artist portrait (#98/#761) — same as ArtistCard,
   // replaces the album-art composite when found.
@@ -115,21 +113,10 @@
     {/if}
   </div>
 
-  <div class="relative z-10 min-w-0 flex-1 flex flex-col gap-0.5">
-    <div class="flex items-center justify-between gap-2">
-      <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
-        {artist.name || i18n.t("collection.unknownArtist")}
-      </p>
-    </div>
-    <div class="min-w-0">
-      {#if hasGenre}
-        <GenreChips genre={artist.genre} />
-      {:else}
-        <p class="truncate text-xs text-brand-text-secondary font-medium">
-          {i18n.t("artistDetail.unknownGenre")}
-        </p>
-      {/if}
-    </div>
+  <div class="relative z-10 min-w-0 flex-1">
+    <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
+      {artist.name || i18n.t("collection.unknownArtist")}
+    </p>
   </div>
 
   <p
