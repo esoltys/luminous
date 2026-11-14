@@ -66,7 +66,7 @@ jobs:
         run: |
           # Build release binary directly with capture feature, embedding the capture frontendDist
           cd src-tauri
-          cargo build --release --features capture
+          cargo build --release --features capture,tauri/custom-protocol
 
       - name: Prepare capture binary artifact
         shell: bash

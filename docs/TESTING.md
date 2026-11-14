@@ -113,7 +113,7 @@ External capture tools and runners can drive a prebuilt non-release binary witho
 - **Build the capture flavor locally:**
   ```bash
   bun run build:capture
-  cd src-tauri && cargo build --release --features capture
+  cd src-tauri && cargo build --release --features capture,tauri/custom-protocol
   ```
 - **Automated CI artifact:** Trigger the manual workflow `Capture Build` (`.github/workflows/capture-build.yml`) via GitHub Actions `workflow_dispatch` to produce an unsigned binary artifact for Windows or Linux.
 - **Release gating:** Release, MSIX, and Flatpak builds never enable the `capture` feature or `capture` Vite mode. `src/lib/scripting/release-gating.test.ts` scans the release `build/` assets in release workflows to prove that the scripting API was dead-code eliminated and no scripting symbols leaked into published binaries.
@@ -125,7 +125,8 @@ Docs and Store screenshots, tutorials, and promotional clips are authored and re
 
 - **Scripting Target:** Luminous exposes the versioned in-app scripting engine (`src/lib/scripting/`) in development and capture builds (`bun run build:capture` or `bun run dev`), providing typed access to views, layout, overlays, dialogs, and playback controls.
 - **Throwaway Profiles:** For local testing or performance profiling, `scripts/throwaway-profile.ts` boots an isolated instance with its own data dir and devtools port without affecting the user's real database.
-- **Workflow:** To regenerate user guide or Store screenshots, run `bun run studio` in the `luminous-store` repository and run the desired guide or store recipes.
+- **Workflow (Store screenshots):** run `bun run studio` in the `luminous-store` repository and run the desired store recipes.
+- **Workflow (user guide):** the guide screenshots use your real library, not mock data. In `luminous-store`, run `bun run guide -- --exe <capture build exe> --out <this checkout>/docs/user-guide/assets`. It captures every manifest image in each guide locale in light and dark, plus the English-only dynamic slideshow, from a private copy of your `luminous.db` (the copy is scrubbed of scrobbling and Discord keys and never written back; close your own Luminous first, it is single-instance). The empty-library Home runs in a separate empty profile. Narrow a run with `--locale en-CA --scheme dark --name albums`, then run `bun run guide-webp` (the command does it for you) and `bun scripts/guide-manifest.ts`. The scenes live in `studio/scenes/src/guide/`; add one there when a guide image is added to the manifest (`studio/scenes/test/guide-scenes.test.ts` fails when a manifest image has no scene).
 
 ### User guide image manifest & validation contract
 
