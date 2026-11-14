@@ -542,6 +542,7 @@ class CollectionStore {
         this.refreshDirectories();
         this.refreshWebDavServers();
         this.refreshSubsonicServers();
+        this.loadArtistProfiles();
         tagsStore.load().catch((err) => {
           console.error("Failed to refresh tags after library change:", err);
         });

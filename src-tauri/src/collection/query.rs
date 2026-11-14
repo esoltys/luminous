@@ -1081,6 +1081,20 @@ impl CollectionScanner {
         set_artist_profile_conn(&conn, profile)
     }
 
+    /// Update only the `bio` column for an artist profile without touching
+    /// `tags` or other fields (e.g. sidecar adoption or bio self-heal).
+    pub fn set_artist_bio(&self, artist: &str, bio: Option<&str>) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        set_artist_bio_conn(&conn, artist, bio)
+    }
+
+    /// Update only the `musicbrainz_artist_id` column for an artist profile
+    /// without touching `tags` or other fields.
+    pub fn set_artist_mbid(&self, artist: &str, mbid: &str) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        set_artist_mbid_conn(&conn, artist, mbid)
+    }
+
     /// Retrieve all custom artist profiles in the library (#473).
     pub fn get_all_artist_profiles(&self) -> Result<Vec<ArtistProfile>> {
         let conn = self.db.pool.get()?;
@@ -2041,6 +2055,34 @@ pub fn set_artist_profile_conn(
     }
 
     Ok(profile.clone())
+}
+
+/// Update only `artist_profiles.bio` (inserting a minimal row if absent),
+/// leaving `tags`, links, and enrichment columns untouched.
+pub fn set_artist_bio_conn(
+    conn: &rusqlite::Connection,
+    artist: &str,
+    bio: Option<&str>,
+) -> Result<()> {
+    conn.execute(
+        "INSERT INTO artist_profiles (artist_key, bio)
+         VALUES (?1, ?2)
+         ON CONFLICT(artist_key) DO UPDATE SET bio = excluded.bio",
+        params![artist, bio],
+    )?;
+    Ok(())
+}
+
+/// Update only `artist_profiles.musicbrainz_artist_id` (inserting a minimal
+/// row if absent), leaving `tags`, bio, and other columns untouched.
+pub fn set_artist_mbid_conn(conn: &rusqlite::Connection, artist: &str, mbid: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO artist_profiles (artist_key, musicbrainz_artist_id)
+         VALUES (?1, ?2)
+         ON CONFLICT(artist_key) DO UPDATE SET musicbrainz_artist_id = excluded.musicbrainz_artist_id",
+        params![artist, mbid],
+    )?;
+    Ok(())
 }
 
 /// Retrieve all saved artist profiles in SQLite (#473).
@@ -3696,6 +3738,50 @@ mod tests {
         assert_eq!(all[0].artist_key, "Shania Twain");
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_scoped_artist_column_updates_preserve_tags() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_scoped_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Nelly Furtado".to_string(),
+                tags: vec!["Award-Winning".to_string(), "Canadian".to_string()],
+                website: Some("https://nellyfurtado.com".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        set_artist_bio_conn(&conn, "Nelly Furtado", Some("Adopted bio")).unwrap();
+        set_artist_mbid_conn(
+            &conn,
+            "Nelly Furtado",
+            "13655113-b181-4718-8a6b-e3a929e7e46a",
+        )
+        .unwrap();
+
+        let loaded = get_artist_profile_conn(&conn, "Nelly Furtado").unwrap();
+        assert_eq!(loaded.tags, vec!["Award-Winning", "Canadian"]);
+        assert_eq!(loaded.website.as_deref(), Some("https://nellyfurtado.com"));
+        assert_eq!(loaded.bio.as_deref(), Some("Adopted bio"));
+        assert_eq!(
+            loaded.musicbrainz_artist_id.as_deref(),
+            Some("13655113-b181-4718-8a6b-e3a929e7e46a")
+        );
+
+        // Also works when no row existed yet
+        set_artist_bio_conn(&conn, "New Artist", Some("Fresh bio")).unwrap();
+        let new_loaded = get_artist_profile_conn(&conn, "New Artist").unwrap();
+        assert_eq!(new_loaded.bio.as_deref(), Some("Fresh bio"));
+        assert!(new_loaded.tags.is_empty());
     }
 
     #[test]

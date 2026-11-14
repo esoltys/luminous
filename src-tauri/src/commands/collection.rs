@@ -764,9 +764,7 @@ pub async fn get_artist_profile(
         let cleaned_bio = profile.bio.as_deref().and_then(extract_bio_prose);
         if cleaned_bio != profile.bio {
             profile.bio = cleaned_bio;
-            if let Ok(saved) = scanner.set_artist_profile(&profile) {
-                profile = saved;
-            }
+            let _ = scanner.set_artist_bio(&profile.artist_key, profile.bio.as_deref());
         }
 
         if profile.bio.is_none() {
@@ -779,9 +777,7 @@ pub async fn get_artist_profile(
                 biomanager::ARTIST_BIO_FILENAME,
             ) {
                 profile.bio = Some(bio);
-                if let Ok(saved) = scanner.set_artist_profile(&profile) {
-                    profile = saved;
-                }
+                let _ = scanner.set_artist_bio(&profile.artist_key, profile.bio.as_deref());
             }
         }
 
@@ -830,6 +826,126 @@ fn merge_artist_profile_edit(stored: ArtistProfile, edit: ArtistProfile) -> Arti
         bio: edit.bio,
         ..stored
     }
+}
+
+/// Merges newly fetched MusicBrainz homepage and social-link relations onto the
+/// *latest* stored `ArtistProfile` (re-read under the DB lock after network
+/// calls complete), so concurrent external writes to `tags`, `bio`, or image
+/// columns are never overwritten by a stale pre-fetch snapshot (#2094).
+fn merge_artist_details_retrieval(
+    mut stored: ArtistProfile,
+    artist: &str,
+    artist_mbid: &str,
+    official_homepages: &[String],
+    mut fetched_links: Vec<ArtistSocialLink>,
+) -> (ArtistProfile, usize) {
+    stored.artist_key = artist.to_string();
+    stored.details_fetched = true;
+    if stored.musicbrainz_artist_id.is_none() {
+        stored.musicbrainz_artist_id = Some(artist_mbid.to_string());
+    }
+
+    // Re-derive the full set of homepage URLs — the current primary website,
+    // any secondary ones already saved as "website" social links, plus
+    // whatever's freshly fetched — deduped and with a live homepage
+    // preferred over a web.archive.org snapshot (only ever a fallback
+    // reference for a site that's gone offline). Recomputing primary vs.
+    // secondary from the *whole* known set on every run, rather than only
+    // reconciling against what was freshly fetched, means re-running this
+    // action heals stale ordering/duplication left by an earlier run
+    // instead of layering more on top of it (#1123).
+    let mut known_homepage_urls: Vec<String> = stored.website.iter().cloned().collect();
+    known_homepage_urls.extend(
+        stored
+            .social_links
+            .iter()
+            .filter(|l| l.platform == "website")
+            .map(|l| l.handle_or_url.clone()),
+    );
+    let new_homepages_count = official_homepages
+        .iter()
+        .filter(|url| !known_homepage_urls.contains(url))
+        .count();
+
+    let mut all_homepages = known_homepage_urls;
+    for url in official_homepages {
+        if !all_homepages.contains(url) {
+            all_homepages.push(url.clone());
+        }
+    }
+    let mut all_homepages = resolve_homepage_urls(all_homepages);
+
+    stored.social_links.retain(|l| l.platform != "website");
+    stored.website = None;
+    if !all_homepages.is_empty() {
+        stored.website = Some(all_homepages.remove(0));
+    }
+    for url in all_homepages {
+        fetched_links.push(ArtistSocialLink {
+            platform: "website".to_string(),
+            handle_or_url: url,
+        });
+    }
+
+    let mut added_count = new_homepages_count;
+    let existing_links =
+        dedupe_links_by_platform_and_url(std::mem::take(&mut stored.social_links), |l| {
+            (l.platform.as_str(), l.handle_or_url.as_str())
+        });
+    let (merged_links, links_added) = merge_artist_social_links(existing_links, fetched_links);
+    stored.social_links = merged_links;
+    added_count += links_added;
+
+    (stored, added_count)
+}
+
+/// Image-only delta produced by `retrieve_artist_image` during its async
+/// download phase, applied to a freshly re-read `ArtistProfile` under the DB
+/// lock so concurrent external writes to `tags`, `bio`, or links are preserved
+/// (#2094).
+#[derive(Default)]
+struct ArtistImageUpdate {
+    artist_mbid: String,
+    /// `Some((cached_filename_or_none_if_sidecar, source))` when a photo was saved.
+    photo: Option<(Option<String>, String)>,
+    mark_photo_fetched: bool,
+    /// `Some(Some(filename))` if cached, `Some(None)` if saved as sidecar.
+    logo_filename: Option<Option<String>>,
+    mark_logo_fetched: bool,
+    /// `Some(Some(filename))` if cached, `Some(None)` if saved as sidecar or cleared.
+    background_filename: Option<Option<String>>,
+    mark_background_fetched: bool,
+}
+
+fn merge_artist_image_retrieval(
+    mut stored: ArtistProfile,
+    artist: &str,
+    update: ArtistImageUpdate,
+) -> ArtistProfile {
+    stored.artist_key = artist.to_string();
+    if stored.musicbrainz_artist_id.is_none() {
+        stored.musicbrainz_artist_id = Some(update.artist_mbid);
+    }
+    if let Some((filename, source)) = update.photo {
+        stored.fetched_image_filename = filename;
+        stored.fetched_image_source = Some(source);
+    }
+    if update.mark_photo_fetched {
+        stored.image_fetched = true;
+    }
+    if let Some(logo_filename) = update.logo_filename {
+        stored.fetched_logo_filename = logo_filename;
+    }
+    if update.mark_logo_fetched {
+        stored.logo_fetched = true;
+    }
+    if let Some(background_filename) = update.background_filename {
+        stored.fetched_background_filename = background_filename;
+    }
+    if update.mark_background_fetched {
+        stored.background_fetched = true;
+    }
+    stored
 }
 
 #[tauri::command]
@@ -1313,8 +1429,8 @@ pub async fn retrieve_album_details(
             let mut artist_profile = scanner.get_artist_profile(&artist_key)?;
             if let Some(artist_credit_id) = artist_credit_id {
                 if artist_profile.musicbrainz_artist_id.is_none() {
+                    scanner.set_artist_mbid(&artist_profile.artist_key, &artist_credit_id)?;
                     artist_profile.musicbrainz_artist_id = Some(artist_credit_id);
-                    artist_profile = save_artist_profile_with_sidecar(scanner, &artist_profile)?;
                 }
             }
             Ok(Some(artist_profile))
@@ -1508,7 +1624,7 @@ pub async fn retrieve_artist_details(
         return Err("Online context enrichment is disabled".to_string());
     }
 
-    let (artist_mbid, current_profile) = resolve_artist_mbid_and_profile(&state, &artist).await?;
+    let (artist_mbid, _) = resolve_artist_mbid_and_profile(&state, &artist).await?;
 
     let Some(artist_mbid) = artist_mbid else {
         return Err(
@@ -1537,72 +1653,21 @@ pub async fn retrieve_artist_details(
         })
         .collect();
 
-    let mut updated_profile = current_profile;
-    updated_profile.artist_key = artist;
-    updated_profile.details_fetched = true;
-    if updated_profile.musicbrainz_artist_id.is_none() {
-        updated_profile.musicbrainz_artist_id = Some(artist_mbid);
-    }
-
-    // Re-derive the full set of homepage URLs — the current primary website,
-    // any secondary ones already saved as "website" social links, plus
-    // whatever's freshly fetched — deduped and with a live homepage
-    // preferred over a web.archive.org snapshot (only ever a fallback
-    // reference for a site that's gone offline). Recomputing primary vs.
-    // secondary from the *whole* known set on every run, rather than only
-    // reconciling against what was freshly fetched, means re-running this
-    // action heals stale ordering/duplication left by an earlier run
-    // instead of layering more on top of it (#1123).
-    let mut known_homepage_urls: Vec<String> = updated_profile.website.iter().cloned().collect();
-    known_homepage_urls.extend(
-        updated_profile
-            .social_links
-            .iter()
-            .filter(|l| l.platform == "website")
-            .map(|l| l.handle_or_url.clone()),
-    );
-    let new_homepages_count = official_homepages
-        .iter()
-        .filter(|url| !known_homepage_urls.contains(url))
-        .count();
-
-    let mut all_homepages = known_homepage_urls;
-    for url in official_homepages {
-        if !all_homepages.contains(&url) {
-            all_homepages.push(url);
-        }
-    }
-    let mut all_homepages = resolve_homepage_urls(all_homepages);
-
-    updated_profile
-        .social_links
-        .retain(|l| l.platform != "website");
-    updated_profile.website = None;
-    let mut fetched_links = fetched_links;
-    if !all_homepages.is_empty() {
-        updated_profile.website = Some(all_homepages.remove(0));
-    }
-    for url in all_homepages {
-        fetched_links.push(ArtistSocialLink {
-            platform: "website".to_string(),
-            handle_or_url: url,
-        });
-    }
-
-    let mut added_count = new_homepages_count;
-    let existing_links =
-        dedupe_links_by_platform_and_url(std::mem::take(&mut updated_profile.social_links), |l| {
-            (l.platform.as_str(), l.handle_or_url.as_str())
-        });
-    let (merged_links, links_added) = merge_artist_social_links(existing_links, fetched_links);
-    updated_profile.social_links = merged_links;
-    added_count += links_added;
-
-    let profile = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        save_artist_profile_with_sidecar(scanner, &updated_profile)
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+    let (profile, added_count) =
+        crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+            let stored = scanner.get_artist_profile(&artist)?;
+            let (updated_profile, added_count) = merge_artist_details_retrieval(
+                stored,
+                &artist,
+                &artist_mbid,
+                &official_homepages,
+                fetched_links,
+            );
+            let saved = save_artist_profile_with_sidecar(scanner, &updated_profile)?;
+            Ok((saved, added_count))
+        })
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(ArtistDetailsRetrievalResult {
         profile,
@@ -1843,11 +1908,10 @@ pub async fn retrieve_artist_image(
     let stem = state.cover_manager.get_artist_image_hash(&artist_mbid);
     let mut result = ArtistImageRetrievalResult::default();
     let mut download_error = None;
-    let mut profile = current_profile;
-    profile.artist_key = artist.clone();
-    if profile.musicbrainz_artist_id.is_none() {
-        profile.musicbrainz_artist_id = Some(artist_mbid);
-    }
+    let mut update = ArtistImageUpdate {
+        artist_mbid,
+        ..Default::default()
+    };
 
     let scanner = CollectionScanner::new(Arc::clone(&state.db));
     let artist_dir = scanner
@@ -1858,7 +1922,7 @@ pub async fn retrieve_artist_image(
 
     if want_photo {
         match photo {
-            None => profile.image_fetched = true,
+            None => update.mark_photo_fetched = true,
             Some((url, source)) => {
                 let mut sidecar_written = false;
                 if let Some(ref dir) = artist_dir {
@@ -1872,9 +1936,8 @@ pub async fn retrieve_artist_image(
                                     crate::covermanager::local_artwork_uri(&sidecar_path);
                                 result.uri = Some(local_uri);
                                 result.source = Some(source.as_str().to_string());
-                                profile.fetched_image_filename = None;
-                                profile.fetched_image_source = Some(source.as_str().to_string());
-                                profile.image_fetched = true;
+                                update.photo = Some((None, source.as_str().to_string()));
+                                update.mark_photo_fetched = true;
                                 sidecar_written = true;
                                 let _ = std::fs::remove_file(
                                     state.cover_manager.covers_dir().join(format!("{stem}.jpg")),
@@ -1891,9 +1954,8 @@ pub async fn retrieve_artist_image(
                         Ok(filename) => {
                             result.uri = Some(format!("luminous-art://{filename}"));
                             result.source = Some(source.as_str().to_string());
-                            profile.fetched_image_filename = Some(filename);
-                            profile.fetched_image_source = Some(source.as_str().to_string());
-                            profile.image_fetched = true;
+                            update.photo = Some((Some(filename), source.as_str().to_string()));
+                            update.mark_photo_fetched = true;
                         }
                         Err(e) => download_error = Some(e),
                     }
@@ -1903,7 +1965,7 @@ pub async fn retrieve_artist_image(
     }
     if want_logo && fanart_asked {
         match fanart.logo {
-            None => profile.logo_fetched = true,
+            None => update.mark_logo_fetched = true,
             Some(url) => {
                 let mut sidecar_written = false;
                 if let Some(ref dir) = artist_dir {
@@ -1916,8 +1978,8 @@ pub async fn retrieve_artist_image(
                                 let local_uri =
                                     crate::covermanager::local_artwork_uri(&sidecar_path);
                                 result.logo_uri = Some(local_uri);
-                                profile.fetched_logo_filename = None;
-                                profile.logo_fetched = true;
+                                update.logo_filename = Some(None);
+                                update.mark_logo_fetched = true;
                                 sidecar_written = true;
                                 let _ = std::fs::remove_file(
                                     state
@@ -1941,8 +2003,8 @@ pub async fn retrieve_artist_image(
                     {
                         Ok(filename) => {
                             result.logo_uri = Some(format!("luminous-art://{filename}"));
-                            profile.fetched_logo_filename = Some(filename);
-                            profile.logo_fetched = true;
+                            update.logo_filename = Some(Some(filename));
+                            update.mark_logo_fetched = true;
                         }
                         Err(e) => download_error = download_error.or(Some(e)),
                     }
@@ -1955,8 +2017,8 @@ pub async fn retrieve_artist_image(
             None => {
                 // Also drops an image cached before banners replaced 16:9
                 // backdrops, which the header can't fit.
-                profile.fetched_background_filename = None;
-                profile.background_fetched = true;
+                update.background_filename = Some(None);
+                update.mark_background_fetched = true;
             }
             Some(url) => {
                 let mut sidecar_written = false;
@@ -1970,8 +2032,8 @@ pub async fn retrieve_artist_image(
                                 let local_uri =
                                     crate::covermanager::local_artwork_uri(&sidecar_path);
                                 result.background_uri = Some(local_uri);
-                                profile.fetched_background_filename = None;
-                                profile.background_fetched = true;
+                                update.background_filename = Some(None);
+                                update.mark_background_fetched = true;
                                 sidecar_written = true;
                                 let _ = std::fs::remove_file(
                                     state
@@ -1994,8 +2056,8 @@ pub async fn retrieve_artist_image(
                     match cache_fetched_artist_image(&state, &client, &url, &stem).await {
                         Ok(filename) => {
                             result.background_uri = Some(format!("luminous-art://{filename}"));
-                            profile.fetched_background_filename = Some(filename);
-                            profile.background_fetched = true;
+                            update.background_filename = Some(Some(filename));
+                            update.mark_background_fetched = true;
                         }
                         Err(e) => download_error = download_error.or(Some(e)),
                     }
@@ -2004,9 +2066,10 @@ pub async fn retrieve_artist_image(
         }
     }
 
-    let to_save = profile.clone();
-    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        save_artist_profile_with_sidecar(scanner, &to_save)
+    let profile = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        let stored = scanner.get_artist_profile(&artist)?;
+        let merged = merge_artist_image_retrieval(stored, &artist, update);
+        save_artist_profile_with_sidecar(scanner, &merged)
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -3096,6 +3159,86 @@ mod tests {
                 && merged.logo_fetched
                 && merged.background_fetched
         );
+    }
+
+    #[test]
+    fn test_merge_artist_details_retrieval_preserves_external_tags_and_bio() {
+        let stored = ArtistProfile {
+            artist_key: "Shania Twain".to_string(),
+            tags: vec!["Award-Winning".to_string(), "Country".to_string()],
+            bio: Some("External bio".to_string()),
+            fetched_image_filename: Some("portrait.jpg".to_string()),
+            image_fetched: true,
+            ..Default::default()
+        };
+
+        let (merged, added_count) = merge_artist_details_retrieval(
+            stored,
+            "Shania Twain",
+            "042c0697-3948-4720-bf43-690240aeac43",
+            &["https://shaniatwain.com".to_string()],
+            vec![ArtistSocialLink {
+                platform: "instagram".to_string(),
+                handle_or_url: "https://instagram.com/shaniatwain".to_string(),
+            }],
+        );
+
+        assert_eq!(added_count, 2);
+        assert_eq!(merged.tags, vec!["Award-Winning", "Country"]);
+        assert_eq!(merged.bio.as_deref(), Some("External bio"));
+        assert_eq!(
+            merged.fetched_image_filename.as_deref(),
+            Some("portrait.jpg")
+        );
+        assert!(merged.image_fetched);
+        assert!(merged.details_fetched);
+        assert_eq!(merged.website.as_deref(), Some("https://shaniatwain.com"));
+        assert_eq!(merged.social_links.len(), 1);
+    }
+
+    #[test]
+    fn test_merge_artist_image_retrieval_preserves_external_tags_and_details() {
+        let stored = ArtistProfile {
+            artist_key: "Dua Lipa".to_string(),
+            website: Some("https://dualipa.com".to_string()),
+            tags: vec!["Award-Winning".to_string(), "Pop".to_string()],
+            social_links: vec![ArtistSocialLink {
+                platform: "youtube".to_string(),
+                handle_or_url: "https://youtube.com/@dualipa".to_string(),
+            }],
+            bio: Some("British-Albanian singer".to_string()),
+            details_fetched: true,
+            ..Default::default()
+        };
+
+        let merged = merge_artist_image_retrieval(
+            stored,
+            "Dua Lipa",
+            ArtistImageUpdate {
+                artist_mbid: "6f1a58bf-9b1b-49cf-a44a-6cefad7ae04f".to_string(),
+                photo: Some((Some("dua.jpg".to_string()), "fanart".to_string())),
+                mark_photo_fetched: true,
+                logo_filename: Some(Some("dua_logo.png".to_string())),
+                mark_logo_fetched: true,
+                background_filename: None,
+                mark_background_fetched: false,
+            },
+        );
+
+        assert_eq!(merged.tags, vec!["Award-Winning", "Pop"]);
+        assert_eq!(merged.bio.as_deref(), Some("British-Albanian singer"));
+        assert_eq!(merged.website.as_deref(), Some("https://dualipa.com"));
+        assert_eq!(merged.social_links.len(), 1);
+        assert!(merged.details_fetched);
+        assert_eq!(merged.fetched_image_filename.as_deref(), Some("dua.jpg"));
+        assert_eq!(merged.fetched_image_source.as_deref(), Some("fanart"));
+        assert!(merged.image_fetched);
+        assert_eq!(
+            merged.fetched_logo_filename.as_deref(),
+            Some("dua_logo.png")
+        );
+        assert!(merged.logo_fetched);
+        assert!(!merged.background_fetched);
     }
 
     #[test]

@@ -10,6 +10,8 @@
     CircleNotchIcon as LoaderCircle,
     PencilSimpleIcon as Pencil,
   } from "phosphor-svelte";
+  import { untrack } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import Button from "./Button.svelte";
   import MarkdownEditor from "./MarkdownEditor.svelte";
   import { collectionStore } from "../stores/collection.svelte";
@@ -59,12 +61,36 @@
   // Sync state when opened or artistName changes
   $effect(() => {
     if (isOpen) {
-      const existing = collectionStore.getArtistProfile(artistName);
+      const targetArtist = artistName;
+      const existing = untrack(() => collectionStore.getArtistProfile(targetArtist));
       website = existing?.website ?? "";
       bio = existing?.bio ?? "";
       tags = existing?.tags ? [...existing.tags] : [];
       socialLinks = existing?.social_links ? existing.social_links.map((l) => ({ ...l })) : [];
       newTagInput = "";
+
+      // Refresh from SQLite so external writes (e.g. MCP) aren't overwritten by a stale cache
+      if (targetArtist) {
+        let cancelled = false;
+        Promise.resolve(invoke<ArtistProfile>("get_artist_profile", { artist: targetArtist }))
+          .then((fresh) => {
+            if (cancelled || !isOpen || artistName !== targetArtist || !fresh?.artist_key) return;
+            collectionStore.artistProfiles = {
+              ...collectionStore.artistProfiles,
+              [fresh.artist_key.toLowerCase()]: fresh,
+            };
+            website = fresh.website ?? "";
+            bio = fresh.bio ?? "";
+            tags = fresh.tags ? [...fresh.tags] : [];
+            socialLinks = fresh.social_links ? fresh.social_links.map((l) => ({ ...l })) : [];
+          })
+          .catch((err) => {
+            console.error("Failed to refresh artist profile:", err);
+          });
+        return () => {
+          cancelled = true;
+        };
+      }
     }
   });
 
