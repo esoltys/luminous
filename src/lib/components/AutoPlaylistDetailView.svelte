@@ -823,7 +823,7 @@
   use:rememberScroll={`autoplaylist:${view.kind}:${view.genre ?? view.decade ?? view.bpm ?? ""}`}
 >
   <div
-    class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome [--acrylic-tint:var(--color-brand-main)] px-6 pt-6 pb-6 shrink-0"
+    class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 pt-6 pb-6 shrink-0"
   >
     <div class="flex items-stretch justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">

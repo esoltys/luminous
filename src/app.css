@@ -317,9 +317,10 @@
  * it read as acrylic: blur alone greys out what shows through, saturate brings
  * its colour back.
  *
- * - Chrome: large panels that content moves behind (player bar, detail
- *   headers, song table surfaces). A small blur, so what passes underneath
- *   still reads as shapes.
+ * - Chrome: large panels that content moves behind (player bar, song table
+ *   surfaces, lyrics header). A small blur, so what passes underneath still
+ *   reads as shapes. Detail headers over already-blurred cover art use
+ *   `.acrylic-chrome-tint` (same tint, no backdrop-filter).
  * - Float: surfaces that open over content (menus, popovers, selection
  *   toolbars, the unpinned info sidebar). A large blur, so text behind them
  *   turns into soft colour instead of competing with their own text.
@@ -351,12 +352,21 @@
   --acrylic-scrim-filter: blur(8px);
 }
 
-.acrylic-chrome {
+/* Detail headers use .acrylic-chrome-tint instead of .acrylic-chrome: they sit
+   over already-blurred cover art (BlurredCover) and host portaled
+   acrylic-float menus that overlap their bottom edge, so dropping
+   backdrop-filter avoids overlapping backdrop-filter layers flickering in
+   WebView2 during reactive logo / spectrum frames (#2089). */
+.acrylic-chrome,
+.acrylic-chrome-tint {
   background-color: color-mix(
     in srgb,
     var(--acrylic-tint, var(--color-brand-sidebar)) var(--acrylic-chrome-opacity, 50%),
     transparent
   );
+}
+
+.acrylic-chrome {
   -webkit-backdrop-filter: var(--acrylic-chrome-filter);
   backdrop-filter: var(--acrylic-chrome-filter);
   will-change: backdrop-filter;
