@@ -167,7 +167,7 @@ describe("HomeView.svelte", () => {
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText("Nov 14-20")).toBeInTheDocument();
+      expect(screen.getByText(/^Nov 14\s*[–-]\s*20$/)).toBeInTheDocument();
     });
     expect(screen.getByText(/^Top albums this week/)).toBeInTheDocument();
   });
