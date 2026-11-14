@@ -542,6 +542,7 @@ class CollectionStore {
         this.refreshDirectories();
         this.refreshWebDavServers();
         this.refreshSubsonicServers();
+        this.loadArtistProfiles();
         tagsStore.load().catch((err) => {
           console.error("Failed to refresh tags after library change:", err);
         });
@@ -1089,6 +1090,23 @@ class CollectionStore {
   getArtistProfile(artistName: string | null | undefined): ArtistProfile | undefined {
     if (!artistName) return undefined;
     return this.artistProfiles[artistName.toLowerCase()];
+  }
+
+  /** Fetches the latest artist profile from SQLite and updates the in-memory
+   * cache so callers (e.g. ArtistProfileEditor) see external writes. */
+  async refreshArtistProfile(artistName: string): Promise<ArtistProfile | undefined> {
+    if (!artistName) return undefined;
+    const fresh = await Promise.resolve(
+      invoke<ArtistProfile>("get_artist_profile", { artist: artistName }),
+    );
+    if (fresh?.artist_key) {
+      this.artistProfiles = {
+        ...this.artistProfiles,
+        [fresh.artist_key.toLowerCase()]: fresh,
+      };
+      return fresh;
+    }
+    return undefined;
   }
 
   async saveArtistProfile(profile: ArtistProfile): Promise<ArtistProfile> {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { invoke } from "@tauri-apps/api/core";
 import ArtistProfileEditor from "./ArtistProfileEditor.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { i18n } from "../stores/i18n.svelte";
@@ -12,6 +13,7 @@ describe("ArtistProfileEditor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     collectionStore.artistProfiles = {};
+    i18n.currentLocale = "en-US";
   });
 
   it("does not render when isOpen is false", () => {
@@ -212,5 +214,64 @@ describe("ArtistProfileEditor", () => {
     // Verify modal dialog structure has max-height and flex-col
     expect(dialog.classList.contains("flex-col")).toBe(true);
     expect(dialog.classList.contains("overflow-hidden")).toBe(true);
+  });
+
+  it("refreshes profile from backend on open so externally written tags are preserved", async () => {
+    collectionStore.artistProfiles = {
+      "shania twain": {
+        artist_key: "Shania Twain",
+        website: "https://www.shaniatwain.com",
+        tags: ["Country"],
+        social_links: [],
+        bio: null,
+      },
+    };
+
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "get_artist_profile") {
+        return Promise.resolve({
+          artist_key: "Shania Twain",
+          website: "https://www.shaniatwain.com",
+          tags: ["Country", "Award-Winning"],
+          social_links: [],
+          bio: null,
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    const mockSave = vi.fn().mockResolvedValue({
+      artist_key: "Shania Twain",
+      website: "https://www.shaniatwain.com",
+      tags: ["Country", "Award-Winning"],
+      social_links: [],
+      bio: "Updated bio",
+    });
+    vi.spyOn(collectionStore, "saveArtistProfile").mockImplementation(mockSave);
+
+    render(ArtistProfileEditor, {
+      props: {
+        artistName: "Shania Twain",
+        isOpen: true,
+        onClose: vi.fn(),
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Award-Winning")).toBeTruthy();
+    });
+
+    const bioInput = screen.getByPlaceholderText(/Add a bio or background notes/i);
+    await fireEvent.input(bioInput, { target: { value: "Updated bio" } });
+    await fireEvent.click(screen.getByRole("button", { name: /Save/i }));
+
+    expect(mockSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artist_key: "Shania Twain",
+        tags: ["Country", "Award-Winning"],
+        bio: "Updated bio",
+      }),
+    );
   });
 });

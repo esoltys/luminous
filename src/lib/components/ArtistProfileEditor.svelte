@@ -10,6 +10,7 @@
     CircleNotchIcon as LoaderCircle,
     PencilSimpleIcon as Pencil,
   } from "phosphor-svelte";
+  import { untrack } from "svelte";
   import Button from "./Button.svelte";
   import MarkdownEditor from "./MarkdownEditor.svelte";
   import { collectionStore } from "../stores/collection.svelte";
@@ -56,15 +57,36 @@
   let isSaving = $state(false);
   let isMarkdownEditorOpen = $state(false);
 
+  function applyProfileToForm(profile: ArtistProfile | undefined) {
+    website = profile?.website ?? "";
+    bio = profile?.bio ?? "";
+    tags = profile?.tags ? [...profile.tags] : [];
+    socialLinks = profile?.social_links ? profile.social_links.map((l) => ({ ...l })) : [];
+  }
+
   // Sync state when opened or artistName changes
   $effect(() => {
     if (isOpen) {
-      const existing = collectionStore.getArtistProfile(artistName);
-      website = existing?.website ?? "";
-      bio = existing?.bio ?? "";
-      tags = existing?.tags ? [...existing.tags] : [];
-      socialLinks = existing?.social_links ? existing.social_links.map((l) => ({ ...l })) : [];
+      const targetArtist = artistName;
+      applyProfileToForm(untrack(() => collectionStore.getArtistProfile(targetArtist)));
       newTagInput = "";
+
+      // Refresh from SQLite so external writes (e.g. MCP) aren't overwritten by a stale cache
+      if (targetArtist) {
+        let cancelled = false;
+        collectionStore
+          .refreshArtistProfile(targetArtist)
+          .then((fresh) => {
+            if (cancelled || !isOpen || artistName !== targetArtist || !fresh) return;
+            applyProfileToForm(fresh);
+          })
+          .catch((err) => {
+            console.error("Failed to refresh artist profile:", err);
+          });
+        return () => {
+          cancelled = true;
+        };
+      }
     }
   });
 
