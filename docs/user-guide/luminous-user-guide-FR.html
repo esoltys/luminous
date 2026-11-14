@@ -68,7 +68,7 @@
       <h2>Accueil</h2>
       <div class="list">
         <div class="row"><div class="mk">•</div><div>L'Accueil donne un aperçu de votre bibliothèque et de vos écoutes.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Palmarès des albums</b> classe les albums selon les minutes écoutées cette semaine. La pastille <b>Retour</b> signale un album qui revient au palmarès.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Palmarès des albums de la semaine</b> classe les albums selon les minutes écoutées. Un mot à côté d’un album indique son mouvement : <b>Nouveau cette semaine</b>, <b>Retour</b>, <b>Monte de 2</b> ou <b>Descend de 1</b>. Les albums qui gardent leur place n’affichent rien.</div></div>
         <div class="row"><div class="mk">•</div><div>Les fichiers que vous ouvrez hors de votre bibliothèque s'accumulent. Lorsque leurs dossiers sont accessibles, une carte de l'Accueil en présente jusqu'à trois : choisissez <b>Ajouter à la bibliothèque</b> pour ajouter le dossier. L'historique d'écoute et les cotes de chaque chanson sont conservés. Choisissez <b>Ignorer le dossier</b> pour passer un dossier, ou <b>Masquer les suggestions</b> pour ne plus en voir. Pour les réactiver, activez <b>Suggérer des dossiers à ajouter à la bibliothèque</b> dans les Paramètres.</div></div>
         <div class="row"><div class="mk">•</div><div>Choisissez le premier jour de la semaine avec <b>Commencer la semaine le</b>, dans <b>Paramètres → Général</b>.</div></div>
       </div>
@@ -88,7 +88,7 @@
     <section id="collection" data-section>
       <div class="eyebrow">Les bases</div>
       <h1>Votre bibliothèque</h1>
-      <p><b>Bibliothèque</b>, dans la barre latérale, offre quatre vues : Artistes, Albums, Chansons et Genres. Chacune affiche un compte et un menu de tri en haut à droite.</p>
+      <p><b>Bibliothèque</b>, dans la barre latérale, offre quatre vues : Artistes, Albums, Chansons et Genres. Chaque vue s’ouvre sur son nom en titre, avec le compte en dessous (« 315 albums », ou « 42 sur 315 albums » pendant une recherche), et les commandes de tri et d’affichage en haut à droite. Paramètres et Aide restent fixés au bas de la barre latérale.</p>
       <figure class="shot mw-700 mb-28">
         <img src="assets/fr-CA/screenshots/dark/albums.webp" alt="Grille des albums" width="1440" height="900" loading="lazy">
       </figure>
@@ -97,7 +97,7 @@
         <div class="row"><div class="mk">•</div><div>Voyez toute votre bibliothèque dans un tableau triable.</div></div>
         <div class="row"><div class="mk">•</div><div>Cliquez avec le bouton droit sur l'en-tête d'une colonne pour choisir les champs affichés, comme <b>Lectures</b> et <b>Ignorées</b>.</div></div>
         <div class="row"><div class="mk">•</div><div>Faites glisser le bord droit de l'en-tête d'une colonne pour la redimensionner. Double-cliquez sur le bord pour rétablir sa largeur.</div></div>
-        <div class="row"><div class="mk">•</div><div>Faites glisser des chansons sur <b>File d'attente</b> ou sur une liste de lecture dans la barre latérale pour les y ajouter. Sélectionnez-en plusieurs pour les faire glisser ensemble.</div></div>
+        <div class="row"><div class="mk">•</div><div>Faites glisser des chansons sur le bouton <b>File d'attente</b> de la barre de lecture ou sur une liste de lecture dans la barre latérale pour les y ajouter. Sélectionnez-en plusieurs pour les faire glisser ensemble.</div></div>
       </div>
       <figure class="shot mw-700 mb-28">
         <img src="assets/fr-CA/screenshots/dark/songs.webp" alt="Tableau des chansons" width="1440" height="900" loading="lazy">
@@ -122,6 +122,7 @@
         <div class="row"><div class="mk">•</div><div>Ouvrez un album pour voir ses pistes. Le panneau latéral indique le format, le débit, la fréquence d'échantillonnage et le volume du fichier en cours.</div></div>
         <div class="row"><div class="mk">•</div><div>Cliquez sur <b>+</b> pour ajouter l'album ou une chanson à la liste de lecture active (la file d'attente, sauf si vous en choisissez une autre).</div></div>
         <div class="row"><div class="mk">•</div><div>Cliquez sur le crayon pour ouvrir <b>Modifier les étiquettes de l'album</b> et corriger le titre, l'artiste, le genre ou l'année de toutes les pistes d'un coup.</div></div>
+        <div class="row"><div class="mk">•</div><div>Les étoiles d’un album n’apparaissent qu’une fois l’album noté. Pour en noter un, survolez-le ou atteignez-le avec Tab et cliquez sur une étoile, faites un clic droit dessus ou ouvrez l’album.</div></div>
       </div>
       <figure class="shot mw-700 mb-28">
         <img src="assets/fr-CA/screenshots/dark/album-detail.webp" alt="Page d'album" width="1440" height="900" loading="lazy">
@@ -200,7 +201,7 @@
       <div class="list">
         <div class="row"><div class="mk">•</div><div>Cliquez sur la pochette pour passer au mode immersif (<kbd>Ctrl</kbd><kbd>2</kbd>).</div></div>
         <div class="row"><div class="mk">•</div><div>Cliquez sur le cœur ou les étoiles pour noter la chanson. Choisissez le style dans <b>Paramètres → Général</b>.</div></div>
-        <div class="row"><div class="mk">•</div><div>Cliquez sur la forme d'onde pour vous déplacer dans la chanson. <svg class="ui-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M56,96v64a8,8,0,0,1-16,0V96a8,8,0,0,1,16,0ZM88,24a8,8,0,0,0-8,8V224a8,8,0,0,0,16,0V32A8,8,0,0,0,88,24Zm40,32a8,8,0,0,0-8,8V192a8,8,0,0,0,16,0V64A8,8,0,0,0,128,56Zm40,32a8,8,0,0,0-8,8v64a8,8,0,0,0,16,0V96A8,8,0,0,0,168,88Zm40-16a8,8,0,0,0-8,8v96a8,8,0,0,0,16,0V80A8,8,0,0,0,208,72Z"/></svg>, à côté, affiche plutôt les bandes de fréquences : bleu pour les graves, ambre pour les médiums, blanc pour les aigus.</div></div>
+        <div class="row"><div class="mk">•</div><div>Cliquez sur la forme d'onde pour vous déplacer dans la chanson. Le menu <b>⋯</b> l’affiche plutôt en bandes de fréquences : bleu pour les graves, ambre pour les médiums, blanc pour les aigus.</div></div>
         <div class="row"><div class="mk">•</div><div><svg class="ui-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M237.66,178.34a8,8,0,0,1,0,11.32l-24,24a8,8,0,0,1-11.32-11.32L212.69,192H200.94a72.12,72.12,0,0,1-58.59-30.15l-41.72-58.4A56.1,56.1,0,0,0,55.06,80H32a8,8,0,0,1,0-16H55.06a72.12,72.12,0,0,1,58.59,30.15l41.72,58.4A56.1,56.1,0,0,0,200.94,176h11.75l-10.35-10.34a8,8,0,0,1,11.32-11.32ZM143,107a8,8,0,0,0,11.16-1.86l1.2-1.67A56.1,56.1,0,0,1,200.94,80h11.75L202.34,90.34a8,8,0,0,0,11.32,11.32l24-24a8,8,0,0,0,0-11.32l-24-24a8,8,0,0,0-11.32,11.32L212.69,64H200.94a72.12,72.12,0,0,0-58.59,30.15l-1.2,1.67A8,8,0,0,0,143,107Zm-30,42a8,8,0,0,0-11.16,1.86l-1.2,1.67A56.1,56.1,0,0,1,55.06,176H32a8,8,0,0,0,0,16H55.06a72.12,72.12,0,0,0,58.59-30.15l1.2-1.67A8,8,0,0,0,113,149Z"/></svg> <b>Lecture aléatoire</b> passe par Désactivé, Tout et :
         <div class="nested">
           <div>– <b>Dans l'album</b> : albums dans l'ordre, pistes mélangées dans chacun.</div>
@@ -208,15 +209,12 @@
           <div>– <b>Artistes</b> : un artiste à la fois, choisi au hasard.</div>
         </div></div></div>
         <div class="row"><div class="mk">•</div><div><svg class="ui-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M24,128A72.08,72.08,0,0,1,96,56H204.69L194.34,45.66a8,8,0,0,1,11.32-11.32l24,24a8,8,0,0,1,0,11.32l-24,24a8,8,0,0,1-11.32-11.32L204.69,72H96a56.06,56.06,0,0,0-56,56,8,8,0,0,1-16,0Zm200-8a8,8,0,0,0-8,8,56.06,56.06,0,0,1-56,56H51.31l10.35-10.34a8,8,0,0,0-11.32-11.32l-24,24a8,8,0,0,0,0,11.32l24,24a8,8,0,0,0,11.32-11.32L51.31,200H160a72.08,72.08,0,0,0,72-72A8,8,0,0,0,224,120Z"/></svg> <b>Répéter</b> passe par Désactivé, Chanson, Album et Liste de lecture.</div></div>
-        <div class="row"><div class="mk">•</div><div>Les boutons de droite ouvrent :
+        <div class="row"><div class="mk">•</div><div>La partie droite de la barre contient le spectre en direct, le volume et deux boutons qui ouvrent :
           <div class="nested">
-            <div><svg class="ui-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"/></svg> le menu de la chanson</div>
-            <div><svg class="ui-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48Zm0,144H32V64H224V192ZM48,136a8,8,0,0,1,8-8H72a8,8,0,0,1,0,16H56A8,8,0,0,1,48,136Zm160,0a8,8,0,0,1-8,8H104a8,8,0,0,1,0-16h96A8,8,0,0,1,208,136Zm-48,32a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16h96A8,8,0,0,1,160,168Zm48,0a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16h16A8,8,0,0,1,208,168Z"/></svg> les paroles</div>
             <div><svg class="ui-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M230.91,172A8,8,0,0,1,228,182.91l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,36,169.09l92,53.65,92-53.65A8,8,0,0,1,230.91,172ZM220,121.09l-92,53.65L36,121.09A8,8,0,0,0,28,134.91l96,56a8,8,0,0,0,8.06,0l96-56A8,8,0,1,0,220,121.09ZM24,80a8,8,0,0,1,4-6.91l96-56a8,8,0,0,1,8.06,0l96,56a8,8,0,0,1,0,13.82l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,24,80Zm23.88,0L128,126.74,208.12,80,128,33.26Z"/></svg> la file d'attente</div>
-            <div><svg class="ui-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"/></svg> le panneau d'informations (<kbd>Ctrl</kbd><kbd>I</kbd>)</div>
-            <div><svg class="ui-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,48H40A16,16,0,0,0,24,64V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48ZM40,64H216v56H136a8,8,0,0,0-8,8v64H40ZM216,192H144V136h72v56Z"/></svg> le mini-lecteur (<kbd>Ctrl</kbd><kbd>M</kbd>)</div>
+            <div><svg class="ui-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M144,128a16,16,0,1,1-16-16A16,16,0,0,1,144,128ZM60,112a16,16,0,1,0,16,16A16,16,0,0,0,60,112Zm136,0a16,16,0,1,0,16,16A16,16,0,0,0,196,112Z"/></svg> le menu : <b>Paroles</b>, <b>Infos de la chanson</b> (<kbd>Ctrl</kbd><kbd>I</kbd>), <b>Mini-lecteur</b> (<kbd>Ctrl</kbd><kbd>M</kbd>) et le mode de la barre de lecture</div>
           </div></div></div>
-        <div class="row"><div class="mk">•</div><div>Le panneau d’information suit ce que vous consultez : sélectionnez une chanson dans une liste, ou ouvrez un album ou un artiste, pour en voir les détails. Sans sélection, il affiche la chanson en cours de lecture. La biographie, les liens et les concerts d’un artiste ou d’un album s’y affichent aussi. L’onglet <b>Technique</b> détaille la chaîne de traitement audio, la plage dynamique, l’emplacement du fichier et l’authenticité sonore : pour les pistes locales sans perte, cliquez sur <b>Vérifier</b> pour inspecter le spectre et la profondeur de bits afin de détecter les coupures de transcodage ou le suréchantillonnage. Cliquez sur l’icône d’épingle, en haut du panneau, pour le détacher : il se replie alors en une mince barre sur le bord droit, glisse par-dessus la page quand vous laissez le pointeur sur la barre, et se referme quand le pointeur le quitte. Cliquez sur l’icône d’information de la barre, ou sur l’épingle du panneau, pour l’épingler de nouveau. Quand une piste sélectionnée est affichée, le lien « Infos artiste » ou « Infos album », en haut du panneau, ramène à l’artiste ou à l’album que vous consultez.</div></div>
+        <div class="row"><div class="mk">•</div><div>Le panneau d’information suit ce que vous consultez : sélectionnez une chanson dans une liste, ou ouvrez un album ou un artiste, pour en voir les détails. Sans sélection, il affiche la chanson en cours de lecture. La biographie, les liens et les concerts d’un artiste ou d’un album s’y affichent aussi. Il s’ouvre sur l’onglet <b>Informations</b>. L’onglet <b>Technique</b> détaille la chaîne de traitement audio, la plage dynamique, l’emplacement du fichier et l’authenticité sonore : pour les pistes locales sans perte, cliquez sur <b>Vérifier</b> pour inspecter le spectre et la profondeur de bits afin de détecter les coupures de transcodage ou le suréchantillonnage. Cliquez sur l’icône d’épingle, en haut du panneau, pour le détacher : il se replie alors en une mince barre sur le bord droit, glisse par-dessus la page quand vous laissez le pointeur sur la barre, et se referme quand le pointeur le quitte. Cliquez sur l’icône d’information de la barre, ou sur l’épingle du panneau, pour l’épingler de nouveau. Quand une piste sélectionnée est affichée, le lien « Infos artiste » ou « Infos album », en haut du panneau, ramène à l’artiste ou à l’album que vous consultez.</div></div>
         <div class="row"><div class="mk">•</div><div>Les touches multimédias et les commandes multimédias de votre système fonctionnent même quand Luminous n'est pas au premier plan.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
@@ -615,9 +613,10 @@
       <h1>Thèmes d'interface</h1>
       <h2>Choisir un thème</h2>
       <div class="list">
-        <div class="row"><div class="mk">•</div><div><b>Luminous</b> colore toute l'application selon la pochette en cours. Le résultat vous plaît? Enregistrez-le comme thème personnalisé.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Luminous</b> colore toute l'application selon la pochette en cours. Le résultat vous plaît? Enregistrez-le comme thème personnalisé. Toutes les surfaces partagent une même teinte; l’accent peut en prendre une autre de la pochette.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Système</b> suit votre réglage clair ou sombre. Utilisez les boutons <b>Clair</b>, <b>Sombre</b> et <b>Système</b> de sa carte pour en imposer un.</div></div>
         <div class="row"><div class="mk">•</div><div>Cliquez sur un thème <b>prédéfini</b> pour l'appliquer.</div></div>
+        <div class="row"><div class="mk">•</div><div>Dans les autres thèmes, la lueur de la barre de lecture prend la couleur de la pochette en cours.</div></div>
       </div>
       <h2>Thèmes additionnels de soutien (version Microsoft Store seulement)</h2>
       <div class="list">

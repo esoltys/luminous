@@ -91,9 +91,9 @@
     searchDebounceTimer = setTimeout(() => collectionStore.search(query), SEARCH_DEBOUNCE_MS);
   }
 
-  // Dev-only entry points for scripted captures (src/lib/scripting/screens.ts).
+  // Dev and capture-build entry points for scripted captures (src/lib/scripting/screens.ts).
   $effect(() => {
-    if (!import.meta.env.DEV) return;
+    if (!import.meta.env.DEV && import.meta.env.MODE !== "capture") return;
     return onDevScreenHooks((hook) => [
       hook("search", async (query) => {
         collectionStore.searchQuery = query;
