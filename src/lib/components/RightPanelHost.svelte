@@ -219,10 +219,7 @@
       class="pointer-events-none absolute inset-0 w-full h-full"
       aria-hidden="true"
     >
-      {#if themeStore.isGlassTheme}
-        <path d={NOTCH_EDGE_PATH} fill="none" stroke="rgba(255, 255, 255, 0.25)" stroke-width="3" />
-      {/if}
-      <path d={NOTCH_EDGE_PATH} fill="none" stroke="var(--notch-border-color)" stroke-width="2" />
+      <path d={NOTCH_EDGE_PATH} fill="none" stroke="var(--color-border)" stroke-width="2" />
     </svg>
     <button
       type="button"
@@ -268,12 +265,10 @@
      `position: relative` in app.css) is applied. */
   .notch-surface {
     position: absolute;
-    --notch-border-color: var(--color-border);
   }
 
   .notch-surface.glass-surface {
     background-color: var(--glass-bg-playerbar) !important;
-    --notch-border-color: var(--glass-border-color, var(--color-border));
   }
 
   /* Docked, nothing renders behind the panel but the flat bg-main canvas, so
