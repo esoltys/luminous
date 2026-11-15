@@ -2378,6 +2378,17 @@ export const es = {
     promoteArtistTag: "Ascender a etiqueta de nivel superior",
     renameToast: "Nombre cambiado a «{name}» (canciones actualizadas: {count})",
     artistRenameToast: "Nombre cambiado a «{name}» (artistas actualizados: {count})",
+    duplicatesBanner: {
+      one: "{count} grupo de etiquetas de artista podría estar duplicado",
+      other: "{count} grupos de etiquetas de artista podrían estar duplicados",
+    },
+    duplicatesReview: "Revisar",
+    duplicatesTitle: "Combinar etiquetas duplicadas",
+    duplicatesIntro:
+      "Estas etiquetas de artista solo se diferencian en la ortografía. Elige la grafía que se conserva en cada grupo y combínalas.",
+    duplicatesMergeBtn: "Combinar en «{name}»",
+    duplicatesMergedToast: "Combinadas en «{name}» (artistas actualizados: {count})",
+    duplicatesDone: "Listo",
     deleteConfirmMessage: {
       one: "¿Quitar las etiquetas seleccionadas ({count}) de todas las canciones que las tienen? Esta acción no se puede deshacer.",
       other:

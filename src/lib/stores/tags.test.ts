@@ -157,3 +157,61 @@ describe("TagsStore genre alias lookups (#1994)", () => {
     expect(tagsStore.canonicalOf("Progressive Rock")).toBeUndefined();
   });
 });
+
+describe("TagsStore artist tag duplicates", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      switch (cmd) {
+        case "merge_artist_tags":
+          return 2;
+        case "get_artist_tag_hierarchy":
+        case "get_artist_tags_overview":
+        case "find_artist_tag_near_duplicates":
+          return [];
+        default:
+          throw new Error(`Unhandled invoke: ${cmd}`);
+      }
+    });
+  });
+
+  it("merges every spelling but the kept one and sums the artists updated", async () => {
+    const updated = await tagsStore.mergeArtistTagSpellings("Award-Winning", [
+      "Award-Winning",
+      "Award Winning",
+      "award winning",
+    ]);
+
+    expect(invoke).toHaveBeenCalledWith("merge_artist_tags", {
+      from: "Award Winning",
+      into: "Award-Winning",
+    });
+    expect(invoke).toHaveBeenCalledWith("merge_artist_tags", {
+      from: "award winning",
+      into: "Award-Winning",
+    });
+    expect(invoke).not.toHaveBeenCalledWith("merge_artist_tags", {
+      from: "Award-Winning",
+      into: "Award-Winning",
+    });
+    expect(updated).toBe(4);
+    expect(invoke).toHaveBeenCalledWith("find_artist_tag_near_duplicates");
+  });
+
+  it("stores the duplicate groups the backend reports", async () => {
+    const groups = [
+      {
+        suggested: "Folk",
+        spellings: [
+          { name: "Folk", artist_count: 2 },
+          { name: "folk", artist_count: 1 },
+        ],
+      },
+    ];
+    vi.mocked(invoke).mockResolvedValueOnce(groups);
+
+    await tagsStore.loadArtistTagDuplicates();
+
+    expect(tagsStore.artistTagDuplicates).toEqual(groups);
+  });
+});

@@ -2388,6 +2388,17 @@ export const de = {
     promoteArtistTag: "Zum Tag der obersten Ebene machen",
     renameToast: "In „{name}“ umbenannt ({count} Titel aktualisiert)",
     artistRenameToast: "In „{name}“ umbenannt ({count} Interpreten aktualisiert)",
+    duplicatesBanner: {
+      one: "{count} Gruppe von Interpreten-Tags enthält möglicherweise Duplikate",
+      other: "{count} Gruppen von Interpreten-Tags enthalten möglicherweise Duplikate",
+    },
+    duplicatesReview: "Prüfen",
+    duplicatesTitle: "Doppelte Tags zusammenführen",
+    duplicatesIntro:
+      "Diese Interpreten-Tags unterscheiden sich nur in der Schreibweise. Pro Gruppe die Schreibweise wählen, die bleiben soll, und dann zusammenführen.",
+    duplicatesMergeBtn: "In „{name}“ zusammenführen",
+    duplicatesMergedToast: "In „{name}“ zusammengeführt ({count} Interpreten aktualisiert)",
+    duplicatesDone: "Fertig",
     deleteConfirmMessage: {
       one: "{count} Tag von jedem Titel entfernen, der es trägt? Dies kann nicht rückgängig gemacht werden.",
       other:

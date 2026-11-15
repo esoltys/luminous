@@ -1625,6 +1625,7 @@ pub fn run() {
             commands::tags::delete_tags,
             // Persisted Artist Tags curation hierarchy (#1105)
             commands::tags::get_artist_tag_hierarchy,
+            commands::tags::find_artist_tag_near_duplicates,
             commands::tags::set_artist_group_color,
             commands::tags::reparent_artist_tag,
             commands::tags::promote_artist_tag,

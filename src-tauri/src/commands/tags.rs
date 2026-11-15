@@ -1,7 +1,9 @@
 use crate::{
     collection::{SelfWriteTracker, WatcherPauseGuard},
     genre_aliases::GenreAlias,
-    models::{GenreGroup, LanguageSummary, QueuePopulationMode, Song, Tag, TagGroup},
+    models::{
+        GenreGroup, LanguageSummary, QueuePopulationMode, Song, Tag, TagDuplicateGroup, TagGroup,
+    },
     tags::TagManager,
     AppState,
 };
@@ -248,6 +250,19 @@ pub async fn get_artist_tag_hierarchy(state: State<'_, AppState>) -> Result<Vec<
         .get_artist_tag_hierarchy()
         .map_err(|e| e.to_string());
     persisted(&state, result).await
+}
+
+/// Artist tags stored under more than one spelling (#2096), for the Genres
+/// page's "possible duplicates" banner and merge dialog.
+#[tauri::command]
+pub async fn find_artist_tag_near_duplicates(
+    state: State<'_, AppState>,
+) -> Result<Vec<TagDuplicateGroup>, String> {
+    crate::tags::with_tag_manager(state.db.clone(), |manager| {
+        manager.find_artist_tag_near_duplicates()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

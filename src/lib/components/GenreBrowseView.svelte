@@ -15,9 +15,23 @@
   import ArtistTagCards from "./ArtistTagCards.svelte";
   import LanguageCards from "./LanguageCards.svelte";
   import CreateArtistTagGroupDialog from "./CreateArtistTagGroupDialog.svelte";
+  import MergeArtistTagDuplicatesDialog from "./MergeArtistTagDuplicatesDialog.svelte";
   import GenreAliasesDialogHost from "./GenreAliasesDialogHost.svelte";
 
   let showNewGroupDialog = $state(false);
+  let showDuplicatesDialog = $state(false);
+
+  async function handleMergeDuplicates(into: string, spellings: string[]) {
+    const count = await tagsStore.mergeArtistTagSpellings(into, spellings);
+    toastStore.show(
+      i18n.t(
+        "songTags.duplicatesMergedToast",
+        { count, name: into },
+        `Merged into "${into}" (${count} artists updated)`,
+      ),
+      "success",
+    );
+  }
 
   let genreNames = $derived(new Set(tagsStore.allTags.map((t) => t.name.toLowerCase())));
 
@@ -74,6 +88,9 @@
     });
     tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
     tagsStore.loadArtistTags().catch((e) => console.error("Failed to load artist tags:", e));
+    tagsStore
+      .loadArtistTagDuplicates()
+      .catch((e) => console.error("Failed to load artist tag duplicates:", e));
     tagsStore
       .loadArtistHierarchy()
       .catch((e) => console.error("Failed to load artist tag hierarchy:", e));
@@ -173,6 +190,20 @@
         <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
           {i18n.t("songTags.artistTagsHeading", {}, "Artist Tags")}
         </h2>
+        {#if tagsStore.artistTagDuplicates.length > 0}
+          <div
+            class="mb-3 flex items-center gap-3 rounded-lg bg-brand-sidebar border border-brand-border px-3 py-2"
+            data-testid="artist-tag-duplicates-banner"
+          >
+            <GitMerge class="w-4 h-4 shrink-0 text-brand-accent-text" />
+            <span class="flex-1 min-w-0 text-sm text-brand-text-primary">
+              {i18n.plural("songTags.duplicatesBanner", tagsStore.artistTagDuplicates.length)}
+            </span>
+            <Button variant="secondary" size="sm" onclick={() => (showDuplicatesDialog = true)}>
+              {i18n.t("songTags.duplicatesReview", {}, "Review")}
+            </Button>
+          </div>
+        {/if}
         <ArtistTagCards
           hierarchy={artistOnlyHierarchy}
           onOpenTag={openArtistTag}
@@ -231,6 +262,16 @@
     onConfirm={(name) => handleCreateGroup(name, [])}
     onCancel={() => {
       showNewGroupDialog = false;
+    }}
+  />
+{/if}
+
+{#if showDuplicatesDialog}
+  <MergeArtistTagDuplicatesDialog
+    groups={tagsStore.artistTagDuplicates}
+    onMerge={handleMergeDuplicates}
+    onClose={() => {
+      showDuplicatesDialog = false;
     }}
   />
 {/if}

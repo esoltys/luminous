@@ -7,6 +7,7 @@ import type {
   QueuePopulationMode,
   Song,
   Tag,
+  TagDuplicateGroup,
   TagGroup,
   TagGroupChild,
 } from "../types";
@@ -45,6 +46,32 @@ class TagsStore {
   artistHierarchy = $state<TagGroup[]>([]);
   private artistHierarchyLoadStarted = false;
 
+  /** Artist tags stored under more than one spelling (#2096), for the Genres
+   * page's merge-duplicates banner and dialog. */
+  artistTagDuplicates = $state<TagDuplicateGroup[]>([]);
+
+  async loadArtistTagDuplicates() {
+    const result = await invoke<TagDuplicateGroup[]>("find_artist_tag_near_duplicates");
+    this.artistTagDuplicates = Array.isArray(result) ? result : [];
+  }
+
+  /** Merges every other spelling of a duplicate group into `into`. Returns how
+   * many artist profiles were rewritten. A spelling that has since vanished is
+   * a no-op, so a stale dialog can't fail. */
+  async mergeArtistTagSpellings(into: string, spellings: string[]): Promise<number> {
+    let updated = 0;
+    for (const from of spellings) {
+      if (from === into) continue;
+      updated += await invoke<number>("merge_artist_tags", { from, into });
+    }
+    await Promise.all([
+      this.loadArtistHierarchy(),
+      this.loadArtistTags(),
+      this.loadArtistTagDuplicates(),
+    ]);
+    return updated;
+  }
+
   async loadArtistTags() {
     const result = await invoke<Tag[]>("get_artist_tags_overview");
     this.artistTags = Array.isArray(result) ? result : [];
@@ -60,6 +87,7 @@ class TagsStore {
     return this.events.listen("artist-tags-changed", () => {
       this.loadArtistHierarchy();
       this.loadArtistTags();
+      this.loadArtistTagDuplicates();
     });
   }
 

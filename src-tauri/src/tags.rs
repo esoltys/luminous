@@ -16,7 +16,8 @@ use crate::{
     genre_aliases::GenreAliases,
     models::{
         join_multi_value, parse_multi_value, GenreGroup, LanguageSummary, QueuePopulationMode,
-        Song, Tag, TagCount, TagGroup, TagGroupChild, LIBRARY_SOURCES_SQL,
+        Song, Tag, TagCount, TagDuplicateGroup, TagGroup, TagGroupChild, TagSpelling,
+        LIBRARY_SOURCES_SQL,
     },
 };
 use anyhow::Result;
@@ -42,6 +43,76 @@ fn take_limit(limit: i64) -> usize {
     } else {
         limit as usize
     }
+}
+
+/// What two artist-tag spellings must share to count as the same tag:
+/// the letters and digits, lowercased, with Latin accents folded. Spacing,
+/// hyphens and other punctuation are ignored, so "Award-Winning",
+/// "Award Winning" and "award winning" collide. Only Latin letters are
+/// transliterated; other scripts are compared as written, so distinct
+/// Cyrillic or CJK tags never merge through a shared romanization.
+fn tag_dedupe_key(tag: &str) -> String {
+    let mut key = String::with_capacity(tag.len());
+    for c in tag.chars() {
+        let latin = c.is_ascii()
+            || ('\u{00C0}'..='\u{024F}').contains(&c)
+            || ('\u{1E00}'..='\u{1EFF}').contains(&c);
+        if latin {
+            key.extend(
+                deunicode::deunicode_char(c)
+                    .unwrap_or("")
+                    .chars()
+                    .filter(|ch| ch.is_alphanumeric())
+                    .flat_map(char::to_lowercase),
+            );
+        } else if c.is_alphanumeric() {
+            key.extend(c.to_lowercase());
+        }
+    }
+    key
+}
+
+/// Groups tag spellings (with artist counts) that normalize to the same
+/// [`tag_dedupe_key`]. A tag with a single spelling, or one with nothing but
+/// punctuation, never forms a group. Within a group the most-used spelling
+/// comes first (ties break alphabetically) and is the suggested merge target;
+/// groups are ordered by total artists, then by suggested name.
+fn group_near_duplicate_tags(spellings: Vec<(String, i64)>) -> Vec<TagDuplicateGroup> {
+    let mut by_key: HashMap<String, Vec<TagSpelling>> = HashMap::new();
+    for (name, artist_count) in spellings {
+        let key = tag_dedupe_key(&name);
+        if key.is_empty() {
+            continue;
+        }
+        by_key
+            .entry(key)
+            .or_default()
+            .push(TagSpelling { name, artist_count });
+    }
+
+    let mut groups: Vec<TagDuplicateGroup> = by_key
+        .into_values()
+        .filter(|s| s.len() > 1)
+        .map(|mut spellings| {
+            spellings.sort_by(|a, b| {
+                b.artist_count
+                    .cmp(&a.artist_count)
+                    .then_with(|| a.name.cmp(&b.name))
+            });
+            TagDuplicateGroup {
+                suggested: spellings[0].name.clone(),
+                spellings,
+            }
+        })
+        .collect();
+
+    let total = |g: &TagDuplicateGroup| g.spellings.iter().map(|s| s.artist_count).sum::<i64>();
+    groups.sort_by(|a, b| {
+        total(b)
+            .cmp(&total(a))
+            .then_with(|| a.suggested.cmp(&b.suggested))
+    });
+    groups
 }
 
 #[derive(Debug)]
@@ -1588,6 +1659,27 @@ impl TagManager {
         Ok(())
     }
 
+    /// Artist tags written under more than one spelling (#2096), for the
+    /// merge-duplicates dialog. Counts every profile that carries a spelling,
+    /// not just artists with songs, because [`Self::merge_artist_tags`] rewrites
+    /// every profile too. Spellings that differ only in case appear here as
+    /// well: the app unifies case on its own saves, but a write by an external
+    /// tool (the MCP server) leaves them split.
+    pub fn find_artist_tag_near_duplicates(&self) -> Result<Vec<TagDuplicateGroup>> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT json_each.value, COUNT(DISTINCT artist_profiles.artist_key)
+             FROM artist_profiles, json_each(artist_profiles.tags)
+             WHERE json_each.type = 'text'
+             GROUP BY json_each.value",
+        )?;
+        let spellings: Vec<(String, i64)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(group_near_duplicate_tags(spellings))
+    }
+
     pub fn merge_artist_tags(&self, from: &str, into: &str) -> Result<usize> {
         let conn = self.db.pool.get()?;
         let mut stmt =
@@ -2613,6 +2705,112 @@ mod tests {
                 .any(|c| c.name.eq_ignore_ascii_case("Electronic")),
             "Electronic must not be nested as its own sub-genre"
         );
+    }
+
+    fn spelling(name: &str, artist_count: i64) -> (String, i64) {
+        (name.to_string(), artist_count)
+    }
+
+    #[test]
+    fn test_tag_dedupe_key_folds_case_accents_spacing_and_punctuation() {
+        let key = tag_dedupe_key("Award-Winning");
+        assert_eq!(key, "awardwinning");
+        assert_eq!(tag_dedupe_key("award winning"), key);
+        assert_eq!(tag_dedupe_key("  AWARD_Winning! "), key);
+        assert_eq!(tag_dedupe_key("Québécois"), tag_dedupe_key("Quebecois"));
+        assert_eq!(tag_dedupe_key("R&B"), "rb");
+        assert_eq!(tag_dedupe_key("—"), "");
+    }
+
+    #[test]
+    fn test_tag_dedupe_key_keeps_other_scripts_apart() {
+        // Romanizing both would collide; compared as written they must not.
+        assert_ne!(tag_dedupe_key("日本"), tag_dedupe_key("日本語"));
+        assert_ne!(tag_dedupe_key("Россия"), tag_dedupe_key("Россиия"));
+        assert_eq!(tag_dedupe_key("Рок-музыка"), tag_dedupe_key("рок музыка"));
+    }
+
+    #[test]
+    fn test_group_near_duplicate_tags_orders_spellings_and_groups() {
+        let groups = group_near_duplicate_tags(vec![
+            spelling("Award Winning", 2),
+            spelling("Award-Winning", 5),
+            spelling("award-winning", 5),
+            spelling("Canadian", 9),
+            spelling("Folk", 1),
+            spelling("folk", 1),
+            spelling("—", 3),
+            spelling("--", 3),
+        ]);
+
+        assert_eq!(
+            groups.len(),
+            2,
+            "single spellings and bare punctuation never group"
+        );
+        // Highest total first: award-winning 12 vs folk 2.
+        assert_eq!(groups[0].suggested, "Award-Winning");
+        assert_eq!(
+            groups[0]
+                .spellings
+                .iter()
+                .map(|s| s.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Award-Winning", "award-winning", "Award Winning"],
+            "most-used first, ties alphabetical (uppercase sorts before lowercase)"
+        );
+        assert_eq!(groups[1].suggested, "Folk");
+    }
+
+    #[test]
+    fn test_group_near_duplicate_tags_is_empty_without_duplicates() {
+        assert!(
+            group_near_duplicate_tags(vec![spelling("Canadian", 3), spelling("Folk", 1)])
+                .is_empty()
+        );
+        assert!(group_near_duplicate_tags(vec![]).is_empty());
+    }
+
+    #[test]
+    fn test_find_artist_tag_near_duplicates_counts_distinct_artists_per_spelling() {
+        let (_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        // Raw inserts stand in for an external writer: the app's own saves
+        // unify case, the MCP server's writes don't.
+        for (artist, tags) in [
+            ("A", r#"["Award-Winning","Canadian"]"#),
+            ("B", r#"["Award Winning"]"#),
+            ("C", r#"["Award-Winning"]"#),
+            ("D", r#"["canadian"]"#),
+            ("E", r#"["Folk"]"#),
+        ] {
+            conn.execute(
+                "INSERT INTO artist_profiles (artist_key, tags) VALUES (?1, ?2)",
+                params![artist, tags],
+            )
+            .unwrap();
+        }
+
+        let groups = TagManager::new(db.clone())
+            .find_artist_tag_near_duplicates()
+            .unwrap();
+
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].suggested, "Award-Winning");
+        assert_eq!(
+            groups[0].spellings,
+            vec![
+                TagSpelling {
+                    name: "Award-Winning".into(),
+                    artist_count: 2
+                },
+                TagSpelling {
+                    name: "Award Winning".into(),
+                    artist_count: 1
+                },
+            ]
+        );
+        assert_eq!(groups[1].suggested, "Canadian");
     }
 
     #[test]
