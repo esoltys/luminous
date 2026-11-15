@@ -757,4 +757,18 @@ describe("ArtistDetailView", () => {
       }
     });
   });
+
+  it("lets the artist title column expand into available header space without max-w-xl (#2121)", () => {
+    const longArtist = "The Very Long Orchestral Ensemble of Northern Symphonies";
+    const { getByRole } = render(ArtistDetailView, {
+      props: { artistName: longArtist },
+    });
+    const heading = getByRole("heading", { level: 1, name: longArtist });
+    expect(heading).toHaveAttribute("title", longArtist);
+    const infoColumn = heading.parentElement;
+    expect(infoColumn).not.toBeNull();
+    expect(infoColumn!.className).toContain("flex-1");
+    expect(infoColumn!.className).toContain("min-w-0");
+    expect(infoColumn!.className).not.toContain("max-w-xl");
+  });
 });

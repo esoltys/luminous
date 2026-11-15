@@ -689,7 +689,7 @@
       : 'pt-6 pb-6'}"
   >
     <div class="flex items-start justify-between gap-6 relative z-10">
-      <div class="flex flex-col justify-end min-w-0 max-w-xl">
+      <div class="flex flex-col justify-end min-w-0 flex-1">
         {#if !windowLayoutStore.isDetailHeaderCollapsed}
           <h1
             class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5"
