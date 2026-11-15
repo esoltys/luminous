@@ -20,7 +20,6 @@
   import Select from "./Select.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
-  import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import {
     DATE_FIELDS,
     DATE_OP_CHOICES,
@@ -464,7 +463,7 @@
 
   // Reserve room for the floating PlayerBar dock so the modal shrinks and its
   // form scrolls internally instead of sliding underneath it.
-  let dockClearance = $derived(playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0);
+  let dockClearance = $derived(playerStore.dockClearancePx);
 </script>
 
 <svelte:window onkeydown={handleKeydown} />

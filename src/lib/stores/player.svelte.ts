@@ -29,6 +29,7 @@ import { prefs } from "./prefs.svelte";
 import { isRemotePath, shortenQuotedUrls } from "../utils/remoteSource";
 import { shuffleArray } from "../utils/shuffle";
 import { AUDIO_BACKEND_LABEL_KEYS } from "../audioOutput";
+import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
 
 export interface CompletedSession {
   contextName: string;
@@ -100,6 +101,12 @@ export class PlayerStore {
   get currentSongDisplayTitle(): string {
     if (!this.currentSong) return i18n.t("playerBar.notPlaying");
     return this.currentSong.title || i18n.t("collection.unknownSong");
+  }
+  /** Height at the bottom of the viewport covered by the floating PlayerBar dock;
+   *  0 when no song is loaded and the dock is hidden. Floating menus and modals
+   *  keep clear of it. */
+  get dockClearancePx(): number {
+    return this.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0;
   }
   /** Previous playback state for detecting playing→stopped transitions. */
   private _previousState: PlayState = "stopped";

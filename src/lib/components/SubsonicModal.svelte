@@ -4,7 +4,6 @@
   import { i18n } from "../stores/i18n.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
-  import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import { BADGE_ICON_CHOICES, BADGE_COLOR_CHOICES } from "../badgeChoices";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
@@ -113,7 +112,7 @@
       : i18n.t("settings.subsonicTestSuccessUnknown");
   });
 
-  const dockClearance = $derived(playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0);
+  const dockClearance = $derived(playerStore.dockClearancePx);
 
   function errorText(err: unknown): string {
     return typeof err === "string" ? err : (err as any)?.message || String(err);

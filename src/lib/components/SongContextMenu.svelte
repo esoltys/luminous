@@ -16,7 +16,6 @@
     EyeIcon as Eye,
     ChartBarIcon as BarChart2,
     ShareNetworkIcon as Share,
-    CaretRightIcon as CaretRight,
     RadioIcon as Radio,
     PlaylistIcon as PlaylistIcon,
     XIcon as X,
@@ -35,7 +34,6 @@
   import { toastStore } from "../stores/toast.svelte";
   import { provenanceStore } from "../stores/provenance.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { VIEWPORT_EDGE_PADDING_PX, PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import { startSongRadio } from "../utils/playlist";
   import {
     isLosslessFileType,
@@ -46,6 +44,7 @@
   } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
+  import ContextMenuSubmenu from "./ContextMenuSubmenu.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import ShareModal from "./ShareModal.svelte";
   import ViewInFilesItem from "./ViewInFilesItem.svelte";
@@ -119,14 +118,6 @@
     showAdded(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
   }
 
-  /** Matches the flyout's `max-h-60` (15rem). */
-  const SUBMENU_MAX_HEIGHT_PX = 240;
-  let isSubmenuOpen = $state(false);
-  let submenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
-  let submenuTriggerEl = $state<HTMLDivElement | null>(null);
-  let opensLeft = $state(false);
-  let opensUp = $state(false);
-
   let showNewPlaylistModal = $state(false);
   let newPlaylistName = $state("");
 
@@ -136,37 +127,6 @@
       ? playlistsStore.customPlaylists.filter((p) => p.id !== activeCustom.id)
       : playlistsStore.customPlaylists,
   );
-
-  function openSubmenu() {
-    if (submenuCloseTimer) {
-      clearTimeout(submenuCloseTimer);
-      submenuCloseTimer = null;
-    }
-    if (submenuTriggerEl && typeof window !== "undefined") {
-      const rect = submenuTriggerEl.getBoundingClientRect();
-      opensLeft = rect.right + 208 + VIEWPORT_EDGE_PADDING_PX > window.innerWidth;
-      const dockClearance = playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0;
-      opensUp =
-        rect.top + SUBMENU_MAX_HEIGHT_PX >
-        window.innerHeight - dockClearance - VIEWPORT_EDGE_PADDING_PX;
-    }
-    isSubmenuOpen = true;
-  }
-
-  function scheduleCloseSubmenu() {
-    if (submenuCloseTimer) clearTimeout(submenuCloseTimer);
-    submenuCloseTimer = setTimeout(() => {
-      isSubmenuOpen = false;
-    }, 150);
-  }
-
-  function closeSubmenuImmediately() {
-    if (submenuCloseTimer) {
-      clearTimeout(submenuCloseTimer);
-      submenuCloseTimer = null;
-    }
-    isSubmenuOpen = false;
-  }
 
   async function handleAddToCustomPlaylist(targetPlaylist: Playlist) {
     const ids = selectedSongIds && selectedSongIds.length > 0 ? selectedSongIds : [song.id];
@@ -335,7 +295,6 @@
       label={selectedCount > 1
         ? i18n.t("playlists.contextMenuPlay")
         : i18n.t("playlists.contextMenuPlaySong")}
-      onmouseenter={closeSubmenuImmediately}
       onclick={() => {
         onPlay();
         onClose();
@@ -345,7 +304,6 @@
     <ContextMenuItem
       icon={Layers}
       label={i18n.t("playlists.contextMenuAddQueue", {}, "Add to Queue")}
-      onmouseenter={closeSubmenuImmediately}
       onclick={async () => {
         if (onAddToQueue) {
           onAddToQueue();
@@ -360,7 +318,6 @@
       <ContextMenuItem
         icon={Radio}
         label={i18n.t("playlists.contextMenuStartSongRadio", {}, "Start Song Radio")}
-        onmouseenter={closeSubmenuImmediately}
         onclick={async () => {
           await startSongRadio(song);
           onClose();
@@ -368,120 +325,65 @@
       />
     {/if}
 
-    <!-- Add to Playlist submenu trigger & flyout -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      bind:this={submenuTriggerEl}
-      class="relative"
-      onmouseenter={openSubmenu}
-      onmouseleave={scheduleCloseSubmenu}
+    <ContextMenuSubmenu
+      icon={ListPlus}
+      label={i18n.t("playlists.contextMenuAddToPlaylistGeneric", {}, "Add to Playlist")}
     >
-      <button
-        type="button"
-        class="w-full text-left px-3 py-1.5 flex items-center gap-2.5 transition-colors hover:bg-brand-main hover:text-brand-text-primary {isSubmenuOpen
-          ? 'bg-brand-main text-brand-text-primary'
-          : 'text-brand-text-primary'}"
-        role="menuitem"
-        aria-haspopup="menu"
-        aria-expanded={isSubmenuOpen}
-        onclick={() => {
-          if (isSubmenuOpen) {
-            closeSubmenuImmediately();
-          } else {
-            openSubmenu();
-          }
-        }}
-        onkeydown={(e) => {
-          if (e.key === "ArrowRight" || e.key === "Enter") {
-            e.preventDefault();
-            openSubmenu();
-          }
-        }}
-      >
-        <ListPlus class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary" />
-        <span class="flex-1"
-          >{i18n.t("playlists.contextMenuAddToPlaylistGeneric", {}, "Add to Playlist")}</span
-        >
-        <CaretRight
-          class="w-3 h-3 shrink-0 text-brand-text-secondary/70 {isSubmenuOpen
-            ? 'text-brand-text-primary'
-            : ''}"
-        />
-      </button>
-
-      {#if isSubmenuOpen}
-        <!-- Opaque, not acrylic: nested inside the menu's Backdrop Root, a
-           backdrop-filter here could only sample the menu, not the page. -->
-        <div
-          class="absolute z-50 w-52 max-h-60 overflow-y-auto bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none {opensLeft
-            ? 'right-[calc(100%-2px)]'
-            : 'left-[calc(100%-2px)]'} {opensUp ? 'bottom-0' : 'top-0'}"
-          role="menu"
-          tabindex="-1"
-          onmouseenter={openSubmenu}
-          onmouseleave={scheduleCloseSubmenu}
-          onkeydown={(e) => {
-            if (e.key === "ArrowLeft" || e.key === "Escape") {
-              e.preventDefault();
-              closeSubmenuImmediately();
-            }
-          }}
-        >
-          {#if playlistsStore.customPlaylists.length === 0}
-            <div class="px-3 py-1.5 text-brand-text-secondary/60 italic select-none">
-              {i18n.t("playlists.contextMenuNoCustomPlaylists", {}, "No custom playlists")}
-            </div>
-          {:else}
-            {#if activeCustom}
-              <button
-                type="button"
-                onclick={() => handleAddToCustomPlaylist(activeCustom)}
-                class="w-full text-left px-3 py-1.5 flex items-center gap-2 transition-colors hover:bg-brand-main hover:text-brand-text-primary group"
-                role="menuitem"
+      {#snippet children()}
+        {#if playlistsStore.customPlaylists.length === 0}
+          <div class="px-3 py-1.5 text-brand-text-secondary/60 italic select-none">
+            {i18n.t("playlists.contextMenuNoCustomPlaylists", {}, "No custom playlists")}
+          </div>
+        {:else}
+          {#if activeCustom}
+            <button
+              type="button"
+              onclick={() => handleAddToCustomPlaylist(activeCustom)}
+              class="w-full text-left px-3 py-1.5 flex items-center gap-2 transition-colors hover:bg-brand-main hover:text-brand-text-primary group"
+              role="menuitem"
+            >
+              <Radio class="w-3.5 h-3.5 shrink-0 text-brand-accent-text" />
+              <span
+                class="truncate flex-1 font-medium text-brand-text-primary"
+                title={activeCustom.name}>{activeCustom.name}</span
               >
-                <Radio class="w-3.5 h-3.5 shrink-0 text-brand-accent-text" />
-                <span
-                  class="truncate flex-1 font-medium text-brand-text-primary"
-                  title={activeCustom.name}>{activeCustom.name}</span
-                >
-                <span
-                  class="label-small text-brand-accent-text px-1 py-0.5 rounded bg-brand-accent/15 shrink-0"
-                >
-                  {i18n.t("playlists.activeBadgeLabel", {}, "Active")}
-                </span>
-              </button>
-              {#if otherCustomPlaylists.length > 0}
-                <ContextMenuDivider />
-              {/if}
+              <span
+                class="label-small text-brand-accent-text px-1 py-0.5 rounded bg-brand-accent/15 shrink-0"
+              >
+                {i18n.t("playlists.activeBadgeLabel", {}, "Active")}
+              </span>
+            </button>
+            {#if otherCustomPlaylists.length > 0}
+              <ContextMenuDivider />
             {/if}
-
-            {#each activeCustom ? otherCustomPlaylists : playlistsStore.customPlaylists as pl (pl.id)}
-              <button
-                type="button"
-                onclick={() => handleAddToCustomPlaylist(pl)}
-                class="w-full text-left px-3 py-1.5 flex items-center gap-2 transition-colors hover:bg-brand-main hover:text-brand-text-primary"
-                role="menuitem"
-              >
-                <PlaylistIcon class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary" />
-                <span class="truncate flex-1" title={pl.name}>{pl.name}</span>
-              </button>
-            {/each}
           {/if}
 
-          <ContextMenuDivider />
+          {#each activeCustom ? otherCustomPlaylists : playlistsStore.customPlaylists as pl (pl.id)}
+            <button
+              type="button"
+              onclick={() => handleAddToCustomPlaylist(pl)}
+              class="w-full text-left px-3 py-1.5 flex items-center gap-2 transition-colors hover:bg-brand-main hover:text-brand-text-primary"
+              role="menuitem"
+            >
+              <PlaylistIcon class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary" />
+              <span class="truncate flex-1" title={pl.name}>{pl.name}</span>
+            </button>
+          {/each}
+        {/if}
 
-          <button
-            type="button"
-            onclick={handleOpenNewPlaylistModal}
-            class="w-full text-left px-3 py-1.5 flex items-center gap-2 transition-colors hover:bg-brand-accent/15 hover:text-brand-accent-text text-brand-accent-text font-medium"
-            role="menuitem"
-          >
-            <Plus class="w-3.5 h-3.5 shrink-0" />
-            <span>{i18n.t("playlists.contextMenuNewPlaylist", {}, "New Playlist...")}</span>
-          </button>
-        </div>
-      {/if}
-    </div>
+        <ContextMenuDivider />
+
+        <button
+          type="button"
+          onclick={handleOpenNewPlaylistModal}
+          class="w-full text-left px-3 py-1.5 flex items-center gap-2 transition-colors hover:bg-brand-accent/15 hover:text-brand-accent-text text-brand-accent-text font-medium"
+          role="menuitem"
+        >
+          <Plus class="w-3.5 h-3.5 shrink-0" />
+          <span>{i18n.t("playlists.contextMenuNewPlaylist", {}, "New Playlist...")}</span>
+        </button>
+      {/snippet}
+    </ContextMenuSubmenu>
 
     {#if !allSelectedRemote}
       <AddToDeviceMenuItem
@@ -495,7 +397,6 @@
       label={song.not_included
         ? i18n.t("playlists.contextMenuIncludeInPlaylists")
         : i18n.t("playlists.contextMenuMarkNotIncluded")}
-      onmouseenter={closeSubmenuImmediately}
       onclick={() => {
         handleToggleNotIncluded();
         onClose();
@@ -508,7 +409,6 @@
         label={song.loved === 1 || (song.loved === undefined && song.rating === 5)
           ? i18n.t("rating.unfavoriteTooltip")
           : i18n.t("rating.favoriteTooltip")}
-        onmouseenter={closeSubmenuImmediately}
         onclick={() => {
           handleToggleFavourite();
           onClose();
@@ -518,7 +418,6 @@
       <ContextMenuItem
         icon={HeartBreakIcon}
         label={song.loved === -1 ? i18n.t("rating.clearHateTooltip") : i18n.t("rating.hateAction")}
-        onmouseenter={closeSubmenuImmediately}
         onclick={() => {
           handleToggleDislike();
           onClose();
@@ -530,7 +429,6 @@
         label={statsExclusionsStore.isSongExcluded(song)
           ? i18n.t("stats.includeInStats")
           : i18n.t("stats.excludeFromStats")}
-        onmouseenter={closeSubmenuImmediately}
         onclick={() => {
           handleToggleStatsExcluded();
           onClose();
@@ -543,7 +441,6 @@
         <ContextMenuItem
           icon={Mic2}
           label={i18n.t("playlists.contextMenuGoArtist")}
-          onmouseenter={closeSubmenuImmediately}
           onclick={() => {
             onGoToArtist?.();
             onClose();
@@ -555,7 +452,6 @@
         <ContextMenuItem
           icon={DiscAlbum}
           label={i18n.t("playlists.contextMenuGoAlbum")}
-          onmouseenter={closeSubmenuImmediately}
           onclick={() => {
             onGoToAlbum?.();
             onClose();
@@ -564,14 +460,13 @@
       {/if}
 
       {#if showViewInFiles}
-        <ViewInFilesItem songId={song.id} onmouseenter={closeSubmenuImmediately} {onClose} />
+        <ViewInFilesItem songId={song.id} {onClose} />
       {/if}
 
       {#if song.artist}
         <ContextMenuItem
           icon={Share}
           label={i18n.t("shareModal.menuItem")}
-          onmouseenter={closeSubmenuImmediately}
           onclick={() => {
             menuVisible = false;
             showShareModal = true;
@@ -584,7 +479,6 @@
         label={pinnedStore.isPinned("song", String(song.id))
           ? i18n.t("playlists.contextMenuUnpinHome")
           : i18n.t("playlists.contextMenuPinHome")}
-        onmouseenter={closeSubmenuImmediately}
         onclick={() => {
           pinnedStore.toggle("song", String(song.id));
           onClose();
@@ -604,7 +498,6 @@
               `Verify Audio Authenticity (${selectedCount})`,
             )
           : i18n.t("collection.verifyAuthenticity", {}, "Verify Audio Authenticity")}
-        onmouseenter={closeSubmenuImmediately}
         onclick={() => {
           handleVerifyLossless();
           onClose();
@@ -616,7 +509,6 @@
       <ContextMenuItem
         icon={Folder}
         label={i18n.t("organizer.title")}
-        onmouseenter={closeSubmenuImmediately}
         onclick={() => {
           onOrganizeFiles?.();
           onClose();
@@ -628,7 +520,6 @@
       <ContextMenuItem
         icon={Edit3}
         label={i18n.t("collection.editTagsTooltip")}
-        onmouseenter={closeSubmenuImmediately}
         onclick={() => {
           if (selectedCount === 1) onEditTags?.();
           else onEditBatchTags?.();
@@ -641,7 +532,6 @@
       <ContextMenuItem
         icon={Prohibit}
         label={i18n.t("lyrics.rejectMatch", {}, "Reject Online Lyrics")}
-        onmouseenter={closeSubmenuImmediately}
         onclick={async () => {
           const songId = song.id;
           onClose();
@@ -666,7 +556,6 @@
       <ContextMenuItem
         icon={OpenInPicard}
         label={i18n.t("picard.openInPicard")}
-        onmouseenter={closeSubmenuImmediately}
         onclick={() => {
           onOpenInPicard?.();
           onClose();
@@ -683,7 +572,7 @@
     {#if trailing}
       <ContextMenuDivider />
       <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div onmouseenter={closeSubmenuImmediately}>{@render trailing()}</div>
+      <div>{@render trailing()}</div>
     {/if}
   </ContextMenu>
 {/if}
