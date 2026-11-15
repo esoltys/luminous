@@ -64,7 +64,7 @@ export const PLAIN_TILE_COVER =
   "rounded-lg outline-2 -outline-offset-2 outline-transparent group-hover:outline-brand-accent group-focus-within:outline-brand-accent transition-[outline-color] duration-200";
 
 /**
- * The hover zoom of a cover inside a plain tile (artist, album, playlist). One definition so the
+ * The hover zoom of a cover inside a tile (artist, album, playlist). One definition so the
  * scale and timing cannot drift between card types. Needs an ancestor with `group`.
  */
 export const HOVER_ZOOM = "transition-transform duration-300 group-hover:scale-105";

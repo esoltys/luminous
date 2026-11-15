@@ -90,7 +90,7 @@
           src={artistPortraitUrl}
           crossorigin="anonymous"
           alt={artist.name || i18n.t("collection.unknownArtist")}
-          class="w-full h-full object-cover {plain ? HOVER_ZOOM : ''}"
+          class="w-full h-full object-cover {HOVER_ZOOM}"
         />
       </div>
     {:else}
@@ -98,7 +98,7 @@
         {covers}
         fallbackName={artist.name || i18n.t("collection.unknownArtist")}
         sizeClass="w-36 h-36"
-        hoverEffect={plain}
+        hoverEffect={true}
       />
     {/if}
     {#if plain}

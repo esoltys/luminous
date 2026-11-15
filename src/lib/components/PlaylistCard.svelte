@@ -1,6 +1,5 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { useCardAppearance } from "../utils/cardAppearance";
   import {
     PlaylistIcon as ListMusic,
     BroadcastIcon as Radio,
@@ -80,8 +79,6 @@
   let isActive = $derived(playlistsStore.effectivePinnedPlaylistId === playlist.id);
 
   let updatedLabel = $derived(formatRelativeDate(playlist.updated));
-
-  const plain = useCardAppearance() === "plain";
 </script>
 
 {#snippet cover()}
@@ -92,10 +89,10 @@
   {:else if topAlbums.length > 0 && autoKind}
     {@const t = getPlaylistCardTheme(autoKind)}
     <PlaylistCoverFrame gradientClass={t.gradientClass}>
-      <CoverStack covers={topAlbums} hoverEffect={plain} sizeClass="w-[82%] h-[82%]" />
+      <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
     </PlaylistCoverFrame>
   {:else if topAlbums.length > 0}
-    <CoverStack covers={topAlbums} hoverEffect={plain} sizeClass="w-[82%] h-[82%]" />
+    <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
   {:else if autoKind}
     {@const t = getPlaylistCardTheme(autoKind)}
     <PlaylistCoverFrame gradientClass={t.gradientClass}>
