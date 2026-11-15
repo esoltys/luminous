@@ -1,7 +1,9 @@
 use crate::{
     collection::{SelfWriteTracker, WatcherPauseGuard},
     genre_aliases::GenreAlias,
-    models::{GenreGroup, LanguageSummary, QueuePopulationMode, Song, Tag, TagGroup},
+    models::{
+        GenreGroup, LanguageSummary, QueuePopulationMode, Song, Tag, TagDuplicateGroup, TagGroup,
+    },
     tags::TagManager,
     AppState,
 };
@@ -250,6 +252,19 @@ pub async fn get_artist_tag_hierarchy(state: State<'_, AppState>) -> Result<Vec<
     persisted(&state, result).await
 }
 
+/// Artist tags stored under more than one spelling (#2096), for the Genres
+/// page's "possible duplicates" banner and merge dialog.
+#[tauri::command]
+pub async fn find_artist_tag_near_duplicates(
+    state: State<'_, AppState>,
+) -> Result<Vec<TagDuplicateGroup>, String> {
+    crate::tags::with_tag_manager(state.db.clone(), |manager| {
+        manager.find_artist_tag_near_duplicates()
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn set_artist_group_color(
     state: State<'_, AppState>,
@@ -335,6 +350,22 @@ pub async fn merge_artist_tags(
     let manager = TagManager::new(state.db.clone());
     let result = manager
         .merge_artist_tags(&from, &into)
+        .map_err(|e| e.to_string());
+    persisted(&state, result).await
+}
+
+/// Merges a group of duplicate artist-tag spellings into one (#2096): a single
+/// command so the Genres page's merge dialog triggers one sidecar write, not one
+/// per spelling.
+#[tauri::command]
+pub async fn merge_artist_tag_spellings(
+    state: State<'_, AppState>,
+    from: Vec<String>,
+    into: String,
+) -> Result<usize, String> {
+    let manager = TagManager::new(state.db.clone());
+    let result = manager
+        .merge_artist_tag_spellings(&from, &into)
         .map_err(|e| e.to_string());
     persisted(&state, result).await
 }

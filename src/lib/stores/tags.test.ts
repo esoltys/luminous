@@ -157,3 +157,52 @@ describe("TagsStore genre alias lookups (#1994)", () => {
     expect(tagsStore.canonicalOf("Progressive Rock")).toBeUndefined();
   });
 });
+
+describe("TagsStore artist tag duplicates", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      switch (cmd) {
+        case "merge_artist_tag_spellings":
+          return 4;
+        case "get_artist_tag_hierarchy":
+        case "get_artist_tags_overview":
+        case "find_artist_tag_near_duplicates":
+          return [];
+        default:
+          throw new Error(`Unhandled invoke: ${cmd}`);
+      }
+    });
+  });
+
+  it("merges a whole group in one backend call and returns the artists updated", async () => {
+    const updated = await tagsStore.mergeArtistTagSpellings("Award-Winning", [
+      "Award Winning",
+      "award winning",
+    ]);
+
+    expect(invoke).toHaveBeenCalledWith("merge_artist_tag_spellings", {
+      from: ["Award Winning", "award winning"],
+      into: "Award-Winning",
+    });
+    expect(updated).toBe(4);
+    expect(invoke).toHaveBeenCalledWith("find_artist_tag_near_duplicates");
+  });
+
+  it("stores the duplicate groups the backend reports", async () => {
+    const groups = [
+      {
+        suggested: "Folk",
+        spellings: [
+          { name: "Folk", artist_count: 2 },
+          { name: "folk", artist_count: 1 },
+        ],
+      },
+    ];
+    vi.mocked(invoke).mockResolvedValueOnce(groups);
+
+    await tagsStore.loadArtistTagDuplicates();
+
+    expect(tagsStore.artistTagDuplicates).toEqual(groups);
+  });
+});

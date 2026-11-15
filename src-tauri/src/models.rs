@@ -1521,6 +1521,23 @@ pub struct Tag {
     pub song_count: i64,
 }
 
+/// One spelling of an artist tag and how many artist profiles carry it.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct TagSpelling {
+    pub name: String,
+    pub artist_count: i64,
+}
+
+/// Artist-tag spellings that differ only in case, accents, spacing or
+/// punctuation (#2096) — "Award-Winning" and "Award Winning". `spellings` is
+/// ordered most-used first (ties alphabetical) and always has at least two
+/// entries; `suggested` is the first, the spelling to merge the others into.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct TagDuplicateGroup {
+    pub suggested: String,
+    pub spellings: Vec<TagSpelling>,
+}
+
 /// One child entry under a [`GenreGroup`]'s main tag.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct TagCount {

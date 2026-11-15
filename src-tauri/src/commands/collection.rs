@@ -957,6 +957,7 @@ fn merge_artist_image_retrieval(
 #[tauri::command]
 pub async fn set_artist_profile(
     profile: ArtistProfile,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<ArtistProfile, String> {
     // The artist.md sidecar write below is app-driven, not an external
@@ -965,12 +966,20 @@ pub async fn set_artist_profile(
     // platforms) and kick off a redundant full rescan on top of the
     // in-memory update this command's return value already applies (#1123).
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
-    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+    let saved = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
         let stored = scanner.get_artist_profile(&profile.artist_key)?;
         save_artist_profile_with_sidecar(scanner, &merge_artist_profile_edit(stored, profile))
     })
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+
+    // Smart playlists match on an artist's tags and country, which live on the
+    // profile, so an edit can move songs in or out of them. `library-changed`
+    // and `song-stats-changed` are the only events that reconcile them, and
+    // neither fires for a profile save.
+    crate::playlist::reconcile_and_sync(app).await;
+
+    Ok(saved)
 }
 
 #[tauri::command]
@@ -1616,6 +1625,7 @@ async fn resolve_artist_mbid_and_profile(
 #[tauri::command]
 pub async fn retrieve_artist_details(
     artist: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<ArtistDetailsRetrievalResult, String> {
     // See `set_artist_profile`'s matching guard — same reasoning, for the
@@ -1677,6 +1687,11 @@ pub async fn retrieve_artist_details(
         })
         .await
         .map_err(|e| e.to_string())?;
+
+    // A country filled in from MusicBrainz can move songs into a smart
+    // playlist, and nothing else announces a profile change (see
+    // `set_artist_profile`).
+    crate::playlist::reconcile_and_sync(app).await;
 
     Ok(ArtistDetailsRetrievalResult {
         profile,

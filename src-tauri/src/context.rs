@@ -294,10 +294,14 @@ pub struct MusicBrainzArtistDetails {
     pub begin_area_mbid: Option<String>,
     pub area_name: Option<String>,
     pub area_mbid: Option<String>,
+    /// The artist's country as an uppercase alpha-2 code (see
+    /// `MbArtistResponse::country_code`), never read off a city or state (#2095).
+    pub country: Option<String>,
 }
 
 impl From<MbArtistResponse> for MusicBrainzArtistDetails {
     fn from(res: MbArtistResponse) -> Self {
+        let country = res.country_code();
         let (begin_date, end_date, ended) = match res.life_span {
             Some(ls) => (ls.begin, ls.end, ls.ended),
             None => (None, None, None),
@@ -321,6 +325,7 @@ impl From<MbArtistResponse> for MusicBrainzArtistDetails {
             begin_area_mbid,
             area_name,
             area_mbid,
+            country,
         }
     }
 }
@@ -1651,6 +1656,20 @@ mod tests {
         // Anything that is not a two-letter code is not a country.
         let junk: MbArtistResponse = serde_json::from_str(r#"{"country": "USA"}"#).unwrap();
         assert_eq!(junk.country_code(), None);
+    }
+
+    #[test]
+    fn test_musicbrainz_artist_details_carry_the_country_not_the_area_name() {
+        let res: MbArtistResponse =
+            serde_json::from_str(r#"{"country": "US", "area": {"id": "x", "name": "California"}}"#)
+                .unwrap();
+        let details: MusicBrainzArtistDetails = res.into();
+        assert_eq!(details.country.as_deref(), Some("US"));
+        assert_eq!(details.area_name.as_deref(), Some("California"));
+
+        let none: MbArtistResponse =
+            serde_json::from_str(r#"{"area": {"name": "California"}}"#).unwrap();
+        assert_eq!(MusicBrainzArtistDetails::from(none).country, None);
     }
 
     #[test]

@@ -1810,6 +1810,17 @@ export const frFR: DeepStringRecord<typeof en> = {
     promoteArtistTag: "Promouvoir en balise principale",
     renameToast: "Renommé en « {name} » ({count} chansons mises à jour)",
     artistRenameToast: "Renommé en « {name} » ({count} artistes mis à jour)",
+    duplicatesBanner: {
+      one: "{count} groupe d'étiquettes d'artiste pourrait contenir des doublons",
+      other: "{count} groupes d'étiquettes d'artiste pourraient contenir des doublons",
+    },
+    duplicatesReview: "Examiner",
+    duplicatesTitle: "Fusionner les étiquettes en double",
+    duplicatesIntro:
+      "Ces étiquettes d'artiste ne diffèrent que par leur graphie. Choisissez la graphie à conserver pour chaque groupe, puis fusionnez.",
+    duplicatesMergeBtn: "Fusionner dans « {name} »",
+    duplicatesMergedToast: "Fusionnées dans « {name} » ({count} artistes mis à jour)",
+    duplicatesDone: "Terminé",
     deleteConfirmMessage: {
       one: "Supprimer {count} balise de toutes les chansons qui la portent ? Cette action est irréversible.",
       other:

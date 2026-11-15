@@ -2379,6 +2379,17 @@ export const it = {
     promoteArtistTag: "Promuovi a tag di primo livello",
     renameToast: "Rinominato in «{name}» ({count} brani aggiornati)",
     artistRenameToast: "Rinominato in «{name}» ({count} artisti aggiornati)",
+    duplicatesBanner: {
+      one: "{count} gruppo di tag artista potrebbe contenere duplicati",
+      other: "{count} gruppi di tag artista potrebbero contenere duplicati",
+    },
+    duplicatesReview: "Rivedi",
+    duplicatesTitle: "Unisci i tag duplicati",
+    duplicatesIntro:
+      "Questi tag artista differiscono solo per l'ortografia. Scegli l'ortografia da mantenere per ogni gruppo, poi unisci.",
+    duplicatesMergeBtn: "Unisci in «{name}»",
+    duplicatesMergedToast: "Uniti in «{name}» ({count} artisti aggiornati)",
+    duplicatesDone: "Fine",
     deleteConfirmMessage: {
       one: "Rimuovere {count} tag da ogni brano che lo contiene? L'operazione non può essere annullata.",
       other:

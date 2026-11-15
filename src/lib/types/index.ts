@@ -1172,6 +1172,20 @@ export interface Tag {
   song_count: number;
 }
 
+/** One stored spelling of an artist tag and the artists carrying it. */
+export interface TagSpelling {
+  name: string;
+  artist_count: number;
+}
+
+/** Artist-tag spellings that differ only in case, accents, spacing or
+ * punctuation (#2096). `spellings` is most-used first; `suggested` is the
+ * first one — the spelling the others merge into by default. */
+export interface TagDuplicateGroup {
+  suggested: string;
+  spellings: TagSpelling[];
+}
+
 /** One child entry under a {@link GenreGroup}'s main tag. */
 export interface TagCount {
   name: string;

@@ -2322,6 +2322,17 @@ export const en = {
     promoteArtistTag: "Promote to top-level tag",
     renameToast: 'Renamed to "{name}" ({count} songs updated)',
     artistRenameToast: 'Renamed to "{name}" ({count} artists updated)',
+    duplicatesBanner: {
+      one: "{count} group of artist tags may be duplicates",
+      other: "{count} groups of artist tags may be duplicates",
+    },
+    duplicatesReview: "Review",
+    duplicatesTitle: "Merge Duplicate Tags",
+    duplicatesIntro:
+      "These artist tags differ only in spelling. Choose the spelling to keep for each group, then merge.",
+    duplicatesMergeBtn: 'Merge into "{name}"',
+    duplicatesMergedToast: 'Merged into "{name}" ({count} artists updated)',
+    duplicatesDone: "Done",
     deleteConfirmMessage: {
       one: "Remove {count} tag from every song that carries it? This can't be undone.",
       other: "Remove {count} tags from every song that carries them? This can't be undone.",

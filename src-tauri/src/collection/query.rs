@@ -2133,6 +2133,38 @@ pub fn set_artist_mbid_conn(conn: &rusqlite::Connection, artist: &str, mbid: &st
     Ok(())
 }
 
+/// Fills a blank `artist_profiles.country` from MusicBrainz, for the profile
+/// already carrying that MusicBrainz artist id (#2095). Returns the profile keys
+/// it changed, so the caller can tell the rest of the app only when something did.
+///
+/// A column-scoped, conditional write on purpose: it never creates a profile
+/// (a row appearing just because an artist was viewed would read as curated to
+/// external tools), never overwrites a country the user or an external tool set,
+/// and never touches tags or any other column. A non-code value is ignored.
+pub fn fill_blank_artist_country_by_mbid_conn(
+    conn: &rusqlite::Connection,
+    mbid: &str,
+    country: &str,
+) -> Result<Vec<String>> {
+    let Some(code) = normalize_country_code(Some(country)) else {
+        return Ok(Vec::new());
+    };
+    let mut stmt = conn.prepare(
+        "SELECT artist_key FROM artist_profiles
+         WHERE musicbrainz_artist_id = ?1 AND COALESCE(country, '') = ''",
+    )?;
+    let keys: Vec<String> = stmt
+        .query_map(params![mbid], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    for key in &keys {
+        conn.execute(
+            "UPDATE artist_profiles SET country = ?1 WHERE artist_key = ?2",
+            params![code, key],
+        )?;
+    }
+    Ok(keys)
+}
+
 /// Canonical stored form of an artist's country: an uppercase ISO 3166-1
 /// alpha-2 code. Anything else (blank, wrong length, non-letters) becomes
 /// `None`, so the column only ever holds a code or NULL (#2095).
@@ -4013,6 +4045,70 @@ mod tests {
         assert_eq!(
             get_artist_profile_conn(&conn, "Rush").unwrap().country,
             None
+        );
+    }
+
+    #[test]
+    fn test_fill_blank_artist_country_by_mbid_only_fills_blank_and_touches_nothing_else() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_country_fill_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        let profile = |key: &str, mbid: &str, country: Option<&str>| ArtistProfile {
+            artist_key: key.to_string(),
+            musicbrainz_artist_id: Some(mbid.to_string()),
+            country: country.map(str::to_string),
+            tags: vec!["Grammy Award".to_string()],
+            bio: Some("A bio".to_string()),
+            ..Default::default()
+        };
+        set_artist_profile_conn(&conn, &profile("Blank", "mbid-1", None)).unwrap();
+        set_artist_profile_conn(&conn, &profile("Manual", "mbid-2", Some("GB"))).unwrap();
+
+        let filled = fill_blank_artist_country_by_mbid_conn(&conn, "mbid-1", "us").unwrap();
+        assert_eq!(filled, vec!["Blank".to_string()]);
+        let blank = get_artist_profile_conn(&conn, "Blank").unwrap();
+        assert_eq!(blank.country.as_deref(), Some("US"));
+        assert_eq!(
+            blank.tags,
+            vec!["Grammy Award"],
+            "only the country column changes"
+        );
+        assert_eq!(blank.bio.as_deref(), Some("A bio"));
+
+        // A country already set is never overwritten, and reports nothing changed.
+        assert!(
+            fill_blank_artist_country_by_mbid_conn(&conn, "mbid-2", "US")
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            get_artist_profile_conn(&conn, "Manual")
+                .unwrap()
+                .country
+                .as_deref(),
+            Some("GB")
+        );
+
+        // No profile carries the id: nothing is created.
+        assert!(
+            fill_blank_artist_country_by_mbid_conn(&conn, "mbid-3", "US")
+                .unwrap()
+                .is_empty()
+        );
+        let rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM artist_profiles", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rows, 2);
+
+        // A value that is not an alpha-2 code is ignored.
+        assert!(
+            fill_blank_artist_country_by_mbid_conn(&conn, "mbid-1", "Canada")
+                .unwrap()
+                .is_empty()
         );
     }
 

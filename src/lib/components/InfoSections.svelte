@@ -79,7 +79,6 @@
         artistType={section.context.artist_type}
         beginAreaName={section.context.artist_begin_area_name}
         beginAreaMbid={section.context.artist_begin_area_mbid}
-        areaName={section.context.artist_area_name}
         areaMbid={section.context.artist_area_mbid}
         {countryCode}
       />

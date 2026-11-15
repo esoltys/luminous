@@ -27,7 +27,7 @@ describe("ArtistInformationPanel", () => {
         endDate: "2016-01-10",
         beginAreaName: "Brixton",
         beginAreaMbid: "d9e80e14-d07f-4ca6-b8db-60cb1c07cb81",
-        areaName: "United Kingdom",
+        countryCode: "GB",
         areaMbid: "8a754a16-0027-4a29-b6d7-2b40ea0481ed",
       },
     });
@@ -77,7 +77,7 @@ describe("ArtistInformationPanel", () => {
         endDate: "1970-04-10",
         beginAreaName: "Liverpool",
         beginAreaMbid: "e1e771b9-7a63-40bf-b5ef-139ec42b6a9b",
-        areaName: "United Kingdom",
+        countryCode: "GB",
       },
     });
 
@@ -107,12 +107,17 @@ describe("ArtistInformationPanel", () => {
     expect(screen.queryByText("Group")).toBeNull();
   });
 
-  it("prefers the profile country over an area that is only a city or state", () => {
+  it("shows the profile country next to a city or state", () => {
     render(ArtistInformationPanel, {
-      props: { beginAreaName: "Los Angeles", areaName: "California", countryCode: "US" },
+      props: { beginAreaName: "Los Angeles", countryCode: "US" },
     });
     expect(screen.getByText("United States")).toBeTruthy();
-    expect(screen.queryByText("California")).toBeNull();
+    expect(screen.getByText("Los Angeles")).toBeTruthy();
+  });
+
+  it("shows no Country row when the profile has no country", () => {
+    render(ArtistInformationPanel, { props: { beginAreaName: "Los Angeles" } });
+    expect(screen.queryByText("Country")).toBeNull();
   });
 
   it("shows a country on its own", () => {

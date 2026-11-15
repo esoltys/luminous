@@ -762,4 +762,25 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
       .mock.calls.filter(([cmd]) => cmd === "get_all_artist_profiles");
     expect(profileCalls).toHaveLength(1);
   });
+
+  it("refreshes one artist profile when the backend fills its country (#2095)", async () => {
+    const baseImpl = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === "get_artist_profile") {
+        return { artist_key: "Kings of Leon", tags: [], country: "US" };
+      }
+      return baseImpl(cmd, args);
+    });
+
+    await (collectionStore as any).init();
+    expect(eventCallbacks["artist-profile-changed"]).toBeDefined();
+    expect(collectionStore.getArtistProfile("Kings of Leon")?.country).toBeUndefined();
+
+    eventCallbacks["artist-profile-changed"]({ payload: "Kings of Leon" });
+
+    await vi.waitFor(() => {
+      expect(collectionStore.getArtistProfile("Kings of Leon")?.country).toBe("US");
+    });
+    expect(invoke).toHaveBeenCalledWith("get_artist_profile", { artist: "Kings of Leon" });
+  });
 });

@@ -554,6 +554,15 @@ class CollectionStore {
         });
       });
 
+      // The backend filled a blank artist country in from MusicBrainz (#2095); the
+      // payload is the profile's key. Refresh just that profile so the Info sidebar
+      // and the artist editor see it without a full library reload.
+      await this.events.listen<string>("artist-profile-changed", (event) => {
+        this.refreshArtistProfile(event.payload).catch((err) => {
+          console.error("Failed to refresh artist profile after a country fill:", err);
+        });
+      });
+
       // Track file-watcher batches (#233, #1087, #1746) in tasksStore so they stay visible
       // in the persistent task tracker. Reuses a single task ID so rapid sequential writes
       // (e.g. Picard saving an album one file at a time) coalesce into one notification row
