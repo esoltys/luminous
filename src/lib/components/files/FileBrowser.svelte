@@ -732,7 +732,9 @@
           <div class="relative flex-1 min-h-0 flex">
             <div
               bind:this={columnEls[column]}
-              class="flex-1 min-h-0 p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
+              class="flex-1 min-h-0 p-1.5 {windowLayoutStore.hasRightNotch && sortColumn === 'name'
+                ? 'pr-16'
+                : ''} outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
               role="listbox"
               tabindex="0"
               aria-label={columnLabel(dir)}

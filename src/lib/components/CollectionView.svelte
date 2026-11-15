@@ -575,7 +575,11 @@
         </CollectionHeader>
       </div>
 
-      <div class="flex-1 px-6 overflow-hidden flex flex-col pb-dock">
+      <div
+        class="flex-1 pl-6 {windowLayoutStore.hasRightNotch && isSongSortAlphabetical
+          ? 'pr-16'
+          : 'pr-6'} overflow-hidden flex flex-col pb-dock"
+      >
         <div class="relative flex-1 min-h-0 flex">
           <div
             class="flex-1 overflow-y-auto border border-brand-border rounded-lg bg-brand-sidebar/40 min-h-0"
@@ -600,12 +604,10 @@
             />
           </div>
           {#if isSongSortAlphabetical}
-            <!-- In the px-6 gutter just right of the table when pinned/hidden, or shifted
-                 inward to clear the right-edge info notch when unpinned. -->
+            <!-- In the right gutter just right of the table (not over its rows), spanning the
+                 table's full height; the parent's playbar padding already bounds the bottom. -->
             <div
-              class="absolute {windowLayoutStore.hasRightNotch
-                ? 'right-4'
-                : 'left-full ml-0.5'} top-0 bottom-0 pointer-events-auto z-20"
+              class="absolute left-full ml-0.5 top-0 bottom-0 pointer-events-auto z-20"
               data-testid="alphabet-scrubber-bounds"
             >
               <AlphabetScrubber
@@ -761,7 +763,13 @@
               {/if}
             {/snippet}
 
-            <div class="pl-6 pr-8">
+            <div
+              class="pl-6 {windowLayoutStore.hasRightNotch &&
+              ((isAlbumSortAlphabetical && navigationStore.activeSubTab === 'albums') ||
+                (isArtistSortAlphabetical && navigationStore.activeSubTab === 'artists'))
+                ? 'pr-16'
+                : 'pr-8'}"
+            >
               {#if navigationStore.activeSubTab === "albums"}
                 {#if activeViewMode === "rows"}
                   {#if sortedAlbums.length === 0}
