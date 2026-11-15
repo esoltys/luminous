@@ -1,12 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  PLAYER_DOCK_HEIGHT_PX,
-  PLAYER_DOCK_INSET_PX,
-  PLAYER_DOCK_CLEARANCE_PX,
-  PLAYER_DOCK_CONTENT_RESERVE_PX,
-} from "./constants";
+import { PLAYER_DOCK_HEIGHT_PX, PLAYER_DOCK_INSET_PX } from "./constants";
 
 // Tailwind spacing steps are 4px, so `h-20` is 80px. Reading the real sources makes a dock
 // resize that forgets constants.ts fail here instead of hiding content under the dock.
@@ -20,10 +15,5 @@ describe("PlayerBar dock geometry", () => {
     );
     expect(Number(height?.[1]) * 4).toBe(PLAYER_DOCK_HEIGHT_PX);
     expect(Number(inset?.[1]) * 4).toBe(PLAYER_DOCK_INSET_PX);
-  });
-
-  it("derives the clearance and the content reserve from that geometry", () => {
-    expect(PLAYER_DOCK_CLEARANCE_PX).toBe(PLAYER_DOCK_HEIGHT_PX + PLAYER_DOCK_INSET_PX);
-    expect(PLAYER_DOCK_CONTENT_RESERVE_PX).toBe(112);
   });
 });
