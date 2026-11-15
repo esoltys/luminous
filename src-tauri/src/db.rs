@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 82;
+pub const CURRENT_SCHEMA_VERSION: i32 = 83;
 
 struct Migration {
     version: i32,
@@ -819,7 +819,190 @@ const MIGRATIONS: &[Migration] = &[
         description: "playlist items outlive their library song: snapshot on delete, relink on insert (#1870)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_82)?),
     },
+    Migration {
+        version: 83,
+        description: "artist_profiles.artist_key is case-insensitive; merge case-duplicate rows (#2097)",
+        apply: migrate_artist_profile_keys_nocase,
+    },
 ];
+
+/// Migration 83 (#2097): `artist_profiles.artist_key` becomes
+/// `COLLATE NOCASE`, so a profile is one row per artist whatever casing a
+/// writer used. Before, the key was case-sensitive while every read was
+/// case-insensitive: an upsert under a different casing (an external tool, or
+/// the library's own spelling) inserted a second row, and the case-sensitive
+/// `ON CONFLICT(artist_key)` clauses never noticed.
+///
+/// Existing case-duplicates are merged first. The surviving key prefers the
+/// library's own spelling (an exact `songs` artist match), then the row with
+/// the most filled-in fields. Its empty fields are filled from the others;
+/// tags and social links are unioned, flags OR-ed.
+fn migrate_artist_profile_keys_nocase(conn: &rusqlite::Connection) -> Result<()> {
+    type Row = (
+        String,
+        Option<String>,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        [i64; 4],
+        Option<String>,
+        Option<String>,
+    );
+
+    let mut rows: Vec<Row> = {
+        let mut stmt = conn.prepare(
+            "SELECT artist_key, website, tags, social_links, bio, musicbrainz_artist_id,
+                    fetched_image_filename, fetched_image_source,
+                    details_fetched, image_fetched, logo_fetched, background_fetched,
+                    fetched_logo_filename, fetched_background_filename
+             FROM artist_profiles ORDER BY artist_key",
+        )?;
+        let mapped = stmt.query_map([], |r| {
+            Ok((
+                r.get(0)?,
+                r.get(1)?,
+                r.get(2)?,
+                r.get(3)?,
+                r.get(4)?,
+                r.get(5)?,
+                r.get(6)?,
+                r.get(7)?,
+                [r.get(8)?, r.get(9)?, r.get(10)?, r.get(11)?],
+                r.get(12)?,
+                r.get(13)?,
+            ))
+        })?;
+        mapped.collect::<rusqlite::Result<_>>()?
+    };
+
+    let in_library: std::collections::HashSet<String> = {
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT COALESCE(NULLIF(album_artist, ''), artist) FROM songs
+             WHERE COALESCE(NULLIF(album_artist, ''), artist) IS NOT NULL",
+        )?;
+        let names = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        names.collect::<rusqlite::Result<_>>()?
+    };
+
+    let filled = |s: &Option<String>| s.as_deref().is_some_and(|v| !v.trim().is_empty());
+    let score = |r: &Row| -> usize {
+        [&r.1, &r.4, &r.5, &r.6, &r.7, &r.9, &r.10]
+            .iter()
+            .filter(|f| filled(f))
+            .count()
+            + usize::from(r.2 != "[]")
+            + usize::from(r.3 != "[]")
+    };
+
+    // Group by case-folded key; each group is merged into a single row.
+    let mut groups: std::collections::BTreeMap<String, Vec<Row>> = Default::default();
+    for row in rows.drain(..) {
+        groups.entry(row.0.to_lowercase()).or_default().push(row);
+    }
+
+    conn.execute_batch(
+        "CREATE TABLE artist_profiles_new (
+            artist_key TEXT PRIMARY KEY COLLATE NOCASE,
+            website TEXT,
+            tags TEXT NOT NULL DEFAULT '[]',
+            social_links TEXT NOT NULL DEFAULT '[]',
+            bio TEXT,
+            musicbrainz_artist_id TEXT,
+            fetched_image_filename TEXT,
+            fetched_image_source TEXT,
+            details_fetched INTEGER NOT NULL DEFAULT 0,
+            image_fetched INTEGER NOT NULL DEFAULT 0,
+            fetched_logo_filename TEXT,
+            fetched_background_filename TEXT,
+            logo_fetched INTEGER NOT NULL DEFAULT 0,
+            background_fetched INTEGER NOT NULL DEFAULT 0
+        );",
+    )?;
+
+    for (_, mut group) in groups {
+        // Best row first: library spelling, then most data, then key order.
+        group.sort_by(|a, b| {
+            in_library
+                .contains(&b.0)
+                .cmp(&in_library.contains(&a.0))
+                .then(score(b).cmp(&score(a)))
+        });
+        let mut merged = group.remove(0);
+        for other in group {
+            for (dst, src) in [
+                (&mut merged.1, other.1),
+                (&mut merged.4, other.4),
+                (&mut merged.5, other.5),
+                (&mut merged.6, other.6),
+                (&mut merged.7, other.7),
+                (&mut merged.9, other.9),
+                (&mut merged.10, other.10),
+            ] {
+                if !filled(dst) {
+                    *dst = src;
+                }
+            }
+            for i in 0..4 {
+                merged.8[i] |= other.8[i];
+            }
+            merged.2 = union_json_array(&merged.2, &other.2, |v| {
+                v.as_str().map(|s| s.to_lowercase())
+            });
+            merged.3 = union_json_array(&merged.3, &other.3, |v| Some(v.to_string()));
+        }
+        conn.execute(
+            "INSERT INTO artist_profiles_new (artist_key, website, tags, social_links, bio,
+                musicbrainz_artist_id, fetched_image_filename, fetched_image_source,
+                details_fetched, image_fetched, logo_fetched, background_fetched,
+                fetched_logo_filename, fetched_background_filename)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            params![
+                merged.0,
+                merged.1,
+                merged.2,
+                merged.3,
+                merged.4,
+                merged.5,
+                merged.6,
+                merged.7,
+                merged.8[0],
+                merged.8[1],
+                merged.8[2],
+                merged.8[3],
+                merged.9,
+                merged.10
+            ],
+        )?;
+    }
+
+    conn.execute_batch(
+        "DROP TABLE artist_profiles;
+         ALTER TABLE artist_profiles_new RENAME TO artist_profiles;",
+    )?;
+    Ok(())
+}
+
+/// Union of two JSON arrays, keeping `a`'s order first and dropping any `b`
+/// element whose identity (per `identity`) is already present.
+fn union_json_array(
+    a: &str,
+    b: &str,
+    identity: impl Fn(&serde_json::Value) -> Option<String>,
+) -> String {
+    let parse = |s: &str| serde_json::from_str::<Vec<serde_json::Value>>(s).unwrap_or_default();
+    let mut out = parse(a);
+    let mut seen: std::collections::HashSet<String> = out.iter().filter_map(&identity).collect();
+    for v in parse(b) {
+        let is_new = identity(&v).is_none_or(|id| seen.insert(id));
+        if is_new {
+            out.push(v);
+        }
+    }
+    serde_json::to_string(&out).unwrap_or_else(|_| a.to_string())
+}
 
 /// Migration 82 (#1870): a playlist item outlives the library row it points
 /// at. Every hard delete of a song — whichever code path issues it — goes
@@ -3918,6 +4101,88 @@ mod tests {
         assert!(!row.2 && !row.3, "attempted flags default to not attempted");
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_83_merges_case_duplicate_artist_profiles() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration83_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Database::new(temp_dir.clone()).unwrap();
+
+        // Rebuild the pre-83 shape (case-sensitive key) with a case-duplicate
+        // pair, an unrelated artist, and the library's spelling on one side.
+        {
+            let conn = db.pool.get().unwrap();
+            conn.execute_batch(
+                "DROP TABLE artist_profiles;
+                 CREATE TABLE artist_profiles (
+                    artist_key TEXT PRIMARY KEY,
+                    website TEXT,
+                    tags TEXT NOT NULL DEFAULT '[]',
+                    social_links TEXT NOT NULL DEFAULT '[]',
+                    bio TEXT,
+                    musicbrainz_artist_id TEXT,
+                    fetched_image_filename TEXT,
+                    fetched_image_source TEXT,
+                    details_fetched INTEGER NOT NULL DEFAULT 0,
+                    image_fetched INTEGER NOT NULL DEFAULT 0,
+                    fetched_logo_filename TEXT,
+                    fetched_background_filename TEXT,
+                    logo_fetched INTEGER NOT NULL DEFAULT 0,
+                    background_fetched INTEGER NOT NULL DEFAULT 0
+                 );
+                 INSERT INTO songs (path, title, artist, source)
+                    VALUES ('p/wod.mp3', 'T', 'The War on Drugs', 0);
+                 INSERT INTO artist_profiles (artist_key, tags, bio, details_fetched)
+                    VALUES ('The War On Drugs', '[\"Indie\",\"rock\"]', 'Philadelphia band', 1);
+                 INSERT INTO artist_profiles (artist_key, tags, website)
+                    VALUES ('The War on Drugs', '[\"indie\",\"folk\"]', 'https://wod.example');
+                 INSERT INTO artist_profiles (artist_key, bio) VALUES ('Rush', 'Toronto trio');
+                 DELETE FROM schema_version WHERE version >= 83;",
+            )
+            .unwrap();
+        }
+        drop(db);
+
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+        let conn = db.pool.get().unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM artist_profiles", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 2, "case-duplicates collapse to one row");
+
+        // Library spelling survives; empty fields are filled from the other
+        // row, tags are unioned case-insensitively, flags OR-ed.
+        let row: (String, Option<String>, Option<String>, String, bool) = conn
+            .query_row(
+                "SELECT artist_key, website, bio, tags, details_fetched
+                 FROM artist_profiles WHERE artist_key = 'the war on drugs'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            )
+            .unwrap();
+        assert_eq!(row.0, "The War on Drugs");
+        assert_eq!(row.1.as_deref(), Some("https://wod.example"));
+        assert_eq!(row.2.as_deref(), Some("Philadelphia band"));
+        assert_eq!(row.3, r#"["indie","folk","rock"]"#);
+        assert!(row.4);
+
+        // The key is now case-insensitive: a different-casing upsert conflicts.
+        conn.execute(
+            "INSERT INTO artist_profiles (artist_key, bio) VALUES ('RUSH', 'x')
+             ON CONFLICT(artist_key) DO UPDATE SET bio = excluded.bio",
+            [],
+        )
+        .unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM artist_profiles", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 2);
     }
 
     #[test]
