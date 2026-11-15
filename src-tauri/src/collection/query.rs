@@ -2050,6 +2050,7 @@ pub fn set_artist_profile_conn(
 ) -> Result<ArtistProfile> {
     let profile = ArtistProfile {
         artist_key: canonical_artist_key(conn, &profile.artist_key)?,
+        country: normalize_country_code(profile.country.as_deref()),
         ..profile.clone()
     };
     let profile = &profile;
@@ -2090,7 +2091,7 @@ pub fn set_artist_profile_conn(
             profile.fetched_background_filename,
             profile.logo_fetched as i32,
             profile.background_fetched as i32,
-            normalize_country_code(profile.country.as_deref())
+            profile.country
         ],
     )?;
 
@@ -3993,7 +3994,9 @@ mod tests {
             country: Some(" ca ".to_string()),
             ..Default::default()
         };
-        set_artist_profile_conn(&conn, &profile).unwrap();
+        // The returned profile carries the stored form, not the raw input.
+        let saved = set_artist_profile_conn(&conn, &profile).unwrap();
+        assert_eq!(saved.country.as_deref(), Some("CA"));
         assert_eq!(
             get_artist_profile_conn(&conn, "RUSH")
                 .unwrap()
@@ -4003,7 +4006,10 @@ mod tests {
         );
 
         profile.country = Some("Canada".to_string());
-        set_artist_profile_conn(&conn, &profile).unwrap();
+        assert_eq!(
+            set_artist_profile_conn(&conn, &profile).unwrap().country,
+            None
+        );
         assert_eq!(
             get_artist_profile_conn(&conn, "Rush").unwrap().country,
             None
