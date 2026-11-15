@@ -1044,8 +1044,9 @@ class CollectionStore {
     } catch (err) {
       // A failed load ends the loading state rather than leaving it up forever.
       this.libraryLoaded = true;
-      await profilesPromise;
       throw err;
+    } finally {
+      await profilesPromise;
     }
     if (hydrationId !== this.activeHydrationId) return;
 
@@ -1053,7 +1054,6 @@ class CollectionStore {
     this.albums = snapshot.albums ?? [];
     this.artists = snapshot.artists ?? [];
     this.libraryLoaded = true;
-    await profilesPromise;
 
     const total = snapshot.total_songs ?? this.songs.length;
     let offset = this.songs.length;
