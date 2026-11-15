@@ -81,9 +81,17 @@
     coords = { left, top: rect.bottom + 8 };
   }
 
+  // The click that opens the popover (a menu item, a button) still reaches the
+  // window listener after `isOpen` flips, with its target possibly already gone
+  // from the DOM, so it must not read as an outside click. Outside clicks are
+  // ignored until the opening event has finished dispatching.
+  let ignoreOutsideClick = false;
+
   // Pre-effect: position before the popover's first paint, not one frame after it.
   $effect.pre(() => {
     if (isOpen) {
+      ignoreOutsideClick = true;
+      setTimeout(() => (ignoreOutsideClick = false), 0);
       updatePosition();
       customValue = "";
       chosenDevice = deviceId;
@@ -109,7 +117,7 @@
   }
 
   function handleWindowClick(e: MouseEvent) {
-    if (!isOpen) return;
+    if (!isOpen || ignoreOutsideClick) return;
     const target = e.target as Node | null;
     if (popoverEl && !popoverEl.contains(target) && anchorEl && !anchorEl.contains(target)) {
       onClose();
