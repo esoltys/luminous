@@ -13,6 +13,7 @@
     FileMenuTarget,
     FileSource,
   } from "../../types";
+  import { windowLayoutStore } from "../../stores/windowLayout.svelte";
   import Button from "../Button.svelte";
   import AlphabetScrubber from "../AlphabetScrubber.svelte";
   import { shownName } from "./shownName";
@@ -729,9 +730,12 @@
           </div>
         {:else}
           <div class="relative flex-1 min-h-0 flex">
+            <!-- pr-16 / right-10 clears the 34px right-edge info notch (RightPanelHost) when unpinned. -->
             <div
               bind:this={columnEls[column]}
-              class="flex-1 min-h-0 p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
+              class="flex-1 min-h-0 p-1.5 {windowLayoutStore.hasRightNotch && sortColumn === 'name'
+                ? 'pr-16'
+                : ''} outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-accent/50"
               role="listbox"
               tabindex="0"
               aria-label={columnLabel(dir)}
@@ -820,7 +824,11 @@
               </VirtualList>
             </div>
             {#if sortColumn === "name"}
-              <div class="absolute right-2 top-2 bottom-2 pointer-events-auto z-20">
+              <div
+                class="absolute {windowLayoutStore.hasRightNotch
+                  ? 'right-10'
+                  : 'right-2'} top-2 bottom-2 pointer-events-auto z-20"
+              >
                 <AlphabetScrubber
                   items={sortedEntries}
                   getKey={(entry) => shownName(entry.name, entry.missingTag)}

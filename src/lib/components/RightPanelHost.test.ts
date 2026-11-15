@@ -4,6 +4,7 @@ import { render, fireEvent } from "@testing-library/svelte";
 import { flushSync } from "svelte";
 import RightPanelHost from "./RightPanelHost.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
+import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
@@ -25,10 +26,10 @@ describe("RightPanelHost.svelte", () => {
     vi.useRealTimers();
   });
 
-  function renderUnpinned() {
+  function renderUnpinned(props: { dockVisible?: boolean } = {}) {
     windowLayoutStore.setRightPanelPinned(false);
     windowLayoutStore.setRightPanelPeeking(false);
-    const view = render(RightPanelHost);
+    const view = render(RightPanelHost, { props });
     flushSync();
     return view;
   }
@@ -37,15 +38,17 @@ describe("RightPanelHost.svelte", () => {
     return container.ownerDocument.querySelector<HTMLElement>(".shadow-2xl")!;
   }
 
-  it("docks the panel with an unpin button while pinned, and shows no rail", () => {
+  it("docks the panel with an unpin button while pinned, and shows no notch", () => {
     const { getByRole, queryByRole } = render(RightPanelHost);
     expect(getByRole("button", { name: /unpin info sidebar/i })).toBeInTheDocument();
     expect(queryByRole("group", { name: /info sidebar/i })).toBeNull();
   });
 
-  it("shows only the rail while unpinned, and its info button pins the sidebar", async () => {
+  it("shows only the notch while unpinned, and its info button pins the sidebar", async () => {
     const { getByRole, queryByRole } = renderUnpinned();
-    expect(getByRole("group", { name: /info sidebar/i })).toBeInTheDocument();
+    const notch = getByRole("group", { name: /info sidebar/i });
+    expect(notch).toBeInTheDocument();
+    expect(notch).toHaveClass("absolute", "right-0", "h-[60px]");
     expect(queryByRole("separator")).toBeNull();
 
     await fireEvent.click(getByRole("button", { name: /^pin info sidebar/i }));
@@ -53,7 +56,7 @@ describe("RightPanelHost.svelte", () => {
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
   });
 
-  it("opens the overlay after the pointer rests on the rail, not on a brief pass", async () => {
+  it("opens the overlay after the pointer rests on the notch, not on a brief pass", async () => {
     const { getByRole } = renderUnpinned();
     const rail = getByRole("group", { name: /info sidebar/i });
 
@@ -100,7 +103,7 @@ describe("RightPanelHost.svelte", () => {
     expect(windowLayoutStore.rightPanelPeeking).toBe(false);
   });
 
-  it("does not reopen after Escape while the pointer is still resting on the rail", async () => {
+  it("does not reopen after Escape while the pointer is still resting on the notch", async () => {
     const { getByRole } = renderUnpinned();
     const rail = getByRole("group", { name: /info sidebar/i });
     await fireEvent.pointerEnter(rail);
@@ -153,10 +156,21 @@ describe("RightPanelHost.svelte", () => {
     expect(queryByRole("separator")).toBeNull();
   });
 
-  it("applies rail-surface and glass-surface on the unpinned rail to match the left sidebar", () => {
+  it("applies notch-surface and glass-surface on the unpinned notch to match the left sidebar", () => {
     const { getByRole } = renderUnpinned();
-    const rail = getByRole("group", { name: /info sidebar/i });
-    expect(rail).toHaveClass("rail-surface");
-    expect(rail).toHaveClass("glass-surface");
+    const notch = getByRole("group", { name: /info sidebar/i });
+    expect(notch).toHaveClass("notch-surface");
+    expect(notch).toHaveClass("glass-surface");
+  });
+
+  it("vertically centers the notch between the top bar and player dock when dockVisible is true", () => {
+    const withoutDock = renderUnpinned({ dockVisible: false });
+    expect(withoutDock.getByRole("group", { name: /info sidebar/i }).style.top).toBe("50%");
+    withoutDock.unmount();
+
+    const withDock = renderUnpinned({ dockVisible: true });
+    expect(withDock.getByRole("group", { name: /info sidebar/i }).style.top).toBe(
+      `calc(50% - ${PLAYER_DOCK_CLEARANCE_PX / 2}px)`,
+    );
   });
 });

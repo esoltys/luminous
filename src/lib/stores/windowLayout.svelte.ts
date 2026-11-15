@@ -376,6 +376,11 @@ class WindowLayoutStore {
     return this.viewportWidth < BREAKPOINT_RIGHT_PANEL_PX;
   }
 
+  /** Whether the unpinned info-sidebar notch is visible at the right edge. */
+  get hasRightNotch(): boolean {
+    return !this.rightPanelPinned && !this.isRightPanelAutoHidden;
+  }
+
   // Whether the info sidebar is switched on, docked or as an overlay. Like
   // rightPanelPinned it ignores the narrow-window override (isRightPanelAutoHidden).
   get rightPanelVisible(): boolean {

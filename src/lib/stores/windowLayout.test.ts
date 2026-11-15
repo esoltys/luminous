@@ -76,6 +76,21 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
       windowLayoutStore.setRightPanelPinned(true);
       expect(localStorage.getItem("layout_rightPanelPinned")).toBe("true");
     });
+
+    it("reports hasRightNotch only when unpinned and above the right-panel breakpoint", () => {
+      windowLayoutStore.viewportWidth = 1400;
+      windowLayoutStore.setRightPanelPinned(true);
+      expect(windowLayoutStore.hasRightNotch).toBe(false);
+
+      windowLayoutStore.setRightPanelPinned(false);
+      expect(windowLayoutStore.hasRightNotch).toBe(true);
+
+      windowLayoutStore.viewportWidth = 500;
+      expect(windowLayoutStore.hasRightNotch).toBe(false);
+
+      windowLayoutStore.viewportWidth = 1400;
+      windowLayoutStore.setRightPanelPinned(true);
+    });
   });
 
   it("toggles and persists layout states (sidebar, right panel, immersive mode)", () => {

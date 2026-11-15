@@ -7,6 +7,7 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
@@ -391,6 +392,10 @@
   let isArtistSortAlphabetical = $derived(
     artistSortField === "name" || artistSortField === "genre",
   );
+  let showGridScrubber = $derived(
+    (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") ||
+      (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists"),
+  );
 
   function getSongAlphabetKey(row: SongTableRow): string {
     if (!row.song) return "";
@@ -574,7 +579,11 @@
         </CollectionHeader>
       </div>
 
-      <div class="flex-1 px-6 overflow-hidden flex flex-col pb-dock">
+      <div
+        class="flex-1 pl-6 {windowLayoutStore.hasRightNotch && isSongSortAlphabetical
+          ? 'pr-16'
+          : 'pr-6'} overflow-hidden flex flex-col pb-dock"
+      >
         <div class="relative flex-1 min-h-0 flex">
           <div
             class="flex-1 overflow-y-auto border border-brand-border rounded-lg bg-brand-sidebar/40 min-h-0"
@@ -599,7 +608,7 @@
             />
           </div>
           {#if isSongSortAlphabetical}
-            <!-- In the px-6 gutter just right of the table (not over its rows), spanning the
+            <!-- In the right gutter just right of the table (not over its rows), spanning the
                  table's full height; the parent's playbar padding already bounds the bottom. -->
             <div
               class="absolute left-full ml-0.5 top-0 bottom-0 pointer-events-auto z-20"
@@ -758,7 +767,10 @@
               {/if}
             {/snippet}
 
-            <div class="pl-6 pr-8">
+            <!-- pr-16 / right-10 clears the 34px right-edge info notch (RightPanelHost) when unpinned. -->
+            <div
+              class="pl-6 {windowLayoutStore.hasRightNotch && showGridScrubber ? 'pr-16' : 'pr-8'}"
+            >
               {#if navigationStore.activeSubTab === "albums"}
                 {#if activeViewMode === "rows"}
                   {#if sortedAlbums.length === 0}
@@ -852,11 +864,13 @@
               {/if}
             </div>
           </div>
-          {#if (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") || (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists")}
+          {#if showGridScrubber}
             <!-- Spans the list area only: starts under the header (measured, since it wraps
                  and collapses) and stops where the floating playbar begins. -->
             <div
-              class="absolute right-2.5 pointer-events-auto z-20 bottom-dock"
+              class="absolute {windowLayoutStore.hasRightNotch
+                ? 'right-10'
+                : 'right-2.5'} pointer-events-auto z-20 bottom-dock"
               style:top="{gridHeaderHeight}px"
               data-testid="alphabet-scrubber-bounds"
             >
