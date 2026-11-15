@@ -22,7 +22,6 @@
   import { tagsStore } from "../stores/tags.svelte";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
-  import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import Input from "./Input.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -33,6 +32,7 @@
   import PlaylistSizeLimitControl from "./PlaylistSizeLimitControl.svelte";
   import { PlaylistSizeLimit } from "../utils/sizeFit.svelte";
   import {
+    PlayIcon as Play,
     PlusIcon as Plus,
     FolderPlusIcon as FolderPlus,
     MusicNotesIcon as Music,
@@ -48,7 +48,6 @@
     ShareNetworkIcon as Share,
   } from "phosphor-svelte";
   import MoreIcon from "./MoreIcon.svelte";
-  import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -554,18 +553,6 @@
     }
   }
 
-  async function handleShufflePlay() {
-    if (songs.length === 0) return;
-    const queuePl = await playlistsStore.requireQueue();
-    const shuffledIds = shuffleArray(songs.map((s) => s.id));
-    await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
-    if (queuePl) {
-      playlistsStore.selectPlaylist(queuePl.id);
-      navigationStore.viewPlaylist(queuePl.id);
-    }
-  }
-
   async function handleAddSongToPlaylist(songId: number) {
     const songObj = songs.find((s) => s.id === songId);
     await playlistsStore.addSongsToActiveTarget([songId], songObj?.title || "Song");
@@ -883,12 +870,15 @@
         {/if}
 
         <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
-          <PlayShuffleButtons
-            onPlayAll={handlePlayAll}
-            onShufflePlay={handleShufflePlay}
+          <Button
+            onclick={handlePlayAll}
             disabled={loading || songs.length === 0}
+            variant="primary"
             class="shrink-0"
-          />
+          >
+            <Play class="w-4 h-4" weight="fill" />
+            {i18n.t("artistDetail.playAll")}
+          </Button>
           <IconActionButton
             onclick={() => pinnedStore.toggle("auto_playlist", pinRefKey)}
             title={pinnedStore.isPinned("auto_playlist", pinRefKey)

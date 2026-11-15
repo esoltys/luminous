@@ -180,4 +180,12 @@ describe("AutoPlaylistDetailView genre aliases (#1994)", () => {
     expect(await findByRole("button", { name: "Synthwave" })).toBeInTheDocument();
     expect(queryByText("Includes aliases")).toBeNull();
   });
+
+  it("renders Play without Shuffle in the quietened header (#2119)", async () => {
+    const { findByRole, queryByRole } = render(AutoPlaylistDetailView, {
+      view: { kind: "genre" as const, genre: "Synthwave", playlistId: 5 },
+    });
+    expect(await findByRole("button", { name: /^Play$/i })).toBeInTheDocument();
+    expect(queryByRole("button", { name: /^Shuffle$/i })).toBeNull();
+  });
 });
