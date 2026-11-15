@@ -8,8 +8,8 @@
   interface Props {
     /** Groups of spellings that differ only in case, accents, spacing or punctuation. */
     groups: TagDuplicateGroup[];
-    /** Merges every other spelling of a group into `into`. */
-    onMerge: (into: string, spellings: string[]) => void | Promise<void>;
+    /** Merges each of `others` (the spellings of one group except `into`) into `into`. */
+    onMerge: (into: string, others: string[]) => void | Promise<void>;
     onClose: () => void;
   }
 
@@ -17,7 +17,8 @@
 
   /** The spelling picked to keep, by group. A group with no pick keeps its suggestion. */
   let picked = $state<Record<string, string>>({});
-  let merging = $state<string | null>(null);
+  /** The group being merged right now (its `suggested`), so only one merge runs at a time. */
+  let mergingGroup = $state<string | null>(null);
 
   function target(group: TagDuplicateGroup): string {
     const choice = picked[group.suggested];
@@ -25,14 +26,15 @@
   }
 
   async function merge(group: TagDuplicateGroup) {
-    merging = group.suggested;
+    const into = target(group);
+    mergingGroup = group.suggested;
     try {
       await onMerge(
-        target(group),
-        group.spellings.map((s) => s.name),
+        into,
+        group.spellings.map((s) => s.name).filter((name) => name !== into),
       );
     } finally {
-      merging = null;
+      mergingGroup = null;
     }
   }
 
@@ -96,7 +98,7 @@
           <Button
             variant="primary"
             size="sm"
-            disabled={merging !== null}
+            disabled={mergingGroup !== null}
             onclick={() => merge(group)}
           >
             {i18n.t(

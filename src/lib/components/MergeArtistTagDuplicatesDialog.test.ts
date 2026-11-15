@@ -42,9 +42,7 @@ describe("MergeArtistTagDuplicatesDialog", () => {
 
     await fireEvent.click(screen.getByText('Merge into "Award-Winning"'));
 
-    await waitFor(() =>
-      expect(onMerge).toHaveBeenCalledWith("Award-Winning", ["Award-Winning", "Award Winning"]),
-    );
+    await waitFor(() => expect(onMerge).toHaveBeenCalledWith("Award-Winning", ["Award Winning"]));
   });
 
   it("merges into the spelling the user picks instead", async () => {
@@ -56,9 +54,7 @@ describe("MergeArtistTagDuplicatesDialog", () => {
     await fireEvent.click(screen.getByLabelText(/Award Winning/));
 
     await fireEvent.click(await screen.findByText('Merge into "Award Winning"'));
-    await waitFor(() =>
-      expect(onMerge).toHaveBeenCalledWith("Award Winning", ["Award-Winning", "Award Winning"]),
-    );
+    await waitFor(() => expect(onMerge).toHaveBeenCalledWith("Award Winning", ["Award-Winning"]));
   });
 
   it("closes itself once no groups are left to review", async () => {

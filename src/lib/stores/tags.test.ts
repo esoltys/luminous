@@ -177,13 +177,12 @@ describe("TagsStore artist tag duplicates", () => {
 
   it("merges a whole group in one backend call and returns the artists updated", async () => {
     const updated = await tagsStore.mergeArtistTagSpellings("Award-Winning", [
-      "Award-Winning",
       "Award Winning",
       "award winning",
     ]);
 
     expect(invoke).toHaveBeenCalledWith("merge_artist_tag_spellings", {
-      from: ["Award-Winning", "Award Winning", "award winning"],
+      from: ["Award Winning", "award winning"],
       into: "Award-Winning",
     });
     expect(updated).toBe(4);

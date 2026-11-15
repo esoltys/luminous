@@ -275,6 +275,13 @@ pub fn parse(content: &str) -> Result<HierarchyFile> {
     Ok(file)
 }
 
+/// How many times [`write_atomic`] retries a locked destination, and the base
+/// delay (multiplied by the attempt number): about 1.5 s in total, enough to
+/// outlast a share or scanner briefly holding the file, short enough that the
+/// blocking-thread caller isn't parked for long.
+const RENAME_RETRIES: u32 = 5;
+const RENAME_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(100);
+
 /// Writes via a temp file in the same directory plus a rename, so another
 /// instance (or a crash mid-write) never sees a half-written file.
 ///
@@ -300,13 +307,6 @@ pub fn write_atomic(path: &Path, content: &str) -> Result<()> {
         }
     }
 }
-
-/// How many times [`write_atomic`] retries a locked destination, and the base
-/// delay (multiplied by the attempt number): about 1.5 s in total, enough to
-/// outlast a share or scanner briefly holding the file, short enough that the
-/// blocking-thread caller isn't parked for long.
-const RENAME_RETRIES: u32 = 5;
-const RENAME_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(100);
 
 /// `ERROR_SHARING_VIOLATION` (32) and `ERROR_LOCK_VIOLATION` (33) — another
 /// process has the destination open (what a network share reports) — and
