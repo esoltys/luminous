@@ -66,7 +66,7 @@ describe("Miniplayer.svelte", () => {
     playerStore.playlistTotal = 10;
     const { getByText, getByTitle } = render(Miniplayer);
     expect(getByText("3/10")).toBeInTheDocument();
-    expect(getByTitle("Track 3 of 10")).toBeInTheDocument();
+    expect(getByTitle("Song 3 of 10")).toBeInTheDocument();
   });
 
   it("omits queue progress indicator when playing a single standalone track or stopped (#1605)", () => {
@@ -403,7 +403,7 @@ describe("Miniplayer.svelte", () => {
       const { getByText, queryByText, getByTitle, getAllByTitle } = render(Miniplayer);
 
       expect(getByText("Queue Complete")).toBeInTheDocument();
-      expect(getByText("2 tracks played")).toBeInTheDocument();
+      expect(getByText("2 songs played")).toBeInTheDocument();
       expect(getByTitle("Shuffle Library")).toBeInTheDocument();
       expect(getByTitle("Replay")).toBeInTheDocument();
       expect(getAllByTitle("Restore Full Window (Ctrl+M)").length).toBeGreaterThan(0);

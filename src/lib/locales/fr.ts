@@ -191,8 +191,8 @@ export const fr: DeepStringRecord<typeof en> = {
     storageNumbered: "Stockage {n}",
     gauge: {
       music: {
-        one: "Musique {size}, {count} piste",
-        other: "Musique {size}, {count} pistes",
+        one: "Musique {size}, {count} chanson",
+        other: "Musique {size}, {count} chansons",
       },
       other: "Autres fichiers {size}",
       free: "Libre {size}",
@@ -508,8 +508,8 @@ export const fr: DeepStringRecord<typeof en> = {
   },
   collection: {
     externalChangesToast: {
-      one: "{name} : {count} piste modifiée en dehors de Luminous",
-      other: "{name} : {count} pistes modifiées en dehors de Luminous",
+      one: "{name} : {count} chanson modifiée en dehors de Luminous",
+      other: "{name} : {count} chansons modifiées en dehors de Luminous",
     },
     alphabetScrubberLabel: "Index alphabétique",
     jumpToLetter: "Aller à la lettre {letter}",
@@ -570,7 +570,7 @@ export const fr: DeepStringRecord<typeof en> = {
     verifyAuthenticityCount: "Vérifier l'authenticité audio ({count})",
     verifyingAuthenticity: "Vérification de l'authenticité audio...",
     verifyAuthenticityComplete: "Vérification de l'authenticité audio terminée",
-    noLosslessTracks: "Aucune piste sans perte locale sélectionnée",
+    noLosslessTracks: "Aucune chanson sans perte locale sélectionnée",
     variousArtists: "Artistes divers",
     unknownSong: "Chanson inconnue",
     unknownArtist: "Artiste inconnu",
@@ -1012,7 +1012,7 @@ export const fr: DeepStringRecord<typeof en> = {
     scanningPhase: "Phase : {phase}",
     phaseDiscovering: "Découverte des fichiers",
     phaseReadingTags: "Lecture des étiquettes",
-    phaseCheckingMissing: "Vérification des pistes manquantes",
+    phaseCheckingMissing: "Vérification des chansons manquantes",
     phaseResolvingArtwork: "Résolution des pochettes",
     phaseUpdating: "Mise à jour de la bibliothèque",
     phaseDone: "Terminé",
@@ -1086,7 +1086,7 @@ export const fr: DeepStringRecord<typeof en> = {
     suggestFoldersResetDone: "Les dossiers ignorés seront de nouveau suggérés.",
     autoOrganizeLabel: "Auto-organisation des nouveaux fichiers et étiquettes",
     autoOrganizeHint:
-      "Organisez automatiquement les fichiers en arrière-plan selon votre modèle actif lors de l'arrivée de nouvelles pistes ou de l'enregistrement d'étiquettes.",
+      "Organisez automatiquement les fichiers en arrière-plan selon votre modèle actif lors de l'arrivée de nouvelles chansons ou de l'enregistrement d'étiquettes.",
     saveArtworkToFoldersLabel: "Enregistrer les illustrations dans les dossiers de musique",
     saveArtworkToFoldersHint:
       "Enregistrez les pochettes, photos d'artistes, logos et bannières directement dans vos dossiers de musique sous forme de fichiers cover.jpg, artist.jpg, logo.png et banner.jpg.",
@@ -1459,7 +1459,7 @@ export const fr: DeepStringRecord<typeof en> = {
     instrumentalTitle: "Chanson instrumentale",
     instrumentalSubtitle: "Cette chanson est marquée comme instrumentale",
     instrumentalDesc:
-      "Cette piste est marquée comme instrumentale. La recherche de paroles en ligne est désactivée.",
+      "Cette chanson est marquée comme instrumentale. La recherche de paroles en ligne est désactivée.",
     instrumentalBadge: "Instrumental",
     markInstrumental: "Marquer comme instrumental",
     unmarkInstrumental: "Démarquer l'instrumental",
@@ -1486,7 +1486,7 @@ export const fr: DeepStringRecord<typeof en> = {
     saveFailedPrefix: "Échec de l'enregistrement des paroles : ",
     noOnlineResults: "Aucune parole trouvée auprès des fournisseurs en ligne.",
     offlineNoLyrics:
-      "Aucune parole enregistrée pour cette piste. Activez « En ligne » dans Paramètres › Intégrations pour les rechercher.",
+      "Aucune parole enregistrée pour cette chanson. Activez « En ligne » dans Paramètres › Intégrations pour les rechercher.",
     insufficientMetadata:
       "Informations insuffisantes (artiste/titre) pour rechercher des paroles en ligne.",
     sourceHelpLabel: "Source des paroles",
@@ -1503,7 +1503,7 @@ export const fr: DeepStringRecord<typeof en> = {
     rejectMatchTooltip: "Rejeter ces paroles en ligne incorrectes et bloquer cette correspondance",
     rejectMatchSuccess: "Correspondance rejetée et bloquée",
     rejectMatchConfirm:
-      "Voulez-vous vraiment rejeter ces paroles? Elles ne seront plus associées automatiquement à cette piste.",
+      "Voulez-vous vraiment rejeter ces paroles? Elles ne seront plus associées automatiquement à cette chanson.",
   },
   stats: {
     title: "Statistiques",
@@ -1568,20 +1568,20 @@ export const fr: DeepStringRecord<typeof en> = {
     shuffleInsideAlbum: "Dans l'album",
     shuffleAlbums: "Albums",
     shuffleArtists: "Artistes",
-    shuffleOffDesc: "Lire les pistes dans leur ordre séquentiel normal",
-    shuffleAllDesc: "Lire toutes les pistes dans un ordre aléatoire",
+    shuffleOffDesc: "Lire les chansons dans leur ordre séquentiel normal",
+    shuffleAllDesc: "Lire toutes les chansons dans un ordre aléatoire",
     shuffleInsideAlbumDesc:
-      "Lire les albums dans leur ordre normal, mais mélanger les pistes à l'intérieur de chaque album",
+      "Lire les albums dans leur ordre normal, mais mélanger les chansons à l'intérieur de chaque album",
     shuffleAlbumsDesc:
-      "Lire les albums dans un ordre aléatoire, mais garder les pistes de chaque album dans l'ordre",
+      "Lire les albums dans un ordre aléatoire, mais garder les chansons de chaque album dans l'ordre",
     shuffleArtistsDesc:
-      "Lire toutes les pistes d'un artiste avant de passer à un nouvel artiste choisi au hasard",
+      "Lire toutes les chansons d'un artiste avant de passer à un nouvel artiste choisi au hasard",
     repeatOff: "Désactivé",
     repeatSong: "Chanson",
     repeatAlbum: "Album",
     repeatPlaylist: "Liste de lecture",
     repeatOffDesc: "Lire la file d'attente en cours normalement et s'arrêter à la fin",
-    repeatSongDesc: "Boucler indéfiniment sur la piste en cours",
+    repeatSongDesc: "Boucler indéfiniment sur la chanson en cours",
     repeatAlbumDesc: "Boucler indéfiniment sur l'album en cours",
     repeatPlaylistDesc:
       "Boucler indéfiniment sur la file d'attente ou la liste de lecture en cours",
@@ -1658,7 +1658,7 @@ export const fr: DeepStringRecord<typeof en> = {
     barcodeLabel: "Code-barres",
     catalogNumberLabel: "N° de catalogue",
     nowPlayingHeading: "Lecture en cours",
-    selectedTrackHeading: "Piste sélectionnée",
+    selectedTrackHeading: "Chanson sélectionnée",
     albumHeading: "Album",
     artistHeading: "Artiste",
     tabContextBio: "Informations",
@@ -1743,7 +1743,7 @@ export const fr: DeepStringRecord<typeof en> = {
     },
     dropToPlay: "ou déposez des fichiers audio pour lire",
     queueProgress: "{current}/{total}",
-    queueProgressAria: "Piste {current} sur {total}",
+    queueProgressAria: "Chanson {current} sur {total}",
   },
 
   chipInput: {
@@ -1882,7 +1882,7 @@ export const fr: DeepStringRecord<typeof en> = {
     discSubtitleField: "Sous-titre du disque",
     discSubtitlePlaceholder: "p. ex. En direct au Marquee",
     groupingField: "Groupement",
-    groupingTooltip: "Regroupe des pistes liées, par ex. les mouvements d'une œuvre classique",
+    groupingTooltip: "Regroupe des chansons liées, par ex. les mouvements d'une œuvre classique",
     bpmField: "BPM",
     bpmTooltip: "Battements par minute (tempo)",
     initialKeyField: "Tonalité initiale",
@@ -1974,7 +1974,7 @@ export const fr: DeepStringRecord<typeof en> = {
     clearArtBtn: "Effacer la pochette intégrée",
     clearArtConfirmTitle: "Effacer la pochette intégrée?",
     clearArtConfirmMessage:
-      "Ceci supprime la pochette intégrée du fichier de chaque piste de cet album. Les pistes utiliseront alors la pochette du dossier ou un espace réservé.",
+      "Ceci supprime la pochette intégrée du fichier de chaque chanson de cet album. Les chansons utiliseront alors la pochette du dossier ou un espace réservé.",
     clearingArt: "Effacement de la pochette...",
     clearArtSuccess: {
       one: "Pochette intégrée effacée pour {count} chanson",
@@ -2340,7 +2340,7 @@ export const fr: DeepStringRecord<typeof en> = {
     themeLabel: "Thème",
     themeLight: "Clair",
     themeDark: "Sombre",
-    trackListToggle: "Infos pistes",
+    trackListToggle: "Infos sur la chanson",
     libraryToggle: "Infos bibliothèque",
     barsToggle: "Barres",
     copyButton: "Copier l'image",
@@ -2431,7 +2431,7 @@ export const fr: DeepStringRecord<typeof en> = {
       "Décochez ce que vous voulez garder. Le titre, l'artiste, l'album, les paroles, la pochette et les autres étiquettes principales ne sont jamais modifiés.",
     nothingFound: "Aucune étiquette superflue trouvée.",
     skipped:
-      "Pistes qui n'ont pas pu être vérifiées (fiche CUE, fichiers distants ou illisibles) : {count}",
+      "Chansons qui n'ont pas pu être vérifiées (fiche CUE, fichiers distants ou illisibles) : {count}",
     kindPromoComment: "Commentaire promotionnel",
     kindEncoder: "Encodeur",
     kindEncodedBy: "Encodé par",
@@ -2445,11 +2445,11 @@ export const fr: DeepStringRecord<typeof en> = {
     removing: "Suppression…",
     cancelBtn: "Annuler",
     closeBtn: "Fermer",
-    done: "Nettoyage des étiquettes terminé. Champs supprimés : {count}; pistes nettoyées : {songs}",
+    done: "Nettoyage des étiquettes terminé. Champs supprimés : {count}; chansons nettoyées : {songs}",
     partialErrors: "Fichiers qui n'ont pas pu être nettoyés : {count}",
     failedPrefix: "Échec du nettoyage des étiquettes : ",
     backgroundBtn: "Exécuter en arrière-plan",
-    readyToReview: "Vérification terminée. Pistes avec des étiquettes superflues : {count}",
+    readyToReview: "Vérification terminée. Chansons avec des étiquettes superflues : {count}",
     reviewBtn: "Examiner",
   },
   organizer: {
@@ -2526,7 +2526,7 @@ export const fr: DeepStringRecord<typeof en> = {
     filterNeedsTags: "Étiquettes requises ({count})",
     filterDuplicates: "Doublons ({count})",
     collisionDiskNotice:
-      "Le fichier de destination existe déjà sur le disque. Cette piste sera acheminée vers le dossier Duplicates pour éviter de l'écraser.",
+      "Le fichier de destination existe déjà sur le disque. Cette chanson sera acheminée vers le dossier Duplicates pour éviter de l'écraser.",
     filterErrors: "Erreurs ({count})",
     includeMissingTagsToggle: "Inclure les morceaux aux étiquettes manquantes",
     customizeSummaryBtn: "Personnaliser…",
@@ -2538,7 +2538,7 @@ export const fr: DeepStringRecord<typeof en> = {
     nothingToOrganize: "Rien à organiser!",
     autoOrganizeToggle: "Auto-organiser",
     autoOrganizeToggleTooltip:
-      "Organisez automatiquement les fichiers en arrière-plan lors de l'arrivée de nouvelles pistes ou de la modification d'étiquettes",
+      "Organisez automatiquement les fichiers en arrière-plan lors de l'arrivée de nouvelles chansons ou de la modification d'étiquettes",
     autoOrganizeSuccess: {
       one: "{count} fichier auto-organisé",
       other: "{count} fichiers auto-organisés",
@@ -2578,7 +2578,7 @@ export const fr: DeepStringRecord<typeof en> = {
     confirmApplyBtn: "Classer les fichiers",
     confirmAutoOrganizeTitle: "Activer l'organisation automatique",
     confirmAutoOrganizeMessage:
-      "L'activation de l'organisation automatique va immédiatement reclasser les pistes existantes de votre bibliothèque selon votre modèle actuel, et déplacera automatiquement les fichiers sur le disque lors de la modification des étiquettes ou de l'ajout de musique. Voulez-vous vraiment activer l'organisation automatique?",
+      "L'activation de l'organisation automatique va immédiatement reclasser les chansons existantes de votre bibliothèque selon votre modèle actuel, et déplacera automatiquement les fichiers sur le disque lors de la modification des étiquettes ou de l'ajout de musique. Voulez-vous vraiment activer l'organisation automatique?",
     confirmAutoOrganizeBtn: "Activer l'organisation automatique",
     filesCount: {
       one: "{count} fichier",
@@ -2593,7 +2593,7 @@ export const fr: DeepStringRecord<typeof en> = {
   },
   musicbrainz: {
     integrationDesc:
-      "est une base de données musicale collaborative qui répertorie les sorties à l'échelle mondiale, attribuant à vos pistes des identifiants universels (MBID) pour des biographies d'artistes précises, la correspondance des pochettes et un scrobbling fluide.",
+      "est une base de données musicale collaborative qui répertorie les sorties à l'échelle mondiale, attribuant à vos chansons des identifiants universels (MBID) pour des biographies d'artistes précises, la correspondance des pochettes et un scrobbling fluide.",
   },
   picard: {
     openInPicard: "Ouvrir dans Picard",
@@ -2605,7 +2605,7 @@ export const fr: DeepStringRecord<typeof en> = {
       "Ouvrir dans Picard n'est pas disponible pour les morceaux sur un serveur distant",
     integrationTitle: "MusicBrainz Picard",
     integrationDesc:
-      "est un programme open source qui identifie les fichiers musicaux grâce à leur empreinte audio numérique unique, complétant automatiquement les détails de piste manquants, les pochettes et des noms de fichiers soignés à l'aide d'une vaste encyclopédie communautaire.",
+      "est un programme open source qui identifie les fichiers musicaux grâce à leur empreinte audio numérique unique, complétant automatiquement les détails de chanson manquants, les pochettes et des noms de fichiers soignés à l'aide d'une vaste encyclopédie communautaire.",
     foundAt: "Trouvé à {path}",
     notFound:
       "Introuvable — installez-le depuis picard.musicbrainz.org, ou définissez un chemin personnalisé ci-dessous.",
@@ -2887,7 +2887,7 @@ export const fr: DeepStringRecord<typeof en> = {
       playerBarControls: {
         title: "Contrôles de lecture",
         description:
-          "Lisez, mettez en pause, passez au morceau suivant, avancez dans la piste et activez la lecture aléatoire ou la répétition depuis ici.",
+          "Lisez, mettez en pause, passez au morceau suivant, avancez dans la chanson et activez la lecture aléatoire ou la répétition depuis ici.",
       },
       playerBarToolbar: {
         title: "File d'attente, volume et plus",
@@ -2926,7 +2926,7 @@ export const fr: DeepStringRecord<typeof en> = {
     libraryScanDone: "Bibliothèque actualisée",
     scanPhaseDiscovering: "découverte des fichiers",
     scanPhaseReadingTags: "lecture des étiquettes",
-    scanPhaseCheckingMissing: "vérification des pistes manquantes",
+    scanPhaseCheckingMissing: "vérification des chansons manquantes",
     scanPhaseResolvingArtwork: "résolution des pochettes",
     scanPhaseUpdating: "mise à jour de la bibliothèque",
     processingSongs: "Traitement des chansons",
@@ -3087,8 +3087,8 @@ export const fr: DeepStringRecord<typeof en> = {
     shelfIncompleteTitle: "Albums aux listes de pistes incomplètes",
     shelfIncompleteHint: "Ces albums comportent des numéros de piste manquants ou en double.",
     unnumberedTracksBadge: {
-      one: "{count} piste sans numéro",
-      other: "{count} pistes sans numéro",
+      one: "{count} chanson sans numéro",
+      other: "{count} chansons sans numéro",
     },
     duplicateTrackNumbersBadge: {
       one: "{count} numéro de piste en double",
@@ -3096,11 +3096,11 @@ export const fr: DeepStringRecord<typeof en> = {
     },
     openInPicardBtn: "Ouvrir dans Picard",
     shelfMissingCoreTitle: {
-      one: "{count} piste sans étiquettes de base",
-      other: "{count} pistes sans étiquettes de base",
+      one: "{count} chanson sans étiquettes de base",
+      other: "{count} chansons sans étiquettes de base",
     },
     shelfMissingCoreHint:
-      "Les pistes sans titre, artiste ou album ne peuvent pas être organisées en dossiers structurés.",
+      "Les chansons sans titre, artiste ou album ne peuvent pas être organisées en dossiers structurés.",
     reviewMissingMetadataBtn: "Examiner les étiquettes manquantes",
     shelfDuplicatesTitle: {
       one: "{count} groupe d'enregistrements en double",
@@ -3111,11 +3111,11 @@ export const fr: DeepStringRecord<typeof en> = {
     reviewDuplicatesBtn: "Comparer les doublons",
     shelfProvenanceTitle: "Avis sur la provenance audio",
     shelfProvenanceHint:
-      "Pistes sans perte signalées pour transcodage avec perte ou suréchantillonnage suspect.",
+      "Chansons sans perte signalées pour transcodage avec perte ou suréchantillonnage suspect.",
     shelfProvenanceBadge: "Transcodage suspect",
     shelfCorruptTitle: "Fichiers audio corrompus ou illisibles",
     shelfCorruptHint:
-      "Pistes échouant au décodage du flux, à la vérification du conteneur ou à la validation de la somme de contrôle",
+      "Chansons échouant au décodage du flux, à la vérification du conteneur ou à la validation de la somme de contrôle",
     showAllWithCount: "Tout afficher ({count})",
     showLess: "Afficher moins",
   },

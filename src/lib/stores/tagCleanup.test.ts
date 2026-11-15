@@ -50,7 +50,7 @@ describe("tagCleanupStore", () => {
     await settled();
     expect(tasksStore.isTaskActive("tag-cleanup-check")).toBe(false);
     const toast = toastStore.messages.find((m) => m.action);
-    expect(toast?.text).toBe("Tag check done. Tracks with clutter: 1");
+    expect(toast?.text).toBe("Tag check done. Songs with clutter: 1");
 
     navigationStore.activeTab = "collection";
     toast!.action!.onClick();

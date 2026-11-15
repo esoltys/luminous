@@ -117,9 +117,9 @@
       </figure>
       <h2>Album</h2>
       <div class="list">
-        <div class="row"><div class="mk">•</div><div>Apri un album per vedere le sue tracce. Il pannello laterale mostra formato, bitrate, frequenza di campionamento e volume del file in riproduzione.</div></div>
+        <div class="row"><div class="mk">•</div><div>Apri un album per vedere i suoi brani. Il pannello laterale mostra formato, bitrate, frequenza di campionamento e volume del file in riproduzione.</div></div>
         <div class="row"><div class="mk">•</div><div>Fai clic su <b>+</b> per aggiungere l'album o un brano alla playlist attiva (la coda, a meno che tu non ne scelga un'altra).</div></div>
-        <div class="row"><div class="mk">•</div><div>Fai clic sulla matita per aprire <b>Modifica tag dell'album</b> e correggere in una volta sola titolo, artista, genere o anno di tutte le tracce.</div></div>
+        <div class="row"><div class="mk">•</div><div>Fai clic sulla matita per aprire <b>Modifica tag dell'album</b> e correggere in una volta sola titolo, artista, genere o anno di tutti i brani.</div></div>
         <div class="row"><div class="mk">•</div><div>Le stelle di un album compaiono solo dopo averlo valutato. Per valutarne uno, passaci sopra con il mouse o raggiungilo con Tab e fai clic su una stella, fai clic con il tasto destro o apri l'album.</div></div>
       </div>
       <figure class="shot mw-700 mb-28">
@@ -127,9 +127,9 @@
       </figure>
       <h2>Metti in ordine i tuoi tag</h2>
       <div class="list">
-        <div class="row"><div class="mk">•</div><div>Fai clic sulla matita di una traccia per aprire <b>Modifica tag del brano</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div>Fai clic sulla matita di un brano per aprire <b>Modifica tag del brano</b>.</div></div>
         <div class="row"><div class="mk">•</div><div>Artista, Artista album, Compositore e Genere accettano più valori. Premi Invio dopo ciascuno.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Rimuovi copertina</b> elimina la copertina incorporata della traccia.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Rimuovi copertina</b> elimina la copertina incorporata del brano.</div></div>
         <div class="row"><div class="mk">•</div><div>Un BPM o una tonalità rilevati dall'audio sono segnalati sotto il campo; modificali per mantenere il tuo valore. Fai clic su <b>Tocca il tempo</b> a ritmo con la musica per impostare il BPM a mano. Accanto alla tonalità compare un codice Camelot.</div></div>
         <div class="row"><div class="mk">•</div><div>Espandi <b>Cronologia</b> per visualizzare i dettagli del file sorgente e le modifiche ai tag registrate da Luminous o da modifiche esterne, fai clic su <b>Ripristina</b> per riportare un campo al suo valore precedente, su <b>Ripristina tutto</b> per annullare un'intera sessione di modifica tra più brani, oppure su <b>Cancella cronologia</b> per azzerare il registro delle modifiche.</div></div>
       </div>
@@ -355,7 +355,7 @@
         <div class="tr"><code>artist_tag</code><div>testo</div><div>Tag artista</div></div>
         <div class="tr"><code>album_artist</code><div>testo</div><div>Solo l'artista dell'album</div></div>
         <div class="tr"><code>album</code><div>testo</div><div>Titolo dell'album</div></div>
-        <div class="tr"><code>title</code><div>testo</div><div>Titolo della traccia</div></div>
+        <div class="tr"><code>title</code><div>testo</div><div>Titolo del brano</div></div>
         <div class="tr"><code>genre</code><div>testo</div><div>Genere</div></div>
         <div class="tr"><code>composer</code><div>testo</div><div>Compositore</div></div>
         <div class="tr"><code>key / initial_key</code><div>testo</div><div>Tonalità (ad es. «D», «Am», «D♭» o un codice Camelot come «8A»)</div></div>
@@ -377,7 +377,7 @@
         <div class="tr"><code>lossless</code><div>true/false</div><div>Solo formati senza perdita (<code>true</code>) o solo con perdita (<code>false</code>)</div></div>
         <div class="tr"><code>tempo</code><div>fascia</div><div>Una fascia di tempo con nome (<code>tempo:down-tempo</code>, <code>tempo:!=extreme</code>): <code>slow</code>, <code>down-tempo</code>, <code>mid-tempo</code>, <code>uptempo</code>, <code>high-energy</code>, <code>extreme</code>. I brani senza BPM non corrispondono a nessuna delle due forme</div></div>
         <div class="tr"><code>compilation</code><div>0/1</div><div>Indicatore di compilation</div></div>
-        <div class="tr"><code>duration / length</code><div>durata</div><div>Durata della traccia, vedi sotto</div></div>
+        <div class="tr"><code>duration / length</code><div>durata</div><div>Durata del brano, vedi sotto</div></div>
       </div>
       <p class="mb-28"><code>duration</code> accetta secondi (<code>duration:&gt;180</code>), <code>MM:SS</code> (<code>duration:&gt;3:30</code>) oppure <code>H:MM:SS</code> (<code>duration:&lt;1:02:03</code>).</p>
       <p class="mb-28"><code>added</code> e <code>lastplayed</code> accettano una data (<code>added:&gt;=2026-01-31</code>) o un intervallo contato a ritroso da oggi: <code>-30d</code>, <code>-2w</code>, <code>-6m</code>, <code>-1y</code> (giorni, settimane, mesi, anni). <code>&gt;=</code> parte dall'inizio di quel giorno, <code>&lt;=</code> arriva alla fine e <code>=</code> corrisponde a qualsiasi momento di quel giorno. <code>added:&gt;=-30d</code> significa sempre gli ultimi 30 giorni. Un brano mai riprodotto conta come più vecchio di qualsiasi data, quindi <code>lastplayed:&lt;-1y</code> lo include.</p>
@@ -389,10 +389,10 @@
         <div class="tr th"><div>Obiettivo</div><div>Query</div></div>
         <div class="tr"><div>Brani rock con 4 o più stelle usciti prima del 2000</div><code>rating:&gt;=4 year:&lt;2000 genre:rock</code></div>
         <div class="tr"><div>Brani nella tonalità di re</div><code>key:d</code></div>
-        <div class="tr"><div>Tracce ad alto tempo (120–130 BPM)</div><code>bpm:&gt;=120 bpm:&lt;=130</code></div>
+        <div class="tr"><div>Brani ad alto tempo (120–130 BPM)</div><code>bpm:&gt;=120 bpm:&lt;=130</code></div>
         <div class="tr"><div>Un mix di parole e campi</div><code>rating:&gt;=4 "tom cochrane"</code></div>
         <div class="tr"><div>Solo album compilation</div><code>compilation:1</code></div>
-        <div class="tr"><div>Tracce di oltre 3:30</div><code>duration:&gt;3:30</code></div>
+        <div class="tr"><div>Brani di oltre 3:30</div><code>duration:&gt;3:30</code></div>
         <div class="tr"><div>Aggiunti negli ultimi 30 giorni</div><code>added:&gt;=-30d</code></div>
         <div class="tr"><div>Non riprodotti nell'ultimo anno (o mai)</div><code>lastplayed:&lt;-1y</code></div>
         <div class="tr"><div>File senza perdita a 96 kHz o più</div><code>lossless:true samplerate:&gt;=96k</code></div>
@@ -404,33 +404,33 @@
       <h1>Organizzazione avanzata</h1>
       <p>Vuoi dare ai file i nomi che preferisci? Scegli <b>Personalizzato</b> nella pagina <a href="#organize">Organizza</a> e scrivi il tuo schema.</p>
       <h2>Variabili dello schema</h2>
-      <p class="mb-18">Combinale con il tuo testo. Racchiudi una parte tra <b>{ }</b> per ometterla quando la traccia non ha quel valore; terminala con <b>/</b> all'interno delle parentesi graffe per trasformarla in una cartella.</p>
+      <p class="mb-18">Combinale con il tuo testo. Racchiudi una parte tra <b>{ }</b> per ometterla quando il brano non ha quel valore; terminala con <b>/</b> all'interno delle parentesi graffe per trasformarla in una cartella.</p>
       <div class="table roomy mw-640 mb-24" style="--cols: 140px 1fr">
         <div class="tr th">
           <div>Variabile</div>
           <div>Viene sostituita da</div>
         </div>
         <div class="tr"><code>%albumartist</code><div>L'artista principale dell'album</div></div>
-        <div class="tr"><code>%artist</code><div>L'artista della traccia</div></div>
+        <div class="tr"><code>%artist</code><div>L'artista del brano</div></div>
         <div class="tr"><code>%album</code><div>Titolo dell'album</div></div>
         <div class="tr"><code>%disc</code><div>Numero del disco</div></div>
         <div class="tr"><code>%disctitle</code><div>Sottotitolo del disco, ad es. «BBC Sessions»</div></div>
         <div class="tr"><code>%track</code><div>Numero di traccia</div></div>
-        <div class="tr"><code>%title</code><div>Titolo della traccia</div></div>
+        <div class="tr"><code>%title</code><div>Titolo del brano</div></div>
         <div class="tr"><code>%year</code><div>Anno di uscita</div></div>
         <div class="tr"><code>%genre</code><div>Genere</div></div>
         <div class="tr"><code>%track3</code><div>Numero di traccia, con zeri iniziali fino a tre cifre</div></div>
         <div class="tr"><code>%rawtrack</code><div>Numero di traccia esattamente come memorizzato nel tag, senza zeri iniziali</div></div>
       </div>
       <h2>Parti facoltative</h2>
-      <p class="mb-18">Tutto ciò che sta tra <b>{ }</b> viene scritto solo se la traccia ha un valore per una delle sue variabili. Altrimenti l'intera parte viene omessa, insieme al testo, agli spazi e alle barre tra le parentesi graffe. Così <code>{%year - }%album</code> dà «2019 - Reservoir», oppure solo «Reservoir» per una traccia senza anno.</p>
+      <p class="mb-18">Tutto ciò che sta tra <b>{ }</b> viene scritto solo se il brano ha un valore per una delle sue variabili. Altrimenti l'intera parte viene omessa, insieme al testo, agli spazi e alle barre tra le parentesi graffe. Così <code>{%year - }%album</code> dà «2019 - Reservoir», oppure solo «Reservoir» per un brano senza anno.</p>
       <p class="mb-24">Fuori dalle parentesi graffe, un valore mancante viene sostituito: Unknown Artist, Unknown Album o Unknown Genre, il nome del file per il titolo, 1 per il disco e 00 per la traccia. Un anno mancante resta vuoto, quindi <code>%year - %album</code> darebbe « - Reservoir».</p>
       <h2>Esempi</h2>
       <div class="table roomy mw-640 mb-8" style="--cols: 200px 1fr">
         <div class="tr"><code>%disc-%track</code><div>2-07</div></div>
         <div class="tr"><code>Disc %disc</code><div>Disc 2</div></div>
         <div class="tr"><code>%year - %album</code><div>2019 - Reservoir</div></div>
-        <div class="tr"><code>{%album/}</code><div>Aggiunge una cartella con il nome dell'album, solo se la traccia ce l'ha</div></div>
+        <div class="tr"><code>{%album/}</code><div>Aggiunge una cartella con il nome dell'album, solo se il brano ce l'ha</div></div>
         <div class="tr"><code>{%disc-}%track</code><div>Omette «1-» quando non c'è il numero del disco: 07 oppure 1-07</div></div>
         <div class="tr"><code>{Disc %disc{ - %disctitle}/}</code><div>Una cartella per disco, con il sottotitolo solo se c'è: Disc 2 - BBC Sessions oppure Disc 2</div></div>
         <div class="tr"><code>{%track }%title</code><div>Aggiunge «07 » prima del titolo, solo se c'è il numero di traccia</div></div>
@@ -531,7 +531,7 @@
         <div class="row"><div class="mk">•</div><div><b>Prontezza dei tag</b>: i brani a cui manca un tag richiesto dal tuo schema (come artista, album o numero di traccia) aspettano in una sezione di revisione, con gli editor di tag a portata di mano, invece di finire in una cartella «Sconosciuto».</div></div>
         <div class="row"><div class="mk">•</div><div><b>Confronta edizioni duplicate</b>: se hai più copie della stessa registrazione, fai clic su <b>Confronta</b> per vederne i dettagli audio e i percorsi dei file. Quando le unisci, cronologia di ascolto, valutazioni, preferiti, tag personalizzati e playlist passano alla copia che tieni.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Ripiano di cura della libreria</b>: sotto l'anteprima dei file, una sezione discreta segnala gli album senza copertina o con tracce incomplete, i brani senza tag di base e gli avvisi di provenienza audio, ognuno con un pulsante per risolvere: modificare l'album, aprirlo in Picard o controllare i tag.</div></div>
-        <div class="row"><div class="mk">•</div><div>Attiva <b>Organizzazione automatica</b> in alto a destra (oppure in <b>Impostazioni → Sorgenti</b>) perché Luminous rinomini e sposti per te in background le nuove tracce e le modifiche ai tag. Prima di partire, una schermata ti spiega cosa succederà.</div></div>
+        <div class="row"><div class="mk">•</div><div>Attiva <b>Organizzazione automatica</b> in alto a destra (oppure in <b>Impostazioni → Sorgenti</b>) perché Luminous rinomini e sposti per te in background i nuovi brani e le modifiche ai tag. Prima di partire, una schermata ti spiega cosa succederà.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Pulisci libreria</b> rimuove i brani mancanti, le cartelle vuote e le voci duplicate.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Ripulisci i tag</b> trova i tag superflui in tutta la libreria: link di download promozionali nei commenti, indicazioni dell'encoder, dati di volume di iTunes e vecchi tag ID3v1. Togli la spunta a ciò che vuoi conservare, poi fai clic su <b>Rimuovi selezionati</b>. Titolo, artista, album, testi, copertina e gli altri tag di base non vengono mai modificati. Il controllo e la rimozione vengono eseguiti in background: fai clic su <b>Esegui in background</b> per continuare a usare Luminous, poi su <b>Esamina</b> nella notifica quando il controllo è terminato. Lo stesso pulsante nell'editor dei tag ripulisce un singolo brano.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Cartella o unità mancante</b>: se gran parte dei brani di una cartella scompare all'improvviso, ad esempio quando si scollega un'unità esterna, Luminous li mantiene nella libreria e mostra un avviso. Fai clic su <b>Esamina</b>, poi su <b>Mantieni brani</b> per attendere che l'unità torni disponibile, oppure su <b>Rimuovi brani</b> per rimuoverli. <b>Pulisci libreria</b> pone la stessa domanda prima di rimuoverli.</div></div>
@@ -627,8 +627,8 @@
       <div class="kb-label">Riproduzione</div>
       <div class="kb-table">
       <div class="kb-row"><div class="kb-keys"><kbd>Spazio</kbd></div><div>Riproduci / pausa</div></div>
-      <div class="kb-row"><div class="kb-keys"><kbd>←</kbd></div><div>Traccia precedente</div></div>
-      <div class="kb-row"><div class="kb-keys"><kbd>→</kbd></div><div>Traccia successiva</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>←</kbd></div><div>Brano precedente</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>→</kbd></div><div>Brano successivo</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>↑</kbd></div><div>Alza il volume</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>↓</kbd></div><div>Abbassa il volume</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Pag ↑</kbd></div><div>Indietro di 10 s</div></div>
