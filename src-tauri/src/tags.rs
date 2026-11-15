@@ -1680,6 +1680,18 @@ impl TagManager {
         Ok(group_near_duplicate_tags(spellings))
     }
 
+    /// Merges every spelling in `from` (skipping `into` itself) into `into` in
+    /// one call, so a caller merging a duplicate group pays for one sidecar
+    /// write-through rather than one per spelling. Returns the artist profiles
+    /// rewritten; a spelling no profile carries any more contributes nothing.
+    pub fn merge_artist_tag_spellings(&self, from: &[String], into: &str) -> Result<usize> {
+        let mut updated = 0;
+        for spelling in from.iter().filter(|s| s.as_str() != into) {
+            updated += self.merge_artist_tags(spelling, into)?;
+        }
+        Ok(updated)
+    }
+
     pub fn merge_artist_tags(&self, from: &str, into: &str) -> Result<usize> {
         let conn = self.db.pool.get()?;
         let mut stmt =
@@ -2811,6 +2823,53 @@ mod tests {
             ]
         );
         assert_eq!(groups[1].suggested, "Canadian");
+    }
+
+    #[test]
+    fn test_merge_artist_tag_spellings_merges_a_group_and_skips_the_target() {
+        let (_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        for (artist, tags) in [
+            ("A", r#"["Award-Winning","Canadian"]"#),
+            ("B", r#"["Award Winning"]"#),
+            ("C", r#"["award winning","Award-Winning"]"#),
+        ] {
+            conn.execute(
+                "INSERT INTO artist_profiles (artist_key, tags) VALUES (?1, ?2)",
+                params![artist, tags],
+            )
+            .unwrap();
+        }
+        let manager = TagManager::new(db.clone());
+
+        let updated = manager
+            .merge_artist_tag_spellings(
+                &[
+                    "Award-Winning".into(),
+                    "Award Winning".into(),
+                    "award winning".into(),
+                    "Gone".into(),
+                ],
+                "Award-Winning",
+            )
+            .unwrap();
+
+        assert_eq!(updated, 2, "B and C changed; A already had only the target");
+        assert!(manager
+            .find_artist_tag_near_duplicates()
+            .unwrap()
+            .is_empty());
+        let tags_of = |artist: &str| -> String {
+            conn.query_row(
+                "SELECT tags FROM artist_profiles WHERE artist_key = ?1",
+                params![artist],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        assert_eq!(tags_of("A"), r#"["Award-Winning","Canadian"]"#);
+        assert_eq!(tags_of("B"), r#"["Award-Winning"]"#);
+        assert_eq!(tags_of("C"), r#"["Award-Winning"]"#);
     }
 
     #[test]

@@ -163,8 +163,8 @@ describe("TagsStore artist tag duplicates", () => {
     vi.clearAllMocks();
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       switch (cmd) {
-        case "merge_artist_tags":
-          return 2;
+        case "merge_artist_tag_spellings":
+          return 4;
         case "get_artist_tag_hierarchy":
         case "get_artist_tags_overview":
         case "find_artist_tag_near_duplicates":
@@ -175,23 +175,15 @@ describe("TagsStore artist tag duplicates", () => {
     });
   });
 
-  it("merges every spelling but the kept one and sums the artists updated", async () => {
+  it("merges a whole group in one backend call and returns the artists updated", async () => {
     const updated = await tagsStore.mergeArtistTagSpellings("Award-Winning", [
       "Award-Winning",
       "Award Winning",
       "award winning",
     ]);
 
-    expect(invoke).toHaveBeenCalledWith("merge_artist_tags", {
-      from: "Award Winning",
-      into: "Award-Winning",
-    });
-    expect(invoke).toHaveBeenCalledWith("merge_artist_tags", {
-      from: "award winning",
-      into: "Award-Winning",
-    });
-    expect(invoke).not.toHaveBeenCalledWith("merge_artist_tags", {
-      from: "Award-Winning",
+    expect(invoke).toHaveBeenCalledWith("merge_artist_tag_spellings", {
+      from: ["Award-Winning", "Award Winning", "award winning"],
       into: "Award-Winning",
     });
     expect(updated).toBe(4);

@@ -354,6 +354,22 @@ pub async fn merge_artist_tags(
     persisted(&state, result).await
 }
 
+/// Merges a group of duplicate artist-tag spellings into one (#2096): a single
+/// command so the Genres page's merge dialog triggers one sidecar write, not one
+/// per spelling.
+#[tauri::command]
+pub async fn merge_artist_tag_spellings(
+    state: State<'_, AppState>,
+    from: Vec<String>,
+    into: String,
+) -> Result<usize, String> {
+    let manager = TagManager::new(state.db.clone());
+    let result = manager
+        .merge_artist_tag_spellings(&from, &into)
+        .map_err(|e| e.to_string());
+    persisted(&state, result).await
+}
+
 #[tauri::command]
 pub async fn delete_artist_tags(
     state: State<'_, AppState>,

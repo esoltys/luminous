@@ -277,14 +277,45 @@ pub fn parse(content: &str) -> Result<HierarchyFile> {
 
 /// Writes via a temp file in the same directory plus a rename, so another
 /// instance (or a crash mid-write) never sees a half-written file.
+///
+/// The rename is retried briefly when the destination is momentarily held open
+/// by another process (Windows os error 32 or 5 — a network
+/// share, a sync client or an antivirus scan that just touched the previous
+/// write); a lock that outlasts the retries still fails, and the caller logs it.
 pub fn write_atomic(path: &Path, content: &str) -> Result<()> {
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, content).with_context(|| format!("writing {}", tmp.display()))?;
-    if let Err(e) = std::fs::rename(&tmp, path) {
-        let _ = std::fs::remove_file(&tmp);
-        return Err(anyhow!(e).context(format!("replacing {}", path.display())));
+    let mut attempt = 0;
+    loop {
+        match std::fs::rename(&tmp, path) {
+            Ok(()) => return Ok(()),
+            Err(e) if attempt < RENAME_RETRIES && is_transient_lock(&e) => {
+                attempt += 1;
+                std::thread::sleep(RENAME_RETRY_DELAY * attempt);
+            }
+            Err(e) => {
+                let _ = std::fs::remove_file(&tmp);
+                return Err(anyhow!(e).context(format!("replacing {}", path.display())));
+            }
+        }
     }
-    Ok(())
+}
+
+/// How many times [`write_atomic`] retries a locked destination, and the base
+/// delay (multiplied by the attempt number): about 1.5 s in total, enough to
+/// outlast a share or scanner briefly holding the file, short enough that the
+/// blocking-thread caller isn't parked for long.
+const RENAME_RETRIES: u32 = 5;
+const RENAME_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// `ERROR_SHARING_VIOLATION` (32) and `ERROR_LOCK_VIOLATION` (33) — another
+/// process has the destination open (what a network share reports) — and
+/// `ERROR_ACCESS_DENIED` (5), which a local rename over an open file reports
+/// instead. A real permission problem also lands on 5 and simply fails after the
+/// retries. Only meaningful on Windows; elsewhere a rename over an open file
+/// just succeeds.
+fn is_transient_lock(e: &std::io::Error) -> bool {
+    cfg!(windows) && matches!(e.raw_os_error(), Some(5 | 32 | 33))
 }
 
 fn content_hash(content: &str) -> u64 {
@@ -777,6 +808,34 @@ mod tests {
         assert!(parse(r#"{"version": 2, "genres": []}"#).is_err());
         assert!(parse(r#"{"version": 0}"#).is_err());
         assert!(parse(r#"{"version": 1}"#).is_ok());
+    }
+
+    /// A destination another process holds open for a moment (a network share
+    /// or scanner) must not fail the write.
+    #[cfg(windows)]
+    #[test]
+    fn write_atomic_waits_out_a_briefly_locked_destination() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("luminous-hierarchy.json");
+        std::fs::write(&path, "old").unwrap();
+        // share_mode(0): no one else may open or replace it while held.
+        let held = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&path)
+            .unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            drop(held);
+        });
+
+        write_atomic(&path, "new").unwrap();
+        release.join().unwrap();
+
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+        assert!(!path.with_extension("json.tmp").exists());
     }
 
     #[test]

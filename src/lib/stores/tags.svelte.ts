@@ -55,15 +55,15 @@ class TagsStore {
     this.artistTagDuplicates = Array.isArray(result) ? result : [];
   }
 
-  /** Merges every other spelling of a duplicate group into `into`. Returns how
-   * many artist profiles were rewritten. A spelling that has since vanished is
-   * a no-op, so a stale dialog can't fail. */
+  /** Merges every other spelling of a duplicate group into `into` in one
+   * backend call (one sidecar write). Returns how many artist profiles were
+   * rewritten. A spelling that has since vanished is a no-op, so a stale dialog
+   * can't fail. */
   async mergeArtistTagSpellings(into: string, spellings: string[]): Promise<number> {
-    let updated = 0;
-    for (const from of spellings) {
-      if (from === into) continue;
-      updated += await invoke<number>("merge_artist_tags", { from, into });
-    }
+    const updated = await invoke<number>("merge_artist_tag_spellings", {
+      from: spellings,
+      into,
+    });
     await Promise.all([
       this.loadArtistHierarchy(),
       this.loadArtistTags(),
