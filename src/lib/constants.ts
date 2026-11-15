@@ -5,6 +5,15 @@
 /** Estimated width of a floating context menu, used to keep it inside the viewport. */
 export const CONTEXT_MENU_WIDTH_PX = 200;
 
+/** Default width of a context-menu flyout (ContextMenuSubmenu). */
+export const CONTEXT_SUBMENU_WIDTH_PX = 208;
+
+/**
+ * Attribute marking a portaled flyout as part of its parent context menu, so
+ * the menu's outside-click check doesn't dismiss it when the flyout is clicked.
+ */
+export const CONTEXT_MENU_LAYER_ATTR = "data-context-menu-layer";
+
 /** Minimum gap kept between a floating menu/modal and the edge of the viewport. */
 export const VIEWPORT_EDGE_PADDING_PX = 10;
 

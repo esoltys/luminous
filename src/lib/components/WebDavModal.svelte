@@ -4,7 +4,6 @@
   import { i18n } from "../stores/i18n.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
-  import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import { BADGE_ICON_CHOICES, BADGE_COLOR_CHOICES } from "../badgeChoices";
   import { combineWebdavPath } from "../webdavDisplay";
   import Button from "./Button.svelte";
@@ -51,7 +50,7 @@
     color: selectedColor,
   });
 
-  const dockClearance = $derived(playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0);
+  const dockClearance = $derived(playerStore.dockClearancePx);
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") onClose();

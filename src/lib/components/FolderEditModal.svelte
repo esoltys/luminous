@@ -6,7 +6,6 @@
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { hierarchySidecarStore } from "../stores/hierarchySidecar.svelte";
-  import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import LibraryBadge from "./LibraryBadge.svelte";
@@ -36,7 +35,7 @@
     color: selectedColor,
   });
 
-  let dockClearance = $derived(playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0);
+  let dockClearance = $derived(playerStore.dockClearancePx);
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
