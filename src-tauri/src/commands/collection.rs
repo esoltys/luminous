@@ -1639,7 +1639,7 @@ pub async fn retrieve_artist_details(
         );
     };
 
-    let relations = ContextManager::new()
+    let lookup = ContextManager::new()
         .fetch_musicbrainz_artist_relations(&artist_mbid)
         .await
         .map_err(|e| e.to_string())?;
@@ -1647,11 +1647,11 @@ pub async fn retrieve_artist_details(
     // MusicBrainz can list more than one "official homepage" (e.g. the
     // artist's own site plus a label's page for them) — dedupe by URL, since
     // MB occasionally repeats the same relation exactly.
-    let official_homepages = dedupe_official_homepages(&relations.relations);
-    let country = relations.country;
+    let official_homepages = dedupe_official_homepages(&lookup.url_relations);
+    let country = lookup.country;
 
-    let fetched_links: Vec<ArtistSocialLink> = relations
-        .relations
+    let fetched_links: Vec<ArtistSocialLink> = lookup
+        .url_relations
         .into_iter()
         .filter_map(|(rel_type, url)| {
             platform_for_artist_rel_type(&rel_type, &url).map(|platform| ArtistSocialLink {

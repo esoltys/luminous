@@ -274,10 +274,10 @@ impl MbArtistResponse {
 }
 
 /// What "Retrieve Artist Details" reads from one MusicBrainz artist lookup:
-/// the `url-rels` pairs and the artist's country code (#1123, #2095).
+/// the `(rel_type, url)` pairs and the artist's country code (#1123, #2095).
 #[derive(Debug, Default)]
-pub struct MusicBrainzArtistRelations {
-    pub relations: Vec<(String, String)>,
+pub struct MusicBrainzArtistLookup {
+    pub url_relations: Vec<(String, String)>,
     pub country: Option<String>,
 }
 
@@ -820,7 +820,7 @@ impl ContextManager {
     pub async fn fetch_musicbrainz_artist_relations(
         &self,
         artist_id: &str,
-    ) -> Result<MusicBrainzArtistRelations> {
+    ) -> Result<MusicBrainzArtistLookup> {
         throttle_musicbrainz().await;
         let url = format!(
             "https://musicbrainz.org/ws/2/artist/{}?inc=url-rels&fmt=json",
@@ -835,8 +835,8 @@ impl ContextManager {
         }
         let parsed: MbArtistResponse = response.json().await?;
         let country = parsed.country_code();
-        Ok(MusicBrainzArtistRelations {
-            relations: parsed
+        Ok(MusicBrainzArtistLookup {
+            url_relations: parsed
                 .relations
                 .into_iter()
                 .filter(|r| !r.ended)

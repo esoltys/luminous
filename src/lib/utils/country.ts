@@ -50,8 +50,19 @@ export function countryDisplayName(code: string | null | undefined, locale = "en
   }
 }
 
-/** Every assignable region, named in `locale` and sorted by that name. */
+const optionsByLocale = new Map<string, CountryOption[]>();
+
+/** Every assignable region, named in `locale` and sorted by that name (built once per locale). */
 export function countryOptions(locale = "en"): CountryOption[] {
+  let options = optionsByLocale.get(locale);
+  if (!options) {
+    options = buildCountryOptions(locale);
+    optionsByLocale.set(locale, options);
+  }
+  return options;
+}
+
+function buildCountryOptions(locale: string): CountryOption[] {
   const names = regionNames(locale);
   if (!names) return [];
   const options: CountryOption[] = [];
