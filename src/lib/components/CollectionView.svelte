@@ -392,6 +392,10 @@
   let isArtistSortAlphabetical = $derived(
     artistSortField === "name" || artistSortField === "genre",
   );
+  let showGridScrubber = $derived(
+    (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") ||
+      (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists"),
+  );
 
   function getSongAlphabetKey(row: SongTableRow): string {
     if (!row.song) return "";
@@ -763,12 +767,9 @@
               {/if}
             {/snippet}
 
+            <!-- pr-16 / right-10 clears the 34px right-edge info notch (RightPanelHost) when unpinned. -->
             <div
-              class="pl-6 {windowLayoutStore.hasRightNotch &&
-              ((isAlbumSortAlphabetical && navigationStore.activeSubTab === 'albums') ||
-                (isArtistSortAlphabetical && navigationStore.activeSubTab === 'artists'))
-                ? 'pr-16'
-                : 'pr-8'}"
+              class="pl-6 {windowLayoutStore.hasRightNotch && showGridScrubber ? 'pr-16' : 'pr-8'}"
             >
               {#if navigationStore.activeSubTab === "albums"}
                 {#if activeViewMode === "rows"}
@@ -863,7 +864,7 @@
               {/if}
             </div>
           </div>
-          {#if (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") || (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists")}
+          {#if showGridScrubber}
             <!-- Spans the list area only: starts under the header (measured, since it wraps
                  and collapses) and stops where the floating playbar begins. -->
             <div

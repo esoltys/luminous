@@ -730,6 +730,7 @@
           </div>
         {:else}
           <div class="relative flex-1 min-h-0 flex">
+            <!-- pr-16 / right-10 clears the 34px right-edge info notch (RightPanelHost) when unpinned. -->
             <div
               bind:this={columnEls[column]}
               class="flex-1 min-h-0 p-1.5 {windowLayoutStore.hasRightNotch && sortColumn === 'name'
