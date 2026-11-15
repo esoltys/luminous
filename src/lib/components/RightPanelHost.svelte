@@ -251,8 +251,7 @@
      backdrop-filter (see flatGlassColor() in theme.svelte.ts). Only the inset
      highlight of --glass-shadow: as before, when the panel inside this
      overflow-hidden wrapper carried it, the elevation stays off the content. */
-  .docked-surface.glass-surface,
-  .notch-surface.glass-surface {
+  .docked-surface.glass-surface {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
     background-color: var(--glass-solid-sidebar) !important;
