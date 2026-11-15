@@ -262,9 +262,16 @@
 
 <style>
   /* Keep the notch out of flex flow even when .glass-surface (which sets
-     `position: relative` in app.css) is applied. */
+     `position: relative` in app.css) is applied, and match the pinned
+     sidebar's solid-glass background so bg-main doesn't bleed through. */
   .notch-surface {
     position: absolute;
+  }
+
+  .notch-surface.glass-surface {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: var(--glass-solid-sidebar) !important;
   }
 
   /* Docked, nothing renders behind the panel but the flat bg-main canvas, so
