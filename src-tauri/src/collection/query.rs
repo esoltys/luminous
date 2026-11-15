@@ -2007,11 +2007,51 @@ fn canonicalize_artist_tag_casing(
     Ok(())
 }
 
-/// Upsert an artist profile into SQLite (#473).
+/// The spelling a profile for `artist` is stored under (#2097).
+///
+/// `artist_profiles.artist_key` is a case-insensitive key (`COLLATE NOCASE`):
+/// "The War on Drugs" and "The War On Drugs" are the same row, for every
+/// reader and writer, so an external tool needs no casing of its own. The
+/// stored *spelling* is the library's — the artist as the songs table spells
+/// it — when the library has one; otherwise the name as given. Every write
+/// below resolves through here, and an upsert rewrites a stale spelling.
+fn canonical_artist_key(conn: &rusqlite::Connection, artist: &str) -> Result<String> {
+    // Fast path: the name is already a library spelling (what the app itself
+    // passes). `idx_songs_artist` serves it; only a differently-cased name
+    // pays the scan below, which no index can serve.
+    let exact: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM songs WHERE artist = ?1)",
+        params![artist],
+        |row| row.get(0),
+    )?;
+    if exact {
+        return Ok(artist.to_string());
+    }
+    let spelling: Option<String> = conn
+        .query_row(
+            "SELECT COALESCE(NULLIF(album_artist, ''), artist) FROM songs
+             WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?1 COLLATE NOCASE
+             ORDER BY COALESCE(NULLIF(album_artist, ''), artist) = ?1 DESC
+             LIMIT 1",
+            params![artist],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(spelling.unwrap_or_else(|| artist.to_string()))
+}
+
+/// Upsert an artist profile into SQLite (#473). The key is stored in the
+/// library's spelling (see `canonical_artist_key`); the returned profile
+/// carries it.
 pub fn set_artist_profile_conn(
     conn: &rusqlite::Connection,
     profile: &ArtistProfile,
 ) -> Result<ArtistProfile> {
+    let profile = ArtistProfile {
+        artist_key: canonical_artist_key(conn, &profile.artist_key)?,
+        ..profile.clone()
+    };
+    let profile = &profile;
     let tags_json = serde_json::to_string(&profile.tags)?;
     let social_links_json = serde_json::to_string(&profile.social_links)?;
 
@@ -2019,6 +2059,7 @@ pub fn set_artist_profile_conn(
         "INSERT INTO artist_profiles (artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source, details_fetched, image_fetched, fetched_logo_filename, fetched_background_filename, logo_fetched, background_fetched)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
          ON CONFLICT(artist_key) DO UPDATE SET
+            artist_key = excluded.artist_key,
             website = excluded.website,
             tags = excluded.tags,
             social_links = excluded.social_links,
@@ -2067,8 +2108,9 @@ pub fn set_artist_bio_conn(
     conn.execute(
         "INSERT INTO artist_profiles (artist_key, bio)
          VALUES (?1, ?2)
-         ON CONFLICT(artist_key) DO UPDATE SET bio = excluded.bio",
-        params![artist, bio],
+         ON CONFLICT(artist_key) DO UPDATE SET
+            artist_key = excluded.artist_key, bio = excluded.bio",
+        params![canonical_artist_key(conn, artist)?, bio],
     )?;
     Ok(())
 }
@@ -2079,8 +2121,10 @@ pub fn set_artist_mbid_conn(conn: &rusqlite::Connection, artist: &str, mbid: &st
     conn.execute(
         "INSERT INTO artist_profiles (artist_key, musicbrainz_artist_id)
          VALUES (?1, ?2)
-         ON CONFLICT(artist_key) DO UPDATE SET musicbrainz_artist_id = excluded.musicbrainz_artist_id",
-        params![artist, mbid],
+         ON CONFLICT(artist_key) DO UPDATE SET
+            artist_key = excluded.artist_key,
+            musicbrainz_artist_id = excluded.musicbrainz_artist_id",
+        params![canonical_artist_key(conn, artist)?, mbid],
     )?;
     Ok(())
 }
@@ -3738,6 +3782,75 @@ mod tests {
         assert_eq!(all[0].artist_key, "Shania Twain");
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// #2097: the key is one row per artist whatever the casing, stored in the
+    /// library's spelling, and the tag filter sees it under either casing.
+    #[test]
+    fn test_artist_profile_key_is_case_insensitive_and_library_spelled() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_key_case_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        upsert_song(
+            &conn,
+            &Song {
+                source: SongSource::LocalFile,
+                path: Some("path/wod.mp3".to_string()),
+                title: Some("Under the Pressure".to_string()),
+                artist: Some("The War on Drugs".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        // An external writer saves under different casing: the stored key
+        // and the returned profile use the library's spelling.
+        let saved = set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "The War On Drugs".to_string(),
+                tags: vec!["indie".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(saved.artist_key, "The War on Drugs");
+
+        // The library's own spelling (the common case) resolves to itself.
+        assert_eq!(
+            canonical_artist_key(&conn, "The War on Drugs").unwrap(),
+            "The War on Drugs"
+        );
+
+        // Scoped writes under yet another casing hit the same row.
+        set_artist_bio_conn(&conn, "THE WAR ON DRUGS", Some("Philadelphia band")).unwrap();
+        set_artist_mbid_conn(&conn, "the war on drugs", "mbid-1").unwrap();
+
+        let all = get_all_artist_profiles_conn(&conn).unwrap();
+        assert_eq!(all.len(), 1, "one row per artist, got {all:?}");
+        assert_eq!(all[0].artist_key, "The War on Drugs");
+        assert_eq!(all[0].tags, vec!["indie"]);
+        assert_eq!(all[0].bio.as_deref(), Some("Philadelphia band"));
+        assert_eq!(all[0].musicbrainz_artist_id.as_deref(), Some("mbid-1"));
+
+        // The artist-tag filter finds the song regardless of key casing.
+        let songs = scanner
+            .get_songs_by_artist_tag("indie", 10, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(songs.len(), 1);
+
+        // An artist the library doesn't have keeps the spelling given; a
+        // later save in another casing updates that row in place.
+        set_artist_bio_conn(&conn, "Unsigned Act", Some("a")).unwrap();
+        set_artist_bio_conn(&conn, "UNSIGNED ACT", Some("b")).unwrap();
+        let all = get_all_artist_profiles_conn(&conn).unwrap();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[1].bio.as_deref(), Some("b"));
     }
 
     #[test]
