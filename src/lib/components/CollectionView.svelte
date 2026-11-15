@@ -305,6 +305,20 @@
   const albumKey = (album: AlbumItem) => album.artist + "|" + album.album;
   const artistKey = (artist: ArtistItem) => artist.name ?? "";
 
+  /**
+   * Space the floating playbar covers at the bottom of the list, as the padding the scroll
+   * areas reserve and the matching inset the A-Z scrubber uses to stop where the playbar
+   * begins. One source so the two cannot drift apart (literal classes so Tailwind finds them).
+   */
+  let playbarClearance = $derived(
+    playerStore.currentSong
+      ? { pad: "pb-28", inset: "bottom-28" }
+      : { pad: "pb-6", inset: "bottom-6" },
+  );
+
+  /** Height of the Albums/Artists header; the A-Z scrubber starts directly below it. */
+  let gridHeaderHeight = $state(0);
+
   let sortedAlbums = $derived.by(() => {
     if (navigationStore.activeSubTab !== "albums") return [];
     const list = [...collectionStore.filteredAlbums];
@@ -571,11 +585,7 @@
         </CollectionHeader>
       </div>
 
-      <div
-        class="flex-1 px-6 overflow-hidden flex flex-col {playerStore.currentSong
-          ? 'pb-28'
-          : 'pb-6'}"
-      >
+      <div class="flex-1 px-6 overflow-hidden flex flex-col {playbarClearance.pad}">
         <div class="relative flex-1 min-h-0 flex">
           <div
             class="flex-1 overflow-y-auto border border-brand-border rounded-lg bg-brand-sidebar/40 min-h-0"
@@ -600,7 +610,12 @@
             />
           </div>
           {#if isSongSortAlphabetical}
-            <div class="absolute right-2.5 top-12 bottom-3 pointer-events-auto z-20">
+            <!-- In the px-6 gutter just right of the table (not over its rows), spanning the
+                 table's full height; the parent's playbar padding already bounds the bottom. -->
+            <div
+              class="absolute left-full ml-0.5 top-0 bottom-0 pointer-events-auto z-20"
+              data-testid="alphabet-scrubber-bounds"
+            >
               <AlphabetScrubber
                 items={tableRows}
                 getKey={getSongAlphabetKey}
@@ -618,10 +633,11 @@
       <div class="flex-1 min-h-0 flex flex-col">
         <div class="relative flex-1 min-h-0 flex flex-col">
           <div
-            class="flex-1 overflow-y-auto min-h-0 {playerStore.currentSong ? 'pb-28' : 'pb-6'}"
+            class="flex-1 overflow-y-auto min-h-0 {playbarClearance.pad}"
             use:rememberScroll={`collection:${navigationStore.activeSubTab}`}
           >
             <CollectionHeader
+              bind:height={gridHeaderHeight}
               title={navigationStore.activeSubTab === "albums"
                 ? i18n.t("sidebar.albums")
                 : i18n.t("sidebar.artists")}
@@ -848,7 +864,13 @@
             </div>
           </div>
           {#if (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") || (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists")}
-            <div class="absolute right-2.5 top-20 bottom-2 pointer-events-auto z-20">
+            <!-- Spans the list area only: starts under the header (measured, since it wraps
+                 and collapses) and stops where the floating playbar begins. -->
+            <div
+              class="absolute right-2.5 pointer-events-auto z-20 {playbarClearance.inset}"
+              style:top="{gridHeaderHeight}px"
+              data-testid="alphabet-scrubber-bounds"
+            >
               {#if navigationStore.activeSubTab === "albums"}
                 <AlphabetScrubber
                   items={sortedAlbums}
