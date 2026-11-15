@@ -33,6 +33,12 @@
   const OPEN_DELAY_MS = 120;
   const CLOSE_DELAY_MS = 250;
 
+  // Continuous S-curve silhouette for the 34x88 right-edge notch: 17px circular-arc
+  // concave flares into the window edge, inflecting seamlessly into 17px convex corners.
+  const NOTCH_EDGE_PATH =
+    "M 34 0 C 34 9.4 26.4 17 17 17 C 7.6 17 0 24.6 0 34 L 0 54 C 0 63.4 7.6 71 17 71 C 26.4 71 34 78.6 34 88";
+  const NOTCH_SILHOUETTE_PATH = `${NOTCH_EDGE_PATH} Z`;
+
   let overlayEl = $state<HTMLElement | null>(null);
   let notchEl = $state<HTMLElement | null>(null);
   // Set when a close leaves the pointer resting on the notch, which would otherwise reopen the
@@ -200,20 +206,29 @@
     role="group"
     aria-label={i18n.t("topNav.rightPanelRail", {}, "Info sidebar")}
     style:top={dockVisible ? `calc(50% - ${PLAYER_DOCK_CLEARANCE_PX / 2}px)` : "50%"}
-    class="notch-surface absolute right-0 -translate-y-1/2 z-30 h-[60px] w-[34px] flex items-center justify-center rounded-l-xl border-y border-l border-r-0 border-brand-border bg-brand-playerbar shadow-xl {themeStore.isGlassTheme
+    style:clip-path={`path('${NOTCH_SILHOUETTE_PATH}')`}
+    class="notch-surface absolute right-0 -translate-y-1/2 z-30 h-[88px] w-[34px] flex items-center justify-center bg-brand-sidebar {themeStore.isGlassTheme
       ? 'glass-surface'
       : ''}"
     onpointerenter={onNotchEnter}
     onpointerleave={cancelTimer}
   >
+    <!-- Stroke along the exact clip-path boundary: width 2 leaves a 1px inner border after clipping. -->
+    <svg
+      viewBox="0 0 34 88"
+      class="pointer-events-none absolute inset-0 w-full h-full"
+      aria-hidden="true"
+    >
+      <path d={NOTCH_EDGE_PATH} fill="none" stroke="var(--color-border)" stroke-width="2" />
+    </svg>
     <button
       type="button"
       onclick={togglePin}
       aria-label={i18n.t("topNav.pinRightPanel", {}, "Pin info sidebar")}
       title={i18n.t("topNav.pinRightPanel", {}, "Pin info sidebar")}
-      class="p-1 rounded-md text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+      class="relative p-1 rounded-md text-brand-text-secondary hover:text-brand-text-primary transition-colors"
     >
-      <!-- Same glyph and size as the player bar's info button; notch is 3x its 20px height. -->
+      <!-- Same glyph and size as the player bar's info button. -->
       <Info class="w-5 h-5" />
     </button>
   </div>
@@ -247,27 +262,17 @@
 
 <style>
   /* Keep the notch out of flex flow even when .glass-surface (which sets
-     `position: relative` in app.css) is applied. */
+     `position: relative` in app.css) is applied, and match the pinned
+     sidebar's solid-glass background so bg-main doesn't bleed through. */
   .notch-surface {
     position: absolute;
   }
 
-  .notch-surface.glass-surface {
-    background-color: var(--glass-bg-playerbar) !important;
-    border-color: var(--glass-border-color, var(--color-border)) !important;
-    box-shadow: var(--glass-shadow, none);
-  }
-
-  /* Match PlayerBar's liquid-glass specular highlight. */
-  .notch-surface.glass-surface::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    box-shadow:
-      inset 1.5px 1.5px 1px 0 rgba(255, 255, 255, 0.45),
-      inset -1px -1px 1px 0 rgba(255, 255, 255, 0.18);
+  .notch-surface.glass-surface,
+  .docked-surface.glass-surface {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: var(--glass-solid-sidebar) !important;
   }
 
   /* Docked, nothing renders behind the panel but the flat bg-main canvas, so
@@ -276,9 +281,6 @@
      highlight of --glass-shadow: as before, when the panel inside this
      overflow-hidden wrapper carried it, the elevation stays off the content. */
   .docked-surface.glass-surface {
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
-    background-color: var(--glass-solid-sidebar) !important;
     border-color: var(--glass-border-color, var(--color-border)) !important;
     box-shadow: var(--glass-highlight, none);
   }
