@@ -40,7 +40,11 @@
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
-  import { autoContinueRunStarts, getPlaylistDisplayName } from "../utils/playlist";
+  import {
+    autoContinueRunStarts,
+    getPlaylistDisplayName,
+    getPopulationModeSuffix,
+  } from "../utils/playlist";
   import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -283,6 +287,16 @@
       activePlaylist.dynamic_enabled &&
       isSmartPlaylistSpec(activePlaylist.dynamic_spec),
   );
+
+  // A smart playlist's title carries its population mode ("Canadian Deep Cuts")
+  // the way an auto playlist's does. Display only: the stored name, and what
+  // rename edits, stay the bare name.
+  let displayTitle = $derived.by(() => {
+    if (!activePlaylist) return "";
+    const base = isQueue ? getPlaylistDisplayName(activePlaylist) : activePlaylist.name;
+    const suffix = isSmartPlaylist ? getPopulationModeSuffix(activePlaylist.population_mode) : "";
+    return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
+  });
 
   function handleEditSmartPlaylist() {
     if (!activePlaylist) return;
@@ -814,7 +828,7 @@
                       : 'hover:text-brand-accent-text'}"
                     title={isQueue ? undefined : i18n.t("playlists.renamePlaylistTooltip")}
                   >
-                    {isQueue ? getPlaylistDisplayName(activePlaylist) : activePlaylist.name}
+                    {displayTitle}
                   </h1>
                   {#if !isQueue}
                     <button
@@ -1288,7 +1302,7 @@
 
 {#if showShareModal && activePlaylist}
   <ShareModal
-    entity={{ kind: "playlist", title: getPlaylistDisplayName(activePlaylist), songs: shareSongs }}
+    entity={{ kind: "playlist", title: displayTitle, songs: shareSongs }}
     onClose={() => {
       showShareModal = false;
     }}

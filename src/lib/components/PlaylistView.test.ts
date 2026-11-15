@@ -780,5 +780,23 @@ describe("PlaylistView.svelte", () => {
       await fireEvent.click(getByRole("tab", { name: "Deep Cuts" }));
       expect(modeSpy).toHaveBeenCalledWith(1, "deep_cuts");
     });
+
+    it("suffixes a smart playlist's title with its population mode, but not the stored name", () => {
+      playlistsStore.playlists = [
+        {
+          ...mockPlaylist,
+          dynamic_enabled: true,
+          dynamic_spec: "genre:rock",
+          population_mode: "deep_cuts",
+        },
+      ];
+      const { getByRole } = render(PlaylistView);
+      expect(getByRole("heading", { level: 1 })).toHaveTextContent("My Playlist Deep Cuts");
+    });
+
+    it("leaves a plain playlist's title bare", () => {
+      const { getByRole } = render(PlaylistView);
+      expect(getByRole("heading", { level: 1 })).toHaveTextContent(/^My Playlist$/);
+    });
   });
 });
