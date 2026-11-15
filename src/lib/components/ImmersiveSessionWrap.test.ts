@@ -53,7 +53,7 @@ describe("ImmersiveSessionWrap.svelte (#1380)", () => {
     const { getByTestId, getByText } = render(ImmersiveSessionWrap, { session: mockSession });
     expect(getByTestId("immersive-session-wrap")).toBeInTheDocument();
     expect(getByText("Queue Complete")).toBeInTheDocument();
-    expect(getByText("3 tracks played")).toBeInTheDocument();
+    expect(getByText("3 songs played")).toBeInTheDocument();
     expect(getByText("Shuffle Library")).toBeInTheDocument();
     expect(getByText("Replay")).toBeInTheDocument();
     expect(getByText("Exit Immersive")).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe("ImmersiveSessionWrap.svelte (#1380)", () => {
     };
     const { getByText } = render(ImmersiveSessionWrap, { session: singleTrackSession });
     expect(getByText("Chill Mix Complete")).toBeInTheDocument();
-    expect(getByText("1 track played")).toBeInTheDocument();
+    expect(getByText("1 song played")).toBeInTheDocument();
   });
 
   it("calls playerStore.shuffleLibrary when Shuffle Library button is clicked", async () => {

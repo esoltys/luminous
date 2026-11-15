@@ -310,7 +310,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     });
     expect(activeTask?.label).toBe("Fast SSD: resolving artwork");
 
-    // Phase: checking missing tracks
+    // Phase: checking missing songs
     eventCallbacks["scan-progress"]({
       payload: {
         phase: "checking_missing",
@@ -321,7 +321,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
         directory_id: 1,
       },
     });
-    expect(activeTask?.label).toBe("Fast SSD: checking missing tracks");
+    expect(activeTask?.label).toBe("Fast SSD: checking missing songs");
 
     eventCallbacks["scan-progress"]({
       payload: {
@@ -354,7 +354,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     });
 
     await vi.waitFor(() => {
-      expect(toastSpy).toHaveBeenCalledWith("Music: 3 tracks changed outside Luminous", "info");
+      expect(toastSpy).toHaveBeenCalledWith("Music: 3 songs changed outside Luminous", "info");
     });
 
     // When external_changes is 0, no toast is shown
@@ -459,7 +459,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
   it("maps scan phases to descriptive localized strings", () => {
     expect(getScanPhaseLabel("discovering")).toBe("discovering files");
     expect(getScanPhaseLabel("reading_tags")).toBe("reading tags");
-    expect(getScanPhaseLabel("checking_missing")).toBe("checking missing tracks");
+    expect(getScanPhaseLabel("checking_missing")).toBe("checking missing songs");
     expect(getScanPhaseLabel("resolving_artwork")).toBe("resolving artwork");
     expect(getScanPhaseLabel("updating")).toBe("updating library");
   });

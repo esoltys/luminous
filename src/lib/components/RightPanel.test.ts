@@ -378,7 +378,7 @@ describe("RightPanel.svelte", () => {
     inspectorStore.setSelection("album-view", { ...mockSong, id: 7, genre: "Jazz" });
     const { getByText, queryByText, queryByRole } = render(RightPanel);
 
-    expect(getByText("Selected Track")).toBeInTheDocument();
+    expect(getByText("Selected song")).toBeInTheDocument();
     expect(getByText("Jazz")).toBeInTheDocument();
     expect(queryByRole("heading", { name: "Now playing" })).not.toBeInTheDocument();
     expect(queryByText("Processing")).not.toBeInTheDocument();
@@ -388,7 +388,7 @@ describe("RightPanel.svelte", () => {
     inspectorStore.setSelection("album-view", mockSong);
     const { getByText, queryByText } = render(RightPanel);
 
-    expect(getByText("Selected Track")).toBeInTheDocument();
+    expect(getByText("Selected song")).toBeInTheDocument();
     expect(queryByText(/nothing playing/i)).not.toBeInTheDocument();
   });
 
@@ -401,7 +401,7 @@ describe("RightPanel.svelte", () => {
 
     expect(getByRole("heading", { name: "Now playing" })).toBeInTheDocument();
     expect(queryByRole("button", { name: "Now playing" })).not.toBeInTheDocument();
-    expect(queryByRole("heading", { name: "Selected Track" })).not.toBeInTheDocument();
+    expect(queryByRole("heading", { name: "Selected song" })).not.toBeInTheDocument();
   });
 
   it("offers no way back when the panel already shows Now Playing, or nothing is playing", () => {

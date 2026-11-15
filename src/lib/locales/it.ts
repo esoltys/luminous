@@ -499,8 +499,8 @@ export const it = {
   },
   collection: {
     externalChangesToast: {
-      one: "{name}: {count} traccia modificata all'esterno di Luminous",
-      other: "{name}: {count} tracce modificate all'esterno di Luminous",
+      one: "{name}: {count} brano modificato all'esterno di Luminous",
+      other: "{name}: {count} brani modificati all'esterno di Luminous",
     },
     alphabetScrubberLabel: "Indice alfabetico",
     jumpToLetter: "Vai alla lettera {letter}",
@@ -561,7 +561,7 @@ export const it = {
     verifyAuthenticityCount: "Verifica autenticità audio ({count})",
     verifyingAuthenticity: "Verifica dell'autenticità audio in corso...",
     verifyAuthenticityComplete: "Verifica dell'autenticità audio completata",
-    noLosslessTracks: "Nessuna traccia senza perdita locale selezionata",
+    noLosslessTracks: "Nessun brano senza perdita locale selezionato",
     variousArtists: "Artisti vari",
     unknownSong: "Brano sconosciuto",
     unknownArtist: "Artista sconosciuto",
@@ -1729,7 +1729,7 @@ export const it = {
     },
     dropToPlay: "oppure trascina file audio per riprodurli",
     queueProgress: "{current}/{total}",
-    queueProgressAria: "Traccia {current} di {total}",
+    queueProgressAria: "Brano {current} di {total}",
   },
 
   chipInput: {
@@ -1767,7 +1767,7 @@ export const it = {
     remoteSourceNote:
       "Questo brano si trova su un server remoto. Le modifiche vengono salvate solo in Luminous: il file sul server non verrà modificato.",
     cueTrackNote:
-      "I tag di questa traccia provengono dal suo file CUE, non dal file stesso, quindi per ora non possono essere modificati qui.",
+      "I tag di questo brano provengono dal suo file CUE, non dal file stesso, quindi per ora non possono essere modificati qui.",
     albumArtistField: "Artista dell'album",
     albumArtistPlaceholder: "Aggiungi un artista dell'album...",
     albumArtistTooltip:
@@ -1869,7 +1869,7 @@ export const it = {
     clearArtBtn: "Rimuovi copertina incorporata",
     clearArtConfirmTitle: "Rimuovere la copertina incorporata?",
     clearArtConfirmMessage:
-      "Questa operazione rimuove la copertina incorporata dal file di ogni traccia di questo album. Le tracce ripiegheranno sull'immagine della cartella o su un segnaposto.",
+      "Questa operazione rimuove la copertina incorporata dal file di ogni brano di questo album. I brani ripiegheranno sull'immagine della cartella o su un segnaposto.",
     clearingArt: "Rimozione della copertina in corso...",
     clearArtSuccess: {
       one: "Copertina incorporata rimossa per {count} brano",
@@ -2416,7 +2416,7 @@ export const it = {
       "Togli la spunta a ciò che vuoi tenere. Titolo, artista, album, testo, copertina e gli altri tag principali non vengono mai modificati.",
     nothingFound: "Nessun tag superfluo trovato.",
     skipped:
-      "Tracce che non è stato possibile controllare (file CUE, file remoti o illeggibili): {count}",
+      "Brani che non è stato possibile controllare (file CUE, file remoti o illeggibili): {count}",
     kindPromoComment: "Commento promozionale",
     kindEncoder: "Codificatore",
     kindEncodedBy: "Codificato da",
@@ -2429,11 +2429,11 @@ export const it = {
     removing: "Rimozione…",
     cancelBtn: "Annulla",
     closeBtn: "Chiudi",
-    done: "Pulizia dei tag completata. Campi rimossi: {count}; tracce ripulite: {songs}",
+    done: "Pulizia dei tag completata. Campi rimossi: {count}; brani ripuliti: {songs}",
     partialErrors: "File che non è stato possibile ripulire: {count}",
     failedPrefix: "Impossibile ripulire i tag: ",
     backgroundBtn: "Esegui in background",
-    readyToReview: "Controllo completato. Tracce con tag superflui: {count}",
+    readyToReview: "Controllo completato. Brani con tag superflui: {count}",
     reviewBtn: "Esamina",
   },
   organizer: {
@@ -3067,8 +3067,8 @@ export const it = {
     shelfIncompleteTitle: "Album con tracce incomplete",
     shelfIncompleteHint: "Questi album hanno numeri di traccia mancanti o duplicati.",
     unnumberedTracksBadge: {
-      one: "{count} traccia non numerata",
-      other: "{count} tracce non numerate",
+      one: "{count} brano non numerato",
+      other: "{count} brani non numerati",
     },
     duplicateTrackNumbersBadge: {
       one: "{count} numero di traccia duplicato",
@@ -3076,8 +3076,8 @@ export const it = {
     },
     openInPicardBtn: "Apri in Picard",
     shelfMissingCoreTitle: {
-      one: "{count} traccia priva di tag di base",
-      other: "{count} tracce prive di tag di base",
+      one: "{count} brano privo di tag di base",
+      other: "{count} brani privi di tag di base",
     },
     shelfMissingCoreHint:
       "I brani privi di titolo, artista o album non possono essere organizzati in cartelle strutturate.",
@@ -3090,11 +3090,11 @@ export const it = {
     reviewDuplicatesBtn: "Confronta duplicati",
     shelfProvenanceTitle: "Avvisi di provenienza audio",
     shelfProvenanceHint:
-      "Tracce lossless segnalate per sospetta transcodifica con perdita o sovracampionamento.",
+      "Brani lossless segnalati per sospetta transcodifica con perdita o sovracampionamento.",
     shelfProvenanceBadge: "Sospetta transcodifica",
     shelfCorruptTitle: "File audio corrotti o illeggibili",
     shelfCorruptHint:
-      "Tracce con errori di decodifica del flusso, verifica del contenitore o convalida del checksum",
+      "Brani con errori di decodifica del flusso, verifica del contenitore o convalida del checksum",
     showAllWithCount: "Mostra tutto ({count})",
     showLess: "Mostra meno",
   },

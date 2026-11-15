@@ -128,7 +128,7 @@ describe("CurationShelf.svelte", () => {
 
     const section = await findByTestId("curation-incomplete-section");
     expect(section).toBeInTheDocument();
-    expect(await findByText("3 unnumbered tracks")).toBeInTheDocument();
+    expect(await findByText("3 unnumbered songs")).toBeInTheDocument();
 
     // Verify incomplete albums render in a single-column flex list to avoid suffix collision (#1934)
     const listContainer = section.querySelector(".flex.flex-col.gap-3");
@@ -165,7 +165,7 @@ describe("CurationShelf.svelte", () => {
     const { findByTestId, findByText } = render(CurationShelf);
 
     expect(await findByTestId("curation-missing-core-section")).toBeInTheDocument();
-    expect(await findByText("7 tracks missing core tags")).toBeInTheDocument();
+    expect(await findByText("7 songs missing core tags")).toBeInTheDocument();
 
     const reviewBtn = await findByText("Review Missing Tags");
     await fireEvent.click(reviewBtn);
