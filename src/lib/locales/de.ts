@@ -1399,6 +1399,8 @@ export const de = {
     autoContinue: "Automatisch fortsetzen",
     sizeLimitBtn: "Größenlimit",
     sizeLimitSetBtn: "Limit: {limit}",
+    sizeLimitMenuItem: "Größenlimit: {value}",
+    sizeLimitNotSet: "nicht festgelegt",
     sizeLimitTitle: "Größenlimit",
     sizeLimitHint:
       "Lege fest, wie viel Platz die Titel oben in dieser Wiedergabeliste belegen dürfen, etwa die Kapazität eines USB-Sticks. Eine gestrichelte Linie zeigt, wo sie nicht mehr passen.",
@@ -1432,7 +1434,7 @@ export const de = {
     notIncludedBadgeTooltip:
       "Nicht in automatischen Wiedergabelisten oder beim Nachfüllen der automatischen Wiedergabe enthalten",
     noFilterResults: "Keine Titel passen zu „{query}“",
-    editSmartPlaylistBtn: "Regeln bearbeiten",
+    editSmartPlaylistBtn: "Intelligente Wiedergabeliste bearbeiten",
     smartRulePlaylistLabel: "Regelbasierte Wiedergabeliste",
     smartRuleBasedTooltip: "Intelligente regelbasierte Wiedergabeliste",
     smartBadgeLabel: "Intelligent",

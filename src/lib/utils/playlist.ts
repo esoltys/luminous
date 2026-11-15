@@ -8,7 +8,6 @@ import type {
   Song,
 } from "../types";
 import { i18n } from "../stores/i18n.svelte";
-import { isSmartPlaylistSpec } from "./filterParser";
 import { getLanguageDisplayName } from "./language";
 import { collectionStore } from "../stores/collection.svelte";
 import { playerStore } from "../stores/player.svelte";
@@ -133,11 +132,10 @@ export function getPlaylistDisplayName(
   }
   // Missing Metadata (#367) is a diagnostic singleton, not a library-data
   // category — a population-mode suffix ("Missing Metadata (Favourites)")
-  // wouldn't mean anything useful, so it's excluded the same way Smart
-  // Playlists are.
+  // wouldn't mean anything useful, so it's excluded. Smart Playlists carry
+  // the suffix like the auto categories: they have mode tabs of their own.
   if (
     !playlist.dynamic_enabled ||
-    isSmartPlaylistSpec(playlist.dynamic_spec) ||
     playlist.dynamic_spec === "missingmeta" ||
     playlist.dynamic_spec === "missingmbid"
   ) {

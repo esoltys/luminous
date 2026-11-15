@@ -1408,6 +1408,8 @@ export const fr: DeepStringRecord<typeof en> = {
     autoContinue: "Lecture continue",
     sizeLimitBtn: "Limite de taille",
     sizeLimitSetBtn: "Limite de {limit}",
+    sizeLimitMenuItem: "Limite de taille : {value}",
+    sizeLimitNotSet: "non définie",
     sizeLimitTitle: "Limite de taille",
     sizeLimitHint:
       "Choisissez l’espace que peuvent occuper les chansons en haut de cette liste de lecture, comme la capacité d’une clé USB. Une ligne pointillée indique où elles cessent d’y entrer.",
@@ -1441,7 +1443,7 @@ export const fr: DeepStringRecord<typeof en> = {
     notIncludedBadgeTooltip:
       "Non inclus dans les listes de lecture automatiques ni le remplissage automatique",
     noFilterResults: 'Aucune chanson ne correspond à "{query}"',
-    editSmartPlaylistBtn: "Modifier les règles",
+    editSmartPlaylistBtn: "Modifier la liste intelligente",
     smartRulePlaylistLabel: "Liste intelligente",
     smartRuleBasedTooltip: "Liste intelligente basée sur des règles",
     smartBadgeLabel: "Intelligente",

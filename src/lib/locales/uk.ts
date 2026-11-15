@@ -1503,6 +1503,8 @@ export const uk = {
     autoContinue: "Автопродовження",
     sizeLimitBtn: "Ліміт розміру",
     sizeLimitSetBtn: "Ліміт {limit}",
+    sizeLimitMenuItem: "Ліміт розміру: {value}",
+    sizeLimitNotSet: "не задано",
     sizeLimitTitle: "Ліміт розміру",
     sizeLimitHint:
       "Виберіть, скільки місця можуть займати пісні на початку цього списку відтворення, наприклад обсяг флешки. Пунктирна лінія покаже, де вони перестають вміщатися.",
@@ -1537,7 +1539,7 @@ export const uk = {
     unmarkedNotIncluded: "«{name}» знову включено до списків відтворення",
     notIncludedBadgeTooltip: "Не входить в автосписки та автопоповнення черги",
     noFilterResults: "Немає пісень за запитом «{query}»",
-    editSmartPlaylistBtn: "Змінити правила",
+    editSmartPlaylistBtn: "Редагування розумного списку відтворення",
     smartRulePlaylistLabel: "Список відтворення за правилами",
     smartRuleBasedTooltip: "Розумний список відтворення за правилами",
     smartBadgeLabel: "Розумний",

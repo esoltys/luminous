@@ -1395,6 +1395,8 @@ export const it = {
     autoContinue: "Continua automaticamente",
     sizeLimitBtn: "Limite di spazio",
     sizeLimitSetBtn: "Limite {limit}",
+    sizeLimitMenuItem: "Limite di spazio: {value}",
+    sizeLimitNotSet: "non impostato",
     sizeLimitTitle: "Limite di spazio",
     sizeLimitHint:
       "Scegli quanto spazio possono occupare i brani in cima a questa playlist, come la capacità di una chiavetta USB. Una linea tratteggiata indica dove smettono di starci.",
@@ -1427,7 +1429,7 @@ export const it = {
     notIncludedBadgeTooltip:
       "Escluso dalle playlist automatiche e dal riempimento della riproduzione automatica",
     noFilterResults: "Nessun brano corrisponde a «{query}»",
-    editSmartPlaylistBtn: "Modifica regole",
+    editSmartPlaylistBtn: "Modifica playlist intelligente",
     smartRulePlaylistLabel: "Playlist con regole intelligenti",
     smartRuleBasedTooltip: "Playlist basata su regole intelligenti",
     smartBadgeLabel: "Intelligente",

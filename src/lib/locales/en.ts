@@ -1362,6 +1362,8 @@ export const en = {
     autoContinue: "Auto Continue",
     sizeLimitBtn: "Size limit",
     sizeLimitSetBtn: "Limit {limit}",
+    sizeLimitMenuItem: "Size limit: {value}",
+    sizeLimitNotSet: "not set",
     sizeLimitTitle: "Size limit",
     sizeLimitHint:
       "Choose how much space the songs at the top of this playlist can take, such as a USB stick's capacity. A dashed line marks where they stop fitting.",
@@ -1393,7 +1395,7 @@ export const en = {
     unmarkedNotIncluded: "Included {name} in playlists again",
     notIncludedBadgeTooltip: "Not included in auto-playlists or Auto-Play refill",
     noFilterResults: 'No songs match "{query}"',
-    editSmartPlaylistBtn: "Edit Rules",
+    editSmartPlaylistBtn: "Edit Smart Playlist",
     smartRulePlaylistLabel: "Smart Rule Playlist",
     smartRuleBasedTooltip: "Smart Rule-Based Playlist",
     smartBadgeLabel: "Smart",

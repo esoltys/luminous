@@ -8,7 +8,6 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
-  import { shuffleArray } from "../utils/shuffle";
   import {
     TrashIcon as Trash2,
     PlaylistIcon as ListMusic,
@@ -23,7 +22,8 @@
     XIcon as X,
     CopyIcon as CopyPlus,
     MusicNotesIcon as Music,
-    ShuffleIcon as Shuffle,
+    ArrowsClockwiseIcon as RefreshCw,
+    UsbIcon as Usb,
     BroadcastIcon as Radio,
     StackIcon as Layers,
     EraserIcon as Eraser,
@@ -39,7 +39,7 @@
   import { toastStore } from "../stores/toast.svelte";
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
-  import type { PlaylistItem, Song } from "../types";
+  import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { autoContinueRunStarts, getPlaylistDisplayName } from "../utils/playlist";
   import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -76,12 +76,14 @@
     formatFileSize,
     formatDuration,
     formatHoursMinutes,
+    formatStorageSize,
   } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { CONTEXT_MENU_WIDTH_PX } from "../constants";
   import { compareSongs } from "../utils/songSort";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import PlaylistSizeLimitControl from "./PlaylistSizeLimitControl.svelte";
+  import PlaylistSizeLimitPopover from "./PlaylistSizeLimitPopover.svelte";
+  import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import { PlaylistSizeLimit } from "../utils/sizeFit.svelte";
 
   // Default column widths (px or fr) — used when no saved width exists for a column.
@@ -281,6 +283,10 @@
       activePlaylist.dynamic_enabled &&
       isSmartPlaylistSpec(activePlaylist.dynamic_spec),
   );
+
+  // Title shown everywhere (header, sidebar, Home): a smart playlist's carries its
+  // population mode ("Canadian Deep Cuts"). Display only: rename edits the bare name.
+  let displayTitle = $derived(getPlaylistDisplayName(activePlaylist));
 
   function handleEditSmartPlaylist() {
     if (!activePlaylist) return;
@@ -622,19 +628,34 @@
     }
   }
 
-  async function handleShufflePlay() {
-    if (!activePlaylist || playlistsStore.activePlaylistTracks.length === 0) return;
-    const availableTracks = playlistsStore.activePlaylistTracks.filter(
-      (t) => t.song && !isItemUnavailable(t),
-    );
-    if (availableTracks.length === 0) return;
-    const shuffledSongIds = shuffleArray(availableTracks.map((t) => t.song!.id));
-    const queuePl = await playlistsStore.requireQueue();
-    await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(shuffledSongIds, 0, queuePl?.id, undefined, "Queue");
-    if (queuePl) {
-      playlistsStore.selectPlaylist(queuePl.id);
-      navigationStore.viewPlaylist(queuePl.id);
+  // Population-mode tabs and Refresh apply to dynamic (smart) playlists only:
+  // a hand-curated playlist has no population mode to re-roll. The backend's
+  // set-mode command repopulates; Refresh re-rolls under the current mode.
+  let isChangingMode = $state(false);
+  let isRefreshing = $state(false);
+  let showSizeLimitPopover = $state(false);
+
+  async function handleChangePopulationMode(mode: QueuePopulationMode) {
+    if (!activePlaylist || mode === activePlaylist.population_mode || isChangingMode) return;
+    isChangingMode = true;
+    try {
+      await playlistsStore.setPlaylistPopulationMode(activePlaylist.id, mode);
+    } catch (err) {
+      console.error("Failed to change population mode:", err);
+    } finally {
+      isChangingMode = false;
+    }
+  }
+
+  async function handleRefreshSmartPlaylist() {
+    if (!activePlaylist || isRefreshing) return;
+    isRefreshing = true;
+    try {
+      await playlistsStore.refreshAutoPlaylist(activePlaylist.id);
+    } catch (err) {
+      console.error("Failed to refresh smart playlist:", err);
+    } finally {
+      isRefreshing = false;
     }
   }
 
@@ -797,7 +818,7 @@
                       : 'hover:text-brand-accent-text'}"
                     title={isQueue ? undefined : i18n.t("playlists.renamePlaylistTooltip")}
                   >
-                    {isQueue ? getPlaylistDisplayName(activePlaylist) : activePlaylist.name}
+                    {displayTitle}
                   </h1>
                   {#if !isQueue}
                     <button
@@ -809,16 +830,6 @@
                     </button>
                   {/if}
                 </div>
-              {/if}
-
-              {#if !isSpecialPlaylist}
-                {#if rawGenre}
-                  <GenreChips genre={rawGenre} variant="full" limit={4} />
-                {:else}
-                  <div class="text-xs text-brand-text-primary font-medium">
-                    <span>{genreLabel}</span>
-                  </div>
-                {/if}
               {/if}
 
               <div
@@ -848,14 +859,6 @@
               >
                 <Play class="w-4 h-4 fill-current" />
                 {i18n.t("artistDetail.playAll")}
-              </Button>
-              <Button
-                onclick={handleShufflePlay}
-                disabled={playlistsStore.activePlaylistTracks.length === 0}
-                variant="secondary"
-              >
-                <Shuffle class="w-4 h-4" />
-                {i18n.t("artistDetail.shuffleAndPlay")}
               </Button>
               {#if isQueue}
                 <Button
@@ -891,32 +894,6 @@
                 >
                   {#snippet icon()}<FolderPlus class="w-4 h-4" />{/snippet}
                 </IconActionButton>
-              {/if}
-              {#if isSmartPlaylist}
-                <Button
-                  onclick={handleEditSmartPlaylist}
-                  variant="secondary"
-                  title={i18n.t("playlists.editSmartPlaylistBtn")}
-                >
-                  <Pencil class="w-4 h-4" />
-                  <span>{i18n.t("playlists.editSmartPlaylistBtn")}</span>
-                </Button>
-              {/if}
-              {#if !isQueue && activePlaylist}
-                <PlaylistSizeLimitControl
-                  playlist={activePlaylist}
-                  deviceName={sizeLimit.deviceName}
-                />
-              {/if}
-              {#if !isActive && activePlaylist && !activePlaylist.dynamic_enabled}
-                <Button
-                  onclick={() => playlistsStore.pinPlaylist(activePlaylist.id)}
-                  variant="accent-soft"
-                  title={i18n.t("playlists.makeActiveBtn")}
-                >
-                  <Radio class="w-4 h-4" />
-                  <span>{i18n.t("playlists.makeActiveBtn")}</span>
-                </Button>
               {/if}
               {#if !isQueue && activePlaylist}
                 <IconActionButton
@@ -955,6 +932,16 @@
                 <MoreIcon class="w-4 h-4" />
               </button>
             </div>
+
+            {#if isSmartPlaylist && activePlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
+              <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
+                <PopulationModeTabs
+                  mode={activePlaylist.population_mode ?? "all"}
+                  disabled={isChangingMode}
+                  onChange={handleChangePopulationMode}
+                />
+              </div>
+            {/if}
           </div>
 
           {#if !windowLayoutStore.isDetailHeaderCollapsed}
@@ -1001,7 +988,20 @@
         </div>
       </div>
 
-      <div class="p-6 flex flex-col pb-dock">
+      <div class="p-6 flex flex-col gap-6 pb-dock">
+        {#if !isSpecialPlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
+          <div class="flex flex-wrap items-center gap-3">
+            {#if rawGenre}
+              <GenreChips genre={rawGenre} variant="full" limit={4} />
+            {:else}
+              <div
+                class="inline-flex items-center px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-xs text-brand-text-secondary italic"
+              >
+                <span>{genreLabel}</span>
+              </div>
+            {/if}
+          </div>
+        {/if}
         <div
           class="border border-brand-border/60 rounded-xl acrylic-chrome relative overflow-hidden"
         >
@@ -1157,6 +1157,51 @@
         showOverflowMenu = false;
       }}
     />
+    {#if isSmartPlaylist}
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={RefreshCw}
+        label={i18n.t("playlists.refreshPlaylistBtn")}
+        disabled={isRefreshing}
+        onclick={() => {
+          handleRefreshSmartPlaylist();
+          showOverflowMenu = false;
+        }}
+      />
+      <ContextMenuItem
+        icon={Pencil}
+        label={i18n.t("playlists.editSmartPlaylistBtn")}
+        onclick={() => {
+          handleEditSmartPlaylist();
+          showOverflowMenu = false;
+        }}
+      />
+    {/if}
+    {#if !isQueue}
+      {#if !isSmartPlaylist}<ContextMenuDivider />{/if}
+      <ContextMenuItem
+        icon={Usb}
+        label={i18n.t("playlists.sizeLimitMenuItem", {
+          value: activePlaylist.size_limit_bytes
+            ? formatStorageSize(activePlaylist.size_limit_bytes)
+            : i18n.t("playlists.sizeLimitNotSet"),
+        })}
+        onclick={() => {
+          showSizeLimitPopover = true;
+          showOverflowMenu = false;
+        }}
+      />
+      {#if !isActive && !activePlaylist.dynamic_enabled}
+        <ContextMenuItem
+          icon={Radio}
+          label={i18n.t("playlists.makeActiveBtn")}
+          onclick={() => {
+            playlistsStore.pinPlaylist(activePlaylist.id);
+            showOverflowMenu = false;
+          }}
+        />
+      {/if}
+    {/if}
     <ContextMenuDivider />
     <ContextMenuItem
       icon={FolderInput}
@@ -1232,9 +1277,22 @@
   </ContextMenu>
 {/if}
 
+{#if activePlaylist && !isQueue}
+  <PlaylistSizeLimitPopover
+    isOpen={showSizeLimitPopover}
+    anchorEl={overflowButtonEl ?? null}
+    limitBytes={activePlaylist.size_limit_bytes ?? null}
+    deviceId={activePlaylist.size_limit_device ?? null}
+    deviceLabel={sizeLimit.deviceName}
+    refreshReorders={activePlaylist.dynamic_enabled && !activePlaylist.sort_field}
+    onApply={(bytes, deviceId) => playlistsStore.setSizeLimit(activePlaylist.id, bytes, deviceId)}
+    onClose={() => (showSizeLimitPopover = false)}
+  />
+{/if}
+
 {#if showShareModal && activePlaylist}
   <ShareModal
-    entity={{ kind: "playlist", title: getPlaylistDisplayName(activePlaylist), songs: shareSongs }}
+    entity={{ kind: "playlist", title: displayTitle, songs: shareSongs }}
     onClose={() => {
       showShareModal = false;
     }}

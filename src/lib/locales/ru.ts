@@ -1510,6 +1510,8 @@ export const ru = {
     autoContinue: "Автопродолжение",
     sizeLimitBtn: "Лимит размера",
     sizeLimitSetBtn: "Лимит {limit}",
+    sizeLimitMenuItem: "Лимит размера: {value}",
+    sizeLimitNotSet: "не задан",
     sizeLimitTitle: "Лимит размера",
     sizeLimitHint:
       "Выберите, сколько места могут занять песни в начале этого списка воспроизведения, например объём флешки. Пунктирная линия покажет, где они перестают помещаться.",
@@ -1544,7 +1546,7 @@ export const ru = {
     unmarkedNotIncluded: "{name} снова включено в подборки",
     notIncludedBadgeTooltip: "Не входит в автосписки и пополнение автовоспроизведения",
     noFilterResults: "Нет песен, соответствующих запросу «{query}»",
-    editSmartPlaylistBtn: "Изменить правила",
+    editSmartPlaylistBtn: "Изменение умного списка",
     smartRulePlaylistLabel: "Умный список с правилами",
     smartRuleBasedTooltip: "Умный список воспроизведения с правилами",
     smartBadgeLabel: "Умный",

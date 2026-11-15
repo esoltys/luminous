@@ -15,7 +15,6 @@
   } from "phosphor-svelte";
   import { stripEnclosingQuotes, type Rule } from "../utils/filterParser";
   import type { QueuePopulationMode } from "../types";
-  import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
   import Button from "./Button.svelte";
@@ -198,7 +197,9 @@
   // capturing the initial value only is intentional here.
   let userHasEditedName = $state(untrack(() => editing !== null));
   let playlistName = $state(untrack(() => editing?.name ?? generateSuggestedName(rules)));
-  let populationMode = $state<QueuePopulationMode>(untrack(() => editing?.populationMode ?? "all"));
+  // The mode is picked on the playlist's own page (its tabs), not here: an edit
+  // keeps the playlist's current mode, a new playlist starts on "all".
+  const populationMode: QueuePopulationMode = untrack(() => editing?.populationMode ?? "all");
 
   $effect(() => {
     if (!userHasEditedName) {
@@ -717,14 +718,6 @@
             </div>
           {/each}
         </div>
-      </div>
-
-      <!-- Queue population mode tabs (#120): applied when this playlist (re)populates -->
-      <div class="flex items-center gap-3 pt-1">
-        <span class="text-xs font-semibold text-brand-text-primary shrink-0"
-          >{i18n.t("playlists.populationModeLabel")}</span
-        >
-        <PopulationModeTabs mode={populationMode} onChange={(m) => (populationMode = m)} />
       </div>
 
       <div class="flex items-center justify-end gap-3 pt-4 border-t border-brand-border/60">
