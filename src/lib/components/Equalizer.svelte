@@ -1,10 +1,12 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { onMount } from "svelte";
   import { onDevScreenHooks } from "../scripting/devHooks";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { loudnessStore } from "../stores/loudness.svelte";
+  import { playerStore } from "../stores/player.svelte";
   import {
     SlidersIcon as Sliders,
     PulseIcon as Activity,
@@ -61,6 +63,8 @@
   /** The backend's `active_preset`: a built-in name, `user:<id>`, or null (Custom). */
   let activePreset = $state<string | null>(null);
   let presetList = $state<EqPresetList>({ builtin: [], user: [] });
+  let eqDeviceName = $state<string | null>(null);
+  const activeDeviceName = $derived(playerStore.audioPipeline?.output_device_name || eqDeviceName);
 
   let presetMenuPos = $state<{ x: number; y: number } | null>(null);
   let presetMenuButtonEl = $state<HTMLButtonElement | undefined>(undefined);
@@ -156,6 +160,8 @@
    * state, and an echo that newer edits have overtaken is not assigned. */
   let applyLoop: Promise<void> | null = null;
   let applyPending = false;
+  // Bumped on device switches so an in-flight apply echo from the old device is ignored.
+  let configEpoch = 0;
 
   function applyConfig(): Promise<void> {
     applyPending = true;
@@ -163,10 +169,11 @@
       try {
         while (applyPending) {
           applyPending = false;
+          const epoch = configEpoch;
           const canonical = await invoke<EqConfig>("apply_equalizer_config", {
             config: { enabled, mode, preamp, gains, parametric },
           });
-          if (applyPending) continue;
+          if (applyPending || epoch !== configEpoch) continue;
           assignConfig(canonical);
           await refreshCurves();
         }
@@ -583,12 +590,47 @@
     ]);
   });
 
-  onMount(async () => {
+  async function loadActiveDeviceName(isActive = () => true) {
+    try {
+      const name = await invoke<string>("get_active_output_device_name");
+      if (isActive() && name) eqDeviceName = name;
+    } catch {
+      // Ignore if backend command is unavailable (e.g. unit tests)
+    }
+  }
+
+  onMount(() => {
+    let active = true;
+    let unlistenEq: (() => void) | undefined;
+    listen<EqConfig>("equalizer-state-changed", async (event) => {
+      if (!active) return;
+      configEpoch++;
+      applyPending = false;
+      assignConfig(event.payload);
+      await Promise.all([
+        refreshCurves(),
+        loadPresetPreviews(),
+        loadActiveDeviceName(() => active),
+      ]);
+    }).then((unlisten) => {
+      if (active) unlistenEq = unlisten;
+      else unlisten();
+    });
+
     loadLoudnessSettings();
     loadFadeSettings();
     loudnessStore.init();
-    await Promise.all([loadConfig(), loadSettingRanges(), loadPresetList()]);
-    await Promise.all([refreshCurves(), loadPresetPreviews()]);
+    Promise.all([
+      loadConfig(),
+      loadSettingRanges(),
+      loadPresetList(),
+      loadActiveDeviceName(() => active),
+    ]).then(() => Promise.all([refreshCurves(), loadPresetPreviews()]));
+
+    return () => {
+      active = false;
+      unlistenEq?.();
+    };
   });
 </script>
 
@@ -613,9 +655,15 @@
           </div>
           <div class="space-y-1 min-w-0">
             <h3 class="font-bold text-sm text-brand-text-primary">
-              {mode === "parametric"
-                ? i18n.t("equalizer.titleParametric")
-                : i18n.t("equalizer.title")}
+              {#if activeDeviceName}
+                {mode === "parametric"
+                  ? i18n.t("equalizer.titleParametricForDevice", { device: activeDeviceName })
+                  : i18n.t("equalizer.titleForDevice", { device: activeDeviceName })}
+              {:else}
+                {mode === "parametric"
+                  ? i18n.t("equalizer.titleParametric")
+                  : i18n.t("equalizer.title")}
+              {/if}
             </h3>
             <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
               {mode === "parametric"

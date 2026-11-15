@@ -624,7 +624,7 @@ describe("PlayerBar.svelte", () => {
     expect(artist.textContent).not.toContain("Test Album");
   });
 
-  it("lists the Mini-player with its Ctrl+M shortcut in the song menu (#2042)", async () => {
+  it("lists the Mini-player with its Ctrl+Shift+M shortcut in the song menu (#2042)", async () => {
     playerStore.currentSong = mockSong;
     const toggleSpy = vi
       .spyOn(windowLayoutStore, "toggleMiniplayerMode")
@@ -632,11 +632,24 @@ describe("PlayerBar.svelte", () => {
     const utils = render(PlayerBar);
 
     await fireEvent.click(utils.getByTitle("Song menu"));
-    expect(utils.getByText("Ctrl+M")).toBeInTheDocument();
+    expect(utils.getByText("Ctrl+Shift+M")).toBeInTheDocument();
     expect(utils.queryByText(/picture-in-picture/i)).toBeNull();
 
     await fireEvent.click(utils.getByText("Mini-player"));
     expect(toggleSpy).toHaveBeenCalled();
+  });
+
+  it("lists Equalizer with its Ctrl+Shift+E shortcut in the song menu", async () => {
+    playerStore.currentSong = mockSong;
+    const { navigationStore } = await import("../stores/navigation.svelte");
+    const openSpy = vi.spyOn(navigationStore, "openSettings");
+    const utils = render(PlayerBar);
+
+    await fireEvent.click(utils.getByTitle("Song menu"));
+    expect(utils.getByText("Ctrl+Shift+E")).toBeInTheDocument();
+
+    await fireEvent.click(utils.getByText("Equalizer"));
+    expect(openSpy).toHaveBeenCalledWith("equalizer");
   });
 
   it("switches the seek bar mode from the song menu (#2042)", async () => {

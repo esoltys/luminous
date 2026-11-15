@@ -5,7 +5,7 @@
 //! Errors are stable codes the frontend maps to translated messages.
 
 use luminous_equalizer::{
-    builtin_preset_name, EqMode, EqualizerState, ModeSettings, ParametricBand,
+    builtin_preset_name, EqMode, Equalizer, EqualizerState, ModeSettings, ParametricBand,
 };
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
@@ -40,9 +40,17 @@ fn other_mode(mode: EqMode) -> EqMode {
     }
 }
 
-/// Saves the whole EQ state. Fire-and-forget — a failed EQ write is invisible
-/// to the user mid-drag and nothing the UI can act on.
-pub fn save_state(conn: &Connection, state: &EqualizerState) {
+struct SerializedState {
+    gains: String,
+    parametric: String,
+    mode: &'static str,
+    active_preamp: f64,
+    active_preset: String,
+    inactive_preamp: f64,
+    inactive_preset: String,
+}
+
+fn serialize_state(state: &EqualizerState) -> SerializedState {
     let gains = state
         .gains
         .iter()
@@ -50,56 +58,29 @@ pub fn save_state(conn: &Connection, state: &EqualizerState) {
         .collect::<Vec<String>>()
         .join(",");
     let parametric = serde_json::to_string(&state.parametric).unwrap_or_default();
-    // The row stores the active mode's preamp/preset and the other mode's
-    // as `inactive_*` (migration 56).
+    // Store the active mode's preamp/preset and the other mode's as `inactive_*` (migration 56).
     let active = state.settings(state.mode);
     let inactive = state.settings(other_mode(state.mode));
-    let result = conn.execute(
-        "UPDATE equalizer_settings
-         SET enabled = ?1, preamp = ?2, gains = ?3, mode = ?4, parametric = ?5,
-             active_preset = ?6, inactive_preamp = ?7, inactive_preset = ?8
-         WHERE id = 1",
-        params![
-            state.enabled,
-            active.preamp as f64,
-            gains,
-            mode_name(state.mode),
-            parametric,
-            active.preset.as_deref().unwrap_or(""),
-            inactive.preamp as f64,
-            inactive.preset.as_deref().unwrap_or(""),
-        ],
-    );
-    if let Err(e) = result {
-        log::warn!("Failed to save equalizer settings: {e}");
+    SerializedState {
+        gains,
+        parametric,
+        mode: mode_name(state.mode),
+        active_preamp: active.preamp as f64,
+        active_preset: active.preset.as_deref().unwrap_or("").to_string(),
+        inactive_preamp: inactive.preamp as f64,
+        inactive_preset: inactive.preset.as_deref().unwrap_or("").to_string(),
     }
 }
 
-/// The saved EQ state, or `None` if the row can't be read. Unreadable
-/// fields fall back rather than failing the whole restore: a bad gain reads
-/// 0 dB, unparseable bands an empty list (the default layout), and a preset
-/// that no longer exists (e.g. the removed built-in "Headphones") Custom.
-pub fn load_state(conn: &Connection) -> Option<EqualizerState> {
-    let (enabled, preamp, gains, mode, parametric, preset, inactive_preamp, inactive_preset) = conn
-        .query_row(
-            "SELECT enabled, preamp, gains, mode, parametric, active_preset,
-                    inactive_preamp, inactive_preset
-             FROM equalizer_settings WHERE id = 1",
-            [],
-            |row| {
-                Ok((
-                    row.get::<_, i32>(0)? != 0,
-                    row.get::<_, f64>(1)? as f32,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, String>(4)?,
-                    row.get::<_, String>(5)?,
-                    row.get::<_, f64>(6)? as f32,
-                    row.get::<_, String>(7)?,
-                ))
-            },
-        )
-        .ok()?;
+fn read_state_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<EqualizerState> {
+    let enabled = row.get::<_, i32>(0)? != 0;
+    let preamp = row.get::<_, f64>(1)? as f32;
+    let gains = row.get::<_, String>(2)?;
+    let mode = row.get::<_, String>(3)?;
+    let parametric = row.get::<_, String>(4)?;
+    let preset = row.get::<_, String>(5)?;
+    let inactive_preamp = row.get::<_, f64>(6)? as f32;
+    let inactive_preset = row.get::<_, String>(7)?;
 
     let mut parsed_gains = [0.0f32; 10];
     for (slot, val) in parsed_gains.iter_mut().zip(gains.split(',')) {
@@ -126,7 +107,7 @@ pub fn load_state(conn: &Connection) -> Option<EqualizerState> {
         EqMode::Graphic10 => (active, inactive),
         EqMode::Parametric => (inactive, active),
     };
-    Some(EqualizerState {
+    Ok(EqualizerState {
         enabled,
         mode,
         gains: parsed_gains,
@@ -134,6 +115,116 @@ pub fn load_state(conn: &Connection) -> Option<EqualizerState> {
         graphic_settings,
         parametric_settings,
     })
+}
+
+/// Saves the whole EQ state. Fire-and-forget — a failed EQ write is invisible
+/// to the user mid-drag and nothing the UI can act on.
+fn save_state(conn: &Connection, state: &EqualizerState) {
+    let s = serialize_state(state);
+    let result = conn.execute(
+        "UPDATE equalizer_settings
+         SET enabled = ?1, preamp = ?2, gains = ?3, mode = ?4, parametric = ?5,
+             active_preset = ?6, inactive_preamp = ?7, inactive_preset = ?8
+         WHERE id = 1",
+        params![
+            state.enabled,
+            s.active_preamp,
+            s.gains,
+            s.mode,
+            s.parametric,
+            s.active_preset,
+            s.inactive_preamp,
+            s.inactive_preset,
+        ],
+    );
+    if let Err(e) = result {
+        log::warn!("Failed to save equalizer settings: {e}");
+    }
+}
+
+/// Saves the EQ state for `device_name` and updates the global fallback row.
+pub fn save_device_state(conn: &Connection, device_name: &str, state: &EqualizerState) {
+    save_state(conn, state);
+    let device = device_name.trim();
+    if device.is_empty() {
+        return;
+    }
+    let s = serialize_state(state);
+    let result = conn.execute(
+        "INSERT OR REPLACE INTO eq_device_settings
+         (device_name, enabled, preamp, gains, mode, parametric,
+          active_preset, inactive_preamp, inactive_preset)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![
+            device,
+            state.enabled,
+            s.active_preamp,
+            s.gains,
+            s.mode,
+            s.parametric,
+            s.active_preset,
+            s.inactive_preamp,
+            s.inactive_preset,
+        ],
+    );
+    if let Err(e) = result {
+        log::warn!("Failed to save equalizer settings for '{device}': {e}");
+    }
+}
+
+/// The saved EQ state, or `None` if the row can't be read. Unreadable
+/// fields fall back rather than failing the whole restore: a bad gain reads
+/// 0 dB, unparseable bands an empty list (the default layout), and a preset
+/// that no longer exists (e.g. the removed built-in "Headphones") Custom.
+fn load_state(conn: &Connection) -> Option<EqualizerState> {
+    conn.query_row(
+        "SELECT enabled, preamp, gains, mode, parametric, active_preset,
+                inactive_preamp, inactive_preset
+         FROM equalizer_settings WHERE id = 1",
+        [],
+        read_state_row,
+    )
+    .ok()
+}
+
+/// Loads the saved EQ state for `device_name`.
+///
+/// If `device_name` has never been saved:
+/// - When `eq_device_settings` is empty (first run after upgrade), inherits the
+///   legacy `equalizer_settings` row and seeds `eq_device_settings` for this
+///   device so future new devices don't inherit it.
+/// - Otherwise, starts clean with `Equalizer::new().state()` (Flat, disabled).
+pub fn load_device_state(conn: &Connection, device_name: &str) -> EqualizerState {
+    let device = device_name.trim();
+    if !device.is_empty() {
+        if let Ok(state) = conn.query_row(
+            "SELECT enabled, preamp, gains, mode, parametric, active_preset,
+                    inactive_preamp, inactive_preset
+             FROM eq_device_settings WHERE device_name = ?1",
+            params![device],
+            read_state_row,
+        ) {
+            return state;
+        }
+    }
+
+    let has_any_device: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM eq_device_settings)",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
+    if !has_any_device {
+        let initial = load_state(conn).unwrap_or_else(|| Equalizer::new().state());
+        if !device.is_empty() {
+            save_device_state(conn, device, &initial);
+        }
+        return initial;
+    }
+
+    Equalizer::new().state()
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -266,6 +357,17 @@ pub fn rename(conn: &Connection, id: i64, name: &str) -> Result<(), String> {
 pub fn delete(conn: &Connection, id: i64) -> Result<(), String> {
     conn.execute("DELETE FROM eq_user_presets WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
+    let key = user_preset_key(id);
+    for table in ["eq_device_settings", "equalizer_settings"] {
+        let _ = conn.execute(
+            &format!("UPDATE {table} SET active_preset = '' WHERE active_preset = ?1"),
+            params![key],
+        );
+        let _ = conn.execute(
+            &format!("UPDATE {table} SET inactive_preset = '' WHERE inactive_preset = ?1"),
+            params![key],
+        );
+    }
     Ok(())
 }
 
@@ -381,5 +483,66 @@ mod tests {
         )
         .unwrap();
         assert_eq!(load_state(&conn).unwrap().parametric_settings.preset, None);
+    }
+
+    #[test]
+    fn device_eq_state_is_isolated_per_device_and_migrates_legacy_once() {
+        let (_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+
+        // Pre-existing global settings before upgrade.
+        let legacy = EqualizerState {
+            enabled: true,
+            mode: EqMode::Graphic10,
+            gains: [2.0; 10],
+            parametric: vec![],
+            graphic_settings: ModeSettings {
+                preamp: -1.0,
+                preset: Some("Rock".into()),
+            },
+            parametric_settings: ModeSettings {
+                preamp: 0.0,
+                preset: Some("Flat".into()),
+            },
+        };
+        save_state(&conn, &legacy);
+
+        // First device seen after upgrade inherits and seeds the legacy state.
+        assert_eq!(load_device_state(&conn, "Internal Speakers"), legacy);
+
+        // A brand-new second device starts clean (Flat, disabled).
+        let bt_default = load_device_state(&conn, "Bluetooth Headphones");
+        assert_eq!(bt_default, Equalizer::new().state());
+        assert!(!bt_default.enabled);
+
+        // Saving a user preset on Bluetooth Headphones doesn't affect Speakers.
+        let pid = create(&conn, "WH-1000XM5", &bands(), -3.0).unwrap();
+        let bt_custom = EqualizerState {
+            enabled: true,
+            mode: EqMode::Parametric,
+            gains: [0.0; 10],
+            parametric: bands(),
+            graphic_settings: ModeSettings {
+                preamp: 0.0,
+                preset: Some("Flat".into()),
+            },
+            parametric_settings: ModeSettings {
+                preamp: -3.0,
+                preset: Some(user_preset_key(pid)),
+            },
+        };
+        save_device_state(&conn, "Bluetooth Headphones", &bt_custom);
+
+        assert_eq!(load_device_state(&conn, "Internal Speakers"), legacy);
+        assert_eq!(load_device_state(&conn, "Bluetooth Headphones"), bt_custom);
+
+        // Deleting the user preset clears its reference even on inactive devices.
+        delete(&conn, pid).unwrap();
+        assert_eq!(
+            load_device_state(&conn, "Bluetooth Headphones")
+                .parametric_settings
+                .preset,
+            None
+        );
     }
 }

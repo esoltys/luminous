@@ -761,6 +761,24 @@ impl AudioEngine {
         self.shared.output_config.read().clone()
     }
 
+    /// When following the system default device, refresh the cached device name
+    /// so idle callers (e.g. opening Equalizer settings while paused) see OS
+    /// default changes without waiting for playback to resume. Returns the new
+    /// device name if it changed.
+    pub fn refresh_default_device(&self) -> Option<String> {
+        let cfg = self.shared.output_config.read().clone();
+        if !is_tracking_default(&cfg) {
+            return None;
+        }
+        let current = get_default_device_name()?;
+        let mut guard = self.shared.output_device_name.write();
+        if guard.as_deref() == Some(current.as_str()) {
+            return None;
+        }
+        *guard = Some(current.clone());
+        Some(current)
+    }
+
     /// The engine's event stream, handed out once: the first call returns
     /// it, later calls `None`. Drain it on a dedicated thread (blocking on
     /// `Receiver::iter()`), not while holding a lock on the engine.
@@ -1067,11 +1085,128 @@ impl AudioOutput {
     }
 }
 
+/// Both modes on the WASAPI endpoints follow the system default when no
+/// device is chosen; an ASIO driver is never "the default".
+fn is_tracking_default(cfg: &AudioOutputConfig) -> bool {
+    matches!(
+        cfg.backend,
+        AudioBackendKind::Cpal | AudioBackendKind::WasapiExclusive
+    ) && cfg.device_id.is_none()
+}
+
 fn get_default_device_name() -> Option<String> {
     use cpal::traits::HostTrait;
     let host = cpal::default_host();
-    let device = host.default_output_device()?;
-    Some(device.to_string())
+    match host.default_output_device() {
+        Some(device) => Some(resolve_default_device_name(&device)),
+        None => {
+            #[cfg(target_os = "linux")]
+            {
+                query_wpctl_default_sink().or_else(query_pactl_default_sink)
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                None
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn is_virtual_sound_server_alias(name: &str) -> bool {
+    let lower = name.trim().to_ascii_lowercase();
+    matches!(
+        lower.as_str(),
+        "default"
+            | "default audio device"
+            | "pipewire"
+            | "pipewire sound server"
+            | "pulse"
+            | "pulseaudio"
+            | "pulseaudio sound server"
+            | "alsa:default"
+            | "alsa:pipewire"
+            | "alsa:pulse"
+    ) || lower.starts_with("default:")
+        || lower.starts_with("pipewire:")
+        || lower.starts_with("pulse:")
+        || lower.starts_with("default alsa output")
+}
+
+#[cfg(target_os = "linux")]
+fn is_virtual_default_device(device: &cpal::Device) -> bool {
+    use cpal::traits::DeviceTrait;
+    let id_is_virtual = device
+        .id()
+        .ok()
+        .is_some_and(|id| is_virtual_sound_server_alias(&id.to_string()));
+    id_is_virtual || is_virtual_sound_server_alias(&device_display_name(device))
+}
+
+/// On Linux, CPAL's default device is usually the virtual ALSA `"default"` /
+/// `"Default Audio Device"` or `"pipewire"`/`"pulse"` PCM, whose name never
+/// changes when PipeWire/PulseAudio switches between speakers and Bluetooth
+/// headphones. Resolve the active default sink's human-readable name so
+/// device-change tracking works.
+#[cfg(target_os = "linux")]
+fn resolve_default_device_name(device: &cpal::Device) -> String {
+    let cpal_name = device_display_name(device);
+    if !is_virtual_default_device(device) {
+        return cpal_name;
+    }
+    query_wpctl_default_sink()
+        .or_else(query_pactl_default_sink)
+        .unwrap_or(cpal_name)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn resolve_default_device_name(device: &cpal::Device) -> String {
+    device_display_name(device)
+}
+
+#[cfg(target_os = "linux")]
+fn parse_wpctl_default_sink(text: &str) -> Option<String> {
+    let mut node_name = None;
+    for line in text.lines() {
+        let trimmed = line.trim().trim_start_matches('*').trim();
+        if let Some(val) = trimmed.strip_prefix("node.description = ") {
+            let desc = val.trim().trim_matches('"').trim();
+            if !desc.is_empty() {
+                return Some(desc.to_string());
+            }
+        } else if let Some(val) = trimmed.strip_prefix("node.name = ") {
+            let name = val.trim().trim_matches('"').trim();
+            if !name.is_empty() {
+                node_name = Some(name.to_string());
+            }
+        }
+    }
+    node_name
+}
+
+#[cfg(target_os = "linux")]
+fn query_wpctl_default_sink() -> Option<String> {
+    let out = std::process::Command::new("wpctl")
+        .args(["inspect", "@DEFAULT_AUDIO_SINK@"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    parse_wpctl_default_sink(&String::from_utf8_lossy(&out.stdout))
+}
+
+#[cfg(target_os = "linux")]
+fn query_pactl_default_sink() -> Option<String> {
+    let out = std::process::Command::new("pactl")
+        .arg("get-default-sink")
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!name.is_empty()).then_some(name)
 }
 
 /// The device to open for the system default output.
@@ -1192,7 +1327,7 @@ fn resolve_cpal_device(
     }
     let device = select_output_device(host)?;
     Ok(ResolvedDevice {
-        name: Some(device_display_name(&device)),
+        name: Some(resolve_default_device_name(&device)),
         device,
         stands_in: requested_id.is_some(),
     })
@@ -2120,27 +2255,42 @@ fn check_and_rebuild_output(
         .unwrap_or(false);
 
     let output_cfg = shared.output_config.read().clone();
-    // Both modes on the WASAPI endpoints follow the system default when no
-    // device is chosen; an ASIO driver is never "the default".
-    let is_tracking_default = matches!(
-        output_cfg.backend,
-        AudioBackendKind::Cpal | AudioBackendKind::WasapiExclusive
-    ) && output_cfg.device_id.is_none();
+    let is_tracking_default = is_tracking_default(&output_cfg);
 
     let check_due =
         now.duration_since(session.last_device_check) >= std::time::Duration::from_millis(500);
 
-    let default_changed = if is_tracking_default && (check_due || stream_errored) {
-        session.last_device_check = now;
-        let current_dev_name = get_default_device_name();
-        let old_dev_name = output.as_ref().and_then(|o| o.device_name.clone());
-        current_dev_name != old_dev_name
-    } else {
-        if check_due {
+    let (default_changed, new_default_name) =
+        if is_tracking_default && (check_due || stream_errored) {
             session.last_device_check = now;
+            let current_dev_name = get_default_device_name();
+            let old_dev_name = output.as_ref().and_then(|o| o.device_name.clone());
+            (current_dev_name != old_dev_name, current_dev_name)
+        } else {
+            if check_due {
+                session.last_device_check = now;
+            }
+            (false, None)
+        };
+
+    // On Linux, PipeWire/PulseAudio reroutes the virtual "default" ALSA stream
+    // seamlessly when the default sink changes, so we only need to publish the
+    // new device name and notify the app (no stream teardown/glitch).
+    #[cfg(target_os = "linux")]
+    if default_changed && !force_rebuild && !stream_errored {
+        use cpal::traits::HostTrait;
+        let is_virtual = cpal::default_host()
+            .default_output_device()
+            .is_some_and(|d| is_virtual_default_device(&d));
+        if is_virtual {
+            if let Some(out) = output.as_mut() {
+                out.device_name = new_default_name.clone();
+                *shared.output_device_name.write() = new_default_name;
+                let _ = event_tx.send(AudioEvent::PipelineChanged);
+                return DeviceCheckOutcome::Ok;
+            }
         }
-        false
-    };
+    }
 
     // Only polled while standing in, so the enumeration costs nothing in the
     // usual case.
@@ -3528,5 +3678,37 @@ mod tests {
         assert!(is_fatal_cpal_error(&cpal::Error::new(
             cpal::ErrorKind::Other
         )));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_virtual_alias_and_wpctl_parsing() {
+        assert!(is_virtual_sound_server_alias("Default Audio Device"));
+        assert!(is_virtual_sound_server_alias("alsa:default"));
+        assert!(is_virtual_sound_server_alias("PipeWire Sound Server"));
+        assert!(is_virtual_sound_server_alias("default"));
+        assert!(is_virtual_sound_server_alias(
+            "Default ALSA Output (currently PipeWire Media Server)"
+        ));
+        assert!(!is_virtual_sound_server_alias("soundcore Liberty 5"));
+        assert!(!is_virtual_sound_server_alias(
+            "HDA Intel PCH, ALC289 Analog"
+        ));
+
+        let sample = "\
+id 76, type PipeWire:Interface:Node
+  * node.description = \"soundcore Liberty 5\"
+  * node.name = \"bluez_output.90_BF_D9_68_B3_7E.1\"
+";
+        assert_eq!(
+            parse_wpctl_default_sink(sample).as_deref(),
+            Some("soundcore Liberty 5")
+        );
+
+        let no_desc = "  * node.name = \"alsa_output.pci-0000_00_1f.3.analog-stereo\"\n";
+        assert_eq!(
+            parse_wpctl_default_sink(no_desc).as_deref(),
+            Some("alsa_output.pci-0000_00_1f.3.analog-stereo")
+        );
     }
 }

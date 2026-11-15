@@ -406,7 +406,7 @@ describe("Miniplayer.svelte", () => {
       expect(getByText("2 songs played")).toBeInTheDocument();
       expect(getByTitle("Shuffle Library")).toBeInTheDocument();
       expect(getByTitle("Replay")).toBeInTheDocument();
-      expect(getAllByTitle("Restore Full Window (Ctrl+M)").length).toBeGreaterThan(0);
+      expect(getAllByTitle("Restore Full Window (Ctrl+Shift+M)").length).toBeGreaterThan(0);
       expect(queryByText("Nothing playing")).toBeNull();
     });
 

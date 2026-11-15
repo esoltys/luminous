@@ -1715,7 +1715,7 @@ export const it = {
   },
   miniplayer: {
     title: "Miniplayer",
-    exit: "Ripristina finestra intera (Ctrl+M)",
+    exit: "Ripristina finestra intera (Ctrl+Shift+M)",
     dragHint: "Trascina la finestra",
     showLyrics: "Mostra testo in tempo reale",
     showCoverArt: "Mostra copertina",
@@ -1950,6 +1950,8 @@ export const it = {
     enableEq: "Attiva EQ",
     subtitle: "Aumenta o riduci bassi, medi e alti",
     titleParametric: "Equalizzatore parametrico",
+    titleForDevice: "Equalizzatore grafico a 10 bande per {device}",
+    titleParametricForDevice: "Equalizzatore parametrico per {device}",
     subtitleParametric:
       "Applica correzioni precise con il tipo di filtro, il guadagno e il Q di ogni banda",
     modeLabel: "Modalità",
@@ -2819,6 +2821,7 @@ export const it = {
     toggleImmersive: "Attiva/disattiva modalità immersiva",
     toggleRightPanel: "Mostra/nascondi pannello destro",
     toggleMiniplayer: "Attiva/disattiva miniplayer",
+    openEqualizer: "Apri impostazioni equalizzatore",
     openSettings: "Apri Impostazioni",
     showShortcuts: "Mostra questo elenco",
     footnote:

@@ -212,7 +212,7 @@
   }
 
   function handleKeyDown(e: KeyboardEvent) {
-    // Ctrl/Cmd+M is handled globally by +layout.svelte's toggleMiniplayerMode
+    // Ctrl/Cmd+Shift+M is handled globally by +layout.svelte's toggleMiniplayerMode
     // listener. Handling it here too would double-fire on every press (this
     // handler exits, then the still-bubbling event reaches the global one,
     // which sees the just-cleared isMiniplayer flag and re-enters) — so only
@@ -894,7 +894,7 @@
           <button
             onclick={() => windowLayoutStore.exitMiniplayerMode()}
             class="p-1 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-border/40 rounded transition-colors"
-            title={i18n.t("miniplayer.exit", {}, "Restore Full Window (Ctrl+M)")}
+            title={i18n.t("miniplayer.exit", {}, "Restore Full Window (Ctrl+Shift+M)")}
           >
             <Maximize2 class="w-3.5 h-3.5" />
           </button>

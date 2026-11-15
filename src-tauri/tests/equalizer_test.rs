@@ -150,6 +150,7 @@ fn test_import_autoeq_profile() {
 
     let res = import_profile_into(
         &env.db,
+        "Test Device",
         &mut env.equalizer,
         &text,
         "Anker Soundcore Life Q20",
@@ -179,7 +180,13 @@ fn test_reject_profile_with_unsupported_filters() {
     let before_config = env.equalizer.config();
 
     let text = "Preamp: -3 dB\nFilter 1: ON PK Fc 100 Hz Gain 2 dB Q 1\nFilter 2: ON LP Fc 80 Hz\n";
-    let res = import_profile_into(&env.db, &mut env.equalizer, text, "Unsupported");
+    let res = import_profile_into(
+        &env.db,
+        "Test Device",
+        &mut env.equalizer,
+        text,
+        "Unsupported",
+    );
 
     let err = res.expect_err("import should fail for unsupported filter");
     let json: serde_json::Value = serde_json::from_str(&err).unwrap();

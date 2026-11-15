@@ -1842,7 +1842,7 @@ export const ru = {
   },
   miniplayer: {
     title: "Мини-проигрыватель",
-    exit: "Вернуть полное окно (Ctrl+M)",
+    exit: "Вернуть полное окно (Ctrl+Shift+M)",
     dragHint: "Перетащить окно",
     showLyrics: "Показать текст в реальном времени",
     showCoverArt: "Показать обложку",
@@ -2084,6 +2084,8 @@ export const ru = {
     enableEq: "Включить эквалайзер",
     subtitle: "Усиливайте или ослабляйте низкие, средние и высокие частоты",
     titleParametric: "Параметрический эквалайзер",
+    titleForDevice: "10-полосный графический эквалайзер для {device}",
+    titleParametricForDevice: "Параметрический эквалайзер для {device}",
     subtitleParametric:
       "Выполняйте точную коррекцию: у каждой полосы свой тип фильтра, усиление и добротность",
     modeLabel: "Режим",
@@ -3000,6 +3002,7 @@ export const ru = {
     toggleImmersive: "Переключить режим погружения",
     toggleRightPanel: "Показать или скрыть правую панель",
     toggleMiniplayer: "Переключить мини-проигрыватель",
+    openEqualizer: "Открыть настройки эквалайзера",
     openSettings: "Открыть параметры",
     showShortcuts: "Показать этот список",
     footnote:

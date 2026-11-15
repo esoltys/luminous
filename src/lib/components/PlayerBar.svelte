@@ -55,6 +55,7 @@
     WaveformIcon as AudioWaveform,
     PaletteIcon as Palette,
     PictureInPictureIcon as PictureInPicture,
+    SlidersIcon as Sliders,
     DiscIcon as DiscAlbum,
     MicrophoneStageIcon as Mic2,
     PlaylistIcon as ListMusic,
@@ -707,9 +708,19 @@
         />
       {/if}
       <ContextMenuItem
+        icon={Sliders}
+        label={i18n.t("settings.tabEqualizer", {}, "Equalizer")}
+        shortcut={`${ctrlKey}+Shift+E`}
+        onclick={() =>
+          chooseMenuItem(() => {
+            windowLayoutStore.exitImmersiveMode();
+            navigationStore.openSettings("equalizer");
+          })}
+      />
+      <ContextMenuItem
         icon={PictureInPicture}
         label={i18n.t("playerBar.menuMiniplayer", {}, "Mini-player")}
-        shortcut={`${ctrlKey}+M`}
+        shortcut={`${ctrlKey}+Shift+M`}
         onclick={() => chooseMenuItem(() => windowLayoutStore.toggleMiniplayerMode())}
       />
       {#if !windowLayoutStore.isPlayerBarCompact}

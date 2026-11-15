@@ -1673,7 +1673,7 @@ export const en = {
   },
   miniplayer: {
     title: "Miniplayer",
-    exit: "Restore Full Window (Ctrl+M)",
+    exit: "Restore Full Window (Ctrl+Shift+M)",
     dragHint: "Drag window",
     showLyrics: "Show Live Lyrics",
     showCoverArt: "Show Cover Art",
@@ -1902,6 +1902,8 @@ export const en = {
     enableEq: "Enable EQ",
     subtitle: "Boost or cut bass, mids and treble",
     titleParametric: "Parametric Equalizer",
+    titleForDevice: "10-Band Graphic Equalizer for {device}",
+    titleParametricForDevice: "Parametric Equalizer for {device}",
     subtitleParametric: "Sculpt precise corrections with each band's own filter type, gain and Q",
     modeLabel: "Mode",
     modeGraphic: "10-band",
@@ -2751,6 +2753,7 @@ export const en = {
     toggleImmersive: "Toggle immersion mode",
     toggleRightPanel: "Toggle right panel",
     toggleMiniplayer: "Toggle miniplayer",
+    openEqualizer: "Open Equalizer settings",
     openSettings: "Open Settings",
     showShortcuts: "Show this list",
     footnote:

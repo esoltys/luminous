@@ -1729,7 +1729,7 @@ export const fr: DeepStringRecord<typeof en> = {
   },
   miniplayer: {
     title: "Mini-lecteur",
-    exit: "Restaurer la fenêtre principale (Ctrl+M)",
+    exit: "Restaurer la fenêtre principale (Ctrl+Shift+M)",
     dragHint: "Déplacer la fenêtre",
     showLyrics: "Afficher les paroles synchronisées",
     showCoverArt: "Afficher la pochette",
@@ -2065,6 +2065,8 @@ export const fr: DeepStringRecord<typeof en> = {
     enableEq: "Activer l'égaliseur",
     subtitle: "Augmentez ou réduisez les graves, les médiums et les aigus",
     titleParametric: "Égaliseur paramétrique",
+    titleForDevice: "Égaliseur graphique 10 bandes pour {device}",
+    titleParametricForDevice: "Égaliseur paramétrique pour {device}",
     subtitleParametric:
       "Sculptez des corrections précises avec le type de filtre, le gain et le Q propres à chaque bande",
     modeLabel: "Mode",
@@ -2837,6 +2839,7 @@ export const fr: DeepStringRecord<typeof en> = {
     toggleImmersive: "Basculer le mode immersion",
     toggleRightPanel: "Basculer le panneau droit",
     toggleMiniplayer: "Basculer le mini-lecteur",
+    openEqualizer: "Ouvrir l'égaliseur",
     openSettings: "Ouvrir les paramètres",
     showShortcuts: "Afficher cette liste",
     footnote:
