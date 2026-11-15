@@ -141,41 +141,31 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(navigationStore.activeTab).toBe("collection");
   });
 
-  it("retains view on Shuffle while updating playback and queue", async () => {
-    const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist");
-    const playSongsSpy = vi.spyOn(playerStore, "playSongs");
-    const setShuffleSpy = vi.spyOn(playerStore, "setShuffleMode");
-
-    const { getByText } = render(AlbumDetailView, {
+  it("does not render Shuffle or + buttons in the quietened header", async () => {
+    const { queryByRole, queryByTitle } = render(AlbumDetailView, {
       props: { albumName: mockAlbumName },
     });
 
-    // Wait for songs to load
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Find the "Shuffle" button exactly
-    const shuffleButton = getByText("Shuffle").closest("button")!;
-    await fireEvent.click(shuffleButton);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    expect(setShuffleSpy).toHaveBeenCalledWith("off");
-    expect(playSongsSpy).toHaveBeenCalled();
-    expect(viewPlaylistSpy).not.toHaveBeenCalled();
-    expect(navigationStore.activeTab).toBe("collection");
+    expect(queryByRole("button", { name: /^Play$/i })).toBeTruthy();
+    expect(queryByRole("button", { name: /^Shuffle$/i })).toBeNull();
+    expect(queryByTitle("Add all songs to Queue")).toBeNull();
   });
 
-  it("adds all album songs to Queue when clicking the + button with no active custom playlist", async () => {
+  it("adds all album songs to Queue from the overflow menu", async () => {
     playlistsStore.activeCustomPlaylist = null;
     const addSongsSpy = vi.spyOn(playlistsStore, "addSongsToQueue");
 
-    const { getByTitle } = render(AlbumDetailView, {
+    const { getByTitle, findByText } = render(AlbumDetailView, {
       props: { albumName: mockAlbumName },
     });
 
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const addButton = getByTitle("Add all songs to Queue");
-    await fireEvent.click(addButton);
+    await fireEvent.click(getByTitle("More actions"));
+    const addToQueueItem = await findByText("Add to Queue");
+    await fireEvent.click(addToQueueItem);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(addSongsSpy).toHaveBeenCalledWith([1, 2]);

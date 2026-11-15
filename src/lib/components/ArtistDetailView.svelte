@@ -9,7 +9,6 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
-  import { shuffleArray } from "../utils/shuffle";
   import { formatDuration, formatHoursMinutes } from "../utils/formatters";
   import CoverArt from "./CoverArt.svelte";
   import CoverMosaic from "./CoverMosaic.svelte";
@@ -26,15 +25,18 @@
   import { prefs, type CollectionViewMode } from "../stores/prefs.svelte";
   import TagEditor from "./TagEditor.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
+  import Button from "./Button.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import CardSection from "./CardSection.svelte";
-  import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import ArtistProfileEditor from "./ArtistProfileEditor.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
+  import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import {
+    PlayIcon as Play,
+    StackIcon as Layers,
     PencilSimpleIcon as Edit3,
     ArrowSquareOutIcon as OpenInPicard,
     ArrowsClockwiseIcon as RefreshCw,
@@ -48,7 +50,7 @@
   } from "phosphor-svelte";
   import MoreIcon from "./MoreIcon.svelte";
   import { contextStore, entitySubject } from "../stores/context.svelte";
-  import { startArtistRadio } from "../utils/playlist";
+  import { addArtistToQueue, startArtistRadio } from "../utils/playlist";
   import ShareModal from "./ShareModal.svelte";
   import type {
     Song,
@@ -90,7 +92,7 @@
   let singleContextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
   // "Not included" tracks stay visible/individually playable but drop out of
-  // the whole-artist Play/Shuffle Play actions (#104).
+  // the whole-artist Play actions (#104).
   let playableSongs = $derived(songs.filter((s) => !s.not_included));
   let editingSongId = $state<number | null>(null);
   /** A multi-song selection open in the batch tag editor. */
@@ -727,18 +729,6 @@
     }
   }
 
-  async function handleShufflePlay() {
-    if (playableSongs.length === 0) return;
-    const queuePl = await playlistsStore.requireQueue();
-    const shuffledIds = shuffleArray(playableSongs.map((s) => s.id));
-    await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
-    if (queuePl) {
-      playlistsStore.selectPlaylist(queuePl.id);
-      navigationStore.viewPlaylist(queuePl.id);
-    }
-  }
-
   async function handleStartArtistRadio() {
     await startArtistRadio(artistName);
     const queuePl = playlistsStore.queuePlaylist;
@@ -794,18 +784,14 @@
             ? ''
             : 'mt-3'} select-none"
         >
-          <PlayShuffleButtons
-            onPlayAll={handlePlayAll}
-            onShufflePlay={handleShufflePlay}
+          <Button
+            onclick={handlePlayAll}
             disabled={loading || songs.length === 0}
-          />
-          <IconActionButton
-            onclick={handleStartArtistRadio}
-            title={i18n.t("artistDetail.startArtistRadio", {}, "Start Artist Radio")}
-            disabled={loading || songs.length === 0}
+            variant="primary"
           >
-            {#snippet icon()}<Radio class="w-4 h-4" />{/snippet}
-          </IconActionButton>
+            <Play class="w-4 h-4" weight="fill" />
+            {i18n.t("artistDetail.playAll")}
+          </Button>
           <IconActionButton
             onclick={() => pinnedStore.toggle("artist", artistName)}
             title={pinnedStore.isPinned("artist", artistName)
@@ -1156,6 +1142,25 @@
     }}
   >
     <ContextMenuItem
+      icon={Radio}
+      label={i18n.t("artistDetail.startArtistRadio", {}, "Start Artist Radio")}
+      onclick={() => {
+        handleStartArtistRadio();
+        overflowMenuPos = null;
+      }}
+      disabled={loading || songs.length === 0}
+    />
+    <ContextMenuItem
+      icon={Layers}
+      label={i18n.t("playlists.contextMenuAddQueue", {}, "Add to Queue")}
+      onclick={() => {
+        addArtistToQueue(artistName);
+        overflowMenuPos = null;
+      }}
+      disabled={loading || songs.length === 0}
+    />
+    <ContextMenuDivider />
+    <ContextMenuItem
       icon={Edit3}
       label={i18n.t("artistDetail.editArtistDetails", {}, "Edit Artist Details")}
       onclick={() => {
@@ -1172,23 +1177,6 @@
         overflowMenuPos = null;
       }}
       disabled={loading || collectionStore.isScanning || refreshing}
-    />
-    <ContextMenuItem
-      icon={OpenInPicard}
-      label={i18n.t("picard.openAllInPicard")}
-      onclick={() => {
-        handleOpenAllInPicard();
-        overflowMenuPos = null;
-      }}
-      disabled={loading ||
-        songs.length === 0 ||
-        !picardStore.available ||
-        songs.every(isRemoteSource)}
-      title={!picardStore.available
-        ? i18n.t("picard.notFoundTooltip")
-        : songs.length > 0 && songs.every(isRemoteSource)
-          ? i18n.t("picard.remoteNotSupportedTooltip")
-          : undefined}
     />
     {#if prefs.onlineEnabled}
       <ContextMenuItem
@@ -1232,6 +1220,25 @@
         disabled={loading || retrievingImage || !hasMusicbrainzArtistId}
       />
     {/if}
+    <ContextMenuDivider />
+    <ContextMenuItem
+      icon={OpenInPicard}
+      label={i18n.t("picard.openAllInPicard")}
+      onclick={() => {
+        handleOpenAllInPicard();
+        overflowMenuPos = null;
+      }}
+      disabled={loading ||
+        songs.length === 0 ||
+        !picardStore.available ||
+        songs.every(isRemoteSource)}
+      title={!picardStore.available
+        ? i18n.t("picard.notFoundTooltip")
+        : songs.length > 0 && songs.every(isRemoteSource)
+          ? i18n.t("picard.remoteNotSupportedTooltip")
+          : undefined}
+    />
+    <ContextMenuDivider />
     <ContextMenuItem
       icon={BarChart2}
       label={statsExclusionsStore.isExcluded("artist", artistName)

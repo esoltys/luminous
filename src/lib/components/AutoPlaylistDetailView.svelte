@@ -22,7 +22,6 @@
   import { tagsStore } from "../stores/tags.svelte";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
-  import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import Input from "./Input.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -30,9 +29,10 @@
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ShareModal from "./ShareModal.svelte";
-  import PlaylistSizeLimitControl from "./PlaylistSizeLimitControl.svelte";
+  import PlaylistSizeLimitPopover from "./PlaylistSizeLimitPopover.svelte";
   import { PlaylistSizeLimit } from "../utils/sizeFit.svelte";
   import {
+    PlayIcon as Play,
     PlusIcon as Plus,
     FolderPlusIcon as FolderPlus,
     MusicNotesIcon as Music,
@@ -46,9 +46,9 @@
     PushPinSlashIcon as PinOff,
     ArrowSquareOutIcon as OpenInPicard,
     ShareNetworkIcon as Share,
+    UsbIcon as Usb,
   } from "phosphor-svelte";
   import MoreIcon from "./MoreIcon.svelte";
-  import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -63,7 +63,7 @@
   import { openInPicard } from "../utils/picard";
   import { picardStore } from "../stores/picard.svelte";
   import { compareSongs } from "../utils/songSort";
-  import { toTitleCase, formatHoursMinutes } from "../utils/formatters";
+  import { toTitleCase, formatHoursMinutes, formatStorageSize } from "../utils/formatters";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
@@ -554,18 +554,6 @@
     }
   }
 
-  async function handleShufflePlay() {
-    if (songs.length === 0) return;
-    const queuePl = await playlistsStore.requireQueue();
-    const shuffledIds = shuffleArray(songs.map((s) => s.id));
-    await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
-    if (queuePl) {
-      playlistsStore.selectPlaylist(queuePl.id);
-      navigationStore.viewPlaylist(queuePl.id);
-    }
-  }
-
   async function handleAddSongToPlaylist(songId: number) {
     const songObj = songs.find((s) => s.id === songId);
     await playlistsStore.addSongsToActiveTarget([songId], songObj?.title || "Song");
@@ -735,6 +723,8 @@
   }
 
   let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
+  let overflowButtonEl = $state<HTMLButtonElement | undefined>(undefined);
+  let showSizeLimitPopover = $state(false);
 
   function toggleOverflowMenu(event: MouseEvent) {
     const btn = event.currentTarget as HTMLElement;
@@ -883,12 +873,15 @@
         {/if}
 
         <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
-          <PlayShuffleButtons
-            onPlayAll={handlePlayAll}
-            onShufflePlay={handleShufflePlay}
+          <Button
+            onclick={handlePlayAll}
             disabled={loading || songs.length === 0}
+            variant="primary"
             class="shrink-0"
-          />
+          >
+            <Play class="w-4 h-4" weight="fill" />
+            {i18n.t("artistDetail.playAll")}
+          </Button>
           <IconActionButton
             onclick={() => pinnedStore.toggle("auto_playlist", pinRefKey)}
             title={pinnedStore.isPinned("auto_playlist", pinRefKey)
@@ -914,10 +907,8 @@
           >
             {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
           </IconActionButton>
-          {#if listedPlaylist}
-            <PlaylistSizeLimitControl playlist={listedPlaylist} deviceName={sizeLimit.deviceName} />
-          {/if}
           <button
+            bind:this={overflowButtonEl}
             onclick={toggleOverflowMenu}
             title={i18n.t("playlists.moreActionsTooltip")}
             class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs shrink-0 cursor-pointer"
@@ -1125,6 +1116,34 @@
         overflowMenuPos = null;
       }}
     />
+    {#if listedPlaylist || ((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined)}
+      <ContextMenuDivider />
+      {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined}
+        <ContextMenuItem
+          icon={RefreshCw}
+          label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}
+          onclick={() => {
+            handleRefreshAutoPlaylist();
+            overflowMenuPos = null;
+          }}
+          disabled={loading || isRefreshing}
+        />
+      {/if}
+      {#if listedPlaylist}
+        <ContextMenuItem
+          icon={Usb}
+          label={i18n.t("playlists.sizeLimitMenuItem", {
+            value: listedPlaylist.size_limit_bytes
+              ? formatStorageSize(listedPlaylist.size_limit_bytes)
+              : i18n.t("playlists.sizeLimitNotSet"),
+          })}
+          onclick={() => {
+            showSizeLimitPopover = true;
+            overflowMenuPos = null;
+          }}
+        />
+      {/if}
+    {/if}
     <ContextMenuDivider />
     <ContextMenuItem
       icon={Plus}
@@ -1148,17 +1167,6 @@
       }}
       disabled={loading || songs.length === 0}
     />
-    {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined}
-      <ContextMenuItem
-        icon={RefreshCw}
-        label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}
-        onclick={() => {
-          handleRefreshAutoPlaylist();
-          overflowMenuPos = null;
-        }}
-        disabled={loading || isRefreshing}
-      />
-    {/if}
 
     {#if kind === "missing_metadata" || kind === "missing_musicbrainz"}
       {@const picardTargets =
@@ -1196,6 +1204,19 @@
       />
     {/if}
   </ContextMenu>
+{/if}
+
+{#if listedPlaylist}
+  <PlaylistSizeLimitPopover
+    isOpen={showSizeLimitPopover}
+    anchorEl={overflowButtonEl ?? null}
+    limitBytes={listedPlaylist.size_limit_bytes ?? null}
+    deviceId={listedPlaylist.size_limit_device ?? null}
+    deviceLabel={sizeLimit.deviceName}
+    refreshReorders={listedPlaylist.dynamic_enabled && !listedPlaylist.sort_field}
+    onApply={(bytes, deviceId) => playlistsStore.setSizeLimit(listedPlaylist.id, bytes, deviceId)}
+    onClose={() => (showSizeLimitPopover = false)}
+  />
 {/if}
 
 {#if showShareModal}
