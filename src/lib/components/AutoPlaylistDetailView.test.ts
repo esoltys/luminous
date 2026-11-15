@@ -90,7 +90,7 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
   const genreView = { kind: "genre" as const, genre: "Synthwave", playlistId: 5 };
 
   it("draws the backing playlist's break above the first song that doesn't fit", async () => {
-    const { findByRole, getByText, getByRole } = render(AutoPlaylistDetailView, {
+    const { findByRole, getByText, getByTitle, queryByRole } = render(AutoPlaylistDetailView, {
       view: genreView,
     });
     const brk = await findByRole("separator", {
@@ -98,7 +98,10 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
     });
     expect(brk.nextElementSibling).toHaveTextContent("Track Three");
     expect(getByText("12.4 GB of 16 GB used")).toBeInTheDocument();
-    expect(getByRole("button", { name: /Limit 16 GB/ })).toBeInTheDocument();
+    expect(queryByRole("button", { name: /Limit 16 GB/ })).toBeNull();
+
+    await fireEvent.click(getByTitle("More actions"));
+    expect(await findByRole("menuitem", { name: /16 GB/ })).toBeInTheDocument();
   });
 
   it("hides the break when the fit was computed for a different order", async () => {
@@ -181,11 +184,14 @@ describe("AutoPlaylistDetailView genre aliases (#1994)", () => {
     expect(queryByText("Includes aliases")).toBeNull();
   });
 
-  it("renders Play without Shuffle in the quietened header (#2119)", async () => {
-    const { findByRole, queryByRole } = render(AutoPlaylistDetailView, {
+  it("renders Play without Shuffle and moves Size Limit into the overflow menu (#2119)", async () => {
+    const { findByRole, findByTitle, findByText, queryByRole } = render(AutoPlaylistDetailView, {
       view: { kind: "genre" as const, genre: "Synthwave", playlistId: 5 },
     });
     expect(await findByRole("button", { name: /^Play$/i })).toBeInTheDocument();
     expect(queryByRole("button", { name: /^Shuffle$/i })).toBeNull();
+
+    await fireEvent.click(await findByTitle("More actions"));
+    expect(await findByText(/Size Limit:/i)).toBeInTheDocument();
   });
 });

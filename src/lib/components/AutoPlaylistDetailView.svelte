@@ -29,7 +29,7 @@
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ShareModal from "./ShareModal.svelte";
-  import PlaylistSizeLimitControl from "./PlaylistSizeLimitControl.svelte";
+  import PlaylistSizeLimitPopover from "./PlaylistSizeLimitPopover.svelte";
   import { PlaylistSizeLimit } from "../utils/sizeFit.svelte";
   import {
     PlayIcon as Play,
@@ -46,6 +46,7 @@
     PushPinSlashIcon as PinOff,
     ArrowSquareOutIcon as OpenInPicard,
     ShareNetworkIcon as Share,
+    UsbIcon as Usb,
   } from "phosphor-svelte";
   import MoreIcon from "./MoreIcon.svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
@@ -62,7 +63,7 @@
   import { openInPicard } from "../utils/picard";
   import { picardStore } from "../stores/picard.svelte";
   import { compareSongs } from "../utils/songSort";
-  import { toTitleCase, formatHoursMinutes } from "../utils/formatters";
+  import { toTitleCase, formatHoursMinutes, formatStorageSize } from "../utils/formatters";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
@@ -722,6 +723,8 @@
   }
 
   let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
+  let overflowButtonEl = $state<HTMLButtonElement | undefined>(undefined);
+  let showSizeLimitPopover = $state(false);
 
   function toggleOverflowMenu(event: MouseEvent) {
     const btn = event.currentTarget as HTMLElement;
@@ -904,10 +907,8 @@
           >
             {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
           </IconActionButton>
-          {#if listedPlaylist}
-            <PlaylistSizeLimitControl playlist={listedPlaylist} deviceName={sizeLimit.deviceName} />
-          {/if}
           <button
+            bind:this={overflowButtonEl}
             onclick={toggleOverflowMenu}
             title={i18n.t("playlists.moreActionsTooltip")}
             class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs shrink-0 cursor-pointer"
@@ -1138,6 +1139,20 @@
       }}
       disabled={loading || songs.length === 0}
     />
+    {#if listedPlaylist}
+      <ContextMenuItem
+        icon={Usb}
+        label={i18n.t("playlists.sizeLimitMenuItem", {
+          value: listedPlaylist.size_limit_bytes
+            ? formatStorageSize(listedPlaylist.size_limit_bytes)
+            : i18n.t("playlists.sizeLimitNotSet"),
+        })}
+        onclick={() => {
+          showSizeLimitPopover = true;
+          overflowMenuPos = null;
+        }}
+      />
+    {/if}
     {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined}
       <ContextMenuItem
         icon={RefreshCw}
@@ -1186,6 +1201,19 @@
       />
     {/if}
   </ContextMenu>
+{/if}
+
+{#if listedPlaylist}
+  <PlaylistSizeLimitPopover
+    isOpen={showSizeLimitPopover}
+    anchorEl={overflowButtonEl ?? null}
+    limitBytes={listedPlaylist.size_limit_bytes ?? null}
+    deviceId={listedPlaylist.size_limit_device ?? null}
+    deviceLabel={sizeLimit.deviceName}
+    refreshReorders={listedPlaylist.dynamic_enabled && !listedPlaylist.sort_field}
+    onApply={(bytes, deviceId) => playlistsStore.setSizeLimit(listedPlaylist.id, bytes, deviceId)}
+    onClose={() => (showSizeLimitPopover = false)}
+  />
 {/if}
 
 {#if showShareModal}
