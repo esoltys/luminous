@@ -1648,7 +1648,7 @@ mod tests {
         .unwrap();
         assert_eq!(state.country_code(), None);
 
-        // MusicBrainz's special "XW" (worldwide) is two letters but fine to keep.
+        // Anything that is not a two-letter code is not a country.
         let junk: MbArtistResponse = serde_json::from_str(r#"{"country": "USA"}"#).unwrap();
         assert_eq!(junk.country_code(), None);
     }
