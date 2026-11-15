@@ -876,4 +876,16 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       });
     });
   });
+
+  it("lets the album title column expand into available header space without max-w-xl (#2121)", () => {
+    const longTitle = "TRON: Legacy: Original Motion Picture Soundtrack (The Complete Edition)";
+    const { getByRole } = render(AlbumDetailView, { props: { albumName: longTitle } });
+    const heading = getByRole("heading", { level: 1, name: longTitle });
+    expect(heading).toHaveAttribute("title", longTitle);
+    const infoColumn = heading.parentElement;
+    expect(infoColumn).not.toBeNull();
+    expect(infoColumn!.className).toContain("flex-1");
+    expect(infoColumn!.className).toContain("min-w-0");
+    expect(infoColumn!.className).not.toContain("max-w-xl");
+  });
 });
