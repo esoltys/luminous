@@ -3,10 +3,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor, screen } from "@testing-library/svelte";
 import Equalizer from "./Equalizer.svelte";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
+}));
+
+const eventListeners = vi.hoisted(() => new Map<string, (event: { payload: unknown }) => void>());
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async (event: string, cb: (event: { payload: unknown }) => void) => {
+    eventListeners.set(event, cb);
+    return () => {
+      eventListeners.delete(event);
+    };
+  }),
 }));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
@@ -60,6 +71,7 @@ describe("Equalizer.svelte", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    eventListeners.clear();
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "get_equalizer_state") return defaultEqConfig;
       if (cmd === "list_eq_presets") return defaultPresets;
@@ -631,5 +643,55 @@ describe("Equalizer.svelte", () => {
       ).toHaveAccessibleDescription(/EBU R128.*ReplayGain/);
     });
     expect(getByText("Play every song at a similar volume")).toBeInTheDocument();
+  });
+
+  it("updates controls live when equalizer-state-changed fires on device switch", async () => {
+    const { getByRole, getByText } = render(Equalizer);
+    await waitFor(() => {
+      expect(listen).toHaveBeenCalledWith("equalizer-state-changed", expect.any(Function));
+    });
+
+    const toggle = getByRole("switch", { name: /enable eq/i });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    const handler = eventListeners.get("equalizer-state-changed")!;
+    handler({
+      payload: {
+        ...defaultEqConfig,
+        enabled: false,
+        mode: "parametric",
+        active_preset: "Rock",
+      },
+    });
+
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute("aria-checked", "false");
+      expect(getByText("Parametric Equalizer")).toBeInTheDocument();
+    });
+  });
+
+  it("shows the active playback device name in the Equalizer heading", async () => {
+    const baseImpl = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === "get_active_output_device_name") return "soundcore Liberty 5";
+      return baseImpl(cmd, args);
+    });
+
+    const { getByText } = render(Equalizer);
+    await waitFor(() => {
+      expect(getByText("10-Band Graphic Equalizer for soundcore Liberty 5")).toBeInTheDocument();
+    });
+
+    const handler = eventListeners.get("equalizer-state-changed")!;
+    handler({
+      payload: {
+        ...defaultEqConfig,
+        mode: "parametric",
+      },
+    });
+
+    await waitFor(() => {
+      expect(getByText("Parametric Equalizer for soundcore Liberty 5")).toBeInTheDocument();
+    });
   });
 });

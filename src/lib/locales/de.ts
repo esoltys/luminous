@@ -1957,6 +1957,8 @@ export const de = {
     enableEq: "EQ aktivieren",
     subtitle: "Bässe, Mitten und Höhen anheben oder absenken",
     titleParametric: "Parametrischer Equalizer",
+    titleForDevice: "10-Band-Grafik-Equalizer für {device}",
+    titleParametricForDevice: "Parametrischer Equalizer für {device}",
     subtitleParametric:
       "Präzise Korrekturen mit Filtertyp, Verstärkung und Güte (Q) jedes einzelnen Bands",
     modeLabel: "Modus",
@@ -2830,6 +2832,7 @@ export const de = {
     toggleImmersive: "Immersiven Modus umschalten",
     toggleRightPanel: "Rechten Bereich umschalten",
     toggleMiniplayer: "Miniplayer umschalten",
+    openEqualizer: "Equalizer-Einstellungen öffnen",
     openSettings: "Einstellungen öffnen",
     showShortcuts: "Diese Liste anzeigen",
     footnote:

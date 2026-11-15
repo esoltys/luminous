@@ -2,13 +2,66 @@ use crate::eq_store::{self, parse_user_preset_key, user_preset_key, UserPreset};
 use crate::AppState;
 use luminous_equalizer::{EqMode, Equalizer, EqualizerConfig, BUILTIN_PRESETS};
 use serde::Serialize;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
-/// Fire-and-forget persistence — see `eq_store::save_state`.
-fn save_eq_settings(db: &crate::db::Database, eq: &Equalizer) {
+/// Fire-and-forget persistence — see `eq_store::save_device_state`.
+fn save_eq_settings(db: &crate::db::Database, device_name: &str, eq: &Equalizer) {
     if let Ok(conn) = db.pool.get() {
-        eq_store::save_state(&conn, &eq.state());
+        eq_store::save_device_state(&conn, device_name, &eq.state());
     }
+}
+
+/// Runs `mutate` against the live `Equalizer` and active device name, acquiring
+/// `audio` before `active_eq_device` to match `sync_device_equalizer`'s lock order.
+async fn with_active_eq_mut<T, F>(state: &AppState, mutate: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce(&mut Equalizer, &str) -> Result<T, String> + Send + 'static,
+{
+    let active_device = Arc::clone(&state.active_eq_device);
+    crate::audio::with_audio(&state.audio, move |engine| {
+        let device = active_device.lock().clone();
+        engine.with_equalizer(|eq| mutate(eq, &device))
+    })
+    .await
+}
+
+/// Switches the live equalizer to `device_name`'s saved state when it differs
+/// from `state.active_eq_device`, emitting `"equalizer-state-changed"`.
+pub async fn sync_device_equalizer(
+    app: &AppHandle,
+    state: &AppState,
+    device_name: String,
+) -> Option<EqualizerConfig> {
+    if *state.active_eq_device.lock() == device_name {
+        return None;
+    }
+
+    let db_clone = Arc::clone(&state.db);
+    let active_clone = Arc::clone(&state.active_eq_device);
+    let dev = device_name;
+    let config = crate::audio::with_audio(&state.audio, move |engine| {
+        let mut guard = active_clone.lock();
+        if *guard == dev {
+            return None;
+        }
+        let eq_state = if let Ok(conn) = db_clone.pool.get() {
+            eq_store::load_device_state(&conn, &dev)
+        } else {
+            Equalizer::new().state()
+        };
+        let cfg = engine.with_equalizer(|eq| {
+            eq.restore(&eq_state);
+            eq.config()
+        });
+        *guard = dev;
+        Some(cfg)
+    })
+    .await?;
+
+    let _ = app.emit("equalizer-state-changed", &config);
+    Some(config)
 }
 
 /// The pipeline popover summarises the EQ (on/off, mode, active bands), but
@@ -21,7 +74,24 @@ async fn emit_pipeline_changed(app: &AppHandle, state: &AppState) {
 }
 
 #[tauri::command]
-pub async fn get_equalizer_state(state: State<'_, AppState>) -> Result<EqualizerConfig, String> {
+pub async fn get_active_output_device_name(state: State<'_, AppState>) -> Result<String, String> {
+    Ok(state.active_eq_device.lock().clone())
+}
+
+#[tauri::command]
+pub async fn get_equalizer_state(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<EqualizerConfig, String> {
+    let device_name = crate::audio::with_audio(&state.audio, |engine| {
+        engine.refresh_default_device();
+        engine.output_info().device_name
+    })
+    .await;
+    if let Some(config) = sync_device_equalizer(&app, &state, device_name).await {
+        emit_pipeline_changed(&app, &state).await;
+        return Ok(config);
+    }
     Ok(crate::audio::with_audio(&state.audio, |engine| {
         engine.with_equalizer(|eq| eq.config())
     })
@@ -37,14 +107,12 @@ pub async fn apply_equalizer_config(
     config: EqualizerConfig,
 ) -> Result<EqualizerConfig, String> {
     let db = state.db.clone();
-    let canonical = crate::audio::with_audio(&state.audio, move |engine| {
-        engine.with_equalizer(|eq| {
-            let canonical = eq.apply(&config);
-            save_eq_settings(&db, eq);
-            canonical
-        })
+    let canonical = with_active_eq_mut(&state, move |eq, device| {
+        let canonical = eq.apply(&config);
+        save_eq_settings(&db, device, eq);
+        Ok(canonical)
     })
-    .await;
+    .await?;
     emit_pipeline_changed(&app, &state).await;
     Ok(canonical)
 }
@@ -55,14 +123,12 @@ pub async fn reset_parametric_bands(
     state: State<'_, AppState>,
 ) -> Result<EqualizerConfig, String> {
     let db = state.db.clone();
-    let canonical = crate::audio::with_audio(&state.audio, move |engine| {
-        engine.with_equalizer(|eq| {
-            eq.reset_parametric();
-            save_eq_settings(&db, eq);
-            eq.config()
-        })
+    let canonical = with_active_eq_mut(&state, move |eq, device| {
+        eq.reset_parametric();
+        save_eq_settings(&db, device, eq);
+        Ok(eq.config())
     })
-    .await;
+    .await?;
     emit_pipeline_changed(&app, &state).await;
     Ok(canonical)
 }
@@ -82,18 +148,16 @@ pub async fn load_equalizer_preset(
         }
         None => None,
     };
-    let canonical = crate::audio::with_audio(&state.audio, move |engine| {
-        engine.with_equalizer(|eq| {
-            match user {
-                Some((id, preset)) => {
-                    eq.load_parametric_preset(user_preset_key(id), &preset.bands, preset.preamp)
-                }
-                None if eq.load_builtin_preset(&preset_name) => {}
-                None => return Err(format!("unknown preset: {preset_name}")),
+    let canonical = with_active_eq_mut(&state, move |eq, device| {
+        match user {
+            Some((id, preset)) => {
+                eq.load_parametric_preset(user_preset_key(id), &preset.bands, preset.preamp)
             }
-            save_eq_settings(&db, eq);
-            Ok(eq.config())
-        })
+            None if eq.load_builtin_preset(&preset_name) => {}
+            None => return Err(format!("unknown preset: {preset_name}")),
+        }
+        save_eq_settings(&db, device, eq);
+        Ok(eq.config())
     })
     .await?;
     emit_pipeline_changed(&app, &state).await;
@@ -123,18 +187,16 @@ pub async fn save_eq_user_preset(
     name: String,
 ) -> Result<EqualizerConfig, String> {
     let db = state.db.clone();
-    crate::audio::with_audio(&state.audio, move |engine| {
-        engine.with_equalizer(|eq| {
-            let config = eq.config();
-            if config.mode != EqMode::Parametric {
-                return Err("user presets are parametric-only".to_string());
-            }
-            let conn = db.pool.get().map_err(|e| e.to_string())?;
-            let id = eq_store::create(&conn, &name, &config.parametric, config.preamp)?;
-            eq.set_active_preset(Some(user_preset_key(id)));
-            save_eq_settings(&db, eq);
-            Ok(eq.config())
-        })
+    with_active_eq_mut(&state, move |eq, device| {
+        let config = eq.config();
+        if config.mode != EqMode::Parametric {
+            return Err("user presets are parametric-only".to_string());
+        }
+        let conn = db.pool.get().map_err(|e| e.to_string())?;
+        let id = eq_store::create(&conn, &name, &config.parametric, config.preamp)?;
+        eq.set_active_preset(Some(user_preset_key(id)));
+        save_eq_settings(&db, device, eq);
+        Ok(eq.config())
     })
     .await
 }
@@ -148,6 +210,7 @@ pub async fn save_eq_user_preset(
 /// `eq_store::ERR_*` code.
 pub fn import_profile_into(
     db: &crate::db::Database,
+    device_name: &str,
     eq: &mut Equalizer,
     text: &str,
     name: &str,
@@ -158,7 +221,7 @@ pub fn import_profile_into(
     let id = eq_store::create(&conn, name, &profile.bands, profile.preamp).map_err(preset_err)?;
     eq.load_parametric_preset(user_preset_key(id), &profile.bands, profile.preamp);
     eq.set_enabled(true);
-    save_eq_settings(db, eq);
+    save_eq_settings(db, device_name, eq);
     Ok(eq.config())
 }
 
@@ -170,8 +233,8 @@ pub async fn import_parametric_profile(
     name: String,
 ) -> Result<EqualizerConfig, String> {
     let db = state.db.clone();
-    let canonical = crate::audio::with_audio(&state.audio, move |engine| {
-        engine.with_equalizer(|eq| import_profile_into(&db, eq, &text, &name))
+    let canonical = with_active_eq_mut(&state, move |eq, device| {
+        import_profile_into(&db, device, eq, &text, &name)
     })
     .await?;
     emit_pipeline_changed(&app, &state).await;
@@ -224,17 +287,15 @@ pub async fn delete_eq_user_preset(
     id: i64,
 ) -> Result<EqualizerConfig, String> {
     let db = state.db.clone();
-    crate::audio::with_audio(&state.audio, move |engine| {
-        engine.with_equalizer(|eq| {
-            let conn = db.pool.get().map_err(|e| e.to_string())?;
-            eq_store::delete(&conn, id)?;
-            let active = eq.config().active_preset;
-            if active.as_deref().and_then(parse_user_preset_key) == Some(id) {
-                eq.set_active_preset(None);
-                save_eq_settings(&db, eq);
-            }
-            Ok(eq.config())
-        })
+    with_active_eq_mut(&state, move |eq, device| {
+        let conn = db.pool.get().map_err(|e| e.to_string())?;
+        eq_store::delete(&conn, id)?;
+        let active = eq.config().active_preset;
+        if active.as_deref().and_then(parse_user_preset_key) == Some(id) {
+            eq.set_active_preset(None);
+            save_eq_settings(&db, device, eq);
+        }
+        Ok(eq.config())
     })
     .await
 }
@@ -347,7 +408,7 @@ mod tests {
     #[test]
     fn import_saves_exact_profile_as_the_active_user_preset() {
         let (_dir, db, mut eq) = setup();
-        let echo = import_profile_into(&db, &mut eq, PROFILE, " HD 600 ").unwrap();
+        let echo = import_profile_into(&db, "Test Device", &mut eq, PROFILE, " HD 600 ").unwrap();
 
         let conn = db.pool.get().unwrap();
         let presets = eq_store::list(&conn).unwrap();
@@ -369,7 +430,14 @@ mod tests {
     fn unparseable_profile_saves_nothing_and_leaves_eq_alone() {
         let (_dir, db, mut eq) = setup();
         let before = eq.config();
-        let err = import_profile_into(&db, &mut eq, "Filter 1: ON LP Fc 100 Hz", "X").unwrap_err();
+        let err = import_profile_into(
+            &db,
+            "Test Device",
+            &mut eq,
+            "Filter 1: ON LP Fc 100 Hz",
+            "X",
+        )
+        .unwrap_err();
         assert_eq!(code(&err), "unsupported_filters");
         assert_eq!(eq.config(), before);
         assert!(eq_store::list(&db.pool.get().unwrap()).unwrap().is_empty());
@@ -381,9 +449,9 @@ mod tests {
         eq_store::create(&db.pool.get().unwrap(), "HD 600", &[], 0.0).unwrap();
         let before = eq.config();
 
-        let err = import_profile_into(&db, &mut eq, PROFILE, "hd 600").unwrap_err();
+        let err = import_profile_into(&db, "Test Device", &mut eq, PROFILE, "hd 600").unwrap_err();
         assert_eq!(code(&err), eq_store::ERR_DUPLICATE_NAME);
-        let err = import_profile_into(&db, &mut eq, PROFILE, "  ").unwrap_err();
+        let err = import_profile_into(&db, "Test Device", &mut eq, PROFILE, "  ").unwrap_err();
         assert_eq!(code(&err), eq_store::ERR_EMPTY_NAME);
 
         assert_eq!(eq.config(), before);

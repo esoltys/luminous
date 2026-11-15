@@ -1833,7 +1833,7 @@ export const uk = {
   },
   miniplayer: {
     title: "Міні-плеєр",
-    exit: "Відновити повне вікно (Ctrl+M)",
+    exit: "Відновити повне вікно (Ctrl+Shift+M)",
     dragHint: "Перетягнути вікно",
     showLyrics: "Показати текст наживо",
     showCoverArt: "Показати обкладинку",
@@ -2074,6 +2074,8 @@ export const uk = {
     enableEq: "Увімкнути еквалайзер",
     subtitle: "Підсилюйте або послаблюйте низькі, середні та високі частоти",
     titleParametric: "Параметричний еквалайзер",
+    titleForDevice: "10-смуговий графічний еквалайзер для {device}",
+    titleParametricForDevice: "Параметричний еквалайзер для {device}",
     subtitleParametric:
       "Робіть точні корекції: кожна смуга має власний тип фільтра, підсилення та добротність",
     modeLabel: "Режим",
@@ -2989,6 +2991,7 @@ export const uk = {
     toggleImmersive: "Перемкнути режим занурення",
     toggleRightPanel: "Перемкнути праву панель",
     toggleMiniplayer: "Перемкнути міні-плеєр",
+    openEqualizer: "Відкрити налаштування еквалайзера",
     openSettings: "Відкрити налаштування",
     showShortcuts: "Показати цей список",
     footnote:

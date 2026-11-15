@@ -131,6 +131,8 @@ pub struct AppState {
     pub transcoder: Arc<luminous_transcode::Transcoder>,
     /// Plans and runs syncs to devices (#836).
     pub device_sync: Arc<devices::sync::DeviceSync>,
+    /// Playback device name whose EQ state is currently loaded in `audio`.
+    pub active_eq_device: Arc<parking_lot::Mutex<String>>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -331,13 +333,59 @@ fn with_webview2_remote_debugging(current: &str, port: u16) -> String {
     }
 }
 
-/// Applies the saved EQ state to a freshly-constructed `AudioEngine`, so
-/// playback starts with the user's last-saved EQ instead of engine defaults.
-fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
-    let Ok(conn) = db.pool.get() else { return };
-    if let Some(state) = crate::eq_store::load_state(&conn) {
+async fn sync_eq_to_audio_device(app: &tauri::AppHandle, audio: &Arc<Mutex<AudioEngine>>) -> bool {
+    if let Some(app_state) = app.try_state::<AppState>() {
+        let device_name = audio.lock().await.output_info().device_name;
+        return commands::equalizer::sync_device_equalizer(app, &app_state, device_name)
+            .await
+            .is_some();
+    }
+    false
+}
+
+/// Polls for OS default output device changes while idle/paused so per-device
+/// EQ and the pipeline popover stay in sync even before playback resumes.
+fn spawn_device_eq_watcher(
+    app_handle: tauri::AppHandle,
+    audio: Arc<Mutex<AudioEngine>>,
+    player: Arc<Mutex<Player>>,
+) {
+    tauri::async_runtime::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            let new_device =
+                crate::audio::with_audio(&audio, |engine| engine.refresh_default_device()).await;
+            if let Some(device_name) = new_device {
+                if let Some(app_state) = app_handle.try_state::<AppState>() {
+                    if commands::equalizer::sync_device_equalizer(
+                        &app_handle,
+                        &app_state,
+                        device_name,
+                    )
+                    .await
+                    .is_some()
+                    {
+                        let p = player.lock().await;
+                        let a = audio.lock().await;
+                        let _ = app_handle.emit("audio-pipeline-changed", p.get_pipeline_info(&a));
+                    }
+                }
+            }
+        }
+    });
+}
+
+/// Applies the saved per-device EQ state to a freshly-constructed `AudioEngine`,
+/// returning the device name whose state was loaded.
+fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) -> String {
+    let device_name = audio_engine.output_info().device_name;
+    if let Ok(conn) = db.pool.get() {
+        let state = crate::eq_store::load_device_state(&conn, &device_name);
         audio_engine.with_equalizer(|eq| eq.restore(&state));
     }
+    device_name
 }
 
 /// Applies the saved audio output backend/device settings from app_state so
@@ -550,6 +598,7 @@ fn spawn_audio_event_loop(
                     match event {
                         crate::audio::AudioEvent::Playing { .. } => {
                             p.reset_playback_errors();
+                            sync_eq_to_audio_device(&app, &audio).await;
                             let state = p.get_state().await;
                             if let Some(ref song) = p.current_song {
                                 if let Some(app_state) = app.try_state::<AppState>() {
@@ -658,6 +707,7 @@ fn spawn_audio_event_loop(
                             spawn_auto_continue_if_due(&p, &app);
                         }
                         crate::audio::AudioEvent::PipelineChanged => {
+                            sync_eq_to_audio_device(&app, &audio).await;
                             let pipeline = {
                                 let a = audio.lock().await;
                                 p.get_pipeline_info(&a)
@@ -1055,7 +1105,7 @@ pub fn run() {
             let audio_engine =
                 AudioEngine::with_source_opener(media_source::opener(Arc::clone(&db)));
             restore_audio_output_from_db(&db, &audio_engine);
-            restore_equalizer_from_db(&db, &audio_engine);
+            let initial_eq_device = restore_equalizer_from_db(&db, &audio_engine);
 
             let audio = Arc::new(Mutex::new(audio_engine));
 
@@ -1120,6 +1170,11 @@ pub fn run() {
 
             // Spawn real-time visualizer spectrum emission loop (Tokio)
             spawn_visualizer_loop(app.handle().clone(), Arc::clone(&audio));
+            spawn_device_eq_watcher(
+                app.handle().clone(),
+                Arc::clone(&audio),
+                Arc::clone(&player),
+            );
 
             // Spawn Tokio/UI stall watchdog — see #1002.
             stall_monitor::spawn();
@@ -1200,6 +1255,7 @@ pub fn run() {
                 devices: device_monitor,
                 transcoder,
                 device_sync,
+                active_eq_device: Arc::new(parking_lot::Mutex::new(initial_eq_device)),
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -1542,6 +1598,7 @@ pub fn run() {
             commands::visualizer::get_band_waveform_data,
             commands::visualizer::set_spectrum_enabled,
             // Equalizer commands
+            commands::equalizer::get_active_output_device_name,
             commands::equalizer::get_equalizer_state,
             commands::equalizer::apply_equalizer_config,
             commands::equalizer::get_parametric_response,

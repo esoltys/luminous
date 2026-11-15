@@ -226,8 +226,15 @@
 
       switch (e.key.toLowerCase()) {
         case "m":
+          if (!e.shiftKey) break;
           e.preventDefault();
           windowLayoutStore.toggleMiniplayerMode();
+          break;
+        case "e":
+          if (!e.shiftKey) break;
+          e.preventDefault();
+          windowLayoutStore.exitImmersiveMode();
+          navigationStore.openSettings("equalizer");
           break;
         case ",":
           e.preventDefault();

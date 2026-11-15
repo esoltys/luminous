@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 85;
+pub const CURRENT_SCHEMA_VERSION: i32 = 86;
 
 struct Migration {
     version: i32,
@@ -855,6 +855,26 @@ const MIGRATIONS: &[Migration] = &[
                     "ALTER TABLE artist_context_enrichment ADD COLUMN country TEXT;",
                 )?;
             }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 86,
+        description: "eq_device_settings: per-playback-device equalizer state",
+        apply: |conn| {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS eq_device_settings (
+                    device_name TEXT PRIMARY KEY,
+                    enabled INTEGER NOT NULL DEFAULT 0,
+                    preamp REAL NOT NULL DEFAULT 0.0,
+                    gains TEXT NOT NULL DEFAULT '0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0',
+                    mode TEXT NOT NULL DEFAULT 'graphic10',
+                    parametric TEXT NOT NULL DEFAULT '',
+                    active_preset TEXT NOT NULL DEFAULT '',
+                    inactive_preamp REAL NOT NULL DEFAULT 0.0,
+                    inactive_preset TEXT NOT NULL DEFAULT ''
+                );",
+            )?;
             Ok(())
         },
     },
