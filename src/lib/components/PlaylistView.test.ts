@@ -741,7 +741,7 @@ describe("PlaylistView.svelte", () => {
       expect(chip.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it("gives only smart playlists mode tabs, Refresh and Edit Rules", async () => {
+    it("gives only smart playlists mode tabs, Refresh and Edit Smart Playlist", async () => {
       const { queryByRole, getByRole, unmount } = render(PlaylistView);
       expect(queryByRole("tablist")).toBeNull();
       await fireEvent.click(getByRole("button", { name: "More actions" }));
@@ -759,7 +759,7 @@ describe("PlaylistView.svelte", () => {
       const smart = render(PlaylistView);
       expect(smart.getByRole("tab", { name: "Deep Cuts" })).toBeInTheDocument();
       await fireEvent.click(smart.getByRole("button", { name: "More actions" }));
-      expect(smart.getByRole("menuitem", { name: "Edit Rules" })).toBeInTheDocument();
+      expect(smart.getByRole("menuitem", { name: "Edit Smart Playlist" })).toBeInTheDocument();
 
       const refreshSpy = vi.spyOn(playlistsStore, "refreshAutoPlaylist").mockResolvedValue();
       await fireEvent.click(smart.getByRole("menuitem", { name: "Refresh Playlist" }));

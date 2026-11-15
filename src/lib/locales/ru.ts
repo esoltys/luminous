@@ -1546,7 +1546,7 @@ export const ru = {
     unmarkedNotIncluded: "{name} снова включено в подборки",
     notIncludedBadgeTooltip: "Не входит в автосписки и пополнение автовоспроизведения",
     noFilterResults: "Нет песен, соответствующих запросу «{query}»",
-    editSmartPlaylistBtn: "Изменить правила",
+    editSmartPlaylistBtn: "Изменение умного списка",
     smartRulePlaylistLabel: "Умный список с правилами",
     smartRuleBasedTooltip: "Умный список воспроизведения с правилами",
     smartBadgeLabel: "Умный",

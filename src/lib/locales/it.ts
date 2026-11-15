@@ -1429,7 +1429,7 @@ export const it = {
     notIncludedBadgeTooltip:
       "Escluso dalle playlist automatiche e dal riempimento della riproduzione automatica",
     noFilterResults: "Nessun brano corrisponde a «{query}»",
-    editSmartPlaylistBtn: "Modifica regole",
+    editSmartPlaylistBtn: "Modifica playlist intelligente",
     smartRulePlaylistLabel: "Playlist con regole intelligenti",
     smartRuleBasedTooltip: "Playlist basata su regole intelligenti",
     smartBadgeLabel: "Intelligente",

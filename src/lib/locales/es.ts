@@ -1430,7 +1430,7 @@ export const es = {
     notIncludedBadgeTooltip:
       "No se incluye en las listas automáticas ni en el relleno de reproducción automática",
     noFilterResults: "Ninguna canción coincide con «{query}»",
-    editSmartPlaylistBtn: "Editar reglas",
+    editSmartPlaylistBtn: "Editar lista inteligente",
     smartRulePlaylistLabel: "Lista con reglas inteligentes",
     smartRuleBasedTooltip: "Lista de reproducción basada en reglas inteligentes",
     smartBadgeLabel: "Inteligente",

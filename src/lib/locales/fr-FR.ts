@@ -1443,7 +1443,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     notIncludedBadgeTooltip:
       "Non inclus dans les listes de lecture automatiques ni le remplissage automatique",
     noFilterResults: 'Aucune chanson ne correspond à "{query}"',
-    editSmartPlaylistBtn: "Modifier les règles",
+    editSmartPlaylistBtn: "Modifier la liste intelligente",
     smartRulePlaylistLabel: "Liste intelligente",
     smartRuleBasedTooltip: "Liste intelligente basée sur des règles",
     smartBadgeLabel: "Intelligente",

@@ -1539,7 +1539,7 @@ export const uk = {
     unmarkedNotIncluded: "«{name}» знову включено до списків відтворення",
     notIncludedBadgeTooltip: "Не входить в автосписки та автопоповнення черги",
     noFilterResults: "Немає пісень за запитом «{query}»",
-    editSmartPlaylistBtn: "Змінити правила",
+    editSmartPlaylistBtn: "Редагування розумного списку відтворення",
     smartRulePlaylistLabel: "Список відтворення за правилами",
     smartRuleBasedTooltip: "Розумний список відтворення за правилами",
     smartBadgeLabel: "Розумний",

@@ -1434,7 +1434,7 @@ export const de = {
     notIncludedBadgeTooltip:
       "Nicht in automatischen Wiedergabelisten oder beim Nachfüllen der automatischen Wiedergabe enthalten",
     noFilterResults: "Keine Titel passen zu „{query}“",
-    editSmartPlaylistBtn: "Regeln bearbeiten",
+    editSmartPlaylistBtn: "Intelligente Wiedergabeliste bearbeiten",
     smartRulePlaylistLabel: "Regelbasierte Wiedergabeliste",
     smartRuleBasedTooltip: "Intelligente regelbasierte Wiedergabeliste",
     smartBadgeLabel: "Intelligent",

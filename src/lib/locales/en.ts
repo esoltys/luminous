@@ -1395,7 +1395,7 @@ export const en = {
     unmarkedNotIncluded: "Included {name} in playlists again",
     notIncludedBadgeTooltip: "Not included in auto-playlists or Auto-Play refill",
     noFilterResults: 'No songs match "{query}"',
-    editSmartPlaylistBtn: "Edit Rules",
+    editSmartPlaylistBtn: "Edit Smart Playlist",
     smartRulePlaylistLabel: "Smart Rule Playlist",
     smartRuleBasedTooltip: "Smart Rule-Based Playlist",
     smartBadgeLabel: "Smart",
