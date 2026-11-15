@@ -7,7 +7,6 @@
   import { sourceIcon } from "./sourceIcon";
   import { shownName } from "./shownName";
   import { collectionStore } from "../../stores/collection.svelte";
-  import { playerStore } from "../../stores/player.svelte";
   import { toastStore } from "../../stores/toast.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import { formatFileSize } from "../../utils/formatters";
@@ -211,11 +210,7 @@
       <DeviceView device={openDevice} />
     {/key}
   {:else if location}
-    <div
-      class="flex-1 min-h-0 flex flex-col px-6 pt-4 gap-4"
-      class:pb-28={!!playerStore.currentSong}
-      class:pb-6={!playerStore.currentSong}
-    >
+    <div class="flex-1 min-h-0 flex flex-col px-6 pt-4 gap-4 pb-dock">
       <header class="flex items-end justify-between gap-4 flex-wrap">
         <div class="min-w-0">
           <nav
@@ -401,11 +396,7 @@
       />
     {/if}
   {:else}
-    <div
-      class="flex-1 overflow-y-auto px-6 pt-4"
-      class:pb-28={!!playerStore.currentSong}
-      class:pb-12={!playerStore.currentSong}
-    >
+    <div class="flex-1 overflow-y-auto px-6 pt-4 pb-dock">
       <header class="flex items-end justify-between gap-4 mb-4">
         <h1 class="text-3xl font-heading font-bold text-brand-text-primary leading-snug">
           {i18n.t("sidebar.files")}

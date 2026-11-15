@@ -52,9 +52,14 @@
     SIDEBAR_MAX_WIDTH_PX,
     SIDEBAR_COLLAPSED_WIDTH_PX,
     PANEL_RESIZE_STEP_PX,
+    PLAYER_DOCK_CONTENT_RESERVE_PX,
   } from "../lib/constants";
 
   let { children } = $props();
+
+  // The floating PlayerBar dock renders only with a song, and never on Help. The same
+  // condition drives the `pb-dock` bottom padding (app.css) every view uses to clear it.
+  const dockVisible = $derived(!!playerStore.currentSong && navigationStore.activeTab !== "help");
 
   function handleWelcomeGetStarted() {
     // Unconditional: this is an explicit user request to start the tour, not
@@ -540,7 +545,12 @@
               {/if}
 
               <!-- Central Content Area -->
-              <main class="@container relative flex-1 bg-brand-main overflow-hidden flex flex-col">
+              <main
+                class="@container relative flex-1 bg-brand-main overflow-hidden flex flex-col"
+                style:--dock-content-inset={dockVisible
+                  ? `${PLAYER_DOCK_CONTENT_RESERVE_PX}px`
+                  : null}
+              >
                 {@render children()}
                 <DeviceSyncDrawer />
               </main>
@@ -648,7 +658,7 @@
          underneath the gap for the blur to have something to blur. Hidden
          whenever there's no current song, so it doesn't linger showing
          "Nothing playing" after the queue ends. -->
-      {#if playerStore.currentSong && navigationStore.activeTab !== "help"}
+      {#if dockVisible}
         <div class="absolute inset-x-4 bottom-4 z-40">
           <PlayerBar />
         </div>

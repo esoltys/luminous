@@ -5,7 +5,6 @@ import CollectionView from "./CollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { prefs } from "../stores/prefs.svelte";
-import { playerStore } from "../stores/player.svelte";
 import { pinnedStore } from "../stores/pinned.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { Song, AlbumItem, ArtistItem } from "../types";
@@ -363,21 +362,10 @@ describe("CollectionView.svelte", () => {
       return render(CollectionView);
     }
 
-    it("ends above the playbar while a song is loaded", () => {
-      playerStore.currentSong = mockSongs[0];
+    it("stops where the playbar begins via the shared dock inset", () => {
       const { getByTestId } = renderArtistsWithScrubber();
-      const bounds = getByTestId("alphabet-scrubber-bounds");
-      expect(bounds).toHaveClass("bottom-28");
-      expect(bounds).not.toHaveClass("bottom-6");
-      playerStore.currentSong = undefined;
-    });
-
-    it("uses the plain list padding when nothing is playing", () => {
-      playerStore.currentSong = undefined;
-      const { getByTestId } = renderArtistsWithScrubber();
-      const bounds = getByTestId("alphabet-scrubber-bounds");
-      expect(bounds).toHaveClass("bottom-6");
-      expect(bounds).not.toHaveClass("bottom-28");
+      // The inset itself (112px with a song, 1.5rem without) comes from the layout.
+      expect(getByTestId("alphabet-scrubber-bounds")).toHaveClass("bottom-dock");
     });
   });
 });

@@ -991,7 +991,7 @@
     </div>
   </div>
 
-  <div class="px-6 py-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
+  <div class="px-6 py-6 flex flex-col pb-dock">
     <div class="border border-brand-border/60 rounded-xl acrylic-chrome relative overflow-hidden">
       <SongTable
         rows={tableRows}

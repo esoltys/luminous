@@ -816,7 +816,7 @@
     </div>
   </div>
 
-  <div class="relative z-10 px-6 py-6 flex flex-col gap-6" class:pb-28={!!playerStore.currentSong}>
+  <div class="relative z-10 px-6 py-6 flex flex-col gap-6 pb-dock">
     {#if !windowLayoutStore.isDetailHeaderCollapsed}
       <div class="flex flex-wrap items-center justify-between gap-3">
         {#if hasChips}

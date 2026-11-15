@@ -7,7 +7,6 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { prefs, type CollectionViewMode } from "../stores/prefs.svelte";
   import type { Playlist } from "../types";
@@ -510,7 +509,7 @@
 {:else}
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
     <div
-      class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}"
+      class="flex-1 overflow-y-auto pb-dock"
       use:rememberScroll={`playlists:${navigationStore.playlistsSubTab}`}
     >
       <CollectionHeader

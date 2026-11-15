@@ -5,7 +5,6 @@
   import { onMount } from "svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { playerStore } from "../stores/player.svelte";
   import { prefs, type GenreSortField } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -116,7 +115,7 @@
   }
 </script>
 
-<div class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
+<div class="flex-1 overflow-y-auto pb-dock">
   <CollectionHeader
     title={i18n.t("sidebar.genres")}
     subtitle={i18n.plural("collection.genreCount", tagsStore.allTags.length)}

@@ -1025,7 +1025,7 @@
   {/if}
 
   {#if playlists.length > 0}
-    <div class="px-6 pt-10 {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
+    <div class="px-6 pt-10 pb-dock">
       <CardSection
         title={i18n.t("artistDetail.playlistsFeaturing", { artist: artistName })}
         viewMode={prefs.artistReleasesViewMode}
@@ -1051,7 +1051,7 @@
       </CardSection>
     </div>
   {:else}
-    <div class={playerStore.currentSong ? "pb-28" : "pb-6"}></div>
+    <div class="pb-dock"></div>
   {/if}
 </div>
 

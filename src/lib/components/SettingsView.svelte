@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { playerStore } from "../stores/player.svelte";
   import { navigationStore, type SettingsTab } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { untrack } from "svelte";
@@ -43,11 +42,7 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-  <div
-    class="flex-1 overflow-y-scroll px-6 pb-6"
-    class:pb-28={!!playerStore.currentSong}
-    use:rememberScroll={`settings:${settingsTab}`}
-  >
+  <div class="flex-1 overflow-y-scroll px-6 pb-dock" use:rememberScroll={`settings:${settingsTab}`}>
     <div
       class="pt-4 pb-4 flex items-center gap-2"
       role="tablist"

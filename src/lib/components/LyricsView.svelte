@@ -498,8 +498,7 @@
   </div>
 
   <div
-    class="flex-1 overflow-y-auto px-6 py-12"
-    class:pb-28={!!playerStore.currentSong}
+    class="flex-1 overflow-y-auto px-6 py-12 pb-dock"
     bind:this={containerEl}
     use:rememberScroll={"lyrics"}
   >

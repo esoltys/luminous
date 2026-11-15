@@ -227,12 +227,7 @@
 </script>
 
 <!-- Right padding belongs to each part, so scrollable ones scroll at the window edge. -->
-<div
-  class="flex-1 min-h-0 flex flex-col pl-6 pt-4 gap-4"
-  class:pb-28={!!playerStore.currentSong}
-  class:pb-6={!playerStore.currentSong}
-  data-testid="device-view"
->
+<div class="flex-1 min-h-0 flex flex-col pl-6 pt-4 gap-4 pb-dock" data-testid="device-view">
   {#if preview}
     <DeviceSyncPreview
       {device}

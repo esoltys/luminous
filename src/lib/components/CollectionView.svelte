@@ -305,17 +305,6 @@
   const albumKey = (album: AlbumItem) => album.artist + "|" + album.album;
   const artistKey = (artist: ArtistItem) => artist.name ?? "";
 
-  /**
-   * Space the floating playbar covers at the bottom of the list, as the padding the scroll
-   * areas reserve and the matching inset the A-Z scrubber uses to stop where the playbar
-   * begins. One source so the two cannot drift apart (literal classes so Tailwind finds them).
-   */
-  let playbarClearance = $derived(
-    playerStore.currentSong
-      ? { pad: "pb-28", inset: "bottom-28" }
-      : { pad: "pb-6", inset: "bottom-6" },
-  );
-
   /** Height of the Albums/Artists header; the A-Z scrubber starts directly below it. */
   let gridHeaderHeight = $state(0);
 
@@ -585,7 +574,7 @@
         </CollectionHeader>
       </div>
 
-      <div class="flex-1 px-6 overflow-hidden flex flex-col {playbarClearance.pad}">
+      <div class="flex-1 px-6 overflow-hidden flex flex-col pb-dock">
         <div class="relative flex-1 min-h-0 flex">
           <div
             class="flex-1 overflow-y-auto border border-brand-border rounded-lg bg-brand-sidebar/40 min-h-0"
@@ -633,7 +622,7 @@
       <div class="flex-1 min-h-0 flex flex-col">
         <div class="relative flex-1 min-h-0 flex flex-col">
           <div
-            class="flex-1 overflow-y-auto min-h-0 {playbarClearance.pad}"
+            class="flex-1 overflow-y-auto min-h-0 pb-dock"
             use:rememberScroll={`collection:${navigationStore.activeSubTab}`}
           >
             <CollectionHeader
@@ -867,7 +856,7 @@
             <!-- Spans the list area only: starts under the header (measured, since it wraps
                  and collapses) and stops where the floating playbar begins. -->
             <div
-              class="absolute right-2.5 pointer-events-auto z-20 {playbarClearance.inset}"
+              class="absolute right-2.5 pointer-events-auto z-20 bottom-dock"
               style:top="{gridHeaderHeight}px"
               data-testid="alphabet-scrubber-bounds"
             >
@@ -1002,9 +991,7 @@
 {#if selectedKeys.size > 0 && navigationStore.activeSubTab === "songs"}
   <div
     data-floating-toolbar="true"
-    class="absolute left-1/2 -translate-x-1/2 z-40 acrylic-float border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold"
-    class:bottom-6={!playerStore.currentSong}
-    class:bottom-28={!!playerStore.currentSong}
+    class="absolute left-1/2 -translate-x-1/2 bottom-dock z-40 acrylic-float border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold"
   >
     <span class="text-brand-accent-text font-bold">
       {i18n.t("playlists.selectedCount", { count: selectedKeys.size })}
