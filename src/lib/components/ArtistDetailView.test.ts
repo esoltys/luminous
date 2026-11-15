@@ -63,35 +63,36 @@ describe("ArtistDetailView", () => {
     contextStore.clearAll();
   });
 
-  it("renders artist name and action buttons including overflow menu", async () => {
+  it("renders artist name and quietened action buttons including overflow menu", async () => {
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
     expect(screen.getByText("Shania Twain")).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Play$/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Shuffle$/i })).toBeTruthy();
-    expect(screen.getByTitle("Start Artist Radio")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Shuffle$/i })).toBeNull();
+    expect(screen.queryByTitle("Start Artist Radio")).toBeNull();
     expect(screen.getByTitle("More actions")).toBeTruthy();
   });
 
-  it("clicking Start Artist Radio action button starts radio for artist", async () => {
+  it("clicking Start Artist Radio in overflow menu starts radio for artist", async () => {
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-    const radioBtn = await screen.findByTitle("Start Artist Radio");
-    expect(radioBtn).toBeTruthy();
+    const moreBtn = await screen.findByTitle("More actions");
+    await fireEvent.click(moreBtn);
 
-    await fireEvent.click(radioBtn);
+    const radioItem = await screen.findByText("Start Artist Radio");
+    await fireEvent.click(radioItem);
     expect(invoke).toHaveBeenCalledWith("start_radio", {
       seed: { type: "artist", artist: "Shania Twain" },
       limit: null,
     });
   });
 
-  it("does not duplicate Start Artist Radio in the overflow menu", async () => {
+  it("exposes Add to Queue in the overflow menu", async () => {
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
     const moreBtn = screen.getByTitle("More actions");
     await fireEvent.click(moreBtn);
 
-    expect(screen.queryByText("Start Artist Radio")).toBeNull();
+    expect(screen.getByText("Add to Queue")).toBeTruthy();
   });
 
   it("renders the artist's tags in the header", async () => {
@@ -439,7 +440,6 @@ describe("ArtistDetailView", () => {
 
         // Action buttons remain visible
         expect(screen.getByRole("button", { name: /^Play$/i })).toBeTruthy();
-        expect(screen.getByRole("button", { name: /^Shuffle$/i })).toBeTruthy();
         expect(screen.getByTitle("More actions")).toBeTruthy();
 
         // Artist name, tags, and bio profile section are hidden

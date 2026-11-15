@@ -19,7 +19,6 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { discStarts } from "../utils/artist";
-  import { shuffleArray } from "../utils/shuffle";
   import { coverRequestUrl } from "../utils/covers";
   import CoverArt from "./CoverArt.svelte";
   import CoverStack from "./CoverStack.svelte";
@@ -33,7 +32,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { tasksStore } from "../stores/tasks.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
-  import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
+  import Button from "./Button.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import LinkButton from "./LinkButton.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
@@ -44,7 +43,8 @@
   import ViewInFilesItem from "./ViewInFilesItem.svelte";
   import CommunityRating from "./CommunityRating.svelte";
   import {
-    PlusIcon as Plus,
+    PlayIcon as Play,
+    StackIcon as Layers,
     PencilSimpleIcon as Edit3,
     ArrowsClockwiseIcon as RefreshCw,
     DownloadSimpleIcon as RetrieveDetails,
@@ -430,8 +430,8 @@
 
   // "Not included" tracks stay visible and individually playable (clicking
   // a row plays the full `sortedSongs` list, that track included), but bulk
-  // "play the whole album" actions — Play/Shuffle Play buttons, Add Album
-  // to Playlist — build their queue from this filtered list instead (#104).
+  // "play the whole album" actions — Play button and Add to Queue —
+  // build their queue from this filtered list instead (#104).
   let playableSongs = $derived(sortedSongs.filter((s) => !s.not_included));
 
   // Default column widths (px or fr) — used when no saved width exists for a column.
@@ -521,24 +521,16 @@
     );
   }
 
-  async function handleShufflePlay() {
-    if (playableSongs.length === 0) return;
-    const shuffledIds = shuffleArray(playableSongs.map((s) => s.id));
-    await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(shuffledIds, 0, undefined, albumPlayContext());
-  }
-
   async function handleAddSongToPlaylist(songId: number) {
     const songObj = songs.find((s) => s.id === songId);
     await playlistsStore.addSongsToActiveTarget([songId], songObj?.title || "Song");
   }
 
-  async function handleAddAlbumToPlaylist() {
+  async function handleAddAlbumToQueue() {
     if (playableSongs.length === 0) return;
-    await playlistsStore.addSongsToActiveTarget(
-      playableSongs.map((s) => s.id),
-      albumName || "Album",
-    );
+    await playlistsStore.addSongsToQueue(playableSongs.map((s) => s.id));
+    const name = albumName || i18n.t("collection.unknownAlbum");
+    toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
   }
 
   function openTagEditor(songId: number) {
@@ -740,22 +732,14 @@
             ? ''
             : 'mt-3'} select-none"
         >
-          <PlayShuffleButtons
-            onPlayAll={handlePlayAll}
-            onShufflePlay={handleShufflePlay}
+          <Button
+            onclick={handlePlayAll}
             disabled={loading || songs.length === 0}
-          />
-          <IconActionButton
-            onclick={handleAddAlbumToPlaylist}
-            disabled={loading || songs.length === 0}
-            title={playlistsStore.activeCustomPlaylist
-              ? i18n.t("albumDetail.addAllToPlaylistTooltip", {
-                  name: playlistsStore.activeCustomPlaylist.name,
-                })
-              : i18n.t("albumDetail.addAllToPlaylistTooltipDefault")}
+            variant="primary"
           >
-            {#snippet icon()}<Plus class="w-4 h-4" />{/snippet}
-          </IconActionButton>
+            <Play class="w-4 h-4" weight="fill" />
+            {i18n.t("artistDetail.playAll")}
+          </Button>
           <IconActionButton
             onclick={() => pinnedStore.toggle("album", albumName)}
             title={pinnedStore.isPinned("album", albumName)
@@ -932,6 +916,16 @@
       overflowMenuPos = null;
     }}
   >
+    <ContextMenuItem
+      icon={Layers}
+      label={i18n.t("playlists.contextMenuAddQueue", {}, "Add to Queue")}
+      onclick={() => {
+        handleAddAlbumToQueue();
+        overflowMenuPos = null;
+      }}
+      disabled={loading || songs.length === 0}
+    />
+    <ContextMenuDivider />
     <ContextMenuItem
       icon={Edit3}
       label={i18n.t("albumDetail.editAlbumDetails", {}, "Edit Album Details")}
