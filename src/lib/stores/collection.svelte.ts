@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { stripEnclosingQuotes } from "../utils/filterParser";
 import { createEventScope } from "../utils/eventScope";
+import { artistMatchesQuery, parseArtistQuery } from "../utils/artistQuery";
 import { i18n } from "./i18n.svelte";
 import type {
   AlbumArtRetrievalResult,
@@ -1586,19 +1587,11 @@ class CollectionStore {
     const rawQuery = this.searchQuery.trim();
     if (rawQuery === "") return this.albums;
 
-    // Check if query is structured search with artist-tag or tag
-    const tagMatch = rawQuery.match(/^(?:artist[-_]?tags?|artisttags?|tags?):(.+)$/i);
-    if (tagMatch) {
-      const tagQuery = tagMatch[1]
-        .replace(/^['"]|['"]$/g, "")
-        .trim()
-        .toLowerCase();
-      if (!tagQuery) return this.albums;
-      return this.albums.filter((album) => {
-        if (!album.artist) return false;
-        const profile = this.artistProfiles[album.artist.toLowerCase()];
-        return profile?.tags?.some((t) => t.toLowerCase().includes(tagQuery)) ?? false;
-      });
+    const structured = parseArtistQuery(rawQuery);
+    if (structured) {
+      return this.albums.filter((album) =>
+        artistMatchesQuery(structured, this.artistProfiles[album.artist?.toLowerCase() ?? ""]),
+      );
     }
 
     const query = rawQuery.toLowerCase();
@@ -1617,19 +1610,11 @@ class CollectionStore {
     const rawQuery = this.searchQuery.trim();
     if (rawQuery === "") return this.artists;
 
-    // Check if query is structured search with artist-tag or tag
-    const tagMatch = rawQuery.match(/^(?:artist[-_]?tags?|artisttags?|tags?):(.+)$/i);
-    if (tagMatch) {
-      const tagQuery = tagMatch[1]
-        .replace(/^['"]|['"]$/g, "")
-        .trim()
-        .toLowerCase();
-      if (!tagQuery) return this.artists;
-      return this.artists.filter((artist) => {
-        if (!artist.name) return false;
-        const profile = this.artistProfiles[artist.name.toLowerCase()];
-        return profile?.tags?.some((t) => t.toLowerCase().includes(tagQuery)) ?? false;
-      });
+    const structured = parseArtistQuery(rawQuery);
+    if (structured) {
+      return this.artists.filter((artist) =>
+        artistMatchesQuery(structured, this.artistProfiles[artist.name?.toLowerCase() ?? ""]),
+      );
     }
 
     const query = rawQuery.toLowerCase();

@@ -167,6 +167,60 @@ describe("CollectionStore - search and tag filtering", () => {
     expect(collectionStore.filteredAlbums[0].album).toBe("Come On Over");
   });
 
+  describe("country: search on Artists and Albums (#2116)", () => {
+    beforeEach(() => {
+      collectionStore.artists = [
+        { name: "Shania Twain" } as ArtistItem,
+        { name: "The Beatles" } as ArtistItem,
+        { name: "Unprofiled" } as ArtistItem,
+        { name: "No Country" } as ArtistItem,
+      ];
+      collectionStore.albums = [
+        { album: "Come On Over", artist: "Shania Twain" } as AlbumItem,
+        { album: "Abbey Road", artist: "The Beatles" } as AlbumItem,
+        { album: "Mystery", artist: "Unprofiled" } as AlbumItem,
+        { album: "Nameless", artist: "" } as AlbumItem,
+        { album: "Blank", artist: "No Country" } as AlbumItem,
+      ];
+      collectionStore.artistProfiles = {
+        "shania twain": { artist_key: "Shania Twain", tags: [], social_links: [], country: "CA" },
+        "the beatles": { artist_key: "The Beatles", tags: [], social_links: [], country: "GB" },
+        "no country": { artist_key: "No Country", tags: [], social_links: [], country: null },
+      };
+    });
+
+    const artistNames = () => collectionStore.filteredArtists.map((a) => a.name);
+    const albumNames = () => collectionStore.filteredAlbums.map((a) => a.album);
+
+    it.each(["country:ca", "country:=ca", "country: CA", "artist-country:Ca", "country:'ca'"])(
+      "matches the whole code with %s",
+      (query) => {
+        collectionStore.searchQuery = query;
+        expect(artistNames()).toEqual(["Shania Twain"]);
+        expect(albumNames()).toEqual(["Come On Over"]);
+      },
+    );
+
+    it("!= includes artists with no profile or no country, and albums with no artist", () => {
+      collectionStore.searchQuery = "country:!=ca";
+      expect(artistNames()).toEqual(["The Beatles", "Unprofiled", "No Country"]);
+      expect(albumNames()).toEqual(["Abbey Road", "Mystery", "Nameless", "Blank"]);
+    });
+
+    it("falls back to plain text for a value that is not a two-letter code", () => {
+      collectionStore.searchQuery = "country:canada";
+      expect(artistNames()).toEqual([]);
+      collectionStore.searchQuery = "country:c";
+      expect(artistNames()).toEqual([]);
+      expect(albumNames()).toEqual([]);
+    });
+
+    it("does not treat other operators as a country filter", () => {
+      collectionStore.searchQuery = "country:>ca";
+      expect(artistNames()).toEqual([]);
+    });
+  });
+
   it("manages recent searches state, deduplication, and persistence", () => {
     collectionStore.clearRecentSearches();
     expect(collectionStore.recentSearches).toHaveLength(0);
