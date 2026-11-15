@@ -16,4 +16,11 @@ describe("PlayerBar dock geometry", () => {
     expect(Number(height?.[1]) * 4).toBe(PLAYER_DOCK_HEIGHT_PX);
     expect(Number(inset?.[1]) * 4).toBe(PLAYER_DOCK_INSET_PX);
   });
+
+  it("has pb-dock and bottom-dock read the one --dock-content-inset variable", () => {
+    const css = read("../app.css");
+    expect(css).toMatch(/@utility pb-dock\s*\{\s*padding-bottom:\s*var\(--dock-content-inset\)/);
+    expect(css).toMatch(/@utility bottom-dock\s*\{\s*bottom:\s*var\(--dock-content-inset\)/);
+    expect(css).toMatch(/:root\s*\{\s*--dock-content-inset:/);
+  });
 });

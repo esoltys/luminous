@@ -27,14 +27,17 @@
 
 /* Bottom padding (pb-dock) that clears the floating PlayerBar dock (see PLAYER_DOCK_* in
    constants.ts). --dock-content-inset is set on <main> by routes/+layout.svelte: the
-   dock's reserve while it is showing, 1.5rem otherwise. */
+   dock's reserve while it is showing; this :root default (1.5rem) applies otherwise. */
+:root {
+  --dock-content-inset: 1.5rem;
+}
 @utility pb-dock {
-  padding-bottom: var(--dock-content-inset, 1.5rem);
+  padding-bottom: var(--dock-content-inset);
 }
 /* Same inset for floating elements anchored to the bottom of the content area (selection
    toolbars, the A-Z scrubber), so they stop where the dock begins. */
 @utility bottom-dock {
-  bottom: var(--dock-content-inset, 1.5rem);
+  bottom: var(--dock-content-inset);
 }
 
 @theme {
