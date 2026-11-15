@@ -200,7 +200,7 @@
     role="group"
     aria-label={i18n.t("topNav.rightPanelRail", {}, "Info sidebar")}
     style:top={dockVisible ? `calc(50% - ${PLAYER_DOCK_CLEARANCE_PX / 2}px)` : "50%"}
-    class="notch-surface absolute right-0 -translate-y-1/2 z-30 h-[60px] w-9 flex items-center justify-center rounded-l-xl border-y border-l border-r-0 border-brand-border bg-brand-sidebar shadow-md {themeStore.isGlassTheme
+    class="notch-surface absolute right-0 -translate-y-1/2 z-30 h-[60px] w-9 flex items-center justify-center rounded-l-xl border-y border-l border-r-0 border-brand-border bg-brand-playerbar shadow-xl {themeStore.isGlassTheme
       ? 'glass-surface'
       : ''}"
     onpointerenter={onNotchEnter}
@@ -246,6 +246,30 @@
 {/if}
 
 <style>
+  /* Keep the notch out of flex flow even when .glass-surface (which sets
+     `position: relative` in app.css) is applied. */
+  .notch-surface {
+    position: absolute;
+  }
+
+  .notch-surface.glass-surface {
+    background-color: var(--glass-bg-playerbar) !important;
+    border-color: var(--glass-border-color, var(--color-border)) !important;
+    box-shadow: var(--glass-shadow, none);
+  }
+
+  /* Match PlayerBar's liquid-glass specular highlight. */
+  .notch-surface.glass-surface::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+      inset 1.5px 1.5px 1px 0 rgba(255, 255, 255, 0.45),
+      inset -1px -1px 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
   /* Docked, nothing renders behind the panel but the flat bg-main canvas, so
      it paints the glass result as a solid color instead of running a
      backdrop-filter (see flatGlassColor() in theme.svelte.ts). Only the inset
