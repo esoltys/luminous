@@ -200,7 +200,7 @@
     role="group"
     aria-label={i18n.t("topNav.rightPanelRail", {}, "Info sidebar")}
     style:top={dockVisible ? `calc(50% - ${PLAYER_DOCK_CLEARANCE_PX / 2}px)` : "50%"}
-    class="notch-surface absolute right-0 -translate-y-1/2 z-30 h-[60px] w-9 flex items-center justify-center rounded-l-xl border-y border-l border-r-0 border-brand-border bg-brand-playerbar shadow-xl {themeStore.isGlassTheme
+    class="notch-surface absolute right-0 -translate-y-1/2 z-30 h-[60px] w-[34px] flex items-center justify-center rounded-l-xl border-y border-l border-r-0 border-brand-border bg-brand-playerbar shadow-xl {themeStore.isGlassTheme
       ? 'glass-surface'
       : ''}"
     onpointerenter={onNotchEnter}
