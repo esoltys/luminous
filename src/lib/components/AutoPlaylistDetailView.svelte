@@ -1116,6 +1116,34 @@
         overflowMenuPos = null;
       }}
     />
+    {#if listedPlaylist || ((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined)}
+      <ContextMenuDivider />
+      {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined}
+        <ContextMenuItem
+          icon={RefreshCw}
+          label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}
+          onclick={() => {
+            handleRefreshAutoPlaylist();
+            overflowMenuPos = null;
+          }}
+          disabled={loading || isRefreshing}
+        />
+      {/if}
+      {#if listedPlaylist}
+        <ContextMenuItem
+          icon={Usb}
+          label={i18n.t("playlists.sizeLimitMenuItem", {
+            value: listedPlaylist.size_limit_bytes
+              ? formatStorageSize(listedPlaylist.size_limit_bytes)
+              : i18n.t("playlists.sizeLimitNotSet"),
+          })}
+          onclick={() => {
+            showSizeLimitPopover = true;
+            overflowMenuPos = null;
+          }}
+        />
+      {/if}
+    {/if}
     <ContextMenuDivider />
     <ContextMenuItem
       icon={Plus}
@@ -1139,31 +1167,6 @@
       }}
       disabled={loading || songs.length === 0}
     />
-    {#if listedPlaylist}
-      <ContextMenuItem
-        icon={Usb}
-        label={i18n.t("playlists.sizeLimitMenuItem", {
-          value: listedPlaylist.size_limit_bytes
-            ? formatStorageSize(listedPlaylist.size_limit_bytes)
-            : i18n.t("playlists.sizeLimitNotSet"),
-        })}
-        onclick={() => {
-          showSizeLimitPopover = true;
-          overflowMenuPos = null;
-        }}
-      />
-    {/if}
-    {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined}
-      <ContextMenuItem
-        icon={RefreshCw}
-        label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}
-        onclick={() => {
-          handleRefreshAutoPlaylist();
-          overflowMenuPos = null;
-        }}
-        disabled={loading || isRefreshing}
-      />
-    {/if}
 
     {#if kind === "missing_metadata" || kind === "missing_musicbrainz"}
       {@const picardTargets =
