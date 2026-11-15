@@ -166,6 +166,22 @@ describe("playlist utils", () => {
     expect(getPlaylistDisplayName(playlist)).toBe("Metal; Death Metal Favourites (Smart)");
   });
 
+  it("appends the population-mode suffix to a Smart Playlist like an auto category", () => {
+    const playlist: Playlist = {
+      id: 11,
+      name: "Canadian",
+      dynamic_spec: "genre:canadian",
+      population_mode: "deep_cuts",
+      created: 100,
+      updated: 100,
+      track_count: 8,
+      dynamic_enabled: true,
+      is_queue: false,
+    };
+    expect(getPlaylistDisplayName(playlist)).toBe("Canadian Deep Cuts");
+    expect(getPlaylistDisplayName({ ...playlist, population_mode: "all" })).toBe("Canadian");
+  });
+
   it("never appends a population-mode suffix to the Missing Metadata auto-playlist (#367)", () => {
     const playlist: Playlist = {
       id: 11,

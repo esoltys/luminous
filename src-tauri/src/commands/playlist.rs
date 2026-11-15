@@ -441,18 +441,22 @@ pub async fn set_playlist_dynamic_config(
 /// Persist the `population_mode` bias (All/Favourites/Familiar/Discover/Deep
 /// Cuts, see #120) for a playlist, and immediately regenerate its tracks so
 /// the change takes effect right away rather than waiting for the next
-/// scheduled/manual refresh.
+/// scheduled/manual refresh. Announces `playlists-changed`: the mode is part
+/// of the playlist's display name, so pins and open views must pick it up.
 #[tauri::command]
 pub async fn set_playlist_population_mode(
     playlist_id: i64,
     mode: QueuePopulationMode,
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     with_playlists(&state, |pm| {
         pm.set_playlist_population_mode(playlist_id, mode)?;
         pm.refresh_auto_playlist(playlist_id)
     })
-    .await
+    .await?;
+    let _ = tauri::Emitter::emit(&app, "playlists-changed", vec![playlist_id]);
+    Ok(())
 }
 
 /// Force-regenerates one auto-playlist's tracks from the library (e.g. when

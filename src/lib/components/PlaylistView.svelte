@@ -40,11 +40,7 @@
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
-  import {
-    autoContinueRunStarts,
-    getPlaylistDisplayName,
-    getPopulationModeSuffix,
-  } from "../utils/playlist";
+  import { autoContinueRunStarts, getPlaylistDisplayName } from "../utils/playlist";
   import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -288,15 +284,9 @@
       isSmartPlaylistSpec(activePlaylist.dynamic_spec),
   );
 
-  // A smart playlist's title carries its population mode ("Canadian Deep Cuts")
-  // the way an auto playlist's does. Display only: the stored name, and what
-  // rename edits, stay the bare name.
-  let displayTitle = $derived.by(() => {
-    if (!activePlaylist) return "";
-    const base = isQueue ? getPlaylistDisplayName(activePlaylist) : activePlaylist.name;
-    const suffix = isSmartPlaylist ? getPopulationModeSuffix(activePlaylist.population_mode) : "";
-    return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
-  });
+  // Title shown everywhere (header, sidebar, Home): a smart playlist's carries its
+  // population mode ("Canadian Deep Cuts"). Display only: rename edits the bare name.
+  let displayTitle = $derived(getPlaylistDisplayName(activePlaylist));
 
   function handleEditSmartPlaylist() {
     if (!activePlaylist) return;
