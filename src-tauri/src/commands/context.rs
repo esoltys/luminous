@@ -158,6 +158,7 @@ pub async fn get_song_context(
     song_id: i64,
     force_refresh: Option<bool>,
     locale: Option<String>,
+    app: tauri::AppHandle,
 ) -> Result<SongContextEnrichment, String> {
     let force_refresh = force_refresh.unwrap_or(false);
     let wiki_lang = crate::context::wikipedia_language(locale.as_deref());
@@ -297,13 +298,20 @@ pub async fn get_song_context(
             .map(|c| {
                 is_cache_fresh(c.fetched_at, now)
                     && c.sort_name.is_some()
+                    // A row cached before migration 85 has no country yet (#2095).
+                    && c.country.is_some()
                     && c.wikipedia_lang.as_deref().unwrap_or("en") == wiki_lang
             })
             .unwrap_or(false);
 
+        // What MusicBrainz says this artist's country is, from whichever path
+        // below supplies the details; it fills a blank profile country.
+        let mut artist_country: Option<String> = None;
+
         if fresh && !force_refresh {
             if let Some(ref row) = cached {
                 apply_artist_cache(&mut result, row);
+                artist_country = row.country.clone();
             }
         } else {
             let db_clone = db.clone();
@@ -364,8 +372,10 @@ pub async fn get_song_context(
                 result.artist_begin_area_mbid = details.begin_area_mbid.clone();
                 result.artist_area_name = details.area_name.clone();
                 result.artist_area_mbid = details.area_mbid.clone();
+                artist_country = details.country.clone();
                 result.fetched_at = Some(now);
             } else if let Some(ref c) = cached {
+                artist_country = c.country.clone();
                 result.artist_sort_name = c.sort_name.clone();
                 result.artist_type = c.artist_type.clone();
                 result.artist_gender = c.gender.clone();
@@ -398,6 +408,8 @@ pub async fn get_song_context(
                 }
             }
         }
+
+        backfill_artist_country(&app, artist_id, artist_country.as_deref()).await;
     }
 
     Ok(result)
@@ -530,6 +542,9 @@ struct ArtistCacheRow {
     begin_area_mbid: Option<String>,
     area_name: Option<String>,
     area_mbid: Option<String>,
+    /// Alpha-2 country MusicBrainz gave the artist; `""` when it has none, and
+    /// `None` for rows cached before migration 85 (stale once, so it is fetched).
+    country: Option<String>,
     /// Language the bio was requested in; `None` for rows from before migration 61.
     wikipedia_lang: Option<String>,
     fetched_at: i64,
@@ -561,7 +576,8 @@ async fn read_artist_cache(
         conn.query_row(
             "SELECT wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url,
                     sort_name, artist_type, gender, begin_date, end_date, ended,
-                    begin_area_name, begin_area_mbid, area_name, area_mbid, fetched_at, wikipedia_lang
+                    begin_area_name, begin_area_mbid, area_name, area_mbid, fetched_at, wikipedia_lang,
+                    country
              FROM artist_context_enrichment WHERE artist_id = ?1",
             params![artist_id],
             |row| {
@@ -582,6 +598,7 @@ async fn read_artist_cache(
                     area_mbid: row.get(12)?,
                     fetched_at: row.get(13)?,
                     wikipedia_lang: row.get(14)?,
+                    country: row.get(15)?,
                 })
             },
         )
@@ -612,8 +629,8 @@ async fn write_artist_cache(
             "INSERT INTO artist_context_enrichment
                 (artist_id, wikidata_id, wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url,
                  sort_name, artist_type, gender, begin_date, end_date, ended,
-                 begin_area_name, begin_area_mbid, area_name, area_mbid, fetched_at, wikipedia_lang)
-             VALUES (?1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+                 begin_area_name, begin_area_mbid, area_name, area_mbid, fetched_at, wikipedia_lang, country)
+             VALUES (?1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
              ON CONFLICT(artist_id) DO UPDATE SET
                 wikipedia_extract = CASE WHEN excluded.wikipedia_extract IS NOT NULL THEN excluded.wikipedia_extract ELSE artist_context_enrichment.wikipedia_extract END,
                 wikipedia_page_url = CASE WHEN excluded.wikipedia_page_url IS NOT NULL THEN excluded.wikipedia_page_url ELSE artist_context_enrichment.wikipedia_page_url END,
@@ -629,6 +646,7 @@ async fn write_artist_cache(
                 area_name = CASE WHEN excluded.area_name IS NOT NULL THEN excluded.area_name ELSE artist_context_enrichment.area_name END,
                 area_mbid = CASE WHEN excluded.area_mbid IS NOT NULL THEN excluded.area_mbid ELSE artist_context_enrichment.area_mbid END,
                 wikipedia_lang = CASE WHEN excluded.wikipedia_lang IS NOT NULL THEN excluded.wikipedia_lang ELSE artist_context_enrichment.wikipedia_lang END,
+                country = CASE WHEN excluded.country IS NOT NULL THEN excluded.country ELSE artist_context_enrichment.country END,
                 fetched_at = excluded.fetched_at",
             params![
                 artist_id,
@@ -647,12 +665,42 @@ async fn write_artist_cache(
                 details.as_ref().and_then(|d| d.area_mbid.clone()),
                 fetched_at,
                 wikipedia_lang,
+                // `""` records "MusicBrainz was asked and has no country".
+                details.as_ref().map(|d| d.country.clone().unwrap_or_default()),
             ],
         )?;
         Ok(())
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+/// Fills a blank profile country from what MusicBrainz said for `artist_id`, and
+/// tells the rest of the app only when a profile actually changed: smart
+/// playlists are re-checked (a country rule can now match) and the frontend
+/// refreshes that profile's cached copy.
+async fn backfill_artist_country(app: &tauri::AppHandle, artist_id: &str, country: Option<&str>) {
+    use tauri::{Emitter, Manager};
+
+    let Some(country) = country.filter(|c| !c.is_empty()) else {
+        return;
+    };
+    let state = app.state::<AppState>();
+    let (id, code) = (artist_id.to_string(), country.to_string());
+    let changed = crate::db::run_blocking(&state.db, move |conn| {
+        crate::collection::fill_blank_artist_country_by_mbid_conn(conn, &id, &code)
+    })
+    .await;
+    match changed {
+        Ok(keys) if !keys.is_empty() => {
+            for key in keys {
+                let _ = app.emit("artist-profile-changed", key);
+            }
+            crate::playlist::reconcile_and_sync(app.clone()).await;
+        }
+        Ok(_) => {}
+        Err(e) => log::warn!("Filling the artist country failed: {e}"),
+    }
 }
 
 /// Fetches upcoming and recent concerts, tour dates, and festival appearances
@@ -923,6 +971,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_artist_cache_country_distinguishes_unknown_from_none_and_is_not_lost() {
+        let (_temp_dir, db) = temp_db("artist_cache_country");
+        let db = Arc::new(db);
+        let details = |country: Option<&str>| crate::context::MusicBrainzArtistDetails {
+            sort_name: Some("Sort".to_string()),
+            country: country.map(str::to_string),
+            ..Default::default()
+        };
+        let country_of = |db: &Arc<Database>, id: &'static str| {
+            let db = db.clone();
+            async move { read_artist_cache(&db, id).await.unwrap().unwrap().country }
+        };
+
+        // MusicBrainz answered with no country: "" (checked), not NULL (never checked).
+        write_artist_cache(&db, "none", &None, &Some(details(None)), None, 1)
+            .await
+            .unwrap();
+        assert_eq!(country_of(&db, "none").await.as_deref(), Some(""));
+
+        // A row cached before the column existed reads NULL, so it counts as stale.
+        {
+            let conn = db.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO artist_context_enrichment (artist_id, sort_name, fetched_at) VALUES ('old', 'Sort', 1)",
+                [],
+            )
+            .unwrap();
+        }
+        assert_eq!(country_of(&db, "old").await, None);
+
+        // A later write with no details (bio only) keeps the stored country.
+        write_artist_cache(&db, "kept", &None, &Some(details(Some("US"))), None, 1)
+            .await
+            .unwrap();
+        write_artist_cache(&db, "kept", &None, &None, None, 2)
+            .await
+            .unwrap();
+        assert_eq!(country_of(&db, "kept").await.as_deref(), Some("US"));
+    }
+
+    #[tokio::test]
     async fn test_write_and_read_artist_cache_with_mb_details() {
         let (_temp_dir, db) = temp_db("artist_cache_mb_details");
         let db = Arc::new(db);
@@ -937,6 +1026,7 @@ mod tests {
             begin_area_mbid: Some("e4f1e288-92a0-4f36-8f0e-23397e261a99".to_string()),
             area_name: Some("Canada".to_string()),
             area_mbid: Some("71bbafaa-e825-3e15-8ca9-017dcad1748b".to_string()),
+            country: Some("CA".to_string()),
         };
         let bio = crate::context::WikipediaSummary {
             extract: "Shania Twain is a Canadian singer-songwriter.".to_string(),
@@ -977,6 +1067,7 @@ mod tests {
         );
         assert_eq!(cached.fetched_at, 1000);
         assert_eq!(cached.wikipedia_lang.as_deref(), Some("fr"));
+        assert_eq!(cached.country.as_deref(), Some("CA"));
 
         let mut enrichment = SongContextEnrichment::default();
         apply_artist_cache(&mut enrichment, &cached);

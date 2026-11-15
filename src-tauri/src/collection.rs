@@ -52,6 +52,7 @@ pub mod safeguard;
 mod scan_gate;
 pub mod suggestions;
 mod watcher;
+pub(crate) use query::fill_blank_artist_country_by_mbid_conn;
 pub(crate) use query::get_artist_profile_conn;
 pub(crate) use query::normalize_country_code;
 #[cfg(test)]

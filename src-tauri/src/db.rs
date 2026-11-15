@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 84;
+pub const CURRENT_SCHEMA_VERSION: i32 = 85;
 
 struct Migration {
     version: i32,
@@ -835,6 +835,25 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_country {
                 conn.execute_batch("ALTER TABLE artist_profiles ADD COLUMN country TEXT;")?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 85,
+        description: "artist_context_enrichment.country: cached MusicBrainz artist country (#2095)",
+        apply: |conn| {
+            let has_country: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('artist_context_enrichment') WHERE name = 'country'",
+                )?
+                .exists([])?;
+            if !has_country {
+                // NULL = cached before this column existed (stale once, so the
+                // country is fetched); '' = MusicBrainz has none for the artist.
+                conn.execute_batch(
+                    "ALTER TABLE artist_context_enrichment ADD COLUMN country TEXT;",
+                )?;
             }
             Ok(())
         },
