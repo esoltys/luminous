@@ -13,6 +13,7 @@
     FileMenuTarget,
     FileSource,
   } from "../../types";
+  import { windowLayoutStore } from "../../stores/windowLayout.svelte";
   import Button from "../Button.svelte";
   import AlphabetScrubber from "../AlphabetScrubber.svelte";
   import { shownName } from "./shownName";
@@ -820,7 +821,11 @@
               </VirtualList>
             </div>
             {#if sortColumn === "name"}
-              <div class="absolute right-2 top-2 bottom-2 pointer-events-auto z-20">
+              <div
+                class="absolute {windowLayoutStore.hasRightNotch
+                  ? 'right-10'
+                  : 'right-2'} top-2 bottom-2 pointer-events-auto z-20"
+              >
                 <AlphabetScrubber
                   items={sortedEntries}
                   getKey={(entry) => shownName(entry.name, entry.missingTag)}

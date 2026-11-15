@@ -43,7 +43,7 @@
 
   const layout = windowLayoutStore;
   let docked = $derived(layout.rightPanelPinned && !layout.isRightPanelAutoHidden);
-  let showNotch = $derived(!layout.rightPanelPinned && !layout.isRightPanelAutoHidden);
+  let showNotch = $derived(layout.hasRightNotch);
   let showOverlay = $derived(showNotch && layout.rightPanelPeeking);
 
   function later(fn: () => void, ms: number) {

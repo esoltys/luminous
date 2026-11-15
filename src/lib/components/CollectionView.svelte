@@ -7,6 +7,7 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
@@ -599,10 +600,12 @@
             />
           </div>
           {#if isSongSortAlphabetical}
-            <!-- In the px-6 gutter just right of the table (not over its rows), spanning the
-                 table's full height; the parent's playbar padding already bounds the bottom. -->
+            <!-- In the px-6 gutter just right of the table when pinned/hidden, or shifted
+                 inward to clear the right-edge info notch when unpinned. -->
             <div
-              class="absolute left-full ml-0.5 top-0 bottom-0 pointer-events-auto z-20"
+              class="absolute {windowLayoutStore.hasRightNotch
+                ? 'right-4'
+                : 'left-full ml-0.5'} top-0 bottom-0 pointer-events-auto z-20"
               data-testid="alphabet-scrubber-bounds"
             >
               <AlphabetScrubber
@@ -856,7 +859,9 @@
             <!-- Spans the list area only: starts under the header (measured, since it wraps
                  and collapses) and stops where the floating playbar begins. -->
             <div
-              class="absolute right-2.5 pointer-events-auto z-20 bottom-dock"
+              class="absolute {windowLayoutStore.hasRightNotch
+                ? 'right-10'
+                : 'right-2.5'} pointer-events-auto z-20 bottom-dock"
               style:top="{gridHeaderHeight}px"
               data-testid="alphabet-scrubber-bounds"
             >
