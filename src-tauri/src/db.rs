@@ -838,42 +838,30 @@ const MIGRATIONS: &[Migration] = &[
 /// the most filled-in fields. Its empty fields are filled from the others;
 /// tags and social links are unioned, flags OR-ed.
 fn migrate_artist_profile_keys_nocase(conn: &rusqlite::Connection) -> Result<()> {
-    type Row = (
-        String,
-        Option<String>,
-        String,
-        String,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        [i64; 4],
-        Option<String>,
-        Option<String>,
-    );
-
-    let mut rows: Vec<Row> = {
+    let rows: Vec<ProfileRow83> = {
         let mut stmt = conn.prepare(
             "SELECT artist_key, website, tags, social_links, bio, musicbrainz_artist_id,
                     fetched_image_filename, fetched_image_source,
-                    details_fetched, image_fetched, logo_fetched, background_fetched,
-                    fetched_logo_filename, fetched_background_filename
+                    fetched_logo_filename, fetched_background_filename,
+                    details_fetched, image_fetched, logo_fetched, background_fetched
              FROM artist_profiles ORDER BY artist_key",
         )?;
         let mapped = stmt.query_map([], |r| {
-            Ok((
-                r.get(0)?,
-                r.get(1)?,
-                r.get(2)?,
-                r.get(3)?,
-                r.get(4)?,
-                r.get(5)?,
-                r.get(6)?,
-                r.get(7)?,
-                [r.get(8)?, r.get(9)?, r.get(10)?, r.get(11)?],
-                r.get(12)?,
-                r.get(13)?,
-            ))
+            Ok(ProfileRow83 {
+                artist_key: r.get(0)?,
+                tags: r.get(2)?,
+                social_links: r.get(3)?,
+                text: [
+                    r.get(1)?,
+                    r.get(4)?,
+                    r.get(5)?,
+                    r.get(6)?,
+                    r.get(7)?,
+                    r.get(8)?,
+                    r.get(9)?,
+                ],
+                flags: [r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?],
+            })
         })?;
         mapped.collect::<rusqlite::Result<_>>()?
     };
@@ -887,20 +875,13 @@ fn migrate_artist_profile_keys_nocase(conn: &rusqlite::Connection) -> Result<()>
         names.collect::<rusqlite::Result<_>>()?
     };
 
-    let filled = |s: &Option<String>| s.as_deref().is_some_and(|v| !v.trim().is_empty());
-    let score = |r: &Row| -> usize {
-        [&r.1, &r.4, &r.5, &r.6, &r.7, &r.9, &r.10]
-            .iter()
-            .filter(|f| filled(f))
-            .count()
-            + usize::from(r.2 != "[]")
-            + usize::from(r.3 != "[]")
-    };
-
     // Group by case-folded key; each group is merged into a single row.
-    let mut groups: std::collections::BTreeMap<String, Vec<Row>> = Default::default();
-    for row in rows.drain(..) {
-        groups.entry(row.0.to_lowercase()).or_default().push(row);
+    let mut groups: std::collections::BTreeMap<String, Vec<ProfileRow83>> = Default::default();
+    for row in rows {
+        groups
+            .entry(row.artist_key.to_lowercase())
+            .or_default()
+            .push(row);
     }
 
     conn.execute_batch(
@@ -926,54 +907,37 @@ fn migrate_artist_profile_keys_nocase(conn: &rusqlite::Connection) -> Result<()>
         // Best row first: library spelling, then most data, then key order.
         group.sort_by(|a, b| {
             in_library
-                .contains(&b.0)
-                .cmp(&in_library.contains(&a.0))
-                .then(score(b).cmp(&score(a)))
+                .contains(&b.artist_key)
+                .cmp(&in_library.contains(&a.artist_key))
+                .then(b.completeness().cmp(&a.completeness()))
         });
         let mut merged = group.remove(0);
         for other in group {
-            for (dst, src) in [
-                (&mut merged.1, other.1),
-                (&mut merged.4, other.4),
-                (&mut merged.5, other.5),
-                (&mut merged.6, other.6),
-                (&mut merged.7, other.7),
-                (&mut merged.9, other.9),
-                (&mut merged.10, other.10),
-            ] {
-                if !filled(dst) {
-                    *dst = src;
-                }
-            }
-            for i in 0..4 {
-                merged.8[i] |= other.8[i];
-            }
-            merged.2 = union_json_array(&merged.2, &other.2, |v| {
-                v.as_str().map(|s| s.to_lowercase())
-            });
-            merged.3 = union_json_array(&merged.3, &other.3, |v| Some(v.to_string()));
+            merged.absorb(other);
         }
+        let [website, bio, mbid, image, image_source, logo, background] = &merged.text;
+        let [details, image_fetched, logo_fetched, background_fetched] = merged.flags;
         conn.execute(
             "INSERT INTO artist_profiles_new (artist_key, website, tags, social_links, bio,
                 musicbrainz_artist_id, fetched_image_filename, fetched_image_source,
-                details_fetched, image_fetched, logo_fetched, background_fetched,
-                fetched_logo_filename, fetched_background_filename)
+                fetched_logo_filename, fetched_background_filename,
+                details_fetched, image_fetched, logo_fetched, background_fetched)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
-                merged.0,
-                merged.1,
-                merged.2,
-                merged.3,
-                merged.4,
-                merged.5,
-                merged.6,
-                merged.7,
-                merged.8[0],
-                merged.8[1],
-                merged.8[2],
-                merged.8[3],
-                merged.9,
-                merged.10
+                merged.artist_key,
+                website,
+                merged.tags,
+                merged.social_links,
+                bio,
+                mbid,
+                image,
+                image_source,
+                logo,
+                background,
+                details,
+                image_fetched,
+                logo_fetched,
+                background_fetched
             ],
         )?;
     }
@@ -983,6 +947,47 @@ fn migrate_artist_profile_keys_nocase(conn: &rusqlite::Connection) -> Result<()>
          ALTER TABLE artist_profiles_new RENAME TO artist_profiles;",
     )?;
     Ok(())
+}
+
+/// One pre-83 `artist_profiles` row, as migration 83 merges them. `text` holds
+/// the nullable text columns in the order: website, bio, musicbrainz id,
+/// fetched image filename, fetched image source, fetched logo filename,
+/// fetched background filename. `flags` holds `details_fetched`,
+/// `image_fetched`, `logo_fetched`, `background_fetched`.
+struct ProfileRow83 {
+    artist_key: String,
+    tags: String,
+    social_links: String,
+    text: [Option<String>; 7],
+    flags: [i64; 4],
+}
+
+impl ProfileRow83 {
+    fn completeness(&self) -> usize {
+        let filled = |s: &Option<String>| s.as_deref().is_some_and(|v| !v.trim().is_empty());
+        self.text.iter().filter(|s| filled(s)).count()
+            + usize::from(self.tags != "[]")
+            + usize::from(self.social_links != "[]")
+    }
+
+    /// Fills this row's empty fields from `other`, unions the tag and link
+    /// lists (tags compared case-insensitively) and OR-s the flags.
+    fn absorb(&mut self, other: ProfileRow83) {
+        for (mine, theirs) in self.text.iter_mut().zip(other.text) {
+            if mine.as_deref().is_none_or(|v| v.trim().is_empty()) {
+                *mine = theirs;
+            }
+        }
+        for (mine, theirs) in self.flags.iter_mut().zip(other.flags) {
+            *mine |= theirs;
+        }
+        self.tags = union_json_array(&self.tags, &other.tags, |v| {
+            v.as_str().map(|s| s.to_lowercase())
+        });
+        self.social_links = union_json_array(&self.social_links, &other.social_links, |v| {
+            Some(v.to_string())
+        });
+    }
 }
 
 /// Union of two JSON arrays, keeping `a`'s order first and dropping any `b`

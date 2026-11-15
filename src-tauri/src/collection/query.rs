@@ -2016,6 +2016,17 @@ fn canonicalize_artist_tag_casing(
 /// it — when the library has one; otherwise the name as given. Every write
 /// below resolves through here, and an upsert rewrites a stale spelling.
 fn canonical_artist_key(conn: &rusqlite::Connection, artist: &str) -> Result<String> {
+    // Fast path: the name is already a library spelling (what the app itself
+    // passes). `idx_songs_artist` serves it; only a differently-cased name
+    // pays the scan below, which no index can serve.
+    let exact: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM songs WHERE artist = ?1)",
+        params![artist],
+        |row| row.get(0),
+    )?;
+    if exact {
+        return Ok(artist.to_string());
+    }
     let spelling: Option<String> = conn
         .query_row(
             "SELECT COALESCE(NULLIF(album_artist, ''), artist) FROM songs
@@ -2036,8 +2047,10 @@ pub fn set_artist_profile_conn(
     conn: &rusqlite::Connection,
     profile: &ArtistProfile,
 ) -> Result<ArtistProfile> {
-    let mut profile = profile.clone();
-    profile.artist_key = canonical_artist_key(conn, &profile.artist_key)?;
+    let profile = ArtistProfile {
+        artist_key: canonical_artist_key(conn, &profile.artist_key)?,
+        ..profile.clone()
+    };
     let profile = &profile;
     let tags_json = serde_json::to_string(&profile.tags)?;
     let social_links_json = serde_json::to_string(&profile.social_links)?;
@@ -3807,6 +3820,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(saved.artist_key, "The War on Drugs");
+
+        // The library's own spelling (the common case) resolves to itself.
+        assert_eq!(
+            canonical_artist_key(&conn, "The War on Drugs").unwrap(),
+            "The War on Drugs"
+        );
 
         // Scoped writes under yet another casing hit the same row.
         set_artist_bio_conn(&conn, "THE WAR ON DRUGS", Some("Philadelphia band")).unwrap();
