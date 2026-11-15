@@ -16,7 +16,7 @@ Moved out of `AGENTS.md`; read this before any UI, animation, copy or locale cha
 
 - **Explicit-action-only celebrations**: Micro-animations (heart pulse, confetti, etc.) must fire only in
   response to a deliberate user interaction (e.g., a click handler). Never trigger them from a reactive
-  `$effect` or a prop-change watcher — doing so causes false positives when the track changes and a
+  `$effect` or a prop-change watcher — doing so causes false positives when the song changes and a
   different (already-favourited) song loads. Enforced by `celebration-in-effect`.
 
 - **Motion budget**: every animation must name its purpose — feedback, spatial continuity, state
@@ -87,6 +87,10 @@ Moved out of `AGENTS.md`; read this before any UI, animation, copy or locale cha
 - **Icon semantics**: Avoid icons that imply system-level tracking or achievement recording (e.g.,
   `<Trophy>`). For milestone/completion moments, prefer neutral icons like `<Star>` that convey
   "special" without implying a leaderboard or achievement system.
+
+- **"Song" is the user-facing noun**: UI copy, locale strings and the user guide say "song". Keep
+  "track" for the audio/metadata senses (track number, CUE track) and for identifiers and MCP tool
+  names, which are external contracts.
 
 - **Instructive, not descriptive, copy voice**: Hint/help text under a toggle, button, or tab should
   tell the user what to do or what happens when they act ("Scan watched folders for new files"), not
