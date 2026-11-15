@@ -7,7 +7,6 @@
   import ShareModal from "./ShareModal.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
-  import { playerStore } from "../stores/player.svelte";
   import type { StatsRange, StatsSummary, StatsTopItem } from "../types";
   import { bucketListeningClock } from "../utils/listeningClock";
   import type { DaypartBucket } from "../utils/daypart";
@@ -116,11 +115,7 @@
 <div
   class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative"
 >
-  <div
-    class="flex-1 overflow-y-auto px-6 pb-12"
-    class:pb-28={!!playerStore.currentSong}
-    use:rememberScroll={"stats"}
-  >
+  <div class="flex-1 overflow-y-auto px-6 pb-dock" use:rememberScroll={"stats"}>
     <div class="pt-4 pb-4">
       <div class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">

@@ -571,11 +571,7 @@
         </CollectionHeader>
       </div>
 
-      <div
-        class="flex-1 px-6 overflow-hidden flex flex-col {playerStore.currentSong
-          ? 'pb-28'
-          : 'pb-6'}"
-      >
+      <div class="flex-1 px-6 overflow-hidden flex flex-col pb-dock">
         <div class="relative flex-1 min-h-0 flex">
           <div
             class="flex-1 overflow-y-auto border border-brand-border rounded-lg bg-brand-sidebar/40 min-h-0"
@@ -618,7 +614,7 @@
       <div class="flex-1 min-h-0 flex flex-col">
         <div class="relative flex-1 min-h-0 flex flex-col">
           <div
-            class="flex-1 overflow-y-auto min-h-0 {playerStore.currentSong ? 'pb-28' : 'pb-6'}"
+            class="flex-1 overflow-y-auto min-h-0 pb-dock"
             use:rememberScroll={`collection:${navigationStore.activeSubTab}`}
           >
             <CollectionHeader

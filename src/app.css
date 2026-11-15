@@ -25,6 +25,13 @@
   @apply text-[11px] font-semibold;
 }
 
+/* Bottom padding that clears the floating PlayerBar dock (see PLAYER_DOCK_* in
+   constants.ts). --dock-content-inset is set on <main> by routes/+layout.svelte: the
+   dock's reserve while it is showing, 1.5rem otherwise. */
+@utility pb-dock {
+  padding-bottom: var(--dock-content-inset, 1.5rem);
+}
+
 @theme {
   /* Window-size tiers (issue #1154). Pinned in px so they equal window.innerWidth exactly;
      mirrored by BREAKPOINT_*_PX in src/lib/constants.ts (breakpoints.test.ts keeps them equal).

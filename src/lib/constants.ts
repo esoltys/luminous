@@ -17,13 +17,26 @@ export const CONTEXT_MENU_LAYER_ATTR = "data-context-menu-layer";
 /** Minimum gap kept between a floating menu/modal and the edge of the viewport. */
 export const VIEWPORT_EDGE_PADDING_PX = 10;
 
-/**
- * The floating PlayerBar dock (h-20 + bottom-4 inset ≈ 96px) sits on top of
- * page content whenever a song is loaded. Anything that positions itself
- * near the bottom of the viewport (context menus, modals) needs to clamp
- * above it so it isn't hidden underneath.
+/*
+ * The floating PlayerBar dock's geometry, defined once. It sits on top of page
+ * content whenever a song is loaded.
+ *
+ * - Height and inset are mirrored by the dock's `h-20` (PlayerBar.svelte) and
+ *   `bottom-4` (routes/+layout.svelte) classes; playerDock.test.ts keeps them equal.
+ * - Floating menus and modals clamp above PLAYER_DOCK_CLEARANCE_PX.
+ * - Scrolling views pad their bottom by PLAYER_DOCK_CONTENT_RESERVE_PX (the clearance
+ *   plus a gap) through the `pb-dock` utility, which reads the `--dock-content-inset`
+ *   variable the layout sets on <main>. Never hand-write `pb-28`/`pb-6` for this.
+ *   Portaled UI that can't inherit the variable (ColumnSelector) imports the constant.
+ *
+ * Deliberately not covered: RightPanel's `mb-24` and the immersive face's `pb-32`,
+ * which size against different geometry.
  */
-export const PLAYER_DOCK_CLEARANCE_PX = 96;
+export const PLAYER_DOCK_HEIGHT_PX = 80;
+export const PLAYER_DOCK_INSET_PX = 16;
+const PLAYER_DOCK_CONTENT_GAP_PX = 16;
+export const PLAYER_DOCK_CLEARANCE_PX = PLAYER_DOCK_HEIGHT_PX + PLAYER_DOCK_INSET_PX;
+export const PLAYER_DOCK_CONTENT_RESERVE_PX = PLAYER_DOCK_CLEARANCE_PX + PLAYER_DOCK_CONTENT_GAP_PX;
 
 /** Sidebar width bounds (routes/+layout.svelte resize handle, Sidebar.svelte collapse threshold). */
 export const SIDEBAR_MIN_WIDTH_PX = 180;

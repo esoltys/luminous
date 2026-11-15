@@ -3,7 +3,6 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { playerStore } from "../stores/player.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import type { HomeItem, StatsTopItem, TopAlbumItem, ScanProgress } from "../types";
   import type { AlbumStatsPayload } from "../utils/stats";
@@ -154,10 +153,7 @@
 </script>
 
 <div class="flex flex-col h-full w-full bg-brand-main overflow-hidden">
-  <div
-    class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}"
-    use:rememberScroll={"home"}
-  >
+  <div class="flex-1 overflow-y-auto pb-dock" use:rememberScroll={"home"}>
     {#if !showEmptyWelcome}
       <div class="px-6 pt-6">
         <h1

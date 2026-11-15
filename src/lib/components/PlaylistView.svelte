@@ -1001,7 +1001,7 @@
         </div>
       </div>
 
-      <div class="p-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
+      <div class="p-6 flex flex-col pb-dock">
         <div
           class="border border-brand-border/60 rounded-xl acrylic-chrome relative overflow-hidden"
         >

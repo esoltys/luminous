@@ -6,6 +6,7 @@
   import { portal } from "../utils/portal";
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
   import { TableIcon as Columns } from "phosphor-svelte";
+  import { PLAYER_DOCK_CONTENT_RESERVE_PX } from "../constants";
 
   interface Props {
     align?: "left" | "right";
@@ -25,8 +26,6 @@
   const MENU_GAP_PX = 8; // mt-2
   const MENU_MAX_HEIGHT_PX = 448; // 28rem ceiling
   const MENU_MIN_HEIGHT_PX = 160;
-  // Matches the pb-28 bottom padding views reserve elsewhere to clear the floating PlayerBar dock.
-  const PLAYERBAR_RESERVE_PX = 112;
   const PAGE_BOTTOM_MARGIN_PX = 16;
 
   let menuMaxHeight = $state(MENU_MAX_HEIGHT_PX);
@@ -41,7 +40,9 @@
   function updateMenuPosition() {
     if (!buttonEl) return;
     const rect = buttonEl.getBoundingClientRect();
-    const reserve = playerStore.currentSong ? PLAYERBAR_RESERVE_PX : PAGE_BOTTOM_MARGIN_PX;
+    const reserve = playerStore.currentSong
+      ? PLAYER_DOCK_CONTENT_RESERVE_PX
+      : PAGE_BOTTOM_MARGIN_PX;
     const available = window.innerHeight - rect.bottom - MENU_GAP_PX - reserve;
     menuMaxHeight = Math.max(MENU_MIN_HEIGHT_PX, Math.min(MENU_MAX_HEIGHT_PX, available));
     menuTop = rect.bottom + MENU_GAP_PX;
@@ -55,7 +56,9 @@
 
   /** Opens the menu at an arbitrary viewport position — used when there's no trigger button, e.g. a right-click. */
   export function openAt(x: number, y: number) {
-    const reserve = playerStore.currentSong ? PLAYERBAR_RESERVE_PX : PAGE_BOTTOM_MARGIN_PX;
+    const reserve = playerStore.currentSong
+      ? PLAYER_DOCK_CONTENT_RESERVE_PX
+      : PAGE_BOTTOM_MARGIN_PX;
     const available = window.innerHeight - y - MENU_GAP_PX - reserve;
     menuMaxHeight = Math.max(MENU_MIN_HEIGHT_PX, Math.min(MENU_MAX_HEIGHT_PX, available));
     menuTop = y;

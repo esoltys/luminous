@@ -1,7 +1,6 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { playerStore } from "../stores/player.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { organizeStore } from "../stores/organizer.svelte";
   import OrganizeFiles from "./OrganizeFiles.svelte";
@@ -82,11 +81,7 @@
 <div
   class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative"
 >
-  <div
-    class="flex-1 overflow-y-auto px-6 pb-12"
-    class:pb-28={!!playerStore.currentSong}
-    use:rememberScroll={"organize"}
-  >
+  <div class="flex-1 overflow-y-auto px-6 pb-dock" use:rememberScroll={"organize"}>
     <div class="pt-4 pb-4 flex items-start justify-between gap-4">
       {#if organizeReadyCount === 0 && waitingSongCount === 0}
         <span
