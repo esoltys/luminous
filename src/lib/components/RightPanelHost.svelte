@@ -207,7 +207,7 @@
     aria-label={i18n.t("topNav.rightPanelRail", {}, "Info sidebar")}
     style:top={dockVisible ? `calc(50% - ${PLAYER_DOCK_CLEARANCE_PX / 2}px)` : "50%"}
     style:clip-path={`path('${NOTCH_SILHOUETTE_PATH}')`}
-    class="notch-surface absolute right-0 -translate-y-1/2 z-30 h-[88px] w-[34px] flex items-center justify-center bg-brand-playerbar {themeStore.isGlassTheme
+    class="notch-surface absolute right-0 -translate-y-1/2 z-30 h-[88px] w-[34px] flex items-center justify-center bg-brand-sidebar {themeStore.isGlassTheme
       ? 'glass-surface'
       : ''}"
     onpointerenter={onNotchEnter}
@@ -265,10 +265,6 @@
      `position: relative` in app.css) is applied. */
   .notch-surface {
     position: absolute;
-  }
-
-  .notch-surface.glass-surface {
-    background-color: var(--glass-bg-playerbar) !important;
   }
 
   /* Docked, nothing renders behind the panel but the flat bg-main canvas, so
