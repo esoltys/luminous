@@ -98,7 +98,7 @@
         {covers}
         fallbackName={artist.name || i18n.t("collection.unknownArtist")}
         sizeClass="w-36 h-36"
-        hoverEffect={true}
+        hoverEffect
       />
     {/if}
     {#if plain}
