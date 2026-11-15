@@ -5,6 +5,7 @@ import CollectionView from "./CollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { prefs } from "../stores/prefs.svelte";
+import { playerStore } from "../stores/player.svelte";
 import { pinnedStore } from "../stores/pinned.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { Song, AlbumItem, ArtistItem } from "../types";
@@ -347,5 +348,25 @@ describe("CollectionView.svelte", () => {
       await fireEvent.change(select, { target: { value: "total_playcount-true" } });
     }
     expect(queryByTestId("alphabet-scrubber")).toBeNull();
+  });
+  describe("Artists A-Z scrubber bounds (#2105)", () => {
+    function renderArtistsWithScrubber() {
+      // The artist sort persists in localStorage; an earlier test leaves it on popularity.
+      localStorage.setItem("sort_artist_field", "name");
+      navigationStore.activeSubTab = "artists";
+      collectionStore.artists = Array.from({ length: 20 }, (_, i) => ({
+        name: `Artist ${String.fromCharCode(65 + (i % 26))}${i}`,
+        album_count: 1,
+        song_count: 1,
+        genre: "Rock",
+      }));
+      return render(CollectionView);
+    }
+
+    it("stops where the playbar begins via the shared dock inset", () => {
+      const { getByTestId } = renderArtistsWithScrubber();
+      // The inset itself (112px with a song, 1.5rem without) comes from the layout.
+      expect(getByTestId("alphabet-scrubber-bounds")).toHaveClass("bottom-dock");
+    });
   });
 });

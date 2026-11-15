@@ -26,7 +26,7 @@ export const VIEWPORT_EDGE_PADDING_PX = 10;
  * - Floating menus and modals clamp above PLAYER_DOCK_CLEARANCE_PX.
  * - Scrolling views pad their bottom by PLAYER_DOCK_CONTENT_RESERVE_PX (the clearance
  *   plus a gap) through the `pb-dock` utility, which reads the `--dock-content-inset`
- *   variable the layout sets on <main>. Never hand-write `pb-28`/`pb-6` for this.
+ *   variable the layout sets on <main>. Never hand-write `pb-28`/`bottom-28` for this (use `pb-dock` / `bottom-dock`).
  *   Portaled UI that can't inherit the variable (ColumnSelector) imports the constant.
  *
  * Deliberately not covered: RightPanel's `mb-24` and the immersive face's `pb-32`,

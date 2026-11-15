@@ -11,12 +11,17 @@
     actions?: Snippet;
     /** Optional secondary action row rendered beneath the title/controls row. */
     toolbar?: Snippet;
+    /** Rendered height in px (wraps and collapses), so a sibling overlay can start below the header. */
+    height?: number;
   }
 
-  let { title, subtitle, actions, toolbar }: Props = $props();
+  let { title, subtitle, actions, toolbar, height = $bindable(0) }: Props = $props();
 </script>
 
-<header class="px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-4'}">
+<header
+  bind:clientHeight={height}
+  class="px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-4'}"
+>
   <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
     <div class="min-w-0">
       <h1

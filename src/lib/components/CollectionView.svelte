@@ -305,6 +305,9 @@
   const albumKey = (album: AlbumItem) => album.artist + "|" + album.album;
   const artistKey = (artist: ArtistItem) => artist.name ?? "";
 
+  /** Height of the Albums/Artists header; the A-Z scrubber starts directly below it. */
+  let gridHeaderHeight = $state(0);
+
   let sortedAlbums = $derived.by(() => {
     if (navigationStore.activeSubTab !== "albums") return [];
     const list = [...collectionStore.filteredAlbums];
@@ -596,7 +599,12 @@
             />
           </div>
           {#if isSongSortAlphabetical}
-            <div class="absolute right-2.5 top-12 bottom-3 pointer-events-auto z-20">
+            <!-- In the px-6 gutter just right of the table (not over its rows), spanning the
+                 table's full height; the parent's playbar padding already bounds the bottom. -->
+            <div
+              class="absolute left-full ml-0.5 top-0 bottom-0 pointer-events-auto z-20"
+              data-testid="alphabet-scrubber-bounds"
+            >
               <AlphabetScrubber
                 items={tableRows}
                 getKey={getSongAlphabetKey}
@@ -618,6 +626,7 @@
             use:rememberScroll={`collection:${navigationStore.activeSubTab}`}
           >
             <CollectionHeader
+              bind:height={gridHeaderHeight}
               title={navigationStore.activeSubTab === "albums"
                 ? i18n.t("sidebar.albums")
                 : i18n.t("sidebar.artists")}
@@ -844,7 +853,13 @@
             </div>
           </div>
           {#if (isAlbumSortAlphabetical && navigationStore.activeSubTab === "albums") || (isArtistSortAlphabetical && navigationStore.activeSubTab === "artists")}
-            <div class="absolute right-2.5 top-20 bottom-2 pointer-events-auto z-20">
+            <!-- Spans the list area only: starts under the header (measured, since it wraps
+                 and collapses) and stops where the floating playbar begins. -->
+            <div
+              class="absolute right-2.5 pointer-events-auto z-20 bottom-dock"
+              style:top="{gridHeaderHeight}px"
+              data-testid="alphabet-scrubber-bounds"
+            >
               {#if navigationStore.activeSubTab === "albums"}
                 <AlphabetScrubber
                   items={sortedAlbums}
@@ -976,9 +991,7 @@
 {#if selectedKeys.size > 0 && navigationStore.activeSubTab === "songs"}
   <div
     data-floating-toolbar="true"
-    class="absolute left-1/2 -translate-x-1/2 z-40 acrylic-float border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold"
-    class:bottom-6={!playerStore.currentSong}
-    class:bottom-28={!!playerStore.currentSong}
+    class="absolute left-1/2 -translate-x-1/2 bottom-dock z-40 acrylic-float border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold"
   >
     <span class="text-brand-accent-text font-bold">
       {i18n.t("playlists.selectedCount", { count: selectedKeys.size })}
