@@ -33,10 +33,10 @@
   const OPEN_DELAY_MS = 120;
   const CLOSE_DELAY_MS = 250;
 
-  // S-curve silhouette for the 34x88 right-edge notch: concave 12px outer flares into the
-  // window edge, flowing into 14px convex corners on the protruding 64px tab body.
+  // Continuous S-curve silhouette for the 34x88 right-edge notch: 17px circular-arc
+  // concave flares into the window edge, inflecting seamlessly into 17px convex corners.
   const NOTCH_EDGE_PATH =
-    "M 34 0 C 34 7 29 12 22 12 L 14 12 C 6 12 0 18 0 26 L 0 62 C 0 70 6 76 14 76 L 22 76 C 29 76 34 81 34 88";
+    "M 34 0 C 34 9.4 26.4 17 17 17 C 7.6 17 0 24.6 0 34 L 0 54 C 0 63.4 7.6 71 17 71 C 26.4 71 34 78.6 34 88";
   const NOTCH_SILHOUETTE_PATH = `${NOTCH_EDGE_PATH} Z`;
 
   let overlayEl = $state<HTMLElement | null>(null);
