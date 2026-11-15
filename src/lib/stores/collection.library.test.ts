@@ -718,4 +718,48 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     expect(fallbackTask?.current).toBe(3);
     expect(fallbackTask?.total).toBe(5);
   });
+
+  it("reloads artistProfiles when library-changed fires (#2100)", async () => {
+    let profiles = [
+      {
+        artist_key: "rock band",
+        display_name: "Rock Band",
+        bio: "Initial bio",
+        tags: ["rock"],
+      },
+    ];
+
+    const baseImpl = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === "get_all_artist_profiles") return profiles;
+      return baseImpl(cmd, args);
+    });
+
+    await (collectionStore as any).init();
+    expect(eventCallbacks["library-changed"]).toBeDefined();
+    expect(collectionStore.getArtistProfile("Rock Band")?.bio).toBe("Initial bio");
+    expect(collectionStore.getArtistProfile("Rock Band")?.tags).toEqual(["rock"]);
+
+    profiles = [
+      {
+        artist_key: "rock band",
+        display_name: "Rock Band",
+        bio: "Updated externally",
+        tags: ["rock", "prog"],
+      },
+    ];
+
+    vi.mocked(invoke).mockClear();
+    eventCallbacks["library-changed"]();
+
+    await vi.waitFor(() => {
+      expect(collectionStore.getArtistProfile("Rock Band")?.bio).toBe("Updated externally");
+      expect(collectionStore.getArtistProfile("Rock Band")?.tags).toEqual(["rock", "prog"]);
+    });
+
+    const profileCalls = vi
+      .mocked(invoke)
+      .mock.calls.filter(([cmd]) => cmd === "get_all_artist_profiles");
+    expect(profileCalls).toHaveLength(1);
+  });
 });

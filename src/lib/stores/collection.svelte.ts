@@ -535,14 +535,14 @@ class CollectionStore {
       });
 
       // Listen to library changed events (e.g. from background directory watcher,
-      // or a song getting flagged unavailable after a failed play)
+      // or a song getting flagged unavailable after a failed play).
+      // refreshLibrary() also reloads artist and album profiles.
       await this.events.listen("library-changed", () => {
         this.refreshStats();
         this.refreshLibrary();
         this.refreshDirectories();
         this.refreshWebDavServers();
         this.refreshSubsonicServers();
-        this.loadArtistProfiles();
         tagsStore.load().catch((err) => {
           console.error("Failed to refresh tags after library change:", err);
         });
@@ -1031,6 +1031,10 @@ class CollectionStore {
     const INITIAL_CHUNK = 2000;
     const CHUNK_SIZE = 5000;
 
+    // Fetch artist/album profiles alongside the initial library snapshot so
+    // external profile writes aren't delayed behind (or skipped by) snapshot loading.
+    const profilesPromise = Promise.all([this.loadArtistProfiles(), this.loadAlbumProfiles()]);
+
     let snapshot: LibrarySnapshot;
     try {
       snapshot = await invoke<LibrarySnapshot>("get_library_snapshot", {
@@ -1041,6 +1045,8 @@ class CollectionStore {
       // A failed load ends the loading state rather than leaving it up forever.
       this.libraryLoaded = true;
       throw err;
+    } finally {
+      await profilesPromise;
     }
     if (hydrationId !== this.activeHydrationId) return;
 
@@ -1048,7 +1054,6 @@ class CollectionStore {
     this.albums = snapshot.albums ?? [];
     this.artists = snapshot.artists ?? [];
     this.libraryLoaded = true;
-    await Promise.all([this.loadArtistProfiles(), this.loadAlbumProfiles()]);
 
     const total = snapshot.total_songs ?? this.songs.length;
     let offset = this.songs.length;
