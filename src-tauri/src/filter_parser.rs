@@ -251,6 +251,13 @@ impl FieldFilter {
                 self.op.to_sql(),
                 param_idx
             )
+        } else if self.sql_column == "artist_country" {
+            // An artist with no country is outside every country, so `!=`
+            // also keeps them (NOT IN a subquery that never lists them).
+            let membership = if self.op == Op::Neq { "NOT IN" } else { "IN" };
+            format!(
+                "COALESCE(NULLIF(album_artist, ''), artist) {membership} (SELECT artist_key FROM artist_profiles WHERE country = ?{param_idx})"
+            )
         } else if self.sql_column == "language" {
             match self.op {
                 Op::Eq => format!(
@@ -554,6 +561,7 @@ fn resolve_field(field: &str) -> Option<(&'static str, bool)> {
         "artist_tag" | "artist-tag" | "artisttag" | "artist_tags" | "tag" | "tags" => {
             ("artist_tag", false)
         }
+        "country" | "artist_country" | "artist-country" => ("artist_country", false),
         "language" | "lang" => ("language", false),
         "lyrics" | "lyric" => ("lyrics", false),
         "folder" | "subfolder" | "directory" | "path" => ("path", false),
@@ -696,6 +704,24 @@ fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> 
                 value,
             });
         }
+    }
+
+    if sql_column == "artist_country" {
+        // An ISO alpha-2 code, matched whole (`country:ca`, `country:!=us`);
+        // a substring match would make `country:c` select half the world.
+        let op = match op {
+            Op::Eq | Op::Contains => Op::Eq,
+            Op::Neq => Op::Neq,
+            _ => return None,
+        };
+        let code = crate::collection::normalize_country_code(Some(raw_val.as_str()))?;
+        return Some(FieldFilter {
+            field: field_clean,
+            sql_column,
+            is_numeric,
+            op,
+            value: FilterValue::Text(code),
+        });
     }
 
     let value = if sql_column == "genre" && matches!(op, Op::Contains | Op::Eq | Op::Neq) {
@@ -1060,6 +1086,29 @@ mod tests {
 
         assert_eq!(q.field_filters[1].field, "tag");
         assert_eq!(q.field_filters[1].sql_column, "artist_tag");
+    }
+
+    #[test]
+    fn test_parse_country_filter() {
+        let q = parse_query("country:ca");
+        assert_eq!(q.field_filters.len(), 1);
+        assert_eq!(q.field_filters[0].sql_column, "artist_country");
+        assert_eq!(q.field_filters[0].op, Op::Eq);
+        assert_eq!(
+            q.field_filters[0].value,
+            FilterValue::Text("CA".to_string())
+        );
+        assert_eq!(
+            q.field_filters[0].to_sql_clause(1),
+            "COALESCE(NULLIF(album_artist, ''), artist) IN (SELECT artist_key FROM artist_profiles WHERE country = ?1)"
+        );
+
+        let neq = parse_query("country:!=us");
+        assert_eq!(neq.field_filters[0].op, Op::Neq);
+        assert!(neq.field_filters[0].to_sql_clause(1).contains("NOT IN"));
+
+        // Not a two-letter code: not a country filter.
+        assert!(parse_query("country:canada").field_filters.is_empty());
     }
 
     #[test]

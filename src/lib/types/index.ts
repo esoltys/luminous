@@ -1070,6 +1070,8 @@ export interface ArtistProfile {
   logo_fetched?: boolean;
   /** Whether a fanart.tv background has already been fetched or attempted (#1276). */
   background_fetched?: boolean;
+  /** Uppercase ISO 3166-1 alpha-2 country code, e.g. "CA"; null when unknown (#2095). */
+  country?: string | null;
 }
 
 export interface ArtistImageRetrievalResult {

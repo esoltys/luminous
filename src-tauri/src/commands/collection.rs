@@ -824,6 +824,7 @@ fn merge_artist_profile_edit(stored: ArtistProfile, edit: ArtistProfile) -> Arti
         tags: edit.tags,
         social_links: edit.social_links,
         bio: edit.bio,
+        country: edit.country,
         ..stored
     }
 }
@@ -838,9 +839,14 @@ fn merge_artist_details_retrieval(
     artist_mbid: &str,
     official_homepages: &[String],
     mut fetched_links: Vec<ArtistSocialLink>,
+    country: Option<&str>,
 ) -> (ArtistProfile, usize) {
     stored.artist_key = artist.to_string();
     stored.details_fetched = true;
+    // A hand-entered country always wins; MusicBrainz only fills a blank (#2095).
+    if stored.country.as_deref().is_none_or(str::is_empty) {
+        stored.country = crate::collection::normalize_country_code(country);
+    }
     if stored.musicbrainz_artist_id.is_none() {
         stored.musicbrainz_artist_id = Some(artist_mbid.to_string());
     }
@@ -1641,9 +1647,11 @@ pub async fn retrieve_artist_details(
     // MusicBrainz can list more than one "official homepage" (e.g. the
     // artist's own site plus a label's page for them) — dedupe by URL, since
     // MB occasionally repeats the same relation exactly.
-    let official_homepages = dedupe_official_homepages(&relations);
+    let official_homepages = dedupe_official_homepages(&relations.relations);
+    let country = relations.country;
 
     let fetched_links: Vec<ArtistSocialLink> = relations
+        .relations
         .into_iter()
         .filter_map(|(rel_type, url)| {
             platform_for_artist_rel_type(&rel_type, &url).map(|platform| ArtistSocialLink {
@@ -1662,6 +1670,7 @@ pub async fn retrieve_artist_details(
                 &artist_mbid,
                 &official_homepages,
                 fetched_links,
+                country.as_deref(),
             );
             let saved = save_artist_profile_with_sidecar(scanner, &updated_profile)?;
             Ok((saved, added_count))
@@ -3181,9 +3190,11 @@ mod tests {
                 platform: "instagram".to_string(),
                 handle_or_url: "https://instagram.com/shaniatwain".to_string(),
             }],
+            Some("ca"),
         );
 
         assert_eq!(added_count, 2);
+        assert_eq!(merged.country.as_deref(), Some("CA"));
         assert_eq!(merged.tags, vec!["Award-Winning", "Country"]);
         assert_eq!(merged.bio.as_deref(), Some("External bio"));
         assert_eq!(
@@ -3194,6 +3205,41 @@ mod tests {
         assert!(merged.details_fetched);
         assert_eq!(merged.website.as_deref(), Some("https://shaniatwain.com"));
         assert_eq!(merged.social_links.len(), 1);
+    }
+
+    #[test]
+    fn test_merge_artist_details_retrieval_never_overwrites_manual_country() {
+        let with = |country: Option<&str>| ArtistProfile {
+            artist_key: "Rush".to_string(),
+            country: country.map(str::to_string),
+            ..Default::default()
+        };
+        let merge = |stored, fetched| {
+            merge_artist_details_retrieval(stored, "Rush", "mbid", &[], vec![], fetched).0
+        };
+        assert_eq!(
+            merge(with(Some("US")), Some("CA")).country.as_deref(),
+            Some("US")
+        );
+        assert_eq!(
+            merge(with(Some("")), Some("CA")).country.as_deref(),
+            Some("CA")
+        );
+        assert_eq!(merge(with(None), None).country, None);
+        assert_eq!(merge(with(None), Some("Canada")).country, None);
+    }
+
+    #[test]
+    fn test_merge_artist_profile_edit_applies_country() {
+        let stored = ArtistProfile {
+            country: Some("US".to_string()),
+            ..Default::default()
+        };
+        let edit = ArtistProfile {
+            country: None,
+            ..Default::default()
+        };
+        assert_eq!(merge_artist_profile_edit(stored, edit).country, None);
     }
 
     #[test]

@@ -25,6 +25,7 @@
     localizePlatform,
     type SocialPlatformInfo,
   } from "../utils/artistSocials";
+  import { countryDisplayName, countryOptions, parseCountryInput } from "../utils/country";
   import type { ArtistProfile, ArtistSocialLink } from "../types";
 
   let {
@@ -50,6 +51,10 @@
   let genreNames = $derived(new Set(tagsStore.allTags.map((t) => t.name.toLowerCase())));
 
   let website = $state("");
+  // What the user sees and types: a country name in the UI language. Saved as an alpha-2 code.
+  let country = $state("");
+  let countryError = $state(false);
+  let countryChoices = $derived(countryOptions(i18n.currentLocale));
   let bio = $state("");
   let tags = $state<string[]>([]);
   let newTagInput = $state("");
@@ -59,6 +64,10 @@
 
   function applyProfileToForm(profile: ArtistProfile | undefined) {
     website = profile?.website ?? "";
+    country = profile?.country
+      ? countryDisplayName(profile.country, i18n.currentLocale) || profile.country
+      : "";
+    countryError = false;
     bio = profile?.bio ?? "";
     tags = profile?.tags ? [...profile.tags] : [];
     socialLinks = profile?.social_links ? profile.social_links.map((l) => ({ ...l })) : [];
@@ -132,6 +141,11 @@
 
   async function handleSave() {
     if (!artistName.trim()) return;
+    const countryCode = parseCountryInput(country, i18n.currentLocale);
+    if (countryCode === null) {
+      countryError = true;
+      return;
+    }
     isSaving = true;
     try {
       const cleanTags = tags.map((t) => t.trim()).filter(Boolean);
@@ -148,6 +162,7 @@
         tags: cleanTags,
         social_links: cleanLinks,
         bio: bio.trim() || null,
+        country: countryCode || null,
       };
 
       const saved = await collectionStore.saveArtistProfile(profile);
@@ -349,6 +364,41 @@
             )}
             class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
           />
+        </div>
+
+        <!-- Country Field -->
+        <div class="flex flex-col gap-1.5">
+          <label
+            for="artist-country"
+            class="label-field text-brand-text-secondary flex items-center gap-1.5"
+          >
+            <Globe class="w-3.5 h-3.5 text-brand-accent" />
+            {i18n.t("artistInfo.country", {}, "Country")}
+          </label>
+          <input
+            id="artist-country"
+            type="text"
+            list="artist-country-options"
+            bind:value={country}
+            oninput={() => (countryError = false)}
+            aria-invalid={countryError}
+            placeholder={i18n.t("artistProfileEditor.countryPlaceholder", {}, "e.g. Canada or CA")}
+            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+          />
+          <datalist id="artist-country-options">
+            {#each countryChoices as option (option.code)}
+              <option value={option.name}></option>
+            {/each}
+          </datalist>
+          {#if countryError}
+            <p class="text-xs text-brand-text-secondary" role="alert">
+              {i18n.t(
+                "artistProfileEditor.countryInvalid",
+                {},
+                "Enter a country name or a 2-letter code like CA",
+              )}
+            </p>
+          {/if}
         </div>
 
         <!-- Social & External Links -->

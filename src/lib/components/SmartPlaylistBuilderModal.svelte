@@ -231,6 +231,11 @@
       type: "text",
     },
     {
+      key: "country",
+      label: i18n.t("smartPlaylistBuilder.fieldCountry", {}, "Country (2-letter code)"),
+      type: "text",
+    },
+    {
       key: "folder",
       label: i18n.t("smartPlaylistBuilder.fieldFolder", {}, "Folder / Path"),
       type: "text",

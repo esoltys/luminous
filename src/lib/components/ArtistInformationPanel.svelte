@@ -1,6 +1,7 @@
 <script lang="ts">
   import { i18n } from "../stores/i18n.svelte";
   import { formatArtistLifeEvent, isArtistPerson } from "../utils/artistInfo";
+  import { countryDisplayName } from "../utils/country";
 
   interface Props {
     sortName?: string | null;
@@ -13,6 +14,8 @@
     beginAreaMbid?: string | null;
     areaName?: string | null;
     areaMbid?: string | null;
+    /** The profile's ISO alpha-2 country (#2095); preferred over `areaName`, which can be a city or state. */
+    countryCode?: string | null;
     onOpenUrl?: (url: string) => void;
     class?: string;
   }
@@ -28,6 +31,7 @@
     beginAreaMbid,
     areaName,
     areaMbid,
+    countryCode,
     onOpenUrl: _onOpenUrl,
     class: className = "",
   }: Props = $props();
@@ -36,7 +40,9 @@
   let formattedBeginDate = $derived(formatArtistLifeEvent(beginDate, i18n.currentLocale));
   let formattedEndDate = $derived(formatArtistLifeEvent(endDate, i18n.currentLocale));
   let city = $derived(beginAreaName?.trim() || "");
-  let country = $derived(areaName?.trim() || "");
+  let country = $derived(
+    countryDisplayName(countryCode, i18n.currentLocale) || areaName?.trim() || "",
+  );
   let isSameCityCountry = $derived(
     !!city && !!country && city.toLowerCase() === country.toLowerCase(),
   );
