@@ -5,7 +5,6 @@ import CollectionView from "./CollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { prefs } from "../stores/prefs.svelte";
-import { playerStore } from "../stores/player.svelte";
 import { pinnedStore } from "../stores/pinned.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { Song, AlbumItem, ArtistItem } from "../types";
