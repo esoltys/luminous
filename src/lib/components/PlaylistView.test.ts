@@ -21,6 +21,12 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() =
 let fitAnswer: PlaylistSizeFit | null = null;
 const answerCommands = async (cmd: string) => (cmd === "get_playlist_size_fit" ? fitAnswer : []);
 
+/** Size limit lives in the overflow menu, not the header. */
+async function openSizeLimit(getByRole: (role: string, opts?: object) => HTMLElement) {
+  await fireEvent.click(getByRole("button", { name: "More actions" }));
+  await fireEvent.click(getByRole("menuitem", { name: "Size limit" }));
+}
+
 describe("PlaylistView.svelte", () => {
   const mockPlaylist: Playlist = {
     id: 1,
@@ -320,7 +326,6 @@ describe("PlaylistView.svelte", () => {
         "opacity-50",
       );
       expect(getByText("12.4 GB of 16 GB used")).toBeInTheDocument();
-      expect(getByRole("button", { name: /Limit 16 GB/ })).toBeInTheDocument();
     });
 
     it("keeps the break between the visible rows while searching", async () => {
@@ -347,7 +352,7 @@ describe("PlaylistView.svelte", () => {
     it("sets and removes the limit from the popover", async () => {
       const setLimitSpy = vi.spyOn(playlistsStore, "setSizeLimit").mockResolvedValue();
       const { getByRole } = render(PlaylistView);
-      await fireEvent.click(getByRole("button", { name: /Limit 16 GB/ }));
+      await openSizeLimit(getByRole);
       const dialog = getByRole("dialog", { name: "Size limit" });
       expect(within(dialog).getByRole("button", { name: "16 GB" })).toHaveAttribute(
         "aria-pressed",
@@ -357,7 +362,7 @@ describe("PlaylistView.svelte", () => {
       await fireEvent.click(within(dialog).getByRole("button", { name: "2 GB" }));
       expect(setLimitSpy).toHaveBeenCalledWith(1, 2_000_000_000, null);
 
-      await fireEvent.click(getByRole("button", { name: /Limit 16 GB/ }));
+      await openSizeLimit(getByRole);
       await fireEvent.click(getByRole("button", { name: "Remove limit" }));
       expect(setLimitSpy).toHaveBeenLastCalledWith(1, null, null);
     });
@@ -366,7 +371,7 @@ describe("PlaylistView.svelte", () => {
       playlistsStore.playlists = [mockPlaylist];
       const setLimitSpy = vi.spyOn(playlistsStore, "setSizeLimit").mockResolvedValue();
       const { getByRole, getByPlaceholderText } = render(PlaylistView);
-      await fireEvent.click(getByRole("button", { name: "Size limit" }));
+      await openSizeLimit(getByRole);
       await fireEvent.input(getByPlaceholderText("Custom size"), { target: { value: "1.5" } });
       await fireEvent.click(getByRole("button", { name: "Set" }));
       expect(setLimitSpy).toHaveBeenCalledWith(1, 1_500_000_000, null);
@@ -404,7 +409,7 @@ describe("PlaylistView.svelte", () => {
       });
       const setLimitSpy = vi.spyOn(playlistsStore, "setSizeLimit").mockResolvedValue();
       const { getByRole, findByRole } = render(PlaylistView);
-      await fireEvent.click(getByRole("button", { name: /Limit 16 GB/ }));
+      await openSizeLimit(getByRole);
       await findByRole("option", { name: "HiBy R1" });
       await fireEvent.change(getByRole("combobox", { name: "Count sizes for" }), {
         target: { value: "vol-1" },
@@ -412,10 +417,11 @@ describe("PlaylistView.svelte", () => {
       expect(setLimitSpy).toHaveBeenCalledWith(1, 16_000_000_000, "vol-1");
     });
 
-    it("offers no limit on the Queue", () => {
+    it("offers no limit on the Queue", async () => {
       playlistsStore.playlists = [{ ...mockPlaylist, name: "Queue", is_queue: true }];
-      const { queryByRole } = render(PlaylistView);
-      expect(queryByRole("button", { name: "Size limit" })).toBeNull();
+      const { getByRole, queryByRole } = render(PlaylistView);
+      await fireEvent.click(getByRole("button", { name: "More actions" }));
+      expect(queryByRole("menuitem", { name: "Size limit" })).toBeNull();
     });
   });
 
@@ -697,5 +703,70 @@ describe("PlaylistView.svelte", () => {
 
     const { getByText } = render(PlaylistView);
     expect(getByText("My Playlist")).toBeInTheDocument();
+  });
+
+  describe("header layout", () => {
+    it("offers only Play, Pin and Share as header actions — no Shuffle", () => {
+      const { getByRole, queryByRole } = render(PlaylistView);
+      expect(getByRole("button", { name: "Play" })).toBeInTheDocument();
+      expect(queryByRole("button", { name: /Shuffle/ })).toBeNull();
+      expect(queryByRole("button", { name: "Size limit" })).toBeNull();
+      expect(queryByRole("button", { name: "Make Active" })).toBeNull();
+    });
+
+    it("keeps Make Active in the overflow menu", async () => {
+      const { getByRole } = render(PlaylistView);
+      await fireEvent.click(getByRole("button", { name: "More actions" }));
+      expect(getByRole("menuitem", { name: "Make Active" })).toBeInTheDocument();
+    });
+
+    it("puts genre chips between the header and the song table", () => {
+      const { getByTitle, getByRole } = render(PlaylistView);
+      const chip = getByTitle("Browse Rock");
+      const table = document.querySelector("[data-song-row]")!;
+      const heading = getByRole("heading", { level: 1 });
+      expect(heading.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(chip.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("gives only smart playlists mode tabs, Refresh and Edit Rules", async () => {
+      const { queryByRole, getByRole, unmount } = render(PlaylistView);
+      expect(queryByRole("tablist")).toBeNull();
+      await fireEvent.click(getByRole("button", { name: "More actions" }));
+      expect(queryByRole("menuitem", { name: "Refresh Playlist" })).toBeNull();
+      unmount();
+
+      playlistsStore.playlists = [
+        {
+          ...mockPlaylist,
+          dynamic_enabled: true,
+          dynamic_spec: "genre:rock",
+          population_mode: "all",
+        },
+      ];
+      const smart = render(PlaylistView);
+      expect(smart.getByRole("tab", { name: "Deep Cuts" })).toBeInTheDocument();
+      await fireEvent.click(smart.getByRole("button", { name: "More actions" }));
+      expect(smart.getByRole("menuitem", { name: "Edit Rules" })).toBeInTheDocument();
+
+      const refreshSpy = vi.spyOn(playlistsStore, "refreshAutoPlaylist").mockResolvedValue();
+      await fireEvent.click(smart.getByRole("menuitem", { name: "Refresh Playlist" }));
+      expect(refreshSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("changes a smart playlist's population mode from the tabs", async () => {
+      playlistsStore.playlists = [
+        {
+          ...mockPlaylist,
+          dynamic_enabled: true,
+          dynamic_spec: "genre:rock",
+          population_mode: "all",
+        },
+      ];
+      const modeSpy = vi.spyOn(playlistsStore, "setPlaylistPopulationMode").mockResolvedValue();
+      const { getByRole } = render(PlaylistView);
+      await fireEvent.click(getByRole("tab", { name: "Deep Cuts" }));
+      expect(modeSpy).toHaveBeenCalledWith(1, "deep_cuts");
+    });
   });
 });
