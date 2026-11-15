@@ -12,6 +12,7 @@
     COVER_STACK_SCALE_STEP,
     COVER_STACK_OPACITY_STEP,
   } from "../constants";
+  import { HOVER_ZOOM, HOVER_ZOOM_STACKED } from "../utils/cardAppearance";
 
   export interface CoverItem {
     songId?: number;
@@ -133,9 +134,7 @@
   {#if activeCovers.length > 0}
     {#if activeCovers.length === 1}
       <div
-        class="{sizeClass} overflow-hidden relative group/artwork {hoverEffect
-          ? 'transition-transform duration-300 group-hover:scale-105'
-          : ''}"
+        class="{sizeClass} overflow-hidden relative group/artwork {hoverEffect ? HOVER_ZOOM : ''}"
       >
         <CoverArt
           songId={activeCovers[0].songId}
@@ -179,9 +178,9 @@
               ? 'bottom-0 right-0 w-28 h-28'
               : 'inset-0'} {direction !== 'left' && activeCovers.length === 1
               ? 'rounded-[inherit]'
-              : ''} overflow-hidden border border-brand-border/60 shadow-xl transition-[transform,opacity] duration-300 {hoverEffect
-              ? 'group-hover:scale-105'
-              : ''}"
+              : ''} overflow-hidden border border-brand-border/60 shadow-xl {hoverEffect
+              ? HOVER_ZOOM_STACKED
+              : 'transition-[transform,opacity] duration-300'}"
             style="z-index: {10 - i}; transform: {getTransform(
               i,
               activeCovers.length,

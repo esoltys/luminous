@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rowClasses } from "./cardAppearance";
+import { rowClasses, HOVER_ZOOM, HOVER_ZOOM_STACKED } from "./cardAppearance";
 
 describe("rowClasses", () => {
   it("draws a filled, bordered, rounded box when boxed", () => {
@@ -19,5 +19,18 @@ describe("rowClasses", () => {
 
   it("keeps a keyboard-focus outline when plain, so focus never goes invisible", () => {
     expect(rowClasses("plain")).toContain("focus-visible:outline-brand-accent");
+  });
+});
+
+describe("hover zoom", () => {
+  it("uses the same scale and duration for plain and stacked covers", () => {
+    for (const c of [HOVER_ZOOM, HOVER_ZOOM_STACKED]) {
+      expect(c).toContain("group-hover:scale-105");
+      expect(c).toContain("duration-300");
+    }
+  });
+
+  it("transitions the scale property when a stack also transitions transform and opacity", () => {
+    expect(HOVER_ZOOM_STACKED).toContain("transition-[transform,scale,opacity]");
   });
 });

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { useCardAppearance } from "../utils/cardAppearance";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
   import { i18n } from "../stores/i18n.svelte";
@@ -201,13 +202,15 @@
       return null;
     return formatRelativeDate(updated);
   });
+
+  const plain = useCardAppearance() === "plain";
 </script>
 
 {#snippet cover()}
   {#if topCovers.length > 0}
     {@const t = getPlaylistCardTheme(kind)}
     <PlaylistCoverFrame gradientClass={t.gradientClass}>
-      <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
+      <CoverStack covers={topCovers} hoverEffect={plain} sizeClass="w-[82%] h-[82%]" />
     </PlaylistCoverFrame>
   {:else}
     {@const t = getPlaylistCardTheme(kind)}

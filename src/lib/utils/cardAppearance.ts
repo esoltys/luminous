@@ -62,3 +62,17 @@ export const PLAIN_TILE_RING =
 /** The cover square of a tile: gets the hover/focus outline when the box is gone. */
 export const PLAIN_TILE_COVER =
   "rounded-lg outline-2 -outline-offset-2 outline-transparent group-hover:outline-brand-accent group-focus-within:outline-brand-accent transition-[outline-color] duration-200";
+
+/**
+ * The hover zoom of a cover inside a plain tile (artist, album, playlist). One definition so the
+ * scale and timing cannot drift between card types. Needs an ancestor with `group`.
+ */
+export const HOVER_ZOOM = "transition-transform duration-300 group-hover:scale-105";
+
+/**
+ * Same zoom for an element that also transitions its own `transform` and `opacity` (stacked
+ * covers). Tailwind v4 `scale-*` sets the `scale` property, so it must be listed explicitly or the
+ * zoom snaps instead of easing.
+ */
+export const HOVER_ZOOM_STACKED =
+  "transition-[transform,scale,opacity] duration-300 group-hover:scale-105";

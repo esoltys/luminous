@@ -4,6 +4,7 @@ import { render, waitFor, fireEvent } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { ExtendedArtworkResponse } from "../types";
 import CoverStack from "./CoverStack.svelte";
+import { HOVER_ZOOM_STACKED } from "../utils/cardAppearance";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(""),
@@ -23,6 +24,23 @@ describe("CoverStack.svelte", () => {
     { songId: 1, artAutomatic: "cover1.jpg" },
     { songId: 2, artAutomatic: "cover2.jpg" },
   ];
+
+  it("eases the hover zoom of a stack, listing the scale property in its transition", () => {
+    const { container } = render(CoverStack, {
+      props: { covers: mockCovers, hoverEffect: true },
+    });
+    const item = container.querySelector(".cover-item") as HTMLElement;
+    expect(item.className).toContain("group-hover:scale-105");
+    expect(item.className).toContain("duration-300");
+    expect(item.className).toContain("scale");
+    expect(item.className).toContain(HOVER_ZOOM_STACKED);
+  });
+
+  it("does not zoom a stack on hover unless asked", () => {
+    const { container } = render(CoverStack, { props: { covers: mockCovers } });
+    const item = container.querySelector(".cover-item") as HTMLElement;
+    expect(item.className).not.toContain("group-hover:scale-105");
+  });
 
   it("centers content by default when direction is right", () => {
     const { container } = render(CoverStack, {

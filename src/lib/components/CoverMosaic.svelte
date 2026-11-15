@@ -1,5 +1,6 @@
 <script lang="ts">
   import CoverArt from "./CoverArt.svelte";
+  import { HOVER_ZOOM } from "../utils/cardAppearance";
   import { getArtistGradient } from "../utils/artist";
   import { i18n } from "../stores/i18n.svelte";
   import type { CoverStackItem } from "../utils/covers";
@@ -90,9 +91,7 @@
   // width/height ratio, e.g. 2 quarters => (2+1)/2 = 1.5, 4 quarters => (2+2)/2 = 2.
   let ratio = $derived(quarterCovers.length === 0 ? 1 : (2 + quarterCols) / 2);
 
-  let tileClass = $derived(
-    `w-full h-full ${hoverEffect ? "group-hover:scale-105 transition-transform duration-300" : ""}`,
-  );
+  let tileClass = $derived(`w-full h-full ${hoverEffect ? HOVER_ZOOM : ""}`);
 
   /** Width is derived from the rendered height via JS (ResizeObserver), not CSS
    * `aspect-ratio` (see the sizeClass doc comment above for why the bottom-up
