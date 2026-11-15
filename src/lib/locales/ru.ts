@@ -1510,6 +1510,8 @@ export const ru = {
     autoContinue: "Автопродолжение",
     sizeLimitBtn: "Лимит размера",
     sizeLimitSetBtn: "Лимит {limit}",
+    sizeLimitMenuItem: "Лимит размера: {value}",
+    sizeLimitNotSet: "не задан",
     sizeLimitTitle: "Лимит размера",
     sizeLimitHint:
       "Выберите, сколько места могут занять песни в начале этого списка воспроизведения, например объём флешки. Пунктирная линия покажет, где они перестают помещаться.",

@@ -1395,6 +1395,8 @@ export const it = {
     autoContinue: "Continua automaticamente",
     sizeLimitBtn: "Limite di spazio",
     sizeLimitSetBtn: "Limite {limit}",
+    sizeLimitMenuItem: "Limite di spazio: {value}",
+    sizeLimitNotSet: "non impostato",
     sizeLimitTitle: "Limite di spazio",
     sizeLimitHint:
       "Scegli quanto spazio possono occupare i brani in cima a questa playlist, come la capacità di una chiavetta USB. Una linea tratteggiata indica dove smettono di starci.",

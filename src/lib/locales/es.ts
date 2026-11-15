@@ -1396,6 +1396,8 @@ export const es = {
     autoContinue: "Continuar automáticamente",
     sizeLimitBtn: "Límite de tamaño",
     sizeLimitSetBtn: "Límite de {limit}",
+    sizeLimitMenuItem: "Límite de tamaño: {value}",
+    sizeLimitNotSet: "sin definir",
     sizeLimitTitle: "Límite de tamaño",
     sizeLimitHint:
       "Elige cuánto espacio pueden ocupar las canciones al principio de esta lista de reproducción, como la capacidad de una memoria USB. Una línea discontinua marca dónde dejan de caber.",

@@ -1408,6 +1408,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     autoContinue: "Lecture continue",
     sizeLimitBtn: "Limite de taille",
     sizeLimitSetBtn: "Limite de {limit}",
+    sizeLimitMenuItem: "Limite de taille : {value}",
+    sizeLimitNotSet: "non définie",
     sizeLimitTitle: "Limite de taille",
     sizeLimitHint:
       "Choisissez l’espace que peuvent occuper les chansons en haut de cette liste de lecture, comme la capacité d’une clé USB. Une ligne pointillée indique où elles cessent d’y entrer.",

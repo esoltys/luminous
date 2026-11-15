@@ -76,6 +76,7 @@
     formatFileSize,
     formatDuration,
     formatHoursMinutes,
+    formatStorageSize,
   } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { CONTEXT_MENU_WIDTH_PX } from "../constants";
@@ -1176,7 +1177,11 @@
       {#if !isSmartPlaylist}<ContextMenuDivider />{/if}
       <ContextMenuItem
         icon={Usb}
-        label={i18n.t("playlists.sizeLimitBtn")}
+        label={i18n.t("playlists.sizeLimitMenuItem", {
+          value: activePlaylist.size_limit_bytes
+            ? formatStorageSize(activePlaylist.size_limit_bytes)
+            : i18n.t("playlists.sizeLimitNotSet"),
+        })}
         onclick={() => {
           showSizeLimitPopover = true;
           showOverflowMenu = false;

@@ -24,7 +24,7 @@ const answerCommands = async (cmd: string) => (cmd === "get_playlist_size_fit" ?
 /** Size limit lives in the overflow menu, not the header. */
 async function openSizeLimit(getByRole: (role: string, opts?: object) => HTMLElement) {
   await fireEvent.click(getByRole("button", { name: "More actions" }));
-  await fireEvent.click(getByRole("menuitem", { name: "Size limit" }));
+  await fireEvent.click(getByRole("menuitem", { name: /^Size limit/ }));
 }
 
 describe("PlaylistView.svelte", () => {
@@ -421,7 +421,7 @@ describe("PlaylistView.svelte", () => {
       playlistsStore.playlists = [{ ...mockPlaylist, name: "Queue", is_queue: true }];
       const { getByRole, queryByRole } = render(PlaylistView);
       await fireEvent.click(getByRole("button", { name: "More actions" }));
-      expect(queryByRole("menuitem", { name: "Size limit" })).toBeNull();
+      expect(queryByRole("menuitem", { name: /^Size limit/ })).toBeNull();
     });
   });
 
@@ -712,6 +712,18 @@ describe("PlaylistView.svelte", () => {
       expect(queryByRole("button", { name: /Shuffle/ })).toBeNull();
       expect(queryByRole("button", { name: "Size limit" })).toBeNull();
       expect(queryByRole("button", { name: "Make Active" })).toBeNull();
+    });
+
+    it("shows the current size limit on the Size limit menu item", async () => {
+      const { getByRole, unmount } = render(PlaylistView);
+      await fireEvent.click(getByRole("button", { name: "More actions" }));
+      expect(getByRole("menuitem", { name: "Size limit: not set" })).toBeInTheDocument();
+      unmount();
+
+      playlistsStore.playlists = [{ ...mockPlaylist, size_limit_bytes: 2_000_000_000 }];
+      const limited = render(PlaylistView);
+      await fireEvent.click(limited.getByRole("button", { name: "More actions" }));
+      expect(limited.getByRole("menuitem", { name: "Size limit: 2 GB" })).toBeInTheDocument();
     });
 
     it("keeps Make Active in the overflow menu", async () => {

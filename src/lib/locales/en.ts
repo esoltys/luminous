@@ -1362,6 +1362,8 @@ export const en = {
     autoContinue: "Auto Continue",
     sizeLimitBtn: "Size limit",
     sizeLimitSetBtn: "Limit {limit}",
+    sizeLimitMenuItem: "Size limit: {value}",
+    sizeLimitNotSet: "not set",
     sizeLimitTitle: "Size limit",
     sizeLimitHint:
       "Choose how much space the songs at the top of this playlist can take, such as a USB stick's capacity. A dashed line marks where they stop fitting.",

@@ -1503,6 +1503,8 @@ export const uk = {
     autoContinue: "Автопродовження",
     sizeLimitBtn: "Ліміт розміру",
     sizeLimitSetBtn: "Ліміт {limit}",
+    sizeLimitMenuItem: "Ліміт розміру: {value}",
+    sizeLimitNotSet: "не задано",
     sizeLimitTitle: "Ліміт розміру",
     sizeLimitHint:
       "Виберіть, скільки місця можуть займати пісні на початку цього списку відтворення, наприклад обсяг флешки. Пунктирна лінія покаже, де вони перестають вміщатися.",
