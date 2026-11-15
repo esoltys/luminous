@@ -48,7 +48,9 @@ describe("RightPanelHost.svelte", () => {
     const { getByRole, queryByRole } = renderUnpinned();
     const notch = getByRole("group", { name: /info sidebar/i });
     expect(notch).toBeInTheDocument();
-    expect(notch).toHaveClass("absolute", "right-0", "h-[60px]");
+    expect(notch).toHaveClass("absolute", "right-0", "h-[88px]", "w-[34px]");
+    expect(notch.style.clipPath).toContain("path(");
+    expect(notch.querySelector("svg path[d]")).not.toBeNull();
     expect(queryByRole("separator")).toBeNull();
 
     await fireEvent.click(getByRole("button", { name: /^pin info sidebar/i }));
