@@ -729,11 +729,6 @@
     }
   }
 
-  async function handleAddArtistToQueue() {
-    if (playableSongs.length === 0) return;
-    await addArtistToQueue(artistName);
-  }
-
   async function handleStartArtistRadio() {
     await startArtistRadio(artistName);
     const queuePl = playlistsStore.queuePlaylist;
@@ -1159,7 +1154,7 @@
       icon={Layers}
       label={i18n.t("playlists.contextMenuAddQueue", {}, "Add to Queue")}
       onclick={() => {
-        handleAddArtistToQueue();
+        addArtistToQueue(artistName);
         overflowMenuPos = null;
       }}
       disabled={loading || songs.length === 0}
