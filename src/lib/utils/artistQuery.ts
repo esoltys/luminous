@@ -6,6 +6,8 @@
  * two-letter code. Anything else is not a structured query (plain text).
  */
 
+import type { ArtistProfile } from "../types";
+
 export type ArtistQuery =
   { kind: "tag"; tag: string } | { kind: "country"; code: string; negate: boolean };
 
@@ -43,7 +45,7 @@ export function parseArtistQuery(rawQuery: string): ArtistQuery | null {
  */
 export function artistMatchesQuery(
   query: ArtistQuery,
-  profile: { tags?: string[]; country?: string | null } | undefined,
+  profile: Pick<ArtistProfile, "tags" | "country"> | undefined,
 ): boolean {
   if (query.kind === "tag") {
     if (!query.tag) return true;
