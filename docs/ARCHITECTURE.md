@@ -10,3 +10,12 @@ Moved out of `AGENTS.md`. Each crate in `crates/` is an engine with no Tauri or 
 - `crates/luminous-metadata` — local audio metadata and sidecar parsers: Lofty audio tag read/write, CUE sheet parsing, Dynamic Range meter log parsing, and playlist format import/export (M3U, M3U8, PLS, XSPF). No `tauri`, `rusqlite`, `reqwest`, or `tokio` (CI-checked); `collection/` and `tageditor.rs` adapt to the app's SQLite models.
 - `crates/luminous-transcode` — converting library files for portable players: the "can't play" rule against a `DeviceProfile`, size estimates, decode/resample/encode (Opus via vendored libopus; AAC/MP3 via Media Foundation on Windows, `ffmpeg` on `PATH` elsewhere), art downscaling and the host-side transcode cache. No `tauri`, `rusqlite` or `reqwest` (CI-checked); `src-tauri` passes in the cache directory and exposes the encoder capabilities.
 - `crates/luminous-remote` — remote wire-protocol clients: Subsonic, WebDAV, ListenBrainz, CritiqueBrainz, Lyrics (LRCLIB/NetEase/Lyrics.ovh), MusicBrainz OAuth. No `tauri` or `rusqlite` (CI-checked); edge modules in `src-tauri` (`subsonic/`, `webdav/`, `scrobbler.rs`, `lyrics.rs`, `musicbrainz.rs`) handle SQLite caching, token persistence, and Tauri events.
+
+# Shared database contract
+
+External tools (the Luminous MCP server) read and write columns of the app's SQLite database directly, so a column they rely on is documented here and changes only through a numbered migration in `db.rs`.
+
+## `artist_profiles`
+
+- `artist_key` — the artist name, `COLLATE NOCASE` (migration 83, #2097): one row per artist whatever the casing.
+- `country` — added by migration 84 (#2095). An uppercase ISO 3166-1 alpha-2 code (`CA`, `US`, `FI`), or `NULL` when unknown; never a country name, a city or a state. The app fills it from MusicBrainz's artist `country` (falling back to an `area` that is itself a country) only while it is empty, so a value written by hand or by an external tool is never overwritten. Writers should store an uppercase two-letter code or `NULL`; the app's own writes normalise anything else to `NULL`. Searchable as `country:ca`.

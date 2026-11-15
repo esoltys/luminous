@@ -107,6 +107,19 @@ describe("ArtistInformationPanel", () => {
     expect(screen.queryByText("Group")).toBeNull();
   });
 
+  it("prefers the profile country over an area that is only a city or state", () => {
+    render(ArtistInformationPanel, {
+      props: { beginAreaName: "Los Angeles", areaName: "California", countryCode: "US" },
+    });
+    expect(screen.getByText("United States")).toBeTruthy();
+    expect(screen.queryByText("California")).toBeNull();
+  });
+
+  it("shows a country on its own", () => {
+    render(ArtistInformationPanel, { props: { countryCode: "CA" } });
+    expect(screen.getByText("Canada")).toBeTruthy();
+  });
+
   it("renders a titled, non-collapsible card", () => {
     const { container } = render(ArtistInformationPanel, {
       props: {

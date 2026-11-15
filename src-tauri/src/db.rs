@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 83;
+pub const CURRENT_SCHEMA_VERSION: i32 = 84;
 
 struct Migration {
     version: i32,
@@ -823,6 +823,21 @@ const MIGRATIONS: &[Migration] = &[
         version: 83,
         description: "artist_profiles.artist_key is case-insensitive; merge case-duplicate rows (#2097)",
         apply: migrate_artist_profile_keys_nocase,
+    },
+    Migration {
+        version: 84,
+        description: "artist_profiles.country: ISO 3166-1 alpha-2 country code (#2095)",
+        apply: |conn| {
+            let has_country: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('artist_profiles') WHERE name = 'country'",
+                )?
+                .exists([])?;
+            if !has_country {
+                conn.execute_batch("ALTER TABLE artist_profiles ADD COLUMN country TEXT;")?;
+            }
+            Ok(())
+        },
     },
 ];
 
@@ -3767,6 +3782,26 @@ mod tests {
         assert!(tables_exist);
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_84_adds_artist_profiles_country_column() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO artist_profiles (artist_key, country) VALUES ('Rush', 'CA')",
+            [],
+        )
+        .unwrap();
+        let country: Option<String> = conn
+            .query_row(
+                "SELECT country FROM artist_profiles WHERE artist_key = 'rush'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(country.as_deref(), Some("CA"));
     }
 
     #[test]

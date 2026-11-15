@@ -1927,7 +1927,7 @@ fn fill_home_album_items(conn: &rusqlite::Connection, items: &mut [HomeItem]) ->
 
 /// Column list shared by every `artist_profiles` read, in the order
 /// `artist_profile_from_row` expects.
-const ARTIST_PROFILE_COLUMNS: &str = "artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source, details_fetched, image_fetched, fetched_logo_filename, fetched_background_filename, logo_fetched, background_fetched";
+const ARTIST_PROFILE_COLUMNS: &str = "artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source, details_fetched, image_fetched, fetched_logo_filename, fetched_background_filename, logo_fetched, background_fetched, country";
 
 fn artist_profile_from_row(row: &rusqlite::Row) -> rusqlite::Result<ArtistProfile> {
     let tags_json: String = row.get(2)?;
@@ -1948,6 +1948,7 @@ fn artist_profile_from_row(row: &rusqlite::Row) -> rusqlite::Result<ArtistProfil
         fetched_background_filename: row.get(11)?,
         logo_fetched: row.get(12)?,
         background_fetched: row.get(13)?,
+        country: row.get(14)?,
     })
 }
 
@@ -2049,6 +2050,7 @@ pub fn set_artist_profile_conn(
 ) -> Result<ArtistProfile> {
     let profile = ArtistProfile {
         artist_key: canonical_artist_key(conn, &profile.artist_key)?,
+        country: normalize_country_code(profile.country.as_deref()),
         ..profile.clone()
     };
     let profile = &profile;
@@ -2056,8 +2058,8 @@ pub fn set_artist_profile_conn(
     let social_links_json = serde_json::to_string(&profile.social_links)?;
 
     conn.execute(
-        "INSERT INTO artist_profiles (artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source, details_fetched, image_fetched, fetched_logo_filename, fetched_background_filename, logo_fetched, background_fetched)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+        "INSERT INTO artist_profiles (artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source, details_fetched, image_fetched, fetched_logo_filename, fetched_background_filename, logo_fetched, background_fetched, country)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
          ON CONFLICT(artist_key) DO UPDATE SET
             artist_key = excluded.artist_key,
             website = excluded.website,
@@ -2072,7 +2074,8 @@ pub fn set_artist_profile_conn(
             fetched_logo_filename = excluded.fetched_logo_filename,
             fetched_background_filename = excluded.fetched_background_filename,
             logo_fetched = excluded.logo_fetched,
-            background_fetched = excluded.background_fetched",
+            background_fetched = excluded.background_fetched,
+            country = excluded.country",
         params![
             profile.artist_key,
             profile.website,
@@ -2087,7 +2090,8 @@ pub fn set_artist_profile_conn(
             profile.fetched_logo_filename,
             profile.fetched_background_filename,
             profile.logo_fetched as i32,
-            profile.background_fetched as i32
+            profile.background_fetched as i32,
+            profile.country
         ],
     )?;
 
@@ -2127,6 +2131,15 @@ pub fn set_artist_mbid_conn(conn: &rusqlite::Connection, artist: &str, mbid: &st
         params![canonical_artist_key(conn, artist)?, mbid],
     )?;
     Ok(())
+}
+
+/// Canonical stored form of an artist's country: an uppercase ISO 3166-1
+/// alpha-2 code. Anything else (blank, wrong length, non-letters) becomes
+/// `None`, so the column only ever holds a code or NULL (#2095).
+pub fn normalize_country_code(raw: Option<&str>) -> Option<String> {
+    let code = raw?.trim();
+    (code.len() == 2 && code.bytes().all(|b| b.is_ascii_alphabetic()))
+        .then(|| code.to_ascii_uppercase())
 }
 
 /// Retrieve all saved artist profiles in SQLite (#473).
@@ -3964,6 +3977,43 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_country_round_trip_normalises_to_uppercase_code() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_country_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        // The editor's value is stored as an uppercase code; junk becomes NULL.
+        let mut profile = ArtistProfile {
+            artist_key: "Rush".to_string(),
+            country: Some(" ca ".to_string()),
+            ..Default::default()
+        };
+        // The returned profile carries the stored form, not the raw input.
+        let saved = set_artist_profile_conn(&conn, &profile).unwrap();
+        assert_eq!(saved.country.as_deref(), Some("CA"));
+        assert_eq!(
+            get_artist_profile_conn(&conn, "RUSH")
+                .unwrap()
+                .country
+                .as_deref(),
+            Some("CA")
+        );
+
+        profile.country = Some("Canada".to_string());
+        assert_eq!(
+            set_artist_profile_conn(&conn, &profile).unwrap().country,
+            None
+        );
+        assert_eq!(
+            get_artist_profile_conn(&conn, "Rush").unwrap().country,
+            None
+        );
     }
 
     #[test]

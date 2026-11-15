@@ -178,6 +178,44 @@ describe("ArtistProfileEditor", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("shows the stored country by name and saves what the user types as a code", async () => {
+    collectionStore.artistProfiles = {
+      rush: { artist_key: "Rush", tags: [], social_links: [], country: "CA" },
+    };
+    const mockSave = vi.fn().mockResolvedValue({ artist_key: "Rush", tags: [], social_links: [] });
+    vi.spyOn(collectionStore, "saveArtistProfile").mockImplementation(mockSave);
+    render(ArtistProfileEditor, {
+      props: { artistName: "Rush", isOpen: true, onClose: vi.fn() },
+    });
+
+    const input = screen.getByLabelText("Country");
+    expect((input as HTMLInputElement).value).toBe("Canada");
+    await fireEvent.input(input, { target: { value: "finland" } });
+    await fireEvent.click(screen.getByRole("button", { name: /Save/i }));
+    expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ country: "FI" }));
+
+    mockSave.mockClear();
+    await fireEvent.input(input, { target: { value: "" } });
+    await fireEvent.click(screen.getByRole("button", { name: /Save/i }));
+    expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ country: null }));
+  });
+
+  it("refuses to save an unrecognised country", async () => {
+    const mockSave = vi.fn();
+    vi.spyOn(collectionStore, "saveArtistProfile").mockImplementation(mockSave);
+    const onClose = vi.fn();
+    render(ArtistProfileEditor, {
+      props: { artistName: "Rush", isOpen: true, onClose },
+    });
+
+    await fireEvent.input(screen.getByLabelText("Country"), { target: { value: "Narnia" } });
+    await fireEvent.click(screen.getByRole("button", { name: /Save/i }));
+
+    expect(mockSave).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toBeTruthy();
+  });
+
   it("renders localized text when locale is French", () => {
     i18n.currentLocale = "fr-CA";
 

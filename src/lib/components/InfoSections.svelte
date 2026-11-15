@@ -8,6 +8,7 @@
     QuestionIcon as HelpCircle,
     TagIcon as Tag,
   } from "phosphor-svelte";
+  import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import { picardStore } from "../stores/picard.svelte";
@@ -34,6 +35,12 @@
 
   let sections = $derived(view.sections);
   let song = $derived(view.subject?.song);
+  let profileArtist = $derived(
+    view.subject?.kind === "artist" ? view.subject.name : (view.subject?.song?.artist ?? ""),
+  );
+  let countryCode = $derived(
+    profileArtist ? collectionStore.getArtistProfile(profileArtist)?.country : null,
+  );
   let canOpenPicard = $derived(song != null && !isRemoteSource(song));
   let canEditTags = $derived(song != null);
 
@@ -74,6 +81,7 @@
         beginAreaMbid={section.context.artist_begin_area_mbid}
         areaName={section.context.artist_area_name}
         areaMbid={section.context.artist_area_mbid}
+        {countryCode}
       />
     {:else if section.id === "bio"}
       {#if section.source === "wikipedia"}

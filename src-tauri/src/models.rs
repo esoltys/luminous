@@ -1453,6 +1453,12 @@ pub struct ArtistProfile {
     /// Whether the fanart.tv background has been fetched or attempted (#1276).
     #[serde(default)]
     pub background_fetched: bool,
+    /// The artist's country as an uppercase ISO 3166-1 alpha-2 code (`"CA"`),
+    /// `None` when unknown (#2095). Filled from MusicBrainz's artist
+    /// `country` only while empty; a hand-entered value is never overwritten.
+    /// External readers (luminous-mcp) read this column directly.
+    #[serde(default)]
+    pub country: Option<String>,
 }
 
 /// An external platform or web link associated with an album release (#950).

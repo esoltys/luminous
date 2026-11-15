@@ -233,10 +233,16 @@ struct MbLifeSpan {
 struct MbArea {
     id: Option<String>,
     name: Option<String>,
+    /// Present only when the area *is* a country (a city or state has none).
+    #[serde(default, rename = "iso-3166-1-codes")]
+    iso_3166_1_codes: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Default)]
 struct MbArtistResponse {
+    /// ISO 3166-1 alpha-2 code MusicBrainz derives from the area hierarchy, so
+    /// it is set even when `area` is a city or state (#2095).
+    country: Option<String>,
     #[serde(rename = "sort-name")]
     sort_name: Option<String>,
     #[serde(rename = "type")]
@@ -249,6 +255,30 @@ struct MbArtistResponse {
     area: Option<MbArea>,
     #[serde(default)]
     relations: Vec<MbRelation>,
+}
+
+impl MbArtistResponse {
+    /// The artist's country as an uppercase alpha-2 code: MusicBrainz's own
+    /// `country`, else the code of `area` when that area is itself a country.
+    /// A city or state name is never read as a country (#2095).
+    fn country_code(&self) -> Option<String> {
+        let area_code = self
+            .area
+            .as_ref()
+            .and_then(|a| a.iso_3166_1_codes.first())
+            .map(String::as_str);
+        [self.country.as_deref(), area_code]
+            .into_iter()
+            .find_map(|c| crate::collection::normalize_country_code(c))
+    }
+}
+
+/// What "Retrieve Artist Details" reads from one MusicBrainz artist lookup:
+/// the `(rel_type, url)` pairs and the artist's country code (#1123, #2095).
+#[derive(Debug, Default)]
+pub struct MusicBrainzArtistLookup {
+    pub url_relations: Vec<(String, String)>,
+    pub country: Option<String>,
 }
 
 /// Structured biographical details fetched from MusicBrainz's artist lookup (#1128).
@@ -790,7 +820,7 @@ impl ContextManager {
     pub async fn fetch_musicbrainz_artist_relations(
         &self,
         artist_id: &str,
-    ) -> Result<Vec<(String, String)>> {
+    ) -> Result<MusicBrainzArtistLookup> {
         throttle_musicbrainz().await;
         let url = format!(
             "https://musicbrainz.org/ws/2/artist/{}?inc=url-rels&fmt=json",
@@ -804,12 +834,16 @@ impl ContextManager {
             ));
         }
         let parsed: MbArtistResponse = response.json().await?;
-        Ok(parsed
-            .relations
-            .into_iter()
-            .filter(|r| !r.ended)
-            .filter_map(|r| Some((r.rel_type?, r.url?.resource?)))
-            .collect())
+        let country = parsed.country_code();
+        Ok(MusicBrainzArtistLookup {
+            url_relations: parsed
+                .relations
+                .into_iter()
+                .filter(|r| !r.ended)
+                .filter_map(|r| Some((r.rel_type?, r.url?.resource?)))
+                .collect(),
+            country,
+        })
     }
 
     /// Looks up an artist's biographical details (sort name, gender,
@@ -1590,6 +1624,33 @@ mod tests {
         assert_eq!(r2.unwrap(), "result_val");
         // Only one worker should have actually executed the inner work future
         assert_eq!(counter.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_musicbrainz_artist_country_code_sources() {
+        // Top-level `country` wins even when the area is a city (#2095).
+        let city: MbArtistResponse = serde_json::from_str(
+            r#"{"country": "us", "area": {"id": "x", "name": "Los Angeles"}}"#,
+        )
+        .unwrap();
+        assert_eq!(city.country_code().as_deref(), Some("US"));
+
+        // No top-level country: fall back to an area that is itself a country.
+        let area: MbArtistResponse =
+            serde_json::from_str(r#"{"area": {"name": "Canada", "iso-3166-1-codes": ["CA"]}}"#)
+                .unwrap();
+        assert_eq!(area.country_code().as_deref(), Some("CA"));
+
+        // A city or state with no code is never read as a country.
+        let state: MbArtistResponse = serde_json::from_str(
+            r#"{"area": {"name": "California"}, "begin-area": {"name": "Los Angeles"}}"#,
+        )
+        .unwrap();
+        assert_eq!(state.country_code(), None);
+
+        // Anything that is not a two-letter code is not a country.
+        let junk: MbArtistResponse = serde_json::from_str(r#"{"country": "USA"}"#).unwrap();
+        assert_eq!(junk.country_code(), None);
     }
 
     #[test]
