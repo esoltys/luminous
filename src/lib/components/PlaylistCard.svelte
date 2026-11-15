@@ -89,10 +89,10 @@
   {:else if topAlbums.length > 0 && autoKind}
     {@const t = getPlaylistCardTheme(autoKind)}
     <PlaylistCoverFrame gradientClass={t.gradientClass}>
-      <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
+      <CoverStack covers={topAlbums} hoverEffect sizeClass="w-[82%] h-[82%]" />
     </PlaylistCoverFrame>
   {:else if topAlbums.length > 0}
-    <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
+    <CoverStack covers={topAlbums} hoverEffect sizeClass="w-[82%] h-[82%]" />
   {:else if autoKind}
     {@const t = getPlaylistCardTheme(autoKind)}
     <PlaylistCoverFrame gradientClass={t.gradientClass}>

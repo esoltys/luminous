@@ -207,7 +207,7 @@
   {#if topCovers.length > 0}
     {@const t = getPlaylistCardTheme(kind)}
     <PlaylistCoverFrame gradientClass={t.gradientClass}>
-      <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
+      <CoverStack covers={topCovers} hoverEffect sizeClass="w-[82%] h-[82%]" />
     </PlaylistCoverFrame>
   {:else}
     {@const t = getPlaylistCardTheme(kind)}

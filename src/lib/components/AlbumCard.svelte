@@ -82,7 +82,7 @@
     <CoverStack
       covers={covers && covers.length > 0 ? covers : [albumToCoverItem(album)]}
       sizeClass={covers && covers.length > 1 ? "w-24 h-24" : "w-full h-full"}
-      hoverEffect={plain}
+      hoverEffect
     />
     {#if plain}
       <div class={PLAIN_TILE_RING}></div>
