@@ -555,8 +555,8 @@
                 <DeviceSyncDrawer />
               </main>
 
-              <!-- Right Contextual Panel: docked, or a rail plus hover overlay when unpinned -->
-              <RightPanelHost instant={instantLayout} />
+              <!-- Right Contextual Panel: docked, or a notch plus hover overlay when unpinned -->
+              <RightPanelHost instant={instantLayout} {dockVisible} />
             </div>
           </div>
 

@@ -10,20 +10,23 @@
     RIGHT_PANEL_MIN_WIDTH_PX,
     RIGHT_PANEL_MAX_WIDTH_PX,
     PANEL_RESIZE_STEP_PX,
+    PLAYER_DOCK_CLEARANCE_PX,
   } from "../constants";
 
   /**
    * Where the info sidebar lives. Pinned, it is docked beside the content. Unpinned, it
-   * leaves the layout: a slim rail stays at the right edge, and the sidebar is an
-   * overlay that opens when the pointer rests on the rail and closes shortly after the
-   * pointer leaves it, or on Escape or a click outside.
+   * leaves the layout: a compact notch stays centered at the right edge (between the top bar
+   * and the player dock when `dockVisible`), and the sidebar is an overlay that opens when
+   * the pointer rests on the notch and closes shortly after the pointer leaves it, or on
+   * Escape or a click outside.
    *
    * The host paints the panel's surface in both places, so RightPanel itself is only content.
    *
    * Must sit inside a `relative` container that spans the area the overlay should cover.
    * `instant` snaps the slide, for keyboard-driven changes.
    */
-  let { instant = false }: { instant?: boolean } = $props();
+  let { instant = false, dockVisible = false }: { instant?: boolean; dockVisible?: boolean } =
+    $props();
 
   const PANEL_SLIDE_MS = 250;
   const OVERLAY_SLIDE_MS = 200;
@@ -31,17 +34,17 @@
   const CLOSE_DELAY_MS = 250;
 
   let overlayEl = $state<HTMLElement | null>(null);
-  let railEl = $state<HTMLElement | null>(null);
-  // Set when a close leaves the pointer resting on the rail, which would otherwise reopen the overlay
-  // straight away; cleared once the pointer moves off the rail.
-  let railSuppressed = false;
+  let notchEl = $state<HTMLElement | null>(null);
+  // Set when a close leaves the pointer resting on the notch, which would otherwise reopen the
+  // overlay straight away; cleared once the pointer moves off the notch.
+  let notchSuppressed = false;
   let resizing = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const layout = windowLayoutStore;
   let docked = $derived(layout.rightPanelPinned && !layout.isRightPanelAutoHidden);
-  let showRail = $derived(!layout.rightPanelPinned && !layout.isRightPanelAutoHidden);
-  let showOverlay = $derived(showRail && layout.rightPanelPeeking);
+  let showNotch = $derived(!layout.rightPanelPinned && !layout.isRightPanelAutoHidden);
+  let showOverlay = $derived(showNotch && layout.rightPanelPeeking);
 
   function later(fn: () => void, ms: number) {
     cancelTimer();
@@ -58,8 +61,8 @@
     layout.setRightPanelPeeking(false);
   }
 
-  function onRailEnter() {
-    if (layout.rightPanelPeeking || railSuppressed) return;
+  function onNotchEnter() {
+    if (layout.rightPanelPeeking || notchSuppressed) return;
     later(() => layout.setRightPanelPeeking(true), OPEN_DELAY_MS);
   }
 
@@ -79,9 +82,9 @@
   });
 
   $effect(() => {
-    if (!showRail) return;
+    if (!showNotch) return;
     const onPointerMove = (e: PointerEvent) => {
-      if (railSuppressed && !railEl?.contains(e.target as Node)) railSuppressed = false;
+      if (notchSuppressed && !notchEl?.contains(e.target as Node)) notchSuppressed = false;
     };
     window.addEventListener("pointermove", onPointerMove);
     return () => window.removeEventListener("pointermove", onPointerMove);
@@ -91,7 +94,7 @@
     if (!showOverlay) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        railSuppressed = true;
+        notchSuppressed = true;
         closeOverlay();
       }
     };
@@ -188,17 +191,19 @@
   </div>
 {/if}
 
-{#if showRail}
-  <!-- A visible rail rather than an invisible hot edge: it keeps the content's own scrollbar
-       clear of the trigger, and gives the pointer something to find. -->
+{#if showNotch}
+  <!-- A compact floating notch at the right edge, vertically centered between the top bar and
+       the player dock (when visible), so the content keeps full horizontal width and its
+       scrollbar stays clear of the trigger. -->
   <div
-    bind:this={railEl}
+    bind:this={notchEl}
     role="group"
     aria-label={i18n.t("topNav.rightPanelRail", {}, "Info sidebar")}
-    class="rail-surface h-full w-9 flex-shrink-0 flex flex-col items-center pt-2 border-l border-brand-border bg-brand-sidebar {themeStore.isGlassTheme
+    style:top={dockVisible ? `calc(50% - ${PLAYER_DOCK_CLEARANCE_PX / 2}px)` : "50%"}
+    class="notch-surface absolute right-0 -translate-y-1/2 z-30 h-[60px] w-9 flex items-center justify-center rounded-l-xl border-y border-l border-r-0 border-brand-border bg-brand-sidebar shadow-md {themeStore.isGlassTheme
       ? 'glass-surface'
       : ''}"
-    onpointerenter={onRailEnter}
+    onpointerenter={onNotchEnter}
     onpointerleave={cancelTimer}
   >
     <button
@@ -208,7 +213,7 @@
       title={i18n.t("topNav.pinRightPanel", {}, "Pin info sidebar")}
       class="p-1 rounded-md text-brand-text-secondary hover:text-brand-text-primary transition-colors"
     >
-      <!-- Same glyph and size as the player bar's info button. -->
+      <!-- Same glyph and size as the player bar's info button; notch is 3x its 20px height. -->
       <Info class="w-5 h-5" />
     </button>
   </div>
@@ -247,7 +252,7 @@
      highlight of --glass-shadow: as before, when the panel inside this
      overflow-hidden wrapper carried it, the elevation stays off the content. */
   .docked-surface.glass-surface,
-  .rail-surface.glass-surface {
+  .notch-surface.glass-surface {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
     background-color: var(--glass-solid-sidebar) !important;
