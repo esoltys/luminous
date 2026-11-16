@@ -10,7 +10,12 @@
   import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
   import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { getAutoPlaylistSubtitle, getPlaylistDisplayName } from "../utils/playlist";
+  import {
+    getAutoPlaylistSubtitle,
+    getPlaylistDisplayName,
+    hasBackingRow,
+    hasFillMode,
+  } from "../utils/playlist";
   import { countryDisplayName } from "../utils/country";
   import { getLanguageDisplayName } from "../utils/language";
   import { toTitleCase } from "../utils/formatters";
@@ -68,18 +73,7 @@
   }: Props = $props();
 
   let displayLabel = $derived.by(() => {
-    if (
-      (kind === "genre" ||
-        kind === "decade" ||
-        kind === "bpm" ||
-        kind === "artist_tag" ||
-        kind === "missing_metadata" ||
-        kind === "missing_musicbrainz" ||
-        kind === "daypart" ||
-        kind === "language" ||
-        kind === "country") &&
-      playlistId !== undefined
-    ) {
+    if (hasBackingRow(kind) && playlistId !== undefined) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
@@ -105,14 +99,7 @@
     const currentTrackCount = trackCount;
 
     const request =
-      (k === "genre" ||
-        k === "decade" ||
-        k === "bpm" ||
-        k === "artist_tag" ||
-        k === "daypart" ||
-        k === "language" ||
-        k === "country") &&
-      pid !== undefined
+      hasFillMode(k) && pid !== undefined
         ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
             items.filter((item) => !!item.song).map((item) => item.song as Song),
           )
@@ -188,17 +175,7 @@
   let topCovers = $derived(kind === "missing_metadata" ? [] : songsToCoverStack(songs));
 
   let updatedLabel = $derived.by(() => {
-    if (
-      (kind !== "genre" &&
-        kind !== "decade" &&
-        kind !== "bpm" &&
-        kind !== "artist_tag" &&
-        kind !== "missing_metadata" &&
-        kind !== "missing_musicbrainz" &&
-        kind !== "daypart") ||
-      updated === undefined
-    )
-      return null;
+    if (!hasBackingRow(kind) || updated === undefined) return null;
     return formatRelativeDate(updated);
   });
 </script>

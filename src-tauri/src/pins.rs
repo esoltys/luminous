@@ -267,15 +267,16 @@ pub fn resolve_auto_playlist(
 
     let virtual_item = |kind: &str, track_count: i32| AutoPlaylistItem {
         kind: kind.to_string(),
-        genre: None,
-        artist_tag: None,
-        decade: None,
-        bpm: None,
-        language: None,
-        country: None,
-        playlist_id: None,
-        updated: None,
         track_count,
+        ..Default::default()
+    };
+    // A singleton kind keyed on the backing row alone (no selector value).
+    let row_item = |kind: &str, p: &Playlist| AutoPlaylistItem {
+        kind: kind.to_string(),
+        playlist_id: Some(p.id),
+        updated: Some(p.updated),
+        track_count: p.track_count,
+        ..Default::default()
     };
 
     let item = match kind {
@@ -306,18 +307,7 @@ pub fn resolve_auto_playlist(
                         && p.track_count > 0
                         && p.dynamic_spec.as_deref() == Some("missingmeta")
                 })
-                .map(|p| AutoPlaylistItem {
-                    kind: kind.to_string(),
-                    genre: None,
-                    artist_tag: None,
-                    decade: None,
-                    bpm: None,
-                    language: None,
-                    country: None,
-                    playlist_id: Some(p.id),
-                    updated: Some(p.updated),
-                    track_count: p.track_count,
-                })
+                .map(|p| row_item(kind, p))
         }
         "missing_musicbrainz" => playlists
             .iter()
@@ -326,18 +316,7 @@ pub fn resolve_auto_playlist(
                     && p.track_count > 0
                     && p.dynamic_spec.as_deref() == Some("missingmbid")
             })
-            .map(|p| AutoPlaylistItem {
-                kind: kind.to_string(),
-                genre: None,
-                artist_tag: None,
-                decade: None,
-                bpm: None,
-                language: None,
-                country: None,
-                playlist_id: Some(p.id),
-                updated: Some(p.updated),
-                track_count: p.track_count,
-            }),
+            .map(|p| row_item(kind, p)),
         "daypart" => {
             // Singleton like "missing_metadata", but resolved by *prefix*
             // rather than exact spec match (#223) — the row's spec changes
@@ -352,18 +331,7 @@ pub fn resolve_auto_playlist(
                             .as_deref()
                             .is_some_and(|s| s.starts_with("daypart:"))
                 })
-                .map(|p| AutoPlaylistItem {
-                    kind: kind.to_string(),
-                    genre: None,
-                    artist_tag: None,
-                    decade: None,
-                    bpm: None,
-                    language: None,
-                    country: None,
-                    playlist_id: Some(p.id),
-                    updated: Some(p.updated),
-                    track_count: p.track_count,
-                })
+                .map(|p| row_item(kind, p))
                 .or_else(|| Some(virtual_item(kind, 0)))
         }
         "genre" | "decade" | "bpm" | "artist_tag" | "language" | "country" => {

@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   autoContinueRunStarts,
   autoPlaylistRefFromPlaylist,
+  hasBackingRow,
+  hasFillMode,
   getDaypartMixLabel,
   getDaypartMixSourceLabel,
   getPlaylistAutoKindAndSubtitle,
@@ -381,5 +383,22 @@ describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
       kind: "smart",
       subtitle: i18n.t("playlists.smartRulePlaylistLabel"),
     });
+  });
+});
+
+describe("auto-playlist kind capabilities", () => {
+  it("backs every materialized kind with a row and leaves the live ones without", () => {
+    for (const kind of ["genre", "decade", "bpm", "artist_tag", "daypart", "language", "country"]) {
+      expect(hasBackingRow(kind), kind).toBe(true);
+      expect(hasFillMode(kind), kind).toBe(true);
+    }
+    for (const kind of ["missing_metadata", "missing_musicbrainz"]) {
+      expect(hasBackingRow(kind), kind).toBe(true);
+      expect(hasFillMode(kind), kind).toBe(false);
+    }
+    for (const kind of ["favourites", "recently_added", "most_played", "history"]) {
+      expect(hasBackingRow(kind), kind).toBe(false);
+      expect(hasFillMode(kind), kind).toBe(false);
+    }
   });
 });

@@ -4,7 +4,11 @@
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { getAutoPlaylistSubtitle, getPlaylistDisplayName } from "../utils/playlist";
+  import {
+    getAutoPlaylistSubtitle,
+    getPlaylistDisplayName,
+    hasBackingRow,
+  } from "../utils/playlist";
   import { countryDisplayName } from "../utils/country";
   import { getLanguageDisplayName } from "../utils/language";
   import { toTitleCase } from "../utils/formatters";
@@ -58,18 +62,7 @@
   }: Props = $props();
 
   let displayLabel = $derived.by(() => {
-    if (
-      (kind === "genre" ||
-        kind === "decade" ||
-        kind === "bpm" ||
-        kind === "artist_tag" ||
-        kind === "missing_metadata" ||
-        kind === "missing_musicbrainz" ||
-        kind === "daypart" ||
-        kind === "language" ||
-        kind === "country") &&
-      playlistId !== undefined
-    ) {
+    if (hasBackingRow(kind) && playlistId !== undefined) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
@@ -81,19 +74,7 @@
   let subtitleLabel = $derived(getAutoPlaylistSubtitle({ kind, bpm }));
 
   let updatedLabel = $derived.by(() => {
-    if (
-      (kind !== "genre" &&
-        kind !== "decade" &&
-        kind !== "bpm" &&
-        kind !== "artist_tag" &&
-        kind !== "missing_metadata" &&
-        kind !== "missing_musicbrainz" &&
-        kind !== "daypart" &&
-        kind !== "language" &&
-        kind !== "country") ||
-      updated === undefined
-    )
-      return null;
+    if (!hasBackingRow(kind) || updated === undefined) return null;
     return formatRelativeDate(updated);
   });
 </script>

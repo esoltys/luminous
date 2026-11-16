@@ -402,6 +402,43 @@ export function autoPlaylistRefFromPlaylist(playlist: Playlist): AutoPlaylistRef
   return { kind: "genre", genre, ...base };
 }
 
+/**
+ * Auto-playlist kinds that are backed by a materialized `playlists` row, so they carry an
+ * `updated` stamp, a Refresh action and a display name taken from the row. Favourites, Recently
+ * Added, Most Played and History are computed live and have no row.
+ */
+const ROW_BACKED_KINDS: ReadonlySet<string> = new Set([
+  "genre",
+  "decade",
+  "bpm",
+  "artist_tag",
+  "missing_metadata",
+  "missing_musicbrainz",
+  "daypart",
+  "language",
+  "country",
+]);
+
+/** Row-backed kinds whose songs come straight from the row, so they also offer a fill mode. The
+ * two Missing-* kinds are excluded: a fill mode means nothing for a diagnostic list. */
+const FILL_MODE_KINDS: ReadonlySet<string> = new Set([
+  "genre",
+  "decade",
+  "bpm",
+  "artist_tag",
+  "daypart",
+  "language",
+  "country",
+]);
+
+export function hasBackingRow(kind: string): boolean {
+  return ROW_BACKED_KINDS.has(kind);
+}
+
+export function hasFillMode(kind: string): boolean {
+  return FILL_MODE_KINDS.has(kind);
+}
+
 /** Localized type subtitle for an auto-playlist card or search result. */
 export function getAutoPlaylistSubtitle(ref: Pick<AutoPlaylistRef, "kind" | "bpm">): string {
   switch (ref.kind) {

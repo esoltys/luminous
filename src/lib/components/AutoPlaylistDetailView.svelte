@@ -58,6 +58,8 @@
     getBpmBucketLabel,
     getDaypartMixLabel,
     getDaypartMixSourceLabel,
+    hasBackingRow,
+    hasFillMode,
   } from "../utils/playlist";
   import { genreColorHsl, resolveGenreColorIndex } from "../utils/genrePalette";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -319,19 +321,7 @@
   });
 
   let updatedLabel = $derived.by(() => {
-    if (
-      (kind !== "genre" &&
-        kind !== "decade" &&
-        kind !== "bpm" &&
-        kind !== "artist_tag" &&
-        kind !== "missing_metadata" &&
-        kind !== "missing_musicbrainz" &&
-        kind !== "daypart" &&
-        kind !== "language" &&
-        kind !== "country") ||
-      updated === undefined
-    )
-      return null;
+    if (!hasBackingRow(kind) || updated === undefined) return null;
     return new Date(updated * 1000).toLocaleDateString();
   });
 
@@ -362,16 +352,7 @@
     ctry: typeof country,
     pid: typeof playlistId,
   ): Promise<Loaded> {
-    if (
-      (k === "genre" ||
-        k === "decade" ||
-        k === "bpm" ||
-        k === "artist_tag" ||
-        k === "daypart" ||
-        k === "language" ||
-        k === "country") &&
-      pid !== undefined
-    ) {
+    if (hasFillMode(k) && pid !== undefined) {
       return loadPlaylistRows(pid);
     }
     if (k === "country") {
@@ -946,7 +927,7 @@
           </button>
         </div>
 
-        {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "daypart" || kind === "language" || kind === "country") && playlistId !== undefined}
+        {#if hasFillMode(kind) && playlistId !== undefined}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
             <!-- Queue population mode tabs (#120): what bias to (re)populate this auto-playlist with -->
             <PopulationModeTabs
@@ -1145,9 +1126,9 @@
         overflowMenuPos = null;
       }}
     />
-    {#if listedPlaylist || ((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined)}
+    {#if listedPlaylist || (hasBackingRow(kind) && playlistId !== undefined)}
       <ContextMenuDivider />
-      {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined}
+      {#if hasBackingRow(kind) && playlistId !== undefined}
         <ContextMenuItem
           icon={RefreshCw}
           label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}
