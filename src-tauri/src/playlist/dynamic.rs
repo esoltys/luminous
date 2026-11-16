@@ -169,8 +169,8 @@ async fn reconcile_pass(app: &tauri::AppHandle) {
 pub fn match_dynamic_playlists(db: &Arc<Database>) -> Result<Vec<DynamicPlaylistMatch>> {
     let targets = dynamic_playlist_specs(db)?;
     let mut matches = Vec::with_capacity(targets.len());
-    for (playlist_id, spec, mode) in targets {
-        match spec_songs(db, &spec, mode) {
+    for (playlist_id, spec, is_system, mode) in targets {
+        match spec_songs(db, &spec, is_system, mode) {
             Ok(resolved) if resolved.random_sample => {}
             Ok(resolved) => matches.push(DynamicPlaylistMatch {
                 playlist_id,
@@ -184,11 +184,11 @@ pub fn match_dynamic_playlists(db: &Arc<Database>) -> Result<Vec<DynamicPlaylist
 }
 
 /// Every enabled dynamic playlist with a non-empty spec, as
-/// `(id, spec, population_mode)`.
-fn dynamic_playlist_specs(db: &Database) -> Result<Vec<(i64, String, QueuePopulationMode)>> {
+/// `(id, spec, is_system, population_mode)`.
+fn dynamic_playlist_specs(db: &Database) -> Result<Vec<(i64, String, bool, QueuePopulationMode)>> {
     let conn = db.pool.get()?;
     let mut stmt = conn.prepare(
-        "SELECT id, dynamic_spec, COALESCE(population_mode, 'all') FROM playlists
+        "SELECT id, dynamic_spec, COALESCE(is_system, 0), COALESCE(population_mode, 'all') FROM playlists
          WHERE dynamic_enabled = 1 AND TRIM(COALESCE(dynamic_spec, '')) != ''",
     )?;
     let rows = stmt
@@ -196,21 +196,36 @@ fn dynamic_playlist_specs(db: &Database) -> Result<Vec<(i64, String, QueuePopula
             Ok((
                 row.get::<_, i64>(0)?,
                 row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
+                row.get::<_, bool>(2)?,
+                row.get::<_, String>(3)?,
             ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows
         .into_iter()
-        .map(|(id, spec, mode)| (id, spec, QueuePopulationMode::from(mode.as_str())))
+        .map(|(id, spec, is_system, mode)| {
+            (
+                id,
+                spec,
+                is_system,
+                QueuePopulationMode::from(mode.as_str()),
+            )
+        })
         .collect())
 }
 
 /// Every library song matching a dynamic spec, in the order the spec's
-/// population mode dictates. The single dispatch point for all spec kinds
-/// (decade:, bpmrange:, artisttag:, artistcountry:, missingmeta, tag:, daypart:, smart-rule
-/// query).
-fn spec_songs(db: &Arc<Database>, spec: &str, mode: QueuePopulationMode) -> Result<SpecSongs> {
+/// population mode dictates. When `is_system` is true, dispatches system
+/// auto-playlist specs (`decade:`, `bpmrange:`, `artisttag:`, `artistcountry:`,
+/// `language:`, `missingmeta`, `missingmbid`, `tag:`, `daypart:`); user Smart
+/// Playlists (`is_system == false`) always resolve as search-rule queries so
+/// filters like `language:ja` or `tag:canadian` never collide (#2136).
+fn spec_songs(
+    db: &Arc<Database>,
+    spec: &str,
+    is_system: bool,
+    mode: QueuePopulationMode,
+) -> Result<SpecSongs> {
     let matched = |songs| {
         Ok(SpecSongs {
             songs,
@@ -228,53 +243,51 @@ fn spec_songs(db: &Arc<Database>, spec: &str, mode: QueuePopulationMode) -> Resu
         })
     };
     let scanner = CollectionScanner::new(db.clone());
-    if let Some(decade) = spec.strip_prefix("decade:") {
-        matched(scanner.get_songs_by_decade(decade, NO_SONG_LIMIT, mode)?)
-    } else if let Some((min, max)) = spec
-        .strip_prefix("bpmrange:")
-        .and_then(crate::collection::parse_bpm_range_spec)
-    {
-        matched(scanner.get_songs_by_bpm_range(min, max, NO_SONG_LIMIT, mode)?)
-    } else if let Some(tag) = spec.strip_prefix("artisttag:") {
-        matched(scanner.get_songs_by_artist_tag(tag, NO_SONG_LIMIT, mode)?)
-    } else if spec == "missingmeta" {
-        matched(scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)?)
-    } else if spec == "missingmbid" {
-        matched(scanner.get_songs_missing_musicbrainz_id(NO_SONG_LIMIT, mode)?)
-    } else if let Some(code) = spec.strip_prefix("artistcountry:") {
-        matched(scanner.get_songs_by_artist_country(code, NO_SONG_LIMIT, mode)?)
-    } else if let Some(lang) = spec.strip_prefix("language:") {
-        let tag_manager = TagManager::new(db.clone());
-        matched(tag_manager.get_songs_by_language(lang, NO_SONG_LIMIT, mode)?)
-    } else if let Some(name) = spec.strip_prefix("tag:") {
-        // A system genre auto-playlist, keyed on a curated tag name (#548)
-        // rather than a Smart Playlist rule spec (which always contains a
-        // "field:" rule).
-        let tag_manager = TagManager::new(db.clone());
-        matched(tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?)
-    } else if let Some(rest) = spec.strip_prefix("daypart:") {
-        // "<bucket>:<date>:<resolved-name>" — bucket/date are only the
-        // reroll cache key `sync_daypart_auto_playlist` checks; here we only
-        // care about the already-resolved trailing name (empty means the
-        // random-fill fallback was chosen). This never re-picks anything
-        // itself, so calling this via `populate_dynamic_playlist`/reconcile
-        // does not reroll the mix.
-        let name = rest.splitn(3, ':').nth(2).unwrap_or("");
-        if name.is_empty() {
-            random_fill(&scanner)
-        } else {
+    if is_system {
+        if let Some(decade) = spec.strip_prefix("decade:") {
+            return matched(scanner.get_songs_by_decade(decade, NO_SONG_LIMIT, mode)?);
+        } else if let Some((min, max)) = spec
+            .strip_prefix("bpmrange:")
+            .and_then(crate::collection::parse_bpm_range_spec)
+        {
+            return matched(scanner.get_songs_by_bpm_range(min, max, NO_SONG_LIMIT, mode)?);
+        } else if let Some(tag) = spec.strip_prefix("artisttag:") {
+            return matched(scanner.get_songs_by_artist_tag(tag, NO_SONG_LIMIT, mode)?);
+        } else if spec == "missingmeta" {
+            return matched(scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)?);
+        } else if spec == "missingmbid" {
+            return matched(scanner.get_songs_missing_musicbrainz_id(NO_SONG_LIMIT, mode)?);
+        } else if let Some(code) = spec.strip_prefix("artistcountry:") {
+            return matched(scanner.get_songs_by_artist_country(code, NO_SONG_LIMIT, mode)?);
+        } else if let Some(lang) = spec.strip_prefix("language:") {
             let tag_manager = TagManager::new(db.clone());
-            let songs = tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?;
-            if songs.is_empty() {
+            return matched(tag_manager.get_songs_by_language(lang, NO_SONG_LIMIT, mode)?);
+        } else if let Some(name) = spec.strip_prefix("tag:") {
+            let tag_manager = TagManager::new(db.clone());
+            return matched(tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?);
+        } else if let Some(rest) = spec.strip_prefix("daypart:") {
+            // "<bucket>:<date>:<resolved-name>" — bucket/date are only the
+            // reroll cache key `sync_daypart_auto_playlist` checks; here we only
+            // care about the already-resolved trailing name (empty means the
+            // random-fill fallback was chosen). This never re-picks anything
+            // itself, so calling this via `populate_dynamic_playlist`/reconcile
+            // does not reroll the mix.
+            let name = rest.splitn(3, ':').nth(2).unwrap_or("");
+            return if name.is_empty() {
                 random_fill(&scanner)
             } else {
-                matched(songs)
-            }
+                let tag_manager = TagManager::new(db.clone());
+                let songs = tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?;
+                if songs.is_empty() {
+                    random_fill(&scanner)
+                } else {
+                    matched(songs)
+                }
+            };
         }
-    } else {
-        let query = spec.replace(';', " ");
-        matched(scanner.search_songs_by_mode(&query, NO_SONG_LIMIT, mode)?)
     }
+    let query = spec.replace(';', " ");
+    matched(scanner.search_songs_by_mode(&query, NO_SONG_LIMIT, mode)?)
 }
 
 impl PlaylistManager {
@@ -295,26 +308,27 @@ impl PlaylistManager {
     pub(super) fn songs_for_spec(
         &self,
         spec: &str,
+        is_system: bool,
         mode: QueuePopulationMode,
     ) -> Result<Vec<Song>> {
-        Ok(spec_songs(&self.db, spec, mode)?.songs)
+        Ok(spec_songs(&self.db, spec, is_system, mode)?.songs)
     }
 
     /// Populate/refresh tracks for any dynamic playlist based on its `dynamic_spec`,
     /// selected per its own `population_mode` bias (see #120).
     pub fn populate_dynamic_playlist(&mut self, playlist_id: i64) -> Result<()> {
         let conn = self.db.pool.get()?;
-        let row: Option<(Option<String>, String)> = conn
+        let row: Option<(Option<String>, bool, String)> = conn
             .query_row(
-                "SELECT dynamic_spec, COALESCE(population_mode, 'all') FROM playlists WHERE id = ?1 AND dynamic_enabled = 1",
+                "SELECT dynamic_spec, COALESCE(is_system, 0), COALESCE(population_mode, 'all') FROM playlists WHERE id = ?1 AND dynamic_enabled = 1",
                 params![playlist_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .optional()?;
 
-        let (spec, mode) = match row {
-            Some((Some(s), mode)) if !s.trim().is_empty() => {
-                (s, QueuePopulationMode::from(mode.as_str()))
+        let (spec, is_system, mode) = match row {
+            Some((Some(s), is_system, mode)) if !s.trim().is_empty() => {
+                (s, is_system, QueuePopulationMode::from(mode.as_str()))
             }
             _ => return Ok(()),
         };
@@ -322,7 +336,7 @@ impl PlaylistManager {
         // writes instead of holding two.
         drop(conn);
 
-        let songs = self.songs_for_spec(&spec, mode)?;
+        let songs = self.songs_for_spec(&spec, is_system, mode)?;
 
         let conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
@@ -557,10 +571,14 @@ mod tests {
 
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
         let daypart_songs = manager
-            .songs_for_spec("daypart:morning:2026-09-03:Jazz", QueuePopulationMode::All)
+            .songs_for_spec(
+                "daypart:morning:2026-09-03:Jazz",
+                true,
+                QueuePopulationMode::All,
+            )
             .unwrap();
         let tag_songs = manager
-            .songs_for_spec("tag:Jazz", QueuePopulationMode::All)
+            .songs_for_spec("tag:Jazz", true, QueuePopulationMode::All)
             .unwrap();
 
         assert_eq!(daypart_songs.len(), 3);
@@ -596,7 +614,11 @@ mod tests {
 
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
         let songs = manager
-            .songs_for_spec("daypart:morning:2026-09-03:", QueuePopulationMode::All)
+            .songs_for_spec(
+                "daypart:morning:2026-09-03:",
+                true,
+                QueuePopulationMode::All,
+            )
             .unwrap();
 
         assert_eq!(
@@ -752,6 +774,15 @@ mod tests {
         }
         let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
         let pl = manager.create_playlist("Morning Mix").unwrap();
+        db_arc
+            .pool
+            .get()
+            .unwrap()
+            .execute(
+                "UPDATE playlists SET is_system = 1 WHERE id = ?1",
+                params![pl.id],
+            )
+            .unwrap();
         manager
             .set_playlist_dynamic_spec(pl.id, "daypart:morning:2026-09-03:")
             .unwrap();
@@ -958,6 +989,15 @@ mod tests {
             .unwrap();
 
         let pl = manager.create_playlist("Metal Auto").unwrap();
+        db_arc
+            .pool
+            .get()
+            .unwrap()
+            .execute(
+                "UPDATE playlists SET is_system = 1 WHERE id = ?1",
+                params![pl.id],
+            )
+            .unwrap();
         manager
             .set_playlist_dynamic_spec(pl.id, "tag:Metal")
             .unwrap();
@@ -991,6 +1031,7 @@ mod tests {
         let songs = manager
             .songs_for_spec(
                 "daypart:morning:2026-09-12:NonExistentGenre",
+                true,
                 QueuePopulationMode::All,
             )
             .unwrap();
@@ -1085,6 +1126,57 @@ mod tests {
         let delta = delta.unwrap();
         assert_eq!(delta.playlist_id, pl.id);
         assert_eq!(delta.removed_uuids.len(), 2);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_user_smart_playlist_with_colliding_prefix_uses_search_rules() {
+        let (db, temp_dir) = setup_test_db();
+        {
+            let conn = db.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, artist, genre, rating, language, path, source, unavailable)
+                 VALUES ('High', 'ArtistCan', 'Rock', 5, 'ja', '/high.mp3', 1, 0)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, artist, genre, rating, language, path, source, unavailable)
+                 VALUES ('Low', 'ArtistCan', 'Rock', 1, 'en', '/low.mp3', 1, 0)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO artist_profiles (artist_key, tags) VALUES ('ArtistCan', '[\"canadian\"]')",
+                [],
+            )
+            .unwrap();
+        }
+        let db_arc = std::sync::Arc::new(db);
+        let mut manager = PlaylistManager::new(db_arc).unwrap();
+
+        let pl_tag = manager.create_playlist("High Rated Canadian").unwrap();
+        manager
+            .set_playlist_dynamic_spec(pl_tag.id, "tag:canadian; rating:>=4")
+            .unwrap();
+        let tag_tracks = manager.get_playlist_tracks(pl_tag.id).unwrap();
+        assert_eq!(tag_tracks.len(), 1);
+        assert_eq!(
+            tag_tracks[0].song.as_ref().unwrap().title.as_deref(),
+            Some("High")
+        );
+
+        let pl_lang = manager.create_playlist("Japanese").unwrap();
+        manager
+            .set_playlist_dynamic_spec(pl_lang.id, "language:ja")
+            .unwrap();
+        let lang_tracks = manager.get_playlist_tracks(pl_lang.id).unwrap();
+        assert_eq!(lang_tracks.len(), 1);
+        assert_eq!(
+            lang_tracks[0].song.as_ref().unwrap().title.as_deref(),
+            Some("High")
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

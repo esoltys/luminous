@@ -117,47 +117,58 @@
     if (view.playlistId !== undefined) return view.playlistId;
     if (view.kind === "missing_musicbrainz") {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid",
+        (p) => p.dynamic_enabled && p.is_system !== false && p.dynamic_spec === "missingmbid",
       )?.id;
     }
     if (view.kind === "missing_metadata") {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta",
+        (p) => p.dynamic_enabled && p.is_system !== false && p.dynamic_spec === "missingmeta",
       )?.id;
     }
     if (view.kind === "daypart") {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"),
+        (p) => p.dynamic_enabled && p.is_system !== false && p.dynamic_spec?.startsWith("daypart:"),
       )?.id;
     }
     if (view.kind === "decade" && view.decade) {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `decade:${view.decade}`,
+        (p) =>
+          p.dynamic_enabled && p.is_system !== false && p.dynamic_spec === `decade:${view.decade}`,
       )?.id;
     }
     if (view.kind === "bpm" && view.bpm) {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `bpmrange:${view.bpm}`,
+        (p) =>
+          p.dynamic_enabled && p.is_system !== false && p.dynamic_spec === `bpmrange:${view.bpm}`,
       )?.id;
     }
     if (view.kind === "artist_tag" && view.artistTag) {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `artisttag:${view.artistTag}`,
+        (p) =>
+          p.dynamic_enabled &&
+          p.is_system !== false &&
+          p.dynamic_spec === `artisttag:${view.artistTag}`,
       )?.id;
     }
     if (view.kind === "language" && view.language) {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `language:${view.language}`,
+        (p) =>
+          p.dynamic_enabled &&
+          p.is_system !== false &&
+          p.dynamic_spec === `language:${view.language}`,
       )?.id;
     }
     if (view.kind === "country" && view.country) {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `artistcountry:${view.country}`,
+        (p) =>
+          p.dynamic_enabled &&
+          p.is_system !== false &&
+          p.dynamic_spec === `artistcountry:${view.country}`,
       )?.id;
     }
     if (view.kind === "genre" && view.genre) {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `tag:${view.genre}`,
+        (p) => p.dynamic_enabled && p.is_system !== false && p.dynamic_spec === `tag:${view.genre}`,
       )?.id;
     }
     return undefined;

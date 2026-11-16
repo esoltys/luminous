@@ -128,11 +128,11 @@ impl PlaylistManager {
             return Ok(true);
         }
         conn.execute(
-            "DELETE FROM playlist_items WHERE playlist_id IN (SELECT id FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE ?1)",
+            "DELETE FROM playlist_items WHERE playlist_id IN (SELECT id FROM playlists WHERE dynamic_enabled = 1 AND is_system = 1 AND dynamic_spec LIKE ?1)",
             params![family.spec_pattern()],
         )?;
         conn.execute(
-            "DELETE FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE ?1",
+            "DELETE FROM playlists WHERE dynamic_enabled = 1 AND is_system = 1 AND dynamic_spec LIKE ?1",
             params![family.spec_pattern()],
         )?;
         Ok(false)
@@ -211,7 +211,7 @@ impl PlaylistManager {
         // BPM auto-playlists and user-created Smart Playlist rule specs use
         // their own prefixes/shapes and must not be swept up here.
         let mut stmt = conn.prepare(
-            "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'tag:%'",
+            "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND is_system = 1 AND dynamic_spec LIKE 'tag:%'",
         )?;
         let existing: Vec<(i64, String)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
@@ -246,7 +246,7 @@ impl PlaylistManager {
         let spec = format!("tag:{}", name);
         let existing_row: Option<(i64, i64, String)> = conn
             .query_row(
-                "SELECT id, COALESCE(updated, 0), COALESCE(population_mode, 'all') FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                "SELECT id, COALESCE(updated, 0), COALESCE(population_mode, 'all') FROM playlists WHERE dynamic_enabled = 1 AND is_system = 1 AND dynamic_spec = ?1",
                 params![spec],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
@@ -264,7 +264,7 @@ impl PlaylistManager {
             }
             None => {
                 conn.execute(
-                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system, created, updated) VALUES (?1, 1, ?2, 1, ?3, ?3)",
                     params![name, spec, now],
                 )?;
                 conn.last_insert_rowid()
@@ -312,7 +312,7 @@ impl PlaylistManager {
         let now = chrono::Utc::now().timestamp();
 
         let mut stmt =
-            conn.prepare("SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'decade:%'")?;
+            conn.prepare("SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND is_system = 1 AND dynamic_spec LIKE 'decade:%'")?;
         let existing: Vec<(i64, String)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
             .filter_map(|r| r.ok())
@@ -329,7 +329,7 @@ impl PlaylistManager {
             let spec = format!("decade:{}", decade);
             let existing_row: Option<(i64, i64, i64, String)> = conn
                 .query_row(
-                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.is_system = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
                     params![spec],
                     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                 )
@@ -384,7 +384,7 @@ impl PlaylistManager {
                 }
                 None => {
                     conn.execute(
-                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system, created, updated) VALUES (?1, 1, ?2, 1, ?3, ?3)",
                         params![decade, spec, now],
                     )?;
                     conn.last_insert_rowid()
@@ -419,7 +419,7 @@ impl PlaylistManager {
             let spec = format!("bpmrange:{}", bucket.spec_suffix());
             let existing_row: Option<(i64, i64, i64, String)> = conn
                 .query_row(
-                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.is_system = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
                     params![spec],
                     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                 )
@@ -474,7 +474,7 @@ impl PlaylistManager {
                 }
                 None => {
                     conn.execute(
-                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system, created, updated) VALUES (?1, 1, ?2, 1, ?3, ?3)",
                         params![name, spec, now],
                     )?;
                     conn.last_insert_rowid()
@@ -503,7 +503,7 @@ impl PlaylistManager {
         let now = chrono::Utc::now().timestamp();
 
         let mut stmt = conn.prepare(
-            "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'artisttag:%'",
+            "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND is_system = 1 AND dynamic_spec LIKE 'artisttag:%'",
         )?;
         let existing: Vec<(i64, String)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
@@ -525,7 +525,7 @@ impl PlaylistManager {
             let spec = format!("artisttag:{}", tag);
             let existing_row: Option<(i64, i64, i64, String)> = conn
                 .query_row(
-                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.is_system = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
                     params![spec],
                     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                 )
@@ -581,7 +581,7 @@ impl PlaylistManager {
                 }
                 None => {
                     conn.execute(
-                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system, created, updated) VALUES (?1, 1, ?2, 1, ?3, ?3)",
                         params![display_name, spec, now],
                     )?;
                     conn.last_insert_rowid()
@@ -611,7 +611,7 @@ impl PlaylistManager {
         let now = chrono::Utc::now().timestamp();
 
         let mut stmt = conn.prepare(
-            "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'language:%'",
+            "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND is_system = 1 AND dynamic_spec LIKE 'language:%'",
         )?;
         let existing: Vec<(i64, String)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
@@ -633,7 +633,7 @@ impl PlaylistManager {
             let spec = format!("language:{}", lang.code);
             let existing_row: Option<(i64, i64, i64, String)> = conn
                 .query_row(
-                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.is_system = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
                     params![spec],
                     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                 )
@@ -677,7 +677,7 @@ impl PlaylistManager {
                 }
                 None => {
                     conn.execute(
-                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system, created, updated) VALUES (?1, 1, ?2, 1, ?3, ?3)",
                         params![lang.code, spec, now],
                     )?;
                     conn.last_insert_rowid()
@@ -713,7 +713,7 @@ impl PlaylistManager {
 
         let existing: Vec<(i64, String)> = {
             let mut stmt = conn.prepare(
-                "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'artistcountry:%'",
+                "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND is_system = 1 AND dynamic_spec LIKE 'artistcountry:%'",
             )?;
             let rows = stmt
                 .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
@@ -736,7 +736,7 @@ impl PlaylistManager {
             let spec = format!("{PREFIX}{}", country.code);
             let existing_row: Option<(i64, i64, String)> = conn
                 .query_row(
-                    "SELECT id, COALESCE(updated, 0), COALESCE(population_mode, 'all') FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                    "SELECT id, COALESCE(updated, 0), COALESCE(population_mode, 'all') FROM playlists WHERE dynamic_enabled = 1 AND is_system = 1 AND dynamic_spec = ?1",
                     params![spec],
                     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                 )
@@ -771,7 +771,7 @@ impl PlaylistManager {
                 }
                 None => {
                     conn.execute(
-                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system, created, updated) VALUES (?1, 1, ?2, 1, ?3, ?3)",
                         params![country.code, spec, now],
                     )?;
                     conn.last_insert_rowid()
@@ -809,7 +809,7 @@ impl PlaylistManager {
                 "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all')
                  FROM playlists p
                  LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
-                 WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1
+                 WHERE p.dynamic_enabled = 1 AND p.is_system = 1 AND p.dynamic_spec = ?1
                  GROUP BY p.id",
                 params![SPEC],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
@@ -840,7 +840,7 @@ impl PlaylistManager {
             }
             None => {
                 conn.execute(
-                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system, created, updated) VALUES (?1, 1, ?2, 1, ?3, ?3)",
                     params![NAME, SPEC, now],
                 )?;
                 conn.last_insert_rowid()
@@ -873,7 +873,7 @@ impl PlaylistManager {
                 "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all')
                  FROM playlists p
                  LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
-                 WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1
+                 WHERE p.dynamic_enabled = 1 AND p.is_system = 1 AND p.dynamic_spec = ?1
                  GROUP BY p.id",
                 params![SPEC],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
@@ -912,7 +912,7 @@ impl PlaylistManager {
             }
             None => {
                 conn.execute(
-                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system, created, updated) VALUES (?1, 1, ?2, 1, ?3, ?3)",
                     params![NAME, SPEC, now],
                 )?;
                 conn.last_insert_rowid()
@@ -1061,7 +1061,7 @@ impl PlaylistManager {
                 "SELECT p.id, p.dynamic_spec, COALESCE(p.population_mode, 'all'),
                         (SELECT COUNT(*) FROM playlist_items pi WHERE pi.playlist_id = p.id)
                  FROM playlists p
-                 WHERE p.dynamic_enabled = 1 AND p.dynamic_spec LIKE 'daypart:%'",
+                 WHERE p.dynamic_enabled = 1 AND p.is_system = 1 AND p.dynamic_spec LIKE 'daypart:%'",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
@@ -1101,13 +1101,13 @@ impl PlaylistManager {
 
         let resolved_name = self.pick_daypart_genre_grouping()?.unwrap_or_default();
         let mut new_spec = format!("{SPEC_PREFIX}{bucket}:{today}:{resolved_name}");
-        let mut songs = self.songs_for_spec(&new_spec, mode)?;
+        let mut songs = self.songs_for_spec(&new_spec, true, mode)?;
 
         // Fallback: if the picked genre didn't clear the minimum threshold,
         // fall back to random fill across the library (#223).
         if songs.len() < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST as usize {
             let fallback_spec = format!("{SPEC_PREFIX}{bucket}:{today}:");
-            let fallback_songs = self.songs_for_spec(&fallback_spec, mode)?;
+            let fallback_songs = self.songs_for_spec(&fallback_spec, true, mode)?;
             if fallback_songs.len() >= songs.len() {
                 new_spec = fallback_spec;
                 songs = fallback_songs;
@@ -1134,7 +1134,7 @@ impl PlaylistManager {
             }
             None => {
                 conn.execute(
-                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system, created, updated) VALUES (?1, 1, ?2, 1, ?3, ?3)",
                     params![bucket_name, new_spec, now],
                 )?;
                 conn.last_insert_rowid()
@@ -1236,12 +1236,12 @@ mod tests {
         {
             let conn = db_arc.pool.get().unwrap();
             conn.execute(
-                "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec) VALUES ('1980s', 1, 'decade:1980s')",
+                "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system) VALUES ('1980s', 1, 'decade:1980s', 1)",
                 [],
             )
             .unwrap();
             conn.execute(
-                "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec) VALUES ('Rock', 1, 'tag:Rock')",
+                "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system) VALUES ('Rock', 1, 'tag:Rock', 1)",
                 [],
             )
             .unwrap();
@@ -1277,7 +1277,7 @@ mod tests {
             let conn = db_arc.pool.get().unwrap();
             for (_, spec) in rows {
                 conn.execute(
-                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec) VALUES ('x', 1, ?1)",
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system) VALUES ('x', 1, ?1, 1)",
                     params![spec],
                 )
                 .unwrap();
@@ -1300,6 +1300,64 @@ mod tests {
                 .all(|s| s == "missingmeta" || s == "missingmbid"),
             "all families off leaves only diagnostics: {left:?}"
         );
+    }
+
+    /// #2136: user Smart Playlists (`is_system = 0`) whose rule spec starts
+    /// with `language:`, `decade:`, or `tag:` must never be pruned by
+    /// `family_enabled_or_prune` or `sync_*`, even when the family is disabled
+    /// or no matching key exists in the library.
+    #[test]
+    fn user_smart_playlists_with_colliding_prefixes_are_never_pruned() {
+        let (db, _dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        let smart_specs = [
+            "language:ja",
+            "decade:1980s",
+            "tag:canadian",
+            "tag:Rock; rating:>=4",
+        ];
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for (idx, spec) in smart_specs.iter().enumerate() {
+                conn.execute(
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, is_system) VALUES (?1, 1, ?2, 0)",
+                    params![format!("Smart {idx}"), spec],
+                )
+                .unwrap();
+            }
+        }
+        for key in [
+            "auto_playlists_genre",
+            "auto_playlists_decade",
+            "auto_playlists_language",
+        ] {
+            set_pref(&db_arc, key, "false");
+        }
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_all_auto_playlists().unwrap();
+
+        for key in [
+            "auto_playlists_genre",
+            "auto_playlists_decade",
+            "auto_playlists_language",
+        ] {
+            set_pref(&db_arc, key, "true");
+        }
+        manager.sync_all_auto_playlists().unwrap();
+
+        let remaining: Vec<String> = manager
+            .get_playlists()
+            .unwrap()
+            .into_iter()
+            .filter(|p| !p.is_system)
+            .filter_map(|p| p.dynamic_spec)
+            .collect();
+        for spec in smart_specs {
+            assert!(
+                remaining.iter().any(|s| s == spec),
+                "expected user smart playlist {spec} to survive sync/prune, got {remaining:?}"
+            );
+        }
     }
 
     fn seed_country_library(db: &Database) {

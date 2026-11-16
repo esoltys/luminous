@@ -141,7 +141,7 @@
                                 })
                               : k === "language"
                                 ? invoke<Song[]>("get_songs_by_language", {
-                                    code: l ?? "",
+                                    language: l ?? "",
                                     limit: 50,
                                   })
                                 : invoke<Song[]>("get_songs_by_curated_tag", {

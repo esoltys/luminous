@@ -304,6 +304,7 @@ pub fn resolve_auto_playlist(
                 .iter()
                 .find(|p| {
                     p.dynamic_enabled
+                        && p.is_system
                         && p.track_count > 0
                         && p.dynamic_spec.as_deref() == Some("missingmeta")
                 })
@@ -313,6 +314,7 @@ pub fn resolve_auto_playlist(
             .iter()
             .find(|p| {
                 p.dynamic_enabled
+                    && p.is_system
                     && p.track_count > 0
                     && p.dynamic_spec.as_deref() == Some("missingmbid")
             })
@@ -327,6 +329,7 @@ pub fn resolve_auto_playlist(
                 .iter()
                 .find(|p| {
                     p.dynamic_enabled
+                        && p.is_system
                         && p.dynamic_spec
                             .as_deref()
                             .is_some_and(|s| s.starts_with("daypart:"))
@@ -349,6 +352,7 @@ pub fn resolve_auto_playlist(
                 .iter()
                 .find(|p| {
                     p.dynamic_enabled
+                        && p.is_system
                         && p.track_count > 0
                         && p.dynamic_spec.as_deref() == Some(expected_spec.as_str())
                 })
@@ -614,6 +618,7 @@ mod tests {
             size_limit_device: None,
             sort_field: None,
             sort_asc: true,
+            is_system: true,
         }
     }
 

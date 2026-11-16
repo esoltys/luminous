@@ -30,8 +30,7 @@
     SparkleIcon as Sparkles,
     ArrowsClockwiseIcon as RefreshCw,
   } from "phosphor-svelte";
-  import { isSmartPlaylistSpec } from "../utils/filterParser";
-  import { getPlaylistDisplayName } from "../utils/playlist";
+  import { getPlaylistDisplayName, isSmartPlaylist, isSystemAutoPlaylist } from "../utils/playlist";
   import { scrobblerStore } from "../stores/scrobbler.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -115,42 +114,48 @@
   // System genre auto-playlists are keyed one row per curated tag (#548),
   // stored as "tag:<name>" in dynamic_spec — e.g. "tag:Rock", "tag:Jazz".
   let genreAutoPlaylists = $derived(
-    playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("tag:")),
+    playlistsStore.playlists.filter(
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("tag:"),
+    ),
   );
   let artistTagAutoPlaylists = $derived(
     playlistsStore.playlists.filter(
-      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("artisttag:"),
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("artisttag:"),
     ),
   );
   let languageAutoPlaylists = $derived(
     playlistsStore.playlists.filter(
-      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("language:"),
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("language:"),
     ),
   );
   let countryAutoPlaylists = $derived(
     playlistsStore.playlists.filter(
-      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("artistcountry:"),
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("artistcountry:"),
     ),
   );
   let decadeAutoPlaylists = $derived(
     playlistsStore.playlists.filter(
-      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:"),
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("decade:"),
     ),
   );
   let bpmAutoPlaylists = $derived(
     playlistsStore.playlists
-      .filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("bpmrange:"))
+      .filter((p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("bpmrange:"))
       .sort((a, b) => BPM_BUCKET_ORDER.indexOf(a.name) - BPM_BUCKET_ORDER.indexOf(b.name)),
   );
   // Missing Metadata (#367) is a singleton diagnostic auto-playlist, not a
   // per-value category like genre/decade/BPM/artist tag.
   let missingMetadataAutoPlaylist = $derived(
-    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta"),
+    playlistsStore.playlists.find(
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec === "missingmeta",
+    ),
   );
   // Missing MusicBrainz (#83) is surfaced when scrobbling is enabled, identifying
   // songs that lack MusicBrainz recording IDs.
   let missingMusicBrainzAutoPlaylist = $derived(
-    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid"),
+    playlistsStore.playlists.find(
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec === "missingmbid",
+    ),
   );
   // Daypart Mix (#223) is also a singleton, but unlike missing-metadata its
   // dynamic_spec changes content (bucket/date/genre) every time the daypart
@@ -158,14 +163,12 @@
   // (and any Home pin keyed on its id) is found across every crossing.
   let daypartMixPlaylist = $derived(
     playlistsStore.playlists.find(
-      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"),
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("daypart:"),
     ),
   );
   let customPlaylists = $derived.by(() => {
     // Include non-dynamic playlists + user-created Smart playlists
-    const list = playlistsStore.playlists.filter(
-      (p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec),
-    );
+    const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylist(p));
     const queue = list.find((p) => p.is_queue);
     const rest = list.filter((p) => !p.is_queue);
     return queue ? [queue, ...rest] : rest;

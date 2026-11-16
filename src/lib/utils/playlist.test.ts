@@ -384,6 +384,17 @@ describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
       subtitle: i18n.t("playlists.smartRulePlaylistLabel"),
     });
   });
+
+  it("treats user smart playlists with is_system: false as smart even when spec starts with language:/decade:/tag:", () => {
+    for (const spec of ["language:ja", "decade:1980s", "tag:canadian", "tag:Rock; rating:>=4"]) {
+      const smart: Playlist = { ...makePlaylist("User Smart", spec), is_system: false };
+      expect(autoPlaylistRefFromPlaylist(smart), spec).toBeNull();
+      expect(getPlaylistAutoKindAndSubtitle(smart), spec).toEqual({
+        kind: "smart",
+        subtitle: i18n.t("playlists.smartRulePlaylistLabel"),
+      });
+    }
+  });
 });
 
 describe("auto-playlist kind capabilities", () => {

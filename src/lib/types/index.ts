@@ -266,6 +266,8 @@ export interface Playlist {
   /** True for the app's single built-in Queue playlist (backend-computed —
    * never derive this from the playlist name). */
   is_queue: boolean;
+  /** True for system-managed auto-playlists; false for user custom and Smart Playlists (#2136). */
+  is_system?: boolean;
   /** Size budget for the songs at the top of the playlist, in bytes (#344). */
   size_limit_bytes?: number | null;
   /** The device (a device profile id) the limit is measured for, in its

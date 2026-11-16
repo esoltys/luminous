@@ -272,6 +272,7 @@ impl PlaylistManager {
             size_limit_device: None,
             sort_field: None,
             sort_asc: true,
+            is_system: false,
         })
     }
 

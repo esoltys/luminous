@@ -657,6 +657,11 @@ pub struct Playlist {
     pub sort_field: Option<String>,
     #[serde(default = "default_true")]
     pub sort_asc: bool,
+    /// True for system-managed auto-playlists (genre, decade, BPM, language,
+    /// country, artist tag, missing metadata/MBID, daypart); false for user
+    /// custom and Smart Playlists (#2136).
+    #[serde(default)]
+    pub is_system: bool,
 }
 
 fn default_true() -> bool {
@@ -665,7 +670,7 @@ fn default_true() -> bool {
 
 /// Columns of `playlists p` that `Playlist::from_row` maps, in order. A
 /// query selects these followed by one `track_count` column.
-pub const PLAYLIST_SELECT_COLS: &str = "p.id, p.name, p.dynamic_enabled, p.dynamic_spec,      p.population_mode, p.last_played_row, p.created, p.updated,      p.size_limit_bytes, p.sort_field, p.sort_asc, p.size_limit_device";
+pub const PLAYLIST_SELECT_COLS: &str = "p.id, p.name, p.dynamic_enabled, p.dynamic_spec,      p.population_mode, p.last_played_row, p.created, p.updated,      p.size_limit_bytes, p.sort_field, p.sort_asc, p.size_limit_device,      p.is_system";
 
 impl Playlist {
     /// The single definition of what makes a row "the Queue".
@@ -698,7 +703,8 @@ impl Playlist {
             sort_field: row.get(9)?,
             sort_asc: row.get::<_, Option<bool>>(10)?.unwrap_or(true),
             size_limit_device: row.get(11)?,
-            track_count: row.get(12)?,
+            is_system: row.get::<_, Option<bool>>(12)?.unwrap_or(false),
+            track_count: row.get(13)?,
             is_queue,
         })
     }

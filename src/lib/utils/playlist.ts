@@ -366,12 +366,38 @@ export function autoContinueRunStarts(items: PlaylistItem[]): Set<string> {
 }
 
 /**
+ * True if a playlist is a user-authored Smart Playlist rather than a system
+ * auto-playlist. Prefers the backend `is_system` flag (#2136) and falls back
+ * to `isSmartPlaylistSpec` when `is_system` is omitted in legacy fixtures.
+ */
+export function isSmartPlaylist(
+  playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system">,
+): boolean {
+  if (!playlist.dynamic_enabled) return false;
+  if (playlist.is_system !== undefined) {
+    return !playlist.is_system && !!playlist.dynamic_spec;
+  }
+  return isSmartPlaylistSpec(playlist.dynamic_spec);
+}
+
+/**
+ * True if a playlist is a system-managed auto-playlist row.
+ */
+export function isSystemAutoPlaylist(
+  playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system">,
+): boolean {
+  if (!playlist.dynamic_enabled) return false;
+  if (playlist.is_system !== undefined) return playlist.is_system;
+  return !isSmartPlaylistSpec(playlist.dynamic_spec);
+}
+
+/**
  * Derives an {@link AutoPlaylistRef} from a materialized system auto-playlist
  * row's `dynamic_spec`, or `null` for regular custom playlists and user-authored
  * Smart Playlists.
  */
 export function autoPlaylistRefFromPlaylist(playlist: Playlist): AutoPlaylistRef | null {
-  if (!playlist.dynamic_enabled || isSmartPlaylistSpec(playlist.dynamic_spec)) return null;
+  if (!isSystemAutoPlaylist(playlist)) return null;
   const spec = playlist.dynamic_spec;
   const base = { playlistId: playlist.id, updated: playlist.updated };
   if (spec?.startsWith("decade:")) {
@@ -480,7 +506,7 @@ export function getPlaylistAutoKindAndSubtitle(
   playlist: Playlist,
 ): { kind: PlaylistCardThemeKind; subtitle: string } | null {
   if (!playlist.dynamic_enabled) return null;
-  if (isSmartPlaylistSpec(playlist.dynamic_spec)) {
+  if (isSmartPlaylist(playlist)) {
     return { kind: "smart", subtitle: i18n.t("playlists.smartRulePlaylistLabel") };
   }
   const ref = autoPlaylistRefFromPlaylist(playlist);
