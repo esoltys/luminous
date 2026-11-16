@@ -9,7 +9,7 @@
   import LanguageSelect from "./LanguageSelect.svelte";
   import Select from "./Select.svelte";
   import Toggle from "./Toggle.svelte";
-  import { GearIcon as Settings, PlaylistIcon } from "phosphor-svelte";
+  import { GearIcon as Settings, SparkleIcon } from "phosphor-svelte";
 
   const AUTO_PLAYLIST_FAMILIES: { family: AutoPlaylistFamily; key: string }[] = [
     { family: "genre", key: "Genre" },
@@ -94,7 +94,7 @@
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 mt-4">
   <div class="pb-3 flex items-center gap-3">
     <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
-      <PlaylistIcon class="w-5 h-5" />
+      <SparkleIcon class="w-5 h-5" />
     </div>
     <div class="space-y-1 min-w-0">
       <h3 class="font-bold text-sm text-brand-text-primary">
