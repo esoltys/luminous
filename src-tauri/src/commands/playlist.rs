@@ -127,6 +127,22 @@ pub async fn get_songs_by_artist_tag(
 }
 
 #[tauri::command]
+pub async fn get_songs_by_artist_country(
+    state: State<'_, AppState>,
+    country: String,
+    limit: Option<i64>,
+    mode: Option<QueuePopulationMode>,
+) -> Result<Vec<crate::models::Song>, String> {
+    let limit = limit.unwrap_or(50);
+    let mode = mode.unwrap_or_default();
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_songs_by_artist_country(&country, limit, mode)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_playlists_by_artist(
     artist: String,
     state: State<'_, AppState>,

@@ -93,7 +93,7 @@ export function autoPlaylistLabel(ap: AutoPlaylistItem): string {
       const pl = playlistsStore.playlists.find((p) => p.id === ap.playlistId);
       return pl
         ? getPlaylistDisplayName(pl)
-        : (ap.genre ?? ap.decade ?? ap.bpm ?? ap.artistTag ?? ap.kind);
+        : (ap.genre ?? ap.decade ?? ap.bpm ?? ap.artistTag ?? ap.language ?? ap.country ?? ap.kind);
     }
   }
 }
@@ -107,6 +107,8 @@ function isAutoPlaylistActive(ap: AutoPlaylistItem): boolean {
   if (ap.decade !== undefined && sel.decade !== ap.decade) return false;
   if (ap.bpm !== undefined && sel.bpm !== ap.bpm) return false;
   if (ap.artistTag !== undefined && sel.artistTag !== ap.artistTag) return false;
+  if (ap.language !== undefined && sel.language !== ap.language) return false;
+  if (ap.country !== undefined && sel.country !== ap.country) return false;
   return true;
 }
 
@@ -220,6 +222,8 @@ export function toNavigablePin(item: PinnedItem): NavigablePin {
             artistTag: item.autoPlaylist.artistTag,
             decade: item.autoPlaylist.decade,
             bpm: item.autoPlaylist.bpm,
+            language: item.autoPlaylist.language,
+            country: item.autoPlaylist.country,
             playlistId: item.autoPlaylist.playlistId,
             updated: item.autoPlaylist.updated,
           }),

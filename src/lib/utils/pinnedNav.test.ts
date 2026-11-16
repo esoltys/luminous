@@ -96,6 +96,35 @@ describe("pinnedNav.ts", () => {
     expect(autoPin.title).toBe(i18n.t("playlists.autoFavourites"));
   });
 
+  it("opens a pinned country auto-playlist on its country and marks it active there", () => {
+    const pin = toNavigablePin({
+      type: "auto_playlist",
+      autoPlaylist: { kind: "country", country: "CA", playlistId: 9, trackCount: 30 },
+    } as PinnedItem);
+    expect(pin.id).toBe("auto_playlist:country:CA");
+    const spy = vi.spyOn(navigationStore, "viewAutoPlaylist").mockImplementation(() => {});
+    pin.open();
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ kind: "country", country: "CA" }));
+    spy.mockRestore();
+
+    navigationStore.activeTab = "playlists";
+    navigationStore.selectedAutoPlaylist = { kind: "country", country: "CA" };
+    expect(pin.isActive).toBe(false); // computed when projected
+    expect(
+      toNavigablePin({
+        type: "auto_playlist",
+        autoPlaylist: { kind: "country", country: "CA", trackCount: 30 },
+      } as PinnedItem).isActive,
+    ).toBe(true);
+    navigationStore.selectedAutoPlaylist = { kind: "country", country: "NZ" };
+    expect(
+      toNavigablePin({
+        type: "auto_playlist",
+        autoPlaylist: { kind: "country", country: "CA", trackCount: 30 },
+      } as PinnedItem).isActive,
+    ).toBe(false);
+  });
+
   it("gives pinned auto-playlists the same icon as their card theme", () => {
     for (const kind of ["genre", "decade", "daypart"] as const) {
       const pin = toNavigablePin({

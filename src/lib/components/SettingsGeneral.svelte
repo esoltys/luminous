@@ -39,6 +39,11 @@
       hint: "settings.autoPlaylistsLanguageHint",
     },
     {
+      family: "country",
+      label: "settings.autoPlaylistsCountry",
+      hint: "settings.autoPlaylistsCountryHint",
+    },
+    {
       family: "daypart",
       label: "settings.autoPlaylistsDaypart",
       hint: "settings.autoPlaylistsDaypartHint",

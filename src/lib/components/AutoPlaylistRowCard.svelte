@@ -4,7 +4,12 @@
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { getAutoPlaylistSubtitle, getPlaylistDisplayName } from "../utils/playlist";
+  import {
+    getAutoPlaylistSubtitle,
+    getPlaylistDisplayName,
+    hasBackingRow,
+  } from "../utils/playlist";
+  import { countryDisplayName } from "../utils/country";
   import { getLanguageDisplayName } from "../utils/language";
   import { toTitleCase } from "../utils/formatters";
   import { rowClasses, useCardAppearance } from "../utils/cardAppearance";
@@ -25,12 +30,14 @@
       | "missing_metadata"
       | "missing_musicbrainz"
       | "daypart"
-      | "language";
+      | "language"
+      | "country";
     genre?: string;
     artistTag?: string;
     decade?: string;
     bpm?: string;
     language?: string;
+    country?: string;
     playlistId?: number;
     updated?: number;
     trackCount: number;
@@ -46,6 +53,7 @@
     decade,
     bpm,
     language,
+    country,
     playlistId,
     updated,
     trackCount,
@@ -54,39 +62,19 @@
   }: Props = $props();
 
   let displayLabel = $derived.by(() => {
-    if (
-      (kind === "genre" ||
-        kind === "decade" ||
-        kind === "bpm" ||
-        kind === "artist_tag" ||
-        kind === "missing_metadata" ||
-        kind === "missing_musicbrainz" ||
-        kind === "daypart" ||
-        kind === "language") &&
-      playlistId !== undefined
-    ) {
+    if (hasBackingRow(kind) && playlistId !== undefined) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
     if (kind === "language") return getLanguageDisplayName(language || label);
+    if (kind === "country") return countryDisplayName(country, i18n.currentLocale) || label;
     return kind === "artist_tag" ? toTitleCase(label) : label;
   });
 
   let subtitleLabel = $derived(getAutoPlaylistSubtitle({ kind, bpm }));
 
   let updatedLabel = $derived.by(() => {
-    if (
-      (kind !== "genre" &&
-        kind !== "decade" &&
-        kind !== "bpm" &&
-        kind !== "artist_tag" &&
-        kind !== "missing_metadata" &&
-        kind !== "missing_musicbrainz" &&
-        kind !== "daypart" &&
-        kind !== "language") ||
-      updated === undefined
-    )
-      return null;
+    if (!hasBackingRow(kind) || updated === undefined) return null;
     return formatRelativeDate(updated);
   });
 </script>

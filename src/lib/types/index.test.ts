@@ -54,6 +54,7 @@ describe("autoPlaylistRefKeyFor", () => {
       "artist_tag:Progressive Metal",
     );
     expect(autoPlaylistRefKeyFor({ kind: "language", language: "eng" })).toBe("language:eng");
+    expect(autoPlaylistRefKeyFor({ kind: "country", country: "CA" })).toBe("country:CA");
   });
 });
 

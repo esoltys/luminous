@@ -267,13 +267,16 @@ pub fn resolve_auto_playlist(
 
     let virtual_item = |kind: &str, track_count: i32| AutoPlaylistItem {
         kind: kind.to_string(),
-        genre: None,
-        artist_tag: None,
-        decade: None,
-        bpm: None,
-        playlist_id: None,
-        updated: None,
         track_count,
+        ..Default::default()
+    };
+    // A singleton kind keyed on the backing row alone (no selector value).
+    let row_item = |kind: &str, p: &Playlist| AutoPlaylistItem {
+        kind: kind.to_string(),
+        playlist_id: Some(p.id),
+        updated: Some(p.updated),
+        track_count: p.track_count,
+        ..Default::default()
     };
 
     let item = match kind {
@@ -304,16 +307,7 @@ pub fn resolve_auto_playlist(
                         && p.track_count > 0
                         && p.dynamic_spec.as_deref() == Some("missingmeta")
                 })
-                .map(|p| AutoPlaylistItem {
-                    kind: kind.to_string(),
-                    genre: None,
-                    artist_tag: None,
-                    decade: None,
-                    bpm: None,
-                    playlist_id: Some(p.id),
-                    updated: Some(p.updated),
-                    track_count: p.track_count,
-                })
+                .map(|p| row_item(kind, p))
         }
         "missing_musicbrainz" => playlists
             .iter()
@@ -322,16 +316,7 @@ pub fn resolve_auto_playlist(
                     && p.track_count > 0
                     && p.dynamic_spec.as_deref() == Some("missingmbid")
             })
-            .map(|p| AutoPlaylistItem {
-                kind: kind.to_string(),
-                genre: None,
-                artist_tag: None,
-                decade: None,
-                bpm: None,
-                playlist_id: Some(p.id),
-                updated: Some(p.updated),
-                track_count: p.track_count,
-            }),
+            .map(|p| row_item(kind, p)),
         "daypart" => {
             // Singleton like "missing_metadata", but resolved by *prefix*
             // rather than exact spec match (#223) — the row's spec changes
@@ -346,24 +331,17 @@ pub fn resolve_auto_playlist(
                             .as_deref()
                             .is_some_and(|s| s.starts_with("daypart:"))
                 })
-                .map(|p| AutoPlaylistItem {
-                    kind: kind.to_string(),
-                    genre: None,
-                    artist_tag: None,
-                    decade: None,
-                    bpm: None,
-                    playlist_id: Some(p.id),
-                    updated: Some(p.updated),
-                    track_count: p.track_count,
-                })
+                .map(|p| row_item(kind, p))
                 .or_else(|| Some(virtual_item(kind, 0)))
         }
-        "genre" | "decade" | "bpm" | "artist_tag" => {
+        "genre" | "decade" | "bpm" | "artist_tag" | "language" | "country" => {
             let selector = selector.unwrap_or("").to_string();
             let prefix = match kind {
                 "genre" => "tag:",
                 "decade" => "decade:",
                 "bpm" => "bpmrange:",
+                "language" => "language:",
+                "country" => "artistcountry:",
                 _ => "artisttag:",
             };
             let expected_spec = format!("{prefix}{selector}");
@@ -379,7 +357,9 @@ pub fn resolve_auto_playlist(
                     genre: (kind == "genre").then(|| selector.clone()),
                     artist_tag: (kind == "artist_tag").then(|| selector.clone()),
                     decade: (kind == "decade").then(|| selector.clone()),
-                    bpm: (kind == "bpm").then_some(selector),
+                    bpm: (kind == "bpm").then(|| selector.clone()),
+                    language: (kind == "language").then(|| selector.clone()),
+                    country: (kind == "country").then_some(selector),
                     playlist_id: Some(p.id),
                     updated: Some(p.updated),
                     track_count: p.track_count,
@@ -716,6 +696,8 @@ mod tests {
             test_playlist(2, "decade:1980s", 4),
             test_playlist(3, "bpmrange:60-90", 7),
             test_playlist(4, "artisttag:Progressive Metal", 3),
+            test_playlist(5, "artistcountry:CA", 30),
+            test_playlist(6, "language:ja", 26),
         ];
 
         let genre = resolve_auto_playlist(&scanner, &playlists, "genre:Rock")
@@ -740,6 +722,20 @@ mod tests {
                 .unwrap()
                 .expect("artist_tag:Progressive Metal should resolve");
         assert_eq!(artist_tag.artist_tag.as_deref(), Some("Progressive Metal"));
+
+        // Country and language pins (#2135) resolve through their own spec prefixes.
+        let country = resolve_auto_playlist(&scanner, &playlists, "country:CA")
+            .unwrap()
+            .expect("country:CA should resolve against artistcountry:CA");
+        assert_eq!(country.playlist_id, Some(5));
+        assert_eq!(country.country.as_deref(), Some("CA"));
+        let language = resolve_auto_playlist(&scanner, &playlists, "language:ja")
+            .unwrap()
+            .expect("language:ja should resolve");
+        assert_eq!(language.language.as_deref(), Some("ja"));
+        assert!(resolve_auto_playlist(&scanner, &playlists, "country:US")
+            .unwrap()
+            .is_none());
 
         // A selector that no longer matches any row (renamed/deleted) self-heals to None.
         assert!(resolve_auto_playlist(&scanner, &playlists, "genre:Jazz")

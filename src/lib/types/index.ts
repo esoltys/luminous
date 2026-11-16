@@ -1333,12 +1333,14 @@ export interface AutoPlaylistItem {
     | "missing_metadata"
     | "missing_musicbrainz"
     | "daypart"
-    | "language";
+    | "language"
+    | "country";
   genre?: string;
   artistTag?: string;
   decade?: string;
   bpm?: string;
   language?: string;
+  country?: string;
   playlistId?: number;
   updated?: number;
   trackCount: number;
@@ -1364,6 +1366,7 @@ export function autoPlaylistRefKeyFor(ref: {
   bpm?: string;
   artistTag?: string;
   language?: string;
+  country?: string;
 }): string {
   switch (ref.kind) {
     case "genre":
@@ -1376,6 +1379,8 @@ export function autoPlaylistRefKeyFor(ref: {
       return `artist_tag:${ref.artistTag ?? ""}`;
     case "language":
       return `language:${ref.language ?? ""}`;
+    case "country":
+      return `country:${ref.country ?? ""}`;
     default:
       return ref.kind;
   }

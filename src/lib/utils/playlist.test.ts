@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   autoContinueRunStarts,
   autoPlaylistRefFromPlaylist,
+  hasBackingRow,
+  hasFillMode,
   getDaypartMixLabel,
   getDaypartMixSourceLabel,
   getPlaylistAutoKindAndSubtitle,
@@ -213,6 +215,21 @@ describe("playlist utils", () => {
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Japanese");
   });
+
+  it("resolves a country code to its localized name", () => {
+    const playlist: Playlist = {
+      id: 13,
+      name: "CA",
+      dynamic_spec: "artistcountry:CA",
+      population_mode: "all",
+      created: 100,
+      updated: 100,
+      track_count: 30,
+      dynamic_enabled: true,
+      is_queue: false,
+    };
+    expect(getPlaylistDisplayName(playlist)).toBe("Canada");
+  });
 });
 
 describe("Auto Continue rows (#1235)", () => {
@@ -333,6 +350,11 @@ describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
       kind: "language",
       language: "jpn",
     });
+    expect(autoPlaylistRefFromPlaylist(makePlaylist("CA", "artistcountry:CA"))).toMatchObject({
+      kind: "country",
+      country: "CA",
+    });
+    expect(autoPlaylistRefFromPlaylist(makePlaylist("Mine", "country:ca"))).toBeNull();
     expect(
       autoPlaylistRefFromPlaylist(makePlaylist("Missing Metadata", "missingmeta")),
     ).toMatchObject({
@@ -361,5 +383,22 @@ describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
       kind: "smart",
       subtitle: i18n.t("playlists.smartRulePlaylistLabel"),
     });
+  });
+});
+
+describe("auto-playlist kind capabilities", () => {
+  it("backs every materialized kind with a row and leaves the live ones without", () => {
+    for (const kind of ["genre", "decade", "bpm", "artist_tag", "daypart", "language", "country"]) {
+      expect(hasBackingRow(kind), kind).toBe(true);
+      expect(hasFillMode(kind), kind).toBe(true);
+    }
+    for (const kind of ["missing_metadata", "missing_musicbrainz"]) {
+      expect(hasBackingRow(kind), kind).toBe(true);
+      expect(hasFillMode(kind), kind).toBe(false);
+    }
+    for (const kind of ["favourites", "recently_added", "most_played", "history"]) {
+      expect(hasBackingRow(kind), kind).toBe(false);
+      expect(hasFillMode(kind), kind).toBe(false);
+    }
   });
 });

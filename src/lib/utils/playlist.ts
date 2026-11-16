@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { i18n } from "../stores/i18n.svelte";
 import type { AutoPlaylistRef } from "../stores/navigation.svelte";
+import { countryDisplayName } from "./country";
 import { getLanguageDisplayName } from "./language";
 import { formatBpmRange } from "./formatters";
 import { isSmartPlaylistSpec } from "./filterParser";
@@ -133,6 +134,10 @@ export function getPlaylistDisplayName(
   if (playlist.dynamic_spec?.startsWith("language:")) {
     const code = playlist.dynamic_spec.replace(/^language:/, "");
     baseName = getLanguageDisplayName(code) || playlist.name;
+  }
+  if (playlist.dynamic_spec?.startsWith("artistcountry:")) {
+    const code = playlist.dynamic_spec.replace(/^artistcountry:/, "");
+    baseName = countryDisplayName(code, i18n.currentLocale) || playlist.name;
   }
   // Missing Metadata (#367) is a diagnostic singleton, not a library-data
   // category — a population-mode suffix ("Missing Metadata (Favourites)")
@@ -381,6 +386,9 @@ export function autoPlaylistRefFromPlaylist(playlist: Playlist): AutoPlaylistRef
   if (spec?.startsWith("language:")) {
     return { kind: "language", language: spec.slice("language:".length), ...base };
   }
+  if (spec?.startsWith("artistcountry:")) {
+    return { kind: "country", country: spec.slice("artistcountry:".length), ...base };
+  }
   if (spec === "missingmeta") {
     return { kind: "missing_metadata", ...base };
   }
@@ -394,6 +402,43 @@ export function autoPlaylistRefFromPlaylist(playlist: Playlist): AutoPlaylistRef
   return { kind: "genre", genre, ...base };
 }
 
+/**
+ * Auto-playlist kinds that are backed by a materialized `playlists` row, so they carry an
+ * `updated` stamp, a Refresh action and a display name taken from the row. Favourites, Recently
+ * Added, Most Played and History are computed live and have no row.
+ */
+const ROW_BACKED_KINDS: ReadonlySet<string> = new Set([
+  "genre",
+  "decade",
+  "bpm",
+  "artist_tag",
+  "missing_metadata",
+  "missing_musicbrainz",
+  "daypart",
+  "language",
+  "country",
+]);
+
+/** Row-backed kinds whose songs come straight from the row, so they also offer a fill mode. The
+ * two Missing-* kinds are excluded: a fill mode means nothing for a diagnostic list. */
+const FILL_MODE_KINDS: ReadonlySet<string> = new Set([
+  "genre",
+  "decade",
+  "bpm",
+  "artist_tag",
+  "daypart",
+  "language",
+  "country",
+]);
+
+export function hasBackingRow(kind: string): boolean {
+  return ROW_BACKED_KINDS.has(kind);
+}
+
+export function hasFillMode(kind: string): boolean {
+  return FILL_MODE_KINDS.has(kind);
+}
+
 /** Localized type subtitle for an auto-playlist card or search result. */
 export function getAutoPlaylistSubtitle(ref: Pick<AutoPlaylistRef, "kind" | "bpm">): string {
   switch (ref.kind) {
@@ -405,6 +450,8 @@ export function getAutoPlaylistSubtitle(ref: Pick<AutoPlaylistRef, "kind" | "bpm
       return i18n.t("playlists.artistTagAutoPlaylist");
     case "language":
       return i18n.t("playlists.languageAutoPlaylist");
+    case "country":
+      return i18n.t("playlists.countryAutoPlaylist");
     case "missing_metadata":
       return i18n.t("playlists.missingMetadataAutoPlaylist");
     case "missing_musicbrainz":

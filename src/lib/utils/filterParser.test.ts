@@ -41,6 +41,8 @@ describe("stripEnclosingQuotes", () => {
 describe("isSmartPlaylistSpec", () => {
   it("returns false for a curated genre auto-playlist spec (tag:)", () => {
     expect(isSmartPlaylistSpec("tag:Metal")).toBe(false);
+    expect(isSmartPlaylistSpec("artistcountry:CA")).toBe(false);
+    expect(isSmartPlaylistSpec("country:ca")).toBe(true);
   });
 
   it("returns false for a decade auto-playlist spec", () => {

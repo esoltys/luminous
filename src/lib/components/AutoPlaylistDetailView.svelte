@@ -18,6 +18,7 @@
   import EmptyState from "./EmptyState.svelte";
   import SearchEmptyState from "./SearchEmptyState.svelte";
   import { matchesSongSearch } from "../utils/songSearch";
+  import { countryDisplayName } from "../utils/country";
   import { getLanguageDisplayName } from "../utils/language";
   import { tagsStore } from "../stores/tags.svelte";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
@@ -57,6 +58,8 @@
     getBpmBucketLabel,
     getDaypartMixLabel,
     getDaypartMixSourceLabel,
+    hasBackingRow,
+    hasFillMode,
   } from "../utils/playlist";
   import { genreColorHsl, resolveGenreColorIndex } from "../utils/genrePalette";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -109,6 +112,7 @@
   let decade = $derived(view.decade);
   let bpm = $derived(view.bpm);
   let language = $derived(view.language);
+  let country = $derived(view.country);
   let playlistId = $derived.by(() => {
     if (view.playlistId !== undefined) return view.playlistId;
     if (view.kind === "missing_musicbrainz") {
@@ -144,6 +148,11 @@
     if (view.kind === "language" && view.language) {
       return playlistsStore.playlists.find(
         (p) => p.dynamic_enabled && p.dynamic_spec === `language:${view.language}`,
+      )?.id;
+    }
+    if (view.kind === "country" && view.country) {
+      return playlistsStore.playlists.find(
+        (p) => p.dynamic_enabled && p.dynamic_spec === `artistcountry:${view.country}`,
       )?.id;
     }
     if (view.kind === "genre" && view.genre) {
@@ -228,6 +237,11 @@
     // point is to surface every affected song, not bias toward favourites).
     if (kind === "missing_metadata") return i18n.t("playlists.autoMissingMetadata");
     if (kind === "missing_musicbrainz") return i18n.t("playlists.autoMissingMusicBrainz");
+    if (kind === "country") {
+      const base = countryDisplayName(country, i18n.currentLocale) || country || "";
+      const suffix = getPopulationModeSuffix(populationMode);
+      return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
+    }
     if (kind === "language") {
       const base = getLanguageDisplayName(language);
       const suffix = getPopulationModeSuffix(populationMode);
@@ -307,18 +321,7 @@
   });
 
   let updatedLabel = $derived.by(() => {
-    if (
-      (kind !== "genre" &&
-        kind !== "decade" &&
-        kind !== "bpm" &&
-        kind !== "artist_tag" &&
-        kind !== "missing_metadata" &&
-        kind !== "missing_musicbrainz" &&
-        kind !== "daypart" &&
-        kind !== "language") ||
-      updated === undefined
-    )
-      return null;
+    if (!hasBackingRow(kind) || updated === undefined) return null;
     return new Date(updated * 1000).toLocaleDateString();
   });
 
@@ -346,18 +349,16 @@
     d: typeof decade,
     b: typeof bpm,
     lang: typeof language,
+    ctry: typeof country,
     pid: typeof playlistId,
   ): Promise<Loaded> {
-    if (
-      (k === "genre" ||
-        k === "decade" ||
-        k === "bpm" ||
-        k === "artist_tag" ||
-        k === "daypart" ||
-        k === "language") &&
-      pid !== undefined
-    ) {
+    if (hasFillMode(k) && pid !== undefined) {
       return loadPlaylistRows(pid);
+    }
+    if (k === "country") {
+      return songsOnly(
+        await invoke<Song[]>("get_songs_by_artist_country", { country: ctry ?? "", limit: 500 }),
+      );
     }
     if (k === "language") {
       return songsOnly(
@@ -485,12 +486,13 @@
     const d = decade;
     const b = bpm;
     const lang = language;
+    const ctry = country;
     const pid = playlistId;
     const count = backingTrackCount;
     const layout = backingLayoutKey;
-    const listKey = JSON.stringify([k, g, at, d, b, lang, pid]);
+    const listKey = JSON.stringify([k, g, at, d, b, lang, ctry, pid]);
     if (listKey !== shownListKey) loading = true;
-    fetchSongs(k, g, at, d, b, lang, pid)
+    fetchSongs(k, g, at, d, b, lang, ctry, pid)
       .then(async (loaded) => ({
         ...loaded,
         songs: await unionWithOtherSystem(k, g, at, loaded.songs),
@@ -503,6 +505,7 @@
           decade !== d ||
           bpm !== b ||
           language !== lang ||
+          country !== ctry ||
           playlistId !== pid
         )
           return;
@@ -520,6 +523,7 @@
           decade === d &&
           bpm === b &&
           language === lang &&
+          country === ctry &&
           playlistId === pid
         )
           loading = false;
@@ -623,7 +627,9 @@
     isChangingMode = true;
     try {
       await playlistsStore.setPlaylistPopulationMode(playlistId, newMode);
-      applyLoaded(await fetchSongs(kind, genre, artistTag, decade, bpm, language, playlistId));
+      applyLoaded(
+        await fetchSongs(kind, genre, artistTag, decade, bpm, language, country, playlistId),
+      );
     } catch (err) {
       console.error("Failed to change queue population mode:", err);
     } finally {
@@ -638,7 +644,9 @@
     isRefreshing = true;
     try {
       await playlistsStore.refreshAutoPlaylist(playlistId);
-      applyLoaded(await fetchSongs(kind, genre, artistTag, decade, bpm, language, playlistId));
+      applyLoaded(
+        await fetchSongs(kind, genre, artistTag, decade, bpm, language, country, playlistId),
+      );
     } catch (err) {
       console.error("Failed to refresh auto-playlist:", err);
     } finally {
@@ -654,7 +662,7 @@
     collectionStore.refreshLibrary();
     tagsStore.load();
     loading = true;
-    fetchSongs(kind, genre, artistTag, decade, bpm, language, playlistId)
+    fetchSongs(kind, genre, artistTag, decade, bpm, language, country, playlistId)
       .then(applyLoaded)
       .catch((err) => console.error(err))
       .finally(() => (loading = false));
@@ -681,7 +689,9 @@
         kind === "most_played"
       ) {
         try {
-          applyLoaded(await fetchSongs(kind, genre, artistTag, decade, bpm, language, playlistId));
+          applyLoaded(
+            await fetchSongs(kind, genre, artistTag, decade, bpm, language, country, playlistId),
+          );
         } catch (err) {
           console.error("Failed to re-fetch songs on stats change:", err);
         }
@@ -917,7 +927,7 @@
           </button>
         </div>
 
-        {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "daypart") && playlistId !== undefined}
+        {#if hasFillMode(kind) && playlistId !== undefined}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
             <!-- Queue population mode tabs (#120): what bias to (re)populate this auto-playlist with -->
             <PopulationModeTabs
@@ -1116,9 +1126,9 @@
         overflowMenuPos = null;
       }}
     />
-    {#if listedPlaylist || ((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined)}
+    {#if listedPlaylist || (hasBackingRow(kind) && playlistId !== undefined)}
       <ContextMenuDivider />
-      {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined}
+      {#if hasBackingRow(kind) && playlistId !== undefined}
         <ContextMenuItem
           icon={RefreshCw}
           label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}

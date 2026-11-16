@@ -55,6 +55,7 @@ pub(crate) enum AutoFamily {
     ArtistTag,
     Bpm,
     Language,
+    Country,
     Daypart,
 }
 
@@ -67,6 +68,7 @@ impl AutoFamily {
             Self::ArtistTag => "artisttag:%",
             Self::Bpm => "bpmrange:%",
             Self::Language => "language:%",
+            Self::Country => "artistcountry:%",
             Self::Daypart => "daypart:%",
         }
     }
@@ -78,6 +80,7 @@ impl AutoFamily {
             Self::ArtistTag => prefs.auto_playlists_artist_tag,
             Self::Bpm => prefs.auto_playlists_bpm,
             Self::Language => prefs.auto_playlists_language,
+            Self::Country => prefs.auto_playlists_country,
             Self::Daypart => prefs.auto_playlists_daypart,
         }
     }
@@ -144,6 +147,7 @@ impl PlaylistManager {
         self.sync_bpm_auto_playlists()?;
         self.sync_artist_tag_auto_playlists()?;
         self.sync_language_auto_playlists()?;
+        self.sync_country_auto_playlists()?;
         self.sync_missing_metadata_auto_playlist()?;
         self.sync_missing_musicbrainz_auto_playlist()?;
         self.sync_daypart_auto_playlist()?;
@@ -686,6 +690,100 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Regenerates each country "auto-playlist" (#2135) — a system-managed
+    /// `playlists` row with `dynamic_enabled = 1` and `dynamic_spec`
+    /// `artistcountry:<CC>` (e.g. `artistcountry:CA`) holding every song whose
+    /// artist's profile country is that code — if it's missing or its
+    /// `updated` timestamp is more than 24h old, and prunes rows for countries
+    /// no longer present in the library. The prefix is deliberately not
+    /// `country:`, which a user's smart-playlist query can start with and
+    /// which the family prune would then delete.
+    pub fn sync_country_auto_playlists(&self) -> Result<()> {
+        if !self.family_enabled_or_prune(AutoFamily::Country)? {
+            return Ok(());
+        }
+        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+        const PREFIX: &str = "artistcountry:";
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let countries = scanner.get_countries_overview()?;
+        let valid_codes: HashSet<String> = countries.iter().map(|c| c.code.clone()).collect();
+        let mut conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+
+        let existing: Vec<(i64, String)> = {
+            let mut stmt = conn.prepare(
+                "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'artistcountry:%'",
+            )?;
+            let rows = stmt
+                .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+                .filter_map(|r| r.ok())
+                .collect();
+            rows
+        };
+        for (id, spec) in &existing {
+            let code = spec.strip_prefix(PREFIX).unwrap_or(spec);
+            if !valid_codes.contains(code) {
+                conn.execute(
+                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                    params![id],
+                )?;
+                conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+            }
+        }
+
+        for country in &countries {
+            let spec = format!("{PREFIX}{}", country.code);
+            let existing_row: Option<(i64, i64, String)> = conn
+                .query_row(
+                    "SELECT id, COALESCE(updated, 0), COALESCE(population_mode, 'all') FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                    params![spec],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .ok();
+
+            // Below the threshold a country gets no new playlist, but one that
+            // already exists stays until its country has no songs left.
+            if existing_row.is_none() && country.song_count < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST {
+                continue;
+            }
+            let needs_generation = match &existing_row {
+                None => true,
+                Some((_, updated, _)) => now - updated > STALE_AFTER_SECS,
+            };
+            if !needs_generation {
+                continue;
+            }
+
+            let mode = existing_row
+                .as_ref()
+                .map(|(_, _, m)| QueuePopulationMode::from(m.as_str()))
+                .unwrap_or_default();
+            let songs = scanner.get_songs_by_artist_country(&country.code, NO_SONG_LIMIT, mode)?;
+
+            let playlist_id = match existing_row {
+                Some((id, _, _)) => {
+                    conn.execute(
+                        "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
+                        params![country.code, now, id],
+                    )?;
+                    id
+                }
+                None => {
+                    conn.execute(
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                        params![country.code, spec, now],
+                    )?;
+                    conn.last_insert_rowid()
+                }
+            };
+
+            replace_playlist_items(&mut conn, playlist_id, &songs)?;
+        }
+
+        Ok(())
+    }
+
     /// Regenerates the single "Missing Metadata" auto-playlist (#367) — a
     /// system-managed `playlists` row with `dynamic_enabled = 1` and
     /// `dynamic_spec = "missingmeta"` — if missing or its `updated`
@@ -1172,6 +1270,7 @@ mod tests {
             ("auto_playlists_artist_tag", "artisttag:canadian"),
             ("auto_playlists_bpm", "bpmrange:60-90"),
             ("auto_playlists_language", "language:ja"),
+            ("auto_playlists_country", "artistcountry:CA"),
             ("auto_playlists_daypart", "daypart:morning:2026-01-01"),
         ];
         {
@@ -1201,6 +1300,102 @@ mod tests {
                 .all(|s| s == "missingmeta" || s == "missingmbid"),
             "all families off leaves only diagnostics: {left:?}"
         );
+    }
+
+    fn seed_country_library(db: &Database) {
+        let conn = db.pool.get().unwrap();
+        for (artist, country, n) in [("Rush", "CA", 25), ("Few", "NZ", 3), ("Nobody", "", 30)] {
+            conn.execute(
+                "INSERT INTO artist_profiles (artist_key, country) VALUES (?1, ?2)",
+                params![artist, country],
+            )
+            .unwrap();
+            for i in 0..n {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, source, unavailable) VALUES (?1, ?2, 1, 0)",
+                    params![format!("{artist} {i}"), artist],
+                )
+                .unwrap();
+            }
+        }
+        // An artist with no profile at all belongs to no country either.
+        for i in 0..30 {
+            conn.execute(
+                "INSERT INTO songs (title, artist, source, unavailable) VALUES (?1, 'Unprofiled', 1, 0)",
+                params![format!("Unprofiled {i}")],
+            )
+            .unwrap();
+        }
+    }
+
+    fn country_specs(manager: &PlaylistManager) -> Vec<String> {
+        let mut specs: Vec<String> = manager
+            .get_playlists()
+            .unwrap()
+            .into_iter()
+            .filter_map(|p| p.dynamic_spec)
+            .filter(|s| s.starts_with("artistcountry:"))
+            .collect();
+        specs.sort();
+        specs
+    }
+
+    /// #2135: one playlist per country over the threshold, holding exactly
+    /// that country's artists' songs; artists without a country are in none.
+    #[test]
+    fn test_sync_country_auto_playlists() {
+        let (db, _dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        seed_country_library(&db_arc);
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+
+        manager.sync_country_auto_playlists().unwrap();
+
+        assert_eq!(country_specs(&manager), vec!["artistcountry:CA"]);
+        let ca = manager
+            .get_playlists()
+            .unwrap()
+            .into_iter()
+            .find(|p| p.dynamic_spec.as_deref() == Some("artistcountry:CA"))
+            .unwrap();
+        assert_eq!(ca.name, "CA");
+        assert_eq!(manager.get_playlist_tracks(ca.id).unwrap().len(), 25);
+    }
+
+    /// #2135: a country that loses all its songs is pruned, and a user's
+    /// smart playlist whose query starts with `country:` is left alone.
+    #[test]
+    fn test_sync_country_auto_playlists_prunes_and_spares_smart_playlists() {
+        let (db, _dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        seed_country_library(&db_arc);
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES ('Mine', 1, 'country:ca', 0, 0)",
+                [],
+            )
+            .unwrap();
+        }
+        manager.sync_country_auto_playlists().unwrap();
+        db_arc
+            .pool
+            .get()
+            .unwrap()
+            .execute(
+                "UPDATE artist_profiles SET country = '' WHERE artist_key = 'Rush'",
+                [],
+            )
+            .unwrap();
+        manager.sync_country_auto_playlists().unwrap();
+
+        assert!(country_specs(&manager).is_empty());
+        assert!(manager
+            .get_playlists()
+            .unwrap()
+            .iter()
+            .any(|p| p.dynamic_spec.as_deref() == Some("country:ca")));
     }
 
     #[test]

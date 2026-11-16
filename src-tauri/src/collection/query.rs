@@ -12,8 +12,8 @@ use crate::album_key::{album_display_sql, album_key};
 use crate::filter_parser::ParsedQuery;
 use crate::genre_aliases::GenreAliases;
 use crate::models::{
-    AlbumItem, AlbumLink, AlbumProfile, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats,
-    Playlist, QueuePopulationMode, Song, Tag, TopAlbumItem, LIBRARY_SOURCES_SQL,
+    AlbumItem, AlbumLink, AlbumProfile, ArtistProfile, ArtistSocialLink, CountrySummary, HomeItem,
+    LibraryStats, Playlist, QueuePopulationMode, Song, Tag, TopAlbumItem, LIBRARY_SOURCES_SQL,
     LISTENED_SOURCES_SQL,
 };
 use anyhow::Result;
@@ -678,6 +678,75 @@ impl CollectionScanner {
             .filter_map(|r| r.ok())
             .collect();
         Ok(songs)
+    }
+
+    /// Songs by artists whose profile country is `country` (an ISO 3166-1
+    /// alpha-2 code, any case), for the Country auto-playlists (#2135). Artists
+    /// with no profile country match no code. The artist join mirrors the
+    /// `country:` search filter, so both agree on what "from Canada" means.
+    pub fn get_songs_by_artist_country(
+        &self,
+        country: &str,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
+        let Some(code) = normalize_country_code(Some(country)) else {
+            return Ok(Vec::new());
+        };
+        let conn = self.db.pool.get()?;
+        let (extra_where, order_by) = mode_query_fragments(mode);
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE COALESCE(NULLIF(album_artist, ''), artist) IN (
+                 SELECT artist_key FROM artist_profiles WHERE country = ?1
+             )
+               AND source IN ({lib})
+               AND unavailable = 0
+               AND not_included = 0
+               AND loved != -1
+               {extra_where}
+             ORDER BY {order_by}
+             LIMIT ?2",
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![code, limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    /// Every country with at least one library song, with its song count,
+    /// most songs first (ties by code). Drives which Country auto-playlists
+    /// exist (#2135).
+    pub fn get_countries_overview(&self) -> Result<Vec<CountrySummary>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT p.country, COUNT(*) FROM songs s
+             JOIN artist_profiles p
+               ON p.artist_key = COALESCE(NULLIF(s.album_artist, ''), s.artist)
+             WHERE COALESCE(p.country, '') != ''
+               AND s.source IN ({lib})
+               AND s.unavailable = 0
+               AND s.not_included = 0
+               AND s.loved != -1
+             GROUP BY p.country
+             ORDER BY COUNT(*) DESC, p.country",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(CountrySummary {
+                    code: row.get(0)?,
+                    song_count: row.get(1)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(rows)
     }
 
     /// Songs missing one or more core tags (title/artist/album — the minimum
@@ -3827,6 +3896,67 @@ mod tests {
         assert_eq!(all[0].artist_key, "Shania Twain");
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// #2135: songs match through the album artist when there is one, a
+    /// code matches in any case, and a code nobody has (or junk) matches none.
+    #[test]
+    fn test_songs_by_artist_country_and_overview() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_songs_by_country_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+        for (path, artist, album_artist) in [
+            ("a.mp3", "Rush", None),
+            ("b.mp3", "Rush", None),
+            ("c.mp3", "Guest", Some("Rush")),
+            ("d.mp3", "Elsewhere", None),
+        ] {
+            upsert_song(
+                &conn,
+                &Song {
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    title: Some(path.to_string()),
+                    artist: Some(artist.to_string()),
+                    album_artist: album_artist.map(str::to_string),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        }
+        for (key, country) in [("Rush", "CA"), ("Elsewhere", "NZ")] {
+            set_artist_profile_conn(
+                &conn,
+                &ArtistProfile {
+                    artist_key: key.to_string(),
+                    country: Some(country.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        }
+
+        let ca = scanner
+            .get_songs_by_artist_country("ca", -1, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(ca.len(), 3, "album artist Rush covers the guest track");
+        for none in ["US", "", "Canada"] {
+            assert!(scanner
+                .get_songs_by_artist_country(none, -1, QueuePopulationMode::All)
+                .unwrap()
+                .is_empty());
+        }
+        let overview: Vec<_> = scanner
+            .get_countries_overview()
+            .unwrap()
+            .into_iter()
+            .map(|c| (c.code, c.song_count))
+            .collect();
+        assert_eq!(overview, vec![("CA".to_string(), 3), ("NZ".to_string(), 1)]);
     }
 
     /// #2097: the key is one row per artist whatever the casing, stored in the

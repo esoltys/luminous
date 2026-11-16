@@ -10,7 +10,13 @@
   import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
   import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { getAutoPlaylistSubtitle, getPlaylistDisplayName } from "../utils/playlist";
+  import {
+    getAutoPlaylistSubtitle,
+    getPlaylistDisplayName,
+    hasBackingRow,
+    hasFillMode,
+  } from "../utils/playlist";
+  import { countryDisplayName } from "../utils/country";
   import { getLanguageDisplayName } from "../utils/language";
   import { toTitleCase } from "../utils/formatters";
 
@@ -28,13 +34,15 @@
       | "missing_metadata"
       | "missing_musicbrainz"
       | "daypart"
-      | "language";
+      | "language"
+      | "country";
     genre?: string;
     artistTag?: string;
     decade?: string;
     /** For kind "bpm": the bucket's dynamic_spec suffix, e.g. "60-90" or the open-ended "150-". */
     bpm?: string;
     language?: string;
+    country?: string;
     /** For kind "genre", "decade", "bpm", "artist_tag" or "language": the materialized playlist row backing it (refreshed at most every 24h). */
     playlistId?: number;
     /** For kind "genre", "decade", "bpm", "artist_tag" or "language": when this playlist's songs were last (re)generated. */
@@ -54,6 +62,7 @@
     decade,
     bpm,
     language,
+    country,
     playlistId,
     updated,
     trackCount,
@@ -64,21 +73,12 @@
   }: Props = $props();
 
   let displayLabel = $derived.by(() => {
-    if (
-      (kind === "genre" ||
-        kind === "decade" ||
-        kind === "bpm" ||
-        kind === "artist_tag" ||
-        kind === "missing_metadata" ||
-        kind === "missing_musicbrainz" ||
-        kind === "daypart" ||
-        kind === "language") &&
-      playlistId !== undefined
-    ) {
+    if (hasBackingRow(kind) && playlistId !== undefined) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
     if (kind === "language") return getLanguageDisplayName(language || label);
+    if (kind === "country") return countryDisplayName(country, i18n.currentLocale) || label;
     if (kind === "daypart") return label || i18n.t("playlists.daypartAutoPlaylist");
     return kind === "artist_tag" ? toTitleCase(label) : label;
   });
@@ -94,17 +94,12 @@
     const d = decade;
     const b = bpm;
     const l = language;
+    const c = country;
     const pid = playlistId;
     const currentTrackCount = trackCount;
 
     const request =
-      (k === "genre" ||
-        k === "decade" ||
-        k === "bpm" ||
-        k === "artist_tag" ||
-        k === "daypart" ||
-        k === "language") &&
-      pid !== undefined
+      hasFillMode(k) && pid !== undefined
         ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
             items.filter((item) => !!item.song).map((item) => item.song as Song),
           )
@@ -139,15 +134,20 @@
                                 tag: at ?? "",
                                 limit: 50,
                               })
-                            : k === "language"
-                              ? invoke<Song[]>("get_songs_by_language", {
-                                  code: l ?? "",
+                            : k === "country"
+                              ? invoke<Song[]>("get_songs_by_artist_country", {
+                                  country: c ?? "",
                                   limit: 50,
                                 })
-                              : invoke<Song[]>("get_songs_by_curated_tag", {
-                                  tagName: g ?? "",
-                                  limit: 50,
-                                });
+                              : k === "language"
+                                ? invoke<Song[]>("get_songs_by_language", {
+                                    code: l ?? "",
+                                    limit: 50,
+                                  })
+                                : invoke<Song[]>("get_songs_by_curated_tag", {
+                                    tagName: g ?? "",
+                                    limit: 50,
+                                  });
 
     request
       .then((res) => {
@@ -158,6 +158,7 @@
           decade === d &&
           bpm === b &&
           language === l &&
+          country === c &&
           playlistId === pid &&
           trackCount === currentTrackCount
         ) {
@@ -174,17 +175,7 @@
   let topCovers = $derived(kind === "missing_metadata" ? [] : songsToCoverStack(songs));
 
   let updatedLabel = $derived.by(() => {
-    if (
-      (kind !== "genre" &&
-        kind !== "decade" &&
-        kind !== "bpm" &&
-        kind !== "artist_tag" &&
-        kind !== "missing_metadata" &&
-        kind !== "missing_musicbrainz" &&
-        kind !== "daypart") ||
-      updated === undefined
-    )
-      return null;
+    if (!hasBackingRow(kind) || updated === undefined) return null;
     return formatRelativeDate(updated);
   });
 </script>

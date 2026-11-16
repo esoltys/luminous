@@ -54,6 +54,7 @@ describe("SettingsGeneral.svelte", () => {
         "BPM",
         "Detect tempo and key",
         "Language",
+        "Country",
         "Moment Mix",
       ]);
       expect(getByRole("switch", { name: "Genre" })).toBeChecked();

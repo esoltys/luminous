@@ -43,7 +43,8 @@ export type ScriptAutoPlaylistKind =
   | "missing_metadata"
   | "missing_musicbrainz"
   | "daypart"
-  | "language";
+  | "language"
+  | "country";
 /** A song-table column key. */
 export type ScriptSongColumn =
   | "track"
