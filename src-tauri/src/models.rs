@@ -1360,7 +1360,7 @@ pub struct ArtistItem {
 /// Added/Most Played/History have no backing playlist row (`playlist_id`/
 /// `updated` are `None`); genre/decade/bpm/artist_tag are materialized rows,
 /// so those are populated from the matching `Playlist`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutoPlaylistItem {
     pub kind: String,
@@ -1368,6 +1368,10 @@ pub struct AutoPlaylistItem {
     pub artist_tag: Option<String>,
     pub decade: Option<String>,
     pub bpm: Option<String>,
+    /// For kind "language": the canonical language code.
+    pub language: Option<String>,
+    /// For kind "country": the uppercase ISO 3166-1 alpha-2 code.
+    pub country: Option<String>,
     pub playlist_id: Option<i64>,
     pub updated: Option<i64>,
     pub track_count: i32,
@@ -1854,10 +1858,10 @@ mod tests {
                 genre: None,
                 artist_tag: None,
                 decade: None,
-                bpm: None,
                 playlist_id: None,
                 updated: None,
                 track_count: 3,
+                ..Default::default()
             },
         };
         let value = serde_json::to_value(&item).unwrap();

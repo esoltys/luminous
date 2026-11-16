@@ -78,7 +78,13 @@
         const pl = playlistsStore.playlists.find((p) => p.id === ap.playlistId);
         return pl
           ? getPlaylistDisplayName(pl)
-          : (ap.genre ?? ap.decade ?? ap.bpm ?? ap.artistTag ?? ap.kind);
+          : (ap.genre ??
+              ap.decade ??
+              ap.bpm ??
+              ap.artistTag ??
+              ap.language ??
+              ap.country ??
+              ap.kind);
       }
     }
   }
@@ -123,6 +129,8 @@
           artistTag: item.autoPlaylist.artistTag,
           decade: item.autoPlaylist.decade,
           bpm: item.autoPlaylist.bpm,
+          language: item.autoPlaylist.language,
+          country: item.autoPlaylist.country,
           playlistId: item.autoPlaylist.playlistId,
           updated: item.autoPlaylist.updated,
         });
@@ -281,6 +289,8 @@
                 artistTag={item.autoPlaylist.artistTag}
                 decade={item.autoPlaylist.decade}
                 bpm={item.autoPlaylist.bpm}
+                language={item.autoPlaylist.language}
+                country={item.autoPlaylist.country}
                 playlistId={item.autoPlaylist.playlistId}
                 updated={item.autoPlaylist.updated}
                 trackCount={item.autoPlaylist.trackCount}
@@ -295,6 +305,8 @@
                 artistTag={item.autoPlaylist.artistTag}
                 decade={item.autoPlaylist.decade}
                 bpm={item.autoPlaylist.bpm}
+                language={item.autoPlaylist.language}
+                country={item.autoPlaylist.country}
                 playlistId={item.autoPlaylist.playlistId}
                 updated={item.autoPlaylist.updated}
                 trackCount={item.autoPlaylist.trackCount}
