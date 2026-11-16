@@ -3,6 +3,7 @@ import { playlistsStore } from "./playlists.svelte";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
 import { sameAlbum, albumKey as computeAlbumKey } from "$lib/utils/albumKey";
+import { isSystemAutoPlaylist } from "../utils/playlist";
 import type { FileNavigationTarget, FileSource } from "../types";
 
 export type ActiveTab =
@@ -497,64 +498,40 @@ class NavigationStore {
    * (`dynamic_spec === "tag:"+tag`); a tag below the auto-playlist song
    * threshold has none yet, so `playlistId` stays undefined and
    * AutoPlaylistDetailView falls back to a direct curated-hierarchy query. */
+  private viewKeyedAutoPlaylist(
+    kind: "genre" | "artist_tag" | "language",
+    specPrefix: string,
+    selector: string,
+  ) {
+    collectionStore.searchQuery = "";
+    collectionStore.searchResults = [];
+    this.selectedArtistName = null;
+    this.selectedAlbumName = null;
+    const expectedSpec = `${specPrefix}${selector}`;
+    const playlist = playlistsStore.playlists.find(
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec === expectedSpec,
+    );
+    this.viewAutoPlaylist({
+      kind,
+      selector,
+      playlistId: playlist?.id,
+      updated: playlist?.updated,
+    });
+  }
+
+  /** Opens a genre tag's auto-playlist detail view. */
   viewGenreTag(tag: string) {
-    collectionStore.searchQuery = "";
-    collectionStore.searchResults = [];
-    this.selectedArtistName = null;
-    this.selectedAlbumName = null;
-    const playlist = playlistsStore.playlists.find(
-      (p) => p.dynamic_enabled && p.dynamic_spec === `tag:${tag}`,
-    );
-    this.viewAutoPlaylist({
-      kind: "genre",
-      selector: tag,
-      playlistId: playlist?.id,
-      updated: playlist?.updated,
-    });
+    this.viewKeyedAutoPlaylist("genre", "tag:", tag);
   }
 
-  /** Opens an artist tag's auto-playlist detail view — the browsable-only
-   * counterpart to `viewGenreTag` for curated artist tags (#962/#956
-   * follow-up). Resolves the tag's materialized playlist row if one exists
-   * (`dynamic_spec === "artisttag:"+tag`); below the auto-playlist song
-   * threshold it has none yet, so `playlistId` stays undefined and
-   * AutoPlaylistDetailView falls back to a direct `get_songs_by_artist_tag`
-   * query. */
+  /** Opens an artist tag's auto-playlist detail view (#962/#956 follow-up). */
   viewArtistTag(tag: string) {
-    collectionStore.searchQuery = "";
-    collectionStore.searchResults = [];
-    this.selectedArtistName = null;
-    this.selectedAlbumName = null;
-    const playlist = playlistsStore.playlists.find(
-      (p) => p.dynamic_enabled && p.dynamic_spec === `artisttag:${tag}`,
-    );
-    this.viewAutoPlaylist({
-      kind: "artist_tag",
-      selector: tag,
-      playlistId: playlist?.id,
-      updated: playlist?.updated,
-    });
+    this.viewKeyedAutoPlaylist("artist_tag", "artisttag:", tag);
   }
 
-  /** Opens a language's auto-playlist detail view. Resolves the language's
-   * materialized playlist row if one exists (`dynamic_spec === "language:"+code`);
-   * below the auto-playlist song threshold it has none yet, so `playlistId`
-   * stays undefined and AutoPlaylistDetailView falls back to a direct
-   * `get_songs_by_language` query. */
+  /** Opens a language's auto-playlist detail view. */
   viewLanguage(code: string) {
-    collectionStore.searchQuery = "";
-    collectionStore.searchResults = [];
-    this.selectedArtistName = null;
-    this.selectedAlbumName = null;
-    const playlist = playlistsStore.playlists.find(
-      (p) => p.dynamic_enabled && p.dynamic_spec === `language:${code}`,
-    );
-    this.viewAutoPlaylist({
-      kind: "language",
-      selector: code,
-      playlistId: playlist?.id,
-      updated: playlist?.updated,
-    });
+    this.viewKeyedAutoPlaylist("language", "language:", code);
   }
 
   viewArtist(name: string) {

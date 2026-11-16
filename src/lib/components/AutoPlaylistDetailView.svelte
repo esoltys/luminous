@@ -60,6 +60,7 @@
     getDaypartMixSourceLabel,
     hasBackingRow,
     hasFillMode,
+    isSystemAutoPlaylist,
   } from "../utils/playlist";
   import { genreColorHsl, resolveGenreColorIndex } from "../utils/genrePalette";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -112,17 +113,17 @@
     if (view.playlistId !== undefined) return view.playlistId;
     if (view.kind === "missing_musicbrainz") {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.is_system !== false && p.dynamic_spec === "missingmbid",
+        (p) => isSystemAutoPlaylist(p) && p.dynamic_spec === "missingmbid",
       )?.id;
     }
     if (view.kind === "missing_metadata") {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.is_system !== false && p.dynamic_spec === "missingmeta",
+        (p) => isSystemAutoPlaylist(p) && p.dynamic_spec === "missingmeta",
       )?.id;
     }
     if (view.kind === "daypart") {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.is_system !== false && p.dynamic_spec?.startsWith("daypart:"),
+        (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("daypart:"),
       )?.id;
     }
     if (!view.selector) return undefined;
@@ -138,7 +139,7 @@
     if (!prefix) return undefined;
     const expectedSpec = `${prefix}${view.selector}`;
     return playlistsStore.playlists.find(
-      (p) => p.dynamic_enabled && p.is_system !== false && p.dynamic_spec === expectedSpec,
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec === expectedSpec,
     )?.id;
   });
   // The playlist row backing this view (undefined for the built-in kinds that have none).
