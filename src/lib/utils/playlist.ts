@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { i18n } from "../stores/i18n.svelte";
 import type { AutoPlaylistRef } from "../stores/navigation.svelte";
+import { countryDisplayName } from "./country";
 import { getLanguageDisplayName } from "./language";
 import { formatBpmRange } from "./formatters";
 import { isSmartPlaylistSpec } from "./filterParser";
@@ -133,6 +134,10 @@ export function getPlaylistDisplayName(
   if (playlist.dynamic_spec?.startsWith("language:")) {
     const code = playlist.dynamic_spec.replace(/^language:/, "");
     baseName = getLanguageDisplayName(code) || playlist.name;
+  }
+  if (playlist.dynamic_spec?.startsWith("artistcountry:")) {
+    const code = playlist.dynamic_spec.replace(/^artistcountry:/, "");
+    baseName = countryDisplayName(code, i18n.currentLocale) || playlist.name;
   }
   // Missing Metadata (#367) is a diagnostic singleton, not a library-data
   // category — a population-mode suffix ("Missing Metadata (Favourites)")
@@ -381,6 +386,9 @@ export function autoPlaylistRefFromPlaylist(playlist: Playlist): AutoPlaylistRef
   if (spec?.startsWith("language:")) {
     return { kind: "language", language: spec.slice("language:".length), ...base };
   }
+  if (spec?.startsWith("artistcountry:")) {
+    return { kind: "country", country: spec.slice("artistcountry:".length), ...base };
+  }
   if (spec === "missingmeta") {
     return { kind: "missing_metadata", ...base };
   }
@@ -405,6 +413,8 @@ export function getAutoPlaylistSubtitle(ref: Pick<AutoPlaylistRef, "kind" | "bpm
       return i18n.t("playlists.artistTagAutoPlaylist");
     case "language":
       return i18n.t("playlists.languageAutoPlaylist");
+    case "country":
+      return i18n.t("playlists.countryAutoPlaylist");
     case "missing_metadata":
       return i18n.t("playlists.missingMetadataAutoPlaylist");
     case "missing_musicbrainz":

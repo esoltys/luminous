@@ -10,6 +10,7 @@ import {
   SunHorizonIcon,
   TagIcon,
   TranslateIcon,
+  GlobeHemisphereWestIcon,
   TrendUpIcon,
   WarningIcon,
 } from "phosphor-svelte";
@@ -28,7 +29,8 @@ export type PlaylistCardThemeKind =
   | "missing_metadata"
   | "missing_musicbrainz"
   | "daypart"
-  | "language";
+  | "language"
+  | "country";
 
 /**
  * One entry per playlist kind: the single owner of that kind's icon and colour. Every surface that
@@ -158,6 +160,14 @@ const THEMES: Record<PlaylistCardThemeKind, PlaylistCardTheme> = {
       "from-[#0D9488]/25 to-[#14B8A6]/15 border-[#14B8A6]/30 shadow-[0_0_20px_2px_rgba(20,184,166,0.35)]",
     iconColorClass: "text-[#14B8A6]",
     badgeColorClass: "bg-[#0D9488] text-white",
+  },
+  country: {
+    icon: GlobeHemisphereWestIcon,
+    tintClass: "bg-[#F59E0B]/15 border-[#F59E0B]/30",
+    gradientClass:
+      "from-[#D97706]/25 to-[#F59E0B]/15 border-[#F59E0B]/30 shadow-[0_0_20px_2px_rgba(245,158,11,0.35)]",
+    iconColorClass: "text-[#F59E0B]",
+    badgeColorClass: "bg-[#B45309] text-white",
   },
 };
 

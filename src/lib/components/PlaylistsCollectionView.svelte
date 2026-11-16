@@ -50,12 +50,14 @@
       | "missing_metadata"
       | "missing_musicbrainz"
       | "daypart"
-      | "language";
+      | "language"
+      | "country";
     genre?: string;
     artistTag?: string;
     decade?: string;
     bpm?: string;
     language?: string;
+    country?: string;
     label: string;
     playlistId?: number;
     updated?: number;
@@ -123,6 +125,11 @@
   let languageAutoPlaylists = $derived(
     playlistsStore.playlists.filter(
       (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("language:"),
+    ),
+  );
+  let countryAutoPlaylists = $derived(
+    playlistsStore.playlists.filter(
+      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("artistcountry:"),
     ),
   );
   let decadeAutoPlaylists = $derived(
@@ -298,6 +305,19 @@
         });
       }
     }
+    for (const p of countryAutoPlaylists) {
+      if (p.track_count > 0) {
+        defs.push({
+          id: `auto:country:${p.id}`,
+          kind: "country",
+          country: p.dynamic_spec?.replace(/^artistcountry:/, "") ?? "",
+          label: getPlaylistDisplayName(p),
+          playlistId: p.id,
+          updated: p.updated,
+          trackCount: p.track_count,
+        });
+      }
+    }
     return defs;
   });
 
@@ -328,7 +348,8 @@
         d.kind !== "decade" &&
         d.kind !== "artist_tag" &&
         d.kind !== "bpm" &&
-        d.kind !== "language",
+        d.kind !== "language" &&
+        d.kind !== "country",
     );
     const rest = autoDefs
       .filter(
@@ -336,7 +357,8 @@
           d.kind === "genre" ||
           d.kind === "decade" ||
           d.kind === "artist_tag" ||
-          d.kind === "language",
+          d.kind === "language" ||
+          d.kind === "country",
       )
       .sort((a, b) => {
         if (field === "name") {
@@ -438,24 +460,31 @@
               }
             : def.kind === "bpm"
               ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
-              : def.kind === "language"
+              : def.kind === "country"
                 ? {
-                    kind: "language",
-                    language: def.language,
+                    kind: "country",
+                    country: def.country,
                     playlistId: def.playlistId,
                     updated: def.updated,
                   }
-                : def.kind === "missing_metadata"
-                  ? { kind: "missing_metadata", playlistId: def.playlistId, updated: def.updated }
-                  : def.kind === "missing_musicbrainz"
-                    ? {
-                        kind: "missing_musicbrainz",
-                        playlistId: def.playlistId,
-                        updated: def.updated,
-                      }
-                    : def.kind === "daypart"
-                      ? { kind: "daypart", playlistId: def.playlistId, updated: def.updated }
-                      : { kind: def.kind },
+                : def.kind === "language"
+                  ? {
+                      kind: "language",
+                      language: def.language,
+                      playlistId: def.playlistId,
+                      updated: def.updated,
+                    }
+                  : def.kind === "missing_metadata"
+                    ? { kind: "missing_metadata", playlistId: def.playlistId, updated: def.updated }
+                    : def.kind === "missing_musicbrainz"
+                      ? {
+                          kind: "missing_musicbrainz",
+                          playlistId: def.playlistId,
+                          updated: def.updated,
+                        }
+                      : def.kind === "daypart"
+                        ? { kind: "daypart", playlistId: def.playlistId, updated: def.updated }
+                        : { kind: def.kind },
     );
   }
 
@@ -620,6 +649,7 @@
                   decade={def.decade}
                   bpm={def.bpm}
                   language={def.language}
+                  country={def.country}
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
@@ -635,6 +665,7 @@
                   decade={def.decade}
                   bpm={def.bpm}
                   language={def.language}
+                  country={def.country}
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}

@@ -222,6 +222,7 @@ export function isSmartPlaylistSpec(spec: string | null | undefined): boolean {
     !spec.startsWith("tag:") &&
     !spec.startsWith("artisttag:") &&
     !spec.startsWith("daypart:") &&
-    !spec.startsWith("language:")
+    !spec.startsWith("language:") &&
+    !spec.startsWith("artistcountry:")
   );
 }

@@ -9,7 +9,8 @@ export type GenreSortField = "name" | "count";
 export type WeekStart = "sunday" | "monday";
 /** The families of generated auto-playlists the user can switch off (#2131); the
  * backend's `auto_playlists_<family>` preferences, which it enforces in its sync. */
-export type AutoPlaylistFamily = "genre" | "decade" | "artist_tag" | "bpm" | "language" | "daypart";
+export type AutoPlaylistFamily =
+  "genre" | "decade" | "artist_tag" | "bpm" | "language" | "country" | "daypart";
 
 /** Shape of the backend's UiPreferences struct — the schema (keys, domains,
  * defaults) lives in Rust (commands/settings.rs); this store just mirrors it. */
@@ -29,6 +30,7 @@ interface UiPreferences {
   auto_playlists_artist_tag: boolean;
   auto_playlists_bpm: boolean;
   auto_playlists_language: boolean;
+  auto_playlists_country: boolean;
   auto_playlists_daypart: boolean;
   albums_view_mode: CollectionViewMode;
   artists_view_mode: CollectionViewMode;
@@ -68,6 +70,7 @@ class PrefsStore {
     artist_tag: true,
     bpm: true,
     language: true,
+    country: true,
     daypart: true,
   });
   albumsViewMode = $state<CollectionViewMode>("cards");
@@ -120,6 +123,7 @@ class PrefsStore {
       artist_tag: prefs.auto_playlists_artist_tag ?? true,
       bpm: prefs.auto_playlists_bpm ?? true,
       language: prefs.auto_playlists_language ?? true,
+      country: prefs.auto_playlists_country ?? true,
       daypart: prefs.auto_playlists_daypart ?? true,
     };
     this.albumsViewMode = prefs.albums_view_mode;
@@ -189,6 +193,7 @@ class PrefsStore {
       auto_playlists_artist_tag: this.autoPlaylists.artist_tag,
       auto_playlists_bpm: this.autoPlaylists.bpm,
       auto_playlists_language: this.autoPlaylists.language,
+      auto_playlists_country: this.autoPlaylists.country,
       auto_playlists_daypart: this.autoPlaylists.daypart,
       albums_view_mode: this.albumsViewMode,
       artists_view_mode: this.artistsViewMode,

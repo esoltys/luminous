@@ -5,6 +5,7 @@
   import { formatRelativeDate } from "../utils/date";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { getAutoPlaylistSubtitle, getPlaylistDisplayName } from "../utils/playlist";
+  import { countryDisplayName } from "../utils/country";
   import { getLanguageDisplayName } from "../utils/language";
   import { toTitleCase } from "../utils/formatters";
   import { rowClasses, useCardAppearance } from "../utils/cardAppearance";
@@ -25,12 +26,14 @@
       | "missing_metadata"
       | "missing_musicbrainz"
       | "daypart"
-      | "language";
+      | "language"
+      | "country";
     genre?: string;
     artistTag?: string;
     decade?: string;
     bpm?: string;
     language?: string;
+    country?: string;
     playlistId?: number;
     updated?: number;
     trackCount: number;
@@ -46,6 +49,7 @@
     decade,
     bpm,
     language,
+    country,
     playlistId,
     updated,
     trackCount,
@@ -62,13 +66,15 @@
         kind === "missing_metadata" ||
         kind === "missing_musicbrainz" ||
         kind === "daypart" ||
-        kind === "language") &&
+        kind === "language" ||
+        kind === "country") &&
       playlistId !== undefined
     ) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
     if (kind === "language") return getLanguageDisplayName(language || label);
+    if (kind === "country") return countryDisplayName(country, i18n.currentLocale) || label;
     return kind === "artist_tag" ? toTitleCase(label) : label;
   });
 
@@ -83,7 +89,8 @@
         kind !== "missing_metadata" &&
         kind !== "missing_musicbrainz" &&
         kind !== "daypart" &&
-        kind !== "language") ||
+        kind !== "language" &&
+        kind !== "country") ||
       updated === undefined
     )
       return null;

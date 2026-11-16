@@ -47,7 +47,8 @@ export interface AutoPlaylistRef {
     | "missing_metadata"
     | "missing_musicbrainz"
     | "daypart"
-    | "language";
+    | "language"
+    | "country";
   /** For kind "genre": the curated tag's plain name (#548) — a top-level
    * card name or a sub-genre chip name, resolved the same way either way
    * (see `viewGenreTag`). */
@@ -55,6 +56,7 @@ export interface AutoPlaylistRef {
   artistTag?: string;
   decade?: string;
   language?: string;
+  country?: string;
   /** For kind "bpm": the bucket's dynamic_spec suffix, e.g. "60-90" or the open-ended "150-". */
   bpm?: string;
   /** For kind "genre", "decade", "bpm", "artist_tag", or "language": the materialized (dynamic_enabled) playlist row backing it. */
@@ -535,6 +537,25 @@ class NavigationStore {
     this.viewAutoPlaylist({
       kind: "language",
       language: code,
+      playlistId: playlist?.id,
+      updated: playlist?.updated,
+    });
+  }
+
+  /** Opens a country's auto-playlist detail view (`artistcountry:<CC>`). Like
+   * `viewLanguage`, a country below the song threshold has no playlist row yet,
+   * so the detail view falls back to `get_songs_by_artist_country`. */
+  viewCountry(code: string) {
+    collectionStore.searchQuery = "";
+    collectionStore.searchResults = [];
+    this.selectedArtistName = null;
+    this.selectedAlbumName = null;
+    const playlist = playlistsStore.playlists.find(
+      (p) => p.dynamic_enabled && p.dynamic_spec === `artistcountry:${code}`,
+    );
+    this.viewAutoPlaylist({
+      kind: "country",
+      country: code,
       playlistId: playlist?.id,
       updated: playlist?.updated,
     });
