@@ -209,7 +209,7 @@ export function hasAdvancedSearchTerms(query: string): boolean {
  * system genre/decade/BPM/artist-tag/daypart auto-playlist. Smart Playlist specs always contain
  * a "field:value" rule; system genre auto-playlists use a "tag:" prefix
  * (#548), decade auto-playlists use "decade:", BPM auto-playlists use
- * "bpmrange:", artist tag auto-playlists use "artisttag:", and the Moment
+ * "bpmrange:", artist tag auto-playlists use "artisttag:", country auto-playlists use "artistcountry:", and the Moment
  * Mix (formerly Daypart Mix, #223) auto-playlist uses "daypart:". Mirrors
  * the categorization in playlist.rs.
  */

@@ -3898,6 +3898,67 @@ mod tests {
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
+    /// #2135: songs match through the album artist when there is one, a
+    /// code matches in any case, and a code nobody has (or junk) matches none.
+    #[test]
+    fn test_songs_by_artist_country_and_overview() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_songs_by_country_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+        for (path, artist, album_artist) in [
+            ("a.mp3", "Rush", None),
+            ("b.mp3", "Rush", None),
+            ("c.mp3", "Guest", Some("Rush")),
+            ("d.mp3", "Elsewhere", None),
+        ] {
+            upsert_song(
+                &conn,
+                &Song {
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    title: Some(path.to_string()),
+                    artist: Some(artist.to_string()),
+                    album_artist: album_artist.map(str::to_string),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        }
+        for (key, country) in [("Rush", "CA"), ("Elsewhere", "NZ")] {
+            set_artist_profile_conn(
+                &conn,
+                &ArtistProfile {
+                    artist_key: key.to_string(),
+                    country: Some(country.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        }
+
+        let ca = scanner
+            .get_songs_by_artist_country("ca", -1, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(ca.len(), 3, "album artist Rush covers the guest track");
+        for none in ["US", "", "Canada"] {
+            assert!(scanner
+                .get_songs_by_artist_country(none, -1, QueuePopulationMode::All)
+                .unwrap()
+                .is_empty());
+        }
+        let overview: Vec<_> = scanner
+            .get_countries_overview()
+            .unwrap()
+            .into_iter()
+            .map(|c| (c.code, c.song_count))
+            .collect();
+        assert_eq!(overview, vec![("CA".to_string(), 3), ("NZ".to_string(), 1)]);
+    }
+
     /// #2097: the key is one row per artist whatever the casing, stored in the
     /// library's spelling, and the tag filter sees it under either casing.
     #[test]

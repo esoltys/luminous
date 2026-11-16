@@ -542,25 +542,6 @@ class NavigationStore {
     });
   }
 
-  /** Opens a country's auto-playlist detail view (`artistcountry:<CC>`). Like
-   * `viewLanguage`, a country below the song threshold has no playlist row yet,
-   * so the detail view falls back to `get_songs_by_artist_country`. */
-  viewCountry(code: string) {
-    collectionStore.searchQuery = "";
-    collectionStore.searchResults = [];
-    this.selectedArtistName = null;
-    this.selectedAlbumName = null;
-    const playlist = playlistsStore.playlists.find(
-      (p) => p.dynamic_enabled && p.dynamic_spec === `artistcountry:${code}`,
-    );
-    this.viewAutoPlaylist({
-      kind: "country",
-      country: code,
-      playlistId: playlist?.id,
-      updated: playlist?.updated,
-    });
-  }
-
   viewArtist(name: string) {
     collectionStore.searchQuery = "";
     collectionStore.searchResults = [];
