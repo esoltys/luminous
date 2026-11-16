@@ -5,7 +5,6 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { rateAlbum } from "../utils/stats";
   import CoverArt from "./CoverArt.svelte";
   import PlaylistCoverThumb from "./PlaylistCoverThumb.svelte";
@@ -13,7 +12,11 @@
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { getPlaylistDisplayName } from "../utils/playlist";
+  import {
+    autoPlaylistRefFromPlaylist,
+    getPlaylistAutoKindAndSubtitle,
+    getPlaylistDisplayName,
+  } from "../utils/playlist";
   import { CaretRightIcon as ChevronRight } from "phosphor-svelte";
   import { rowClasses, rowListGap, useCardAppearance } from "../utils/cardAppearance";
 
@@ -45,13 +48,8 @@
     return getPlaylistDisplayName(item.playlist);
   }
 
-  /** "Genre" / "Decade" / "Smart" / "Custom" — mirrors PlaylistCard's autoKind derivation. */
   function playlistCategoryFor(playlist: Playlist): string {
-    if (!playlist.dynamic_enabled) return i18n.t("sidebar.playlistsCustom");
-    if (isSmartPlaylistSpec(playlist.dynamic_spec)) return i18n.t("playlists.smartAutoPlaylist");
-    return playlist.dynamic_spec?.startsWith("decade:")
-      ? i18n.t("playlists.decadeAutoPlaylist")
-      : i18n.t("playlists.genreAutoPlaylist");
+    return getPlaylistAutoKindAndSubtitle(playlist)?.subtitle ?? i18n.t("sidebar.playlistsCustom");
   }
 
   function subtitleFor(item: HomeItem): string {
@@ -82,27 +80,13 @@
     return index + 1;
   }
 
-  // Mirrors ArtistDetailView's openPlaylist: genre/decade auto-playlists open
+  // Mirrors ArtistDetailView's openPlaylist: system auto-playlists open
   // in AutoPlaylistDetailView, custom playlists (including Smart Playlists)
   // in the regular PlaylistView.
   function openPlaylist(playlist: Playlist) {
-    if (playlist.dynamic_enabled && !isSmartPlaylistSpec(playlist.dynamic_spec)) {
-      const isDecade = playlist.dynamic_spec?.startsWith("decade:") ?? false;
-      navigationStore.viewAutoPlaylist(
-        isDecade
-          ? {
-              kind: "decade",
-              decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name,
-              playlistId: playlist.id,
-              updated: playlist.updated,
-            }
-          : {
-              kind: "genre",
-              genre: playlist.dynamic_spec?.replace(/^tag:/, "") ?? playlist.name,
-              playlistId: playlist.id,
-              updated: playlist.updated,
-            },
-      );
+    const autoRef = autoPlaylistRefFromPlaylist(playlist);
+    if (autoRef) {
+      navigationStore.viewAutoPlaylist(autoRef);
       return;
     }
     playlistsStore.selectPlaylist(playlist.id);

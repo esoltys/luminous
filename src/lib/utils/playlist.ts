@@ -8,7 +8,11 @@ import type {
   Song,
 } from "../types";
 import { i18n } from "../stores/i18n.svelte";
+import type { AutoPlaylistRef } from "../stores/navigation.svelte";
 import { getLanguageDisplayName } from "./language";
+import { formatBpmRange } from "./formatters";
+import { isSmartPlaylistSpec } from "./filterParser";
+import type { PlaylistCardThemeKind } from "./playlistCardTheme";
 import { collectionStore } from "../stores/collection.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
@@ -354,4 +358,87 @@ export function autoContinueRunStarts(items: PlaylistItem[]): Set<string> {
     previousWasAuto = auto;
   }
   return starts;
+}
+
+/**
+ * Derives an {@link AutoPlaylistRef} from a materialized system auto-playlist
+ * row's `dynamic_spec`, or `null` for regular custom playlists and user-authored
+ * Smart Playlists.
+ */
+export function autoPlaylistRefFromPlaylist(playlist: Playlist): AutoPlaylistRef | null {
+  if (!playlist.dynamic_enabled || isSmartPlaylistSpec(playlist.dynamic_spec)) return null;
+  const spec = playlist.dynamic_spec;
+  const base = { playlistId: playlist.id, updated: playlist.updated };
+  if (spec?.startsWith("decade:")) {
+    return { kind: "decade", decade: spec.slice("decade:".length), ...base };
+  }
+  if (spec?.startsWith("bpmrange:")) {
+    return { kind: "bpm", bpm: spec.slice("bpmrange:".length), ...base };
+  }
+  if (spec?.startsWith("artisttag:")) {
+    return { kind: "artist_tag", artistTag: spec.slice("artisttag:".length), ...base };
+  }
+  if (spec?.startsWith("language:")) {
+    return { kind: "language", language: spec.slice("language:".length), ...base };
+  }
+  if (spec === "missingmeta") {
+    return { kind: "missing_metadata", ...base };
+  }
+  if (spec === "missingmbid") {
+    return { kind: "missing_musicbrainz", ...base };
+  }
+  if (spec?.startsWith("daypart:")) {
+    return { kind: "daypart", ...base };
+  }
+  const genre = spec ? (spec.startsWith("tag:") ? spec.slice("tag:".length) : spec) : playlist.name;
+  return { kind: "genre", genre, ...base };
+}
+
+/** Localized type subtitle for an auto-playlist card or search result. */
+export function getAutoPlaylistSubtitle(ref: Pick<AutoPlaylistRef, "kind" | "bpm">): string {
+  switch (ref.kind) {
+    case "decade":
+      return i18n.t("playlists.decadeAutoPlaylist");
+    case "bpm":
+      return formatBpmRange(ref.bpm) ?? i18n.t("playlists.bpmAutoPlaylist");
+    case "artist_tag":
+      return i18n.t("playlists.artistTagAutoPlaylist");
+    case "language":
+      return i18n.t("playlists.languageAutoPlaylist");
+    case "missing_metadata":
+      return i18n.t("playlists.missingMetadataAutoPlaylist");
+    case "missing_musicbrainz":
+      return i18n.t("playlists.missingMusicBrainzAutoPlaylist", {}, "Auto-Playlist");
+    case "daypart":
+      return i18n.t("playlists.daypartAutoPlaylist");
+    case "favourites":
+      return i18n.t("playlists.favouritesAutoPlaylist");
+    case "recently_added":
+      return i18n.t("playlists.recentlyAddedAutoPlaylist");
+    case "most_played":
+      return i18n.t("playlists.mostPlayedAutoPlaylist");
+    case "history":
+      return i18n.t("playlists.historyAutoPlaylist");
+    default:
+      return i18n.t("playlists.genreAutoPlaylist");
+  }
+}
+
+/**
+ * Returns the card theme kind and localized subtitle for a dynamic `Playlist`
+ * row (both Smart Playlists and system auto-playlists), or `null` for plain
+ * custom playlists.
+ */
+export function getPlaylistAutoKindAndSubtitle(
+  playlist: Playlist,
+): { kind: PlaylistCardThemeKind; subtitle: string } | null {
+  if (!playlist.dynamic_enabled) return null;
+  if (isSmartPlaylistSpec(playlist.dynamic_spec)) {
+    return { kind: "smart", subtitle: i18n.t("playlists.smartRulePlaylistLabel") };
+  }
+  const ref = autoPlaylistRefFromPlaylist(playlist);
+  if (!ref) return null;
+  // `no_genre` has no materialized playlist row and no dedicated card theme.
+  const kind: PlaylistCardThemeKind = ref.kind === "no_genre" ? "genre" : ref.kind;
+  return { kind, subtitle: getAutoPlaylistSubtitle(ref) };
 }

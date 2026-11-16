@@ -10,9 +10,9 @@
   import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
   import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { getPlaylistDisplayName } from "../utils/playlist";
+  import { getAutoPlaylistSubtitle, getPlaylistDisplayName } from "../utils/playlist";
   import { getLanguageDisplayName } from "../utils/language";
-  import { formatBpmRange, toTitleCase } from "../utils/formatters";
+  import { toTitleCase } from "../utils/formatters";
 
   interface Props {
     label: string;
@@ -83,21 +83,7 @@
     return kind === "artist_tag" ? toTitleCase(label) : label;
   });
 
-  let subtitleLabel = $derived.by(() => {
-    if (kind === "missing_metadata") return i18n.t("playlists.missingMetadataAutoPlaylist");
-    if (kind === "missing_musicbrainz") return i18n.t("playlists.missingMusicBrainzAutoPlaylist");
-    if (kind === "daypart") return i18n.t("playlists.daypartAutoPlaylist");
-    if (kind === "language" || language) return i18n.t("playlists.languageAutoPlaylist");
-    if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
-    if (kind === "bpm") return formatBpmRange(bpm) ?? i18n.t("playlists.bpmAutoPlaylist");
-    if (kind === "artist_tag" || artistTag) return i18n.t("playlists.artistTagAutoPlaylist");
-    if (kind === "genre" || genre) return i18n.t("playlists.genreAutoPlaylist");
-    if (kind === "favourites") return i18n.t("playlists.favouritesAutoPlaylist");
-    if (kind === "recently_added") return i18n.t("playlists.recentlyAddedAutoPlaylist");
-    if (kind === "most_played") return i18n.t("playlists.mostPlayedAutoPlaylist");
-    if (kind === "history") return i18n.t("playlists.historyAutoPlaylist");
-    return i18n.t("playlists.genreAutoPlaylist");
-  });
+  let subtitleLabel = $derived(getAutoPlaylistSubtitle({ kind, bpm }));
 
   let songs = $state<Song[]>([]);
 

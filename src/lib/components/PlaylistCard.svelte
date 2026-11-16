@@ -11,14 +11,13 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
-  import { isSmartPlaylistSpec } from "../utils/filterParser";
   import CoverStack from "./CoverStack.svelte";
   import PlaylistCardShell from "./PlaylistCardShell.svelte";
   import PlaylistCoverFrame from "./PlaylistCoverFrame.svelte";
   import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
   import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
 
-  import { getPlaylistDisplayName } from "../utils/playlist";
+  import { getPlaylistAutoKindAndSubtitle, getPlaylistDisplayName } from "../utils/playlist";
 
   let {
     playlist,
@@ -56,24 +55,9 @@
 
   let topAlbums = $derived(songsToCoverStack(tracks.filter((t) => !!t.song).map((t) => t.song!)));
 
-  // System genre auto-playlists store a bare genre name (no ':') and never
-  // reach this component (they render via AutoPlaylistCard instead).
-  let autoKind = $derived<"genre" | "decade" | "smart" | null>(
-    !playlist.dynamic_enabled
-      ? null
-      : playlist.dynamic_spec?.startsWith("decade:")
-        ? "decade"
-        : isSmartPlaylistSpec(playlist.dynamic_spec)
-          ? "smart"
-          : "genre",
-  );
-
-  let subtitleLabel = $derived.by(() => {
-    if (!playlist.dynamic_enabled) return null;
-    if (autoKind === "decade") return i18n.t("playlists.decadeAutoPlaylist");
-    if (autoKind === "genre") return i18n.t("playlists.genreAutoPlaylist");
-    return i18n.t("playlists.smartRulePlaylistLabel");
-  });
+  let dynamicMeta = $derived(getPlaylistAutoKindAndSubtitle(playlist));
+  let autoKind = $derived(dynamicMeta?.kind ?? null);
+  let subtitleLabel = $derived(dynamicMeta?.subtitle ?? null);
 
   let isQueue = $derived(playlist.is_queue);
   let isActive = $derived(playlistsStore.effectivePinnedPlaylistId === playlist.id);

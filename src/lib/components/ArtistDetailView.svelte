@@ -69,7 +69,7 @@
     resolveArtistBackgroundUrl,
   } from "../utils/covers";
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
-  import { isSmartPlaylistSpec } from "../utils/filterParser";
+  import { autoPlaylistRefFromPlaylist } from "../utils/playlist";
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -679,29 +679,15 @@
     navigationStore.viewAlbum(album.album || "", undefined, album.album_key ?? undefined);
   }
 
-  // Mirrors PlaylistsCollectionView's openAuto/openPlaylist split so genre/decade
-  // auto-playlists open in AutoPlaylistDetailView (Auto-Play toggle, etc.) here too,
-  // instead of always falling through to the custom-playlist detail view. Smart
-  // Playlists are also dynamic_enabled but are user-authored rule playlists, not
-  // system auto-playlists, so they must go through the normal viewPlaylist path.
+  // Mirrors PlaylistsCollectionView's openAuto/openPlaylist split so system
+  // auto-playlists open in AutoPlaylistDetailView (Auto-Play toggle, etc.)
+  // here too, instead of falling through to the custom-playlist detail view.
+  // Smart Playlists are also dynamic_enabled but are user-authored rule
+  // playlists, so they go through the normal viewPlaylist path.
   function openPlaylist(playlist: Playlist) {
-    if (playlist.dynamic_enabled && !isSmartPlaylistSpec(playlist.dynamic_spec)) {
-      const isDecade = playlist.dynamic_spec?.startsWith("decade:") ?? false;
-      navigationStore.viewAutoPlaylist(
-        isDecade
-          ? {
-              kind: "decade",
-              decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name,
-              playlistId: playlist.id,
-              updated: playlist.updated,
-            }
-          : {
-              kind: "genre",
-              genre: playlist.dynamic_spec?.replace(/^tag:/, "") ?? playlist.name,
-              playlistId: playlist.id,
-              updated: playlist.updated,
-            },
-      );
+    const autoRef = autoPlaylistRefFromPlaylist(playlist);
+    if (autoRef) {
+      navigationStore.viewAutoPlaylist(autoRef);
       return;
     }
     playlistsStore.selectPlaylist(playlist.id);
