@@ -32,12 +32,7 @@
       | "daypart"
       | "language"
       | "country";
-    genre?: string;
-    artistTag?: string;
-    decade?: string;
-    bpm?: string;
-    language?: string;
-    country?: string;
+    selector?: string;
     playlistId?: number;
     updated?: number;
     trackCount: number;
@@ -45,33 +40,20 @@
     oncontextmenu?: (e: MouseEvent) => void;
   }
 
-  let {
-    label,
-    kind,
-    genre,
-    artistTag,
-    decade,
-    bpm,
-    language,
-    country,
-    playlistId,
-    updated,
-    trackCount,
-    onClick,
-    oncontextmenu,
-  }: Props = $props();
+  let { label, kind, selector, playlistId, updated, trackCount, onClick, oncontextmenu }: Props =
+    $props();
 
   let displayLabel = $derived.by(() => {
     if (hasBackingRow(kind) && playlistId !== undefined) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
-    if (kind === "language") return getLanguageDisplayName(language || label);
-    if (kind === "country") return countryDisplayName(country, i18n.currentLocale) || label;
+    if (kind === "language") return getLanguageDisplayName(selector || label);
+    if (kind === "country") return countryDisplayName(selector, i18n.currentLocale) || label;
     return kind === "artist_tag" ? toTitleCase(label) : label;
   });
 
-  let subtitleLabel = $derived(getAutoPlaylistSubtitle({ kind, bpm }));
+  let subtitleLabel = $derived(getAutoPlaylistSubtitle({ kind, selector }));
 
   let updatedLabel = $derived.by(() => {
     if (!hasBackingRow(kind) || updated === undefined) return null;

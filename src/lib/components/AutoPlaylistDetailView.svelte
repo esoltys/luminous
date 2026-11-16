@@ -60,6 +60,7 @@
     getDaypartMixSourceLabel,
     hasBackingRow,
     hasFillMode,
+    isSystemAutoPlaylist,
   } from "../utils/playlist";
   import { genreColorHsl, resolveGenreColorIndex } from "../utils/genrePalette";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -107,60 +108,39 @@
     actions: "80px",
   };
 
-  let genre = $derived(view.genre);
-  let artistTag = $derived(view.artistTag);
-  let decade = $derived(view.decade);
-  let bpm = $derived(view.bpm);
-  let language = $derived(view.language);
-  let country = $derived(view.country);
+  let selector = $derived(view.selector);
   let playlistId = $derived.by(() => {
     if (view.playlistId !== undefined) return view.playlistId;
     if (view.kind === "missing_musicbrainz") {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid",
+        (p) => isSystemAutoPlaylist(p) && p.dynamic_spec === "missingmbid",
       )?.id;
     }
     if (view.kind === "missing_metadata") {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta",
+        (p) => isSystemAutoPlaylist(p) && p.dynamic_spec === "missingmeta",
       )?.id;
     }
     if (view.kind === "daypart") {
       return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"),
+        (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("daypart:"),
       )?.id;
     }
-    if (view.kind === "decade" && view.decade) {
-      return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `decade:${view.decade}`,
-      )?.id;
-    }
-    if (view.kind === "bpm" && view.bpm) {
-      return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `bpmrange:${view.bpm}`,
-      )?.id;
-    }
-    if (view.kind === "artist_tag" && view.artistTag) {
-      return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `artisttag:${view.artistTag}`,
-      )?.id;
-    }
-    if (view.kind === "language" && view.language) {
-      return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `language:${view.language}`,
-      )?.id;
-    }
-    if (view.kind === "country" && view.country) {
-      return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `artistcountry:${view.country}`,
-      )?.id;
-    }
-    if (view.kind === "genre" && view.genre) {
-      return playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && p.dynamic_spec === `tag:${view.genre}`,
-      )?.id;
-    }
-    return undefined;
+    if (!view.selector) return undefined;
+    const prefixMap: Record<string, string> = {
+      decade: "decade:",
+      bpm: "bpmrange:",
+      artist_tag: "artisttag:",
+      language: "language:",
+      country: "artistcountry:",
+      genre: "tag:",
+    };
+    const prefix = prefixMap[view.kind];
+    if (!prefix) return undefined;
+    const expectedSpec = `${prefix}${view.selector}`;
+    return playlistsStore.playlists.find(
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec === expectedSpec,
+    )?.id;
   });
   // The playlist row backing this view (undefined for the built-in kinds that have none).
   let backingPlaylist = $derived(
@@ -238,23 +218,26 @@
     if (kind === "missing_metadata") return i18n.t("playlists.autoMissingMetadata");
     if (kind === "missing_musicbrainz") return i18n.t("playlists.autoMissingMusicBrainz");
     if (kind === "country") {
-      const base = countryDisplayName(country, i18n.currentLocale) || country || "";
+      const base = countryDisplayName(selector, i18n.currentLocale) || selector || "";
       const suffix = getPopulationModeSuffix(populationMode);
       return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
     }
     if (kind === "language") {
-      const base = getLanguageDisplayName(language);
+      const base = getLanguageDisplayName(selector);
       const suffix = getPopulationModeSuffix(populationMode);
       return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
     }
     const base =
       kind === "decade"
-        ? decade || i18n.t("artistDetail.unknownYear")
+        ? selector || i18n.t("artistDetail.unknownYear")
         : kind === "bpm"
-          ? getBpmBucketLabel(backingPlaylist?.dynamic_spec, backingPlaylist?.name ?? bpm ?? "")
+          ? getBpmBucketLabel(
+              backingPlaylist?.dynamic_spec,
+              backingPlaylist?.name ?? selector ?? "",
+            )
           : kind === "artist_tag"
             ? backingPlaylist?.name ||
-              toTitleCase(artistTag || "") ||
+              toTitleCase(selector || "") ||
               i18n.t("playlists.artistTagAutoPlaylist")
             : kind === "daypart"
               ? // The row's own `name` IS the current bucket's English mix name
@@ -265,7 +248,7 @@
                 : i18n.t("playlists.daypartAutoPlaylist")
               : kind === "no_genre"
                 ? i18n.t("songTags.noGenre", {}, "No Genre")
-                : genre || i18n.t("artistDetail.unknownGenre");
+                : selector || i18n.t("artistDetail.unknownGenre");
     const suffix = getPopulationModeSuffix(populationMode);
     return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
   });
@@ -292,8 +275,8 @@
    * hierarchy at all (e.g. a fresh sub-threshold tag the hierarchy hasn't
    * caught up to yet). */
   let genreColorIndex = $derived.by(() => {
-    if (kind !== "genre" || !genre) return undefined;
-    return resolveGenreColorIndex(tagsStore.hierarchy, genre);
+    if (kind !== "genre" || !selector) return undefined;
+    return resolveGenreColorIndex(tagsStore.hierarchy, selector);
   });
 
   $effect(() => {
@@ -312,7 +295,7 @@
 
   // Genre aliases (#1942): the spellings rolled up into this genre, or the
   // canonical genre this name is read as when it is itself an alias.
-  let aliasGenre = $derived(kind === "genre" && genre ? genre : undefined);
+  let aliasGenre = $derived(kind === "genre" && selector ? selector : undefined);
   let includedAliases = $derived(aliasGenre ? tagsStore.aliasesOf(aliasGenre) : []);
   let readAsGenre = $derived(aliasGenre ? tagsStore.canonicalOf(aliasGenre) : undefined);
 
@@ -344,12 +327,7 @@
 
   async function fetchSongs(
     k: typeof kind,
-    g: typeof genre,
-    at: typeof artistTag,
-    d: typeof decade,
-    b: typeof bpm,
-    lang: typeof language,
-    ctry: typeof country,
+    s: typeof selector,
     pid: typeof playlistId,
   ): Promise<Loaded> {
     if (hasFillMode(k) && pid !== undefined) {
@@ -357,12 +335,12 @@
     }
     if (k === "country") {
       return songsOnly(
-        await invoke<Song[]>("get_songs_by_artist_country", { country: ctry ?? "", limit: 500 }),
+        await invoke<Song[]>("get_songs_by_artist_country", { country: s ?? "", limit: 500 }),
       );
     }
     if (k === "language") {
       return songsOnly(
-        await invoke<Song[]>("get_songs_by_language", { language: lang ?? "", limit: 500 }),
+        await invoke<Song[]>("get_songs_by_language", { language: s ?? "", limit: 500 }),
       );
     }
     if (k === "missing_musicbrainz") {
@@ -388,12 +366,12 @@
     if (k === "history")
       return songsOnly(await invoke<Song[]>("get_recently_played_songs", { limit: 100 }));
     if (k === "decade")
-      return songsOnly(await invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 }));
+      return songsOnly(await invoke<Song[]>("get_songs_by_decade", { decade: s ?? "", limit: 50 }));
     if (k === "bpm")
-      return songsOnly(await invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 }));
+      return songsOnly(await invoke<Song[]>("get_songs_by_bpm", { spec: s ?? "", limit: 50 }));
     if (k === "artist_tag")
       return songsOnly(
-        await invoke<Song[]>("get_songs_by_artist_tag", { tag: at ?? "", limit: 500 }),
+        await invoke<Song[]>("get_songs_by_artist_tag", { tag: s ?? "", limit: 500 }),
       );
     if (k === "no_genre")
       return songsOnly(await invoke<Song[]>("get_songs_without_genre", { limit: 500 }));
@@ -401,7 +379,7 @@
     // curated-hierarchy query (#548), same matching a materialized genre
     // auto-playlist's own population uses.
     return songsOnly(
-      await invoke<Song[]>("get_songs_by_curated_tag", { tagName: g ?? "", limit: 500 }),
+      await invoke<Song[]>("get_songs_by_curated_tag", { tagName: s ?? "", limit: 500 }),
     );
   }
 
@@ -431,22 +409,21 @@
    * rows (and its size-limit break). */
   async function unionWithOtherSystem(
     k: typeof kind,
-    g: typeof genre,
-    at: typeof artistTag,
+    s: typeof selector,
     primary: Song[],
   ): Promise<Song[]> {
-    if (k === "genre" && g) {
-      const lower = g.toLowerCase();
+    if (k === "genre" && s) {
+      const lower = s.toLowerCase();
       if (tagsStore.artistTags.some((t) => t.name.toLowerCase() === lower)) {
         try {
-          const extra = await invoke<Song[]>("get_songs_by_artist_tag", { tag: g, limit: 500 });
+          const extra = await invoke<Song[]>("get_songs_by_artist_tag", { tag: s, limit: 500 });
           return mergeSongsById(primary, extra);
         } catch (e) {
           console.error("Failed to union in artist-tag songs for genre view:", e);
         }
       }
-    } else if (k === "artist_tag" && at) {
-      const lower = at.toLowerCase();
+    } else if (k === "artist_tag" && s) {
+      const lower = s.toLowerCase();
       const isAlsoGenre = tagsStore.hierarchy.some(
         (group) =>
           group.name.toLowerCase() === lower ||
@@ -455,7 +432,7 @@
       if (isAlsoGenre) {
         try {
           const extra = await invoke<Song[]>("get_songs_by_curated_tag", {
-            tagName: at,
+            tagName: s,
             limit: 500,
           });
           return mergeSongsById(primary, extra);
@@ -481,34 +458,19 @@
 
   $effect(() => {
     const k = kind;
-    const g = genre;
-    const at = artistTag;
-    const d = decade;
-    const b = bpm;
-    const lang = language;
-    const ctry = country;
+    const s = selector;
     const pid = playlistId;
     const count = backingTrackCount;
     const layout = backingLayoutKey;
-    const listKey = JSON.stringify([k, g, at, d, b, lang, ctry, pid]);
+    const listKey = JSON.stringify([k, s, pid]);
     if (listKey !== shownListKey) loading = true;
-    fetchSongs(k, g, at, d, b, lang, ctry, pid)
+    fetchSongs(k, s, pid)
       .then(async (loaded) => ({
         ...loaded,
-        songs: await unionWithOtherSystem(k, g, at, loaded.songs),
+        songs: await unionWithOtherSystem(k, s, loaded.songs),
       }))
       .then((loaded) => {
-        if (
-          kind !== k ||
-          genre !== g ||
-          artistTag !== at ||
-          decade !== d ||
-          bpm !== b ||
-          language !== lang ||
-          country !== ctry ||
-          playlistId !== pid
-        )
-          return;
+        if (kind !== k || selector !== s || playlistId !== pid) return;
         applyLoaded(loaded);
         shownListKey = listKey;
       })
@@ -516,17 +478,7 @@
         console.error("Failed to load auto-playlist detail:", err);
       })
       .finally(() => {
-        if (
-          kind === k &&
-          genre === g &&
-          artistTag === at &&
-          decade === d &&
-          bpm === b &&
-          language === lang &&
-          country === ctry &&
-          playlistId === pid
-        )
-          loading = false;
+        if (kind === k && selector === s && playlistId === pid) loading = false;
       });
   });
 
@@ -627,9 +579,7 @@
     isChangingMode = true;
     try {
       await playlistsStore.setPlaylistPopulationMode(playlistId, newMode);
-      applyLoaded(
-        await fetchSongs(kind, genre, artistTag, decade, bpm, language, country, playlistId),
-      );
+      applyLoaded(await fetchSongs(kind, selector, playlistId));
     } catch (err) {
       console.error("Failed to change queue population mode:", err);
     } finally {
@@ -644,9 +594,7 @@
     isRefreshing = true;
     try {
       await playlistsStore.refreshAutoPlaylist(playlistId);
-      applyLoaded(
-        await fetchSongs(kind, genre, artistTag, decade, bpm, language, country, playlistId),
-      );
+      applyLoaded(await fetchSongs(kind, selector, playlistId));
     } catch (err) {
       console.error("Failed to refresh auto-playlist:", err);
     } finally {
@@ -662,7 +610,7 @@
     collectionStore.refreshLibrary();
     tagsStore.load();
     loading = true;
-    fetchSongs(kind, genre, artistTag, decade, bpm, language, country, playlistId)
+    fetchSongs(kind, selector, playlistId)
       .then(applyLoaded)
       .catch((err) => console.error(err))
       .finally(() => (loading = false));
@@ -689,9 +637,7 @@
         kind === "most_played"
       ) {
         try {
-          applyLoaded(
-            await fetchSongs(kind, genre, artistTag, decade, bpm, language, country, playlistId),
-          );
+          applyLoaded(await fetchSongs(kind, selector, playlistId));
         } catch (err) {
           console.error("Failed to re-fetch songs on stats change:", err);
         }
@@ -820,7 +766,7 @@
 
 <div
   class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full"
-  use:rememberScroll={`autoplaylist:${view.kind}:${view.genre ?? view.decade ?? view.bpm ?? ""}`}
+  use:rememberScroll={`autoplaylist:${view.kind}:${view.selector ?? ""}`}
 >
   <div
     class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 pt-6 pb-6 shrink-0"

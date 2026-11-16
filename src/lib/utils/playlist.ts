@@ -270,13 +270,16 @@ export async function addPlaylistToQueue(playlist: Playlist): Promise<void> {
 }
 
 async function fetchAutoPlaylistSongs(ap: AutoPlaylistItem): Promise<Song[]> {
-  const { kind, genre, decade, bpm, artistTag, playlistId } = ap;
+  const { kind, selector, playlistId } = ap;
   if (
     (kind === "genre" ||
       kind === "decade" ||
       kind === "bpm" ||
       kind === "artist_tag" ||
+      kind === "language" ||
+      kind === "country" ||
       kind === "missing_metadata" ||
+      kind === "missing_musicbrainz" ||
       kind === "daypart") &&
     playlistId !== undefined
   ) {
@@ -294,13 +297,23 @@ async function fetchAutoPlaylistSongs(ap: AutoPlaylistItem): Promise<Song[]> {
   else if (kind === "history")
     songs = await invoke<Song[]>("get_recently_played_songs", { limit: 100 });
   else if (kind === "decade")
-    songs = await invoke<Song[]>("get_songs_by_decade", { decade: decade ?? "", limit: 50 });
+    songs = await invoke<Song[]>("get_songs_by_decade", { decade: selector ?? "", limit: 50 });
   else if (kind === "bpm")
-    songs = await invoke<Song[]>("get_songs_by_bpm", { spec: bpm ?? "", limit: 50 });
+    songs = await invoke<Song[]>("get_songs_by_bpm", { spec: selector ?? "", limit: 50 });
   else if (kind === "artist_tag")
-    songs = await invoke<Song[]>("get_songs_by_artist_tag", { tag: artistTag ?? "", limit: 500 });
+    songs = await invoke<Song[]>("get_songs_by_artist_tag", { tag: selector ?? "", limit: 500 });
+  else if (kind === "language")
+    songs = await invoke<Song[]>("get_songs_by_language", { language: selector ?? "", limit: 500 });
+  else if (kind === "country")
+    songs = await invoke<Song[]>("get_songs_by_artist_country", {
+      country: selector ?? "",
+      limit: 500,
+    });
   else
-    songs = await invoke<Song[]>("get_songs_by_curated_tag", { tagName: genre ?? "", limit: 500 });
+    songs = await invoke<Song[]>("get_songs_by_curated_tag", {
+      tagName: selector ?? "",
+      limit: 500,
+    });
   return songs.filter((s) => !s.not_included && !s.unavailable);
 }
 
@@ -366,28 +379,54 @@ export function autoContinueRunStarts(items: PlaylistItem[]): Set<string> {
 }
 
 /**
+ * True if a playlist is a user-authored Smart Playlist rather than a system
+ * auto-playlist. Prefers the backend `is_system` flag (#2136) and falls back
+ * to `isSmartPlaylistSpec` when `is_system` is omitted in legacy fixtures.
+ */
+export function isSmartPlaylist(
+  playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system">,
+): boolean {
+  if (!playlist.dynamic_enabled) return false;
+  if (playlist.is_system !== undefined) {
+    return !playlist.is_system && !!playlist.dynamic_spec;
+  }
+  return isSmartPlaylistSpec(playlist.dynamic_spec);
+}
+
+/**
+ * True if a playlist is a system-managed auto-playlist row.
+ */
+export function isSystemAutoPlaylist(
+  playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system">,
+): boolean {
+  if (!playlist.dynamic_enabled) return false;
+  if (playlist.is_system !== undefined) return playlist.is_system;
+  return !isSmartPlaylistSpec(playlist.dynamic_spec);
+}
+
+/**
  * Derives an {@link AutoPlaylistRef} from a materialized system auto-playlist
  * row's `dynamic_spec`, or `null` for regular custom playlists and user-authored
  * Smart Playlists.
  */
 export function autoPlaylistRefFromPlaylist(playlist: Playlist): AutoPlaylistRef | null {
-  if (!playlist.dynamic_enabled || isSmartPlaylistSpec(playlist.dynamic_spec)) return null;
+  if (!isSystemAutoPlaylist(playlist)) return null;
   const spec = playlist.dynamic_spec;
   const base = { playlistId: playlist.id, updated: playlist.updated };
   if (spec?.startsWith("decade:")) {
-    return { kind: "decade", decade: spec.slice("decade:".length), ...base };
+    return { kind: "decade", selector: spec.slice("decade:".length), ...base };
   }
   if (spec?.startsWith("bpmrange:")) {
-    return { kind: "bpm", bpm: spec.slice("bpmrange:".length), ...base };
+    return { kind: "bpm", selector: spec.slice("bpmrange:".length), ...base };
   }
   if (spec?.startsWith("artisttag:")) {
-    return { kind: "artist_tag", artistTag: spec.slice("artisttag:".length), ...base };
+    return { kind: "artist_tag", selector: spec.slice("artisttag:".length), ...base };
   }
   if (spec?.startsWith("language:")) {
-    return { kind: "language", language: spec.slice("language:".length), ...base };
+    return { kind: "language", selector: spec.slice("language:".length), ...base };
   }
   if (spec?.startsWith("artistcountry:")) {
-    return { kind: "country", country: spec.slice("artistcountry:".length), ...base };
+    return { kind: "country", selector: spec.slice("artistcountry:".length), ...base };
   }
   if (spec === "missingmeta") {
     return { kind: "missing_metadata", ...base };
@@ -399,7 +438,7 @@ export function autoPlaylistRefFromPlaylist(playlist: Playlist): AutoPlaylistRef
     return { kind: "daypart", ...base };
   }
   const genre = spec ? (spec.startsWith("tag:") ? spec.slice("tag:".length) : spec) : playlist.name;
-  return { kind: "genre", genre, ...base };
+  return { kind: "genre", selector: genre, ...base };
 }
 
 /**
@@ -440,12 +479,12 @@ export function hasFillMode(kind: string): boolean {
 }
 
 /** Localized type subtitle for an auto-playlist card or search result. */
-export function getAutoPlaylistSubtitle(ref: Pick<AutoPlaylistRef, "kind" | "bpm">): string {
+export function getAutoPlaylistSubtitle(ref: Pick<AutoPlaylistRef, "kind" | "selector">): string {
   switch (ref.kind) {
     case "decade":
       return i18n.t("playlists.decadeAutoPlaylist");
     case "bpm":
-      return formatBpmRange(ref.bpm) ?? i18n.t("playlists.bpmAutoPlaylist");
+      return formatBpmRange(ref.selector) ?? i18n.t("playlists.bpmAutoPlaylist");
     case "artist_tag":
       return i18n.t("playlists.artistTagAutoPlaylist");
     case "language":
@@ -480,7 +519,7 @@ export function getPlaylistAutoKindAndSubtitle(
   playlist: Playlist,
 ): { kind: PlaylistCardThemeKind; subtitle: string } | null {
   if (!playlist.dynamic_enabled) return null;
-  if (isSmartPlaylistSpec(playlist.dynamic_spec)) {
+  if (isSmartPlaylist(playlist)) {
     return { kind: "smart", subtitle: i18n.t("playlists.smartRulePlaylistLabel") };
   }
   const ref = autoPlaylistRefFromPlaylist(playlist);

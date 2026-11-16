@@ -30,8 +30,7 @@
     SparkleIcon as Sparkles,
     ArrowsClockwiseIcon as RefreshCw,
   } from "phosphor-svelte";
-  import { isSmartPlaylistSpec } from "../utils/filterParser";
-  import { getPlaylistDisplayName } from "../utils/playlist";
+  import { getPlaylistDisplayName, isSmartPlaylist, isSystemAutoPlaylist } from "../utils/playlist";
   import { scrobblerStore } from "../stores/scrobbler.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -52,12 +51,7 @@
       | "daypart"
       | "language"
       | "country";
-    genre?: string;
-    artistTag?: string;
-    decade?: string;
-    bpm?: string;
-    language?: string;
-    country?: string;
+    selector?: string;
     label: string;
     playlistId?: number;
     updated?: number;
@@ -115,42 +109,48 @@
   // System genre auto-playlists are keyed one row per curated tag (#548),
   // stored as "tag:<name>" in dynamic_spec — e.g. "tag:Rock", "tag:Jazz".
   let genreAutoPlaylists = $derived(
-    playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("tag:")),
+    playlistsStore.playlists.filter(
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("tag:"),
+    ),
   );
   let artistTagAutoPlaylists = $derived(
     playlistsStore.playlists.filter(
-      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("artisttag:"),
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("artisttag:"),
     ),
   );
   let languageAutoPlaylists = $derived(
     playlistsStore.playlists.filter(
-      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("language:"),
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("language:"),
     ),
   );
   let countryAutoPlaylists = $derived(
     playlistsStore.playlists.filter(
-      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("artistcountry:"),
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("artistcountry:"),
     ),
   );
   let decadeAutoPlaylists = $derived(
     playlistsStore.playlists.filter(
-      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:"),
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("decade:"),
     ),
   );
   let bpmAutoPlaylists = $derived(
     playlistsStore.playlists
-      .filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("bpmrange:"))
+      .filter((p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("bpmrange:"))
       .sort((a, b) => BPM_BUCKET_ORDER.indexOf(a.name) - BPM_BUCKET_ORDER.indexOf(b.name)),
   );
   // Missing Metadata (#367) is a singleton diagnostic auto-playlist, not a
   // per-value category like genre/decade/BPM/artist tag.
   let missingMetadataAutoPlaylist = $derived(
-    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta"),
+    playlistsStore.playlists.find(
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec === "missingmeta",
+    ),
   );
   // Missing MusicBrainz (#83) is surfaced when scrobbling is enabled, identifying
   // songs that lack MusicBrainz recording IDs.
   let missingMusicBrainzAutoPlaylist = $derived(
-    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid"),
+    playlistsStore.playlists.find(
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec === "missingmbid",
+    ),
   );
   // Daypart Mix (#223) is also a singleton, but unlike missing-metadata its
   // dynamic_spec changes content (bucket/date/genre) every time the daypart
@@ -158,14 +158,12 @@
   // (and any Home pin keyed on its id) is found across every crossing.
   let daypartMixPlaylist = $derived(
     playlistsStore.playlists.find(
-      (p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"),
+      (p) => isSystemAutoPlaylist(p) && p.dynamic_spec?.startsWith("daypart:"),
     ),
   );
   let customPlaylists = $derived.by(() => {
     // Include non-dynamic playlists + user-created Smart playlists
-    const list = playlistsStore.playlists.filter(
-      (p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec),
-    );
+    const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylist(p));
     const queue = list.find((p) => p.is_queue);
     const rest = list.filter((p) => !p.is_queue);
     return queue ? [queue, ...rest] : rest;
@@ -245,7 +243,7 @@
         defs.push({
           id: `auto:decade:${p.id}`,
           kind: "decade",
-          decade: dec,
+          selector: dec,
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -258,7 +256,7 @@
         defs.push({
           id: `auto:genre:${p.id}`,
           kind: "genre",
-          genre: p.dynamic_spec?.replace(/^tag:/, "") ?? p.name,
+          selector: p.dynamic_spec?.replace(/^tag:/, "") ?? p.name,
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -271,7 +269,7 @@
         defs.push({
           id: `auto:artist_tag:${p.id}`,
           kind: "artist_tag",
-          artistTag: p.dynamic_spec?.replace(/^artisttag:/, "") ?? p.name,
+          selector: p.dynamic_spec?.replace(/^artisttag:/, "") ?? p.name,
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -284,7 +282,7 @@
         defs.push({
           id: `auto:bpm:${p.id}`,
           kind: "bpm",
-          bpm: p.dynamic_spec?.replace(/^bpmrange:/, "") ?? "",
+          selector: p.dynamic_spec?.replace(/^bpmrange:/, "") ?? "",
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -297,7 +295,7 @@
         defs.push({
           id: `auto:language:${p.id}`,
           kind: "language",
-          language: p.dynamic_spec?.replace(/^language:/, "") ?? "",
+          selector: p.dynamic_spec?.replace(/^language:/, "") ?? "",
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -310,7 +308,7 @@
         defs.push({
           id: `auto:country:${p.id}`,
           kind: "country",
-          country: p.dynamic_spec?.replace(/^artistcountry:/, "") ?? "",
+          selector: p.dynamic_spec?.replace(/^artistcountry:/, "") ?? "",
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -441,51 +439,12 @@
   }
 
   function openAuto(def: AutoDef) {
-    navigationStore.viewAutoPlaylist(
-      def.kind === "genre"
-        ? { kind: "genre", genre: def.genre, playlistId: def.playlistId, updated: def.updated }
-        : def.kind === "artist_tag"
-          ? {
-              kind: "artist_tag",
-              artistTag: def.artistTag,
-              playlistId: def.playlistId,
-              updated: def.updated,
-            }
-          : def.kind === "decade"
-            ? {
-                kind: "decade",
-                decade: def.decade,
-                playlistId: def.playlistId,
-                updated: def.updated,
-              }
-            : def.kind === "bpm"
-              ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
-              : def.kind === "country"
-                ? {
-                    kind: "country",
-                    country: def.country,
-                    playlistId: def.playlistId,
-                    updated: def.updated,
-                  }
-                : def.kind === "language"
-                  ? {
-                      kind: "language",
-                      language: def.language,
-                      playlistId: def.playlistId,
-                      updated: def.updated,
-                    }
-                  : def.kind === "missing_metadata"
-                    ? { kind: "missing_metadata", playlistId: def.playlistId, updated: def.updated }
-                    : def.kind === "missing_musicbrainz"
-                      ? {
-                          kind: "missing_musicbrainz",
-                          playlistId: def.playlistId,
-                          updated: def.updated,
-                        }
-                      : def.kind === "daypart"
-                        ? { kind: "daypart", playlistId: def.playlistId, updated: def.updated }
-                        : { kind: def.kind },
-    );
+    navigationStore.viewAutoPlaylist({
+      kind: def.kind,
+      ...(def.selector !== undefined ? { selector: def.selector } : {}),
+      ...(def.playlistId !== undefined ? { playlistId: def.playlistId } : {}),
+      ...(def.updated !== undefined ? { updated: def.updated } : {}),
+    });
   }
 
   function openPlaylist(pl: Playlist) {
@@ -644,12 +603,7 @@
                 <AutoPlaylistRowCard
                   label={def.label}
                   kind={def.kind}
-                  genre={def.genre}
-                  artistTag={def.artistTag}
-                  decade={def.decade}
-                  bpm={def.bpm}
-                  language={def.language}
-                  country={def.country}
+                  selector={def.selector}
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
@@ -660,12 +614,7 @@
                 <AutoPlaylistCard
                   label={def.label}
                   kind={def.kind}
-                  genre={def.genre}
-                  artistTag={def.artistTag}
-                  decade={def.decade}
-                  bpm={def.bpm}
-                  language={def.language}
-                  country={def.country}
+                  selector={def.selector}
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}

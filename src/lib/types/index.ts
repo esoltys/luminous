@@ -266,6 +266,8 @@ export interface Playlist {
   /** True for the app's single built-in Queue playlist (backend-computed —
    * never derive this from the playlist name). */
   is_queue: boolean;
+  /** True for system-managed auto-playlists; false for user custom and Smart Playlists (#2136). */
+  is_system?: boolean;
   /** Size budget for the songs at the top of the playlist, in bytes (#344). */
   size_limit_bytes?: number | null;
   /** The device (a device profile id) the limit is measured for, in its
@@ -1335,12 +1337,9 @@ export interface AutoPlaylistItem {
     | "daypart"
     | "language"
     | "country";
-  genre?: string;
-  artistTag?: string;
-  decade?: string;
-  bpm?: string;
-  language?: string;
-  country?: string;
+  /** Kind-specific selector (genre name, decade, bpm spec, artist tag,
+   * canonical language code, or uppercase ISO 3166-1 alpha-2 country code). */
+  selector?: string;
   playlistId?: number;
   updated?: number;
   trackCount: number;
@@ -1355,32 +1354,19 @@ export type PinnedItem =
 
 /** The stable ref_key for a pinned auto-playlist: the bare kind for
  * Favourites/Recently Added/Most Played/History (no backing row to key on),
- * or `kind:selector` for genre/decade/bpm/artist_tag — keyed by the selector
- * value (genre name, decade, bpm spec, artist tag) rather than the
- * materialized playlist's id, since that row can be dropped and recreated by
- * a background sync while the selector stays stable. */
-export function autoPlaylistRefKeyFor(ref: {
-  kind: string;
-  genre?: string;
-  decade?: string;
-  bpm?: string;
-  artistTag?: string;
-  language?: string;
-  country?: string;
-}): string {
+ * or `kind:selector` for genre/decade/bpm/artist_tag/language/country — keyed
+ * by the selector value rather than the materialized playlist's id, since that
+ * row can be dropped and recreated by a background sync while the selector
+ * stays stable. */
+export function autoPlaylistRefKeyFor(ref: { kind: string; selector?: string }): string {
   switch (ref.kind) {
     case "genre":
-      return `genre:${ref.genre ?? ""}`;
     case "decade":
-      return `decade:${ref.decade ?? ""}`;
     case "bpm":
-      return `bpm:${ref.bpm ?? ""}`;
     case "artist_tag":
-      return `artist_tag:${ref.artistTag ?? ""}`;
     case "language":
-      return `language:${ref.language ?? ""}`;
     case "country":
-      return `country:${ref.country ?? ""}`;
+      return `${ref.kind}:${ref.selector ?? ""}`;
     default:
       return ref.kind;
   }

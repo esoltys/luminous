@@ -40,8 +40,12 @@
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
-  import { autoContinueRunStarts, getPlaylistDisplayName } from "../utils/playlist";
-  import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
+  import {
+    autoContinueRunStarts,
+    getPlaylistDisplayName,
+    isSmartPlaylist as isSmartPlaylistRow,
+  } from "../utils/playlist";
+  import { parseSearchRules } from "../utils/filterParser";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
   import { invoke } from "@tauri-apps/api/core";
@@ -279,9 +283,7 @@
   );
 
   let isSmartPlaylist = $derived(
-    activePlaylist !== undefined &&
-      activePlaylist.dynamic_enabled &&
-      isSmartPlaylistSpec(activePlaylist.dynamic_spec),
+    activePlaylist !== undefined && isSmartPlaylistRow(activePlaylist),
   );
 
   // Title shown everywhere (header, sidebar, Home): a smart playlist's carries its

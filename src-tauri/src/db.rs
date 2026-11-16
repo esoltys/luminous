@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 86;
+pub const CURRENT_SCHEMA_VERSION: i32 = 87;
 
 struct Migration {
     version: i32,
@@ -875,6 +875,38 @@ const MIGRATIONS: &[Migration] = &[
                     inactive_preset TEXT NOT NULL DEFAULT ''
                 );",
             )?;
+            Ok(())
+        },
+    },
+    Migration {
+        version: 87,
+        description: "playlists.is_system: distinguish system auto-playlists from user smart playlists (#2136)",
+        apply: |conn| {
+            let has_is_system: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('playlists') WHERE name = 'is_system'",
+                )?
+                .exists([])?;
+            if !has_is_system {
+                conn.execute_batch(
+                    "ALTER TABLE playlists ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0;
+                     UPDATE playlists SET is_system = 1
+                     WHERE dynamic_enabled = 1
+                       AND (
+                         dynamic_spec IN ('missingmeta', 'missingmbid')
+                         OR dynamic_spec LIKE 'daypart:%'
+                         OR dynamic_spec LIKE 'bpmrange:%'
+                         OR dynamic_spec LIKE 'artisttag:%'
+                         OR dynamic_spec LIKE 'artistcountry:%'
+                         OR (
+                           (dynamic_spec LIKE 'decade:%' OR dynamic_spec LIKE 'language:%' OR dynamic_spec LIKE 'tag:%')
+                           AND dynamic_spec NOT LIKE '%;%'
+                           AND dynamic_spec NOT LIKE '%:%:%'
+                           AND dynamic_spec NOT LIKE '%\"%'
+                         )
+                       );",
+                )?;
+            }
             Ok(())
         },
     },

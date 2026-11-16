@@ -321,7 +321,7 @@ describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
     const pl = makePlaylist("Uptempo BPM", "bpmrange:115-130");
     expect(autoPlaylistRefFromPlaylist(pl)).toEqual({
       kind: "bpm",
-      bpm: "115-130",
+      selector: "115-130",
       playlistId: 42,
       updated: 200,
     });
@@ -334,25 +334,25 @@ describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
   it("maps all other system auto-playlist specs to their matching kind", () => {
     expect(autoPlaylistRefFromPlaylist(makePlaylist("1980s", "decade:1980s"))).toMatchObject({
       kind: "decade",
-      decade: "1980s",
+      selector: "1980s",
     });
     expect(autoPlaylistRefFromPlaylist(makePlaylist("Rock", "tag:Rock"))).toMatchObject({
       kind: "genre",
-      genre: "Rock",
+      selector: "Rock",
     });
     expect(
       autoPlaylistRefFromPlaylist(makePlaylist("Canadian", "artisttag:Canadian")),
     ).toMatchObject({
       kind: "artist_tag",
-      artistTag: "Canadian",
+      selector: "Canadian",
     });
     expect(autoPlaylistRefFromPlaylist(makePlaylist("Japanese", "language:jpn"))).toMatchObject({
       kind: "language",
-      language: "jpn",
+      selector: "jpn",
     });
     expect(autoPlaylistRefFromPlaylist(makePlaylist("CA", "artistcountry:CA"))).toMatchObject({
       kind: "country",
-      country: "CA",
+      selector: "CA",
     });
     expect(autoPlaylistRefFromPlaylist(makePlaylist("Mine", "country:ca"))).toBeNull();
     expect(
@@ -383,6 +383,17 @@ describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
       kind: "smart",
       subtitle: i18n.t("playlists.smartRulePlaylistLabel"),
     });
+  });
+
+  it("treats user smart playlists with is_system: false as smart even when spec starts with language:/decade:/tag:", () => {
+    for (const spec of ["language:ja", "decade:1980s", "tag:canadian", "tag:Rock; rating:>=4"]) {
+      const smart: Playlist = { ...makePlaylist("User Smart", spec), is_system: false };
+      expect(autoPlaylistRefFromPlaylist(smart), spec).toBeNull();
+      expect(getPlaylistAutoKindAndSubtitle(smart), spec).toEqual({
+        kind: "smart",
+        subtitle: i18n.t("playlists.smartRulePlaylistLabel"),
+      });
+    }
   });
 });
 

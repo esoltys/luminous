@@ -36,16 +36,10 @@
       | "daypart"
       | "language"
       | "country";
-    genre?: string;
-    artistTag?: string;
-    decade?: string;
-    /** For kind "bpm": the bucket's dynamic_spec suffix, e.g. "60-90" or the open-ended "150-". */
-    bpm?: string;
-    language?: string;
-    country?: string;
-    /** For kind "genre", "decade", "bpm", "artist_tag" or "language": the materialized playlist row backing it (refreshed at most every 24h). */
+    selector?: string;
+    /** For materialized kinds: the backing playlist row id (refreshed at most every 24h). */
     playlistId?: number;
-    /** For kind "genre", "decade", "bpm", "artist_tag" or "language": when this playlist's songs were last (re)generated. */
+    /** For materialized kinds: when this playlist's songs were last (re)generated. */
     updated?: number;
     trackCount: number;
     onClick: () => void;
@@ -57,12 +51,7 @@
   let {
     label,
     kind,
-    genre,
-    artistTag,
-    decade,
-    bpm,
-    language,
-    country,
+    selector,
     playlistId,
     updated,
     trackCount,
@@ -77,24 +66,19 @@
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
-    if (kind === "language") return getLanguageDisplayName(language || label);
-    if (kind === "country") return countryDisplayName(country, i18n.currentLocale) || label;
+    if (kind === "language") return getLanguageDisplayName(selector || label);
+    if (kind === "country") return countryDisplayName(selector, i18n.currentLocale) || label;
     if (kind === "daypart") return label || i18n.t("playlists.daypartAutoPlaylist");
     return kind === "artist_tag" ? toTitleCase(label) : label;
   });
 
-  let subtitleLabel = $derived(getAutoPlaylistSubtitle({ kind, bpm }));
+  let subtitleLabel = $derived(getAutoPlaylistSubtitle({ kind, selector }));
 
   let songs = $state<Song[]>([]);
 
   $effect(() => {
     const k = kind;
-    const g = genre;
-    const at = artistTag;
-    const d = decade;
-    const b = bpm;
-    const l = language;
-    const c = country;
+    const s = selector;
     const pid = playlistId;
     const currentTrackCount = trackCount;
 
@@ -126,26 +110,26 @@
                     : k === "history"
                       ? invoke<Song[]>("get_recently_played_songs", { limit: 50 })
                       : k === "decade"
-                        ? invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 })
+                        ? invoke<Song[]>("get_songs_by_decade", { decade: s ?? "", limit: 50 })
                         : k === "bpm"
-                          ? invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 })
+                          ? invoke<Song[]>("get_songs_by_bpm", { spec: s ?? "", limit: 50 })
                           : k === "artist_tag"
                             ? invoke<Song[]>("get_songs_by_artist_tag", {
-                                tag: at ?? "",
+                                tag: s ?? "",
                                 limit: 50,
                               })
                             : k === "country"
                               ? invoke<Song[]>("get_songs_by_artist_country", {
-                                  country: c ?? "",
+                                  country: s ?? "",
                                   limit: 50,
                                 })
                               : k === "language"
                                 ? invoke<Song[]>("get_songs_by_language", {
-                                    code: l ?? "",
+                                    language: s ?? "",
                                     limit: 50,
                                   })
                                 : invoke<Song[]>("get_songs_by_curated_tag", {
-                                    tagName: g ?? "",
+                                    tagName: s ?? "",
                                     limit: 50,
                                   });
 
@@ -153,12 +137,7 @@
       .then((res) => {
         if (
           kind === k &&
-          genre === g &&
-          artistTag === at &&
-          decade === d &&
-          bpm === b &&
-          language === l &&
-          country === c &&
+          selector === s &&
           playlistId === pid &&
           trackCount === currentTrackCount
         ) {

@@ -99,28 +99,28 @@ describe("pinnedNav.ts", () => {
   it("opens a pinned country auto-playlist on its country and marks it active there", () => {
     const pin = toNavigablePin({
       type: "auto_playlist",
-      autoPlaylist: { kind: "country", country: "CA", playlistId: 9, trackCount: 30 },
+      autoPlaylist: { kind: "country", selector: "CA", playlistId: 9, trackCount: 30 },
     } as PinnedItem);
     expect(pin.id).toBe("auto_playlist:country:CA");
     const spy = vi.spyOn(navigationStore, "viewAutoPlaylist").mockImplementation(() => {});
     pin.open();
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ kind: "country", country: "CA" }));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ kind: "country", selector: "CA" }));
     spy.mockRestore();
 
     navigationStore.activeTab = "playlists";
-    navigationStore.selectedAutoPlaylist = { kind: "country", country: "CA" };
+    navigationStore.selectedAutoPlaylist = { kind: "country", selector: "CA" };
     expect(pin.isActive).toBe(false); // computed when projected
     expect(
       toNavigablePin({
         type: "auto_playlist",
-        autoPlaylist: { kind: "country", country: "CA", trackCount: 30 },
+        autoPlaylist: { kind: "country", selector: "CA", trackCount: 30 },
       } as PinnedItem).isActive,
     ).toBe(true);
-    navigationStore.selectedAutoPlaylist = { kind: "country", country: "NZ" };
+    navigationStore.selectedAutoPlaylist = { kind: "country", selector: "NZ" };
     expect(
       toNavigablePin({
         type: "auto_playlist",
-        autoPlaylist: { kind: "country", country: "CA", trackCount: 30 },
+        autoPlaylist: { kind: "country", selector: "CA", trackCount: 30 },
       } as PinnedItem).isActive,
     ).toBe(false);
   });

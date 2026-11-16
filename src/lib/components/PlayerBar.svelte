@@ -10,7 +10,6 @@
   import { dockGlowOpacity, resolveDockGlowColors, themeStore } from "../stores/theme.svelte";
   import { isLightColor } from "../utils/colorUtils";
   import { generateEllipseGradientSvg } from "../utils/ellipseGradient";
-  import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { formatDuration } from "../utils/formatters";
   import { prefs } from "../stores/prefs.svelte";
   import CoverArt from "./CoverArt.svelte";
