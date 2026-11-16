@@ -1079,22 +1079,6 @@
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
         <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t("settings.detectTempoKeyLabel")}</span
-        >
-        <p class="text-xs text-brand-text-secondary text-pretty">
-          {i18n.t("settings.detectTempoKeyHint")}
-        </p>
-      </div>
-      <Toggle
-        checked={prefs.detectTempoAndKey}
-        onchange={(v) => prefs.setDetectTempoAndKey(v)}
-        label={i18n.t("settings.detectTempoKeyLabel")}
-      />
-    </div>
-
-    <div class="flex items-center justify-between gap-4">
-      <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
           >{i18n.t("settings.suggestFoldersLabel")}</span
         >
         <p class="text-xs text-brand-text-secondary text-pretty">

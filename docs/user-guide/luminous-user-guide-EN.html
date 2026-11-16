@@ -257,7 +257,7 @@
         <img src="assets/en-CA/screenshots/dark/playlist-smart-edit.webp" alt="Editing smart playlist rules" width="1440" height="900" loading="lazy">
       </figure>
       <h2>BPM playlists</h2>
-      <p class="mb-16">BPM playlists use each song's BPM. Turn on <b>Detect tempo and key</b> in <b>Settings → Sources</b> and Luminous works out the tempo of songs without a BPM tag, and never replaces a BPM you've tagged yourself. Make your own ranges with a smart playlist.</p>
+      <p class="mb-16">BPM playlists use each song's BPM. Turn on <b>Detect tempo and key</b> in <b>Settings → General</b> and Luminous works out the tempo of songs without a BPM tag, and never replaces a BPM you've tagged yourself. Make your own ranges with a smart playlist.</p>
       <div class="table mw-460 mb-20" style="--cols: 1fr 1fr">
         <div class="tr th"><div>Category</div><div>BPM range</div></div>
         <div class="tr"><div>Very Slow BPM</div><div>0–60</div></div>
@@ -446,6 +446,8 @@
         <div class="row"><div class="mk">•</div><div><b>Language</b>: the language of menus, buttons, messages and this guide.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Start the week with</b>: Sunday or Monday, for weekly charts and stats.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Song rating style</b>: a heart, 5 stars, or both.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Auto-playlists</b>: choose which generated playlists Luminous keeps: Genre, Decade, Artist tags, BPM, Language and Moment Mix. Turning one off removes its playlists; turning it back on rebuilds them.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Detect tempo and key</b> (off by default): fills in missing BPM and key tags by analyzing your songs in the background. It reads each song once, which can take a while on large libraries or network drives, and disk activity can continue after a scan. A notice in <b>Settings → Sources</b> shows how many songs are left. It only fills in empty tags and doesn't change your files.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/en-CA/screenshots/dark/settings-general.webp" alt="General settings" width="1440" height="900" loading="lazy">
@@ -475,7 +477,6 @@
       <div class="list">
         <div class="row"><div class="mk">•</div><div>Click <b>Add Folder</b> to add a music folder. New and changed files appear on their own.</div></div>
         <div class="row"><div class="mk">•</div><div>Turn off <b>Real-Time Folder Watching</b> to check for changes only when you rescan.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Detect tempo and key</b> (off by default): fills in missing BPM and key tags by analyzing your songs in the background. It reads each song once, which can take a while on large libraries or network drives, and disk activity can continue after a scan. A notice here shows how many songs are left. It only fills in empty tags and doesn't change your files.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Rescan Library on Startup</b> checks your folders each time Luminous opens.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Rescan Library</b> looks for changes; <b>Force Full Re-Scan</b> rereads everything. When a scan finishes, a notification reports any songs whose tags changed outside Luminous.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Save artwork next to your music</b> saves covers as <code>cover.jpg</code> in album folders and artist photos as <code>artist.jpg</code>. Existing folder art is never overwritten.</div></div>
