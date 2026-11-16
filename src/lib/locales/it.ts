@@ -1755,7 +1755,7 @@ export const it = {
     genreTooltip:
       "Il primo valore è considerato il genere principale nella scheda Generi, gli altri ne sono sottogeneri.",
     languageField: "Lingua",
-    languagePlaceholder: "Aggiungi un codice lingua...",
+    languagePlaceholder: "Aggiungi un codice lingua. Esempio «it»",
     languageTooltip: "Codice lingua ISO 639 (es. en, ja, it)",
     cancelBtn: "Annulla",
     saveBtn: "Salva tag",
@@ -1847,7 +1847,7 @@ export const it = {
     genreTooltip:
       "Il primo valore è considerato il genere principale nella scheda Generi, gli altri ne sono sottogeneri.",
     languageField: "Lingua",
-    languagePlaceholder: "Aggiungi un codice lingua...",
+    languagePlaceholder: "Aggiungi un codice lingua. Esempio «it»",
     languageTooltip: "Codice lingua ISO 639 (es. en, ja, it)",
     compilationField: "Compilation (contrassegna come Artisti vari)",
     yearField: "Anno di pubblicazione",

@@ -33,6 +33,7 @@ pub mod filter_parser;
 pub mod genre_aliases;
 pub mod hierarchy_sidecar;
 pub mod install_format;
+pub mod language;
 pub mod library_paths;
 pub mod loudness;
 pub mod lyrics;

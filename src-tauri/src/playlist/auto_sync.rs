@@ -1060,6 +1060,45 @@ mod tests {
     }
 
     #[test]
+    fn test_sync_language_auto_playlists_merges_spellings_of_one_language() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for (spelling, count) in [("eng", 15), ("english", 34)] {
+                for i in 0..count {
+                    conn.execute(
+                        "INSERT INTO songs (title, language, source, unavailable) VALUES (?1, ?2, 1, 0)",
+                        rusqlite::params![format!("{spelling} {i}"), spelling],
+                    )
+                    .unwrap();
+                }
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_language_auto_playlists().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let specs: Vec<&str> = playlists
+            .iter()
+            .filter(|p| p.dynamic_enabled)
+            .filter_map(|p| p.dynamic_spec.as_deref())
+            .filter(|s| s.starts_with("language:"))
+            .collect();
+        assert_eq!(specs, vec!["language:en"]);
+
+        let en = playlists
+            .iter()
+            .find(|p| p.dynamic_spec.as_deref() == Some("language:en"))
+            .unwrap();
+        assert_eq!(manager.get_playlist_tracks(en.id).unwrap().len(), 49);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
     fn test_sync_decade_auto_playlists() {
         let (db, temp_dir) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);

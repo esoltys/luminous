@@ -14,6 +14,7 @@ use crate::{
     collection::{mode_query_fragments, row_to_song, SONG_SELECT_COLS},
     db::Database,
     genre_aliases::GenreAliases,
+    language::canonical_language,
     models::{
         join_multi_value, parse_multi_value, GenreGroup, LanguageSummary, QueuePopulationMode,
         Song, Tag, TagCount, TagDuplicateGroup, TagGroup, TagGroupChild, TagSpelling,
@@ -450,7 +451,7 @@ impl TagManager {
             let codes = parse_multi_value(&lang_str);
             let mut seen_in_song = HashSet::new();
             for code in codes {
-                let norm = code.trim().to_lowercase();
+                let norm = canonical_language(&code);
                 if norm.is_empty() || !seen_in_song.insert(norm.clone()) {
                     continue;
                 }
@@ -485,8 +486,10 @@ impl TagManager {
         Ok(result)
     }
 
-    /// Songs whose language tag contains `language` at any position
-    /// (case-insensitive, exact component match).
+    /// Songs whose language tag has a component in the same language as
+    /// `language`, compared by [`canonical_language`] (so `en` also finds songs
+    /// tagged `eng` or `english`, matching the Languages cards' grouping). The
+    /// comparison happens in Rust because SQL can't know the aliases.
     pub fn get_songs_by_language(
         &self,
         language: &str,
@@ -497,7 +500,8 @@ impl TagManager {
         let (extra_where, order_by) = mode_query_fragments(mode);
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE language LIKE '%' || ?1 || '%'
+             WHERE language IS NOT NULL
+               AND language != ''
                AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
@@ -509,11 +513,11 @@ impl TagManager {
         );
         let mut stmt = conn.prepare(&sql)?;
         let candidates: Vec<Song> = stmt
-            .query_map(params![language], row_to_song)?
+            .query_map([], row_to_song)?
             .filter_map(|r| r.ok())
             .collect();
 
-        let target = language.trim().to_lowercase();
+        let target = canonical_language(language);
         let songs = candidates
             .into_iter()
             .filter(|song| {
@@ -522,7 +526,7 @@ impl TagManager {
                     .map(|l| {
                         parse_multi_value(l)
                             .iter()
-                            .any(|v| v.trim().to_lowercase() == target)
+                            .any(|v| canonical_language(v) == target)
                     })
                     .unwrap_or(false)
             })
@@ -1845,6 +1849,55 @@ mod tests {
     fn alias(db: &Database, from: &str, to: &str) {
         let mut conn = db.pool.get().unwrap();
         crate::genre_aliases::set_alias(&mut conn, from, to).unwrap();
+    }
+
+    fn insert_song_with_language(db: &Database, path: &str, language: &str, album_key: &str) {
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO songs (source, filetype, path, language, album_key) VALUES (1, 0, ?1, ?2, ?3)",
+            params![path, language, album_key],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_language_variants_group_into_one_entry_and_one_lookup() {
+        let (_dir, db) = test_db();
+        insert_song_with_language(&db, "/a.mp3", "eng", "alb1");
+        insert_song_with_language(&db, "/b.mp3", "english", "alb2");
+        insert_song_with_language(&db, "/c.mp3", "en", "alb2");
+        // One song carrying two spellings of English counts once for English.
+        insert_song_with_language(&db, "/d.mp3", "en; eng; fra", "alb3");
+        insert_song_with_language(&db, "/e.mp3", "french", "alb4");
+        insert_song_with_language(&db, "/f.mp3", "Klingon", "alb5");
+
+        let manager = TagManager::new(db.clone());
+        let overview: Vec<(String, i64, i64)> = manager
+            .get_languages_overview()
+            .unwrap()
+            .into_iter()
+            .map(|l| (l.code, l.song_count, l.album_count))
+            .collect();
+        assert_eq!(
+            overview,
+            vec![
+                ("en".to_string(), 4, 3),
+                ("fr".to_string(), 2, 2),
+                ("klingon".to_string(), 1, 1),
+            ]
+        );
+
+        // The lookup agrees with the card, whichever spelling asks for it.
+        for ask in ["en", "eng", "English"] {
+            let songs = manager
+                .get_songs_by_language(ask, -1, QueuePopulationMode::default())
+                .unwrap();
+            assert_eq!(songs.len(), 4, "{ask}");
+        }
+        let klingon = manager
+            .get_songs_by_language("klingon", -1, QueuePopulationMode::default())
+            .unwrap();
+        assert_eq!(klingon.len(), 1);
     }
 
     #[test]

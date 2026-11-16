@@ -1883,7 +1883,7 @@ export const ru = {
     genreTooltip:
       "Первое значение считается основным жанром на вкладке «Жанры», остальные — его поджанрами.",
     languageField: "Язык",
-    languagePlaceholder: "Добавить код языка...",
+    languagePlaceholder: "Добавить код языка. Пример «ru»",
     languageTooltip: "Код языка ISO 639 (например, en, ja, ru)",
     cancelBtn: "Отмена",
     saveBtn: "Сохранить теги",
@@ -1975,7 +1975,7 @@ export const ru = {
     genreTooltip:
       "Первое значение считается основным жанром на вкладке «Жанры», остальные — его поджанрами.",
     languageField: "Язык",
-    languagePlaceholder: "Добавить код языка...",
+    languagePlaceholder: "Добавить код языка. Пример «ru»",
     languageTooltip: "Код языка ISO 639 (например, en, ja, ru)",
     compilationField: "Сборник (пометить как «Разные исполнители»)",
     yearField: "Год выпуска",
