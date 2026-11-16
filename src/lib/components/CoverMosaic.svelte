@@ -258,7 +258,12 @@
   {:else if quarterCovers.length === 0}
     {@render bigTile()}
   {:else}
-    <div class="grid gap-0.5 w-full h-full" style="grid-template-columns: 2fr {quarterCols}fr;">
+    <!-- One explicit row of the container's height: an implicit `auto` row grows to its tiles'
+      content (133.5px in a 130px box), pushing them past the box and eating its bottom padding. -->
+    <div
+      class="grid gap-0.5 w-full h-full"
+      style="grid-template-columns: 2fr {quarterCols}fr; grid-template-rows: minmax(0, 1fr);"
+    >
       {@render bigTile()}
       <div
         class="grid grid-rows-2 gap-0.5 h-full {quarterCols === 2 ? 'grid-cols-2' : 'grid-cols-1'}"

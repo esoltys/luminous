@@ -35,6 +35,15 @@ describe("CoverMosaic.svelte", () => {
     expect(aspectRatio(container)).toBe("1 / 1");
   });
 
+  it("pins the tile grid to one container-height row so tiles can't overflow the box", () => {
+    const { container } = render(CoverMosaic, {
+      props: { covers: [cover(1), cover(2), cover(3)] },
+    });
+
+    const grid = (container.firstElementChild as HTMLElement).firstElementChild as HTMLElement;
+    expect(grid.style.gridTemplateRows).toBe("minmax(0px, 1fr)");
+  });
+
   it("renders 1 full tile + 1 quarter tile for 2 covers (never two equal tiles)", () => {
     const { container } = render(CoverMosaic, {
       props: { covers: [cover(1), cover(2)] },
