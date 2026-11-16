@@ -14,11 +14,7 @@
     XIcon as X,
     SparkleIcon as Sparkles,
   } from "phosphor-svelte";
-  import {
-    parseSearchRules,
-    hasAdvancedSearchTerms,
-    isSmartPlaylistSpec,
-  } from "../utils/filterParser";
+  import { parseSearchRules, hasAdvancedSearchTerms } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
   import { onDevScreenHooks } from "../scripting/devHooks";
@@ -34,12 +30,15 @@
   import { parseFileFilter } from "./files/fileFilter";
   import { shouldSkipGlobalShortcut } from "../utils/globalShortcuts";
   import { resolveArtistPortraitUrl } from "../utils/covers";
-  import { getPlaylistDisplayName } from "../utils/playlist";
+  import {
+    autoPlaylistRefFromPlaylist,
+    getAutoPlaylistSubtitle,
+    getPlaylistDisplayName,
+  } from "../utils/playlist";
   import CoverArt from "./CoverArt.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "../utils/motion";
-  import { formatBpmRange } from "../utils/formatters";
   import { MAX_SEARCH_SUGGESTIONS_PER_CATEGORY } from "../constants";
 
   let searchInput: HTMLInputElement | undefined;
@@ -197,69 +196,23 @@
       if (nameLower === "queue") continue;
       const specLower = (p.dynamic_spec || "").toLowerCase();
       if (nameLower.includes(query) || specLower.includes(query)) {
-        if (p.dynamic_enabled && !isSmartPlaylistSpec(p.dynamic_spec)) {
-          if (p.dynamic_spec?.startsWith("decade:")) {
-            const decade = p.dynamic_spec.replace(/^decade:/, "");
-            results.push({
-              type: "auto",
-              id: `auto:decade:${p.id}`,
-              label: getPlaylistDisplayName(p),
-              subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${i18n.t("playlists.decadeAutoPlaylist")}`,
-              ref: { kind: "decade", decade, playlistId: p.id, updated: p.updated },
-            });
-          } else if (p.dynamic_spec?.startsWith("bpmrange:")) {
-            const bpm = p.dynamic_spec.replace(/^bpmrange:/, "");
-            results.push({
-              type: "auto",
-              id: `auto:bpm:${p.id}`,
-              label: getPlaylistDisplayName(p),
-              subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${formatBpmRange(bpm) ?? i18n.t("playlists.bpmAutoPlaylist")}`,
-              ref: { kind: "bpm", bpm, playlistId: p.id, updated: p.updated },
-            });
-          } else if (p.dynamic_spec?.startsWith("artisttag:")) {
-            const artistTag = p.dynamic_spec.replace(/^artisttag:/, "");
-            results.push({
-              type: "auto",
-              id: `auto:artist_tag:${p.id}`,
-              label: getPlaylistDisplayName(p),
-              subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${i18n.t("playlists.artistTagAutoPlaylist")}`,
-              ref: { kind: "artist_tag", artistTag, playlistId: p.id, updated: p.updated },
-            });
-          } else if (p.dynamic_spec === "missingmeta") {
-            results.push({
-              type: "auto",
-              id: `auto:missing_metadata:${p.id}`,
-              label: getPlaylistDisplayName(p),
-              subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${i18n.t("playlists.missingMetadataAutoPlaylist")}`,
-              ref: { kind: "missing_metadata", playlistId: p.id, updated: p.updated },
-            });
-          } else if (p.dynamic_spec === "missingmbid") {
-            if (!picardStore.missingPlaylistEnabled) continue;
-            results.push({
-              type: "auto",
-              id: `auto:missing_musicbrainz:${p.id}`,
-              label: getPlaylistDisplayName(p),
-              subtitle: i18n.t("playlists.missingMusicBrainzAutoPlaylist", {}, "Auto-Playlist"),
-              ref: { kind: "missing_musicbrainz", playlistId: p.id, updated: p.updated },
-            });
-          } else if (p.dynamic_spec?.startsWith("daypart:")) {
-            results.push({
-              type: "auto",
-              id: `auto:daypart:${p.id}`,
-              label: getPlaylistDisplayName(p),
-              subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${i18n.t("playlists.daypartAutoPlaylist")}`,
-              ref: { kind: "daypart", playlistId: p.id, updated: p.updated },
-            });
-          } else {
-            const genre = p.dynamic_spec?.replace(/^tag:/, "") ?? p.name;
-            results.push({
-              type: "auto",
-              id: `auto:genre:${p.id}`,
-              label: getPlaylistDisplayName(p),
-              subtitle: `${i18n.t("playlists.autoPlaylistLabel")} • ${i18n.t("playlists.genreAutoPlaylist")}`,
-              ref: { kind: "genre", genre, playlistId: p.id, updated: p.updated },
-            });
+        const autoRef = autoPlaylistRefFromPlaylist(p);
+        if (autoRef) {
+          if (autoRef.kind === "missing_musicbrainz" && !picardStore.missingPlaylistEnabled) {
+            continue;
           }
+          const typeSubtitle = getAutoPlaylistSubtitle(autoRef);
+          const subtitle =
+            autoRef.kind === "missing_musicbrainz"
+              ? typeSubtitle
+              : `${i18n.t("playlists.autoPlaylistLabel")} • ${typeSubtitle}`;
+          results.push({
+            type: "auto",
+            id: `auto:${autoRef.kind}:${p.id}`,
+            label: getPlaylistDisplayName(p),
+            subtitle,
+            ref: autoRef,
+          });
         } else {
           results.push({
             type: "custom",

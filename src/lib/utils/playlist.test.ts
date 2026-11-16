@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   autoContinueRunStarts,
+  autoPlaylistRefFromPlaylist,
   getDaypartMixLabel,
   getDaypartMixSourceLabel,
+  getPlaylistAutoKindAndSubtitle,
   getPlaylistDisplayName,
   getPopulationModeSuffix,
   isAutoContinueItem,
@@ -283,5 +285,81 @@ describe("getPlaylistDisplayName for the built-in Queue", () => {
     expect(getPlaylistDisplayName({ name: "Queue", is_queue: true })).toBe("Очередь");
     expect(getPlaylistDisplayName({ name: "Queue", is_queue: false })).toBe("Queue");
     i18n.currentLocale = "en-CA";
+  });
+});
+
+describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
+  const makePlaylist = (name: string, dynamic_spec?: string, dynamic_enabled = true): Playlist => ({
+    id: 42,
+    name,
+    created: 100,
+    updated: 200,
+    track_count: 10,
+    dynamic_enabled,
+    dynamic_spec,
+    is_queue: false,
+  });
+
+  it("maps bpmrange: specs to bpm ref and formatted BPM subtitle", () => {
+    const pl = makePlaylist("Uptempo BPM", "bpmrange:115-130");
+    expect(autoPlaylistRefFromPlaylist(pl)).toEqual({
+      kind: "bpm",
+      bpm: "115-130",
+      playlistId: 42,
+      updated: 200,
+    });
+    expect(getPlaylistAutoKindAndSubtitle(pl)).toEqual({
+      kind: "bpm",
+      subtitle: "115–130 BPM",
+    });
+  });
+
+  it("maps all other system auto-playlist specs to their matching kind", () => {
+    expect(autoPlaylistRefFromPlaylist(makePlaylist("1980s", "decade:1980s"))).toMatchObject({
+      kind: "decade",
+      decade: "1980s",
+    });
+    expect(autoPlaylistRefFromPlaylist(makePlaylist("Rock", "tag:Rock"))).toMatchObject({
+      kind: "genre",
+      genre: "Rock",
+    });
+    expect(
+      autoPlaylistRefFromPlaylist(makePlaylist("Canadian", "artisttag:Canadian")),
+    ).toMatchObject({
+      kind: "artist_tag",
+      artistTag: "Canadian",
+    });
+    expect(autoPlaylistRefFromPlaylist(makePlaylist("Japanese", "language:jpn"))).toMatchObject({
+      kind: "language",
+      language: "jpn",
+    });
+    expect(
+      autoPlaylistRefFromPlaylist(makePlaylist("Missing Metadata", "missingmeta")),
+    ).toMatchObject({
+      kind: "missing_metadata",
+    });
+    expect(autoPlaylistRefFromPlaylist(makePlaylist("Missing MBID", "missingmbid"))).toMatchObject({
+      kind: "missing_musicbrainz",
+    });
+    expect(
+      autoPlaylistRefFromPlaylist(
+        makePlaylist("Afternoon Mix", "daypart:afternoon:2026-11-15:Rock"),
+      ),
+    ).toMatchObject({
+      kind: "daypart",
+    });
+  });
+
+  it("returns null ref for plain custom playlists and smart playlists, while keeping smart card metadata", () => {
+    const custom = makePlaylist("Road Trip", undefined, false);
+    expect(autoPlaylistRefFromPlaylist(custom)).toBeNull();
+    expect(getPlaylistAutoKindAndSubtitle(custom)).toBeNull();
+
+    const smart = makePlaylist("High Rated Rock", "genre:rock rating:>=4");
+    expect(autoPlaylistRefFromPlaylist(smart)).toBeNull();
+    expect(getPlaylistAutoKindAndSubtitle(smart)).toEqual({
+      kind: "smart",
+      subtitle: i18n.t("playlists.smartRulePlaylistLabel"),
+    });
   });
 });
