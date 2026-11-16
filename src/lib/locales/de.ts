@@ -725,7 +725,7 @@ export const de = {
     autoPlaylistsDecade: "Jahrzehnt",
     autoPlaylistsDecadeHint: "Eine Playlist pro Jahrzehnt, etwa die 1980er.",
     autoPlaylistsArtistTag: "Künstler-Tags",
-    autoPlaylistsArtistTagHint: "Eine Playlist pro Künstler-Tag, etwa Kanadisch.",
+    autoPlaylistsArtistTagHint: "Eine Playlist pro Künstler-Tag, etwa Singer-Songwriter.",
     autoPlaylistsBpm: "BPM",
     autoPlaylistsBpmHint: "Playlists nach Tempobereich.",
     autoPlaylistsLanguage: "Sprache",

@@ -720,7 +720,7 @@ export const es = {
     autoPlaylistsDecade: "Década",
     autoPlaylistsDecadeHint: "Una lista por década, como los años 80.",
     autoPlaylistsArtistTag: "Etiquetas de artista",
-    autoPlaylistsArtistTagHint: "Una lista por etiqueta de artista, como Canadiense.",
+    autoPlaylistsArtistTagHint: "Una lista por etiqueta de artista, como Cantautor.",
     autoPlaylistsBpm: "BPM",
     autoPlaylistsBpmHint: "Listas agrupadas por rango de tempo.",
     autoPlaylistsLanguage: "Idioma",

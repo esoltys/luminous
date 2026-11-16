@@ -729,7 +729,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     autoPlaylistsDecade: "Décennie",
     autoPlaylistsDecadeHint: "Une liste par décennie, comme les années 1980.",
     autoPlaylistsArtistTag: "Étiquettes d'artiste",
-    autoPlaylistsArtistTagHint: "Une liste par étiquette d'artiste, comme Canadien.",
+    autoPlaylistsArtistTagHint:
+      "Une liste par étiquette d'artiste, comme Auteur-compositeur-interprète.",
     autoPlaylistsBpm: "BPM",
     autoPlaylistsBpmHint: "Listes regroupées par plage de tempo.",
     autoPlaylistsLanguage: "Langue",

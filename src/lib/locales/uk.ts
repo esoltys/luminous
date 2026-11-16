@@ -799,7 +799,8 @@ export const uk = {
     autoPlaylistsDecade: "Десятиліття",
     autoPlaylistsDecadeHint: "Один плейлист на десятиліття, наприклад 1980-ті.",
     autoPlaylistsArtistTag: "Теги виконавців",
-    autoPlaylistsArtistTagHint: "Один плейлист на кожен тег виконавця, наприклад «Канадські».",
+    autoPlaylistsArtistTagHint:
+      "Один плейлист на кожен тег виконавця, наприклад «Автор-виконавець».",
     autoPlaylistsBpm: "BPM",
     autoPlaylistsBpmHint: "Плейлисти за діапазоном темпу.",
     autoPlaylistsLanguage: "Мова",

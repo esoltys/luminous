@@ -801,7 +801,8 @@ export const ru = {
     autoPlaylistsDecade: "Десятилетие",
     autoPlaylistsDecadeHint: "Один плейлист на десятилетие, например 1980-е.",
     autoPlaylistsArtistTag: "Теги исполнителей",
-    autoPlaylistsArtistTagHint: "Один плейлист на каждый тег исполнителя, например «Канадские».",
+    autoPlaylistsArtistTagHint:
+      "Один плейлист на каждый тег исполнителя, например «Автор-исполнитель».",
     autoPlaylistsBpm: "BPM",
     autoPlaylistsBpmHint: "Плейлисты по диапазону темпа.",
     autoPlaylistsLanguage: "Язык",

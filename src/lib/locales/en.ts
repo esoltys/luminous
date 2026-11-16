@@ -708,7 +708,7 @@ export const en = {
     autoPlaylistsDecade: "Decade",
     autoPlaylistsDecadeHint: "One playlist per decade, such as the 1980s.",
     autoPlaylistsArtistTag: "Artist tags",
-    autoPlaylistsArtistTagHint: "One playlist per artist tag, such as Canadian.",
+    autoPlaylistsArtistTagHint: "One playlist per artist tag, such as Singer-Songwriter.",
     autoPlaylistsBpm: "BPM",
     autoPlaylistsBpmHint: "Playlists grouped by tempo range.",
     autoPlaylistsLanguage: "Language",

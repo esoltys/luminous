@@ -719,7 +719,7 @@ export const it = {
     autoPlaylistsDecade: "Decennio",
     autoPlaylistsDecadeHint: "Una playlist per decennio, ad esempio gli anni '80.",
     autoPlaylistsArtistTag: "Tag artista",
-    autoPlaylistsArtistTagHint: "Una playlist per ogni tag artista, ad esempio Canadese.",
+    autoPlaylistsArtistTagHint: "Una playlist per ogni tag artista, ad esempio Cantautore.",
     autoPlaylistsBpm: "BPM",
     autoPlaylistsBpmHint: "Playlist raggruppate per intervallo di tempo.",
     autoPlaylistsLanguage: "Lingua",
