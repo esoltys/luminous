@@ -119,6 +119,24 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
     expect(sortSpy).toHaveBeenCalledWith(5, "title", true);
   });
 
+  it("offers the fill-mode tabs on a country auto-playlist and applies the picked mode", async () => {
+    playlistsStore.playlists = [
+      { ...genrePlaylist, name: "CA", dynamic_spec: "artistcountry:CA", population_mode: "all" },
+    ];
+    const modeSpy = vi.spyOn(playlistsStore, "setPlaylistPopulationMode").mockResolvedValue();
+    const { findByRole, findByText } = render(AutoPlaylistDetailView, {
+      view: { kind: "country" as const, country: "CA", playlistId: 5 },
+    });
+    await findByText("Track Three");
+    const tabs = await findByRole("tablist", { name: "Playing from" });
+    expect(tabs).toBeInTheDocument();
+    const favourites = Array.from(tabs.querySelectorAll('[role="tab"]')).find((t) =>
+      /favourite/i.test(t.textContent ?? ""),
+    ) as HTMLElement;
+    await fireEvent.click(favourites);
+    await waitFor(() => expect(modeSpy).toHaveBeenCalledWith(5, "favourites"));
+  });
+
   it("sorts Favourites locally and offers no size limit there", async () => {
     playlistsStore.playlists = [];
     const sortSpy = vi.spyOn(playlistsStore, "setSort").mockResolvedValue();
