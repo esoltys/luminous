@@ -1370,14 +1370,10 @@ pub struct ArtistItem {
 #[serde(rename_all = "camelCase")]
 pub struct AutoPlaylistItem {
     pub kind: String,
-    pub genre: Option<String>,
-    pub artist_tag: Option<String>,
-    pub decade: Option<String>,
-    pub bpm: Option<String>,
-    /// For kind "language": the canonical language code.
-    pub language: Option<String>,
-    /// For kind "country": the uppercase ISO 3166-1 alpha-2 code.
-    pub country: Option<String>,
+    /// Kind-specific selector (genre name, decade, bpm spec, artist tag,
+    /// canonical language code, or uppercase ISO 3166-1 alpha-2 country code),
+    /// or `None` for singleton/virtual kinds (#2138).
+    pub selector: Option<String>,
     pub playlist_id: Option<i64>,
     pub updated: Option<i64>,
     pub track_count: i32,
@@ -1861,13 +1857,10 @@ mod tests {
         let item = PinnedItem::AutoPlaylist {
             auto_playlist: AutoPlaylistItem {
                 kind: "favourites".to_string(),
-                genre: None,
-                artist_tag: None,
-                decade: None,
+                selector: None,
                 playlist_id: None,
                 updated: None,
                 track_count: 3,
-                ..Default::default()
             },
         };
         let value = serde_json::to_value(&item).unwrap();

@@ -47,14 +47,14 @@ describe("autoPlaylistRefKeyFor", () => {
   });
 
   it("keys materialized kinds by their selector, not a playlist id", () => {
-    expect(autoPlaylistRefKeyFor({ kind: "genre", genre: "Rock" })).toBe("genre:Rock");
-    expect(autoPlaylistRefKeyFor({ kind: "decade", decade: "1980s" })).toBe("decade:1980s");
-    expect(autoPlaylistRefKeyFor({ kind: "bpm", bpm: "60-90" })).toBe("bpm:60-90");
-    expect(autoPlaylistRefKeyFor({ kind: "artist_tag", artistTag: "Progressive Metal" })).toBe(
+    expect(autoPlaylistRefKeyFor({ kind: "genre", selector: "Rock" })).toBe("genre:Rock");
+    expect(autoPlaylistRefKeyFor({ kind: "decade", selector: "1980s" })).toBe("decade:1980s");
+    expect(autoPlaylistRefKeyFor({ kind: "bpm", selector: "60-90" })).toBe("bpm:60-90");
+    expect(autoPlaylistRefKeyFor({ kind: "artist_tag", selector: "Progressive Metal" })).toBe(
       "artist_tag:Progressive Metal",
     );
-    expect(autoPlaylistRefKeyFor({ kind: "language", language: "eng" })).toBe("language:eng");
-    expect(autoPlaylistRefKeyFor({ kind: "country", country: "CA" })).toBe("country:CA");
+    expect(autoPlaylistRefKeyFor({ kind: "language", selector: "eng" })).toBe("language:eng");
+    expect(autoPlaylistRefKeyFor({ kind: "country", selector: "CA" })).toBe("country:CA");
   });
 });
 
@@ -68,7 +68,7 @@ describe("pinnedRefKeyFor", () => {
     expect(pinnedRefKeyFor({ type: "playlist", playlist: { id: 3 } as any })).toBe("3");
     const autoPlaylistItem: PinnedItem = {
       type: "auto_playlist",
-      autoPlaylist: { kind: "genre", genre: "Jazz", trackCount: 5 } as any,
+      autoPlaylist: { kind: "genre", selector: "Jazz", trackCount: 5 },
     };
     expect(pinnedRefKeyFor(autoPlaylistItem)).toBe("genre:Jazz");
   });

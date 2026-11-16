@@ -76,15 +76,7 @@
       }
       default: {
         const pl = playlistsStore.playlists.find((p) => p.id === ap.playlistId);
-        return pl
-          ? getPlaylistDisplayName(pl)
-          : (ap.genre ??
-              ap.decade ??
-              ap.bpm ??
-              ap.artistTag ??
-              ap.language ??
-              ap.country ??
-              ap.kind);
+        return pl ? getPlaylistDisplayName(pl) : (ap.selector ?? ap.kind);
       }
     }
   }
@@ -125,12 +117,7 @@
       case "auto_playlist":
         navigationStore.viewAutoPlaylist({
           kind: item.autoPlaylist.kind,
-          genre: item.autoPlaylist.genre,
-          artistTag: item.autoPlaylist.artistTag,
-          decade: item.autoPlaylist.decade,
-          bpm: item.autoPlaylist.bpm,
-          language: item.autoPlaylist.language,
-          country: item.autoPlaylist.country,
+          selector: item.autoPlaylist.selector,
           playlistId: item.autoPlaylist.playlistId,
           updated: item.autoPlaylist.updated,
         });
@@ -285,12 +272,7 @@
               <AutoPlaylistRowCard
                 label={autoPlaylistLabel(item.autoPlaylist)}
                 kind={item.autoPlaylist.kind}
-                genre={item.autoPlaylist.genre}
-                artistTag={item.autoPlaylist.artistTag}
-                decade={item.autoPlaylist.decade}
-                bpm={item.autoPlaylist.bpm}
-                language={item.autoPlaylist.language}
-                country={item.autoPlaylist.country}
+                selector={item.autoPlaylist.selector}
                 playlistId={item.autoPlaylist.playlistId}
                 updated={item.autoPlaylist.updated}
                 trackCount={item.autoPlaylist.trackCount}
@@ -301,12 +283,7 @@
               <AutoPlaylistCard
                 label={autoPlaylistLabel(item.autoPlaylist)}
                 kind={item.autoPlaylist.kind}
-                genre={item.autoPlaylist.genre}
-                artistTag={item.autoPlaylist.artistTag}
-                decade={item.autoPlaylist.decade}
-                bpm={item.autoPlaylist.bpm}
-                language={item.autoPlaylist.language}
-                country={item.autoPlaylist.country}
+                selector={item.autoPlaylist.selector}
                 playlistId={item.autoPlaylist.playlistId}
                 updated={item.autoPlaylist.updated}
                 trackCount={item.autoPlaylist.trackCount}

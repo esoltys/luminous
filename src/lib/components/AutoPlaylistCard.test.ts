@@ -18,7 +18,7 @@ describe("AutoPlaylistCard", () => {
       props: {
         label: "Japanese",
         kind: "language",
-        language: "ja",
+        selector: "ja",
         trackCount: 12,
         onClick: vi.fn(),
       },

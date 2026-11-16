@@ -358,12 +358,7 @@ pub fn resolve_auto_playlist(
                 })
                 .map(|p| AutoPlaylistItem {
                     kind: kind.to_string(),
-                    genre: (kind == "genre").then(|| selector.clone()),
-                    artist_tag: (kind == "artist_tag").then(|| selector.clone()),
-                    decade: (kind == "decade").then(|| selector.clone()),
-                    bpm: (kind == "bpm").then(|| selector.clone()),
-                    language: (kind == "language").then(|| selector.clone()),
-                    country: (kind == "country").then_some(selector),
+                    selector: Some(selector),
                     playlist_id: Some(p.id),
                     updated: Some(p.updated),
                     track_count: p.track_count,
@@ -709,35 +704,35 @@ mod tests {
             .unwrap()
             .expect("genre:Rock should resolve against playlist id 1");
         assert_eq!(genre.playlist_id, Some(1));
-        assert_eq!(genre.genre.as_deref(), Some("Rock"));
+        assert_eq!(genre.selector.as_deref(), Some("Rock"));
         assert_eq!(genre.track_count, 12);
 
         let decade = resolve_auto_playlist(&scanner, &playlists, "decade:1980s")
             .unwrap()
             .expect("decade:1980s should resolve");
-        assert_eq!(decade.decade.as_deref(), Some("1980s"));
+        assert_eq!(decade.selector.as_deref(), Some("1980s"));
 
         let bpm = resolve_auto_playlist(&scanner, &playlists, "bpm:60-90")
             .unwrap()
             .expect("bpm:60-90 should resolve");
-        assert_eq!(bpm.bpm.as_deref(), Some("60-90"));
+        assert_eq!(bpm.selector.as_deref(), Some("60-90"));
 
         let artist_tag =
             resolve_auto_playlist(&scanner, &playlists, "artist_tag:Progressive Metal")
                 .unwrap()
                 .expect("artist_tag:Progressive Metal should resolve");
-        assert_eq!(artist_tag.artist_tag.as_deref(), Some("Progressive Metal"));
+        assert_eq!(artist_tag.selector.as_deref(), Some("Progressive Metal"));
 
         // Country and language pins (#2135) resolve through their own spec prefixes.
         let country = resolve_auto_playlist(&scanner, &playlists, "country:CA")
             .unwrap()
             .expect("country:CA should resolve against artistcountry:CA");
         assert_eq!(country.playlist_id, Some(5));
-        assert_eq!(country.country.as_deref(), Some("CA"));
+        assert_eq!(country.selector.as_deref(), Some("CA"));
         let language = resolve_auto_playlist(&scanner, &playlists, "language:ja")
             .unwrap()
             .expect("language:ja should resolve");
-        assert_eq!(language.language.as_deref(), Some("ja"));
+        assert_eq!(language.selector.as_deref(), Some("ja"));
         assert!(resolve_auto_playlist(&scanner, &playlists, "country:US")
             .unwrap()
             .is_none());
@@ -761,12 +756,7 @@ mod tests {
             .expect("missing_metadata should resolve against the singleton row");
         assert_eq!(item.playlist_id, Some(1));
         assert_eq!(item.track_count, 3);
-        assert!(
-            item.genre.is_none()
-                && item.decade.is_none()
-                && item.bpm.is_none()
-                && item.artist_tag.is_none()
-        );
+        assert!(item.selector.is_none());
 
         // Dropped to 0 songs (or the row deleted) self-heals to None.
         let empty_playlists = vec![test_playlist(1, "missingmeta", 0)];

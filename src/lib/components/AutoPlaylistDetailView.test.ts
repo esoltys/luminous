@@ -87,7 +87,7 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
     });
   });
 
-  const genreView = { kind: "genre" as const, genre: "Synthwave", playlistId: 5 };
+  const genreView = { kind: "genre" as const, selector: "Synthwave", playlistId: 5 };
 
   it("draws the backing playlist's break above the first song that doesn't fit", async () => {
     const { findByRole, getByText, getByTitle, queryByRole } = render(AutoPlaylistDetailView, {
@@ -120,8 +120,8 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
   });
 
   it.each([
-    ["country", "artistcountry:CA", { country: "CA" }],
-    ["language", "language:da", { language: "da" }],
+    ["country", "artistcountry:CA", { selector: "CA" }],
+    ["language", "language:da", { selector: "da" }],
   ] as const)(
     "offers the fill-mode tabs on a %s auto-playlist and applies the picked mode",
     async (kind, spec, selector) => {
@@ -185,7 +185,7 @@ describe("AutoPlaylistDetailView genre aliases (#1994)", () => {
   it("lists the aliases rolled into the viewed genre and opens the dialog from a chip", async () => {
     const openSpy = vi.spyOn(tagsStore, "openAliasDialog").mockImplementation(() => {});
     const { findByRole } = render(AutoPlaylistDetailView, {
-      view: { kind: "genre" as const, genre: "Synthwave", playlistId: 5 },
+      view: { kind: "genre" as const, selector: "Synthwave", playlistId: 5 },
     });
     await fireEvent.click(await findByRole("button", { name: "Manage alias Syn Wave" }));
     expect(openSpy).toHaveBeenCalledWith("Syn Wave");
@@ -194,7 +194,7 @@ describe("AutoPlaylistDetailView genre aliases (#1994)", () => {
   it("omits the row when the genre has no aliases", async () => {
     aliases = [];
     const { findByText, queryByText } = render(AutoPlaylistDetailView, {
-      view: { kind: "genre" as const, genre: "Synthwave", playlistId: 5 },
+      view: { kind: "genre" as const, selector: "Synthwave", playlistId: 5 },
     });
     await findByText("Track Three");
     expect(queryByText("Includes aliases")).toBeNull();
@@ -202,7 +202,7 @@ describe("AutoPlaylistDetailView genre aliases (#1994)", () => {
 
   it("names the canonical genre when the viewed genre is an alias", async () => {
     const { findByRole, queryByText } = render(AutoPlaylistDetailView, {
-      view: { kind: "genre" as const, genre: "Syn Wave", playlistId: 5 },
+      view: { kind: "genre" as const, selector: "Syn Wave", playlistId: 5 },
     });
     expect(await findByRole("button", { name: "Synthwave" })).toBeInTheDocument();
     expect(queryByText("Includes aliases")).toBeNull();
@@ -210,7 +210,7 @@ describe("AutoPlaylistDetailView genre aliases (#1994)", () => {
 
   it("renders Play without Shuffle and moves Size Limit into the overflow menu (#2119)", async () => {
     const { findByRole, findByTitle, findByText, queryByRole } = render(AutoPlaylistDetailView, {
-      view: { kind: "genre" as const, genre: "Synthwave", playlistId: 5 },
+      view: { kind: "genre" as const, selector: "Synthwave", playlistId: 5 },
     });
     expect(await findByRole("button", { name: /^Play$/i })).toBeInTheDocument();
     expect(queryByRole("button", { name: /^Shuffle$/i })).toBeNull();

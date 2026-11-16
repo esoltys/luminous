@@ -49,19 +49,13 @@ export interface AutoPlaylistRef {
     | "daypart"
     | "language"
     | "country";
-  /** For kind "genre": the curated tag's plain name (#548) — a top-level
-   * card name or a sub-genre chip name, resolved the same way either way
-   * (see `viewGenreTag`). */
-  genre?: string;
-  artistTag?: string;
-  decade?: string;
-  language?: string;
-  country?: string;
-  /** For kind "bpm": the bucket's dynamic_spec suffix, e.g. "60-90" or the open-ended "150-". */
-  bpm?: string;
-  /** For kind "genre", "decade", "bpm", "artist_tag", or "language": the materialized (dynamic_enabled) playlist row backing it. */
+  /** Kind-specific selector: curated tag name (genre / artist_tag), decade,
+   * bpm spec suffix (e.g. "60-90" or "150-"), canonical language code, or
+   * uppercase ISO 3166-1 alpha-2 country code. */
+  selector?: string;
+  /** For materialized kinds: the backing (dynamic_enabled) playlist row id. */
   playlistId?: number;
-  /** For kind "genre", "decade", "bpm", "artist_tag", or "language": when this playlist's songs were last (re)generated. */
+  /** For materialized kinds: when this playlist's songs were last (re)generated. */
   updated?: number;
 }
 
@@ -412,7 +406,28 @@ class NavigationStore {
       const savedAutoPlaylist = localStorage.getItem("navigation_selectedAutoPlaylist");
       if (savedAutoPlaylist) {
         try {
-          this._selectedAutoPlaylist = JSON.parse(savedAutoPlaylist) as AutoPlaylistRef;
+          const parsed = JSON.parse(savedAutoPlaylist) as AutoPlaylistRef & {
+            genre?: string;
+            artistTag?: string;
+            decade?: string;
+            bpm?: string;
+            language?: string;
+            country?: string;
+          };
+          const selector =
+            parsed.selector ??
+            parsed.genre ??
+            parsed.artistTag ??
+            parsed.decade ??
+            parsed.bpm ??
+            parsed.language ??
+            parsed.country;
+          this._selectedAutoPlaylist = {
+            kind: parsed.kind,
+            ...(selector !== undefined ? { selector } : {}),
+            ...(parsed.playlistId !== undefined ? { playlistId: parsed.playlistId } : {}),
+            ...(parsed.updated !== undefined ? { updated: parsed.updated } : {}),
+          };
         } catch (e) {
           console.error("Failed to parse saved selectedAutoPlaylist:", e);
         }
@@ -492,7 +507,7 @@ class NavigationStore {
     );
     this.viewAutoPlaylist({
       kind: "genre",
-      genre: tag,
+      selector: tag,
       playlistId: playlist?.id,
       updated: playlist?.updated,
     });
@@ -515,7 +530,7 @@ class NavigationStore {
     );
     this.viewAutoPlaylist({
       kind: "artist_tag",
-      artistTag: tag,
+      selector: tag,
       playlistId: playlist?.id,
       updated: playlist?.updated,
     });
@@ -536,7 +551,7 @@ class NavigationStore {
     );
     this.viewAutoPlaylist({
       kind: "language",
-      language: code,
+      selector: code,
       playlistId: playlist?.id,
       updated: playlist?.updated,
     });

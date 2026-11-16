@@ -51,12 +51,7 @@
       | "daypart"
       | "language"
       | "country";
-    genre?: string;
-    artistTag?: string;
-    decade?: string;
-    bpm?: string;
-    language?: string;
-    country?: string;
+    selector?: string;
     label: string;
     playlistId?: number;
     updated?: number;
@@ -248,7 +243,7 @@
         defs.push({
           id: `auto:decade:${p.id}`,
           kind: "decade",
-          decade: dec,
+          selector: dec,
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -261,7 +256,7 @@
         defs.push({
           id: `auto:genre:${p.id}`,
           kind: "genre",
-          genre: p.dynamic_spec?.replace(/^tag:/, "") ?? p.name,
+          selector: p.dynamic_spec?.replace(/^tag:/, "") ?? p.name,
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -274,7 +269,7 @@
         defs.push({
           id: `auto:artist_tag:${p.id}`,
           kind: "artist_tag",
-          artistTag: p.dynamic_spec?.replace(/^artisttag:/, "") ?? p.name,
+          selector: p.dynamic_spec?.replace(/^artisttag:/, "") ?? p.name,
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -287,7 +282,7 @@
         defs.push({
           id: `auto:bpm:${p.id}`,
           kind: "bpm",
-          bpm: p.dynamic_spec?.replace(/^bpmrange:/, "") ?? "",
+          selector: p.dynamic_spec?.replace(/^bpmrange:/, "") ?? "",
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -300,7 +295,7 @@
         defs.push({
           id: `auto:language:${p.id}`,
           kind: "language",
-          language: p.dynamic_spec?.replace(/^language:/, "") ?? "",
+          selector: p.dynamic_spec?.replace(/^language:/, "") ?? "",
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -313,7 +308,7 @@
         defs.push({
           id: `auto:country:${p.id}`,
           kind: "country",
-          country: p.dynamic_spec?.replace(/^artistcountry:/, "") ?? "",
+          selector: p.dynamic_spec?.replace(/^artistcountry:/, "") ?? "",
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -444,51 +439,12 @@
   }
 
   function openAuto(def: AutoDef) {
-    navigationStore.viewAutoPlaylist(
-      def.kind === "genre"
-        ? { kind: "genre", genre: def.genre, playlistId: def.playlistId, updated: def.updated }
-        : def.kind === "artist_tag"
-          ? {
-              kind: "artist_tag",
-              artistTag: def.artistTag,
-              playlistId: def.playlistId,
-              updated: def.updated,
-            }
-          : def.kind === "decade"
-            ? {
-                kind: "decade",
-                decade: def.decade,
-                playlistId: def.playlistId,
-                updated: def.updated,
-              }
-            : def.kind === "bpm"
-              ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
-              : def.kind === "country"
-                ? {
-                    kind: "country",
-                    country: def.country,
-                    playlistId: def.playlistId,
-                    updated: def.updated,
-                  }
-                : def.kind === "language"
-                  ? {
-                      kind: "language",
-                      language: def.language,
-                      playlistId: def.playlistId,
-                      updated: def.updated,
-                    }
-                  : def.kind === "missing_metadata"
-                    ? { kind: "missing_metadata", playlistId: def.playlistId, updated: def.updated }
-                    : def.kind === "missing_musicbrainz"
-                      ? {
-                          kind: "missing_musicbrainz",
-                          playlistId: def.playlistId,
-                          updated: def.updated,
-                        }
-                      : def.kind === "daypart"
-                        ? { kind: "daypart", playlistId: def.playlistId, updated: def.updated }
-                        : { kind: def.kind },
-    );
+    navigationStore.viewAutoPlaylist({
+      kind: def.kind,
+      ...(def.selector !== undefined ? { selector: def.selector } : {}),
+      ...(def.playlistId !== undefined ? { playlistId: def.playlistId } : {}),
+      ...(def.updated !== undefined ? { updated: def.updated } : {}),
+    });
   }
 
   function openPlaylist(pl: Playlist) {
@@ -647,12 +603,7 @@
                 <AutoPlaylistRowCard
                   label={def.label}
                   kind={def.kind}
-                  genre={def.genre}
-                  artistTag={def.artistTag}
-                  decade={def.decade}
-                  bpm={def.bpm}
-                  language={def.language}
-                  country={def.country}
+                  selector={def.selector}
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
@@ -663,12 +614,7 @@
                 <AutoPlaylistCard
                   label={def.label}
                   kind={def.kind}
-                  genre={def.genre}
-                  artistTag={def.artistTag}
-                  decade={def.decade}
-                  bpm={def.bpm}
-                  language={def.language}
-                  country={def.country}
+                  selector={def.selector}
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
