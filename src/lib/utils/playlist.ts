@@ -390,7 +390,7 @@ export function autoPlaylistRefFromPlaylist(playlist: Playlist): AutoPlaylistRef
   if (spec?.startsWith("daypart:")) {
     return { kind: "daypart", ...base };
   }
-  const genre = spec?.startsWith("tag:") ? spec.slice("tag:".length) : (spec ?? playlist.name);
+  const genre = spec ? (spec.startsWith("tag:") ? spec.slice("tag:".length) : spec) : playlist.name;
   return { kind: "genre", genre, ...base };
 }
 
