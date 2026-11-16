@@ -11,13 +11,38 @@
   import Toggle from "./Toggle.svelte";
   import { GearIcon as Settings, SparkleIcon } from "phosphor-svelte";
 
-  const AUTO_PLAYLIST_FAMILIES: { family: AutoPlaylistFamily; key: string }[] = [
-    { family: "genre", key: "Genre" },
-    { family: "decade", key: "Decade" },
-    { family: "artist_tag", key: "ArtistTag" },
-    { family: "bpm", key: "Bpm" },
-    { family: "language", key: "Language" },
-    { family: "daypart", key: "Daypart" },
+  // Label and hint keys are spelled out, not built from a suffix, so they stay greppable.
+  const AUTO_PLAYLIST_FAMILIES: { family: AutoPlaylistFamily; label: string; hint: string }[] = [
+    {
+      family: "genre",
+      label: "settings.autoPlaylistsGenre",
+      hint: "settings.autoPlaylistsGenreHint",
+    },
+    {
+      family: "decade",
+      label: "settings.autoPlaylistsDecade",
+      hint: "settings.autoPlaylistsDecadeHint",
+    },
+    {
+      family: "artist_tag",
+      label: "settings.autoPlaylistsArtistTag",
+      hint: "settings.autoPlaylistsArtistTagHint",
+    },
+    {
+      family: "bpm",
+      label: "settings.autoPlaylistsBpm",
+      hint: "settings.autoPlaylistsBpmHint",
+    },
+    {
+      family: "language",
+      label: "settings.autoPlaylistsLanguage",
+      hint: "settings.autoPlaylistsLanguageHint",
+    },
+    {
+      family: "daypart",
+      label: "settings.autoPlaylistsDaypart",
+      hint: "settings.autoPlaylistsDaypartHint",
+    },
   ];
 </script>
 
@@ -106,20 +131,18 @@
     </div>
   </div>
 
-  {#each AUTO_PLAYLIST_FAMILIES as { family, key } (family)}
+  {#each AUTO_PLAYLIST_FAMILIES as { family, label, hint } (family)}
     <div class="flex items-center justify-between gap-4 py-4">
       <div class="flex flex-col gap-0.5 min-w-0">
-        <span class="text-sm font-medium text-brand-text-primary"
-          >{i18n.t(`settings.autoPlaylists${key}`)}</span
-        >
+        <span class="text-sm font-medium text-brand-text-primary">{i18n.t(label)}</span>
         <p class="text-xs text-brand-text-secondary text-pretty">
-          {i18n.t(`settings.autoPlaylists${key}Hint`)}
+          {i18n.t(hint)}
         </p>
       </div>
       <Toggle
         checked={prefs.autoPlaylists[family]}
         onchange={(v) => prefs.setAutoPlaylistFamily(family, v)}
-        label={i18n.t(`settings.autoPlaylists${key}`)}
+        label={i18n.t(label)}
       />
     </div>
 

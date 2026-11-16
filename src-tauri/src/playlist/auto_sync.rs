@@ -116,10 +116,10 @@ impl PlaylistManager {
     /// Whether the user keeps `family` of auto-playlists (the `auto_playlists_*`
     /// UI preferences, default on). When it is off this also deletes every
     /// playlist of the family and returns `false`, so a sync pass starts with
-    /// `if !self.family_enabled(..)? { return Ok(()); }` and a turned-off family
+    /// `if !self.family_enabled_or_prune(..)? { return Ok(()); }` and a turned-off family
     /// disappears on the next sync, whichever caller triggered it. Turning the
     /// family back on needs no special path: the normal sync recreates it.
-    pub(crate) fn family_enabled(&self, family: AutoFamily) -> Result<bool> {
+    pub(crate) fn family_enabled_or_prune(&self, family: AutoFamily) -> Result<bool> {
         let conn = self.db.pool.get()?;
         if family.is_on(&crate::commands::settings::load_ui_preferences(&conn)) {
             return Ok(true);
@@ -180,7 +180,7 @@ impl PlaylistManager {
     /// take the playlists lock once per tag instead of for the whole pass
     /// (`sync_all_auto_playlists_cooperative`, #1968).
     pub(crate) fn genre_auto_playlist_tags(&self) -> Result<Vec<String>> {
-        if !self.family_enabled(AutoFamily::Genre)? {
+        if !self.family_enabled_or_prune(AutoFamily::Genre)? {
             return Ok(Vec::new());
         }
         let tag_manager = TagManager::new(self.db.clone());
@@ -297,7 +297,7 @@ impl PlaylistManager {
     /// it's missing or its `updated` timestamp is more than 24h old, and prunes
     /// rows for decades no longer present in the library.
     pub fn sync_decade_auto_playlists(&self) -> Result<()> {
-        if !self.family_enabled(AutoFamily::Decade)? {
+        if !self.family_enabled_or_prune(AutoFamily::Decade)? {
             return Ok(());
         }
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
@@ -401,7 +401,7 @@ impl PlaylistManager {
     /// is fixed (see [`TEMPO_BUCKETS`]), not derived from distinct library
     /// values, so there is no pruning pass for "buckets no longer present".
     pub fn sync_bpm_auto_playlists(&self) -> Result<()> {
-        if !self.family_enabled(AutoFamily::Bpm)? {
+        if !self.family_enabled_or_prune(AutoFamily::Bpm)? {
             return Ok(());
         }
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
@@ -488,7 +488,7 @@ impl PlaylistManager {
     /// it's missing or its `updated` timestamp is more than 24h old, and prunes
     /// rows for artist tags no longer present in the library.
     pub fn sync_artist_tag_auto_playlists(&self) -> Result<()> {
-        if !self.family_enabled(AutoFamily::ArtistTag)? {
+        if !self.family_enabled_or_prune(AutoFamily::ArtistTag)? {
             return Ok(());
         }
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
@@ -595,7 +595,7 @@ impl PlaylistManager {
     /// it's missing or its `updated` timestamp is more than 24h old, and prunes
     /// rows for languages no longer present in the library.
     pub fn sync_language_auto_playlists(&self) -> Result<()> {
-        if !self.family_enabled(AutoFamily::Language)? {
+        if !self.family_enabled_or_prune(AutoFamily::Language)? {
             return Ok(());
         }
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
@@ -948,7 +948,7 @@ impl PlaylistManager {
         local_now: chrono::DateTime<chrono::Local>,
         utc_now: i64,
     ) -> Result<()> {
-        if !self.family_enabled(AutoFamily::Daypart)? {
+        if !self.family_enabled_or_prune(AutoFamily::Daypart)? {
             return Ok(());
         }
         const SPEC_PREFIX: &str = "daypart:";
