@@ -1886,7 +1886,7 @@ export const fr: DeepStringRecord<typeof en> = {
     genreTooltip:
       "La première valeur est traitée comme le genre principal dans l'onglet Genres, les autres comme ses sous-genres.",
     languageField: "Langue",
-    languagePlaceholder: "Ajouter un code de langue...",
+    languagePlaceholder: "Ajouter un code de langue. Exemple « fr »",
     languageTooltip: "Code de langue ISO 639 (p. ex. en, ja, fr)",
     cancelBtn: "Annuler",
     saveBtn: "Enregistrer",
@@ -1979,7 +1979,7 @@ export const fr: DeepStringRecord<typeof en> = {
     genreTooltip:
       "La première valeur est traitée comme le genre principal dans l'onglet Genres, les autres comme ses sous-genres.",
     languageField: "Langue",
-    languagePlaceholder: "Ajouter un code de langue...",
+    languagePlaceholder: "Ajouter un code de langue. Exemple « fr »",
     languageTooltip: "Code de langue ISO 639 (p. ex. en, ja, fr)",
     compilationField: "Compilation (marquer comme Artistes divers)",
     yearField: "Année de sortie",

@@ -1775,7 +1775,7 @@ export const de = {
     genreTooltip:
       "Der erste Wert gilt auf der Registerkarte „Genres“ als Hauptgenre, die übrigen als dessen Untergenres.",
     languageField: "Sprache",
-    languagePlaceholder: "Sprachcode hinzufügen...",
+    languagePlaceholder: "Sprachcode hinzufügen. Beispiel „de“",
     languageTooltip: "ISO-639-Sprachcode (z. B. en, ja, de)",
     cancelBtn: "Abbrechen",
     saveBtn: "Tags speichern",
@@ -1868,7 +1868,7 @@ export const de = {
     genreTooltip:
       "Der erste Wert gilt auf der Registerkarte „Genres“ als Hauptgenre, die übrigen als dessen Untergenres.",
     languageField: "Sprache",
-    languagePlaceholder: "Sprachcode hinzufügen...",
+    languagePlaceholder: "Sprachcode hinzufügen. Beispiel „de“",
     languageTooltip: "ISO-639-Sprachcode (z. B. en, ja, de)",
     compilationField: "Sampler (als „Verschiedene Interpreten“ markieren)",
     yearField: "Erscheinungsjahr",

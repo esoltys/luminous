@@ -1727,7 +1727,7 @@ export const en = {
     genreTooltip:
       "The first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
     languageField: "Language",
-    languagePlaceholder: "Add a language code...",
+    languagePlaceholder: 'Add a language code. Example "en"',
     languageTooltip: "ISO 639 language code (e.g. en, ja, fr)",
     cancelBtn: "Cancel",
     saveBtn: "Save Tags",
@@ -1818,7 +1818,7 @@ export const en = {
     genreTooltip:
       "The first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
     languageField: "Language",
-    languagePlaceholder: "Add a language code...",
+    languagePlaceholder: 'Add a language code. Example "en"',
     languageTooltip: "ISO 639 language code (e.g. en, ja, fr)",
     compilationField: "Compilation (mark as Various Artists)",
     yearField: "Release Year",

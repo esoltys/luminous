@@ -1890,7 +1890,7 @@ export const uk = {
     genreTooltip:
       "Перше значення вважається основним жанром на вкладці «Жанри», решта — його піджанрами.",
     languageField: "Мова",
-    languagePlaceholder: "Додати код мови...",
+    languagePlaceholder: "Додати код мови. Приклад «uk»",
     languageTooltip: "Код мови ISO 639 (наприклад, en, ja, uk)",
     cancelBtn: "Скасувати",
     saveBtn: "Зберегти теги",
@@ -1982,7 +1982,7 @@ export const uk = {
     genreTooltip:
       "Перше значення вважається основним жанром на вкладці «Жанри», решта — його піджанрами.",
     languageField: "Мова",
-    languagePlaceholder: "Додати код мови...",
+    languagePlaceholder: "Додати код мови. Приклад «uk»",
     languageTooltip: "Код мови ISO 639 (наприклад, en, ja, uk)",
     compilationField: "Збірка (позначити як «Різні виконавці»)",
     yearField: "Рік випуску",

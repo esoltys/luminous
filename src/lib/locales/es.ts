@@ -1770,7 +1770,7 @@ export const es = {
     genreTooltip:
       "El primer valor se trata como el género principal en la pestaña Géneros y los demás, como subgéneros suyos.",
     languageField: "Idioma",
-    languagePlaceholder: "Añadir código de idioma...",
+    languagePlaceholder: "Añadir código de idioma. Ejemplo «es»",
     languageTooltip: "Código de idioma ISO 639 (p. ej., en, ja, es)",
     cancelBtn: "Cancelar",
     saveBtn: "Guardar etiquetas",
@@ -1862,7 +1862,7 @@ export const es = {
     genreTooltip:
       "El primer valor se trata como el género principal en la pestaña Géneros y los demás, como subgéneros suyos.",
     languageField: "Idioma",
-    languagePlaceholder: "Añadir código de idioma...",
+    languagePlaceholder: "Añadir código de idioma. Ejemplo «es»",
     languageTooltip: "Código de idioma ISO 639 (p. ej., en, ja, es)",
     compilationField: "Recopilación (marcar como Varios artistas)",
     yearField: "Año de lanzamiento",
