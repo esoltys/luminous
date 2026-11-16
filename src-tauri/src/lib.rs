@@ -1566,6 +1566,7 @@ pub fn run() {
             commands::playlist::get_songs_by_decade,
             commands::playlist::get_songs_by_bpm,
             commands::playlist::get_songs_by_artist_tag,
+            commands::playlist::get_songs_by_artist_country,
             commands::playlist::get_playlists_by_artist,
             commands::playlist::get_playlist_tracks,
             commands::playlist::set_playlist_sort,

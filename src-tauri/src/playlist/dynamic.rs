@@ -208,7 +208,7 @@ fn dynamic_playlist_specs(db: &Database) -> Result<Vec<(i64, String, QueuePopula
 
 /// Every library song matching a dynamic spec, in the order the spec's
 /// population mode dictates. The single dispatch point for all spec kinds
-/// (decade:, bpmrange:, artisttag:, missingmeta, tag:, daypart:, smart-rule
+/// (decade:, bpmrange:, artisttag:, artistcountry:, missingmeta, tag:, daypart:, smart-rule
 /// query).
 fn spec_songs(db: &Arc<Database>, spec: &str, mode: QueuePopulationMode) -> Result<SpecSongs> {
     let matched = |songs| {
@@ -241,6 +241,8 @@ fn spec_songs(db: &Arc<Database>, spec: &str, mode: QueuePopulationMode) -> Resu
         matched(scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)?)
     } else if spec == "missingmbid" {
         matched(scanner.get_songs_missing_musicbrainz_id(NO_SONG_LIMIT, mode)?)
+    } else if let Some(code) = spec.strip_prefix("artistcountry:") {
+        matched(scanner.get_songs_by_artist_country(code, NO_SONG_LIMIT, mode)?)
     } else if let Some(lang) = spec.strip_prefix("language:") {
         let tag_manager = TagManager::new(db.clone());
         matched(tag_manager.get_songs_by_language(lang, NO_SONG_LIMIT, mode)?)

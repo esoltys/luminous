@@ -1512,6 +1512,14 @@ pub struct LanguageSummary {
     pub album_count: i64,
 }
 
+/// A country with library songs by artists from it (#2135). `code` is the
+/// uppercase ISO 3166-1 alpha-2 code stored on the artist profile.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct CountrySummary {
+    pub code: String,
+    pub song_count: i64,
+}
+
 /// A Luminous-native song tag (#224), independent of the embedded
 /// `songs.genre` column. `song_count` is the number of songs currently
 /// carrying this tag, at any position.

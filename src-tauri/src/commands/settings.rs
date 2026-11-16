@@ -76,6 +76,7 @@ pub struct UiPreferences {
     pub auto_playlists_artist_tag: bool,
     pub auto_playlists_bpm: bool,
     pub auto_playlists_language: bool,
+    pub auto_playlists_country: bool,
     pub auto_playlists_daypart: bool,
 }
 
@@ -108,6 +109,7 @@ impl Default for UiPreferences {
             auto_playlists_artist_tag: true,
             auto_playlists_bpm: true,
             auto_playlists_language: true,
+            auto_playlists_country: true,
             auto_playlists_daypart: true,
         }
     }
@@ -160,7 +162,7 @@ impl UiPreferences {
     /// Bool fields, persisted as a literal "true"/"false" string the same
     /// way the FadeSettings bools are — not part of `fields()` since they
     /// aren't domain-checked Strings.
-    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 14] {
+    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 15] {
         [
             ("genre_sort_asc", &mut self.genre_sort_asc),
             ("fanart_fetch_photo", &mut self.fanart_fetch_photo),
@@ -181,6 +183,7 @@ impl UiPreferences {
             ),
             ("auto_playlists_bpm", &mut self.auto_playlists_bpm),
             ("auto_playlists_language", &mut self.auto_playlists_language),
+            ("auto_playlists_country", &mut self.auto_playlists_country),
             ("auto_playlists_daypart", &mut self.auto_playlists_daypart),
         ]
     }
