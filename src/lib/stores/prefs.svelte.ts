@@ -7,6 +7,9 @@ type SeekBarMode = "waveform" | "bands";
 export type CollectionViewMode = "cards" | "rows";
 export type GenreSortField = "name" | "count";
 export type WeekStart = "sunday" | "monday";
+/** The families of generated auto-playlists the user can switch off (#2131); the
+ * backend's `auto_playlists_<family>` preferences, which it enforces in its sync. */
+export type AutoPlaylistFamily = "genre" | "decade" | "artist_tag" | "bpm" | "language" | "daypart";
 
 /** Shape of the backend's UiPreferences struct — the schema (keys, domains,
  * defaults) lives in Rust (commands/settings.rs); this store just mirrors it. */
@@ -21,6 +24,12 @@ interface UiPreferences {
   fanart_fetch_disc_art: boolean;
   save_artwork_to_folders: boolean;
   detect_tempo_and_key: boolean;
+  auto_playlists_genre: boolean;
+  auto_playlists_decade: boolean;
+  auto_playlists_artist_tag: boolean;
+  auto_playlists_bpm: boolean;
+  auto_playlists_language: boolean;
+  auto_playlists_daypart: boolean;
   albums_view_mode: CollectionViewMode;
   artists_view_mode: CollectionViewMode;
   playlists_auto_view_mode: CollectionViewMode;
@@ -52,6 +61,15 @@ class PrefsStore {
   saveArtworkToFolders = $state<boolean>(false);
   /** Estimate BPM and key for songs missing those tags by analysing audio in the background (#1943). Off by default. */
   detectTempoAndKey = $state<boolean>(false);
+  /** Which families of auto-playlists the library keeps; all on by default. */
+  autoPlaylists = $state<Record<AutoPlaylistFamily, boolean>>({
+    genre: true,
+    decade: true,
+    artist_tag: true,
+    bpm: true,
+    language: true,
+    daypart: true,
+  });
   albumsViewMode = $state<CollectionViewMode>("cards");
   artistsViewMode = $state<CollectionViewMode>("cards");
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
@@ -96,6 +114,14 @@ class PrefsStore {
     this.fanartFetchDiscArt = prefs.fanart_fetch_disc_art;
     this.saveArtworkToFolders = prefs.save_artwork_to_folders;
     this.detectTempoAndKey = prefs.detect_tempo_and_key ?? false;
+    this.autoPlaylists = {
+      genre: prefs.auto_playlists_genre ?? true,
+      decade: prefs.auto_playlists_decade ?? true,
+      artist_tag: prefs.auto_playlists_artist_tag ?? true,
+      bpm: prefs.auto_playlists_bpm ?? true,
+      language: prefs.auto_playlists_language ?? true,
+      daypart: prefs.auto_playlists_daypart ?? true,
+    };
     this.albumsViewMode = prefs.albums_view_mode;
     this.artistsViewMode = prefs.artists_view_mode;
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
@@ -146,7 +172,7 @@ class PrefsStore {
   }
 
   /** Persist the whole current state — fire-and-forget on the backend. */
-  private save() {
+  private save(): Promise<unknown> {
     const prefs: UiPreferences = {
       rating_style: this.ratingStyle,
       seekbar_mode: this.seekBarMode,
@@ -158,6 +184,12 @@ class PrefsStore {
       fanart_fetch_disc_art: this.fanartFetchDiscArt,
       save_artwork_to_folders: this.saveArtworkToFolders,
       detect_tempo_and_key: this.detectTempoAndKey,
+      auto_playlists_genre: this.autoPlaylists.genre,
+      auto_playlists_decade: this.autoPlaylists.decade,
+      auto_playlists_artist_tag: this.autoPlaylists.artist_tag,
+      auto_playlists_bpm: this.autoPlaylists.bpm,
+      auto_playlists_language: this.autoPlaylists.language,
+      auto_playlists_daypart: this.autoPlaylists.daypart,
       albums_view_mode: this.albumsViewMode,
       artists_view_mode: this.artistsViewMode,
       playlists_auto_view_mode: this.playlistsAutoViewMode,
@@ -170,7 +202,7 @@ class PrefsStore {
       genre_sort_asc: this.genreSortAsc,
       week_start: this.weekStart,
     };
-    invoke("set_ui_preferences", { prefs });
+    return invoke("set_ui_preferences", { prefs });
   }
 
   setRatingStyle(style: RatingStyle) {
@@ -216,6 +248,19 @@ class PrefsStore {
   setDetectTempoAndKey(enabled: boolean) {
     this.detectTempoAndKey = enabled;
     this.save();
+  }
+
+  /** Switches an auto-playlist family on or off. The backend sync does the
+   * pruning or regeneration, so this persists first and then runs it; the
+   * sync's `playlists-changed` event refreshes every open view. */
+  async setAutoPlaylistFamily(family: AutoPlaylistFamily, enabled: boolean) {
+    this.autoPlaylists[family] = enabled;
+    try {
+      await this.save();
+      await invoke("sync_all_auto_playlists");
+    } catch (e) {
+      console.error("Failed to apply auto-playlist setting:", e);
+    }
   }
 
   toggleSeekBarMode() {

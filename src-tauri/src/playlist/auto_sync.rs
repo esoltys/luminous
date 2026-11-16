@@ -45,6 +45,44 @@ fn daypart_bucket_and_date(
     (bucket, name, now.date_naive().to_string())
 }
 
+/// A family of system-generated auto-playlists the user can switch off in
+/// Settings > General (#2131). Each is identified by the `dynamic_spec`
+/// prefix its playlists share.
+#[derive(Clone, Copy)]
+pub(crate) enum AutoFamily {
+    Genre,
+    Decade,
+    ArtistTag,
+    Bpm,
+    Language,
+    Daypart,
+}
+
+impl AutoFamily {
+    /// `LIKE` pattern matching every `dynamic_spec` in the family.
+    fn spec_pattern(self) -> &'static str {
+        match self {
+            Self::Genre => "tag:%",
+            Self::Decade => "decade:%",
+            Self::ArtistTag => "artisttag:%",
+            Self::Bpm => "bpmrange:%",
+            Self::Language => "language:%",
+            Self::Daypart => "daypart:%",
+        }
+    }
+
+    fn is_on(self, prefs: &crate::commands::settings::UiPreferences) -> bool {
+        match self {
+            Self::Genre => prefs.auto_playlists_genre,
+            Self::Decade => prefs.auto_playlists_decade,
+            Self::ArtistTag => prefs.auto_playlists_artist_tag,
+            Self::Bpm => prefs.auto_playlists_bpm,
+            Self::Language => prefs.auto_playlists_language,
+            Self::Daypart => prefs.auto_playlists_daypart,
+        }
+    }
+}
+
 /// Replaces a playlist's tracks in SQLite inside a single transaction with a prepared statement,
 /// eliminating thousands of single-row autocommit transactions during auto-playlist generation (#1807).
 fn replace_playlist_items(
@@ -75,6 +113,28 @@ fn replace_playlist_items(
 }
 
 impl PlaylistManager {
+    /// Whether the user keeps `family` of auto-playlists (the `auto_playlists_*`
+    /// UI preferences, default on). When it is off this also deletes every
+    /// playlist of the family and returns `false`, so a sync pass starts with
+    /// `if !self.family_enabled_or_prune(..)? { return Ok(()); }` and a turned-off family
+    /// disappears on the next sync, whichever caller triggered it. Turning the
+    /// family back on needs no special path: the normal sync recreates it.
+    pub(crate) fn family_enabled_or_prune(&self, family: AutoFamily) -> Result<bool> {
+        let conn = self.db.pool.get()?;
+        if family.is_on(&crate::commands::settings::load_ui_preferences(&conn)) {
+            return Ok(true);
+        }
+        conn.execute(
+            "DELETE FROM playlist_items WHERE playlist_id IN (SELECT id FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE ?1)",
+            params![family.spec_pattern()],
+        )?;
+        conn.execute(
+            "DELETE FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE ?1",
+            params![family.spec_pattern()],
+        )?;
+        Ok(false)
+    }
+
     /// Runs all three auto-playlist syncs (genre, decade, BPM) in one call —
     /// the frontend used to invoke these as three separate IPC round trips
     /// in lockstep at every call site.
@@ -120,6 +180,9 @@ impl PlaylistManager {
     /// take the playlists lock once per tag instead of for the whole pass
     /// (`sync_all_auto_playlists_cooperative`, #1968).
     pub(crate) fn genre_auto_playlist_tags(&self) -> Result<Vec<String>> {
+        if !self.family_enabled_or_prune(AutoFamily::Genre)? {
+            return Ok(Vec::new());
+        }
         let tag_manager = TagManager::new(self.db.clone());
         // Self-contained and idempotent — doesn't rely on the async
         // "library-changed" listener (tags::reconcile_hierarchy_and_notify)
@@ -234,6 +297,9 @@ impl PlaylistManager {
     /// it's missing or its `updated` timestamp is more than 24h old, and prunes
     /// rows for decades no longer present in the library.
     pub fn sync_decade_auto_playlists(&self) -> Result<()> {
+        if !self.family_enabled_or_prune(AutoFamily::Decade)? {
+            return Ok(());
+        }
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
 
         let scanner = CollectionScanner::new(self.db.clone());
@@ -335,6 +401,9 @@ impl PlaylistManager {
     /// is fixed (see [`TEMPO_BUCKETS`]), not derived from distinct library
     /// values, so there is no pruning pass for "buckets no longer present".
     pub fn sync_bpm_auto_playlists(&self) -> Result<()> {
+        if !self.family_enabled_or_prune(AutoFamily::Bpm)? {
+            return Ok(());
+        }
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
 
         let scanner = CollectionScanner::new(self.db.clone());
@@ -419,6 +488,9 @@ impl PlaylistManager {
     /// it's missing or its `updated` timestamp is more than 24h old, and prunes
     /// rows for artist tags no longer present in the library.
     pub fn sync_artist_tag_auto_playlists(&self) -> Result<()> {
+        if !self.family_enabled_or_prune(AutoFamily::ArtistTag)? {
+            return Ok(());
+        }
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
 
         let scanner = CollectionScanner::new(self.db.clone());
@@ -523,6 +595,9 @@ impl PlaylistManager {
     /// it's missing or its `updated` timestamp is more than 24h old, and prunes
     /// rows for languages no longer present in the library.
     pub fn sync_language_auto_playlists(&self) -> Result<()> {
+        if !self.family_enabled_or_prune(AutoFamily::Language)? {
+            return Ok(());
+        }
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
 
         let tag_manager = crate::tags::TagManager::new(self.db.clone());
@@ -873,6 +948,9 @@ impl PlaylistManager {
         local_now: chrono::DateTime<chrono::Local>,
         utc_now: i64,
     ) -> Result<()> {
+        if !self.family_enabled_or_prune(AutoFamily::Daypart)? {
+            return Ok(());
+        }
         const SPEC_PREFIX: &str = "daypart:";
 
         let (bucket, bucket_name, today) = daypart_bucket_and_date(local_now);
@@ -1000,6 +1078,129 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap().keep();
         let db = Database::new(temp_dir.clone()).unwrap();
         (db, temp_dir)
+    }
+
+    fn set_pref(db: &Database, key: &str, value: &str) {
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+            params![key, value],
+        )
+        .unwrap();
+    }
+
+    fn language_spec_exists(manager: &PlaylistManager) -> bool {
+        manager
+            .get_playlists()
+            .unwrap()
+            .iter()
+            .any(|p| p.dynamic_enabled && p.dynamic_spec.as_deref() == Some("language:ja"))
+    }
+
+    /// #2131: turning a family off deletes its playlists and keeps them away
+    /// across syncs; turning it back on regenerates them.
+    #[test]
+    fn disabled_family_is_pruned_and_regenerated_when_reenabled() {
+        let (db, _dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 0..25 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, language, source, unavailable) VALUES ('Track {i}', 'ja', 1, 0)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_language_auto_playlists().unwrap();
+        assert!(language_spec_exists(&manager));
+
+        set_pref(&db_arc, "auto_playlists_language", "false");
+        manager.sync_language_auto_playlists().unwrap();
+        assert!(!language_spec_exists(&manager), "off family is pruned");
+        manager.sync_language_auto_playlists().unwrap();
+        assert!(!language_spec_exists(&manager), "and stays pruned");
+
+        set_pref(&db_arc, "auto_playlists_language", "true");
+        manager.sync_language_auto_playlists().unwrap();
+        assert!(language_spec_exists(&manager), "back on regenerates");
+    }
+
+    /// Turning one family off must not touch another family's playlists.
+    #[test]
+    fn disabling_one_family_leaves_the_others() {
+        let (db, _dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec) VALUES ('1980s', 1, 'decade:1980s')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec) VALUES ('Rock', 1, 'tag:Rock')",
+                [],
+            )
+            .unwrap();
+        }
+        set_pref(&db_arc, "auto_playlists_decade", "false");
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_decade_auto_playlists().unwrap();
+        let specs: Vec<_> = manager
+            .get_playlists()
+            .unwrap()
+            .into_iter()
+            .filter_map(|p| p.dynamic_spec)
+            .collect();
+        assert_eq!(specs, vec!["tag:Rock".to_string()]);
+    }
+
+    /// Every family's sync entry point honours its preference, so a caller can
+    /// never regenerate a family the user turned off.
+    #[test]
+    fn every_family_gate_prunes_its_own_spec_prefix() {
+        let (db, _dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        let rows = [
+            ("auto_playlists_genre", "tag:Rock"),
+            ("auto_playlists_decade", "decade:1980s"),
+            ("auto_playlists_artist_tag", "artisttag:canadian"),
+            ("auto_playlists_bpm", "bpmrange:60-90"),
+            ("auto_playlists_language", "language:ja"),
+            ("auto_playlists_daypart", "daypart:morning:2026-01-01"),
+        ];
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for (_, spec) in rows {
+                conn.execute(
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec) VALUES ('x', 1, ?1)",
+                    params![spec],
+                )
+                .unwrap();
+            }
+        }
+        for (key, _) in rows {
+            set_pref(&db_arc, key, "false");
+        }
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_all_auto_playlists().unwrap();
+        let left: Vec<_> = manager
+            .get_playlists()
+            .unwrap()
+            .into_iter()
+            .filter_map(|p| p.dynamic_spec)
+            .collect();
+        // Only the always-on diagnostic playlists remain.
+        assert!(
+            left.iter()
+                .all(|s| s == "missingmeta" || s == "missingmbid"),
+            "all families off leaves only diagnostics: {left:?}"
+        );
     }
 
     #[test]

@@ -164,7 +164,9 @@ const IDENTICAL_OK_FR = new Set([
   "playerBar.volume", // "Volume"
   "playlists.activeBadgeLabel", // "Active"
   "playlists.bpmAutoPlaylist", // "BPM"
+  "settings.autoPlaylistsBpm", // "BPM"
   "playlists.genreAutoPlaylist", // "Genre"
+  "settings.autoPlaylistsGenre", // "Genre"
   "playlists.tableHeaderTrack", // "#"
   "settings.badgeColorCyan", // "Cyan"
   "settings.badgeColorIndigo", // "Indigo"
@@ -244,6 +246,7 @@ const IDENTICAL_OK_IT = new Set<string>([
   "playlists.tableHeaderTrack", // "#"
   "playlists.populationModeTitleFormat", // "{base} {suffix}"
   "playlists.bpmAutoPlaylist", // "BPM"
+  "settings.autoPlaylistsBpm", // "BPM"
   "playlists.playlistTypeLabel", // "Playlist"
   "stats.minuteCount", // "{count} min"
   "stats.minuteUnderOne", // "< 1 min"
@@ -333,6 +336,7 @@ const IDENTICAL_OK_ES = new Set<string>([
   "playlists.tableHeaderTrack", // "#"
   "playlists.populationModeTitleFormat", // "{base} {suffix}"
   "playlists.bpmAutoPlaylist", // "BPM"
+  "settings.autoPlaylistsBpm", // "BPM"
   "lyrics.instrumentalBadge", // "Instrumental"
   "lyrics.sourceManual", // "Manual"
   "stats.minuteCount", // "{count} min"
@@ -432,6 +436,8 @@ const IDENTICAL_OK_DE = new Set<string>([
   "playlists.populationModeTitleFormat",
   "playlists.populationModeFamiliar",
   "playlists.genreAutoPlaylist",
+  "settings.autoPlaylistsGenre",
+  "settings.autoPlaylistsBpm",
   "playlists.bpmAutoPlaylist",
   "lyrics.instrumentalBadge",
   "playerBar.pause",
@@ -530,6 +536,7 @@ const IDENTICAL_OK_UK = new Set<string>([
   "settings.subsonicUrlPlaceholder", // an example URL
   "playlists.populationModeTitleFormat", // "{base} {suffix}"
   "playlists.bpmAutoPlaylist", // BPM
+  "settings.autoPlaylistsBpm", // BPM
   "playerBar.musicbrainzSectionLabel", // MusicBrainz
   "playerBar.critiquebrainzSectionLabel", // CritiqueBrainz
   "playerBar.listenbrainzSectionLabel", // ListenBrainz
@@ -573,6 +580,7 @@ const IDENTICAL_OK_RU = new Set<string>([
   "settings.subsonicUrlPlaceholder", // an example URL
   "playlists.populationModeTitleFormat", // "{base} {suffix}"
   "playlists.bpmAutoPlaylist", // BPM
+  "settings.autoPlaylistsBpm", // BPM
   "playerBar.musicbrainzSectionLabel", // MusicBrainz
   "playerBar.critiquebrainzSectionLabel", // CritiqueBrainz
   "playerBar.listenbrainzSectionLabel", // ListenBrainz

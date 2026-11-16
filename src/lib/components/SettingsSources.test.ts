@@ -109,6 +109,13 @@ describe("SettingsSources.svelte - WebDAV section", () => {
     ).toBeInTheDocument();
   });
 
+  it("no longer offers tempo detection, which moved to General with the BPM auto-playlists (#2131)", async () => {
+    const { findByText, queryByText } = render(SettingsSources);
+
+    await findByText("Remote WebDAV");
+    expect(queryByText("Detect tempo and key")).toBeNull();
+  });
+
   it("opens WebDavModal when clicking Add WebDAV", async () => {
     const { findByText, getByRole } = render(SettingsSources);
 
