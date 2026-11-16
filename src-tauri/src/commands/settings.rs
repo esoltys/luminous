@@ -526,7 +526,7 @@ mod tests {
             .filter(|(key, _)| key.starts_with("auto_playlists_"))
             .map(|(_, on)| *on)
             .collect();
-        assert_eq!(families.len(), 6);
+        assert_eq!(families.len(), 7);
         assert!(families.iter().all(|on| *on));
     }
 
