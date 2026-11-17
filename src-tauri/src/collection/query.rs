@@ -1505,7 +1505,11 @@ impl CollectionScanner {
     /// play_history whenever they weren't built under the current
     /// `week_start` setting.
     pub fn get_top_albums(&self, limit: i64) -> Result<Vec<TopAlbumItem>> {
-        self.get_top_albums_at(limit, crate::clock::unix_now(), &jiff::tz::TimeZone::system())
+        self.get_top_albums_at(
+            limit,
+            crate::clock::unix_now(),
+            &jiff::tz::TimeZone::system(),
+        )
     }
 
     /// `now`/time-zone-parameterized core of `get_top_albums`, split out so

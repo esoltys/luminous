@@ -204,10 +204,7 @@ pub fn build_diagnostics_bundle(app_data_dir: &Path, app_version: &str) -> Strin
 
     let mut out = String::new();
     out.push_str("Luminous diagnostics export\n");
-    out.push_str(&format!(
-        "Generated: {}\n",
-        crate::clock::local_rfc3339()
-    ));
+    out.push_str(&format!("Generated: {}\n", crate::clock::local_rfc3339()));
     out.push_str(&format!("App version: {app_version}\n"));
     out.push_str(&format!(
         "OS: {} ({})\n",

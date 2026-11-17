@@ -1241,7 +1241,7 @@ mod tests {
     }
 
     fn only_filter(query: &str, now: &Zoned) -> FieldFilter {
-        let mut parsed = parse_query_at(query, &now);
+        let mut parsed = parse_query_at(query, now);
         assert!(
             parsed.bare_terms.is_empty(),
             "{query} fell back to bare terms"
