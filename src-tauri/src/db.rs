@@ -5490,9 +5490,9 @@ mod tests {
         )
         .unwrap();
 
-        for uuid in ["plain", "marked", "garbage"] {
-            let (song_id, url, meta) = m82_item(&conn, uuid);
-            assert_eq!(song_id, None, "{uuid}: FK should null the link");
+        for label in ["plain", "marked", "garbage"] {
+            let (song_id, url, meta) = m82_item(&conn, label);
+            assert_eq!(song_id, None, "{label}: FK should null the link");
             assert_eq!(url.as_deref(), Some("/m/a.flac"));
             let meta: serde_json::Value = serde_json::from_str(&meta.unwrap()).unwrap();
             assert_eq!(meta["title"], "A");
