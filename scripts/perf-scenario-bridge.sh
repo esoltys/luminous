@@ -2,8 +2,8 @@
 # Scripted load scenarios for the Tokio scheduler diagnostics in
 # docs/PERFORMANCE.md (#1002) — drives the app via its local bridge server
 # (src-tauri/src/bridge.rs) instead of GUI automation, so the same scenario
-# can be repeated identically across a before/after build for comparison in
-# tokio-console or against spawn_scheduler_latency_monitor's log output.
+# can be repeated identically across a before/after build for comparison
+# against the stall monitor's log output (src-tauri/src/stall_monitor.rs).
 #
 # `skip-tracks` queues the checked-in test fixtures
 # (src-tauri/tests/fixtures/audio/, see scripts/generate_test_fixtures.sh)
