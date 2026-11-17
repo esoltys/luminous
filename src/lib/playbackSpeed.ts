@@ -7,7 +7,7 @@ export const PLAYBACK_SPEED_MAX = 3;
 export const PLAYBACK_SPEED_STEP = 0.05;
 export const PLAYBACK_SPEED_NORMAL = 1;
 /** One-tap presets, slowest first. */
-export const PLAYBACK_SPEED_PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const;
+export const PLAYBACK_SPEED_PRESETS = [1, 1.25, 1.5, 2, 3] as const;
 
 /** `speed` kept inside the range and on the step grid, as the backend will apply it. */
 export function snapPlaybackSpeed(speed: number): number {

@@ -72,7 +72,7 @@
       disabled={shown <= PLAYBACK_SPEED_MIN}
       onclick={() => step(-1)}
     >
-      <Minus class="w-3.5 h-3.5" />
+      <Minus class="w-3.5 h-3.5" weight="regular" />
     </button>
     <input
       type="range"
@@ -94,7 +94,7 @@
       disabled={shown >= PLAYBACK_SPEED_MAX}
       onclick={() => step(1)}
     >
-      <Plus class="w-3.5 h-3.5" />
+      <Plus class="w-3.5 h-3.5" weight="regular" />
     </button>
   </div>
 
@@ -103,7 +103,7 @@
       <button
         type="button"
         class="speed-preset label-small {shown === preset
-          ? 'bg-brand-accent text-brand-text-on-accent'
+          ? 'bg-brand-accent text-brand-accent-contrast'
           : 'bg-brand-main text-brand-text-primary hover:bg-brand-border'}"
         aria-pressed={shown === preset}
         onclick={() => applyNow(preset)}

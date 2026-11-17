@@ -32,6 +32,14 @@ describe("PlaybackSpeedPanel.svelte (#2142)", () => {
     expect(screen.getByRole("button", { name: /^1.5×$/ })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: /^2×$/ })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: /^1×\s+Normal$/ })).toBeInTheDocument();
+    // The same five presets as YouTube: 1, 1.25, 1.5, 2, 3.
+    expect(screen.getAllByRole("button", { name: /×/ }).map((b) => b.textContent?.trim())).toEqual([
+      expect.stringMatching(/^1×/),
+      "1.25×",
+      "1.5×",
+      "2×",
+      "3×",
+    ]);
   });
 
   it("applies a preset at once", async () => {
