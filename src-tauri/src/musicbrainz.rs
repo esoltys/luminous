@@ -1,7 +1,6 @@
 use crate::db::Database;
 pub use luminous_remote::musicbrainz::*;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -20,13 +19,6 @@ pub struct MusicBrainzManager {
     remote: MusicBrainzClient,
     db: Arc<Database>,
     active_session: Arc<parking_lot::Mutex<Option<InFlightSession>>>,
-}
-
-fn now_unix() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
 }
 
 impl MusicBrainzManager {
@@ -366,8 +358,8 @@ impl MusicBrainzManager {
 
         let expires_at = token_data
             .expires_in
-            .map(|sec| now_unix() + sec)
-            .unwrap_or_else(|| now_unix() + 3600);
+            .map(|sec| crate::clock::unix_now() + sec)
+            .unwrap_or_else(|| crate::clock::unix_now() + 3600);
 
         self.set_stored_setting("mb_access_token", &token_data.access_token)?;
         if let Some(ref refresh) = token_data.refresh_token {
@@ -415,7 +407,7 @@ impl MusicBrainzManager {
             .unwrap_or(0);
 
         // If token expires in less than 5 minutes, attempt refresh
-        if now_unix() + 300 >= expires_at {
+        if crate::clock::unix_now() + 300 >= expires_at {
             if let Ok(Some(refresh_token)) = self.get_stored_setting("mb_refresh_token") {
                 if let Ok(new_token) = self.refresh_access_token(&refresh_token).await {
                     return Ok(new_token);
@@ -437,8 +429,8 @@ impl MusicBrainzManager {
 
         let expires_at = token_data
             .expires_in
-            .map(|sec| now_unix() + sec)
-            .unwrap_or_else(|| now_unix() + 3600);
+            .map(|sec| crate::clock::unix_now() + sec)
+            .unwrap_or_else(|| crate::clock::unix_now() + 3600);
 
         self.set_stored_setting("mb_access_token", &token_data.access_token)?;
         if let Some(ref refresh) = token_data.refresh_token {
@@ -488,7 +480,7 @@ impl MusicBrainzManager {
             if let Ok(Some(cached_json)) = self.get_stored_setting("mb_cached_stats") {
                 if let Ok(stats) = serde_json::from_str::<MusicBrainzUserStats>(&cached_json) {
                     // Return cached stats if younger than 1 hour
-                    if now_unix() - stats.cached_at < 3600 {
+                    if crate::clock::unix_now() - stats.cached_at < 3600 {
                         return Ok(stats);
                     }
                 }
@@ -516,7 +508,7 @@ impl MusicBrainzManager {
             username: username.to_string(),
             collections_count,
             releases_count,
-            cached_at: now_unix(),
+            cached_at: crate::clock::unix_now(),
         };
 
         if let Ok(serialized) = serde_json::to_string(&stats) {

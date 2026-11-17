@@ -38,7 +38,7 @@ pub async fn update_device_profile(
 ) -> Result<(), String> {
     let devices = state.devices.clone();
     crate::db::run_blocking(&state.db, move |conn| {
-        devices.save_profile(conn, &id, profile, chrono::Utc::now().timestamp())
+        devices.save_profile(conn, &id, profile, crate::clock::unix_now())
     })
     .await
     .map_err(|e| e.to_string())

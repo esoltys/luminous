@@ -374,9 +374,7 @@ struct ExistingSong {
 
 /// Parses an RFC 3339 `created` timestamp into Unix seconds.
 fn created_unix(created: Option<&str>) -> Option<i64> {
-    chrono::DateTime::parse_from_rfc3339(created?)
-        .ok()
-        .map(|dt| dt.timestamp())
+    crate::clock::parse_rfc3339_unix(created?)
 }
 
 /// Phase 3: write the enumeration into the library in one transaction.

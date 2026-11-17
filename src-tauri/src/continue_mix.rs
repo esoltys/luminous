@@ -436,7 +436,7 @@ async fn extend(app: &tauri::AppHandle) -> Result<()> {
         .collect();
 
     let db = state.db.clone();
-    let now = chrono::Utc::now().timestamp();
+    let now = crate::clock::unix_now();
     let ids = tokio::task::spawn_blocking(move || {
         let conn = db.pool.get()?;
         select_songs(

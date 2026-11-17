@@ -8,7 +8,6 @@ use crate::collection::CollectionScanner;
 use crate::models::{QueuePopulationMode, Song, LIBRARY_SOURCES_SQL};
 use crate::tags::TagManager;
 use anyhow::Result;
-use chrono::Timelike;
 use rand::seq::IndexedRandom;
 use rusqlite::params;
 use std::collections::HashSet;
@@ -37,12 +36,11 @@ fn daypart_bucket_for_hour(hour: u32) -> (&'static str, &'static str) {
 /// Bucket id, display name, and local calendar date (the `dynamic_spec`
 /// reroll cache key — see [`PlaylistManager::sync_daypart_auto_playlist`])
 /// for a given local timestamp. Takes `now` as a parameter rather than
-/// calling `Local::now()` internally so tests can inject arbitrary times.
-fn daypart_bucket_and_date(
-    now: chrono::DateTime<chrono::Local>,
-) -> (&'static str, &'static str, String) {
-    let (bucket, name) = daypart_bucket_for_hour(now.hour());
-    (bucket, name, now.date_naive().to_string())
+/// calling `Zoned::now()` internally so tests can inject arbitrary times.
+fn daypart_bucket_and_date(now: &jiff::Zoned) -> (&'static str, &'static str, String) {
+    // `hour()` is 0..=23, so the conversion cannot fail.
+    let (bucket, name) = daypart_bucket_for_hour(now.hour() as u32);
+    (bucket, name, now.date().to_string())
 }
 
 /// A family of system-generated auto-playlists the user can switch off in
@@ -161,7 +159,7 @@ impl PlaylistManager {
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
 
         let conn = self.db.pool.get()?;
-        let now = chrono::Utc::now().timestamp();
+        let now = crate::clock::unix_now();
         let spec = format!("{prefix}{}", item.key);
         let existing_row: Option<(i64, i64, String)> = conn
             .query_row(
@@ -442,7 +440,7 @@ impl PlaylistManager {
 
         let scanner = CollectionScanner::new(self.db.clone());
         let mut conn = self.db.pool.get()?;
-        let now = chrono::Utc::now().timestamp();
+        let now = crate::clock::unix_now();
 
         for bucket in TEMPO_BUCKETS.iter() {
             let (name, min, max) = (bucket.name, bucket.min, bucket.max);
@@ -620,7 +618,7 @@ impl PlaylistManager {
 
         let scanner = CollectionScanner::new(self.db.clone());
         let mut conn = self.db.pool.get()?;
-        let now = chrono::Utc::now().timestamp();
+        let now = crate::clock::unix_now();
 
         let existing_row: Option<(i64, i64, i64, String)> = conn
             .query_row(
@@ -684,7 +682,7 @@ impl PlaylistManager {
 
         let scanner = CollectionScanner::new(self.db.clone());
         let mut conn = self.db.pool.get()?;
-        let now = chrono::Utc::now().timestamp();
+        let now = crate::clock::unix_now();
 
         let existing_row: Option<(i64, i64, i64, String)> = conn
             .query_row(
@@ -856,12 +854,12 @@ impl PlaylistManager {
     /// relabeling an in-progress queue's upcoming tracks was considered and
     /// rejected as unnecessary complexity for a rare edge case.
     pub fn sync_daypart_auto_playlist(&self) -> Result<()> {
-        self.sync_daypart_auto_playlist_at(chrono::Local::now(), chrono::Utc::now().timestamp())
+        self.sync_daypart_auto_playlist_at(&jiff::Zoned::now(), crate::clock::unix_now())
     }
 
     pub fn sync_daypart_auto_playlist_at(
         &self,
-        local_now: chrono::DateTime<chrono::Local>,
+        local_now: &jiff::Zoned,
         utc_now: i64,
     ) -> Result<()> {
         if !self.family_enabled_or_prune(AutoFamily::Daypart)? {
@@ -2032,13 +2030,17 @@ mod tests {
         assert_eq!(daypart_bucket_for_hour(0).0, "latenight");
     }
 
-    fn fixed_daypart_test_time() -> (chrono::DateTime<chrono::Local>, i64) {
-        use chrono::TimeZone;
-        let dt = chrono::Local
-            .with_ymd_and_hms(2026, 6, 15, 9, 0, 0)
-            .single()
-            .unwrap();
-        let ts = dt.timestamp();
+    /// `hour`:00 local time on the given date, in the machine's zone.
+    fn local_at(year: i16, month: i8, day: i8, hour: i8) -> jiff::Zoned {
+        jiff::civil::date(year, month, day)
+            .at(hour, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::system())
+            .unwrap()
+    }
+
+    fn fixed_daypart_test_time() -> (jiff::Zoned, i64) {
+        let dt = local_at(2026, 6, 15, 9);
+        let ts = dt.timestamp().as_second();
         (dt, ts)
     }
 
@@ -2063,7 +2065,7 @@ mod tests {
 
         let (dt, ts) = fixed_daypart_test_time();
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
-        manager.sync_daypart_auto_playlist_at(dt, ts).unwrap();
+        manager.sync_daypart_auto_playlist_at(&dt, ts).unwrap();
 
         let playlists = manager.get_playlists().unwrap();
         let daypart_playlists: Vec<_> = playlists
@@ -2108,7 +2110,7 @@ mod tests {
 
         let (dt, ts) = fixed_daypart_test_time();
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
-        manager.sync_daypart_auto_playlist_at(dt, ts).unwrap();
+        manager.sync_daypart_auto_playlist_at(&dt, ts).unwrap();
 
         let playlists = manager.get_playlists().unwrap();
         let first = playlists
@@ -2126,8 +2128,8 @@ mod tests {
         // no-op (same `updated` timestamp, same spec) — this is what keeps
         // every other `sync_all_auto_playlists()` call site (finish_scan,
         // manual refresh, mount) from thrashing the genre selection.
-        manager.sync_daypart_auto_playlist_at(dt, ts).unwrap();
-        manager.sync_daypart_auto_playlist_at(dt, ts).unwrap();
+        manager.sync_daypart_auto_playlist_at(&dt, ts).unwrap();
+        manager.sync_daypart_auto_playlist_at(&dt, ts).unwrap();
 
         let playlists_after = manager.get_playlists().unwrap();
         let after = playlists_after
@@ -2169,7 +2171,7 @@ mod tests {
         let (dt_morning, ts_morning) = fixed_daypart_test_time();
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
         manager
-            .sync_daypart_auto_playlist_at(dt_morning, ts_morning)
+            .sync_daypart_auto_playlist_at(&dt_morning, ts_morning)
             .unwrap();
 
         let playlists = manager.get_playlists().unwrap();
@@ -2186,15 +2188,11 @@ mod tests {
         assert_eq!(before.name, "Morning Mix");
 
         // Advance to afternoon (14:00) on the same date:
-        use chrono::TimeZone;
-        let dt_afternoon = chrono::Local
-            .with_ymd_and_hms(2026, 6, 15, 14, 0, 0)
-            .single()
-            .unwrap();
-        let ts_afternoon = dt_afternoon.timestamp();
+        let dt_afternoon = local_at(2026, 6, 15, 14);
+        let ts_afternoon = dt_afternoon.timestamp().as_second();
 
         manager
-            .sync_daypart_auto_playlist_at(dt_afternoon, ts_afternoon)
+            .sync_daypart_auto_playlist_at(&dt_afternoon, ts_afternoon)
             .unwrap();
 
         let playlists_after = manager.get_playlists().unwrap();
@@ -2272,7 +2270,7 @@ mod tests {
         // random pick is deterministic regardless of which node it lands on:
         // "Rock" resolves directly, and "Soft Rock" (10 songs) must walk up
         // to "Rock" (408) rather than falling to a random-library-fill.
-        manager.sync_daypart_auto_playlist_at(dt, ts).unwrap();
+        manager.sync_daypart_auto_playlist_at(&dt, ts).unwrap();
 
         let playlists = manager.get_playlists().unwrap();
         let daypart_pl = playlists
@@ -2336,7 +2334,7 @@ mod tests {
 
         let (dt, ts) = fixed_daypart_test_time();
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
-        manager.sync_daypart_auto_playlist_at(dt, ts).unwrap();
+        manager.sync_daypart_auto_playlist_at(&dt, ts).unwrap();
 
         let playlists = manager.get_playlists().unwrap();
         let daypart_pl = playlists
@@ -2384,7 +2382,7 @@ mod tests {
 
         let (dt, ts) = fixed_daypart_test_time();
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
-        manager.sync_daypart_auto_playlist_at(dt, ts).unwrap();
+        manager.sync_daypart_auto_playlist_at(&dt, ts).unwrap();
 
         let playlists = manager.get_playlists().unwrap();
         assert!(
@@ -2420,7 +2418,7 @@ mod tests {
 
         let (dt, ts) = fixed_daypart_test_time();
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
-        manager.sync_daypart_auto_playlist_at(dt, ts).unwrap();
+        manager.sync_daypart_auto_playlist_at(&dt, ts).unwrap();
         let playlists = manager.get_playlists().unwrap();
         let daypart_pl = playlists
             .iter()
@@ -2451,13 +2449,9 @@ mod tests {
             .unwrap();
         }
 
-        use chrono::TimeZone;
-        let dt_later = chrono::Local
-            .with_ymd_and_hms(2026, 6, 16, 9, 0, 0)
-            .single()
-            .unwrap();
+        let dt_later = local_at(2026, 6, 16, 9);
         manager
-            .sync_daypart_auto_playlist_at(dt_later, dt_later.timestamp())
+            .sync_daypart_auto_playlist_at(&dt_later, dt_later.timestamp().as_second())
             .unwrap();
 
         let playlists_after = manager.get_playlists().unwrap();
@@ -2490,7 +2484,7 @@ mod tests {
 
         let (dt, ts) = fixed_daypart_test_time();
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
-        manager.sync_daypart_auto_playlist_at(dt, ts).unwrap();
+        manager.sync_daypart_auto_playlist_at(&dt, ts).unwrap();
 
         let playlists = manager.get_playlists().unwrap();
         let daypart_pl = playlists
@@ -2517,7 +2511,7 @@ mod tests {
         assert_eq!(manager.get_playlist_tracks(id).unwrap().len(), 0);
 
         // Calling sync_daypart_auto_playlist in the same bucket must heal the empty playlist
-        manager.sync_daypart_auto_playlist_at(dt, ts).unwrap();
+        manager.sync_daypart_auto_playlist_at(&dt, ts).unwrap();
         assert_eq!(manager.get_playlist_tracks(id).unwrap().len(), 30);
 
         let _ = std::fs::remove_dir_all(temp_dir);

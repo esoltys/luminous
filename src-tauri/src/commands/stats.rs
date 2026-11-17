@@ -23,7 +23,7 @@ pub async fn get_listening_activity(
     days: i64,
     state: State<'_, AppState>,
 ) -> Result<Vec<ListenEvent>, String> {
-    let since_unix = chrono::Utc::now().timestamp() - days * 86_400;
+    let since_unix = crate::clock::unix_now() - days * 86_400;
     crate::db::run_blocking(&state.db, move |conn| {
         crate::stats_summary::listening_activity(conn, since_unix)
     })

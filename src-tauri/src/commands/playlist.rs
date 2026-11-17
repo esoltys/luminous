@@ -324,7 +324,7 @@ pub async fn set_playlist_size_limit(
     if let Some(id) = stored_device {
         let devices = state.devices.clone();
         crate::db::run_blocking(&state.db, move |conn| {
-            devices.keep_profile_without_marker(conn, &id, chrono::Utc::now().timestamp())
+            devices.keep_profile_without_marker(conn, &id, crate::clock::unix_now())
         })
         .await
         .map_err(|e| e.to_string())?;

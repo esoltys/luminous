@@ -243,7 +243,7 @@ impl DeviceMonitor {
                     .pool
                     .get()
                     .map_err(anyhow::Error::from)
-                    .and_then(|conn| build_entries(&conn, &devices, chrono::Utc::now().timestamp()))
+                    .and_then(|conn| build_entries(&conn, &devices, crate::clock::unix_now()))
                 {
                     Ok(entries) => self.replace(app, entries),
                     Err(e) => log::warn!("Could not refresh connected devices: {e}"),

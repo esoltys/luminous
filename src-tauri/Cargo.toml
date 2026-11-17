@@ -76,10 +76,6 @@ serde_json.workspace = true
 
 # --- Async runtime ---
 tokio = { version = "1", features = ["full"] }
-# Opt-in Tokio task/scheduler introspection for `tokio-console` — see the
-# "tokio-console" feature below and docs/PERFORMANCE.md. Never enabled in a
-# release build.
-console-subscriber = { version = "0.5", optional = true }
 
 # --- Database ---
 rusqlite = { version = "0.40", features = ["bundled"] }
@@ -115,7 +111,7 @@ env_logger = "0.11"
 
 # --- Utilities ---
 walkdir = "2"
-chrono = { version = "0.4", features = ["serde"] }
+jiff = "0.2"
 parking_lot.workspace = true
 rand = "0.10"
 percent-encoding = "2"
@@ -125,13 +121,6 @@ md-5 = "0.11"
 sha2 = "0.11"
 
 [features]
-# Enables `tokio-console` task/scheduler introspection — see
-# docs/PERFORMANCE.md. Requires building with `RUSTFLAGS="--cfg
-# tokio_unstable"` (not set by default anywhere in this repo) since it relies
-# on Tokio APIs exempted from semver stability guarantees. Dev/debug use
-# only — never enable this for a release build.
-tokio-console = ["dep:console-subscriber"]
-
 # Non-release capture build flavor: enables the remote devtools CDP port (9222)
 # and exposes the in-app scripting surface for prebuilt automated capture tools (#1633).
 # Never enabled for standard release, MSIX or Flatpak builds.

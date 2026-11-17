@@ -72,7 +72,7 @@ const SONG_EXCLUSION_FILTER: &str = "NOT EXISTS (
 /// Build a full Personal Stats summary for `range`, excluding any song,
 /// album, artist, or genre flagged in `stats_exclusions`.
 pub fn get_summary(conn: &Connection, range: StatsRange) -> Result<StatsSummary> {
-    get_summary_at(conn, range, chrono::Utc::now().timestamp())
+    get_summary_at(conn, range, crate::clock::unix_now())
 }
 
 fn get_summary_at(conn: &Connection, range: StatsRange, now: i64) -> Result<StatsSummary> {

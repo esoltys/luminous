@@ -251,7 +251,7 @@ impl PlaylistManager {
                 ));
             }
         }
-        let now = chrono::Utc::now().timestamp();
+        let now = crate::clock::unix_now();
         conn.execute(
             "INSERT INTO playlists (name, updated) VALUES (?1, ?2)",
             params![name, now],
@@ -313,7 +313,7 @@ impl PlaylistManager {
         let conn = self.db.pool.get()?;
         conn.execute(
             "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
-            params![name, chrono::Utc::now().timestamp(), id],
+            params![name, crate::clock::unix_now(), id],
         )?;
         Ok(())
     }

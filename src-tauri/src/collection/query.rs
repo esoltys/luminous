@@ -1505,16 +1505,16 @@ impl CollectionScanner {
     /// play_history whenever they weren't built under the current
     /// `week_start` setting.
     pub fn get_top_albums(&self, limit: i64) -> Result<Vec<TopAlbumItem>> {
-        self.get_top_albums_at(limit, chrono::Utc::now().timestamp(), &chrono::Local)
+        self.get_top_albums_at(limit, crate::clock::unix_now(), &jiff::tz::TimeZone::system())
     }
 
     /// `now`/time-zone-parameterized core of `get_top_albums`, split out so
     /// tests can drive multiple synthetic weeks deterministically.
-    fn get_top_albums_at<Tz: chrono::TimeZone>(
+    fn get_top_albums_at(
         &self,
         limit: i64,
         now: i64,
-        tz: &Tz,
+        tz: &jiff::tz::TimeZone,
     ) -> Result<Vec<TopAlbumItem>> {
         let conn = self.db.pool.get()?;
         let start_sunday: bool = conn
@@ -1817,12 +1817,12 @@ fn rank_albums_between(
 /// under several dates, so one week on the chart counted as several in
 /// weeks-on-chart and peak rank. The table is purely derived, so rebuilding
 /// loses nothing; the current week is replaced on every call anyway.
-fn rebuild_chart_history_if_stale<Tz: chrono::TimeZone>(
+fn rebuild_chart_history_if_stale(
     conn: &rusqlite::Connection,
     start_sunday: bool,
     current_starts_at: i64,
     limit: i64,
-    tz: &Tz,
+    tz: &jiff::tz::TimeZone,
 ) -> Result<()> {
     let build_key = chart_history_build_key(conn, start_sunday)?;
     let built_for: Option<String> = conn
@@ -1886,33 +1886,31 @@ struct ChartWeek {
 /// Round `now` down to the most recent Sunday or Monday (per `start_sunday`)
 /// on the local calendar of `tz`. Using the UTC calendar instead rolls the
 /// chart into next week early (or late) by the zone's UTC offset.
-fn chart_week<Tz: chrono::TimeZone>(now: i64, start_sunday: bool, tz: &Tz) -> ChartWeek {
-    use chrono::{Datelike, NaiveTime, Timelike};
-    let today = tz
-        .timestamp_opt(now, 0)
-        .single()
-        .map(|dt| dt.naive_local().date())
-        .unwrap_or_else(|| {
-            chrono::DateTime::from_timestamp(now, 0)
-                .unwrap_or_default()
-                .date_naive()
-        });
+fn chart_week(now: i64, start_sunday: bool, tz: &jiff::tz::TimeZone) -> ChartWeek {
+    use jiff::{civil, Span, Timestamp};
+    // An unrepresentable `now` falls back to the epoch's calendar day.
+    let today = Timestamp::from_second(now)
+        .map(|ts| tz.to_datetime(ts).date())
+        .unwrap_or_else(|_| civil::date(1970, 1, 1));
     let weekday = today.weekday();
     let days_back = if start_sunday {
-        weekday.num_days_from_sunday()
+        weekday.to_sunday_zero_offset()
     } else {
-        weekday.num_days_from_monday()
+        weekday.to_monday_zero_offset()
     };
-    let first_day = today - chrono::Duration::days(days_back as i64);
-    let period_start = first_day.and_time(NaiveTime::MIN).and_utc().timestamp();
+    let first_day = today
+        .checked_sub(Span::new().days(i64::from(days_back)))
+        .unwrap_or(today);
+    let period_start = first_day
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .map(|z| z.timestamp().as_second())
+        .unwrap_or(0);
     // Local midnight can fall in a DST gap in zones that spring forward at
-    // 00:00; the week then starts at the first local time that exists.
-    let starts_at = (0..3)
-        .find_map(|hour| {
-            let t = NaiveTime::MIN.with_hour(hour)?;
-            tz.from_local_datetime(&first_day.and_time(t)).earliest()
-        })
-        .map(|dt| dt.timestamp())
+    // 00:00; jiff's default ("compatible") disambiguation then yields the
+    // first local time that exists, which is when the week actually begins.
+    let starts_at = first_day
+        .to_zoned(tz.clone())
+        .map(|z| z.timestamp().as_second())
         .unwrap_or(period_start);
     ChartWeek {
         period_start,
@@ -4514,7 +4512,7 @@ mod tests {
     }
 
     fn week_of(now: i64, start_sunday: bool, offset_hours: i32) -> (i64, i64) {
-        let tz = chrono::FixedOffset::east_opt(offset_hours * 3600).unwrap();
+        let tz = jiff::tz::TimeZone::fixed(jiff::tz::offset(offset_hours as i8));
         let w = chart_week(now, start_sunday, &tz);
         (w.period_start, w.starts_at)
     }
@@ -4642,7 +4640,7 @@ mod tests {
             record_play(steady_id, 1_704_153_600 + 30);
         }
         let week1 = scanner
-            .get_top_albums_at(10, week1_now, &chrono::Utc)
+            .get_top_albums_at(10, week1_now, &jiff::tz::TimeZone::UTC)
             .unwrap();
         let by_album = |items: &[TopAlbumItem], album: &str| -> TopAlbumItem {
             items
@@ -4673,7 +4671,7 @@ mod tests {
             record_play(new_id, week2_base + 40);
         }
         let week2 = scanner
-            .get_top_albums_at(10, week2_now, &chrono::Utc)
+            .get_top_albums_at(10, week2_now, &jiff::tz::TimeZone::UTC)
             .unwrap();
 
         let rising = by_album(&week2, "Rising Album");
@@ -4754,7 +4752,7 @@ mod tests {
         record_plays(long, this_week + 60, 1200, 1); // 20 min
 
         let chart = CollectionScanner::new(db.clone())
-            .get_top_albums_at(10, now, &chrono::Utc)
+            .get_top_albums_at(10, now, &jiff::tz::TimeZone::UTC)
             .unwrap();
         assert_eq!(chart[0].album.album.as_deref(), Some("Long Album"));
         assert_eq!(chart[0].movement, "steady");
@@ -4769,7 +4767,7 @@ mod tests {
         )
         .unwrap();
         let chart = CollectionScanner::new(db.clone())
-            .get_top_albums_at(10, now, &chrono::Utc)
+            .get_top_albums_at(10, now, &jiff::tz::TimeZone::UTC)
             .unwrap();
         assert_eq!(chart.len(), 1);
         assert_eq!(chart[0].album.album.as_deref(), Some("Short Album"));
@@ -4843,7 +4841,7 @@ mod tests {
         }
 
         let chart = CollectionScanner::new(db.clone())
-            .get_top_albums_at(10, sep27 + 86_400, &chrono::Utc)
+            .get_top_albums_at(10, sep27 + 86_400, &jiff::tz::TimeZone::UTC)
             .unwrap();
         assert_eq!(chart.len(), 1);
         assert_eq!(chart[0].movement, "new");
@@ -4934,7 +4932,7 @@ mod tests {
         let a = seed(r"C:\Music\a.mp3", "Album A");
         let b = seed(r"C:\Music\b.mp3", "Album B");
 
-        let tz = chrono::FixedOffset::west_opt(7 * 3600).unwrap();
+        let tz = jiff::tz::TimeZone::fixed(jiff::tz::offset(-7));
         // Local Sundays 2026-09-13 and 2026-09-20, 00:00 at UTC-7.
         let last_week = 1_789_282_800;
         let this_week = 1_789_887_600;
@@ -5329,13 +5327,13 @@ mod tests {
         record_play(minority, week1 + 20);
         record_play(minority, week2 + 10);
         let chart1 = scanner
-            .get_top_albums_at(10, week2 + 3600, &chrono::Utc)
+            .get_top_albums_at(10, week2 + 3600, &jiff::tz::TimeZone::UTC)
             .unwrap();
         assert_eq!(chart1.len(), 1, "{chart1:?}");
         assert_eq!(chart1[0].album.album.as_deref(), Some("Songs of the Sea"));
         assert_eq!(chart1[0].album.rating, 4.0);
         let chart2 = scanner
-            .get_top_albums_at(10, week2 + 7 * 86_400 + 3600, &chrono::Utc)
+            .get_top_albums_at(10, week2 + 7 * 86_400 + 3600, &jiff::tz::TimeZone::UTC)
             .unwrap();
         assert_eq!(chart2.len(), 1);
         assert_eq!(chart2[0].previous_rank, Some(1));

@@ -47,7 +47,7 @@ impl OperationLog {
         if entries.len() == MAX_OPERATION_ENTRIES {
             entries.pop_front();
         }
-        entries.push_back(format!("[{}] {summary}", chrono::Local::now().to_rfc3339()));
+        entries.push_back(format!("[{}] {summary}", crate::clock::local_rfc3339()));
     }
 
     fn snapshot(&self) -> Vec<String> {
@@ -111,7 +111,7 @@ fn raw_append_log_entry(path: &Path, kind: &str, body: &str) {
             let _ = std::fs::rename(path, rotated);
         }
     }
-    let entry = format!("[{}] {kind}: {body}\n", chrono::Local::now().to_rfc3339());
+    let entry = format!("[{}] {kind}: {body}\n", crate::clock::local_rfc3339());
     match std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -206,7 +206,7 @@ pub fn build_diagnostics_bundle(app_data_dir: &Path, app_version: &str) -> Strin
     out.push_str("Luminous diagnostics export\n");
     out.push_str(&format!(
         "Generated: {}\n",
-        chrono::Local::now().to_rfc3339()
+        crate::clock::local_rfc3339()
     ));
     out.push_str(&format!("App version: {app_version}\n"));
     out.push_str(&format!(
