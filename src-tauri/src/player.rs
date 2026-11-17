@@ -2068,7 +2068,7 @@ impl Player {
         if let (Some(scrobbler), Some(song)) = (&self.scrobbler, &self.current_song) {
             let scrobbler = Arc::clone(scrobbler);
             let song = song.clone();
-            let listened_at = chrono::Utc::now().timestamp();
+            let listened_at = crate::clock::unix_now();
             tokio::spawn(async move {
                 scrobbler.on_scrobble_point(&song, listened_at).await;
             });

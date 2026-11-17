@@ -26,7 +26,7 @@ pub fn pin(conn: &Connection, item_type: &str, ref_key: &str) -> Result<()> {
         return Ok(());
     }
 
-    let pinned_at = chrono::Utc::now().timestamp();
+    let pinned_at = crate::clock::unix_now();
     conn.execute("UPDATE pinned_items SET position = position + 1", [])?;
     conn.execute(
         "INSERT INTO pinned_items (item_type, ref_key, position, pinned_at) VALUES (?1, ?2, 0, ?3)",
@@ -114,7 +114,7 @@ pub fn init_default_pins(conn: &Connection) -> Result<()> {
         .unwrap_or(0);
 
     if existing_count == 0 {
-        let now = chrono::Utc::now().timestamp();
+        let now = crate::clock::unix_now();
         for (idx, (item_type, ref_key)) in DEFAULT_PINNED_ITEMS.iter().enumerate() {
             conn.execute(
                 "INSERT OR IGNORE INTO pinned_items (item_type, ref_key, position, pinned_at) VALUES (?1, ?2, ?3, ?4)",

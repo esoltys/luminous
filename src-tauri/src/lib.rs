@@ -15,6 +15,7 @@ pub mod audio;
 pub mod band_waveform;
 pub mod biomanager;
 pub mod bridge;
+pub mod clock;
 pub mod collection;
 pub mod commands;
 pub mod context;
@@ -876,15 +877,6 @@ fn register_media_shortcuts(app: &tauri::App) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Opt-in Tokio task/scheduler introspection (see docs/PERFORMANCE.md).
-    // Must run before Tauri creates its async runtime, since it installs the
-    // `tracing` subscriber that records every task's spawn/poll events —
-    // anything spawned before this line wouldn't be visible in `tokio-console`.
-    // Off by default: the `tokio-console` feature and its `tokio_unstable`
-    // cfg flag are dev/debug-only and never part of a release build.
-    #[cfg(feature = "tokio-console")]
-    console_subscriber::init();
-
     // Without this, every log::info!/warn!/error! call across the backend
     // (including reconcile-failure diagnostics) is a silent no-op — `log`
     // is just a facade and needs a registered backend to actually emit

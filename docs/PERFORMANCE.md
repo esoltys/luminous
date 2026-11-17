@@ -291,50 +291,21 @@ Every point is a scratch-profile run, the mean of the newest two for that versio
 averages 500 ms or more. Results are written to `docs/BENCHMARK.md` (gitignored). CI doesn't run
 it; run it by hand before and after a change to the collection view.
 
-## Tokio scheduler diagnostics (tokio-console)
+## Tokio scheduler diagnostics
 
 Tracks scheduler-level questions the memory baseline above can't answer — is an `AppState`
 mutex held across blocking I/O, is a task hogging a worker thread on a single poll, is a
 background loop's tick getting delayed. See #1002 for the audit this was built for.
 
-This is an A/B tool for checking a specific fix, not a release-to-release comparison. It runs
-against a dev build (`tokio-console` needs a feature flag and `tokio_unstable`, so it can't be
-compiled into a release build), and its wall times depend on the machine and library. It isn't
-re-run each release. The memory scenarios above are the release-to-release check.
+The signal is the always-on stall monitor (`src-tauri/src/stall_monitor.rs`, described under
+[The always-on watchdog](#the-always-on-watchdog)). This is an A/B tool for checking a specific
+fix, not a release-to-release comparison: wall times depend on the machine and library, and it
+isn't re-run each release. The memory scenarios above are the release-to-release check.
 
-### Setup
-
-`console-subscriber` is an optional dependency behind the `tokio-console` Cargo feature (off by
-default — never enabled in a release build, `bun run tauri build`, or CI). Enabling it also
-requires the `tokio_unstable` rustc cfg flag, since `console-subscriber` reads Tokio APIs that are
-exempted from semver stability guarantees; that flag is intentionally not baked into
-`.cargo/config.toml`, so it has to be passed explicitly per invocation:
-
-```bash
-cargo install tokio-console  # once, the separate viewer CLI
-RUSTFLAGS="--cfg tokio_unstable" bun run tauri dev -- --features tokio-console
-```
-
-On Windows, the `VAR=value cmd` inline-env syntax above only works in a POSIX shell (Git Bash,
-WSL). In PowerShell, set the variable as a separate statement first:
-
-```powershell
-$env:RUSTFLAGS="--cfg tokio_unstable"; bun run tauri dev -- --features tokio-console
-```
-
-This project uses the JS-side Tauri CLI (`bun run tauri`, see `package.json`), not the
-`cargo-tauri` crate — `cargo tauri dev` won't work here unless `cargo install tauri-cli` has been
-run separately. `bun run tauri dev` shells out to `cargo build`/`cargo run` for the Rust side, so
-`RUSTFLAGS` set in the environment still reaches that build; `--` forwards `--features
-tokio-console` through the JS CLI to the underlying `cargo` invocation.
-
-Then in another terminal, `tokio-console` connects to the running app and shows a live table of
-every Tokio task — poll count, total busy time, idle time, and warnings for a task that blocked a
-worker thread for a long single poll. No manual `#[tracing::instrument]` annotations are needed to
-get started: `tokio::spawn`/`spawn_blocking` already emit the tracing events `console-subscriber`
-reads, so every IPC command handler and background loop (`spawn_visualizer_loop`,
-`spawn_position_tick_loop`, the `stall_monitor` probe, the bridge server's per-connection
-tasks, etc.) shows up automatically.
+There used to be an opt-in `tokio-console` Cargo feature for per-task poll and busy-time numbers.
+It was removed (#2150): it needed `tokio_unstable`, was never enabled in CI or release builds, and
+its `console-subscriber` dependency pulled in the unmaintained `humantime` crate (RUSTSEC-2026-0542).
+If a stall needs per-task detail, run a local build with `console-subscriber` added by hand.
 
 ### Using it for A/B comparisons
 
@@ -357,12 +328,11 @@ that folder as a watched library folder in the running app (Settings → Library
 (near-instant, six tiny clips). The script errors out with this same instruction if it can't find
 them. `bridge-flood` doesn't need this — it doesn't touch playback at all.
 
-1. Build/run the "before" version (e.g. `main`, or the commit before a fix) with the `tokio-console`
-   setup above and run the relevant scenario script against it.
-2. In `tokio-console`, note the task(s) relevant to the change: its poll count, max single-poll
-   duration, and total busy time.
-3. Rebuild on the "after" branch, run the identical script, and compare the same numbers for the
-   same task.
+1. Build/run the "before" version (e.g. `main`, or the commit before a fix) with `bun run tauri dev`
+   and run the relevant scenario script against it, counting `Tokio stall:` / `UI stall:` log lines
+   (see [The always-on watchdog](#the-always-on-watchdog)).
+2. Rebuild on the "after" branch, run the identical script, and compare the counts and the reported
+   overshoot in ms.
 
 ### First recorded run (2026-09-15)
 
@@ -391,24 +361,21 @@ runs (600 requests total) and the server stayed responsive throughout — consis
 proof of) the connection-semaphore fix working. `skip-tracks 50` did trigger 2 warnings (65ms and
 77ms overshoot), but both landed during an auto-crossfade transition and cover-art resolution, not
 during the loudness-settings read itself — real audio-pipeline work, not obviously the mutex/DB
-issue the fix targeted. Per-task `tokio-console` busy/poll numbers (the more precise signal for
-isolating the loudness fix specifically) weren't captured here — that needs the interactive
-`tokio-console` viewer attached during the run, which wasn't done for this pass. A more conclusive
-before/after would need: (a) the pre-fix commit rebuilt and run through the identical script, and
-(b) `tokio-console` actually open and watched during both runs rather than relying on the coarser
-log-based watchdog.
+issue the fix targeted. Per-task busy/poll numbers (the more precise signal for isolating the
+loudness fix specifically) weren't captured here — that needed the `tokio-console` viewer, since
+removed. A more conclusive before/after would need the pre-fix commit rebuilt and run through the
+identical script.
 
 ### The always-on watchdog
 
-`src-tauri/src/stall_monitor.rs` is a dependency-free proxy for the same signal — it logs a
+`src-tauri/src/stall_monitor.rs` is a dependency-free scheduler-latency signal — it logs a
 warning if a 20ms Tokio sleep overshoots by more than 40ms. Each warning names the likely cause (a
 plain OS-thread probe running alongside tells a blocked Tokio worker apart from the whole process
 being starved, and system CPU pressure marks a stall within a few seconds of contention as
 inconclusive, since contention delays Tokio wakes far more than that one thread) and the IPC
 commands dispatched around the stall. It also warns when a synchronous
-command blocks the main thread for 32ms or more. It's coarser than `tokio-console` (it correlates
-rather than naming the exact task) but runs in every build with no special flags or features, so
-it's the first thing to check before reaching for the full `tokio-console` setup above.
+command blocks the main thread for 32ms or more. It correlates rather than naming the exact task,
+but runs in every build with no special flags or features.
 
 It's just a `log::warn!` call, so it shows up like any other backend log line:
 
@@ -421,7 +388,7 @@ Watch the terminal for lines containing `Tokio stall:` or `UI stall:` while you 
 `env_logger::Builder` in `run()`) already includes `warn`, so no `RUST_LOG` override is needed.
 Each line reports the overshoot in ms, the likely cause, and the nearby IPC commands.
 
-For an A/B comparison without `tokio-console`, redirect to a file and count occurrences over an
+For an A/B comparison, redirect to a file and count occurrences over an
 identical run of the scenario script on each build:
 
 ```bash
@@ -432,6 +399,5 @@ grep -c "Tokio stall:" /tmp/luminous-dev.log
 
 Fewer (or zero) hits on the "after" build than the "before" build is evidence the fix reduced
 scheduler contention. A silent run either way isn't proof of nothing changed, though — the 40ms
-threshold only fires on fairly gross stalls, so `tokio-console`'s per-task busy-time numbers are
-the more sensitive signal for a change that shaves a few milliseconds rather than causing an
-outright pileup.
+threshold only fires on fairly gross stalls, so it can't confirm a change that shaves only a few
+milliseconds rather than removing an outright pileup.

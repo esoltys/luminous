@@ -23,8 +23,8 @@
 //! IPC commands dispatched around it, and times synchronous commands — which
 //! Tauri runs inline on the main thread, freezing the UI while they run.
 //!
-//! This is a cheap first signal, not a substitute for `tokio-console`
-//! (see docs/PERFORMANCE.md), which can name the exact task holding a worker.
+//! It correlates a stall with nearby IPC commands rather than naming the
+//! exact task holding a worker (see docs/PERFORMANCE.md).
 
 mod cpu_pressure;
 
@@ -317,7 +317,7 @@ impl fmt::Display for Cause {
             Cause::WorkerBlocked { had_ipc: true } => f.write_str(
                 "a Tokio worker was blocked (OS-thread probe was on time) — likely blocking \
                  work (sync lock, DB query, file I/O) inside one of the async commands below; \
-                 run with tokio-console to confirm which",
+                 check the commands below",
             ),
             Cause::WorkerBlocked { had_ipc: false } => f.write_str(
                 "a Tokio worker was blocked (OS-thread probe was on time) with no IPC nearby — \

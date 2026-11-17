@@ -119,13 +119,6 @@ pub struct AutoSyncScheduler {
     next_run: parking_lot::Mutex<HashMap<ScheduleKey, i64>>,
 }
 
-fn now_unix() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
-
 impl AutoSyncScheduler {
     pub fn new() -> Self {
         Self::default()
@@ -157,7 +150,7 @@ impl AutoSyncScheduler {
         let period = std::time::Duration::from_secs(interval_secs);
         self.next_run
             .lock()
-            .insert(key, now_unix() + interval_secs as i64);
+            .insert(key, crate::clock::unix_now() + interval_secs as i64);
 
         let scheduler = Arc::clone(self);
         let handle = tauri::async_runtime::spawn(async move {
@@ -170,7 +163,7 @@ impl AutoSyncScheduler {
                 scheduler
                     .next_run
                     .lock()
-                    .insert(key, now_unix() + interval_secs as i64);
+                    .insert(key, crate::clock::unix_now() + interval_secs as i64);
 
                 if SyncGuard::is_active(kind, server_id) {
                     log::debug!(

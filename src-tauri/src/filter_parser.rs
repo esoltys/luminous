@@ -36,7 +36,7 @@
 //! last 30 days". A song with no `lastplayed` counts as older than any date.
 //! A bare integer is still an epoch-seconds timestamp, compared as-is.
 
-use chrono::{DateTime, Duration, Local, Months, NaiveDate, TimeZone};
+use jiff::{civil::Date, tz::TimeZone, Span, Zoned};
 use rusqlite::types::{ToSqlOutput, Value as SqlValue};
 use rusqlite::ToSql;
 
@@ -367,12 +367,12 @@ impl ParsedQuery {
 /// instead (quotes stripped), so malformed input degrades to a plain-text
 /// search rather than being rejected.
 pub fn parse_query(raw_query: &str) -> ParsedQuery {
-    parse_query_at(raw_query, Local::now())
+    parse_query_at(raw_query, Zoned::now().date())
 }
 
-/// [`parse_query`] with the clock injected, which relative date values
+/// [`parse_query`] with the local date injected, which relative date values
 /// (`-30d`) resolve against.
-pub fn parse_query_at(raw_query: &str, now: DateTime<Local>) -> ParsedQuery {
+pub fn parse_query_at(raw_query: &str, today: Date) -> ParsedQuery {
     let mut parsed = ParsedQuery::default();
     let tokens = tokenize(raw_query);
 
@@ -380,14 +380,14 @@ pub fn parse_query_at(raw_query: &str, now: DateTime<Local>) -> ParsedQuery {
         if let Some(bounds) = expand_range(&token) {
             let filters: Vec<FieldFilter> = bounds
                 .iter()
-                .filter_map(|bound| parse_field_filter(bound, now))
+                .filter_map(|bound| parse_field_filter(bound, today))
                 .collect();
             if filters.len() == bounds.len() {
                 parsed.field_filters.extend(filters);
                 continue;
             }
         }
-        if let Some(filter) = parse_field_filter(&token, now) {
+        if let Some(filter) = parse_field_filter(&token, today) {
             parsed.field_filters.push(filter);
         } else {
             let clean = token.trim_matches('"').trim_matches('\'').trim();
@@ -650,7 +650,7 @@ fn parse_filetype_filter(field: &str, raw: &str, op: &Op) -> Option<(Op, FilterV
     Some((op, FilterValue::IntSet(codes)))
 }
 
-fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> {
+fn parse_field_filter(token: &str, today: Date) -> Option<FieldFilter> {
     let colon_idx = token.find(':')?;
     let (field_part, val_part) = token.split_at(colon_idx);
     let field_clean = field_part.trim().to_lowercase();
@@ -694,7 +694,7 @@ fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> 
 
     if is_date_column(sql_column) {
         if let Some((op, value)) =
-            parse_day(&raw_val, now.date_naive()).and_then(|day| day_comparison(&op, day))
+            parse_day(&raw_val, today).and_then(|day| day_comparison(&op, day))
         {
             return Some(FieldFilter {
                 field: field_clean,
@@ -777,41 +777,42 @@ fn parse_field_filter(token: &str, now: DateTime<Local>) -> Option<FieldFilter> 
 /// Midnight starting `day` in the local time zone, as epoch seconds. A zone
 /// whose clocks skip midnight (a DST gap) starts the day at its first
 /// existing hour.
-fn local_day_start(day: NaiveDate) -> Option<i64> {
-    (0..4).find_map(|hour| {
-        let naive = day.and_hms_opt(hour, 0, 0)?;
-        Local
-            .from_local_datetime(&naive)
-            .earliest()
-            .map(|t| t.timestamp())
-    })
+fn local_day_start(day: Date) -> Option<i64> {
+    // jiff's default ("compatible") disambiguation starts a day whose
+    // midnight falls in a DST gap at the first local time that exists.
+    day.to_zoned(TimeZone::system())
+        .ok()
+        .map(|z| z.timestamp().as_second())
 }
 
 /// Read a date value: `YYYY-MM-DD`, or `-<n><unit>` counted back from
 /// `today` (`d` days, `w` weeks, `m` months, `y` years). `None` for anything
 /// else, including bare integers, which stay epoch timestamps.
-fn parse_day(raw: &str, today: NaiveDate) -> Option<NaiveDate> {
-    if let Ok(day) = NaiveDate::parse_from_str(raw, "%Y-%m-%d") {
+fn parse_day(raw: &str, today: Date) -> Option<Date> {
+    if let Ok(day) = Date::strptime("%Y-%m-%d", raw) {
         return Some(day);
     }
     let rest = raw.strip_prefix('-')?;
     let unit = rest.chars().last()?;
     let count: u32 = rest[..rest.len() - unit.len_utf8()].parse().ok()?;
-    match unit.to_ascii_lowercase() {
-        'd' => today.checked_sub_signed(Duration::days(i64::from(count))),
-        'w' => today.checked_sub_signed(Duration::days(i64::from(count) * 7)),
-        'm' => today.checked_sub_months(Months::new(count)),
-        'y' => today.checked_sub_months(Months::new(count.checked_mul(12)?)),
-        _ => None,
-    }
+    // Month arithmetic clamps to the end of a shorter month (Mar 31 - 1m =
+    // Feb 28), and an out-of-range result is `None`.
+    let back = match unit.to_ascii_lowercase() {
+        'd' => Span::new().try_days(i64::from(count)),
+        'w' => Span::new().try_weeks(i64::from(count)),
+        'm' => Span::new().try_months(i64::from(count)),
+        'y' => Span::new().try_years(i64::from(count)),
+        _ => return None,
+    };
+    today.checked_sub(back.ok()?).ok()
 }
 
 /// Translate "`op` this calendar day" into a comparison against epoch
 /// seconds: `>=` / `<` pin to the day's start, `>` / `<=` to the start of
 /// the next day, `=` / `!=` to the whole day.
-fn day_comparison(op: &Op, day: NaiveDate) -> Option<(Op, FilterValue)> {
+fn day_comparison(op: &Op, day: Date) -> Option<(Op, FilterValue)> {
     let start = local_day_start(day)?;
-    let end = local_day_start(day.succ_opt()?)?;
+    let end = local_day_start(day.tomorrow().ok()?)?;
     Some(match op {
         Op::Gte => (Op::Gte, FilterValue::Int(start)),
         Op::Lt => (Op::Lt, FilterValue::Int(start)),
@@ -1228,19 +1229,16 @@ mod tests {
 
     // --- date values for `added` / `lastplayed` ---
 
-    fn at(y: i32, m: u32, d: u32, h: u32) -> DateTime<Local> {
-        Local
-            .with_ymd_and_hms(y, m, d, h, 30, 0)
-            .earliest()
-            .unwrap()
+    fn at(y: i16, m: i8, d: i8) -> Date {
+        jiff::civil::date(y, m, d)
     }
 
-    fn day_start(y: i32, m: u32, d: u32) -> i64 {
-        local_day_start(NaiveDate::from_ymd_opt(y, m, d).unwrap()).unwrap()
+    fn day_start(y: i16, m: i8, d: i8) -> i64 {
+        local_day_start(jiff::civil::date(y, m, d)).unwrap()
     }
 
-    fn only_filter(query: &str, now: DateTime<Local>) -> FieldFilter {
-        let mut parsed = parse_query_at(query, now);
+    fn only_filter(query: &str, today: Date) -> FieldFilter {
+        let mut parsed = parse_query_at(query, today);
         assert!(
             parsed.bare_terms.is_empty(),
             "{query} fell back to bare terms"
@@ -1251,7 +1249,7 @@ mod tests {
 
     #[test]
     fn absolute_day_comparators_read_as_a_person_would() {
-        let now = at(2026, 6, 15, 12);
+        let now = at(2026, 6, 15);
         let (start, end) = (day_start(2026, 1, 31), day_start(2026, 2, 1));
 
         let f = only_filter("added:>=2026-01-31", now);
@@ -1277,7 +1275,7 @@ mod tests {
 
     #[test]
     fn relative_offsets_resolve_against_the_clock_to_a_day() {
-        let now = at(2026, 3, 31, 23);
+        let now = at(2026, 3, 31);
         let cases = [
             ("-30d", (2026, 3, 1)),
             ("-2w", (2026, 3, 17)),
@@ -1289,15 +1287,11 @@ mod tests {
             let f = only_filter(&format!("added:>={offset}"), now);
             assert_eq!(f.value, FilterValue::Int(day_start(y, m, d)), "{offset}");
         }
-        // The hour of the day doesn't move the window.
-        let early = only_filter("added:>=-7d", at(2026, 3, 31, 0));
-        let late = only_filter("added:>=-7d", at(2026, 3, 31, 23));
-        assert_eq!(early.value, late.value);
     }
 
     #[test]
     fn integers_and_junk_are_not_dates() {
-        let now = at(2026, 6, 15, 12);
+        let now = at(2026, 6, 15);
         let f = only_filter("added:>=1700000000", now);
         assert_eq!((f.op, f.value), (Op::Gte, FilterValue::Int(1_700_000_000)));
         let f = only_filter("added:>=-5", now);
@@ -1318,7 +1312,7 @@ mod tests {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         conn.execute("CREATE TABLE songs (id INTEGER, lastplayed INTEGER)", [])
             .unwrap();
-        let now = at(2026, 6, 15, 12);
+        let now = at(2026, 6, 15);
         let day = |y, m, d| day_start(y, m, d);
         // 1: never played, 2: long ago, 3: on 6/10 at noon, 4: today.
         for (id, lp) in [
@@ -1367,7 +1361,7 @@ mod tests {
             [],
         )
         .unwrap();
-        let now = at(2026, 6, 15, 12);
+        let now = at(2026, 6, 15);
         let day = |y, m, d| day_start(y, m, d) + 60;
         // 1: MP3 320k, 2: FLAC 96k, 3: ALAC 44.1k, 4: Opus 128k, 5: WAV
         for (id, ft, br, sr, yr, added) in [

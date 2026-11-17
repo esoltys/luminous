@@ -46,7 +46,7 @@ impl Clock for SystemClock {
         Instant::now()
     }
     fn unix_now(&self) -> i64 {
-        chrono::Utc::now().timestamp()
+        crate::clock::unix_now()
     }
 }
 

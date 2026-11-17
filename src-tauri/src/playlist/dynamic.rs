@@ -93,7 +93,7 @@ pub async fn reconcile_each_day(app: tauri::AppHandle) {
     tokio::time::sleep(crate::playlist::STARTUP_RECONCILE_DELAY).await;
     let mut last_reconciled = None;
     loop {
-        let today = chrono::Local::now().date_naive();
+        let today = jiff::Zoned::now().date();
         if last_reconciled != Some(today) {
             last_reconciled = Some(today);
             reconcile_and_sync(app.clone()).await;
@@ -339,7 +339,7 @@ impl PlaylistManager {
         let songs = self.songs_for_spec(&spec, is_system, mode)?;
 
         let conn = self.db.pool.get()?;
-        let now = chrono::Utc::now().timestamp();
+        let now = crate::clock::unix_now();
         conn.execute(
             "UPDATE playlists SET updated = ?1 WHERE id = ?2",
             params![now, playlist_id],

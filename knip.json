@@ -3,5 +3,5 @@
   "entry": ["scripts/throwaway-profile.ts"],
   "ignore": ["docs/**", "scripts/cdp-pane-client.js"],
   "ignoreDependencies": ["@typescript/native-preview"],
-  "ignoreBinaries": ["pgrep", "magick", "zsyncmake"]
+  "ignoreBinaries": ["magick", "zsyncmake"]
 }

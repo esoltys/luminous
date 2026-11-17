@@ -252,7 +252,7 @@ impl PlaylistManager {
     ) -> Result<()> {
         conn.execute(
             "UPDATE playlists SET updated = ?1 WHERE id = ?2",
-            params![chrono::Utc::now().timestamp(), playlist_id],
+            params![crate::clock::unix_now(), playlist_id],
         )?;
         Ok(())
     }

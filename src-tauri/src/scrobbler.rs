@@ -475,7 +475,7 @@ impl ScrobblerManager {
         };
 
         let timestamps = if is_playing && settings.discord_show_time {
-            let now = chrono::Utc::now().timestamp() as u64;
+            let now = crate::clock::unix_now() as u64;
             let pos_secs = (position_nanosec.max(0) as u64) / 1_000_000_000;
             let start = now.saturating_sub(pos_secs);
             let end = song
@@ -707,7 +707,7 @@ impl ScrobblerManager {
                 album: release.map(|s| s.to_string()),
                 duration_secs: duration_ms.map(|ms| (ms / 1000) as u32),
                 track_number: tracknumber,
-                timestamp: chrono::Utc::now().timestamp(),
+                timestamp: crate::clock::unix_now(),
                 mbid: song.musicbrainz_recording_id.clone(),
             };
 
@@ -1319,7 +1319,7 @@ impl ScrobblerManager {
                     })
                     .collect();
 
-                let now = chrono::Utc::now().timestamp();
+                let now = crate::clock::unix_now();
                 match lb.submit_listens(token, &payload_items).await {
                     Ok(()) => {
                         let count = entries.len() as u32;
@@ -1352,7 +1352,7 @@ impl ScrobblerManager {
                     })
                     .collect();
 
-                let now = chrono::Utc::now().timestamp();
+                let now = crate::clock::unix_now();
                 match client.scrobble_batch(session_key, &lf_tracks).await {
                     Ok(resp) => {
                         let count = resp.accepted;
