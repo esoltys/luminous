@@ -85,7 +85,7 @@
   let includeTrackList = $state(true);
   let includeLibraryInfo = $state(true);
   let includeBars = $state(true);
-  let useLogo = $state(false);
+  let useLogo = $state(true);
   let settingsLoaded = $state(false);
   let previewUrl = $state<string | null>(null);
   let rendering = $state(false);
@@ -115,7 +115,9 @@
       if (savedBars === "true" || savedBars === "false") {
         includeBars = savedBars === "true";
       }
-      if (settings[SETTING_USE_LOGO] === "true") useLogo = true;
+      if (settings[SETTING_USE_LOGO] === "true" || settings[SETTING_USE_LOGO] === "false") {
+        useLogo = settings[SETTING_USE_LOGO] === "true";
+      }
     } catch (err) {
       console.error("Failed to load share card settings:", err);
     } finally {
