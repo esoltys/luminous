@@ -790,6 +790,9 @@ export const ru = {
     aboutDedication: "❤️ моим девочкам: Николь, Брук и Рэйчел",
     aboutCreatedByPrefix: "Создано ",
     aboutCreatedBySuffix: " в Кутенеях, Британская Колумбия, Канада",
+    aboutSupportText:
+      "Luminous — бесплатный плеер с открытым исходным кодом. Если он стал частью вашего ежедневного прослушивания, вы можете поддержать разработку.",
+    aboutSupportButton: "Поддержать на Ko-fi",
     aboutLicenseSubtitle: "Лицензия MIT",
     aboutTrademarkPolicy: "Политика в отношении товарных знаков",
     generalTitle: "Общие параметры",

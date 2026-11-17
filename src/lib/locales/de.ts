@@ -714,6 +714,9 @@ export const de = {
     aboutDedication: "❤️ für meine Mädels: Nicole, Brooke und Rachel",
     aboutCreatedByPrefix: "Entwickelt von ",
     aboutCreatedBySuffix: " in den BC Kootenays, Kanada",
+    aboutSupportText:
+      "Luminous ist kostenlos und Open Source. Wenn es Teil deines täglichen Musikhörens geworden ist, unterstütze gern die Entwicklung.",
+    aboutSupportButton: "Auf Ko-fi unterstützen",
     aboutLicenseSubtitle: "MIT-Lizenz",
     aboutTrademarkPolicy: "Markenrichtlinie",
     generalTitle: "Allgemeine Einstellungen",

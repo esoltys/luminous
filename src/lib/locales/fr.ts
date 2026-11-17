@@ -718,6 +718,9 @@ export const fr: DeepStringRecord<typeof en> = {
     aboutDedication: "❤️ pour mes filles : Nicole, Brooke et Rachel",
     aboutCreatedByPrefix: "Créé par ",
     aboutCreatedBySuffix: " dans les Kootenays de la C.-B., Canada",
+    aboutSupportText:
+      "Luminous est gratuit et à code source ouvert. S'il fait désormais partie de votre écoute quotidienne, pensez à soutenir son développement.",
+    aboutSupportButton: "Me soutenir sur Ko-fi",
     aboutLicenseSubtitle: "Licence MIT",
     aboutTrademarkPolicy: "Politique sur les marques",
     generalTitle: "Paramètres généraux",
