@@ -372,9 +372,13 @@ struct ExistingSong {
     art_automatic: Option<String>,
 }
 
-/// Parses an RFC 3339 `created` timestamp into Unix seconds.
+/// Parses an RFC 3339 `created` timestamp (any offset, or `Z`) into Unix
+/// seconds; `None` when absent or malformed.
 fn created_unix(created: Option<&str>) -> Option<i64> {
-    crate::clock::parse_rfc3339_unix(created?)
+    created?
+        .parse::<jiff::Timestamp>()
+        .ok()
+        .map(|t| t.as_second())
 }
 
 /// Phase 3: write the enumeration into the library in one transaction.
@@ -600,6 +604,22 @@ fn apply_album_ratings(tx: &Connection, server_id: i64, albums: &[AlbumId3]) -> 
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn created_unix_handles_offsets_and_rejects_garbage() {
+        assert_eq!(super::created_unix(Some("1970-01-01T00:00:10Z")), Some(10));
+        assert_eq!(
+            super::created_unix(Some("1970-01-01T01:00:10+01:00")),
+            Some(10)
+        );
+        assert_eq!(
+            super::created_unix(Some("2024-01-01T00:00:00.5Z")),
+            Some(1_704_067_200)
+        );
+        assert_eq!(super::created_unix(Some("not a date")), None);
+        assert_eq!(super::created_unix(Some("2024-01-01")), None);
+        assert_eq!(super::created_unix(None), None);
+    }
+
     use super::*;
     use crate::db::Database;
     use crate::subsonic::Auth;

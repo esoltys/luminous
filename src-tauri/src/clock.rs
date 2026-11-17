@@ -27,11 +27,6 @@ fn rfc3339_of(now: &jiff::Zoned) -> String {
     now.strftime("%Y-%m-%dT%H:%M:%S%:z").to_string()
 }
 
-/// Parses an RFC 3339 timestamp (any offset, or `Z`) into Unix seconds.
-pub fn parse_rfc3339_unix(raw: &str) -> Option<i64> {
-    raw.parse::<jiff::Timestamp>().ok().map(|t| t.as_second())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -49,17 +44,5 @@ mod tests {
             .to_zoned(tz)
             .unwrap();
         assert_eq!(rfc3339_of(&t), "2026-06-15T09:00:00-06:00");
-    }
-
-    #[test]
-    fn parse_rfc3339_handles_offsets_and_rejects_garbage() {
-        assert_eq!(parse_rfc3339_unix("1970-01-01T00:00:10Z"), Some(10));
-        assert_eq!(parse_rfc3339_unix("1970-01-01T01:00:10+01:00"), Some(10));
-        assert_eq!(
-            parse_rfc3339_unix("2024-01-01T00:00:00.5Z"),
-            Some(1_704_067_200)
-        );
-        assert_eq!(parse_rfc3339_unix("not a date"), None);
-        assert_eq!(parse_rfc3339_unix("2024-01-01"), None);
     }
 }
