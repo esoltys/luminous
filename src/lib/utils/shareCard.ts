@@ -49,6 +49,9 @@ export interface ShareCardOptions {
    * Ignored when it has fewer than 2 entries; falls back to `coverDataUri`. */
   coverStackDataUris?: (string | null)[] | null;
   title: string;
+  /** Base64 data URI of a logo drawn in place of the title text (e.g. an artist's
+   * band logo). `title` stays the accessible name; omit to render the title as text. */
+  titleLogoDataUri?: string | null;
   subtitle: string;
   metadataLine: string;
   tracks?: ShareCardTrack[];
@@ -97,6 +100,8 @@ const ONE_LINE_LIST = {
   portraitMosaicFloor: 0.8,
   textHeightSlack: 1.06,
 };
+/** A title logo may be this many title-text heights tall: logos are wide marks, so they get more room than two text lines. */
+const LOGO_HEIGHT_IN_TITLES = 2.4;
 const ELLIPSIS_STYLE = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
 
 /**
@@ -280,12 +285,16 @@ export function buildShareCardSvg(options: ShareCardOptions): {
   const scrimTo = isDark ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
   const baseBg = isDark ? (options.primaryColor ?? "#0a0b0e") : "#ffffff";
   const cardPad = Math.round(width * 0.06);
-  // Portrait/square frames stack cover-then-text centered in the middle of
-  // the canvas; landscape frames keep a side-by-side row so the wide aspect
-  // isn't mostly empty gradient either side of a narrow text column.
-  const isSquare = width === height;
+  // Portrait, square and 4:3 frames stack cover-then-text centered in the middle
+  // of the canvas; wider frames (16:9) keep a side-by-side row so the wide aspect
+  // isn't mostly empty gradient either side of a narrow text column. 4:3 is too
+  // close to square for a side-by-side row to read well, so it sizes like a square
+  // off its shorter side.
   const isPortrait = height > width;
-  const isVertical = isPortrait || isSquare;
+  // Square or 4:3 (a deliberately wider cutoff than trackListLayout's own "squareish", which only governs column counts).
+  const isBoxy = !isPortrait && width / height < 1.5;
+  const isVertical = isPortrait || isBoxy;
+  const shortSide = Math.min(width, height);
   // A very elongated portrait frame (9:16) has a lot more vertical room than
   // a mild one (3:4) at the same width, so content sized purely off width
   // reads small and leaves dead space top and bottom. Scale content up
@@ -320,8 +329,8 @@ export function buildShareCardSvg(options: ShareCardOptions): {
     ? isVertical
       ? Math.min(2.8, contentScale * 2)
       : 1.6 * Math.min(1, 1440 / width)
-    : isSquare
-      ? 1.25
+    : isBoxy
+      ? 1.25 * (shortSide / width)
       : isPortrait
         ? Math.min(1.9, contentScale * 1.4)
         : contentScale;
@@ -344,8 +353,8 @@ export function buildShareCardSvg(options: ShareCardOptions): {
     ? Math.max(0.82, 1 - Math.max(0, trackCount - 12) * 0.006)
     : 1;
   const coverSize = Math.round(
-    isSquare
-      ? width * (willShowTrackList ? 0.4 * trackListDensityScale : 0.5)
+    isBoxy
+      ? shortSide * (willShowTrackList ? 0.4 * trackListDensityScale : 0.5)
       : isPortrait
         ? width *
           (willShowTrackList
@@ -436,8 +445,11 @@ export function buildShareCardSvg(options: ShareCardOptions): {
   const titleFont = width * 0.046 * textScale;
   const titleBlockWidth = textBlockMaxWidth ?? maxMosaicWidth;
   const titleLines = options.title.length * titleFont * 0.55 > titleBlockWidth ? 2 : 1;
+  // A logo is bounded to this height, so it's the title block's height when present.
+  const logoMaxHeight = Math.round(titleFont * LOGO_HEIGHT_IN_TITLES);
+  const titleHeight = options.titleLogoDataUri ? logoMaxHeight : titleFont * 1.25 * titleLines;
   const estTextHeight =
-    titleFont * 1.25 * titleLines +
+    titleHeight +
     (options.subtitle ? width * 0.026 * textScale * 1.3 + 6 : 0) +
     (options.metadataLine ? width * 0.019 * textScale * 1.3 + 6 : 0) +
     (listRows > 0
@@ -486,7 +498,11 @@ export function buildShareCardSvg(options: ShareCardOptions): {
               : buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, false)
         }
         <div style="min-width:0;${isVertical ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isVertical ? "center" : "flex-start"};text-align:${textAlign};${noCover ? "width:100%;" : textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
-          <div style="font-size:${Math.round(width * 0.046 * textScale)}px;font-weight:800;color:${textPrimary};line-height:1.25;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
+          ${
+            options.titleLogoDataUri
+              ? `<img decoding="sync" alt="${escapeHtml(options.title)}" src="${options.titleLogoDataUri}" style="max-width:100%;max-height:${logoMaxHeight}px;object-fit:contain;object-position:${isVertical ? "center" : "left"};filter:drop-shadow(0 4px 8px rgba(0,0,0,0.35));" />`
+              : `<div style="font-size:${Math.round(titleFont)}px;font-weight:800;color:${textPrimary};line-height:1.25;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>`
+          }
           <div style="font-size:${Math.round(width * 0.026 * textScale)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
           <div style="font-size:${Math.round(width * 0.019 * textScale)}px;color:${textSecondary};margin-top:6px;">${escapeHtml(options.metadataLine)}</div>
           ${showTrackList ? trackListHtml : ""}

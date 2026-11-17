@@ -37,6 +37,30 @@ describe("buildShareCardSvg", () => {
     expect(svg).toContain("&lt;script&gt;");
   });
 
+  it("draws the title logo in place of the title text when one is given (#2146)", () => {
+    const logo = "data:image/png;base64,AAAA";
+    for (const ratio of SHARE_ASPECT_RATIOS) {
+      const { svg } = buildShareCardSvg({
+        ...baseOptions,
+        aspectRatio: ratio.id,
+        titleLogoDataUri: logo,
+      });
+      expect(svg).toContain(`src="${logo}"`);
+      expect(svg).toContain('alt="Test Album"');
+      expect(svg).not.toContain(">Test Album</div>");
+    }
+  });
+
+  it("renders the title as text without a title logo", () => {
+    const { svg } = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "1:1",
+      titleLogoDataUri: null,
+    });
+    expect(svg).toContain(">Test Album</div>");
+    expect(svg).not.toContain("<img");
+  });
+
   it("omits the track list block when includeTrackList is false", () => {
     const { svg } = buildShareCardSvg({
       ...baseOptions,
@@ -201,7 +225,7 @@ describe("buildShareCardSvg", () => {
   it("caps mosaic width on horizontal frames so adjacent text has sufficient space and is not pushed offscreen", () => {
     const { svg } = buildShareCardSvg({
       ...baseOptions,
-      aspectRatio: "4:3",
+      aspectRatio: "16:9",
       includeTrackList: false,
       coverStackDataUris: [
         "data:image/png;base64,1",
@@ -210,15 +234,29 @@ describe("buildShareCardSvg", () => {
         "data:image/png;base64,4",
       ],
     });
-    const match = svg.match(/width:(\d+)px;height:(\d+)px;border-radius/);
+    const match = svg.match(/;width:([\d.]+)px;height:([\d.]+)px;border-radius/);
     expect(match).not.toBeNull();
     const mosaicWidth = Number(match![1]);
-    const cardWidth = 1440;
-    const cardPad = Math.round(1440 * 0.06);
-    const contentGap = Math.round(1440 * 0.035);
+    const cardWidth = 1920;
+    const cardPad = Math.round(1920 * 0.06);
+    const contentGap = Math.round(1920 * 0.035);
     const availWidth = cardWidth - 2 * cardPad - contentGap;
     expect(mosaicWidth).toBeLessThanOrEqual(availWidth * 0.55);
     expect(availWidth - mosaicWidth).toBeGreaterThan(500);
+  });
+
+  it("stacks the text under the cover on 4:3, like square and portrait frames", () => {
+    const stack = ["data:image/png;base64,1", "data:image/png;base64,2"];
+    const rowOf = (ratio: "4:3" | "16:9") =>
+      buildShareCardSvg({
+        ...baseOptions,
+        aspectRatio: ratio,
+        includeTrackList: false,
+        coverStackDataUris: stack,
+      }).svg;
+    expect(rowOf("4:3")).toContain("flex-direction:column;align-items:center;gap:");
+    expect(rowOf("4:3")).toContain("text-align:center");
+    expect(rowOf("16:9")).toContain("flex-direction:row");
   });
 
   function coverPixelWidth(svg: string): number {

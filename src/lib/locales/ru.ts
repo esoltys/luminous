@@ -2414,6 +2414,7 @@ export const ru = {
     themeDark: "Тёмная",
     trackListToggle: "Сведения о песне",
     libraryToggle: "Сведения о библиотеке",
+    logoToggle: "Использовать логотип",
     barsToggle: "Полосы",
     copyButton: "Копировать изображение",
     saveButton: "Сохранить изображение",

@@ -2270,6 +2270,7 @@ export const it = {
     themeDark: "Scuro",
     trackListToggle: "Info sul brano",
     libraryToggle: "Info sulla libreria",
+    logoToggle: "Usa il logo",
     barsToggle: "Barre",
     copyButton: "Copia immagine",
     saveButton: "Salva immagine",

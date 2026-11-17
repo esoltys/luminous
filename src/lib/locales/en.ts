@@ -2213,6 +2213,7 @@ export const en = {
     themeDark: "Dark",
     trackListToggle: "Song info",
     libraryToggle: "Library Info",
+    logoToggle: "Use logo",
     barsToggle: "Bars",
     copyButton: "Copy Image",
     saveButton: "Save Image",

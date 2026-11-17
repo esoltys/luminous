@@ -33,6 +33,7 @@
     songsToCoverStack,
     getArtistCoverStack,
     resolveArtistPortraitUrl,
+    resolveArtistLogoUrl,
     type CoverStackItem,
   } from "../utils/covers";
   import { bucketListeningClock } from "../utils/listeningClock";
@@ -77,12 +78,14 @@
   const SETTING_INCLUDE_TRACK_LIST = "share_card_include_track_list";
   const SETTING_INCLUDE_LIBRARY_INFO = "share_card_include_library_info";
   const SETTING_INCLUDE_BARS = "share_card_include_bars";
+  const SETTING_USE_LOGO = "share_card_use_logo";
 
   let aspectRatio = $state<ShareAspectRatio>("1:1");
   let theme = $state<ShareCardTheme>("dark");
   let includeTrackList = $state(true);
   let includeLibraryInfo = $state(true);
   let includeBars = $state(true);
+  let useLogo = $state(true);
   let settingsLoaded = $state(false);
   let previewUrl = $state<string | null>(null);
   let rendering = $state(false);
@@ -111,6 +114,9 @@
       const savedBars = settings[SETTING_INCLUDE_BARS];
       if (savedBars === "true" || savedBars === "false") {
         includeBars = savedBars === "true";
+      }
+      if (settings[SETTING_USE_LOGO] === "true" || settings[SETTING_USE_LOGO] === "false") {
+        useLogo = settings[SETTING_USE_LOGO] === "true";
       }
     } catch (err) {
       console.error("Failed to load share card settings:", err);
@@ -148,6 +154,11 @@
   $effect(() => {
     if (!settingsLoaded) return;
     void invoke("set_app_setting", { key: SETTING_INCLUDE_BARS, value: String(includeBars) });
+  });
+
+  $effect(() => {
+    if (!settingsLoaded) return;
+    void invoke("set_app_setting", { key: SETTING_USE_LOGO, value: String(useLogo) });
   });
 
   // Only the album/playlist entity cards have a track list to toggle —
@@ -191,11 +202,17 @@
 
   let artistSongs = $state<Song[]>([]);
   let artistPortraitUrl = $state<string | null>(null);
+  // The artist's band logo, as a data URI once it has loaded (null when there isn't one).
+  let artistLogoDataUri = $state<string | null>(null);
+  // Offered only when this artist has a logo that loaded; the card falls back to the name otherwise.
+  let showLogoToggle = $derived(entity.kind === "artist" && !!artistLogoDataUri);
+  let titleLogoDataUri = $derived(showLogoToggle && useLogo ? artistLogoDataUri : null);
 
   $effect(() => {
     if (entity.kind !== "artist") {
       artistSongs = [];
       artistPortraitUrl = null;
+      artistLogoDataUri = null;
       return;
     }
     const name = entity.artistName;
@@ -212,6 +229,17 @@
           collectionStore.getArtistProfile(name)?.fetched_image_filename,
         );
       }
+      const logoUrl = resolveArtistLogoUrl(
+        res?.band_logo_uri,
+        collectionStore.getArtistProfile(name)?.fetched_logo_filename,
+      );
+      if (!logoUrl) {
+        if (!cancelled) artistLogoDataUri = null;
+        return;
+      }
+      void toDataUri(logoUrl).then((uri) => {
+        if (!cancelled) artistLogoDataUri = uri;
+      });
     });
     return () => {
       cancelled = true;
@@ -656,6 +684,7 @@
         coverDataUri,
         coverStackDataUris,
         title: cardTitle,
+        titleLogoDataUri,
         subtitle: cardSubtitle,
         metadataLine: cardMetadataLine,
         tracks: trackCards,
@@ -671,6 +700,7 @@
     void theme;
     void includeTrackList;
     void includeLibraryInfo;
+    void titleLogoDataUri;
     void effectiveIncludeTrackList;
     void coverDataUri;
     void coverStackDataUris;
@@ -861,6 +891,19 @@
               checked={includeBars}
               onchange={(v) => (includeBars = v)}
               label={i18n.t("shareModal.barsToggle")}
+              showOnOffLabel={false}
+            />
+          </div>
+        {/if}
+        {#if showLogoToggle}
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap"
+              >{i18n.t("shareModal.logoToggle")}</span
+            >
+            <Toggle
+              checked={useLogo}
+              onchange={(v) => (useLogo = v)}
+              label={i18n.t("shareModal.logoToggle")}
               showOnOffLabel={false}
             />
           </div>
