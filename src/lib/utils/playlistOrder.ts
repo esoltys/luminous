@@ -84,7 +84,10 @@ function pinnedRank(p: Playlist): number {
   return PINNED_AUTO_SPECS.findIndex((s) => p.dynamic_spec?.startsWith(s));
 }
 
-const byDisplay = (p: Playlist) => ({
+// The Playlists view sorts the Custom tab by the raw `name` and the Auto tab by the display name
+// (which carries population-mode suffixes and locale-specific labels); mirror that exactly.
+const byName = (p: Playlist) => ({ label: p.name, trackCount: p.track_count, updated: p.updated });
+const byDisplayName = (p: Playlist) => ({
   label: getPlaylistDisplayName(p),
   trackCount: p.track_count,
   updated: p.updated,
@@ -109,9 +112,9 @@ export function orderPlaylists(playlists: readonly Playlist[]): Playlist[] {
     .sort((a, b) => BPM_BUCKET_ORDER.indexOf(a.name) - BPM_BUCKET_ORDER.indexOf(b.name));
 
   return [
-    ...sortByPlaylistField(custom, loadPlaylistSortPref("custom"), byDisplay),
+    ...sortByPlaylistField(custom, loadPlaylistSortPref("custom"), byName),
     ...pinned,
-    ...sortByPlaylistField(rest, loadPlaylistSortPref("auto"), byDisplay),
+    ...sortByPlaylistField(rest, loadPlaylistSortPref("auto"), byDisplayName),
     ...bpm,
   ];
 }

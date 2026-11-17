@@ -6,7 +6,6 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { orderPlaylists } from "../utils/playlistOrder";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
@@ -74,6 +73,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { orderPlaylists } from "../utils/playlistOrder";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
   import { compareSongs } from "../utils/songSort";
