@@ -34,6 +34,13 @@
   import { scrobblerStore } from "../stores/scrobbler.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
+  import {
+    BPM_BUCKET_ORDER,
+    loadPlaylistSortPref,
+    savePlaylistSortPref,
+    sortByPlaylistField,
+    type PlaylistSortField,
+  } from "../utils/playlistOrder";
 
   interface AutoDef {
     id: string;
@@ -57,18 +64,6 @@
     updated?: number;
     trackCount: number;
   }
-
-  // Fixed intensity order for the BPM auto-playlist bucket names (mirrors
-  // src-tauri/src/playlist/tempo_buckets.rs's TEMPO_BUCKETS) — alphabetical sort would
-  // scramble Down-Tempo/Mid-Tempo/Uptempo/High Energy/Extreme.
-  const BPM_BUCKET_ORDER = [
-    "Very Slow BPM",
-    "Down-Tempo BPM",
-    "Mid-Tempo BPM",
-    "Uptempo BPM",
-    "High Energy BPM",
-    "Extreme BPM",
-  ];
 
   onMount(async () => {
     try {
@@ -320,21 +315,14 @@
   });
 
   // ---- Auto grid sort (mirrors the Custom grid's field+direction sort) ----
-  let autoSortField = $state<"name" | "track_count" | "updated">(
-    (typeof window !== "undefined" &&
-      (localStorage.getItem("sort_auto_playlist_field") as "name" | "track_count" | "updated")) ||
-      "name",
-  );
-  let autoSortAsc = $state(
-    typeof window !== "undefined"
-      ? localStorage.getItem("sort_auto_playlist_asc") !== "false"
-      : true,
-  );
+  const initialAutoSort = loadPlaylistSortPref("auto");
+  let autoSortField = $state<PlaylistSortField>(initialAutoSort.field);
+  let autoSortAsc = $state(initialAutoSort.asc);
 
   // Moment Mix and Favourites/Recently Added are always pinned first, ahead of the sort
   // order applied to decade, genre & artist tag auto-playlists. BPM auto-playlists always
   // sort last, in their fixed intensity order (Down-Tempo → Extreme, set by
-  // BPM_BUCKET_ORDER above) — never interleaved into the name/track_count/
+  // BPM_BUCKET_ORDER in utils/playlistOrder) — never interleaved into the name/track_count/
   // updated sort applied to genre/decade/artist tag, which would otherwise scramble them
   // (e.g. "High Energy BPM" sorting alphabetically between two genres).
   let sortedAutoDefs = $derived.by(() => {
@@ -349,62 +337,40 @@
         d.kind !== "language" &&
         d.kind !== "country",
     );
-    const rest = autoDefs
-      .filter(
-        (d) =>
-          d.kind === "genre" ||
-          d.kind === "decade" ||
-          d.kind === "artist_tag" ||
-          d.kind === "language" ||
-          d.kind === "country",
-      )
-      .sort((a, b) => {
-        if (field === "name") {
-          return asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label);
-        }
-        const valA = field === "track_count" ? a.trackCount : (a.updated ?? 0);
-        const valB = field === "track_count" ? b.trackCount : (b.updated ?? 0);
-        return asc ? valA - valB : valB - valA;
-      });
+    const rest = autoDefs.filter(
+      (d) =>
+        d.kind === "genre" ||
+        d.kind === "decade" ||
+        d.kind === "artist_tag" ||
+        d.kind === "language" ||
+        d.kind === "country",
+    );
+    const sortedRest = sortByPlaylistField(rest, { field, asc }, (d) => ({
+      label: d.label,
+      trackCount: d.trackCount,
+      updated: d.updated ?? 0,
+    }));
     const bpmBlock = autoDefs.filter((d) => d.kind === "bpm");
-    return [...pinned, ...rest, ...bpmBlock];
+    return [...pinned, ...sortedRest, ...bpmBlock];
   });
 
   // ---- Custom grid sort ----
-  let customSortField = $state<"name" | "track_count" | "updated">(
-    (typeof window !== "undefined" &&
-      (localStorage.getItem("sort_custom_playlist_field") as "name" | "track_count" | "updated")) ||
-      "name",
-  );
-  let customSortAsc = $state(
-    typeof window !== "undefined"
-      ? localStorage.getItem("sort_custom_playlist_asc") !== "false"
-      : true,
-  );
+  const initialCustomSort = loadPlaylistSortPref("custom");
+  let customSortField = $state<PlaylistSortField>(initialCustomSort.field);
+  let customSortAsc = $state(initialCustomSort.asc);
 
   $effect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("sort_auto_playlist_field", autoSortField);
-      localStorage.setItem("sort_auto_playlist_asc", autoSortAsc.toString());
-      localStorage.setItem("sort_custom_playlist_field", customSortField);
-      localStorage.setItem("sort_custom_playlist_asc", customSortAsc.toString());
-    }
+    savePlaylistSortPref("auto", { field: autoSortField, asc: autoSortAsc });
+    savePlaylistSortPref("custom", { field: customSortField, asc: customSortAsc });
   });
 
-  let sortedPlaylists = $derived.by(() => {
-    const field = customSortField;
-    const asc = customSortAsc;
-    return customPlaylists
-      .filter((p) => !p.is_queue)
-      .sort((a, b) => {
-        if (field === "name") {
-          return asc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-        }
-        const valA = field === "track_count" ? a.track_count : a.updated;
-        const valB = field === "track_count" ? b.track_count : b.updated;
-        return asc ? valA - valB : valB - valA;
-      });
-  });
+  let sortedPlaylists = $derived(
+    sortByPlaylistField(
+      customPlaylists.filter((p) => !p.is_queue),
+      { field: customSortField, asc: customSortAsc },
+      (p) => ({ label: p.name, trackCount: p.track_count, updated: p.updated }),
+    ),
+  );
 
   let activeViewMode = $derived(
     navigationStore.playlistsSubTab === "auto"

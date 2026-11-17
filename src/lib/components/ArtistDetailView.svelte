@@ -73,6 +73,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { orderPlaylists } from "../utils/playlistOrder";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
   import { compareSongs } from "../utils/songSort";
@@ -489,8 +490,9 @@
       .then(([fetchedSongs, fetchedPlaylists, fetchedCompilations, fetchedProfile]) => {
         if (requested !== artistName) return;
         songs = Array.isArray(fetchedSongs) ? fetchedSongs : [];
+        // Same order as the Playlists view (own playlists first, then auto-playlists).
         playlists = Array.isArray(fetchedPlaylists)
-          ? fetchedPlaylists.filter((p) => !p.is_queue)
+          ? orderPlaylists(fetchedPlaylists.filter((p) => !p.is_queue))
           : [];
         compilations = Array.isArray(fetchedCompilations) ? fetchedCompilations : [];
         if (fetchedProfile?.artist_key) {

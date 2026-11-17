@@ -771,4 +771,37 @@ describe("ArtistDetailView", () => {
     expect(infoColumn!.className).toContain("min-w-0");
     expect(infoColumn!.className).not.toContain("max-w-xl");
   });
+
+  it("lists playlists featuring the artist in Playlists-view order: own first, then auto (#2145)", async () => {
+    const base = { created: 0, updated: 0, track_count: 3, is_queue: false };
+    const rows = [
+      {
+        ...base,
+        id: 1,
+        name: "Rock",
+        dynamic_enabled: true,
+        dynamic_spec: "tag:Rock",
+        is_system: true,
+      },
+      { ...base, id: 2, name: "Zed Mix", dynamic_enabled: false },
+      { ...base, id: 3, name: "Alpha Mix", dynamic_enabled: false },
+    ];
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "get_songs_by_artist") return Promise.resolve([SONG]);
+      if (cmd === "get_playlists_by_artist") return Promise.resolve(rows);
+      if (cmd === "get_playlist_tracks") return Promise.resolve([]);
+      if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+      if (cmd === "get_artist_profile") return Promise.resolve(null as any);
+      return Promise.resolve();
+    });
+
+    render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+    const [alpha, zed, rock] = await Promise.all(
+      ["Alpha Mix", "Zed Mix", "Rock"].map((n) => screen.findByText(n)),
+    );
+    const before = (a: Node, b: Node) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(before(alpha, zed)).toBe(true);
+    expect(before(zed, rock)).toBe(true);
+  });
 });
