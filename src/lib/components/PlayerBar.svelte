@@ -745,7 +745,7 @@
         label={playerStore.playbackSpeed === PLAYBACK_SPEED_NORMAL
           ? i18n.t("playerBar.menuPlaybackSpeed")
           : `${i18n.t("playerBar.menuPlaybackSpeed")} · ${formatPlaybackSpeed(playerStore.playbackSpeed)}`}
-        width={260}
+        width={300}
       >
         {#snippet children()}
           <PlaybackSpeedPanel />

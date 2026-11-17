@@ -98,11 +98,11 @@
     </button>
   </div>
 
-  <div class="flex flex-wrap justify-center gap-1.5">
+  <div class="flex flex-nowrap justify-center gap-1.5">
     {#each PLAYBACK_SPEED_PRESETS as preset (preset)}
       <button
         type="button"
-        class="speed-preset label-small {shown === preset
+        class="speed-preset label-small whitespace-nowrap {shown === preset
           ? 'bg-brand-accent text-brand-accent-contrast'
           : 'bg-brand-main text-brand-text-primary hover:bg-brand-border'}"
         aria-pressed={shown === preset}
