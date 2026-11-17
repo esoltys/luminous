@@ -6,6 +6,7 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { orderPlaylists } from "../utils/playlistOrder";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
@@ -489,8 +490,9 @@
       .then(([fetchedSongs, fetchedPlaylists, fetchedCompilations, fetchedProfile]) => {
         if (requested !== artistName) return;
         songs = Array.isArray(fetchedSongs) ? fetchedSongs : [];
+        // Same order as the Playlists view (own playlists first, then auto-playlists).
         playlists = Array.isArray(fetchedPlaylists)
-          ? fetchedPlaylists.filter((p) => !p.is_queue)
+          ? orderPlaylists(fetchedPlaylists.filter((p) => !p.is_queue))
           : [];
         compilations = Array.isArray(fetchedCompilations) ? fetchedCompilations : [];
         if (fetchedProfile?.artist_key) {
