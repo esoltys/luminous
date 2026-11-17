@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 87;
+pub const CURRENT_SCHEMA_VERSION: i32 = 88;
 
 struct Migration {
     version: i32,
@@ -907,6 +907,45 @@ const MIGRATIONS: &[Migration] = &[
                        );",
                 )?;
             }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 88,
+        description: "discard leftover pre-#548 bare-genre auto-playlists left with is_system = 0",
+        apply: |conn| {
+            // Long-lived DBs that had pre-#548 bare-genre auto-playlists (`name == dynamic_spec`,
+            // no `field:` prefix) after `schema_version` had already passed 19 were left with
+            // `is_system = 0` by migration 87, causing them to surface as Smart Playlists under
+            // Custom. Require `name = dynamic_spec` and `NOT LIKE '%:%'` so user Smart Playlists
+            // (including free-text ones whose name differs from their query) are untouched.
+            conn.execute_batch(
+                "DELETE FROM pinned_items
+                 WHERE item_type = 'playlist'
+                   AND ref_key IN (
+                     SELECT CAST(id AS TEXT) FROM playlists
+                     WHERE dynamic_enabled = 1
+                       AND is_system = 0
+                       AND name = dynamic_spec
+                       AND TRIM(COALESCE(dynamic_spec, '')) != ''
+                       AND dynamic_spec NOT LIKE '%:%'
+                   );
+                 DELETE FROM playlist_items
+                 WHERE playlist_id IN (
+                     SELECT id FROM playlists
+                     WHERE dynamic_enabled = 1
+                       AND is_system = 0
+                       AND name = dynamic_spec
+                       AND TRIM(COALESCE(dynamic_spec, '')) != ''
+                       AND dynamic_spec NOT LIKE '%:%'
+                 );
+                 DELETE FROM playlists
+                 WHERE dynamic_enabled = 1
+                   AND is_system = 0
+                   AND name = dynamic_spec
+                   AND TRIM(COALESCE(dynamic_spec, '')) != ''
+                   AND dynamic_spec NOT LIKE '%:%';",
+            )?;
             Ok(())
         },
     },
@@ -5617,5 +5656,75 @@ mod tests {
         let (song_id, _, meta) = m82_item(&conn, "imp");
         assert_eq!(song_id, Some(30));
         assert_eq!(meta, None);
+    }
+
+    #[test]
+    fn test_migration_88_discards_leftover_bare_genre_playlists_only() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_migration88_test_")
+            .tempdir()
+            .unwrap();
+        {
+            let db = Database::new(dir.path().to_path_buf()).unwrap();
+            let conn = db.pool.get().unwrap();
+            conn.execute_batch(
+                "INSERT INTO songs (id, path, title, source) VALUES (1, '/m/a.flac', 'A', 2);
+                 -- Leftover pre-#548 bare-genre rows left with is_system = 0
+                 INSERT INTO playlists (id, name, dynamic_enabled, dynamic_spec, is_system) VALUES
+                     (77, 'Country', 1, 'Country', 0),
+                     (82, 'Metal; Death Metal', 1, 'Metal; Death Metal', 0),
+                     -- Current system auto-playlist
+                     (144, 'Rock', 1, 'tag:Rock', 1),
+                     -- User Smart Playlists (field:value spec, and free-text spec with distinct name)
+                     (200, 'My Rock', 1, 'genre:rock', 0),
+                     (201, 'Live Mix', 1, 'live', 0),
+                     -- Regular custom playlist
+                     (202, 'Roadtrip', 0, NULL, 0);
+                 INSERT INTO playlist_items (playlist_id, song_id, position, uuid) VALUES
+                     (77, 1, 0, 'u77'),
+                     (82, 1, 0, 'u82'),
+                     (144, 1, 0, 'u144'),
+                     (200, 1, 0, 'u200'),
+                     (201, 1, 0, 'u201'),
+                     (202, 1, 0, 'u202');
+                 INSERT INTO pinned_items (item_type, ref_key, position, pinned_at) VALUES
+                     ('playlist', '77', 0, 1),
+                     ('playlist', '200', 1, 1);
+                 DELETE FROM schema_version WHERE version >= 88;",
+            )
+            .unwrap();
+        }
+
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        let remaining_ids: Vec<i64> = conn
+            .prepare("SELECT id FROM playlists ORDER BY id")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(remaining_ids, vec![144, 200, 201, 202]);
+
+        let item_pids: Vec<i64> = conn
+            .prepare("SELECT playlist_id FROM playlist_items ORDER BY playlist_id")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(item_pids, vec![144, 200, 201, 202]);
+
+        let pinned_keys: Vec<String> = conn
+            .prepare(
+                "SELECT ref_key FROM pinned_items WHERE item_type = 'playlist' ORDER BY ref_key",
+            )
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(pinned_keys, vec!["200".to_string()]);
     }
 }

@@ -1140,18 +1140,16 @@ fn is_tracking_default(cfg: &AudioOutputConfig) -> bool {
 fn get_default_device_name() -> Option<String> {
     use cpal::traits::HostTrait;
     let host = cpal::default_host();
-    match host.default_output_device() {
-        Some(device) => Some(resolve_default_device_name(&device)),
-        None => {
-            #[cfg(target_os = "linux")]
-            {
-                query_wpctl_default_sink().or_else(query_pactl_default_sink)
-            }
-            #[cfg(not(target_os = "linux"))]
-            {
-                None
-            }
-        }
+    let dev = host
+        .default_output_device()
+        .map(|device| resolve_default_device_name(&device));
+    #[cfg(target_os = "linux")]
+    {
+        dev.or_else(|| query_wpctl_default_sink().or_else(query_pactl_default_sink))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        dev
     }
 }
 
@@ -2340,6 +2338,9 @@ fn check_and_rebuild_output(
             }
             (false, None)
         };
+
+    #[cfg(not(target_os = "linux"))]
+    let _ = &new_default_name;
 
     // On Linux, PipeWire/PulseAudio reroutes the virtual "default" ALSA stream
     // seamlessly when the default sink changes, so we only need to publish the
