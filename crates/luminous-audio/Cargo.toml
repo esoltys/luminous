@@ -19,6 +19,8 @@ symphonia-adapter-libopus = "0.3"
 cpal = "0.18"
 ringbuf = "0.5"
 rustfft.workspace = true
+# Pitch-preserving playback speed (#2142): pure Rust WSOLA, no C toolchain.
+wsola = "0.3"
 parking_lot.workspace = true
 log.workspace = true
 anyhow.workspace = true

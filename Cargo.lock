@@ -3437,6 +3437,7 @@ dependencies = [
  "symphonia-adapter-libopus",
  "windows",
  "windows-core 0.62.2",
+ "wsola",
  "zbus",
 ]
 
@@ -8361,6 +8362,15 @@ dependencies = [
  "windows-core 0.62.2",
  "windows-version",
  "x11-dl",
+]
+
+[[package]]
+name = "wsola"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8149cd82a73bbde439d2b42a40a032de7dc28b1ec01919fcd0bd0456ecea75e6"
+dependencies = [
+ "thiserror 2.0.20",
 ]
 
 [[package]]
