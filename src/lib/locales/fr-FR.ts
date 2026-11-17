@@ -719,6 +719,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     aboutCreatedByPrefix: "Créé par ",
     aboutCreatedBySuffix: " dans les Kootenays de la C.-B., Canada",
     aboutLicenseSubtitle: "Licence MIT",
+    aboutTrademarkPolicy: "Politique sur les marques",
     generalTitle: "Paramètres généraux",
     generalSubtitle: "Configurer la langue de l'application et les préférences de format.",
     autoPlaylistsTitle: "Listes de lecture automatiques",
