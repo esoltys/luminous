@@ -60,7 +60,6 @@
   import ColumnSelector from "./ColumnSelector.svelte";
   import {
     PlayIcon as Play,
-    PlusIcon as Plus,
     PencilSimpleIcon as Edit3,
     TrashIcon as Trash2,
     WarningIcon as AlertTriangle,
@@ -70,6 +69,7 @@
     DiscIcon as DiscAlbum,
     ShieldCheckIcon as ShieldCheck,
   } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
   import type { Snippet } from "svelte";
 
   import { startPointerDrag, type PointerDragHandle } from "../utils/pointerDrag";

@@ -3,9 +3,9 @@
     ListPlusIcon as ListPlus,
     RadioIcon as Radio,
     PlaylistIcon,
-    PlusIcon as Plus,
     XIcon as X,
   } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import type { Playlist } from "../types";

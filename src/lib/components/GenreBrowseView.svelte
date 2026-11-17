@@ -1,7 +1,8 @@
 <script lang="ts">
   import CollectionHeader from "./CollectionHeader.svelte";
   import ViewModeToggle from "./ViewModeToggle.svelte";
-  import { TagIcon, PlusIcon as Plus, GitMergeIcon as GitMerge } from "phosphor-svelte";
+  import { TagIcon, GitMergeIcon as GitMerge } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
   import { onMount } from "svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { toastStore } from "../stores/toast.svelte";

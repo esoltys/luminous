@@ -3,7 +3,6 @@
   import {
     PlayIcon,
     StackIcon,
-    PlusIcon,
     ArrowsClockwiseIcon,
     DeviceMobileSpeakerIcon,
     FolderOpenIcon,
@@ -12,6 +11,7 @@
     PencilSimpleIcon,
     GearIcon,
   } from "phosphor-svelte";
+  import PlusIcon from "../PlusIcon.svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { filesStore } from "../../stores/files.svelte";
   import { playerStore } from "../../stores/player.svelte";

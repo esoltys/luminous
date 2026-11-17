@@ -1,6 +1,7 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
-  import { EjectIcon, FoldersIcon, PlusIcon, StopIcon } from "phosphor-svelte";
+  import { EjectIcon, FoldersIcon, StopIcon } from "phosphor-svelte";
+  import PlusIcon from "../PlusIcon.svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { filesStore, sameSource, sourceKey } from "../../stores/files.svelte";
   import { deviceIcon, sourceIcon } from "./sourceIcon";

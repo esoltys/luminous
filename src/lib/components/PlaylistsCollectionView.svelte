@@ -25,11 +25,11 @@
   import Button from "./Button.svelte";
   import {
     FolderOpenIcon as FolderInput,
-    PlusIcon as Plus,
     PlaylistIcon as ListMusic,
     SparkleIcon as Sparkles,
     ArrowsClockwiseIcon as RefreshCw,
   } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
   import { getPlaylistDisplayName, isSmartPlaylist, isSystemAutoPlaylist } from "../utils/playlist";
   import { scrobblerStore } from "../stores/scrobbler.svelte";
   import { picardStore } from "../stores/picard.svelte";

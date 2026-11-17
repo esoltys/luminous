@@ -2,7 +2,8 @@
   import { untrack } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { CaretDownIcon, PlusIcon, WarningIcon } from "phosphor-svelte";
+  import { CaretDownIcon, WarningIcon } from "phosphor-svelte";
+  import PlusIcon from "../PlusIcon.svelte";
   import { devicesStore } from "../../stores/devices.svelte";
   import { playlistsStore } from "../../stores/playlists.svelte";
   import { collectionStore } from "../../stores/collection.svelte";

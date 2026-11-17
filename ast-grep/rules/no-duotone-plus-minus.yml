@@ -1,0 +1,14 @@
+id: no-duotone-plus-minus
+language: html
+severity: error
+ignores:
+  - "**/PlusIcon.svelte"
+  - "**/MinusIcon.svelte"
+message: Import Plus and Minus from components/PlusIcon.svelte and MinusIcon.svelte, not from phosphor-svelte.
+note: |
+  The app's default icon weight is duotone, which turns + and - into shaded boxes that are hard to
+  read at small sizes. The wrapper components force the single-tone weight everywhere, including
+  when the icon is passed as an `icon={Plus}` prop where a weight can't be set at the call site.
+rule:
+  kind: raw_text
+  regex: '(?s)import\s*\{[^}]*\b(PlusIcon|MinusIcon)\b[^}]*\}\s*from\s*"phosphor-svelte"'

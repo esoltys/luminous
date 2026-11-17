@@ -14,11 +14,11 @@
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import {
     PlayIcon as Play,
-    PlusIcon as Plus,
     MusicNotesIcon as Music,
     DiscIcon as DiscAlbum,
     MicrophoneStageIcon as Mic2,
   } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
