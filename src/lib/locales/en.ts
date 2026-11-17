@@ -698,6 +698,7 @@ export const en = {
     aboutCreatedByPrefix: "Created by ",
     aboutCreatedBySuffix: " in the BC Kootenays, Canada",
     aboutLicenseSubtitle: "MIT License",
+    aboutTrademarkPolicy: "Trademark Policy",
     generalTitle: "General Settings",
     generalSubtitle: "Configure application language and formatting preferences.",
     autoPlaylistsTitle: "Auto-playlists",

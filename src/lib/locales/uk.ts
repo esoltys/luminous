@@ -789,6 +789,7 @@ export const uk = {
     aboutCreatedByPrefix: "Створив ",
     aboutCreatedBySuffix: " у Британській Колумбії (Кутенеї), Канада",
     aboutLicenseSubtitle: "Ліцензія MIT",
+    aboutTrademarkPolicy: "Політика щодо торговельних марок",
     generalTitle: "Загальні налаштування",
     generalSubtitle: "Налаштуйте мову застосунку та параметри форматування.",
     autoPlaylistsTitle: "Автоплейлисти",

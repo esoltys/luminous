@@ -189,3 +189,11 @@ lake build --wfail
 ```
 
 More detail: [Testing](docs/TESTING.md), [Performance](docs/PERFORMANCE.md), [Troubleshooting](docs/TROUBLESHOOTING.md), [CI](docs/CI.md).
+
+---
+
+## License & Trademarks
+
+Luminous source code is licensed under the [MIT License](LICENSE).
+
+The Luminous name, iconography, and visual branding are **not** covered by the MIT License; see [NOTICE](NOTICE) and the [Trademark Policy](TRADEMARKS.md) for details on permitted use and rebranding requirements for third-party builds.

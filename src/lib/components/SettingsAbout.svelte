@@ -22,7 +22,10 @@
     <div class="space-y-2 text-center @3xl:text-left flex-1 min-w-0">
       <div class="flex flex-wrap items-center justify-center @3xl:justify-start gap-2.5">
         <h3 class="text-2xl font-bold text-brand-text-primary">
-          {i18n.t("settings.aboutAppName", {}, "Luminous Music Player")}
+          {i18n.t("settings.aboutAppName", {}, "Luminous Music Player")}<sup
+            class="text-xs font-normal text-brand-text-secondary ml-0.5"
+            aria-label="trademark">™</sup
+          >
         </h3>
       </div>
       <p class="text-sm text-brand-text-secondary">{i18n.t("settings.aboutTagline")}</p>
@@ -130,8 +133,7 @@
       </div>
     </button>
 
-    <button
-      onclick={() => openExternalUrl("https://github.com/esoltys/luminous/blob/main/LICENSE")}
+    <div
       class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group"
     >
       <div
@@ -140,14 +142,30 @@
         <Shield class="w-5 h-5" />
       </div>
       <div class="min-w-0">
-        <p class="text-sm font-bold text-brand-text-primary truncate">
+        <button
+          onclick={() => openExternalUrl("https://github.com/esoltys/luminous/blob/main/LICENSE")}
+          class="block w-full text-left text-sm font-bold text-brand-text-primary hover:text-brand-accent-text hover:underline truncate transition-colors"
+        >
           {i18n.t("settings.aboutViewLicense")}
-        </p>
+        </button>
         <p class="text-xs text-brand-text-secondary truncate">
-          {i18n.t("settings.aboutLicenseSubtitle", {}, "MIT License")}
+          <button
+            onclick={() => openExternalUrl("https://github.com/esoltys/luminous/blob/main/LICENSE")}
+            class="hover:text-brand-accent-text hover:underline transition-colors"
+          >
+            {i18n.t("settings.aboutLicenseSubtitle", {}, "MIT License")}
+          </button>
+          <span aria-hidden="true"> · </span>
+          <button
+            onclick={() =>
+              openExternalUrl("https://github.com/esoltys/luminous/blob/main/TRADEMARKS.md")}
+            class="hover:text-brand-accent-text hover:underline transition-colors"
+          >
+            {i18n.t("settings.aboutTrademarkPolicy", {}, "Trademark Policy")}
+          </button>
         </p>
       </div>
-    </button>
+    </div>
   </div>
 
   <div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 space-y-4">

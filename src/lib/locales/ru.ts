@@ -791,6 +791,7 @@ export const ru = {
     aboutCreatedByPrefix: "Создано ",
     aboutCreatedBySuffix: " в Кутенеях, Британская Колумбия, Канада",
     aboutLicenseSubtitle: "Лицензия MIT",
+    aboutTrademarkPolicy: "Политика в отношении товарных знаков",
     generalTitle: "Общие параметры",
     generalSubtitle: "Выберите язык приложения и настройте форматирование.",
     autoPlaylistsTitle: "Автоплейлисты",

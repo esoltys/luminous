@@ -710,6 +710,7 @@ export const es = {
     aboutCreatedByPrefix: "Creado por ",
     aboutCreatedBySuffix: " en los Kootenays de Columbia Británica, Canadá",
     aboutLicenseSubtitle: "Licencia MIT",
+    aboutTrademarkPolicy: "Política de marcas",
     generalTitle: "Configuración general",
     generalSubtitle: "Configura el idioma de la aplicación y las preferencias de formato.",
     autoPlaylistsTitle: "Listas automáticas",

@@ -1,4 +1,11 @@
-The MIT License in LICENSE covers this repository.
+The MIT License in LICENSE covers the source code of this repository and does not
+grant any trademark rights.
+
+The "Luminous" and "Luminous Music Player" names, wordmarks, and official brand
+assets (including app-icon.png, app-icon.svg, static/app-icon.svg,
+static/favicon.png, static/luminous-mark.svg, static/signature.svg, and the
+assets under src-tauri/icons/) are excluded from the MIT License. All rights in
+them are reserved, and their use is governed by TRADEMARKS.md.
 
 Add-on themes distributed through the Microsoft Store (for example Mothman),
 including their artwork, code and bundles, are not part of the Software and are

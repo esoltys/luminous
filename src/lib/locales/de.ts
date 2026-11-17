@@ -715,6 +715,7 @@ export const de = {
     aboutCreatedByPrefix: "Entwickelt von ",
     aboutCreatedBySuffix: " in den BC Kootenays, Kanada",
     aboutLicenseSubtitle: "MIT-Lizenz",
+    aboutTrademarkPolicy: "Markenrichtlinie",
     generalTitle: "Allgemeine Einstellungen",
     generalSubtitle: "Sprache der App und Formatierung festlegen.",
     autoPlaylistsTitle: "Auto-Playlists",
