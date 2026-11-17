@@ -254,7 +254,10 @@ impl Player {
             if let Some(saved) = app_state_get_parsed::<f32>(&conn, "playback_speed") {
                 playback_speed = match audio.try_lock() {
                     Ok(engine) => engine.set_playback_speed(saved).unwrap_or(1.0),
-                    Err(_) => 1.0,
+                    Err(_) => {
+                        log::error!("Audio engine busy at startup: playback speed not restored");
+                        1.0
+                    }
                 };
             }
             if let Some(s) = app_state_get(&conn, "shuffle_mode") {

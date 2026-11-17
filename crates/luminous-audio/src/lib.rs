@@ -25,6 +25,14 @@
 //! overlap's first sample (scheduled into the callback), and the tail is
 //! pre-scaled by the ratio of the two gains so it keeps its own level.
 //!
+//! ## Playback speed (#2142)
+//! `decode → resample → channel match → speed stage → ring buffer`. The speed
+//! stage (`speed.rs`) is a passthrough at 1.0 and a pitch-preserving
+//! time-stretch otherwise; it runs on the decode thread, so the DSP chain below
+//! only ever sees already-stretched audio. Position counters stay on the
+//! track's own timeline: the decode thread counts what it feeds the stage and
+//! the output callback scales what it plays by the speed.
+//!
 //! ## DSP chain (contract shared with #77/#79)
 //! `decode → loudness gain (#77) → EQ preamp → EQ bands → fade envelope (#79)
 //! → volume → clip guard → output`. Each gain stage is a single precomputed
@@ -624,11 +632,6 @@ impl AudioEngine {
         let speed = snap_speed(speed);
         self.send_cmd(AudioCommand::SetSpeed(speed))?;
         Ok(speed)
-    }
-
-    /// The playback speed in effect (1.0 until `set_playback_speed` lands).
-    pub fn playback_speed(&self) -> f32 {
-        f32::from_bits(self.shared.speed.load(Ordering::Relaxed))
     }
 
     /// Set the master volume, clamped to 0.0–1.0 and to the safety ceiling
@@ -2554,6 +2557,13 @@ fn handle_decode_command(
         }
         Ok(AudioCommand::SeekTo(target_ns)) => {
             seek_session(target_ns, out, session, shared, event_tx)
+        }
+        // Already at this speed (a preset that is already selected): nothing to
+        // restart, so no audible hiccup.
+        Ok(AudioCommand::SetSpeed(speed))
+            if speed == f32::from_bits(shared.speed.load(Ordering::Relaxed)) =>
+        {
+            CmdOutcome::Continue
         }
         Ok(AudioCommand::SetSpeed(speed)) => {
             // The ring buffer holds audio decoded at the old speed, so

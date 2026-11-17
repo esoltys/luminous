@@ -14,8 +14,9 @@
     snapPlaybackSpeed,
   } from "../playbackSpeed";
 
-  // Each change restarts the audio at the current position, so a drag is applied at most
-  // every DRAG_APPLY_MS and once more on release; the readout follows the thumb meanwhile.
+  // Each change restarts the audio at the current position, so a drag is applied once the
+  // thumb has rested for DRAG_APPLY_MS, and again on release; the readout follows the thumb
+  // meanwhile.
   const DRAG_APPLY_MS = 120;
 
   let dragSpeed = $state<number | null>(null);
@@ -39,11 +40,8 @@
   function handleInput(e: Event) {
     const speed = snapPlaybackSpeed(parseFloat((e.target as HTMLInputElement).value));
     dragSpeed = speed;
-    if (!applyTimer) applyTimer = setTimeout(() => applyNow(speed), DRAG_APPLY_MS);
-    else {
-      cancelTimer();
-      applyTimer = setTimeout(() => applyNow(speed), DRAG_APPLY_MS);
-    }
+    cancelTimer();
+    applyTimer = setTimeout(() => applyNow(speed), DRAG_APPLY_MS);
   }
 
   function handleChange(e: Event) {
