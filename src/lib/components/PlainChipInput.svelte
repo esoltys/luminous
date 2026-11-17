@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { XIcon as X, PlusIcon as Plus } from "phosphor-svelte";
+  import { XIcon as X } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
 

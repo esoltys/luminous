@@ -2,7 +2,6 @@
   import { isRemoteSource } from "../utils/remoteSource";
   import {
     PlayIcon as Play,
-    PlusIcon as Plus,
     ListPlusIcon as ListPlus,
     MicrophoneStageIcon as Mic2,
     DiscIcon as DiscAlbum,
@@ -24,6 +23,7 @@
     ShieldCheckIcon as ShieldCheck,
     ProhibitIcon as Prohibit,
   } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import type { Snippet } from "svelte";
   import { i18n } from "../stores/i18n.svelte";

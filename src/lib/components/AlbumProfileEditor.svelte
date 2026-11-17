@@ -4,7 +4,6 @@
   import { onMount } from "svelte";
   import {
     XIcon as X,
-    PlusIcon as Plus,
     TrashIcon as Trash2,
     GlobeIcon as Globe,
     TagIcon,
@@ -19,6 +18,7 @@
     FolderOpenIcon as FolderOpen,
     PencilSimpleIcon as Pencil,
   } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
   import Button from "./Button.svelte";
   import MarkdownEditor from "./MarkdownEditor.svelte";
   import FormField from "./FormField.svelte";

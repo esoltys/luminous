@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { PlayIcon, PlusIcon, CaretRightIcon } from "phosphor-svelte";
+  import { PlayIcon, CaretRightIcon } from "phosphor-svelte";
+  import PlusIcon from "../PlusIcon.svelte";
   import MoreIcon from "../MoreIcon.svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { filesStore, sourceKey } from "../../stores/files.svelte";

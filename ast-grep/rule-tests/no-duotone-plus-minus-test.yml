@@ -1,0 +1,7 @@
+id: no-duotone-plus-minus
+valid:
+  - '<script lang="ts">import Plus from "./PlusIcon.svelte";</script>'
+  - '<script lang="ts">import { PlayIcon, ListPlusIcon } from "phosphor-svelte";</script>'
+invalid:
+  - '<script lang="ts">import { PlusIcon as Plus } from "phosphor-svelte";</script>'
+  - '<script lang="ts">import { CaretDownIcon, MinusIcon, WarningIcon } from "phosphor-svelte";</script>'

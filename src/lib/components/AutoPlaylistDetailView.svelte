@@ -34,7 +34,6 @@
   import { PlaylistSizeLimit } from "../utils/sizeFit.svelte";
   import {
     PlayIcon as Play,
-    PlusIcon as Plus,
     FolderPlusIcon as FolderPlus,
     MusicNotesIcon as Music,
     ArrowsClockwiseIcon as RefreshCw,
@@ -49,6 +48,7 @@
     ShareNetworkIcon as Share,
     UsbIcon as Usb,
   } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
   import MoreIcon from "./MoreIcon.svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";

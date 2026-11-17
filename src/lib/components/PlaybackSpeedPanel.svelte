@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { MinusIcon as Minus, PlusIcon as Plus } from "phosphor-svelte";
+  import Minus from "./MinusIcon.svelte";
+  import Plus from "./PlusIcon.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
   import {
@@ -70,7 +71,7 @@
       disabled={shown <= PLAYBACK_SPEED_MIN}
       onclick={() => step(-1)}
     >
-      <Minus class="w-3.5 h-3.5" weight="regular" />
+      <Minus class="w-3.5 h-3.5" />
     </button>
     <input
       type="range"
@@ -92,7 +93,7 @@
       disabled={shown >= PLAYBACK_SPEED_MAX}
       onclick={() => step(1)}
     >
-      <Plus class="w-3.5 h-3.5" weight="regular" />
+      <Plus class="w-3.5 h-3.5" />
     </button>
   </div>
 

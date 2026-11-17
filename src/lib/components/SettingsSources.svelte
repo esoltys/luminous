@@ -32,7 +32,6 @@
   import { listen } from "@tauri-apps/api/event";
   import {
     FolderIcon as Folder,
-    PlusIcon as Plus,
     TrashIcon as Trash2,
     PencilSimpleIcon as Edit3,
     ArrowsClockwiseIcon as RefreshCw,
@@ -45,6 +44,7 @@
     PlaylistIcon as ListMusic,
     ProhibitIcon as Prohibit,
   } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
 
   let editingDirectory = $state<MusicDirectory | null>(null);
   let showBlockedMetadataModal = $state(false);

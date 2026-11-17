@@ -1,7 +1,6 @@
 <script lang="ts">
   import {
     PlayIcon as Play,
-    PlusIcon as Plus,
     ListPlusIcon as ListPlus,
     MicrophoneStageIcon as Mic2,
     StackIcon as Layers,
@@ -13,6 +12,7 @@
     ShareNetworkIcon as Share,
     ShieldCheckIcon as ShieldCheck,
   } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";

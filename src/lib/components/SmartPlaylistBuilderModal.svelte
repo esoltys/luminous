@@ -8,11 +8,11 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import {
     XIcon as X,
-    PlusIcon as Plus,
     SparkleIcon as Sparkles,
     SlidersHorizontalIcon as SlidersHorizontal,
     FolderIcon as Folder,
   } from "phosphor-svelte";
+  import Plus from "./PlusIcon.svelte";
   import { stripEnclosingQuotes, type Rule } from "../utils/filterParser";
   import type { QueuePopulationMode } from "../types";
   import Toggle from "./Toggle.svelte";
