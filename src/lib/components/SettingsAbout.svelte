@@ -171,7 +171,9 @@
   <div
     class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 flex flex-col @3xl:flex-row items-center justify-between gap-4"
   >
-    <p class="text-xs text-brand-text-secondary leading-relaxed text-center @3xl:text-left">
+    <p
+      class="flex-1 min-w-0 text-xs text-brand-text-secondary leading-relaxed text-center @3xl:text-left"
+    >
       {i18n.t("settings.aboutSupportText")}
     </p>
     <button
