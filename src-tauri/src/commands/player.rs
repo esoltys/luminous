@@ -445,6 +445,27 @@ pub async fn set_volume(volume: f32, state: State<'_, AppState>) -> Result<f32, 
     Ok(player.volume)
 }
 
+/// Play at `speed` times normal without changing pitch (#2142). The engine
+/// clamps to 0.25-3.0 in 0.05 steps; the result, as applied, arrives as
+/// `playback-state` and is returned here.
+#[tauri::command]
+pub async fn set_playback_speed(
+    speed: f32,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<f32, String> {
+    use tauri::Emitter;
+    let mut player = state.player.lock().await;
+    player
+        .set_playback_speed(speed)
+        .await
+        .map_err(|e| e.to_string())?;
+    let playback_state = player.get_state().await;
+    crate::media_session::mirror_state(&app, &playback_state).await;
+    let _ = app.emit("playback-state", playback_state);
+    Ok(player.playback_speed)
+}
+
 /// Turn the volume safety ceiling (#1890) on or off and set its level; the
 /// result, including any volume it lowered, arrives as `playback-state`.
 #[tauri::command]

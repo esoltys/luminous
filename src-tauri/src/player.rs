@@ -162,6 +162,8 @@ pub struct Player {
     /// The volume safety ceiling (#1890). Persisted as
     /// `volume_safety_enabled` / `volume_safety_ceiling`.
     pub volume_safety: VolumeSafety,
+    /// Playback speed (#2142); 1.0 is normal. Persisted as `playback_speed`.
+    pub playback_speed: f32,
 
     // Loudness normalization (#77) — where the currently applied gain came
     // from, for the player-bar indicator.
@@ -218,6 +220,7 @@ impl Player {
     pub fn new(db: Arc<Database>, audio: Arc<Mutex<AudioEngine>>) -> Self {
         let mut volume = 1.0f32;
         let mut volume_safety = VolumeSafety::default();
+        let mut playback_speed = 1.0f32;
         let mut shuffle_mode = ShuffleMode::Off;
         let mut repeat_mode = RepeatMode::Off;
         let mut auto_continue = false;
@@ -245,6 +248,14 @@ impl Player {
                 // Unreachable at construction (nothing else holds the fresh
                 // engine yet), but a skipped safety cap must not be silent.
                 log::error!("Audio engine busy at startup: volume and safety ceiling not restored");
+            }
+            // Restored before anything plays, so the first track starts at
+            // the speed the user left. The engine reports what it applies.
+            if let Some(saved) = app_state_get_parsed::<f32>(&conn, "playback_speed") {
+                playback_speed = match audio.try_lock() {
+                    Ok(engine) => engine.set_playback_speed(saved).unwrap_or(1.0),
+                    Err(_) => 1.0,
+                };
             }
             if let Some(s) = app_state_get(&conn, "shuffle_mode") {
                 shuffle_mode = shuffle_mode_from_key(&s);
@@ -382,6 +393,7 @@ impl Player {
             auto_continue,
             volume,
             volume_safety,
+            playback_speed,
             current_loudness_source: loudness_source,
             current_loudness_gain_db: loudness_gain_db,
             playlist_items,
@@ -1287,6 +1299,17 @@ impl Player {
         Ok(())
     }
 
+    /// Play at `speed` (#2142). The engine clamps it to 0.25-3.0 in 0.05
+    /// steps; `self.playback_speed` holds what it applies, and that is what
+    /// gets persisted.
+    pub async fn set_playback_speed(&mut self, speed: f32) -> Result<()> {
+        self.playback_speed = self.audio.lock().await.set_playback_speed(speed)?;
+        if let Ok(conn) = self._db.pool.get() {
+            app_state_set(&conn, "playback_speed", &self.playback_speed.to_string());
+        }
+        Ok(())
+    }
+
     /// Turn the volume safety ceiling (#1890) on or off and set its level
     /// (kept within `VolumeSafety`'s bounds). Turning it on, or lowering
     /// it, brings a louder volume down to the ceiling at once.
@@ -2011,6 +2034,7 @@ impl Player {
             playlist_index,
             playlist_total,
             volume_safety: self.volume_safety,
+            playback_speed: self.playback_speed,
         }
     }
 
@@ -2337,6 +2361,30 @@ mod tests {
         assert_eq!(restarted.volume_safety, VolumeSafety::new(true, 0.6));
         assert_eq!(restarted.volume, 0.6);
         assert_eq!(fresh_audio.lock().await.current_volume(), 0.6);
+    }
+
+    #[tokio::test]
+    async fn playback_speed_is_snapped_persisted_and_restored() {
+        let (_dir, db) = setup_test_db();
+        let db_arc = Arc::new(db);
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+        assert_eq!(player.playback_speed, 1.0);
+        assert_eq!(player.get_state().await.playback_speed, 1.0);
+
+        // The engine's answer, not the request, is what is kept and shown.
+        player.set_playback_speed(1.12).await.unwrap();
+        assert_eq!(player.playback_speed, 1.10);
+        assert_eq!(player.get_state().await.playback_speed, 1.10);
+        player.set_playback_speed(9.0).await.unwrap();
+        assert_eq!(player.playback_speed, 3.0);
+        player.set_playback_speed(0.1).await.unwrap();
+        assert_eq!(player.playback_speed, 0.25);
+
+        // A restart comes back at the speed the user left.
+        player.set_playback_speed(1.5).await.unwrap();
+        let restarted = Player::new(db_arc.clone(), Arc::new(Mutex::new(AudioEngine::new())));
+        assert_eq!(restarted.playback_speed, 1.5);
     }
 
     /// Regression test for the "album skips first track, file not found"

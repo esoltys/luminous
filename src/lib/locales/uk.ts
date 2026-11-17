@@ -1847,6 +1847,13 @@ export const uk = {
     menuSongInfo: "Про пісню",
     menuMiniplayer: "Міні-плеєр",
     menuSeekbarBands: "Смуга перемотування: смуги частот",
+    menuPlaybackSpeed: "Швидкість відтворення",
+    playbackSpeedNormal: "Звичайна",
+    playbackSpeedSlower: "Повільніше",
+    playbackSpeedFaster: "Швидше",
+    playbackSpeedSlider: "Швидкість відтворення",
+    playbackSpeedReset:
+      "Відтворення зі швидкістю {speed}. Натисніть, щоб повернути звичайну швидкість.",
     menuSeekbarWaveform: "Смуга перемотування: хвильова форма",
     ctrlKey: "Ctrl",
   },

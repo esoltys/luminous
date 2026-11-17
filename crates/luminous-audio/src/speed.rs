@@ -50,10 +50,6 @@ impl SpeedStage {
         }
     }
 
-    pub(crate) fn speed(&self) -> f32 {
-        self.speed
-    }
-
     /// Change speed. Drops the stretcher's buffered audio, so callers do this
     /// only where the ring buffer is being restarted anyway (a seek).
     pub(crate) fn set_speed(&mut self, speed: f32) {
@@ -212,7 +208,6 @@ mod tests {
         let mut stage = SpeedStage::new(2.0);
         let _ = stage.process(sine(440.0, 2000), RATE, 2);
         stage.set_speed(1.0);
-        assert_eq!(stage.speed(), 1.0);
         assert!(stage.flush().is_empty());
     }
 

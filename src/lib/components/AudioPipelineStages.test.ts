@@ -2,6 +2,7 @@ import "@testing-library/jest-dom";
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/svelte";
 import AudioPipelineStages from "./AudioPipelineStages.svelte";
+import { playerStore } from "../stores/player.svelte";
 import type { AudioPipelineInfo } from "../types";
 
 function pipeline(overrides: Partial<AudioPipelineInfo> = {}): AudioPipelineInfo {
@@ -76,6 +77,21 @@ describe("AudioPipelineStages", () => {
     });
 
     expect(getByText("Bit-perfect")).toBeInTheDocument();
+  });
+
+  it("calls a sped-up or slowed-down track processed, not bit-perfect (#2142)", () => {
+    playerStore.playbackSpeed = 1.25;
+    try {
+      const { getByText, queryByText } = render(AudioPipelineStages, {
+        pipeline: pipeline({ input_sample_rate: 44_100 }),
+      });
+      expect(queryByText("Bit-perfect")).not.toBeInTheDocument();
+      expect(getByText("Processed")).toBeInTheDocument();
+      expect(getByText("Playback speed")).toBeInTheDocument();
+      expect(getByText("1.25×")).toBeInTheDocument();
+    } finally {
+      playerStore.playbackSpeed = 1;
+    }
   });
 
   it("shows hardware volume control and preserves bit-perfect status", () => {

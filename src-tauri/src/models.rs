@@ -769,6 +769,13 @@ pub struct PlaybackState {
     /// The volume safety ceiling (#1890); `volume` never exceeds it while on.
     #[serde(default)]
     pub volume_safety: VolumeSafety,
+    /// Playback speed (#2142), 1.0 = normal. Pitch is preserved.
+    #[serde(default = "default_playback_speed")]
+    pub playback_speed: f32,
+}
+
+fn default_playback_speed() -> f32 {
+    1.0
 }
 
 /// The volume safety ceiling (#1890), in volume-slider units. While

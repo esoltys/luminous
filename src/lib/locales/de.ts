@@ -1733,6 +1733,13 @@ export const de = {
     menuSongInfo: "Songinfo",
     menuMiniplayer: "Miniplayer",
     menuSeekbarBands: "Suchleiste: Frequenzbänder",
+    menuPlaybackSpeed: "Wiedergabegeschwindigkeit",
+    playbackSpeedNormal: "Normal",
+    playbackSpeedSlower: "Langsamer",
+    playbackSpeedFaster: "Schneller",
+    playbackSpeedSlider: "Wiedergabegeschwindigkeit",
+    playbackSpeedReset:
+      "Wiedergabe mit {speed}. Klicken, um zur normalen Geschwindigkeit zurückzukehren.",
     menuSeekbarWaveform: "Suchleiste: Wellenform",
     ctrlKey: "Strg",
   },

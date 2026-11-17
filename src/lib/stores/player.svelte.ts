@@ -56,6 +56,8 @@ export class PlayerStore {
   volume = $state<number>(1.0);
   /** The volume safety ceiling (#1890); null until the first playback state. */
   volumeSafety = $state<VolumeSafety | null>(null);
+  /** Playback speed (#2142); 1 is normal. Pitch is preserved. */
+  playbackSpeed = $state<number>(1);
   shuffleMode = $state<ShuffleMode>("off");
   repeatMode = $state<RepeatMode>("off");
   stopAfterCurrent = $state<boolean>(false);
@@ -399,6 +401,7 @@ export class PlayerStore {
     this.positionNanosec = state.position_nanosec;
     this.volume = state.volume;
     this.volumeSafety = state.volume_safety ?? null;
+    this.playbackSpeed = state.playback_speed ?? 1;
     this.shuffleMode = state.shuffle_mode;
     this.repeatMode = state.repeat_mode;
     this.stopAfterCurrent = state.stop_after_current;
@@ -730,6 +733,12 @@ export class PlayerStore {
    * level it reports applying rather than the one asked for. */
   async setVolume(vol: number) {
     this.volume = await invoke<number>("set_volume", { volume: vol });
+  }
+
+  /** The backend clamps to 0.25-3.0 in 0.05 steps, so keep the speed it reports applying
+   * rather than the one asked for. */
+  async setPlaybackSpeed(speed: number) {
+    this.playbackSpeed = await invoke<number>("set_playback_speed", { speed });
   }
 
   /** Turn the volume safety ceiling on or off and set its level; the result
