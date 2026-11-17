@@ -697,6 +697,9 @@ export const en = {
     aboutDedication: "❤️ to My Girls: Nicole, Brooke, and Rachel",
     aboutCreatedByPrefix: "Created by ",
     aboutCreatedBySuffix: " in the BC Kootenays, Canada",
+    aboutSupportText:
+      "Luminous is free and open source. If it's become part of your daily listening, consider supporting development.",
+    aboutSupportButton: "Support me on Ko-fi",
     aboutLicenseSubtitle: "MIT License",
     aboutTrademarkPolicy: "Trademark Policy",
     generalTitle: "General Settings",

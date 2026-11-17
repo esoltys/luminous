@@ -788,6 +788,9 @@ export const uk = {
     aboutDedication: "❤️ моїм дівчатам: Ніколь, Брук і Рейчел",
     aboutCreatedByPrefix: "Створив ",
     aboutCreatedBySuffix: " у Британській Колумбії (Кутенеї), Канада",
+    aboutSupportText:
+      "Luminous — безкоштовний програвач із відкритим вихідним кодом. Якщо він став частиною Вашого щоденного прослуховування, Ви можете підтримати розробку.",
+    aboutSupportButton: "Підтримати на Ko-fi",
     aboutLicenseSubtitle: "Ліцензія MIT",
     aboutTrademarkPolicy: "Політика щодо торговельних марок",
     generalTitle: "Загальні налаштування",

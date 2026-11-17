@@ -168,6 +168,27 @@
     </div>
   </div>
 
+  <div
+    class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 flex flex-col @3xl:flex-row items-center justify-between gap-4"
+  >
+    <p
+      class="flex-1 min-w-0 text-xs text-brand-text-secondary leading-relaxed text-center @3xl:text-left"
+    >
+      {i18n.t("settings.aboutSupportText")}
+    </p>
+    <button
+      onclick={() => openExternalUrl("https://ko-fi.com/K3K711LEE")}
+      class="shrink-0 inline-flex items-center gap-2.5 rounded-full border border-brand-border bg-brand-main hover:border-brand-accent/60 hover:bg-brand-accent/10 px-4 py-2 text-sm font-bold text-brand-text-primary transition-all group"
+    >
+      <img
+        src="/kofi-logo.png"
+        alt=""
+        class="w-5 h-5 object-contain shrink-0 drop-shadow-[0_0_1.5px_rgba(255,255,255,0.85)] group-hover:scale-105 transition-transform"
+      />
+      <span>{i18n.t("settings.aboutSupportButton")}</span>
+    </button>
+  </div>
+
   <div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 space-y-4">
     <h4 class="label-heading text-brand-text-secondary border-b border-brand-border pb-2">
       {i18n.t("settings.aboutInfluences")}
