@@ -86,7 +86,7 @@ export const LUMINOUS_DARK_COLORS: ThemeColors = {
   "color-accent-hover": "#626fe8",
   "color-text-primary": "#f1f3f8",
   "color-text-secondary": "#a6adc4",
-  "color-border": "#3d3d34",
+  "color-border": "#4f5bd5",
 };
 
 export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
@@ -97,7 +97,7 @@ export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
   "color-accent-hover": "#3a45b0",
   "color-text-primary": "#16181d",
   "color-text-secondary": "#5a6072",
-  "color-border": "#cdc7b8",
+  "color-border": "#4f5bd5",
 };
 
 const HEX6 = /^#[0-9a-f]{6}$/i;
