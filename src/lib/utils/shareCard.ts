@@ -285,12 +285,15 @@ export function buildShareCardSvg(options: ShareCardOptions): {
   const scrimTo = isDark ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
   const baseBg = isDark ? (options.primaryColor ?? "#0a0b0e") : "#ffffff";
   const cardPad = Math.round(width * 0.06);
-  // Portrait/square frames stack cover-then-text centered in the middle of
-  // the canvas; landscape frames keep a side-by-side row so the wide aspect
-  // isn't mostly empty gradient either side of a narrow text column.
-  const isSquare = width === height;
+  // Portrait, square and 4:3 frames stack cover-then-text centered in the middle
+  // of the canvas; wider frames (16:9) keep a side-by-side row so the wide aspect
+  // isn't mostly empty gradient either side of a narrow text column. 4:3 is too
+  // close to square for a side-by-side row to read well, so it sizes like a square
+  // off its shorter side.
   const isPortrait = height > width;
-  const isVertical = isPortrait || isSquare;
+  const isSquareish = !isPortrait && width / height < 1.5;
+  const isVertical = isPortrait || isSquareish;
+  const shortSide = Math.min(width, height);
   // A very elongated portrait frame (9:16) has a lot more vertical room than
   // a mild one (3:4) at the same width, so content sized purely off width
   // reads small and leaves dead space top and bottom. Scale content up
@@ -325,8 +328,8 @@ export function buildShareCardSvg(options: ShareCardOptions): {
     ? isVertical
       ? Math.min(2.8, contentScale * 2)
       : 1.6 * Math.min(1, 1440 / width)
-    : isSquare
-      ? 1.25
+    : isSquareish
+      ? 1.25 * (shortSide / width)
       : isPortrait
         ? Math.min(1.9, contentScale * 1.4)
         : contentScale;
@@ -349,8 +352,8 @@ export function buildShareCardSvg(options: ShareCardOptions): {
     ? Math.max(0.82, 1 - Math.max(0, trackCount - 12) * 0.006)
     : 1;
   const coverSize = Math.round(
-    isSquare
-      ? width * (willShowTrackList ? 0.4 * trackListDensityScale : 0.5)
+    isSquareish
+      ? shortSide * (willShowTrackList ? 0.4 * trackListDensityScale : 0.5)
       : isPortrait
         ? width *
           (willShowTrackList
