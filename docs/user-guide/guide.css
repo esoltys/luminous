@@ -228,7 +228,7 @@
   --color-accent-contrast: #ffffff;
   --color-text-primary: #16181d;
   --color-text-secondary: #5a6072;
-  --color-border: #cdc7b8;
+  --color-border: #4f5bd5;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -243,7 +243,7 @@
     --color-accent-contrast: #ffffff;
     --color-text-primary: #f1f3f8;
     --color-text-secondary: #a6adc4;
-    --color-border: #38382f;
+    --color-border: #4f5bd5;
   }
 }
 
