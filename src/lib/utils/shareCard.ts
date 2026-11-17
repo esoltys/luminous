@@ -291,8 +291,9 @@ export function buildShareCardSvg(options: ShareCardOptions): {
   // close to square for a side-by-side row to read well, so it sizes like a square
   // off its shorter side.
   const isPortrait = height > width;
-  const isSquareish = !isPortrait && width / height < 1.5;
-  const isVertical = isPortrait || isSquareish;
+  // Square or 4:3 (a deliberately wider cutoff than trackListLayout's own "squareish", which only governs column counts).
+  const isBoxy = !isPortrait && width / height < 1.5;
+  const isVertical = isPortrait || isBoxy;
   const shortSide = Math.min(width, height);
   // A very elongated portrait frame (9:16) has a lot more vertical room than
   // a mild one (3:4) at the same width, so content sized purely off width
@@ -328,7 +329,7 @@ export function buildShareCardSvg(options: ShareCardOptions): {
     ? isVertical
       ? Math.min(2.8, contentScale * 2)
       : 1.6 * Math.min(1, 1440 / width)
-    : isSquareish
+    : isBoxy
       ? 1.25 * (shortSide / width)
       : isPortrait
         ? Math.min(1.9, contentScale * 1.4)
@@ -352,7 +353,7 @@ export function buildShareCardSvg(options: ShareCardOptions): {
     ? Math.max(0.82, 1 - Math.max(0, trackCount - 12) * 0.006)
     : 1;
   const coverSize = Math.round(
-    isSquareish
+    isBoxy
       ? shortSide * (willShowTrackList ? 0.4 * trackListDensityScale : 0.5)
       : isPortrait
         ? width *
