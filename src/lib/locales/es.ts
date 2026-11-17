@@ -2269,6 +2269,7 @@ export const es = {
     themeDark: "Oscuro",
     trackListToggle: "Información de la canción",
     libraryToggle: "Información de la biblioteca",
+    logoToggle: "Usar logo",
     barsToggle: "Barras",
     copyButton: "Copiar imagen",
     saveButton: "Guardar imagen",

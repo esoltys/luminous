@@ -2406,6 +2406,7 @@ export const uk = {
     themeDark: "Темна",
     trackListToggle: "Відомості про пісню",
     libraryToggle: "Відомості про бібліотеку",
+    logoToggle: "Використовувати логотип",
     barsToggle: "Смуги",
     copyButton: "Копіювати зображення",
     saveButton: "Зберегти зображення",

@@ -37,6 +37,30 @@ describe("buildShareCardSvg", () => {
     expect(svg).toContain("&lt;script&gt;");
   });
 
+  it("draws the title logo in place of the title text when one is given (#2146)", () => {
+    const logo = "data:image/png;base64,AAAA";
+    for (const ratio of SHARE_ASPECT_RATIOS) {
+      const { svg } = buildShareCardSvg({
+        ...baseOptions,
+        aspectRatio: ratio.id,
+        titleLogoDataUri: logo,
+      });
+      expect(svg).toContain(`src="${logo}"`);
+      expect(svg).toContain('alt="Test Album"');
+      expect(svg).not.toContain(">Test Album</div>");
+    }
+  });
+
+  it("renders the title as text without a title logo", () => {
+    const { svg } = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "1:1",
+      titleLogoDataUri: null,
+    });
+    expect(svg).toContain(">Test Album</div>");
+    expect(svg).not.toContain("<img");
+  });
+
   it("omits the track list block when includeTrackList is false", () => {
     const { svg } = buildShareCardSvg({
       ...baseOptions,

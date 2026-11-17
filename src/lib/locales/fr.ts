@@ -2384,6 +2384,7 @@ export const fr: DeepStringRecord<typeof en> = {
     themeDark: "Sombre",
     trackListToggle: "Infos sur la chanson",
     libraryToggle: "Infos bibliothèque",
+    logoToggle: "Utiliser le logo",
     barsToggle: "Barres",
     copyButton: "Copier l'image",
     saveButton: "Enregistrer l'image",

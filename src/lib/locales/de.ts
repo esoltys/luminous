@@ -2280,6 +2280,7 @@ export const de = {
     themeDark: "Dunkel",
     trackListToggle: "Titelinfo",
     libraryToggle: "Mediathekinfo",
+    logoToggle: "Logo verwenden",
     barsToggle: "Balken",
     copyButton: "Bild kopieren",
     saveButton: "Bild speichern",
