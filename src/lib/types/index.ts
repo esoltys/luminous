@@ -719,6 +719,8 @@ export interface PlaybackState {
   playlist_total?: number;
   /** The volume safety ceiling (#1890); `volume` never exceeds it while on. */
   volume_safety?: VolumeSafety;
+  /** 1 = normal; absent from a backend that predates #2142. */
+  playback_speed?: number;
 }
 
 /** The volume safety ceiling (#1890), in volume-slider units. `ceiling` is

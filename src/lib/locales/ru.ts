@@ -1856,6 +1856,13 @@ export const ru = {
     menuSongInfo: "О песне",
     menuMiniplayer: "Мини-проигрыватель",
     menuSeekbarBands: "Полоса перемотки: частотные полосы",
+    menuPlaybackSpeed: "Скорость воспроизведения",
+    playbackSpeedNormal: "Обычная",
+    playbackSpeedSlower: "Медленнее",
+    playbackSpeedFaster: "Быстрее",
+    playbackSpeedSlider: "Скорость воспроизведения",
+    playbackSpeedReset:
+      "Воспроизведение со скоростью {speed}. Нажмите, чтобы вернуть обычную скорость.",
     menuSeekbarWaveform: "Полоса перемотки: волновая форма",
     ctrlKey: "Ctrl",
   },

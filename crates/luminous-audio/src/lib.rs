@@ -25,6 +25,14 @@
 //! overlap's first sample (scheduled into the callback), and the tail is
 //! pre-scaled by the ratio of the two gains so it keeps its own level.
 //!
+//! ## Playback speed (#2142)
+//! `decode → resample → channel match → speed stage → ring buffer`. The speed
+//! stage (`speed.rs`) is a passthrough at 1.0 and a pitch-preserving
+//! time-stretch otherwise; it runs on the decode thread, so the DSP chain below
+//! only ever sees already-stretched audio. Position counters stay on the
+//! track's own timeline: the decode thread counts what it feeds the stage and
+//! the output callback scales what it plays by the speed.
+//!
 //! ## DSP chain (contract shared with #77/#79)
 //! `decode → loudness gain (#77) → EQ preamp → EQ bands → fade envelope (#79)
 //! → volume → clip guard → output`. Each gain stage is a single precomputed
@@ -38,6 +46,7 @@ pub mod pcm;
 pub mod sink;
 mod source;
 mod spectrum;
+mod speed;
 // Each sink's platform-neutral helpers (failure mapping, device naming) are
 // only called on its own platform, but are built and tested everywhere.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
@@ -57,6 +66,7 @@ pub use sink::{
     OutputFallbackReason,
 };
 pub use source::OfflineDecoder;
+pub use speed::{snap_speed, MAX_SPEED, MIN_SPEED, SPEED_STEP};
 pub use symphonia::core::io::MediaSource;
 
 use ringbuf::{
@@ -166,6 +176,9 @@ enum AudioCommand {
     /// sink's hardware mixer. It carries no level so a stale command can never
     /// apply one the safety ceiling has since lowered.
     SyncHardwareVolume,
+    /// Play at this speed (already snapped) from now on. Restarts the ring
+    /// buffer at the audible position when something is playing (#2142).
+    SetSpeed(f32),
 }
 
 struct PlayRequest {
@@ -317,6 +330,13 @@ pub(crate) struct AudioShared {
     pub(crate) loudness_switch_at: AtomicU64,
     /// The gain `loudness_switch_at` switches to; written before it.
     pub(crate) loudness_switch_gain: AtomicU32,
+    /// Playback speed (#2142), in effect for the audio in the ring buffer.
+    /// Only the decode thread writes it, together with a ring restart, so
+    /// the output callback never sees audio decoded at another speed.
+    pub(crate) speed: AtomicU32,
+    /// Fraction of a timeline sample the output callback has played but not
+    /// yet added to `played_samples` (it only counts whole samples).
+    pub(crate) speed_carry: AtomicU64,
     pub(crate) fade_gain: AtomicU32,
     /// Bumped by every fade-gain write that isn't a ramp step, so an
     /// in-flight `ramp_fade_gain` stops instead of overwriting it: the
@@ -500,6 +520,8 @@ impl AudioEngine {
             loudness_generation: AtomicU64::new(0),
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
+            speed: AtomicU32::new(1.0f32.to_bits()),
+            speed_carry: AtomicU64::new(0.0f64.to_bits()),
             fade_gain: AtomicU32::new(1.0f32.to_bits()),
             fade_generation: AtomicU64::new(0),
             hardware_volume_active: std::sync::atomic::AtomicBool::new(false),
@@ -599,6 +621,17 @@ impl AudioEngine {
 
     pub fn seek_to(&self, position_nanosec: u64) -> Result<()> {
         self.send_cmd(AudioCommand::SeekTo(position_nanosec))
+    }
+
+    /// Play at `speed` times normal without changing pitch (#2142). The
+    /// request is clamped to `MIN_SPEED..=MAX_SPEED` and snapped to
+    /// `SPEED_STEP`; the speed actually used is returned, so a caller never
+    /// needs to validate. Position, seeking and handover stay on the track's
+    /// own timeline at any speed, and 1.0 leaves samples untouched.
+    pub fn set_playback_speed(&self, speed: f32) -> Result<f32> {
+        let speed = snap_speed(speed);
+        self.send_cmd(AudioCommand::SetSpeed(speed))?;
+        Ok(speed)
     }
 
     /// Set the master volume, clamped to 0.0–1.0 and to the safety ceiling
@@ -939,11 +972,21 @@ struct CrossfadeTail {
 /// `switch_at` takes effect; `None` if it lies beyond this buffer. The end is
 /// inclusive so a switch landing exactly on a buffer boundary fires in the
 /// buffer that reached it, before the decode thread can rebase the counter.
-fn loudness_switch_offset(switch_at: u64, played_before: u64, played: usize) -> Option<usize> {
-    if switch_at == NO_LOUDNESS_SWITCH || switch_at > played_before + played as u64 {
+/// `speed` converts timeline samples to the buffer's output samples (#2142).
+fn loudness_switch_offset(
+    switch_at: u64,
+    played_before: u64,
+    played: usize,
+    speed: f32,
+) -> Option<usize> {
+    // `switch_at` and `played_before` are timeline samples; the buffer's
+    // `played` samples cover `played * speed` of them.
+    let covered = (played as f64 * speed as f64).round() as u64;
+    if switch_at == NO_LOUDNESS_SWITCH || switch_at > played_before + covered {
         return None;
     }
-    Some(switch_at.saturating_sub(played_before) as usize)
+    let offset = (switch_at.saturating_sub(played_before) as f64 / speed as f64).round() as usize;
+    Some(offset.min(played))
 }
 
 /// Equal-power crossfade gains `(outgoing, incoming)` at progress `p` in
@@ -1353,6 +1396,7 @@ impl OutputRenderer {
         let mut loudness = f32::from_bits(self.shared.loudness_gain.load(Ordering::Relaxed));
         let played_before = self.played_samples.load(Ordering::Relaxed);
         let fade = f32::from_bits(self.shared.fade_gain.load(Ordering::Relaxed));
+        let speed = f32::from_bits(self.shared.speed.load(Ordering::Relaxed));
         let mut played = 0;
 
         // Non-blocking try_lock ensures CPAL callback never stalls
@@ -1383,7 +1427,7 @@ impl OutputRenderer {
         let loudness_before = loudness;
         let mut split = 0;
         let switch_at = self.shared.loudness_switch_at.load(Ordering::Acquire);
-        if let Some(k) = loudness_switch_offset(switch_at, played_before, played) {
+        if let Some(k) = loudness_switch_offset(switch_at, played_before, played, speed) {
             if self
                 .shared
                 .loudness_switch_at
@@ -1465,10 +1509,21 @@ impl OutputRenderer {
             self.shared.visualizer_buf.push(&self.mono_scratch);
         }
 
-        let total_played = self
-            .played_samples
-            .fetch_add(played as u64, Ordering::Relaxed)
-            + played as u64;
+        // `played_samples` is on the track's own timeline, so at another
+        // speed each output sample advances it by `speed` samples. Only whole
+        // samples are added; the remainder carries to the next callback.
+        let advance = if speed == 1.0 {
+            played as u64
+        } else {
+            let carried = f64::from_bits(self.shared.speed_carry.load(Ordering::Relaxed))
+                + played as f64 * speed as f64;
+            let whole = carried.floor();
+            self.shared
+                .speed_carry
+                .store((carried - whole).to_bits(), Ordering::Relaxed);
+            whole as u64
+        };
+        let total_played = self.played_samples.fetch_add(advance, Ordering::Relaxed) + advance;
         let pos_ns = (total_played as f64 * 1_000_000_000.0
             / (self.sample_rate as f64 * self.channels as f64)) as u64;
         self.shared.position.store(pos_ns, Ordering::Relaxed);
@@ -1800,6 +1855,9 @@ struct DecodeSession {
     /// "space" as `AudioOutput::played_samples` (kept in sync at every
     /// buffer clear).
     pushed_samples: u64,
+    /// Playback speed stage (#2142). `pushed_samples` counts what goes into
+    /// it (timeline samples), not what comes out.
+    speed: speed::SpeedStage,
     target_sample_rate: u32,
     target_channels: u16,
     last_device_check: std::time::Instant,
@@ -1974,6 +2032,12 @@ fn decode_thread(
                         }
                         continue;
                     }
+                    // Nothing is playing, so there is no ring buffer to
+                    // restart: the next track starts at this speed.
+                    Ok(AudioCommand::SetSpeed(speed)) => {
+                        shared.speed.store(speed.to_bits(), Ordering::Relaxed);
+                        continue;
+                    }
                     Ok(_) => continue, // Ignore other commands when stopped
                     Err(_) => break,   // Channel disconnected
                 }
@@ -2006,6 +2070,9 @@ fn decode_thread(
                     if let Some(out) = output.as_ref() {
                         out.sink.set_hardware_volume(shared.current_volume());
                     }
+                }
+                Ok(AudioCommand::SetSpeed(speed)) => {
+                    shared.speed.store(speed.to_bits(), Ordering::Relaxed);
                 }
                 // Pause/Resume/SeekTo/Preload target a track that hasn't
                 // started playing yet at this point — nothing to apply.
@@ -2085,6 +2152,7 @@ fn decode_thread(
             crossfade_incoming_gain: 1.0,
             outgoing: None,
             pushed_samples: start_samples,
+            speed: speed::SpeedStage::new(f32::from_bits(shared.speed.load(Ordering::Relaxed))),
             target_sample_rate,
             target_channels,
             last_device_check: std::time::Instant::now(),
@@ -2488,71 +2556,32 @@ fn handle_decode_command(
             CmdOutcome::RequeuePlay(new_req)
         }
         Ok(AudioCommand::SeekTo(target_ns)) => {
-            log::debug!("SeekTo command received. target_ns: {target_ns}");
-
-            // A seek cuts any crossfade tail still being mixed in.
-            session.outgoing = None;
-            shared.cancel_loudness_switch();
-            if let Some(t) = session.transition.take() {
-                // Mid-handover seek: the audible position is still in
-                // the finished track but its decoder is gone — reopen
-                // it fresh at the target. The preload is dropped so
-                // AboutToFinish re-arms naturally on the new track.
-                session.next = None;
-                match ActiveTrack::open(
-                    &shared.open_source,
-                    t.finished,
-                    target_ns,
-                    session.target_sample_rate,
-                    session.target_channels as usize,
-                ) {
-                    Ok(t) => session.current = t,
-                    Err(message) => {
-                        let _ = event_tx.send(AudioEvent::Error { message });
-                        return CmdOutcome::BreakDecode;
-                    }
-                }
-            } else {
-                let target_time = symphonia::core::units::Time::from_nanos(target_ns as i64);
-                let seek_res = session.current.format.seek(
-                    symphonia::core::formats::SeekMode::Accurate,
-                    symphonia::core::formats::SeekTo::Time {
-                        time: target_time,
-                        track_id: Some(session.current.track_id),
-                    },
-                );
-                match seek_res {
-                    Ok(seeked_to) => {
-                        session.current.decoder.reset();
-                        log::info!("Seek successful: {seeked_to:?}");
-                    }
-                    Err(e) => {
-                        log::error!("Seek failed: {e:?}");
-                    }
-                }
-                session.current.decoded_pos_ns = target_ns;
-                session.current.eof = false;
-                session.current.resampler = Resampler::new(
-                    session.current.src_rate,
-                    session.target_sample_rate,
-                    session.target_channels as usize,
-                );
-            }
-
-            // Clear the buffer after seek to avoid stale audio
-            {
-                let mut consumer = out.consumer.lock();
-                while consumer.try_pop().is_some() {}
-            }
-            let target_samples = samples_for_ns(
-                target_ns,
-                session.target_sample_rate,
-                session.target_channels,
-            );
-            out.played_samples.store(target_samples, Ordering::Relaxed);
-            session.pushed_samples = target_samples;
-            position.store(target_ns, Ordering::Relaxed);
+            seek_session(target_ns, out, session, shared, event_tx)
+        }
+        // Already at this speed (a preset that is already selected): nothing to
+        // restart, so no audible hiccup.
+        Ok(AudioCommand::SetSpeed(speed))
+            if speed == f32::from_bits(shared.speed.load(Ordering::Relaxed)) =>
+        {
             CmdOutcome::Continue
+        }
+        Ok(AudioCommand::SetSpeed(speed)) => {
+            // The ring buffer holds audio decoded at the old speed, so
+            // restart it at the audible position, then publish the new
+            // speed for the output callback (#2142).
+            let outcome = seek_session(
+                position.load(Ordering::Relaxed),
+                out,
+                session,
+                shared,
+                event_tx,
+            );
+            session.speed.set_speed(speed);
+            shared
+                .speed_carry
+                .store(0.0f64.to_bits(), Ordering::Relaxed);
+            shared.speed.store(speed.to_bits(), Ordering::Relaxed);
+            outcome
         }
         Ok(AudioCommand::PreloadNext(preq)) => {
             session.next = open_preload(out, session, shared, preq);
@@ -2586,6 +2615,85 @@ fn handle_decode_command(
             CmdOutcome::Continue
         }
     }
+}
+
+/// Move the live session to `target_ns` on the current track: reopen or seek
+/// the decoder, restart the ring buffer and rebase the position counters.
+fn seek_session(
+    target_ns: u64,
+    out: &mut AudioOutput,
+    session: &mut DecodeSession,
+    shared: &Arc<AudioShared>,
+    event_tx: &mpsc::Sender<AudioEvent>,
+) -> CmdOutcome {
+    let position = &shared.position;
+    log::debug!("SeekTo command received. target_ns: {target_ns}");
+
+    // A seek cuts any crossfade tail still being mixed in.
+    session.outgoing = None;
+    shared.cancel_loudness_switch();
+    if let Some(t) = session.transition.take() {
+        // Mid-handover seek: the audible position is still in
+        // the finished track but its decoder is gone — reopen
+        // it fresh at the target. The preload is dropped so
+        // AboutToFinish re-arms naturally on the new track.
+        session.next = None;
+        match ActiveTrack::open(
+            &shared.open_source,
+            t.finished,
+            target_ns,
+            session.target_sample_rate,
+            session.target_channels as usize,
+        ) {
+            Ok(t) => session.current = t,
+            Err(message) => {
+                let _ = event_tx.send(AudioEvent::Error { message });
+                return CmdOutcome::BreakDecode;
+            }
+        }
+    } else {
+        let target_time = symphonia::core::units::Time::from_nanos(target_ns as i64);
+        let seek_res = session.current.format.seek(
+            symphonia::core::formats::SeekMode::Accurate,
+            symphonia::core::formats::SeekTo::Time {
+                time: target_time,
+                track_id: Some(session.current.track_id),
+            },
+        );
+        match seek_res {
+            Ok(seeked_to) => {
+                session.current.decoder.reset();
+                log::info!("Seek successful: {seeked_to:?}");
+            }
+            Err(e) => {
+                log::error!("Seek failed: {e:?}");
+            }
+        }
+        session.current.decoded_pos_ns = target_ns;
+        session.current.eof = false;
+        session.current.resampler = Resampler::new(
+            session.current.src_rate,
+            session.target_sample_rate,
+            session.target_channels as usize,
+        );
+    }
+
+    // Clear the buffer after seek to avoid stale audio
+    {
+        let mut consumer = out.consumer.lock();
+        while consumer.try_pop().is_some() {}
+    }
+    let target_samples = samples_for_ns(
+        target_ns,
+        session.target_sample_rate,
+        session.target_channels,
+    );
+    out.played_samples.store(target_samples, Ordering::Relaxed);
+    session.pushed_samples = target_samples;
+    position.store(target_ns, Ordering::Relaxed);
+    // Whatever the speed stage buffered belongs to the old position.
+    session.speed.reset();
+    CmdOutcome::Continue
 }
 
 /// Drives steps 3+4 of one `'decode` iteration: complete a pending gapless
@@ -2664,6 +2772,13 @@ fn handle_eof(
     // length overstated it) — nothing left to mix the tail into.
     session.outgoing = None;
 
+    // Whatever the speed stage still holds belongs to this track: play it
+    // out before a handover or the drain, then start the next track clean.
+    let tail = session.speed.flush();
+    if !tail.is_empty() {
+        push_to_ring(out, &tail);
+    }
+
     if session.transition.is_some() {
         // Waiting for the boundary to be consumed before the next (already
         // fully decoded) track can take over.
@@ -2735,9 +2850,23 @@ fn decode_one_packet(
         }
     }
 
+    // Timeline samples consumed, before the speed stage changes the length.
+    let timeline_samples = resampled.len() as u64;
+    let resampled = session.speed.process(
+        resampled,
+        session.target_sample_rate,
+        session.target_channels as usize,
+    );
+    push_to_ring(out, &resampled);
+    session.pushed_samples += timeline_samples;
+    DecodeStepOutcome::Decoded
+}
+
+/// Push `samples` into the ring buffer, waiting for the output to make room.
+fn push_to_ring(out: &mut AudioOutput, samples: &[f32]) {
     let mut pushed = 0;
-    while pushed < resampled.len() {
-        let written = out.producer.push_slice(&resampled[pushed..]);
+    while pushed < samples.len() {
+        let written = out.producer.push_slice(&samples[pushed..]);
         if written == 0 {
             // Ring buffer is full, sleep a bit and try again
             std::thread::sleep(std::time::Duration::from_millis(5));
@@ -2745,8 +2874,6 @@ fn decode_one_packet(
             pushed += written;
         }
     }
-    session.pushed_samples += resampled.len() as u64;
-    DecodeStepOutcome::Decoded
 }
 
 /// Result of reading and decoding one packet of an `ActiveTrack`.
@@ -3165,6 +3292,8 @@ mod tests {
             loudness_generation: AtomicU64::new(0),
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
+            speed: AtomicU32::new(1.0f32.to_bits()),
+            speed_carry: AtomicU64::new(0.0f64.to_bits()),
             fade_gain: AtomicU32::new(1.0f32.to_bits()),
             fade_generation: AtomicU64::new(0),
             hardware_volume_active: std::sync::atomic::AtomicBool::new(false),
@@ -3350,14 +3479,17 @@ mod tests {
     #[test]
     fn loudness_switch_offset_lands_on_the_scheduled_sample() {
         // Buffer covers played-sample indices 1000..1512.
-        assert_eq!(loudness_switch_offset(1200, 1000, 512), Some(200));
+        assert_eq!(loudness_switch_offset(1200, 1000, 512, 1.0), Some(200));
         // Exactly at the buffer's end: fires now (offset = whole buffer), so
         // the next buffer isn't racing the decode thread's counter rebase.
-        assert_eq!(loudness_switch_offset(1512, 1000, 512), Some(512));
-        assert_eq!(loudness_switch_offset(1513, 1000, 512), None);
+        assert_eq!(loudness_switch_offset(1512, 1000, 512, 1.0), Some(512));
+        assert_eq!(loudness_switch_offset(1513, 1000, 512, 1.0), None);
         // Already passed (e.g. a buffer with no output): apply immediately.
-        assert_eq!(loudness_switch_offset(900, 1000, 512), Some(0));
-        assert_eq!(loudness_switch_offset(NO_LOUDNESS_SWITCH, 1000, 512), None);
+        assert_eq!(loudness_switch_offset(900, 1000, 512, 1.0), Some(0));
+        assert_eq!(
+            loudness_switch_offset(NO_LOUDNESS_SWITCH, 1000, 512, 1.0),
+            None
+        );
     }
 
     #[test]
@@ -3504,6 +3636,69 @@ mod tests {
             budget_us
         );
         std::hint::black_box(&output);
+    }
+
+    /// A renderer over a ring buffer pre-filled with `frames` of silence.
+    fn renderer_with_audio(
+        shared: &Arc<AudioShared>,
+        frames: usize,
+    ) -> (OutputRenderer, Arc<AtomicU64>) {
+        let len = frames * 2;
+        let (mut producer, consumer) = HeapRb::<f32>::new(len).split();
+        producer.push_slice(&vec![0.0f32; len]);
+        let played = Arc::new(AtomicU64::new(0));
+        let renderer = OutputRenderer {
+            shared: Arc::clone(shared),
+            consumer: Arc::new(Mutex::new(consumer)),
+            played_samples: Arc::clone(&played),
+            mono_scratch: Vec::with_capacity(len),
+            sample_rate: 48_000,
+            channels: 2,
+        };
+        (renderer, played)
+    }
+
+    #[test]
+    fn position_runs_on_the_track_timeline_at_any_speed() {
+        for (speed, expected_secs) in [(1.0f32, 1.0f64), (2.0, 2.0), (0.5, 0.5), (1.05, 1.05)] {
+            let shared = Arc::new(test_shared());
+            shared.speed.store(speed.to_bits(), Ordering::Relaxed);
+            // One second of output, rendered in odd-sized buffers so the
+            // fractional carry is exercised.
+            let (mut renderer, _) = renderer_with_audio(&shared, 48_000);
+            let mut buf = vec![0.0f32; 2 * 441];
+            let mut rendered = 0;
+            while rendered + buf.len() <= 2 * 48_000 {
+                renderer.render(&mut buf);
+                rendered += buf.len();
+            }
+            let secs = shared.position.load(Ordering::Relaxed) as f64 / 1e9;
+            let played_secs = rendered as f64 / 2.0 / 48_000.0;
+            assert!(
+                (secs - played_secs * expected_secs).abs() < 0.001,
+                "speed {speed}: position {secs}s after {played_secs}s of output"
+            );
+        }
+    }
+
+    #[test]
+    fn loudness_switch_offset_converts_timeline_samples_at_speed() {
+        // A 512-sample buffer at 2x covers 1024 timeline samples.
+        assert_eq!(loudness_switch_offset(1400, 1000, 512, 2.0), Some(200));
+        assert_eq!(loudness_switch_offset(2024, 1000, 512, 2.0), Some(512));
+        assert_eq!(loudness_switch_offset(2025, 1000, 512, 2.0), None);
+        // At half speed the same buffer covers 256 timeline samples.
+        assert_eq!(loudness_switch_offset(1100, 1000, 512, 0.5), Some(200));
+        assert_eq!(loudness_switch_offset(1257, 1000, 512, 0.5), None);
+    }
+
+    #[test]
+    fn setting_the_speed_returns_the_snapped_value() {
+        let engine = AudioEngine::new();
+        assert_eq!(engine.set_playback_speed(1.12).unwrap(), 1.10);
+        assert_eq!(engine.set_playback_speed(99.0).unwrap(), MAX_SPEED);
+        assert_eq!(engine.set_playback_speed(0.0).unwrap(), MIN_SPEED);
+        assert_eq!(engine.set_playback_speed(f32::NAN).unwrap(), 1.0);
     }
 
     #[test]

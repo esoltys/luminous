@@ -1537,6 +1537,7 @@ pub fn run() {
             commands::player::previous_track,
             commands::player::seek_to,
             commands::player::set_volume,
+            commands::player::set_playback_speed,
             commands::player::set_volume_safety,
             commands::player::get_playback_state,
             commands::player::refresh_playback_queue,

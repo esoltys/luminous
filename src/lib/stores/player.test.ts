@@ -79,6 +79,13 @@ describe("PlayerStore", () => {
     expect(invoke).toHaveBeenCalledWith("set_volume", { volume: 0.75 });
   });
 
+  it("keeps the playback speed the backend applied, not the one asked for (#2142)", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(1.1);
+    await store.setPlaybackSpeed(1.12);
+    expect(invoke).toHaveBeenCalledWith("set_playback_speed", { speed: 1.12 });
+    expect(store.playbackSpeed).toBe(1.1);
+  });
+
   it("should update shuffle mode locally and invoke set_shuffle_mode", async () => {
     await store.setShuffleMode("all");
     expect(store.shuffleMode).toBe("all");

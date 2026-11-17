@@ -20,6 +20,9 @@
   import LinkButton from "./LinkButton.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
+  import ContextMenuSubmenu from "./ContextMenuSubmenu.svelte";
+  import PlaybackSpeedPanel from "./PlaybackSpeedPanel.svelte";
+  import { PLAYBACK_SPEED_NORMAL, formatPlaybackSpeed } from "../playbackSpeed";
   import TagEditor from "./TagEditor.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { openInPicard } from "../utils/picard";
@@ -55,6 +58,7 @@
     PaletteIcon as Palette,
     PictureInPictureIcon as PictureInPicture,
     SlidersIcon as Sliders,
+    GaugeIcon as Gauge,
     DiscIcon as DiscAlbum,
     MicrophoneStageIcon as Mic2,
     PlaylistIcon as ListMusic,
@@ -353,6 +357,24 @@
 <!-- The "more" button opens the song menu. It is the dock's only route to Lyrics, Song info,
      the Mini-player and the seek bar mode, so every width tier shows it: the right-hand
      cluster in the full tier, the transport row in the compact tier. -->
+<!-- Shown only away from normal speed, so a speed that persists across restarts is never
+     invisible; a click puts it back to normal. -->
+{#snippet speedChip()}
+  {#if playerStore.playbackSpeed !== PLAYBACK_SPEED_NORMAL}
+    <button
+      type="button"
+      onclick={() => playerStore.setPlaybackSpeed(PLAYBACK_SPEED_NORMAL)}
+      class="inline-flex items-center flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums bg-brand-main text-brand-text-primary hover:bg-brand-border transition-colors"
+      title={i18n.t("playerBar.playbackSpeedReset", {
+        speed: formatPlaybackSpeed(playerStore.playbackSpeed),
+      })}
+      data-testid="playback-speed-chip"
+    >
+      {formatPlaybackSpeed(playerStore.playbackSpeed)}
+    </button>
+  {/if}
+{/snippet}
+
 {#snippet moreButton(iconClass: string)}
   <button
     onmousedown={() => (menuWasOpenOnPress = contextMenuState !== null)}
@@ -582,6 +604,7 @@
         {/if}
 
         {#if windowLayoutStore.isPlayerBarCompact}
+          {@render speedChip()}
           {@render moreButton("w-5 h-5")}
         {/if}
       </div>
@@ -650,6 +673,7 @@
             aria-label={i18n.t("playerBar.volumeSlider")}
             title={i18n.t("playerBar.volumeWithValue", { value: Math.round(volumePercent) })}
           />
+          {@render speedChip()}
           {@render moreButton("w-5 h-5")}
         </div>
       </div>
@@ -716,6 +740,17 @@
             navigationStore.openSettings("equalizer");
           })}
       />
+      <ContextMenuSubmenu
+        icon={Gauge}
+        label={playerStore.playbackSpeed === PLAYBACK_SPEED_NORMAL
+          ? i18n.t("playerBar.menuPlaybackSpeed")
+          : `${i18n.t("playerBar.menuPlaybackSpeed")} · ${formatPlaybackSpeed(playerStore.playbackSpeed)}`}
+        width={300}
+      >
+        {#snippet children()}
+          <PlaybackSpeedPanel />
+        {/snippet}
+      </ContextMenuSubmenu>
       <ContextMenuItem
         icon={PictureInPicture}
         label={i18n.t("playerBar.menuMiniplayer", {}, "Mini-player")}

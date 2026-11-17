@@ -34,3 +34,7 @@ debug = true
 # debug info.
 [profile.dev.package."*"]
 opt-level = 2
+
+# WSOLA is a per-sample hot loop; keep it optimized in debug builds too.
+[profile.dev.package.wsola]
+opt-level = 3

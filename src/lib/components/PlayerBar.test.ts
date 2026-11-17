@@ -2,6 +2,7 @@ import "@testing-library/jest-dom";
 import { tick } from "svelte";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, screen } from "@testing-library/svelte";
+import { invoke } from "@tauri-apps/api/core";
 import PlayerBar from "./PlayerBar.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { collectionStore } from "../stores/collection.svelte";
@@ -70,6 +71,31 @@ describe("PlayerBar.svelte", () => {
     navigationStore.playlistsSubTab = "custom";
     navigationStore.selectedPlaylistId = null;
     playlistsStore.playlists = [];
+  });
+
+  it("shows the speed chip only away from normal speed, and resets it on click (#2142)", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    playerStore.playbackSpeed = 1;
+    const { queryByTestId, getByTestId } = render(PlayerBar);
+    expect(queryByTestId("playback-speed-chip")).not.toBeInTheDocument();
+
+    playerStore.playbackSpeed = 1.25;
+    await tick();
+    expect(getByTestId("playback-speed-chip")).toHaveTextContent("1.25×");
+
+    await fireEvent.click(getByTestId("playback-speed-chip"));
+    expect(invoke).toHaveBeenCalledWith("set_playback_speed", { speed: 1 });
+    playerStore.playbackSpeed = 1;
+  });
+
+  it("opens the speed panel from the song menu (#2142)", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    const { getByTitle, getByText, findByTestId } = render(PlayerBar);
+    await fireEvent.click(getByTitle("Song menu"));
+    await fireEvent.mouseEnter(getByText("Playback speed").closest("div")!);
+    expect(await findByTestId("playback-speed-panel")).toBeInTheDocument();
   });
 
   it("renders 'Not Playing' state when currentSong is undefined", () => {

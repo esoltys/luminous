@@ -2,6 +2,7 @@
   import type { AudioPipelineInfo, LoudnessGainSource } from "../types";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { PLAYBACK_SPEED_NORMAL, formatPlaybackSpeed } from "../playbackSpeed";
   import {
     CpuIcon as Cpu,
     SlidersIcon as Sliders,
@@ -67,9 +68,13 @@
   // track's rate differs from the device's.
   let resampled = $derived(!!pipeline?.resample_rate);
 
-  // Untouched by Luminous: no EQ, normalization or resampling.
+  // Untouched by Luminous: no EQ, normalization, resampling or speed change (#2142).
   let unprocessed = $derived(
-    !!pipeline && !pipeline.eq_enabled && pipeline.loudness_source === "disabled" && !resampled,
+    !!pipeline &&
+      !pipeline.eq_enabled &&
+      pipeline.loudness_source === "disabled" &&
+      !resampled &&
+      playerStore.playbackSpeed === PLAYBACK_SPEED_NORMAL,
   );
   // Volume is neutral if handled in device hardware or set to 100% in software.
   let volumeNeutral = $derived(
@@ -224,6 +229,18 @@
             {/if}
           </span>
         </div>
+
+        <!-- Playback speed (#2142): a stretched signal is never bit-perfect -->
+        {#if playerStore.playbackSpeed !== PLAYBACK_SPEED_NORMAL}
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-brand-text-secondary font-medium"
+              >{i18n.t("playerBar.menuPlaybackSpeed")}</span
+            >
+            <span class="font-semibold text-right text-brand-text-primary">
+              {formatPlaybackSpeed(playerStore.playbackSpeed)}
+            </span>
+          </div>
+        {/if}
 
         <!-- Headroom / Bit-perfect note -->
         <div class="flex items-center justify-between gap-2">
