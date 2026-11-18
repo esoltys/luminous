@@ -93,15 +93,15 @@ impl crate::background_reads::BackgroundRead for ProvenanceReader {
         .optional()
     }
 
-    fn read(&mut self, song_id: i64, _path: &Path) -> crate::background_reads::Read {
+    fn read(&mut self, song_id: i64, _path: &Path) -> crate::background_reads::ReadOutcome {
         match verify_song_provenance(&self.db, song_id) {
             Ok(prov) => {
                 let _ = self.app.emit("song-provenance-changed", &prov);
-                crate::background_reads::Read::Stored
+                crate::background_reads::ReadOutcome::Stored
             }
             Err(e) => {
                 log::debug!("Background provenance skipped song {song_id}: {e}");
-                crate::background_reads::Read::NothingStored
+                crate::background_reads::ReadOutcome::NothingStored
             }
         }
     }

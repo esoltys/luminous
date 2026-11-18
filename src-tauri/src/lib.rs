@@ -1261,7 +1261,7 @@ pub fn run() {
             {
                 let handle = app.handle();
                 let db = &state.db;
-                let reprobe = (handle.clone(), Arc::clone(db));
+                let (reprobe_app, reprobe_db) = (handle.clone(), Arc::clone(db));
                 crate::background_reads::BackgroundReadRunner::new(
                     Arc::clone(db),
                     vec![
@@ -1289,7 +1289,7 @@ pub fn run() {
                 )
                 // Correct the codec of tracks scanned when it came from the extension (#1866).
                 .once_settled(move || {
-                    crate::collection::reprobe_codecs_and_announce(&reprobe.0, &reprobe.1)
+                    crate::collection::reprobe_codecs_and_announce(&reprobe_app, &reprobe_db)
                 })
                 .spawn();
             }

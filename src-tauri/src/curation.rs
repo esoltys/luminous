@@ -1065,17 +1065,17 @@ impl crate::background_reads::BackgroundRead for IntegrityReader {
         .optional()
     }
 
-    fn read(&mut self, song_id: i64, _path: &Path) -> crate::background_reads::Read {
+    fn read(&mut self, song_id: i64, _path: &Path) -> crate::background_reads::ReadOutcome {
         match verify_song_integrity(&self.db, song_id) {
             Ok(corrupt) => {
                 if let Some(item) = corrupt {
                     let _ = self.app.emit("song-integrity-changed", &item);
                 }
-                crate::background_reads::Read::Stored
+                crate::background_reads::ReadOutcome::Stored
             }
             Err(e) => {
                 log::debug!("Background integrity check skipped song {song_id}: {e}");
-                crate::background_reads::Read::NothingStored
+                crate::background_reads::ReadOutcome::NothingStored
             }
         }
     }

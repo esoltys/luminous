@@ -216,9 +216,18 @@ fn candidates_sql(select: &str, tail: &str) -> String {
     )
 }
 
-fn next_song_to_analyze(conn: &Connection) -> rusqlite::Result<Option<(i64, String)>> {
+fn next_song_to_analyze(
+    conn: &Connection,
+    skipped: &crate::background_reads::Skipped,
+) -> rusqlite::Result<Option<(i64, String)>> {
     conn.query_row(
-        &candidates_sql("s.id, s.path", "ORDER BY s.added DESC, s.id DESC LIMIT 1"),
+        &candidates_sql(
+            "s.id, s.path",
+            &format!(
+                "AND {} ORDER BY s.added DESC, s.id DESC LIMIT 1",
+                skipped.sql_excluding("s.id")
+            ),
+        ),
         params![MUSICAL_ANALYSIS_VERSION],
         |row| Ok((row.get(0)?, row.get(1)?)),
     )
@@ -283,28 +292,37 @@ impl crate::background_reads::BackgroundRead for MusicalReader {
     fn next(
         &mut self,
         conn: &Connection,
-        _skipped: &crate::background_reads::Skipped,
+        skipped: &crate::background_reads::Skipped,
     ) -> rusqlite::Result<Option<(i64, String)>> {
         // Only grind through the backlog while the user has opted in.
         if !detection_enabled(conn) {
             return Ok(None);
         }
-        next_song_to_analyze(conn)
+        next_song_to_analyze(conn, skipped)
     }
 
-    fn read(&mut self, song_id: i64, path: &std::path::Path) -> crate::background_reads::Read {
+    fn read(
+        &mut self,
+        song_id: i64,
+        path: &std::path::Path,
+    ) -> crate::background_reads::ReadOutcome {
+        use crate::background_reads::ReadOutcome;
         if let Err(e) = crate::waveform::analyze_song(&self.db, song_id, path) {
             log::debug!("Musical analysis skipped song {song_id}: {e}");
             // Remember the attempt so an undecodable file is not retried in a loop.
-            if let Ok(conn) = self.db.pool.get() {
-                let _ = record_analysis(
+            let recorded = self.db.pool.get().ok().is_some_and(|conn| {
+                record_analysis(
                     &conn,
                     song_id,
                     &MusicalAnalysis {
                         bpm: None,
                         key: None,
                     },
-                );
+                )
+                .is_ok()
+            });
+            if !recorded {
+                return ReadOutcome::NothingStored;
             }
         }
         self.unannounced = true;
@@ -317,8 +335,7 @@ impl crate::background_reads::BackgroundRead for MusicalReader {
         if self.last_announce.elapsed() >= LIBRARY_REFRESH_INTERVAL {
             self.announce();
         }
-        // A failed decode is recorded as attempted, so there is always a result.
-        crate::background_reads::Read::Stored
+        ReadOutcome::Stored
     }
 
     fn caught_up(&mut self) {
@@ -452,7 +469,10 @@ mod tests {
 
         assert_eq!(values(&db, id), (None, None));
         assert!(!needs_analysis(&conn, id).unwrap());
-        assert_eq!(next_song_to_analyze(&conn).unwrap(), None);
+        assert_eq!(
+            next_song_to_analyze(&conn, &Default::default()).unwrap(),
+            None
+        );
     }
 
     #[test]
@@ -471,7 +491,25 @@ mod tests {
 
         assert_eq!(detected_flags(&conn, id).unwrap(), DetectedFlags::default());
         assert!(needs_analysis(&conn, id).unwrap());
-        assert_eq!(next_song_to_analyze(&conn).unwrap().map(|s| s.0), Some(id));
+        assert_eq!(
+            next_song_to_analyze(&conn, &Default::default())
+                .unwrap()
+                .map(|s| s.0),
+            Some(id)
+        );
+    }
+
+    /// A song the background runner skipped this session is not offered
+    /// again, so a file whose attempt couldn't be recorded isn't re-read in a
+    /// loop (#2160).
+    #[test]
+    fn skipped_songs_are_not_offered() {
+        let (_dir, db) = setup();
+        let id = add_song(&db, None, None, 10);
+        let conn = db.pool.get().unwrap();
+        let mut skipped = crate::background_reads::Skipped::default();
+        skipped.insert(id);
+        assert_eq!(next_song_to_analyze(&conn, &skipped).unwrap(), None);
     }
 
     #[test]
@@ -487,18 +525,29 @@ mod tests {
         mark_user_curated(&conn, id).unwrap();
 
         assert_eq!(detected_flags(&conn, id).unwrap(), DetectedFlags::default());
-        assert_eq!(next_song_to_analyze(&conn).unwrap(), None);
+        assert_eq!(
+            next_song_to_analyze(&conn, &Default::default()).unwrap(),
+            None
+        );
         // Neither a decode for another reason nor a version bump refills the gap they left.
         record_analysis(&conn, id, &found(130.0, "Am")).unwrap();
         assert_eq!(values(&db, id).0, None);
         conn.execute("UPDATE song_musical_analysis SET version = 0", [])
             .unwrap();
-        assert_eq!(next_song_to_analyze(&conn).unwrap(), None);
+        assert_eq!(
+            next_song_to_analyze(&conn, &Default::default()).unwrap(),
+            None
+        );
 
         // But a changed file starts over.
         conn.execute("UPDATE songs SET mtime = 99 WHERE id = ?1", params![id])
             .unwrap();
-        assert_eq!(next_song_to_analyze(&conn).unwrap().map(|s| s.0), Some(id));
+        assert_eq!(
+            next_song_to_analyze(&conn, &Default::default())
+                .unwrap()
+                .map(|s| s.0),
+            Some(id)
+        );
     }
 
     #[test]
@@ -532,7 +581,9 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            next_song_to_analyze(&conn).unwrap().map(|s| s.0),
+            next_song_to_analyze(&conn, &Default::default())
+                .unwrap()
+                .map(|s| s.0),
             Some(short)
         );
         assert_eq!(remaining(&conn).unwrap(), 1);
@@ -550,7 +601,10 @@ mod tests {
             .unwrap();
 
         mark_user_curated_by_path(&conn, &path);
-        assert_eq!(next_song_to_analyze(&conn).unwrap(), None);
+        assert_eq!(
+            next_song_to_analyze(&conn, &Default::default()).unwrap(),
+            None
+        );
         // An unknown path is a no-op, not an error.
         mark_user_curated_by_path(&conn, "/not/in/the/library.flac");
     }
@@ -562,7 +616,9 @@ mod tests {
         let missing = add_song(&db, Some(100.0), None, 11);
         let conn = db.pool.get().unwrap();
         assert_eq!(
-            next_song_to_analyze(&conn).unwrap().map(|s| s.0),
+            next_song_to_analyze(&conn, &Default::default())
+                .unwrap()
+                .map(|s| s.0),
             Some(missing)
         );
     }

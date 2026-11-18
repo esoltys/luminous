@@ -54,10 +54,11 @@ pub trait BackgroundRead: Send {
     ) -> rusqlite::Result<Option<(i64, String)>>;
 
     /// Reads the song's file and stores the outcome. Returns
-    /// [`Read::NothingStored`] when there was nothing to store (the file
-    /// couldn't be read or analyzed), so the runner skips that song for the
-    /// rest of the session.
-    fn read(&mut self, song_id: i64, path: &Path) -> Read;
+    /// [`ReadOutcome::NothingStored`] when nothing was stored (the file
+    /// couldn't be read, or the result couldn't be written), so the runner
+    /// skips that song for the rest of the session instead of reading it again
+    /// in a loop.
+    fn read(&mut self, song_id: i64, path: &Path) -> ReadOutcome;
 
     /// Called when `next` finds nothing, for readers that batch notifications
     /// until their backlog drains.
@@ -66,7 +67,7 @@ pub trait BackgroundRead: Send {
 
 /// What [`BackgroundRead::read`] did with a song.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Read {
+pub enum ReadOutcome {
     /// A result (or a failure marker) is stored, so `next` won't offer the
     /// song again until its file changes.
     Stored,
@@ -88,6 +89,10 @@ impl Skipped {
         }
         let ids: Vec<String> = self.0.iter().map(i64::to_string).collect();
         format!("{column} NOT IN ({})", ids.join(","))
+    }
+
+    pub(crate) fn insert(&mut self, song_id: i64) {
+        self.0.insert(song_id);
     }
 
     fn contains(&self, song_id: i64) -> bool {
@@ -136,6 +141,7 @@ impl BackgroundReadRunner {
         self
     }
 
+    /// Starts the runner's thread, which lives for the rest of the app's life.
     pub fn spawn(mut self) {
         std::thread::Builder::new()
             .name("luminous-background-reads".to_string())
@@ -164,8 +170,8 @@ impl BackgroundReadRunner {
         let Some((index, song_id, path)) = self.pick() else {
             return IDLE_POLL;
         };
-        if self.readers[index].read(song_id, Path::new(&path)) == Read::NothingStored {
-            self.skipped[index].0.insert(song_id);
+        if self.readers[index].read(song_id, Path::new(&path)) == ReadOutcome::NothingStored {
+            self.skipped[index].insert(song_id);
         }
         PAUSE_BETWEEN_FILES
     }
@@ -249,13 +255,13 @@ mod tests {
                 .find(|id| !skipped.contains(**id))
                 .map(|id| (*id, format!("{id}.flac"))))
         }
-        fn read(&mut self, song_id: i64, _path: &Path) -> Read {
+        fn read(&mut self, song_id: i64, _path: &Path) -> ReadOutcome {
             self.reads.lock().push((self.name, song_id));
             if self.stores_result {
                 self.queue.retain(|id| *id != song_id);
-                Read::Stored
+                ReadOutcome::Stored
             } else {
-                Read::NothingStored
+                ReadOutcome::NothingStored
             }
         }
     }
@@ -416,7 +422,7 @@ mod tests {
     fn sql_excluding_lists_skipped_songs() {
         let mut skipped = Skipped::default();
         assert_eq!(skipped.sql_excluding("s.id"), "1");
-        skipped.0.insert(42);
+        skipped.insert(42);
         assert_eq!(skipped.sql_excluding("s.id"), "s.id NOT IN (42)");
     }
 }

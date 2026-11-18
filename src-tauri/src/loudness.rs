@@ -3,8 +3,8 @@
 //!
 //! DSP measurement and gain calculation live in `luminous_analysis`.
 //! A low-priority background reader (`LoudnessReader`, run by
-//! `crate::background_reads`) decodes
-//! each not-yet-analyzed local track once (through `luminous_audio::OfflineDecoder`,
+//! `crate::background_reads`) decodes each not-yet-analyzed local track once
+//! (through `luminous_audio::OfflineDecoder`,
 //! the same decode path as the band_waveform/waveform analyzers) and writes
 //! `songs.ebur128_integrated_loudness_lufs`. Playback consults, in order:
 //! measured R128 loudness -> ReplayGain tag (track or album, per settings) ->
@@ -29,6 +29,10 @@ use tauri::{AppHandle, Emitter};
 
 pub fn get_settings(db: &Database) -> Result<LoudnessSettings> {
     let conn = db.pool.get().context("failed to get db connection")?;
+    settings_on(&conn)
+}
+
+fn settings_on(conn: &rusqlite::Connection) -> Result<LoudnessSettings> {
     let (enabled, target_lufs, mode_str, fallback_gain_db) = conn.query_row(
         "SELECT enabled, target_lufs, mode, fallback_gain_db FROM loudness_settings WHERE id = 1",
         [],
@@ -114,7 +118,7 @@ impl crate::background_reads::BackgroundRead for LoudnessReader {
         // into loudness normalization — otherwise this would decode the
         // entire library (slow and disk-heavy on external drives) for a
         // feature that's off by default and never gets used.
-        let enabled = get_settings(&self.db).map(|s| s.enabled).unwrap_or(false);
+        let enabled = settings_on(conn).map(|s| s.enabled).unwrap_or(false);
         if !enabled {
             return Ok(None);
         }
@@ -133,7 +137,7 @@ impl crate::background_reads::BackgroundRead for LoudnessReader {
         .optional()
     }
 
-    fn read(&mut self, song_id: i64, path: &Path) -> crate::background_reads::Read {
+    fn read(&mut self, song_id: i64, path: &Path) -> crate::background_reads::ReadOutcome {
         let lufs = match analyze_integrated_loudness(path) {
             Ok(lufs) => lufs,
             Err(e) => {
@@ -145,30 +149,31 @@ impl crate::background_reads::BackgroundRead for LoudnessReader {
             }
         };
 
-        let remaining: i64 = self
-            .db
-            .pool
-            .get()
+        // A failed decode stores the sentinel, so only a failed write leaves
+        // the song unmeasured.
+        let stored = self.db.pool.get().ok().and_then(|conn| {
+            conn.execute(
+                "UPDATE songs SET ebur128_integrated_loudness_lufs = ?1 WHERE id = ?2",
+                params![lufs, song_id],
+            )
+            .ok()?;
+            conn.query_row(
+                &format!(
+                    "SELECT COUNT(*) FROM songs
+                     WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
+                       AND ebur128_integrated_loudness_lufs IS NULL",
+                    lib = *LOCAL_SOURCES_SQL
+                ),
+                [],
+                |row| row.get::<_, i64>(0),
+            )
             .ok()
-            .and_then(|conn| {
-                conn.execute(
-                    "UPDATE songs SET ebur128_integrated_loudness_lufs = ?1 WHERE id = ?2",
-                    params![lufs, song_id],
-                )
-                .ok()?;
-                conn.query_row(
-                    &format!(
-                        "SELECT COUNT(*) FROM songs
-                         WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
-                           AND ebur128_integrated_loudness_lufs IS NULL",
-                        lib = *LOCAL_SOURCES_SQL
-                    ),
-                    [],
-                    |row| row.get(0),
-                )
-                .ok()
-            })
-            .unwrap_or(0);
+            .or(Some(0))
+        });
+        let Some(remaining) = stored else {
+            log::warn!("Couldn't store the R128 loudness of song {song_id}");
+            return crate::background_reads::ReadOutcome::NothingStored;
+        };
 
         self.analyzed += 1;
         let _ = self.app.emit(
@@ -178,8 +183,7 @@ impl crate::background_reads::BackgroundRead for LoudnessReader {
                 remaining: remaining.max(0) as u64,
             },
         );
-        // A failed decode stored the sentinel, so there is always a result.
-        crate::background_reads::Read::Stored
+        crate::background_reads::ReadOutcome::Stored
     }
 }
 
