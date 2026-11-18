@@ -23,10 +23,9 @@ pub const LASTFM_API_BASE: &str = "https://ws.audioscrobbler.com/2.0/";
 pub const LASTFM_AUTH_BASE: &str = "https://www.last.fm/api/auth/";
 pub const SUBMISSION_CLIENT_NAME: &str = "Luminous";
 
-/// Built-in default client credentials for Last.fm desktop integration.
-/// Overridable via `LASTFM_API_KEY` / `LASTFM_API_SECRET` environment variables.
-pub const DEFAULT_LASTFM_API_KEY: &str = "2c5be3e0fae740d287ee3b4e7a8e7a6f";
-pub const DEFAULT_LASTFM_API_SECRET: &str = "7e14a1fa33f6a6fcfce898a3b8417dc4";
+// There is deliberately no built-in API key: Last.fm requires a Pro subscription
+// on the account that owns a key (#2165), so every user supplies their own. The
+// caller decides where credentials come from; this module only signs requests.
 
 /// Credentials representing an authenticated Last.fm user session.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

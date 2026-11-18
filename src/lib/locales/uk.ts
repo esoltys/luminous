@@ -2882,6 +2882,15 @@ export const uk = {
     finishAuthBtn: "Завершити вхід",
     cancelAuthBtn: "Скасувати",
     authFailed: "Не вдалося авторизуватися в Last.fm",
+    credentialsHint:
+      "Last.fm вимагає ваш власний ключ API, а для ключа потрібна підписка Last.fm Pro на акаунті, якому він належить. Введіть свій ключ нижче, щоб підключитися.",
+    connectedWithoutKey:
+      "Підключено, але ключ API не задано, тому до Last.fm нічого не надсилається. Введіть свій ключ, щоб підключитися знову.",
+    createKeyLink: "Створити ключ API",
+    apiKeyLabel: "Ключ API Last.fm",
+    apiSecretLabel: "Спільний секрет Last.fm",
+    saveCredentialsBtn: "Зберегти ключ",
+    credentialsFailed: "Не вдалося зберегти ключ API Last.fm",
     disconnectBtn: "Відключити",
     enableLabel: "Увімкнути скроблінг Last.fm",
     enableHint: "Надсилати завершені прослуховування до вашого профілю Last.fm",

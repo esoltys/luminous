@@ -2730,6 +2730,15 @@ export const fr: DeepStringRecord<typeof en> = {
     finishAuthBtn: "Terminer la connexion",
     cancelAuthBtn: "Annuler",
     authFailed: "Échec de l'autorisation avec Last.fm",
+    credentialsHint:
+      "Last.fm exige votre propre clé d'API, et une clé nécessite un abonnement Last.fm Pro sur le compte qui la détient. Entrez la vôtre ci-dessous pour vous connecter.",
+    connectedWithoutKey:
+      "Connecté, mais aucune clé d'API n'est définie : rien n'est envoyé à Last.fm. Entrez votre propre clé pour vous reconnecter.",
+    createKeyLink: "Créer une clé d'API",
+    apiKeyLabel: "Clé d'API Last.fm",
+    apiSecretLabel: "Secret partagé Last.fm",
+    saveCredentialsBtn: "Enregistrer la clé",
+    credentialsFailed: "Échec de l'enregistrement de la clé d'API Last.fm",
     disconnectBtn: "Déconnecter",
     enableLabel: "Activer le scrobbling Last.fm",
     enableHint: "Transmettre les écoutes terminées à votre profil Last.fm",

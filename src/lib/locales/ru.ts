@@ -2893,6 +2893,15 @@ export const ru = {
     finishAuthBtn: "Завершить вход",
     cancelAuthBtn: "Отмена",
     authFailed: "Не удалось авторизоваться в Last.fm",
+    credentialsHint:
+      "Last.fm требует ваш собственный ключ API, а для ключа нужна подписка Last.fm Pro на аккаунте, которому он принадлежит. Введите свой ключ ниже, чтобы подключиться.",
+    connectedWithoutKey:
+      "Подключено, но ключ API не задан, поэтому в Last.fm ничего не отправляется. Введите свой ключ, чтобы подключиться заново.",
+    createKeyLink: "Создать ключ API",
+    apiKeyLabel: "Ключ API Last.fm",
+    apiSecretLabel: "Общий секрет Last.fm",
+    saveCredentialsBtn: "Сохранить ключ",
+    credentialsFailed: "Не удалось сохранить ключ API Last.fm",
     disconnectBtn: "Отключить",
     enableLabel: "Включить скробблинг Last.fm",
     enableHint: "Отправлять завершённые прослушивания в профиль Last.fm",

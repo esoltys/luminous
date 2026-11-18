@@ -2714,6 +2714,15 @@ export const es = {
     finishAuthBtn: "Finalizar inicio de sesión",
     cancelAuthBtn: "Cancelar",
     authFailed: "No se pudo autorizar con Last.fm",
+    credentialsHint:
+      "Last.fm requiere tu propia clave de API, y una clave necesita una suscripción a Last.fm Pro en la cuenta que la posee. Introduce la tuya a continuación para conectarte.",
+    connectedWithoutKey:
+      "Conectado, pero no hay ninguna clave de API configurada, así que no se envía nada a Last.fm. Introduce tu propia clave para volver a conectarte.",
+    createKeyLink: "Crear una clave de API",
+    apiKeyLabel: "Clave de API de Last.fm",
+    apiSecretLabel: "Secreto compartido de Last.fm",
+    saveCredentialsBtn: "Guardar clave",
+    credentialsFailed: "No se pudo guardar la clave de API de Last.fm",
     disconnectBtn: "Desconectar",
     enableLabel: "Activar scrobbling de Last.fm",
     enableHint: "Enviar reproducciones completadas a tu perfil de Last.fm",
