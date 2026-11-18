@@ -9,14 +9,13 @@
 
 use crate::db::Database;
 use crate::models::{Playlist, Song, SongSource, LOCAL_SOURCES_SQL};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use luminous_analysis::IntegrityVerdict;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 /// Summary of an album surfaced during curation audit.
@@ -946,11 +945,18 @@ pub(crate) fn query_corrupt_songs(conn: &Connection) -> Result<Vec<CorruptSongIt
 }
 
 /// Verify a single song's file integrity, saving the result to `song_integrity`.
+/// Returns the corrupt item when the file is corrupt. Only `'corrupt'` rows
+/// are ever reported.
+///
+/// A file that can't be reached (drive asleep or disconnected, permission
+/// denied) is an error and stores nothing, so it's checked again later
+/// instead of being judged on a failed read (#2162). The background checker
+/// skips it for the rest of the session (see `crate::background_reads`).
 pub fn verify_song_integrity(db: &Database, song_id: i64) -> Result<Option<CorruptSongItem>> {
     let conn = db.pool.get().context("failed to get db connection")?;
 
     let row = conn.query_row(
-        "SELECT path, source, mtime, title, artist, album, format FROM songs WHERE id = ?1",
+        "SELECT path, source, mtime, title, artist, album, filetype FROM songs WHERE id = ?1",
         params![song_id],
         |row| {
             Ok((
@@ -960,12 +966,12 @@ pub fn verify_song_integrity(db: &Database, song_id: i64) -> Result<Option<Corru
                 row.get::<_, Option<String>>(3)?,
                 row.get::<_, Option<String>>(4)?,
                 row.get::<_, Option<String>>(5)?,
-                row.get::<_, Option<String>>(6)?,
+                row.get::<_, i64>(6)?,
             ))
         },
     );
 
-    let (path_str, source_raw, mtime_val, title, artist, album, format_str) = match row {
+    let (path_str, source_raw, mtime_val, title, artist, album, filetype) = match row {
         Ok(vals) => vals,
         Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
         Err(e) => return Err(e.into()),
@@ -981,100 +987,98 @@ pub fn verify_song_integrity(db: &Database, song_id: i64) -> Result<Option<Corru
     };
 
     let mtime = mtime_val.unwrap_or(0);
-    let p = Path::new(&path);
+    let now = crate::clock::unix_now();
+    let record = |status: &str, detail: Option<&str>| {
+        conn.execute(
+            "INSERT INTO song_integrity (song_id, mtime, status, error_detail, verified_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(song_id) DO UPDATE SET
+                mtime = excluded.mtime,
+                status = excluded.status,
+                error_detail = excluded.error_detail,
+                verified_at = excluded.verified_at",
+            params![song_id, mtime, status, detail, now],
+        )
+    };
 
-    let verdict = luminous_analysis::verify_audio_file(p);
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
-
-    match verdict {
+    match luminous_analysis::verify_audio_file(Path::new(&path)) {
         IntegrityVerdict::Valid => {
-            conn.execute(
-                "INSERT INTO song_integrity (song_id, mtime, status, error_detail, verified_at)
-                 VALUES (?1, ?2, 'valid', NULL, ?3)
-                 ON CONFLICT(song_id) DO UPDATE SET
-                    mtime = excluded.mtime,
-                    status = excluded.status,
-                    error_detail = excluded.error_detail,
-                    verified_at = excluded.verified_at",
-                params![song_id, mtime, now],
-            )?;
+            record("valid", None)?;
             Ok(None)
         }
+        IntegrityVerdict::Unverified => bail!("couldn't reach {path} to check it"),
         IntegrityVerdict::Corrupt { reason } => {
-            conn.execute(
-                "INSERT INTO song_integrity (song_id, mtime, status, error_detail, verified_at)
-                 VALUES (?1, ?2, 'corrupt', ?3, ?4)
-                 ON CONFLICT(song_id) DO UPDATE SET
-                    mtime = excluded.mtime,
-                    status = excluded.status,
-                    error_detail = excluded.error_detail,
-                    verified_at = excluded.verified_at",
-                params![song_id, mtime, reason, now],
-            )?;
+            record("corrupt", Some(&reason))?;
             Ok(Some(CorruptSongItem {
                 id: song_id,
                 title,
                 artist,
                 album,
                 path,
-                format: format_str.unwrap_or_else(|| "Unknown".to_string()),
+                format: crate::models::FileType::from(filetype)
+                    .display_name()
+                    .to_string(),
                 error_detail: reason,
                 verified_at: now,
             }))
         }
-        IntegrityVerdict::Unverified => Ok(None),
     }
 }
 
-/// Spawn a low-priority background thread that checks unverified local tracks (#1938, epic #1441).
-/// Throttles between tracks so it never interferes with playback or UI responsiveness.
-pub fn spawn_background_integrity_checker(app: AppHandle, db: Arc<Database>) {
-    std::thread::Builder::new()
-        .name("luminous-integrity".to_string())
-        .spawn(move || {
-            loop {
-                let next: Option<(i64, String)> = match db.pool.get() {
-                    Ok(conn) => conn
-                        .query_row(
-                            &format!(
-                                "SELECT s.id, s.path FROM songs s
-                                 LEFT JOIN song_integrity i ON s.id = i.song_id
-                                 WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
-                                   AND (i.song_id IS NULL OR i.mtime != s.mtime)
-                                 ORDER BY s.added DESC, s.id DESC LIMIT 1",
-                                lib = *LOCAL_SOURCES_SQL
-                            ),
-                            [],
-                            |row| Ok((row.get(0)?, row.get(1)?)),
-                        )
-                        .optional()
-                        .unwrap_or(None),
-                    Err(_) => None,
-                };
+/// Background integrity checks of unverified local tracks, newest first
+/// (#1938, epic #1441), scheduled by `crate::background_reads`.
+pub struct IntegrityReader {
+    app: AppHandle,
+    db: Arc<Database>,
+}
 
-                let Some((song_id, _path)) = next else {
-                    std::thread::sleep(Duration::from_secs(20));
-                    continue;
-                };
+impl IntegrityReader {
+    pub fn new(app: AppHandle, db: Arc<Database>) -> Self {
+        Self { app, db }
+    }
+}
 
-                match verify_song_integrity(&db, song_id) {
-                    Ok(Some(corrupt_item)) => {
-                        let _ = app.emit("song-integrity-changed", &corrupt_item);
-                    }
-                    Ok(None) => {}
-                    Err(e) => {
-                        log::debug!("Background integrity checker skipped song {song_id}: {e}");
-                    }
+impl crate::background_reads::BackgroundRead for IntegrityReader {
+    fn name(&self) -> &'static str {
+        "integrity"
+    }
+
+    fn next(
+        &mut self,
+        conn: &Connection,
+        skipped: &crate::background_reads::Skipped,
+    ) -> rusqlite::Result<Option<(i64, String)>> {
+        conn.query_row(
+            &format!(
+                "SELECT s.id, s.path FROM songs s
+                 LEFT JOIN song_integrity i ON s.id = i.song_id
+                 WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+                   AND (i.song_id IS NULL OR i.mtime != s.mtime)
+                   AND {skip}
+                 ORDER BY s.added DESC, s.id DESC LIMIT 1",
+                lib = *LOCAL_SOURCES_SQL,
+                skip = skipped.sql_excluding("s.id")
+            ),
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+    }
+
+    fn read(&mut self, song_id: i64, _path: &Path) -> crate::background_reads::ReadOutcome {
+        match verify_song_integrity(&self.db, song_id) {
+            Ok(corrupt) => {
+                if let Some(item) = corrupt {
+                    let _ = self.app.emit("song-integrity-changed", &item);
                 }
-
-                // Throttle between tracks to keep CPU/disk gentle
-                std::thread::sleep(Duration::from_millis(300));
+                crate::background_reads::ReadOutcome::Stored
             }
-        })
-        .expect("failed to spawn integrity checker thread");
+            Err(e) => {
+                log::debug!("Background integrity check skipped song {song_id}: {e}");
+                crate::background_reads::ReadOutcome::NothingStored
+            }
+        }
+    }
 }
 
 /// Triggers verification of all unverified local songs across the library (#1938).
@@ -2061,5 +2065,64 @@ mod tests {
             after_update.is_empty(),
             "stale corrupt record with mismatched mtime must be excluded"
         );
+    }
+
+    fn insert_local_flac(conn: &Connection, path: &Path) -> i64 {
+        conn.execute(
+            "INSERT INTO songs (path, title, filetype, source, mtime) VALUES (?1, 'T', ?2, ?3, 1000)",
+            params![
+                path.to_string_lossy(),
+                FileType::Flac as i32,
+                SongSource::LocalFile as i32
+            ],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    }
+
+    fn stored_status(conn: &Connection, song_id: i64) -> Option<String> {
+        conn.query_row(
+            "SELECT status FROM song_integrity WHERE song_id = ?1",
+            [song_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .unwrap()
+    }
+
+    /// The query once selected a `format` column `songs` doesn't have, so
+    /// every check failed and nothing was ever stored (#2160).
+    #[test]
+    fn verify_song_integrity_stores_valid_and_corrupt_results() {
+        let (temp, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        let healthy =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/audio/song_gamma.flac");
+        let healthy_id = insert_local_flac(&conn, &healthy);
+        assert!(verify_song_integrity(&db, healthy_id).unwrap().is_none());
+        assert_eq!(stored_status(&conn, healthy_id).as_deref(), Some("valid"));
+
+        let empty = temp.path().join("empty.flac");
+        std::fs::write(&empty, b"").unwrap();
+        let empty_id = insert_local_flac(&conn, &empty);
+        let item = verify_song_integrity(&db, empty_id)
+            .unwrap()
+            .expect("an empty file is corrupt");
+        assert_eq!(item.format, "FLAC");
+        assert_eq!(stored_status(&conn, empty_id).as_deref(), Some("corrupt"));
+    }
+
+    /// A drive that's asleep or unplugged must not get healthy files listed
+    /// as corrupt (#2162).
+    #[test]
+    fn verify_song_integrity_stores_nothing_for_an_unreachable_file() {
+        let (temp, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        let missing_id = insert_local_flac(&conn, &temp.path().join("unplugged.flac"));
+        assert!(verify_song_integrity(&db, missing_id).is_err());
+        assert_eq!(stored_status(&conn, missing_id), None);
+        assert!(query_corrupt_songs(&conn).unwrap().is_empty());
     }
 }
