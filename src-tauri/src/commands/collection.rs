@@ -25,7 +25,7 @@ pub async fn add_directory(
     })
     .await
     .map_err(|e| e.to_string())?;
-    crate::collection::start_watcher(app.clone(), &state);
+    crate::collection::library_folders_changed(app.clone(), &state);
     link_default_library_if_unchosen(app).await;
     Ok(res)
 }
@@ -57,7 +57,7 @@ pub async fn remove_directory(
     })
     .await
     .map_err(|e| e.to_string())?;
-    crate::collection::start_watcher(app.clone(), &state);
+    crate::collection::library_folders_changed(app.clone(), &state);
     link_default_library_if_unchosen(app).await;
     Ok(())
 }
@@ -87,7 +87,7 @@ pub async fn relocate_directory(
         })
         .await;
     }
-    crate::collection::start_watcher(app.clone(), &state);
+    crate::collection::library_folders_changed(app.clone(), &state);
     let _ = app.emit("library-changed", ());
     Ok(result)
 }

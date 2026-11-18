@@ -18,7 +18,8 @@ pub enum IntegrityVerdict {
     Valid,
     /// Audio stream or container is corrupted, truncated, or failed checksum verification.
     Corrupt { reason: String },
-    /// File cannot be verified (e.g. unsupported container or unreadable stream).
+    /// The file couldn't be reached (missing, permission denied, drive unavailable),
+    /// so nothing is known about its contents.
     Unverified,
 }
 
@@ -28,7 +29,7 @@ impl IntegrityVerdict {
         matches!(self, IntegrityVerdict::Valid)
     }
 
-    /// True if the track is corrupt or unreadable.
+    /// True if the track was read and found corrupt.
     pub fn is_corrupt(&self) -> bool {
         matches!(self, IntegrityVerdict::Corrupt { .. })
     }
@@ -45,16 +46,18 @@ impl IntegrityVerdict {
 /// Verifies container structure, frame decodability, and embedded checksums for an audio file.
 ///
 /// Encapsulates format probing, stream packet decoding, and MD5 streaminfo verification.
+/// Only a file that was read and failed to probe or decode is `Corrupt`. A file that
+/// can't be reached (missing, permission denied, drive asleep or disconnected) is
+/// `Unverified`, since failing to read it says nothing about its contents (#2162).
 pub fn verify_audio_file(path: &Path) -> IntegrityVerdict {
-    // 1. Inspect physical file existence and non-zero size
+    // 1. Reach the file: metadata and an open both work before anything is judged.
     let meta = match std::fs::metadata(path) {
         Ok(m) => m,
-        Err(e) => {
-            return IntegrityVerdict::Corrupt {
-                reason: format!("File inaccessible or unreadable: {e}"),
-            };
-        }
+        Err(_) => return IntegrityVerdict::Unverified,
     };
+    if std::fs::File::open(path).is_err() {
+        return IntegrityVerdict::Unverified;
+    }
 
     if meta.len() == 0 {
         return IntegrityVerdict::Corrupt {
@@ -62,21 +65,22 @@ pub fn verify_audio_file(path: &Path) -> IntegrityVerdict {
         };
     }
 
-    // 2. Open decoder with verification enabled
-    let decoder = match OfflineDecoder::open_file_verified(path) {
-        Ok(d) => d,
-        Err(e) => {
-            return IntegrityVerdict::Corrupt {
-                reason: format!("Container or format probe failed: {e}"),
-            };
-        }
+    // 2. Open the decoder with verification enabled, then 3. verify stream
+    // packets and frame decodability.
+    let failure = match OfflineDecoder::open_file_verified(path) {
+        Ok(decoder) => match decoder.verify_integrity() {
+            Ok(()) => return IntegrityVerdict::Valid,
+            Err(reason) => reason,
+        },
+        Err(e) => format!("Container or format probe failed: {e}"),
     };
 
-    // 3. Verify stream packets and frame decodability
-    match decoder.verify_integrity() {
-        Ok(()) => IntegrityVerdict::Valid,
-        Err(reason) => IntegrityVerdict::Corrupt { reason },
+    // The decoder reports a read error the same way as bad data. If the file
+    // is no longer reachable, the drive went away mid-read: not corruption.
+    if std::fs::metadata(path).is_err() {
+        return IntegrityVerdict::Unverified;
     }
+    IntegrityVerdict::Corrupt { reason: failure }
 }
 
 #[cfg(test)]
@@ -144,6 +148,13 @@ mod tests {
             reason.contains("Truncated") || reason.contains("Corrupt") || reason.contains("EOF"),
             "unexpected reason: {reason}"
         );
+    }
+
+    #[test]
+    fn verify_missing_file_is_unverified_not_corrupt() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let verdict = verify_audio_file(&dir.path().join("gone.flac"));
+        assert_eq!(verdict, IntegrityVerdict::Unverified);
     }
 
     #[test]

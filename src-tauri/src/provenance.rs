@@ -12,7 +12,6 @@ use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 /// Lossless file types in SQLite songs table (flac: 2, oggflac: 3, alac: 8, aiff: 9, wav: 10, wavpack: 11, trueaudio: 13, ape: 14, dsf: 15, dsdiff: 16).
@@ -51,53 +50,61 @@ fn verdict_to_str(v: ProvenanceVerdict) -> &'static str {
     }
 }
 
-/// Spawn a low-priority background thread that analyzes unverified local lossless tracks.
-/// Throttles between tracks so it never interferes with playback or UI responsiveness.
-pub fn spawn_background_analyzer(app: AppHandle, db: Arc<Database>) {
-    std::thread::Builder::new()
-        .name("luminous-provenance".to_string())
-        .spawn(move || {
-            loop {
-                let next: Option<(i64, String)> = match db.pool.get() {
-                    Ok(conn) => conn
-                        .query_row(
-                            &format!(
-                                "SELECT s.id, s.path FROM songs s
-                                 LEFT JOIN song_provenance p ON s.id = p.song_id
-                                 WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
-                                   AND s.filetype IN ({lossless})
-                                   AND (p.song_id IS NULL OR p.mtime != s.mtime)
-                                 ORDER BY s.added DESC, s.id DESC LIMIT 1",
-                                lib = *LOCAL_SOURCES_SQL,
-                                lossless = LOSSLESS_FILETYPES_SQL
-                            ),
-                            [],
-                            |row| Ok((row.get(0)?, row.get(1)?)),
-                        )
-                        .optional()
-                        .unwrap_or(None),
-                    Err(_) => None,
-                };
+/// Background analysis of unverified local lossless tracks, newest first,
+/// scheduled by `crate::background_reads`. A track that can't be decoded
+/// stores nothing, so the runner skips it for the rest of the session.
+pub struct ProvenanceReader {
+    app: AppHandle,
+    db: Arc<Database>,
+}
 
-                let Some((song_id, _path)) = next else {
-                    std::thread::sleep(Duration::from_secs(15));
-                    continue;
-                };
+impl ProvenanceReader {
+    pub fn new(app: AppHandle, db: Arc<Database>) -> Self {
+        Self { app, db }
+    }
+}
 
-                match verify_song_provenance(&db, song_id) {
-                    Ok(prov) => {
-                        let _ = app.emit("song-provenance-changed", &prov);
-                    }
-                    Err(e) => {
-                        log::debug!("Background provenance skipped song {song_id}: {e}");
-                    }
-                }
+impl crate::background_reads::BackgroundRead for ProvenanceReader {
+    fn name(&self) -> &'static str {
+        "provenance"
+    }
 
-                // Throttle between tracks so background analysis is gentle on disk/CPU
-                std::thread::sleep(Duration::from_millis(250));
+    fn next(
+        &mut self,
+        conn: &rusqlite::Connection,
+        skipped: &crate::background_reads::Skipped,
+    ) -> rusqlite::Result<Option<(i64, String)>> {
+        conn.query_row(
+            &format!(
+                "SELECT s.id, s.path FROM songs s
+                 LEFT JOIN song_provenance p ON s.id = p.song_id
+                 WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+                   AND s.filetype IN ({lossless})
+                   AND (p.song_id IS NULL OR p.mtime != s.mtime)
+                   AND {skip}
+                 ORDER BY s.added DESC, s.id DESC LIMIT 1",
+                lib = *LOCAL_SOURCES_SQL,
+                lossless = LOSSLESS_FILETYPES_SQL,
+                skip = skipped.sql_excluding("s.id")
+            ),
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+    }
+
+    fn read(&mut self, song_id: i64, _path: &Path) -> crate::background_reads::ReadOutcome {
+        match verify_song_provenance(&self.db, song_id) {
+            Ok(prov) => {
+                let _ = self.app.emit("song-provenance-changed", &prov);
+                crate::background_reads::ReadOutcome::Stored
             }
-        })
-        .expect("failed to spawn provenance analyzer thread");
+            Err(e) => {
+                log::debug!("Background provenance skipped song {song_id}: {e}");
+                crate::background_reads::ReadOutcome::NothingStored
+            }
+        }
+    }
 }
 
 /// Retrieve the cached provenance analysis for a song, checking if the file has modified on disk since.

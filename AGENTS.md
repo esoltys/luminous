@@ -152,6 +152,7 @@ verify with the user, not a reason to skip telling them.
 - Library scanning is incremental (checks file mod times) and doesn't re-scan unchanged files.
 - Database access uses indices, FTS5 for track/album search, and prepared statements.
 - Band waveform/FFT analysis runs on a background thread and must not block playback.
+- Anything that reads library files in the background (loudness, tempo/key, provenance, integrity) is a `BackgroundRead` registered with the runner in `src-tauri/src/background_reads.rs`, never its own thread: the runner holds reads until the library has settled and yields to every scan (#2160).
 
 ## Destructive Operations
 

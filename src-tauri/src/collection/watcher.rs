@@ -376,8 +376,20 @@ fn is_unchanged_on_disk(conn: &rusqlite::Connection, path: &Path) -> bool {
     .unwrap_or(false)
 }
 
+/// Call at startup and after every change to the set of library folders
+/// (added, removed, relocated): re-points the file watcher at the current
+/// folders and refreshes the device list, since a drive holding a library
+/// folder is library storage and is never listed as a device. Without the
+/// refresh the list stays stale until the device poller's periodic rebuild.
+/// `start_watcher` is private so a new folder command can't restart watching
+/// without also refreshing devices.
+pub fn library_folders_changed(app: AppHandle, state: &crate::AppState) {
+    start_watcher(app, state);
+    state.devices.request_rebuild();
+}
+
 /// Start background directory watching using notify.
-pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
+fn start_watcher(app: AppHandle, state: &crate::AppState) {
     let db = Arc::clone(&state.db);
     let app_clone = app.clone();
 

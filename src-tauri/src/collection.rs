@@ -61,7 +61,7 @@ pub(crate) use query::MISSING_CORE_TAGS_SQL;
 pub(crate) use reconcile::resolve_case_insensitive_path;
 pub use safeguard::{MassRemovalIncident, MassRemovalRegistry, SafeguardVerdict};
 pub use scan_gate::ScanGate;
-pub use watcher::{start_watcher, SelfWriteTracker, WatcherPauseGuard};
+pub use watcher::{library_folders_changed, SelfWriteTracker, WatcherPauseGuard};
 
 /// What started a library scan — recorded with its timings so repeated
 /// whole-library rescans (e.g. one per watcher event on a network share) are
@@ -2148,19 +2148,19 @@ pub(crate) fn reprobe_container_codecs(db: &Database) -> Result<usize> {
     Ok(changed)
 }
 
-/// Runs [`reprobe_container_codecs`] on a background thread at startup and
-/// announces `library-changed` if it corrected anything.
-pub fn spawn_codec_reprobe(app: AppHandle, db: Arc<Database>) {
-    let _ = std::thread::Builder::new()
-        .name("luminous-codec-reprobe".into())
-        .spawn(move || match reprobe_container_codecs(&db) {
-            Ok(0) => {}
-            Ok(changed) => {
-                log::info!("Corrected the recorded codec of {changed} tracks (#1866)");
-                let _ = app.emit("library-changed", ());
-            }
-            Err(e) => log::warn!("Codec re-probe failed: {e:#}"),
-        });
+/// Runs [`reprobe_container_codecs`] and announces `library-changed` if it
+/// corrected anything. Run once at startup by the background-read runner, after
+/// the library has settled (`crate::background_reads`), since it reads file
+/// headers across the library.
+pub fn reprobe_codecs_and_announce(app: &AppHandle, db: &Database) {
+    match reprobe_container_codecs(db) {
+        Ok(0) => {}
+        Ok(changed) => {
+            log::info!("Corrected the recorded codec of {changed} tracks (#1866)");
+            let _ = app.emit("library-changed", ());
+        }
+        Err(e) => log::warn!("Codec re-probe failed: {e:#}"),
+    }
 }
 
 /// Reads tags for `path`, resolves embedded/folder cover art via `cover_manager`,

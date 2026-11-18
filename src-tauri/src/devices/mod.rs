@@ -30,8 +30,9 @@ use tauri::{AppHandle, Emitter};
 pub const DEVICES_CHANGED_EVENT: &str = "devices-changed";
 
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
-/// Rebuild at least this often even when no device changed, so a newly
-/// watched music folder on a device, or a marker edited elsewhere, shows up.
+/// Rebuild at least this often even when no device changed, so a marker
+/// edited elsewhere shows up. Library-folder changes don't wait for this:
+/// `collection::library_folders_changed` requests a rebuild.
 const REBUILD_EVERY_POLLS: u32 = 15;
 
 /// What the UI shows for one device.
@@ -562,6 +563,27 @@ mod tests {
 
         let entries = build_entries(&conn, &[volume(device_dir.path(), "0088-5572")], NOW).unwrap();
         assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn adding_or_removing_a_library_folder_flips_the_device_with_the_same_volumes() {
+        let (_db_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        let device_dir = tempfile::tempdir().unwrap();
+        let volumes = [volume(device_dir.path(), "0088-5572")];
+        let library = device_dir
+            .path()
+            .join("Library")
+            .to_string_lossy()
+            .to_string();
+
+        assert_eq!(build_entries(&conn, &volumes, NOW).unwrap().len(), 1);
+        conn.execute("INSERT INTO directories (path) VALUES (?1)", [&library])
+            .unwrap();
+        assert!(build_entries(&conn, &volumes, NOW).unwrap().is_empty());
+        conn.execute("DELETE FROM directories WHERE path = ?1", [&library])
+            .unwrap();
+        assert_eq!(build_entries(&conn, &volumes, NOW).unwrap().len(), 1);
     }
 
     #[test]

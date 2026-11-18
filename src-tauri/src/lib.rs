@@ -12,6 +12,7 @@
 pub mod album_key;
 pub mod artist_image;
 pub mod audio;
+pub mod background_reads;
 pub mod band_waveform;
 pub mod biomanager;
 pub mod bridge;
@@ -1251,28 +1252,47 @@ pub fn run() {
                 active_eq_device: Arc::new(parking_lot::Mutex::new(initial_eq_device)),
             };
 
-            crate::collection::start_watcher(app.handle().clone(), &state);
+            crate::collection::library_folders_changed(app.handle().clone(), &state);
 
-            // Start background EBU R128 loudness analyzer (#77)
-            crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
-
-            // Start background tempo/key detection for tracks lacking those tags (#1943)
-            crate::musical::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
-
-            // Start background lossless audio provenance analyzer (#1373, epic #1441)
-            crate::provenance::spawn_background_analyzer(
-                app.handle().clone(),
-                Arc::clone(&state.db),
-            );
-
-            // Start background audio integrity checker (#1938, epic #1441)
-            crate::curation::spawn_background_integrity_checker(
-                app.handle().clone(),
-                Arc::clone(&state.db),
-            );
-
-            // Correct the codec of tracks scanned when it came from the extension (#1866).
-            crate::collection::spawn_codec_reprobe(app.handle().clone(), Arc::clone(&state.db));
+            // Everything that reads library files in the background, on one
+            // thread that waits for the library to settle and yields to scans
+            // (#2160). Readers take turns in this order: loudness first, since
+            // it affects playback when normalization is on.
+            {
+                let handle = app.handle();
+                let db = &state.db;
+                let (reprobe_app, reprobe_db) = (handle.clone(), Arc::clone(db));
+                crate::background_reads::BackgroundReadRunner::new(
+                    Arc::clone(db),
+                    vec![
+                        // EBU R128 loudness (#77)
+                        Box::new(crate::loudness::LoudnessReader::new(
+                            handle.clone(),
+                            Arc::clone(db),
+                        )),
+                        // Tempo/key for tracks lacking those tags (#1943)
+                        Box::new(crate::musical::MusicalReader::new(
+                            handle.clone(),
+                            Arc::clone(db),
+                        )),
+                        // Lossless provenance (#1373, epic #1441)
+                        Box::new(crate::provenance::ProvenanceReader::new(
+                            handle.clone(),
+                            Arc::clone(db),
+                        )),
+                        // Audio integrity (#1938, epic #1441)
+                        Box::new(crate::curation::IntegrityReader::new(
+                            handle.clone(),
+                            Arc::clone(db),
+                        )),
+                    ],
+                )
+                // Correct the codec of tracks scanned when it came from the extension (#1866).
+                .once_settled(move || {
+                    crate::collection::reprobe_codecs_and_announce(&reprobe_app, &reprobe_db)
+                })
+                .spawn();
+            }
 
             app.manage(state);
             let managed_state = app.state::<AppState>();
