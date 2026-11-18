@@ -61,7 +61,7 @@ pub(crate) use query::MISSING_CORE_TAGS_SQL;
 pub(crate) use reconcile::resolve_case_insensitive_path;
 pub use safeguard::{MassRemovalIncident, MassRemovalRegistry, SafeguardVerdict};
 pub use scan_gate::ScanGate;
-pub use watcher::{start_watcher, SelfWriteTracker, WatcherPauseGuard};
+pub use watcher::{library_folders_changed, SelfWriteTracker, WatcherPauseGuard};
 
 /// What started a library scan — recorded with its timings so repeated
 /// whole-library rescans (e.g. one per watcher event on a network share) are
