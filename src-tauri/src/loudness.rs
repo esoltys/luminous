@@ -2,7 +2,8 @@
 //! persistence and background analyzer orchestration.
 //!
 //! DSP measurement and gain calculation live in `luminous_analysis`.
-//! A low-priority background thread (`spawn_background_analyzer`) decodes
+//! A low-priority background reader (`LoudnessReader`, run by
+//! `crate::background_reads`) decodes
 //! each not-yet-analyzed local track once (through `luminous_audio::OfflineDecoder`,
 //! the same decode path as the band_waveform/waveform analyzers) and writes
 //! `songs.ebur128_integrated_loudness_lufs`. Playback consults, in order:
@@ -20,7 +21,6 @@ pub use luminous_analysis::{
 use rusqlite::{params, OptionalExtension};
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 // ---------------------------------------------------------------------------
@@ -79,100 +79,108 @@ pub fn analyze_integrated_loudness(path: &Path) -> Result<f64> {
 // Background analysis worker
 // ---------------------------------------------------------------------------
 
-/// Spawn the low-priority background R128 analyzer. Picks up local/collection
-/// tracks lacking a loudness measurement, most-recently-added first (a simple
-/// approximation of "newly scanned tracks first, then backfill"), analyzes
-/// one at a time, and throttles between tracks so it never competes with
-/// playback or scanning for CPU.
-pub fn spawn_background_analyzer(app: AppHandle, db: Arc<Database>) {
-    std::thread::Builder::new()
-        .name("luminous-loudness".to_string())
-        .spawn(move || {
-            let mut analyzed: u64 = 0;
-            loop {
-                // Only grind through the backlog while the user has actually
-                // opted into loudness normalization — otherwise this thread
-                // would decode the entire library (slow and disk-heavy on
-                // external drives) for a feature that's off by default and
-                // never gets used.
-                let enabled = get_settings(&db).map(|s| s.enabled).unwrap_or(false);
-                if !enabled {
-                    std::thread::sleep(Duration::from_secs(15));
-                    continue;
-                }
+/// Background R128 analysis, scheduled by `crate::background_reads`. Picks up
+/// local/collection tracks lacking a loudness measurement, most-recently-added
+/// first (a simple approximation of "newly scanned tracks first, then
+/// backfill"). A track that fails to decode gets `ANALYSIS_FAILED_SENTINEL`,
+/// so it isn't picked again.
+pub struct LoudnessReader {
+    app: AppHandle,
+    db: Arc<Database>,
+    analyzed: u64,
+}
 
-                let next: Option<(i64, String)> = match db.pool.get() {
-                    Ok(conn) => conn
-                        .query_row(
-                            &format!(
-                                "SELECT id, path FROM songs
-                         WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
-                           AND ebur128_integrated_loudness_lufs IS NULL
-                         ORDER BY added DESC, id DESC LIMIT 1",
-                                lib = *LOCAL_SOURCES_SQL
-                            ),
-                            [],
-                            |row| Ok((row.get(0)?, row.get(1)?)),
-                        )
-                        .optional()
-                        .unwrap_or(None),
-                    Err(_) => None,
-                };
+impl LoudnessReader {
+    pub fn new(app: AppHandle, db: Arc<Database>) -> Self {
+        Self {
+            app,
+            db,
+            analyzed: 0,
+        }
+    }
+}
 
-                let Some((song_id, path_str)) = next else {
-                    // Nothing to do right now — check back periodically for newly
-                    // scanned tracks.
-                    std::thread::sleep(Duration::from_secs(15));
-                    continue;
-                };
+impl crate::background_reads::BackgroundRead for LoudnessReader {
+    fn name(&self) -> &'static str {
+        "loudness"
+    }
 
-                let path = Path::new(&path_str);
-                let lufs = match analyze_integrated_loudness(path) {
-                    Ok(lufs) => lufs,
-                    Err(e) => {
-                        log::warn!("R128 analysis failed for song {song_id} ({path_str}): {e}");
-                        ANALYSIS_FAILED_SENTINEL
-                    }
-                };
+    fn next(
+        &mut self,
+        conn: &rusqlite::Connection,
+        skipped: &crate::background_reads::Skipped,
+    ) -> rusqlite::Result<Option<(i64, String)>> {
+        // Only grind through the backlog while the user has actually opted
+        // into loudness normalization — otherwise this would decode the
+        // entire library (slow and disk-heavy on external drives) for a
+        // feature that's off by default and never gets used.
+        let enabled = get_settings(&self.db).map(|s| s.enabled).unwrap_or(false);
+        if !enabled {
+            return Ok(None);
+        }
+        conn.query_row(
+            &format!(
+                "SELECT id, path FROM songs
+                 WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
+                   AND ebur128_integrated_loudness_lufs IS NULL AND {skip}
+                 ORDER BY added DESC, id DESC LIMIT 1",
+                lib = *LOCAL_SOURCES_SQL,
+                skip = skipped.sql_excluding("id")
+            ),
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+    }
 
-                let remaining: i64 = db
-                    .pool
-                    .get()
-                    .ok()
-                    .and_then(|conn| {
-                        conn.execute(
-                            "UPDATE songs SET ebur128_integrated_loudness_lufs = ?1 WHERE id = ?2",
-                            params![lufs, song_id],
-                        )
-                        .ok()?;
-                        conn.query_row(
-                            &format!(
-                                "SELECT COUNT(*) FROM songs
+    fn read(&mut self, song_id: i64, path: &Path) -> crate::background_reads::Read {
+        let lufs = match analyze_integrated_loudness(path) {
+            Ok(lufs) => lufs,
+            Err(e) => {
+                log::warn!(
+                    "R128 analysis failed for song {song_id} ({}): {e}",
+                    path.display()
+                );
+                ANALYSIS_FAILED_SENTINEL
+            }
+        };
+
+        let remaining: i64 = self
+            .db
+            .pool
+            .get()
+            .ok()
+            .and_then(|conn| {
+                conn.execute(
+                    "UPDATE songs SET ebur128_integrated_loudness_lufs = ?1 WHERE id = ?2",
+                    params![lufs, song_id],
+                )
+                .ok()?;
+                conn.query_row(
+                    &format!(
+                        "SELECT COUNT(*) FROM songs
                          WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
                            AND ebur128_integrated_loudness_lufs IS NULL",
-                                lib = *LOCAL_SOURCES_SQL
-                            ),
-                            [],
-                            |row| row.get(0),
-                        )
-                        .ok()
-                    })
-                    .unwrap_or(0);
+                        lib = *LOCAL_SOURCES_SQL
+                    ),
+                    [],
+                    |row| row.get(0),
+                )
+                .ok()
+            })
+            .unwrap_or(0);
 
-                analyzed += 1;
-                let _ = app.emit(
-                    "loudness-analysis-progress",
-                    crate::models::LoudnessAnalysisProgress {
-                        analyzed,
-                        remaining: remaining.max(0) as u64,
-                    },
-                );
-
-                // Low-priority: yield generously between tracks.
-                std::thread::sleep(Duration::from_millis(250));
-            }
-        })
-        .expect("failed to spawn loudness analyzer thread");
+        self.analyzed += 1;
+        let _ = self.app.emit(
+            "loudness-analysis-progress",
+            crate::models::LoudnessAnalysisProgress {
+                analyzed: self.analyzed,
+                remaining: remaining.max(0) as u64,
+            },
+        );
+        // A failed decode stored the sentinel, so there is always a result.
+        crate::background_reads::Read::Stored
+    }
 }
 
 #[cfg(test)]

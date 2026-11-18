@@ -16,8 +16,12 @@
 //!
 //! Not gated: `rescan_paths` and the tag editor, which write individual files
 //! under their own `WatcherPauseGuard` and don't walk the library.
+//!
+//! The gate is also the one place that knows whether a scan is running, which
+//! the background readers (`crate::background_reads`) consult so they never
+//! start a file while a scan holds it (#2160).
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tokio::sync::{Mutex, MutexGuard};
 
 #[derive(Debug, Default)]
@@ -25,6 +29,9 @@ pub struct ScanGate {
     running: Mutex<()>,
     /// True only while a full (unscoped) scan holds `running`.
     full_running: AtomicBool,
+    /// Full scans that have released the gate since launch, however they
+    /// ended (finished, failed or returned early).
+    full_scans_finished: AtomicU64,
 }
 
 /// Held for the duration of one scan; releases the gate on drop, including on
@@ -58,6 +65,17 @@ impl ScanGate {
             _running: running,
         })
     }
+
+    /// Whether a scan, full or scoped, holds the gate right now. A scan
+    /// still waiting for the gate doesn't count.
+    pub fn is_scanning(&self) -> bool {
+        self.running.try_lock().is_err()
+    }
+
+    /// How many full scans have released the gate since launch.
+    pub fn full_scans_finished(&self) -> u64 {
+        self.full_scans_finished.load(Ordering::SeqCst)
+    }
 }
 
 impl Drop for ScanPermit<'_> {
@@ -65,6 +83,7 @@ impl Drop for ScanPermit<'_> {
         // Runs before `_running` is released, so a waiter never sees a stale flag.
         if self.full {
             self.gate.full_running.store(false, Ordering::SeqCst);
+            self.gate.full_scans_finished.fetch_add(1, Ordering::SeqCst);
         }
     }
 }
@@ -121,7 +140,34 @@ mod tests {
             Err::<(), &str>("scan failed")
         };
         assert!(attempt().await.is_err());
+        assert_eq!(
+            gate.full_scans_finished(),
+            1,
+            "a failed full scan still finished"
+        );
         assert!(gate.acquire(true).await.is_some());
         assert!(!gate.full_running.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn reports_scanning_while_any_permit_is_held() {
+        let gate = ScanGate::default();
+        assert!(!gate.is_scanning());
+
+        let scoped = gate.acquire(false).await.unwrap();
+        assert!(gate.is_scanning());
+        drop(scoped);
+        assert!(!gate.is_scanning());
+        assert_eq!(
+            gate.full_scans_finished(),
+            0,
+            "a scoped scan isn't a full one"
+        );
+
+        let full = gate.acquire(true).await.unwrap();
+        assert!(gate.is_scanning());
+        drop(full);
+        assert!(!gate.is_scanning());
+        assert_eq!(gate.full_scans_finished(), 1);
     }
 }

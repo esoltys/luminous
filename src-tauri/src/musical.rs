@@ -246,68 +246,86 @@ pub struct MusicalAnalysisProgress {
 /// when the backlog drains brings everything up to date.
 const LIBRARY_REFRESH_INTERVAL: Duration = Duration::from_secs(120);
 
-/// Spawn the low-priority background worker that fills in tempo and key for tracks lacking them.
-/// One track at a time, throttled, and decoded through the same pass that caches the waveforms,
-/// so each file is read once for all of it.
-pub fn spawn_background_analyzer(app: AppHandle, db: Arc<Database>) {
-    std::thread::Builder::new()
-        .name("luminous-musical".to_string())
-        .spawn(move || {
-            let mut unannounced = false;
-            let mut last_announce = Instant::now();
-            loop {
-                // Only grind through the backlog while the user has opted in.
-                let next = db.pool.get().ok().and_then(|conn| {
-                    if detection_enabled(&conn) {
-                        next_song_to_analyze(&conn).unwrap_or(None)
-                    } else {
-                        None
-                    }
-                });
+/// Background tempo/key detection for tracks lacking them, scheduled by
+/// `crate::background_reads`. Decoded through the same pass that caches the waveforms, so each
+/// file is read once for all of it. A file that can't be decoded is recorded as attempted, so it
+/// isn't picked again.
+pub struct MusicalReader {
+    app: AppHandle,
+    db: Arc<Database>,
+    /// Songs analysed since the library views were last told.
+    unannounced: bool,
+    last_announce: Instant,
+}
 
-                let Some((song_id, path_str)) = next else {
-                    if std::mem::take(&mut unannounced) {
-                        let _ = app.emit("library-changed", ());
-                        last_announce = Instant::now();
-                    }
-                    std::thread::sleep(Duration::from_secs(15));
-                    continue;
-                };
+impl MusicalReader {
+    pub fn new(app: AppHandle, db: Arc<Database>) -> Self {
+        Self {
+            app,
+            db,
+            unannounced: false,
+            last_announce: Instant::now(),
+        }
+    }
 
-                let path = std::path::Path::new(&path_str);
-                if let Err(e) = crate::waveform::analyze_song(&db, song_id, path) {
-                    log::debug!("Musical analysis skipped song {song_id}: {e}");
-                    // Remember the attempt so an undecodable file is not retried in a loop.
-                    if let Ok(conn) = db.pool.get() {
-                        let _ = record_analysis(
-                            &conn,
-                            song_id,
-                            &MusicalAnalysis {
-                                bpm: None,
-                                key: None,
-                            },
-                        );
-                    }
-                }
-                unannounced = true;
-                if let Some(left) = db.pool.get().ok().and_then(|c| remaining(&c).ok()) {
-                    let _ = app.emit(
-                        "musical-analysis-progress",
-                        MusicalAnalysisProgress { remaining: left },
-                    );
-                }
+    fn announce(&mut self) {
+        let _ = self.app.emit("library-changed", ());
+        self.unannounced = false;
+        self.last_announce = Instant::now();
+    }
+}
 
-                if last_announce.elapsed() >= LIBRARY_REFRESH_INTERVAL {
-                    let _ = app.emit("library-changed", ());
-                    unannounced = false;
-                    last_announce = Instant::now();
-                }
+impl crate::background_reads::BackgroundRead for MusicalReader {
+    fn name(&self) -> &'static str {
+        "tempo/key"
+    }
 
-                // Low-priority: yield between tracks so playback and scanning are never starved.
-                std::thread::sleep(Duration::from_millis(250));
+    fn next(
+        &mut self,
+        conn: &Connection,
+        _skipped: &crate::background_reads::Skipped,
+    ) -> rusqlite::Result<Option<(i64, String)>> {
+        // Only grind through the backlog while the user has opted in.
+        if !detection_enabled(conn) {
+            return Ok(None);
+        }
+        next_song_to_analyze(conn)
+    }
+
+    fn read(&mut self, song_id: i64, path: &std::path::Path) -> crate::background_reads::Read {
+        if let Err(e) = crate::waveform::analyze_song(&self.db, song_id, path) {
+            log::debug!("Musical analysis skipped song {song_id}: {e}");
+            // Remember the attempt so an undecodable file is not retried in a loop.
+            if let Ok(conn) = self.db.pool.get() {
+                let _ = record_analysis(
+                    &conn,
+                    song_id,
+                    &MusicalAnalysis {
+                        bpm: None,
+                        key: None,
+                    },
+                );
             }
-        })
-        .expect("failed to spawn musical analyzer thread");
+        }
+        self.unannounced = true;
+        if let Some(left) = self.db.pool.get().ok().and_then(|c| remaining(&c).ok()) {
+            let _ = self.app.emit(
+                "musical-analysis-progress",
+                MusicalAnalysisProgress { remaining: left },
+            );
+        }
+        if self.last_announce.elapsed() >= LIBRARY_REFRESH_INTERVAL {
+            self.announce();
+        }
+        // A failed decode is recorded as attempted, so there is always a result.
+        crate::background_reads::Read::Stored
+    }
+
+    fn caught_up(&mut self) {
+        if self.unannounced {
+            self.announce();
+        }
+    }
 }
 
 #[cfg(test)]

@@ -503,6 +503,29 @@ const SCROLL_ALBUM_GRID = `async function () {
   return { steps, cards: grid.querySelectorAll("img").length };
 }`;
 
+/**
+ * Logs how far background analysis has got in `profile`. Analysis reads whole files from the library drive, so a
+ * scan timed while it still has a backlog isn't comparable with one timed after it finished (#2160). Builds without
+ * an analysis table report it as absent.
+ */
+function logAnalysisBacklog(profile: AppProfile, when: string) {
+  const db = new Database(profile.dbPath, { readonly: true });
+  try {
+    const count = (table: string) => {
+      try {
+        return String((db.query(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n);
+      } catch {
+        return "absent";
+      }
+    };
+    log(
+      `background analysis ${when}: ${count("songs")} songs, provenance results ${count("song_provenance")}, integrity results ${count("song_integrity")}`,
+    );
+  } finally {
+    db.close();
+  }
+}
+
 async function localSource(opts: Options, rec: Recorder, folders: string[]) {
   const profile = new AppProfile({ exe: opts.exe, window: opts });
   log(`local: scratch profile ${profile.root}`);
@@ -521,6 +544,7 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
       );
       tracks = await withCdp(libraryTracks);
       log(`initial scan of ${tracks} tracks in ${folders.length} folder(s) took ${scan.seconds}s`);
+      logAnalysisBacklog(profile, "after the initial scan");
       await rec.finish(
         "initial-scan",
         SETTLE_AFTER_SCAN_SEC,
@@ -560,10 +584,12 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
     // 3. Forced full scan — same call as Settings → Force Full Scan.
     rec.begin();
     try {
+      logAnalysisBacklog(profile, "before the forced scan");
       const scan = await withCdp((c) =>
         timed(() => invoke(c, "scan_directories", { force: true })),
       );
       log(`forced full scan took ${scan.seconds}s`);
+      logAnalysisBacklog(profile, "after the forced scan");
       await rec.finish(
         "after-full-scan",
         SETTLE_AFTER_SCAN_SEC,
