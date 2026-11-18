@@ -854,7 +854,7 @@ impl PlaylistManager {
     /// relabeling an in-progress queue's upcoming tracks was considered and
     /// rejected as unnecessary complexity for a rare edge case.
     pub fn sync_daypart_auto_playlist(&self) -> Result<()> {
-        self.sync_daypart_auto_playlist_at(&jiff::Zoned::now(), crate::clock::unix_now())
+        self.sync_daypart_auto_playlist_at(&crate::clock::local_now(), crate::clock::unix_now())
     }
 
     pub fn sync_daypart_auto_playlist_at(

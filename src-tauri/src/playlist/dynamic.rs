@@ -93,7 +93,7 @@ pub async fn reconcile_each_day(app: tauri::AppHandle) {
     tokio::time::sleep(crate::playlist::STARTUP_RECONCILE_DELAY).await;
     let mut last_reconciled = None;
     loop {
-        let today = jiff::Zoned::now().date();
+        let today = crate::clock::local_now().date();
         if last_reconciled != Some(today) {
             last_reconciled = Some(today);
             reconcile_and_sync(app.clone()).await;
