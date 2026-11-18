@@ -130,7 +130,7 @@ None are needed for `bun run tauri dev`. Set them in your shell before building;
 | `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Signing updater artifacts in `bun run tauri build` (read by the Tauri CLI) | The build fails; see [Generating an Updater Signing Key](#generating-an-updater-signing-key) |
 | `FANART_API_KEY` | fanart.tv artist images | fanart.tv images are unavailable unless a key is entered in Settings |
 | `MUSICBRAINZ_CLIENT_ID`, `MUSICBRAINZ_CLIENT_SECRET` | MusicBrainz sign-in | The built-in client is used |
-| `LASTFM_API_KEY`, `LASTFM_API_SECRET` | Last.fm scrobbling | The built-in key is used |
+| `LASTFM_API_KEY`, `LASTFM_API_SECRET` (both required) | Last.fm scrobbling | Last.fm is unavailable until a key and secret are entered in Settings. Luminous ships no key of its own: Last.fm requires Pro on the account that owns a key |
 
 ---
 

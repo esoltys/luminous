@@ -9,7 +9,6 @@ use crate::models::{Song, SongSource};
 use anyhow::Result;
 pub use luminous_remote::lastfm::{
     LastFmClient, LastFmLovedTrack, LastFmScrobbleResponse, LastFmSession, LastFmTrack,
-    DEFAULT_LASTFM_API_KEY, DEFAULT_LASTFM_API_SECRET,
 };
 pub use luminous_remote::scrobbler::*;
 use rusqlite::params;
@@ -32,7 +31,11 @@ pub struct ScrobblerSettings {
     pub lastfm_enabled: bool,
     pub lastfm_session_key: String,
     pub lastfm_username: Option<String>,
+    /// The user's own Last.fm API credentials. Read-only through the generic settings
+    /// save (hence `default`: the frontend may omit them); see `set_lastfm_credentials`.
+    #[serde(default)]
     pub lastfm_api_key: String,
+    #[serde(default)]
     pub lastfm_api_secret: String,
 
     pub scrobble_now_playing: bool,
@@ -44,6 +47,58 @@ pub struct ScrobblerSettings {
     pub discord_client_id: String,
     pub discord_show_album: bool,
     pub discord_show_time: bool,
+}
+
+/// Shown when a Last.fm action needs an API key the user has not entered yet.
+const LASTFM_NO_CREDENTIALS: &str =
+    "Enter your Last.fm API key and secret in Settings before connecting.";
+
+/// A key and secret only count as a pair: a half-set pair is ignored, never
+/// mixed with the other half from a different source.
+fn credential_pair(key: Option<&str>, secret: Option<&str>) -> Option<(String, String)> {
+    let (key, secret) = (key?.trim(), secret?.trim());
+    (!key.is_empty() && !secret.is_empty()).then(|| (key.to_string(), secret.to_string()))
+}
+
+/// The Last.fm API credentials in effect, or `None` when none are configured.
+///
+/// Precedence: the user's own key from Settings, then the `LASTFM_API_KEY` /
+/// `LASTFM_API_SECRET` environment variables, then the same pair baked in at
+/// build time (source builds and CI). There is no built-in default key, since
+/// Last.fm requires Pro on the account that owns a key (#2165).
+pub fn resolve_lastfm_credentials(settings: &ScrobblerSettings) -> Option<(String, String)> {
+    credential_pair(
+        Some(&settings.lastfm_api_key),
+        Some(&settings.lastfm_api_secret),
+    )
+    .or_else(|| {
+        credential_pair(
+            std::env::var("LASTFM_API_KEY").ok().as_deref(),
+            std::env::var("LASTFM_API_SECRET").ok().as_deref(),
+        )
+    })
+    .or_else(|| {
+        credential_pair(
+            option_env!("LASTFM_API_KEY"),
+            option_env!("LASTFM_API_SECRET"),
+        )
+    })
+}
+
+/// A Last.fm client for the credentials in effect, or `None` when unconfigured.
+pub fn resolve_lastfm_client(settings: &ScrobblerSettings) -> Option<LastFmClient> {
+    resolve_lastfm_credentials(settings).map(|(key, secret)| LastFmClient::new(key, secret))
+}
+
+/// A ready-to-use client and its session key, only when Last.fm is enabled,
+/// connected and has credentials. Every Last.fm submission goes through this, so
+/// an unconfigured Last.fm makes no requests and logs no errors.
+pub fn active_lastfm_session(settings: &ScrobblerSettings) -> Option<(LastFmClient, String)> {
+    let session_key = settings.lastfm_session_key.trim();
+    if !settings.lastfm_enabled || session_key.is_empty() {
+        return None;
+    }
+    resolve_lastfm_client(settings).map(|client| (client, session_key.to_string()))
 }
 
 impl Default for ScrobblerSettings {
@@ -272,7 +327,21 @@ impl ScrobblerManager {
     }
 
     /// Persist scrobbler settings into `app_state`.
-    pub async fn save_settings(&self, new_settings: ScrobblerSettings) -> Result<()> {
+    ///
+    /// The Last.fm API credentials are not writable through here: they always keep
+    /// their current values, whatever `new_settings` carries. Only
+    /// [`Self::set_lastfm_credentials`] changes them, because it must also drop the
+    /// session they invalidate (#2165).
+    pub async fn save_settings(&self, mut new_settings: ScrobblerSettings) -> Result<()> {
+        {
+            let current = self.settings.lock().await;
+            new_settings.lastfm_api_key = current.lastfm_api_key.clone();
+            new_settings.lastfm_api_secret = current.lastfm_api_secret.clone();
+        }
+        self.persist_settings(new_settings).await
+    }
+
+    async fn persist_settings(&self, new_settings: ScrobblerSettings) -> Result<()> {
         if let Ok(conn) = self.db.pool.get() {
             let pairs: &[(&str, String)] = &[
                 (
@@ -568,36 +637,31 @@ impl ScrobblerManager {
         d.status()
     }
 
-    /// Resolve a LastFmClient using custom credentials from settings, env vars, or defaults.
-    pub fn resolve_lastfm_client(&self, settings: &ScrobblerSettings) -> LastFmClient {
-        let api_key = if !settings.lastfm_api_key.trim().is_empty() {
-            settings.lastfm_api_key.trim().to_string()
-        } else if let Ok(k) = std::env::var("LASTFM_API_KEY") {
-            k.trim().to_string()
-        } else if let Some(k) = option_env!("LASTFM_API_KEY") {
-            k.trim().to_string()
-        } else {
-            DEFAULT_LASTFM_API_KEY.to_string()
-        };
-
-        let api_secret = if !settings.lastfm_api_secret.trim().is_empty() {
-            settings.lastfm_api_secret.trim().to_string()
-        } else if let Ok(s) = std::env::var("LASTFM_API_SECRET") {
-            s.trim().to_string()
-        } else if let Some(s) = option_env!("LASTFM_API_SECRET") {
-            s.trim().to_string()
-        } else {
-            DEFAULT_LASTFM_API_SECRET.to_string()
-        };
-
-        LastFmClient::new(api_key, api_secret)
+    /// Store the user's own Last.fm API key and secret (#2165).
+    ///
+    /// A Last.fm session is bound to the key that created it, so changing either
+    /// half drops the current session in the same save: the stored session is
+    /// always valid for the stored credentials. Re-saving identical credentials
+    /// keeps the session.
+    pub async fn set_lastfm_credentials(&self, api_key: &str, api_secret: &str) -> Result<()> {
+        let mut settings = self.get_settings().await;
+        let (key, secret) = (api_key.trim(), api_secret.trim());
+        if settings.lastfm_api_key == key && settings.lastfm_api_secret == secret {
+            return Ok(());
+        }
+        settings.lastfm_api_key = key.to_string();
+        settings.lastfm_api_secret = secret.to_string();
+        settings.lastfm_enabled = false;
+        settings.lastfm_session_key = String::new();
+        settings.lastfm_username = None;
+        self.persist_settings(settings).await
     }
 
     /// Initiate Last.fm desktop authentication: acquires a request token and returns
     /// (token, authorization_url) for the user to authorize in their browser.
     pub async fn start_lastfm_auth(&self) -> Result<(String, String), String> {
         let settings = self.get_settings().await;
-        let client = self.resolve_lastfm_client(&settings);
+        let client = resolve_lastfm_client(&settings).ok_or(LASTFM_NO_CREDENTIALS)?;
         let token = client.get_auth_token().await.map_err(|e| e.to_string())?;
         let auth_url = client.build_auth_url(&token);
         Ok((token, auth_url))
@@ -606,7 +670,7 @@ impl ScrobblerManager {
     /// Complete Last.fm desktop authentication: exchanges the authorized token for a permanent session.
     pub async fn complete_lastfm_auth(&self, token: &str) -> Result<LastFmSession, String> {
         let mut settings = self.get_settings().await;
-        let client = self.resolve_lastfm_client(&settings);
+        let client = resolve_lastfm_client(&settings).ok_or(LASTFM_NO_CREDENTIALS)?;
         let session = client.get_session(token).await.map_err(|e| e.to_string())?;
 
         settings.lastfm_session_key = session.session_key.clone();
@@ -645,12 +709,13 @@ impl ScrobblerManager {
             && settings.scrobble_now_playing
             && !settings.listenbrainz_token.trim().is_empty();
 
-        let lf_now_playing = settings.lastfm_enabled
-            && !settings.scrobble_paused
-            && settings.scrobble_now_playing
-            && !settings.lastfm_session_key.trim().is_empty();
+        let lf_now_playing = if !settings.scrobble_paused && settings.scrobble_now_playing {
+            active_lastfm_session(&settings)
+        } else {
+            None
+        };
 
-        if !lb_now_playing && !lf_now_playing {
+        if !lb_now_playing && lf_now_playing.is_none() {
             return;
         }
 
@@ -698,9 +763,7 @@ impl ScrobblerManager {
             });
         }
 
-        if lf_now_playing {
-            let lastfm = self.resolve_lastfm_client(&settings);
-            let sk = settings.lastfm_session_key.clone();
+        if let Some((lastfm, sk)) = lf_now_playing {
             let lf_track = LastFmTrack {
                 artist: artist.to_string(),
                 track: title.to_string(),
@@ -860,11 +923,9 @@ impl ScrobblerManager {
         }
 
         // Last.fm submission (rating >= 4.0 treated as loved)
-        if settings.lastfm_enabled && !settings.lastfm_session_key.trim().is_empty() {
+        if let Some((lastfm, sk)) = active_lastfm_session(&settings) {
             if let (Some(artist), Some(track)) = (&song.artist, &song.title) {
                 if !artist.trim().is_empty() && !track.trim().is_empty() && rating >= 4.0 {
-                    let lastfm = self.resolve_lastfm_client(&settings);
-                    let sk = settings.lastfm_session_key.clone();
                     let artist_clone = artist.clone();
                     let track_clone = track.clone();
                     tauri::async_runtime::spawn(async move {
@@ -904,11 +965,9 @@ impl ScrobblerManager {
         }
 
         // Last.fm submission: loved=1 loves, loved<=0 unloves
-        if settings.lastfm_enabled && !settings.lastfm_session_key.trim().is_empty() {
+        if let Some((lastfm, sk)) = active_lastfm_session(&settings) {
             if let (Some(artist), Some(track)) = (&song.artist, &song.title) {
                 if !artist.trim().is_empty() && !track.trim().is_empty() {
-                    let lastfm = self.resolve_lastfm_client(&settings);
-                    let sk = settings.lastfm_session_key.clone();
                     let artist_clone = artist.clone();
                     let track_clone = track.clone();
                     let is_loved = loved > 0;
@@ -1022,11 +1081,9 @@ impl ScrobblerManager {
         }
 
         // 2. Sync Last.fm loved tracks if enabled
-        if settings.lastfm_enabled {
-            let sk = settings.lastfm_session_key.trim();
+        if let Some((lastfm, sk)) = active_lastfm_session(&settings) {
             let username = settings.lastfm_username.as_deref().unwrap_or("").trim();
-            if !sk.is_empty() && !username.is_empty() {
-                let lastfm = self.resolve_lastfm_client(&settings);
+            if !username.is_empty() {
                 match lastfm.fetch_all_loved_tracks(username).await {
                     Ok(remote_loved) => {
                         let (lf_outcome, lf_pushes) = {
@@ -1039,7 +1096,7 @@ impl ScrobblerManager {
                         outcome.song_ids.extend(lf_outcome.song_ids);
 
                         for (artist, track) in lf_pushes {
-                            match lastfm.set_loved(sk, &artist, &track, true).await {
+                            match lastfm.set_loved(&sk, &artist, &track, true).await {
                                 Ok(()) => pushed += 1,
                                 Err(e) => {
                                     log::warn!("Failed to push loved track to Last.fm: {e}");
@@ -1144,33 +1201,7 @@ impl ScrobblerManager {
                 None
             };
 
-            let lastfm_opt =
-                if settings.lastfm_enabled && !settings.lastfm_session_key.trim().is_empty() {
-                    let api_key = if !settings.lastfm_api_key.trim().is_empty() {
-                        settings.lastfm_api_key.trim().to_string()
-                    } else if let Ok(k) = std::env::var("LASTFM_API_KEY") {
-                        k.trim().to_string()
-                    } else if let Some(k) = option_env!("LASTFM_API_KEY") {
-                        k.trim().to_string()
-                    } else {
-                        DEFAULT_LASTFM_API_KEY.to_string()
-                    };
-
-                    let api_secret = if !settings.lastfm_api_secret.trim().is_empty() {
-                        settings.lastfm_api_secret.trim().to_string()
-                    } else if let Ok(s) = std::env::var("LASTFM_API_SECRET") {
-                        s.trim().to_string()
-                    } else if let Some(s) = option_env!("LASTFM_API_SECRET") {
-                        s.trim().to_string()
-                    } else {
-                        DEFAULT_LASTFM_API_SECRET.to_string()
-                    };
-
-                    let client = LastFmClient::new(api_key, api_secret);
-                    Some((client, settings.lastfm_session_key.clone()))
-                } else {
-                    None
-                };
+            let lastfm_opt = active_lastfm_session(&settings);
 
             if lb_token.is_none() && lastfm_opt.is_none() {
                 return;
@@ -1203,13 +1234,7 @@ impl ScrobblerManager {
                 None
             };
 
-        let lastfm_opt =
-            if settings.lastfm_enabled && !settings.lastfm_session_key.trim().is_empty() {
-                let client = self.resolve_lastfm_client(&settings);
-                Some((client, settings.lastfm_session_key.clone()))
-            } else {
-                None
-            };
+        let lastfm_opt = active_lastfm_session(&settings);
 
         if lb_token.is_none() && lastfm_opt.is_none() {
             return Err("Neither ListenBrainz nor Last.fm scrobbler is configured".into());
@@ -1496,5 +1521,112 @@ mod tests {
         assert_eq!(status.lastfm_pending_count, 1);
         assert_eq!(status.listenbrainz_pending_count, 0);
         assert_eq!(status.pending_count, 1);
+    }
+
+    #[test]
+    fn lastfm_credentials_only_count_as_a_complete_pair() {
+        assert_eq!(
+            credential_pair(Some("k"), Some("s")),
+            Some(("k".into(), "s".into()))
+        );
+        assert_eq!(
+            credential_pair(Some(" k "), Some(" s ")),
+            Some(("k".into(), "s".into()))
+        );
+        assert_eq!(credential_pair(Some("k"), Some("  ")), None);
+        assert_eq!(credential_pair(Some("k"), None), None);
+        assert_eq!(credential_pair(None, Some("s")), None);
+    }
+
+    #[test]
+    fn a_complete_pair_in_settings_wins_over_other_sources() {
+        let settings = ScrobblerSettings {
+            lastfm_api_key: "user_key".into(),
+            lastfm_api_secret: "user_secret".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            resolve_lastfm_credentials(&settings),
+            Some(("user_key".into(), "user_secret".into()))
+        );
+    }
+
+    #[test]
+    fn lastfm_session_is_inactive_without_enable_session_or_credentials() {
+        let mut settings = ScrobblerSettings {
+            lastfm_api_key: "k".into(),
+            lastfm_api_secret: "s".into(),
+            ..Default::default()
+        };
+        assert!(active_lastfm_session(&settings).is_none(), "not enabled");
+
+        settings.lastfm_enabled = true;
+        assert!(active_lastfm_session(&settings).is_none(), "no session key");
+
+        settings.lastfm_session_key = "sk".into();
+        let (_, session_key) = active_lastfm_session(&settings).expect("fully configured");
+        assert_eq!(session_key, "sk");
+    }
+
+    #[test]
+    fn settings_json_without_lastfm_credentials_still_deserializes() {
+        // The frontend's generic settings save does not carry the credentials.
+        let mut value = serde_json::to_value(ScrobblerSettings::default()).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("lastfm_api_key");
+        object.remove("lastfm_api_secret");
+        let parsed: ScrobblerSettings = serde_json::from_value(value).unwrap();
+        assert!(parsed.lastfm_api_key.is_empty());
+    }
+
+    #[tokio::test]
+    async fn changing_lastfm_credentials_drops_the_session_and_generic_saves_cannot_clobber_them() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_lastfm_credentials_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(crate::db::Database::new(dir.path().to_path_buf()).unwrap());
+        let manager = ScrobblerManager::new(Arc::clone(&db));
+
+        manager
+            .set_lastfm_credentials(" key ", " secret ")
+            .await
+            .unwrap();
+        let stored = ScrobblerManager::load_settings_from_db(&db);
+        assert_eq!(stored.lastfm_api_key, "key");
+        assert_eq!(stored.lastfm_api_secret, "secret");
+
+        let mut connected = manager.get_settings().await;
+        connected.lastfm_enabled = true;
+        connected.lastfm_session_key = "sk".into();
+        connected.lastfm_username = Some("someone".into());
+        manager.save_settings(connected).await.unwrap();
+
+        // A generic save that carries blank credentials leaves them alone.
+        let mut blank = manager.get_settings().await;
+        blank.lastfm_api_key = String::new();
+        blank.lastfm_api_secret = String::new();
+        manager.save_settings(blank).await.unwrap();
+        let after_generic = manager.get_settings().await;
+        assert_eq!(after_generic.lastfm_api_key, "key");
+        assert!(after_generic.lastfm_enabled);
+
+        // Re-saving the same credentials keeps the session.
+        manager
+            .set_lastfm_credentials("key", "secret")
+            .await
+            .unwrap();
+        assert_eq!(manager.get_settings().await.lastfm_session_key, "sk");
+
+        // A different key invalidates it.
+        manager
+            .set_lastfm_credentials("other", "secret")
+            .await
+            .unwrap();
+        let changed = ScrobblerManager::load_settings_from_db(&db);
+        assert_eq!(changed.lastfm_api_key, "other");
+        assert!(!changed.lastfm_enabled);
+        assert!(changed.lastfm_session_key.is_empty());
+        assert!(changed.lastfm_username.is_none());
     }
 }

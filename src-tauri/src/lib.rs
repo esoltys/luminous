@@ -1743,6 +1743,8 @@ pub fn run() {
             commands::scrobbler::toggle_scrobble_pause,
             commands::scrobbler::sync_ratings_to_listenbrainz,
             commands::scrobbler::get_discord_status,
+            commands::scrobbler::set_lastfm_credentials,
+            commands::scrobbler::lastfm_credentials_configured,
             commands::scrobbler::start_lastfm_login,
             commands::scrobbler::finish_lastfm_login,
             commands::scrobbler::disconnect_lastfm,

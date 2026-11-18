@@ -102,6 +102,33 @@ pub struct LastFmAuthPrompt {
     pub auth_url: String,
 }
 
+/// Save the user's own Last.fm API key and secret (#2165). Changing them drops the
+/// current Last.fm session, which the old key created.
+#[tauri::command]
+pub async fn set_lastfm_credentials(
+    api_key: String,
+    api_secret: String,
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    state
+        .scrobbler
+        .set_lastfm_credentials(&api_key, &api_secret)
+        .await
+        .map_err(|e| e.to_string())?;
+    let settings = state.scrobbler.get_settings().await;
+    let _ = app.emit("scrobbler-settings-changed", &settings);
+    Ok(())
+}
+
+/// Whether any Last.fm API credentials are in effect (Settings, environment or
+/// build time), so the UI knows whether Connect can work.
+#[tauri::command]
+pub async fn lastfm_credentials_configured(state: State<'_, AppState>) -> Result<bool, String> {
+    let settings = state.scrobbler.get_settings().await;
+    Ok(crate::scrobbler::resolve_lastfm_credentials(&settings).is_some())
+}
+
 #[tauri::command]
 pub async fn start_lastfm_login(state: State<'_, AppState>) -> Result<LastFmAuthPrompt, String> {
     let (token, auth_url) = state.scrobbler.start_lastfm_auth().await?;

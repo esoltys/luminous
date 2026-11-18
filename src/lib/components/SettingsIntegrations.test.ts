@@ -5,6 +5,7 @@ import { tick } from "svelte";
 import SettingsIntegrations from "./SettingsIntegrations.svelte";
 import { scrobblerStore } from "../stores/scrobbler.svelte";
 import { prefs } from "../stores/prefs.svelte";
+import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((cmd: string) => {
@@ -311,5 +312,73 @@ describe("SettingsIntegrations.svelte", () => {
     expect(await findByText("lastfm_fan")).toBeInTheDocument();
     expect(getByRole("button", { name: "Disconnect" })).toBeInTheDocument();
     expect(getByRole("switch", { name: "Enable Last.fm scrobbling" })).toBeInTheDocument();
+  });
+
+  describe("Last.fm API credentials (#2165)", () => {
+    beforeEach(() => {
+      scrobblerStore.lastfmApiKey = "";
+      scrobblerStore.lastfmApiSecret = "";
+      scrobblerStore.lastfmCredentialsConfigured = false;
+      scrobblerStore.lastfmCredentialsError = null;
+    });
+
+    it("cannot connect until the user has saved their own key", async () => {
+      const { findByRole } = render(SettingsIntegrations);
+      const connect = await findByRole("button", { name: "Connect Last.fm" });
+      expect(connect).toBeDisabled();
+
+      scrobblerStore.lastfmApiKey = "my-key";
+      scrobblerStore.lastfmApiSecret = "my-secret";
+      scrobblerStore.lastfmCredentialsConfigured = true;
+      await tick();
+      expect(connect).toBeEnabled();
+    });
+
+    it("saves the entered key and secret explicitly, not on every keystroke", async () => {
+      const { findByLabelText, findByRole } = render(SettingsIntegrations);
+      const keyInput = await findByLabelText("Last.fm API key");
+      const secretInput = await findByLabelText("Last.fm shared secret");
+      const save = await findByRole("button", { name: "Save key" });
+      expect(save).toBeDisabled();
+
+      await fireEvent.input(keyInput, { target: { value: "  my-key " } });
+      await fireEvent.input(secretInput, { target: { value: "my-secret" } });
+      await tick();
+      expect(invoke).not.toHaveBeenCalledWith("set_lastfm_credentials", expect.anything());
+      expect(save).toBeEnabled();
+
+      await fireEvent.click(save);
+      expect(invoke).toHaveBeenCalledWith("set_lastfm_credentials", {
+        apiKey: "  my-key ",
+        apiSecret: "my-secret",
+      });
+    });
+
+    it("warns, and offers the form, when connected without any key", async () => {
+      scrobblerStore.lastfmUsername = "old_session";
+      scrobblerStore.lastfmEnabled = true;
+      const { findByText, findByLabelText, queryByText, queryByLabelText } =
+        render(SettingsIntegrations);
+      expect(await findByText(/no API key is set/)).toBeInTheDocument();
+      expect(await findByLabelText("Last.fm API key")).toBeInTheDocument();
+
+      scrobblerStore.lastfmCredentialsConfigured = true;
+      await tick();
+      expect(queryByText(/no API key is set/)).not.toBeInTheDocument();
+      expect(queryByLabelText("Last.fm API key")).not.toBeInTheDocument();
+    });
+
+    it("keeps Connect disabled while the form holds unsaved changes", async () => {
+      scrobblerStore.lastfmCredentialsConfigured = true;
+      const { findByLabelText, findByRole } = render(SettingsIntegrations);
+      const connect = await findByRole("button", { name: "Connect Last.fm" });
+      expect(connect).toBeEnabled();
+
+      await fireEvent.input(await findByLabelText("Last.fm API key"), {
+        target: { value: "changed" },
+      });
+      await tick();
+      expect(connect).toBeDisabled();
+    });
   });
 });
