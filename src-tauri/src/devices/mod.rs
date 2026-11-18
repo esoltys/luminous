@@ -30,9 +30,15 @@ use tauri::{AppHandle, Emitter};
 pub const DEVICES_CHANGED_EVENT: &str = "devices-changed";
 
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
-/// Rebuild at least this often even when no device changed, so a newly
-/// watched music folder on a device, or a marker edited elsewhere, shows up.
+/// Rebuild at least this often even when no device changed, so a marker
+/// edited elsewhere shows up. Library-folder changes don't wait for this:
+/// `collection::library_folders_changed` requests a rebuild.
 const REBUILD_EVERY_POLLS: u32 = 15;
+
+/// Whether a poll should rebuild the device list now.
+fn should_rebuild(requested: bool, devices_changed: bool, polls_since_rebuild: u32) -> bool {
+    requested || devices_changed || polls_since_rebuild >= REBUILD_EVERY_POLLS
+}
 
 /// What the UI shows for one device.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -235,10 +241,11 @@ impl DeviceMonitor {
         loop {
             let devices = watcher.poll();
             let requested = std::mem::take(&mut *self.rebuild_requested.lock());
-            if requested
-                || last_devices.as_ref() != Some(&devices)
-                || polls_since_rebuild >= REBUILD_EVERY_POLLS
-            {
+            if should_rebuild(
+                requested,
+                last_devices.as_ref() != Some(&devices),
+                polls_since_rebuild,
+            ) {
                 match db
                     .pool
                     .get()
@@ -562,6 +569,40 @@ mod tests {
 
         let entries = build_entries(&conn, &[volume(device_dir.path(), "0088-5572")], NOW).unwrap();
         assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn adding_or_removing_a_library_folder_flips_the_device_with_the_same_volumes() {
+        let (_db_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        let device_dir = tempfile::tempdir().unwrap();
+        let volumes = [volume(device_dir.path(), "0088-5572")];
+        let library = device_dir
+            .path()
+            .join("Library")
+            .to_string_lossy()
+            .to_string();
+
+        assert_eq!(build_entries(&conn, &volumes, NOW).unwrap().len(), 1);
+        conn.execute("INSERT INTO directories (path) VALUES (?1)", [&library])
+            .unwrap();
+        assert!(build_entries(&conn, &volumes, NOW).unwrap().is_empty());
+        conn.execute("DELETE FROM directories WHERE path = ?1", [&library])
+            .unwrap();
+        assert_eq!(build_entries(&conn, &volumes, NOW).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_requested_rebuild_does_not_wait_for_a_device_change_or_the_periodic_rebuild() {
+        let monitor = DeviceMonitor::new();
+        assert!(!should_rebuild(false, false, 0));
+        assert!(!should_rebuild(false, false, REBUILD_EVERY_POLLS - 1));
+        assert!(should_rebuild(false, false, REBUILD_EVERY_POLLS));
+        assert!(should_rebuild(false, true, 0));
+
+        monitor.request_rebuild();
+        let requested = std::mem::take(&mut *monitor.rebuild_requested.lock());
+        assert!(should_rebuild(requested, false, 0));
     }
 
     #[test]

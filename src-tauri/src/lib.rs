@@ -1251,7 +1251,7 @@ pub fn run() {
                 active_eq_device: Arc::new(parking_lot::Mutex::new(initial_eq_device)),
             };
 
-            crate::collection::start_watcher(app.handle().clone(), &state);
+            crate::collection::library_folders_changed(app.handle().clone(), &state);
 
             // Start background EBU R128 loudness analyzer (#77)
             crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));

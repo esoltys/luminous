@@ -2,7 +2,7 @@
 //! and OpenSubsonic (#916, #1162).
 //!
 //! Local watched folders get live change notifications from a filesystem
-//! watcher (`collection::start_watcher`); a remote server can't push change
+//! watcher (`collection::library_folders_changed`); a remote server can't push change
 //! notifications, so a server that opts into auto-sync instead gets its own
 //! tokio interval task that re-runs its sync on a schedule. Tasks are keyed
 //! by `(RemoteKind, server id)` so a single server's schedule can be replaced
