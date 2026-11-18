@@ -36,7 +36,7 @@
 //! last 30 days". A song with no `lastplayed` counts as older than any date.
 //! A bare integer is still an epoch-seconds timestamp, compared as-is.
 
-use jiff::{civil::Date, tz::TimeZone, Span, Zoned};
+use jiff::{civil::Date, Span};
 use rusqlite::types::{ToSqlOutput, Value as SqlValue};
 use rusqlite::ToSql;
 
@@ -367,7 +367,7 @@ impl ParsedQuery {
 /// instead (quotes stripped), so malformed input degrades to a plain-text
 /// search rather than being rejected.
 pub fn parse_query(raw_query: &str) -> ParsedQuery {
-    parse_query_at(raw_query, Zoned::now().date())
+    parse_query_at(raw_query, crate::clock::local_now().date())
 }
 
 /// [`parse_query`] with the local date injected, which relative date values
@@ -780,7 +780,7 @@ fn parse_field_filter(token: &str, today: Date) -> Option<FieldFilter> {
 fn local_day_start(day: Date) -> Option<i64> {
     // jiff's default ("compatible") disambiguation starts a day whose
     // midnight falls in a DST gap at the first local time that exists.
-    day.to_zoned(TimeZone::system())
+    day.to_zoned(crate::clock::local_tz())
         .ok()
         .map(|z| z.timestamp().as_second())
 }
