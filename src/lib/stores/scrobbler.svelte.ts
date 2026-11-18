@@ -67,6 +67,12 @@ class ScrobblerStore {
   lastfmEnabled = $state(false);
   lastfmUsername = $state<string | null>(null);
   lastfmSessionKey = $state("");
+  /** The user's own API credentials (#2165); there is no built-in key. */
+  lastfmApiKey = $state("");
+  lastfmApiSecret = $state("");
+  /** Whether any credentials are in effect, including env/build-time ones the form can't show. */
+  lastfmCredentialsConfigured = $state(false);
+  lastfmCredentialsError = $state<string | null>(null);
   lastfmPendingToken = $state<string | null>(null);
   lastfmPendingAuthUrl = $state<string | null>(null);
   isStartingLastfm = $state(false);
@@ -113,6 +119,8 @@ class ScrobblerStore {
       this.lastfmEnabled = settings.lastfm_enabled ?? false;
       this.lastfmSessionKey = settings.lastfm_session_key ?? "";
       this.lastfmUsername = settings.lastfm_username ?? null;
+      this.lastfmApiKey = settings.lastfm_api_key ?? "";
+      this.lastfmApiSecret = settings.lastfm_api_secret ?? "";
       this.nowPlayingEnabled = settings.scrobble_now_playing;
       this.ratingsEnabled = settings.scrobble_ratings;
       this.paused = settings.scrobble_paused;
@@ -135,6 +143,9 @@ class ScrobblerStore {
         this.lastfmEnabled = s.lastfm_enabled ?? false;
         this.lastfmSessionKey = s.lastfm_session_key ?? "";
         this.lastfmUsername = s.lastfm_username ?? null;
+        this.lastfmApiKey = s.lastfm_api_key ?? "";
+        this.lastfmApiSecret = s.lastfm_api_secret ?? "";
+        void this.refreshLastfmCredentialsConfigured();
         this.nowPlayingEnabled = s.scrobble_now_playing;
         this.ratingsEnabled = s.scrobble_ratings;
         this.paused = s.scrobble_paused;
@@ -148,6 +159,7 @@ class ScrobblerStore {
       console.error("Failed to register scrobbler-settings-changed listener:", e);
     }
 
+    await this.refreshLastfmCredentialsConfigured();
     await this.refreshCacheStatus();
     if (this.discordEnabled) {
       await this.checkDiscordStatus();
@@ -237,6 +249,35 @@ class ScrobblerStore {
       this.lastAttempt = status.last_attempt;
     } catch (e) {
       console.error("Failed to fetch scrobble cache status:", e);
+    }
+  }
+
+  async refreshLastfmCredentialsConfigured() {
+    try {
+      this.lastfmCredentialsConfigured =
+        (await invoke<boolean>("lastfm_credentials_configured")) === true;
+    } catch (e) {
+      console.error("Failed to check Last.fm credentials:", e);
+    }
+  }
+
+  /**
+   * Save the user's own Last.fm API key and secret. The backend drops the current
+   * session when they change (a session is bound to the key that made it), and its
+   * `scrobbler-settings-changed` event updates the rest of this store.
+   */
+  async saveLastfmCredentials(apiKey: string, apiSecret: string) {
+    this.lastfmCredentialsError = null;
+    try {
+      await invoke("set_lastfm_credentials", { apiKey, apiSecret });
+      this.lastfmApiKey = apiKey.trim();
+      this.lastfmApiSecret = apiSecret.trim();
+      await this.refreshLastfmCredentialsConfigured();
+      return true;
+    } catch (err: any) {
+      this.lastfmCredentialsError =
+        typeof err === "string" ? err : (err?.message ?? i18n.t("lastfm.credentialsFailed"));
+      return false;
     }
   }
 

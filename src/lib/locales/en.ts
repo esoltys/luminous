@@ -2646,6 +2646,15 @@ export const en = {
     finishAuthBtn: "Finish Login",
     cancelAuthBtn: "Cancel",
     authFailed: "Failed to authorize with Last.fm",
+    credentialsHint:
+      "Last.fm requires your own API key, and a key needs a Last.fm Pro subscription on the account that owns it. Enter yours below to connect.",
+    connectedWithoutKey:
+      "Connected, but no API key is set, so nothing is being sent to Last.fm. Enter your own key to reconnect.",
+    createKeyLink: "Create an API key",
+    apiKeyLabel: "Last.fm API key",
+    apiSecretLabel: "Last.fm shared secret",
+    saveCredentialsBtn: "Save key",
+    credentialsFailed: "Failed to save the Last.fm API key",
     disconnectBtn: "Disconnect",
     enableLabel: "Enable Last.fm scrobbling",
     enableHint: "Submit completed listens to your Last.fm profile",

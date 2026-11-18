@@ -30,6 +30,25 @@
   } from "phosphor-svelte";
 
   let showListenBrainzToken = $state(false);
+  let showLastfmSecret = $state(false);
+  // The Last.fm key form edits a draft; saving is explicit because changing the
+  // credentials disconnects the current session (#2165).
+  let lastfmKeyInput = $state("");
+  let lastfmSecretInput = $state("");
+  let isSavingLastfmCredentials = $state(false);
+  $effect(() => {
+    lastfmKeyInput = scrobblerStore.lastfmApiKey;
+    lastfmSecretInput = scrobblerStore.lastfmApiSecret;
+  });
+  const lastfmCredentialsDirty = $derived(
+    lastfmKeyInput.trim() !== scrobblerStore.lastfmApiKey ||
+      lastfmSecretInput.trim() !== scrobblerStore.lastfmApiSecret,
+  );
+  async function saveLastfmCredentials() {
+    isSavingLastfmCredentials = true;
+    await scrobblerStore.saveLastfmCredentials(lastfmKeyInput, lastfmSecretInput);
+    isSavingLastfmCredentials = false;
+  }
   let showFanartKey = $state(false);
   let hasFanartEnvKey = $state(false);
   let fanartKeyStatus = $state<{
@@ -590,7 +609,9 @@
         {:else if !scrobblerStore.lastfmPendingToken}
           <Button
             onclick={() => scrobblerStore.startLastfmAuth()}
-            disabled={scrobblerStore.isStartingLastfm}
+            disabled={scrobblerStore.isStartingLastfm ||
+              !scrobblerStore.lastfmCredentialsConfigured ||
+              lastfmCredentialsDirty}
             variant="secondary"
             size="sm"
             class="gap-1.5 shrink-0"
@@ -606,6 +627,74 @@
         {/if}
       </div>
     </div>
+
+    <!-- Also shown while connected without a key: a session made with a since-removed
+         built-in key can't submit anything, and saying so beats silent no-ops (#2165). -->
+    {#if !scrobblerStore.lastfmPendingToken && (!scrobblerStore.lastfmUsername || !scrobblerStore.lastfmCredentialsConfigured)}
+      <div class="space-y-3 pt-2 border-t border-brand-border/60">
+        {#if scrobblerStore.lastfmUsername}
+          <InlineMessage>{i18n.t("lastfm.connectedWithoutKey")}</InlineMessage>
+        {/if}
+        <p class="text-xs text-brand-text-secondary leading-relaxed">
+          {i18n.t("lastfm.credentialsHint")}
+          <button
+            type="button"
+            onclick={() => openExternalUrl("https://www.last.fm/api/account/create")}
+            class="text-brand-accent hover:underline">{i18n.t("lastfm.createKeyLink")}</button
+          >
+        </p>
+        <div class="flex flex-col gap-1">
+          <label for="lastfm-api-key-input" class="text-xs font-semibold text-brand-text-primary"
+            >{i18n.t("lastfm.apiKeyLabel")}</label
+          >
+          <Input
+            id="lastfm-api-key-input"
+            bind:value={lastfmKeyInput}
+            surface="sidebar"
+            class="w-full max-w-md"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label for="lastfm-api-secret-input" class="text-xs font-semibold text-brand-text-primary"
+            >{i18n.t("lastfm.apiSecretLabel")}</label
+          >
+          <div class="relative max-w-md">
+            <Input
+              id="lastfm-api-secret-input"
+              type={showLastfmSecret ? "text" : "password"}
+              bind:value={lastfmSecretInput}
+              surface="sidebar"
+              class="w-full pr-10"
+            />
+            <button
+              type="button"
+              onclick={() => (showLastfmSecret = !showLastfmSecret)}
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+              title={showLastfmSecret ? i18n.t("settings.hideToken") : i18n.t("settings.showToken")}
+            >
+              {#if showLastfmSecret}
+                <EyeOff class="w-4 h-4" />
+              {:else}
+                <Eye class="w-4 h-4" />
+              {/if}
+            </button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <Button
+            onclick={saveLastfmCredentials}
+            disabled={isSavingLastfmCredentials || !lastfmCredentialsDirty}
+            variant="secondary"
+            size="sm"
+          >
+            {i18n.t("lastfm.saveCredentialsBtn")}
+          </Button>
+        </div>
+        {#if scrobblerStore.lastfmCredentialsError}
+          <InlineMessage>{scrobblerStore.lastfmCredentialsError}</InlineMessage>
+        {/if}
+      </div>
+    {/if}
 
     {#if !scrobblerStore.lastfmUsername}
       {#if scrobblerStore.lastfmPendingToken}
