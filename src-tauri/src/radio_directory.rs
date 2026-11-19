@@ -1028,7 +1028,11 @@ pub fn materialize_station(conn: &Connection, stationuuid: &str) -> Result<crate
     let bitrate = (station.bitrate > 0).then_some(station.bitrate);
     let genre = (!station.tags.trim().is_empty()).then_some(station.tags.as_str());
     let homepage = (!station.homepage.trim().is_empty()).then_some(station.homepage.as_str());
-    let favicon = (!station.favicon.trim().is_empty()).then_some(station.favicon.as_str());
+    let favicon_trimmed = station.favicon.trim();
+    let favicon = (!favicon_trimmed.is_empty()
+        && !favicon_trimmed.eq_ignore_ascii_case("null")
+        && !favicon_trimmed.eq_ignore_ascii_case("undefined"))
+    .then_some(favicon_trimmed);
     let artist = (!station.country.trim().is_empty()).then_some(station.country.as_str());
 
     let existing_id: Option<i64> = conn
@@ -1051,7 +1055,7 @@ pub fn materialize_station(conn: &Connection, stationuuid: &str) -> Result<crate
                 genre = ?7,
                 bitrate = ?8,
                 length_nanosec = NULL,
-                art_manual = COALESCE(?9, art_manual),
+                art_manual = COALESCE(?9, NULLIF(art_manual, 'null')),
                 mtime = ?10,
                 unavailable = 0
              WHERE id = ?11",

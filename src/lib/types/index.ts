@@ -1279,16 +1279,18 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
  */
 export function resolveArtUrl(art: string | null | undefined, original = false): string | null {
   if (!art || typeof art !== "string") return null;
-  if (art.startsWith("http://") || art.startsWith("https://")) {
-    return art;
+  const trimmed = art.trim();
+  if (!trimmed || trimmed === "null" || trimmed === "undefined") return null;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
   }
-  if (art.startsWith("luminous-art://")) {
-    return getCoverArtUrl(art);
+  if (trimmed.startsWith("luminous-art://")) {
+    return getCoverArtUrl(trimmed);
   }
-  if (art.startsWith("album-")) {
-    return getCoverArtUrl(`luminous-art://${art}`);
+  if (trimmed.startsWith("album-")) {
+    return getCoverArtUrl(`luminous-art://${trimmed}`);
   }
-  return getCoverArtUrl(`luminous-art://${original ? "local" : "thumb"}/${art}`);
+  return getCoverArtUrl(`luminous-art://${original ? "local" : "thumb"}/${trimmed}`);
 }
 
 /**
