@@ -699,12 +699,14 @@ pub fn get_station_by_uuid(
         .optional()?)
 }
 
-/// Queries stations from the local `radio_directory` mirror using FTS5 full-text search
-/// and optional tag, country, language, codec, bitrate, and playability filters.
-pub fn query_stations(
-    conn: &Connection,
+/// Builds SQL WHERE clauses and bind parameters for `query_stations` and
+/// `compute_filtered_facets`. When `include_facets` is false, `countrycode`,
+/// `language`, and `codec` are omitted so cross-linked facet counts can be
+/// accumulated in a single scan.
+fn build_where_clauses(
     query: &RadioDirectoryQuery,
-) -> Result<Vec<RadioDirectoryStation>> {
+    include_facets: bool,
+) -> (Vec<String>, Vec<Box<dyn ToSql>>) {
     let mut clauses = vec!["lastcheckok = 1".to_string()];
     let mut bind_params: Vec<Box<dyn ToSql>> = Vec::new();
 
@@ -728,30 +730,32 @@ pub fn query_stations(
         }
     }
 
-    if let Some(ref cc) = query.countrycode {
-        let clean_cc = cc.trim().to_ascii_uppercase();
-        if !clean_cc.is_empty() {
-            bind_params.push(Box::new(clean_cc));
-            let idx = bind_params.len();
-            clauses.push(format!("(countrycode = ?{idx} OR UPPER(country) = ?{idx})"));
+    if include_facets {
+        if let Some(ref cc) = query.countrycode {
+            let clean_cc = cc.trim().to_ascii_uppercase();
+            if !clean_cc.is_empty() {
+                bind_params.push(Box::new(clean_cc));
+                let idx = bind_params.len();
+                clauses.push(format!("(countrycode = ?{idx} OR UPPER(country) = ?{idx})"));
+            }
         }
-    }
 
-    if let Some(ref lang) = query.language {
-        let clean_lang = lang.trim().to_lowercase();
-        if !clean_lang.is_empty() {
-            bind_params.push(Box::new(format!("%,{clean_lang},%")));
-            let idx = bind_params.len();
-            clauses.push(format!("(',' || language || ',') LIKE ?{idx}"));
+        if let Some(ref lang) = query.language {
+            let clean_lang = lang.trim().to_lowercase();
+            if !clean_lang.is_empty() {
+                bind_params.push(Box::new(format!("%,{clean_lang},%")));
+                let idx = bind_params.len();
+                clauses.push(format!("(',' || language || ',') LIKE ?{idx}"));
+            }
         }
-    }
 
-    if let Some(ref codec) = query.codec {
-        let clean_codec = codec.trim().to_ascii_uppercase();
-        if !clean_codec.is_empty() {
-            bind_params.push(Box::new(clean_codec));
-            let idx = bind_params.len();
-            clauses.push(format!("codec = ?{idx}"));
+        if let Some(ref codec) = query.codec {
+            let clean_codec = codec.trim().to_ascii_uppercase();
+            if !clean_codec.is_empty() {
+                bind_params.push(Box::new(clean_codec));
+                let idx = bind_params.len();
+                clauses.push(format!("codec = ?{idx}"));
+            }
         }
     }
 
@@ -764,6 +768,17 @@ pub fn query_stations(
     if query.hide_unsupported {
         clauses.push("hls = 0".to_string());
     }
+
+    (clauses, bind_params)
+}
+
+/// Queries stations from the local `radio_directory` mirror using FTS5 full-text search
+/// and optional tag, country, language, codec, bitrate, and playability filters.
+pub fn query_stations(
+    conn: &Connection,
+    query: &RadioDirectoryQuery,
+) -> Result<Vec<RadioDirectoryStation>> {
+    let (clauses, bind_params) = build_where_clauses(query, true);
 
     let order_sql = match query.order_by {
         RadioDirectoryOrder::Clickcount => "clickcount DESC, votes DESC, name COLLATE NOCASE ASC",
@@ -811,12 +826,31 @@ pub fn compute_local_facets(
     hide_unsupported: bool,
     tag_limit: usize,
 ) -> Result<RadioDirectoryFacets> {
-    let mut stmt = conn.prepare(
+    let query = RadioDirectoryQuery {
+        hide_unsupported,
+        ..Default::default()
+    };
+    compute_filtered_facets(conn, &query, tag_limit)
+}
+
+/// Computes cross-linked facet counts for `query` in a single scan: each facet
+/// (countries, languages, codecs) applies all other active filters except its own
+/// dimension so users can still switch values within that dimension (#2005).
+pub fn compute_filtered_facets(
+    conn: &Connection,
+    query: &RadioDirectoryQuery,
+    tag_limit: usize,
+) -> Result<RadioDirectoryFacets> {
+    let (clauses, bind_params) = build_where_clauses(query, false);
+    let sql = format!(
         "SELECT tags, country, countrycode, language, codec, hls
          FROM radio_directory
-         WHERE lastcheckok = 1",
-    )?;
-    let rows = stmt.query_map([], |r| {
+         WHERE {}",
+        clauses.join(" AND ")
+    );
+    let param_refs: Vec<&dyn ToSql> = bind_params.iter().map(|b| b.as_ref()).collect();
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(param_refs.as_slice(), |r| {
         Ok((
             r.get::<_, String>(0)?,
             r.get::<_, String>(1)?,
@@ -827,6 +861,22 @@ pub fn compute_local_facets(
         ))
     })?;
 
+    let filter_cc = query
+        .countrycode
+        .as_deref()
+        .map(|s| s.trim().to_ascii_uppercase())
+        .filter(|s| !s.is_empty());
+    let filter_lang = query
+        .language
+        .as_deref()
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty());
+    let filter_codec = query
+        .codec
+        .as_deref()
+        .map(|s| s.trim().to_ascii_uppercase())
+        .filter(|s| !s.is_empty());
+
     let mut tag_counts: HashMap<String, i64> = HashMap::new();
     let mut country_counts: HashMap<String, (String, i64)> = HashMap::new();
     let mut language_counts: HashMap<String, i64> = HashMap::new();
@@ -834,15 +884,25 @@ pub fn compute_local_facets(
 
     for row in rows {
         let (tags, country, countrycode, language, codec, hls) = row?;
-        if hide_unsupported && !can_play_stream(&codec, hls) {
+        if query.hide_unsupported && !can_play_stream(&codec, hls) {
             continue;
         }
 
-        if !codec.is_empty() {
+        let matches_cc = filter_cc.as_ref().is_none_or(|cc| {
+            countrycode.eq_ignore_ascii_case(cc) || country.eq_ignore_ascii_case(cc)
+        });
+        let matches_lang = filter_lang
+            .as_ref()
+            .is_none_or(|lang| language.split(',').any(|l| l.eq_ignore_ascii_case(lang)));
+        let matches_codec = filter_codec
+            .as_ref()
+            .is_none_or(|c| codec.eq_ignore_ascii_case(c));
+
+        if matches_cc && matches_lang && !codec.is_empty() {
             *codec_counts.entry(codec).or_default() += 1;
         }
 
-        if !countrycode.is_empty() || !country.is_empty() {
+        if matches_lang && matches_codec && (!countrycode.is_empty() || !country.is_empty()) {
             let key = if !countrycode.is_empty() {
                 countrycode.clone()
             } else {
@@ -857,13 +917,13 @@ pub fn compute_local_facets(
             entry.1 += 1;
         }
 
-        if !language.is_empty() {
+        if matches_cc && matches_codec && !language.is_empty() {
             for lang in language.split(',').filter(|l| !l.is_empty()) {
                 *language_counts.entry(lang.to_string()).or_default() += 1;
             }
         }
 
-        if !tags.is_empty() {
+        if matches_cc && matches_lang && matches_codec && !tags.is_empty() {
             for tag in tags.split(',').filter(|t| !t.is_empty()) {
                 *tag_counts.entry(tag.to_string()).or_default() += 1;
             }
@@ -1988,6 +2048,21 @@ mod tests {
         .unwrap();
         assert_eq!(ca_stations.len(), 1);
         assert_eq!(ca_stations[0].stationuuid, "uuid-a");
+
+        // Cross-linked facets: filtering by CA narrows languages to CA's languages while keeping all countries selectable.
+        let ca_facets = compute_filtered_facets(
+            &conn,
+            &RadioDirectoryQuery {
+                countrycode: Some("CA".into()),
+                hide_unsupported: false,
+                ..Default::default()
+            },
+            50,
+        )
+        .unwrap();
+        assert_eq!(ca_facets.languages.len(), 1);
+        assert_eq!(ca_facets.languages[0].name, "english");
+        assert_eq!(ca_facets.countries.len(), 2);
 
         // Prune uuid-a from radio_directory; saved + materialize still resolve via songs fallback,
         // and GC keeps uuid-a because it is saved.

@@ -85,12 +85,14 @@ pub async fn get_radio_directory_station(
 pub async fn get_radio_directory_facets(
     hide_unsupported: Option<bool>,
     tag_limit: Option<usize>,
+    query: Option<RadioDirectoryQuery>,
     state: State<'_, AppState>,
 ) -> Result<RadioDirectoryFacets, String> {
     let hide_unsupported = hide_unsupported.unwrap_or(true);
     let tag_limit = tag_limit.unwrap_or(500);
-    crate::db::run_blocking(&state.db, move |conn| {
-        radio_directory::compute_local_facets(conn, hide_unsupported, tag_limit)
+    crate::db::run_blocking(&state.db, move |conn| match query {
+        Some(q) => radio_directory::compute_filtered_facets(conn, &q, tag_limit),
+        None => radio_directory::compute_local_facets(conn, hide_unsupported, tag_limit),
     })
     .await
     .map_err(|e| e.to_string())

@@ -213,11 +213,26 @@ class RadioStore {
     }
   }
 
+  private buildQuery() {
+    return {
+      search: this.searchQuery.trim() || null,
+      tag: this.selectedTag,
+      countrycode: this.selectedCountry,
+      language: this.selectedLanguage,
+      codec: this.selectedCodec,
+      hideUnsupported: this._hideUnsupported,
+      orderBy: this._orderBy,
+      offset: 0,
+      limit: 200,
+    };
+  }
+
   async loadFacets(): Promise<void> {
     try {
       const facets = await invoke<RadioDirectoryFacets>("get_radio_directory_facets", {
         hideUnsupported: this._hideUnsupported,
         tagLimit: 60,
+        query: this.buildQuery(),
       });
       if (facets) this.facets = facets;
     } catch (err) {
@@ -230,17 +245,7 @@ class RadioStore {
     this.discoverError = null;
     try {
       const stations = await invoke<RadioDirectoryStation[]>("query_radio_directory", {
-        query: {
-          search: this.searchQuery.trim() || null,
-          tag: this.selectedTag,
-          countrycode: this.selectedCountry,
-          language: this.selectedLanguage,
-          codec: this.selectedCodec,
-          hideUnsupported: this._hideUnsupported,
-          orderBy: this._orderBy,
-          offset: 0,
-          limit: 200,
-        },
+        query: this.buildQuery(),
       });
       this.discoverStations = stations ?? [];
     } catch (err) {
@@ -310,6 +315,10 @@ class RadioStore {
     }
   }
 
+  private refreshDiscoverAndFacets() {
+    void Promise.all([this.loadDiscover(), this.loadFacets()]);
+  }
+
   setSearchQuery(query: string, immediate = false) {
     this.searchQuery = query;
     if (this.searchTimer) {
@@ -317,25 +326,25 @@ class RadioStore {
       this.searchTimer = null;
     }
     if (immediate) {
-      void this.loadDiscover();
+      this.refreshDiscoverAndFacets();
       return;
     }
     this.searchTimer = setTimeout(() => {
       this.searchTimer = null;
-      void this.loadDiscover();
+      this.refreshDiscoverAndFacets();
     }, 180);
   }
 
   toggleTag(tagName: string) {
     this.selectedTag = this.selectedTag === tagName ? null : tagName;
-    void this.loadDiscover();
+    this.refreshDiscoverAndFacets();
   }
 
   setFilter(field: "country" | "language" | "codec", value: string | null) {
     if (field === "country") this.selectedCountry = value;
     else if (field === "language") this.selectedLanguage = value;
     else this.selectedCodec = value;
-    void this.loadDiscover();
+    this.refreshDiscoverAndFacets();
   }
 
   setCodecFilter(codec: string | null, hideUnsupported: boolean) {
@@ -346,7 +355,7 @@ class RadioStore {
     if (hideChanged) {
       void this.refreshAll();
     } else {
-      void this.loadDiscover();
+      this.refreshDiscoverAndFacets();
     }
   }
 
@@ -356,7 +365,7 @@ class RadioStore {
     this.selectedCountry = null;
     this.selectedLanguage = null;
     this.selectedCodec = null;
-    void this.loadDiscover();
+    this.refreshDiscoverAndFacets();
   }
 }
 
