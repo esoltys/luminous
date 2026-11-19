@@ -333,6 +333,13 @@ pub enum AudioEvent {
     OutputUnavailable {
         message: String,
     },
+    /// A live stream's in-band metadata announced a new `StreamTitle` (#2008):
+    /// the raw, untrimmed text the station sent, for the track `track_id`.
+    /// Sent only when the title changes; parsing it is the app's job.
+    StreamTitle {
+        track_id: i64,
+        title: String,
+    },
     Error {
         message: String,
     },
@@ -915,8 +922,8 @@ struct ActiveTrack {
     /// Transport-reported Icecast/Shoutcast station headers, if any (#2002).
     #[allow(dead_code)]
     icy_headers: Option<IcyHeaders>,
-    /// Live in-stream `StreamTitle` updates from an ICY reader (#2002, #2008).
-    #[allow(dead_code)]
+    /// Live in-stream `StreamTitle` updates from an ICY reader (#2002),
+    /// forwarded as [`AudioEvent::StreamTitle`] by the decode loop (#2008).
     metadata_rx: Option<mpsc::Receiver<String>>,
 }
 
@@ -2284,6 +2291,7 @@ fn decode_thread(
             }
 
             advance_transition_and_preload_signal(out, &mut session, &shared.position, &event_tx);
+            forward_stream_title(&session.current, &event_tx);
 
             maybe_start_crossfade(&mut session, &shared);
 
@@ -2802,6 +2810,24 @@ fn seek_session(
     // Whatever the speed stage buffered belongs to the old position.
     session.speed.reset();
     CmdOutcome::Continue
+}
+
+/// Forwards the newest `StreamTitle` the track's ICY reader has queued since
+/// the last iteration as [`AudioEvent::StreamTitle`] (#2008). Runs on the
+/// decode thread, so it is checked even while the ring buffer is full.
+fn forward_stream_title(track: &ActiveTrack, event_tx: &mpsc::Sender<AudioEvent>) {
+    if let Some(title) = track.metadata_rx.as_ref().and_then(latest_queued) {
+        let _ = event_tx.send(AudioEvent::StreamTitle {
+            track_id: track.spec.id,
+            title,
+        });
+    }
+}
+
+/// Drains `rx` without blocking and returns the last value, if any: only the
+/// newest title matters once several have queued up.
+fn latest_queued(rx: &mpsc::Receiver<String>) -> Option<String> {
+    rx.try_iter().last()
 }
 
 /// Drives steps 3+4 of one `'decode` iteration: complete a pending gapless
@@ -3479,6 +3505,18 @@ mod tests {
             let (a, b) = equal_power_gains(step as f32 / 100.0);
             assert!((a * a + b * b - 1.0).abs() < 1e-6, "p = {step}/100");
         }
+    }
+
+    #[test]
+    fn latest_queued_keeps_only_the_newest_stream_title() {
+        let (tx, rx) = mpsc::channel::<String>();
+        assert_eq!(latest_queued(&rx), None, "nothing queued");
+        tx.send("A - One".into()).unwrap();
+        tx.send("B - Two".into()).unwrap();
+        assert_eq!(latest_queued(&rx).as_deref(), Some("B - Two"));
+        assert_eq!(latest_queued(&rx), None, "drained");
+        drop(tx);
+        assert_eq!(latest_queued(&rx), None, "a closed reader is not an error");
     }
 
     #[test]

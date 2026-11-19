@@ -1861,6 +1861,8 @@ export const ru = {
     trackSkippedRemoteToast: "Не удалось воспроизвести «{title}» — {message}. Пропущено.",
     stationOfflineToast: "«{title}» — Станция не в сети.",
     liveBadge: "Эфир",
+    findInLibrary: "Найти в библиотеке",
+    onAirLabel: "В эфире",
     openNothingPlayable: "Поддерживаемые аудиофайлы для воспроизведения не найдены.",
     playSongFailed: "Не удалось воспроизвести песню.",
     noSongPlaying: "Сейчас ничего не играет",
