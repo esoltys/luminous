@@ -143,28 +143,6 @@
     {/if}
   </div>
 
-  <!-- Genre / Tag chips with station counts -->
-  {#if radioStore.facets.tags.length > 0}
-    <div
-      class="flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0"
-      data-testid="radio-tag-chips"
-    >
-      {#each radioStore.facets.tags.slice(0, 24) as tag (tag.name)}
-        <button
-          type="button"
-          onclick={() => radioStore.toggleTag(tag.name)}
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors {radioStore.selectedTag ===
-          tag.name
-            ? 'bg-brand-accent text-brand-accent-contrast font-medium'
-            : 'bg-brand-surface/70 text-brand-text-secondary hover:bg-brand-accent/15 hover:text-brand-text-primary border border-brand-border/40'}"
-        >
-          <span>{tag.name}</span>
-          <span class="opacity-70">{tag.stationcount}</span>
-        </button>
-      {/each}
-    </div>
-  {/if}
-
   <!-- Station results -->
   <div
     bind:this={scrollContainerEl}
