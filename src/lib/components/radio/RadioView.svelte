@@ -36,7 +36,9 @@
   <!-- Header -->
   <header class="flex flex-wrap items-center justify-between gap-3 shrink-0">
     <div class="flex items-center gap-3 min-w-0">
-      <h1 class="text-xl font-semibold text-brand-text-primary truncate">
+      <h1
+        class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug py-0.5 truncate"
+      >
         {i18n.t("radio.title")}
       </h1>
       {#if radioStore.status?.optedIn && radioStore.isStale && radioStore.status.lastSyncedAt}
