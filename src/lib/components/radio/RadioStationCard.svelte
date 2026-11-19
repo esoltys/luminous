@@ -3,11 +3,8 @@
     BroadcastIcon as Broadcast,
     PlayIcon as Play,
     PauseIcon as Pause,
-    BookmarkSimpleIcon as Bookmark,
-    PushPinIcon as Pin,
   } from "phosphor-svelte";
   import RadioStationContextMenu from "./RadioStationContextMenu.svelte";
-  import { pinnedStore } from "../../stores/pinned.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import { resolveArtUrl, type RadioDirectoryStation } from "../../types";
   import { PLAIN_TILE_COVER, PLAIN_TILE_RING, useCardAppearance } from "../../utils/cardAppearance";
@@ -16,25 +13,16 @@
 
   let {
     station,
-    saved = true,
     playing = false,
     onPlay,
-    onToggleSave,
   }: {
     station: RadioDirectoryStation;
-    /** My Stations only lists saved stations; a pinned card on Home may not be. */
-    saved?: boolean;
     playing?: boolean;
     onPlay: (station: RadioDirectoryStation) => void;
-    onToggleSave: (station: RadioDirectoryStation) => void;
   } = $props();
 
   let artFailed = $state(false);
   let menu = $state<{ x: number; y: number } | null>(null);
-  const pinned = $derived(pinnedStore.isPinned("station", station.stationuuid));
-  const pinLabel = $derived(
-    pinned ? i18n.t("playlists.contextMenuUnpinHome") : i18n.t("playlists.contextMenuPinHome"),
-  );
   const artworkUrl = $derived(resolveArtUrl(station.favicon));
 
   $effect(() => {
@@ -106,41 +94,14 @@
   </button>
 
   <div class="flex flex-col flex-1 {plain ? 'pt-3' : 'p-3.5'}">
-    <div class="flex items-start justify-between gap-2">
-      <button
-        type="button"
-        disabled={!station.playable}
-        onclick={() => onPlay(station)}
-        class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text transition-colors duration-150 truncate text-left flex-1 min-w-0"
-      >
-        {station.name || i18n.t("radio.unnamedStation")}
-      </button>
-      <button
-        type="button"
-        data-testid="radio-station-pin-btn"
-        onclick={() => void pinnedStore.toggle("station", station.stationuuid)}
-        aria-pressed={pinned}
-        aria-label={pinLabel}
-        title={pinLabel}
-        class="{pinned
-          ? 'text-brand-accent-text'
-          : 'text-brand-text-secondary hover:text-brand-text-primary'} hover:opacity-80 shrink-0 p-0.5"
-      >
-        <Pin class="w-4 h-4" weight={pinned ? "fill" : "regular"} />
-      </button>
-      <button
-        type="button"
-        onclick={() => onToggleSave(station)}
-        aria-pressed={saved}
-        aria-label={saved ? i18n.t("radio.unsaveStation") : i18n.t("radio.saveStation")}
-        title={saved ? i18n.t("radio.unsaveStation") : i18n.t("radio.saveStation")}
-        class="{saved
-          ? 'text-brand-accent-text'
-          : 'text-brand-text-secondary hover:text-brand-text-primary'} hover:opacity-80 shrink-0 p-0.5"
-      >
-        <Bookmark class="w-4 h-4" weight={saved ? "fill" : "regular"} />
-      </button>
-    </div>
+    <button
+      type="button"
+      disabled={!station.playable}
+      onclick={() => onPlay(station)}
+      class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text transition-colors duration-150 truncate text-left min-w-0"
+    >
+      {station.name || i18n.t("radio.unnamedStation")}
+    </button>
 
     <div
       class="flex items-center justify-between mt-0.5 gap-2 text-xs text-brand-text-secondary font-medium"

@@ -318,10 +318,8 @@
             {:else}
               <RadioStationCard
                 station={item.station}
-                saved={radioStore.isSaved(item.station.stationuuid)}
                 playing={radioStore.isPlayingStation(item.station.stationuuid)}
                 onPlay={(s) => void radioStore.playStation(s)}
-                onToggleSave={(s) => void radioStore.toggleSaveStation(s)}
               />
             {/if}
           {:else if rows}
