@@ -1112,6 +1112,10 @@ export const frFR: DeepStringRecord<typeof en> = {
     saveArtworkToFoldersLabel: "Enregistrer les illustrations dans les dossiers de musique",
     saveArtworkToFoldersHint:
       "Enregistrez les pochettes, photos d'artistes, logos et bannières directement dans vos dossiers de musique sous forme de fichiers cover.jpg, artist.jpg, logo.png et banner.jpg.",
+    verifyAudioBackgroundLabel:
+      "Vérifier l'intégrité audio et la provenance sans perte en arrière-plan",
+    verifyAudioBackgroundHint:
+      "Décode les fichiers de la bibliothèque en arrière-plan pour détecter la corruption et les transcodages avec perte suspects. Désactivé par défaut pour éviter l'activité disque continue sur les grandes bibliothèques ou disques externes ; les vérifications manuelles restent actives.",
     saveArtworkToFoldersModalTitle: "Exporter les pochettes dans les dossiers musicaux",
     saveArtworkToFoldersModalMessage:
       "L'activation de cette option exportera les pochettes d'albums (cover.jpg), photos d'artistes (artist.jpg), logos de groupes (logo.png) et bannières (banner.jpg) en cache directement dans vos dossiers de musique locaux. Les dossiers partagés et les illustrations existantes ne seront pas écrasés. Voulez-vous continuer ?",

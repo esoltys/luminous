@@ -1038,6 +1038,30 @@ impl IntegrityReader {
     }
 }
 
+fn next_song_for_integrity(
+    conn: &Connection,
+    skipped: &crate::background_reads::Skipped,
+) -> rusqlite::Result<Option<(i64, String)>> {
+    if !crate::commands::settings::background_verification_enabled(conn) {
+        return Ok(None);
+    }
+    conn.query_row(
+        &format!(
+            "SELECT s.id, s.path FROM songs s
+             LEFT JOIN song_integrity i ON s.id = i.song_id
+             WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+               AND (i.song_id IS NULL OR i.mtime != s.mtime)
+               AND {skip}
+             ORDER BY s.added DESC, s.id DESC LIMIT 1",
+            lib = *LOCAL_SOURCES_SQL,
+            skip = skipped.sql_excluding("s.id")
+        ),
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )
+    .optional()
+}
+
 impl crate::background_reads::BackgroundRead for IntegrityReader {
     fn name(&self) -> &'static str {
         "integrity"
@@ -1048,21 +1072,7 @@ impl crate::background_reads::BackgroundRead for IntegrityReader {
         conn: &Connection,
         skipped: &crate::background_reads::Skipped,
     ) -> rusqlite::Result<Option<(i64, String)>> {
-        conn.query_row(
-            &format!(
-                "SELECT s.id, s.path FROM songs s
-                 LEFT JOIN song_integrity i ON s.id = i.song_id
-                 WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
-                   AND (i.song_id IS NULL OR i.mtime != s.mtime)
-                   AND {skip}
-                 ORDER BY s.added DESC, s.id DESC LIMIT 1",
-                lib = *LOCAL_SOURCES_SQL,
-                skip = skipped.sql_excluding("s.id")
-            ),
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()
+        next_song_for_integrity(conn, skipped)
     }
 
     fn read(&mut self, song_id: i64, _path: &Path) -> crate::background_reads::ReadOutcome {
@@ -2124,5 +2134,29 @@ mod tests {
         assert!(verify_song_integrity(&db, missing_id).is_err());
         assert_eq!(stored_status(&conn, missing_id), None);
         assert!(query_corrupt_songs(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn background_integrity_skips_when_toggle_is_off() {
+        let (temp, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        let track = temp.path().join("track.flac");
+        let song_id = insert_local_flac(&conn, &track);
+        let skipped = crate::background_reads::Skipped::default();
+
+        // Off by default: background reader offers nothing.
+        assert_eq!(next_song_for_integrity(&conn, &skipped).unwrap(), None);
+
+        // Opting in lets the background reader pick the unverified song.
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('verify_audio_integrity_and_provenance', 'true')",
+            [],
+        )
+        .unwrap();
+        assert_eq!(
+            next_song_for_integrity(&conn, &skipped).unwrap(),
+            Some((song_id, track.to_string_lossy().into_owned()))
+        );
     }
 }

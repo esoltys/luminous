@@ -1073,6 +1073,9 @@ export const en = {
     saveArtworkToFoldersLabel: "Save artwork next to your music",
     saveArtworkToFoldersHint:
       "Save album covers, artist photos, band logos, and banners directly into your music folders as cover.jpg, artist.jpg, logo.png, and banner.jpg.",
+    verifyAudioBackgroundLabel: "Verify audio integrity and lossless provenance in the background",
+    verifyAudioBackgroundHint:
+      "Decode library files in the background to check for corruption and suspected lossy transcodes. Off by default to avoid continuous disk activity on large or external drives; manual album and track checks still work.",
     saveArtworkToFoldersModalTitle: "Export Artwork to Music Folders",
     saveArtworkToFoldersModalMessage:
       "Enabling this will export existing cached album covers (cover.jpg), artist photos (artist.jpg), band logos (logo.png), and banners (banner.jpg) directly into your local music folders. Shared folders and existing artwork will not be overwritten. Do you want to proceed?",

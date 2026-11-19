@@ -20,10 +20,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
-/// Whether the user has turned on tempo/key detection (Settings → Sources). Off by default, since
+/// Whether the user has turned on tempo/key detection (Settings → General). Off by default, since
 /// it reads every song missing those tags once.
 pub fn detection_enabled(conn: &Connection) -> bool {
-    crate::commands::settings::load_ui_preferences(conn).detect_tempo_and_key
+    crate::commands::settings::read_bool_pref(conn, "detect_tempo_and_key", false)
 }
 
 /// Bump when the estimators change enough that earlier results should be recomputed.
