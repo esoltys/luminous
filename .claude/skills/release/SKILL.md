@@ -17,7 +17,11 @@ needs updating to match. Work through it in order:
    origin`.
 2. **Scope**: `git log <last-tag>..main --oneline`; confirm every user-facing fix has a linked,
    `bug`-labeled issue — file one retroactively (and link the PR) if it's missing. Chore PRs
-   do not require an issue and do not need to be listed in the release notes.
+   do not require an issue and do not need to be listed in the release notes. A commit title often
+   shows only the PR number: read `Fixes #N` in the PR body before concluding a fix has no issue.
+   The release-notes source is the milestone (`gh issue list --milestone X.Y --state all --limit 300`).
+   Also check that third-party integrations (Last.fm, MusicBrainz, Files.fm) still work with the
+   shipped keys.
 3. **Content**: update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR,DE,ES,IT,RU,UK}.html`) for
    any user-facing changes, editing every guide in the same change. Regenerate screenshots for
    changed views with your own Luminous closed by launching Capture Studio in `esoltys/luminous-store` (`bun run studio`)
@@ -25,10 +29,17 @@ needs updating to match. Work through it in order:
    ru or uk. Write `docs/release-notes/vX.Y.Z.md` (chores do not need to be listed). Prepare the
    Store listing in `esoltys/luminous-store` as its own PR: compose Store screenshots with Capture Studio,
    update `ReleaseNotes` and captions in every `listing.csv` column, then run a dry run.
-4. **Verification**: `bun run check`, `bun run lint:ast`, `bun run test:run`, `cargo test --workspace`
+   Captures are time-of-day sensitive (greeting and Moment Mix), so start just after a bucket
+   boundary and montage-check Home across locales; build the capture exe with
+   `CARGO_TARGET_DIR=target`; grep before changing any scene's `tall(...)`; delete the ignored
+   `build/` dir afterwards. The checklist has the details.
+4. **Verification**: in a fresh worktree run `bun install --frozen-lockfile` first. Then
+   `bun run fmt:check`, `bun run check`, `bun run lint:ast`, `bun run test:run`, `cargo test --workspace`
    (from repo root), `bun run audit:cargo`, and `cargo clippy --all-targets -- -D warnings`
    (from `src-tauri/` — zero warnings, including pre-existing ones), a `bun run tauri dev`
-   check of new UI in de and ru for overflow, and the manual QA walkthrough in `docs/TESTING.md` (real-hardware smoke test —
+   check of new UI in de and ru for overflow (tell the user a window will open and to leave it
+   alone, run it on a COPY of the real data dir, free port 1420 first, and check local-time
+   behaviour such as the greeting versus the Moment Mix), and the manual QA walkthrough in `docs/TESTING.md` (real-hardware smoke test —
    `cargo test --test smoke_test -- --ignored --nocapture` from `src-tauri/` — plus a
    `bun run tauri dev` exercise of anything specific to this release). Compare memory against
    the previous release on Windows (Luminous closed, a track over 2.5 min loaded; pass the
@@ -36,6 +47,8 @@ needs updating to match. Work through it in order:
    `bun run tauri build --no-bundle`, `bun run perf:memory -- --app-version X.Y.Z`,
    `bun run perf:chart -- --baseline <previous> --candidate X.Y.Z`; add the rows, chart and
    delta table to `docs/PERFORMANCE.md` and look into any private-bytes change beyond ~3%.
+   Re-run the previous release's baseline the same day before reading a scan-time delta as a
+   regression: scan times drift with the drive.
    Confirm the Security Audit and CodeQL workflows are green on `main`.
 5. **Cut it**: `bun run release <version>` (no `--push` — that would push straight to `main` and
    bypass review) to bump the version, run its own checks, commit, and tag locally on the release
@@ -58,15 +71,17 @@ needs updating to match. Work through it in order:
    --exit-status` until **every** job concludes — both platform legs and `flatpak-build` — and
    report back on the signed Linux + Windows bundles and the `.flatpak`.
 9. **Post-build**: help edit the draft GitHub release body in from `docs/release-notes/vX.Y.Z.md`,
-   leave publishing it to the user, and walk through (don't run unprompted):
-   - the Microsoft Store submission, which lives in the separate private `esoltys/luminous-store`
+   leave publishing it to the user, and walk through (don't run unprompted), in this order:
+   - the Microsoft Store submission, only AFTER the release is published (the workflow downloads
+     the `.msix` with `gh release download`, which cannot see a draft). It lives in the separate private `esoltys/luminous-store`
      repo (`gh workflow run publish-store.yml -f tag=vX.Y.Z` there, plus
      `-f update_screenshots=true` if the listing prep changed anything). Note that `publish-store.yml`
      stages the draft submission (`PendingCommit`); commit it into certification via Partner Center
      or `Complete-ApplicationSubmission`, then check status via `./Get-StoreSubmissionStatus.ps1` from `~/source/luminous-store`
    - installing the build on a real machine per platform (Windows + Linux)
    - confirming the `.flatpak` is attached and `flatpak update org.luminous.music` picks up the
-     new version from the shared repo (`docs/FLATPAK.md`)
+     new version from the shared repo (`docs/FLATPAK.md`); the ref is `.../x86_64/master`
+   - refreshing the landing page (landing-page skill) from `origin/main`'s guide assets
    - verifying the in-app updater from an older installed version
    - updating the opendesktop.org listing (new `.deb`/`.rpm` via "Add URL" + changelog entry)
    - closing/linking the resolved GitHub issues and updating the milestone
