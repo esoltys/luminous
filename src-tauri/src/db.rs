@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 90;
+pub const CURRENT_SCHEMA_VERSION: i32 = 91;
 
 struct Migration {
     version: i32,
@@ -959,6 +959,11 @@ const MIGRATIONS: &[Migration] = &[
         description: "Retire unused radio_channels scaffolding (#2004)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_90)?),
     },
+    Migration {
+        version: 91,
+        description: "clear folder art assigned to every album of a mixed-album folder",
+        apply: migrate_clear_mixed_folder_art,
+    },
 ];
 
 /// Migration 83 (#2097): `artist_profiles.artist_key` becomes
@@ -1422,6 +1427,52 @@ fn migrate_composite_album_keys(conn: &rusqlite::Connection) -> Result<()> {
 
     let _ = conn.execute("DELETE FROM album_chart_history", []);
 
+    Ok(())
+}
+
+/// Migration 91: before folder art was limited to single-album folders, a
+/// flat folder shared by several albums gave its one `cover.jpg` to all of
+/// them. Clear that automatic art (never a manual pick, never a cached
+/// `album-*` copy) for every song in such a folder; the next scan's artwork
+/// pass finds songs with no art and re-resolves them (embedded art, then
+/// online), and the folder-art lookup now declines these folders.
+fn migrate_clear_mixed_folder_art(conn: &rusqlite::Connection) -> Result<()> {
+    use std::collections::{HashMap, HashSet};
+    use std::path::{Path, PathBuf};
+
+    let rows: Vec<(i64, String, String, bool)> = conn
+        .prepare(&format!(
+            "SELECT id, path, COALESCE(album_key, ''),
+                    art_automatic IS NOT NULL AND art_automatic NOT LIKE 'album-%'
+                      AND art_manual IS NULL
+             FROM songs WHERE source IN ({})",
+            *crate::models::FILE_SOURCES_SQL
+        ))?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+
+    let mut albums_by_dir: HashMap<PathBuf, HashSet<&str>> = HashMap::new();
+    for (_, path, album_key, _) in &rows {
+        if let (Some(dir), false) = (Path::new(path).parent(), album_key.is_empty()) {
+            albums_by_dir
+                .entry(dir.to_path_buf())
+                .or_default()
+                .insert(album_key);
+        }
+    }
+
+    for (id, path, _, has_folder_art) in &rows {
+        let mixed = Path::new(path)
+            .parent()
+            .and_then(|dir| albums_by_dir.get(dir))
+            .is_some_and(|albums| albums.len() > 1);
+        if *has_folder_art && mixed {
+            conn.execute(
+                "UPDATE songs SET art_automatic = NULL, art_unset = 0 WHERE id = ?1",
+                [id],
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -5026,6 +5077,55 @@ mod tests {
         assert_eq!(row(&plain), Some((plain.clone(), plain)));
         assert!(row(embedded).is_none());
         assert!(row("http://u:p@radio/stream").is_some());
+    }
+
+    #[test]
+    fn migration_91_clears_folder_art_only_in_mixed_album_folders() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration91_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        // (path, album_key, art_automatic, art_manual)
+        let rows = [
+            ("/m/mixed/a.mp3", "a", Some("/m/mixed/cover.jpg"), None),
+            ("/m/mixed/b.mp3", "b", Some("/m/mixed/cover.jpg"), None),
+            ("/m/mixed/c.mp3", "c", Some("album-0123"), None),
+            (
+                "/m/mixed/d.mp3",
+                "d",
+                Some("/m/mixed/cover.jpg"),
+                Some("x.jpg"),
+            ),
+            ("/m/one/1.mp3", "z", Some("/m/one/cover.jpg"), None),
+            ("/m/one/2.mp3", "z", Some("/m/one/cover.jpg"), None),
+        ];
+        for (path, key, auto, manual) in rows {
+            conn.execute(
+                "INSERT INTO songs (path, source, album_key, art_automatic, art_manual)
+                 VALUES (?1, 1, ?2, ?3, ?4)",
+                params![path, key, auto, manual],
+            )
+            .unwrap();
+        }
+
+        migrate_clear_mixed_folder_art(&conn).unwrap();
+
+        let art = |path: &str| -> Option<String> {
+            conn.query_row(
+                "SELECT art_automatic FROM songs WHERE path = ?1",
+                params![path],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        assert_eq!(art("/m/mixed/a.mp3"), None);
+        assert_eq!(art("/m/mixed/b.mp3"), None);
+        assert_eq!(art("/m/mixed/c.mp3").as_deref(), Some("album-0123"));
+        assert!(art("/m/mixed/d.mp3").is_some(), "manual art is untouched");
+        assert!(art("/m/one/1.mp3").is_some());
+        assert!(art("/m/one/2.mp3").is_some());
     }
 
     /// Migration 72 (#1842): local rows outside every watched folder were
