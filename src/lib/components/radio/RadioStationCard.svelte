@@ -103,16 +103,11 @@
       {station.name || i18n.t("radio.unnamedStation")}
     </button>
 
-    <div
-      class="flex items-center justify-between mt-0.5 gap-2 text-xs text-brand-text-secondary font-medium"
-    >
-      <span class="truncate min-w-0">
-        {station.country || station.codec || ""}
-      </span>
-      {#if station.bitrate > 0}
-        <span class="shrink-0">{station.bitrate} kbps</span>
-      {/if}
-    </div>
+    {#if station.bitrate > 0}
+      <p class="mt-0.5 text-xs text-brand-text-secondary font-medium truncate">
+        {station.bitrate} kbps
+      </p>
+    {/if}
   </div>
 
   {#if !plain}
