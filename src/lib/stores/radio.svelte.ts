@@ -223,17 +223,6 @@ class RadioStore {
     );
   }
 
-  /**
-   * True when this station is currently loaded in an active or paused session
-   * so clicking it should toggle pause/resume rather than re-opening the stream.
-   */
-  private isStationLoaded(stationuuid: string): boolean {
-    return (
-      (playerStore.state === "playing" || playerStore.state === "paused") &&
-      playerStore.currentSong?.path === `radio://${stationuuid}`
-    );
-  }
-
   async init(): Promise<void> {
     if (!this.initialized) {
       this.initialized = true;
@@ -423,7 +412,7 @@ class RadioStore {
   /** Plays a station, or toggles pause/resume if it is already loaded. */
   async playStation(station: RadioDirectoryStation): Promise<void> {
     if (!station.playable) return;
-    await this.toggleOrStartStation(station.stationuuid, station.name);
+    await this.playStationByUuid(station.stationuuid, station.name);
   }
 
   /**
@@ -452,13 +441,12 @@ class RadioStore {
     this.globalSearchStations = [];
   }
 
-  /** Plays a station known only by uuid (e.g. from a recent search), or toggles if loaded. */
+  /** Plays a station known only by uuid (e.g. from a recent search), or toggles pause/resume if loaded. */
   async playStationByUuid(stationuuid: string, name: string): Promise<void> {
-    await this.toggleOrStartStation(stationuuid, name);
-  }
-
-  private async toggleOrStartStation(stationuuid: string, name: string): Promise<void> {
-    if (this.isStationLoaded(stationuuid)) {
+    const isLoaded =
+      (playerStore.state === "playing" || playerStore.state === "paused") &&
+      playerStore.currentSong?.path === `radio://${stationuuid}`;
+    if (isLoaded) {
       await playerStore.togglePlayPause();
       return;
     }

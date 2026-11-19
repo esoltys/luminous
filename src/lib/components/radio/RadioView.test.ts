@@ -381,5 +381,11 @@ describe("RadioView", () => {
     expect(mockInvoke).toHaveBeenCalledWith("resume");
     expect(radioStore.isPlayingStation("uuid-saved")).toBe(true);
     expect(mockInvoke.mock.calls.filter(([cmd]) => cmd === "play_radio_station")).toHaveLength(1);
+
+    // If playback stops while the station is still currentSong, clicking restarts via play_radio_station.
+    playerStore.state = "stopped";
+    expect(radioStore.isPlayingStation("uuid-saved")).toBe(false);
+    await fireEvent.click(await screen.findByRole("button", { name: "Play CBC Music" }));
+    expect(mockInvoke.mock.calls.filter(([cmd]) => cmd === "play_radio_station")).toHaveLength(2);
   });
 });
