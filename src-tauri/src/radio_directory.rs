@@ -288,6 +288,18 @@ pub fn get_status(
 // Sync Engine (Incremental + Full Resync Fallback)
 // ---------------------------------------------------------------------------
 
+fn is_change_batch_fresh(oldest_iso8601: Option<&str>, last_synced_at: Option<i64>) -> bool {
+    let (Some(iso), Some(last_synced)) = (oldest_iso8601, last_synced_at) else {
+        return true;
+    };
+    let Ok(ts) = iso.parse::<jiff::Timestamp>() else {
+        return true;
+    };
+    // Allow 1 day of clock skew/overlap; if the server returned changes more than 24h
+    // older than our last sync, it ignored our `lastchangeuuid` and dumped its 30-day history.
+    ts.as_second() >= last_synced.saturating_sub(86_400)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SyncPlan {
     Incremental,
@@ -424,7 +436,13 @@ where
             });
 
             match client.fetch_changed_stations(&last_uuid, changed_limit).await {
-                Ok(batch) if batch.cursor_valid => {
+                Ok(batch)
+                    if batch.cursor_valid
+                        && is_change_batch_fresh(
+                            batch.oldest_change_iso8601.as_deref(),
+                            meta.last_synced_at,
+                        ) =>
+                {
                     let newest_uuid = batch.newest_change_uuid.or(Some(last_uuid));
                     let stations = batch.stations;
                     let fetched_len = stations.len();
@@ -852,23 +870,7 @@ pub fn compute_local_facets(
         }
     }
 
-    let mut tags: Vec<RadioBrowserFacetEntry> = tag_counts
-        .into_iter()
-        .map(|(name, stationcount)| RadioBrowserFacetEntry {
-            name,
-            code: None,
-            stationcount,
-        })
-        .collect();
-    tags.sort_by(|a, b| {
-        b.stationcount
-            .cmp(&a.stationcount)
-            .then_with(|| a.name.cmp(&b.name))
-    });
-    if tag_limit > 0 && tags.len() > tag_limit {
-        tags.truncate(tag_limit);
-    }
-
+    let mut tags = into_sorted_facets(tag_counts, tag_limit);
     let mut countries: Vec<RadioBrowserFacetEntry> = country_counts
         .into_iter()
         .map(|(code, (name, stationcount))| RadioBrowserFacetEntry {
@@ -877,46 +879,41 @@ pub fn compute_local_facets(
             stationcount,
         })
         .collect();
-    countries.sort_by(|a, b| {
-        b.stationcount
-            .cmp(&a.stationcount)
-            .then_with(|| a.name.cmp(&b.name))
-    });
+    sort_facet_entries(&mut countries);
 
-    let mut languages: Vec<RadioBrowserFacetEntry> = language_counts
-        .into_iter()
-        .map(|(name, stationcount)| RadioBrowserFacetEntry {
-            name,
-            code: None,
-            stationcount,
-        })
-        .collect();
-    languages.sort_by(|a, b| {
-        b.stationcount
-            .cmp(&a.stationcount)
-            .then_with(|| a.name.cmp(&b.name))
-    });
-
-    let mut codecs: Vec<RadioBrowserFacetEntry> = codec_counts
-        .into_iter()
-        .map(|(name, stationcount)| RadioBrowserFacetEntry {
-            name,
-            code: None,
-            stationcount,
-        })
-        .collect();
-    codecs.sort_by(|a, b| {
-        b.stationcount
-            .cmp(&a.stationcount)
-            .then_with(|| a.name.cmp(&b.name))
-    });
+    let languages = into_sorted_facets(language_counts, 0);
+    let codecs = into_sorted_facets(codec_counts, 0);
 
     Ok(RadioDirectoryFacets {
-        tags,
+        tags: std::mem::take(&mut tags),
         countries,
         languages,
         codecs,
     })
+}
+
+fn sort_facet_entries(entries: &mut [RadioBrowserFacetEntry]) {
+    entries.sort_by(|a, b| {
+        b.stationcount
+            .cmp(&a.stationcount)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+}
+
+fn into_sorted_facets(counts: HashMap<String, i64>, limit: usize) -> Vec<RadioBrowserFacetEntry> {
+    let mut entries: Vec<RadioBrowserFacetEntry> = counts
+        .into_iter()
+        .map(|(name, stationcount)| RadioBrowserFacetEntry {
+            name,
+            code: None,
+            stationcount,
+        })
+        .collect();
+    sort_facet_entries(&mut entries);
+    if limit > 0 && entries.len() > limit {
+        entries.truncate(limit);
+    }
+    entries
 }
 
 #[cfg(test)]
@@ -1366,5 +1363,118 @@ mod tests {
         assert!(get_station_by_uuid(&conn, "s-old").unwrap().is_none());
         assert!(get_station_by_uuid(&conn, "s-survivor").unwrap().is_some());
         assert!(get_station_by_uuid(&conn, "s-fresh").unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn falls_back_to_full_resync_when_server_ignores_unknown_change_uuid() {
+        let (_dir, db) = test_db();
+        let server = MockServer::start().await;
+
+        // Initial sync at 2026-11-10T10:00:00Z (1794304800)
+        let t0 = "2026-11-10T10:00:00Z"
+            .parse::<jiff::Timestamp>()
+            .unwrap()
+            .as_second();
+        Mock::given(method("GET"))
+            .and(path("/json/stations"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                sample_station_json(
+                    "s-1",
+                    "chg-1",
+                    "Station One",
+                    "rock",
+                    "Canada",
+                    "CA",
+                    "english",
+                    "MP3",
+                    128,
+                    0,
+                    10,
+                    1,
+                    "2026-11-10T10:00:00Z"
+                )
+            ])))
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+
+        let client = RadioBrowserClient::with_servers(vec![server.uri()], RADIO_BROWSER_USER_AGENT);
+        sync_with_client(&db, &client, 10, 100, t0, |_| {})
+            .await
+            .unwrap();
+
+        // 2 days later, we attempt incremental sync with `lastchangeuuid=chg-1`,
+        // but the server had a DB restore and doesn't recognize `chg-1`, so it dumps
+        // changes starting from 20 days earlier ("2026-10-20T00:00:00Z").
+        Mock::given(method("GET"))
+            .and(path("/json/stations/changed"))
+            .and(query_param("lastchangeuuid", "chg-1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "changeuuid": "chg-ancient",
+                    "stationuuid": "s-1",
+                    "name": "Station One Ancient",
+                    "lastchangetime_iso8601": "2026-10-20T00:00:00Z"
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/json/stations/byuuid"))
+            .and(query_param("uuids", "s-1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                sample_station_json(
+                    "s-1",
+                    "chg-ancient",
+                    "Station One Ancient",
+                    "rock",
+                    "Canada",
+                    "CA",
+                    "english",
+                    "MP3",
+                    128,
+                    0,
+                    10,
+                    1,
+                    "2026-10-20T00:00:00Z"
+                )
+            ])))
+            .mount(&server)
+            .await;
+
+        // Full resync fallback endpoint
+        Mock::given(method("GET"))
+            .and(path("/json/stations"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                sample_station_json(
+                    "s-2",
+                    "chg-2",
+                    "Station Two Rebuilt",
+                    "jazz",
+                    "Canada",
+                    "CA",
+                    "english",
+                    "MP3",
+                    256,
+                    0,
+                    50,
+                    1,
+                    "2026-11-12T10:00:00Z"
+                )
+            ])))
+            .mount(&server)
+            .await;
+
+        let t1 = t0 + 2 * 86_400;
+        let stats = sync_with_client(&db, &client, 10, 100, t1, |_| {})
+            .await
+            .expect("falls back to full resync when server dumps old change history");
+
+        assert_eq!(stats.mode, "full");
+        assert_eq!(stats.total_stations, 1);
+        let conn = db.pool.get().unwrap();
+        assert!(get_station_by_uuid(&conn, "s-1").unwrap().is_none());
+        assert!(get_station_by_uuid(&conn, "s-2").unwrap().is_some());
     }
 }

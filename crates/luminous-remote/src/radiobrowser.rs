@@ -215,6 +215,8 @@ struct WireChangeHeader {
     stationuuid: String,
     #[serde(default, deserialize_with = "deserialize_string_default")]
     changeuuid: String,
+    #[serde(default)]
+    lastchangetime_iso8601: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -296,13 +298,15 @@ pub struct ChangedStationsBatch {
     pub stations: Vec<RadioBrowserStation>,
     /// The newest `changeuuid` observed in the change stream, if any changes were returned.
     pub newest_change_uuid: Option<String>,
+    /// ISO 8601 timestamp (`YYYY-MM-DDTHH:MM:SSZ`) of the oldest change event in the batch.
+    /// Used by the sync engine to detect when the server ignored an unknown/expired
+    /// `lastchangeuuid` and dumped changes older than the local mirror's last sync.
+    pub oldest_change_iso8601: Option<String>,
     /// Total number of raw change events returned by `/json/stations/changed`.
     /// When this equals the requested `limit`, the cursor may have fallen behind
     /// the batch window and the caller should fall back to a full resync.
     pub raw_change_count: usize,
-    /// True when the requested `last_change_uuid` was still recognized by the server
-    /// (or when zero changes occurred since that UUID). False when the server appears
-    /// to have ignored an expired/unknown `last_change_uuid` and dumped its oldest history.
+    /// True when `raw_change_count < limit` (meaning the batch did not hit the safety cap).
     pub cursor_valid: bool,
 }
 
@@ -581,10 +585,18 @@ impl RadioBrowserClient {
             return Ok(ChangedStationsBatch {
                 stations: Vec::new(),
                 newest_change_uuid: None,
+                oldest_change_iso8601: None,
                 raw_change_count: 0,
                 cursor_valid: true,
             });
         }
+
+        let oldest_change_iso8601 = headers
+            .iter()
+            .filter_map(|h| h.lastchangetime_iso8601.as_deref())
+            .map(str::trim)
+            .find(|s| !s.is_empty())
+            .map(str::to_string);
 
         let newest_change_uuid = headers
             .iter()
@@ -607,88 +619,81 @@ impl RadioBrowserClient {
         Ok(ChangedStationsBatch {
             stations,
             newest_change_uuid,
+            oldest_change_iso8601,
             raw_change_count,
             cursor_valid,
         })
     }
 
+    async fn fetch_facet_list<F>(
+        &self,
+        path: &str,
+        map_entry: F,
+    ) -> Result<Vec<RadioBrowserFacetEntry>, String>
+    where
+        F: Fn(WireFacetEntry) -> Option<RadioBrowserFacetEntry>,
+    {
+        let raw: Vec<WireFacetEntry> = self.get_json_with_failover(path).await?;
+        Ok(raw.into_iter().filter_map(map_entry).collect())
+    }
+
     /// Fetches tag counts from `/json/tags?hidebroken=true`.
     pub async fn fetch_tags(&self) -> Result<Vec<RadioBrowserFacetEntry>, String> {
-        let raw: Vec<WireFacetEntry> = self
-            .get_json_with_failover("/json/tags?hidebroken=true")
-            .await?;
-        Ok(raw
-            .into_iter()
-            .filter_map(|e| {
-                let name = e.name.trim().to_lowercase();
-                (!name.is_empty()).then_some(RadioBrowserFacetEntry {
-                    name,
-                    code: None,
-                    stationcount: e.stationcount.unwrap_or(0),
-                })
+        self.fetch_facet_list("/json/tags?hidebroken=true", |e| {
+            let name = e.name.trim().to_lowercase();
+            (!name.is_empty()).then_some(RadioBrowserFacetEntry {
+                name,
+                code: None,
+                stationcount: e.stationcount.unwrap_or(0),
             })
-            .collect())
+        })
+        .await
     }
 
     /// Fetches country counts from `/json/countries?hidebroken=true`.
     pub async fn fetch_countries(&self) -> Result<Vec<RadioBrowserFacetEntry>, String> {
-        let raw: Vec<WireFacetEntry> = self
-            .get_json_with_failover("/json/countries?hidebroken=true")
-            .await?;
-        Ok(raw
-            .into_iter()
-            .filter_map(|e| {
-                let name = e.name.trim().to_string();
-                let code = e
-                    .iso_3166_1
-                    .map(|c| c.trim().to_ascii_uppercase())
-                    .filter(|c| !c.is_empty());
-                (!name.is_empty() || code.is_some()).then_some(RadioBrowserFacetEntry {
-                    name,
-                    code,
-                    stationcount: e.stationcount.unwrap_or(0),
-                })
+        self.fetch_facet_list("/json/countries?hidebroken=true", |e| {
+            let name = e.name.trim().to_string();
+            let code = e
+                .iso_3166_1
+                .map(|c| c.trim().to_ascii_uppercase())
+                .filter(|c| !c.is_empty());
+            (!name.is_empty() || code.is_some()).then_some(RadioBrowserFacetEntry {
+                name,
+                code,
+                stationcount: e.stationcount.unwrap_or(0),
             })
-            .collect())
+        })
+        .await
     }
 
     /// Fetches language counts from `/json/languages?hidebroken=true`.
     pub async fn fetch_languages(&self) -> Result<Vec<RadioBrowserFacetEntry>, String> {
-        let raw: Vec<WireFacetEntry> = self
-            .get_json_with_failover("/json/languages?hidebroken=true")
-            .await?;
-        Ok(raw
-            .into_iter()
-            .filter_map(|e| {
-                let name = e.name.trim().to_lowercase();
-                (!name.is_empty()).then_some(RadioBrowserFacetEntry {
-                    name,
-                    code: e
-                        .iso_639
-                        .map(|c| c.trim().to_ascii_lowercase())
-                        .filter(|c| !c.is_empty()),
-                    stationcount: e.stationcount.unwrap_or(0),
-                })
+        self.fetch_facet_list("/json/languages?hidebroken=true", |e| {
+            let name = e.name.trim().to_lowercase();
+            (!name.is_empty()).then_some(RadioBrowserFacetEntry {
+                name,
+                code: e
+                    .iso_639
+                    .map(|c| c.trim().to_ascii_lowercase())
+                    .filter(|c| !c.is_empty()),
+                stationcount: e.stationcount.unwrap_or(0),
             })
-            .collect())
+        })
+        .await
     }
 
     /// Fetches codec counts from `/json/codecs?hidebroken=true`.
     pub async fn fetch_codecs(&self) -> Result<Vec<RadioBrowserFacetEntry>, String> {
-        let raw: Vec<WireFacetEntry> = self
-            .get_json_with_failover("/json/codecs?hidebroken=true")
-            .await?;
-        Ok(raw
-            .into_iter()
-            .filter_map(|e| {
-                let name = e.name.trim().to_ascii_uppercase();
-                (!name.is_empty()).then_some(RadioBrowserFacetEntry {
-                    name,
-                    code: None,
-                    stationcount: e.stationcount.unwrap_or(0),
-                })
+        self.fetch_facet_list("/json/codecs?hidebroken=true", |e| {
+            let name = e.name.trim().to_ascii_uppercase();
+            (!name.is_empty()).then_some(RadioBrowserFacetEntry {
+                name,
+                code: None,
+                stationcount: e.stationcount.unwrap_or(0),
             })
-            .collect())
+        })
+        .await
     }
 
     /// Reports a station play click (`/json/url/{stationuuid}`) and returns the resolved stream URL.
