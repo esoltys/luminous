@@ -383,7 +383,7 @@
   let rawGenre = $derived.by(() => {
     const counts = new Map<string, number>();
     for (const item of playlistsStore.activePlaylistTracks) {
-      if (!item.song?.genre) continue;
+      if (!item.song?.genre || isLiveSong(item.song)) continue;
       for (const g of parseMultiValue(item.song.genre)) {
         const trimmed = g.trim();
         if (trimmed) {
@@ -1016,7 +1016,7 @@
       </div>
 
       <div class="p-6 flex flex-col gap-6 pb-dock">
-        {#if !isSpecialPlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
+        {#if !isSpecialPlaylist && !isStationListPlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
           <div class="flex flex-wrap items-center gap-3">
             {#if rawGenre}
               <GenreChips genre={rawGenre} variant="full" limit={4} />
