@@ -1,12 +1,26 @@
 <script lang="ts">
   import { i18n } from "../stores/i18n.svelte";
   import { walkthroughStore } from "../stores/walkthrough.svelte";
-  import { CompassIcon as Compass } from "phosphor-svelte";
+  import {
+    CompassIcon as Compass,
+    BugIcon as Bug,
+    LifebuoyIcon as Lifebuoy,
+  } from "phosphor-svelte";
+  import { GET_HELP_URL, REPORT_BUG_URL } from "../utils/supportLinks";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Button from "./Button.svelte";
   import { openExternalUrl } from "../utils/openExternalUrl";
 
   import { navigationStore } from "../stores/navigation.svelte";
+
+  /**
+   * Shown as icon-only buttons in narrow windows, so the name lives in the
+   * tooltip and accessible label rather than only in the visible text.
+   */
+  const supportLinks = [
+    { key: "help.getHelp", fallback: "Get help", url: GET_HELP_URL, icon: Lifebuoy },
+    { key: "help.reportBug", fallback: "Report a bug", url: REPORT_BUG_URL, icon: Bug },
+  ] as const;
 
   let isLoading = $state(true);
   let frameElement = $state<HTMLIFrameElement | null>(null);
@@ -50,7 +64,7 @@
   }
 </script>
 
-<div class="relative flex flex-col h-full overflow-hidden bg-brand-main">
+<div class="@container relative flex flex-col h-full overflow-hidden bg-brand-main">
   {#if isLoading}
     <div
       class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-brand-main"
@@ -58,7 +72,20 @@
       <LoadingSpinner label={i18n.t("help.loading", {}, "Loading user guide...")} />
     </div>
   {/if}
-  <div class="absolute top-4 right-6 z-20">
+  <div class="absolute top-4 right-6 z-20 flex flex-wrap justify-end gap-2">
+    {#each supportLinks as link (link.key)}
+      {@const label = i18n.t(link.key, {}, link.fallback)}
+      <Button
+        onclick={() => openExternalUrl(link.url)}
+        variant="secondary"
+        size="sm"
+        title={label}
+        aria-label={label}
+      >
+        <link.icon class="w-3.5 h-3.5" />
+        <span class="hidden @3xl:inline">{label}</span>
+      </Button>
+    {/each}
     <Button onclick={() => walkthroughStore.start()} variant="secondary" size="sm">
       <Compass class="w-3.5 h-3.5" />
       {i18n.t("walkthrough.restartTour", {}, "Restart Feature Walkthrough")}

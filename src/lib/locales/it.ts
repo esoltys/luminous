@@ -701,7 +701,7 @@ export const it = {
     aboutViewLicense: "Visualizza la licenza MIT",
     aboutHomepage: "Sito di Luminous",
     aboutDiscussions: "Community su Reddit",
-    aboutIssues: "Segnalazioni su GitHub",
+    aboutIssues: "Segnala un bug",
     aboutInfluences: "Influenze e ringraziamenti",
     aboutInfluencesText:
       "Ispirato a lettori multimediali open source e indipendenti: Audacious, Strawberry Music Player, Elisa (KDE) e MusicBee.",
@@ -1560,6 +1560,8 @@ export const it = {
     heatmapLegendMore: "Più",
   },
   help: {
+    getHelp: "Ottieni aiuto",
+    reportBug: "Segnala un bug",
     loading: "Caricamento del manuale utente...",
   },
   tray: {

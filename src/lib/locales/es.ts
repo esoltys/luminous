@@ -702,7 +702,7 @@ export const es = {
     aboutViewLicense: "Ver la licencia MIT",
     aboutHomepage: "Página de Luminous",
     aboutDiscussions: "Comunidad de Reddit",
-    aboutIssues: "Incidencias de GitHub",
+    aboutIssues: "Informar de un error",
     aboutInfluences: "Influencias y agradecimientos",
     aboutInfluencesText:
       "Inspirado en reproductores de código abierto e independientes: Audacious, Strawberry Music Player, Elisa (KDE) y MusicBee.",
@@ -1561,6 +1561,8 @@ export const es = {
     heatmapLegendMore: "Más",
   },
   help: {
+    getHelp: "Obtener ayuda",
+    reportBug: "Informar de un error",
     loading: "Cargando la guía del usuario...",
   },
   tray: {

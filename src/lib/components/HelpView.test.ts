@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
+import { REPORT_BUG_URL, GET_HELP_URL } from "../utils/supportLinks";
 import HelpView from "./HelpView.svelte";
 import { openExternalUrl } from "../utils/openExternalUrl";
 
@@ -42,5 +43,13 @@ describe("HelpView.svelte", () => {
     doc.querySelector("a")!.dispatchEvent(click);
     expect(openExternalUrl).not.toHaveBeenCalled();
     expect(click.defaultPrevented).toBe(false);
+  });
+
+  it("offers Report a bug and Get help up front", async () => {
+    const { getByRole } = render(HelpView);
+    await fireEvent.click(getByRole("button", { name: "Report a bug" }));
+    expect(openExternalUrl).toHaveBeenLastCalledWith(REPORT_BUG_URL);
+    await fireEvent.click(getByRole("button", { name: "Get help" }));
+    expect(openExternalUrl).toHaveBeenLastCalledWith(GET_HELP_URL);
   });
 });

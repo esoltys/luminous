@@ -711,7 +711,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     aboutViewLicense: "Voir la licence MIT",
     aboutHomepage: "Page d'accueil de Luminous",
     aboutDiscussions: "Communauté Reddit",
-    aboutIssues: "Problèmes GitHub",
+    aboutIssues: "Signaler un bogue",
     aboutInfluences: "Influences et remerciements",
     aboutInfluencesText:
       "Inspiré par des lecteurs multimédias indépendants à code source ouvert : Audacious, Strawberry Music Player, Elisa (KDE) et MusicBee.",
@@ -1574,6 +1574,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     heatmapLegendMore: "Plus",
   },
   help: {
+    getHelp: "Obtenir de l'aide",
+    reportBug: "Signaler un bogue",
     loading: "Chargement du guide d'utilisation...",
   },
   tray: {

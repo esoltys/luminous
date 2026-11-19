@@ -42,4 +42,12 @@ describe("SettingsAbout.svelte", () => {
     ).toBeInTheDocument();
     expect(getByRole("button", { name: "Me soutenir sur Ko-fi" })).toBeInTheDocument();
   });
+
+  it("labels the bug link plainly and opens the bug report form", async () => {
+    const { getByRole } = render(SettingsAbout);
+    await fireEvent.click(getByRole("button", { name: /Report a bug/ }));
+    expect(openExternalUrl).toHaveBeenCalledWith(
+      "https://github.com/esoltys/luminous/issues/new?template=bug_report.yml",
+    );
+  });
 });
