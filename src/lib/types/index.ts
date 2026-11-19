@@ -1418,7 +1418,7 @@ export type PlayContext =
   | { type: "album"; album: string; albumArtist?: string }
   | { type: "playlist"; playlistId: number };
 
-export type RecentSearchKind = "query" | "artist" | "album" | "song" | "playlist";
+export type RecentSearchKind = "query" | "artist" | "album" | "song" | "playlist" | "station";
 
 export interface RecentSearchItem {
   id: string;
@@ -1647,7 +1647,7 @@ export interface RadioDirectoryStation {
   playable: boolean;
 }
 
-export type RadioDirectoryOrder = "clickcount" | "votes" | "name" | "bitrate";
+export type RadioDirectoryOrder = "clickcount" | "votes" | "name" | "bitrate" | "relevance";
 
 export interface RadioDirectoryQuery {
   search?: string | null;

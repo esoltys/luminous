@@ -138,6 +138,10 @@ pub enum RadioDirectoryOrder {
     Votes,
     Name,
     Bitrate,
+    /// Stations whose name matches every search token first, then stations matched
+    /// only through tags, country or language; each tier by popularity. Without a
+    /// search it falls back to [`RadioDirectoryOrder::Clickcount`].
+    Relevance,
 }
 
 /// Filter parameters for [`query_stations`].
@@ -778,13 +782,33 @@ pub fn query_stations(
     conn: &Connection,
     query: &RadioDirectoryQuery,
 ) -> Result<Vec<RadioDirectoryStation>> {
-    let (clauses, bind_params) = build_where_clauses(query, true);
+    let (clauses, mut bind_params) = build_where_clauses(query, true);
 
+    const POPULARITY: &str = "clickcount DESC, votes DESC, name COLLATE NOCASE ASC";
+    let name_match = match query.order_by {
+        RadioDirectoryOrder::Relevance => query.search.as_deref().and_then(build_fts_query),
+        _ => None,
+    };
     let order_sql = match query.order_by {
-        RadioDirectoryOrder::Clickcount => "clickcount DESC, votes DESC, name COLLATE NOCASE ASC",
-        RadioDirectoryOrder::Votes => "votes DESC, clickcount DESC, name COLLATE NOCASE ASC",
-        RadioDirectoryOrder::Name => "name COLLATE NOCASE ASC, clickcount DESC",
-        RadioDirectoryOrder::Bitrate => "bitrate DESC, clickcount DESC, name COLLATE NOCASE ASC",
+        RadioDirectoryOrder::Clickcount => POPULARITY.to_string(),
+        RadioDirectoryOrder::Votes => {
+            "votes DESC, clickcount DESC, name COLLATE NOCASE ASC".to_string()
+        }
+        RadioDirectoryOrder::Name => "name COLLATE NOCASE ASC, clickcount DESC".to_string(),
+        RadioDirectoryOrder::Bitrate => {
+            "bitrate DESC, clickcount DESC, name COLLATE NOCASE ASC".to_string()
+        }
+        RadioDirectoryOrder::Relevance => match name_match {
+            // FTS5 column filter: every token must prefix-match a word of the name.
+            Some(expr) => {
+                bind_params.push(Box::new(format!("name : ({expr})")));
+                let idx = bind_params.len();
+                format!(
+                    "CASE WHEN rowid IN (SELECT rowid FROM radio_directory_fts WHERE radio_directory_fts MATCH ?{idx}) THEN 0 ELSE 1 END, {POPULARITY}"
+                )
+            }
+            None => POPULARITY.to_string(),
+        },
     };
 
     let sql = format!(
@@ -816,6 +840,35 @@ pub fn query_stations(
     }
 
     Ok(results)
+}
+
+/// Hard cap on [`search_stations`] results, whatever the caller asks for.
+pub const MAX_STATION_SEARCH_RESULTS: usize = 20;
+
+/// Global-search lookup over the local directory mirror (#2007): prefix match on
+/// name, tags, country and language, ranked by [`RadioDirectoryOrder::Relevance`],
+/// playable stations only, at most [`MAX_STATION_SEARCH_RESULTS`] rows.
+///
+/// Reads only the local mirror, so it works offline. Returns no rows (not an error)
+/// for a query with no searchable words or when the user hasn't opted in to the
+/// directory.
+pub fn search_stations(
+    conn: &Connection,
+    search: &str,
+    limit: usize,
+) -> Result<Vec<RadioDirectoryStation>> {
+    if build_fts_query(search).is_none() || !is_opted_in(conn) {
+        return Ok(Vec::new());
+    }
+    query_stations(
+        conn,
+        &RadioDirectoryQuery {
+            search: Some(search.to_string()),
+            order_by: RadioDirectoryOrder::Relevance,
+            limit: limit.clamp(1, MAX_STATION_SEARCH_RESULTS),
+            ..Default::default()
+        },
+    )
 }
 
 /// Computes local tag, country, language, and codec counts directly from `radio_directory`.
@@ -2093,5 +2146,139 @@ mod tests {
         // list_radio_playlist_ids executes cleanly against the real playlists schema.
         let pl_ids = list_radio_playlist_ids(&conn).unwrap();
         assert!(pl_ids.is_empty());
+    }
+
+    fn search_station(
+        uuid: &str,
+        name: &str,
+        tags: &str,
+        codec: &str,
+        clickcount: i32,
+    ) -> RadioBrowserStation {
+        RadioBrowserStation {
+            stationuuid: uuid.into(),
+            changeuuid: format!("c-{uuid}"),
+            name: name.into(),
+            url_resolved: format!("https://resolved.example/{uuid}.mp3"),
+            homepage: String::new(),
+            favicon: String::new(),
+            tags: tags.into(),
+            country: "Canada".into(),
+            countrycode: "CA".into(),
+            language: "english".into(),
+            codec: codec.into(),
+            bitrate: 128,
+            hls: false,
+            votes: 0,
+            clickcount,
+            lastcheckok: true,
+            lastchangetime_iso8601: None,
+        }
+    }
+
+    fn seed_search_directory(conn: &mut Connection, stations: &[RadioBrowserStation]) {
+        let tx = conn.transaction().unwrap();
+        upsert_stations_tx(&tx, stations, 1000).unwrap();
+        tx.execute(
+            "INSERT INTO radio_directory_meta (id, opted_in) VALUES (1, 1)
+             ON CONFLICT(id) DO UPDATE SET opted_in = 1",
+            [],
+        )
+        .unwrap();
+        tx.commit().unwrap();
+    }
+
+    #[test]
+    fn search_stations_ranks_name_matches_before_tag_matches_then_popularity() {
+        let (_dir, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+        seed_search_directory(
+            &mut conn,
+            &[
+                // Tag-only match, by far the most popular: still ranks below name matches.
+                search_station("tag-only", "Smooth Lounge", "jazz,lounge", "MP3", 9000),
+                search_station("name-small", "Jazz Corner", "", "MP3", 5),
+                search_station("name-big", "Radio Jazzy Nights", "", "MP3", 400),
+                search_station("no-match", "Rock Hits", "rock", "MP3", 10_000),
+            ],
+        );
+
+        let uuids: Vec<String> = search_stations(&conn, "jazz", 10)
+            .unwrap()
+            .into_iter()
+            .map(|s| s.stationuuid)
+            .collect();
+        assert_eq!(uuids, vec!["name-big", "name-small", "tag-only"]);
+
+        // Every token must match; country and language are searchable too.
+        let multi = search_stations(&conn, "jaz canad", 10).unwrap();
+        assert_eq!(multi.len(), 3);
+        assert!(search_stations(&conn, "jazz germany", 10)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn search_stations_caps_results_and_counts_only_playable_stations() {
+        let (_dir, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+        let mut stations: Vec<RadioBrowserStation> = (0..30)
+            .map(|i| search_station(&format!("ok-{i}"), &format!("Ambient {i}"), "", "MP3", i))
+            .collect();
+        // Unplayable rows (no known codec) are the most popular, so they'd fill the cap
+        // if the playable filter ran after it.
+        stations.extend((0..5).map(|i| {
+            search_station(
+                &format!("nocodec-{i}"),
+                &format!("Ambient X {i}"),
+                "",
+                "",
+                99_999,
+            )
+        }));
+        seed_search_directory(&mut conn, &stations);
+
+        let five = search_stations(&conn, "ambient", 5).unwrap();
+        assert_eq!(five.len(), 5);
+        assert!(five.iter().all(|s| s.playable));
+        assert_eq!(five[0].stationuuid, "ok-29");
+
+        // The backend clamps whatever the caller asks for.
+        let capped = search_stations(&conn, "ambient", 1_000).unwrap();
+        assert_eq!(capped.len(), MAX_STATION_SEARCH_RESULTS);
+        assert_eq!(search_stations(&conn, "ambient", 0).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn search_stations_reads_the_local_mirror_offline_and_is_empty_when_not_opted_in() {
+        let (_dir, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+        let stations = [search_station("s1", "Folk Roots", "folk", "MP3", 1)];
+        let tx = conn.transaction().unwrap();
+        upsert_stations_tx(&tx, &stations, 1000).unwrap();
+        tx.commit().unwrap();
+
+        // Rows present but not opted in: no results, no error.
+        assert!(search_stations(&conn, "folk", 5).unwrap().is_empty());
+
+        conn.execute(
+            "INSERT INTO radio_directory_meta (id, opted_in) VALUES (1, 1)
+             ON CONFLICT(id) DO UPDATE SET opted_in = 1",
+            [],
+        )
+        .unwrap();
+        // Online lookups off: the search never touches the network, so it still answers.
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('context_enrichment_enabled', 'false')",
+            [],
+        )
+        .unwrap();
+        assert!(!crate::commands::context::is_online_enabled(&conn));
+        let found = search_stations(&conn, "folk", 5).unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].stationuuid, "s1");
+
+        // Punctuation-only input has no searchable words.
+        assert!(search_stations(&conn, ":*\"", 5).unwrap().is_empty());
     }
 }
