@@ -1740,6 +1740,8 @@ export const fr: DeepStringRecord<typeof en> = {
       other: "{count} morceaux indisponibles ignorés.",
     },
     trackSkippedRemoteToast: "Impossible de lire « {title} » — {message}. Morceau ignoré.",
+    stationOfflineToast: "« {title} » — Station hors ligne.",
+    liveBadge: "En direct",
     openNothingPlayable: "Aucun fichier audio pris en charge à lire.",
     playSongFailed: "Impossible de lire ce morceau.",
     noSongPlaying: "Aucune chanson en cours de lecture",

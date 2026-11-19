@@ -5,7 +5,7 @@
 //! ensuring listens survive offline sessions and application restarts.
 
 use crate::db::Database;
-use crate::models::{Song, SongSource};
+use crate::models::Song;
 use anyhow::Result;
 pub use luminous_remote::lastfm::{
     LastFmClient, LastFmLovedTrack, LastFmScrobbleResponse, LastFmSession, LastFmTrack,
@@ -720,13 +720,7 @@ impl ScrobblerManager {
         }
 
         // Exclude radio streams
-        if matches!(
-            song.source,
-            SongSource::Stream
-                | SongSource::SomaFm
-                | SongSource::RadioParadise
-                | SongSource::RadioBrowser
-        ) {
+        if song.source.is_live_stream() {
             return;
         }
 
@@ -799,13 +793,7 @@ impl ScrobblerManager {
         }
 
         // Radio / live stream tracks are not scrobbled
-        if matches!(
-            song.source,
-            SongSource::Stream
-                | SongSource::SomaFm
-                | SongSource::RadioParadise
-                | SongSource::RadioBrowser
-        ) {
+        if song.source.is_live_stream() {
             return;
         }
 

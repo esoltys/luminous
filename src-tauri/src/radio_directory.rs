@@ -916,6 +916,157 @@ fn into_sorted_facets(counts: HashMap<String, i64>, limit: usize) -> Vec<RadioBr
     entries
 }
 
+/// Default number of recently played/opened unreferenced station rows kept by
+/// [`gc_unreferenced_stations`] (#2004).
+pub const DEFAULT_RECENT_STATION_TAIL: usize = 20;
+
+/// Canonical `radio://<stationuuid>` path stored on materialized `songs` rows.
+pub fn station_uri(stationuuid: &str) -> String {
+    format!("{}{}", crate::media_source::RADIO_URI_SCHEME, stationuuid)
+}
+
+/// Extracts `<stationuuid>` from a `radio://<stationuuid>` URI.
+pub fn parse_station_uuid(location: &str) -> Option<&str> {
+    location
+        .strip_prefix(crate::media_source::RADIO_URI_SCHEME)
+        .map(str::trim)
+        .filter(|uuid| !uuid.is_empty())
+}
+
+/// Resolves the current `url_resolved` stream URL for `stationuuid` from the
+/// local `radio_directory` mirror.
+pub fn resolve_station_stream_url(conn: &Connection, stationuuid: &str) -> Result<Option<String>> {
+    let url: Option<String> = conn
+        .query_row(
+            "SELECT NULLIF(TRIM(url_resolved), '') FROM radio_directory WHERE stationuuid = ?1 LIMIT 1",
+            params![stationuuid],
+            |r| r.get(0),
+        )
+        .optional()?
+        .flatten();
+    Ok(url)
+}
+
+/// Materialises a directory station as a `songs` row (`source = RadioBrowser`,
+/// `path = radio://<stationuuid>`) so the Queue, playlists, and pins treat it as
+/// a normal playable item (#2004). Idempotent: updates station metadata if the
+/// row already exists.
+pub fn materialize_station(conn: &Connection, stationuuid: &str) -> Result<crate::models::Song> {
+    let station = get_station_by_uuid(conn, stationuuid)?
+        .ok_or_else(|| anyhow::anyhow!("Radio station '{stationuuid}' not found in directory"))?;
+    let uri = station_uri(&station.stationuuid);
+    let now = crate::clock::unix_now();
+    let bitrate = (station.bitrate > 0).then_some(station.bitrate);
+    let genre = (!station.tags.trim().is_empty()).then_some(station.tags.as_str());
+    let homepage = (!station.homepage.trim().is_empty()).then_some(station.homepage.as_str());
+    let favicon = (!station.favicon.trim().is_empty()).then_some(station.favicon.as_str());
+    let artist = (!station.country.trim().is_empty()).then_some(station.country.as_str());
+
+    let existing_id: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM songs WHERE path = ?1 LIMIT 1",
+            params![uri],
+            |r| r.get(0),
+        )
+        .optional()?;
+
+    if let Some(song_id) = existing_id {
+        conn.execute(
+            "UPDATE songs SET
+                source = ?1,
+                filetype = ?2,
+                url = ?3,
+                stream_url = ?4,
+                title = ?5,
+                artist = ?6,
+                genre = ?7,
+                bitrate = ?8,
+                length_nanosec = NULL,
+                art_manual = COALESCE(?9, art_manual),
+                mtime = ?10,
+                unavailable = 0
+             WHERE id = ?11",
+            params![
+                crate::models::SongSource::RADIO_BROWSER_ID,
+                crate::models::FileType::Stream as i32,
+                homepage,
+                station.url_resolved,
+                station.name,
+                artist,
+                genre,
+                bitrate,
+                favicon,
+                now,
+                song_id,
+            ],
+        )?;
+    } else {
+        conn.execute(
+            "INSERT INTO songs (
+                source, filetype, path, url, stream_url, title, artist, genre,
+                bitrate, length_nanosec, art_manual, mtime, unavailable
+             ) VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
+                ?9, NULL, ?10, ?11, 0
+             )",
+            params![
+                crate::models::SongSource::RADIO_BROWSER_ID,
+                crate::models::FileType::Stream as i32,
+                uri,
+                homepage,
+                station.url_resolved,
+                station.name,
+                artist,
+                genre,
+                bitrate,
+                favicon,
+                now,
+            ],
+        )?;
+    }
+
+    let sql = format!(
+        "SELECT {} FROM songs WHERE path = ?1 LIMIT 1",
+        crate::collection::SONG_SELECT_COLS
+    );
+    let song = conn.query_row(&sql, params![uri], crate::collection::row_to_song)?;
+    Ok(song)
+}
+
+/// Garbage-collects unreferenced `RadioBrowser` station rows from `songs` (#2004).
+/// Keeps any row referenced by `playlist_items` (including the Queue) or
+/// `pinned_items`, `protected_song_id` (if active), and the `keep_recent` most
+/// recently played/materialized rows.
+pub fn gc_unreferenced_stations(
+    conn: &Connection,
+    keep_recent: usize,
+    protected_song_id: Option<i64>,
+) -> Result<usize> {
+    let deleted = conn.execute(
+        "DELETE FROM songs
+         WHERE source = ?1
+           AND id != COALESCE(?2, -1)
+           AND id NOT IN (
+               SELECT song_id FROM playlist_items WHERE song_id IS NOT NULL
+           )
+           AND CAST(id AS TEXT) NOT IN (
+               SELECT ref_key FROM pinned_items WHERE item_type = 'song'
+           )
+           AND id NOT IN (
+               SELECT id FROM songs
+               WHERE source = ?1
+               ORDER BY COALESCE(lastplayed, mtime, added, 0) DESC, id DESC
+               LIMIT ?3
+           )",
+        params![
+            crate::models::SongSource::RADIO_BROWSER_ID,
+            protected_song_id,
+            keep_recent as i64,
+        ],
+    )?;
+    Ok(deleted)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1476,5 +1627,86 @@ mod tests {
         let conn = db.pool.get().unwrap();
         assert!(get_station_by_uuid(&conn, "s-1").unwrap().is_none());
         assert!(get_station_by_uuid(&conn, "s-2").unwrap().is_some());
+    }
+
+    #[test]
+    fn materialize_station_is_idempotent_and_gc_preserves_refs_and_tail() {
+        let (_dir, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+
+        let stations: Vec<RadioBrowserStation> = (1..=5)
+            .map(|i| RadioBrowserStation {
+                stationuuid: format!("uuid-{i}"),
+                changeuuid: format!("c-{i}"),
+                name: format!("Station {i}"),
+                url_resolved: format!("https://resolved.example/{i}.mp3"),
+                homepage: "https://example.org".into(),
+                favicon: String::new(),
+                tags: "ambient,chill".into(),
+                country: "Canada".into(),
+                countrycode: "CA".into(),
+                language: "english".into(),
+                codec: "MP3".into(),
+                bitrate: 192,
+                hls: false,
+                votes: 10,
+                clickcount: 20,
+                lastcheckok: true,
+                lastchangetime_iso8601: None,
+            })
+            .collect();
+        let tx = conn.transaction().unwrap();
+        upsert_stations_tx(&tx, &stations, 1000).unwrap();
+        tx.commit().unwrap();
+
+        let s1 = materialize_station(&conn, "uuid-1").unwrap();
+        assert_eq!(s1.source, crate::models::SongSource::RadioBrowser);
+        assert_eq!(s1.filetype, crate::models::FileType::Stream);
+        assert_eq!(s1.path.as_deref(), Some("radio://uuid-1"));
+        assert_eq!(s1.length_nanosec, None);
+
+        // Idempotent re-materialize returns the same row id.
+        let s1_again = materialize_station(&conn, "uuid-1").unwrap();
+        assert_eq!(s1_again.id, s1.id);
+
+        let s2 = materialize_station(&conn, "uuid-2").unwrap();
+        let s3 = materialize_station(&conn, "uuid-3").unwrap();
+        let s4 = materialize_station(&conn, "uuid-4").unwrap();
+        let s5 = materialize_station(&conn, "uuid-5").unwrap();
+
+        // Reference s1 via a playlist, and s2 via pinned_items.
+        conn.execute(
+            "INSERT INTO playlists (id, name, dynamic_enabled) VALUES (10, 'Radio Favs', 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO playlist_items (playlist_id, position, uuid, type, song_id) VALUES (10, 0, 'item-1', 0, ?1)",
+            params![s1.id],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO pinned_items (item_type, ref_key, position, pinned_at) VALUES ('song', ?1, 0, 1000)",
+            params![s2.id.to_string()],
+        )
+        .unwrap();
+
+        // Keep tail of 1 most recent (s5) + protected s3; s4 should be GC'd, while s1, s2, s3, s5 survive.
+        let deleted = gc_unreferenced_stations(&conn, 1, Some(s3.id)).unwrap();
+        assert_eq!(deleted, 1);
+
+        let surviving_ids: Vec<i64> = {
+            let mut stmt = conn
+                .prepare("SELECT id FROM songs WHERE source = ?1 ORDER BY id")
+                .unwrap();
+            stmt.query_map(params![crate::models::SongSource::RADIO_BROWSER_ID], |r| {
+                r.get(0)
+            })
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect()
+        };
+        assert_eq!(surviving_ids, vec![s1.id, s2.id, s3.id, s5.id]);
+        let _ = s4;
     }
 }

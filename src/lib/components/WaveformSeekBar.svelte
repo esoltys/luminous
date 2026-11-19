@@ -4,6 +4,7 @@
   import { themeStore } from "../stores/theme.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { isLiveSong } from "../types";
 
   const CANVAS_BAR_HEIGHT_PX = 28;
   const NARROW_WIDTH_BREAKPOINT_PX = 450;
@@ -120,7 +121,7 @@
 
   function draw() {
     if (typeof document !== "undefined" && document.hidden) return;
-    if (!canvas || !containerEl) return;
+    if (!canvas || !containerEl || isLiveSong(playerStore.currentSong)) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -326,8 +327,17 @@
   let loadedMode: string | undefined = undefined;
 
   $effect(() => {
-    const songId = playerStore.currentSong?.id;
+    const song = playerStore.currentSong;
+    const songId = song?.id;
     const mode = prefs.seekBarMode;
+
+    if (isLiveSong(song)) {
+      loadedSongId = songId;
+      loadedMode = mode;
+      waveformData = [];
+      bandData = [];
+      return;
+    }
 
     if (songId !== loadedSongId || mode !== loadedMode) {
       loadedSongId = songId;
@@ -385,7 +395,7 @@
 
   // Handle seek actions (click / drag)
   function seekToX(clientX: number) {
-    if (!canvas || !playerStore.currentSong) return;
+    if (!canvas || !playerStore.currentSong || isLiveSong(playerStore.currentSong)) return;
     const rect = canvas.getBoundingClientRect();
     const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
     const pct = x / rect.width;
@@ -394,7 +404,7 @@
   }
 
   function handleMouseDown(e: MouseEvent) {
-    if (!playerStore.currentSong) return;
+    if (!playerStore.currentSong || isLiveSong(playerStore.currentSong)) return;
     isDragging = true;
     seekToX(e.clientX);
   }
@@ -412,20 +422,22 @@
 
 <svelte:window onmouseup={handleMouseUp} onmousemove={handleMouseMove} />
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-  bind:this={containerEl}
-  onmousedown={handleMouseDown}
-  data-waveform-container
-  data-waveform-loading={isLoadingWaveform || isLoadingBands ? "true" : "false"}
-  class="relative flex-1 h-7 overflow-hidden flex items-center group select-none"
-  title={prefs.seekBarMode === "bands"
-    ? i18n.t(
-        "playerBar.bandsLegend",
-        {},
-        "Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy",
-      )
-    : undefined}
->
-  <canvas bind:this={canvas} class="block w-full h-7 opacity-100"></canvas>
-</div>
+{#if !isLiveSong(playerStore.currentSong)}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    bind:this={containerEl}
+    onmousedown={handleMouseDown}
+    data-waveform-container
+    data-waveform-loading={isLoadingWaveform || isLoadingBands ? "true" : "false"}
+    class="relative flex-1 h-7 overflow-hidden flex items-center group select-none"
+    title={prefs.seekBarMode === "bands"
+      ? i18n.t(
+          "playerBar.bandsLegend",
+          {},
+          "Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy",
+        )
+      : undefined}
+  >
+    <canvas bind:this={canvas} class="block w-full h-7 opacity-100"></canvas>
+  </div>
+{/if}

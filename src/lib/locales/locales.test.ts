@@ -385,6 +385,7 @@ const IDENTICAL_OK_ES = new Set<string>([
 
 // Cognates, loanwords and technical terms Windows and the field also leave in English, plus brands, acronyms and symbols.
 const IDENTICAL_OK_DE = new Set<string>([
+  "playerBar.liveBadge", // "Live" is the usual word in this language
   "playerBar.playbackSpeedNormal", // "Normal" is the same word in this language
   "smartPlaylistBuilder.fieldTempo", // "Tempo"
   "smartPlaylistBuilder.fieldFormat", // "Format"

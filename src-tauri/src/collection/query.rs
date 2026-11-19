@@ -66,8 +66,9 @@ impl CollectionScanner {
         let query_trimmed = query.trim();
         if query_trimmed.is_empty() {
             let sql = format!(
-                "SELECT {} FROM songs WHERE unavailable = 0 ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track LIMIT ?1",
-                SONG_SELECT_COLS
+                "SELECT {} FROM songs WHERE unavailable = 0 AND source IN ({}) ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track LIMIT ?1",
+                SONG_SELECT_COLS,
+                *LIBRARY_SOURCES_SQL
             );
             let mut stmt = conn.prepare(&sql)?;
             let songs = stmt
@@ -79,7 +80,10 @@ impl CollectionScanner {
 
         let parsed = crate::filter_parser::parse_query(query_trimmed);
 
-        let mut where_clauses = vec!["unavailable = 0".to_string()];
+        let mut where_clauses = vec![
+            "unavailable = 0".to_string(),
+            format!("source IN ({})", *LIBRARY_SOURCES_SQL),
+        ];
         let mut query_params: Vec<Box<dyn ToSql>> = Vec::new();
 
         push_query_clauses(&conn, parsed, &mut where_clauses, &mut query_params)?;
@@ -5526,5 +5530,44 @@ mod tests {
             .unwrap();
         assert_eq!(balcony_songs.len(), 1);
         assert_eq!(balcony_songs[0].artist.as_deref(), Some("Balcony Sunrise"));
+    }
+
+    #[test]
+    fn search_songs_excludes_radio_browser_stations() {
+        let _dir = tempfile::Builder::new()
+            .prefix("luminous_search_radio_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        {
+            let conn = db.pool.get().unwrap();
+            let lib_song = Song {
+                path: Some("/music/ambient.flac".to_string()),
+                title: Some("Ambient Drift".to_string()),
+                artist: Some("Artist".to_string()),
+                source: SongSource::LocalFile,
+                filetype: FileType::Flac,
+                ..Default::default()
+            };
+            upsert_song(&conn, &lib_song).unwrap();
+
+            let station = Song {
+                path: Some("radio://station-ambient".to_string()),
+                title: Some("Ambient FM".to_string()),
+                source: SongSource::RadioBrowser,
+                filetype: FileType::Stream,
+                ..Default::default()
+            };
+            upsert_song(&conn, &station).unwrap();
+        }
+
+        let all = scanner.search_songs("", 50).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].title.as_deref(), Some("Ambient Drift"));
+
+        let filtered = scanner.search_songs("Ambient", 50).unwrap();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].title.as_deref(), Some("Ambient Drift"));
     }
 }

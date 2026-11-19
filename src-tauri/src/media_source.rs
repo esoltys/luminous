@@ -117,7 +117,14 @@ fn resolve_live_stream_url(db: &Database, location: &str) -> Result<Option<Strin
     };
 
     if location.starts_with(RADIO_URI_SCHEME) {
-        let resolved: Option<String> = conn
+        let directory_url = crate::radio_directory::parse_station_uuid(location)
+            .and_then(|uuid| crate::radio_directory::resolve_station_stream_url(&conn, uuid).ok())
+            .flatten();
+        if let Some(url) = directory_url {
+            return Ok(Some(url));
+        }
+
+        let fallback: Option<String> = conn
             .query_row(
                 "SELECT COALESCE(NULLIF(stream_url, ''), NULLIF(url, '')) \
                  FROM songs WHERE path = ?1 LIMIT 1",
@@ -126,9 +133,11 @@ fn resolve_live_stream_url(db: &Database, location: &str) -> Result<Option<Strin
             )
             .ok()
             .flatten();
-        return match resolved {
+        return match fallback {
             Some(url) => Ok(Some(url)),
-            None => Err(format!("No stream URL found for '{location}'")),
+            None => Err(format!(
+                "Station offline: no stream URL found for '{location}'"
+            )),
         };
     }
 
@@ -2240,5 +2249,54 @@ mod tests {
         );
         assert!(hits.load(Ordering::SeqCst) >= 3);
         let _ = server_thread.join();
+    }
+
+    #[test]
+    fn radio_uri_resolves_against_directory_before_songs_fallback() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_media_source_radio_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO radio_directory (
+                stationuuid, name, url_resolved, homepage, favicon, tags,
+                country, countrycode, language, codec, bitrate, hls,
+                votes, clickcount, lastcheckok, changeuuid, updated_at
+             ) VALUES (
+                'u-1', 'Station One', 'https://fresh.example/live.mp3', '', '', '',
+                '', '', '', 'MP3', 128, 0, 1, 1, 1, 'c-1', 100
+             )",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (source, filetype, path, stream_url, title) VALUES (?1, ?2, 'radio://u-1', 'https://stale.example/old.mp3', 'Station One')",
+            rusqlite::params![
+                crate::models::SongSource::RADIO_BROWSER_ID,
+                crate::models::FileType::Stream as i32
+            ],
+        )
+        .unwrap();
+
+        let resolved = resolve_live_stream_url(&db, "radio://u-1").unwrap();
+        assert_eq!(resolved.as_deref(), Some("https://fresh.example/live.mp3"));
+
+        // Falls back to songs.stream_url when absent from radio_directory.
+        conn.execute(
+            "INSERT INTO songs (source, filetype, path, stream_url, title) VALUES (?1, ?2, 'radio://u-fallback', 'https://fallback.example/stream', 'Fallback')",
+            rusqlite::params![
+                crate::models::SongSource::RADIO_BROWSER_ID,
+                crate::models::FileType::Stream as i32
+            ],
+        )
+        .unwrap();
+        let fallback = resolve_live_stream_url(&db, "radio://u-fallback").unwrap();
+        assert_eq!(fallback.as_deref(), Some("https://fallback.example/stream"));
+
+        let err = resolve_live_stream_url(&db, "radio://missing").unwrap_err();
+        assert!(err.contains("Station offline"));
     }
 }

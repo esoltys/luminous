@@ -462,4 +462,18 @@ describe("Miniplayer.svelte", () => {
       expect(exitSpy).toHaveBeenCalled();
     });
   });
+
+  it("shows LIVE badge and hides seek bar for live radio stations (#2004)", () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      source: "radio_browser",
+      path: "radio://station-1",
+      length_nanosec: undefined,
+    };
+    playerStore.state = "playing";
+
+    const { container } = render(Miniplayer);
+    expect(container.querySelector("[data-live-badge]")).toBeInTheDocument();
+    expect(container.querySelector("[data-waveform-container]")).not.toBeInTheDocument();
+  });
 });

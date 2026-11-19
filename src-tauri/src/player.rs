@@ -188,6 +188,9 @@ pub struct Player {
     scrobble_point_nanosec: Option<u64>,
     scrobbled: bool,
     scrobbler: Option<Arc<crate::scrobbler::ScrobblerManager>>,
+    /// True once the Radio Browser click report has been dispatched for the
+    /// current live station play (#2004).
+    click_reported_for_play: bool,
 
     /// Consecutive playback failures since the last successful `Playing`
     /// event — see `MAX_CONSECUTIVE_PLAYBACK_ERRORS`.
@@ -383,6 +386,7 @@ impl Player {
 
         let scrobble_point_nanosec = restored_song
             .as_ref()
+            .filter(|s| !crate::audio::is_live_song(s))
             .and_then(|s| s.length_nanosec.map(|ns| (ns as u64) / 2));
 
         let mut player = Self {
@@ -409,6 +413,7 @@ impl Player {
             scrobble_point_nanosec,
             scrobbled: false,
             scrobbler: None,
+            click_reported_for_play: false,
             consecutive_playback_errors: 0,
             remote_streaming_active: None,
         };
@@ -418,7 +423,11 @@ impl Player {
         if let Some(song) = restored_song {
             if let Ok(engine) = player.audio.try_lock() {
                 engine.set_loudness_gain(loudness_gain);
-                let _ = engine.cue(crate::audio::track_for(&song), restored_position_ns);
+                // Live radio stations are restored without opening the stream
+                // until the user explicitly presses play (#2004).
+                if !crate::audio::is_live_song(&song) {
+                    let _ = engine.cue(crate::audio::track_for(&song), restored_position_ns);
+                }
             }
         }
 
@@ -792,9 +801,15 @@ impl Player {
         real_play: bool,
     ) -> Result<()> {
         let start_ns = song.beginning_nanosec.max(0) as u64;
+        let is_live = crate::audio::is_live_song(&song);
 
-        self.scrobble_point_nanosec = song.length_nanosec.map(|ns| (ns as u64) / 2);
+        self.scrobble_point_nanosec = if is_live {
+            None
+        } else {
+            song.length_nanosec.map(|ns| (ns as u64) / 2)
+        };
         self.scrobbled = false;
+        self.click_reported_for_play = false;
 
         match kind {
             GaplessTargetKind::Replay => {
@@ -830,6 +845,15 @@ impl Player {
             );
         }
         self.preload_upcoming_waveforms();
+        if is_live {
+            if let Ok(conn) = self._db.pool.get() {
+                let _ = crate::radio_directory::gc_unreferenced_stations(
+                    &conn,
+                    crate::radio_directory::DEFAULT_RECENT_STATION_TAIL,
+                    Some(song.id),
+                );
+            }
+        }
         self.persist_current_song().await;
         self.persist_position(if real_play { start_ns } else { 0 })
             .await;
@@ -880,7 +904,7 @@ impl Player {
         let mut songs_to_preload = Vec::new();
 
         if let Some(ref song) = self.current_song {
-            if !song.source.is_remote() {
+            if !song.source.is_remote() && !crate::audio::is_live_song(song) {
                 if let Some(ref path_str) = song.path {
                     songs_to_preload.push((song.id, std::path::PathBuf::from(path_str)));
                 }
@@ -888,7 +912,7 @@ impl Player {
         }
 
         if let Some(target) = self.peek_next_natural() {
-            if !target.song.source.is_remote() {
+            if !target.song.source.is_remote() && !crate::audio::is_live_song(&target.song) {
                 if let Some(ref path_str) = target.song.path {
                     songs_to_preload.push((target.song.id, std::path::PathBuf::from(path_str)));
                 }
@@ -1140,8 +1164,29 @@ impl Player {
     }
 
     pub async fn resume(&self) -> Result<()> {
+        if let Some(ref song) = self.current_song {
+            if crate::audio::is_live_song(song) {
+                let audio = self.audio.lock().await;
+                if audio.current_state() == luminous_audio::EngineState::Stopped {
+                    return audio.play(crate::audio::track_for(song), 0);
+                }
+            }
+        }
         let fade_ms = self.fade_duration_ms().await;
         self.audio.lock().await.resume(fade_ms)
+    }
+
+    /// Returns the Radio Browser `stationuuid` once per play when a `radio://`
+    /// station begins playing, so the caller can dispatch the click report (#2004).
+    pub fn take_pending_station_click_uuid(&mut self) -> Option<String> {
+        if self.click_reported_for_play {
+            return None;
+        }
+        let song = self.current_song.as_ref()?;
+        let path = song.path.as_deref()?;
+        let uuid = crate::radio_directory::parse_station_uuid(path)?;
+        self.click_reported_for_play = true;
+        Some(uuid.to_string())
     }
 
     /// Called by the audio-event loop before treating a playback failure as a
@@ -1229,6 +1274,7 @@ impl Player {
             // their server sync instead, mirroring the same exemption in
             // `find_missing_song_ids` (see collection.rs).
             let missing_on_disk = !song.source.is_remote()
+                && !crate::audio::is_live_song(song)
                 && song
                     .path
                     .as_deref()
@@ -2061,6 +2107,13 @@ impl Player {
     /// crossed, the listen is recorded (playcount/lastplayed) and the
     /// `song-stats-changed` payload is returned for the caller to emit.
     pub fn on_position_update(&mut self, position_nanosec: u64) -> Option<serde_json::Value> {
+        if self
+            .current_song
+            .as_ref()
+            .is_some_and(crate::audio::is_live_song)
+        {
+            return None;
+        }
         let scrobble_at = self.scrobble_point_nanosec?;
         if self.scrobbled || position_nanosec < scrobble_at {
             return None;
@@ -2109,7 +2162,12 @@ impl Player {
     /// point. Call before a user-initiated track change (never on natural
     /// completion). Returns the `song-stats-changed` payload for emission.
     pub fn note_manual_skip(&mut self) -> Option<serde_json::Value> {
-        if self.scrobbled {
+        if self.scrobbled
+            || self
+                .current_song
+                .as_ref()
+                .is_some_and(crate::audio::is_live_song)
+        {
             return None;
         }
         let song_id = self.current_song.as_ref()?.id;
@@ -3745,5 +3803,69 @@ mod tests {
         assert_eq!(live_gain, 1.0);
         assert_eq!(live_src, LoudnessGainSource::Disabled);
         assert_eq!(live_db, None);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn live_station_skips_stats_unavailable_flag_and_startup_stream_open() {
+        let (_dir, db) = setup_test_db();
+        let db = Arc::new(db);
+
+        let station_id: i64 = {
+            let conn = db.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (source, filetype, path, stream_url, title, length_nanosec)
+                 VALUES (?1, ?2, 'radio://station-test-1', 'http://127.0.0.1:9/stream', 'Test Station', 120000000000)",
+                rusqlite::params![
+                    crate::models::SongSource::RADIO_BROWSER_ID,
+                    crate::models::FileType::Stream as i32
+                ],
+            )
+            .unwrap();
+            let id = conn.last_insert_rowid();
+            conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_song_id', ?1), ('last_position_nanosec', '45000000000')",
+                rusqlite::params![id.to_string()],
+            )
+            .unwrap();
+            id
+        };
+
+        let audio = Arc::new(tokio::sync::Mutex::new(crate::audio::AudioEngine::new()));
+        let mut player = Player::new(db.clone(), audio.clone());
+
+        // Restored station is selected, position is 0, scrobble point is None,
+        // and the audio engine stays Stopped (stream not opened at startup).
+        assert_eq!(player.current_song.as_ref().map(|s| s.id), Some(station_id));
+        assert_eq!(player.scrobble_point_nanosec, None);
+        assert_eq!(
+            audio.lock().await.current_state(),
+            luminous_audio::EngineState::Stopped
+        );
+
+        // Position update and manual skip do not record stats.
+        assert!(player.on_position_update(100_000_000_000).is_none());
+        assert!(player.note_manual_skip().is_none());
+
+        // Playback error does not flag the station unavailable = 1.
+        let outcome = player.note_playback_error();
+        assert!(!outcome.flagged_unavailable);
+        let unavailable: i32 = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT unavailable FROM songs WHERE id = ?1",
+                rusqlite::params![station_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(unavailable, 0);
+
+        // Click UUID is emitted once per play.
+        assert_eq!(
+            player.take_pending_station_click_uuid().as_deref(),
+            Some("station-test-1")
+        );
+        assert_eq!(player.take_pending_station_click_uuid(), None);
     }
 }

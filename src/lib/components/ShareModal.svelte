@@ -21,6 +21,7 @@
   import { playerStore } from "../stores/player.svelte";
   import {
     getCoverArtUrl,
+    isLiveSong,
     resolveArtUrl,
     type Song,
     type StatsSummary,
@@ -303,7 +304,11 @@
   );
 
   let totalDurationLabel = $derived.by(() => {
-    const totalNs = songs.reduce((sum, s) => sum + (s.length_nanosec ?? 0), 0);
+    const totalNs = songs.reduce(
+      (sum, s) => sum + (isLiveSong(s) ? 0 : (s.length_nanosec ?? 0)),
+      0,
+    );
+    if (totalNs <= 0) return "";
     return formatHoursMinutes(Math.round(totalNs / 1_000_000_000 / 60));
   });
 

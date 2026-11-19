@@ -1730,6 +1730,8 @@ export const de = {
       other: "{count} nicht verfügbare Titel übersprungen.",
     },
     trackSkippedRemoteToast: "„{title}“ konnte nicht abgespielt werden – {message}. Übersprungen.",
+    stationOfflineToast: "„{title}“ – Sender offline.",
+    liveBadge: "Live",
     openNothingPlayable: "Es wurden keine unterstützten Audiodateien zum Abspielen gefunden.",
     playSongFailed: "Dieser Titel konnte nicht abgespielt werden.",
     noSongPlaying: "Zurzeit wird kein Titel abgespielt",
