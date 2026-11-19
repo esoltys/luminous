@@ -58,6 +58,18 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&decoded).to_string()
 }
 
+/// True when `s` (after trimming whitespace) begins with `http://` or `https://`
+/// (case-insensitive).
+pub fn is_http_url(s: &str) -> bool {
+    let trimmed = s.trim();
+    trimmed
+        .get(..7)
+        .is_some_and(|p| p.eq_ignore_ascii_case("http://"))
+        || trimmed
+            .get(..8)
+            .is_some_and(|p| p.eq_ignore_ascii_case("https://"))
+}
+
 pub fn clean_track_path(raw: &str) -> String {
     let unquoted = raw
         .trim()
@@ -65,6 +77,9 @@ pub fn clean_track_path(raw: &str) -> String {
         .trim_matches('"')
         .trim_matches('\'')
         .trim();
+    if is_http_url(unquoted) {
+        return unquoted.to_string();
+    }
     let mut s = unquoted;
     if let Some(stripped) = s.strip_prefix("file:///") {
         s = stripped;
@@ -396,6 +411,10 @@ pub fn export_playlist(
     let base_dir = export_path.parent();
 
     let format_path = |track_path: &Path| -> String {
+        let raw = track_path.to_string_lossy();
+        if is_http_url(&raw) {
+            return raw.into_owned();
+        }
         if relative {
             if let Some(base) = base_dir {
                 if let Ok(rel) = pathdiff::diff_paths(track_path, base) {
@@ -403,7 +422,7 @@ pub fn export_playlist(
                 }
             }
         }
-        track_path.to_string_lossy().to_string()
+        raw.into_owned()
     };
 
     let entries: Vec<PlaylistEntry> = tracks
@@ -443,10 +462,16 @@ pub fn render_playlist(
                     (Some(art), Some(t)) => format!("{} - {}", art, t),
                     (None, Some(t)) => t.to_string(),
                     (Some(art), None) => art.to_string(),
-                    (None, None) => Path::new(&entry.location)
-                        .file_stem()
-                        .map(|s| s.to_string_lossy().to_string())
-                        .unwrap_or_default(),
+                    (None, None) => {
+                        if is_http_url(&entry.location) {
+                            entry.location.clone()
+                        } else {
+                            Path::new(&entry.location)
+                                .file_stem()
+                                .map(|s| s.to_string_lossy().to_string())
+                                .unwrap_or_default()
+                        }
+                    }
                 };
                 lines.push(format!("#EXTINF:{},{}", dur, title_display));
                 lines.push(entry.location.clone());
@@ -713,5 +738,41 @@ Length2=150
             pls,
             "[playlist]\nNumberOfEntries=1\n\nFile1=..\\Music\\A\\01 Song.mp3\nTitle1=Song\nLength1=-1\n\n"
         );
+    }
+
+    #[test]
+    fn http_url_with_percent_escapes_survives_parse_and_export_round_trip() {
+        let url = "https://stream.example.com/live%20feed/channel%3A1?token=a%2Fb%25c";
+        let m3u = format!("#EXTM3U\n#EXTINF:-1,My Station\n{url}\n");
+        let parsed_m3u = parse_m3u(&m3u);
+        assert_eq!(parsed_m3u.len(), 1);
+        assert_eq!(parsed_m3u[0].path_or_url, url);
+        assert_eq!(parsed_m3u[0].title.as_deref(), Some("My Station"));
+
+        let pls =
+            format!("[playlist]\nNumberOfEntries=1\nFile1={url}\nTitle1=My Station\nLength1=-1\n");
+        let parsed_pls = parse_pls(&pls);
+        assert_eq!(parsed_pls.len(), 1);
+        assert_eq!(parsed_pls[0].path_or_url, url);
+        assert_eq!(parsed_pls[0].title.as_deref(), Some("My Station"));
+
+        let tracks = [ExportTrack {
+            path: Path::new(url),
+            title: Some("My Station"),
+            artist: None,
+            album: None,
+            duration_sec: None,
+        }];
+        let exported_pls = export_playlist(
+            "Stations",
+            &tracks,
+            PlaylistFormat::Pls,
+            Path::new("/exports/stations.pls"),
+            true,
+        )
+        .unwrap();
+        let reparsed = parse_pls(&exported_pls);
+        assert_eq!(reparsed.len(), 1);
+        assert_eq!(reparsed[0].path_or_url, url);
     }
 }

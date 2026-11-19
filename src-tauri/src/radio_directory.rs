@@ -1309,10 +1309,11 @@ pub fn gc_unreferenced_stations(
     keep_recent: usize,
     protected_song_id: Option<i64>,
 ) -> Result<usize> {
-    let deleted = conn.execute(
+    let sources_sql = &*crate::models::LIVE_STREAM_SOURCES_SQL;
+    let sql = format!(
         "DELETE FROM songs
-         WHERE source = ?1
-           AND id != COALESCE(?2, -1)
+         WHERE source IN ({sources_sql})
+           AND id != COALESCE(?1, -1)
            AND id NOT IN (
                SELECT song_id FROM playlist_items WHERE song_id IS NOT NULL
            )
@@ -1320,19 +1321,21 @@ pub fn gc_unreferenced_stations(
                SELECT ref_key FROM pinned_items WHERE item_type = 'song'
            )
            AND path NOT IN (
-               SELECT ?4 || stationuuid FROM radio_saved
+               SELECT ?3 || stationuuid FROM radio_saved
            )
            AND path NOT IN (
-               SELECT ?4 || ref_key FROM pinned_items WHERE item_type = 'station'
+               SELECT ?3 || ref_key FROM pinned_items WHERE item_type = 'station'
            )
            AND id NOT IN (
                SELECT id FROM songs
-               WHERE source = ?1
+               WHERE source IN ({sources_sql})
                ORDER BY COALESCE(lastplayed, mtime, added, 0) DESC, id DESC
-               LIMIT ?3
-           )",
+               LIMIT ?2
+           )"
+    );
+    let deleted = conn.execute(
+        &sql,
         params![
-            crate::models::SongSource::RADIO_BROWSER_ID,
             protected_song_id,
             keep_recent as i64,
             crate::media_source::RADIO_URI_SCHEME,
@@ -1532,20 +1535,20 @@ pub fn list_recent_stations(
 ) -> Result<Vec<RadioDirectoryStation>> {
     let limit = limit.clamp(1, 200);
     let prefix_len = crate::media_source::RADIO_URI_SCHEME.len() as i64;
+    let sources_sql = &*crate::models::LIVE_STREAM_SOURCES_SQL;
     let sql = format!(
         "SELECT SUBSTR(s.path, ?1 + 1) AS stationuuid, {JOINED_STATION_COLS}
          FROM songs s
          LEFT JOIN radio_directory rd ON rd.stationuuid = SUBSTR(s.path, ?1 + 1)
-         WHERE s.source = ?2
-           AND s.path LIKE (?3 || '%')
+         WHERE s.source IN ({sources_sql})
+           AND s.path LIKE (?2 || '%')
          ORDER BY COALESCE(s.lastplayed, s.mtime, s.added, 0) DESC, s.id DESC
-         LIMIT ?4"
+         LIMIT ?3"
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(
         params![
             prefix_len,
-            crate::models::SongSource::RADIO_BROWSER_ID,
             crate::media_source::RADIO_URI_SCHEME,
             limit as i64
         ],
@@ -1557,21 +1560,362 @@ pub fn list_recent_stations(
     collect_joined_stations(rows, hide_unsupported)
 }
 
-/// Returns IDs of playlists that contain at least one `RadioBrowser` station (#2005).
+/// Returns IDs of playlists that contain at least one live-stream station (#2005, #2009).
 pub fn list_radio_playlist_ids(conn: &Connection) -> Result<Vec<i64>> {
-    let mut stmt = conn.prepare(
+    let sources_sql = &*crate::models::LIVE_STREAM_SOURCES_SQL;
+    let sql = format!(
         "SELECT DISTINCT pi.playlist_id
          FROM playlist_items pi
          JOIN songs s ON s.id = pi.song_id
-         WHERE s.source = ?1
-         ORDER BY pi.playlist_id ASC",
-    )?;
+         WHERE s.source IN ({sources_sql})
+         ORDER BY pi.playlist_id ASC"
+    );
+    let mut stmt = conn.prepare(&sql)?;
     let ids = stmt
-        .query_map(params![crate::models::SongSource::RADIO_BROWSER_ID], |r| {
-            r.get(0)
-        })?
+        .query_map([], |r| r.get(0))?
         .collect::<rusqlite::Result<Vec<i64>>>()?;
     Ok(ids)
+}
+
+/// Prefix used for user-added / imported custom station UUIDs so they never
+/// collide with Radio Browser UUIDs (#2009).
+pub const CUSTOM_STATION_UUID_PREFIX: &str = "custom-";
+
+/// Maximum size of a remote `.pls`/`.m3u`/`.m3u8` playlist file fetched when
+/// resolving a custom station URL (1 MiB).
+const MAX_REMOTE_PLAYLIST_BYTES: usize = 1024 * 1024;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedStationUrl {
+    pub stream_url: String,
+    pub title: Option<String>,
+}
+
+/// Finds an existing live-stream `songs` row for `stream_url` or creates a new
+/// `SongSource::Stream` row (`path = radio://custom-<uuid>`) so custom and
+/// playlist-imported stations play, queue, and exclude from stats/scrobbling
+/// uniformly with directory stations (#2009).
+pub fn upsert_stream_station(
+    conn: &Connection,
+    stream_url: &str,
+    name: Option<&str>,
+    tags: Option<&str>,
+) -> Result<crate::models::Song> {
+    upsert_stream_station_inner(conn, stream_url, name, tags, false)
+}
+
+fn upsert_stream_station_inner(
+    conn: &Connection,
+    stream_url: &str,
+    name: Option<&str>,
+    tags: Option<&str>,
+    update_existing_stream: bool,
+) -> Result<crate::models::Song> {
+    let url = stream_url.trim();
+    if !luminous_metadata::playlist::is_http_url(url) {
+        anyhow::bail!("Station URL must start with http:// or https://");
+    }
+
+    let sources_sql = &*crate::models::LIVE_STREAM_SOURCES_SQL;
+    let existing_sql = format!(
+        "SELECT {} FROM songs
+         WHERE source IN ({sources_sql}) AND (stream_url = ?1 OR path = ?1)
+         ORDER BY id ASC LIMIT 1",
+        crate::collection::SONG_SELECT_COLS
+    );
+    if let Some(mut existing) = conn
+        .query_row(&existing_sql, params![url], crate::collection::row_to_song)
+        .optional()?
+    {
+        if update_existing_stream && existing.source == crate::models::SongSource::Stream {
+            let trimmed_name = name.map(str::trim).filter(|s| !s.is_empty());
+            let genre = tags.map(str::trim).filter(|s| !s.is_empty());
+            let now = crate::clock::unix_now();
+            conn.execute(
+                "UPDATE songs SET title = COALESCE(?1, title), genre = ?2, mtime = ?3 WHERE id = ?4",
+                params![trimmed_name, genre, now, existing.id],
+            )?;
+            if let Some(t) = trimmed_name {
+                existing.title = Some(t.to_string());
+            }
+            existing.genre = genre.map(str::to_string);
+            existing.mtime = Some(now);
+        }
+        return Ok(existing);
+    }
+
+    let custom_uuid = format!("{CUSTOM_STATION_UUID_PREFIX}{}", uuid::Uuid::new_v4());
+    let uri = station_uri(&custom_uuid);
+    let now = crate::clock::unix_now();
+    let title = name.map(str::trim).filter(|s| !s.is_empty()).unwrap_or(url);
+    let genre = tags.map(str::trim).filter(|s| !s.is_empty());
+
+    conn.execute(
+        "INSERT INTO songs (
+            source, filetype, path, url, stream_url, title, genre,
+            length_nanosec, mtime, unavailable
+         ) VALUES (
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7,
+            NULL, ?8, 0
+         )",
+        params![
+            crate::models::SongSource::STREAM_ID,
+            crate::models::FileType::Stream as i32,
+            uri,
+            Option::<&str>::None,
+            url,
+            title,
+            genre,
+            now,
+        ],
+    )?;
+
+    let fetch_sql = format!(
+        "SELECT {} FROM songs WHERE path = ?1 LIMIT 1",
+        crate::collection::SONG_SELECT_COLS
+    );
+    let song = conn.query_row(&fetch_sql, params![uri], crate::collection::row_to_song)?;
+    Ok(song)
+}
+
+/// Adds a user-defined custom station to `songs` (`SongSource::Stream`) and
+/// `radio_saved`, completely separate from `radio_directory` so directory syncs
+/// never overwrite it (#2009).
+pub fn add_custom_station(
+    conn: &Connection,
+    name: &str,
+    stream_url: &str,
+    tags: &str,
+) -> Result<RadioDirectoryStation> {
+    let trimmed_name = name.trim();
+    if trimmed_name.is_empty() {
+        anyhow::bail!("Station name cannot be empty");
+    }
+    let song = upsert_stream_station_inner(conn, stream_url, Some(trimmed_name), Some(tags), true)?;
+    let uuid = song
+        .path
+        .as_deref()
+        .and_then(parse_station_uuid)
+        .ok_or_else(|| anyhow::anyhow!("Custom station missing radio:// path"))?
+        .to_string();
+
+    save_station(conn, &uuid)?;
+    find_station(conn, &uuid)?.ok_or_else(|| anyhow::anyhow!("Failed to load saved custom station"))
+}
+
+/// Updates an existing user-added custom station's name, stream URL, and tags (#2009).
+pub fn update_custom_station(
+    conn: &Connection,
+    stationuuid: &str,
+    name: &str,
+    stream_url: &str,
+    tags: &str,
+) -> Result<RadioDirectoryStation> {
+    let uuid = stationuuid.trim();
+    if !uuid.starts_with(CUSTOM_STATION_UUID_PREFIX) {
+        anyhow::bail!("Only custom stations can be edited");
+    }
+    let trimmed_name = name.trim();
+    if trimmed_name.is_empty() {
+        anyhow::bail!("Station name cannot be empty");
+    }
+    let url = stream_url.trim();
+    if !luminous_metadata::playlist::is_http_url(url) {
+        anyhow::bail!("Station URL must start with http:// or https://");
+    }
+    let uri = station_uri(uuid);
+    let genre = (!tags.trim().is_empty()).then_some(tags.trim());
+    let updated = conn.execute(
+        "UPDATE songs
+         SET title = ?1, stream_url = ?2, genre = ?3, mtime = ?4
+         WHERE path = ?5 AND source = ?6",
+        params![
+            trimmed_name,
+            url,
+            genre,
+            crate::clock::unix_now(),
+            uri,
+            crate::models::SongSource::STREAM_ID,
+        ],
+    )?;
+    if updated == 0 {
+        anyhow::bail!("Custom station '{uuid}' not found");
+    }
+    find_station(conn, uuid)?
+        .ok_or_else(|| anyhow::anyhow!("Failed to load updated custom station"))
+}
+
+fn playlist_extension_kind(
+    url: &reqwest::Url,
+) -> Option<luminous_metadata::playlist::PlaylistFormat> {
+    let path = url.path().to_ascii_lowercase();
+    if path.ends_with(".pls") {
+        Some(luminous_metadata::playlist::PlaylistFormat::Pls)
+    } else if path.ends_with(".m3u8") {
+        Some(luminous_metadata::playlist::PlaylistFormat::M3u8)
+    } else if path.ends_with(".m3u") {
+        Some(luminous_metadata::playlist::PlaylistFormat::M3u)
+    } else {
+        None
+    }
+}
+
+fn classify_playlist_content_type(
+    content_type: Option<&str>,
+    url_format: luminous_metadata::playlist::PlaylistFormat,
+) -> Result<luminous_metadata::playlist::PlaylistFormat> {
+    use luminous_metadata::playlist::PlaylistFormat;
+    let Some(raw_ct) = content_type else {
+        return Ok(url_format);
+    };
+    let mime = raw_ct
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+    if mime.is_empty() {
+        return Ok(url_format);
+    }
+    match mime.as_str() {
+        "audio/x-scpls" | "audio/scpls" | "application/pls+xml" => Ok(PlaylistFormat::Pls),
+        "audio/x-mpegurl"
+        | "audio/mpegurl"
+        | "application/vnd.apple.mpegurl"
+        | "application/x-mpegurl" => Ok(PlaylistFormat::M3u),
+        "text/plain" | "application/octet-stream" => Ok(url_format),
+        _ => anyhow::bail!("URL returned unexpected Content-Type '{mime}' instead of a playlist"),
+    }
+}
+
+/// Resolves a user-supplied station URL. If the URL points to a `.pls`, `.m3u`,
+/// or `.m3u8` playlist, fetches it, validates `Content-Type`, and extracts the
+/// first `http(s)://` stream URL (#2009). Direct stream URLs are validated and
+/// returned without fetching.
+pub async fn resolve_station_url(raw_url: &str) -> Result<ResolvedStationUrl> {
+    let client = reqwest::Client::builder()
+        .user_agent(RADIO_BROWSER_USER_AGENT)
+        .timeout(std::time::Duration::from_secs(15))
+        .build()?;
+    resolve_station_url_with_client(&client, raw_url).await
+}
+
+pub async fn resolve_station_url_with_client(
+    client: &reqwest::Client,
+    raw_url: &str,
+) -> Result<ResolvedStationUrl> {
+    let trimmed = raw_url.trim();
+    let parsed_url =
+        reqwest::Url::parse(trimmed).map_err(|e| anyhow::anyhow!("Invalid station URL: {e}"))?;
+    if !matches!(parsed_url.scheme(), "http" | "https") {
+        anyhow::bail!("Station URL must start with http:// or https://");
+    }
+
+    let Some(url_format) = playlist_extension_kind(&parsed_url) else {
+        return Ok(ResolvedStationUrl {
+            stream_url: trimmed.to_string(),
+            title: None,
+        });
+    };
+
+    let resp = client
+        .get(parsed_url.clone())
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to fetch playlist URL: {e}"))?;
+    if !resp.status().is_success() {
+        anyhow::bail!("Playlist URL returned HTTP {}", resp.status().as_u16());
+    }
+
+    let ct = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    let format = classify_playlist_content_type(ct.as_deref(), url_format)?;
+
+    if let Some(len) = resp.content_length() {
+        if len > MAX_REMOTE_PLAYLIST_BYTES as u64 {
+            anyhow::bail!("Playlist response exceeds maximum size");
+        }
+    }
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to read playlist response: {e}"))?;
+    if bytes.len() > MAX_REMOTE_PLAYLIST_BYTES {
+        anyhow::bail!("Playlist response exceeds maximum size");
+    }
+    let body = String::from_utf8_lossy(&bytes);
+
+    let tracks = match format {
+        luminous_metadata::playlist::PlaylistFormat::Pls => {
+            luminous_metadata::playlist::parse_pls(&body)
+        }
+        luminous_metadata::playlist::PlaylistFormat::M3u
+        | luminous_metadata::playlist::PlaylistFormat::M3u8 => {
+            luminous_metadata::playlist::parse_m3u(&body)
+        }
+        luminous_metadata::playlist::PlaylistFormat::Xspf => {
+            luminous_metadata::playlist::parse_xspf(&body)?.tracks
+        }
+    };
+
+    for track in tracks {
+        let candidate = if luminous_metadata::playlist::is_http_url(&track.path_or_url) {
+            track.path_or_url
+        } else if let Ok(joined) = parsed_url.join(&track.path_or_url) {
+            if matches!(joined.scheme(), "http" | "https") {
+                joined.to_string()
+            } else {
+                continue;
+            }
+        } else {
+            continue;
+        };
+        return Ok(ResolvedStationUrl {
+            stream_url: candidate,
+            title: track.title,
+        });
+    }
+
+    anyhow::bail!("No stream URL found in playlist")
+}
+
+/// Exports all saved stations (`radio_saved`) to `export_path` in M3U, M3U8, or
+/// PLS format (#2009).
+pub fn export_saved_stations<P: AsRef<std::path::Path>>(
+    conn: &Connection,
+    export_path: P,
+) -> Result<usize> {
+    use luminous_metadata::playlist::{self, ExportTrack, PlaylistFormat};
+
+    let path = export_path.as_ref();
+    let format = PlaylistFormat::from_path(path).ok_or_else(|| {
+        anyhow::anyhow!(
+            "Unsupported playlist format for export path: {}",
+            path.display()
+        )
+    })?;
+    let stations = list_saved_stations(conn, false)?;
+    let tracks: Vec<ExportTrack> = stations
+        .iter()
+        .filter(|s| !s.url_resolved.trim().is_empty())
+        .map(|s| ExportTrack {
+            path: std::path::Path::new(s.url_resolved.trim()),
+            title: (!s.name.trim().is_empty()).then_some(s.name.trim()),
+            artist: None,
+            album: None,
+            duration_sec: None,
+        })
+        .collect();
+    let count = tracks.len();
+    let content = playlist::export_playlist("Saved Stations", &tracks, format, path, false)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, content)?;
+    Ok(count)
 }
 
 #[cfg(test)]
@@ -2671,5 +3015,107 @@ mod tests {
         assert_eq!(suggestions.len(), 1);
         assert_eq!(suggestions[0].name, "Folk Metal");
         assert_eq!(suggestions[0].stationcount, 2);
+    }
+
+    #[test]
+    fn add_custom_station_persists_separately_from_directory_sync_and_exports() {
+        let (dir, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+
+        let added = add_custom_station(
+            &conn,
+            "My Custom FM",
+            "https://custom.example.com/stream%201",
+            "indie, folk",
+        )
+        .unwrap();
+        assert!(added.stationuuid.starts_with(CUSTOM_STATION_UUID_PREFIX));
+        assert_eq!(added.name, "My Custom FM");
+        assert_eq!(added.url_resolved, "https://custom.example.com/stream%201");
+        assert_eq!(added.tags, "indie, folk");
+
+        // Directory full sync (and prune) must not touch custom stations.
+        let tx = conn.transaction().unwrap();
+        upsert_stations_tx(
+            &tx,
+            &[search_station("dir-1", "Dir FM", "rock", "MP3", 1)],
+            1000,
+        )
+        .unwrap();
+        tx.commit().unwrap();
+        conn.execute(
+            "DELETE FROM radio_directory WHERE stationuuid = 'dir-1'",
+            [],
+        )
+        .unwrap();
+
+        let saved = list_saved_stations(&conn, true).unwrap();
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].stationuuid, added.stationuuid);
+        assert_eq!(
+            saved[0].url_resolved,
+            "https://custom.example.com/stream%201"
+        );
+
+        let pls_out = dir.path().join("saved.pls");
+        let count = export_saved_stations(&conn, &pls_out).unwrap();
+        assert_eq!(count, 1);
+        let pls_text = std::fs::read_to_string(&pls_out).unwrap();
+        assert!(pls_text.contains("File1=https://custom.example.com/stream%201"));
+        assert!(pls_text.contains("Title1=My Custom FM"));
+
+        let m3u_out = dir.path().join("saved.m3u");
+        export_saved_stations(&conn, &m3u_out).unwrap();
+        let m3u_text = std::fs::read_to_string(&m3u_out).unwrap();
+        assert!(m3u_text.contains("https://custom.example.com/stream%201"));
+
+        let updated = update_custom_station(
+            &conn,
+            &added.stationuuid,
+            "My Updated FM",
+            "https://custom.example.com/hd.aac",
+            "jazz",
+        )
+        .unwrap();
+        assert_eq!(updated.name, "My Updated FM");
+        assert_eq!(updated.url_resolved, "https://custom.example.com/hd.aac");
+        assert_eq!(updated.tags, "jazz");
+        assert!(update_custom_station(&conn, "dir-1", "X", "https://x.com/s", "").is_err());
+    }
+
+    #[tokio::test]
+    async fn resolve_station_url_resolves_pls_and_rejects_html_content_type() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/listen.pls"))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(
+                b"[playlist]\nNumberOfEntries=1\nFile1=https://icecast.example.com/live.mp3\nTitle1=Icecast Live\n"
+                    .to_vec(),
+                "audio/x-scpls",
+            ))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/bad.pls"))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(
+                b"<html>Not Found</html>".to_vec(),
+                "text/html; charset=utf-8",
+            ))
+            .mount(&server)
+            .await;
+
+        let client = reqwest::Client::new();
+        let resolved =
+            resolve_station_url_with_client(&client, &format!("{}/listen.pls", server.uri()))
+                .await
+                .unwrap();
+        assert_eq!(resolved.stream_url, "https://icecast.example.com/live.mp3");
+        assert_eq!(resolved.title.as_deref(), Some("Icecast Live"));
+
+        let err = resolve_station_url_with_client(&client, &format!("{}/bad.pls", server.uri()))
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("Content-Type"));
     }
 }

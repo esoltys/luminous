@@ -1215,6 +1215,9 @@ impl Player {
             return None;
         }
         let song = self.current_song.as_ref()?;
+        if song.source != crate::models::SongSource::RadioBrowser {
+            return None;
+        }
         let path = song.path.as_deref()?;
         let uuid = crate::radio_directory::parse_station_uuid(path)?;
         self.click_reported_for_play = true;

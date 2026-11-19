@@ -627,19 +627,19 @@
       </div>
 
       {#if !windowLayoutStore.isPlayerBarCompact}
-        <div class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
+        <div
+          class="relative flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60"
+        >
           <!-- Quality indicator badge (opens pipeline popover on click) -->
           <QualityBadge />
           <span>{formatDuration(playerStore.positionNanosec)}</span>
           {#if isLiveSong(playerStore.currentSong)}
-            <div class="flex-1 flex items-center justify-center">
-              <span
-                data-live-badge
-                class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-brand-accent/15 text-brand-accent"
-              >
-                {i18n.t("playerBar.liveBadge", undefined, "Live")}
-              </span>
-            </div>
+            <span
+              data-live-badge
+              class="absolute left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-brand-accent/15 text-brand-accent"
+            >
+              {i18n.t("playerBar.liveBadge", undefined, "Live")}
+            </span>
           {:else}
             <div class="flex-1 flex flex-col gap-1">
               <WaveformSeekBar />

@@ -37,7 +37,7 @@
   } from "phosphor-svelte";
   import MoreIcon from "./MoreIcon.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { resolveArtUrl } from "../types";
+  import { isLiveSong, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import {
@@ -365,6 +365,11 @@
     songsToCoverStack(
       playlistsStore.activePlaylistTracks.filter((t) => !!t.song).map((t) => t.song!),
     ),
+  );
+
+  let allLiveStreams = $derived(
+    playlistsStore.activePlaylistTracks.length > 0 &&
+      playlistsStore.activePlaylistTracks.every((item) => !!item.song && isLiveSong(item.song)),
   );
 
   let totalRuntimeLabel = $derived.by(() => {
@@ -851,8 +856,10 @@
                 <span>
                   {i18n.plural("playlists.songsCount", playlistsStore.activePlaylistTracks.length)}
                 </span>
-                <span>•</span>
-                <span>{totalRuntimeLabel}</span>
+                {#if !allLiveStreams}
+                  <span>•</span>
+                  <span>{totalRuntimeLabel}</span>
+                {/if}
                 {#if sizeLimit.status}
                   <span>•</span>
                   <span>{sizeLimit.status}</span>

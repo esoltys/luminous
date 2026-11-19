@@ -132,7 +132,6 @@
             {station}
             playing={radioStore.isPlayingStation(station.stationuuid)}
             onPlay={(s) => void radioStore.playStation(s)}
-            onToggleSave={(s) => void radioStore.toggleSaveStation(s)}
           />
         {/each}
       </div>

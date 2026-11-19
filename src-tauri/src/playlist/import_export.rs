@@ -126,6 +126,23 @@ impl PlaylistManager {
         let conn = self.db.pool.get()?;
 
         for (pos, track) in parsed.tracks.iter().enumerate() {
+            if playlist::is_http_url(&track.path_or_url) {
+                let song = crate::radio_directory::upsert_stream_station(
+                    &conn,
+                    &track.path_or_url,
+                    track.title.as_deref(),
+                    None,
+                )?;
+                let uuid = Uuid::new_v4().to_string();
+                let item_url = song.path.as_deref().unwrap_or(&track.path_or_url);
+                conn.execute(
+                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url)
+                     VALUES (?1, ?2, ?3, ?4, 0, ?5)",
+                    params![playlist.id, song.id, pos as i32, uuid, item_url],
+                )?;
+                continue;
+            }
+
             let mut resolved_path = std::path::PathBuf::from(&track.path_or_url);
             if resolved_path.is_relative() {
                 if let Some(base) = base_dir {
@@ -285,7 +302,19 @@ impl PlaylistManager {
             .iter()
             .filter_map(|item| {
                 if let Some(ref song) = item.song {
-                    let p = if let Some(ref path) = song.path {
+                    let is_radio_uri = song
+                        .path
+                        .as_deref()
+                        .is_some_and(|p| p.starts_with(crate::media_source::RADIO_URI_SCHEME));
+                    let p = if is_radio_uri || song.source.is_live_stream() {
+                        if let Some(ref stream_url) = song.stream_url {
+                            std::path::Path::new(stream_url)
+                        } else if let Some(ref path) = song.path {
+                            std::path::Path::new(path)
+                        } else {
+                            std::path::Path::new(item.url.as_ref()?)
+                        }
+                    } else if let Some(ref path) = song.path {
                         std::path::Path::new(path)
                     } else {
                         std::path::Path::new(item.url.as_ref()?)
@@ -476,5 +505,38 @@ mod tests {
             0,
             "nothing left that can match"
         );
+    }
+
+    #[test]
+    fn test_import_pls_with_http_stream_creates_station_item_and_exports_stream_url() {
+        let (temp_dir, db) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        let pls_file = temp_dir.path().join("stations.pls");
+        let stream_url = "https://stream.example.com/live%20feed/channel?q=1";
+        std::fs::write(
+            &pls_file,
+            format!(
+                "[playlist]\nNumberOfEntries=1\nFile1={stream_url}\nTitle1=Indie Radio\nLength1=-1\n"
+            ),
+        )
+        .unwrap();
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let imported = manager.import_playlist(&pls_file).unwrap();
+        let tracks = manager.get_playlist_tracks(imported.id).unwrap();
+        assert_eq!(tracks.len(), 1);
+        let song = tracks[0].song.as_ref().expect("station should be a Song");
+        assert_eq!(song.source, crate::models::SongSource::Stream);
+        assert!(song.path.as_deref().unwrap().starts_with("radio://custom-"));
+        assert_eq!(song.stream_url.as_deref(), Some(stream_url));
+        assert_eq!(song.title.as_deref(), Some("Indie Radio"));
+
+        let export_m3u = temp_dir.path().join("exported.m3u");
+        manager
+            .export_playlist(imported.id, &export_m3u, true)
+            .unwrap();
+        let m3u_text = std::fs::read_to_string(&export_m3u).unwrap();
+        assert!(m3u_text.contains(stream_url));
+        assert!(!m3u_text.contains("radio://"));
     }
 }

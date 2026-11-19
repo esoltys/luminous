@@ -194,9 +194,20 @@
         ? 'bg-brand-accent/20 text-brand-accent-text hover:bg-brand-accent/30'
         : 'text-brand-text-secondary hover:bg-brand-surface hover:text-brand-text-primary'}"
     >
-      <Bookmark class="w-4 h-4" weight={saved ? "fill" : "regular"} />
-      <span class="hidden @md:inline">
-        {saved ? i18n.t("radio.saved") : i18n.t("radio.save")}
+      <Bookmark class="w-4 h-4 shrink-0" weight={saved ? "fill" : "regular"} />
+      <span class="hidden @md:inline-grid items-center text-left">
+        <span
+          class="col-start-1 row-start-1 {saved ? 'invisible' : ''}"
+          aria-hidden={saved ? "true" : undefined}
+        >
+          {i18n.t("radio.save")}
+        </span>
+        <span
+          class="col-start-1 row-start-1 {saved ? '' : 'invisible'}"
+          aria-hidden={!saved ? "true" : undefined}
+        >
+          {i18n.t("radio.saved")}
+        </span>
       </span>
     </button>
   </div>
