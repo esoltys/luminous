@@ -45,7 +45,6 @@ Weekly Dependabot PRs (npm + cargo) are consolidated into one PR by the `esoltys
 - **Tauri pairing**: bumping any `@tauri-apps/*` package also bumps its paired crate (`@tauri-apps/api` ↔ `tauri`, `@tauri-apps/plugin-<x>` ↔ `tauri-plugin-<x>`) via `cargo update -p <crate> --precise <ver>`, and vice versa, so major/minor versions stay aligned (#1208). Verify with `bun run check:tauri-versions`.
 - Respect the ignores in `.github/dependabot.yml` (e.g. no TypeScript major, see #522).
 - Verify with `bun run check`, `bun run check:tauri-versions`, `bun run test:run`, then from `src-tauri/`: `cargo test` and `cargo clippy --all-targets -- -D warnings`.
-- **jest-dom / Vitest shim**: `@testing-library/jest-dom@7.0.1` still augments Vitest's pre-5 `Assertion<T>`, so `vitest.setup.ts` re-attaches its matchers through `Matchers<R, T>` (testing-library/jest-dom#738). Check for a newer jest-dom on every run (`bun pm view @testing-library/jest-dom versions`). When one ships Vitest 5 types (#742), bump it and delete the shim in the same commit (both augmentations together can conflict), verify, and remove this note.
 
 ## System Dependencies (Linux)
 
