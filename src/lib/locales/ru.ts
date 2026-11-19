@@ -3369,6 +3369,7 @@ export const ru = {
   },
   radio: {
     title: "Интернет-радио",
+    stationCount: "Станций: {count}",
     myStationsTab: "Мои станции",
     discoverTab: "Обзор",
     optInTitle: "Просмотр интернет-радиостанций",

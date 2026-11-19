@@ -3093,6 +3093,7 @@ export const en = {
   },
   radio: {
     title: "Internet Radio",
+    stationCount: "{count} stations",
     myStationsTab: "My stations",
     discoverTab: "Discover",
     optInTitle: "Browse live internet radio",

@@ -3184,6 +3184,7 @@ export const fr: DeepStringRecord<typeof en> = {
   },
   radio: {
     title: "Radio Internet",
+    stationCount: "{count} stations",
     myStationsTab: "Mes stations",
     discoverTab: "Découvrir",
     optInTitle: "Parcourir la radio Internet en direct",

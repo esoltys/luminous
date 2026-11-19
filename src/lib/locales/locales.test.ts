@@ -181,6 +181,7 @@ const IDENTICAL_OK_FR = new Set([
   "shortcuts.groupNavigation", // "Navigation"
   "sidebar.albums", // "Albums"
   "sidebar.genres", // "Genres"
+  "radio.stationCount", // "{count} stations"
   "smartPlaylistBuilder.fieldAlbum", // "Album"
   "smartPlaylistBuilder.fieldBpm", // "BPM"
   "smartPlaylistBuilder.fieldCompilation", // "Compilation"

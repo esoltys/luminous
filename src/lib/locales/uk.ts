@@ -3358,6 +3358,7 @@ export const uk = {
   },
   radio: {
     title: "Інтернет-радіо",
+    stationCount: "Станцій: {count}",
     myStationsTab: "Мої станції",
     discoverTab: "Огляд",
     optInTitle: "Перегляд інтернет-радіостанцій",

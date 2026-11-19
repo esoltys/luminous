@@ -33,7 +33,8 @@
   const needsOptIn = $derived(!radioStore.status?.optedIn || radioStore.status.stationCount === 0);
   const headerSubtitle = $derived.by(() => {
     const count = radioStore.status?.playableStationCount ?? 0;
-    const countText = count > 0 ? `${count.toLocaleString()} stations` : "";
+    const countText =
+      count > 0 ? i18n.t("radio.stationCount", { count: count.toLocaleString() }) : "";
     if (radioStore.status?.optedIn && radioStore.isStale && radioStore.status.lastSyncedAt) {
       const ago = formatUpdatedAgo(radioStore.status.lastSyncedAt);
       return countText ? `${countText} · ${ago}` : ago;

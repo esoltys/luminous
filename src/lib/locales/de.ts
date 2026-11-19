@@ -3178,6 +3178,7 @@ export const de = {
   },
   radio: {
     title: "Internetradio",
+    stationCount: "{count} Sender",
     myStationsTab: "Meine Sender",
     discoverTab: "Entdecken",
     optInTitle: "Live-Internetradio durchsuchen",
