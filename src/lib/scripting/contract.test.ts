@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createScriptingApi } from "./index";
 import { methodPaths } from "./contract";
@@ -11,6 +11,7 @@ import {
   type ScriptSettingsTab,
   type ScriptSong,
   type ScriptSongColumn,
+  type ScriptStation,
   type ScriptSubTab,
   type ScriptTab,
 } from "./types";
@@ -21,7 +22,7 @@ import type {
   SettingsTab,
 } from "../stores/navigation.svelte";
 import type { VisibleColumns } from "../stores/collection.svelte";
-import type { PlaybackState, Song } from "../types";
+import type { PlayingStation, ScriptPlaybackSnapshot, Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
@@ -41,8 +42,9 @@ export type DriftChecks = [
   // it names must still exist (a dropped optional field would stay assignable) and fit.
   Assert<Equal<Exclude<keyof ScriptSong, keyof Song>, never>>,
   Assert<Song extends ScriptSong ? true : false>,
-  Assert<Equal<Exclude<keyof ScriptPlaybackState, keyof PlaybackState>, never>>,
-  Assert<PlaybackState extends ScriptPlaybackState ? true : false>,
+  Assert<Equal<Exclude<keyof ScriptPlaybackState, keyof ScriptPlaybackSnapshot>, never>>,
+  Assert<ScriptPlaybackSnapshot extends ScriptPlaybackState ? true : false>,
+  Assert<Equal<ScriptStation, PlayingStation>>,
 ];
 
 type Version = [number, number, number];
@@ -126,6 +128,25 @@ describe("Scripting contract", () => {
         if (!minorBump) expect(added, `${step} adds methods without a minor bump`).toEqual([]);
       }
     });
+  });
+
+  it("only invokes backend commands the app registers", () => {
+    // A misspelt command name fails only at runtime, in the real app (#2010 caught
+    // playback.pause() calling a "pause_playback" that never existed).
+    const handlers = readFileSync(path.resolve(__dirname, "../../../src-tauri/src/lib.rs"), "utf8");
+    const registered = new Set([...handlers.matchAll(/commands::\w+::(\w+),/g)].map((m) => m[1]));
+    const sources = readdirSync(__dirname).filter(
+      (f) => f.endsWith(".ts") && !f.includes(".test."),
+    );
+    const invoked = sources.flatMap((f) =>
+      [
+        ...readFileSync(path.resolve(__dirname, f), "utf8").matchAll(
+          /invoke(?:<[^(]*>)?\("(\w+)"/g,
+        ),
+      ].map((m) => `${f}: ${m[1]}`),
+    );
+    expect(invoked.length).toBeGreaterThan(0);
+    expect(invoked.filter((entry) => !registered.has(entry.split(": ")[1]))).toEqual([]);
   });
 
   it("keeps types.ts free of imports so it can be vendored", () => {

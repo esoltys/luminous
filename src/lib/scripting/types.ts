@@ -7,7 +7,7 @@
 // Signature and resolve-condition changes are only caught in review.
 
 /** Version of this contract. Callers pass their vendored copy to `connect()`. */
-export const SCRIPT_API_VERSION = "1.4.0";
+export const SCRIPT_API_VERSION = "1.5.0";
 
 /** What `connect()` resolves with: the running app's version and every method it offers. */
 export interface ScriptContract {
@@ -96,10 +96,24 @@ export interface ScriptSong {
 
 export type ScriptPlayState = "stopped" | "playing" | "paused";
 
+/** An internet radio station, identified by its Radio Browser uuid. */
+export interface ScriptStation {
+  uuid: string;
+  name: string;
+  homepage?: string;
+  /** Comma-separated directory tags, e.g. "jazz,smooth jazz". */
+  tags?: string;
+  country?: string;
+  /** Stream bitrate in kbps, when the directory lists one. */
+  bitrate?: number;
+}
+
 /** The playback fields the contract promises; the app's real snapshot carries more. */
 export interface ScriptPlaybackState {
   state: ScriptPlayState;
   current_song?: ScriptSong;
+  /** Set while a radio station is the current item (since 1.5); `current_song` is its stand-in row. */
+  current_station?: ScriptStation;
   playlist_id?: number;
   position_nanosec: number;
   volume: number;
@@ -155,6 +169,14 @@ export interface ScriptPlaybackApi {
    * Resolves when the backend confirms playback state is 'playing' for that song.
    */
   play(target: number | PlaySongSelector): Promise<ScriptSong>;
+
+  /**
+   * Plays an internet radio station by uuid, or by name from the downloaded station
+   * directory (exact name first, then the best search match), replacing the Queue as
+   * the Radio tab does. Rejects for a station the audio engine can't play.
+   * Resolves when the backend confirms that station is playing.
+   */
+  playStation(target: string | { name: string }): Promise<ScriptStation>;
 
   /**
    * Pauses active playback, resolving when paused.

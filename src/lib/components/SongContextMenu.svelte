@@ -38,6 +38,7 @@
   import {
     isLosslessFileType,
     isOnlineLyricsSource,
+    pinRefForSong,
     type Song,
     type Playlist,
     type LyricsPayload,
@@ -475,12 +476,12 @@
       {/if}
 
       <ContextMenuItem
-        icon={pinnedStore.isPinned("song", String(song.id)) ? PinOff : Pin}
-        label={pinnedStore.isPinned("song", String(song.id))
+        icon={pinnedStore.isPinned(...pinRefForSong(song)) ? PinOff : Pin}
+        label={pinnedStore.isPinned(...pinRefForSong(song))
           ? i18n.t("playlists.contextMenuUnpinHome")
           : i18n.t("playlists.contextMenuPinHome")}
         onclick={() => {
-          pinnedStore.toggle("song", String(song.id));
+          pinnedStore.toggle(...pinRefForSong(song));
           onClose();
         }}
       />

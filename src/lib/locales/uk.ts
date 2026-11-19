@@ -3437,6 +3437,7 @@ export const uk = {
     stationListsTitle: "Списки станцій",
     openList: "Відкрити",
     playStation: "Відтворити {name}",
+    playStationMenu: "Відтворити станцію",
     playingLabel: "Відтворюється {name}",
     saveStation: "Зберегти станцію",
     unsaveStation: "Видалити зі збережених",

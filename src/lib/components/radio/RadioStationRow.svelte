@@ -4,7 +4,10 @@
     PauseIcon as Pause,
     BookmarkSimpleIcon as Bookmark,
     WarningCircleIcon as AlertCircle,
+    PushPinIcon as Pin,
   } from "phosphor-svelte";
+  import RadioStationContextMenu from "./RadioStationContextMenu.svelte";
+  import { pinnedStore } from "../../stores/pinned.svelte";
   import HelpTip from "../HelpTip.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import { resolveArtUrl, type RadioDirectoryStation } from "../../types";
@@ -26,6 +29,11 @@
   } = $props();
 
   let artFailed = $state(false);
+  let menu = $state<{ x: number; y: number } | null>(null);
+  const pinned = $derived(pinnedStore.isPinned("station", station.stationuuid));
+  const pinLabel = $derived(
+    pinned ? i18n.t("playlists.contextMenuUnpinHome") : i18n.t("playlists.contextMenuPinHome"),
+  );
   const artworkUrl = $derived(resolveArtUrl(station.favicon));
 
   $effect(() => {
@@ -42,9 +50,16 @@
   );
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   data-testid="radio-station-row"
   data-station-uuid={station.stationuuid}
+  oncontextmenu={(e) => {
+    // Stop here so a wrapper that has its own menu (Home's pinned row) doesn't open a second one.
+    e.preventDefault();
+    e.stopPropagation();
+    menu = { x: e.clientX, y: e.clientY };
+  }}
   class="@container flex items-center gap-3 px-3 py-2.5 rounded-xl border border-brand-border/40 bg-brand-surface/40 hover:bg-brand-surface/80 transition-colors duration-150"
 >
   <button
@@ -149,6 +164,19 @@
   <div class="flex items-center gap-1.5 shrink-0">
     <button
       type="button"
+      data-testid="radio-station-pin-btn"
+      onclick={() => void pinnedStore.toggle("station", station.stationuuid)}
+      aria-pressed={pinned}
+      aria-label={pinLabel}
+      title={pinLabel}
+      class="inline-flex items-center justify-center p-1.5 rounded-lg transition-colors duration-150 {pinned
+        ? 'text-brand-accent-text hover:opacity-80'
+        : 'text-brand-text-secondary hover:bg-brand-surface hover:text-brand-text-primary'}"
+    >
+      <Pin class="w-4 h-4" weight={pinned ? "fill" : "regular"} />
+    </button>
+    <button
+      type="button"
       onclick={() => onToggleSave(station)}
       aria-pressed={saved}
       aria-label={saved ? i18n.t("radio.unsaveStation") : i18n.t("radio.saveStation")}
@@ -163,3 +191,14 @@
     </button>
   </div>
 </div>
+
+{#if menu}
+  <RadioStationContextMenu
+    x={menu.x}
+    y={menu.y}
+    {station}
+    onClose={() => {
+      menu = null;
+    }}
+  />
+{/if}

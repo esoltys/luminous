@@ -5,6 +5,7 @@ import { navigationStore } from "../stores/navigation.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { getPlaylistCardTheme } from "./playlistCardTheme";
 import { i18n } from "../stores/i18n.svelte";
+import { radioStore } from "../stores/radio.svelte";
 
 describe("pinnedNav.ts", () => {
   beforeEach(() => {
@@ -190,6 +191,34 @@ describe("pinnedNav.ts", () => {
     expect(viewAutoPlaylistSpy).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "favourites" }),
     );
+  });
+
+  it("projects a pinned station that plays it on open and is active while on air", () => {
+    const stationItem: PinnedItem = {
+      type: "station",
+      station: {
+        stationuuid: "uuid-jazz",
+        name: "Jazz FM91",
+        country: "Canada",
+        favicon: "https://jazz.fm/icon.png",
+        playable: true,
+      } as any,
+    };
+    const playStationSpy = vi.spyOn(radioStore, "playStation").mockImplementation(async () => {});
+
+    const pin = toNavigablePin(stationItem);
+    expect(pin.id).toBe("station:uuid-jazz");
+    expect(pin.title).toBe("Jazz FM91");
+    expect(pin.subtitle).toBe("Canada");
+    expect(pin.station?.stationuuid).toBe("uuid-jazz");
+    expect(pin.isActive).toBe(false);
+
+    pin.open();
+    expect(playStationSpy).toHaveBeenCalledWith(stationItem.station);
+
+    playerStore.currentSong = { id: 900, path: "radio://uuid-jazz" } as any;
+    expect(toNavigablePin(stationItem).isActive).toBe(true);
+    expect(getNavigablePins([stationItem])).toHaveLength(1);
   });
 
   it("filters out empty playlists when projecting multiple items", () => {

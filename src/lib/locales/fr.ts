@@ -3264,6 +3264,7 @@ export const fr: DeepStringRecord<typeof en> = {
     stationListsTitle: "Listes de stations",
     openList: "Ouvrir",
     playStation: "Lire {name}",
+    playStationMenu: "Écouter la station",
     playingLabel: "Lecture de {name}",
     saveStation: "Enregistrer la station",
     unsaveStation: "Retirer des stations enregistrées",

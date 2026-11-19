@@ -4,6 +4,7 @@ import {
   getCoverArtUrl,
   pinnedRefKeyFor,
   autoPlaylistRefKeyFor,
+  pinRefForSong,
   type PinnedItem,
 } from "./index";
 
@@ -71,5 +72,15 @@ describe("pinnedRefKeyFor", () => {
       autoPlaylist: { kind: "genre", selector: "Jazz", trackCount: 5 },
     };
     expect(pinnedRefKeyFor(autoPlaylistItem)).toBe("genre:Jazz");
+    expect(pinnedRefKeyFor({ type: "station", station: { stationuuid: "uuid-1" } as any })).toBe(
+      "uuid-1",
+    );
+  });
+});
+
+describe("pinRefForSong", () => {
+  it("pins a live station song as its station, and any other song by id", () => {
+    expect(pinRefForSong({ id: 9, path: "radio://uuid-1" } as any)).toEqual(["station", "uuid-1"]);
+    expect(pinRefForSong({ id: 9, path: "/music/a.flac" } as any)).toEqual(["song", "9"]);
   });
 });

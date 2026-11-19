@@ -1329,7 +1329,7 @@ export type HomeItem =
 /** A user-pinned Home-shelf entry (#222) — a superset of {@link HomeItem} that
  * also allows Artist, since pins are explicitly user-curated across all four
  * browsable entity types. */
-export type PinnedItemType = "song" | "album" | "artist" | "playlist" | "auto_playlist";
+export type PinnedItemType = "song" | "album" | "artist" | "playlist" | "auto_playlist" | "station";
 
 export interface LanguageSummary {
   code: string;
@@ -1370,7 +1370,8 @@ export type PinnedItem =
   | { type: "album"; album: AlbumItem }
   | { type: "artist"; artist: ArtistItem }
   | { type: "playlist"; playlist: Playlist }
-  | { type: "auto_playlist"; autoPlaylist: AutoPlaylistItem };
+  | { type: "auto_playlist"; autoPlaylist: AutoPlaylistItem }
+  | { type: "station"; station: RadioDirectoryStation };
 
 /** The stable ref_key for a pinned auto-playlist: the bare kind for
  * Favourites/Recently Added/Most Played/History (no backing row to key on),
@@ -1393,7 +1394,7 @@ export function autoPlaylistRefKeyFor(ref: { kind: string; selector?: string }):
 }
 
 /** The `(item_type, ref_key)` identity Luminous stores for a pin — song/playlist
- * id as a string, bare album title, or effective-artist name. Shared by the
+ * id as a string, bare album title, effective-artist name, or station uuid. Shared by the
  * pinned store and every pin/unpin entry point so they agree on how to key
  * each item type. */
 export function pinnedRefKeyFor(item: PinnedItem): string {
@@ -1408,8 +1409,50 @@ export function pinnedRefKeyFor(item: PinnedItem): string {
       return String(item.playlist.id);
     case "auto_playlist":
       return autoPlaylistRefKeyFor(item.autoPlaylist);
+    case "station":
+      return item.station.stationuuid;
   }
 }
+
+/** The Radio Browser uuid of a live station song (`radio://<uuid>`), or null. */
+export function stationUuidOf(song: { path?: string | null } | null | undefined): string | null {
+  const uuid = song?.path?.startsWith("radio://") ? song.path.slice("radio://".length).trim() : "";
+  return uuid || null;
+}
+
+/** The pin a song's "Pin to Home" toggles: a live station pins as the station
+ * (by uuid, #2010) so it can't be pinned twice under two types. */
+export function pinRefForSong(song: Song): [PinnedItemType, string] {
+  const uuid = stationUuidOf(song);
+  return uuid ? ["station", uuid] : ["song", String(song.id)];
+}
+
+/** The station the player is on, as `playback.status()` reports it to scripts (#2010).
+ * Derived from the materialized station song, so it needs no extra backend state. */
+export interface PlayingStation {
+  uuid: string;
+  name: string;
+  homepage?: string;
+  tags?: string;
+  country?: string;
+  bitrate?: number;
+}
+
+export function playingStationFor(song: Song | null | undefined): PlayingStation | undefined {
+  const uuid = stationUuidOf(song);
+  if (!song || !uuid) return undefined;
+  return {
+    uuid,
+    name: song.title ?? "",
+    homepage: song.url || undefined,
+    tags: song.genre || undefined,
+    country: song.artist || undefined,
+    bitrate: song.bitrate || undefined,
+  };
+}
+
+/** What `playback.status()` returns: the backend snapshot plus the derived station. */
+export type ScriptPlaybackSnapshot = PlaybackState & { current_station?: PlayingStation };
 
 // What the user was inside when a play started — lets "Recently Played"
 // show an Album/Playlist card instead of always collapsing to a Song.

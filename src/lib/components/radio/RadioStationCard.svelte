@@ -4,7 +4,10 @@
     PlayIcon as Play,
     PauseIcon as Pause,
     BookmarkSimpleIcon as Bookmark,
+    PushPinIcon as Pin,
   } from "phosphor-svelte";
+  import RadioStationContextMenu from "./RadioStationContextMenu.svelte";
+  import { pinnedStore } from "../../stores/pinned.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import { resolveArtUrl, type RadioDirectoryStation } from "../../types";
   import { PLAIN_TILE_COVER, PLAIN_TILE_RING, useCardAppearance } from "../../utils/cardAppearance";
@@ -13,17 +16,25 @@
 
   let {
     station,
+    saved = true,
     playing = false,
     onPlay,
     onToggleSave,
   }: {
     station: RadioDirectoryStation;
+    /** My Stations only lists saved stations; a pinned card on Home may not be. */
+    saved?: boolean;
     playing?: boolean;
     onPlay: (station: RadioDirectoryStation) => void;
     onToggleSave: (station: RadioDirectoryStation) => void;
   } = $props();
 
   let artFailed = $state(false);
+  let menu = $state<{ x: number; y: number } | null>(null);
+  const pinned = $derived(pinnedStore.isPinned("station", station.stationuuid));
+  const pinLabel = $derived(
+    pinned ? i18n.t("playlists.contextMenuUnpinHome") : i18n.t("playlists.contextMenuPinHome"),
+  );
   const artworkUrl = $derived(resolveArtUrl(station.favicon));
 
   $effect(() => {
@@ -32,9 +43,16 @@
   });
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   data-testid="radio-station-card"
   data-station-uuid={station.stationuuid}
+  oncontextmenu={(e) => {
+    // Stop here so a wrapper that has its own menu (Home's pinned row) doesn't open a second one.
+    e.preventDefault();
+    e.stopPropagation();
+    menu = { x: e.clientX, y: e.clientY };
+  }}
   class="w-full flex flex-col group relative select-none {plain
     ? ''
     : 'bg-brand-sidebar border border-brand-border/60 rounded-b-xl overflow-hidden'}"
@@ -99,12 +117,28 @@
       </button>
       <button
         type="button"
-        onclick={() => onToggleSave(station)}
-        aria-pressed={true}
-        aria-label={i18n.t("radio.unsaveStation")}
-        class="text-brand-accent-text hover:opacity-80 shrink-0 p-0.5"
+        data-testid="radio-station-pin-btn"
+        onclick={() => void pinnedStore.toggle("station", station.stationuuid)}
+        aria-pressed={pinned}
+        aria-label={pinLabel}
+        title={pinLabel}
+        class="{pinned
+          ? 'text-brand-accent-text'
+          : 'text-brand-text-secondary hover:text-brand-text-primary'} hover:opacity-80 shrink-0 p-0.5"
       >
-        <Bookmark class="w-4 h-4" weight="fill" />
+        <Pin class="w-4 h-4" weight={pinned ? "fill" : "regular"} />
+      </button>
+      <button
+        type="button"
+        onclick={() => onToggleSave(station)}
+        aria-pressed={saved}
+        aria-label={saved ? i18n.t("radio.unsaveStation") : i18n.t("radio.saveStation")}
+        title={saved ? i18n.t("radio.unsaveStation") : i18n.t("radio.saveStation")}
+        class="{saved
+          ? 'text-brand-accent-text'
+          : 'text-brand-text-secondary hover:text-brand-text-primary'} hover:opacity-80 shrink-0 p-0.5"
+      >
+        <Bookmark class="w-4 h-4" weight={saved ? "fill" : "regular"} />
       </button>
     </div>
 
@@ -126,3 +160,14 @@
     ></div>
   {/if}
 </div>
+
+{#if menu}
+  <RadioStationContextMenu
+    x={menu.x}
+    y={menu.y}
+    {station}
+    onClose={() => {
+      menu = null;
+    }}
+  />
+{/if}

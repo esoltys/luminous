@@ -1426,6 +1426,10 @@ pub enum PinnedItem {
         #[serde(rename = "autoPlaylist")]
         auto_playlist: AutoPlaylistItem,
     },
+    /// An internet radio station, keyed by its Radio Browser uuid (#2010).
+    Station {
+        station: Box<crate::radio_directory::RadioDirectoryStation>,
+    },
 }
 
 /// A social media or external platform link associated with an artist (#473).

@@ -159,19 +159,19 @@ describe("In-app scripting API", () => {
       playerStore.state = "playing";
 
       vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-        if (cmd === "pause_playback") {
+        if (cmd === "pause") {
           playerStore.state = "paused";
-        } else if (cmd === "resume_playback") {
+        } else if (cmd === "resume") {
           playerStore.state = "playing";
         }
       });
 
       await api.playback.pause();
-      expect(invoke).toHaveBeenCalledWith("pause_playback");
+      expect(invoke).toHaveBeenCalledWith("pause");
       expect(playerStore.state).toBe("paused");
 
       await api.playback.resume();
-      expect(invoke).toHaveBeenCalledWith("resume_playback");
+      expect(invoke).toHaveBeenCalledWith("resume");
       expect(playerStore.state).toBe("playing");
 
       await api.playback.seek(45.5);
@@ -186,6 +186,100 @@ describe("In-app scripting API", () => {
       const status = api.playback.status();
       expect(status.state).toBe("playing");
       expect(status.volume).toBe(0.85);
+    });
+
+    const stationSong = {
+      id: 900,
+      title: "Jazz FM91",
+      artist: "Canada",
+      genre: "jazz,smooth jazz",
+      url: "https://jazz.fm",
+      bitrate: 128,
+      path: "radio://uuid-jazz",
+      source: "radio_browser",
+      filetype: "STREAM",
+    } as any;
+
+    it("reports the playing station in the status snapshot, and none for a song", () => {
+      const api = createScriptingApi();
+      playerStore.currentSong = stationSong;
+      expect(api.playback.status().current_station).toEqual({
+        uuid: "uuid-jazz",
+        name: "Jazz FM91",
+        homepage: "https://jazz.fm",
+        tags: "jazz,smooth jazz",
+        country: "Canada",
+        bitrate: 128,
+      });
+
+      playerStore.currentSong = {
+        id: 1,
+        title: "Song",
+        source: "local_file",
+        path: "/a.mp3",
+      } as any;
+      expect(api.playback.status().current_station).toBeUndefined();
+    });
+
+    it("plays a station by name and resolves once the backend reports it playing", async () => {
+      const api = createScriptingApi();
+      playerStore.state = "stopped";
+      playerStore.currentSong = undefined;
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "query_radio_directory") {
+          return [
+            { stationuuid: "uuid-other", name: "Jazz FM91 Extra", playable: true },
+            { stationuuid: "uuid-jazz", name: "Jazz FM91", playable: true },
+          ];
+        }
+        if (cmd === "play_radio_station") {
+          playerStore.state = "playing";
+          playerStore.currentSong = stationSong;
+          return stationSong;
+        }
+        return null;
+      });
+
+      const station = await api.playback.playStation({ name: "jazz fm91" });
+      expect(invoke).toHaveBeenCalledWith("play_radio_station", { stationuuid: "uuid-jazz" });
+      expect(station.uuid).toBe("uuid-jazz");
+      expect(station.name).toBe("Jazz FM91");
+    });
+
+    it("plays a pruned station by uuid from its stored row", async () => {
+      const api = createScriptingApi();
+      playerStore.state = "stopped";
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "play_radio_station") {
+          playerStore.state = "playing";
+          playerStore.currentSong = stationSong;
+        }
+        return null;
+      });
+
+      await expect(api.playback.playStation("uuid-jazz")).resolves.toMatchObject({
+        uuid: "uuid-jazz",
+      });
+    });
+
+    it("rejects a station the engine can't play without trying it", async () => {
+      const api = createScriptingApi();
+      vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+        cmd === "get_radio_directory_station"
+          ? { stationuuid: "uuid-hls", name: "HLS Radio", playable: false }
+          : null,
+      );
+
+      await expect(api.playback.playStation("uuid-hls")).rejects.toThrow("can't play");
+      expect(invoke).not.toHaveBeenCalledWith("play_radio_station", expect.anything());
+    });
+
+    it("rejects a name that matches no station", async () => {
+      const api = createScriptingApi();
+      vi.mocked(invoke).mockResolvedValue([]);
+      await expect(api.playback.playStation({ name: "Nowhere FM" })).rejects.toThrow(
+        'No station matching "Nowhere FM"',
+      );
     });
   });
 

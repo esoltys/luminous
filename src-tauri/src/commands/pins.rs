@@ -1,6 +1,6 @@
 //! Commands backing the user-curated "Pinned" shelf on Home (#222). A pin is
 //! stored as a lightweight `(item_type, ref_key)` reference — `get_pinned_items`
-//! resolves each reference against the live song/album/artist/playlist tables
+//! resolves each reference against the live song/album/artist/playlist/station tables
 //! on every read, so a pinned item always reflects current data (artwork,
 //! rating, track count, ...) rather than a stale snapshot. A reference that no
 //! longer resolves (e.g. a pinned song was deleted) is silently omitted from
@@ -18,9 +18,14 @@ pub async fn pin_item(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    crate::db::run_blocking(&state.db, move |conn| pins::pin(conn, &item_type, &ref_key))
-        .await
-        .map_err(|e| e.to_string())?;
+    crate::db::run_blocking(&state.db, move |conn| {
+        if item_type == "station" {
+            crate::radio_directory::ensure_station_materialized(conn, &ref_key)?;
+        }
+        pins::pin(conn, &item_type, &ref_key)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     let _ = app.emit("pinned-items-changed", ());
     Ok(())
 }
@@ -174,6 +179,18 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                     .map_err(|e| e.to_string())?
                 {
                     items.push(PinnedItem::AutoPlaylist { auto_playlist });
+                }
+            }
+            "station" => {
+                let station = crate::db::run_blocking(&state.db, move |conn| {
+                    crate::radio_directory::find_station(conn, &ref_key)
+                })
+                .await
+                .map_err(|e| e.to_string())?;
+                if let Some(station) = station {
+                    items.push(PinnedItem::Station {
+                        station: Box::new(station),
+                    });
                 }
             }
             _ => {}

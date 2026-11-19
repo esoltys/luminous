@@ -3257,6 +3257,7 @@ export const de = {
     stationListsTitle: "Senderlisten",
     openList: "Öffnen",
     playStation: "{name} abspielen",
+    playStationMenu: "Sender abspielen",
     playingLabel: "{name} wird abgespielt",
     saveStation: "Sender speichern",
     unsaveStation: "Aus gespeicherten Sendern entfernen",

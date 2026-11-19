@@ -1164,8 +1164,9 @@ pub fn materialize_station(conn: &Connection, stationuuid: &str) -> Result<crate
 }
 
 /// Garbage-collects unreferenced `RadioBrowser` station rows from `songs` (#2004).
-/// Keeps any row referenced by `playlist_items` (including the Queue) or
-/// `pinned_items`, `protected_song_id` (if active), and the `keep_recent` most
+/// Keeps any row referenced by `playlist_items` (including the Queue),
+/// `pinned_items` (a song pin by id, a station pin by uuid, #2010), `radio_saved`,
+/// `protected_song_id` (if active), and the `keep_recent` most
 /// recently played/materialized rows.
 pub fn gc_unreferenced_stations(
     conn: &Connection,
@@ -1184,6 +1185,9 @@ pub fn gc_unreferenced_stations(
            )
            AND path NOT IN (
                SELECT ?4 || stationuuid FROM radio_saved
+           )
+           AND path NOT IN (
+               SELECT ?4 || ref_key FROM pinned_items WHERE item_type = 'station'
            )
            AND id NOT IN (
                SELECT id FROM songs
@@ -1215,6 +1219,55 @@ pub fn save_station(conn: &Connection, stationuuid: &str) -> Result<()> {
     )?;
     let _ = materialize_station(conn, uuid);
     Ok(())
+}
+
+/// Creates the fallback `songs` row for `stationuuid` when it has none, so a
+/// pinned station still resolves after an upstream directory prune (#2010).
+/// Leaves an existing row alone: re-materializing bumps its `mtime`, which
+/// would reorder Recents just because the station was pinned.
+pub fn ensure_station_materialized(conn: &Connection, stationuuid: &str) -> Result<()> {
+    let uuid = stationuuid.trim();
+    if uuid.is_empty() {
+        return Ok(());
+    }
+    let exists = conn
+        .query_row(
+            "SELECT 1 FROM songs WHERE path = ?1 LIMIT 1",
+            params![station_uri(uuid)],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    if !exists && get_station_by_uuid(conn, uuid)?.is_some() {
+        materialize_station(conn, uuid)?;
+    }
+    Ok(())
+}
+
+/// Resolves one station by uuid the way the saved list does: live
+/// `radio_directory` metadata first, else the materialized `songs` row, else
+/// `None` so a stale pin is dropped silently (#2010).
+pub fn find_station(conn: &Connection, stationuuid: &str) -> Result<Option<RadioDirectoryStation>> {
+    let uuid = stationuuid.trim();
+    if uuid.is_empty() {
+        return Ok(None);
+    }
+    let sql = format!(
+        "SELECT ?2, {JOINED_STATION_COLS}
+         FROM (SELECT 1)
+         LEFT JOIN radio_directory rd ON rd.stationuuid = ?2
+         LEFT JOIN songs s ON s.path = (?1 || ?2)
+         LIMIT 1"
+    );
+    let station = conn
+        .query_row(
+            &sql,
+            params![crate::media_source::RADIO_URI_SCHEME, uuid],
+            |row| station_from_joined_row(row, uuid.to_string(), true),
+        )
+        .optional()?
+        .flatten();
+    Ok(station)
 }
 
 /// Removes a station from `radio_saved` (idempotent) (#2005).
@@ -2104,6 +2157,83 @@ mod tests {
         };
         assert_eq!(surviving_ids, vec![s1.id, s2.id, s3.id, s5.id]);
         let _ = s4;
+    }
+
+    #[test]
+    fn station_pin_round_trip_survives_prune_and_gc_then_drops_when_gone() {
+        let (_dir, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+        let station = |uuid: &str| RadioBrowserStation {
+            stationuuid: uuid.into(),
+            changeuuid: format!("c-{uuid}"),
+            name: format!("Station {uuid}"),
+            url_resolved: format!("https://stream.example/{uuid}.mp3"),
+            homepage: "https://example.org".into(),
+            favicon: String::new(),
+            tags: "jazz".into(),
+            country: "Canada".into(),
+            countrycode: "CA".into(),
+            language: "english".into(),
+            codec: "MP3".into(),
+            bitrate: 128,
+            hls: false,
+            votes: 1,
+            clickcount: 1,
+            lastcheckok: true,
+            lastchangetime_iso8601: None,
+        };
+        let tx = conn.transaction().unwrap();
+        upsert_stations_tx(&tx, &[station("uuid-p")], 1000).unwrap();
+        tx.commit().unwrap();
+
+        // Pinning materializes the fallback row once and leaves it alone after.
+        ensure_station_materialized(&conn, "uuid-p").unwrap();
+        crate::pins::pin(&conn, "station", "uuid-p").unwrap();
+        conn.execute(
+            "UPDATE songs SET mtime = 5 WHERE path = 'radio://uuid-p'",
+            [],
+        )
+        .unwrap();
+        ensure_station_materialized(&conn, "uuid-p").unwrap();
+        let mtime: i64 = conn
+            .query_row(
+                "SELECT mtime FROM songs WHERE path = 'radio://uuid-p'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(mtime, 5, "re-pinning must not reorder Recents");
+        assert_eq!(
+            crate::pins::pinned_refs(&conn).unwrap(),
+            vec![("station".to_string(), "uuid-p".to_string())]
+        );
+
+        // Live directory metadata wins while the station is listed.
+        let live = find_station(&conn, "uuid-p").unwrap().unwrap();
+        assert_eq!(live.codec, "MP3");
+        assert_eq!(live.countrycode, "CA");
+
+        // The pin keeps its fallback row out of GC, even with no tail to spare.
+        assert_eq!(gc_unreferenced_stations(&conn, 0, None).unwrap(), 0);
+
+        // Pruned upstream: resolves from the materialized row instead.
+        conn.execute(
+            "DELETE FROM radio_directory WHERE stationuuid = 'uuid-p'",
+            [],
+        )
+        .unwrap();
+        let fallback = find_station(&conn, "uuid-p").unwrap().unwrap();
+        assert_eq!(fallback.name, "Station uuid-p");
+        assert_eq!(fallback.url_resolved, "https://stream.example/uuid-p.mp3");
+
+        // Gone everywhere: the pin no longer resolves, without an error.
+        conn.execute("DELETE FROM songs WHERE path = 'radio://uuid-p'", [])
+            .unwrap();
+        assert!(find_station(&conn, "uuid-p").unwrap().is_none());
+        assert!(find_station(&conn, "  ").unwrap().is_none());
+
+        crate::pins::unpin(&conn, "station", "uuid-p").unwrap();
+        assert!(crate::pins::pinned_refs(&conn).unwrap().is_empty());
     }
 
     #[test]

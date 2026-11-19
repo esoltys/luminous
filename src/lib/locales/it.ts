@@ -3242,6 +3242,7 @@ export const it = {
     stationListsTitle: "Liste di stazioni",
     openList: "Apri",
     playStation: "Riproduci {name}",
+    playStationMenu: "Riproduci stazione",
     playingLabel: "In riproduzione {name}",
     saveStation: "Salva stazione",
     unsaveStation: "Rimuovi dalle stazioni salvate",

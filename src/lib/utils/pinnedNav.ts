@@ -1,9 +1,17 @@
 import type { Component } from "svelte";
-import type { AutoPlaylistItem, PinnedItem, PinnedItemType, ArtistItem, Playlist } from "../types";
+import type {
+  AutoPlaylistItem,
+  PinnedItem,
+  PinnedItemType,
+  ArtistItem,
+  Playlist,
+  RadioDirectoryStation,
+} from "../types";
 import { pinnedRefKeyFor } from "../types";
 import { navigationStore } from "../stores/navigation.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { radioStore } from "../stores/radio.svelte";
 import { i18n } from "../stores/i18n.svelte";
 import { getPlaylistDisplayName } from "./playlist";
 
@@ -18,6 +26,7 @@ export function hasPinnedContent(item: PinnedItem): boolean {
 }
 
 import {
+  BroadcastIcon as Broadcast,
   DiscIcon as DiscAlbum,
   MicrophoneStageIcon as Mic2,
   MusicNotesIcon as Music,
@@ -64,6 +73,9 @@ export interface NavigablePin {
 
   /** Backing auto-playlist entity if type === 'auto_playlist'. */
   readonly autoPlaylist?: AutoPlaylistItem;
+
+  /** Backing station if type === 'station'. */
+  readonly station?: RadioDirectoryStation;
 
   /** Whether this entity is currently active (playing or open in detail view). */
   readonly isActive: boolean;
@@ -215,6 +227,21 @@ export function toNavigablePin(item: PinnedItem): NavigablePin {
             playlistId: item.autoPlaylist.playlistId,
             updated: item.autoPlaylist.updated,
           }),
+      };
+    }
+
+    case "station": {
+      const station = item.station;
+      return {
+        id,
+        rawItem: item,
+        type: "station",
+        title: station.name || i18n.t("radio.unnamedStation"),
+        subtitle: station.country || undefined,
+        icon: Broadcast,
+        station,
+        isActive: radioStore.isPlayingStation(station.stationuuid),
+        open: () => void radioStore.playStation(station),
       };
     }
   }

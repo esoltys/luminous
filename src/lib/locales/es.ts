@@ -3249,6 +3249,7 @@ export const es = {
     stationListsTitle: "Listas de emisoras",
     openList: "Abrir",
     playStation: "Reproducir {name}",
+    playStationMenu: "Reproducir emisora",
     playingLabel: "Reproduciendo {name}",
     saveStation: "Guardar emisora",
     unsaveStation: "Quitar de emisoras guardadas",
