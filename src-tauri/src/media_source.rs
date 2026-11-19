@@ -6,36 +6,52 @@
 //! credentials and the HTTP client never cross into the engine crate.
 
 use crate::db::Database;
-use luminous_audio::{MediaSource, OfflineDecoder};
+use luminous_audio::{IcyHeaders, MediaSource, OfflineDecoder, OpenedSource};
 use parking_lot::Mutex;
+use std::collections::VecDeque;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
-use std::sync::{Arc, LazyLock};
+use std::sync::{mpsc, Arc, LazyLock};
+use std::time::Duration;
 
-/// Global shared HTTP client for media sources. Reuses connection pools, DNS caching,
-/// and TLS 1.3 session tickets across sequential track playback, prefetching, and offline analysis.
+/// URI scheme for saved/directory internet radio stations (#2002, #2004).
+pub const RADIO_URI_SCHEME: &str = "radio://";
+
+/// Global shared HTTP client for finite media sources (WebDAV, Subsonic).
+/// Reuses connection pools, DNS caching, and TLS 1.3 session tickets across
+/// sequential track playback, prefetching, and offline analysis.
 static SHARED_CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
     reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .tcp_keepalive(std::time::Duration::from_secs(60))
-        .pool_idle_timeout(std::time::Duration::from_secs(90))
+        .timeout(Duration::from_secs(30))
+        .tcp_keepalive(Duration::from_secs(60))
+        .pool_idle_timeout(Duration::from_secs(90))
         .build()
         .expect("Failed to build shared HTTP client for media sources")
 });
 
+/// Dedicated HTTP client for unbounded live streams (#2002): connect timeout
+/// with NO total-response timeout, and redirect following enabled.
+static LIVE_CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
+    reqwest::blocking::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .tcp_keepalive(Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .build()
+        .expect("Failed to build live stream HTTP client")
+});
+
 /// The opener handed to `AudioEngine::with_source_opener`: the same lookup
-/// as [`open`], owning its database handle.
+/// as [`open_for_engine`], owning its database handle.
 pub fn opener(
     db: Arc<Database>,
-) -> impl Fn(&str) -> Result<Box<dyn MediaSource>, String> + Send + Sync + 'static {
-    move |location| open(&db, location)
+) -> impl Fn(&str) -> Result<OpenedSource, String> + Send + Sync + 'static {
+    move |location| open_for_engine(&db, location)
 }
 
-/// Open a stored song location: a local path, an `http(s)://` URL (WebDAV
-/// or remote stream), or a `subsonic://` path. Errors name the location the
-/// user knows, never a signed URL.
-pub fn open(db: &Database, location: &str) -> Result<Box<dyn MediaSource>, String> {
-    open_with(
+/// Open a stored song location for the playback engine, returning the reader
+/// together with any transport-reported MIME type and ICY metadata channel.
+pub fn open_for_engine(db: &Database, location: &str) -> Result<OpenedSource, String> {
+    open_with_options(
         location,
         |path| {
             let conn = db.pool.get().map_err(|e| e.to_string())?;
@@ -46,7 +62,15 @@ pub fn open(db: &Database, location: &str) -> Result<Box<dyn MediaSource>, Strin
             crate::webdav::resolve_auth_header(&conn, url)
         },
         |loc| lookup_filesize(db, loc),
+        |loc| resolve_live_stream_url(db, loc),
     )
+}
+
+/// Open a stored song location: a local path, an `http(s)://` URL (WebDAV
+/// or remote stream), a `subsonic://` path, or a `radio://` URI. Errors name
+/// the location the user knows, never a signed URL.
+pub fn open(db: &Database, location: &str) -> Result<Box<dyn MediaSource>, String> {
+    open_for_engine(db, location).map(|opened| opened.reader)
 }
 
 /// An offline (waveform) decoder for a stored song location, which may be
@@ -80,40 +104,113 @@ fn lookup_filesize(db: &Database, location: &str) -> Option<u64> {
     size.filter(|&s| s > 0).map(|s| s as u64)
 }
 
+/// If `location` is a `radio://` URI or a live-stream song row (`RadioBrowser`,
+/// `Stream`, `SomaFm`, `RadioParadise`, or `FileType::Stream`), returns the
+/// resolved HTTP(S) stream URL to open via [`LiveHttpSource`]. Returns
+/// `Ok(None)` when `location` is not a live stream.
+fn resolve_live_stream_url(db: &Database, location: &str) -> Result<Option<String>, String> {
+    let Ok(conn) = db.pool.get() else {
+        if location.starts_with(RADIO_URI_SCHEME) {
+            return Err(format!("Cannot resolve '{location}': database unavailable"));
+        }
+        return Ok(None);
+    };
+
+    if location.starts_with(RADIO_URI_SCHEME) {
+        let resolved: Option<String> = conn
+            .query_row(
+                "SELECT COALESCE(NULLIF(stream_url, ''), NULLIF(url, '')) \
+                 FROM songs WHERE path = ?1 LIMIT 1",
+                rusqlite::params![location],
+                |r| r.get(0),
+            )
+            .ok()
+            .flatten();
+        return match resolved {
+            Some(url) => Ok(Some(url)),
+            None => Err(format!("No stream URL found for '{location}'")),
+        };
+    }
+
+    if location.starts_with("http://") || location.starts_with("https://") {
+        let sql = format!(
+            "SELECT EXISTS( \
+                SELECT 1 FROM songs \
+                WHERE (path = ?1 OR stream_url = ?1 OR url = ?1) \
+                  AND (source IN ({}) OR filetype = ?2) \
+            )",
+            *crate::models::LIVE_STREAM_SOURCES_SQL,
+        );
+        let is_live: bool = conn
+            .query_row(
+                &sql,
+                rusqlite::params![location, crate::models::FileType::Stream as i32],
+                |r| r.get(0),
+            )
+            .unwrap_or(false);
+        if is_live {
+            return Ok(Some(location.to_string()));
+        }
+    }
+
+    Ok(None)
+}
+
 /// [`open`] with the database lookups passed in, so the routing and
 /// error wording are testable without a database.
+#[cfg(test)]
 fn open_with(
     location: &str,
     sign_subsonic: impl FnOnce(&str) -> Result<String, String>,
     webdav_auth: impl FnOnce(&str) -> Option<String>,
     lookup_filesize: impl FnOnce(&str) -> Option<u64>,
 ) -> Result<Box<dyn MediaSource>, String> {
+    open_with_options(
+        location,
+        sign_subsonic,
+        webdav_auth,
+        lookup_filesize,
+        |_| Ok(None),
+    )
+    .map(|opened| opened.reader)
+}
+
+fn open_with_options(
+    location: &str,
+    sign_subsonic: impl FnOnce(&str) -> Result<String, String>,
+    webdav_auth: impl FnOnce(&str) -> Option<String>,
+    lookup_filesize: impl FnOnce(&str) -> Option<u64>,
+    resolve_live: impl FnOnce(&str) -> Result<Option<String>, String>,
+) -> Result<OpenedSource, String> {
+    if let Some(live_url) = resolve_live(location)? {
+        let label = if location.starts_with(RADIO_URI_SCHEME) {
+            Some(location)
+        } else {
+            None
+        };
+        return LiveHttpSource::open_with_label(&live_url, label);
+    }
+
     if location.starts_with(crate::subsonic::URI_SCHEME) {
         // Signed fresh on every open; the URL itself never leaves this
         // function. The signer's errors already name the track by its
         // `subsonic://` path, and the UI prefixes the song title.
         let known_length = lookup_filesize(location);
         let url = sign_subsonic(location)?;
-        Ok(Box::new(HttpRangeReader::new_with_options(
-            &url,
-            Some(location),
-            None,
-            known_length,
-        )?))
+        Ok(OpenedSource::new(Box::new(
+            HttpRangeReader::new_with_options(&url, Some(location), None, known_length)?,
+        )))
     } else if location.starts_with("http://") || location.starts_with("https://") {
         let known_length = lookup_filesize(location);
         let (url, embedded) = extract_basic_auth(location);
         let auth = embedded.or_else(|| webdav_auth(&url));
-        Ok(Box::new(HttpRangeReader::new_with_options(
-            &url,
-            None,
-            auth,
-            known_length,
-        )?))
+        Ok(OpenedSource::new(Box::new(
+            HttpRangeReader::new_with_options(&url, None, auth, known_length)?,
+        )))
     } else {
         let file = std::fs::File::open(location)
             .map_err(|e| format!("Cannot open file '{location}': {e}"))?;
-        Ok(Box::new(file))
+        Ok(OpenedSource::new(Box::new(file)))
     }
 }
 
@@ -638,6 +735,546 @@ impl MediaSource for HttpRangeReader {
             None
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// LiveHttpSource — non-seekable Icecast / Shoutcast streaming media source (#2002)
+// ---------------------------------------------------------------------------
+
+/// Default pre-roll ring capacity allocated at open time (64 KiB) and initial
+/// pre-roll target (16 KiB) so format probing and the first decode frames never
+/// underrun on connection startup.
+const LIVE_RING_CAPACITY: usize = 64 * 1024;
+const LIVE_PREROLL_BYTES: usize = 16 * 1024;
+
+/// Default exponential backoff schedule for mid-stream reconnects.
+const DEFAULT_RECONNECT_BACKOFFS: &[Duration] = &[
+    Duration::from_millis(200),
+    Duration::from_millis(400),
+    Duration::from_millis(800),
+    Duration::from_millis(1600),
+    Duration::from_millis(3200),
+];
+
+/// Parses an ICY metadata block (padded with trailing NUL bytes) and extracts
+/// the `StreamTitle='...';` value if present and non-empty (#2002).
+///
+/// Handles embedded single quotes inside titles by matching up to the
+/// `';` delimiter (or a trailing `'` at the end of the block).
+pub fn parse_icy_stream_title(block: &[u8]) -> Option<String> {
+    let last_non_zero = block.iter().rposition(|&b| b != 0)?;
+    let trimmed_bytes = &block[..=last_non_zero];
+    let text = String::from_utf8_lossy(trimmed_bytes);
+    let prefix = "StreamTitle='";
+    let start = text.find(prefix)? + prefix.len();
+    let rest = &text[start..];
+    let end = rest
+        .find("';")
+        .or_else(|| rest.rfind('\''))
+        .unwrap_or(rest.len());
+    let title = rest[..end].trim();
+    (!title.is_empty()).then(|| title.to_string())
+}
+
+struct ConnectedLiveStream {
+    reader: Box<dyn Read + Send + Sync>,
+    mime_type: Option<String>,
+    metaint: Option<usize>,
+    icy_headers: IcyHeaders,
+    used_shoutcast_v1: bool,
+}
+
+/// Non-seekable streaming HTTP media source for live Icecast and Shoutcast stations (#2002).
+///
+/// - Sends `Icy-MetaData: 1`, follows redirects, and tolerates Shoutcast v1's
+///   non-standard `ICY 200 OK` status line.
+/// - Strips interleaved `icy-metaint` metadata blocks out of the byte stream so
+///   audio decoders never see corrupted frames, parses `StreamTitle`, and
+///   publishes deduplicated updates on a channel.
+/// - Pre-allocates a bounded ring buffer at open time with a small pre-roll.
+/// - Reconnects with bounded exponential backoff on mid-stream drops for
+///   frame-based streams (MP3, ADTS AAC) and returns a non-EOF I/O error once
+///   retries are exhausted so the audio engine emits `AudioEvent::Error`
+///   instead of advancing the queue as if a track finished.
+pub struct LiveHttpSource {
+    url: String,
+    label: String,
+    stream: Option<Box<dyn Read + Send + Sync>>,
+    metaint: Option<usize>,
+    bytes_until_meta: usize,
+    meta_scratch: Vec<u8>,
+    read_scratch: Vec<u8>,
+    ring: VecDeque<u8>,
+    ring_capacity: usize,
+    metadata_tx: Mutex<mpsc::Sender<String>>,
+    last_title: Option<String>,
+    can_reconnect_in_place: bool,
+    used_shoutcast_v1: bool,
+    reconnect_backoffs: Vec<Duration>,
+}
+
+/// True when a live stream's codec/container is frame-resynchronizable across
+/// a fresh HTTP reconnect without re-probing container headers (MP3, ADTS AAC).
+/// Containerized streams like Ogg Vorbis/Opus or FLAC require a full track reopen.
+fn is_frame_resyncable_mime(mime: Option<&str>, url: &str) -> bool {
+    if let Some(normalized) = mime.and_then(luminous_audio::normalize_probe_mime) {
+        if matches!(normalized.as_str(), "audio/mpeg" | "audio/aac") {
+            return true;
+        }
+        if normalized.contains("ogg")
+            || normalized.contains("flac")
+            || normalized.contains("wav")
+            || normalized.contains("aiff")
+        {
+            return false;
+        }
+    }
+    matches!(
+        luminous_audio::extension_from_location(url)
+            .map(|e| e.to_ascii_lowercase())
+            .as_deref(),
+        Some("mp3" | "aac")
+    )
+}
+
+impl LiveHttpSource {
+    /// Opens a live stream at `url` and returns the bundled [`OpenedSource`]
+    /// (reader, discovered `Content-Type`, `IcyHeaders`, and `StreamTitle` receiver).
+    pub fn open(url: &str) -> Result<OpenedSource, String> {
+        Self::open_with_label(url, None)
+    }
+
+    /// Opens a live stream at `url`, using `label` in error messages if provided.
+    pub fn open_with_label(url: &str, label: Option<&str>) -> Result<OpenedSource, String> {
+        Self::open_with_backoffs(url, label, DEFAULT_RECONNECT_BACKOFFS.to_vec())
+    }
+
+    pub fn open_with_backoffs(
+        url: &str,
+        label: Option<&str>,
+        reconnect_backoffs: Vec<Duration>,
+    ) -> Result<OpenedSource, String> {
+        let label_str = label.unwrap_or(url).to_string();
+        let connected = connect_live_stream(url, &label_str)?;
+        let (metadata_tx, metadata_rx) = mpsc::channel();
+        let can_reconnect_in_place = is_frame_resyncable_mime(connected.mime_type.as_deref(), url);
+        let mime_type = connected.mime_type;
+        let icy_headers = connected.icy_headers;
+
+        let mut source = Self {
+            url: url.to_string(),
+            label: label_str,
+            stream: Some(connected.reader),
+            metaint: connected.metaint,
+            bytes_until_meta: connected.metaint.unwrap_or(0),
+            meta_scratch: Vec::with_capacity(4080),
+            read_scratch: vec![0u8; 8192],
+            ring: VecDeque::with_capacity(LIVE_RING_CAPACITY),
+            ring_capacity: LIVE_RING_CAPACITY,
+            metadata_tx: Mutex::new(metadata_tx),
+            last_title: None,
+            can_reconnect_in_place,
+            used_shoutcast_v1: connected.used_shoutcast_v1,
+            reconnect_backoffs,
+        };
+
+        // Pre-roll initial audio bytes at open time so format probing has an
+        // immediate buffer ready.
+        source
+            .preroll(LIVE_PREROLL_BYTES)
+            .map_err(|e| format!("Failed to read live stream '{}': {e}", source.label))?;
+
+        Ok(OpenedSource {
+            reader: Box::new(source),
+            mime_type,
+            icy_headers: Some(icy_headers),
+            metadata_rx: Some(metadata_rx),
+        })
+    }
+
+    fn preroll(&mut self, target_bytes: usize) -> std::io::Result<()> {
+        let goal = target_bytes.min(self.ring_capacity);
+        while self.ring.len() < goal {
+            let n = self.pump_once()?;
+            if n == 0 {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    /// Reads one chunk of audio bytes from the active connection (stripping any
+    /// interleaved ICY metadata block when `bytes_until_meta == 0`) and pushes
+    /// it into `self.ring`. Transparently reconnects on drop if supported.
+    fn pump_once(&mut self) -> std::io::Result<usize> {
+        loop {
+            if self.stream.is_none() {
+                self.reconnect()?;
+            }
+
+            if let Some(metaint) = self.metaint {
+                if self.bytes_until_meta == 0 {
+                    match self.read_and_strip_icy_block() {
+                        Ok(()) => {
+                            self.bytes_until_meta = metaint;
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "ICY metadata read failed on '{}': {e}; attempting reconnect",
+                                self.label
+                            );
+                            self.stream = None;
+                            self.reconnect()?;
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            let available_ring = self.ring_capacity.saturating_sub(self.ring.len());
+            if available_ring == 0 {
+                return Ok(0);
+            }
+
+            let max_to_read = match self.metaint {
+                Some(_) => self
+                    .bytes_until_meta
+                    .min(available_ring)
+                    .min(self.read_scratch.len()),
+                None => available_ring.min(self.read_scratch.len()),
+            };
+
+            let read_res = self
+                .stream
+                .as_mut()
+                .expect("stream checked above")
+                .read(&mut self.read_scratch[..max_to_read]);
+
+            match read_res {
+                Ok(0) => {
+                    log::warn!(
+                        "Live stream '{}' dropped (EOF); attempting reconnect",
+                        self.label
+                    );
+                    self.stream = None;
+                    self.reconnect()?;
+                }
+                Ok(n) => {
+                    self.ring.extend(&self.read_scratch[..n]);
+                    if self.metaint.is_some() {
+                        self.bytes_until_meta -= n;
+                    }
+                    return Ok(n);
+                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => {
+                    log::warn!(
+                        "Live stream '{}' read error ({e}); attempting reconnect",
+                        self.label
+                    );
+                    self.stream = None;
+                    self.reconnect()?;
+                }
+            }
+        }
+    }
+
+    fn read_and_strip_icy_block(&mut self) -> std::io::Result<()> {
+        let stream = self.stream.as_mut().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotConnected, "stream closed")
+        })?;
+        let mut len_byte = [0u8; 1];
+        stream.read_exact(&mut len_byte)?;
+        let meta_len = (len_byte[0] as usize) * 16;
+        if meta_len == 0 {
+            return Ok(());
+        }
+        self.meta_scratch.resize(meta_len, 0);
+        stream.read_exact(&mut self.meta_scratch)?;
+        if let Some(title) = parse_icy_stream_title(&self.meta_scratch) {
+            if self.last_title.as_deref() != Some(title.as_str()) {
+                self.last_title = Some(title.clone());
+                let _ = self.metadata_tx.lock().send(title);
+            }
+        }
+        Ok(())
+    }
+
+    fn reconnect(&mut self) -> std::io::Result<()> {
+        if !self.can_reconnect_in_place || self.reconnect_backoffs.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::ConnectionAborted,
+                format!("Live stream '{}' disconnected", self.label),
+            ));
+        }
+
+        let mut last_err = String::from("connection lost");
+        for delay in &self.reconnect_backoffs {
+            if !delay.is_zero() {
+                std::thread::sleep(*delay);
+            }
+            let connect_res = if self.used_shoutcast_v1 {
+                let (clean_url, auth_header) = extract_basic_auth(&self.url);
+                connect_shoutcast_v1_fallback(&clean_url, auth_header.as_deref(), &self.label)
+            } else {
+                connect_live_stream(&self.url, &self.label)
+            };
+            match connect_res {
+                Ok(connected) => {
+                    self.stream = Some(connected.reader);
+                    self.metaint = connected.metaint;
+                    self.bytes_until_meta = connected.metaint.unwrap_or(0);
+                    self.used_shoutcast_v1 = connected.used_shoutcast_v1;
+                    return Ok(());
+                }
+                Err(e) => {
+                    last_err = e;
+                }
+            }
+        }
+
+        Err(std::io::Error::new(
+            std::io::ErrorKind::ConnectionAborted,
+            format!(
+                "Live stream '{}' disconnected after {} reconnect attempts: {last_err}",
+                self.label,
+                self.reconnect_backoffs.len()
+            ),
+        ))
+    }
+}
+
+impl Read for LiveHttpSource {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+        while self.ring.is_empty() {
+            self.pump_once()?;
+        }
+        let to_copy = buf.len().min(self.ring.len());
+        let (first, second) = self.ring.as_slices();
+        if to_copy <= first.len() {
+            buf[..to_copy].copy_from_slice(&first[..to_copy]);
+        } else {
+            let first_len = first.len();
+            buf[..first_len].copy_from_slice(first);
+            buf[first_len..to_copy].copy_from_slice(&second[..to_copy - first_len]);
+        }
+        self.ring.drain(..to_copy);
+        Ok(to_copy)
+    }
+}
+
+impl Seek for LiveHttpSource {
+    fn seek(&mut self, _pos: SeekFrom) -> std::io::Result<u64> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "Cannot seek a live stream",
+        ))
+    }
+}
+
+impl MediaSource for LiveHttpSource {
+    fn is_seekable(&self) -> bool {
+        false
+    }
+
+    fn byte_len(&self) -> Option<u64> {
+        None
+    }
+}
+
+fn parse_icy_header_values<'a>(
+    mut get_str: impl FnMut(&str) -> Option<&'a str>,
+) -> (Option<usize>, IcyHeaders) {
+    let non_empty = |s: &'a str| {
+        let trimmed = s.trim();
+        (!trimmed.is_empty()).then(|| trimmed.to_string())
+    };
+    let metaint = get_str("icy-metaint")
+        .and_then(|s| s.trim().parse::<usize>().ok())
+        .filter(|&n| n > 0);
+    let name = get_str("icy-name").and_then(non_empty);
+    let genre = get_str("icy-genre").and_then(non_empty);
+    let bitrate_kbps = get_str("icy-br")
+        .and_then(|s| {
+            s.split(',')
+                .next()
+                .and_then(|b| b.trim().parse::<u32>().ok())
+        })
+        .filter(|&b| b > 0);
+    (
+        metaint,
+        IcyHeaders {
+            name,
+            genre,
+            bitrate_kbps,
+        },
+    )
+}
+
+fn parse_icy_headers_from_map(headers: &reqwest::header::HeaderMap) -> (Option<usize>, IcyHeaders) {
+    parse_icy_header_values(|name| headers.get(name).and_then(|v| v.to_str().ok()))
+}
+
+fn connect_live_stream(url: &str, label: &str) -> Result<ConnectedLiveStream, String> {
+    let (clean_url, auth_header) = extract_basic_auth(url);
+    let mut req = LIVE_CLIENT.get(&clean_url).header("Icy-MetaData", "1");
+    if let Some(ref auth) = auth_header {
+        req = req.header(reqwest::header::AUTHORIZATION, auth);
+    }
+
+    match req.send() {
+        Ok(resp) => {
+            if !resp.status().is_success() {
+                return Err(format!(
+                    "HTTP error {} when connecting to live stream '{}'",
+                    resp.status(),
+                    label
+                ));
+            }
+            if is_error_content_type(resp.headers()) {
+                return Err(format!(
+                    "Can't play '{}': the server sent an error page instead of audio",
+                    label
+                ));
+            }
+            let mime_type = resp
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            let (metaint, icy_headers) = parse_icy_headers_from_map(resp.headers());
+            Ok(ConnectedLiveStream {
+                reader: Box::new(resp),
+                mime_type,
+                metaint,
+                icy_headers,
+                used_shoutcast_v1: false,
+            })
+        }
+        Err(err) => {
+            // Shoutcast v1 servers respond with `ICY 200 OK\r\n` instead of
+            // `HTTP/1.0 200 OK\r\n`, which hyper/reqwest rejects as an invalid
+            // HTTP version. Fall back to a raw HTTP/1.0 TCP stream for plain
+            // `http://` URLs when reqwest fails to parse the response.
+            if clean_url.starts_with("http://") {
+                if let Ok(shoutcast) =
+                    connect_shoutcast_v1_fallback(&clean_url, auth_header.as_deref(), label)
+                {
+                    return Ok(shoutcast);
+                }
+            }
+            Err(format!(
+                "Failed to connect to live stream '{}': {}",
+                label,
+                err.without_url()
+            ))
+        }
+    }
+}
+
+/// Raw TCP fallback for Shoutcast v1 servers that emit `ICY 200 OK\r\n` instead
+/// of a valid `HTTP/1.x` status line (#2002).
+fn connect_shoutcast_v1_fallback(
+    url: &str,
+    auth_header: Option<&str>,
+    label: &str,
+) -> Result<ConnectedLiveStream, String> {
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::{TcpStream, ToSocketAddrs};
+
+    let parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
+    if parsed.scheme() != "http" {
+        return Err("Shoutcast v1 fallback only applies to http://".to_string());
+    }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| "Missing host in URL".to_string())?;
+    let port = parsed.port_or_known_default().unwrap_or(80);
+    let addr = (host, port)
+        .to_socket_addrs()
+        .map_err(|e| e.to_string())?
+        .next()
+        .ok_or_else(|| "Could not resolve host".to_string())?;
+
+    let stream =
+        TcpStream::connect_timeout(&addr, Duration::from_secs(10)).map_err(|e| e.to_string())?;
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(15)));
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(10)));
+
+    let mut path_and_query = parsed.path().to_string();
+    if path_and_query.is_empty() {
+        path_and_query.push('/');
+    }
+    if let Some(q) = parsed.query() {
+        path_and_query.push('?');
+        path_and_query.push_str(q);
+    }
+
+    let host_header = if port == 80 {
+        host.to_string()
+    } else {
+        format!("{host}:{port}")
+    };
+    let mut request = format!(
+        "GET {path_and_query} HTTP/1.0\r\nHost: {host_header}\r\nIcy-MetaData: 1\r\nConnection: close\r\n"
+    );
+    if let Some(auth) = auth_header {
+        request.push_str(&format!("Authorization: {auth}\r\n"));
+    }
+    request.push_str("\r\n");
+
+    let mut writer = stream.try_clone().map_err(|e| e.to_string())?;
+    writer
+        .write_all(request.as_bytes())
+        .map_err(|e| e.to_string())?;
+    writer.flush().map_err(|e| e.to_string())?;
+
+    let mut reader = BufReader::new(stream);
+    let mut status_line = String::new();
+    reader
+        .read_line(&mut status_line)
+        .map_err(|e| e.to_string())?;
+    let status_trimmed = status_line.trim();
+    let is_ok = status_trimmed.starts_with("ICY 200")
+        || status_trimmed.starts_with("HTTP/1.0 200")
+        || status_trimmed.starts_with("HTTP/1.1 200");
+    if !is_ok {
+        return Err(format!("Non-200 status '{status_trimmed}' from '{label}'"));
+    }
+
+    let mut raw_headers: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+
+    loop {
+        let mut line = String::new();
+        let n = reader.read_line(&mut line).map_err(|e| e.to_string())?;
+        if n == 0 || line == "\r\n" || line == "\n" {
+            break;
+        }
+        if let Some((k, v)) = line.split_once(':') {
+            let key = k.trim().to_ascii_lowercase();
+            let val = v.trim();
+            if !val.is_empty() {
+                raw_headers.insert(key, val.to_string());
+            }
+        }
+    }
+
+    let mime_type = raw_headers.get("content-type").cloned();
+    let (metaint, icy_headers) =
+        parse_icy_header_values(|name| raw_headers.get(name).map(String::as_str));
+
+    Ok(ConnectedLiveStream {
+        reader: Box::new(reader),
+        mime_type,
+        metaint,
+        icy_headers,
+        used_shoutcast_v1: true,
+    })
 }
 
 #[cfg(test)]
@@ -1347,5 +1984,261 @@ mod tests {
         })
         .await
         .unwrap();
+    }
+
+    /// Encodes a metadata string (`StreamTitle='...';`) as an ICY metadata block:
+    /// 1 length byte (`len / 16`) followed by NUL-padded payload of `len_byte * 16` bytes.
+    fn encode_icy_block(text: &str) -> Vec<u8> {
+        if text.is_empty() {
+            return vec![0u8];
+        }
+        let bytes = text.as_bytes();
+        let blocks = bytes.len().div_ceil(16);
+        assert!(blocks <= 255, "ICY metadata block too long");
+        let mut out = vec![0u8; 1 + blocks * 16];
+        out[0] = blocks as u8;
+        out[1..1 + bytes.len()].copy_from_slice(bytes);
+        out
+    }
+
+    /// Interleaves raw `audio` bytes with ICY metadata blocks every `metaint` bytes.
+    fn build_icy_interleaved_stream(audio: &[u8], metaint: usize, titles: &[&str]) -> Vec<u8> {
+        let mut out = Vec::new();
+        let mut offset = 0;
+        let mut block_idx = 0;
+        while offset < audio.len() {
+            let remaining = audio.len() - offset;
+            if remaining >= metaint {
+                out.extend_from_slice(&audio[offset..offset + metaint]);
+                offset += metaint;
+                let meta_str = titles
+                    .get(block_idx)
+                    .copied()
+                    .filter(|s| !s.is_empty())
+                    .map(|t| format!("StreamTitle='{t}';StreamUrl='';"))
+                    .unwrap_or_default();
+                out.extend_from_slice(&encode_icy_block(&meta_str));
+                block_idx += 1;
+            } else {
+                out.extend_from_slice(&audio[offset..]);
+                break;
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn icy_stream_title_parser_handles_padding_quotes_and_empty_blocks() {
+        let block = encode_icy_block("StreamTitle='Boards of Canada - Roygbiv';StreamUrl='';");
+        assert_eq!(
+            parse_icy_stream_title(&block[1..]).as_deref(),
+            Some("Boards of Canada - Roygbiv")
+        );
+
+        // Single quote inside the track title before the `';` delimiter
+        let with_quote =
+            encode_icy_block("StreamTitle='Guns N' Roses - Sweet Child O' Mine';StreamUrl='';");
+        assert_eq!(
+            parse_icy_stream_title(&with_quote[1..]).as_deref(),
+            Some("Guns N' Roses - Sweet Child O' Mine")
+        );
+
+        // Empty title or all-zero block produces None
+        let empty_title = encode_icy_block("StreamTitle='   ';StreamUrl='';");
+        assert_eq!(parse_icy_stream_title(&empty_title[1..]), None);
+        assert_eq!(parse_icy_stream_title(&[0u8; 16]), None);
+    }
+
+    #[tokio::test]
+    async fn live_http_source_strips_icy_metadata_exposes_headers_and_publishes_titles() {
+        use wiremock::matchers::{header, method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        let metaint = 1024usize;
+        // 40 KiB of deterministic pseudo-audio payload (> 16 KiB preroll, crossing ~40 ICY blocks)
+        let original_audio: Vec<u8> = (0..40_960).map(|i| ((i * 31 + 7) % 251) as u8).collect();
+        let interleaved = build_icy_interleaved_stream(
+            &original_audio,
+            metaint,
+            &[
+                "Nightwish - Ghost Love Score",
+                "Nightwish - Ghost Love Score", // duplicate: must be deduplicated
+                "",                             // empty block (len = 0)
+                "Epica - Consign to Oblivion",
+            ],
+        );
+
+        Mock::given(method("GET"))
+            .and(path("/live"))
+            .and(header("Icy-MetaData", "1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "audio/mpeg")
+                    .insert_header("icy-metaint", metaint.to_string())
+                    .insert_header("icy-name", "Luminous Metal Radio")
+                    .insert_header("icy-genre", "Symphonic Metal")
+                    .insert_header("icy-br", "192")
+                    .set_body_bytes(interleaved),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/live", server.uri());
+        tokio::task::spawn_blocking(move || {
+            // No reconnects so we can read cleanly up to the end of the 40 KiB fixture
+            let opened = LiveHttpSource::open_with_backoffs(&url, None, Vec::new())
+                .expect("open live stream");
+            assert!(!opened.reader.is_seekable());
+            assert_eq!(opened.reader.byte_len(), None);
+            assert_eq!(opened.mime_type.as_deref(), Some("audio/mpeg"));
+            assert_eq!(
+                opened.icy_headers,
+                Some(IcyHeaders {
+                    name: Some("Luminous Metal Radio".into()),
+                    genre: Some("Symphonic Metal".into()),
+                    bitrate_kbps: Some(192),
+                })
+            );
+
+            let mut reader = opened.reader;
+            let mut decoded_audio = vec![0u8; original_audio.len()];
+            reader
+                .read_exact(&mut decoded_audio)
+                .expect("read full stripped audio payload");
+            assert_eq!(
+                decoded_audio, original_audio,
+                "ICY metadata blocks must be completely stripped without corrupting audio bytes"
+            );
+
+            let rx = opened.metadata_rx.expect("metadata channel present");
+            let titles: Vec<String> = rx.try_iter().collect();
+            assert_eq!(
+                titles,
+                vec![
+                    "Nightwish - Ghost Love Score".to_string(),
+                    "Epica - Consign to Oblivion".to_string(),
+                ]
+            );
+        })
+        .await
+        .unwrap();
+    }
+
+    #[test]
+    fn live_http_source_tolerates_shoutcast_v1_icy_200_ok_and_reconnects_on_drop() {
+        use std::io::{Read as _, Write as _};
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake shoutcast server");
+        let addr = listener.local_addr().unwrap();
+
+        let part1: Vec<u8> = (0..20_000).map(|i| (i % 256) as u8).collect();
+        let part2: Vec<u8> = (20_000..40_000).map(|i| (i % 256) as u8).collect();
+        let part1_srv = part1.clone();
+        let part2_srv = part2.clone();
+        let metaint = 4096usize;
+        let hits = Arc::new(AtomicUsize::new(0));
+        let hits_srv = Arc::clone(&hits);
+
+        let server_thread = std::thread::spawn(move || {
+            // Accept 4 connections:
+            // 0) Initial reqwest probe: responds with non-HTTP `ICY 200 OK`, causing reqwest
+            //    to trigger the Shoutcast v1 raw TCP fallback.
+            // 1) Initial Shoutcast v1 fallback open: responds with `ICY 200 OK` + part1, then drops.
+            // 2) First reconnect (goes directly to Shoutcast v1 fallback): sends part2, then drops.
+            // 3) Second reconnect: refuses with 503 so retry exhaustion surfaces an error.
+            for conn_idx in 0..4 {
+                let Ok((mut socket, _)) = listener.accept() else {
+                    break;
+                };
+                hits_srv.fetch_add(1, Ordering::SeqCst);
+                let mut req_buf = [0u8; 1024];
+                let _ = socket.read(&mut req_buf);
+                let req_text = String::from_utf8_lossy(&req_buf);
+                assert!(
+                    req_text.to_ascii_lowercase().contains("icy-metadata: 1"),
+                    "client must send Icy-MetaData: 1"
+                );
+
+                match conn_idx {
+                    0 | 1 => {
+                        let body = build_icy_interleaved_stream(
+                            &part1_srv,
+                            metaint,
+                            &["Track One - Shoutcast v1"],
+                        );
+                        let headers = format!(
+                            "ICY 200 OK\r\nicy-name:Classic Shoutcast\r\nicy-genre:Rock\r\nicy-br:128\r\nicy-metaint:{metaint}\r\ncontent-type:audio/mpeg\r\n\r\n"
+                        );
+                        let _ = socket.write_all(headers.as_bytes());
+                        let _ = socket.write_all(&body);
+                    }
+                    2 => {
+                        let body = build_icy_interleaved_stream(
+                            &part2_srv,
+                            metaint,
+                            &["Track Two - Reconnected"],
+                        );
+                        let headers = format!(
+                            "ICY 200 OK\r\nicy-name:Classic Shoutcast\r\nicy-metaint:{metaint}\r\ncontent-type:audio/mpeg\r\n\r\n"
+                        );
+                        let _ = socket.write_all(headers.as_bytes());
+                        let _ = socket.write_all(&body);
+                    }
+                    _ => {
+                        let _ = socket.write_all(b"HTTP/1.0 503 Service Unavailable\r\n\r\n");
+                    }
+                }
+            }
+        });
+
+        let url = format!("http://{addr}/stream");
+        let opened = LiveHttpSource::open_with_backoffs(
+            &url,
+            Some("radio://shoutcast-test"),
+            vec![Duration::from_millis(10)],
+        )
+        .expect("connect to Shoutcast v1 ICY 200 OK server");
+
+        assert_eq!(opened.mime_type.as_deref(), Some("audio/mpeg"));
+        assert_eq!(
+            opened.icy_headers.as_ref().and_then(|h| h.name.as_deref()),
+            Some("Classic Shoutcast")
+        );
+
+        let mut reader = opened.reader;
+        let mut combined = vec![0u8; part1.len() + part2.len()];
+        reader
+            .read_exact(&mut combined)
+            .expect("seamlessly read across dropped connection and reconnect");
+        assert_eq!(&combined[..part1.len()], &part1[..]);
+        assert_eq!(&combined[part1.len()..], &part2[..]);
+
+        let rx = opened.metadata_rx.unwrap();
+        let titles: Vec<String> = rx.try_iter().collect();
+        assert_eq!(
+            titles,
+            vec![
+                "Track One - Shoutcast v1".to_string(),
+                "Track Two - Reconnected".to_string()
+            ]
+        );
+
+        // Next read after part2 drops and exhausts the 1 reconnect attempt against the 503 response.
+        // It must return an Err (not Ok(0) EOF) so the audio engine emits AudioEvent::Error.
+        let mut extra = [0u8; 64];
+        let err = reader
+            .read(&mut extra)
+            .expect_err("exhausted reconnects on live stream must return an error, never Ok(0)");
+        assert_eq!(err.kind(), std::io::ErrorKind::ConnectionAborted);
+        assert!(
+            err.to_string().contains("radio://shoutcast-test"),
+            "error should name the label: {err}"
+        );
+        assert!(hits.load(Ordering::SeqCst) >= 3);
+        let _ = server_thread.join();
     }
 }

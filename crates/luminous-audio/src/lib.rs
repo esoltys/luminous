@@ -61,11 +61,12 @@ use parking_lot::Mutex;
 use source::ProbedTrack;
 use std::path::Path;
 
+pub use codecs::can_play_stream;
 pub use sink::{
     enumerate_output_devices, AudioBackendKind, AudioDeviceInfo, AudioOutputConfig, AudioSink,
     OutputFallbackReason,
 };
-pub use source::OfflineDecoder;
+pub use source::{normalize_probe_mime, OfflineDecoder};
 pub use speed::{snap_speed, MAX_SPEED, MIN_SPEED, SPEED_STEP};
 pub use symphonia::core::io::MediaSource;
 
@@ -204,6 +205,52 @@ pub struct Track {
     /// The tagged length, used for the `AboutToFinish` signal when there is
     /// no `end_ns`.
     pub length_ns: Option<u64>,
+    /// True for unbounded live streams (Icecast/Shoutcast internet radio, #2002).
+    /// Disables initial and mid-stream seeking (making `seek_to` a no-op),
+    /// suppresses `AboutToFinish` and auto-crossfade, handles Ogg chained-stream
+    /// resets, and treats a stream termination as [`AudioEvent::Error`] rather
+    /// than [`AudioEvent::TrackFinished`].
+    pub live: bool,
+}
+
+/// Station metadata headers sent by an Icecast/Shoutcast server at connect time (#2002).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct IcyHeaders {
+    pub name: Option<String>,
+    pub genre: Option<String>,
+    pub bitrate_kbps: Option<u32>,
+}
+
+/// An opened media source together with transport-discovered probe hints and
+/// optional live ICY metadata (#2002).
+pub struct OpenedSource {
+    pub reader: Box<dyn MediaSource>,
+    /// MIME type reported by the transport (e.g. HTTP `Content-Type`), if any,
+    /// used to hint Symphonia's format probe when `location` has no extension.
+    pub mime_type: Option<String>,
+    /// Icecast/Shoutcast station headers discovered on the HTTP response.
+    pub icy_headers: Option<IcyHeaders>,
+    /// Receiver of deduplicated in-stream `StreamTitle` updates parsed from
+    /// interleaved ICY metadata blocks.
+    pub metadata_rx: Option<mpsc::Receiver<String>>,
+}
+
+impl OpenedSource {
+    /// Wraps a bare [`MediaSource`] with no transport MIME hint or ICY metadata.
+    pub fn new(reader: Box<dyn MediaSource>) -> Self {
+        Self {
+            reader,
+            mime_type: None,
+            icy_headers: None,
+            metadata_rx: None,
+        }
+    }
+}
+
+impl From<Box<dyn MediaSource>> for OpenedSource {
+    fn from(reader: Box<dyn MediaSource>) -> Self {
+        Self::new(reader)
+    }
 }
 
 /// Playback state as the engine sees it.
@@ -217,11 +264,11 @@ pub enum EngineState {
 
 /// Opens the bytes behind a [`Track::location`]. The engine's default opener
 /// reads local files; the app injects one that also knows its remote sources.
-type SourceOpener = dyn Fn(&str) -> Result<Box<dyn MediaSource>, String> + Send + Sync;
+type SourceOpener = dyn Fn(&str) -> Result<OpenedSource, String> + Send + Sync;
 
-fn open_file(path: &str) -> Result<Box<dyn MediaSource>, String> {
+fn open_file(path: &str) -> Result<OpenedSource, String> {
     let file = std::fs::File::open(path).map_err(|e| format!("Cannot open file '{path}': {e}"))?;
-    Ok(Box::new(file))
+    Ok(OpenedSource::new(Box::new(file)))
 }
 
 /// Facts about the output stage, for the app's pipeline display.
@@ -494,13 +541,17 @@ impl AudioEngine {
 
     /// An engine that opens every [`Track::location`] through `open_source`,
     /// on the decode thread, each time a track starts or is reopened.
-    pub fn with_source_opener(
-        open_source: impl Fn(&str) -> Result<Box<dyn MediaSource>, String> + Send + Sync + 'static,
-    ) -> Self {
+    pub fn with_source_opener<R>(
+        open_source: impl Fn(&str) -> Result<R, String> + Send + Sync + 'static,
+    ) -> Self
+    where
+        R: Into<OpenedSource>,
+    {
+        let open_source: Box<SourceOpener> = Box::new(move |loc| open_source(loc).map(Into::into));
         let (cmd_tx, cmd_rx) = mpsc::sync_channel::<AudioCommand>(64);
         let (event_tx, event_rx) = mpsc::channel::<AudioEvent>();
         let shared = Arc::new(AudioShared {
-            open_source: Box::new(open_source),
+            open_source,
             position: AtomicU64::new(0),
             volume: AtomicU32::new(1.0f32.to_bits()),
             volume_ceiling: AtomicU32::new(1.0f32.to_bits()),
@@ -559,7 +610,9 @@ impl AudioEngine {
     }
 
     /// Load `track` paused at `start_nanosec`, ready for `resume`.
+    /// For live streams (`track.live`), `start_nanosec` is ignored (always 0).
     pub fn cue(&self, track: Track, start_nanosec: u64) -> Result<()> {
+        let start_nanosec = if track.live { 0 } else { start_nanosec };
         *self.shared.play_state.lock() = EngineState::Paused;
         self.shared.position.store(start_nanosec, Ordering::Relaxed);
         self.send_cmd(AudioCommand::Cue(PlayRequest {
@@ -826,6 +879,20 @@ impl Default for AudioEngine {
     }
 }
 
+/// Extracts the bare file extension (without dot) from a file path or a URL
+/// whose query string / fragment has been stripped.
+pub fn extension_from_location(location: &str) -> Option<&str> {
+    let without_fragment = location.split('#').next().unwrap_or(location);
+    let without_query = without_fragment
+        .split('?')
+        .next()
+        .unwrap_or(without_fragment);
+    Path::new(without_query)
+        .extension()
+        .and_then(|e| e.to_str())
+        .filter(|e| !e.is_empty())
+}
+
 /// A fully opened, probed, decode-ready track.
 struct ActiveTrack {
     spec: Track,
@@ -836,15 +903,21 @@ struct ActiveTrack {
     src_channels: usize,
     resampler: Resampler,
     start_ns: u64,
-    /// Hard decode cutoff (CUE end boundary).
+    /// Hard decode cutoff (CUE end boundary); always `None` for live streams.
     end_ns: Option<u64>,
     /// Where `AboutToFinish` is measured from: the CUE end boundary if set,
-    /// otherwise the tagged track length.
+    /// otherwise the tagged track length; always `None` for live streams.
     about_end_ns: Option<u64>,
     /// Decoded-stream position (source timeline), advanced per packet.
     decoded_pos_ns: u64,
     about_to_finish_sent: bool,
     eof: bool,
+    /// Transport-reported Icecast/Shoutcast station headers, if any (#2002).
+    #[allow(dead_code)]
+    icy_headers: Option<IcyHeaders>,
+    /// Live in-stream `StreamTitle` updates from an ICY reader (#2002, #2008).
+    #[allow(dead_code)]
+    metadata_rx: Option<mpsc::Receiver<String>>,
 }
 
 impl ActiveTrack {
@@ -864,13 +937,15 @@ impl ActiveTrack {
         if spec.location.is_empty() {
             return Err("Track has no playable location".to_string());
         }
-        let source = open_source(&spec.location)?;
+        let OpenedSource {
+            reader: source,
+            mime_type,
+            icy_headers,
+            metadata_rx,
+        } = open_source(&spec.location)?;
         // The location's own extension wins; a stream URL has none, so the
         // spec's hint stands in.
-        let extension = Path::new(&spec.location)
-            .extension()
-            .and_then(|e| e.to_str())
-            .or(spec.extension_hint.as_deref());
+        let extension = extension_from_location(&spec.location).or(spec.extension_hint.as_deref());
         let ProbedTrack {
             mut format,
             mut decoder,
@@ -878,10 +953,12 @@ impl ActiveTrack {
             sample_rate: src_rate,
             channels: src_channels,
             ..
-        } = ProbedTrack::open(source, extension)?;
+        } = ProbedTrack::open(source, extension, mime_type.as_deref())?;
 
-        if start_nanosec > 0 {
-            let target_time = symphonia::core::units::Time::from_nanos(start_nanosec as i64);
+        // Live streams are non-seekable; ignore any initial seek offset.
+        let effective_start_ns = if spec.live { 0 } else { start_nanosec };
+        if effective_start_ns > 0 {
+            let target_time = symphonia::core::units::Time::from_nanos(effective_start_ns as i64);
             match format.seek(
                 symphonia::core::formats::SeekMode::Accurate,
                 symphonia::core::formats::SeekTo::Time {
@@ -890,12 +967,20 @@ impl ActiveTrack {
                 },
             ) {
                 Ok(_) => decoder.reset(),
-                Err(e) => log::warn!("Initial seek to {start_nanosec}ns failed: {e:?}"),
+                Err(e) => log::warn!("Initial seek to {effective_start_ns}ns failed: {e:?}"),
             }
         }
 
-        let end_ns = spec.end_ns.filter(|&ns| ns > 0);
-        let about_end_ns = end_ns.or(spec.length_ns);
+        let end_ns = if spec.live {
+            None
+        } else {
+            spec.end_ns.filter(|&ns| ns > 0)
+        };
+        let about_end_ns = if spec.live {
+            None
+        } else {
+            end_ns.or(spec.length_ns)
+        };
 
         Ok(Self {
             spec,
@@ -905,12 +990,14 @@ impl ActiveTrack {
             src_rate,
             src_channels,
             resampler: Resampler::new(src_rate, target_rate, target_channels),
-            start_ns: start_nanosec,
+            start_ns: effective_start_ns,
             end_ns,
             about_end_ns,
-            decoded_pos_ns: start_nanosec,
+            decoded_pos_ns: effective_start_ns,
             about_to_finish_sent: false,
             eof: false,
+            icy_headers,
+            metadata_rx,
         })
     }
 }
@@ -2013,8 +2100,12 @@ fn decode_thread(
                     }
                     // A seek on a cued (restored at startup, never resumed)
                     // track only moves the start point — `Resume` above
-                    // opens the track from `shared.position`.
+                    // opens the track from `shared.position`. Seeking a live
+                    // track is a no-op (#2002).
                     Ok(AudioCommand::SeekTo(target_ns)) if paused_req.is_some() => {
+                        if paused_req.as_ref().is_some_and(|r| r.track.live) {
+                            continue;
+                        }
                         if let Some(out) = output.as_ref() {
                             out.played_samples.store(
                                 samples_for_ns(target_ns, out.sample_rate, out.channels),
@@ -2428,15 +2519,17 @@ fn check_and_rebuild_output(
                         }
                     }
                 } else {
-                    let target_time = symphonia::core::units::Time::from_nanos(cur_pos as i64);
-                    let _ = session.current.format.seek(
-                        symphonia::core::formats::SeekMode::Accurate,
-                        symphonia::core::formats::SeekTo::Time {
-                            time: target_time,
-                            track_id: Some(session.current.track_id),
-                        },
-                    );
-                    session.current.decoder.reset();
+                    if !session.current.spec.live {
+                        let target_time = symphonia::core::units::Time::from_nanos(cur_pos as i64);
+                        let _ = session.current.format.seek(
+                            symphonia::core::formats::SeekMode::Accurate,
+                            symphonia::core::formats::SeekTo::Time {
+                                time: target_time,
+                                track_id: Some(session.current.track_id),
+                            },
+                        );
+                        session.current.decoder.reset();
+                    }
                     session.current.decoded_pos_ns = cur_pos;
                     session.current.eof = false;
                     session.current.resampler = Resampler::new(
@@ -2557,6 +2650,9 @@ fn handle_decode_command(
             CmdOutcome::RequeuePlay(new_req)
         }
         Ok(AudioCommand::SeekTo(target_ns)) => {
+            if session.current.spec.live && session.transition.is_none() {
+                return CmdOutcome::Continue;
+            }
             seek_session(target_ns, out, session, shared, event_tx)
         }
         // Already at this speed (a preset that is already selected): nothing to
@@ -2569,14 +2665,19 @@ fn handle_decode_command(
         Ok(AudioCommand::SetSpeed(speed)) => {
             // The ring buffer holds audio decoded at the old speed, so
             // restart it at the audible position, then publish the new
-            // speed for the output callback (#2142).
-            let outcome = seek_session(
-                position.load(Ordering::Relaxed),
-                out,
-                session,
-                shared,
-                event_tx,
-            );
+            // speed for the output callback (#2142). For a live stream
+            // we cannot seek back, so only update the speed stage.
+            let outcome = if session.current.spec.live && session.transition.is_none() {
+                CmdOutcome::Continue
+            } else {
+                seek_session(
+                    position.load(Ordering::Relaxed),
+                    out,
+                    session,
+                    shared,
+                    event_tx,
+                )
+            };
             session.speed.set_speed(speed);
             shared
                 .speed_carry
@@ -2585,11 +2686,17 @@ fn handle_decode_command(
             outcome
         }
         Ok(AudioCommand::PreloadNext(preq)) => {
+            if session.current.spec.live {
+                return CmdOutcome::Continue;
+            }
             session.next = open_preload(out, session, shared, preq);
             session.crossfade_secs = 0.0;
             CmdOutcome::Continue
         }
         Ok(AudioCommand::PreloadNextCrossfade(preq, secs, gain)) => {
+            if session.current.spec.live {
+                return CmdOutcome::Continue;
+            }
             session.next = open_preload(out, session, shared, preq);
             session.crossfade_secs = if session.next.is_some() { secs } else { 0.0 };
             session.crossfade_incoming_gain = gain;
@@ -2932,14 +3039,51 @@ fn decode_track_packet(track: &mut ActiveTrack, target_channels: usize) -> Packe
                     PacketStep::Samples(track.resampler.resample(&channel_converted))
                 }
                 Err(SymphoniaError::DecodeError(_)) => PacketStep::Skip,
+                Err(SymphoniaError::ResetRequired) => {
+                    track.decoder.reset();
+                    PacketStep::Skip
+                }
                 Err(_) => PacketStep::DecoderFailed,
             }
+        }
+        Err(SymphoniaError::ResetRequired) => {
+            // Chained Ogg streams (common on Icecast Vorbis/Opus radio stations)
+            // start a new logical bitstream with a new serial number / track_id
+            // at song boundaries (#2002). Re-bind to the new default audio track.
+            match ProbedTrack::build_decoder_for_default_track(
+                &*track.format,
+                &symphonia::core::codecs::audio::AudioDecoderOptions::default(),
+            ) {
+                Ok(source::DefaultTrackDecoder {
+                    decoder,
+                    track_id,
+                    sample_rate,
+                    channels,
+                    ..
+                }) => {
+                    track.decoder = decoder;
+                    track.track_id = track_id;
+                    if sample_rate != track.src_rate || channels != track.src_channels {
+                        track.src_rate = sample_rate;
+                        track.src_channels = channels;
+                        track.resampler =
+                            Resampler::new(sample_rate, track.resampler.to_rate, target_channels);
+                    }
+                    PacketStep::Skip
+                }
+                Err(message) => PacketStep::ReadFailed(message),
+            }
+        }
+        Ok(None) if track.spec.live => {
+            PacketStep::ReadFailed("Live stream disconnected".to_string())
         }
         Ok(None) => {
             track.eof = true;
             PacketStep::Skip
         }
-        Err(SymphoniaError::IoError(ref e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+        Err(SymphoniaError::IoError(ref e))
+            if e.kind() == std::io::ErrorKind::UnexpectedEof && !track.spec.live =>
+        {
             track.eof = true;
             PacketStep::Skip
         }
@@ -3845,6 +3989,72 @@ mod tests {
         assert_eq!(track.spec.id, 7);
         assert_eq!(track.src_rate, 48_000);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn live_track_disables_initial_seek_end_cutoffs_and_treats_disconnect_as_error() {
+        let dir = std::env::temp_dir().join(format!("luminous-audio-live-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let wav = dir.join("live.wav");
+        write_test_pcm16_wav(&wav, 48_000, &[vec![100; 480]]);
+        let real = wav.to_string_lossy().into_owned();
+        let opener = move |_: &str| open_file(&real);
+        let spec = Track {
+            id: 99,
+            location: "http://radio.example/live".into(),
+            extension_hint: Some("wav".into()),
+            end_ns: Some(500_000),
+            length_ns: Some(1_000_000),
+            live: true,
+        };
+        // Even when passed a non-zero start_nanosec, end_ns, and length_ns,
+        // a live track starts at 0 and has no end_ns or about_end_ns.
+        let mut track =
+            ActiveTrack::open(&opener, spec, 500_000_000, 48_000, 2).expect("opens live track");
+        assert_eq!(track.start_ns, 0);
+        assert_eq!(track.decoded_pos_ns, 0);
+        assert!(track.end_ns.is_none());
+        assert!(track.about_end_ns.is_none());
+
+        // Drain packets until the underlying stream ends: a live track must report
+        // ReadFailed (which emits AudioEvent::Error), never setting `track.eof = true`.
+        let mut saw_read_failed = false;
+        for _ in 0..32 {
+            match decode_track_packet(&mut track, 2) {
+                PacketStep::Samples(_) | PacketStep::Skip => {}
+                PacketStep::ReadFailed(msg) => {
+                    assert!(
+                        msg.contains("Live stream disconnected") || msg.contains("Decode error"),
+                        "unexpected live disconnect message: {msg}"
+                    );
+                    saw_read_failed = true;
+                    break;
+                }
+                PacketStep::DecoderFailed => panic!("unexpected decoder failure"),
+            }
+        }
+        assert!(
+            saw_read_failed,
+            "live track disconnect must surface ReadFailed"
+        );
+        assert!(
+            !track.eof,
+            "live track disconnect must never be treated as normal EOF"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn extension_from_location_strips_query_and_fragment() {
+        assert_eq!(
+            extension_from_location("https://stream.example.com/radio.mp3?token=abc#live"),
+            Some("mp3")
+        );
+        assert_eq!(
+            extension_from_location("https://stream.example.com/live"),
+            None
+        );
+        assert_eq!(extension_from_location("/music/track.flac"), Some("flac"));
     }
 
     #[test]

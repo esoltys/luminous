@@ -45,6 +45,10 @@ impl SongSource {
     pub const COLLECTION_ID: i32 = Self::Collection as i32;
     pub const WEBDAV_ID: i32 = Self::WebDav as i32;
     pub const SUBSONIC_ID: i32 = Self::Subsonic as i32;
+    pub const STREAM_ID: i32 = Self::Stream as i32;
+    pub const SOMAFM_ID: i32 = Self::SomaFm as i32;
+    pub const RADIO_PARADISE_ID: i32 = Self::RadioParadise as i32;
+    pub const RADIO_BROWSER_ID: i32 = Self::RadioBrowser as i32;
 
     /// True if this source is a library file on disk (LocalFile or
     /// Collection). Opened files outside the library (`OpenedFile`) are on
@@ -70,6 +74,14 @@ impl SongSource {
     /// Picard, and their availability is owned by the server sync instead.
     pub fn is_remote(&self) -> bool {
         matches!(self, Self::WebDav | Self::Subsonic)
+    }
+
+    /// True for live internet radio streams (#2002).
+    pub fn is_live_stream(&self) -> bool {
+        matches!(
+            self,
+            Self::RadioBrowser | Self::Stream | Self::SomaFm | Self::RadioParadise
+        )
     }
 }
 
@@ -146,6 +158,17 @@ pub(crate) static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
         "{}, {}",
         SongSource::LocalFile as i32,
         SongSource::Collection as i32,
+    )
+});
+
+/// SQL `IN (...)` fragment listing the live internet-radio source IDs (#2002).
+pub(crate) static LIVE_STREAM_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "{}, {}, {}, {}",
+        SongSource::Stream as i32,
+        SongSource::SomaFm as i32,
+        SongSource::RadioParadise as i32,
+        SongSource::RadioBrowser as i32,
     )
 });
 

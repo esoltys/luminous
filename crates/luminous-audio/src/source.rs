@@ -26,24 +26,64 @@ pub(crate) struct ProbedTrack {
     pub(crate) bits_per_sample: Option<u32>,
 }
 
+/// Normalizes an HTTP `Content-Type` header value into a bare MIME type
+/// Symphonia's format probe understands (e.g. `"audio/mpeg; charset=utf-8"`
+/// -> `"audio/mpeg"`, `"audio/aacp"` -> `"audio/aac"`).
+pub fn normalize_probe_mime(raw: &str) -> Option<String> {
+    let base = raw.split(';').next()?.trim().to_ascii_lowercase();
+    if base.is_empty() {
+        return None;
+    }
+    let mapped = match base.as_str() {
+        "audio/aacp" | "audio/x-aac" => "audio/aac",
+        "audio/mp3" | "audio/x-mp3" | "audio/x-mpeg" | "audio/mpeg3" => "audio/mpeg",
+        "audio/x-flac" => "audio/flac",
+        "audio/x-wav" | "audio/wave" => "audio/wav",
+        "audio/x-aiff" => "audio/aiff",
+        "audio/x-ogg" | "application/x-ogg" => "application/ogg",
+        other => other,
+    };
+    Some(mapped.to_string())
+}
+
+/// Decoder and format parameters for a single logical audio bitstream.
+pub(crate) struct DefaultTrackDecoder {
+    pub(crate) decoder: Box<dyn AudioDecoder>,
+    pub(crate) track_id: u32,
+    pub(crate) sample_rate: u32,
+    pub(crate) channels: usize,
+    pub(crate) bits_per_sample: Option<u32>,
+}
+
 impl ProbedTrack {
-    /// Probe `source`, with `extension` (no dot) hinting the format.
+    /// Probe `source`, with `extension` (no dot) and optional `mime_type`
+    /// hinting the format.
     pub(crate) fn open(
         source: Box<dyn MediaSource>,
         extension: Option<&str>,
+        mime_type: Option<&str>,
     ) -> Result<Self, String> {
-        Self::open_with_options(source, extension, &AudioDecoderOptions::default())
+        Self::open_with_options(
+            source,
+            extension,
+            mime_type,
+            &AudioDecoderOptions::default(),
+        )
     }
 
     /// Probe `source` with customized `AudioDecoderOptions`.
     pub(crate) fn open_with_options(
         source: Box<dyn MediaSource>,
         extension: Option<&str>,
+        mime_type: Option<&str>,
         decoder_opts: &AudioDecoderOptions,
     ) -> Result<Self, String> {
         let mut hint = Hint::new();
-        if let Some(ext) = extension {
+        if let Some(ext) = extension.filter(|e| !e.is_empty()) {
             hint.with_extension(ext);
+        }
+        if let Some(mime) = mime_type.and_then(normalize_probe_mime) {
+            hint.mime_type(&mime);
         }
 
         let mss = MediaSourceStream::new(source, Default::default());
@@ -56,6 +96,31 @@ impl ProbedTrack {
             )
             .map_err(|e| format!("Format probe failed: {e}"))?;
 
+        let DefaultTrackDecoder {
+            decoder,
+            track_id,
+            sample_rate,
+            channels,
+            bits_per_sample,
+        } = Self::build_decoder_for_default_track(&*format, decoder_opts)?;
+
+        Ok(Self {
+            format,
+            decoder,
+            track_id,
+            sample_rate,
+            channels,
+            bits_per_sample,
+        })
+    }
+
+    /// Re-initializes the audio decoder for the format reader's current default
+    /// audio track (used both at initial open and when an Ogg chained stream
+    /// signals `SymphoniaError::ResetRequired` at a logical bitstream boundary).
+    pub(crate) fn build_decoder_for_default_track(
+        format: &dyn FormatReader,
+        decoder_opts: &AudioDecoderOptions,
+    ) -> Result<DefaultTrackDecoder, String> {
         let track = format
             .default_track(TrackType::Audio)
             .ok_or_else(|| "No audio track found".to_string())?;
@@ -75,9 +140,7 @@ impl ProbedTrack {
             .map(|c| c.count())
             .unwrap_or(2);
         let bits_per_sample = audio_params.bits_per_sample;
-
-        Ok(Self {
-            format,
+        Ok(DefaultTrackDecoder {
             decoder,
             track_id,
             sample_rate,
@@ -99,7 +162,7 @@ impl OfflineDecoder {
     /// format.
     pub fn open(source: Box<dyn MediaSource>, extension: Option<&str>) -> Result<Self, String> {
         Ok(Self {
-            track: ProbedTrack::open(source, extension)?,
+            track: ProbedTrack::open(source, extension, None)?,
         })
     }
 
@@ -111,19 +174,19 @@ impl OfflineDecoder {
         let mut opts = AudioDecoderOptions::default();
         opts.verify = true;
         Ok(Self {
-            track: ProbedTrack::open_with_options(source, extension, &opts)?,
+            track: ProbedTrack::open_with_options(source, extension, None, &opts)?,
         })
     }
 
     /// Open and probe a local file.
     pub fn open_file(path: &std::path::Path) -> Result<Self, String> {
-        let source = crate::open_file(&path.to_string_lossy())?;
+        let source = crate::open_file(&path.to_string_lossy())?.reader;
         Self::open(source, path.extension().and_then(|e| e.to_str()))
     }
 
     /// Open and probe a local file with checksum verification enabled.
     pub fn open_file_verified(path: &std::path::Path) -> Result<Self, String> {
-        let source = crate::open_file(&path.to_string_lossy())?;
+        let source = crate::open_file(&path.to_string_lossy())?.reader;
         Self::open_verified(source, path.extension().and_then(|e| e.to_str()))
     }
 
@@ -175,6 +238,24 @@ impl OfflineDecoder {
             let packet = match track.format.next_packet() {
                 Ok(Some(packet)) => packet,
                 Ok(None) => return Ok(()),
+                Err(SymphoniaError::ResetRequired) => {
+                    let DefaultTrackDecoder {
+                        decoder,
+                        track_id,
+                        sample_rate,
+                        channels,
+                        bits_per_sample,
+                    } = ProbedTrack::build_decoder_for_default_track(
+                        &*track.format,
+                        &AudioDecoderOptions::default(),
+                    )?;
+                    track.decoder = decoder;
+                    track.track_id = track_id;
+                    track.sample_rate = sample_rate;
+                    track.channels = channels;
+                    track.bits_per_sample = bits_per_sample;
+                    continue;
+                }
                 Err(SymphoniaError::IoError(e))
                     if e.kind() == std::io::ErrorKind::UnexpectedEof =>
                 {
@@ -193,6 +274,10 @@ impl OfflineDecoder {
                     }
                 }
                 Err(SymphoniaError::DecodeError(_)) => continue,
+                Err(SymphoniaError::ResetRequired) => {
+                    track.decoder.reset();
+                    continue;
+                }
                 Err(e) => return Err(e.to_string()),
             }
         }
@@ -360,6 +445,35 @@ impl OfflineDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Cursor, Read, Seek, SeekFrom};
+
+    /// A non-seekable `MediaSource` over in-memory bytes, simulating a live
+    /// network stream with no known byte length.
+    struct NonSeekableBytes(Cursor<Vec<u8>>);
+
+    impl Read for NonSeekableBytes {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            self.0.read(buf)
+        }
+    }
+
+    impl Seek for NonSeekableBytes {
+        fn seek(&mut self, _pos: SeekFrom) -> std::io::Result<u64> {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "live stream is not seekable",
+            ))
+        }
+    }
+
+    impl MediaSource for NonSeekableBytes {
+        fn is_seekable(&self) -> bool {
+            false
+        }
+        fn byte_len(&self) -> Option<u64> {
+            None
+        }
+    }
 
     /// Opus in a `.ogg` file — the extension Vorbis uses — must still decode,
     /// since the library now imports these files (#1866).
@@ -371,5 +485,74 @@ mod tests {
         let mut frames = 0;
         decoder.decode_blocks(2, |planes| frames += planes[0].len());
         assert!(frames > 0, "no audio decoded");
+    }
+
+    /// Ogg Icecast stations chain logical Ogg bitstreams back-to-back at track
+    /// boundaries, causing Symphonia's Ogg reader to return `ResetRequired`
+    /// (#2002). Verify that a chained stream decodes across the boundary
+    /// instead of stopping after the first logical stream.
+    #[test]
+    fn ogg_chained_stream_decodes_across_logical_bitstream_boundary() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../src-tauri/tests/fixtures/codec/opus.ogg");
+        let single_bytes = std::fs::read(&path).expect("read opus.ogg");
+
+        let single_decoder = OfflineDecoder::open(
+            Box::new(NonSeekableBytes(Cursor::new(single_bytes.clone()))),
+            None,
+        )
+        .expect("open single ogg stream");
+        let mut single_frames = 0;
+        single_decoder.decode_blocks(2, |planes| single_frames += planes[0].len());
+        assert!(single_frames > 0);
+
+        // Concatenate two complete Ogg bitstreams into a single non-seekable live stream.
+        let mut chained_bytes = single_bytes.clone();
+        chained_bytes.extend_from_slice(&single_bytes);
+
+        let chained_track = ProbedTrack::open(
+            Box::new(NonSeekableBytes(Cursor::new(chained_bytes))),
+            None,
+            Some("application/ogg; codecs=opus"),
+        )
+        .expect("probe chained ogg stream with Content-Type hint");
+
+        let chained_decoder = OfflineDecoder {
+            track: chained_track,
+        };
+        let mut chained_frames = 0;
+        chained_decoder
+            .try_decode_blocks(2, |planes| {
+                chained_frames += planes[0].len();
+                ControlFlow::Continue(())
+            })
+            .expect("chained ogg stream must not error at boundary");
+
+        assert_eq!(
+            chained_frames,
+            single_frames * 2,
+            "chained Ogg stream should decode both logical bitstreams seamlessly"
+        );
+    }
+
+    #[test]
+    fn normalize_probe_mime_strips_parameters_and_maps_icecast_aliases() {
+        assert_eq!(
+            normalize_probe_mime("audio/mpeg; charset=utf-8").as_deref(),
+            Some("audio/mpeg")
+        );
+        assert_eq!(
+            normalize_probe_mime("Audio/AACP").as_deref(),
+            Some("audio/aac")
+        );
+        assert_eq!(
+            normalize_probe_mime("audio/x-mpeg").as_deref(),
+            Some("audio/mpeg")
+        );
+        assert_eq!(
+            normalize_probe_mime("application/x-ogg; codecs=vorbis").as_deref(),
+            Some("application/ogg")
+        );
+        assert_eq!(normalize_probe_mime("   "), None);
     }
 }
