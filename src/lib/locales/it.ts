@@ -3159,8 +3159,12 @@ export const it = {
       "Brani lossless segnalati per sospetta transcodifica con perdita o sovracampionamento.",
     shelfProvenanceBadge: "Sospetta transcodifica",
     shelfCorruptTitle: "File audio corrotti o illeggibili",
-    shelfCorruptHint:
-      "Brani con errori di decodifica del flusso, verifica del contenitore o convalida del checksum",
+    shelfCorruptHint: "Brani con errori di verifica del contenitore o di decodifica del flusso",
+    shelfIntegrityWarningsTitle: "Avvisi di integrità audio",
+    shelfIntegrityWarningsHint:
+      "Brani che vengono riprodotti normalmente, ma presentano una mancata corrispondenza del checksum o un lieve troncamento a fine flusso",
+    showWarnings: "Mostra avvisi",
+    hideWarnings: "Nascondi avvisi",
     showAllWithCount: "Mostra tutto ({count})",
     showLess: "Mostra meno",
   },

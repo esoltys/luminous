@@ -1513,6 +1513,7 @@ export interface CurationOverview {
   suspected_provenance_songs: Song[];
   duplicate_groups: DuplicateTrackGroup[];
   corrupt_songs: CorruptSongItem[];
+  integrity_warnings: CorruptSongItem[];
 }
 
 /** Kind of removable tag cruft (#1939); mirrors `luminous_metadata::CruftKind`. */

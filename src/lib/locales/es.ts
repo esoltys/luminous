@@ -3167,7 +3167,12 @@ export const es = {
     shelfProvenanceBadge: "Sospecha de transcodificación",
     shelfCorruptTitle: "Archivos de audio dañados o ilegibles",
     shelfCorruptHint:
-      "Canciones con fallos en la decodificación del flujo, verificación del contenedor o validación de la suma de comprobación",
+      "Canciones con fallos en la verificación del contenedor o la decodificación del flujo",
+    shelfIntegrityWarningsTitle: "Advertencias de integridad de audio",
+    shelfIntegrityWarningsHint:
+      "Canciones que se reproducen con normalidad, pero tienen una discrepancia de suma de comprobación o un truncamiento menor al final del flujo",
+    showWarnings: "Mostrar advertencias",
+    hideWarnings: "Ocultar advertencias",
     showAllWithCount: "Mostrar todo ({count})",
     showLess: "Mostrar menos",
   },

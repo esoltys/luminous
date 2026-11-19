@@ -3089,8 +3089,12 @@ export const en = {
       "Lossless songs flagged with suspected lossy transcode or upsampling characteristics.",
     shelfProvenanceBadge: "Suspected Transcode",
     shelfCorruptTitle: "Corrupted & Unreadable Audio",
-    shelfCorruptHint:
-      "Songs failing stream decoding, container verification, or checksum validation",
+    shelfCorruptHint: "Songs failing container verification or stream decoding",
+    shelfIntegrityWarningsTitle: "Audio integrity warnings",
+    shelfIntegrityWarningsHint:
+      "Songs that play normally, but have a checksum mismatch or minor stream-end truncation",
+    showWarnings: "Show warnings",
+    hideWarnings: "Hide warnings",
     showAllWithCount: "Show all ({count})",
     showLess: "Show less",
   },

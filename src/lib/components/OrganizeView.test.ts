@@ -232,6 +232,7 @@ describe("OrganizeView header status", () => {
           suspected_provenance_songs: [],
           duplicate_groups: groups,
           corrupt_songs: [],
+          integrity_warnings: [],
         });
       }
       return defaultInvokeHandler(cmd);

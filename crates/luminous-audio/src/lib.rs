@@ -66,7 +66,7 @@ pub use sink::{
     enumerate_output_devices, AudioBackendKind, AudioDeviceInfo, AudioOutputConfig, AudioSink,
     OutputFallbackReason,
 };
-pub use source::{normalize_probe_mime, OfflineDecoder};
+pub use source::{normalize_probe_mime, IntegrityCheck, OfflineDecoder};
 pub use speed::{snap_speed, MAX_SPEED, MIN_SPEED, SPEED_STEP};
 pub use symphonia::core::io::MediaSource;
 

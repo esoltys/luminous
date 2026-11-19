@@ -91,6 +91,7 @@ pub struct CurationOverview {
     pub suspected_provenance_songs: Vec<Song>,
     pub duplicate_groups: Vec<DuplicateTrackGroup>,
     pub corrupt_songs: Vec<CorruptSongItem>,
+    pub integrity_warnings: Vec<CorruptSongItem>,
 }
 
 /// Common CTEs computing top genres per album and pre-ordering tracks for album aggregation.
@@ -897,8 +898,12 @@ pub fn resolve_duplicate_group_in_db(
     Ok(deleted_paths)
 }
 
-/// Safely queries SQLite for corrupt tracks detected across the local library (#1938).
-pub(crate) fn query_corrupt_songs(conn: &Connection) -> Result<Vec<CorruptSongItem>> {
+/// Safely queries SQLite for tracks with a specific `song_integrity.status`
+/// (`'corrupt'` or `'warning'`) across the local library (#1938, #2197).
+fn query_songs_by_integrity_status(
+    conn: &Connection,
+    status: &str,
+) -> Result<Vec<CorruptSongItem>> {
     let has_table: bool = conn
         .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'song_integrity'")?
         .exists([])?;
@@ -912,13 +917,13 @@ pub(crate) fn query_corrupt_songs(conn: &Connection) -> Result<Vec<CorruptSongIt
          JOIN songs s ON s.id = i.song_id
          WHERE s.source IN ({local_sources})
            AND s.unavailable = 0
-           AND i.status = 'corrupt'
+           AND i.status = ?1
            AND i.mtime = s.mtime
          ORDER BY s.added DESC, s.id DESC",
         local_sources = *LOCAL_SOURCES_SQL
     ))?;
 
-    let rows = stmt.query_map([], |row| {
+    let rows = stmt.query_map(params![status], |row| {
         let ft_num: i64 = row.get(5).unwrap_or(0);
         let format = crate::models::FileType::from(ft_num)
             .display_name()
@@ -944,9 +949,18 @@ pub(crate) fn query_corrupt_songs(conn: &Connection) -> Result<Vec<CorruptSongIt
     Ok(items)
 }
 
+/// Safely queries SQLite for corrupt tracks detected across the local library (#1938).
+pub(crate) fn query_corrupt_songs(conn: &Connection) -> Result<Vec<CorruptSongItem>> {
+    query_songs_by_integrity_status(conn, "corrupt")
+}
+
+/// Safely queries SQLite for playable tracks with non-fatal integrity warnings (#2197).
+pub(crate) fn query_integrity_warning_songs(conn: &Connection) -> Result<Vec<CorruptSongItem>> {
+    query_songs_by_integrity_status(conn, "warning")
+}
+
 /// Verify a single song's file integrity, saving the result to `song_integrity`.
-/// Returns the corrupt item when the file is corrupt. Only `'corrupt'` rows
-/// are ever reported.
+/// Returns the flagged item when the file is `'corrupt'` or `'warning'`.
 ///
 /// A file that can't be reached (drive asleep or disconnected, permission
 /// denied) is an error and stores nothing, so it's checked again later
@@ -1001,26 +1015,33 @@ pub fn verify_song_integrity(db: &Database, song_id: i64) -> Result<Option<Corru
         )
     };
 
-    match luminous_analysis::verify_audio_file(Path::new(&path)) {
+    let verdict = luminous_analysis::verify_audio_file(Path::new(&path));
+    let make_item = |path: String, reason: String| CorruptSongItem {
+        id: song_id,
+        title,
+        artist,
+        album,
+        path,
+        format: crate::models::FileType::from(filetype)
+            .display_name()
+            .to_string(),
+        error_detail: reason,
+        verified_at: now,
+    };
+
+    match verdict {
         IntegrityVerdict::Valid => {
             record("valid", None)?;
             Ok(None)
         }
         IntegrityVerdict::Unverified => bail!("couldn't reach {path} to check it"),
+        IntegrityVerdict::Warning { reason } => {
+            record("warning", Some(&reason))?;
+            Ok(Some(make_item(path, reason)))
+        }
         IntegrityVerdict::Corrupt { reason } => {
             record("corrupt", Some(&reason))?;
-            Ok(Some(CorruptSongItem {
-                id: song_id,
-                title,
-                artist,
-                album,
-                path,
-                format: crate::models::FileType::from(filetype)
-                    .display_name()
-                    .to_string(),
-                error_detail: reason,
-                verified_at: now,
-            }))
+            Ok(Some(make_item(path, reason)))
         }
     }
 }
@@ -1139,6 +1160,7 @@ pub fn compute_curation_overview(conn: &Connection) -> Result<CurationOverview> 
     let missing_core_tags_song_ids = query_missing_core_tags_song_ids(conn)?;
     let suspected_provenance_songs = query_suspected_provenance_songs(conn)?;
     let corrupt_songs = query_corrupt_songs(conn)?;
+    let integrity_warnings = query_integrity_warning_songs(conn)?;
 
     Ok(CurationOverview {
         unillustrated_albums,
@@ -1147,6 +1169,7 @@ pub fn compute_curation_overview(conn: &Connection) -> Result<CurationOverview> 
         suspected_provenance_songs,
         duplicate_groups,
         corrupt_songs,
+        integrity_warnings,
     })
 }
 
@@ -2121,6 +2144,23 @@ mod tests {
             .expect("an empty file is corrupt");
         assert_eq!(item.format, "FLAC");
         assert_eq!(stored_status(&conn, empty_id).as_deref(), Some("corrupt"));
+
+        let mut md5_bad_bytes = std::fs::read(&healthy).unwrap();
+        md5_bad_bytes[26] ^= 0xff;
+        let md5_bad = temp.path().join("md5_mismatch.flac");
+        std::fs::write(&md5_bad, &md5_bad_bytes).unwrap();
+        let md5_bad_id = insert_local_flac(&conn, &md5_bad);
+        let warning_item = verify_song_integrity(&db, md5_bad_id)
+            .unwrap()
+            .expect("MD5 mismatch should return a warning item");
+        assert_eq!(warning_item.error_detail, "FLAC MD5 checksum mismatch");
+        assert_eq!(stored_status(&conn, md5_bad_id).as_deref(), Some("warning"));
+
+        let overview = compute_curation_overview(&conn).unwrap();
+        assert_eq!(overview.corrupt_songs.len(), 1);
+        assert_eq!(overview.corrupt_songs[0].id, empty_id);
+        assert_eq!(overview.integrity_warnings.len(), 1);
+        assert_eq!(overview.integrity_warnings[0].id, md5_bad_id);
     }
 
     /// A drive that's asleep or unplugged must not get healthy files listed

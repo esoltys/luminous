@@ -157,6 +157,20 @@ pub struct OfflineDecoder {
     track: ProbedTrack,
 }
 
+/// Outcome of structural, frame-level, and checksum verification of an audio stream.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IntegrityCheck {
+    /// All decoded frames succeeded and any embedded stream checksum matched.
+    Valid,
+    /// Audio frames decoded and the track is playable, but a non-fatal integrity
+    /// discrepancy was found (e.g., a FLAC `STREAMINFO` MD5 mismatch or trailing
+    /// EOF after audio frames were already decoded).
+    Warning(String),
+    /// The stream or container could not be decoded cleanly (zero decoded
+    /// frames, corrupt frame data, or mid-stream packet error).
+    Corrupt(String),
+}
+
 impl OfflineDecoder {
     /// Probe already-opened bytes, with `extension` (no dot) hinting the
     /// format.
@@ -287,17 +301,29 @@ impl OfflineDecoder {
     ///
     /// For FLAC files, decodes all packets with checksum verification active and validates
     /// against the embedded 128-bit STREAMINFO MD5 signature upon stream completion.
+    /// Because playback ignores `verify_ok` and stops cleanly at EOF, a FLAC MD5 mismatch
+    /// or trailing `UnexpectedEof` after audio frames have been decoded is reported as
+    /// [`IntegrityCheck::Warning`] rather than [`IntegrityCheck::Corrupt`].
     ///
     /// For containerized and lossy files (MP3, AAC, ALAC, Opus, Vorbis, etc.), decodes initial
     /// boundary packets to ensure frame sync and header validity, then verifies end boundary
     /// decodability to detect truncated or corrupted files without full stream decoding overhead.
-    pub fn verify_integrity(mut self) -> Result<(), String> {
+    pub fn verify_integrity(mut self) -> IntegrityCheck {
         let track_id = self.track.track_id;
         let is_flac = self.codec_id() == symphonia::core::codecs::audio::well_known::CODEC_ID_FLAC;
 
         if is_flac {
+            let expected_frames = self
+                .track
+                .format
+                .tracks()
+                .iter()
+                .find(|t| t.id == track_id)
+                .and_then(|t| t.duration)
+                .map(|d| d.get());
+            let mut decoded_frames: u64 = 0;
             let mut any_decoded = false;
-            let mut planes: Vec<Vec<f32>> = Vec::new();
+            let mut eof_after_audio = false;
             loop {
                 match self.track.format.next_packet() {
                     Ok(Some(packet)) => {
@@ -307,41 +333,62 @@ impl OfflineDecoder {
                         match self.track.decoder.decode(&packet) {
                             Ok(decoded) => {
                                 any_decoded = true;
-                                decoded.copy_to_vecs_planar(&mut planes);
+                                decoded_frames += decoded.frames() as u64;
                             }
                             Err(SymphoniaError::DecodeError(e)) => {
-                                return Err(format!("Corrupt FLAC audio frame: {e}"));
+                                return IntegrityCheck::Corrupt(format!(
+                                    "Corrupt FLAC audio frame: {e}"
+                                ));
                             }
-                            Err(e) => return Err(format!("FLAC frame decode error: {e}")),
+                            Err(e) => {
+                                return IntegrityCheck::Corrupt(format!(
+                                    "FLAC frame decode error: {e}"
+                                ));
+                            }
                         }
                     }
                     Ok(None) => break,
                     Err(SymphoniaError::IoError(e))
                         if e.kind() == std::io::ErrorKind::UnexpectedEof =>
                     {
-                        return Err(
-                            "Truncated FLAC audio stream: premature end-of-file".to_string()
+                        let severely_truncated = expected_frames.is_some_and(|exp| {
+                            decoded_frames.saturating_mul(100) < exp.saturating_mul(95)
+                        });
+                        if any_decoded && !severely_truncated {
+                            eof_after_audio = true;
+                            break;
+                        }
+                        return IntegrityCheck::Corrupt(
+                            "Truncated FLAC audio stream: premature end-of-file".to_string(),
                         );
                     }
-                    Err(e) => return Err(format!("FLAC stream packet error: {e}")),
+                    Err(e) => {
+                        return IntegrityCheck::Corrupt(format!("FLAC stream packet error: {e}"));
+                    }
                 }
             }
 
             if !any_decoded {
-                return Err("Zero audio frames decoded from FLAC stream".to_string());
+                return IntegrityCheck::Corrupt(
+                    "Zero audio frames decoded from FLAC stream".to_string(),
+                );
             }
 
             let finalize_res = self.track.decoder.finalize();
-            if let Some(false) = finalize_res.verify_ok {
-                return Err("FLAC MD5 checksum mismatch".to_string());
+            if eof_after_audio {
+                return IntegrityCheck::Warning(
+                    "Truncated FLAC audio stream: premature end-of-file".to_string(),
+                );
             }
-            Ok(())
+            if let Some(false) = finalize_res.verify_ok {
+                return IntegrityCheck::Warning("FLAC MD5 checksum mismatch".to_string());
+            }
+            IntegrityCheck::Valid
         } else {
             // Containerized / lossy / PCM streams:
             // 1. Decode initial packets (head)
             let mut initial_packets = 0;
             let mut any_decoded = false;
-            let mut planes: Vec<Vec<f32>> = Vec::new();
             while initial_packets < 10 {
                 match self.track.format.next_packet() {
                     Ok(Some(packet)) => {
@@ -350,14 +397,17 @@ impl OfflineDecoder {
                         }
                         initial_packets += 1;
                         match self.track.decoder.decode(&packet) {
-                            Ok(decoded) => {
+                            Ok(_decoded) => {
                                 any_decoded = true;
-                                decoded.copy_to_vecs_planar(&mut planes);
                             }
                             Err(SymphoniaError::DecodeError(e)) => {
-                                return Err(format!("Corrupt audio frame: {e}"));
+                                return IntegrityCheck::Corrupt(format!(
+                                    "Corrupt audio frame: {e}"
+                                ));
                             }
-                            Err(e) => return Err(format!("Audio decode error: {e}")),
+                            Err(e) => {
+                                return IntegrityCheck::Corrupt(format!("Audio decode error: {e}"));
+                            }
                         }
                     }
                     Ok(None) => break,
@@ -365,16 +415,22 @@ impl OfflineDecoder {
                         if e.kind() == std::io::ErrorKind::UnexpectedEof =>
                     {
                         if initial_packets == 0 {
-                            return Err("Truncated audio file: premature end-of-file".to_string());
+                            return IntegrityCheck::Corrupt(
+                                "Truncated audio file: premature end-of-file".to_string(),
+                            );
                         }
                         break;
                     }
-                    Err(e) => return Err(format!("Audio stream packet error: {e}")),
+                    Err(e) => {
+                        return IntegrityCheck::Corrupt(format!("Audio stream packet error: {e}"));
+                    }
                 }
             }
 
             if !any_decoded {
-                return Err("Zero audio frames decoded from stream".to_string());
+                return IntegrityCheck::Corrupt(
+                    "Zero audio frames decoded from stream".to_string(),
+                );
             }
 
             // 2. Decode trailing packets to detect truncated files
@@ -406,11 +462,13 @@ impl OfflineDecoder {
                             while let Ok(Some(packet)) = self.track.format.next_packet() {
                                 if packet.track_id == track_id {
                                     if let Err(e) = self.track.decoder.decode(&packet) {
-                                        return Err(format!("Corrupt trailing audio frame: {e}"));
+                                        return IntegrityCheck::Corrupt(format!(
+                                            "Corrupt trailing audio frame: {e}"
+                                        ));
                                     }
                                 }
                             }
-                            return Ok(());
+                            return IntegrityCheck::Valid;
                         }
                     }
                 }
@@ -424,20 +482,24 @@ impl OfflineDecoder {
                             continue;
                         }
                         if let Err(e) = self.track.decoder.decode(&packet) {
-                            return Err(format!("Corrupt audio frame: {e}"));
+                            return IntegrityCheck::Corrupt(format!("Corrupt audio frame: {e}"));
                         }
                     }
                     Ok(None) => break,
                     Err(SymphoniaError::IoError(e))
                         if e.kind() == std::io::ErrorKind::UnexpectedEof =>
                     {
-                        return Err("Truncated audio file: premature end-of-file".to_string());
+                        return IntegrityCheck::Warning(
+                            "Truncated audio file: premature end-of-file".to_string(),
+                        );
                     }
-                    Err(e) => return Err(format!("Audio stream packet error: {e}")),
+                    Err(e) => {
+                        return IntegrityCheck::Corrupt(format!("Audio stream packet error: {e}"));
+                    }
                 }
             }
 
-            Ok(())
+            IntegrityCheck::Valid
         }
     }
 }

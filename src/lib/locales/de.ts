@@ -3174,8 +3174,12 @@ export const de = {
       "Verlustfreie Titel mit Verdacht auf verlustbehaftete Transkodierung oder Upsampling.",
     shelfProvenanceBadge: "Verdacht auf Transkodierung",
     shelfCorruptTitle: "Beschädigte und unlesbare Audiodateien",
-    shelfCorruptHint:
-      "Titel mit Fehlern bei der Stream-Dekodierung, Container-Überprüfung oder Prüfsummenvalidierung",
+    shelfCorruptHint: "Titel mit Fehlern bei der Container-Überprüfung oder Stream-Dekodierung",
+    shelfIntegrityWarningsTitle: "Integritätswarnungen für Audiodateien",
+    shelfIntegrityWarningsHint:
+      "Titel, die normal abgespielt werden, aber eine Prüfsummenabweichung oder eine geringfügige Kürzung am Stream-Ende aufweisen",
+    showWarnings: "Warnungen anzeigen",
+    hideWarnings: "Warnungen ausblenden",
     showAllWithCount: "Alle anzeigen ({count})",
     showLess: "Weniger anzeigen",
   },

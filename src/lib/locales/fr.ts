@@ -3181,8 +3181,12 @@ export const fr: DeepStringRecord<typeof en> = {
       "Chansons sans perte signalées pour transcodage avec perte ou suréchantillonnage suspect.",
     shelfProvenanceBadge: "Transcodage suspect",
     shelfCorruptTitle: "Fichiers audio corrompus ou illisibles",
-    shelfCorruptHint:
-      "Chansons échouant au décodage du flux, à la vérification du conteneur ou à la validation de la somme de contrôle",
+    shelfCorruptHint: "Chansons échouant à la vérification du conteneur ou au décodage du flux",
+    shelfIntegrityWarningsTitle: "Avertissements d’intégrité audio",
+    shelfIntegrityWarningsHint:
+      "Chansons qui jouent normalement, mais présentent une non-concordance de somme de contrôle ou une troncature mineure en fin de flux",
+    showWarnings: "Afficher les avertissements",
+    hideWarnings: "Masquer les avertissements",
     showAllWithCount: "Tout afficher ({count})",
     showLess: "Afficher moins",
   },

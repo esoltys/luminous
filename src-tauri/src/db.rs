@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 92;
+pub const CURRENT_SCHEMA_VERSION: i32 = 93;
 
 struct Migration {
     version: i32,
@@ -968,6 +968,14 @@ const MIGRATIONS: &[Migration] = &[
         version: 92,
         description: "radio_saved table for user-saved internet radio stations (#2005)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_92)?),
+    },
+    Migration {
+        version: 93,
+        description: "invalidate cached corrupt song_integrity rows for warning/corrupt split (#2197)",
+        apply: |conn| {
+            conn.execute("DELETE FROM song_integrity WHERE status = 'corrupt'", [])?;
+            Ok(())
+        },
     },
 ];
 
