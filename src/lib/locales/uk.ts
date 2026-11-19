@@ -3468,7 +3468,7 @@ export const uk = {
     stationTagsPlaceholder: "напр. ambient, electronic",
     importStationFileBtn: "Імпорт із файлу…",
     importStationFileTitle: "Імпортувати плейлист станцій",
-    exportStationsBtn: "Експорт",
+    exportStationsBtn: "Експортувати збережені станції",
     exportStationsTooltip: "Експортувати збережені станції",
     customStationAdded: "Додано станцію {name}",
     customStationsImported: {

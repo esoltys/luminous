@@ -425,7 +425,8 @@ describe("RadioView", () => {
     render(RadioView);
     await fireEvent.click(screen.getByTestId("radio-tab-my-stations"));
 
-    const addBtn = await screen.findByTestId("radio-add-station-btn");
+    await fireEvent.click(await screen.findByTestId("radio-overflow-btn"));
+    const addBtn = await screen.findByRole("menuitem", { name: "Add station" });
     await fireEvent.click(addBtn);
 
     const nameInput = await screen.findByTestId("add-station-name");

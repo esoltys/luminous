@@ -3478,7 +3478,7 @@ export const ru = {
     stationTagsPlaceholder: "напр. ambient, electronic",
     importStationFileBtn: "Импорт из файла…",
     importStationFileTitle: "Импортировать плейлист станций",
-    exportStationsBtn: "Экспорт",
+    exportStationsBtn: "Экспортировать сохранённые станции",
     exportStationsTooltip: "Экспортировать сохранённые станции",
     customStationAdded: "Добавлена станция {name}",
     customStationsImported: {

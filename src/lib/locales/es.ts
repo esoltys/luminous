@@ -3278,7 +3278,7 @@ export const es = {
     stationTagsPlaceholder: "p. ej., ambient, electrónica",
     importStationFileBtn: "Importar archivo…",
     importStationFileTitle: "Importar lista de emisoras",
-    exportStationsBtn: "Exportar",
+    exportStationsBtn: "Exportar emisoras guardadas",
     exportStationsTooltip: "Exportar emisoras guardadas",
     customStationAdded: "{name} añadida",
     customStationsImported: {

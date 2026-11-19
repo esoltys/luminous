@@ -3271,7 +3271,7 @@ export const it = {
     stationTagsPlaceholder: "es. ambient, elettronica",
     importStationFileBtn: "Importa da file…",
     importStationFileTitle: "Importa playlist stazioni",
-    exportStationsBtn: "Esporta",
+    exportStationsBtn: "Esporta stazioni salvate",
     exportStationsTooltip: "Esporta stazioni salvate",
     customStationAdded: "{name} aggiunta",
     customStationsImported: {

@@ -1,16 +1,61 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { save } from "@tauri-apps/plugin-dialog";
   import {
     ArrowClockwiseIcon as RefreshCw,
     WarningCircleIcon as AlertCircle,
+    ExportIcon as Export,
   } from "phosphor-svelte";
   import { fade } from "../../utils/motion";
+  import { CONTEXT_MENU_WIDTH_PX } from "../../constants";
   import { radioStore } from "../../stores/radio.svelte";
+  import { toastStore } from "../../stores/toast.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import CollectionHeader from "../CollectionHeader.svelte";
+  import MoreIcon from "../MoreIcon.svelte";
+  import Plus from "../PlusIcon.svelte";
+  import ContextMenu from "../ContextMenu.svelte";
+  import ContextMenuItem from "../ContextMenuItem.svelte";
+  import ContextMenuDivider from "../ContextMenuDivider.svelte";
   import RadioOptInCard from "./RadioOptInCard.svelte";
   import RadioDiscoverView from "./RadioDiscoverView.svelte";
   import RadioMyStationsView from "./RadioMyStationsView.svelte";
+  import AddStationModal from "./AddStationModal.svelte";
+
+  let overflowButtonEl: HTMLButtonElement | null = $state(null);
+  let showOverflowMenu = $state(false);
+  let overflowMenuPos = $state({ x: 0, y: 0 });
+  let showAddStationModal = $state(false);
+
+  function toggleOverflowMenu() {
+    if (showOverflowMenu) {
+      showOverflowMenu = false;
+      return;
+    }
+    if (!overflowButtonEl) return;
+    const rect = overflowButtonEl.getBoundingClientRect();
+    overflowMenuPos = { x: rect.right - CONTEXT_MENU_WIDTH_PX, y: rect.bottom + 8 };
+    showOverflowMenu = true;
+  }
+
+  async function handleExportSavedStations() {
+    try {
+      const savePath = await save({
+        title: i18n.t("radio.exportStationsTooltip"),
+        defaultPath: "saved-stations.pls",
+        filters: [
+          { name: "PLS Playlist (*.pls)", extensions: ["pls"] },
+          { name: "M3U8 Playlist (*.m3u8)", extensions: ["m3u8"] },
+          { name: "M3U Playlist (*.m3u)", extensions: ["m3u"] },
+        ],
+      });
+      if (savePath && typeof savePath === "string") {
+        await radioStore.exportSavedStations(savePath);
+      }
+    } catch (err) {
+      toastStore.show(err instanceof Error ? err.message : String(err), "error");
+    }
+  }
 
   function formatUpdatedAgo(lastSyncedAt: number | null): string {
     if (!lastSyncedAt) return "";
@@ -93,20 +138,17 @@
         </button>
       </div>
 
-      {#if radioStore.status?.optedIn}
-        <button
-          type="button"
-          disabled={radioStore.syncing}
-          onclick={() => void radioStore.syncDirectory()}
-          aria-label={i18n.t("radio.refreshIndex")}
-          class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-brand-border hover:border-brand-accent/60 bg-brand-sidebar text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary disabled:opacity-50 transition-colors"
-        >
-          <RefreshCw class="w-3.5 h-3.5 {radioStore.syncing ? 'animate-spin' : ''}" />
-          <span class="hidden @sm:inline">
-            {radioStore.syncing ? i18n.t("radio.syncingShort") : i18n.t("radio.refreshIndex")}
-          </span>
-        </button>
-      {/if}
+      <button
+        bind:this={overflowButtonEl}
+        type="button"
+        onclick={toggleOverflowMenu}
+        data-testid="radio-overflow-btn"
+        aria-label={i18n.t("playlists.moreActionsTooltip")}
+        title={i18n.t("playlists.moreActionsTooltip")}
+        class="flex items-center justify-center w-8 h-8 rounded-full border border-brand-border hover:border-brand-accent/60 bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+      >
+        <MoreIcon class="w-4 h-4" />
+      </button>
     {/snippet}
   </CollectionHeader>
 
@@ -154,3 +196,52 @@
     </div>
   </div>
 </div>
+
+{#if showOverflowMenu}
+  <ContextMenu
+    x={overflowMenuPos.x}
+    y={overflowMenuPos.y}
+    onClose={() => {
+      showOverflowMenu = false;
+    }}
+  >
+    <ContextMenuItem
+      icon={Plus}
+      label={i18n.t("radio.addStationBtn")}
+      onclick={() => {
+        showOverflowMenu = false;
+        showAddStationModal = true;
+      }}
+    />
+    {#if radioStore.savedStations.length > 0}
+      <ContextMenuItem
+        icon={Export}
+        label={i18n.t("radio.exportStationsBtn")}
+        onclick={() => {
+          showOverflowMenu = false;
+          void handleExportSavedStations();
+        }}
+      />
+    {/if}
+    {#if radioStore.status?.optedIn}
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={RefreshCw}
+        label={radioStore.syncing ? i18n.t("radio.syncingShort") : i18n.t("radio.refreshIndex")}
+        disabled={radioStore.syncing}
+        onclick={() => {
+          showOverflowMenu = false;
+          void radioStore.syncDirectory();
+        }}
+      />
+    {/if}
+  </ContextMenu>
+{/if}
+
+{#if showAddStationModal}
+  <AddStationModal
+    onClose={() => {
+      showAddStationModal = false;
+    }}
+  />
+{/if}

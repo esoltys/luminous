@@ -3293,7 +3293,7 @@ export const fr: DeepStringRecord<typeof en> = {
     stationTagsPlaceholder: "p. ex. ambient, électronique",
     importStationFileBtn: "Importer un fichier…",
     importStationFileTitle: "Importer une liste de stations",
-    exportStationsBtn: "Exporter",
+    exportStationsBtn: "Exporter les stations enregistrées",
     exportStationsTooltip: "Exporter les stations enregistrées",
     customStationAdded: "{name} ajoutée",
     customStationsImported: {

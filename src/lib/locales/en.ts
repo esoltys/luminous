@@ -3201,7 +3201,7 @@ export const en = {
     stationTagsPlaceholder: "e.g. ambient, electronic",
     importStationFileBtn: "Import from file…",
     importStationFileTitle: "Import station playlist",
-    exportStationsBtn: "Export",
+    exportStationsBtn: "Export Saved Stations",
     exportStationsTooltip: "Export saved stations",
     customStationAdded: "Added {name}",
     customStationsImported: {
