@@ -28,7 +28,7 @@ pub(crate) async fn replace_queue_and_play_state(
         .map_err(|e| e.to_string())
 }
 
-async fn replace_queue_and_play(
+pub(crate) async fn replace_queue_and_play(
     state: &State<'_, AppState>,
     song_ids: &[i64],
     start_index: usize,

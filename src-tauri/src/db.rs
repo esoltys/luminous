@@ -964,6 +964,11 @@ const MIGRATIONS: &[Migration] = &[
         description: "clear folder art assigned to every album of a mixed-album folder",
         apply: migrate_clear_mixed_folder_art,
     },
+    Migration {
+        version: 92,
+        description: "radio_saved table for user-saved internet radio stations (#2005)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_92)?),
+    },
 ];
 
 /// Migration 83 (#2097): `artist_profiles.artist_key` becomes
@@ -3279,6 +3284,14 @@ INSERT OR IGNORE INTO radio_directory_meta (id, opted_in) VALUES (1, 0);
 
 const MIGRATION_90: &str = "
 DROP TABLE IF EXISTS radio_channels;
+";
+
+const MIGRATION_92: &str = "
+CREATE TABLE IF NOT EXISTS radio_saved (
+    stationuuid TEXT PRIMARY KEY,
+    saved_at    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_radio_saved_saved_at ON radio_saved(saved_at DESC);
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
