@@ -156,75 +156,84 @@ fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<DroppedItem>, usize) {
 /// command that turns raw filesystem paths into Queue entries, so an
 /// unmanaged file dropped or opened from outside the library is always
 /// treated identically.
+fn resolve_single_local_song(
+    conn: &rusqlite::Connection,
+    cover_manager: &CoverManager,
+    watched: &crate::collection::WatchedFolders,
+    item_path: &Path,
+) -> Result<Option<crate::models::Song>, String> {
+    use rusqlite::params;
+    use rusqlite::OptionalExtension;
+
+    let item_path_str = item_path.to_string_lossy().to_string();
+    let norm_path_1 = item_path_str.replace('/', "\\");
+    let norm_path_2 = item_path_str.replace('\\', "/");
+
+    let existing: Option<crate::models::Song> = conn
+        .query_row(
+            &format!(
+                "SELECT {} FROM songs WHERE path = ?1 OR path = ?2 OR path = ?3 OR LOWER(path) = LOWER(?1)",
+                crate::collection::SONG_SELECT_COLS
+            ),
+            params![item_path_str, norm_path_1, norm_path_2],
+            crate::collection::row_to_song,
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    if let Some(mut s) = existing {
+        if s.unavailable {
+            let _ = conn.execute(
+                "UPDATE songs SET unavailable = 0 WHERE id = ?1",
+                params![s.id],
+            );
+            s.unavailable = false;
+        }
+        return Ok(Some(s));
+    }
+
+    // Unknown file. Inside a watched folder it's a library song the scan
+    // hasn't reached yet; anywhere else it's an opened file, queued,
+    // played and counted in history without joining the library (#1842).
+    let prepared =
+        crate::collection::read_and_prepare_song(cover_manager, item_path).and_then(|mut song| {
+            song.source = watched.source_for(item_path);
+            crate::collection::upsert_song(conn, &song)
+        });
+    if let Err(e) = prepared {
+        log::warn!("Failed to read tags for '{}': {}", item_path_str, e);
+        return Ok(None);
+    }
+
+    let inserted: Result<crate::models::Song, _> = conn.query_row(
+        &format!(
+            "SELECT {} FROM songs WHERE path = ?1",
+            crate::collection::SONG_SELECT_COLS
+        ),
+        params![item_path_str],
+        crate::collection::row_to_song,
+    );
+
+    match inserted {
+        Ok(s) => Ok(Some(s)),
+        Err(e) => {
+            log::error!("Failed to fetch upserted song {}: {}", item_path_str, e);
+            Ok(None)
+        }
+    }
+}
+
 pub(crate) fn resolve_songs_from_paths(
     conn: &rusqlite::Connection,
     cover_manager: &CoverManager,
     resolved_paths: Vec<PathBuf>,
 ) -> Result<Vec<crate::models::Song>, String> {
-    use rusqlite::params;
-    use rusqlite::OptionalExtension;
-
     let mut songs = Vec::with_capacity(resolved_paths.len());
     let watched = crate::collection::WatchedFolders::load(conn).map_err(|e| e.to_string())?;
 
     for item_path in resolved_paths {
-        let item_path_str = item_path.to_string_lossy().to_string();
-        let norm_path_1 = item_path_str.replace('/', "\\");
-        let norm_path_2 = item_path_str.replace('\\', "/");
-
-        // Check if exists in db (handling slash normalization and case variations)
-        let existing: Option<crate::models::Song> = conn
-            .query_row(
-                &format!(
-                    "SELECT {} FROM songs WHERE path = ?1 OR path = ?2 OR path = ?3 OR LOWER(path) = LOWER(?1)",
-                    crate::collection::SONG_SELECT_COLS
-                ),
-                params![item_path_str, norm_path_1, norm_path_2],
-                crate::collection::row_to_song,
-            )
-            .optional()
-            .map_err(|e| e.to_string())?;
-
-        if let Some(mut s) = existing {
-            if s.unavailable {
-                let _ = conn.execute(
-                    "UPDATE songs SET unavailable = 0 WHERE id = ?1",
-                    params![s.id],
-                );
-                s.unavailable = false;
-            }
-            songs.push(s);
-            continue;
-        }
-
-        // Unknown file. Inside a watched folder it's a library song the scan
-        // hasn't reached yet; anywhere else it's an opened file, queued,
-        // played and counted in history without joining the library (#1842).
-        let prepared = crate::collection::read_and_prepare_song(cover_manager, &item_path)
-            .and_then(|mut song| {
-                song.source = watched.source_for(&item_path);
-                crate::collection::upsert_song(conn, &song)
-            });
-        if let Err(e) = prepared {
-            log::warn!("Failed to read tags for '{}': {}", item_path_str, e);
-            continue;
-        }
-
-        // Fetch the inserted song to get its ID and full state
-        let inserted: Result<crate::models::Song, _> = conn.query_row(
-            &format!(
-                "SELECT {} FROM songs WHERE path = ?1",
-                crate::collection::SONG_SELECT_COLS
-            ),
-            params![item_path_str],
-            crate::collection::row_to_song,
-        );
-
-        match inserted {
-            Ok(s) => songs.push(s),
-            Err(e) => {
-                log::error!("Failed to fetch upserted song {}: {}", item_path_str, e);
-            }
+        if let Some(song) = resolve_single_local_song(conn, cover_manager, &watched, &item_path)? {
+            songs.push(song);
         }
     }
 
@@ -594,10 +603,14 @@ fn resolve_songs_from_dropped_items(
     items: Vec<DroppedItem>,
 ) -> Result<Vec<crate::models::Song>, String> {
     let mut songs = Vec::with_capacity(items.len());
+    let watched = crate::collection::WatchedFolders::load(conn).map_err(|e| e.to_string())?;
     for item in items {
         match item {
             DroppedItem::LocalPath(path) => {
-                songs.extend(resolve_songs_from_paths(conn, cover_manager, vec![path])?);
+                if let Some(song) = resolve_single_local_song(conn, cover_manager, &watched, &path)?
+                {
+                    songs.push(song);
+                }
             }
             DroppedItem::StreamUrl(track) => {
                 match crate::radio_directory::upsert_stream_station(

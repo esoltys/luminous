@@ -1467,6 +1467,16 @@ pub fn upsert_stream_station(
     name: Option<&str>,
     tags: Option<&str>,
 ) -> Result<crate::models::Song> {
+    upsert_stream_station_inner(conn, stream_url, name, tags, false)
+}
+
+fn upsert_stream_station_inner(
+    conn: &Connection,
+    stream_url: &str,
+    name: Option<&str>,
+    tags: Option<&str>,
+    update_existing_stream: bool,
+) -> Result<crate::models::Song> {
     let url = stream_url.trim();
     if !luminous_metadata::playlist::is_http_url(url) {
         anyhow::bail!("Station URL must start with http:// or https://");
@@ -1479,10 +1489,24 @@ pub fn upsert_stream_station(
          ORDER BY id ASC LIMIT 1",
         crate::collection::SONG_SELECT_COLS
     );
-    if let Some(existing) = conn
+    if let Some(mut existing) = conn
         .query_row(&existing_sql, params![url], crate::collection::row_to_song)
         .optional()?
     {
+        if update_existing_stream && existing.source == crate::models::SongSource::Stream {
+            let trimmed_name = name.map(str::trim).filter(|s| !s.is_empty());
+            let genre = tags.map(str::trim).filter(|s| !s.is_empty());
+            let now = crate::clock::unix_now();
+            conn.execute(
+                "UPDATE songs SET title = COALESCE(?1, title), genre = ?2, mtime = ?3 WHERE id = ?4",
+                params![trimmed_name, genre, now, existing.id],
+            )?;
+            if let Some(t) = trimmed_name {
+                existing.title = Some(t.to_string());
+            }
+            existing.genre = genre.map(str::to_string);
+            existing.mtime = Some(now);
+        }
         return Ok(existing);
     }
 
@@ -1533,23 +1557,13 @@ pub fn add_custom_station(
     if trimmed_name.is_empty() {
         anyhow::bail!("Station name cannot be empty");
     }
-    let song = upsert_stream_station(conn, stream_url, Some(trimmed_name), Some(tags))?;
+    let song = upsert_stream_station_inner(conn, stream_url, Some(trimmed_name), Some(tags), true)?;
     let uuid = song
         .path
         .as_deref()
         .and_then(parse_station_uuid)
         .ok_or_else(|| anyhow::anyhow!("Custom station missing radio:// path"))?
         .to_string();
-
-    // If an earlier custom row existed for the same stream URL, update its
-    // user-facing name/tags to match what the user just entered.
-    if song.source == crate::models::SongSource::Stream {
-        let genre = (!tags.trim().is_empty()).then_some(tags.trim());
-        conn.execute(
-            "UPDATE songs SET title = ?1, genre = ?2, mtime = ?3 WHERE id = ?4",
-            params![trimmed_name, genre, crate::clock::unix_now(), song.id],
-        )?;
-    }
 
     save_station(conn, &uuid)?;
     find_station(conn, &uuid)?.ok_or_else(|| anyhow::anyhow!("Failed to load saved custom station"))
