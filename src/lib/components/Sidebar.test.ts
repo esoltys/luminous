@@ -385,7 +385,7 @@ describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
     expect(getByRole("button", { name: /custom/i })).not.toHaveAttribute("data-drop-target");
   });
 
-  it("uses a consistent text-xs font-medium scale across all expanded nav buttons and text-[11px] for section labels", () => {
+  it("uses a consistent text-sm font-medium scale across all expanded nav buttons and text-xs for section labels", () => {
     const { getByRole, getByText } = render(Sidebar, { props: { width: 256 } });
     for (const name of [
       /home/i,
@@ -397,12 +397,12 @@ describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
       /help/i,
     ]) {
       const btn = getByRole("button", { name });
-      expect(btn).toHaveClass("text-xs", "font-medium");
-      expect(btn).not.toHaveClass("text-sm", "font-semibold");
+      expect(btn).toHaveClass("text-sm", "font-medium");
+      expect(btn).not.toHaveClass("text-xs", "font-semibold");
     }
     for (const heading of ["Library", "Playlists", "Files"]) {
       const label = getByText(heading);
-      expect(label).toHaveClass("text-[11px]", "font-medium");
+      expect(label).toHaveClass("text-xs", "font-medium");
     }
   });
 });

@@ -4,14 +4,14 @@
  */
 
 /** Primary text style for every navigable row in the expanded sidebar (top-level, pins, sub-items). */
-export const SIDEBAR_NAV_TEXT_CLASS = "text-xs font-medium";
+export const SIDEBAR_NAV_TEXT_CLASS = "text-sm font-medium";
 
 /** Secondary caption text style for subtitles, device storage/sync status, and drag-expanded lists. */
-export const SIDEBAR_CAPTION_TEXT_CLASS = "text-[11px] font-normal";
+export const SIDEBAR_CAPTION_TEXT_CLASS = "text-xs font-normal";
 
 /** A quiet, non-interactive section heading ("Pinned", "Library", "Playlists", "Files"). */
 export const SIDEBAR_SECTION_LABEL_CLASS =
-  "w-full px-3 pt-2.5 pb-0.5 text-[11px] font-medium text-brand-text-secondary/70 truncate";
+  "w-full px-3 pt-2.5 pb-0.5 text-xs font-medium text-brand-text-secondary/70 truncate";
 
 /** Selected/unselected colours of a sub-item row; the selected one matches the main nav buttons. */
 export const SIDEBAR_ROW_SELECTED_CLASS =
