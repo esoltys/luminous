@@ -17,7 +17,11 @@
   import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
   import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
 
-  import { getPlaylistAutoKindAndSubtitle, getPlaylistDisplayName } from "../utils/playlist";
+  import {
+    formatPlaylistItemCount,
+    getPlaylistAutoKindAndSubtitle,
+    getPlaylistDisplayName,
+  } from "../utils/playlist";
 
   let {
     playlist,
@@ -133,6 +137,7 @@
   {subtitleLabel}
   {updatedLabel}
   trackCount={playlist.track_count}
+  countLabel={formatPlaylistItemCount(playlist, playlist.track_count)}
   {cover}
   {footer}
 />

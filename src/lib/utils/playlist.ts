@@ -390,6 +390,20 @@ export function isStationList(
 }
 
 /**
+ * Formats a playlist's item count using "stations" for radio station lists and
+ * "songs" for regular/smart playlists.
+ */
+export function formatPlaylistItemCount(
+  playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system"> | undefined,
+  count: number,
+): string {
+  if (playlist && isStationList(playlist)) {
+    return i18n.t("radio.stationCount", { count });
+  }
+  return i18n.plural("playlists.songsCount", count);
+}
+
+/**
  * Parses a `radio:...` dynamic_spec string into a structured {@link RadioStationListSpec},
  * or returns `null` if the spec is not a station list spec.
  */

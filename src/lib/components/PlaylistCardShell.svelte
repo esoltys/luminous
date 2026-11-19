@@ -12,6 +12,7 @@
     subtitleLabel = null,
     updatedLabel,
     trackCount,
+    countLabel,
     cover,
     footer,
   }: {
@@ -23,16 +24,18 @@
     subtitleLabel?: string | null;
     updatedLabel: string;
     trackCount: number;
+    countLabel?: string;
     cover: Snippet;
     footer?: Snippet;
   } = $props();
 
   const plain = useCardAppearance() === "plain";
+  const resolvedCountLabel = $derived(
+    countLabel ?? i18n.plural("playlists.songsCount", trackCount),
+  );
 
   // Plain tiles fold the kind and the song count onto one line ("Moment mix, 299 songs").
-  const plainDetail = $derived(
-    [subtitleLabel, i18n.plural("playlists.songsCount", trackCount)].filter(Boolean).join(", "),
-  );
+  const plainDetail = $derived([subtitleLabel, resolvedCountLabel].filter(Boolean).join(", "));
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -78,7 +81,7 @@
       class="flex items-center justify-between mt-1.5 text-xs leading-[22px] text-brand-text-secondary"
     >
       <span class="truncate">{updatedLabel}</span>
-      <span class="shrink-0">{i18n.plural("playlists.songsCount", trackCount)}</span>
+      <span class="shrink-0">{resolvedCountLabel}</span>
     </div>
   {/if}
 

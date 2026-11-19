@@ -42,6 +42,7 @@
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import {
     autoContinueRunStarts,
+    formatPlaylistItemCount,
     getPlaylistDisplayName,
     isSmartPlaylist as isSmartPlaylistRow,
     isStationList as isStationListRow,
@@ -854,7 +855,10 @@
                 class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium"
               >
                 <span>
-                  {i18n.plural("playlists.songsCount", playlistsStore.activePlaylistTracks.length)}
+                  {formatPlaylistItemCount(
+                    activePlaylist,
+                    playlistsStore.activePlaylistTracks.length,
+                  )}
                 </span>
                 {#if !allLiveStreams}
                   <span>•</span>

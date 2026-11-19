@@ -14,6 +14,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import {
     autoPlaylistRefFromPlaylist,
+    formatPlaylistItemCount,
     getPlaylistAutoKindAndSubtitle,
     getPlaylistDisplayName,
   } from "../utils/playlist";
@@ -71,7 +72,7 @@
 
   function trackCountFor(item: HomeItem): string {
     if (item.type === "playlist") {
-      return i18n.plural("playlists.songsCount", item.playlist.track_count);
+      return formatPlaylistItemCount(item.playlist, item.playlist.track_count);
     }
     return "";
   }

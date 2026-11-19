@@ -5,7 +5,11 @@
   import { formatRelativeDate } from "../utils/date";
   import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
   import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
-  import { getPlaylistAutoKindAndSubtitle, getPlaylistDisplayName } from "../utils/playlist";
+  import {
+    formatPlaylistItemCount,
+    getPlaylistAutoKindAndSubtitle,
+    getPlaylistDisplayName,
+  } from "../utils/playlist";
   import { rowClasses, useCardAppearance } from "../utils/cardAppearance";
 
   const appearance = useCardAppearance();
@@ -59,7 +63,7 @@
 
   <div class="shrink-0 max-w-40 text-right">
     <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">
-      {i18n.plural("playlists.songsCount", playlist.track_count)}
+      {formatPlaylistItemCount(playlist, playlist.track_count)}
     </p>
     <p class="text-xs text-brand-text-secondary truncate">{updatedLabel}</p>
   </div>
