@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createScriptingApi } from "./index";
 import { methodPaths } from "./contract";
@@ -128,6 +128,25 @@ describe("Scripting contract", () => {
         if (!minorBump) expect(added, `${step} adds methods without a minor bump`).toEqual([]);
       }
     });
+  });
+
+  it("only invokes backend commands the app registers", () => {
+    // A misspelt command name fails only at runtime, in the real app (#2010 caught
+    // playback.pause() calling a "pause_playback" that never existed).
+    const handlers = readFileSync(path.resolve(__dirname, "../../../src-tauri/src/lib.rs"), "utf8");
+    const registered = new Set([...handlers.matchAll(/commands::\w+::(\w+),/g)].map((m) => m[1]));
+    const sources = readdirSync(__dirname).filter(
+      (f) => f.endsWith(".ts") && !f.includes(".test."),
+    );
+    const invoked = sources.flatMap((f) =>
+      [
+        ...readFileSync(path.resolve(__dirname, f), "utf8").matchAll(
+          /invoke(?:<[^(]*>)?\("(\w+)"/g,
+        ),
+      ].map((m) => `${f}: ${m[1]}`),
+    );
+    expect(invoked.length).toBeGreaterThan(0);
+    expect(invoked.filter((entry) => !registered.has(entry.split(": ")[1]))).toEqual([]);
   });
 
   it("keeps types.ts free of imports so it can be vendored", () => {

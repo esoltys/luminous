@@ -159,19 +159,19 @@ describe("In-app scripting API", () => {
       playerStore.state = "playing";
 
       vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-        if (cmd === "pause_playback") {
+        if (cmd === "pause") {
           playerStore.state = "paused";
-        } else if (cmd === "resume_playback") {
+        } else if (cmd === "resume") {
           playerStore.state = "playing";
         }
       });
 
       await api.playback.pause();
-      expect(invoke).toHaveBeenCalledWith("pause_playback");
+      expect(invoke).toHaveBeenCalledWith("pause");
       expect(playerStore.state).toBe("paused");
 
       await api.playback.resume();
-      expect(invoke).toHaveBeenCalledWith("resume_playback");
+      expect(invoke).toHaveBeenCalledWith("resume");
       expect(playerStore.state).toBe("playing");
 
       await api.playback.seek(45.5);

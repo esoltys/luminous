@@ -119,13 +119,13 @@ export function createPlaybackController(wait: ScriptWaitApi): ScriptPlaybackApi
 
     async pause(): Promise<void> {
       if (playerStore.state === "paused") return;
-      await invoke("pause_playback");
+      await invoke("pause");
       await wait.forState(() => playerStore.state === "paused", 5000);
     },
 
     async resume(): Promise<void> {
       if (playerStore.state === "playing") return;
-      await invoke("resume_playback");
+      await invoke("resume");
       await wait.forState(() => playerStore.state === "playing", 5000);
     },
 
