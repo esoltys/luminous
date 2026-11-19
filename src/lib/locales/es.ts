@@ -3173,6 +3173,26 @@ export const es = {
       "Canciones que se reproducen con normalidad, pero tienen una discrepancia de suma de comprobación o un truncamiento menor al final del flujo",
     showWarnings: "Mostrar advertencias",
     hideWarnings: "Ocultar advertencias",
+    integrityMd5Label: "Discrepancia de suma de comprobación",
+    integrityMd5Desc:
+      "La suma de comprobación del encabezado no coincide con el audio (algo habitual con ciertos codificadores o editores de etiquetas). La canción se reproduce con normalidad.",
+    integrityMinorTruncationLabel: "Truncamiento menor al final",
+    integrityMinorTruncationDesc:
+      "El archivo termina un poco antes de lo que indica su encabezado, pero casi todo el audio está intacto y se puede reproducir.",
+    integrityIncompleteFileLabel: "Archivo incompleto",
+    integrityIncompleteFileDesc:
+      "El archivo se corta a mitad de la canción (por ejemplo, por una descarga o copia interrumpida).",
+    integrityEmptyFileLabel: "Archivo vacío",
+    integrityEmptyFileDesc: "El archivo no contiene datos (0 bytes).",
+    integrityUnrecognizedFormatLabel: "Formato no reconocido",
+    integrityUnrecognizedFormatDesc:
+      "No se pudo leer el encabezado o contenedor del archivo como audio.",
+    integrityNoAudioLabel: "Sin audio reproducible",
+    integrityNoAudioDesc: "El archivo se abrió, pero no contiene audio decodificable.",
+    integrityDamagedAudioLabel: "Datos de audio dañados",
+    integrityDamagedAudioDesc: "Uno o más fotogramas de audio dentro del archivo están dañados.",
+    integrityUnreadableStreamLabel: "Flujo de audio ilegible",
+    integrityUnreadableStreamDesc: "No se pudo decodificar el flujo de audio correctamente.",
     showAllWithCount: "Mostrar todo ({count})",
     showLess: "Mostrar menos",
   },

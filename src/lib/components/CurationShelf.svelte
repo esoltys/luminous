@@ -14,6 +14,7 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { createEventScope } from "../utils/eventScope";
+  import { describeIntegrityIssue } from "../utils/integrityReason";
   import AlbumRowCard from "./AlbumRowCard.svelte";
   import AlbumProfileEditor from "./AlbumProfileEditor.svelte";
   import DuplicateReviewModal from "./DuplicateReviewModal.svelte";
@@ -442,9 +443,10 @@
       </div>
     {/if}
 
-    {#snippet integritySongRows(songs: CorruptSongItem[])}
+    {#snippet integritySongRows(songs: CorruptSongItem[], isWarning: boolean)}
       <div class="divide-y divide-brand-border/40">
         {#each songs as song (song.id)}
+          {@const issue = describeIntegrityIssue(song.error_detail, isWarning)}
           <div class="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
@@ -454,12 +456,17 @@
                 <span
                   class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-text-primary/10 text-brand-text-primary font-medium whitespace-nowrap"
                 >
-                  {song.error_detail}
+                  {issue.label}
                 </span>
               </div>
               <p class="text-xs text-brand-text-secondary truncate mt-0.5">
                 {song.artist || i18n.t("collection.unknownArtist")}
               </p>
+              {#if issue.description}
+                <p class="text-xs text-brand-text-secondary/80 mt-0.5">
+                  {issue.description}
+                </p>
+              {/if}
             </div>
             <Button variant="secondary" size="sm" onclick={() => locateInFiles(song.id)}>
               <Folder class="w-3.5 h-3.5" />
@@ -494,7 +501,7 @@
           </div>
         </div>
 
-        {@render integritySongRows(overview.corrupt_songs)}
+        {@render integritySongRows(overview.corrupt_songs, false)}
       </div>
     {/if}
 
@@ -532,7 +539,7 @@
         </div>
 
         {#if showIntegrityWarnings}
-          {@render integritySongRows(displayedWarnings)}
+          {@render integritySongRows(displayedWarnings, true)}
 
           {#if overview.integrity_warnings.length > INITIAL_VISIBLE_COUNT}
             <button

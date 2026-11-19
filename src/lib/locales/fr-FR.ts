@@ -3188,6 +3188,26 @@ export const frFR: DeepStringRecord<typeof en> = {
       "Chansons qui sont lues normalement, mais présentent une non-concordance de somme de contrôle ou une troncature mineure en fin de flux",
     showWarnings: "Afficher les avertissements",
     hideWarnings: "Masquer les avertissements",
+    integrityMd5Label: "Somme de contrôle différente",
+    integrityMd5Desc:
+      "La somme de contrôle de l’en-tête ne correspond pas à l’audio (fréquent avec certains encodeurs ou éditeurs de tags). La chanson est lue normalement.",
+    integrityMinorTruncationLabel: "Troncature mineure à la fin",
+    integrityMinorTruncationDesc:
+      "Le fichier se termine un peu plus tôt que prévu par son en-tête, mais presque tout l’audio est intact et lisible.",
+    integrityIncompleteFileLabel: "Fichier incomplet",
+    integrityIncompleteFileDesc:
+      "Le fichier est coupé en plein milieu de la chanson (par exemple après un téléchargement ou une copie interrompue).",
+    integrityEmptyFileLabel: "Fichier vide",
+    integrityEmptyFileDesc: "Le fichier ne contient aucune donnée (0 octet).",
+    integrityUnrecognizedFormatLabel: "Format non reconnu",
+    integrityUnrecognizedFormatDesc:
+      "L’en-tête ou le conteneur du fichier n’a pas pu être lu comme de l’audio.",
+    integrityNoAudioLabel: "Aucun audio lisible",
+    integrityNoAudioDesc: "Le fichier s’est ouvert, mais ne contient aucun audio décodable.",
+    integrityDamagedAudioLabel: "Données audio endommagées",
+    integrityDamagedAudioDesc: "Une ou plusieurs trames audio du fichier sont corrompues.",
+    integrityUnreadableStreamLabel: "Flux audio illisible",
+    integrityUnreadableStreamDesc: "Le flux audio n’a pas pu être décodé correctement.",
     showAllWithCount: "Tout afficher ({count})",
     showLess: "Afficher moins",
   },

@@ -3165,6 +3165,26 @@ export const it = {
       "Brani che vengono riprodotti normalmente, ma presentano una mancata corrispondenza del checksum o un lieve troncamento a fine flusso",
     showWarnings: "Mostra avvisi",
     hideWarnings: "Nascondi avvisi",
+    integrityMd5Label: "Checksum non corrispondente",
+    integrityMd5Desc:
+      "Il checksum nell'intestazione non corrisponde all'audio (comune con alcuni encoder o editor di tag). Il brano viene riprodotto normalmente.",
+    integrityMinorTruncationLabel: "Lieve troncamento finale",
+    integrityMinorTruncationDesc:
+      "Il file termina leggermente prima di quanto previsto dall'intestazione, ma quasi tutto l'audio è integro e riproducibile.",
+    integrityIncompleteFileLabel: "File incompleto",
+    integrityIncompleteFileDesc:
+      "Il file risulta interrotto a metà brano (ad esempio per un download o una copia incompleta).",
+    integrityEmptyFileLabel: "File vuoto",
+    integrityEmptyFileDesc: "Il file non contiene dati (0 byte).",
+    integrityUnrecognizedFormatLabel: "Formato non riconosciuto",
+    integrityUnrecognizedFormatDesc:
+      "L'intestazione o il contenitore del file non è leggibile come audio.",
+    integrityNoAudioLabel: "Nessun audio riproducibile",
+    integrityNoAudioDesc: "Il file è stato aperto, ma non contiene audio decodificabile.",
+    integrityDamagedAudioLabel: "Dati audio danneggiati",
+    integrityDamagedAudioDesc: "Uno o più frame audio nel file sono danneggiati.",
+    integrityUnreadableStreamLabel: "Flusso audio illeggibile",
+    integrityUnreadableStreamDesc: "Impossibile decodificare correttamente il flusso audio.",
     showAllWithCount: "Mostra tutto ({count})",
     showLess: "Mostra meno",
   },

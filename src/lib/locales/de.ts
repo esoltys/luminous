@@ -3180,6 +3180,27 @@ export const de = {
       "Titel, die normal abgespielt werden, aber eine Prüfsummenabweichung oder eine geringfügige Kürzung am Stream-Ende aufweisen",
     showWarnings: "Warnungen anzeigen",
     hideWarnings: "Warnungen ausblenden",
+    integrityMd5Label: "Prüfsummenabweichung",
+    integrityMd5Desc:
+      "Die Prüfsumme im Datei-Header stimmt nicht mit den Audiodaten überein (häufig bei bestimmten Encodern oder Taggern). Der Titel wird normal abgespielt.",
+    integrityMinorTruncationLabel: "Geringfügige Kürzung am Ende",
+    integrityMinorTruncationDesc:
+      "Die Datei endet etwas früher als im Header angegeben, aber nahezu alle Audiodaten sind intakt und abspielbar.",
+    integrityIncompleteFileLabel: "Unvollständige Datei",
+    integrityIncompleteFileDesc:
+      "Die Datei bricht mitten im Titel ab (z. B. durch einen abgebrochenen Download oder Kopiervorgang).",
+    integrityEmptyFileLabel: "Leere Datei",
+    integrityEmptyFileDesc: "Die Datei enthält keine Daten (0 Bytes).",
+    integrityUnrecognizedFormatLabel: "Unbekanntes Format",
+    integrityUnrecognizedFormatDesc:
+      "Der Datei-Header oder Container konnte nicht als Audio gelesen werden.",
+    integrityNoAudioLabel: "Kein abspielbares Audio",
+    integrityNoAudioDesc:
+      "Die Datei ließ sich öffnen, enthält aber keine dekodierbaren Audiodaten.",
+    integrityDamagedAudioLabel: "Beschädigte Audiodaten",
+    integrityDamagedAudioDesc: "Ein oder mehrere Audio-Frames in der Datei sind beschädigt.",
+    integrityUnreadableStreamLabel: "Unlesbarer Audiostream",
+    integrityUnreadableStreamDesc: "Der Audiostream konnte nicht fehlerfrei dekodiert werden.",
     showAllWithCount: "Alle anzeigen ({count})",
     showLess: "Weniger anzeigen",
   },

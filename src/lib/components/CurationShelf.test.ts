@@ -393,6 +393,11 @@ describe("CurationShelf.svelte", () => {
     await fireEvent.click(toggleBtn);
 
     expect(await findByText("Playable Track")).toBeInTheDocument();
-    expect(await findByText("FLAC MD5 checksum mismatch")).toBeInTheDocument();
+    expect(await findByText("Checksum mismatch")).toBeInTheDocument();
+    expect(
+      await findByText(
+        "The file's header checksum doesn't match its audio (common with some encoders or taggers). The song still plays normally.",
+      ),
+    ).toBeInTheDocument();
   });
 });

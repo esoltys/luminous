@@ -3371,6 +3371,26 @@ export const ru = {
       "Песни воспроизводятся нормально, но имеют несовпадение контрольной суммы или незначительное обрезание в конце потока",
     showWarnings: "Показать предупреждения",
     hideWarnings: "Скрыть предупреждения",
+    integrityMd5Label: "Несовпадение контрольной суммы",
+    integrityMd5Desc:
+      "Контрольная сумма в заголовке файла не совпадает со звуком (часто бывает у некоторых кодировщиков или редакторов тегов). Песня воспроизводится нормально.",
+    integrityMinorTruncationLabel: "Незначительное обрезание в конце",
+    integrityMinorTruncationDesc:
+      "Файл заканчивается чуть раньше, чем указано в заголовке, но почти весь звук цел и воспроизводится.",
+    integrityIncompleteFileLabel: "Неполный файл",
+    integrityIncompleteFileDesc:
+      "Файл обрывается на середине песни (например, из-за прерванной загрузки или копирования).",
+    integrityEmptyFileLabel: "Пустой файл",
+    integrityEmptyFileDesc: "Файл не содержит данных (0 байт).",
+    integrityUnrecognizedFormatLabel: "Нераспознанный формат",
+    integrityUnrecognizedFormatDesc:
+      "Не удалось прочитать заголовок или контейнер файла как аудио.",
+    integrityNoAudioLabel: "Нет воспроизводимого звука",
+    integrityNoAudioDesc: "Файл открылся, но не содержит декодируемого аудио.",
+    integrityDamagedAudioLabel: "Поврежденные аудиоданные",
+    integrityDamagedAudioDesc: "Один или несколько аудиофреймов в файле повреждены.",
+    integrityUnreadableStreamLabel: "Нечитаемый аудиопоток",
+    integrityUnreadableStreamDesc: "Не удалось корректно декодировать аудиопоток.",
     showAllWithCount: "Показать все ({count})",
     showLess: "Показать меньше",
   },
