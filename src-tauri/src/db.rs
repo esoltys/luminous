@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 93;
+pub const CURRENT_SCHEMA_VERSION: i32 = 94;
 
 struct Migration {
     version: i32,
@@ -983,6 +983,11 @@ const MIGRATIONS: &[Migration] = &[
             conn.execute("DELETE FROM song_integrity WHERE status = 'corrupt'", [])?;
             Ok(())
         },
+    },
+    Migration {
+        version: 94,
+        description: "force a full radio directory resync to repair truncated mirrors (#2199)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_94)?),
     },
 ];
 
@@ -3309,6 +3314,14 @@ CREATE TABLE IF NOT EXISTS radio_saved (
 CREATE INDEX IF NOT EXISTS idx_radio_saved_saved_at ON radio_saved(saved_at DESC);
 ";
 
+/// Before #2199 the full sync stopped after the first page, and the incremental syncs that
+/// followed never filled the gap. Dropping the change cursor makes `choose_sync_plan` pick a
+/// full resync next time; only a completed full sync writes the cursor back, so an interrupted
+/// repair is retried.
+const MIGRATION_94: &str = "
+UPDATE radio_directory_meta SET last_change_uuid = NULL;
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -5154,6 +5167,37 @@ mod tests {
         assert!(art("/m/mixed/d.mp3").is_some(), "manual art is untouched");
         assert!(art("/m/one/1.mp3").is_some());
         assert!(art("/m/one/2.mp3").is_some());
+    }
+
+    #[test]
+    fn migration_94_drops_radio_change_cursor_but_keeps_mirror_state() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration94_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "UPDATE radio_directory_meta
+             SET opted_in = 1, last_synced_at = 100, last_full_sync_at = 100,
+                 last_change_uuid = 'chg-1'
+             WHERE id = 1",
+            [],
+        )
+        .unwrap();
+
+        conn.execute_batch(MIGRATION_94).unwrap();
+
+        let (opted_in, last_synced, cursor): (i64, Option<i64>, Option<String>) = conn
+            .query_row(
+                "SELECT opted_in, last_synced_at, last_change_uuid FROM radio_directory_meta",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(opted_in, 1);
+        assert_eq!(last_synced, Some(100));
+        assert_eq!(cursor, None);
     }
 
     /// Migration 72 (#1842): local rows outside every watched folder were
