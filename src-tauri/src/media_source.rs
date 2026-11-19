@@ -133,14 +133,18 @@ fn resolve_live_stream_url(db: &Database, location: &str) -> Result<Option<Strin
     }
 
     if location.starts_with("http://") || location.starts_with("https://") {
+        let sql = format!(
+            "SELECT EXISTS( \
+                SELECT 1 FROM songs \
+                WHERE (path = ?1 OR stream_url = ?1 OR url = ?1) \
+                  AND (source IN ({}) OR filetype = ?2) \
+            )",
+            *crate::models::LIVE_STREAM_SOURCES_SQL,
+        );
         let is_live: bool = conn
             .query_row(
-                "SELECT EXISTS( \
-                    SELECT 1 FROM songs \
-                    WHERE (path = ?1 OR stream_url = ?1 OR url = ?1) \
-                      AND (source IN (3, 7, 8, 10) OR filetype = 18) \
-                )",
-                rusqlite::params![location],
+                &sql,
+                rusqlite::params![location, crate::models::FileType::Stream as i32],
                 |r| r.get(0),
             )
             .unwrap_or(false);
@@ -804,8 +808,6 @@ pub struct LiveHttpSource {
     ring_capacity: usize,
     metadata_tx: Mutex<mpsc::Sender<String>>,
     last_title: Option<String>,
-    icy_headers: IcyHeaders,
-    mime_type: Option<String>,
     can_reconnect_in_place: bool,
     used_shoutcast_v1: bool,
     reconnect_backoffs: Vec<Duration>,
@@ -815,22 +817,15 @@ pub struct LiveHttpSource {
 /// a fresh HTTP reconnect without re-probing container headers (MP3, ADTS AAC).
 /// Containerized streams like Ogg Vorbis/Opus or FLAC require a full track reopen.
 fn is_frame_resyncable_mime(mime: Option<&str>, url: &str) -> bool {
-    if let Some(m) = mime {
-        let lower = m.split(';').next().unwrap_or(m).trim().to_ascii_lowercase();
-        if matches!(
-            lower.as_str(),
-            "audio/mpeg"
-                | "audio/mp3"
-                | "audio/x-mp3"
-                | "audio/x-mpeg"
-                | "audio/mpeg3"
-                | "audio/aac"
-                | "audio/aacp"
-                | "audio/x-aac"
-        ) {
+    if let Some(normalized) = mime.and_then(luminous_audio::normalize_probe_mime) {
+        if matches!(normalized.as_str(), "audio/mpeg" | "audio/aac") {
             return true;
         }
-        if lower.contains("ogg") || lower.contains("flac") || lower.contains("wav") {
+        if normalized.contains("ogg")
+            || normalized.contains("flac")
+            || normalized.contains("wav")
+            || normalized.contains("aiff")
+        {
             return false;
         }
     }
@@ -863,8 +858,8 @@ impl LiveHttpSource {
         let connected = connect_live_stream(url, &label_str)?;
         let (metadata_tx, metadata_rx) = mpsc::channel();
         let can_reconnect_in_place = is_frame_resyncable_mime(connected.mime_type.as_deref(), url);
-        let mime_type = connected.mime_type.clone();
-        let icy_headers = connected.icy_headers.clone();
+        let mime_type = connected.mime_type;
+        let icy_headers = connected.icy_headers;
 
         let mut source = Self {
             url: url.to_string(),
@@ -878,8 +873,6 @@ impl LiveHttpSource {
             ring_capacity: LIVE_RING_CAPACITY,
             metadata_tx: Mutex::new(metadata_tx),
             last_title: None,
-            icy_headers: icy_headers.clone(),
-            mime_type: mime_type.clone(),
             can_reconnect_in_place,
             used_shoutcast_v1: connected.used_shoutcast_v1,
             reconnect_backoffs,
@@ -897,16 +890,6 @@ impl LiveHttpSource {
             icy_headers: Some(icy_headers),
             metadata_rx: Some(metadata_rx),
         })
-    }
-
-    /// Station headers (`icy-name`, `icy-genre`, `icy-br`) discovered at open.
-    pub fn icy_headers(&self) -> &IcyHeaders {
-        &self.icy_headers
-    }
-
-    /// MIME type from the response `Content-Type` header, if any.
-    pub fn mime_type(&self) -> Option<&str> {
-        self.mime_type.as_deref()
     }
 
     fn preroll(&mut self, target_bytes: usize) -> std::io::Result<()> {
@@ -1102,20 +1085,18 @@ impl MediaSource for LiveHttpSource {
     }
 }
 
-fn parse_icy_headers_from_map(headers: &reqwest::header::HeaderMap) -> (Option<usize>, IcyHeaders) {
-    let get_str = |name: &str| -> Option<String> {
-        headers
-            .get(name)
-            .and_then(|v| v.to_str().ok())
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(str::to_string)
+fn parse_icy_header_values<'a>(
+    mut get_str: impl FnMut(&str) -> Option<&'a str>,
+) -> (Option<usize>, IcyHeaders) {
+    let non_empty = |s: &'a str| {
+        let trimmed = s.trim();
+        (!trimmed.is_empty()).then(|| trimmed.to_string())
     };
     let metaint = get_str("icy-metaint")
-        .and_then(|s| s.parse::<usize>().ok())
+        .and_then(|s| s.trim().parse::<usize>().ok())
         .filter(|&n| n > 0);
-    let name = get_str("icy-name");
-    let genre = get_str("icy-genre");
+    let name = get_str("icy-name").and_then(non_empty);
+    let genre = get_str("icy-genre").and_then(non_empty);
     let bitrate_kbps = get_str("icy-br")
         .and_then(|s| {
             s.split(',')
@@ -1131,6 +1112,10 @@ fn parse_icy_headers_from_map(headers: &reqwest::header::HeaderMap) -> (Option<u
             bitrate_kbps,
         },
     )
+}
+
+fn parse_icy_headers_from_map(headers: &reqwest::header::HeaderMap) -> (Option<usize>, IcyHeaders) {
+    parse_icy_header_values(|name| headers.get(name).and_then(|v| v.to_str().ok()))
 }
 
 fn connect_live_stream(url: &str, label: &str) -> Result<ConnectedLiveStream, String> {
@@ -1261,9 +1246,8 @@ fn connect_shoutcast_v1_fallback(
         return Err(format!("Non-200 status '{status_trimmed}' from '{label}'"));
     }
 
-    let mut mime_type = None;
-    let mut metaint = None;
-    let mut icy_headers = IcyHeaders::default();
+    let mut raw_headers: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
 
     loop {
         let mut line = String::new();
@@ -1274,25 +1258,15 @@ fn connect_shoutcast_v1_fallback(
         if let Some((k, v)) = line.split_once(':') {
             let key = k.trim().to_ascii_lowercase();
             let val = v.trim();
-            if val.is_empty() {
-                continue;
-            }
-            match key.as_str() {
-                "content-type" => mime_type = Some(val.to_string()),
-                "icy-metaint" => metaint = val.parse::<usize>().ok().filter(|&n| n > 0),
-                "icy-name" => icy_headers.name = Some(val.to_string()),
-                "icy-genre" => icy_headers.genre = Some(val.to_string()),
-                "icy-br" => {
-                    icy_headers.bitrate_kbps = val
-                        .split(',')
-                        .next()
-                        .and_then(|b| b.trim().parse::<u32>().ok())
-                        .filter(|&b| b > 0)
-                }
-                _ => {}
+            if !val.is_empty() {
+                raw_headers.insert(key, val.to_string());
             }
         }
     }
+
+    let mime_type = raw_headers.get("content-type").cloned();
+    let (metaint, icy_headers) =
+        parse_icy_header_values(|name| raw_headers.get(name).map(String::as_str));
 
     Ok(ConnectedLiveStream {
         reader: Box::new(reader),

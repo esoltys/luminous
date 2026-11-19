@@ -29,7 +29,7 @@ pub(crate) struct ProbedTrack {
 /// Normalizes an HTTP `Content-Type` header value into a bare MIME type
 /// Symphonia's format probe understands (e.g. `"audio/mpeg; charset=utf-8"`
 /// -> `"audio/mpeg"`, `"audio/aacp"` -> `"audio/aac"`).
-pub(crate) fn normalize_probe_mime(raw: &str) -> Option<String> {
+pub fn normalize_probe_mime(raw: &str) -> Option<String> {
     let base = raw.split(';').next()?.trim().to_ascii_lowercase();
     if base.is_empty() {
         return None;
