@@ -29,6 +29,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 import RadioView from "./RadioView.svelte";
 import { radioStore } from "../../stores/radio.svelte";
+import { playerStore } from "../../stores/player.svelte";
 
 function makeStation(overrides: Partial<RadioDirectoryStation> = {}): RadioDirectoryStation {
   return {
@@ -75,6 +76,8 @@ describe("RadioView", () => {
     radioStore.selectedCountry = null;
     radioStore.selectedLanguage = null;
     radioStore.selectedCodec = null;
+    playerStore.state = "stopped";
+    playerStore.currentSong = undefined;
   });
 
   it("shows opt-in card when not downloaded and triggers sync on click", async () => {
@@ -316,5 +319,67 @@ describe("RadioView", () => {
     await waitFor(() => {
       expect(screen.getByText("CBC Music")).toBeInTheDocument();
     });
+  });
+
+  it("toggles play, pause, and resume when clicking a saved station card", async () => {
+    const saved = makeStation({ stationuuid: "uuid-saved", name: "CBC Music" });
+    const status: RadioDirectoryStatus = {
+      optedIn: true,
+      stationCount: 1,
+      playableStationCount: 1,
+      lastSyncedAt: Math.floor(Date.now() / 1000),
+      lastFullSyncAt: Math.floor(Date.now() / 1000),
+      nextAutoSyncAt: null,
+      syncInProgress: false,
+      lastError: null,
+      attributionUrl: "https://www.radio-browser.info",
+    };
+
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_radio_directory_status") return status;
+      if (cmd === "get_saved_radio_stations") return [saved];
+      if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
+      if (cmd === "get_radio_directory_facets") return defaultFacets;
+      if (cmd === "query_radio_directory") return [];
+      if (cmd === "play_radio_station") {
+        playerStore.currentSong = { id: 99, title: "CBC Music", path: "radio://uuid-saved" } as any;
+        playerStore.state = "playing";
+        return playerStore.currentSong;
+      }
+      if (cmd === "pause") {
+        playerStore.state = "paused";
+        return null;
+      }
+      if (cmd === "resume") {
+        playerStore.state = "playing";
+        return null;
+      }
+      return null;
+    });
+
+    radioStore.subView = "my_stations";
+    render(RadioView);
+
+    const playBtn = await screen.findByRole("button", { name: "Play CBC Music" });
+    await fireEvent.click(playBtn);
+
+    expect(mockInvoke).toHaveBeenCalledWith("play_radio_station", { stationuuid: "uuid-saved" });
+    expect(radioStore.isPlayingStation("uuid-saved")).toBe(true);
+
+    // Pause by clicking the card while playing — must not re-invoke play_radio_station.
+    const pauseBtn = await screen.findByRole("button", { name: "Playing CBC Music" });
+    await fireEvent.click(pauseBtn);
+
+    expect(mockInvoke).toHaveBeenCalledWith("pause");
+    expect(radioStore.isPlayingStation("uuid-saved")).toBe(false);
+
+    // Resume by clicking the card while paused — must call resume, not play_radio_station.
+    const resumeBtn = await screen.findByRole("button", { name: "Play CBC Music" });
+    await fireEvent.click(resumeBtn);
+
+    expect(mockInvoke).toHaveBeenCalledWith("resume");
+    expect(radioStore.isPlayingStation("uuid-saved")).toBe(true);
+    expect(mockInvoke.mock.calls.filter(([cmd]) => cmd === "play_radio_station")).toHaveLength(1);
   });
 });
