@@ -32,7 +32,7 @@
   import { provenanceStore } from "../stores/provenance.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { songDrag, songsPayload } from "../stores/songDrag.svelte";
-  import { isLosslessFileType } from "../types";
+  import { isLiveSong, isLosslessFileType } from "../types";
   import {
     formatBpm,
     formatFileSize,
@@ -715,6 +715,8 @@
             {name}
           </LinkButton>
         {/each}
+      {:else if isLiveSong(song)}
+        <span class="{secondaryColor(song)} truncate min-w-0">—</span>
       {:else}
         <span class="{secondaryColor(song)} truncate min-w-0"
           >{i18n.t("collection.unknownArtist")}</span
@@ -817,7 +819,13 @@
     </div>
   {:else if col.key === "musicbrainz_id"}
     <div class="text-center {secondaryColor(song)} text-xs font-medium">
-      {song.musicbrainz_track_id ? i18n.t("collection.booleanYes") : i18n.t("collection.booleanNo")}
+      {#if isLiveSong(song)}
+        —
+      {:else}
+        {song.musicbrainz_track_id
+          ? i18n.t("collection.booleanYes")
+          : i18n.t("collection.booleanNo")}
+      {/if}
     </div>
   {:else if col.key === "bitrate"}
     <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
@@ -866,7 +874,9 @@
     </div>
   {:else if col.key === "duration"}
     <div class="text-center {secondaryColor(song)} text-xs font-medium">
-      {formatDuration(song.length_nanosec)}
+      {isLiveSong(song)
+        ? i18n.t("playerBar.liveBadge", undefined, "Live")
+        : formatDuration(song.length_nanosec)}
     </div>
   {:else if col.key === "path"}
     <div class="{secondaryColor(song)} truncate pr-4 min-w-0 text-xs font-medium" title={song.path}>

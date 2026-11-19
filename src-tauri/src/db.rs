@@ -989,6 +989,20 @@ const MIGRATIONS: &[Migration] = &[
         description: "force a full radio directory resync to repair truncated mirrors (#2199)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_94)?),
     },
+    Migration {
+        version: 95,
+        description: "clear unavailable flag on live radio station rows (#2009)",
+        apply: |conn| {
+            let sql = format!(
+                "UPDATE songs SET unavailable = 0
+                 WHERE unavailable = 1
+                   AND (source IN ({}) OR path LIKE 'radio://%')",
+                *crate::models::LIVE_STREAM_SOURCES_SQL
+            );
+            conn.execute(&sql, [])?;
+            Ok(())
+        },
+    },
 ];
 
 /// Migration 83 (#2097): `artist_profiles.artist_key` becomes

@@ -577,6 +577,11 @@ impl CollectionScanner {
                 }
                 continue;
             }
+            // Live internet radio stations (`radio://` URIs) never exist on disk;
+            // their lifecycle is managed by `radio_directory::gc_unreferenced_stations`.
+            if source.is_live_stream() || path.starts_with(crate::media_source::RADIO_URI_SCHEME) {
+                continue;
+            }
 
             let p = Path::new(&path);
 
@@ -5479,5 +5484,26 @@ Official DR value: DR13\n",
             )
             .unwrap();
         assert_eq!(local_art_auto, None);
+    }
+
+    #[test]
+    fn find_missing_song_ids_skips_live_radio_stations() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Arc::new(Database::new(dir.path().to_path_buf()).unwrap());
+        let mgr = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO songs (source, filetype, path, stream_url, title, unavailable)
+             VALUES (?1, ?2, 'radio://station-1', 'https://example.com/1.mp3', 'Station 1', 0),
+                    (?3, ?2, 'radio://custom-1', 'https://example.com/2.mp3', 'Custom 1', 0)",
+            params![
+                SongSource::RADIO_BROWSER_ID,
+                FileType::Stream as i32,
+                SongSource::STREAM_ID
+            ],
+        )
+        .unwrap();
+        let missing = mgr.find_missing_song_ids(&conn, false).unwrap();
+        assert!(missing.is_empty());
     }
 }
