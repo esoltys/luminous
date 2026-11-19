@@ -291,6 +291,20 @@ fn format_ip_base_url(ip: IpAddr) -> String {
     }
 }
 
+fn extract_unique_server_urls(list: Vec<WireServerDescriptor>) -> Vec<String> {
+    let mut seen_hosts = HashSet::new();
+    let mut host_urls: Vec<String> = list
+        .into_iter()
+        .filter_map(|d| normalize_base_url(&d.name))
+        .filter(|u| seen_hosts.insert(u.clone()))
+        .collect();
+    if !host_urls.is_empty() {
+        let mut rng = rand::rng();
+        host_urls.shuffle(&mut rng);
+    }
+    host_urls
+}
+
 /// Result of querying `/json/stations/changed` and resolving full station details.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChangedStationsBatch {
@@ -388,10 +402,23 @@ impl RadioBrowserClient {
             .unwrap_or_default()
     }
 
-    /// Discovers Radio Browser mirror base URLs by DNS resolution of `all.api.radio-browser.info`,
-    /// shuffles them with a random number generator, and upgrades IP literals to their canonical
-    /// `https://<name>` hostnames via `/json/servers` when available.
+    /// Discovers Radio Browser mirror base URLs by querying
+    /// `https://all.api.radio-browser.info/json/servers` (falling back to DNS
+    /// resolution of `all.api.radio-browser.info` if needed), and shuffles the
+    /// resulting `https://<name>` mirror list.
     pub async fn discover_servers(&self) -> Result<Vec<String>, String> {
+        let primary_servers_url = format!("https://{RADIO_BROWSER_DNS_HOST}/json/servers");
+        if let Ok(resp) = self.client.get(&primary_servers_url).send().await {
+            if resp.status().is_success() {
+                if let Ok(list) = resp.json::<Vec<WireServerDescriptor>>().await {
+                    let host_urls = extract_unique_server_urls(list);
+                    if !host_urls.is_empty() {
+                        return Ok(host_urls);
+                    }
+                }
+            }
+        }
+
         let addrs = tokio::net::lookup_host((RADIO_BROWSER_DNS_HOST, 80))
             .await
             .map_err(|e| format!("DNS lookup for {RADIO_BROWSER_DNS_HOST} failed: {e}"))?;
@@ -417,21 +444,20 @@ impl RadioBrowserClient {
         }
 
         // Try to resolve canonical HTTPS mirror hostnames from `/json/servers` on the first
-        // responsive IP so subsequent requests use TLS and proper host headers.
+        // responsive IP, sending the virtual-host `Host` header.
         for ip_base in &ip_urls {
             let url = format!("{ip_base}/json/servers");
-            if let Ok(resp) = self.client.get(&url).send().await {
+            if let Ok(resp) = self
+                .client
+                .get(&url)
+                .header(reqwest::header::HOST, RADIO_BROWSER_DNS_HOST)
+                .send()
+                .await
+            {
                 if resp.status().is_success() {
                     if let Ok(list) = resp.json::<Vec<WireServerDescriptor>>().await {
-                        let mut seen_hosts = HashSet::new();
-                        let mut host_urls: Vec<String> = list
-                            .into_iter()
-                            .filter_map(|d| normalize_base_url(&d.name))
-                            .filter(|u| seen_hosts.insert(u.clone()))
-                            .collect();
+                        let host_urls = extract_unique_server_urls(list);
                         if !host_urls.is_empty() {
-                            let mut rng = rand::rng();
-                            host_urls.shuffle(&mut rng);
                             return Ok(host_urls);
                         }
                     }
@@ -439,7 +465,7 @@ impl RadioBrowserClient {
             }
         }
 
-        Ok(ip_urls)
+        Ok(vec![format!("https://{RADIO_BROWSER_DNS_HOST}")])
     }
 
     async fn ensure_servers(&self) -> Result<Vec<String>, String> {
