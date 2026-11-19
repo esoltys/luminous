@@ -1280,7 +1280,8 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
 export function resolveArtUrl(art: string | null | undefined, original = false): string | null {
   if (!art || typeof art !== "string") return null;
   const trimmed = art.trim();
-  if (!trimmed || trimmed === "null" || trimmed === "undefined") return null;
+  const lower = trimmed.toLowerCase();
+  if (!trimmed || lower === "null" || lower === "undefined") return null;
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
     return trimmed;
   }
