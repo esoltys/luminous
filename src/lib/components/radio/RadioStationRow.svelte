@@ -7,7 +7,7 @@
   } from "phosphor-svelte";
   import HelpTip from "../HelpTip.svelte";
   import { i18n } from "../../stores/i18n.svelte";
-  import type { RadioDirectoryStation } from "../../types";
+  import { resolveArtUrl, type RadioDirectoryStation } from "../../types";
 
   let {
     station,
@@ -24,6 +24,14 @@
     onToggleSave: (station: RadioDirectoryStation) => void;
     onTagClick?: (tag: string) => void;
   } = $props();
+
+  let artFailed = $state(false);
+  const artworkUrl = $derived(resolveArtUrl(station.favicon));
+
+  $effect(() => {
+    void station.favicon;
+    artFailed = false;
+  });
 
   const tagList = $derived(
     station.tags
@@ -46,13 +54,36 @@
     aria-label={playing
       ? i18n.t("radio.playingLabel", { name: station.name })
       : i18n.t("radio.playStation", { name: station.name })}
-    class="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors duration-150 {station.playable
+    class="group relative w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0 transition-colors duration-150 {station.playable
       ? playing
         ? 'bg-brand-accent text-brand-accent-contrast'
         : 'bg-brand-accent/15 text-brand-accent-text hover:bg-brand-accent hover:text-brand-accent-contrast'
       : 'bg-brand-surface text-brand-text-secondary/40 cursor-not-allowed'}"
   >
-    {#if playing}
+    {#if artworkUrl && !artFailed}
+      <img
+        src={artworkUrl}
+        alt=""
+        loading="lazy"
+        onerror={() => {
+          artFailed = true;
+        }}
+        class="w-full h-full object-cover"
+      />
+      {#if station.playable}
+        <span
+          class="absolute inset-0 flex items-center justify-center bg-brand-sidebar/75 text-brand-text-primary transition-opacity duration-150 {playing
+            ? 'opacity-100'
+            : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'}"
+        >
+          {#if playing}
+            <Pause class="w-4 h-4" weight="fill" />
+          {:else}
+            <Play class="w-4 h-4" weight="fill" />
+          {/if}
+        </span>
+      {/if}
+    {:else if playing}
       <Pause class="w-4 h-4" weight="fill" />
     {:else}
       <Play class="w-4 h-4" weight="fill" />
