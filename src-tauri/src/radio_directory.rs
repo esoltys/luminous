@@ -19,7 +19,7 @@
 use crate::db::Database;
 use crate::remote_scheduler::{RemoteKind, SyncGuard};
 use anyhow::Result;
-use luminous_audio::can_play_stream;
+use luminous_audio::{can_play_stream, plays_at_reduced_quality};
 use luminous_remote::radiobrowser::{
     RadioBrowserClient, RadioBrowserFacetEntry, RadioBrowserStation, StationsPage,
     DEFAULT_CHANGED_LIMIT, DEFAULT_STATION_PAGE_SIZE, RADIO_BROWSER_ATTRIBUTION_URL,
@@ -127,6 +127,10 @@ pub struct RadioDirectoryStation {
     pub updated_at: i64,
     /// Evaluated via `luminous_audio::can_play_stream(&codec, hls)`.
     pub playable: bool,
+    /// Playable, but only at reduced quality on this platform (HE-AAC without
+    /// a full decoder: no high band, HE-AACv2 in mono; #2011). Evaluated via
+    /// `luminous_audio::plays_at_reduced_quality(&codec, hls)`.
+    pub reduced_quality: bool,
 }
 
 /// Sort order for querying stations from the local directory mirror.
@@ -161,7 +165,7 @@ pub struct RadioDirectoryQuery {
     /// Minimum bitrate in kbps.
     pub min_bitrate: Option<i32>,
     /// When true (the default in the UI), excludes stations for which
-    /// `luminous_audio::can_play_stream(codec, hls)` is false (HLS, HE-AAC/AAC+).
+    /// `luminous_audio::can_play_stream(codec, hls)` is false (HLS).
     #[serde(default = "default_true")]
     pub hide_unsupported: bool,
     #[serde(default)]
@@ -667,6 +671,7 @@ fn row_to_station(row: &rusqlite::Row<'_>) -> rusqlite::Result<RadioDirectorySta
     let codec: String = row.get(9)?;
     let hls: bool = row.get::<_, i32>(11)? != 0;
     let playable = can_play_stream(&codec, hls);
+    let reduced_quality = plays_at_reduced_quality(&codec, hls);
     Ok(RadioDirectoryStation {
         stationuuid: row.get(0)?,
         name: row.get(1)?,
@@ -686,6 +691,7 @@ fn row_to_station(row: &rusqlite::Row<'_>) -> rusqlite::Result<RadioDirectorySta
         changeuuid: row.get(15)?,
         updated_at: row.get(16)?,
         playable,
+        reduced_quality,
     })
 }
 
@@ -1289,6 +1295,7 @@ fn station_from_joined_row(
         let codec: String = row.get(10)?;
         let hls: bool = row.get::<_, i32>(12)? != 0;
         let playable = can_play_stream(&codec, hls);
+        let reduced_quality = plays_at_reduced_quality(&codec, hls);
         return Ok(Some(RadioDirectoryStation {
             stationuuid: dir_uuid,
             name: row.get(2)?,
@@ -1308,6 +1315,7 @@ fn station_from_joined_row(
             changeuuid: row.get(16)?,
             updated_at: row.get(17)?,
             playable,
+            reduced_quality,
         }));
     }
 
@@ -1336,6 +1344,7 @@ fn station_from_joined_row(
         changeuuid: String::new(),
         updated_at: row.get::<_, Option<i64>>(25)?.unwrap_or(0),
         playable: true,
+        reduced_quality: false,
     }))
 }
 
@@ -1592,7 +1601,7 @@ mod tests {
         let meta = load_meta(&conn).unwrap();
         assert_eq!(meta.last_change_uuid.as_deref(), Some("chg-2"));
 
-        // Playable filter hides HLS / AAC+ by default
+        // Playable filter hides HLS by default
         let playable_jazz = query_stations(
             &conn,
             &RadioDirectoryQuery {

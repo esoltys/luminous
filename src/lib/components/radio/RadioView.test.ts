@@ -50,6 +50,7 @@ function makeStation(overrides: Partial<RadioDirectoryStation> = {}): RadioDirec
     changeuuid: "chg-1",
     updatedAt: 1700000000,
     playable: true,
+    reducedQuality: false,
     ...overrides,
   };
 }
@@ -171,6 +172,42 @@ describe("RadioView", () => {
 
     const errBanner = await screen.findByTestId("radio-sync-error");
     expect(errBanner).toHaveTextContent("DNS lookup failed");
+  });
+
+  it("marks an HE-AAC station that plays at reduced quality", async () => {
+    const heAac = makeStation({
+      stationuuid: "uuid-aacp",
+      name: "AAC+ Station",
+      codec: "AAC+",
+      bitrate: 48,
+      reducedQuality: true,
+    });
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_radio_directory_status")
+        return {
+          optedIn: true,
+          stationCount: 1,
+          playableStationCount: 1,
+          lastSyncedAt: Math.floor(Date.now() / 1000),
+          lastFullSyncAt: Math.floor(Date.now() / 1000),
+          nextAutoSyncAt: null,
+          syncInProgress: false,
+          lastError: null,
+          attributionUrl: "https://www.radio-browser.info",
+        } satisfies RadioDirectoryStatus;
+      if (cmd === "get_saved_radio_stations") return [];
+      if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
+      if (cmd === "get_radio_directory_facets") return defaultFacets;
+      if (cmd === "query_radio_directory") return [heAac];
+      return null;
+    });
+
+    render(RadioView);
+
+    expect(await screen.findByText("Reduced quality")).toBeInTheDocument();
+    expect(screen.queryByText("Unsupported")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play AAC+ Station" })).toBeEnabled();
   });
 
   it("renders Discover stations, empty filter state, and Show unsupported toggle", async () => {

@@ -3265,7 +3265,9 @@ export const de = {
     saved: "Gespeichert",
     unnamedStation: "Unbenannter Sender",
     unsupportedBadge: "Nicht unterstützt",
-    unsupportedHint:
-      "Dieser Stream verwendet HLS oder HE-AAC, was die Audio-Engine noch nicht abspielen kann.",
+    unsupportedHint: "Dieser Stream verwendet HLS, was die Audio-Engine noch nicht abspielen kann.",
+    reducedQualityBadge: "Reduzierte Qualität",
+    reducedQualityHint:
+      "Dieser HE-AAC-Stream wird ohne hohe Frequenzen wiedergegeben, manche Sender nur in Mono, da diesem System noch ein vollständiger HE-AAC-Decoder fehlt.",
   },
 };

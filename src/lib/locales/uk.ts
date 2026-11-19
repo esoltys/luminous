@@ -3445,6 +3445,9 @@ export const uk = {
     saved: "Збережено",
     unnamedStation: "Станція без назви",
     unsupportedBadge: "Не підтримується",
-    unsupportedHint: "Цей потік використовує HLS або HE-AAC, який аудіорушій поки не відтворює.",
+    unsupportedHint: "Цей потік використовує HLS, який аудіорушій поки не відтворює.",
+    reducedQualityBadge: "Знижена якість",
+    reducedQualityHint:
+      "Цей потік HE-AAC відтворюється без високих частот, а деякі станції — у моно: у цій системі поки немає повного декодера HE-AAC.",
   },
 };
