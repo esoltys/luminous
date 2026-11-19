@@ -16,6 +16,7 @@
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import RadioSaveButton from "./radio/RadioSaveButton.svelte";
+  import FindInLibraryButton from "./radio/FindInLibraryButton.svelte";
   import { stationUuidFromPath } from "../stores/radio.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
@@ -452,7 +453,7 @@
         <div class="flex items-center gap-2">
           <span
             class="text-sm font-semibold text-brand-text-primary truncate"
-            title={playerStore.currentSong?.title}
+            title={playerStore.currentSongDisplayTitle}
           >
             {playerStore.currentSongDisplayTitle}
           </span>
@@ -460,6 +461,7 @@
             {@const radioUuid = stationUuidFromPath(playerStore.currentSong.path)}
             {#if radioUuid}
               <RadioSaveButton stationuuid={radioUuid} size="sm" />
+              <FindInLibraryButton size="sm" />
             {:else}
               <SongRating
                 rating={playerStore.currentSong.rating}
@@ -484,7 +486,16 @@
             {playerStore.currentSong.album}
           </LinkButton>
         {/if}
-        {#if playerStore.currentSong?.artist}
+        {#if playerStore.stationNowPlaying}
+          <!-- The station's announced track: its artist and the station, not a library link (#2008). -->
+          <span
+            data-station-now-playing
+            class="text-xs text-brand-text-secondary/70 truncate"
+            title={playerStore.currentSongDisplaySubtitle}
+          >
+            {playerStore.currentSongDisplaySubtitle}
+          </span>
+        {:else if playerStore.currentSong?.artist}
           <LinkButton
             onclick={(e) => {
               e.stopPropagation();

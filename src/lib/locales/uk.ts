@@ -1852,6 +1852,8 @@ export const uk = {
     trackSkippedRemoteToast: "Не вдалося відтворити «{title}» — {message}. Пропущено.",
     stationOfflineToast: "«{title}» — Станція не в мережі.",
     liveBadge: "Наживо",
+    findInLibrary: "Знайти в бібліотеці",
+    onAirLabel: "В ефірі",
     openNothingPlayable: "Не знайдено підтримуваних аудіофайлів для відтворення.",
     playSongFailed: "Не вдалося відтворити цю пісню.",
     noSongPlaying: "Зараз нічого не відтворюється",

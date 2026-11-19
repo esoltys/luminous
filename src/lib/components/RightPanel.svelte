@@ -21,6 +21,7 @@
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
   import InfoSections from "./InfoSections.svelte";
   import { contextStore } from "../stores/context.svelte";
+  import FindInLibraryButton from "./radio/FindInLibraryButton.svelte";
 
   interface Props {
     isOpen?: boolean;
@@ -355,6 +356,21 @@
       </div>
 
       <div class="space-y-2 text-xs">
+        {#if isPlayingSubject && playerStore.stationNowPlaying}
+          {@const np = playerStore.stationNowPlaying}
+          <!-- The track the station announces right now (#2008). -->
+          <div data-station-now-playing class="flex items-center justify-between gap-3">
+            <span class="text-brand-text-secondary/60 shrink-0"
+              >{i18n.t("playerBar.onAirLabel", {}, "On air")}</span
+            >
+            <span class="flex items-center gap-1 min-w-0">
+              <span class="text-brand-text-secondary text-right break-words min-w-0"
+                >{np.artist ? `${np.artist} — ${np.title}` : np.title}</span
+              >
+              <FindInLibraryButton size="sm" />
+            </span>
+          </div>
+        {/if}
         {#if currentSong.year}
           <div class="flex items-start justify-between gap-3">
             <span class="text-brand-text-secondary/60 shrink-0"

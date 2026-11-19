@@ -727,6 +727,15 @@ export interface PlaybackState {
   volume_safety?: VolumeSafety;
   /** 1 = normal; absent from a backend that predates #2142. */
   playback_speed?: number;
+  /** The track the playing station announces (#2008); null when none. */
+  station_now_playing?: StationNowPlaying | null;
+}
+
+/** The track an internet radio station announces in its stream metadata
+ * (#2008), already split by the backend. Never stored on the song row. */
+export interface StationNowPlaying {
+  artist: string | null;
+  title: string;
 }
 
 /** The volume safety ceiling (#1890), in volume-slider units. `ceiling` is

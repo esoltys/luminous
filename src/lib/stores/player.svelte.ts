@@ -18,6 +18,7 @@ import {
   type OutputFallbackReason,
   type AudioBackendKind,
   type VolumeSafety,
+  type StationNowPlaying,
 } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { createEventScope } from "../utils/eventScope";
@@ -99,11 +100,37 @@ export class PlayerStore {
   private _playedSongIdsHistory: number[] = [];
   /** The name of the active playlist, album, or source context being played. */
   activeContextName = $state<string | undefined>(undefined);
-  /** Title to display for the current song: "Nothing playing" when there is no
-   *  song, "Unknown Song" when the song has no title tag (#1246). */
+  /** The track the playing station announces (#2008), from the
+   *  `station-now-playing` event and every playback snapshot. Display-only:
+   *  never on the song row, never scrobbled. */
+  stationNowPlaying = $state<StationNowPlaying | null>(null);
+  /** Title to display for the current song: the track a station announces,
+   *  else "Nothing playing" when there is no song, "Unknown Song" when the
+   *  song has no title tag (#1246). */
   get currentSongDisplayTitle(): string {
     if (!this.currentSong) return i18n.t("playerBar.notPlaying");
+    if (this.stationNowPlaying) return this.stationNowPlaying.title;
     return this.currentSong.title || i18n.t("collection.unknownSong");
+  }
+  /** The line under the title: the announced artist and the station's name
+   *  while a station announces a track, else the song's artist. Empty when
+   *  nothing is loaded. */
+  get currentSongDisplaySubtitle(): string {
+    const song = this.currentSong;
+    if (!song) return "";
+    const np = this.stationNowPlaying;
+    if (np) {
+      const station = song.title || i18n.t("collection.unknownSong");
+      return np.artist ? `${np.artist} · ${station}` : station;
+    }
+    return song.artist || i18n.t("collection.unknownArtist");
+  }
+  /** What to search the library for to find the announced track, or null
+   *  when no station is announcing one. */
+  get stationNowPlayingQuery(): string | null {
+    const np = this.stationNowPlaying;
+    if (!np) return null;
+    return [np.artist, np.title].filter(Boolean).join(" ");
   }
   /** Height at the bottom of the viewport covered by the floating PlayerBar dock;
    *  0 when no song is loaded and the dock is hidden. Floating menus and modals
@@ -247,6 +274,10 @@ export class PlayerStore {
           }
         },
       );
+
+      await this.events.listen<StationNowPlaying | null>("station-now-playing", (event) => {
+        this.stationNowPlaying = event.payload ?? null;
+      });
 
       await this.events.listen<AudioPipelineInfo | null>("audio-pipeline-changed", (event) => {
         this.audioPipeline = event.payload;
@@ -418,6 +449,7 @@ export class PlayerStore {
     this.autoContinue = state.auto_continue ?? false;
     this.playlistIndex = state.playlist_index ?? null;
     this.playlistTotal = state.playlist_total ?? 0;
+    this.stationNowPlaying = state.station_now_playing ?? null;
     if (!state.current_song) {
       this.audioPipeline = null;
     } else if (this.audioPipeline) {

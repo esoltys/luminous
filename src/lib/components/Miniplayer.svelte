@@ -695,17 +695,16 @@
       >
         <span
           class="text-sm font-bold text-brand-text-primary truncate w-full px-2"
-          title={playerStore.currentSong?.title}
+          title={playerStore.currentSongDisplayTitle}
         >
           {playerStore.currentSongDisplayTitle}
         </span>
         <div class="relative w-full flex items-center justify-center mt-0.5">
           <span
             class="text-xs text-brand-text-secondary/70 truncate w-full px-8"
-            title={playerStore.currentSong?.artist}
+            title={playerStore.currentSongDisplaySubtitle}
           >
-            {playerStore.currentSong?.artist ||
-              (playerStore.currentSong ? i18n.t("collection.unknownArtist") : "")}
+            {playerStore.currentSongDisplaySubtitle}
           </span>
           {#if playerStore.queueProgressText}
             <span
@@ -748,16 +747,15 @@
       >
         <span
           class="text-sm font-bold text-brand-text-primary truncate w-full"
-          title={playerStore.currentSong?.title}
+          title={playerStore.currentSongDisplayTitle}
         >
           {playerStore.currentSongDisplayTitle}
         </span>
         <span
           class="text-xs text-brand-text-secondary/80 truncate w-full"
-          title={playerStore.currentSong?.artist}
+          title={playerStore.currentSongDisplaySubtitle}
         >
-          {playerStore.currentSong?.artist ||
-            (playerStore.currentSong ? i18n.t("collection.unknownArtist") : "")}
+          {playerStore.currentSongDisplaySubtitle}
         </span>
         {#if playerStore.currentSong}
           {@const radioUuid = stationUuidFromPath(playerStore.currentSong.path)}

@@ -46,6 +46,7 @@ pub mod models;
 pub mod musical;
 pub mod musicbrainz;
 pub mod native_labels;
+pub mod now_playing;
 pub mod organizer;
 pub mod paths;
 pub mod picard;
@@ -590,6 +591,15 @@ fn spawn_station_click_report_if_pending(p: &mut player::Player, app: &tauri::Ap
     });
 }
 
+/// Tells the frontend which track the playing station announces (#2008), or
+/// `null` once it no longer announces one.
+fn emit_station_now_playing(
+    app: &tauri::AppHandle,
+    now_playing: Option<&crate::now_playing::StationNowPlaying>,
+) {
+    let _ = app.emit("station-now-playing", now_playing);
+}
+
 fn spawn_audio_event_loop(
     app_handle: tauri::AppHandle,
     audio: Arc<Mutex<AudioEngine>>,
@@ -628,6 +638,7 @@ fn spawn_audio_event_loop(
                                             Some(song),
                                             true,
                                             state.position_nanosec,
+                                            state.station_now_playing.as_ref(),
                                         )
                                         .await;
                                 }
@@ -658,6 +669,7 @@ fn spawn_audio_event_loop(
                                         p.current_song.as_ref(),
                                         false,
                                         state.position_nanosec,
+                                        state.station_now_playing.as_ref(),
                                     )
                                     .await;
                             }
@@ -666,6 +678,9 @@ fn spawn_audio_event_loop(
                             let _ = app.emit("playback-state", state);
                         }
                         crate::audio::AudioEvent::Stopped => {
+                            if p.clear_station_now_playing() {
+                                emit_station_now_playing(&app, None);
+                            }
                             if let Some(app_state) = app.try_state::<AppState>() {
                                 app_state.scrobbler.on_playback_stopped().await;
                             }
@@ -706,6 +721,7 @@ fn spawn_audio_event_loop(
                                             Some(song),
                                             true,
                                             state.position_nanosec,
+                                            state.station_now_playing.as_ref(),
                                         )
                                         .await;
                                 }
@@ -726,6 +742,27 @@ fn spawn_audio_event_loop(
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                             spawn_auto_continue_if_due(&p, &app);
+                        }
+                        // Never reaches the scrobbler or stats: the announced
+                        // track is display-only (#2008).
+                        crate::audio::AudioEvent::StreamTitle { track_id, title } => {
+                            if p.note_stream_title(track_id, &title) {
+                                let state = p.get_state().await;
+                                emit_station_now_playing(&app, state.station_now_playing.as_ref());
+                                if let Some(app_state) = app.try_state::<AppState>() {
+                                    app_state
+                                        .scrobbler
+                                        .on_playback_state_changed(
+                                            p.current_song.as_ref(),
+                                            state.state == crate::models::PlayState::Playing,
+                                            state.position_nanosec,
+                                            state.station_now_playing.as_ref(),
+                                        )
+                                        .await;
+                                }
+                                crate::media_session::mirror_state(&app, &state).await;
+                                let _ = app.emit("playback-state", state);
+                            }
                         }
                         crate::audio::AudioEvent::PipelineChanged => {
                             sync_eq_to_audio_device(&app, &audio).await;
@@ -762,6 +799,10 @@ fn spawn_audio_event_loop(
                         }
                         crate::audio::AudioEvent::Error { message } => {
                             log::error!("Audio engine error: {}", message);
+                            // A dropped station stream no longer announces anything.
+                            if p.clear_station_now_playing() {
+                                emit_station_now_playing(&app, None);
+                            }
 
                             if p.try_heal_and_retry_current_track().await {
                                 // Stale-cased path (Linux/case-sensitive
