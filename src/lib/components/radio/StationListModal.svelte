@@ -12,6 +12,7 @@
   import type { Playlist, RadioDirectoryOrder, RadioStationListSpec } from "../../types";
   import Button from "../Button.svelte";
   import Input from "../Input.svelte";
+  import Modal from "../Modal.svelte";
   import Select from "../Select.svelte";
 
   interface Props {
@@ -110,28 +111,19 @@
     }
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    }
-  }
+  const selectClass =
+    "w-full px-2.5 pr-8 py-2 rounded-lg bg-brand-main border border-brand-border hover:border-brand-accent/60 text-xs text-brand-text-primary focus:outline-none focus:border-brand-accent";
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="station-list-modal-title"
-  data-testid="station-list-modal"
->
+<Modal {onClose} maxWidth="max-w-xl" ariaLabelledby="station-list-modal-title">
   <form
     onsubmit={handleSubmit}
-    class="w-full max-w-xl max-h-[90vh] flex flex-col rounded-2xl border border-brand-border bg-brand-surface shadow-2xl overflow-hidden"
+    data-testid="station-list-modal"
+    class="w-full max-h-[85vh] flex flex-col overflow-hidden"
   >
-    <div class="flex items-center justify-between px-5 py-4 border-b border-brand-border/60">
+    <div
+      class="flex items-center justify-between px-5 py-4 border-b border-brand-border/60 bg-brand-main/50"
+    >
       <div class="flex items-center gap-2.5">
         <Radio class="w-5 h-5 text-brand-accent-text" />
         <h2 id="station-list-modal-title" class="text-base font-semibold text-brand-text-primary">
@@ -156,6 +148,7 @@
         </label>
         <Input
           id="station-list-name"
+          class="w-full"
           value={name}
           oninput={(e) => {
             name = (e.currentTarget as HTMLInputElement).value;
@@ -224,6 +217,7 @@
 
         <Input
           id="station-list-tag-search"
+          class="w-full"
           bind:value={tagSearch}
           placeholder={i18n.t("radio.searchGenresPlaceholder")}
         />
@@ -266,6 +260,7 @@
           </label>
           <Select
             id="station-list-country"
+            class={selectClass}
             value={country}
             onchange={(e) => (country = e.currentTarget.value)}
           >
@@ -285,6 +280,7 @@
           </label>
           <Select
             id="station-list-lang"
+            class={selectClass}
             value={lang}
             onchange={(e) => (lang = e.currentTarget.value)}
           >
@@ -304,6 +300,7 @@
           </label>
           <Select
             id="station-list-bitrate"
+            class={selectClass}
             value={minBitrate}
             onchange={(e) => (minBitrate = e.currentTarget.value)}
           >
@@ -325,6 +322,7 @@
           </label>
           <Select
             id="station-list-order"
+            class={selectClass}
             value={order}
             onchange={(e) => (order = e.currentTarget.value as RadioDirectoryOrder)}
           >
@@ -342,6 +340,7 @@
         </label>
         <Select
           id="station-list-limit"
+          class={selectClass}
           value={limit}
           onchange={(e) => (limit = e.currentTarget.value)}
         >
@@ -359,7 +358,7 @@
     </div>
 
     <div
-      class="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-brand-border/60 bg-brand-bg/30"
+      class="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-brand-border/60 bg-brand-main/30"
     >
       <Button variant="secondary" type="button" onclick={onClose} disabled={saving}>
         {i18n.t("common.cancel")}
@@ -369,4 +368,4 @@
       </Button>
     </div>
   </form>
-</div>
+</Modal>
