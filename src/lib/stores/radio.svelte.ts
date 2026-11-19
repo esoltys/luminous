@@ -338,6 +338,18 @@ class RadioStore {
     void this.loadDiscover();
   }
 
+  setCodecFilter(codec: string | null, hideUnsupported: boolean) {
+    const hideChanged = this._hideUnsupported !== hideUnsupported;
+    this.selectedCodec = codec;
+    this._hideUnsupported = hideUnsupported;
+    writeStorage(STORAGE_HIDE_UNSUPPORTED, String(hideUnsupported));
+    if (hideChanged) {
+      void this.refreshAll();
+    } else {
+      void this.loadDiscover();
+    }
+  }
+
   clearFilters() {
     this.searchQuery = "";
     this.selectedTag = null;

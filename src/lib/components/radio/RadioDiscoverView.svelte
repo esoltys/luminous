@@ -110,32 +110,27 @@
 
     <Select
       ariaLabel={i18n.t("radio.filterCodec")}
-      value={radioStore.selectedCodec ?? ""}
-      onchange={(e) => radioStore.setFilter("codec", e.currentTarget.value || null)}
-      class="hidden @xl:block px-2.5 pr-8 py-1.5 rounded-lg bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-xs text-brand-text-primary max-w-[9rem] focus:outline-none focus:border-brand-accent"
+      value={radioStore.selectedCodec ?? (radioStore.hideUnsupported ? "" : "__all__")}
+      onchange={(e) => {
+        const val = e.currentTarget.value;
+        if (val === "__all__") {
+          radioStore.setCodecFilter(null, false);
+        } else if (val === "") {
+          radioStore.setCodecFilter(null, true);
+        } else {
+          radioStore.setCodecFilter(val, radioStore.hideUnsupported);
+        }
+      }}
+      class="px-2.5 pr-8 py-1.5 rounded-lg bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-xs text-brand-text-primary max-w-[12rem] focus:outline-none focus:border-brand-accent"
     >
       <option value="">{i18n.t("radio.allCodecs")}</option>
+      <option value="__all__">{i18n.t("radio.includeUnsupportedCodecs")}</option>
       {#each radioStore.facets.codecs as codec (codec.name)}
         <option value={codec.name}>
           {codec.name} ({codec.stationcount})
         </option>
       {/each}
     </Select>
-
-    <label
-      class="inline-flex items-center gap-1.5 text-xs text-brand-text-secondary cursor-pointer select-none px-1"
-    >
-      <input
-        type="checkbox"
-        data-testid="radio-show-unsupported-toggle"
-        checked={!radioStore.hideUnsupported}
-        onchange={(e) => {
-          radioStore.hideUnsupported = !e.currentTarget.checked;
-        }}
-        class="rounded border-brand-border accent-brand-accent"
-      />
-      <span>{i18n.t("radio.showUnsupported")}</span>
-    </label>
 
     {#if hasActiveFilters}
       <button

@@ -223,9 +223,9 @@ describe("RadioView", () => {
     });
     expect(screen.getByTestId("radio-stale-indicator")).toBeInTheDocument();
 
-    // Toggle "Show unsupported" -> passes hideUnsupported: false and renders unsupported badge.
-    const toggle = screen.getByTestId("radio-show-unsupported-toggle");
-    await fireEvent.click(toggle);
+    // Select "All codecs (incl. unsupported)" in Codecs dropdown -> passes hideUnsupported: false.
+    const codecSelect = screen.getByLabelText("Filter by codec");
+    await fireEvent.change(codecSelect, { target: { value: "__all__" } });
 
     await waitFor(() => {
       expect(screen.getByText("HLS Stream")).toBeInTheDocument();
