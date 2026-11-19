@@ -1,15 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  Playlist,
+  RadioBrowserFacetEntry,
   RadioDirectoryFacets,
   RadioDirectoryOrder,
   RadioDirectoryStation,
   RadioDirectoryStatus,
   RadioDirectorySyncProgress,
   RadioDirectorySyncStats,
+  RadioStationListSpec,
+  RadioStationListTags,
   Song,
 } from "../types";
 import { playerStore } from "./player.svelte";
+import { playlistsStore } from "./playlists.svelte";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
 
@@ -19,6 +24,17 @@ export function stationUuidFromPath(path?: string | null): string | null {
   if (!path?.startsWith("radio://")) return null;
   const uuid = path.slice("radio://".length).trim();
   return uuid || null;
+}
+
+export function formatUpdatedAgo(lastSyncedAt: number | null): string {
+  if (!lastSyncedAt) return "";
+  const diffSecs = Math.max(0, Math.floor(Date.now() / 1000) - lastSyncedAt);
+  const hours = Math.floor(diffSecs / 3600);
+  if (hours < 24) {
+    return i18n.t("radio.updatedHoursAgo", { count: Math.max(1, hours) });
+  }
+  const days = Math.floor(hours / 24);
+  return i18n.t("radio.updatedDaysAgo", { count: days });
 }
 
 const STORAGE_SUB_VIEW = "radio_subView";
@@ -156,6 +172,9 @@ class RadioStore {
   recentStations = $state<RadioDirectoryStation[]>([]);
   radioPlaylistIds = $state<number[]>([]);
   myStationsLoading = $state(false);
+  stationListTags = $state<RadioBrowserFacetEntry[]>([]);
+  suggestedLibraryGenres = $state<RadioBrowserFacetEntry[]>([]);
+  stationListTagsLoading = $state(false);
 
   // Global search (TopNavigation) directory matches, see `searchStationsGlobal`.
   globalSearchStations = $state<RadioDirectoryStation[]>([]);
@@ -557,6 +576,49 @@ class RadioStore {
     this.selectedCodec = null;
     this.selectedMinBitrate = null;
     this.refreshDiscoverAndFacets();
+  }
+
+  async loadStationListTags(): Promise<void> {
+    this.stationListTagsLoading = true;
+    try {
+      const res = await invoke<RadioStationListTags>("get_radio_station_list_tags", {
+        hideUnsupported: true,
+        limit: 200,
+      });
+      this.stationListTags = res?.tags ?? [];
+      this.suggestedLibraryGenres = res?.suggestedFromLibrary ?? [];
+    } catch (err) {
+      console.error("Failed to load station list tags:", err);
+      this.stationListTags = [];
+      this.suggestedLibraryGenres = [];
+    } finally {
+      this.stationListTagsLoading = false;
+    }
+  }
+
+  async createStationList(name: string, spec: RadioStationListSpec): Promise<Playlist> {
+    const playlist = await invoke<Playlist>("create_radio_station_list", { name, spec });
+    await Promise.all([playlistsStore.refreshPlaylists(), this.loadMyStations()]);
+    return playlist;
+  }
+
+  async updateStationList(
+    playlistId: number,
+    name: string,
+    spec: RadioStationListSpec,
+  ): Promise<Playlist> {
+    const playlist = await invoke<Playlist>("update_radio_station_list", {
+      playlistId,
+      name,
+      spec,
+    });
+    await Promise.all([playlistsStore.refreshPlaylists(), this.loadMyStations()]);
+    return playlist;
+  }
+
+  async deleteStationList(playlistId: number): Promise<void> {
+    await playlistsStore.deletePlaylist(playlistId);
+    await this.loadMyStations();
   }
 }
 

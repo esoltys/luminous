@@ -5,23 +5,12 @@
     WarningCircleIcon as AlertCircle,
   } from "phosphor-svelte";
   import { fade } from "../../utils/motion";
-  import { radioStore } from "../../stores/radio.svelte";
+  import { formatUpdatedAgo, radioStore } from "../../stores/radio.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import CollectionHeader from "../CollectionHeader.svelte";
   import RadioOptInCard from "./RadioOptInCard.svelte";
   import RadioDiscoverView from "./RadioDiscoverView.svelte";
   import RadioMyStationsView from "./RadioMyStationsView.svelte";
-
-  function formatUpdatedAgo(lastSyncedAt: number | null): string {
-    if (!lastSyncedAt) return "";
-    const diffSecs = Math.max(0, Math.floor(Date.now() / 1000) - lastSyncedAt);
-    const hours = Math.floor(diffSecs / 3600);
-    if (hours < 24) {
-      return i18n.t("radio.updatedHoursAgo", { count: Math.max(1, hours) });
-    }
-    const days = Math.floor(hours / 24);
-    return i18n.t("radio.updatedDaysAgo", { count: days });
-  }
 
   onMount(() => {
     void radioStore.init();

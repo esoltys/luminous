@@ -213,10 +213,15 @@ export function hasAdvancedSearchTerms(query: string): boolean {
  * Mix (formerly Daypart Mix, #223) auto-playlist uses "daypart:". Mirrors
  * the categorization in playlist.rs.
  */
+export function isStationListSpec(spec: string | null | undefined): boolean {
+  return !!spec && spec.trim().startsWith("radio:");
+}
+
 export function isSmartPlaylistSpec(spec: string | null | undefined): boolean {
   return (
     !!spec &&
     spec.includes(":") &&
+    !spec.startsWith("radio:") &&
     !spec.startsWith("decade:") &&
     !spec.startsWith("bpmrange:") &&
     !spec.startsWith("tag:") &&

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { isSmartPlaylistSpec, parseSearchRules, stripEnclosingQuotes } from "./filterParser";
+import {
+  isSmartPlaylistSpec,
+  isStationListSpec,
+  parseSearchRules,
+  stripEnclosingQuotes,
+} from "./filterParser";
 
 describe("stripEnclosingQuotes", () => {
   it("strips double enclosing quotes from file picker paths", () => {
@@ -70,6 +75,12 @@ describe("isSmartPlaylistSpec", () => {
     expect(isSmartPlaylistSpec(null)).toBe(false);
     expect(isSmartPlaylistSpec(undefined)).toBe(false);
     expect(isSmartPlaylistSpec("")).toBe(false);
+  });
+
+  it("returns false for a radio station list spec (radio:)", () => {
+    expect(isSmartPlaylistSpec("radio:tag=jazz;country=CA")).toBe(false);
+    expect(isStationListSpec("radio:tag=jazz;country=CA")).toBe(true);
+    expect(isStationListSpec("genre:rock")).toBe(false);
   });
 
   it("returns true for a user-authored Smart Playlist rule spec", () => {

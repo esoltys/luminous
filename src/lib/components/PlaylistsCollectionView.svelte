@@ -30,7 +30,12 @@
     ArrowsClockwiseIcon as RefreshCw,
   } from "phosphor-svelte";
   import Plus from "./PlusIcon.svelte";
-  import { getPlaylistDisplayName, isSmartPlaylist, isSystemAutoPlaylist } from "../utils/playlist";
+  import {
+    getPlaylistDisplayName,
+    isSmartPlaylist,
+    isStationList,
+    isSystemAutoPlaylist,
+  } from "../utils/playlist";
   import { scrobblerStore } from "../stores/scrobbler.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -372,6 +377,14 @@
     ),
   );
 
+  let sortedStationLists = $derived(
+    sortByPlaylistField(
+      playlistsStore.playlists.filter((p) => isStationList(p)),
+      { field: customSortField, asc: customSortAsc },
+      (p) => ({ label: p.name, trackCount: p.track_count, updated: p.updated }),
+    ),
+  );
+
   let activeViewMode = $derived(
     navigationStore.playlistsSubTab === "auto"
       ? prefs.playlistsAutoViewMode
@@ -591,7 +604,7 @@
             {/each}
           </div>
         {:else}
-          {#if sortedPlaylists.length === 0}
+          {#if sortedPlaylists.length === 0 && sortedStationLists.length === 0}
             <div class="col-span-full py-16 text-center">
               <EmptyState
                 card
@@ -602,28 +615,60 @@
               />
             </div>
           {:else}
-            <div
-              class="grid {activeViewMode === 'rows'
-                ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2'
-                : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}"
-            >
-              {#each sortedPlaylists as pl (pl.id)}
-                {#if activeViewMode === "rows"}
-                  <PlaylistRowCard
-                    playlist={pl}
-                    onClick={() => openPlaylist(pl)}
-                    oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
-                  />
-                {:else}
-                  <PlaylistCard
-                    playlist={pl}
-                    widthClass="w-full"
-                    onClick={() => openPlaylist(pl)}
-                    oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
-                  />
-                {/if}
-              {/each}
-            </div>
+            {#if sortedPlaylists.length > 0}
+              <div
+                class="grid {activeViewMode === 'rows'
+                  ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2'
+                  : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}"
+              >
+                {#each sortedPlaylists as pl (pl.id)}
+                  {#if activeViewMode === "rows"}
+                    <PlaylistRowCard
+                      playlist={pl}
+                      onClick={() => openPlaylist(pl)}
+                      oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
+                    />
+                  {:else}
+                    <PlaylistCard
+                      playlist={pl}
+                      widthClass="w-full"
+                      onClick={() => openPlaylist(pl)}
+                      oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
+                    />
+                  {/if}
+                {/each}
+              </div>
+            {/if}
+
+            {#if sortedStationLists.length > 0}
+              <section class="mt-8 space-y-3" data-testid="playlists-station-lists-section">
+                <h3 class="label-heading text-brand-text-secondary">
+                  {i18n.t("radio.stationListsTitle")}
+                </h3>
+                <div
+                  class="grid {activeViewMode === 'rows'
+                    ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2'
+                    : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}"
+                >
+                  {#each sortedStationLists as pl (pl.id)}
+                    {#if activeViewMode === "rows"}
+                      <PlaylistRowCard
+                        playlist={pl}
+                        onClick={() => openPlaylist(pl)}
+                        oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
+                      />
+                    {:else}
+                      <PlaylistCard
+                        playlist={pl}
+                        widthClass="w-full"
+                        onClick={() => openPlaylist(pl)}
+                        oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
+                      />
+                    {/if}
+                  {/each}
+                </div>
+              </section>
+            {/if}
           {/if}
         {/if}
       </div>
