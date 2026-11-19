@@ -1,7 +1,8 @@
 //! Wire-protocol clients and response parsers for remote services.
 //!
 //! Owns the HTTP/XML/JSON protocol clients (Subsonic/OpenSubsonic, WebDAV,
-//! ListenBrainz/CritiqueBrainz, multi-provider Lyrics, and MusicBrainz OAuth),
+//! ListenBrainz/CritiqueBrainz, multi-provider Lyrics, MusicBrainz OAuth, Radio
+//! Browser and TunePing),
 //! authentication token and signature math, and wire response parsing.
 //!
 //! Must never depend on `tauri` or `rusqlite` (#1767, epic #1762). App-side
@@ -14,4 +15,5 @@ pub mod musicbrainz;
 pub mod radiobrowser;
 pub mod scrobbler;
 pub mod subsonic;
+pub mod tuneping;
 pub mod webdav;

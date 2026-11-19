@@ -2243,6 +2243,31 @@ export const frFR: DeepStringRecord<typeof en> = {
     disbanded: "Dissous",
     lessThanOneYearAgo: "Il y a moins d'un an",
   },
+  airplay: {
+    title: "À l'antenne maintenant",
+    consentBody:
+      "Affichez les webradios qui diffusent ce morceau en ce moment. L'activation envoie l'artiste et le titre du morceau à Tuneping.",
+    consentAccept: "Afficher les stations",
+    consentDecline: "Pas maintenant",
+    loading: "Vérification des stations…",
+    empty: "Aucune station ne diffuse ce morceau en ce moment.",
+    unavailable: "Impossible de joindre Tuneping. Réessayez dans un instant.",
+    unavailableStale: "Impossible de joindre Tuneping. Affichage du dernier résultat.",
+    confirmedAgo: "Confirmé {age}",
+    bitrate: "{bitrate} kbit/s",
+    more: {
+      one: "+{count} autre station",
+      other: "+{count} autres stations",
+    },
+    refresh: "Actualiser les stations",
+    attribution: "Données fournies par Tuneping",
+    detectedLabel: "À propos de ces données",
+    detectedHint:
+      "Détecté à partir des métadonnées des stations : Tuneping lit le morceau que chaque station annonce dans son flux. L'annonce peut être légèrement en avance ou en retard sur la musique.",
+    settingsTitle: "À l'antenne maintenant",
+    settingsHint:
+      "Affichez dans le panneau Informations les webradios qui diffusent le morceau. L'activation envoie l'artiste et le titre du morceau à Tuneping.",
+  },
   artistEvents: {
     panelTitle: "Concerts et événements à venir",
     noEvents: "Aucun concert à venir trouvé",

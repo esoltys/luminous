@@ -2137,6 +2137,31 @@ export const de = {
     disbanded: "Aufgelöst",
     lessThanOneYearAgo: "vor <1 Jahr",
   },
+  airplay: {
+    title: "Jetzt im Radio",
+    consentBody:
+      "Zeige, welche Internetradiosender diesen Titel gerade spielen. Beim Einschalten werden Interpret und Titel an Tuneping gesendet.",
+    consentAccept: "Sender anzeigen",
+    consentDecline: "Nicht jetzt",
+    loading: "Sender werden geprüft…",
+    empty: "Gerade spielt kein Sender diesen Titel.",
+    unavailable: "Tuneping ist nicht erreichbar. Versuche es gleich noch einmal.",
+    unavailableStale: "Tuneping ist nicht erreichbar. Das letzte Ergebnis wird angezeigt.",
+    confirmedAgo: "Bestätigt {age}",
+    bitrate: "{bitrate} kbit/s",
+    more: {
+      one: "+{count} weiterer Sender",
+      other: "+{count} weitere Sender",
+    },
+    refresh: "Sender aktualisieren",
+    attribution: "Daten von Tuneping",
+    detectedLabel: "Über diese Daten",
+    detectedHint:
+      "Aus Sender-Metadaten erkannt: Tuneping liest den Titel, den jeder Sender in seinem Stream ankündigt. Die Ankündigung kann der Musik etwas voraus sein oder hinterherhinken.",
+    settingsTitle: "Jetzt im Radio",
+    settingsHint:
+      "Zeige im Bereich „Informationen“, welche Internetradiosender den Titel spielen. Beim Einschalten werden Interpret und Titel an Tuneping gesendet.",
+  },
   artistEvents: {
     panelTitle: "Kommende Konzerte und Veranstaltungen",
     noEvents: "Keine kommenden Konzerte gefunden",
