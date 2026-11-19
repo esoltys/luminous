@@ -182,6 +182,7 @@ const IDENTICAL_OK_FR = new Set([
   "sidebar.albums", // "Albums"
   "sidebar.genres", // "Genres"
   "radio.stationCount", // "{count} stations"
+  "radio.stationLabel", // "Station"
   "smartPlaylistBuilder.fieldAlbum", // "Album"
   "smartPlaylistBuilder.fieldBpm", // "BPM"
   "smartPlaylistBuilder.fieldCompilation", // "Compilation"
