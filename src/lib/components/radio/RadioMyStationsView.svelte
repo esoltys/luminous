@@ -34,10 +34,10 @@
   class="@container flex-1 min-h-0 overflow-y-auto space-y-6 pr-1"
 >
   <!-- Saved stations -->
-  <section class="space-y-2.5">
+  <section class="space-y-3">
     <div class="flex items-center justify-between">
-      <h2 class="label-heading text-brand-text-primary flex items-center gap-2">
-        <Bookmark class="w-4 h-4 text-brand-accent-text" />
+      <h2 class="flex items-center gap-2 text-xl font-semibold text-brand-text-primary">
+        <Bookmark class="w-5 h-5 text-brand-accent-text" />
         <span>{i18n.t("radio.savedStationsTitle")}</span>
       </h2>
       <span class="text-xs text-brand-text-secondary">
@@ -82,9 +82,9 @@
   </section>
 
   <!-- Recently played stations -->
-  <section class="space-y-2.5">
-    <h2 class="label-heading text-brand-text-primary flex items-center gap-2">
-      <History class="w-4 h-4 text-brand-text-secondary" />
+  <section class="space-y-3">
+    <h2 class="flex items-center gap-2 text-xl font-semibold text-brand-text-primary">
+      <History class="w-5 h-5 text-brand-text-secondary" />
       <span>{i18n.t("radio.recentStationsTitle")}</span>
     </h2>
 
@@ -109,9 +109,9 @@
 
   <!-- Station lists (custom playlists containing radio stations) -->
   {#if radioPlaylists.length > 0}
-    <section class="space-y-2.5">
-      <h2 class="label-heading text-brand-text-primary flex items-center gap-2">
-        <ListMusic class="w-4 h-4 text-brand-text-secondary" />
+    <section class="space-y-3">
+      <h2 class="flex items-center gap-2 text-xl font-semibold text-brand-text-primary">
+        <ListMusic class="w-5 h-5 text-brand-text-secondary" />
         <span>{i18n.t("radio.stationListsTitle")}</span>
       </h2>
       <div class="grid grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-3 gap-2">
