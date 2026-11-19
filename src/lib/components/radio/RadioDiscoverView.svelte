@@ -24,7 +24,6 @@
   const hasActiveFilters = $derived(
     Boolean(
       radioStore.searchQuery.trim() ||
-      radioStore.selectedTag ||
       radioStore.selectedCountry ||
       radioStore.selectedLanguage ||
       radioStore.selectedCodec,
@@ -181,7 +180,7 @@
               playing={radioStore.isPlayingStation(station.stationuuid)}
               onPlay={(s) => void radioStore.playStation(s)}
               onToggleSave={(s) => void radioStore.toggleSaveStation(s)}
-              onTagClick={(tag) => radioStore.toggleTag(tag)}
+              onTagClick={(tag) => radioStore.setSearchQuery(tag, true)}
             />
           </div>
         {/snippet}

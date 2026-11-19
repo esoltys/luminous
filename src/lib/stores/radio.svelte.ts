@@ -60,7 +60,6 @@ class RadioStore {
 
   // Discover state
   searchQuery = $state("");
-  selectedTag = $state<string | null>(null);
   selectedCountry = $state<string | null>(null);
   selectedLanguage = $state<string | null>(null);
   selectedCodec = $state<string | null>(null);
@@ -216,7 +215,7 @@ class RadioStore {
   private buildQuery() {
     return {
       search: this.searchQuery.trim() || null,
-      tag: this.selectedTag,
+      tag: null,
       countrycode: this.selectedCountry,
       language: this.selectedLanguage,
       codec: this.selectedCodec,
@@ -335,11 +334,6 @@ class RadioStore {
     }, 180);
   }
 
-  toggleTag(tagName: string) {
-    this.selectedTag = this.selectedTag === tagName ? null : tagName;
-    this.refreshDiscoverAndFacets();
-  }
-
   setFilter(field: "country" | "language" | "codec", value: string | null) {
     if (field === "country") this.selectedCountry = value;
     else if (field === "language") this.selectedLanguage = value;
@@ -361,7 +355,6 @@ class RadioStore {
 
   clearFilters() {
     this.searchQuery = "";
-    this.selectedTag = null;
     this.selectedCountry = null;
     this.selectedLanguage = null;
     this.selectedCodec = null;

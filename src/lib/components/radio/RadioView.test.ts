@@ -71,7 +71,6 @@ describe("RadioView", () => {
     radioStore.dispose();
     radioStore.subView = "discover";
     radioStore.searchQuery = "";
-    radioStore.selectedTag = null;
     radioStore.selectedCountry = null;
     radioStore.selectedLanguage = null;
     radioStore.selectedCodec = null;
