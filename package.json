@@ -54,7 +54,7 @@
     "tailwindcss": "^4.3.5"
   },
   "devDependencies": {
-    "@ast-grep/cli": "^0.51.1",
+    "@ast-grep/cli": "^0.51.3",
     "@choochmeque/tauri-windows-bundle": "^0.2.0",
     "@sveltejs/adapter-static": "^4.0.1",
     "@sveltejs/kit": "^3.1.1",
