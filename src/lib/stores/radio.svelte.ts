@@ -15,6 +15,12 @@ import { i18n } from "./i18n.svelte";
 
 type RadioSubView = "my_stations" | "discover";
 
+export function stationUuidFromPath(path?: string | null): string | null {
+  if (!path?.startsWith("radio://")) return null;
+  const uuid = path.slice("radio://".length).trim();
+  return uuid || null;
+}
+
 const STORAGE_SUB_VIEW = "radio_subView";
 const STORAGE_HIDE_UNSUPPORTED = "radio_hideUnsupported";
 const STORAGE_SCROLL_MY = "radio_scrollTop_my_stations";
@@ -84,6 +90,7 @@ class RadioStore {
   private unlisteners: UnlistenFn[] = [];
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private initialized = false;
+  private savedLoaded = false;
 
   get subView(): RadioSubView {
     return this._subView;
@@ -271,6 +278,7 @@ class RadioStore {
       this.savedStations = saved ?? [];
       this.recentStations = recent ?? [];
       this.radioPlaylistIds = playlistIds ?? [];
+      this.savedLoaded = true;
     } catch (err) {
       console.error("Failed to load saved/recent radio stations:", err);
     } finally {
@@ -293,6 +301,27 @@ class RadioStore {
         ),
         "error",
       );
+    }
+  }
+
+  async ensureSavedLoaded(): Promise<void> {
+    if (this.savedLoaded) return;
+    await this.loadMyStations();
+  }
+
+  async toggleSaveByUuid(stationuuid: string): Promise<void> {
+    const currentlySaved = this.isSaved(stationuuid);
+    try {
+      if (currentlySaved) {
+        await invoke("unsave_radio_station", { stationuuid });
+        this.savedStations = this.savedStations.filter((s) => s.stationuuid !== stationuuid);
+      } else {
+        await invoke("save_radio_station", { stationuuid });
+        await this.loadMyStations();
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toastStore.show(msg, "error");
     }
   }
 

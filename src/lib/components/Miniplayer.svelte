@@ -11,6 +11,8 @@
   import CoverArt from "./CoverArt.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SongRating from "./SongRating.svelte";
+  import RadioSaveButton from "./radio/RadioSaveButton.svelte";
+  import { stationUuidFromPath } from "../stores/radio.svelte";
   import {
     PlayIcon as Play,
     PauseIcon as Pause,
@@ -758,14 +760,19 @@
             (playerStore.currentSong ? i18n.t("collection.unknownArtist") : "")}
         </span>
         {#if playerStore.currentSong}
+          {@const radioUuid = stationUuidFromPath(playerStore.currentSong.path)}
           <div class="mt-1.5">
-            <SongRating
-              rating={playerStore.currentSong.rating}
-              loved={playerStore.currentSong.loved}
-              onRate={(r) => playerStore.rateCurrent(r)}
-              onSetLoved={(l) => playerStore.setLovedCurrent(l)}
-              size="md"
-            />
+            {#if radioUuid}
+              <RadioSaveButton stationuuid={radioUuid} size="md" />
+            {:else}
+              <SongRating
+                rating={playerStore.currentSong.rating}
+                loved={playerStore.currentSong.loved}
+                onRate={(r) => playerStore.rateCurrent(r)}
+                onSetLoved={(l) => playerStore.setLovedCurrent(l)}
+                size="md"
+              />
+            {/if}
           </div>
         {/if}
       </div>
