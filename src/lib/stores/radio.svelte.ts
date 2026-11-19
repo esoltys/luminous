@@ -412,7 +412,7 @@ class RadioStore {
           hideUnsupported: this._hideUnsupported,
         }),
         invoke<RadioDirectoryStation[]>("get_recent_radio_stations", {
-          limit: 20,
+          limit: 10,
           hideUnsupported: this._hideUnsupported,
         }),
         invoke<number[]>("get_radio_playlist_ids"),
