@@ -971,8 +971,15 @@ const MIGRATIONS: &[Migration] = &[
     },
     Migration {
         version: 93,
-        description: "invalidate cached corrupt song_integrity rows for warning/corrupt split (#2197)",
+        description: "reclassify cached FLAC MD5 mismatches as warnings and clear truncated rows for re-check (#2197)",
         apply: |conn| {
+            conn.execute(
+                "UPDATE song_integrity
+                 SET status = 'warning'
+                 WHERE status = 'corrupt'
+                   AND error_detail = 'FLAC MD5 checksum mismatch'",
+                [],
+            )?;
             conn.execute("DELETE FROM song_integrity WHERE status = 'corrupt'", [])?;
             Ok(())
         },
