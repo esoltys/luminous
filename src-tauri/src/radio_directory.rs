@@ -1119,7 +1119,7 @@ pub fn suggest_radio_genres_from_library(
         .collect();
 
     let sql = format!(
-        "SELECT genre, SUM(COALESCE(play_count, 0)) AS plays, COUNT(*) AS tracks
+        "SELECT genre, SUM(COALESCE(playcount, 0)) AS plays, COUNT(*) AS tracks
          FROM songs
          WHERE source IN ({}) AND TRIM(COALESCE(genre, '')) != ''
          GROUP BY genre",
@@ -2634,5 +2634,42 @@ mod tests {
 
         // Punctuation-only input has no searchable words.
         assert!(search_stations(&conn, ":*\"", 5).unwrap().is_empty());
+    }
+
+    #[test]
+    fn canonical_radio_tags_and_library_suggestions() {
+        let (_dir, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+        crate::genre_aliases::set_alias(&mut conn, "pagan metal", "Folk Metal").unwrap();
+        conn.execute(
+            "INSERT INTO radio_directory
+             (stationuuid, name, url_resolved, tags, country, countrycode, language, codec, bitrate, hls, votes, clickcount, lastcheckok, updated_at)
+             VALUES
+             ('s1', 'Folk 1', 'http://stream.test/1', 'pagan metal,metal', 'Canada', 'CA', 'english', 'MP3', 128, 0, 10, 100, 1, 1000),
+             ('s2', 'Folk 2', 'http://stream.test/2', 'folk metal,rock', 'Canada', 'CA', 'english', 'MP3', 128, 0, 5, 50, 1, 1000),
+             ('s3', 'Jazz 1', 'http://stream.test/3', 'jazz', 'Canada', 'CA', 'english', 'MP3', 128, 0, 5, 50, 1, 1000)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, artist, genre, playcount, path, source, unavailable)
+             VALUES ('Song A', 'Artist', 'Folk Metal', 42, '/a.mp3', 1, 0),
+                    ('Song B', 'Artist', 'Classical', 99, '/b.mp3', 1, 0)",
+            [],
+        )
+        .unwrap();
+
+        let aliases = crate::genre_aliases::GenreAliases::load(&conn).unwrap();
+        let tags = get_canonical_radio_tags(&conn, &aliases, true, 50).unwrap();
+        let folk = tags
+            .iter()
+            .find(|t| t.name == "Folk Metal")
+            .expect("Folk Metal canonicalized");
+        assert_eq!(folk.stationcount, 2);
+
+        let suggestions = suggest_radio_genres_from_library(&conn, &aliases, true, 10).unwrap();
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(suggestions[0].name, "Folk Metal");
+        assert_eq!(suggestions[0].stationcount, 2);
     }
 }
