@@ -56,7 +56,7 @@ function makeStation(overrides: Partial<RadioDirectoryStation> = {}): RadioDirec
 
 const defaultFacets: RadioDirectoryFacets = {
   tags: [{ name: "jazz", stationcount: 12 }],
-  countries: [{ name: "Canada", isoCode: "CA", stationcount: 5 }],
+  countries: [{ name: "Canada", code: "CA", stationcount: 5 }],
   languages: [{ name: "english", stationcount: 10 }],
   codecs: [{ name: "MP3", stationcount: 8 }],
 };

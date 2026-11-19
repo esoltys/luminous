@@ -87,8 +87,8 @@
       class="px-2.5 pr-8 py-1.5 rounded-lg bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-xs text-brand-text-primary max-w-[11rem] focus:outline-none focus:border-brand-accent"
     >
       <option value="">{i18n.t("radio.allCountries")}</option>
-      {#each radioStore.facets.countries as c (c.isoCode ?? c.name)}
-        <option value={c.isoCode ?? c.name}>
+      {#each radioStore.facets.countries as c (c.code ?? c.name)}
+        <option value={c.code ?? c.name}>
           {c.name} ({c.stationcount})
         </option>
       {/each}

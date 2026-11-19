@@ -1651,7 +1651,7 @@ export interface RadioDirectoryQuery {
 
 export interface RadioBrowserFacetEntry {
   name: string;
-  isoCode?: string | null;
+  code?: string | null;
   stationcount: number;
 }
 
