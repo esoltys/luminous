@@ -1905,17 +1905,9 @@ fn chart_week(now: i64, start_sunday: bool, tz: &jiff::tz::TimeZone) -> ChartWee
     let first_day = today
         .checked_sub(Span::new().days(i64::from(days_back)))
         .unwrap_or(today);
-    let period_start = first_day
-        .to_zoned(jiff::tz::TimeZone::UTC)
-        .map(|z| z.timestamp().as_second())
-        .unwrap_or(0);
-    // Local midnight can fall in a DST gap in zones that spring forward at
-    // 00:00; jiff's default ("compatible") disambiguation then yields the
-    // first local time that exists, which is when the week actually begins.
-    let starts_at = first_day
-        .to_zoned(tz.clone())
-        .map(|z| z.timestamp().as_second())
-        .unwrap_or(period_start);
+    let period_start =
+        crate::clock::day_start_in_tz(first_day, &jiff::tz::TimeZone::UTC).unwrap_or(0);
+    let starts_at = crate::clock::day_start_in_tz(first_day, tz).unwrap_or(period_start);
     ChartWeek {
         period_start,
         starts_at,

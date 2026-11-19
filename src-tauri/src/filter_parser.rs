@@ -774,15 +774,9 @@ fn parse_field_filter(token: &str, today: Date) -> Option<FieldFilter> {
     })
 }
 
-/// Midnight starting `day` in the local time zone, as epoch seconds. A zone
-/// whose clocks skip midnight (a DST gap) starts the day at its first
-/// existing hour.
+/// Midnight starting `day` in the local time zone, as epoch seconds.
 fn local_day_start(day: Date) -> Option<i64> {
-    // jiff's default ("compatible") disambiguation starts a day whose
-    // midnight falls in a DST gap at the first local time that exists.
-    day.to_zoned(crate::clock::local_tz())
-        .ok()
-        .map(|z| z.timestamp().as_second())
+    crate::clock::day_start_in_tz(day, &crate::clock::local_tz())
 }
 
 /// Read a date value: `YYYY-MM-DD`, or `-<n><unit>` counted back from
