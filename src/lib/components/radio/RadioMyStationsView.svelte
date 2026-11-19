@@ -83,6 +83,13 @@
     showStationListModal = true;
   }
 
+  function onRowKeydown(e: KeyboardEvent, action: () => void) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      action();
+    }
+  }
+
   onMount(() => {
     const savedScroll = radioStore.getScrollTop("my_stations");
     if (scrollEl && savedScroll > 0) {
@@ -161,12 +168,7 @@
               role="button"
               tabindex="0"
               onclick={() => void radioStore.playStation(station)}
-              onkeydown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  void radioStore.playStation(station);
-                }
-              }}
+              onkeydown={(e) => onRowKeydown(e, () => void radioStore.playStation(station))}
               class={rowClasses(appearance)}
             >
               <div class="relative shrink-0 overflow-hidden">
@@ -266,12 +268,7 @@
               tabindex="0"
               data-testid="station-list-card"
               onclick={() => navigationStore.viewPlaylist(pl.id)}
-              onkeydown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  navigationStore.viewPlaylist(pl.id);
-                }
-              }}
+              onkeydown={(e) => onRowKeydown(e, () => navigationStore.viewPlaylist(pl.id))}
               class={rowClasses(appearance)}
             >
               <div class="relative shrink-0 overflow-hidden">
@@ -337,12 +334,7 @@
               role="button"
               tabindex="0"
               onclick={() => navigationStore.viewPlaylist(pl.id)}
-              onkeydown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  navigationStore.viewPlaylist(pl.id);
-                }
-              }}
+              onkeydown={(e) => onRowKeydown(e, () => navigationStore.viewPlaylist(pl.id))}
               class={rowClasses(appearance)}
             >
               <div class="relative shrink-0 overflow-hidden">
