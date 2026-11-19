@@ -396,7 +396,7 @@ describe("CurationShelf.svelte", () => {
     expect(await findByText("Checksum mismatch")).toBeInTheDocument();
     expect(
       await findByText(
-        "The file's header checksum doesn't match its audio (common with some encoders or taggers). The song still plays normally.",
+        "The file's saved audio fingerprint doesn't match what's inside—usually from an older encoder or tagger. It plays fine; you can ignore this or re-save the FLAC header to clear it.",
       ),
     ).toBeInTheDocument();
   });

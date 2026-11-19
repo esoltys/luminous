@@ -3181,32 +3181,37 @@ export const fr: DeepStringRecord<typeof en> = {
       "Chansons sans perte signalées pour transcodage avec perte ou suréchantillonnage suspect.",
     shelfProvenanceBadge: "Transcodage suspect",
     shelfCorruptTitle: "Fichiers audio corrompus ou illisibles",
-    shelfCorruptHint: "Chansons échouant à la vérification du conteneur ou au décodage du flux",
+    shelfCorruptHint:
+      "Ces chansons n’ont pas pu être lues ou décodées correctement. Vous devrez probablement les remplacer ou les télécharger de nouveau.",
     shelfIntegrityWarningsTitle: "Avertissements d’intégrité audio",
     shelfIntegrityWarningsHint:
-      "Chansons qui jouent normalement, mais présentent une non-concordance de somme de contrôle ou une troncature mineure en fin de flux",
+      "Ces chansons jouent normalement, mais leur en-tête ou leur fin présente de légers écarts — généralement sans conséquence.",
     showWarnings: "Afficher les avertissements",
     hideWarnings: "Masquer les avertissements",
     integrityMd5Label: "Somme de contrôle différente",
     integrityMd5Desc:
-      "La somme de contrôle de l’en-tête ne correspond pas à l’audio (fréquent avec certains encodeurs ou outils d’étiquetage). La chanson joue normalement.",
+      "L’empreinte audio enregistrée ne correspond pas au contenu, souvent à cause d’un ancien encodeur ou outil d’étiquetage. La lecture fonctionne; vous pouvez l’ignorer ou réenregistrer l’en-tête FLAC.",
     integrityMinorTruncationLabel: "Troncature mineure à la fin",
     integrityMinorTruncationDesc:
-      "Le fichier se termine un peu plus tôt que prévu par son en-tête, mais presque tout l’audio est intact et lisible.",
+      "Le fichier s’arrête une fraction de seconde avant ce que prévoit l’en-tête, souvent à cause d’octets d’étiquette en fin de fichier. Presque tout l’audio est intact : vérifiez la fin et remplacez seulement si ça coupe.",
     integrityIncompleteFileLabel: "Fichier incomplet",
     integrityIncompleteFileDesc:
-      "Le fichier est coupé en cours de chanson (par exemple après un téléchargement ou une copie interrompue).",
+      "Le fichier coupe en pleine chanson, probablement à cause d’un téléchargement ou d’une copie interrompue. Téléchargez-le de nouveau ou remplacez-le.",
     integrityEmptyFileLabel: "Fichier vide",
-    integrityEmptyFileDesc: "Le fichier ne contient aucune donnée (0 octet).",
+    integrityEmptyFileDesc:
+      "Ce fichier fait 0 octet et ne contient aucune donnée audio. Supprimez-le ou restaurez-le depuis une sauvegarde.",
     integrityUnrecognizedFormatLabel: "Format non reconnu",
     integrityUnrecognizedFormatDesc:
-      "L’en-tête ou le conteneur du fichier n’a pas pu être lu comme de l’audio.",
+      "Luminous n’a pas pu lire l’en-tête comme de l’audio — le fichier est peut-être endommagé ou porte la mauvaise extension. Vérifiez-le ou remplacez-le.",
     integrityNoAudioLabel: "Aucun audio lisible",
-    integrityNoAudioDesc: "Le fichier s’est ouvert, mais ne contient aucun audio décodable.",
+    integrityNoAudioDesc:
+      "Le fichier s’est ouvert, mais ne contient aucun audio décodable. Vous devrez le remplacer.",
     integrityDamagedAudioLabel: "Données audio endommagées",
-    integrityDamagedAudioDesc: "Une ou plusieurs trames audio du fichier sont corrompues.",
+    integrityDamagedAudioDesc:
+      "Une partie du flux audio est corrompue, ce qui peut causer des coupures ou des erreurs. Remplacez-le par une copie saine si vous en avez une.",
     integrityUnreadableStreamLabel: "Flux audio illisible",
-    integrityUnreadableStreamDesc: "Le flux audio n’a pas pu être décodé correctement.",
+    integrityUnreadableStreamDesc:
+      "Le flux audio n’a pas pu être décodé proprement. Essayez de le lire ou remplacez le fichier par une copie saine.",
     showAllWithCount: "Tout afficher ({count})",
     showLess: "Afficher moins",
   },

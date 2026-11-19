@@ -5,20 +5,20 @@ describe("describeIntegrityIssue", () => {
   it("maps FLAC MD5 mismatch to a playable non-technical label and description", () => {
     const res = describeIntegrityIssue("FLAC MD5 checksum mismatch", true);
     expect(res.label).toBe("Checksum mismatch");
-    expect(res.description).toContain("plays normally");
+    expect(res.description).toContain("plays fine");
   });
 
   it("distinguishes warning vs corrupt truncation", () => {
     const warn = describeIntegrityIssue("Truncated FLAC audio stream: premature end-of-file", true);
     expect(warn.label).toBe("Minor ending truncation");
-    expect(warn.description).toContain("playable");
+    expect(warn.description).toContain("intact");
 
     const corrupt = describeIntegrityIssue(
       "Truncated FLAC audio stream: premature end-of-file",
       false,
     );
     expect(corrupt.label).toBe("Incomplete file");
-    expect(corrupt.description).toContain("cut off mid-song");
+    expect(corrupt.description).toContain("cuts off mid-song");
   });
 
   it("maps container, empty, zero-frame, corrupt-frame, and decode errors", () => {

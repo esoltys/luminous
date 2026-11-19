@@ -3174,33 +3174,37 @@ export const de = {
       "Verlustfreie Titel mit Verdacht auf verlustbehaftete Transkodierung oder Upsampling.",
     shelfProvenanceBadge: "Verdacht auf Transkodierung",
     shelfCorruptTitle: "Beschädigte und unlesbare Audiodateien",
-    shelfCorruptHint: "Titel mit Fehlern bei der Container-Überprüfung oder Stream-Dekodierung",
+    shelfCorruptHint:
+      "Diese Titel ließen sich nicht fehlerfrei lesen oder dekodieren. Du musst sie wahrscheinlich ersetzen oder erneut herunterladen.",
     shelfIntegrityWarningsTitle: "Integritätswarnungen für Audiodateien",
     shelfIntegrityWarningsHint:
-      "Titel, die normal abgespielt werden, aber eine Prüfsummenabweichung oder eine geringfügige Kürzung am Stream-Ende aufweisen",
+      "Diese Titel werden normal abgespielt, weisen aber kleine Abweichungen im Header oder am Ende auf – meist unbedenklich.",
     showWarnings: "Warnungen anzeigen",
     hideWarnings: "Warnungen ausblenden",
     integrityMd5Label: "Prüfsummenabweichung",
     integrityMd5Desc:
-      "Die Prüfsumme im Datei-Header stimmt nicht mit den Audiodaten überein (häufig bei bestimmten Encodern oder Taggern). Der Titel wird normal abgespielt.",
+      "Der gespeicherte Audio-Fingerabdruck stimmt nicht mit dem Inhalt überein – meist durch einen älteren Encoder oder Tagger. Der Titel spielt normal; du kannst das ignorieren oder den FLAC-Header neu speichern.",
     integrityMinorTruncationLabel: "Geringfügige Kürzung am Ende",
     integrityMinorTruncationDesc:
-      "Die Datei endet etwas früher als im Header angegeben, aber nahezu alle Audiodaten sind intakt und abspielbar.",
+      "Die Datei endet einen Bruchteil einer Sekunde früher als im Header erwartet, oft durch angehängte Tag-Daten. Fast das gesamte Audio ist intakt – prüfe das Ende und ersetze die Datei nur, wenn etwas fehlt.",
     integrityIncompleteFileLabel: "Unvollständige Datei",
     integrityIncompleteFileDesc:
-      "Die Datei bricht mitten im Titel ab (z. B. durch einen abgebrochenen Download oder Kopiervorgang).",
+      "Die Datei bricht mitten im Titel ab, vermutlich durch einen abgebrochenen Download oder Kopiervorgang. Lade sie erneut herunter oder ersetze sie.",
     integrityEmptyFileLabel: "Leere Datei",
-    integrityEmptyFileDesc: "Die Datei enthält keine Daten (0 Bytes).",
+    integrityEmptyFileDesc:
+      "Diese Datei ist 0 Bytes groß und enthält keinerlei Audiodaten. Entferne sie oder stelle sie aus einem Backup wieder her.",
     integrityUnrecognizedFormatLabel: "Unbekanntes Format",
     integrityUnrecognizedFormatDesc:
-      "Der Datei-Header oder Container konnte nicht als Audio gelesen werden.",
+      "Luminous konnte den Datei-Header nicht als Audio lesen – die Datei ist möglicherweise beschädigt oder hat die falsche Endung. Prüfe oder ersetze sie.",
     integrityNoAudioLabel: "Kein abspielbares Audio",
     integrityNoAudioDesc:
-      "Die Datei ließ sich öffnen, enthält aber keine dekodierbaren Audiodaten.",
+      "Die Datei ließ sich öffnen, enthält aber kein dekodierbares Audio. Du musst sie ersetzen.",
     integrityDamagedAudioLabel: "Beschädigte Audiodaten",
-    integrityDamagedAudioDesc: "Ein oder mehrere Audio-Frames in der Datei sind beschädigt.",
+    integrityDamagedAudioDesc:
+      "Ein Teil des Audiostreams ist beschädigt, sodass es zu Aussetzern oder Abbrüchen kommen kann. Ersetze die Datei durch eine saubere Kopie, falls vorhanden.",
     integrityUnreadableStreamLabel: "Unlesbarer Audiostream",
-    integrityUnreadableStreamDesc: "Der Audiostream konnte nicht fehlerfrei dekodiert werden.",
+    integrityUnreadableStreamDesc:
+      "Der Audiostream konnte nicht fehlerfrei dekodiert werden. Teste die Wiedergabe oder ersetze die Datei durch eine saubere Kopie.",
     showAllWithCount: "Alle anzeigen ({count})",
     showLess: "Weniger anzeigen",
   },

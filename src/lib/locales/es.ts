@@ -3167,32 +3167,36 @@ export const es = {
     shelfProvenanceBadge: "Sospecha de transcodificación",
     shelfCorruptTitle: "Archivos de audio dañados o ilegibles",
     shelfCorruptHint:
-      "Canciones con fallos en la verificación del contenedor o la decodificación del flujo",
+      "Estas canciones no se pudieron leer ni decodificar correctamente. Seguramente tendrás que reemplazarlas o volver a descargarlas.",
     shelfIntegrityWarningsTitle: "Advertencias de integridad de audio",
     shelfIntegrityWarningsHint:
-      "Canciones que se reproducen con normalidad, pero tienen una discrepancia de suma de comprobación o un truncamiento menor al final del flujo",
+      "Estas canciones se reproducen con normalidad, pero tienen pequeñas diferencias en el encabezado o al final; normalmente no pasa nada por dejarlas así.",
     showWarnings: "Mostrar advertencias",
     hideWarnings: "Ocultar advertencias",
     integrityMd5Label: "Discrepancia de suma de comprobación",
     integrityMd5Desc:
-      "La suma de comprobación del encabezado no coincide con el audio (algo habitual con ciertos codificadores o editores de etiquetas). La canción se reproduce con normalidad.",
+      "La huella de audio guardada no coincide con el contenido, algo habitual con codificadores o editores de etiquetas antiguos. Se reproduce bien; puedes ignorarlo o volver a guardar el encabezado FLAC.",
     integrityMinorTruncationLabel: "Truncamiento menor al final",
     integrityMinorTruncationDesc:
-      "El archivo termina un poco antes de lo que indica su encabezado, pero casi todo el audio está intacto y se puede reproducir.",
+      "El archivo termina una fracción de segundo antes de lo que espera su encabezado, a menudo por bytes de etiquetas al final. Casi todo el audio está intacto: revisa el final y reemplázalo solo si se corta.",
     integrityIncompleteFileLabel: "Archivo incompleto",
     integrityIncompleteFileDesc:
-      "El archivo se corta a mitad de la canción (por ejemplo, por una descarga o copia interrumpida).",
+      "El archivo se corta a mitad de la canción, probablemente por una descarga o copia interrumpida. Vuelve a descargarlo o reemplázalo desde una copia de seguridad.",
     integrityEmptyFileLabel: "Archivo vacío",
-    integrityEmptyFileDesc: "El archivo no contiene datos (0 bytes).",
+    integrityEmptyFileDesc:
+      "Este archivo ocupa 0 bytes y no tiene ningún dato de audio. Elimínalo o reemplázalo desde una copia de seguridad.",
     integrityUnrecognizedFormatLabel: "Formato no reconocido",
     integrityUnrecognizedFormatDesc:
-      "No se pudo leer el encabezado o contenedor del archivo como audio.",
+      "Luminous no pudo leer el encabezado del archivo como audio; puede estar dañado o tener la extensión incorrecta. Revísalo o reemplázalo.",
     integrityNoAudioLabel: "Sin audio reproducible",
-    integrityNoAudioDesc: "El archivo se abrió, pero no contiene audio decodificable.",
+    integrityNoAudioDesc:
+      "El archivo se abrió, pero no contiene audio decodificable. Tendrás que reemplazarlo.",
     integrityDamagedAudioLabel: "Datos de audio dañados",
-    integrityDamagedAudioDesc: "Uno o más fotogramas de audio dentro del archivo están dañados.",
+    integrityDamagedAudioDesc:
+      "Parte del flujo de audio está dañada, por lo que la reproducción puede fallar o dar saltos. Reemplázalo con una copia limpia si tienes una.",
     integrityUnreadableStreamLabel: "Flujo de audio ilegible",
-    integrityUnreadableStreamDesc: "No se pudo decodificar el flujo de audio correctamente.",
+    integrityUnreadableStreamDesc:
+      "No se pudo decodificar el flujo de audio correctamente. Prueba a reproducirlo o reemplaza el archivo con una copia limpia.",
     showAllWithCount: "Mostrar todo ({count})",
     showLess: "Mostrar menos",
   },
