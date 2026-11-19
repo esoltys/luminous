@@ -26,7 +26,8 @@
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { filesStore } from "../stores/files.svelte";
-  import type { FolderSearchResult, RecentSearchItem } from "../types";
+  import { radioStore, mergeStationSuggestions } from "../stores/radio.svelte";
+  import type { FolderSearchResult, RadioDirectoryStation, RecentSearchItem } from "../types";
   import { parseFileFilter } from "./files/fileFilter";
   import { shouldSkipGlobalShortcut } from "../utils/globalShortcuts";
   import { resolveArtistPortraitUrl } from "../utils/covers";
@@ -36,6 +37,7 @@
     getPlaylistDisplayName,
   } from "../utils/playlist";
   import CoverArt from "./CoverArt.svelte";
+  import StationFavicon from "./radio/StationFavicon.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "../utils/motion";
@@ -85,6 +87,54 @@
   function debouncedSearch(query: string) {
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => collectionStore.search(query), SEARCH_DEBOUNCE_MS);
+  }
+  // A search typed just before the bar unmounts must not land afterwards.
+  $effect(() => () => clearTimeout(searchDebounceTimer));
+
+  // Stations group (#2007): directory matches follow the search text on the same
+  // debounce as song search. `field:value` filter queries are library-only — the
+  // directory index would read them as plain words and return unrelated stations.
+  const stationQuery = $derived.by(() => {
+    const q = collectionStore.searchQuery.trim();
+    return q && !q.includes(":") && !hasAdvancedSearchTerms(q) ? q : "";
+  });
+  $effect(() => {
+    const q = stationQuery;
+    if (!q || isFilesFilterMode) {
+      radioStore.clearGlobalSearchStations();
+      return;
+    }
+    const timer = setTimeout(() => void radioStore.searchStationsGlobal(q), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  });
+
+  const matchingStations = $derived(
+    stationQuery
+      ? mergeStationSuggestions(
+          radioStore.savedStations,
+          radioStore.globalSearchStations,
+          stationQuery,
+          MAX_SEARCH_SUGGESTIONS_PER_CATEGORY,
+        )
+      : [],
+  );
+
+  function stationSubtitle(station: RadioDirectoryStation): string {
+    const label = i18n.t("radio.stationLabel");
+    const where = station.country || station.countrycode;
+    return where ? `${label} • ${where}` : label;
+  }
+
+  function openStationResult(station: RadioDirectoryStation) {
+    void radioStore.playStation(station);
+    collectionStore.addRecentSearch({
+      kind: "station",
+      title: station.name || i18n.t("radio.unnamedStation"),
+      subtitle: stationSubtitle(station),
+      artUrl: station.favicon || null,
+      entityId: station.stationuuid,
+    });
+    isSearchFocused = false;
   }
 
   // Dev and capture-build entry points for scripted captures (src/lib/scripting/screens.ts).
@@ -304,6 +354,8 @@
       navigationStore.viewAlbum(item.title);
     } else if (item.kind === "playlist" && item.entityId) {
       navigationStore.viewPlaylist(Number(item.entityId));
+    } else if (item.kind === "station" && item.entityId) {
+      void radioStore.playStationByUuid(String(item.entityId), item.title);
     } else if (item.kind === "song" && item.query) {
       navigationStore.viewAlbum(
         item.query,
@@ -608,7 +660,7 @@
                   {/if}
                 </div>
 
-                {#if collectionStore.filteredArtists.length === 0 && collectionStore.filteredAlbums.length === 0 && matchingPlaylists.length === 0 && collectionStore.searchResults.length === 0 && collectionStore.folderSearchResults.length === 0 && !collectionStore.searchLoading}
+                {#if collectionStore.filteredArtists.length === 0 && collectionStore.filteredAlbums.length === 0 && matchingPlaylists.length === 0 && matchingStations.length === 0 && collectionStore.searchResults.length === 0 && collectionStore.folderSearchResults.length === 0 && !collectionStore.searchLoading}
                   <div class="p-3 text-center text-xs text-brand-text-secondary/60 select-none">
                     {i18n.t("topNav.noSuggestions", {}, "No matching suggestions")}
                   </div>
@@ -852,6 +904,34 @@
                         </div>
                       </div>
                     {/each}
+
+                    {#each matchingStations as station (station.stationuuid)}
+                      <div
+                        role="button"
+                        tabindex="0"
+                        data-testid="search-station-result"
+                        onclick={() => openStationResult(station)}
+                        onkeydown={(e) => {
+                          if (e.key === "Enter") openStationResult(station);
+                          else handleSearchResultKeyDown(e);
+                        }}
+                        class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      >
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                          <StationFavicon favicon={station.favicon} />
+                          <div class="flex flex-col min-w-0 flex-1">
+                            <span
+                              class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors"
+                            >
+                              {station.name || i18n.t("radio.unnamedStation")}
+                            </span>
+                            <span class="text-xs text-brand-text-secondary/70 truncate">
+                              {stationSubtitle(station)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    {/each}
                   </div>
 
                   {#if collectionStore.folderSearchResults.length > 0}
@@ -984,6 +1064,8 @@
                             <User class="w-4 h-4 text-brand-text-secondary" />
                           </div>
                         {/await}
+                      {:else if item.kind === "station"}
+                        <StationFavicon favicon={item.artUrl} sizeClass="w-9 h-9" />
                       {:else if item.artUrl}
                         <CoverArt
                           songId={typeof item.entityId === "number" ? item.entityId : undefined}

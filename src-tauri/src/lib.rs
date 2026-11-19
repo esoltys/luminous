@@ -1853,6 +1853,7 @@ pub fn run() {
             commands::radio_directory::get_radio_directory_status,
             commands::radio_directory::sync_radio_directory,
             commands::radio_directory::query_radio_directory,
+            commands::radio_directory::search_stations,
             commands::radio_directory::get_radio_directory_station,
             commands::radio_directory::get_radio_directory_facets,
             commands::radio_directory::materialize_radio_station,

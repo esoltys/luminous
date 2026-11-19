@@ -5561,5 +5561,10 @@ mod tests {
         let filtered = scanner.search_songs("Ambient", 50).unwrap();
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].title.as_deref(), Some("Ambient Drift"));
+
+        // Field predicates go through the same source filter (#2007).
+        let by_title = scanner.search_songs("title:ambient", 50).unwrap();
+        assert_eq!(by_title.len(), 1);
+        assert_eq!(by_title[0].title.as_deref(), Some("Ambient Drift"));
     }
 }

@@ -12,6 +12,8 @@
   import Select from "../Select.svelte";
   import RadioStationRow from "./RadioStationRow.svelte";
 
+  const MIN_BITRATE_OPTIONS = [64, 128, 192, 256, 320];
+
   let scrollContainerEl: HTMLElement | null = $state(null);
 
   function unwrapRow(raw: unknown): RadioDirectoryStation {
@@ -26,7 +28,8 @@
       radioStore.searchQuery.trim() ||
       radioStore.selectedCountry ||
       radioStore.selectedLanguage ||
-      radioStore.selectedCodec,
+      radioStore.selectedCodec ||
+      radioStore.selectedMinBitrate,
     ),
   );
 
@@ -128,6 +131,18 @@
         <option value={codec.name}>
           {codec.name} ({codec.stationcount})
         </option>
+      {/each}
+    </Select>
+
+    <Select
+      ariaLabel={i18n.t("radio.filterMinBitrate")}
+      value={String(radioStore.selectedMinBitrate ?? "")}
+      onchange={(e) => radioStore.setMinBitrate(Number(e.currentTarget.value) || null)}
+      class="hidden @lg:block px-2.5 pr-8 py-1.5 rounded-lg bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-xs text-brand-text-primary max-w-[10rem] focus:outline-none focus:border-brand-accent"
+    >
+      <option value="">{i18n.t("radio.anyBitrate")}</option>
+      {#each MIN_BITRATE_OPTIONS as kbps (kbps)}
+        <option value={String(kbps)}>{i18n.t("radio.minBitrateOption", { kbps })}</option>
       {/each}
     </Select>
 

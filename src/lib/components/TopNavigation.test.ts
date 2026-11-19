@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import TopNavigation from "./TopNavigation.svelte";
@@ -7,6 +7,8 @@ import { collectionStore } from "../stores/collection.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { filesStore } from "../stores/files.svelte";
+import { radioStore } from "../stores/radio.svelte";
+import type { RadioDirectoryStation } from "../types";
 
 describe("TopNavigation.svelte", () => {
   beforeEach(() => {
@@ -238,6 +240,134 @@ describe("TopNavigation.svelte", () => {
       source: { kind: "folder", id: 1 },
       path: ["Metal", "Katatonia"],
       selectedName: undefined,
+    });
+  });
+
+  describe("stations group (#2007)", () => {
+    function station(overrides: Partial<RadioDirectoryStation>): RadioDirectoryStation {
+      return {
+        stationuuid: "uuid",
+        name: "Station",
+        urlResolved: "https://stream.example/s.mp3",
+        homepage: "",
+        favicon: "",
+        tags: "",
+        country: "Canada",
+        countrycode: "CA",
+        language: "english",
+        codec: "MP3",
+        bitrate: 128,
+        hls: false,
+        votes: 0,
+        clickcount: 0,
+        lastcheckok: true,
+        changeuuid: "c",
+        updatedAt: 0,
+        playable: true,
+        ...overrides,
+      };
+    }
+
+    const saved = station({ stationuuid: "saved-1", name: "My Jazz Den", tags: "jazz" });
+    const directory = [
+      station({ stationuuid: "saved-1", name: "My Jazz Den", tags: "jazz" }),
+      station({ stationuuid: "dir-1", name: "Jazz FM91", country: "Canada" }),
+    ];
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      radioStore.savedStations = [saved];
+      radioStore.clearGlobalSearchStations();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // The store lazily loads saved stations on the first search; answer those calls.
+    function radioMocks(cmd: string): unknown {
+      if (cmd === "get_saved_radio_stations") return [saved];
+      if (cmd === "get_recent_radio_stations" || cmd === "get_radio_playlist_ids") return [];
+      if (cmd === "search_songs") return [];
+      return null;
+    }
+
+    async function typeQuery(value: string) {
+      const view = render(TopNavigation);
+      const input = view.getByPlaceholderText(/search/i) as HTMLInputElement;
+      await fireEvent.focus(input);
+      await fireEvent.input(input, { target: { value } });
+      await vi.advanceTimersByTimeAsync(250);
+      return view;
+    }
+
+    it("lists saved stations first, then directory matches without duplicates, and plays on click", async () => {
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "search_stations") return directory;
+        return radioMocks(cmd);
+      });
+
+      const { getAllByTestId } = await typeQuery("jazz");
+
+      expect(invoke).toHaveBeenCalledWith("search_stations", { query: "jazz", limit: 10 });
+      const rows = getAllByTestId("search-station-result");
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toHaveTextContent("My Jazz Den");
+      expect(rows[1]).toHaveTextContent("Jazz FM91");
+      expect(rows[1]).toHaveTextContent("Station • Canada");
+
+      await fireEvent.click(rows[1]);
+      expect(invoke).toHaveBeenCalledWith("play_radio_station", { stationuuid: "dir-1" });
+      expect(collectionStore.recentSearches[0]).toMatchObject({
+        kind: "station",
+        title: "Jazz FM91",
+        entityId: "dir-1",
+      });
+    });
+
+    it("still shows saved stations when the directory lookup fails (offline or no index)", async () => {
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "search_stations") throw new Error("no directory");
+        return radioMocks(cmd);
+      });
+
+      const { getAllByTestId } = await typeQuery("jazz");
+
+      const rows = getAllByTestId("search-station-result");
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toHaveTextContent("My Jazz Den");
+    });
+
+    it("does not query the station directory for field:value filter searches", async () => {
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "search_stations") return directory;
+        return radioMocks(cmd);
+      });
+
+      const { queryAllByTestId } = await typeQuery("genre:jazz");
+
+      expect(invoke).not.toHaveBeenCalledWith("search_stations", expect.anything());
+      expect(queryAllByTestId("search-station-result")).toHaveLength(0);
+    });
+
+    it("replays a station from Recent Searches by its uuid", async () => {
+      collectionStore.recentSearches = [
+        {
+          id: "r1",
+          kind: "station",
+          title: "Jazz FM91",
+          subtitle: "Station • Canada",
+          entityId: "dir-1",
+          timestamp: 1_700_000_000_000,
+        },
+      ];
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => radioMocks(cmd));
+
+      const { getByPlaceholderText, getByText } = render(TopNavigation);
+      await fireEvent.focus(getByPlaceholderText(/search/i));
+      await fireEvent.click(getByText("Jazz FM91"));
+
+      expect(invoke).toHaveBeenCalledWith("play_radio_station", { stationuuid: "dir-1" });
     });
   });
 });

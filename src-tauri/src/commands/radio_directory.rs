@@ -67,6 +67,23 @@ pub async fn query_radio_directory(
     .map_err(|e| e.to_string())
 }
 
+/// Global-search station lookup (#2007): ranked, playable-only and capped at
+/// [`radio_directory::MAX_STATION_SEARCH_RESULTS`]. Local mirror only, so it works
+/// offline; returns an empty list when the directory isn't opted in.
+#[tauri::command]
+pub async fn search_stations(
+    query: String,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<Vec<RadioDirectoryStation>, String> {
+    let limit = limit.unwrap_or(radio_directory::MAX_STATION_SEARCH_RESULTS);
+    crate::db::run_blocking(&state.db, move |conn| {
+        radio_directory::search_stations(conn, &query, limit)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// Looks up a single station in the local `radio_directory` mirror by UUID.
 #[tauri::command]
 pub async fn get_radio_directory_station(

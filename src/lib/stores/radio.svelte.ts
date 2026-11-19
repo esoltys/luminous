@@ -26,8 +26,75 @@ const STORAGE_HIDE_UNSUPPORTED = "radio_hideUnsupported";
 const STORAGE_SCROLL_MY = "radio_scrollTop_my_stations";
 const STORAGE_SCROLL_DISCOVER = "radio_scrollTop_discover";
 const STORAGE_ORDER_BY = "radio_orderBy";
+const STORAGE_DISCOVER_FILTERS = "radio_discoverFilters";
+
+/** Discover search and filters, persisted so the tab reopens as the user left it. */
+interface DiscoverFilters {
+  searchQuery: string;
+  country: string | null;
+  language: string | null;
+  codec: string | null;
+  minBitrate: number | null;
+}
+
+function readDiscoverFilters(): DiscoverFilters {
+  const empty: DiscoverFilters = {
+    searchQuery: "",
+    country: null,
+    language: null,
+    codec: null,
+    minBitrate: null,
+  };
+  const raw = readStorage(STORAGE_DISCOVER_FILTERS);
+  if (!raw) return empty;
+  try {
+    const parsed = JSON.parse(raw) as Partial<DiscoverFilters>;
+    const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
+    return {
+      searchQuery: typeof parsed.searchQuery === "string" ? parsed.searchQuery : "",
+      country: str(parsed.country),
+      language: str(parsed.language),
+      codec: str(parsed.codec),
+      minBitrate:
+        typeof parsed.minBitrate === "number" && parsed.minBitrate > 0 ? parsed.minBitrate : null,
+    };
+  } catch {
+    return empty;
+  }
+}
 
 const STALE_THRESHOLD_SECS = 24 * 3600;
+
+/** Directory rows requested per global search; the backend clamps to its own cap too. */
+const GLOBAL_SEARCH_DIRECTORY_LIMIT = 10;
+
+function stationMatchesQuery(station: RadioDirectoryStation, tokens: string[]): boolean {
+  const haystack =
+    `${station.name} ${station.tags} ${station.country} ${station.language}`.toLowerCase();
+  return tokens.every((t) => haystack.includes(t));
+}
+
+/**
+ * Global-search station suggestions (#2007): saved stations matching every query
+ * word first (client-side), then directory results that aren't already saved,
+ * capped at `limit`.
+ */
+export function mergeStationSuggestions(
+  saved: RadioDirectoryStation[],
+  directory: RadioDirectoryStation[],
+  query: string,
+  limit: number,
+): RadioDirectoryStation[] {
+  const tokens = query
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+  if (tokens.length === 0 || limit <= 0) return [];
+  const savedMatches = saved.filter((s) => stationMatchesQuery(s, tokens));
+  const seen = new Set(saved.map((s) => s.stationuuid));
+  const rest = directory.filter((s) => !seen.has(s.stationuuid));
+  return [...savedMatches, ...rest].slice(0, limit);
+}
 
 function readStorage(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -65,10 +132,14 @@ class RadioStore {
   loadingStatus = $state(false);
 
   // Discover state
-  searchQuery = $state("");
-  selectedCountry = $state<string | null>(null);
-  selectedLanguage = $state<string | null>(null);
-  selectedCodec = $state<string | null>(null);
+  private restoredFilters = readDiscoverFilters();
+  searchQuery = $state(this.restoredFilters.searchQuery);
+  selectedCountry = $state<string | null>(this.restoredFilters.country);
+  selectedLanguage = $state<string | null>(this.restoredFilters.language);
+  selectedCodec = $state<string | null>(this.restoredFilters.codec);
+  selectedMinBitrate = $state<number | null>(this.restoredFilters.minBitrate);
+  // Restored selections are checked once against the directory's facets.
+  private restoredFiltersChecked = false;
 
   discoverStations = $state<RadioDirectoryStation[]>([]);
   discoverLoading = $state(false);
@@ -85,6 +156,10 @@ class RadioStore {
   recentStations = $state<RadioDirectoryStation[]>([]);
   radioPlaylistIds = $state<number[]>([]);
   myStationsLoading = $state(false);
+
+  // Global search (TopNavigation) directory matches, see `searchStationsGlobal`.
+  globalSearchStations = $state<RadioDirectoryStation[]>([]);
+  private globalSearchSeq = 0;
 
   private savedUuids = $derived(new Set(this.savedStations.map((s) => s.stationuuid)));
   private unlisteners: UnlistenFn[] = [];
@@ -188,6 +263,7 @@ class RadioStore {
       this.syncError = status.lastError ?? null;
       await this.loadMyStations();
       if (status.optedIn && status.stationCount > 0) {
+        await this.dropMissingRestoredFilters();
         await Promise.all([this.loadFacets(), this.loadDiscover()]);
       }
     } catch (err) {
@@ -195,6 +271,49 @@ class RadioStore {
     } finally {
       this.loadingStatus = false;
     }
+  }
+
+  /**
+   * A restored country, language or format may have left the directory since the
+   * last session (a re-sync dropped it). Clear such a selection rather than keep
+   * filtering on a value the dropdown can no longer show.
+   */
+  private async dropMissingRestoredFilters(): Promise<void> {
+    if (this.restoredFiltersChecked) return;
+    this.restoredFiltersChecked = true;
+    if (!this.selectedCountry && !this.selectedLanguage && !this.selectedCodec) return;
+    try {
+      const facets = await invoke<RadioDirectoryFacets>("get_radio_directory_facets", {
+        hideUnsupported: this._hideUnsupported,
+        tagLimit: 1,
+      });
+      if (!facets) return;
+      const has = (list: { name: string; code?: string | null }[], value: string) =>
+        list.some((e) => e.name === value || e.code === value);
+      if (this.selectedCountry && !has(facets.countries, this.selectedCountry)) {
+        this.selectedCountry = null;
+      }
+      if (this.selectedLanguage && !has(facets.languages, this.selectedLanguage)) {
+        this.selectedLanguage = null;
+      }
+      if (this.selectedCodec && !has(facets.codecs, this.selectedCodec)) {
+        this.selectedCodec = null;
+      }
+      this.persistFilters();
+    } catch {
+      // Keep the restored selection; the query still runs with it.
+    }
+  }
+
+  private persistFilters() {
+    const filters: DiscoverFilters = {
+      searchQuery: this.searchQuery,
+      country: this.selectedCountry,
+      language: this.selectedLanguage,
+      codec: this.selectedCodec,
+      minBitrate: this.selectedMinBitrate,
+    };
+    writeStorage(STORAGE_DISCOVER_FILTERS, JSON.stringify(filters));
   }
 
   async refreshAll(): Promise<void> {
@@ -226,6 +345,7 @@ class RadioStore {
       countrycode: this.selectedCountry,
       language: this.selectedLanguage,
       codec: this.selectedCodec,
+      minBitrate: this.selectedMinBitrate,
       hideUnsupported: this._hideUnsupported,
       orderBy: this._orderBy,
       offset: 0,
@@ -304,6 +424,46 @@ class RadioStore {
     }
   }
 
+  /**
+   * Looks up directory stations for the global search box. Stale responses are
+   * dropped; failures (or no directory) leave an empty list rather than an error.
+   */
+  async searchStationsGlobal(query: string): Promise<void> {
+    const seq = ++this.globalSearchSeq;
+    const q = query.trim();
+    if (!q) {
+      this.globalSearchStations = [];
+      return;
+    }
+    void this.ensureSavedLoaded();
+    const results = await invoke<RadioDirectoryStation[]>("search_stations", {
+      query: q,
+      limit: GLOBAL_SEARCH_DIRECTORY_LIMIT,
+    }).catch(() => [] as RadioDirectoryStation[]);
+    if (seq === this.globalSearchSeq) {
+      this.globalSearchStations = Array.isArray(results) ? results : [];
+    }
+  }
+
+  clearGlobalSearchStations() {
+    this.globalSearchSeq++;
+    this.globalSearchStations = [];
+  }
+
+  /** Plays a station known only by uuid (e.g. from a recent search). */
+  async playStationByUuid(stationuuid: string, name: string): Promise<void> {
+    try {
+      await invoke<Song>("play_radio_station", { stationuuid });
+      void this.loadMyStations();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toastStore.show(
+        i18n.t("playerBar.stationOfflineToast", { title: name }, `"${name}" — ${msg}`),
+        "error",
+      );
+    }
+  }
+
   async ensureSavedLoaded(): Promise<void> {
     if (this.savedLoaded) return;
     await this.loadMyStations();
@@ -344,11 +504,13 @@ class RadioStore {
   }
 
   private refreshDiscoverAndFacets() {
+    this.persistFilters();
     void Promise.all([this.loadDiscover(), this.loadFacets()]);
   }
 
   setSearchQuery(query: string, immediate = false) {
     this.searchQuery = query;
+    this.persistFilters();
     if (this.searchTimer) {
       clearTimeout(this.searchTimer);
       this.searchTimer = null;
@@ -363,6 +525,11 @@ class RadioStore {
     }, 180);
   }
 
+  setMinBitrate(value: number | null) {
+    this.selectedMinBitrate = value && value > 0 ? value : null;
+    this.refreshDiscoverAndFacets();
+  }
+
   setFilter(field: "country" | "language" | "codec", value: string | null) {
     if (field === "country") this.selectedCountry = value;
     else if (field === "language") this.selectedLanguage = value;
@@ -375,6 +542,7 @@ class RadioStore {
     this.selectedCodec = codec;
     this._hideUnsupported = hideUnsupported;
     writeStorage(STORAGE_HIDE_UNSUPPORTED, String(hideUnsupported));
+    this.persistFilters();
     if (hideChanged) {
       void this.refreshAll();
     } else {
@@ -387,6 +555,7 @@ class RadioStore {
     this.selectedCountry = null;
     this.selectedLanguage = null;
     this.selectedCodec = null;
+    this.selectedMinBitrate = null;
     this.refreshDiscoverAndFacets();
   }
 }
