@@ -4814,6 +4814,50 @@ Official DR value: DR13\n",
         );
     }
 
+    /// A flat folder shared by several albums: its one `cover.jpg` is no
+    /// album's cover, so each track keeps its own embedded picture.
+    #[test]
+    fn test_read_and_prepare_song_ignores_folder_art_in_mixed_album_folder() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let first = temp_dir.path().join("one.wav");
+        let second = temp_dir.path().join("two.wav");
+        write_test_wav_with_embedded_art(&first, Some("Album One"));
+        write_test_wav_with_embedded_art(&second, Some("Album Two"));
+        std::fs::write(temp_dir.path().join("cover.jpg"), b"JPEG image content").unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let cover_manager = CoverManager::new(db, temp_dir.path().to_path_buf());
+
+        for path in [&first, &second] {
+            let song = read_and_prepare_song(&cover_manager, path).unwrap();
+            let art = song.art_automatic.expect("embedded art should be cached");
+            assert!(art.starts_with("album-"), "got {art}");
+        }
+    }
+
+    /// Several tracks of one album still share the folder's cover.
+    #[test]
+    fn test_read_and_prepare_song_keeps_folder_art_for_single_album_folder() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let first = temp_dir.path().join("one.wav");
+        let second = temp_dir.path().join("two.wav");
+        write_test_wav_with_embedded_art(&first, Some("Same Album"));
+        write_test_wav_with_embedded_art(&second, Some("same album "));
+        let folder_art_path = temp_dir.path().join("cover.jpg");
+        std::fs::write(&folder_art_path, b"JPEG image content").unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let cover_manager = CoverManager::new(db, temp_dir.path().to_path_buf());
+
+        for path in [&first, &second] {
+            let song = read_and_prepare_song(&cover_manager, path).unwrap();
+            assert_eq!(
+                song.art_automatic.as_deref(),
+                Some(folder_art_path.to_string_lossy().as_ref())
+            );
+        }
+    }
+
     #[test]
     fn test_read_and_prepare_song_prefers_embedded_art_for_albumless_singles() {
         let temp_dir = tempfile::tempdir().unwrap();

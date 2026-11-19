@@ -7,7 +7,9 @@
 //! in place, while embedded art costs a copy in the cache — so a library
 //! that has both doesn't duplicate every cover. Albumless singles are the
 //! exception: they check embedded art first, since a shared `cover.jpg` in
-//! a singles folder isn't any one single's cover. Whichever source succeeds
+//! a singles folder isn't any one single's cover. For the same reason folder
+//! art is ignored in any folder whose audio files carry more than one album
+//! tag. Whichever source succeeds
 //! writes into `songs.art_automatic`; a user-picked cover instead goes in
 //! `art_manual` and always takes precedence (see `get_cover_art_path`/
 //! `get_cover_art_uri`). Extracted/downloaded images are cached as files
@@ -17,12 +19,13 @@ use crate::collection::SelfWriteTracker;
 use crate::db::Database;
 use crate::library_paths;
 use anyhow::{Context, Result};
-use lofty::{file::TaggedFileExt, picture::PictureType, probe::Probe};
+use lofty::{file::TaggedFileExt, picture::PictureType, probe::Probe, tag::Accessor};
 use parking_lot::{Condvar, Mutex};
 use rusqlite::{params, OptionalExtension};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
+use std::time::SystemTime;
 
 /// Position in the Standardized Artwork Hierarchy (#98). Declaration order is
 /// significant: `derive(PartialOrd, Ord)` sorts variants in this order, which
@@ -491,6 +494,65 @@ fn serve_sized_copy(
     max_edge: u32,
 ) -> tauri::http::Response<Vec<u8>> {
     serve_cached_downscale(covers_dir, source, &format!("w{max_edge}|"), max_edge)
+}
+
+/// Per-directory answer to [`folder_holds_one_album`], tagged with the
+/// directory's modified time so adding or removing a file invalidates it.
+/// Retagging a file in place does not touch the directory's mtime, so a retag
+/// is picked up after the next file add/remove or an app restart.
+static ONE_ALBUM_DIRS: LazyLock<Mutex<HashMap<PathBuf, (SystemTime, bool)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Album tag of one audio file, trimmed and lowercased; `None` when the file
+/// is unreadable or has no album, so such files never count as a second album.
+fn read_album_tag(path: &Path) -> Option<String> {
+    let tagged = Probe::open(path).ok()?.read().ok()?;
+    let tag = tagged.primary_tag().or_else(|| tagged.first_tag())?;
+    let album = tag.album()?.trim().to_lowercase();
+    (!album.is_empty()).then_some(album)
+}
+
+/// Whether the audio files in `dir` carry at most one distinct album tag.
+/// A folder image (`cover.jpg`) can only be one album's cover, so folder art
+/// is meaningful only when this holds; in a flat folder shared by several
+/// albums it would otherwise paint one cover over all of them.
+fn folder_holds_one_album(dir: &Path) -> bool {
+    let mtime = std::fs::metadata(dir).and_then(|m| m.modified()).ok();
+    if let Some(mtime) = mtime {
+        if let Some((cached_at, answer)) = ONE_ALBUM_DIRS.lock().get(dir) {
+            if *cached_at == mtime {
+                return *answer;
+            }
+        }
+    }
+
+    let mut first: Option<String> = None;
+    let mut one_album = true;
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for path in entries.filter_map(|e| e.ok()).map(|e| e.path()) {
+            if !crate::collection::is_audio_file(&path) {
+                continue;
+            }
+            let Some(album) = read_album_tag(&path) else {
+                continue;
+            };
+            match &first {
+                None => first = Some(album),
+                Some(seen) if *seen != album => {
+                    one_album = false;
+                    break;
+                }
+                Some(_) => {}
+            }
+        }
+    }
+
+    if let Some(mtime) = mtime {
+        ONE_ALBUM_DIRS
+            .lock()
+            .insert(dir.to_path_buf(), (mtime, one_album));
+    }
+    one_album
 }
 
 static THUMB_INFLIGHT: LazyLock<Mutex<HashSet<String>>> =
@@ -1618,8 +1680,8 @@ impl CoverManager {
 
     /// Look for a same-named-by-convention image file (`cover.jpg`,
     /// `folder.png`, etc.) next to `audio_path` and return its path, or
-    /// `None` if the song has embedded/manual art already or no match
-    /// exists. Doesn't copy into the covers cache — the returned path is used
+    /// `None` if no match exists or the folder mixes albums (the image can't
+    /// be any one of them's cover; those songs use embedded art instead). Doesn't copy into the covers cache — the returned path is used
     /// directly (see `get_cover_art_path`).
     pub fn scan_folder_art(&self, audio_path: &Path) -> Option<PathBuf> {
         Self::scan_folder_art_static(audio_path)
@@ -1630,6 +1692,10 @@ impl CoverManager {
     /// manager is in scope.
     pub fn scan_folder_art_static(audio_path: &Path) -> Option<PathBuf> {
         let parent_dir = audio_path.parent()?;
+
+        if !folder_holds_one_album(parent_dir) {
+            return None;
+        }
 
         if let Ok(entries) = std::fs::read_dir(parent_dir) {
             for entry in entries.filter_map(|e| e.ok()) {
