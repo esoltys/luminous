@@ -36,8 +36,8 @@ fn daypart_bucket_for_hour(hour: u32) -> (&'static str, &'static str) {
 /// Bucket id, display name, and local calendar date (the `dynamic_spec`
 /// reroll cache key — see [`PlaylistManager::sync_daypart_auto_playlist`])
 /// for a given local timestamp. Takes `now` as a parameter rather than
-/// calling `Zoned::now()` internally so tests can inject arbitrary times.
-fn daypart_bucket_and_date(now: &jiff::Zoned) -> (&'static str, &'static str, String) {
+/// calling `ZonedDateTime::now()` internally so tests can inject arbitrary times.
+fn daypart_bucket_and_date(now: &jiff::ZonedDateTime) -> (&'static str, &'static str, String) {
     // `hour()` is 0..=23, so the conversion cannot fail.
     let (bucket, name) = daypart_bucket_for_hour(now.hour() as u32);
     (bucket, name, now.date().to_string())
@@ -859,7 +859,7 @@ impl PlaylistManager {
 
     pub fn sync_daypart_auto_playlist_at(
         &self,
-        local_now: &jiff::Zoned,
+        local_now: &jiff::ZonedDateTime,
         utc_now: i64,
     ) -> Result<()> {
         if !self.family_enabled_or_prune(AutoFamily::Daypart)? {
@@ -2031,14 +2031,14 @@ mod tests {
     }
 
     /// `hour`:00 local time on the given date, in the machine's zone.
-    fn local_at(year: i16, month: i8, day: i8, hour: i8) -> jiff::Zoned {
+    fn local_at(year: i16, month: i8, day: i8, hour: i8) -> jiff::ZonedDateTime {
         jiff::civil::date(year, month, day)
             .at(hour, 0, 0, 0)
-            .to_zoned(jiff::tz::TimeZone::system())
+            .to_zoned_datetime(crate::clock::local_tz())
             .unwrap()
     }
 
-    fn fixed_daypart_test_time() -> (jiff::Zoned, i64) {
+    fn fixed_daypart_test_time() -> (jiff::ZonedDateTime, i64) {
         let dt = local_at(2026, 6, 15, 9);
         let ts = dt.timestamp().as_second();
         (dt, ts)

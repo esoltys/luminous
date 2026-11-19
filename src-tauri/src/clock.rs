@@ -3,8 +3,9 @@
 //! Everything that stamps a row or compares against "now" in Unix seconds goes
 //! through [`unix_now`], so there is one definition of "now" for the crate.
 //! Calendar logic (local dates, week boundaries) uses `jiff`, but always through
-//! [`local_tz`] / [`local_now`] and never `TimeZone::system()` / `Zoned::now()`
-//! directly, so the unknown-zone fallback below applies everywhere.
+//! [`local_tz`] / [`local_now`] / [`day_start_in_tz`] and never
+//! `TimeZone::system()` / `ZonedDateTime::now()` directly, so the unknown-zone
+//! fallback below applies everywhere.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -20,12 +21,13 @@ pub fn unix_now() -> i64 {
 
 /// The user's local time zone.
 ///
-/// `jiff` resolves the Windows zone ID through a built-in table, and a zone
-/// newer than that table (`British Columbia Standard Time`, #2169) comes back
-/// unknown, which behaves as UTC: the Daypart Mix then picked "Late Night" at
-/// 16:00 while the Home greeting said "Good Afternoon". When that happens on
-/// Windows this falls back to the OS's current UTC offset, which has the right
-/// local hour and date; only a DST change in a historical date is approximate.
+/// `jiff` resolves the Windows zone ID through a built-in table; a zone newer
+/// than that table (for example `British Columbia Standard Time` on older
+/// releases, #2169) comes back unknown, which behaves as UTC: the Daypart Mix
+/// then picked "Late Night" at 16:00 while the Home greeting said "Good
+/// Afternoon". When that happens on Windows this falls back to the OS's current
+/// UTC offset, which has the right local hour and date; only a DST change in a
+/// historical date is approximate.
 pub fn local_tz() -> jiff::tz::TimeZone {
     let tz = jiff::tz::TimeZone::system();
     if !tz.is_unknown() {
@@ -46,8 +48,17 @@ pub fn local_tz() -> jiff::tz::TimeZone {
 }
 
 /// The current time in the user's local zone (see [`local_tz`]).
-pub fn local_now() -> jiff::Zoned {
-    jiff::Timestamp::now().to_zoned(local_tz())
+pub fn local_now() -> jiff::ZonedDateTime {
+    jiff::Timestamp::now().to_zoned_datetime(local_tz())
+}
+
+/// Midnight starting `day` in `tz`, as epoch seconds. A zone whose clocks skip
+/// midnight (a DST gap) starts the day at its first existing local time via
+/// `jiff`'s default `"compatible"` disambiguation.
+pub fn day_start_in_tz(day: jiff::civil::Date, tz: &jiff::tz::TimeZone) -> Option<i64> {
+    day.to_zoned_datetime(tz.clone())
+        .ok()
+        .map(|z| z.timestamp().as_second())
 }
 
 /// Seconds east of UTC from the Windows `TIME_ZONE_INFORMATION` biases, which
@@ -91,8 +102,8 @@ pub fn local_rfc3339() -> String {
     rfc3339_of(&local_now())
 }
 
-fn rfc3339_of(now: &jiff::Zoned) -> String {
-    // Not `Zoned`'s own Display, which appends a `[Zone/Name]` annotation.
+fn rfc3339_of(now: &jiff::ZonedDateTime) -> String {
+    // Not `ZonedDateTime`'s own Display, which appends a `[Zone/Name]` annotation.
     now.strftime("%Y-%m-%dT%H:%M:%S%:z").to_string()
 }
 
@@ -129,8 +140,17 @@ mod tests {
         let tz = jiff::tz::TimeZone::fixed(jiff::tz::offset(-6));
         let t = jiff::civil::date(2026, 6, 15)
             .at(9, 0, 0, 0)
-            .to_zoned(tz)
+            .to_zoned_datetime(tz)
             .unwrap();
         assert_eq!(rfc3339_of(&t), "2026-06-15T09:00:00-06:00");
+    }
+
+    #[test]
+    fn day_start_in_tz_returns_midnight_epoch_seconds() {
+        let day = jiff::civil::date(2026, 6, 15);
+        let utc_midnight = day_start_in_tz(day, &jiff::tz::TimeZone::UTC).unwrap();
+        let minus_six = jiff::tz::TimeZone::fixed(jiff::tz::offset(-6));
+        let local_midnight = day_start_in_tz(day, &minus_six).unwrap();
+        assert_eq!(local_midnight - utc_midnight, 6 * 3600);
     }
 }
