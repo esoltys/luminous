@@ -12,7 +12,7 @@ import type { AutoPlaylistRef } from "../stores/navigation.svelte";
 import { countryDisplayName } from "./country";
 import { getLanguageDisplayName } from "./language";
 import { formatBpmRange } from "./formatters";
-import { isSmartPlaylistSpec } from "./filterParser";
+import { isSmartPlaylistSpec, isStationListSpec } from "./filterParser";
 import type { PlaylistCardThemeKind } from "./playlistCardTheme";
 import { collectionStore } from "../stores/collection.svelte";
 import { playerStore } from "../stores/player.svelte";
@@ -379,14 +379,97 @@ export function autoContinueRunStarts(items: PlaylistItem[]): Set<string> {
 }
 
 /**
+ * True if a playlist is a user-authored dynamic radio station list (`radio:...` spec).
+ */
+export function isStationList(
+  playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system">,
+): boolean {
+  return (
+    !!playlist.dynamic_enabled && !playlist.is_system && isStationListSpec(playlist.dynamic_spec)
+  );
+}
+
+/**
+ * Formats a playlist's item count using "stations" for radio station lists and
+ * "songs" for regular/smart playlists.
+ */
+export function formatPlaylistItemCount(
+  playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system"> | undefined,
+  count: number,
+): string {
+  if (playlist && isStationList(playlist)) {
+    return i18n.t("radio.stationCount", { count });
+  }
+  return i18n.plural("playlists.songsCount", count);
+}
+
+/**
+ * Parses a `radio:...` dynamic_spec string into a structured {@link RadioStationListSpec},
+ * or returns `null` if the spec is not a station list spec.
+ */
+export function parseStationListSpec(
+  spec: string | null | undefined,
+): import("../types").RadioStationListSpec | null {
+  if (!isStationListSpec(spec) || !spec) return null;
+  const body = spec.trim().slice("radio:".length);
+  const result: import("../types").RadioStationListSpec = {
+    tags: [],
+    country: null,
+    lang: null,
+    minBitrate: null,
+    order: "clickcount",
+    limit: 100,
+  };
+  for (const rawPart of body.split(";")) {
+    const part = rawPart.trim();
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    const key = part.slice(0, eq).trim().toLowerCase();
+    const val = part.slice(eq + 1).trim();
+    if (key === "tag" || key === "tags") {
+      const seen = new Set<string>();
+      result.tags = val
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => {
+          if (!t) return false;
+          const lower = t.toLowerCase();
+          if (seen.has(lower)) return false;
+          seen.add(lower);
+          return true;
+        });
+    } else if (key === "country" || key === "countrycode") {
+      result.country = val ? val.toUpperCase() : null;
+    } else if (key === "lang" || key === "language") {
+      result.lang = val ? val.toLowerCase() : null;
+    } else if (key === "minbitrate" || key === "min_bitrate") {
+      const n = Number.parseInt(val, 10);
+      result.minBitrate = Number.isFinite(n) && n > 0 ? n : null;
+    } else if (key === "order") {
+      if (val === "votes" || val === "name" || val === "bitrate" || val === "clickcount") {
+        result.order = val;
+      }
+    } else if (key === "limit") {
+      const n = Number.parseInt(val, 10);
+      if (Number.isFinite(n) && n >= 1) {
+        result.limit = Math.min(500, n);
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * True if a playlist is a user-authored Smart Playlist rather than a system
- * auto-playlist. Prefers the backend `is_system` flag (#2136) and falls back
- * to `isSmartPlaylistSpec` when `is_system` is omitted in legacy fixtures.
+ * auto-playlist or a radio station list. Prefers the backend `is_system` flag
+ * (#2136) and falls back to `isSmartPlaylistSpec` when `is_system` is omitted
+ * in legacy fixtures.
  */
 export function isSmartPlaylist(
   playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system">,
 ): boolean {
   if (!playlist.dynamic_enabled) return false;
+  if (isStationListSpec(playlist.dynamic_spec)) return false;
   if (playlist.is_system !== undefined) {
     return !playlist.is_system && !!playlist.dynamic_spec;
   }

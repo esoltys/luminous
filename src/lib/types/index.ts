@@ -1745,3 +1745,17 @@ export interface RadioDirectoryFacets {
   languages: RadioBrowserFacetEntry[];
   codecs: RadioBrowserFacetEntry[];
 }
+
+export interface RadioStationListSpec {
+  tags: string[];
+  country?: string | null;
+  lang?: string | null;
+  minBitrate?: number | null;
+  order: RadioDirectoryOrder;
+  limit: number;
+}
+
+export interface RadioStationListTags {
+  tags: RadioBrowserFacetEntry[];
+  suggestedFromLibrary: RadioBrowserFacetEntry[];
+}

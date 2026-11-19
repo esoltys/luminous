@@ -8,7 +8,7 @@
   } from "phosphor-svelte";
   import { fade } from "../../utils/motion";
   import { CONTEXT_MENU_WIDTH_PX } from "../../constants";
-  import { radioStore } from "../../stores/radio.svelte";
+  import { formatUpdatedAgo, radioStore } from "../../stores/radio.svelte";
   import { toastStore } from "../../stores/toast.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import CollectionHeader from "../CollectionHeader.svelte";
@@ -55,17 +55,6 @@
     } catch (err) {
       toastStore.show(err instanceof Error ? err.message : String(err), "error");
     }
-  }
-
-  function formatUpdatedAgo(lastSyncedAt: number | null): string {
-    if (!lastSyncedAt) return "";
-    const diffSecs = Math.max(0, Math.floor(Date.now() / 1000) - lastSyncedAt);
-    const hours = Math.floor(diffSecs / 3600);
-    if (hours < 24) {
-      return i18n.t("radio.updatedHoursAgo", { count: Math.max(1, hours) });
-    }
-    const days = Math.floor(hours / 24);
-    return i18n.t("radio.updatedDaysAgo", { count: days });
   }
 
   onMount(() => {

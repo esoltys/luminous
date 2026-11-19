@@ -156,6 +156,9 @@ pub struct RadioDirectoryQuery {
     pub search: Option<String>,
     /// Exact tag filter (case-insensitive match against comma-separated `tags`).
     pub tag: Option<String>,
+    /// Multi-tag filter (OR match across any listed tag, case-insensitive).
+    #[serde(default)]
+    pub tags: Vec<String>,
     /// Exact ISO 3166-1 alpha-2 country code filter (e.g. `"CA"`, `"DE"`).
     pub countrycode: Option<String>,
     /// Exact language token filter (e.g. `"english"`, `"french"`).
@@ -181,6 +184,7 @@ impl Default for RadioDirectoryQuery {
         Self {
             search: None,
             tag: None,
+            tags: Vec::new(),
             countrycode: None,
             language: None,
             codec: None,
@@ -734,14 +738,22 @@ fn build_where_clauses(
         }
     }
 
-    if let Some(ref tag) = query.tag {
-        let clean_tag = tag.trim().to_lowercase();
-        if !clean_tag.is_empty() {
-            // Exact match inside comma-separated `tags`
+    let mut tag_filters: Vec<String> = Vec::new();
+    let mut seen_tags = std::collections::HashSet::new();
+    for raw in query.tag.iter().chain(query.tags.iter()) {
+        let clean = raw.trim().to_lowercase();
+        if !clean.is_empty() && seen_tags.insert(clean.clone()) {
+            tag_filters.push(clean);
+        }
+    }
+    if !tag_filters.is_empty() {
+        let mut or_parts = Vec::with_capacity(tag_filters.len());
+        for clean_tag in tag_filters {
             bind_params.push(Box::new(format!("%,{clean_tag},%")));
             let idx = bind_params.len();
-            clauses.push(format!("(',' || tags || ',') LIKE ?{idx}"));
+            or_parts.push(format!("(',' || tags || ',') LIKE ?{idx}"));
         }
+        clauses.push(format!("({})", or_parts.join(" OR ")));
     }
 
     if include_facets {
@@ -1033,6 +1045,128 @@ fn into_sorted_facets(counts: HashMap<String, i64>, limit: usize) -> Vec<RadioBr
         entries.truncate(limit);
     }
     entries
+}
+
+/// Aggregates local `radio_directory` tag counts, canonicalizing each station's
+/// tags through `GenreAliases::canonical_genres` so followed genres line up
+/// with the user's own taxonomy (#2006).
+pub fn get_canonical_radio_tags(
+    conn: &Connection,
+    aliases: &crate::genre_aliases::GenreAliases,
+    hide_unsupported: bool,
+    limit: usize,
+) -> Result<Vec<RadioBrowserFacetEntry>> {
+    let mut stmt = conn.prepare(
+        "SELECT tags, codec, hls FROM radio_directory WHERE lastcheckok = 1 AND TRIM(tags) != ''",
+    )?;
+    let rows = stmt.query_map([], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, i32>(2)? != 0,
+        ))
+    })?;
+
+    // Track counts keyed by lowercased canonical name so case variants merge,
+    // keeping the canonical spelling (or first-seen non-aliased spelling).
+    let mut counts: HashMap<String, (String, i64)> = HashMap::new();
+    for row in rows {
+        let (tags_raw, codec, hls) = row?;
+        if hide_unsupported && !can_play_stream(&codec, hls) {
+            continue;
+        }
+        // `GenreAliases::canonical_genres` splits on `; ` and deduplicates case-insensitively.
+        let normalized_raw = tags_raw.replace(',', "; ");
+        for canonical in aliases.canonical_genres(&normalized_raw) {
+            let key = canonical.to_lowercase();
+            let entry = counts.entry(key).or_insert((canonical, 0));
+            entry.1 += 1;
+        }
+    }
+
+    let mut entries: Vec<RadioBrowserFacetEntry> = counts
+        .into_values()
+        .map(|(name, stationcount)| RadioBrowserFacetEntry {
+            name,
+            code: None,
+            stationcount,
+        })
+        .collect();
+    sort_facet_entries(&mut entries);
+    if limit > 0 && entries.len() > limit {
+        entries.truncate(limit);
+    }
+    Ok(entries)
+}
+
+/// Suggests genres from the user's most-played library tracks that have at
+/// least one matching station in `radio_directory` (#2006). Returns entries
+/// ordered by library play weight descending, carrying the matching radio
+/// station count in `stationcount`.
+pub fn suggest_radio_genres_from_library(
+    conn: &Connection,
+    aliases: &crate::genre_aliases::GenreAliases,
+    hide_unsupported: bool,
+    limit: usize,
+) -> Result<Vec<RadioBrowserFacetEntry>> {
+    let radio_tags = get_canonical_radio_tags(conn, aliases, hide_unsupported, 0)?;
+    if radio_tags.is_empty() {
+        return Ok(Vec::new());
+    }
+    let radio_by_key: HashMap<String, RadioBrowserFacetEntry> = radio_tags
+        .into_iter()
+        .map(|entry| (entry.name.to_lowercase(), entry))
+        .collect();
+
+    let sql = format!(
+        "SELECT genre, SUM(COALESCE(playcount, 0)) AS plays, COUNT(*) AS tracks
+         FROM songs
+         WHERE source IN ({}) AND TRIM(COALESCE(genre, '')) != ''
+         GROUP BY genre",
+        *crate::models::LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map([], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, i64>(1)?,
+            r.get::<_, i64>(2)?,
+        ))
+    })?;
+
+    let mut weights: HashMap<String, (i64, i64)> = HashMap::new();
+    for row in rows {
+        let (genre_raw, plays, tracks) = row?;
+        for canonical in aliases.canonical_genres(&genre_raw) {
+            let key = canonical.to_lowercase();
+            if !radio_by_key.contains_key(&key) {
+                continue;
+            }
+            let entry = weights.entry(key).or_insert((0, 0));
+            entry.0 += plays;
+            entry.1 += tracks;
+        }
+    }
+
+    let mut ranked: Vec<(i64, i64, RadioBrowserFacetEntry)> = weights
+        .into_iter()
+        .filter_map(|(key, (plays, tracks))| {
+            radio_by_key
+                .get(&key)
+                .cloned()
+                .map(|entry| (plays, tracks, entry))
+        })
+        .collect();
+    ranked.sort_by(|a, b| {
+        b.0.cmp(&a.0)
+            .then_with(|| b.1.cmp(&a.1))
+            .then_with(|| b.2.stationcount.cmp(&a.2.stationcount))
+            .then_with(|| a.2.name.cmp(&b.2.name))
+    });
+    if limit > 0 && ranked.len() > limit {
+        ranked.truncate(limit);
+    }
+    Ok(ranked.into_iter().map(|(_, _, entry)| entry).collect())
 }
 
 /// Default number of recently played/opened unreferenced station rows kept by
@@ -2844,6 +2978,43 @@ mod tests {
 
         // Punctuation-only input has no searchable words.
         assert!(search_stations(&conn, ":*\"", 5).unwrap().is_empty());
+    }
+
+    #[test]
+    fn canonical_radio_tags_and_library_suggestions() {
+        let (_dir, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+        crate::genre_aliases::set_alias(&mut conn, "pagan metal", "Folk Metal").unwrap();
+        conn.execute(
+            "INSERT INTO radio_directory
+             (stationuuid, name, url_resolved, tags, country, countrycode, language, codec, bitrate, hls, votes, clickcount, lastcheckok, updated_at)
+             VALUES
+             ('s1', 'Folk 1', 'http://stream.test/1', 'pagan metal,metal', 'Canada', 'CA', 'english', 'MP3', 128, 0, 10, 100, 1, 1000),
+             ('s2', 'Folk 2', 'http://stream.test/2', 'folk metal,rock', 'Canada', 'CA', 'english', 'MP3', 128, 0, 5, 50, 1, 1000),
+             ('s3', 'Jazz 1', 'http://stream.test/3', 'jazz', 'Canada', 'CA', 'english', 'MP3', 128, 0, 5, 50, 1, 1000)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, artist, genre, playcount, path, source, unavailable)
+             VALUES ('Song A', 'Artist', 'Folk Metal', 42, '/a.mp3', 1, 0),
+                    ('Song B', 'Artist', 'Classical', 99, '/b.mp3', 1, 0)",
+            [],
+        )
+        .unwrap();
+
+        let aliases = crate::genre_aliases::GenreAliases::load(&conn).unwrap();
+        let tags = get_canonical_radio_tags(&conn, &aliases, true, 50).unwrap();
+        let folk = tags
+            .iter()
+            .find(|t| t.name == "Folk Metal")
+            .expect("Folk Metal canonicalized");
+        assert_eq!(folk.stationcount, 2);
+
+        let suggestions = suggest_radio_genres_from_library(&conn, &aliases, true, 10).unwrap();
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(suggestions[0].name, "Folk Metal");
+        assert_eq!(suggestions[0].stationcount, 2);
     }
 
     #[test]

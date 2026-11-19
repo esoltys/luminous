@@ -1308,14 +1308,21 @@ impl Player {
             // library view (which all filter on `unavailable = 0`). They're managed by
             // their server sync instead, mirroring the same exemption in
             // `find_missing_song_ids` (see collection.rs).
-            let missing_on_disk = !song.source.is_remote()
-                && !crate::audio::is_live_song(song)
-                && song
-                    .path
-                    .as_deref()
-                    .map(|p| !std::path::Path::new(p).exists())
-                    .unwrap_or(false);
-            if missing_on_disk {
+            //
+            // Live stations (radio://) *do* get flagged `unavailable = 1` when offline so
+            // they receive the same treatment as missing files; `materialize_station` resets
+            // `unavailable = 0` on directory sync or explicit play from Discover/My Stations.
+            let should_flag_unavailable = if crate::audio::is_live_song(song) {
+                true
+            } else {
+                !song.source.is_remote()
+                    && song
+                        .path
+                        .as_deref()
+                        .map(|p| !std::path::Path::new(p).exists())
+                        .unwrap_or(false)
+            };
+            if should_flag_unavailable {
                 if let Ok(conn) = self._db.pool.get() {
                     flagged_unavailable = conn
                         .execute(
@@ -3883,9 +3890,9 @@ mod tests {
         assert!(player.on_position_update(100_000_000_000).is_none());
         assert!(player.note_manual_skip().is_none());
 
-        // Playback error does not flag the station unavailable = 1.
+        // Playback error flags an offline station unavailable = 1 (same as a missing file).
         let outcome = player.note_playback_error();
-        assert!(!outcome.flagged_unavailable);
+        assert!(outcome.flagged_unavailable);
         let unavailable: i32 = db
             .pool
             .get()
@@ -3896,7 +3903,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(unavailable, 0);
+        assert_eq!(unavailable, 1);
 
         // Click UUID is emitted once per play.
         assert_eq!(
@@ -3994,5 +4001,73 @@ mod tests {
             .unwrap();
         assert!(!player.note_stream_title(3, "Some - Thing"));
         assert_eq!(announced(&player), None);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn live_station_list_failure_hands_over_to_next_station() {
+        let (_dir, db) = setup_test_db();
+        let db = Arc::new(db);
+
+        let (id1, id2) = {
+            let conn = db.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (source, filetype, path, stream_url, title)
+                 VALUES (?1, ?2, 'radio://station-1', 'http://127.0.0.1:9/dead', 'Dead Station')",
+                rusqlite::params![
+                    crate::models::SongSource::RADIO_BROWSER_ID,
+                    crate::models::FileType::Stream as i32
+                ],
+            )
+            .unwrap();
+            let id1 = conn.last_insert_rowid();
+            conn.execute(
+                "INSERT INTO songs (source, filetype, path, stream_url, title)
+                 VALUES (?1, ?2, 'radio://station-2', 'http://127.0.0.1:9/backup', 'Backup Station')",
+                rusqlite::params![
+                    crate::models::SongSource::RADIO_BROWSER_ID,
+                    crate::models::FileType::Stream as i32
+                ],
+            )
+            .unwrap();
+            let id2 = conn.last_insert_rowid();
+            (id1, id2)
+        };
+
+        let s1 = Song {
+            id: id1,
+            source: crate::models::SongSource::RadioBrowser,
+            filetype: crate::models::FileType::Stream,
+            path: Some("radio://station-1".to_string()),
+            title: Some("Dead Station".to_string()),
+            ..Song::default()
+        };
+        let s2 = Song {
+            id: id2,
+            source: crate::models::SongSource::RadioBrowser,
+            filetype: crate::models::FileType::Stream,
+            path: Some("radio://station-2".to_string()),
+            title: Some("Backup Station".to_string()),
+            ..Song::default()
+        };
+
+        let audio = Arc::new(tokio::sync::Mutex::new(crate::audio::AudioEngine::new()));
+        let mut player = Player::new(db.clone(), audio.clone());
+        player.playlist_items = vec![
+            crate::models::PlaylistItem::new_song(42, 0, s1.clone()),
+            crate::models::PlaylistItem::new_song(42, 1, s2),
+        ];
+        player.current_playlist_id = Some(42);
+        player.current_index = Some(0);
+        player.current_song = Some(s1);
+
+        let outcome = player.note_playback_error();
+        assert!(!outcome.should_stop);
+        assert!(outcome.flagged_unavailable);
+        assert_eq!(outcome.failed_song.as_ref().map(|s| s.id), Some(id1));
+
+        // Handover advances to the next station in the list (even if stream open fails offline, index advances).
+        let _ = player.next_track().await;
+        assert_eq!(player.current_index, Some(1));
+        assert_eq!(player.current_song.as_ref().map(|s| s.id), Some(id2));
     }
 }

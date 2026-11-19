@@ -42,9 +42,14 @@
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import {
     autoContinueRunStarts,
+    formatPlaylistItemCount,
     getPlaylistDisplayName,
     isSmartPlaylist as isSmartPlaylistRow,
+    isStationList as isStationListRow,
+    parseStationListSpec,
   } from "../utils/playlist";
+  import { formatUpdatedAgo, radioStore } from "../stores/radio.svelte";
+  import StationListModal from "./radio/StationListModal.svelte";
   import { parseSearchRules } from "../utils/filterParser";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -285,6 +290,13 @@
   let isSmartPlaylist = $derived(
     activePlaylist !== undefined && isSmartPlaylistRow(activePlaylist),
   );
+  let isStationListPlaylist = $derived(
+    activePlaylist !== undefined && isStationListRow(activePlaylist),
+  );
+  let showStationListEditModal = $state(false);
+  let stationListUpdatedLabel = $derived(
+    isStationListPlaylist ? formatUpdatedAgo(radioStore.status?.lastSyncedAt ?? null) : "",
+  );
 
   // Title shown everywhere (header, sidebar, Home): a smart playlist's carries its
   // population mode ("Canadian Deep Cuts"). Display only: rename edits the bare name.
@@ -372,7 +384,7 @@
   let rawGenre = $derived.by(() => {
     const counts = new Map<string, number>();
     for (const item of playlistsStore.activePlaylistTracks) {
-      if (!item.song?.genre) continue;
+      if (!item.song?.genre || isLiveSong(item.song)) continue;
       for (const g of parseMultiValue(item.song.genre)) {
         const trimmed = g.trim();
         if (trimmed) {
@@ -843,7 +855,10 @@
                 class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium"
               >
                 <span>
-                  {i18n.plural("playlists.songsCount", playlistsStore.activePlaylistTracks.length)}
+                  {formatPlaylistItemCount(
+                    activePlaylist,
+                    playlistsStore.activePlaylistTracks.length,
+                  )}
                 </span>
                 {#if !allLiveStreams}
                   <span>•</span>
@@ -950,6 +965,13 @@
                   onChange={handleChangePopulationMode}
                 />
               </div>
+            {:else if isStationListPlaylist && stationListUpdatedLabel && !windowLayoutStore.isDetailHeaderCollapsed}
+              <div
+                class="text-xs text-brand-text-secondary mt-2"
+                data-testid="station-list-detail-updated"
+              >
+                {stationListUpdatedLabel}
+              </div>
             {/if}
           </div>
 
@@ -998,7 +1020,7 @@
       </div>
 
       <div class="p-6 flex flex-col gap-6 pb-dock">
-        {#if !isSpecialPlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
+        {#if !isSpecialPlaylist && !isStationListPlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
           <div class="flex flex-wrap items-center gap-3">
             {#if rawGenre}
               <GenreChips genre={rawGenre} variant="full" limit={4} />
@@ -1185,9 +1207,28 @@
           showOverflowMenu = false;
         }}
       />
+    {:else if isStationListPlaylist}
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={RefreshCw}
+        label={i18n.t("playlists.refreshPlaylistBtn")}
+        disabled={isRefreshing}
+        onclick={() => {
+          handleRefreshSmartPlaylist();
+          showOverflowMenu = false;
+        }}
+      />
+      <ContextMenuItem
+        icon={Pencil}
+        label={i18n.t("radio.editStationList")}
+        onclick={() => {
+          showStationListEditModal = true;
+          showOverflowMenu = false;
+        }}
+      />
     {/if}
     {#if !isQueue}
-      {#if !isSmartPlaylist}<ContextMenuDivider />{/if}
+      {#if !isSmartPlaylist && !isStationListPlaylist}<ContextMenuDivider />{/if}
       <ContextMenuItem
         icon={Usb}
         label={i18n.t("playlists.sizeLimitMenuItem", {
@@ -1447,4 +1488,16 @@
       </div>
     </form>
   </Modal>
+{/if}
+
+{#if showStationListEditModal && activePlaylist}
+  {@const parsedSpec = parseStationListSpec(activePlaylist.dynamic_spec)}
+  {#if parsedSpec}
+    <StationListModal
+      editing={{ id: activePlaylist.id, name: activePlaylist.name, spec: parsedSpec }}
+      onClose={() => {
+        showStationListEditModal = false;
+      }}
+    />
+  {/if}
 {/if}

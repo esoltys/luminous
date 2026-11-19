@@ -181,7 +181,9 @@ const IDENTICAL_OK_FR = new Set([
   "shortcuts.groupNavigation", // "Navigation"
   "sidebar.albums", // "Albums"
   "sidebar.genres", // "Genres"
+  "radio.genresLabel", // "Genres"
   "radio.stationCount", // "{count} stations"
+  "radio.stationsCount", // "stations"
   "radio.stationLabel", // "Station"
   "smartPlaylistBuilder.fieldAlbum", // "Album"
   "smartPlaylistBuilder.fieldBpm", // "BPM"
@@ -406,6 +408,7 @@ const IDENTICAL_OK_DE = new Set<string>([
   "units.db",
   "units.lufs",
   "sidebar.genres",
+  "radio.genresLabel", // "Genres"
   "radio.sortName", // "Name"
   "radio.sortBitrate", // "Bitrate"
   "sidebar.scanningPhaseLabel",

@@ -326,6 +326,82 @@ describe("RadioView", () => {
     });
   });
 
+  it("opens StationListModal from My stations and creates a station list", async () => {
+    const status: RadioDirectoryStatus = {
+      optedIn: true,
+      stationCount: 5,
+      playableStationCount: 5,
+      lastSyncedAt: Math.floor(Date.now() / 1000) - 3600,
+      lastFullSyncAt: Math.floor(Date.now() / 1000) - 3600,
+      nextAutoSyncAt: null,
+      syncInProgress: false,
+      lastError: null,
+      attributionUrl: "https://www.radio-browser.info",
+    };
+
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_radio_directory_status") return status;
+      if (cmd === "get_saved_radio_stations") return [];
+      if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
+      if (cmd === "get_radio_directory_facets") return defaultFacets;
+      if (cmd === "query_radio_directory") return [];
+      if (cmd === "get_radio_station_list_tags") {
+        return {
+          tags: [{ name: "Folk Metal", stationcount: 14 }],
+          suggestedFromLibrary: [{ name: "Folk Metal", stationcount: 14 }],
+        };
+      }
+      if (cmd === "create_radio_station_list") {
+        return {
+          id: 99,
+          name: "Folk Metal",
+          track_count: 14,
+          dynamic_enabled: true,
+          dynamic_spec: "radio:tag=Folk Metal;order=clickcount;limit=100",
+          is_system: false,
+          is_queue: false,
+          created: 1000,
+          updated: 1000,
+        };
+      }
+      if (cmd === "get_playlists") return [];
+      return null;
+    });
+
+    render(RadioView);
+    const myTab = await screen.findByTestId("radio-tab-my-stations");
+    await fireEvent.click(myTab);
+
+    const newBtn = await screen.findByTestId("new-station-list-btn");
+    await fireEvent.click(newBtn);
+
+    const modal = await screen.findByTestId("station-list-modal");
+    expect(modal).toBeInTheDocument();
+
+    const suggestions = await screen.findByTestId("station-list-suggestions");
+    const folkBtn = suggestions.querySelector("button");
+    expect(folkBtn).not.toBeNull();
+    await fireEvent.click(folkBtn!);
+
+    const saveBtn = screen.getByRole("button", { name: "Save" });
+    await fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("create_radio_station_list", {
+        name: "Folk Metal",
+        spec: {
+          tags: ["Folk Metal"],
+          country: null,
+          lang: null,
+          minBitrate: null,
+          order: "clickcount",
+          limit: 100,
+        },
+      });
+    });
+  });
+
   it("toggles play, pause, and resume when clicking a saved station card", async () => {
     const saved = makeStation({ stationuuid: "uuid-saved", name: "CBC Music" });
     const status: RadioDirectoryStatus = {

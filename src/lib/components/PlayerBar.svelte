@@ -16,7 +16,6 @@
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import RadioSaveButton from "./radio/RadioSaveButton.svelte";
-  import FindInLibraryButton from "./radio/FindInLibraryButton.svelte";
   import { stationUuidFromPath } from "../stores/radio.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
@@ -461,7 +460,6 @@
             {@const radioUuid = stationUuidFromPath(playerStore.currentSong.path)}
             {#if radioUuid}
               <RadioSaveButton stationuuid={radioUuid} size="sm" />
-              <FindInLibraryButton size="sm" />
             {:else}
               <SongRating
                 rating={playerStore.currentSong.rating}

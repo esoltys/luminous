@@ -1480,7 +1480,11 @@ pub fn run() {
             {
                 use tauri::Listener;
                 let handle = app.handle().clone();
-                for event in ["library-changed", "song-stats-changed"] {
+                for event in [
+                    "library-changed",
+                    "song-stats-changed",
+                    radio_directory::EVENT_RADIO_DIRECTORY_CHANGED,
+                ] {
                     let handle = handle.clone();
                     app.listen(event, move |_| {
                         tauri::async_runtime::spawn(playlist::reconcile_and_sync(handle.clone()));
@@ -1872,6 +1876,9 @@ pub fn run() {
             commands::radio_directory::get_recent_radio_stations,
             commands::radio_directory::get_radio_playlist_ids,
             commands::radio_directory::play_radio_station,
+            commands::radio_directory::get_radio_station_list_tags,
+            commands::radio_directory::create_radio_station_list,
+            commands::radio_directory::update_radio_station_list,
             // Portable device commands (#835)
             commands::devices::get_connected_devices,
             commands::files::list_file_sources,
