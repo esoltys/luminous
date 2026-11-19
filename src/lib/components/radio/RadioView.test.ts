@@ -18,6 +18,11 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: any[]) => mockInvoke(...args),
 }));
 
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: vi.fn(async () => null),
+  save: vi.fn(async () => null),
+}));
+
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async (eventName: string, handler: (event: { payload: any }) => void) => {
     listeners[eventName] = handler;
@@ -387,5 +392,58 @@ describe("RadioView", () => {
     expect(radioStore.isPlayingStation("uuid-saved")).toBe(false);
     await fireEvent.click(await screen.findByRole("button", { name: "Play CBC Music" }));
     expect(mockInvoke.mock.calls.filter(([cmd]) => cmd === "play_radio_station")).toHaveLength(2);
+  });
+
+  it("opens AddStationModal from My stations and adds a custom station", async () => {
+    const customStation = makeStation({
+      stationuuid: "custom-123",
+      name: "My Custom FM",
+      urlResolved: "https://custom.example/live.mp3",
+      tags: "indie",
+    });
+    const status: RadioDirectoryStatus = {
+      optedIn: false,
+      stationCount: 0,
+      playableStationCount: 0,
+      lastSyncedAt: null,
+      lastFullSyncAt: null,
+      nextAutoSyncAt: null,
+      syncInProgress: false,
+      lastError: null,
+      attributionUrl: "https://www.radio-browser.info",
+    };
+
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_radio_directory_status") return status;
+      if (cmd === "get_saved_radio_stations") return [];
+      if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
+      if (cmd === "add_custom_radio_station") return customStation;
+      return null;
+    });
+
+    render(RadioView);
+    await fireEvent.click(screen.getByTestId("radio-tab-my-stations"));
+
+    const addBtn = await screen.findByTestId("radio-add-station-btn");
+    await fireEvent.click(addBtn);
+
+    const nameInput = await screen.findByTestId("add-station-name");
+    const urlInput = screen.getByTestId("add-station-url");
+    const tagsInput = screen.getByTestId("add-station-tags");
+    await fireEvent.input(nameInput, { target: { value: "My Custom FM" } });
+    await fireEvent.input(urlInput, { target: { value: "https://custom.example/live.pls" } });
+    await fireEvent.input(tagsInput, { target: { value: "indie" } });
+
+    await fireEvent.click(screen.getByTestId("add-station-submit"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("add_custom_radio_station", {
+        name: "My Custom FM",
+        url: "https://custom.example/live.pls",
+        tags: "indie",
+      });
+    });
+    expect(await screen.findByText("My Custom FM")).toBeInTheDocument();
   });
 });

@@ -1,18 +1,43 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { save } from "@tauri-apps/plugin-dialog";
   import {
     BookmarkSimpleIcon as Bookmark,
     ClockCounterClockwiseIcon as History,
     PlaylistIcon as ListMusic,
+    ExportIcon as Export,
   } from "phosphor-svelte";
+  import Plus from "../PlusIcon.svelte";
   import { radioStore } from "../../stores/radio.svelte";
   import { playlistsStore } from "../../stores/playlists.svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
+  import { toastStore } from "../../stores/toast.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import RadioStationRow from "./RadioStationRow.svelte";
   import RadioStationCard from "./RadioStationCard.svelte";
+  import AddStationModal from "./AddStationModal.svelte";
 
   let scrollEl: HTMLElement | null = $state(null);
+  let showAddStationModal = $state(false);
+
+  async function handleExportSavedStations() {
+    try {
+      const savePath = await save({
+        title: i18n.t("radio.exportStationsTooltip"),
+        defaultPath: "saved-stations.pls",
+        filters: [
+          { name: "PLS Playlist (*.pls)", extensions: ["pls"] },
+          { name: "M3U8 Playlist (*.m3u8)", extensions: ["m3u8"] },
+          { name: "M3U Playlist (*.m3u)", extensions: ["m3u"] },
+        ],
+      });
+      if (savePath && typeof savePath === "string") {
+        await radioStore.exportSavedStations(savePath);
+      }
+    } catch (err) {
+      toastStore.show(err instanceof Error ? err.message : String(err), "error");
+    }
+  }
 
   const radioPlaylists = $derived.by(() => {
     const ids = new Set(radioStore.radioPlaylistIds);
@@ -35,10 +60,37 @@
 >
   <!-- Saved stations -->
   <section class="space-y-3">
-    <h2 class="flex items-center gap-2 text-xl font-semibold text-brand-text-primary">
-      <Bookmark class="w-5 h-5 text-brand-accent-text" />
-      <span>{i18n.t("radio.savedStationsTitle")}</span>
-    </h2>
+    <div class="flex items-center justify-between gap-3">
+      <h2 class="flex items-center gap-2 text-xl font-semibold text-brand-text-primary">
+        <Bookmark class="w-5 h-5 text-brand-accent-text" />
+        <span>{i18n.t("radio.savedStationsTitle")}</span>
+      </h2>
+      <div class="flex items-center gap-2">
+        {#if radioStore.savedStations.length > 0}
+          <button
+            type="button"
+            onclick={() => void handleExportSavedStations()}
+            data-testid="radio-export-stations-btn"
+            title={i18n.t("radio.exportStationsTooltip")}
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-border hover:border-brand-accent/60 bg-brand-sidebar text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          >
+            <Export class="w-3.5 h-3.5" />
+            <span>{i18n.t("radio.exportStationsBtn")}</span>
+          </button>
+        {/if}
+        <button
+          type="button"
+          onclick={() => {
+            showAddStationModal = true;
+          }}
+          data-testid="radio-add-station-btn"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-accent text-brand-accent-contrast text-xs font-medium hover:opacity-90 transition-opacity"
+        >
+          <Plus class="w-3.5 h-3.5" />
+          <span>{i18n.t("radio.addStationBtn")}</span>
+        </button>
+      </div>
+    </div>
 
     {#if radioStore.savedStations.length === 0}
       <div
@@ -126,3 +178,11 @@
     </section>
   {/if}
 </div>
+
+{#if showAddStationModal}
+  <AddStationModal
+    onClose={() => {
+      showAddStationModal = false;
+    }}
+  />
+{/if}
