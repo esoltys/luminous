@@ -3,5 +3,6 @@
   "entry": ["scripts/throwaway-profile.ts"],
   "ignore": ["docs/**", "scripts/cdp-pane-client.js"],
   "ignoreDependencies": ["@typescript/native-preview"],
+  "ignoreIssues": { "tsconfig.json": ["unlisted"] },
   "ignoreBinaries": ["magick", "zsyncmake"]
 }

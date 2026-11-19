@@ -5,9 +5,6 @@
   "author": "Eric James Soltys <ericjamessoltys@outlook.com>",
   "license": "MIT",
   "type": "module",
-  "imports": {
-    "#lib/*": "./src/lib/*"
-  },
   "scripts": {
     "dev": "bun run sync-docs && svelte-kit sync && vite dev",
     "build": "bun run sync-docs && svelte-kit sync && vite build",
@@ -66,7 +63,7 @@
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "image-js": "^1.7.1",
     "jsdom": "^31.0.1",
-    "knip": "^6.44.2",
+    "knip": "^6.45.1",
     "prettier": "^3.10.1",
     "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.57.3",
