@@ -31,3 +31,10 @@ export function sidebarSubItemClass(active: boolean): string {
     active ? SIDEBAR_ROW_SELECTED_CLASS : SIDEBAR_ROW_IDLE_CLASS
   }`;
 }
+
+/** Layout and typography classes for top-level sidebar buttons (Home, Organize, Stats, footer). */
+export function sidebarTopItemLayoutClass(collapsed: boolean): string {
+  return collapsed
+    ? "justify-center w-10 h-10 rounded-xl p-0"
+    : `w-full px-3 py-1.5 rounded-lg ${SIDEBAR_NAV_TEXT_CLASS}`;
+}

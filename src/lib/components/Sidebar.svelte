@@ -36,9 +36,9 @@
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
   import {
     SIDEBAR_CAPTION_TEXT_CLASS,
-    SIDEBAR_NAV_TEXT_CLASS,
     SIDEBAR_SECTION_LABEL_CLASS,
     sidebarSubItemClass,
+    sidebarTopItemLayoutClass,
   } from "../utils/sidebarNav";
 
   let { width = 256, resizing = false }: { width?: number; resizing?: boolean } = $props();
@@ -153,9 +153,9 @@
     class="relative flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab ===
     tab
       ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20'
-      : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
-      ? 'justify-center w-10 h-10 rounded-xl p-0'
-      : `w-full px-3 py-1.5 rounded-lg ${SIDEBAR_NAV_TEXT_CLASS}`}"
+      : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {sidebarTopItemLayoutClass(
+      layoutCollapsed,
+    )}"
     title={opts.updateBadge
       ? `${label} (${i18n.t("settings.updateAvailable", {}, "Update available")})`
       : label}
@@ -445,9 +445,9 @@
           }}
           class="flex items-center gap-3 transition-colors duration-150 {showProfilePopover
             ? 'bg-brand-accent/20 text-brand-accent-text'
-            : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
-            ? 'justify-center w-10 h-10 rounded-xl p-0'
-            : `w-full px-3 py-1.5 rounded-lg ${SIDEBAR_NAV_TEXT_CLASS}`}"
+            : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {sidebarTopItemLayoutClass(
+            layoutCollapsed,
+          )}"
           title={`${i18n.t("sidebar.connected", {}, "Connected")}${pausedLabel ? ` – ${pausedLabel}` : ""}`}
         >
           <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
@@ -475,9 +475,9 @@
           onclick={() => {
             navigationStore.openSettings("integrations");
           }}
-          class="flex items-center gap-3 transition-colors duration-150 text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover {layoutCollapsed
-            ? 'justify-center w-10 h-10 rounded-xl p-0'
-            : `w-full px-3 py-1.5 rounded-lg ${SIDEBAR_NAV_TEXT_CLASS}`}"
+          class="flex items-center gap-3 transition-colors duration-150 text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover {sidebarTopItemLayoutClass(
+            layoutCollapsed,
+          )}"
           title={i18n.t("sidebar.connectIntegrations", {}, "Connect...")}
         >
           <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
