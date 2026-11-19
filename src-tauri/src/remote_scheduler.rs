@@ -22,15 +22,17 @@ use tauri::AppHandle;
 pub enum RemoteKind {
     WebDav,
     Subsonic,
+    RadioBrowser,
 }
 
 impl RemoteKind {
-    const ALL: [RemoteKind; 2] = [RemoteKind::WebDav, RemoteKind::Subsonic];
+    const SERVER_TABLES: [RemoteKind; 2] = [RemoteKind::WebDav, RemoteKind::Subsonic];
 
     fn table(self) -> &'static str {
         match self {
             RemoteKind::WebDav => "webdav_servers",
             RemoteKind::Subsonic => "subsonic_servers",
+            RemoteKind::RadioBrowser => "radio_directory_meta",
         }
     }
 
@@ -38,6 +40,7 @@ impl RemoteKind {
         match self {
             RemoteKind::WebDav => "WebDAV",
             RemoteKind::Subsonic => "OpenSubsonic",
+            RemoteKind::RadioBrowser => "Radio Browser",
         }
     }
 
@@ -66,6 +69,9 @@ impl RemoteKind {
             )
             .await
             .map(|_| ()),
+            RemoteKind::RadioBrowser => crate::radio_directory::sync_radio_directory_inner(app, db)
+                .await
+                .map(|_| ()),
         }
     }
 }
@@ -99,7 +105,7 @@ impl SyncGuard {
         Ok(Self(key))
     }
 
-    fn is_active(kind: RemoteKind, server_id: i64) -> bool {
+    pub fn is_active(kind: RemoteKind, server_id: i64) -> bool {
         ACTIVE_SYNCS.lock().contains(&(kind, server_id))
     }
 }
@@ -226,7 +232,7 @@ impl AutoSyncScheduler {
         };
 
         let mut servers: Vec<(RemoteKind, i64, i64)> = Vec::new();
-        for kind in RemoteKind::ALL {
+        for kind in RemoteKind::SERVER_TABLES {
             let sql = format!(
                 "SELECT id, sync_interval_minutes FROM {} WHERE enabled = 1 AND auto_sync_enabled = 1",
                 kind.table()
@@ -238,6 +244,13 @@ impl AutoSyncScheduler {
                 },
                 Err(e) => log::warn!("Failed to query {} auto-sync servers: {e}", kind.label()),
             }
+        }
+        if crate::radio_directory::is_opted_in(&conn) {
+            servers.push((
+                RemoteKind::RadioBrowser,
+                crate::radio_directory::RADIO_BROWSER_SCHEDULER_ID,
+                crate::radio_directory::RADIO_BROWSER_SYNC_INTERVAL_MINUTES,
+            ));
         }
         drop(conn);
 

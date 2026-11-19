@@ -17,6 +17,7 @@ pub mod pins;
 pub mod player;
 pub mod playlist;
 pub mod provenance;
+pub mod radio_directory;
 pub mod scrobbler;
 pub mod settings;
 pub mod share;
