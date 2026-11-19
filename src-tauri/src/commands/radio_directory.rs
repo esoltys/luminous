@@ -259,10 +259,90 @@ pub async fn play_radio_station(
     )
     .await?;
 
-    let db = Arc::clone(&state.db);
-    tauri::async_runtime::spawn(async move {
-        let _ = report_station_click_if_online(&db, stationuuid).await;
-    });
+    if song.source == crate::models::SongSource::RadioBrowser {
+        let db = Arc::clone(&state.db);
+        tauri::async_runtime::spawn(async move {
+            let _ = report_station_click_if_online(&db, stationuuid).await;
+        });
+    }
 
     Ok(song)
+}
+
+/// Adds a user-defined custom station by stream URL or `.pls`/`.m3u`/`.m3u8`
+/// playlist URL, saving it outside the `radio_directory` mirror (#2009).
+#[tauri::command]
+pub async fn add_custom_radio_station(
+    name: String,
+    url: String,
+    tags: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<RadioDirectoryStation, String> {
+    let resolved = radio_directory::resolve_station_url(&url)
+        .await
+        .map_err(|e| e.to_string())?;
+    let final_name = if name.trim().is_empty() {
+        resolved
+            .title
+            .unwrap_or_else(|| resolved.stream_url.clone())
+    } else {
+        name
+    };
+    let tags = tags.unwrap_or_default();
+    crate::db::run_blocking(&state.db, move |conn| {
+        radio_directory::add_custom_station(conn, &final_name, &resolved.stream_url, &tags)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Imports all `http(s)://` stream entries from a local `.pls`/`.m3u`/`.m3u8`/`.xspf`
+/// file as saved custom radio stations (#2009).
+#[tauri::command]
+pub async fn import_custom_radio_stations(
+    file_path: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<RadioDirectoryStation>, String> {
+    let path = std::path::PathBuf::from(&file_path);
+    let parsed = luminous_metadata::playlist::parse_playlist(&path).map_err(|e| e.to_string())?;
+    let fallback_name = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "Custom Station".to_string());
+
+    crate::db::run_blocking(&state.db, move |conn| {
+        let mut added = Vec::new();
+        for track in parsed.tracks {
+            if !luminous_metadata::playlist::is_http_url(&track.path_or_url) {
+                continue;
+            }
+            let title = track
+                .title
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or(&fallback_name);
+            let station = radio_directory::add_custom_station(conn, title, &track.path_or_url, "")?;
+            added.push(station);
+        }
+        if added.is_empty() {
+            anyhow::bail!("No http(s) stream URLs found in playlist file");
+        }
+        Ok(added)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Exports all saved stations (`radio_saved`) to an M3U, M3U8, or PLS file (#2009).
+#[tauri::command]
+pub async fn export_saved_radio_stations(
+    export_path: String,
+    state: State<'_, AppState>,
+) -> Result<usize, String> {
+    crate::db::run_blocking(&state.db, move |conn| {
+        radio_directory::export_saved_stations(conn, &export_path)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }

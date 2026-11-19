@@ -55,16 +55,32 @@ fn collect_dir_audio_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DroppedItem {
+    LocalPath(PathBuf),
+    StreamUrl(playlist::ParsedTrack),
+}
+
 /// Expands user-dropped/opened `paths` — audio files, playlist files
-/// (M3U/M3U8/PLS/XSPF), and directories (recursed) — into concrete audio file
-/// paths. Returns the resolved paths plus a count of every candidate entry
-/// considered, so callers can report `skipped = attempted -
-/// resolved.len()` (further narrowed once DB/tag resolution runs below).
-fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<PathBuf>, usize) {
-    let mut resolved_paths = Vec::new();
+/// (M3U/M3U8/PLS/XSPF, including `http(s)://` stream entries), and
+/// directories (recursed) — into concrete items. Returns the resolved items
+/// plus a count of every candidate entry considered, so callers can report
+/// `skipped = attempted - resolved.len()` (further narrowed once DB/tag
+/// resolution runs below).
+fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<DroppedItem>, usize) {
+    let mut resolved = Vec::new();
     let mut attempted: usize = 0;
 
     for path_str in paths {
+        if playlist::is_http_url(&path_str) {
+            attempted += 1;
+            resolved.push(DroppedItem::StreamUrl(playlist::ParsedTrack {
+                path_or_url: path_str.trim().to_string(),
+                ..Default::default()
+            }));
+            continue;
+        }
+
         let path = Path::new(&path_str);
         if !path.exists() {
             attempted += 1;
@@ -77,7 +93,7 @@ fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<PathBuf>, usize) {
             // An empty/non-audio folder still counts as one attempted (and
             // therefore skipped) candidate, rather than silently vanishing.
             attempted += dir_files.len().max(1);
-            resolved_paths.extend(dir_files);
+            resolved.extend(dir_files.into_iter().map(DroppedItem::LocalPath));
         } else if path.is_file() {
             if playlist::PlaylistFormat::from_path(path).is_some() {
                 // Parse M3U/M3U8/PLS/XSPF playlist file
@@ -94,6 +110,10 @@ fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<PathBuf>, usize) {
                 for track in parsed.tracks {
                     attempted += 1;
                     let raw_path = track.path_or_url.trim();
+                    if playlist::is_http_url(raw_path) {
+                        resolved.push(DroppedItem::StreamUrl(track));
+                        continue;
+                    }
                     let clean_rel = raw_path
                         .trim_start_matches("./")
                         .trim_start_matches(".\\")
@@ -109,7 +129,7 @@ fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<PathBuf>, usize) {
                         && item_path.is_file()
                         && crate::collection::is_audio_file(&item_path)
                     {
-                        resolved_paths.push(item_path);
+                        resolved.push(DroppedItem::LocalPath(item_path));
                     } else {
                         log::warn!(
                             "Playlist track path could not be resolved or does not exist: {}",
@@ -120,13 +140,13 @@ fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<PathBuf>, usize) {
             } else {
                 attempted += 1;
                 if crate::collection::is_audio_file(path) {
-                    resolved_paths.push(path.to_path_buf());
+                    resolved.push(DroppedItem::LocalPath(path.to_path_buf()));
                 }
             }
         }
     }
 
-    (resolved_paths, attempted)
+    (resolved, attempted)
 }
 
 /// Resolves already-expanded file paths into `Song` rows: matches existing
@@ -568,6 +588,35 @@ pub struct AddPathsOutcome {
     pub skipped: usize,
 }
 
+fn resolve_songs_from_dropped_items(
+    conn: &rusqlite::Connection,
+    cover_manager: &CoverManager,
+    items: Vec<DroppedItem>,
+) -> Result<Vec<crate::models::Song>, String> {
+    let mut songs = Vec::with_capacity(items.len());
+    for item in items {
+        match item {
+            DroppedItem::LocalPath(path) => {
+                songs.extend(resolve_songs_from_paths(conn, cover_manager, vec![path])?);
+            }
+            DroppedItem::StreamUrl(track) => {
+                match crate::radio_directory::upsert_stream_station(
+                    conn,
+                    &track.path_or_url,
+                    track.title.as_deref(),
+                    None,
+                ) {
+                    Ok(song) => songs.push(song),
+                    Err(e) => {
+                        log::warn!("Failed to resolve stream '{}': {}", track.path_or_url, e);
+                    }
+                }
+            }
+        }
+    }
+    Ok(songs)
+}
+
 #[tauri::command]
 pub async fn open_and_play(
     paths: Vec<String>,
@@ -576,9 +625,9 @@ pub async fn open_and_play(
 ) -> Result<OpenAndPlayOutcome, String> {
     use tauri::Emitter;
 
-    let (resolved_paths, attempted) = resolve_dropped_paths(paths);
+    let (resolved_items, attempted) = resolve_dropped_paths(paths);
 
-    if resolved_paths.is_empty() {
+    if resolved_items.is_empty() {
         return Ok(OpenAndPlayOutcome {
             played: 0,
             skipped: attempted,
@@ -587,7 +636,8 @@ pub async fn open_and_play(
 
     let cover_manager = state.cover_manager.clone();
     let songs = crate::db::run_blocking(&state.db, move |conn| {
-        resolve_songs_from_paths(conn, &cover_manager, resolved_paths).map_err(anyhow::Error::msg)
+        resolve_songs_from_dropped_items(conn, &cover_manager, resolved_items)
+            .map_err(anyhow::Error::msg)
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -619,9 +669,9 @@ pub async fn add_paths_to_queue(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<AddPathsOutcome, String> {
-    let (resolved_paths, attempted) = resolve_dropped_paths(paths);
+    let (resolved_items, attempted) = resolve_dropped_paths(paths);
 
-    if resolved_paths.is_empty() {
+    if resolved_items.is_empty() {
         return Ok(AddPathsOutcome {
             added: 0,
             skipped: attempted,
@@ -630,7 +680,8 @@ pub async fn add_paths_to_queue(
 
     let cover_manager = state.cover_manager.clone();
     let songs = crate::db::run_blocking(&state.db, move |conn| {
-        resolve_songs_from_paths(conn, &cover_manager, resolved_paths).map_err(anyhow::Error::msg)
+        resolve_songs_from_dropped_items(conn, &cover_manager, resolved_items)
+            .map_err(anyhow::Error::msg)
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -984,7 +1035,10 @@ mod tests {
         assert_eq!(attempted, 3);
         let names: Vec<String> = resolved
             .iter()
-            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .map(|item| match item {
+                DroppedItem::LocalPath(p) => p.file_name().unwrap().to_string_lossy().to_string(),
+                DroppedItem::StreamUrl(t) => t.path_or_url.clone(),
+            })
             .collect();
         assert_eq!(names, vec!["a.flac", "b.mp3", "c.wav"]);
     }
@@ -1010,7 +1064,33 @@ mod tests {
             resolve_dropped_paths(vec![file_path.to_string_lossy().to_string()]);
 
         assert_eq!(attempted, 1);
-        assert_eq!(resolved, vec![file_path]);
+        assert_eq!(resolved, vec![DroppedItem::LocalPath(file_path)]);
+    }
+
+    #[test]
+    fn resolve_dropped_paths_accepts_http_streams_from_pls_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let pls_path = dir.path().join("station.pls");
+        fs::write(
+            &pls_path,
+            "[playlist]\nNumberOfEntries=1\nFile1=https://stream.example.com/live%201\nTitle1=Example FM\nLength1=-1\n",
+        )
+        .unwrap();
+
+        let (resolved, attempted) =
+            resolve_dropped_paths(vec![pls_path.to_string_lossy().to_string()]);
+
+        assert_eq!(attempted, 1);
+        assert_eq!(
+            resolved,
+            vec![DroppedItem::StreamUrl(playlist::ParsedTrack {
+                path_or_url: "https://stream.example.com/live%201".to_string(),
+                title: Some("Example FM".to_string()),
+                artist: None,
+                album: None,
+                duration_sec: None,
+            })]
+        );
     }
 
     #[test]

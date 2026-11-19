@@ -76,9 +76,9 @@ impl SongSource {
         matches!(self, Self::WebDav | Self::Subsonic)
     }
 
-    /// True for live internet radio streams (#2002, #2004).
+    /// True for live internet radio streams (#2002, #2004, #2009).
     pub fn is_live_stream(&self) -> bool {
-        matches!(self, Self::RadioBrowser)
+        matches!(self, Self::RadioBrowser | Self::Stream)
     }
 }
 
@@ -158,9 +158,14 @@ pub(crate) static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
     )
 });
 
-/// SQL `IN (...)` fragment listing the live internet-radio source IDs (#2002, #2004).
-pub(crate) static LIVE_STREAM_SOURCES_SQL: LazyLock<String> =
-    LazyLock::new(|| format!("{}", SongSource::RadioBrowser as i32));
+/// SQL `IN (...)` fragment listing the live internet-radio source IDs (#2002, #2004, #2009).
+pub(crate) static LIVE_STREAM_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "{}, {}",
+        SongSource::RadioBrowser as i32,
+        SongSource::Stream as i32
+    )
+});
 
 // ---------------------------------------------------------------------------
 // File type enum
