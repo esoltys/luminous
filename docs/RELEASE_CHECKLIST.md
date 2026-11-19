@@ -12,7 +12,15 @@ manual.
       occasionally merge without one (e.g. #433 shipped before #453 existed to track it).
       Create one retroactively and link the PR if it's missing, so the release notes and
       the post-build issue-closing step below have something to point at. (Chore PRs do
-      not require an issue and do not need to be listed in the release notes.)
+      not require an issue and do not need to be listed in the release notes.) A commit
+      title often shows only the PR number, so read `Fixes #N` in the PR body
+      (`gh pr view N --json body`) before concluding a fix has no issue.
+- [ ] The release-notes source is the milestone, not the log:
+      `gh issue list --milestone X.Y --state all --limit 300 --json number,title,labels`.
+      Treat a PR carrying the milestone as a mistake (milestones are for issues only).
+- [ ] Check that third-party integrations (Last.fm, MusicBrainz, Files.fm) still work with
+      the keys the build ships. 4.0 found late that Last.fm requires a Pro subscription for
+      app keys.
 
 ## Content
 
@@ -25,6 +33,21 @@ manual.
   bun run studio
   ```
   Execute the guide recipes (`guide-*`) targeting the Luminous user guide directory (`docs/user-guide/assets/<tag>/screenshots/{light,dark}/`). Review the resulting PNGs before committing — at least en-CA, en-US and one Cyrillic locale (ru or uk). After replacing or updating any PNG, run `bun run guide-webp`; `scripts/guide-assets.test.ts` fails if the embedded set exceeds its size budget, and `bun scripts/guide-manifest.ts` (or `bun run sync-docs`) verifies all assets match the `docs/user-guide/assets/manifest.json` contract.
+  Capture pitfalls (all hit in 4.0):
+  - The Home greeting and the pinned Moment Mix name depend on the hour. Start the capture
+    just after a bucket boundary (05:00, 12:00, 17:00, 21:00) and keep it inside one bucket,
+    then montage-crop Home across every locale (ImageMagick) and check the greeting and mix
+    name agree. Check the first scene of the first locale too: a cold start can catch
+    "Loading your library…".
+  - Build the capture exe with `CARGO_TARGET_DIR=target` so it is traceable (the shared
+    target dir can link another worktree's stale engine crates). `--out` must be shaped like a
+    luminous checkout.
+  - Before changing a scene's height, grep the scenes for every match. A blanket `sed` on
+    `tall(1500)` also resized the equalizer scene and broke the `sync-docs` manifest check.
+  - A capture build leaves an ignored `build/` dir, which makes `release-gating.test.ts` fail
+    inside `bun run release`. Delete `build/` after the capture.
+  - A settings screen that shows an account handle (Integrations) is cropped at its manifest
+    height; raise the scene and the manifest together when a card is cut off.
 - [ ] Write `docs/release-notes/vX.Y.Z.md` for the new version. Chores do not need to be listed in the release notes.
 - [ ] Prepare the Microsoft Store listing in `esoltys/luminous-store` (its own PR there):
       - Render Store screenshots and artwork via Capture Studio (`bun run studio`), which drives the real app and compiles marketing composites across all supported Store languages into `assets/<locale>/screenshots/` and `assets/<locale>/artwork/`.
@@ -36,6 +59,8 @@ manual.
 
 ## Verification
 
+- [ ] A fresh release worktree has no `node_modules`: run `bun install --frozen-lockfile`
+      first. The suite below can then run as one background script that logs to a file.
 - [ ] `bun run check` — svelte-check / TypeScript
 - [ ] `bun run lint:ast` — architecture-invariant rules
 - [ ] `bun run test:run` — frontend unit tests, including locale completeness and the
@@ -45,7 +70,18 @@ manual.
       `src-tauri/`) — no warnings at all, not just no new ones; fix any pre-existing
       warnings you encounter rather than leaving them
 - [ ] In `bun run tauri dev`, check this release's new UI in the longest locales (de, ru)
-      for overflow or truncation.
+      for overflow or truncation. Before launching:
+  - Tell the user a window is about to open and to leave it alone (in 4.0 it was closed,
+    and the check had to restart).
+  - Run it on a COPY of the real data dir (`LUMINOUS_DATA_DIR` plus
+    `WEBVIEW2_USER_DATA_FOLDER`), never the real profile: migrations are one-way. The real
+    data is in `%APPDATA%\39231EricJamesSoltys.LuminousMusicPlayer`.
+  - Use `CARGO_TARGET_DIR=target`, and check port 1420 is free
+    (`Get-NetTCPConnection -LocalPort 1420`): another worktree's leftover Vite makes
+    `beforeDevCommand` fail. Check the process's command line before killing it.
+- [ ] Check local-time behaviour on the real machine: the Home greeting, the Moment Mix name
+      and the Daypart buckets must agree. 4.0 found that jiff could not map a new Windows
+      time zone and the backend silently used UTC.
 - [ ] Do the manual QA walkthrough in [docs/TESTING.md](TESTING.md) (real-hardware smoke
       test + dev-build exercise), plus anything specific to what changed this release.
 - [ ] Compare memory against the previous release on Windows (from a local machine, with
@@ -58,7 +94,13 @@ manual.
   ```
   Add the new rows, chart and delta table to [docs/PERFORMANCE.md](PERFORMANCE.md).
   Look into any private-bytes change beyond ~3% (run-to-run noise) before cutting the
-  release.
+  release. Scan times drift with the drive and library state (3.2.0's first scan was 2.2 s
+  one day and 116 s three weeks later), so re-run the previous release's baseline the SAME
+  DAY (a baseline worktree built with `CARGO_TARGET_DIR=target`, passed with `--exe`) before
+  reading a scan-time delta as a regression. Doing so caught the 4.0 forced-rescan
+  regression (#2160). The capture and release exes overwrite each other in a shared target
+  dir; the session cannot remove its own baseline worktree on Windows, so hand the
+  `git worktree remove` to the user.
 - [ ] Check the [Security Audit](../.github/workflows/audit.yml) and
       [CodeQL](../.github/workflows/codeql.yml) workflows are green on `main`.
 
@@ -96,8 +138,9 @@ manual.
       `docs/release-notes/vX.Y.Z.md`, then publish it (the workflow creates it as a
       draft with `prerelease: false`, so it's just sitting there until published).
 - [ ] Microsoft Store submission is a separate, manual step in the private
-      `esoltys/luminous-store` repo (not part of this repo's pipeline). After publishing,
-      trigger it there:
+      `esoltys/luminous-store` repo (not part of this repo's pipeline). Publish the GitHub
+      release FIRST: the workflow downloads the `.msix` with `gh release download`, which
+      cannot see a draft ("release not found"). Then trigger it there:
   ```bash
   gh workflow run publish-store.yml -f tag=vX.Y.Z
   ```
@@ -127,7 +170,13 @@ manual.
       (Windows + Linux) — don't just trust the CI build succeeded.
 - [ ] Confirm the `.flatpak` bundle is attached to the release, and that
       `flatpak update org.luminous.music` (with the `esoltys` remote already added — see
-      [docs/FLATPAK.md](FLATPAK.md)) picks up the new version from the shared repo.
+      [docs/FLATPAK.md](FLATPAK.md)) picks up the new version from the shared repo. The ref
+      is `app/org.luminous.music/x86_64/master` (not `stable`); check it returns 200 at
+      `https://esoltys.dev/flatpak/repo/refs/heads/app/org.luminous.music/x86_64/master`.
+- [ ] Refresh the landing page (esoltys.dev/luminous, EN and FR) with the landing-page
+      skill, copying screenshots from `origin/main`'s `docs/user-guide/assets` (not a
+      checkout that predates the recapture), and verify the live Home image shows the
+      same greeting and Moment Mix as the guide.
 - [ ] Verify the in-app updater picks up the new release from an older installed version
       (the app checks for updates on launch — confirm the prompt/flow actually works end
       to end, not just that the build has `createUpdaterArtifacts` set).
