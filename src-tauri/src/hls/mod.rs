@@ -53,6 +53,9 @@ const RELOAD_BACKOFFS: &[Duration] = &[
 ];
 /// Attempts per segment before it is skipped.
 const SEGMENT_ATTEMPTS: usize = 2;
+/// Segments skipped in a row before the station is reported as lost, rather
+/// than leaving the listener in silence until the read times out.
+const MAX_SKIPPED_SEGMENTS: usize = 3;
 
 /// MIME types servers use for HLS playlists.
 pub fn is_playlist_mime(mime: &str) -> bool {
@@ -150,6 +153,7 @@ impl HlsLiveSource {
             tx,
             title_tx,
             last_title: first_audio.title,
+            skipped: 0,
             stop: stop.clone(),
             label: label.to_string(),
         };
@@ -242,6 +246,8 @@ struct Worker {
     tx: mpsc::SyncSender<Result<Vec<u8>, String>>,
     title_tx: mpsc::Sender<String>,
     last_title: Option<String>,
+    /// Segments skipped in a row (download or demux failures).
+    skipped: usize,
     stop: Arc<AtomicBool>,
     label: String,
 }
@@ -251,7 +257,7 @@ impl Worker {
         let mut media = std::mem::take(&mut self.last_media);
         loop {
             if !self.play_new_segments(&media) {
-                return; // the reader is gone
+                return; // the reader is gone, or the station was lost
             }
             if media.end_list {
                 return; // dropping `tx` ends the stream cleanly
@@ -271,7 +277,8 @@ impl Worker {
     }
 
     /// Downloads and forwards every segment at or after `next_sequence`.
-    /// Returns false once the reader has been dropped.
+    /// Returns false once the reader has been dropped, or after too many
+    /// segments failed in a row (the error has then been sent to the reader).
     fn play_new_segments(&mut self, media: &MediaPlaylist) -> bool {
         let Some(last) = media.segments.last() else {
             return true;
@@ -295,11 +302,12 @@ impl Worker {
                 return false;
             }
             self.next_sequence = seg.sequence + 1;
-            let Some(data) = self.fetch_segment(&seg.uri) else {
-                continue;
-            };
-            match self.demux.process(&data) {
+            let processed = self
+                .fetch_segment(&seg.uri)
+                .and_then(|data| self.demux.process(&data));
+            match processed {
                 Ok(audio) => {
+                    self.skipped = 0;
                     if let Some(title) = audio.title {
                         if self.last_title.as_deref() != Some(title.as_str()) {
                             let _ = self.title_tx.send(title.clone());
@@ -312,23 +320,35 @@ impl Worker {
                 }
                 Err(e) => {
                     log::warn!("HLS station '{}': skipping a segment: {e}", self.label);
+                    self.skipped += 1;
+                    if self.skipped >= MAX_SKIPPED_SEGMENTS {
+                        let _ = self.tx.send(Err(format!(
+                            "HLS station '{}' stopped delivering audio: {e}",
+                            self.label
+                        )));
+                        return false;
+                    }
                 }
             }
         }
         true
     }
 
-    fn fetch_segment(&self, uri: &Url) -> Option<Vec<u8>> {
+    fn fetch_segment(&self, uri: &Url) -> Result<Vec<u8>, String> {
+        let mut last_err = String::new();
         for attempt in 1..=SEGMENT_ATTEMPTS {
             match fetch_bytes(uri, MAX_SEGMENT_BYTES) {
-                Ok(data) => return Some(data),
-                Err(e) => log::warn!(
-                    "HLS station '{}': segment download failed (attempt {attempt}): {e}",
-                    self.label
-                ),
+                Ok(data) => return Ok(data),
+                Err(e) => {
+                    log::warn!(
+                        "HLS station '{}': segment download failed (attempt {attempt}): {e}",
+                        self.label
+                    );
+                    last_err = e;
+                }
             }
         }
-        None
+        Err(last_err)
     }
 
     /// Re-downloads the media playlist, retrying with backoff. On a final

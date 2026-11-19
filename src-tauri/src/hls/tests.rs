@@ -244,3 +244,42 @@ async fn mislabelled_audio_is_not_mistaken_for_a_playlist() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn a_run_of_failed_segments_reports_the_station_lost_instead_of_silence() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/hls/live.m3u8"))
+        .respond_with(SlidingPlaylist {
+            playlists: vec![media_playlist(0, 5, false), media_playlist(2, 6, false)],
+            calls: Arc::new(AtomicUsize::new(0)),
+        })
+        .mount(&server)
+        .await;
+    // Playback starts at segment 2; every later segment is gone (e.g. an expired token).
+    mount_ts_segments(&server, 2..3).await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(403))
+        .mount(&server)
+        .await;
+
+    let url = format!("{}/hls/live.m3u8", server.uri());
+    tokio::task::spawn_blocking(move || {
+        let opened = LiveHttpSource::open_with_backoffs(&url, Some("Gone FM"), Vec::new()).unwrap();
+        let mut reader = opened.reader;
+        let mut first = vec![0u8; segment_audio(2).len()];
+        reader.read_exact(&mut first).unwrap();
+        assert_eq!(first, segment_audio(2));
+
+        let err = reader
+            .read(&mut [0u8; 16])
+            .expect_err("station reported lost");
+        assert_eq!(err.kind(), std::io::ErrorKind::ConnectionAborted);
+        assert!(
+            err.to_string().contains("stopped delivering audio"),
+            "{err}"
+        );
+    })
+    .await
+    .unwrap();
+}

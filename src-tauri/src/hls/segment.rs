@@ -75,7 +75,7 @@ impl SegmentDemuxer {
     fn process_ts(&mut self, data: &[u8]) -> Result<SegmentAudio, String> {
         let mut out = Vec::with_capacity(data.len());
         let mut in_audio_pes = false;
-        for packet in data.chunks_exact(TS_PACKET) {
+        for packet in data.as_chunks::<TS_PACKET>().0 {
             if packet[0] != TS_SYNC || packet[1] & 0x80 != 0 {
                 continue; // lost sync or transport error: skip the packet
             }
@@ -131,7 +131,7 @@ impl SegmentDemuxer {
             return;
         };
         // Program loop: 4 bytes each, after the 8-byte header, before the CRC.
-        for entry in section[8..].chunks_exact(4) {
+        for entry in section[8..].as_chunks::<4>().0 {
             let program = u16::from_be_bytes([entry[0], entry[1]]);
             if program != 0 {
                 self.pmt_pid = Some((u16::from(entry[2] & 0x1f) << 8) | u16::from(entry[3]));
@@ -280,7 +280,9 @@ fn id3_text(frame: &[u8]) -> Option<String> {
                 rest => (rest, encoding == 2),
             };
             let words: Vec<u16> = units
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|c| {
                     if big_endian {
                         u16::from_be_bytes([c[0], c[1]])
