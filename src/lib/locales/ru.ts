@@ -1853,6 +1853,8 @@ export const ru = {
       other: "Пропущено {count} недоступной песни.",
     },
     trackSkippedRemoteToast: "Не удалось воспроизвести «{title}» — {message}. Пропущено.",
+    stationOfflineToast: "«{title}» — Станция не в сети.",
+    liveBadge: "Эфир",
     openNothingPlayable: "Поддерживаемые аудиофайлы для воспроизведения не найдены.",
     playSongFailed: "Не удалось воспроизвести песню.",
     noSongPlaying: "Сейчас ничего не играет",

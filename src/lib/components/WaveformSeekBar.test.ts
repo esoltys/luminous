@@ -90,4 +90,16 @@ describe("WaveformSeekBar.svelte", () => {
       HTMLCanvasElement.prototype.getContext = originalGetContext;
     }
   });
+
+  it("renders no seek bar when the current song is a live radio station", () => {
+    playerStore.currentSong = {
+      id: 99,
+      source: "radio_browser",
+      path: "radio://station-1",
+      length_nanosec: undefined,
+    } as any;
+
+    const { container } = render(WaveformSeekBar);
+    expect(container.querySelector("[data-waveform-container]")).not.toBeInTheDocument();
+  });
 });

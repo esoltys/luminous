@@ -1683,6 +1683,8 @@ export const en = {
       other: "Skipped {count} unavailable songs.",
     },
     trackSkippedRemoteToast: 'Couldn\'t play "{title}" — {message}. Skipped.',
+    stationOfflineToast: '"{title}" — Station offline.',
+    liveBadge: "Live",
     openNothingPlayable: "No supported audio files found to play.",
     playSongFailed: "Couldn't play this song.",
     noSongPlaying: "No song currently playing",

@@ -1,22 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type {
-  PlaybackState,
-  Playlist,
-  PlaylistItem,
-  Song,
-  ShuffleMode,
-  RepeatMode,
-  PlayState,
-  LoudnessGainSource,
-  PlayContext,
-  AudioPipelineInfo,
-  RadioSeed,
-  RadioResult,
-  OutputFallbackPayload,
-  OutputFallbackReason,
-  AudioBackendKind,
-  VolumeSafety,
+import {
+  isLiveSong,
+  type PlaybackState,
+  type Playlist,
+  type PlaylistItem,
+  type Song,
+  type ShuffleMode,
+  type RepeatMode,
+  type PlayState,
+  type LoudnessGainSource,
+  type PlayContext,
+  type AudioPipelineInfo,
+  type RadioSeed,
+  type RadioResult,
+  type OutputFallbackPayload,
+  type OutputFallbackReason,
+  type AudioBackendKind,
+  type VolumeSafety,
 } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { createEventScope } from "../utils/eventScope";
@@ -368,7 +369,12 @@ export class PlayerStore {
       // a missing file — bad credentials, server down — so surface the
       // backend's reason instead of "file not found".
       const reason = message && shortenQuotedUrls(message.trim().replace(/[.\s]+$/, ""));
-      if (isRemotePath(path) && reason) {
+      if (path?.startsWith("radio://") || message === "Station offline") {
+        toastStore.show(
+          i18n.t("playerBar.stationOfflineToast", { title }, `"${title}" — Station offline.`),
+          "error",
+        );
+      } else if (isRemotePath(path) && reason) {
         toastStore.show(
           i18n.t(
             "playerBar.trackSkippedRemoteToast",
@@ -398,7 +404,8 @@ export class PlayerStore {
     this.currentSong = state.current_song;
     this.playlistId = state.playlist_id;
     this.playlistItemUuid = state.playlist_item_uuid;
-    this.positionNanosec = state.position_nanosec;
+    this.positionNanosec =
+      isLiveSong(state.current_song) && state.state === "stopped" ? 0 : state.position_nanosec;
     this.volume = state.volume;
     this.volumeSafety = state.volume_safety ?? null;
     this.playbackSpeed = state.playback_speed ?? 1;
@@ -711,6 +718,7 @@ export class PlayerStore {
   }
 
   async seek(positionNs: number) {
+    if (isLiveSong(this.currentSong)) return;
     const roundedNs = Math.round(positionNs);
     this.positionNanosec = roundedNs;
     console.log(
@@ -723,6 +731,7 @@ export class PlayerStore {
   }
 
   async seekRelative(deltaNs: number) {
+    if (isLiveSong(this.currentSong)) return;
     const durationNs = this.currentSong?.length_nanosec;
     const maxPositionNs = typeof durationNs === "number" ? durationNs : Number.POSITIVE_INFINITY;
     const nextPositionNs = Math.min(Math.max(this.positionNanosec + deltaNs, 0), maxPositionNs);

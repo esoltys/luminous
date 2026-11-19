@@ -1844,6 +1844,8 @@ export const uk = {
       other: "Пропущено {count} недоступної пісні.",
     },
     trackSkippedRemoteToast: "Не вдалося відтворити «{title}» — {message}. Пропущено.",
+    stationOfflineToast: "«{title}» — Станція не в мережі.",
+    liveBadge: "Наживо",
     openNothingPlayable: "Не знайдено підтримуваних аудіофайлів для відтворення.",
     playSongFailed: "Не вдалося відтворити цю пісню.",
     noSongPlaying: "Зараз нічого не відтворюється",

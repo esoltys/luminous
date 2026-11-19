@@ -7,6 +7,7 @@
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatDuration } from "../utils/formatters";
+  import { isLiveSong } from "../types";
   import CoverArt from "./CoverArt.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SongRating from "./SongRating.svelte";
@@ -837,13 +838,27 @@
         </div>
 
         <div class="flex flex-col gap-1 w-full text-[10px] text-brand-text-secondary/70 px-1">
-          <WaveformSeekBar />
-          <div
-            class="flex items-center justify-between w-full px-0.5 font-mono text-[9px] opacity-80"
-          >
-            <span>{formatDuration(playerStore.positionNanosec)}</span>
-            <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
-          </div>
+          {#if isLiveSong(playerStore.currentSong)}
+            <div
+              class="flex items-center justify-between w-full px-0.5 font-mono text-[9px] opacity-80"
+            >
+              <span>{formatDuration(playerStore.positionNanosec)}</span>
+              <span
+                data-live-badge
+                class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-brand-accent/15 text-brand-accent"
+              >
+                {i18n.t("playerBar.liveBadge", undefined, "Live")}
+              </span>
+            </div>
+          {:else}
+            <WaveformSeekBar />
+            <div
+              class="flex items-center justify-between w-full px-0.5 font-mono text-[9px] opacity-80"
+            >
+              <span>{formatDuration(playerStore.positionNanosec)}</span>
+              <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
+            </div>
+          {/if}
         </div>
       </div>
 

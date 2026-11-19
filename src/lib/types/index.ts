@@ -38,6 +38,12 @@ export type FileType =
   | "ASF"
   | "STREAM";
 
+export function isLiveSong(
+  song: { source?: SongSource; path?: string | null } | null | undefined,
+): boolean {
+  return Boolean(song && (song.source === "radio_browser" || song.path?.startsWith("radio://")));
+}
+
 export function isLosslessFileType(filetype: FileType): boolean {
   return (
     filetype === "FLAC" ||

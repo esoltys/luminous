@@ -11,6 +11,7 @@
   import { isLightColor } from "../utils/colorUtils";
   import { generateEllipseGradientSvg } from "../utils/ellipseGradient";
   import { formatDuration } from "../utils/formatters";
+  import { isLiveSong } from "../types";
   import { prefs } from "../stores/prefs.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
@@ -614,10 +615,21 @@
           <!-- Quality indicator badge (opens pipeline popover on click) -->
           <QualityBadge />
           <span>{formatDuration(playerStore.positionNanosec)}</span>
-          <div class="flex-1 flex flex-col gap-1">
-            <WaveformSeekBar />
-          </div>
-          <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
+          {#if isLiveSong(playerStore.currentSong)}
+            <div class="flex-1 flex items-center justify-center">
+              <span
+                data-live-badge
+                class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-brand-accent/15 text-brand-accent"
+              >
+                {i18n.t("playerBar.liveBadge", undefined, "Live")}
+              </span>
+            </div>
+          {:else}
+            <div class="flex-1 flex flex-col gap-1">
+              <WaveformSeekBar />
+            </div>
+            <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
+          {/if}
         </div>
       {/if}
     </div>

@@ -115,6 +115,21 @@ describe("PlayerStore", () => {
     expect(invoke).toHaveBeenCalledWith("seek_to", { positionNanosec: 0 });
   });
 
+  it("should ignore seek and seekRelative for live radio stations", async () => {
+    store.currentSong = {
+      id: 77,
+      source: "radio_browser",
+      path: "radio://station-77",
+      length_nanosec: undefined,
+    } as any;
+    store.positionNanosec = 0;
+
+    await store.seek(10_000_000_000);
+    await store.seekRelative(5_000_000_000);
+    expect(invoke).not.toHaveBeenCalledWith("seek_to", expect.anything());
+    expect(store.positionNanosec).toBe(0);
+  });
+
   it("should clamp adjusted volume between muted and full volume", async () => {
     store.volume = 0.98;
 
