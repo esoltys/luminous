@@ -55,7 +55,7 @@
   }
 </script>
 
-<div class="relative flex flex-col h-full overflow-hidden bg-brand-main">
+<div class="@container relative flex flex-col h-full overflow-hidden bg-brand-main">
   {#if isLoading}
     <div
       class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-brand-main"
@@ -64,13 +64,25 @@
     </div>
   {/if}
   <div class="absolute top-4 right-6 z-20 flex flex-wrap justify-end gap-2">
-    <Button onclick={() => openExternalUrl(GET_HELP_URL)} variant="secondary" size="sm">
+    <Button
+      onclick={() => openExternalUrl(GET_HELP_URL)}
+      variant="secondary"
+      size="sm"
+      title={i18n.t("help.getHelp", {}, "Get help")}
+      aria-label={i18n.t("help.getHelp", {}, "Get help")}
+    >
       <Lifebuoy class="w-3.5 h-3.5" />
-      {i18n.t("help.getHelp", {}, "Get help")}
+      <span class="hidden @3xl:inline">{i18n.t("help.getHelp", {}, "Get help")}</span>
     </Button>
-    <Button onclick={() => openExternalUrl(REPORT_BUG_URL)} variant="secondary" size="sm">
+    <Button
+      onclick={() => openExternalUrl(REPORT_BUG_URL)}
+      variant="secondary"
+      size="sm"
+      title={i18n.t("help.reportBug", {}, "Report a bug")}
+      aria-label={i18n.t("help.reportBug", {}, "Report a bug")}
+    >
       <Bug class="w-3.5 h-3.5" />
-      {i18n.t("help.reportBug", {}, "Report a bug")}
+      <span class="hidden @3xl:inline">{i18n.t("help.reportBug", {}, "Report a bug")}</span>
     </Button>
     <Button onclick={() => walkthroughStore.start()} variant="secondary" size="sm">
       <Compass class="w-3.5 h-3.5" />
