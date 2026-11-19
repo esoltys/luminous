@@ -31,7 +31,7 @@
   bind:this={scrollEl}
   onscroll={(e) => radioStore.setScrollTop("my_stations", e.currentTarget.scrollTop)}
   data-testid="radio-my-stations-view"
-  class="@container flex-1 min-h-0 overflow-y-auto space-y-6 pr-1"
+  class="@container flex-1 min-h-0 overflow-y-auto pt-2 pb-dock space-y-12 pr-1"
 >
   <!-- Saved stations -->
   <section class="space-y-3">

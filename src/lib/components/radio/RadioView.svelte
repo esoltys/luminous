@@ -109,7 +109,7 @@
     {/snippet}
   </CollectionHeader>
 
-  <div class="flex-1 min-h-0 flex flex-col px-6 pb-4 gap-3">
+  <div class="flex-1 min-h-0 flex flex-col px-6 pt-2 pb-4 gap-3">
     {#if radioStore.syncError && !needsOptIn}
       <div
         data-testid="radio-offline-banner"
