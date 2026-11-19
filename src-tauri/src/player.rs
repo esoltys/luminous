@@ -292,8 +292,10 @@ impl Player {
                     restored_item_uuid = Some(uuid);
                 }
 
-                if let Some(pos) = app_state_get_parsed::<u64>(&conn, "last_position_nanosec") {
-                    restored_position_ns = pos;
+                if !crate::audio::is_live_song(song) {
+                    if let Some(pos) = app_state_get_parsed::<u64>(&conn, "last_position_nanosec") {
+                        restored_position_ns = pos;
+                    }
                 }
 
                 if let Some(pid) = restored_playlist_id {
@@ -1017,7 +1019,8 @@ impl Player {
         settings: &crate::models::LoudnessSettings,
         song: &Song,
     ) -> (f32, LoudnessGainSource, Option<f32>) {
-        if settings.enabled {
+        // Loudness normalization and ReplayGain are never applied to live streams (#2002).
+        if settings.enabled && !crate::audio::is_live_song(song) {
             let result = crate::loudness::compute_gain(
                 song.ebur128_integrated_loudness_lufs,
                 song.replaygain_track_gain,
@@ -3719,5 +3722,28 @@ mod tests {
         // Stopping playback clears the indicator (#1785)
         player.stop().await.unwrap();
         assert!(!indicator.load(std::sync::atomic::Ordering::Relaxed));
+    }
+
+    #[test]
+    fn compute_loudness_gain_is_disabled_for_live_streams() {
+        let settings = crate::models::LoudnessSettings {
+            enabled: true,
+            ..Default::default()
+        };
+        let mut song = Song {
+            id: 1,
+            ebur128_integrated_loudness_lufs: Some(-9.0),
+            replaygain_track_gain: Some(-6.0),
+            ..Song::default()
+        };
+        let (local_gain, local_src, _) = Player::compute_loudness_gain(&settings, &song);
+        assert_ne!(local_src, LoudnessGainSource::Disabled);
+        assert!((local_gain - 1.0).abs() > 1e-3);
+
+        song.source = crate::models::SongSource::RadioBrowser;
+        let (live_gain, live_src, live_db) = Player::compute_loudness_gain(&settings, &song);
+        assert_eq!(live_gain, 1.0);
+        assert_eq!(live_src, LoudnessGainSource::Disabled);
+        assert_eq!(live_db, None);
     }
 }

@@ -10,7 +10,6 @@ use crate::models::{
 };
 use luminous_audio::{EngineState, OutputInfo, Track};
 use luminous_equalizer::{EqMode, Equalizer};
-use std::path::Path;
 
 pub use luminous_audio::{AudioEngine, AudioEvent};
 
@@ -30,11 +29,21 @@ where
     tokio::task::block_in_place(move || f(&mut a))
 }
 
+/// Whether `song` is an unbounded live stream (internet radio, #2002).
+pub fn is_live_song(song: &Song) -> bool {
+    song.source.is_live_stream()
+        || song.filetype == FileType::Stream
+        || song
+            .path
+            .as_deref()
+            .is_some_and(|p| p.starts_with("radio://"))
+}
+
 /// The engine's view of a song. The location prefers the library path, then
 /// a stream URL, then the source URL; when it's a URL with no extension, the
-/// library path's extension still hints the format. A song with none of the
-/// three gets an empty location, which the engine reports as a playback
-/// `Error` event like any other track that fails to open.
+/// library path's or URL path's extension still hints the format. A song with
+/// none of the three gets an empty location, which the engine reports as a
+/// playback `Error` event like any other track that fails to open.
 pub fn track_for(song: &Song) -> Track {
     let location = song
         .path
@@ -43,18 +52,27 @@ pub fn track_for(song: &Song) -> Track {
         .or(song.url.as_deref())
         .unwrap_or_default()
         .to_owned();
-    let extension_hint = song
-        .path
-        .as_deref()
-        .and_then(|p| Path::new(p).extension())
-        .and_then(|e| e.to_str())
-        .map(str::to_owned);
+    let extension_hint = [
+        song.path.as_deref(),
+        song.stream_url.as_deref(),
+        song.url.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .find_map(luminous_audio::extension_from_location)
+    .map(str::to_owned);
+    let live = is_live_song(song);
     Track {
         id: song.id,
         location,
         extension_hint,
-        end_ns: (song.end_nanosec > 0).then_some(song.end_nanosec as u64),
-        length_ns: song.length_nanosec.map(|ns| ns.max(0) as u64),
+        end_ns: (!live && song.end_nanosec > 0).then_some(song.end_nanosec as u64),
+        length_ns: if live {
+            None
+        } else {
+            song.length_nanosec.map(|ns| ns.max(0) as u64)
+        },
+        live,
     }
 }
 
@@ -228,14 +246,37 @@ mod tests {
     #[test]
     fn track_for_falls_back_to_stream_then_source_url() {
         let streamed = Song {
-            stream_url: Some("https://s/1".into()),
+            stream_url: Some("https://s/1.mp3?token=abc".into()),
             url: Some("https://u/1".into()),
             end_nanosec: 9,
             ..Song::default()
         };
-        assert_eq!(track_for(&streamed).location, "https://s/1");
-        assert_eq!(track_for(&streamed).end_ns, Some(9));
+        let track = track_for(&streamed);
+        assert_eq!(track.location, "https://s/1.mp3?token=abc");
+        assert_eq!(track.extension_hint.as_deref(), Some("mp3"));
+        assert_eq!(track.end_ns, Some(9));
+        assert!(!track.live);
         assert_eq!(track_for(&Song::default()).location, "");
+    }
+
+    #[test]
+    fn track_for_marks_radio_and_stream_songs_live_and_derives_url_extension_hint() {
+        let radio = Song {
+            id: 42,
+            source: crate::models::SongSource::RadioBrowser,
+            path: Some("radio://station-uuid-1".into()),
+            stream_url: Some("https://icecast.example.com/mount.aac?sid=1".into()),
+            end_nanosec: 12_000,
+            length_nanosec: Some(60_000),
+            ..Song::default()
+        };
+        let track = track_for(&radio);
+        assert_eq!(track.id, 42);
+        assert_eq!(track.location, "radio://station-uuid-1");
+        assert_eq!(track.extension_hint.as_deref(), Some("aac"));
+        assert!(track.live);
+        assert_eq!(track.end_ns, None);
+        assert_eq!(track.length_ns, None);
     }
 
     /// Pins the `AudioPipelineInfo` JSON the frontend's Audio Pipeline panel

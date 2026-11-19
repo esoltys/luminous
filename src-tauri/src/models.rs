@@ -71,6 +71,14 @@ impl SongSource {
     pub fn is_remote(&self) -> bool {
         matches!(self, Self::WebDav | Self::Subsonic)
     }
+
+    /// True for live internet radio streams (#2002).
+    pub fn is_live_stream(&self) -> bool {
+        matches!(
+            self,
+            Self::RadioBrowser | Self::Stream | Self::SomaFm | Self::RadioParadise
+        )
+    }
 }
 
 impl fmt::Display for SongSource {
