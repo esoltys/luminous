@@ -222,8 +222,8 @@ describe("RadioView", () => {
     });
     expect(screen.getByTestId("radio-stale-indicator")).toBeInTheDocument();
 
-    // Select "All codecs (incl. unsupported)" in Codecs dropdown -> passes hideUnsupported: false.
-    const codecSelect = screen.getByLabelText("Filter by codec");
+    // Select "All formats (incl. unsupported)" in Formats dropdown -> passes hideUnsupported: false.
+    const codecSelect = screen.getByLabelText("Filter by format");
     await fireEvent.change(codecSelect, { target: { value: "__all__" } });
 
     await waitFor(() => {
