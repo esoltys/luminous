@@ -235,8 +235,11 @@ class RadioStore {
     return this.savedUuids.has(stationuuid);
   }
 
+  /** True only while this station is actively playing (not paused or stopped). */
   isPlayingStation(stationuuid: string): boolean {
-    return playerStore.currentSong?.path === `radio://${stationuuid}`;
+    return (
+      playerStore.state === "playing" && playerStore.currentSong?.path === `radio://${stationuuid}`
+    );
   }
 
   async init(): Promise<void> {
@@ -425,22 +428,10 @@ class RadioStore {
     }
   }
 
+  /** Plays a station, or toggles pause/resume if it is already loaded. */
   async playStation(station: RadioDirectoryStation): Promise<void> {
     if (!station.playable) return;
-    try {
-      await invoke<Song>("play_radio_station", { stationuuid: station.stationuuid });
-      void this.loadMyStations();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toastStore.show(
-        i18n.t(
-          "playerBar.stationOfflineToast",
-          { title: station.name },
-          `"${station.name}" — ${msg}`,
-        ),
-        "error",
-      );
-    }
+    await this.playStationByUuid(station.stationuuid, station.name);
   }
 
   /**
@@ -469,8 +460,15 @@ class RadioStore {
     this.globalSearchStations = [];
   }
 
-  /** Plays a station known only by uuid (e.g. from a recent search). */
+  /** Plays a station known only by uuid (e.g. from a recent search), or toggles pause/resume if loaded. */
   async playStationByUuid(stationuuid: string, name: string): Promise<void> {
+    const isLoaded =
+      (playerStore.state === "playing" || playerStore.state === "paused") &&
+      playerStore.currentSong?.path === `radio://${stationuuid}`;
+    if (isLoaded) {
+      await playerStore.togglePlayPause();
+      return;
+    }
     try {
       await invoke<Song>("play_radio_station", { stationuuid });
       void this.loadMyStations();

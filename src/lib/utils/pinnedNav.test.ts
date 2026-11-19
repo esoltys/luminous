@@ -217,6 +217,7 @@ describe("pinnedNav.ts", () => {
     expect(playStationSpy).toHaveBeenCalledWith(stationItem.station);
 
     playerStore.currentSong = { id: 900, path: "radio://uuid-jazz" } as any;
+    playerStore.state = "playing";
     expect(toNavigablePin(stationItem).isActive).toBe(true);
     expect(getNavigablePins([stationItem])).toHaveLength(1);
   });
