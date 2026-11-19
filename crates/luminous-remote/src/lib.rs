@@ -11,6 +11,7 @@
 pub mod lastfm;
 pub mod lyrics;
 pub mod musicbrainz;
+pub mod radiobrowser;
 pub mod scrobbler;
 pub mod subsonic;
 pub mod webdav;

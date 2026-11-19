@@ -54,6 +54,7 @@ pub mod player;
 pub mod playlist;
 pub mod provenance;
 pub mod radio;
+pub mod radio_directory;
 pub mod ratings_sync;
 pub mod remote_scheduler;
 pub mod restart_manager;
@@ -1785,6 +1786,13 @@ pub fn run() {
             commands::webdav::test_webdav_connection,
             commands::webdav::check_webdav_connection,
             commands::webdav::sync_webdav_server,
+            // Radio Browser station directory commands (#2003)
+            commands::radio_directory::get_radio_directory_status,
+            commands::radio_directory::sync_radio_directory,
+            commands::radio_directory::query_radio_directory,
+            commands::radio_directory::get_radio_directory_station,
+            commands::radio_directory::get_radio_directory_facets,
+            commands::radio_directory::report_radio_station_click,
             // Portable device commands (#835)
             commands::devices::get_connected_devices,
             commands::files::list_file_sources,

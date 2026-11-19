@@ -17,9 +17,10 @@ percent-encoding = "2"
 md-5 = "0.11"
 sha2 = "0.11"
 rand = "0.10"
+parking_lot.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["time", "net"] }
 anyhow.workspace = true
 log.workspace = true
 

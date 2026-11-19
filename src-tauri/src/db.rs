@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 88;
+pub const CURRENT_SCHEMA_VERSION: i32 = 89;
 
 struct Migration {
     version: i32,
@@ -948,6 +948,11 @@ const MIGRATIONS: &[Migration] = &[
             )?;
             Ok(())
         },
+    },
+    Migration {
+        version: 89,
+        description: "radio_directory local station mirror, FTS5 index and sync metadata (#2003)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_89)?),
     },
 ];
 
@@ -3147,6 +3152,73 @@ CREATE TABLE IF NOT EXISTS device_sync_settings (
     last_summary TEXT,
     updated_at   INTEGER NOT NULL
 );
+";
+
+// Migration 89: local mirror of the Radio Browser station directory (#2003).
+// Lives in its own table (never in `songs`), with an FTS5 index over name,
+// tags, country and language kept in sync by triggers, plus a single-row
+// metadata table for opt-in state, last sync timestamp and last change UUID.
+const MIGRATION_89: &str = "
+CREATE TABLE IF NOT EXISTS radio_directory (
+    stationuuid  TEXT PRIMARY KEY NOT NULL,
+    name         TEXT NOT NULL,
+    url_resolved TEXT NOT NULL,
+    homepage     TEXT NOT NULL DEFAULT '',
+    favicon      TEXT NOT NULL DEFAULT '',
+    tags         TEXT NOT NULL DEFAULT '',
+    country      TEXT NOT NULL DEFAULT '',
+    countrycode  TEXT NOT NULL DEFAULT '',
+    language     TEXT NOT NULL DEFAULT '',
+    codec        TEXT NOT NULL DEFAULT '',
+    bitrate      INTEGER NOT NULL DEFAULT 0,
+    hls          INTEGER NOT NULL DEFAULT 0,
+    votes        INTEGER NOT NULL DEFAULT 0,
+    clickcount   INTEGER NOT NULL DEFAULT 0,
+    lastcheckok  INTEGER NOT NULL DEFAULT 1,
+    changeuuid   TEXT NOT NULL DEFAULT '',
+    updated_at   INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_radio_directory_countrycode ON radio_directory(countrycode);
+CREATE INDEX IF NOT EXISTS idx_radio_directory_language    ON radio_directory(language);
+CREATE INDEX IF NOT EXISTS idx_radio_directory_codec       ON radio_directory(codec);
+CREATE INDEX IF NOT EXISTS idx_radio_directory_bitrate     ON radio_directory(bitrate);
+CREATE INDEX IF NOT EXISTS idx_radio_directory_clickcount  ON radio_directory(clickcount DESC);
+CREATE INDEX IF NOT EXISTS idx_radio_directory_votes       ON radio_directory(votes DESC);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS radio_directory_fts USING fts5(
+    name, tags, country, language,
+    content='radio_directory',
+    content_rowid='rowid'
+);
+
+CREATE TRIGGER IF NOT EXISTS radio_directory_ai AFTER INSERT ON radio_directory BEGIN
+    INSERT INTO radio_directory_fts(rowid, name, tags, country, language)
+    VALUES (new.rowid, new.name, new.tags, new.country, new.language);
+END;
+
+CREATE TRIGGER IF NOT EXISTS radio_directory_ad AFTER DELETE ON radio_directory BEGIN
+    INSERT INTO radio_directory_fts(radio_directory_fts, rowid, name, tags, country, language)
+    VALUES ('delete', old.rowid, old.name, old.tags, old.country, old.language);
+END;
+
+CREATE TRIGGER IF NOT EXISTS radio_directory_au AFTER UPDATE ON radio_directory BEGIN
+    INSERT INTO radio_directory_fts(radio_directory_fts, rowid, name, tags, country, language)
+    VALUES ('delete', old.rowid, old.name, old.tags, old.country, old.language);
+    INSERT INTO radio_directory_fts(rowid, name, tags, country, language)
+    VALUES (new.rowid, new.name, new.tags, new.country, new.language);
+END;
+
+CREATE TABLE IF NOT EXISTS radio_directory_meta (
+    id                INTEGER PRIMARY KEY CHECK (id = 1),
+    opted_in          INTEGER NOT NULL DEFAULT 0,
+    last_synced_at    INTEGER,
+    last_full_sync_at INTEGER,
+    last_change_uuid  TEXT,
+    last_error        TEXT
+);
+
+INSERT OR IGNORE INTO radio_directory_meta (id, opted_in) VALUES (1, 0);
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
@@ -5726,5 +5798,83 @@ mod tests {
             .map(|r| r.unwrap())
             .collect();
         assert_eq!(pinned_keys, vec!["200".to_string()]);
+    }
+
+    #[test]
+    fn test_migration_89_creates_radio_directory_fts_and_meta() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_migration89_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+        let conn = db.pool.get().unwrap();
+
+        let opted_in: i32 = conn
+            .query_row(
+                "SELECT opted_in FROM radio_directory_meta WHERE id = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(opted_in, 0);
+
+        conn.execute(
+            "INSERT INTO radio_directory (
+                stationuuid, name, url_resolved, tags, country, countrycode, language, codec, bitrate, hls, votes, clickcount, lastcheckok, changeuuid, updated_at
+             ) VALUES (
+                'uuid-1', 'CBC Radio One Toronto', 'https://cbc.example/stream.mp3', 'news,talk,public radio', 'Canada', 'CA', 'english', 'MP3', 128, 0, 120, 450, 1, 'chg-1', 1000
+             )",
+            [],
+        )
+        .unwrap();
+
+        let matched_uuid: String = conn
+            .query_row(
+                "SELECT stationuuid FROM radio_directory
+                 WHERE rowid IN (SELECT rowid FROM radio_directory_fts WHERE radio_directory_fts MATCH 'toronto*')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(matched_uuid, "uuid-1");
+
+        conn.execute(
+            "UPDATE radio_directory SET name = 'CBC Radio One Ottawa', tags = 'news,ottawa' WHERE stationuuid = 'uuid-1'",
+            [],
+        )
+        .unwrap();
+
+        let old_match: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM radio_directory_fts WHERE radio_directory_fts MATCH 'toronto*'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(old_match, 0);
+
+        let new_match: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM radio_directory_fts WHERE radio_directory_fts MATCH 'ottawa*'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(new_match, 1);
+
+        conn.execute(
+            "DELETE FROM radio_directory WHERE stationuuid = 'uuid-1'",
+            [],
+        )
+        .unwrap();
+        let after_delete: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM radio_directory_fts WHERE radio_directory_fts MATCH 'ottawa*'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(after_delete, 0);
     }
 }

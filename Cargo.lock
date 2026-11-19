@@ -3366,6 +3366,7 @@ dependencies = [
  "base64 0.23.1",
  "log",
  "md-5",
+ "parking_lot",
  "percent-encoding",
  "quick-xml 0.42.0",
  "rand 0.10.2",
