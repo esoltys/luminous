@@ -1,7 +1,12 @@
 <script lang="ts">
   import { i18n } from "../stores/i18n.svelte";
   import { walkthroughStore } from "../stores/walkthrough.svelte";
-  import { CompassIcon as Compass } from "phosphor-svelte";
+  import {
+    CompassIcon as Compass,
+    BugIcon as Bug,
+    LifebuoyIcon as Lifebuoy,
+  } from "phosphor-svelte";
+  import { GET_HELP_URL, REPORT_BUG_URL } from "../utils/supportLinks";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Button from "./Button.svelte";
   import { openExternalUrl } from "../utils/openExternalUrl";
@@ -58,7 +63,15 @@
       <LoadingSpinner label={i18n.t("help.loading", {}, "Loading user guide...")} />
     </div>
   {/if}
-  <div class="absolute top-4 right-6 z-20">
+  <div class="absolute top-4 right-6 z-20 flex flex-wrap justify-end gap-2">
+    <Button onclick={() => openExternalUrl(GET_HELP_URL)} variant="secondary" size="sm">
+      <Lifebuoy class="w-3.5 h-3.5" />
+      {i18n.t("help.getHelp", {}, "Get help")}
+    </Button>
+    <Button onclick={() => openExternalUrl(REPORT_BUG_URL)} variant="secondary" size="sm">
+      <Bug class="w-3.5 h-3.5" />
+      {i18n.t("help.reportBug", {}, "Report a bug")}
+    </Button>
     <Button onclick={() => walkthroughStore.start()} variant="secondary" size="sm">
       <Compass class="w-3.5 h-3.5" />
       {i18n.t("walkthrough.restartTour", {}, "Restart Feature Walkthrough")}

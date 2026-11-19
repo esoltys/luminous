@@ -783,7 +783,7 @@ export const ru = {
     aboutViewLicense: "Текст лицензии",
     aboutHomepage: "Сайт Luminous",
     aboutDiscussions: "Сообщество на Reddit",
-    aboutIssues: "Задачи на GitHub",
+    aboutIssues: "Сообщить об ошибке",
     aboutInfluences: "Источники вдохновения и благодарности",
     aboutInfluencesText:
       "Вдохновлено проигрывателями с открытым исходным кодом и независимыми проигрывателями: Audacious, Strawberry Music Player, Elisa (KDE) и MusicBee.",
@@ -1684,6 +1684,8 @@ export const ru = {
     heatmapLegendMore: "Больше",
   },
   help: {
+    getHelp: "Получить помощь",
+    reportBug: "Сообщить об ошибке",
     loading: "Загрузка руководства пользователя…",
   },
   tray: {

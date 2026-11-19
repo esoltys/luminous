@@ -781,7 +781,7 @@ export const uk = {
     aboutViewLicense: "Ліцензія MIT",
     aboutHomepage: "Сайт Luminous",
     aboutDiscussions: "Спільнота на Reddit",
-    aboutIssues: "Проблеми на GitHub",
+    aboutIssues: "Повідомити про помилку",
     aboutInfluences: "Джерела натхнення та подяки",
     aboutInfluencesText:
       "Натхненно відкритими та незалежними медіаплеєрами: Audacious, Strawberry Music Player, Elisa (KDE) і MusicBee.",
@@ -1676,6 +1676,8 @@ export const uk = {
     heatmapLegendMore: "Більше",
   },
   help: {
+    getHelp: "Отримати допомогу",
+    reportBug: "Повідомити про помилку",
     loading: "Завантаження посібника користувача…",
   },
   tray: {

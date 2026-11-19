@@ -1,6 +1,7 @@
 <script lang="ts">
   import { i18n } from "../stores/i18n.svelte";
   import { openExternalUrl } from "../utils/openExternalUrl";
+  import { GET_HELP_URL, REPORT_BUG_URL } from "../utils/supportLinks";
   import {
     HouseIcon as Home,
     InfoIcon as Info,
@@ -62,7 +63,7 @@
     </button>
 
     <button
-      onclick={() => openExternalUrl("https://www.reddit.com/r/LuminousMusicPlayer/")}
+      onclick={() => openExternalUrl(GET_HELP_URL)}
       class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group"
     >
       <div
@@ -100,7 +101,7 @@
     </button>
 
     <button
-      onclick={() => openExternalUrl("https://github.com/esoltys/luminous/issues")}
+      onclick={() => openExternalUrl(REPORT_BUG_URL)}
       class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group"
     >
       <div
@@ -112,7 +113,9 @@
         <p class="text-sm font-bold text-brand-text-primary truncate">
           {i18n.t("settings.aboutIssues")}
         </p>
-        <p class="text-xs text-brand-text-secondary truncate">github.com/esoltys/luminous/issues</p>
+        <p class="text-xs text-brand-text-secondary truncate">
+          github.com/esoltys/luminous/issues/new
+        </p>
       </div>
     </button>
 
