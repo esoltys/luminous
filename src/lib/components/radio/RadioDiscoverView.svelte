@@ -46,7 +46,7 @@
         class="w-4 h-4 text-brand-text-secondary absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
       />
       <input
-        type="search"
+        type="text"
         data-testid="radio-search-input"
         value={radioStore.searchQuery}
         oninput={(e) => radioStore.setSearchQuery(e.currentTarget.value)}
