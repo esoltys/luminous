@@ -3289,8 +3289,14 @@ export const de = {
     exportStationsBtn: "Exportieren",
     exportStationsTooltip: "Gespeicherte Sender exportieren",
     customStationAdded: "{name} hinzugefügt",
-    customStationsImported: "{count} Sender importiert|{count} Sender importiert",
-    stationsExported: "{count} Sender exportiert|{count} Sender exportiert",
+    customStationsImported: {
+      one: "{count} Sender importiert",
+      other: "{count} Sender importiert",
+    },
+    stationsExported: {
+      one: "{count} Sender exportiert",
+      other: "{count} Sender exportiert",
+    },
     noSavedStations: "Speichern Sie Sender unter Entdecken, um sie hier griffbereit zu haben.",
     browseStationsAction: "Sender durchsuchen",
     recentStationsTitle: "Zuletzt gehört",

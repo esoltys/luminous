@@ -3204,8 +3204,14 @@ export const en = {
     exportStationsBtn: "Export",
     exportStationsTooltip: "Export saved stations",
     customStationAdded: "Added {name}",
-    customStationsImported: "{count} station imported|{count} stations imported",
-    stationsExported: "{count} station exported|{count} stations exported",
+    customStationsImported: {
+      one: "{count} station imported",
+      other: "{count} stations imported",
+    },
+    stationsExported: {
+      one: "{count} station exported",
+      other: "{count} stations exported",
+    },
     noSavedStations: "Save stations from Discover to keep them handy here.",
     browseStationsAction: "Browse stations",
     recentStationsTitle: "Recently Played",

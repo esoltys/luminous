@@ -3296,8 +3296,14 @@ export const fr: DeepStringRecord<typeof en> = {
     exportStationsBtn: "Exporter",
     exportStationsTooltip: "Exporter les stations enregistrées",
     customStationAdded: "{name} ajoutée",
-    customStationsImported: "{count} station importée|{count} stations importées",
-    stationsExported: "{count} station exportée|{count} stations exportées",
+    customStationsImported: {
+      one: "{count} station importée",
+      other: "{count} stations importées",
+    },
+    stationsExported: {
+      one: "{count} station exportée",
+      other: "{count} stations exportées",
+    },
     noSavedStations: "Enregistrez des stations depuis Découvrir pour les retrouver ici.",
     browseStationsAction: "Parcourir les stations",
     recentStationsTitle: "Écoutées récemment",

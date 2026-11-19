@@ -3274,8 +3274,14 @@ export const it = {
     exportStationsBtn: "Esporta",
     exportStationsTooltip: "Esporta stazioni salvate",
     customStationAdded: "{name} aggiunta",
-    customStationsImported: "{count} stazione importata|{count} stazioni importate",
-    stationsExported: "{count} stazione esportata|{count} stazioni esportate",
+    customStationsImported: {
+      one: "{count} stazione importata",
+      other: "{count} stazioni importate",
+    },
+    stationsExported: {
+      one: "{count} stazione esportata",
+      other: "{count} stazioni esportate",
+    },
     noSavedStations: "Salva le stazioni da Scopri per trovarle qui.",
     browseStationsAction: "Sfoglia stazioni",
     recentStationsTitle: "Ascoltate di recente",
