@@ -133,10 +133,17 @@ impl ProbedTrack {
         let decoder = CODEC_REGISTRY
             .make_audio_decoder(audio_params, decoder_opts)
             .map_err(|e| format!("Decoder init failed: {e}"))?;
-        let sample_rate = audio_params.sample_rate.unwrap_or(44100);
-        let channels = audio_params
+        // The decoder's own parameters win: an HE-AAC decoder outputs twice
+        // the core rate the ADTS header declares, in stereo (#2011).
+        let decoded = decoder.codec_params();
+        let sample_rate = decoded
+            .sample_rate
+            .or(audio_params.sample_rate)
+            .unwrap_or(44100);
+        let channels = decoded
             .channels
             .as_ref()
+            .or(audio_params.channels.as_ref())
             .map(|c| c.count())
             .unwrap_or(2);
         let bits_per_sample = audio_params.bits_per_sample;

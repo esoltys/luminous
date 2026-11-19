@@ -3282,7 +3282,9 @@ export const es = {
     saved: "Guardada",
     unnamedStation: "Emisora sin nombre",
     unsupportedBadge: "No compatible",
-    unsupportedHint:
-      "Esta transmisión usa HLS o HE-AAC, que el motor de audio aún no puede reproducir.",
+    unsupportedHint: "Esta transmisión usa HLS, que el motor de audio aún no puede reproducir.",
+    reducedQualityBadge: "Calidad reducida",
+    reducedQualityHint:
+      "Esta transmisión HE-AAC se reproduce sin sus frecuencias altas y algunas emisoras en mono, porque este sistema aún no tiene un decodificador HE-AAC completo.",
   },
 };

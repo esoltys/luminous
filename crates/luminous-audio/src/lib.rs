@@ -40,6 +40,7 @@
 //! or blocks. When every stage is neutral (EQ off, gains at 1.0) samples pass
 //! through bit-perfect.
 
+mod aac;
 pub mod asio;
 mod codecs;
 pub mod pcm;
@@ -51,6 +52,8 @@ mod speed;
 // only called on its own platform, but are built and tested everywhere.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 mod alsa_direct;
+#[cfg(windows)]
+mod mf_aac;
 #[cfg(target_os = "linux")]
 mod reserve_device;
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -61,7 +64,8 @@ use parking_lot::Mutex;
 use source::ProbedTrack;
 use std::path::Path;
 
-pub use codecs::can_play_stream;
+pub use aac::decodes_full_he_aac;
+pub use codecs::{can_play_stream, plays_at_reduced_quality};
 pub use sink::{
     enumerate_output_devices, AudioBackendKind, AudioDeviceInfo, AudioOutputConfig, AudioSink,
     OutputFallbackReason,
@@ -3035,6 +3039,17 @@ fn decode_track_packet(track: &mut ActiveTrack, target_channels: usize) -> Packe
             }
             match track.decoder.decode(&packet) {
                 Ok(decoded) => {
+                    // A decoder can settle on its real output format only
+                    // after a few packets (HE-AAC through Media Foundation,
+                    // #2011); follow it rather than resample at a stale rate.
+                    let spec = decoded.spec();
+                    let (rate, channels) = (spec.rate(), spec.channels().count());
+                    if rate != track.src_rate || channels != track.src_channels {
+                        track.src_rate = rate;
+                        track.src_channels = channels;
+                        track.resampler =
+                            Resampler::new(rate, track.resampler.to_rate, target_channels);
+                    }
                     let mut sample_vec: Vec<f32> = Vec::new();
                     decoded.copy_to_vec_interleaved(&mut sample_vec);
                     let mut samples: &[f32] = &sample_vec;

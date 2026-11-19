@@ -22,6 +22,7 @@ function station(stationuuid: string, overrides: Partial<RadioDirectoryStation> 
     changeuuid: "",
     updatedAt: 0,
     playable: true,
+    reducedQuality: false,
     ...overrides,
   } satisfies RadioDirectoryStation;
 }

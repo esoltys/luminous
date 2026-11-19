@@ -1714,6 +1714,8 @@ export interface RadioDirectoryStation {
   changeuuid: string;
   updatedAt: number;
   playable: boolean;
+  /** Playable, but only at reduced quality on this platform (HE-AAC core only, #2011). */
+  reducedQuality: boolean;
 }
 
 export type RadioDirectoryOrder = "clickcount" | "votes" | "name" | "bitrate" | "relevance";

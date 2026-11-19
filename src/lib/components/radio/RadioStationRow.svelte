@@ -118,6 +118,16 @@
           {i18n.t("radio.unsupportedBadge")}
         </span>
         <HelpTip text={i18n.t("radio.unsupportedHint")} label={i18n.t("radio.unsupportedBadge")} />
+      {:else if station.reducedQuality}
+        <span
+          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-brand-surface border border-brand-border/60 label-small text-brand-text-secondary shrink-0"
+        >
+          {i18n.t("radio.reducedQualityBadge")}
+        </span>
+        <HelpTip
+          text={i18n.t("radio.reducedQualityHint")}
+          label={i18n.t("radio.reducedQualityBadge")}
+        />
       {/if}
     </div>
 

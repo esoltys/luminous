@@ -42,6 +42,8 @@ windows = { version = "0.62", features = [
     "Win32_Media_Audio",
     "Win32_Media_Audio_Endpoints",
     "Win32_Media_KernelStreaming",
+    # HE-AAC decoding through Media Foundation's AAC decoder (#2011).
+    "Win32_Media_MediaFoundation",
     "Win32_Security",
     "Win32_System_Com",
     "Win32_System_Com_StructuredStorage",

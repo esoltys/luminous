@@ -3275,7 +3275,9 @@ export const it = {
     saved: "Salvata",
     unnamedStation: "Stazione senza nome",
     unsupportedBadge: "Non supportata",
-    unsupportedHint:
-      "Questo flusso usa HLS o HE-AAC, che il motore audio non può ancora riprodurre.",
+    unsupportedHint: "Questo flusso usa HLS, che il motore audio non può ancora riprodurre.",
+    reducedQualityBadge: "Qualità ridotta",
+    reducedQualityHint:
+      "Questo flusso HE-AAC viene riprodotto senza le frequenze alte e alcune stazioni in mono, perché questo sistema non ha ancora un decodificatore HE-AAC completo.",
   },
 };

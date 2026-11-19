@@ -3298,6 +3298,9 @@ export const frFR: DeepStringRecord<typeof en> = {
     saved: "Enregistrée",
     unnamedStation: "Station sans nom",
     unsupportedBadge: "Non pris en charge",
-    unsupportedHint: "Ce flux utilise HLS ou HE-AAC, que le moteur audio ne peut pas encore lire.",
+    unsupportedHint: "Ce flux utilise HLS, que le moteur audio ne peut pas encore lire.",
+    reducedQualityBadge: "Qualité réduite",
+    reducedQualityHint:
+      "Ce flux HE-AAC est lu sans ses hautes fréquences, et certaines stations sont lues en mono, car ce système n'a pas encore de décodeur HE-AAC complet.",
   },
 };

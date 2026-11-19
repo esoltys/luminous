@@ -264,6 +264,7 @@ describe("TopNavigation.svelte", () => {
         changeuuid: "c",
         updatedAt: 0,
         playable: true,
+        reducedQuality: false,
         ...overrides,
       };
     }
