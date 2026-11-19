@@ -9,6 +9,7 @@
   import { radioStore } from "../../stores/radio.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import type { RadioDirectoryOrder, RadioDirectoryStation } from "../../types";
+  import Select from "../Select.svelte";
   import RadioStationRow from "./RadioStationRow.svelte";
 
   let scrollContainerEl: HTMLElement | null = $state(null);
@@ -65,25 +66,25 @@
       {/if}
     </div>
 
-    <select
-      aria-label={i18n.t("radio.sortBy")}
+    <Select
+      ariaLabel={i18n.t("radio.sortBy")}
       value={radioStore.orderBy}
       onchange={(e) => {
         radioStore.orderBy = e.currentTarget.value as RadioDirectoryOrder;
       }}
-      class="px-2.5 py-1.5 rounded-lg bg-brand-surface border border-brand-border/60 text-xs text-brand-text-primary focus:outline-none focus:border-brand-accent"
+      class="px-2.5 pr-8 py-1.5 rounded-lg bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-xs text-brand-text-primary focus:outline-none focus:border-brand-accent"
     >
       <option value="clickcount">{i18n.t("radio.sortPopularity")}</option>
       <option value="votes">{i18n.t("radio.sortVotes")}</option>
       <option value="name">{i18n.t("radio.sortName")}</option>
       <option value="bitrate">{i18n.t("radio.sortBitrate")}</option>
-    </select>
+    </Select>
 
-    <select
-      aria-label={i18n.t("radio.filterCountry")}
+    <Select
+      ariaLabel={i18n.t("radio.filterCountry")}
       value={radioStore.selectedCountry ?? ""}
       onchange={(e) => radioStore.setFilter("country", e.currentTarget.value || null)}
-      class="px-2.5 py-1.5 rounded-lg bg-brand-surface border border-brand-border/60 text-xs text-brand-text-primary max-w-[11rem] focus:outline-none focus:border-brand-accent"
+      class="px-2.5 pr-8 py-1.5 rounded-lg bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-xs text-brand-text-primary max-w-[11rem] focus:outline-none focus:border-brand-accent"
     >
       <option value="">{i18n.t("radio.allCountries")}</option>
       {#each radioStore.facets.countries as c (c.isoCode ?? c.name)}
@@ -91,13 +92,13 @@
           {c.name} ({c.stationcount})
         </option>
       {/each}
-    </select>
+    </Select>
 
-    <select
-      aria-label={i18n.t("radio.filterLanguage")}
+    <Select
+      ariaLabel={i18n.t("radio.filterLanguage")}
       value={radioStore.selectedLanguage ?? ""}
       onchange={(e) => radioStore.setFilter("language", e.currentTarget.value || null)}
-      class="hidden @md:block px-2.5 py-1.5 rounded-lg bg-brand-surface border border-brand-border/60 text-xs text-brand-text-primary max-w-[10rem] focus:outline-none focus:border-brand-accent"
+      class="hidden @md:block px-2.5 pr-8 py-1.5 rounded-lg bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-xs text-brand-text-primary max-w-[10rem] focus:outline-none focus:border-brand-accent"
     >
       <option value="">{i18n.t("radio.allLanguages")}</option>
       {#each radioStore.facets.languages as lang (lang.name)}
@@ -105,13 +106,13 @@
           {lang.name} ({lang.stationcount})
         </option>
       {/each}
-    </select>
+    </Select>
 
-    <select
-      aria-label={i18n.t("radio.filterCodec")}
+    <Select
+      ariaLabel={i18n.t("radio.filterCodec")}
       value={radioStore.selectedCodec ?? ""}
       onchange={(e) => radioStore.setFilter("codec", e.currentTarget.value || null)}
-      class="hidden @xl:block px-2.5 py-1.5 rounded-lg bg-brand-surface border border-brand-border/60 text-xs text-brand-text-primary max-w-[9rem] focus:outline-none focus:border-brand-accent"
+      class="hidden @xl:block px-2.5 pr-8 py-1.5 rounded-lg bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-xs text-brand-text-primary max-w-[9rem] focus:outline-none focus:border-brand-accent"
     >
       <option value="">{i18n.t("radio.allCodecs")}</option>
       {#each radioStore.facets.codecs as codec (codec.name)}
@@ -119,7 +120,7 @@
           {codec.name} ({codec.stationcount})
         </option>
       {/each}
-    </select>
+    </Select>
 
     <label
       class="inline-flex items-center gap-1.5 text-xs text-brand-text-secondary cursor-pointer select-none px-1"
