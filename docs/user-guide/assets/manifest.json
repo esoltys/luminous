@@ -147,7 +147,7 @@
           "src": "assets/de/screenshots/dark/settings-integrations.webp",
           "name": "settings-integrations",
           "width": 1440,
-          "height": 1250
+          "height": 1650
         },
         {
           "src": "assets/de/screenshots/dark/organize.webp",
@@ -327,7 +327,7 @@
           "src": "assets/en-CA/screenshots/dark/settings-integrations.webp",
           "name": "settings-integrations",
           "width": 1440,
-          "height": 1250
+          "height": 1650
         },
         {
           "src": "assets/en-CA/screenshots/dark/organize.webp",
@@ -507,7 +507,7 @@
           "src": "assets/es/screenshots/dark/settings-integrations.webp",
           "name": "settings-integrations",
           "width": 1440,
-          "height": 1250
+          "height": 1650
         },
         {
           "src": "assets/es/screenshots/dark/organize.webp",
@@ -687,7 +687,7 @@
           "src": "assets/fr-CA/screenshots/dark/settings-integrations.webp",
           "name": "settings-integrations",
           "width": 1440,
-          "height": 1250
+          "height": 1650
         },
         {
           "src": "assets/fr-CA/screenshots/dark/organize.webp",
@@ -867,7 +867,7 @@
           "src": "assets/it/screenshots/dark/settings-integrations.webp",
           "name": "settings-integrations",
           "width": 1440,
-          "height": 1250
+          "height": 1650
         },
         {
           "src": "assets/it/screenshots/dark/organize.webp",
@@ -1047,7 +1047,7 @@
           "src": "assets/ru/screenshots/dark/settings-integrations.webp",
           "name": "settings-integrations",
           "width": 1440,
-          "height": 1250
+          "height": 1650
         },
         {
           "src": "assets/ru/screenshots/dark/organize.webp",
@@ -1227,7 +1227,7 @@
           "src": "assets/uk/screenshots/dark/settings-integrations.webp",
           "name": "settings-integrations",
           "width": 1440,
-          "height": 1250
+          "height": 1650
         },
         {
           "src": "assets/uk/screenshots/dark/organize.webp",

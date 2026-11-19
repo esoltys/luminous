@@ -268,6 +268,32 @@ Measured on 2026-10-27 in scratch profiles over the same 3,616-track library, th
 
 **Speed.** CPU and startup are unchanged. Scan times are left out: the library is on a network drive, and the same build's scans ranged from under 2s to 228s depending on the drive's cache (3.1.0's first scan took 227.8s in one run and 1.8s in the next), so they say nothing about the code. The stall watchdog logged more warnings during the first scan, 1.0 → 6.7 per run on average, all "Tokio worker blocked … background task" with no IPC nearby. The binary grew 0.3 MB.
 
+### 4.0 vs. 3.2 (Windows)
+
+![Memory: 4.0.0 vs. 3.2.0](performance-3.2.0-vs-4.0.0.png)
+
+| Scenario | Private bytes Δ | Working set Δ | Peak private bytes Δ |
+| --- | --- | --- | --- |
+| Idle | −5.0 MB (−1.1%) | +30.5 MB (+6.2%) | +25.3 MB (+5.1%) |
+| After full scan | +2.4 MB (+0.6%) | +16.4 MB (+3.2%) | −8.6 MB (−1.7%) |
+| During playback (EQ + analyzer on) | +1.7 MB (+0.4%) | +12.2 MB (+2.3%) | −8.5 MB (−2.1%) |
+| First scan (with artwork) | +14.5 MB (+3.9%) | +11.2 MB (+2.3%) | +40.6 MB (+8.4%) |
+| Albums grid scrolled (thumbnails) | +0.1 MB (+0.0%) | +18.1 MB (+3.2%) | +8.9 MB (+1.1%) |
+
+Measured on 2026-11-18 in scratch profiles over the same 3,999-track library, one run per version, playing the baseline track. 3.2.0 is the `v3.2.0` tag built in its own worktree and run the same day; 4.0.0 is the release branch after #2164 merged. Unlike 3.2, these are single runs, so differences inside the usual ~3% are noise.
+
+**Memory.** Steady-state private bytes are flat (within 1%). The first scan reads +3.9% private and +8.4% at peak, which is over the ~3% line but from a single run, and the same-day first-scan time matches 3.2.0, so it wasn't chased further.
+
+| Scenario | CPU, settled (% of machine) | CPU used by the work (CPU-seconds) | Time |
+| --- | --- | --- | --- |
+| Idle | 0.1 → 1.6 | | startup 0.5s → 0.6s |
+| After full scan | 0.0 → 1.9 | 14.3 → 15.5 | forced scan 1.8s → 2.1s |
+| Playback (EQ + analyzer on) | 0.7 → 2.7 | | |
+| First scan (with artwork) | 0.0 → 0.4 | 22.9 → 26.0 | 116.0s → 115.9s |
+| Albums grid scrolled | 0.0 → 2.0 | 14.3 → 15.0 | |
+
+**Speed.** The first measurement of the 4.0.0 branch found a forced full rescan taking 118.7s against 1.8s on 3.2.0 (#2160), because four background analysis threads decoded whole files alongside the scan. Background analysis now runs on one scheduler that waits for the library to settle and pauses during scans (#2164); the rescan is back to 2.1s and the first scan matches 3.2.0 on the same day. The first-scan time on this machine drifts with the drive's cache (3.2.0 took 2.2s on 2026-10-27 and 116s on 2026-11-18), so only same-day runs are comparable. Settled CPU is higher in every scenario (up to 2 percentage points of the machine), consistent with the analysis scheduler still working through the library during the measurement window; this wasn't investigated further.
+
 ### Trend across versions (Windows)
 
 ![Memory by version](performance-trend.png)
