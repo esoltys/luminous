@@ -575,6 +575,21 @@ fn spawn_auto_continue_if_due(player: &Player, app: &tauri::AppHandle) {
 /// each `AudioEvent` into player-state transitions, OS media-session
 /// mirroring, and frontend events. A blocking OS thread rather than a Tokio
 /// task since it blocks on `rx.iter()`.
+fn spawn_station_click_report_if_pending(p: &mut player::Player, app: &tauri::AppHandle) {
+    let Some(uuid) = p.take_pending_station_click_uuid() else {
+        return;
+    };
+    let Some(app_state) = app.try_state::<AppState>() else {
+        return;
+    };
+    let db = app_state.db.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = commands::radio_directory::report_station_click_if_online(&db, uuid).await {
+            log::debug!("Radio Browser click report failed: {e}");
+        }
+    });
+}
+
 fn spawn_audio_event_loop(
     app_handle: tauri::AppHandle,
     audio: Arc<Mutex<AudioEngine>>,
@@ -617,21 +632,7 @@ fn spawn_audio_event_loop(
                                         .await;
                                 }
                             }
-                            if let Some(uuid) = p.take_pending_station_click_uuid() {
-                                if let Some(app_state) = app.try_state::<AppState>() {
-                                    let db = app_state.db.clone();
-                                    tauri::async_runtime::spawn(async move {
-                                        if let Err(e) =
-                                            commands::radio_directory::report_station_click_if_online(
-                                                &db, uuid,
-                                            )
-                                            .await
-                                        {
-                                            log::debug!("Radio Browser click report failed: {e}");
-                                        }
-                                    });
-                                }
-                            }
+                            spawn_station_click_report_if_pending(&mut p, &app);
                             sync_window_title(&app, p.current_song.as_ref(), true);
                             let pipeline = {
                                 let a = audio.lock().await;
@@ -709,21 +710,7 @@ fn spawn_audio_event_loop(
                                         .await;
                                 }
                             }
-                            if let Some(uuid) = p.take_pending_station_click_uuid() {
-                                if let Some(app_state) = app.try_state::<AppState>() {
-                                    let db = app_state.db.clone();
-                                    tauri::async_runtime::spawn(async move {
-                                        if let Err(e) =
-                                            commands::radio_directory::report_station_click_if_online(
-                                                &db, uuid,
-                                            )
-                                            .await
-                                        {
-                                            log::debug!("Radio Browser click report failed: {e}");
-                                        }
-                                    });
-                                }
-                            }
+                            spawn_station_click_report_if_pending(&mut p, &app);
                             sync_window_title(&app, p.current_song.as_ref(), true);
                             let pipeline = {
                                 let a = audio.lock().await;

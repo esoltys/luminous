@@ -327,8 +327,17 @@
   let loadedMode: string | undefined = undefined;
 
   $effect(() => {
-    const songId = playerStore.currentSong?.id;
+    const song = playerStore.currentSong;
+    const songId = song?.id;
     const mode = prefs.seekBarMode;
+
+    if (isLiveSong(song)) {
+      loadedSongId = songId;
+      loadedMode = mode;
+      waveformData = [];
+      bandData = [];
+      return;
+    }
 
     if (songId !== loadedSongId || mode !== loadedMode) {
       loadedSongId = songId;
