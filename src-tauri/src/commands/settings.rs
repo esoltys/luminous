@@ -68,6 +68,10 @@ pub struct UiPreferences {
     /// background (#1943). Off by default: it reads every such song once, which is costly on
     /// large libraries and network drives.
     pub detect_tempo_and_key: bool,
+    /// Verify audio file integrity and lossless provenance in the background (#2189).
+    /// Off by default: decoding every track once is costly on large or external libraries.
+    /// Manual context-menu verification stays available regardless of this setting.
+    pub verify_audio_integrity_and_provenance: bool,
     /// Which families of system-generated auto-playlists the library keeps (#2131). A family that is
     /// off has its playlists deleted and is not regenerated (`PlaylistManager::family_enabled`).
     /// All on by default, so existing libraries are unchanged.
@@ -104,6 +108,7 @@ impl Default for UiPreferences {
             fanart_fetch_disc_art: true,
             save_artwork_to_folders: false,
             detect_tempo_and_key: false,
+            verify_audio_integrity_and_provenance: false,
             auto_playlists_genre: true,
             auto_playlists_decade: true,
             auto_playlists_artist_tag: true,
@@ -162,7 +167,7 @@ impl UiPreferences {
     /// Bool fields, persisted as a literal "true"/"false" string the same
     /// way the FadeSettings bools are — not part of `fields()` since they
     /// aren't domain-checked Strings.
-    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 15] {
+    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 16] {
         [
             ("genre_sort_asc", &mut self.genre_sort_asc),
             ("fanart_fetch_photo", &mut self.fanart_fetch_photo),
@@ -175,6 +180,10 @@ impl UiPreferences {
             ("fanart_fetch_disc_art", &mut self.fanart_fetch_disc_art),
             ("save_artwork_to_folders", &mut self.save_artwork_to_folders),
             ("detect_tempo_and_key", &mut self.detect_tempo_and_key),
+            (
+                "verify_audio_integrity_and_provenance",
+                &mut self.verify_audio_integrity_and_provenance,
+            ),
             ("auto_playlists_genre", &mut self.auto_playlists_genre),
             ("auto_playlists_decade", &mut self.auto_playlists_decade),
             (
@@ -187,6 +196,23 @@ impl UiPreferences {
             ("auto_playlists_daypart", &mut self.auto_playlists_daypart),
         ]
     }
+}
+
+/// Reads a single boolean preference from `app_state` without loading all UI preferences.
+pub(crate) fn read_bool_pref(conn: &rusqlite::Connection, key: &str, default: bool) -> bool {
+    conn.query_row(
+        "SELECT value FROM app_state WHERE key = ?1",
+        rusqlite::params![key],
+        |row| row.get::<_, String>(0),
+    )
+    .map(|v| v == "true")
+    .unwrap_or(default)
+}
+
+/// Whether background audio integrity and lossless provenance verification is enabled.
+/// Off by default to avoid continuous disk reads on large or external libraries (#2189).
+pub fn background_verification_enabled(conn: &rusqlite::Connection) -> bool {
+    read_bool_pref(conn, "verify_audio_integrity_and_provenance", false)
 }
 
 /// Reads every UI preference from `app_state`, falling back to the default
@@ -556,5 +582,20 @@ mod tests {
         assert!(prefs.fanart_fetch_photo);
         assert!(prefs.fanart_fetch_background);
         assert!(prefs.save_artwork_to_folders);
+    }
+
+    #[test]
+    fn background_verification_defaults_to_off_and_respects_stored_value() {
+        let conn = app_state_conn();
+        assert!(!load_ui_preferences(&conn).verify_audio_integrity_and_provenance);
+        assert!(!background_verification_enabled(&conn));
+
+        conn.execute(
+            "INSERT INTO app_state VALUES ('verify_audio_integrity_and_provenance', 'true')",
+            [],
+        )
+        .unwrap();
+        assert!(load_ui_preferences(&conn).verify_audio_integrity_and_provenance);
+        assert!(background_verification_enabled(&conn));
     }
 }

@@ -64,6 +64,32 @@ impl ProvenanceReader {
     }
 }
 
+fn next_song_to_verify(
+    conn: &rusqlite::Connection,
+    skipped: &crate::background_reads::Skipped,
+) -> rusqlite::Result<Option<(i64, String)>> {
+    if !crate::commands::settings::background_verification_enabled(conn) {
+        return Ok(None);
+    }
+    conn.query_row(
+        &format!(
+            "SELECT s.id, s.path FROM songs s
+             LEFT JOIN song_provenance p ON s.id = p.song_id
+             WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+               AND s.filetype IN ({lossless})
+               AND (p.song_id IS NULL OR p.mtime != s.mtime)
+               AND {skip}
+             ORDER BY s.added DESC, s.id DESC LIMIT 1",
+            lib = *LOCAL_SOURCES_SQL,
+            lossless = LOSSLESS_FILETYPES_SQL,
+            skip = skipped.sql_excluding("s.id")
+        ),
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )
+    .optional()
+}
+
 impl crate::background_reads::BackgroundRead for ProvenanceReader {
     fn name(&self) -> &'static str {
         "provenance"
@@ -74,23 +100,7 @@ impl crate::background_reads::BackgroundRead for ProvenanceReader {
         conn: &rusqlite::Connection,
         skipped: &crate::background_reads::Skipped,
     ) -> rusqlite::Result<Option<(i64, String)>> {
-        conn.query_row(
-            &format!(
-                "SELECT s.id, s.path FROM songs s
-                 LEFT JOIN song_provenance p ON s.id = p.song_id
-                 WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
-                   AND s.filetype IN ({lossless})
-                   AND (p.song_id IS NULL OR p.mtime != s.mtime)
-                   AND {skip}
-                 ORDER BY s.added DESC, s.id DESC LIMIT 1",
-                lib = *LOCAL_SOURCES_SQL,
-                lossless = LOSSLESS_FILETYPES_SQL,
-                skip = skipped.sql_excluding("s.id")
-            ),
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()
+        next_song_to_verify(conn, skipped)
     }
 
     fn read(&mut self, song_id: i64, _path: &Path) -> crate::background_reads::ReadOutcome {
@@ -290,6 +300,38 @@ mod tests {
         assert!(
             updated.is_stale,
             "cached provenance should be marked stale when mtime changes"
+        );
+    }
+
+    #[test]
+    fn background_provenance_skips_when_toggle_is_off() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_prov_toggle_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO songs (path, title, source, filetype, mtime) VALUES ('/test.flac', 'Test', 2, 2, 1000)",
+            [],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+        let skipped = crate::background_reads::Skipped::default();
+
+        // Off by default: background reader offers nothing.
+        assert_eq!(next_song_to_verify(&conn, &skipped).unwrap(), None);
+
+        // Opting in lets the background reader pick the unverified lossless song.
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('verify_audio_integrity_and_provenance', 'true')",
+            [],
+        )
+        .unwrap();
+        assert_eq!(
+            next_song_to_verify(&conn, &skipped).unwrap(),
+            Some((song_id, "/test.flac".to_string()))
         );
     }
 }

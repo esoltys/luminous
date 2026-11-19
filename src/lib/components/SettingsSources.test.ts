@@ -326,6 +326,20 @@ describe("SettingsSources.svelte - Save artwork to folders", () => {
 
     expect(await findByText("No blocked metadata matches.")).toBeInTheDocument();
   });
+
+  it("toggles background audio integrity and provenance verification", async () => {
+    const { prefs } = await import("../stores/prefs.svelte");
+    const spy = vi.spyOn(prefs, "setVerifyAudioIntegrityAndProvenance");
+
+    const { findByLabelText } = render(SettingsSources);
+    const toggle = await findByLabelText(
+      "Verify audio integrity and lossless provenance in the background",
+    );
+
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    await fireEvent.click(toggle);
+    expect(spy).toHaveBeenCalledWith(true);
+  });
 });
 
 describe("SettingsSources.svelte - folder suggestions toggle", () => {

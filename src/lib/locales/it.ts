@@ -1100,6 +1100,10 @@ export const it = {
     saveArtworkToFoldersLabel: "Salva le copertine accanto alla musica",
     saveArtworkToFoldersHint:
       "Salva copertine degli album, foto degli artisti, loghi delle band e banner direttamente nelle cartelle musicali come cover.jpg, artist.jpg, logo.png e banner.jpg.",
+    verifyAudioBackgroundLabel:
+      "Verifica l'integrità audio e la provenienza lossless in background",
+    verifyAudioBackgroundHint:
+      "Decodifica i file della libreria in background per rilevare file corrotti e possibili transcodifiche lossy. Disattivato per impostazione predefinita per evitare attività continua su disco su unità grandi o esterne; i controlli manuali continuano a funzionare.",
     saveArtworkToFoldersModalTitle: "Esporta le copertine nelle cartelle musicali",
     saveArtworkToFoldersModalMessage:
       "Attivando questa opzione, le copertine degli album (cover.jpg), le foto degli artisti (artist.jpg), i loghi delle band (logo.png) e i banner (banner.jpg) presenti nella cache verranno esportati direttamente nelle tue cartelle musicali locali. Le cartelle condivise e le immagini esistenti non verranno sovrascritte. Vuoi procedere?",

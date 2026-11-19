@@ -25,6 +25,7 @@ interface UiPreferences {
   fanart_fetch_disc_art: boolean;
   save_artwork_to_folders: boolean;
   detect_tempo_and_key: boolean;
+  verify_audio_integrity_and_provenance: boolean;
   auto_playlists_genre: boolean;
   auto_playlists_decade: boolean;
   auto_playlists_artist_tag: boolean;
@@ -63,6 +64,8 @@ class PrefsStore {
   saveArtworkToFolders = $state<boolean>(false);
   /** Estimate BPM and key for songs missing those tags by analysing audio in the background (#1943). Off by default. */
   detectTempoAndKey = $state<boolean>(false);
+  /** Verify audio file integrity and lossless provenance in the background (#2189). Off by default. */
+  verifyAudioIntegrityAndProvenance = $state<boolean>(false);
   /** Which families of auto-playlists the library keeps; all on by default. */
   autoPlaylists = $state<Record<AutoPlaylistFamily, boolean>>({
     genre: true,
@@ -117,6 +120,7 @@ class PrefsStore {
     this.fanartFetchDiscArt = prefs.fanart_fetch_disc_art;
     this.saveArtworkToFolders = prefs.save_artwork_to_folders;
     this.detectTempoAndKey = prefs.detect_tempo_and_key ?? false;
+    this.verifyAudioIntegrityAndProvenance = prefs.verify_audio_integrity_and_provenance ?? false;
     this.autoPlaylists = {
       genre: prefs.auto_playlists_genre ?? true,
       decade: prefs.auto_playlists_decade ?? true,
@@ -188,6 +192,7 @@ class PrefsStore {
       fanart_fetch_disc_art: this.fanartFetchDiscArt,
       save_artwork_to_folders: this.saveArtworkToFolders,
       detect_tempo_and_key: this.detectTempoAndKey,
+      verify_audio_integrity_and_provenance: this.verifyAudioIntegrityAndProvenance,
       auto_playlists_genre: this.autoPlaylists.genre,
       auto_playlists_decade: this.autoPlaylists.decade,
       auto_playlists_artist_tag: this.autoPlaylists.artist_tag,
@@ -252,6 +257,11 @@ class PrefsStore {
 
   setDetectTempoAndKey(enabled: boolean) {
     this.detectTempoAndKey = enabled;
+    this.save();
+  }
+
+  setVerifyAudioIntegrityAndProvenance(enabled: boolean) {
+    this.verifyAudioIntegrityAndProvenance = enabled;
     this.save();
   }
 

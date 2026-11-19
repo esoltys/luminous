@@ -1102,6 +1102,9 @@ export const de = {
     saveArtworkToFoldersLabel: "Cover neben der Musik speichern",
     saveArtworkToFoldersHint:
       "Albumcover, Interpretenfotos, Bandlogos und Banner direkt in deinen Musikordnern als cover.jpg, artist.jpg, logo.png und banner.jpg speichern.",
+    verifyAudioBackgroundLabel: "Audio-Integrität und Lossless-Herkunft im Hintergrund prüfen",
+    verifyAudioBackgroundHint:
+      "Dekodiert Bibliotheksdateien im Hintergrund, um Beschädigungen und mutmaßliche verlustbehaftete Transkodierungen zu erkennen. Standardmäßig deaktiviert, um dauerhafte Festplattenaktivität bei großen oder externen Laufwerken zu vermeiden; manuelle Prüfungen funktionieren weiterhin.",
     saveArtworkToFoldersModalTitle: "Cover in Musikordner exportieren",
     saveArtworkToFoldersModalMessage:
       "Wenn du dies aktivierst, werden vorhandene zwischengespeicherte Albumcover (cover.jpg), Interpretenfotos (artist.jpg), Bandlogos (logo.png) und Banner (banner.jpg) direkt in deine lokalen Musikordner exportiert. Freigegebene Ordner und vorhandene Cover werden nicht überschrieben. Fortfahren?",

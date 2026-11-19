@@ -1099,6 +1099,10 @@ export const es = {
     saveArtworkToFoldersLabel: "Guardar las carátulas junto a tu música",
     saveArtworkToFoldersHint:
       "Guarda carátulas de álbumes, fotos de artistas, logotipos de bandas y banners directamente en tus carpetas de música como cover.jpg, artist.jpg, logo.png y banner.jpg.",
+    verifyAudioBackgroundLabel:
+      "Verificar la integridad del audio y la procedencia sin pérdida en segundo plano",
+    verifyAudioBackgroundHint:
+      "Decodifica los archivos de la biblioteca en segundo plano para detectar corrupción y posibles transcodificaciones con pérdida. Desactivado por defecto para evitar actividad continua en disco en unidades grandes o externas; las comprobaciones manuales siguen funcionando.",
     saveArtworkToFoldersModalTitle: "Exportar carátulas a las carpetas de música",
     saveArtworkToFoldersModalMessage:
       "Al activar esta opción se exportarán a tus carpetas de música locales las carátulas de álbumes (cover.jpg), fotos de artistas (artist.jpg), logotipos de bandas (logo.png) y banners (banner.jpg) que ya están en caché. No se sobrescribirán las carpetas compartidas ni las carátulas existentes. ¿Quieres continuar?",
