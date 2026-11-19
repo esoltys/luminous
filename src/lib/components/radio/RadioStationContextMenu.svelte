@@ -4,6 +4,7 @@
     BookmarkSimpleIcon as Bookmark,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
+    PencilSimpleIcon as Pencil,
   } from "phosphor-svelte";
   import { onMount } from "svelte";
   import { i18n } from "../../stores/i18n.svelte";
@@ -25,6 +26,7 @@
 
   const pinned = $derived(pinnedStore.isPinned("station", station.stationuuid));
   const saved = $derived(radioStore.isSaved(station.stationuuid));
+  const isCustom = $derived(station.stationuuid.startsWith("custom-"));
 
   onMount(() => {
     void radioStore.ensureSavedLoaded();
@@ -69,4 +71,14 @@
       onClose();
     }}
   />
+  {#if isCustom}
+    <ContextMenuItem
+      icon={Pencil}
+      label={i18n.t("radio.editStationMenu")}
+      onclick={() => {
+        radioStore.editingStation = station;
+        onClose();
+      }}
+    />
+  {/if}
 </ContextMenu>

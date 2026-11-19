@@ -35,7 +35,8 @@
   import AutoPlaylistContextMenu from "./AutoPlaylistContextMenu.svelte";
   import DragGhost from "./DragGhost.svelte";
   import RadioStationCard from "./radio/RadioStationCard.svelte";
-  import RadioStationRow from "./radio/RadioStationRow.svelte";
+  import PinnedStationRowCard from "./radio/PinnedStationRowCard.svelte";
+  import AddStationModal from "./radio/AddStationModal.svelte";
   import { radioStore } from "../stores/radio.svelte";
   import {
     BroadcastIcon as Broadcast,
@@ -308,20 +309,16 @@
           {:else if item.type === "station"}
             <!-- Station cards own their context menu (play, save, pin) and stop it bubbling here. -->
             {#if rows}
-              <RadioStationRow
+              <PinnedStationRowCard
                 station={item.station}
-                saved={radioStore.isSaved(item.station.stationuuid)}
                 playing={radioStore.isPlayingStation(item.station.stationuuid)}
                 onPlay={(s) => void radioStore.playStation(s)}
-                onToggleSave={(s) => void radioStore.toggleSaveStation(s)}
               />
             {:else}
               <RadioStationCard
                 station={item.station}
-                saved={radioStore.isSaved(item.station.stationuuid)}
                 playing={radioStore.isPlayingStation(item.station.stationuuid)}
                 onPlay={(s) => void radioStore.playStation(s)}
-                onToggleSave={(s) => void radioStore.toggleSaveStation(s)}
               />
             {/if}
           {:else if rows}
@@ -441,4 +438,13 @@
       }}
     />
   {/if}
+{/if}
+
+{#if radioStore.editingStation}
+  <AddStationModal
+    station={radioStore.editingStation}
+    onClose={() => {
+      radioStore.editingStation = null;
+    }}
+  />
 {/if}
