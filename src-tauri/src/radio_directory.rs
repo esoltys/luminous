@@ -165,7 +165,7 @@ pub struct RadioDirectoryQuery {
     /// Minimum bitrate in kbps.
     pub min_bitrate: Option<i32>,
     /// When true (the default in the UI), excludes stations for which
-    /// `luminous_audio::can_play_stream(codec, hls)` is false (HLS).
+    /// `luminous_audio::can_play_stream(codec, hls)` is false.
     #[serde(default = "default_true")]
     pub hide_unsupported: bool,
     #[serde(default)]
@@ -777,10 +777,6 @@ fn build_where_clauses(
         bind_params.push(Box::new(min_br));
         let idx = bind_params.len();
         clauses.push(format!("bitrate >= ?{idx}"));
-    }
-
-    if query.hide_unsupported {
-        clauses.push("hls = 0".to_string());
     }
 
     (clauses, bind_params)
@@ -1558,14 +1554,14 @@ mod tests {
             .and(query_param("limit", "2"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
                 sample_station_json(
-                    "s-hls-us",
+                    "s-flv-us",
                     "chg-3",
-                    "Unsupported HLS Stream",
+                    "Unsupported FLV Stream",
                     "jazz,news",
                     "United States",
                     "US",
                     "english",
-                    "AAC+",
+                    "FLV",
                     64,
                     1,
                     900,
@@ -1601,7 +1597,7 @@ mod tests {
         let meta = load_meta(&conn).unwrap();
         assert_eq!(meta.last_change_uuid.as_deref(), Some("chg-2"));
 
-        // Playable filter hides HLS by default
+        // Playable filter hides the unsupported station by default
         let playable_jazz = query_stations(
             &conn,
             &RadioDirectoryQuery {
@@ -1614,7 +1610,7 @@ mod tests {
         assert_eq!(playable_jazz.len(), 1);
         assert_eq!(playable_jazz[0].stationuuid, "s-jazz-ca");
 
-        // Including unsupported returns the HLS station too, ordered by clickcount DESC
+        // Including unsupported returns the FLV station too, ordered by clickcount DESC
         let all_jazz = query_stations(
             &conn,
             &RadioDirectoryQuery {
@@ -1625,7 +1621,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(all_jazz.len(), 2);
-        assert_eq!(all_jazz[0].stationuuid, "s-hls-us");
+        assert_eq!(all_jazz[0].stationuuid, "s-flv-us");
 
         // FTS5 search matches prefix on name/tags/country
         let fts_results = query_stations(
@@ -2281,9 +2277,9 @@ mod tests {
                 country: "Germany".into(),
                 countrycode: "DE".into(),
                 language: "german".into(),
-                codec: "AAC".into(),
+                codec: "FLV".into(),
                 bitrate: 192,
-                hls: true, // HLS -> unsupported
+                hls: false, // FLV -> unsupported
                 votes: 10,
                 clickcount: 30,
                 lastcheckok: true,

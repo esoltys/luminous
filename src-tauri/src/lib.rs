@@ -35,6 +35,7 @@ pub mod files;
 pub mod filter_parser;
 pub mod genre_aliases;
 pub mod hierarchy_sidecar;
+pub mod hls;
 pub mod install_format;
 pub mod language;
 pub mod library_paths;

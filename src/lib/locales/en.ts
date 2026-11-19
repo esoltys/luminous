@@ -3205,7 +3205,7 @@ export const en = {
     saved: "Saved",
     unnamedStation: "Unnamed station",
     unsupportedBadge: "Unsupported",
-    unsupportedHint: "This stream uses HLS, which the audio engine cannot play yet.",
+    unsupportedHint: "This stream uses a format the audio engine cannot play yet.",
     reducedQualityBadge: "Reduced quality",
     reducedQualityHint:
       "This HE-AAC stream plays without its high frequencies, and some stations play in mono, because this system has no full HE-AAC decoder yet.",

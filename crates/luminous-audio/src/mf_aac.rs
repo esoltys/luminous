@@ -39,6 +39,9 @@ pub(crate) fn available() -> bool {
         Session::start()
             .and_then(|_session| {
                 // SAFETY: plain COM creation in the MTA the session holds open.
+                // The probe MFT is released inside the closure, while the
+                // session is still up: releasing it after MFShutdown and the
+                // MTA teardown crashes the process.
                 unsafe {
                     CoCreateInstance::<_, IMFTransform>(
                         &CLSID_MSAACDecMFT,
@@ -46,6 +49,7 @@ pub(crate) fn available() -> bool {
                         CLSCTX_INPROC_SERVER,
                     )
                 }
+                .map(drop)
             })
             .is_ok()
     });
