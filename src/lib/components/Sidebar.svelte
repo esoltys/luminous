@@ -34,7 +34,12 @@
     LightningSlashIcon as LightningSlash,
   } from "phosphor-svelte";
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
-  import { SIDEBAR_SECTION_LABEL_CLASS, sidebarSubItemClass } from "../utils/sidebarNav";
+  import {
+    SIDEBAR_CAPTION_TEXT_CLASS,
+    SIDEBAR_NAV_TEXT_CLASS,
+    SIDEBAR_SECTION_LABEL_CLASS,
+    sidebarSubItemClass,
+  } from "../utils/sidebarNav";
 
   let { width = 256, resizing = false }: { width?: number; resizing?: boolean } = $props();
 
@@ -150,7 +155,7 @@
       ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20'
       : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
       ? 'justify-center w-10 h-10 rounded-xl p-0'
-      : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+      : `w-full px-3 py-1.5 rounded-lg ${SIDEBAR_NAV_TEXT_CLASS}`}"
     title={opts.updateBadge
       ? `${label} (${i18n.t("settings.updateAvailable", {}, "Update available")})`
       : label}
@@ -368,7 +373,7 @@
                   !navigationStore.selectedAutoPlaylist,
               )} {dragExpandedCustom ||
               (songDrag.isDragging && songDrag.dropTarget?.kind === 'custom-category')
-                ? 'ring-2 ring-brand-accent/60 bg-brand-accent/20 text-brand-text-primary font-semibold'
+                ? 'ring-2 ring-brand-accent/60 bg-brand-accent/20 text-brand-text-primary'
                 : ''}"
             >
               <div class="flex items-center gap-2 truncate">
@@ -390,10 +395,10 @@
                     data-drop-target="playlist"
                     data-playlist-id={pl.id}
                     data-playlist-name={pl.name}
-                    class="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] truncate transition-colors {songDrag.isDragging &&
+                    class="w-full flex items-center justify-between px-2 py-1 rounded-md {SIDEBAR_CAPTION_TEXT_CLASS} truncate transition-colors {songDrag.isDragging &&
                     songDrag.dropTarget?.kind === 'playlist' &&
                     songDrag.dropTarget.id === pl.id
-                      ? 'bg-brand-accent/30 text-brand-text-primary ring-2 ring-brand-accent font-semibold'
+                      ? 'bg-brand-accent/30 text-brand-text-primary ring-2 ring-brand-accent'
                       : 'text-brand-text-secondary hover:bg-brand-accent/15'}"
                     onclick={() => navigationStore.viewPlaylist(pl.id)}
                   >
@@ -442,7 +447,7 @@
             ? 'bg-brand-accent/20 text-brand-accent-text'
             : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed
             ? 'justify-center w-10 h-10 rounded-xl p-0'
-            : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+            : `w-full px-3 py-1.5 rounded-lg ${SIDEBAR_NAV_TEXT_CLASS}`}"
           title={`${i18n.t("sidebar.connected", {}, "Connected")}${pausedLabel ? ` – ${pausedLabel}` : ""}`}
         >
           <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">
@@ -460,9 +465,7 @@
             </div>
           </div>
           {#if !layoutCollapsed}
-            <span
-              class="truncate text-xs font-semibold text-brand-text-primary text-left flex-1 min-w-0"
-            >
+            <span class="truncate text-left flex-1 min-w-0">
               {i18n.t("sidebar.connected", {}, "Connected")}
             </span>
           {/if}
@@ -474,7 +477,7 @@
           }}
           class="flex items-center gap-3 transition-colors duration-150 text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover {layoutCollapsed
             ? 'justify-center w-10 h-10 rounded-xl p-0'
-            : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+            : `w-full px-3 py-1.5 rounded-lg ${SIDEBAR_NAV_TEXT_CLASS}`}"
           title={i18n.t("sidebar.connectIntegrations", {}, "Connect...")}
         >
           <div class="shrink-0 flex items-center justify-center {layoutCollapsed ? '' : 'w-7 h-7'}">

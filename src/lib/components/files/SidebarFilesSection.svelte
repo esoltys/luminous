@@ -13,6 +13,8 @@
   import { collectionStore } from "../../stores/collection.svelte";
   import { i18n, formatNumber } from "../../stores/i18n.svelte";
   import {
+    SIDEBAR_CAPTION_TEXT_CLASS,
+    SIDEBAR_NAV_TEXT_CLASS,
     SIDEBAR_ROW_IDLE_CLASS,
     SIDEBAR_ROW_SELECTED_CLASS,
     SIDEBAR_SECTION_LABEL_CLASS,
@@ -112,7 +114,7 @@
       {#if filesStore.loaded && filesStore.sources.length === 0}
         <button
           onclick={addMusicFolder}
-          class="w-full flex items-center gap-2 {SIDEBAR_SUB_ITEM_INDENT_CLASS} pr-2.5 py-1 rounded-md text-xs font-semibold text-brand-accent-text hover:bg-brand-accent/10 transition-colors"
+          class="w-full flex items-center gap-2 {SIDEBAR_SUB_ITEM_INDENT_CLASS} pr-2.5 py-1 rounded-md {SIDEBAR_NAV_TEXT_CLASS} text-brand-accent-text hover:bg-brand-accent/10 transition-colors"
         >
           <PlusIcon class="w-3.5 h-3.5" />
           <span class="truncate">{i18n.t("files.addMusicFolder")}</span>
@@ -149,12 +151,12 @@
             data-drop-target="device"
             data-device-id={device.id}
             data-device-name={name}
-            class="flex-1 min-w-0 flex items-start gap-2 {SIDEBAR_SUB_ITEM_INDENT_CLASS} pr-2.5 py-1.5 rounded-md text-xs text-left transition-colors {open
+            class="flex-1 min-w-0 flex items-start gap-2 {SIDEBAR_SUB_ITEM_INDENT_CLASS} pr-2.5 py-1.5 rounded-md {SIDEBAR_NAV_TEXT_CLASS} text-left transition-colors {open
               ? SIDEBAR_ROW_SELECTED_CLASS
               : SIDEBAR_ROW_IDLE_CLASS} {songDrag.isDragging &&
             songDrag.dropTarget?.kind === 'device' &&
             songDrag.dropTarget.id === device.id
-              ? 'bg-brand-accent/30 ring-2 ring-brand-accent text-brand-text-primary font-semibold'
+              ? 'bg-brand-accent/30 ring-2 ring-brand-accent text-brand-text-primary'
               : ''}"
           >
             <Icon class="w-3.5 h-3.5 shrink-0 mt-px" />
@@ -176,7 +178,7 @@
                 ></span>
               </span>
               <span
-                class="text-[10px] font-normal truncate {open
+                class="{SIDEBAR_CAPTION_TEXT_CLASS} truncate {open
                   ? 'text-brand-accent-contrast/80'
                   : fraction === null
                     ? 'text-brand-text-secondary/80'
