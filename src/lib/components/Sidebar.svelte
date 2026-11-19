@@ -38,6 +38,7 @@
   import {
     SIDEBAR_CAPTION_TEXT_CLASS,
     SIDEBAR_SECTION_LABEL_CLASS,
+    SIDEBAR_SUB_TREE_CLASS,
     sidebarSubItemClass,
     sidebarTopItemLayoutClass,
   } from "../utils/sidebarNav";
@@ -241,7 +242,7 @@
         {/if}
 
         {#if subItemsVisible}
-          <div class="w-full py-0.5 space-y-0">
+          <div class={SIDEBAR_SUB_TREE_CLASS}>
             <button
               onclick={() => {
                 navigationStore.activeTab = "collection";
@@ -346,7 +347,7 @@
         {/if}
 
         {#if subItemsVisible}
-          <div class="w-full py-0.5 space-y-0">
+          <div class={SIDEBAR_SUB_TREE_CLASS}>
             <button
               onclick={() => openPlaylistsSubTab("auto")}
               class={sidebarSubItemClass(
@@ -423,24 +424,23 @@
       {@render navButton("organize", i18n.t("sidebar.organize"), Broom)}
       {@render navButton("stats", i18n.t("sidebar.stats"), BarChart2)}
     {/if}
-  </nav>
 
-  <!-- Fixed footer: the entries that never change stay visible however many pins or file
-       sources push the nav above into scrolling. The Connect row hides while Offline (#1398);
-       Settings and Help do not. -->
-  <div
-    data-testid="sidebar-footer"
-    class="{layoutCollapsed
-      ? 'p-2'
-      : 'px-4 py-2'} border-t border-brand-border/40 w-full flex flex-col items-center space-y-0.5"
-  >
     {@render navButton("settings", i18n.t("sidebar.settings"), Settings, {
       walkthroughTarget: "library-folders",
       updateBadge: showUpdateBadge,
     })}
     {@render navButton("help", i18n.t("sidebar.help"), HelpCircle)}
+  </nav>
 
-    {#if prefs.onlineEnabled}
+  <!-- Fixed footer: holds the Connected / Connect... integrations entry while online (#1398);
+       Settings and Help scroll with the rest of the nav above. -->
+  {#if prefs.onlineEnabled}
+    <div
+      data-testid="sidebar-footer"
+      class="{layoutCollapsed
+        ? 'p-2'
+        : 'px-4 py-2'} border-t border-brand-border/40 w-full flex flex-col items-center space-y-0.5"
+    >
       {#if isConnected}
         <button
           bind:this={profileButtonEl}
@@ -494,10 +494,8 @@
           {/if}
         </button>
       {/if}
-    {/if}
-  </div>
+    </div>
 
-  {#if prefs.onlineEnabled}
     <MusicBrainzProfilePopover
       isOpen={showProfilePopover}
       anchorEl={profileButtonEl}
@@ -512,8 +510,8 @@
 <style>
   /* Horizontal centre of the expanded nav icons, measured from the content edge
      inside the sidebar's p-4: nav button px-3 (12) + half the w-7 icon slot
-     (14). The footer's logo slot uses the same padding, and the sub-item rows
-     start their 14px icons at axis - 7px so they share this line, so change
+     (14). The footer's logo slot uses the same padding, and the sub-item rails
+     are centred on this line (margin = axis - half the 2px border), so change
      this value together with those paddings. */
   aside {
     --sidebar-icon-axis: 26px;

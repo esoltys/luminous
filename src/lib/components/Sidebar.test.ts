@@ -191,25 +191,25 @@ describe("Sidebar.svelte", () => {
     });
   });
 
-  // Settings and Help live in a fixed footer so pins and file sources can never scroll
-  // them out of view (#2040).
-  describe("fixed footer (#2040)", () => {
+  // Settings and Help scroll with the rest of <nav>; the fixed footer holds only the
+  // online integrations button while online.
+  describe("scrolling nav & footer", () => {
     afterEach(() => {
       prefs.onlineEnabled = true;
       updaterStore.updateAvailable = false;
     });
 
     it.each([256, 64])(
-      "renders Settings and Help outside the scrolling nav at width %i",
+      "renders Settings and Help inside the scrolling nav at width %i",
       (width) => {
         const { container, getByTitle } = render(Sidebar, { props: { width } });
         const nav = container.querySelector("nav")!;
         expect(nav).toHaveClass("overflow-y-auto");
         for (const title of ["Settings", "Help"]) {
           const btn = getByTitle(title);
-          expect(nav.contains(btn)).toBe(false);
+          expect(nav.contains(btn)).toBe(true);
           expect(container.querySelector('[data-testid="sidebar-footer"]')!.contains(btn)).toBe(
-            true,
+            false,
           );
         }
       },
@@ -220,12 +220,25 @@ describe("Sidebar.svelte", () => {
       expect(container.querySelector("nav")!.contains(getByTitle("Stats"))).toBe(true);
     });
 
-    it("still shows Settings and Help while Offline, without the Connect row", () => {
+    it("still shows Settings and Help while Offline, and omits the footer without Connect", () => {
       prefs.onlineEnabled = false;
-      const { getByTitle, queryByTitle } = render(Sidebar, { props: { width: 256 } });
+      const { container, getByTitle, queryByTitle } = render(Sidebar, { props: { width: 256 } });
       expect(getByTitle("Settings")).toBeInTheDocument();
       expect(getByTitle("Help")).toBeInTheDocument();
       expect(queryByTitle("Connect...")).toBeNull();
+      expect(container.querySelector('[data-testid="sidebar-footer"]')).toBeNull();
+    });
+
+    it("indents Library, Playlists, and Files sub-items with a vertical margin line", () => {
+      filesStore.loaded = true;
+      filesStore.sources = [
+        { source: { kind: "folder", id: 1 }, name: "Music", songCount: 10, available: true },
+      ];
+      const { getByRole } = render(Sidebar, { props: { width: 256 } });
+      for (const name of [/artists/i, /auto/i, "Music"]) {
+        const tree = getByRole("button", { name }).parentElement!;
+        expect(tree).toHaveClass("border-l-2");
+      }
     });
 
     it("keeps the walkthrough target on Settings and switches tabs on click", async () => {
