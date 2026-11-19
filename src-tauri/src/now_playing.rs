@@ -27,7 +27,9 @@ const SEPARATORS: [&str; 3] = [" - ", " – ", " — "];
 /// that names no track: empty or punctuation-only lines, and a title that just
 /// repeats the station's own name (many stations send it between songs).
 pub fn parse_stream_title(raw: &str, station_name: Option<&str>) -> Option<StationNowPlaying> {
-    let text = raw.trim();
+    // A dash at either edge is a separator with one side missing
+    // (" - Title", "Artist - "): drop it with the padding.
+    let text = raw.trim_matches(|c: char| c.is_whitespace() || matches!(c, '-' | '–' | '—'));
     if !has_words(text) {
         return None;
     }
