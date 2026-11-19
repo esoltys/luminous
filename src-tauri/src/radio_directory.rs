@@ -733,7 +733,7 @@ pub fn query_stations(
         if !clean_cc.is_empty() {
             bind_params.push(Box::new(clean_cc));
             let idx = bind_params.len();
-            clauses.push(format!("countrycode = ?{idx}"));
+            clauses.push(format!("(countrycode = ?{idx} OR UPPER(country) = ?{idx})"));
         }
     }
 
@@ -1244,16 +1244,14 @@ pub fn list_recent_stations(
     collect_joined_stations(rows, hide_unsupported)
 }
 
-/// Returns IDs of user playlists that contain at least one `RadioBrowser` station (#2005).
+/// Returns IDs of playlists that contain at least one `RadioBrowser` station (#2005).
 pub fn list_radio_playlist_ids(conn: &Connection) -> Result<Vec<i64>> {
     let mut stmt = conn.prepare(
-        "SELECT DISTINCT p.id
-         FROM playlists p
-         JOIN playlist_items pi ON pi.playlist_id = p.id
+        "SELECT DISTINCT pi.playlist_id
+         FROM playlist_items pi
          JOIN songs s ON s.id = pi.song_id
-         WHERE p.is_queue = 0
-           AND s.source = ?1
-         ORDER BY p.id ASC",
+         WHERE s.source = ?1
+         ORDER BY pi.playlist_id ASC",
     )?;
     let ids = stmt
         .query_map(params![crate::models::SongSource::RADIO_BROWSER_ID], |r| {
@@ -1972,6 +1970,25 @@ mod tests {
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0].stationuuid, "uuid-a");
 
+        // Country facet -> query_stations round-trip
+        let facets = compute_local_facets(&conn, true, 50).unwrap();
+        let canada = facets
+            .countries
+            .iter()
+            .find(|c| c.name == "Canada")
+            .unwrap();
+        assert_eq!(canada.code.as_deref(), Some("CA"));
+        let ca_stations = query_stations(
+            &conn,
+            &RadioDirectoryQuery {
+                countrycode: canada.code.clone(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(ca_stations.len(), 1);
+        assert_eq!(ca_stations[0].stationuuid, "uuid-a");
+
         // Prune uuid-a from radio_directory; saved + materialize still resolve via songs fallback,
         // and GC keeps uuid-a because it is saved.
         conn.execute(
@@ -1993,5 +2010,9 @@ mod tests {
         unsave_station(&conn, "uuid-a").unwrap();
         unsave_station(&conn, "uuid-b").unwrap();
         assert!(list_saved_stations(&conn, false).unwrap().is_empty());
+
+        // list_radio_playlist_ids executes cleanly against the real playlists schema.
+        let pl_ids = list_radio_playlist_ids(&conn).unwrap();
+        assert!(pl_ids.is_empty());
     }
 }
