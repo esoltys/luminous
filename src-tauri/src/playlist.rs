@@ -17,7 +17,9 @@ mod snapshot;
 mod sort;
 pub mod tempo_buckets;
 
-pub use dynamic::{reconcile_and_sync, reconcile_each_day, DynamicPlaylistDelta};
+pub use dynamic::{
+    reconcile_and_sync, reconcile_each_day, DynamicPlaylistDelta, RadioStationListSpec,
+};
 pub use size_limit::{fit_to_limit, PlaylistSizeFit, SizeFit, SizeLimitInput};
 
 /// SQLite treats a negative `LIMIT` as "no limit" — used when populating an

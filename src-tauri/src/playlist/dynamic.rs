@@ -20,6 +20,182 @@ use uuid::Uuid;
 /// "shuffle across the library" sample rather than every song at once.
 const DAYPART_RANDOM_FILL_LIMIT: i64 = 200;
 
+/// Default and maximum station count for a `radio:` station list (#2006).
+pub const DEFAULT_RADIO_LIST_LIMIT: usize = 100;
+const MAX_RADIO_LIST_LIMIT: usize = 500;
+
+/// Structured representation of a dynamic radio station list spec
+/// (`radio:tag=jazz,folk metal;country=CA;lang=english;minbitrate=96;order=clickcount;limit=100`).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RadioStationListSpec {
+    #[serde(default)]
+    pub tags: Vec<String>,
+    pub country: Option<String>,
+    pub lang: Option<String>,
+    pub min_bitrate: Option<i32>,
+    #[serde(default)]
+    pub order: crate::radio_directory::RadioDirectoryOrder,
+    #[serde(default = "default_radio_list_limit")]
+    pub limit: usize,
+}
+
+fn default_radio_list_limit() -> usize {
+    DEFAULT_RADIO_LIST_LIMIT
+}
+
+impl Default for RadioStationListSpec {
+    fn default() -> Self {
+        Self {
+            tags: Vec::new(),
+            country: None,
+            lang: None,
+            min_bitrate: None,
+            order: crate::radio_directory::RadioDirectoryOrder::Clickcount,
+            limit: DEFAULT_RADIO_LIST_LIMIT,
+        }
+    }
+}
+
+impl RadioStationListSpec {
+    /// Parses a `radio:...` dynamic spec string. Returns `None` if `spec` does
+    /// not start with the `radio:` prefix.
+    pub fn parse(spec: &str) -> Option<Self> {
+        let body = spec.trim().strip_prefix("radio:")?;
+        let mut parsed = Self::default();
+        for part in body.split(';') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            let Some((raw_key, raw_val)) = part.split_once('=') else {
+                continue;
+            };
+            let key = raw_key.trim().to_ascii_lowercase();
+            let val = raw_val.trim();
+            match key.as_str() {
+                "tag" | "tags" => {
+                    let mut seen = std::collections::HashSet::new();
+                    parsed.tags = val
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|t| !t.is_empty() && seen.insert(t.to_lowercase()))
+                        .map(ToString::to_string)
+                        .collect();
+                }
+                "country" | "countrycode" => {
+                    let upper = val.to_ascii_uppercase();
+                    parsed.country = (!upper.is_empty()).then_some(upper);
+                }
+                "lang" | "language" => {
+                    let lower = val.to_lowercase();
+                    parsed.lang = (!lower.is_empty()).then_some(lower);
+                }
+                "minbitrate" | "min_bitrate" => {
+                    parsed.min_bitrate = val.parse::<i32>().ok().filter(|&b| b > 0);
+                }
+                "order" => {
+                    use crate::radio_directory::RadioDirectoryOrder;
+                    parsed.order = match val.to_ascii_lowercase().as_str() {
+                        "votes" => RadioDirectoryOrder::Votes,
+                        "name" => RadioDirectoryOrder::Name,
+                        "bitrate" => RadioDirectoryOrder::Bitrate,
+                        _ => RadioDirectoryOrder::Clickcount,
+                    };
+                }
+                "limit" => {
+                    if let Ok(n) = val.parse::<usize>() {
+                        parsed.limit = n.clamp(1, MAX_RADIO_LIST_LIMIT);
+                    }
+                }
+                _ => {}
+            }
+        }
+        Some(parsed)
+    }
+
+    /// Formats this spec into its canonical `radio:...` string.
+    pub fn to_spec_string(&self) -> String {
+        use crate::radio_directory::RadioDirectoryOrder;
+        let mut parts = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let clean_tags: Vec<&str> = self
+            .tags
+            .iter()
+            .map(|t| t.trim())
+            .filter(|t| !t.is_empty() && seen.insert(t.to_lowercase()))
+            .collect();
+        if !clean_tags.is_empty() {
+            parts.push(format!("tag={}", clean_tags.join(",")));
+        }
+        if let Some(ref cc) = self.country {
+            let clean = cc.trim().to_ascii_uppercase();
+            if !clean.is_empty() {
+                parts.push(format!("country={clean}"));
+            }
+        }
+        if let Some(ref lang) = self.lang {
+            let clean = lang.trim().to_lowercase();
+            if !clean.is_empty() {
+                parts.push(format!("lang={clean}"));
+            }
+        }
+        if let Some(br) = self.min_bitrate.filter(|&b| b > 0) {
+            parts.push(format!("minbitrate={br}"));
+        }
+        let order_str = match self.order {
+            RadioDirectoryOrder::Votes => "votes",
+            RadioDirectoryOrder::Name => "name",
+            RadioDirectoryOrder::Bitrate => "bitrate",
+            RadioDirectoryOrder::Clickcount | RadioDirectoryOrder::Relevance => "clickcount",
+        };
+        parts.push(format!("order={order_str}"));
+        parts.push(format!(
+            "limit={}",
+            self.limit.clamp(1, MAX_RADIO_LIST_LIMIT)
+        ));
+        format!("radio:{}", parts.join(";"))
+    }
+}
+
+/// Resolves a `radio:` station list spec against `radio_directory` (expanding
+/// followed tags through `GenreAliases::members_of`) and materializes matched
+/// stations as `songs` rows (#2006).
+fn resolve_radio_spec(db: &Arc<Database>, spec: &RadioStationListSpec) -> Result<Vec<Song>> {
+    let conn = db.pool.get()?;
+    let aliases = crate::genre_aliases::GenreAliases::load(&conn)?;
+    let mut expanded_tags = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for tag in &spec.tags {
+        for member in aliases.members_of(tag) {
+            if !member.is_empty() && seen.insert(member.clone()) {
+                expanded_tags.push(member);
+            }
+        }
+    }
+
+    let query = crate::radio_directory::RadioDirectoryQuery {
+        tags: expanded_tags,
+        countrycode: spec.country.clone(),
+        language: spec.lang.clone(),
+        min_bitrate: spec.min_bitrate,
+        hide_unsupported: true,
+        order_by: spec.order,
+        offset: 0,
+        limit: spec.limit.clamp(1, MAX_RADIO_LIST_LIMIT),
+        ..Default::default()
+    };
+    let stations = crate::radio_directory::query_stations(&conn, &query)?;
+    let mut songs = Vec::with_capacity(stations.len());
+    for station in stations {
+        songs.push(crate::radio_directory::materialize_station(
+            &conn,
+            &station.stationuuid,
+        )?);
+    }
+    Ok(songs)
+}
+
 /// What a reconcile pass changed in one dynamic playlist.
 #[derive(Debug)]
 pub struct DynamicPlaylistDelta {
@@ -232,6 +408,9 @@ fn spec_songs(
             random_sample: false,
         })
     };
+    if let Some(radio_spec) = RadioStationListSpec::parse(spec) {
+        return matched(resolve_radio_spec(db, &radio_spec)?);
+    }
     let random_fill = |scanner: &CollectionScanner| {
         // Unlike a genre match (naturally bounded by how many songs carry
         // that genre), "random songs from anywhere" has no natural size —
@@ -1176,6 +1355,108 @@ mod tests {
         assert_eq!(
             lang_tracks[0].song.as_ref().unwrap().title.as_deref(),
             Some("High")
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn radio_station_list_spec_round_trip() {
+        let spec = RadioStationListSpec {
+            tags: vec!["Folk Metal".to_string(), "Jazz".to_string()],
+            country: Some("CA".to_string()),
+            lang: Some("english".to_string()),
+            min_bitrate: Some(96),
+            order: crate::radio_directory::RadioDirectoryOrder::Votes,
+            limit: 50,
+        };
+        let encoded = spec.to_spec_string();
+        assert_eq!(
+            encoded,
+            "radio:tag=Folk Metal,Jazz;country=CA;lang=english;minbitrate=96;order=votes;limit=50"
+        );
+        let decoded = RadioStationListSpec::parse(&encoded).expect("should parse radio: spec");
+        assert_eq!(decoded, spec);
+
+        assert!(RadioStationListSpec::parse("genre:rock").is_none());
+        let empty = RadioStationListSpec::parse("radio:").expect("empty radio: spec is valid");
+        assert_eq!(empty, RadioStationListSpec::default());
+    }
+
+    #[test]
+    fn radio_station_list_reconcile_adds_and_evicts_preserving_survivor_order() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let mut conn = db_arc.pool.get().unwrap();
+            crate::genre_aliases::set_alias(&mut conn, "pagan metal", "Folk Metal").unwrap();
+            conn.execute(
+                "INSERT INTO radio_directory
+                 (stationuuid, name, url_resolved, tags, country, countrycode, language, codec, bitrate, hls, votes, clickcount, lastcheckok, updated_at)
+                 VALUES
+                 ('uuid-1', 'Survivor FM', 'http://stream.test/1', 'pagan metal,metal', 'Canada', 'CA', 'english', 'MP3', 128, 0, 10, 500, 1, 1000),
+                 ('uuid-2', 'Evicted FM', 'http://stream.test/2', 'folk metal', 'Canada', 'CA', 'english', 'MP3', 128, 0, 5, 200, 1, 1000)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Folk Metal CA").unwrap();
+        manager
+            .set_playlist_dynamic_spec(
+                pl.id,
+                "radio:tag=Folk Metal;country=CA;minbitrate=96;order=clickcount;limit=100",
+            )
+            .unwrap();
+
+        let initial_tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(initial_tracks.len(), 2);
+        let survivor_uuid = initial_tracks[0].uuid.clone();
+        assert_eq!(
+            initial_tracks[0].song.as_ref().unwrap().path.as_deref(),
+            Some("radio://uuid-1")
+        );
+        assert_eq!(
+            initial_tracks[1].song.as_ref().unwrap().path.as_deref(),
+            Some("radio://uuid-2")
+        );
+
+        // Directory syncs: uuid-2 goes offline (lastcheckok = 0), uuid-3 appears.
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "UPDATE radio_directory SET lastcheckok = 0 WHERE stationuuid = 'uuid-2'",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO radio_directory
+                 (stationuuid, name, url_resolved, tags, country, countrycode, language, codec, bitrate, hls, votes, clickcount, lastcheckok, updated_at)
+                 VALUES
+                 ('uuid-3', 'Newcomer FM', 'http://stream.test/3', 'folk metal', 'Canada', 'CA', 'english', 'OGG', 192, 0, 20, 900, 1, 2000)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let matches = match_dynamic_playlists(&db_arc).unwrap();
+        let deltas = manager.apply_dynamic_matches(matches).unwrap();
+        assert_eq!(deltas.len(), 1);
+        assert_eq!(deltas[0].removed_uuids.len(), 1);
+        assert_eq!(deltas[0].added.len(), 1);
+
+        let updated_tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(updated_tracks.len(), 2);
+        // Survivor stays first with its original row UUID; newcomer is appended.
+        assert_eq!(updated_tracks[0].uuid, survivor_uuid);
+        assert_eq!(
+            updated_tracks[0].song.as_ref().unwrap().path.as_deref(),
+            Some("radio://uuid-1")
+        );
+        assert_eq!(
+            updated_tracks[1].song.as_ref().unwrap().path.as_deref(),
+            Some("radio://uuid-3")
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);

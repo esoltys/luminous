@@ -3992,4 +3992,72 @@ mod tests {
         assert!(!player.note_stream_title(3, "Some - Thing"));
         assert_eq!(announced(&player), None);
     }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn live_station_list_failure_hands_over_to_next_station() {
+        let (_dir, db) = setup_test_db();
+        let db = Arc::new(db);
+
+        let (id1, id2) = {
+            let conn = db.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (source, filetype, path, stream_url, title)
+                 VALUES (?1, ?2, 'radio://station-1', 'http://127.0.0.1:9/dead', 'Dead Station')",
+                rusqlite::params![
+                    crate::models::SongSource::RADIO_BROWSER_ID,
+                    crate::models::FileType::Stream as i32
+                ],
+            )
+            .unwrap();
+            let id1 = conn.last_insert_rowid();
+            conn.execute(
+                "INSERT INTO songs (source, filetype, path, stream_url, title)
+                 VALUES (?1, ?2, 'radio://station-2', 'http://127.0.0.1:9/backup', 'Backup Station')",
+                rusqlite::params![
+                    crate::models::SongSource::RADIO_BROWSER_ID,
+                    crate::models::FileType::Stream as i32
+                ],
+            )
+            .unwrap();
+            let id2 = conn.last_insert_rowid();
+            (id1, id2)
+        };
+
+        let s1 = Song {
+            id: id1,
+            source: crate::models::SongSource::RadioBrowser,
+            filetype: crate::models::FileType::Stream,
+            path: Some("radio://station-1".to_string()),
+            title: Some("Dead Station".to_string()),
+            ..Song::default()
+        };
+        let s2 = Song {
+            id: id2,
+            source: crate::models::SongSource::RadioBrowser,
+            filetype: crate::models::FileType::Stream,
+            path: Some("radio://station-2".to_string()),
+            title: Some("Backup Station".to_string()),
+            ..Song::default()
+        };
+
+        let audio = Arc::new(tokio::sync::Mutex::new(crate::audio::AudioEngine::new()));
+        let mut player = Player::new(db.clone(), audio.clone());
+        player.playlist_items = vec![
+            crate::models::PlaylistItem::new_song(42, 0, s1.clone()),
+            crate::models::PlaylistItem::new_song(42, 1, s2),
+        ];
+        player.current_playlist_id = Some(42);
+        player.current_index = Some(0);
+        player.current_song = Some(s1);
+
+        let outcome = player.note_playback_error();
+        assert!(!outcome.should_stop);
+        assert!(!outcome.flagged_unavailable);
+        assert_eq!(outcome.failed_song.as_ref().map(|s| s.id), Some(id1));
+
+        // Handover advances to the next station in the list (even if stream open fails offline, index advances).
+        let _ = player.next_track().await;
+        assert_eq!(player.current_index, Some(1));
+        assert_eq!(player.current_song.as_ref().map(|s| s.id), Some(id2));
+    }
 }

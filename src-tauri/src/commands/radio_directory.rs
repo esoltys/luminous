@@ -1,5 +1,7 @@
 //! Tauri IPC commands for the local Radio Browser station directory mirror (#2003).
 
+use crate::models::Playlist;
+use crate::playlist::RadioStationListSpec;
 use crate::radio_directory::{
     self, RadioDirectoryFacets, RadioDirectoryQuery, RadioDirectoryStation, RadioDirectoryStatus,
     RadioDirectorySyncStats, RADIO_BROWSER_SCHEDULER_ID, RADIO_BROWSER_SYNC_INTERVAL_MINUTES,
@@ -7,7 +9,7 @@ use crate::radio_directory::{
 };
 use crate::remote_scheduler::{RemoteKind, SyncGuard};
 use crate::AppState;
-use luminous_remote::radiobrowser::RadioBrowserClient;
+use luminous_remote::radiobrowser::{RadioBrowserClient, RadioBrowserFacetEntry};
 use std::sync::Arc;
 use tauri::{AppHandle, State};
 
@@ -265,4 +267,84 @@ pub async fn play_radio_station(
     });
 
     Ok(song)
+}
+
+/// Canonicalized radio directory tag counts plus library-backed genre suggestions (#2006).
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RadioStationListTags {
+    pub tags: Vec<RadioBrowserFacetEntry>,
+    pub suggested_from_library: Vec<RadioBrowserFacetEntry>,
+}
+
+/// Returns canonicalized radio directory tag counts (via `GenreAliases::canonical_genres`)
+/// and suggested genres from the user's most-played library tracks (#2006).
+#[tauri::command]
+pub async fn get_radio_station_list_tags(
+    hide_unsupported: Option<bool>,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<RadioStationListTags, String> {
+    let hide_unsupported = hide_unsupported.unwrap_or(true);
+    let limit = limit.unwrap_or(200);
+    crate::db::run_blocking(&state.db, move |conn| {
+        let aliases = crate::genre_aliases::GenreAliases::load(conn)?;
+        let tags =
+            radio_directory::get_canonical_radio_tags(conn, &aliases, hide_unsupported, limit)?;
+        let suggested_from_library = radio_directory::suggest_radio_genres_from_library(
+            conn,
+            &aliases,
+            hide_unsupported,
+            12,
+        )?;
+        Ok(RadioStationListTags {
+            tags,
+            suggested_from_library,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Creates a new dynamic station list (`playlists` row with `dynamic_enabled = 1`
+/// and a `radio:` spec) and populates it immediately (#2006).
+#[tauri::command]
+pub async fn create_radio_station_list(
+    name: String,
+    spec: RadioStationListSpec,
+    state: State<'_, AppState>,
+) -> Result<Playlist, String> {
+    let spec_str = spec.to_spec_string();
+    crate::playlist::with_playlists(&state.playlists, move |pm| {
+        let created = pm.create_playlist(&name)?;
+        pm.set_playlist_dynamic_spec(created.id, &spec_str)?;
+        pm.get_playlists()?
+            .into_iter()
+            .find(|p| p.id == created.id)
+            .ok_or_else(|| anyhow::anyhow!("Created station list {} missing", created.id))
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Updates an existing dynamic station list's name and `radio:` spec, and
+/// repopulates it immediately (#2006).
+#[tauri::command]
+pub async fn update_radio_station_list(
+    playlist_id: i64,
+    name: String,
+    spec: RadioStationListSpec,
+    state: State<'_, AppState>,
+) -> Result<Playlist, String> {
+    let spec_str = spec.to_spec_string();
+    crate::playlist::with_playlists(&state.playlists, move |pm| {
+        pm.rename_playlist(playlist_id, &name)?;
+        pm.set_playlist_dynamic_spec(playlist_id, &spec_str)?;
+        pm.get_playlists()?
+            .into_iter()
+            .find(|p| p.id == playlist_id)
+            .ok_or_else(|| anyhow::anyhow!("Station list {playlist_id} not found"))
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
