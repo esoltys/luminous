@@ -59,9 +59,15 @@ Both are gated by one-off flags in the `app_state` table of your dev database (`
 sqlite3 <path-to-luminous.db> "DELETE FROM app_state WHERE key IN ('welcome_seen', 'walkthrough_completed');"
 ```
 
-The db lives at `%APPDATA%\org.luminous.music\luminous.db` on Windows,
+The db lives at `%APPDATA%\39231EricJamesSoltys.LuminousMusicPlayer\luminous.db` on Windows,
 `~/.local/share/org.luminous.music/luminous.db` on Linux (respects `LUMINOUS_DATA_DIR` if set —
 see `src-tauri/src/paths.rs`).
+
+> [!WARNING]
+> On Windows, `tauri.windows.conf.json` gives dev runs the Store package identifier, so a plain
+> `bun run tauri dev` opens the **installed app's real library** and applies any new migrations to
+> it, leaving its schema ahead of the released app. Agents and scripted checks must always set
+> `LUMINOUS_DATA_DIR` (and `WEBVIEW2_USER_DATA_FOLDER`) to a throwaway profile, as below.
 
 ## Testing clean / new app installs (`LUMINOUS_DATA_DIR`)
 
