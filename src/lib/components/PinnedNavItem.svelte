@@ -7,7 +7,7 @@
   import { resolveArtistPortraitUrl, getArtistCoverStack } from "../utils/covers";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
   import { SIDEBAR_CAPTION_TEXT_CLASS, SIDEBAR_NAV_TEXT_CLASS } from "../utils/sidebarNav";
-  import type { ExtendedArtworkResponse } from "../types";
+  import { resolveArtUrl, type ExtendedArtworkResponse } from "../types";
 
   interface Props {
     pin: NavigablePin;
@@ -68,6 +68,16 @@
     const albums = getArtistAlbums(collectionStore.albums, pin.artist.name);
     const songs = getArtistSongs(collectionStore.songs, pin.artist.name);
     return getArtistCoverStack(albums, songs, 1)[0] ?? null;
+  });
+
+  // Station favicons are remote and often broken; fall back to the icon on error.
+  const stationArtUrl = $derived(
+    pin.type === "station" ? resolveArtUrl(pin.station?.favicon ?? "") : null,
+  );
+  let stationArtFailed = $state(false);
+  $effect(() => {
+    void stationArtUrl;
+    stationArtFailed = false;
   });
 
   const IconComponent = $derived(pin.icon);
@@ -147,6 +157,15 @@
             : "w-3.5 h-3.5 text-brand-text-secondary"}
         />
       {/if}
+    {:else if stationArtUrl && !stationArtFailed}
+      <img
+        src={stationArtUrl}
+        alt=""
+        class="w-full h-full object-cover"
+        onerror={() => {
+          stationArtFailed = true;
+        }}
+      />
     {:else if autoKind}
       <PlaylistKindIcon kind={autoKind} sizeClass={collapsed ? "w-4 h-4" : "w-3.5 h-3.5"} />
     {:else}

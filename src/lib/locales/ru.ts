@@ -3441,6 +3441,7 @@ export const ru = {
     stationListsTitle: "Списки станций",
     openList: "Открыть",
     playStation: "Воспроизвести {name}",
+    playStationMenu: "Воспроизвести станцию",
     playingLabel: "Воспроизводится {name}",
     saveStation: "Сохранить станцию",
     unsaveStation: "Удалить из сохранённых",

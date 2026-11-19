@@ -12,6 +12,7 @@
   import ArtistContextMenu from "./ArtistContextMenu.svelte";
   import PlaylistCardContextMenu from "./PlaylistCardContextMenu.svelte";
   import AutoPlaylistContextMenu from "./AutoPlaylistContextMenu.svelte";
+  import RadioStationContextMenu from "./radio/RadioStationContextMenu.svelte";
   import {
     queueAlbumAsPlaylist,
     queueArtistAsPlaylist,
@@ -172,6 +173,15 @@
       label={autoPlaylistLabel(item.autoPlaylist)}
       onPlay={() =>
         queueAutoPlaylistAsPlaylist(item.autoPlaylist, autoPlaylistLabel(item.autoPlaylist))}
+      onClose={() => {
+        contextMenuState = null;
+      }}
+    />
+  {:else if item.type === "station"}
+    <RadioStationContextMenu
+      x={contextMenuState.x}
+      y={contextMenuState.y}
+      station={item.station}
       onClose={() => {
         contextMenuState = null;
       }}

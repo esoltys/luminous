@@ -1,7 +1,29 @@
 import { invoke } from "@tauri-apps/api/core";
 import { playerStore } from "../stores/player.svelte";
-import type { Song, PlaybackState } from "../types";
+import {
+  playingStationFor,
+  stationUuidOf,
+  type PlayingStation,
+  type RadioDirectoryStation,
+  type ScriptPlaybackSnapshot,
+  type Song,
+} from "../types";
 import type { PlaySongSelector, ScriptPlaybackApi, ScriptWaitApi } from "./types";
+
+/** Finds a station by name in the downloaded directory: exact name first, then the top search hit. */
+async function findStationByName(name: string): Promise<RadioDirectoryStation> {
+  const results = await invoke<RadioDirectoryStation[]>("query_radio_directory", {
+    query: { search: name, hideUnsupported: false, limit: 50 },
+  });
+  const wanted = name.toLowerCase();
+  const match = results.find((s) => s.name.trim().toLowerCase() === wanted) ?? results[0];
+  if (!match) {
+    throw new Error(
+      `No station matching "${name}" in the station directory (is it downloaded on the Radio tab?)`,
+    );
+  }
+  return match;
+}
 
 /**
  * Creates the playback controller.
@@ -58,6 +80,43 @@ export function createPlaybackController(wait: ScriptWaitApi): ScriptPlaybackApi
       return playerStore.currentSong;
     },
 
+    async playStation(target: string | { name: string }): Promise<PlayingStation> {
+      let uuid: string;
+      let station: RadioDirectoryStation | null;
+      if (typeof target === "string") {
+        uuid = target.trim();
+        if (!uuid) throw new Error("playStation requires a station uuid or { name }");
+        // A saved or pinned station pruned from the directory still plays from its
+        // stored row, so a miss here is not an error; play_radio_station decides.
+        station = await invoke<RadioDirectoryStation | null>("get_radio_directory_station", {
+          stationuuid: uuid,
+        });
+      } else {
+        const name = target.name?.trim();
+        if (!name) throw new Error("playStation requires a station uuid or { name }");
+        station = await findStationByName(name);
+        uuid = station.stationuuid;
+      }
+
+      if (station && !station.playable) {
+        throw new Error(
+          `Station "${station.name}" uses a stream format the audio engine can't play (HLS or HE-AAC)`,
+        );
+      }
+
+      // Called directly rather than through radioStore.playStation, which turns
+      // failures into a toast: a script needs the rejection.
+      await invoke("play_radio_station", { stationuuid: uuid });
+      await wait.forState(
+        () => playerStore.state === "playing" && stationUuidOf(playerStore.currentSong) === uuid,
+        20000,
+      );
+
+      const playing = playingStationFor(playerStore.currentSong);
+      if (!playing) throw new Error(`Failed to confirm playback of station ${uuid}`);
+      return playing;
+    },
+
     async pause(): Promise<void> {
       if (playerStore.state === "paused") return;
       await invoke("pause_playback");
@@ -76,10 +135,11 @@ export function createPlaybackController(wait: ScriptWaitApi): ScriptPlaybackApi
       await wait.settled();
     },
 
-    status(): PlaybackState {
+    status(): ScriptPlaybackSnapshot {
       return {
         state: playerStore.state,
         current_song: playerStore.currentSong,
+        current_station: playingStationFor(playerStore.currentSong),
         playlist_id: playerStore.playlistId,
         playlist_item_uuid: playerStore.playlistItemUuid,
         position_nanosec: playerStore.positionNanosec,

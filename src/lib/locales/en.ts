@@ -3166,6 +3166,7 @@ export const en = {
     stationListsTitle: "Station Lists",
     openList: "Open",
     playStation: "Play {name}",
+    playStationMenu: "Play station",
     playingLabel: "Playing {name}",
     saveStation: "Save station",
     unsaveStation: "Remove from saved stations",

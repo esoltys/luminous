@@ -34,7 +34,11 @@
   import PlaylistCardContextMenu from "./PlaylistCardContextMenu.svelte";
   import AutoPlaylistContextMenu from "./AutoPlaylistContextMenu.svelte";
   import DragGhost from "./DragGhost.svelte";
+  import RadioStationCard from "./radio/RadioStationCard.svelte";
+  import RadioStationRow from "./radio/RadioStationRow.svelte";
+  import { radioStore } from "../stores/radio.svelte";
   import {
+    BroadcastIcon as Broadcast,
     DiscIcon as Disc,
     MicrophoneStageIcon as MicrophoneStage,
     MusicNotesIcon as Music,
@@ -55,6 +59,11 @@
   }
 
   const visibleItems = $derived(pinnedStore.items.filter(hasContent));
+
+  // Station cards show their saved state, so load it once a station is pinned.
+  $effect(() => {
+    if (visibleItems.some((item) => item.type === "station")) void radioStore.ensureSavedLoaded();
+  });
 
   // Mirrors PlaylistsCollectionView's autoDefs label derivation — Favourites/
   // Recently Added/Most Played/History use fixed i18n labels, while genre/
@@ -93,6 +102,8 @@
         return getPlaylistDisplayName(item.playlist);
       case "auto_playlist":
         return autoPlaylistLabel(item.autoPlaylist);
+      case "station":
+        return item.station.name || i18n.t("radio.unnamedStation");
     }
   }
 
@@ -121,6 +132,9 @@
           playlistId: item.autoPlaylist.playlistId,
           updated: item.autoPlaylist.updated,
         });
+        break;
+      case "station":
+        void radioStore.playStation(item.station);
         break;
     }
   }
@@ -291,6 +305,25 @@
                 oncontextmenu={(e) => handleContextMenu(e, item)}
               />
             {/if}
+          {:else if item.type === "station"}
+            <!-- Station cards own their context menu (play, save, pin) and stop it bubbling here. -->
+            {#if rows}
+              <RadioStationRow
+                station={item.station}
+                saved={radioStore.isSaved(item.station.stationuuid)}
+                playing={radioStore.isPlayingStation(item.station.stationuuid)}
+                onPlay={(s) => void radioStore.playStation(s)}
+                onToggleSave={(s) => void radioStore.toggleSaveStation(s)}
+              />
+            {:else}
+              <RadioStationCard
+                station={item.station}
+                saved={radioStore.isSaved(item.station.stationuuid)}
+                playing={radioStore.isPlayingStation(item.station.stationuuid)}
+                onPlay={(s) => void radioStore.playStation(s)}
+                onToggleSave={(s) => void radioStore.toggleSaveStation(s)}
+              />
+            {/if}
           {:else if rows}
             <PinnedSongRowCard
               song={item.song}
@@ -333,6 +366,8 @@
       <ListMusic class="w-3.5 h-3.5 text-brand-accent shrink-0" />
     {:else if dragged.type === "auto_playlist"}
       <Sparkles class="w-3.5 h-3.5 text-brand-accent shrink-0" />
+    {:else if dragged.type === "station"}
+      <Broadcast class="w-3.5 h-3.5 text-brand-accent shrink-0" />
     {:else}
       <Music class="w-3.5 h-3.5 text-brand-accent shrink-0" />
     {/if}

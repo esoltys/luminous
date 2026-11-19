@@ -11,6 +11,7 @@ import {
   type ScriptSettingsTab,
   type ScriptSong,
   type ScriptSongColumn,
+  type ScriptStation,
   type ScriptSubTab,
   type ScriptTab,
 } from "./types";
@@ -21,7 +22,7 @@ import type {
   SettingsTab,
 } from "../stores/navigation.svelte";
 import type { VisibleColumns } from "../stores/collection.svelte";
-import type { PlaybackState, Song } from "../types";
+import type { PlayingStation, ScriptPlaybackSnapshot, Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
@@ -41,8 +42,9 @@ export type DriftChecks = [
   // it names must still exist (a dropped optional field would stay assignable) and fit.
   Assert<Equal<Exclude<keyof ScriptSong, keyof Song>, never>>,
   Assert<Song extends ScriptSong ? true : false>,
-  Assert<Equal<Exclude<keyof ScriptPlaybackState, keyof PlaybackState>, never>>,
-  Assert<PlaybackState extends ScriptPlaybackState ? true : false>,
+  Assert<Equal<Exclude<keyof ScriptPlaybackState, keyof ScriptPlaybackSnapshot>, never>>,
+  Assert<ScriptPlaybackSnapshot extends ScriptPlaybackState ? true : false>,
+  Assert<Equal<ScriptStation, PlayingStation>>,
 ];
 
 type Version = [number, number, number];
