@@ -11,20 +11,7 @@
   import type { RadioDirectoryOrder, RadioDirectoryStation } from "../../types";
   import RadioStationRow from "./RadioStationRow.svelte";
 
-  let searchTimer: ReturnType<typeof setTimeout> | null = null;
   let scrollContainerEl: HTMLElement | null = $state(null);
-
-  function scheduleSearch() {
-    if (searchTimer) clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-      void radioStore.loadDiscover();
-    }, 180);
-  }
-
-  function toggleTag(tagName: string) {
-    radioStore.selectedTag = radioStore.selectedTag === tagName ? null : tagName;
-    void radioStore.loadDiscover();
-  }
 
   function unwrapRow(raw: unknown): RadioDirectoryStation {
     if (raw && typeof raw === "object" && "item" in raw) {
@@ -48,9 +35,6 @@
     if (scrollContainerEl && savedScroll > 0) {
       scrollContainerEl.scrollTop = savedScroll;
     }
-    return () => {
-      if (searchTimer) clearTimeout(searchTimer);
-    };
   });
 </script>
 
@@ -64,18 +48,15 @@
       <input
         type="search"
         data-testid="radio-search-input"
-        bind:value={radioStore.searchQuery}
-        oninput={scheduleSearch}
+        value={radioStore.searchQuery}
+        oninput={(e) => radioStore.setSearchQuery(e.currentTarget.value)}
         placeholder={i18n.t("radio.searchPlaceholder")}
         class="w-full pl-9 pr-8 py-1.5 rounded-lg bg-brand-surface border border-brand-border/60 text-sm text-brand-text-primary placeholder:text-brand-text-secondary/70 focus:outline-none focus:border-brand-accent"
       />
       {#if radioStore.searchQuery}
         <button
           type="button"
-          onclick={() => {
-            radioStore.searchQuery = "";
-            void radioStore.loadDiscover();
-          }}
+          onclick={() => radioStore.setSearchQuery("", true)}
           aria-label={i18n.t("radio.clearSearch")}
           class="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-secondary hover:text-brand-text-primary"
         >
@@ -101,10 +82,7 @@
     <select
       aria-label={i18n.t("radio.filterCountry")}
       value={radioStore.selectedCountry ?? ""}
-      onchange={(e) => {
-        radioStore.selectedCountry = e.currentTarget.value || null;
-        void radioStore.loadDiscover();
-      }}
+      onchange={(e) => radioStore.setFilter("country", e.currentTarget.value || null)}
       class="px-2.5 py-1.5 rounded-lg bg-brand-surface border border-brand-border/60 text-xs text-brand-text-primary max-w-[11rem] focus:outline-none focus:border-brand-accent"
     >
       <option value="">{i18n.t("radio.allCountries")}</option>
@@ -118,10 +96,7 @@
     <select
       aria-label={i18n.t("radio.filterLanguage")}
       value={radioStore.selectedLanguage ?? ""}
-      onchange={(e) => {
-        radioStore.selectedLanguage = e.currentTarget.value || null;
-        void radioStore.loadDiscover();
-      }}
+      onchange={(e) => radioStore.setFilter("language", e.currentTarget.value || null)}
       class="hidden @md:block px-2.5 py-1.5 rounded-lg bg-brand-surface border border-brand-border/60 text-xs text-brand-text-primary max-w-[10rem] focus:outline-none focus:border-brand-accent"
     >
       <option value="">{i18n.t("radio.allLanguages")}</option>
@@ -135,10 +110,7 @@
     <select
       aria-label={i18n.t("radio.filterCodec")}
       value={radioStore.selectedCodec ?? ""}
-      onchange={(e) => {
-        radioStore.selectedCodec = e.currentTarget.value || null;
-        void radioStore.loadDiscover();
-      }}
+      onchange={(e) => radioStore.setFilter("codec", e.currentTarget.value || null)}
       class="hidden @xl:block px-2.5 py-1.5 rounded-lg bg-brand-surface border border-brand-border/60 text-xs text-brand-text-primary max-w-[9rem] focus:outline-none focus:border-brand-accent"
     >
       <option value="">{i18n.t("radio.allCodecs")}</option>
@@ -184,7 +156,7 @@
       {#each radioStore.facets.tags.slice(0, 24) as tag (tag.name)}
         <button
           type="button"
-          onclick={() => toggleTag(tag.name)}
+          onclick={() => radioStore.toggleTag(tag.name)}
           class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors {radioStore.selectedTag ===
           tag.name
             ? 'bg-brand-accent text-brand-accent-contrast font-medium'
@@ -235,7 +207,7 @@
               playing={radioStore.isPlayingStation(station.stationuuid)}
               onPlay={(s) => void radioStore.playStation(s)}
               onToggleSave={(s) => void radioStore.toggleSaveStation(s)}
-              onTagClick={(tag) => toggleTag(tag)}
+              onTagClick={(tag) => radioStore.toggleTag(tag)}
             />
           </div>
         {/snippet}

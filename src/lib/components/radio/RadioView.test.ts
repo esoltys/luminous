@@ -94,6 +94,7 @@ describe("RadioView", () => {
       if (cmd === "get_radio_directory_status") return status;
       if (cmd === "get_saved_radio_stations") return [];
       if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
       if (cmd === "sync_radio_directory") {
         return { mode: "full", upserted: 1, removed: 0, totalStations: 1, syncedAt: 1700000000 };
       }
@@ -128,6 +129,7 @@ describe("RadioView", () => {
       if (cmd === "get_radio_directory_status") return status;
       if (cmd === "get_saved_radio_stations") return [];
       if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
       return null;
     });
 
@@ -162,6 +164,7 @@ describe("RadioView", () => {
       if (cmd === "get_radio_directory_status") return status;
       if (cmd === "get_saved_radio_stations") return [];
       if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
       return null;
     });
 
@@ -201,6 +204,7 @@ describe("RadioView", () => {
       if (cmd === "get_radio_directory_status") return status;
       if (cmd === "get_saved_radio_stations") return [];
       if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
       if (cmd === "get_radio_directory_facets") return defaultFacets;
       if (cmd === "query_radio_directory") {
         if (args?.query?.tag === "empty-tag") return [];

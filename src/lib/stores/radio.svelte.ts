@@ -78,10 +78,12 @@ class RadioStore {
   // My stations state
   savedStations = $state<RadioDirectoryStation[]>([]);
   recentStations = $state<RadioDirectoryStation[]>([]);
+  radioPlaylistIds = $state<number[]>([]);
   myStationsLoading = $state(false);
 
   private savedUuids = $derived(new Set(this.savedStations.map((s) => s.stationuuid)));
   private unlisteners: UnlistenFn[] = [];
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private initialized = false;
 
   get subView(): RadioSubView {
@@ -160,6 +162,10 @@ class RadioStore {
   }
 
   dispose() {
+    if (this.searchTimer) {
+      clearTimeout(this.searchTimer);
+      this.searchTimer = null;
+    }
     for (const unlisten of this.unlisteners) {
       unlisten();
     }
@@ -248,7 +254,7 @@ class RadioStore {
   async loadMyStations(): Promise<void> {
     this.myStationsLoading = true;
     try {
-      const [saved, recent] = await Promise.all([
+      const [saved, recent, playlistIds] = await Promise.all([
         invoke<RadioDirectoryStation[]>("get_saved_radio_stations", {
           hideUnsupported: this._hideUnsupported,
         }),
@@ -256,9 +262,11 @@ class RadioStore {
           limit: 20,
           hideUnsupported: this._hideUnsupported,
         }),
+        invoke<number[]>("get_radio_playlist_ids"),
       ]);
       this.savedStations = saved ?? [];
       this.recentStations = recent ?? [];
+      this.radioPlaylistIds = playlistIds ?? [];
     } catch (err) {
       console.error("Failed to load saved/recent radio stations:", err);
     } finally {
@@ -300,6 +308,34 @@ class RadioStore {
       const msg = err instanceof Error ? err.message : String(err);
       toastStore.show(msg, "error");
     }
+  }
+
+  setSearchQuery(query: string, immediate = false) {
+    this.searchQuery = query;
+    if (this.searchTimer) {
+      clearTimeout(this.searchTimer);
+      this.searchTimer = null;
+    }
+    if (immediate) {
+      void this.loadDiscover();
+      return;
+    }
+    this.searchTimer = setTimeout(() => {
+      this.searchTimer = null;
+      void this.loadDiscover();
+    }, 180);
+  }
+
+  toggleTag(tagName: string) {
+    this.selectedTag = this.selectedTag === tagName ? null : tagName;
+    void this.loadDiscover();
+  }
+
+  setFilter(field: "country" | "language" | "codec", value: string | null) {
+    if (field === "country") this.selectedCountry = value;
+    else if (field === "language") this.selectedLanguage = value;
+    else this.selectedCodec = value;
+    void this.loadDiscover();
   }
 
   clearFilters() {

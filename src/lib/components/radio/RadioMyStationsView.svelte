@@ -13,6 +13,11 @@
 
   let scrollEl: HTMLElement | null = $state(null);
 
+  const radioPlaylists = $derived.by(() => {
+    const ids = new Set(radioStore.radioPlaylistIds);
+    return playlistsStore.customPlaylists.filter((pl) => ids.has(pl.id));
+  });
+
   onMount(() => {
     const savedScroll = radioStore.getScrollTop("my_stations");
     if (scrollEl && savedScroll > 0) {
@@ -100,15 +105,15 @@
     {/if}
   </section>
 
-  <!-- Station lists (custom playlists) -->
-  {#if playlistsStore.customPlaylists.length > 0}
+  <!-- Station lists (custom playlists containing radio stations) -->
+  {#if radioPlaylists.length > 0}
     <section class="space-y-2.5">
       <h2 class="label-heading text-brand-text-primary flex items-center gap-2">
         <ListMusic class="w-4 h-4 text-brand-text-secondary" />
         <span>{i18n.t("radio.stationListsTitle")}</span>
       </h2>
       <div class="grid grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-3 gap-2">
-        {#each playlistsStore.customPlaylists as pl (pl.id)}
+        {#each radioPlaylists as pl (pl.id)}
           <button
             type="button"
             onclick={() => navigationStore.viewPlaylist(pl.id)}

@@ -1165,31 +1165,19 @@ fn station_from_joined_row(
     }))
 }
 
-/// Lists user-saved stations ordered by `saved_at DESC` (#2005).
-/// Prefers live `radio_directory` metadata and falls back to materialized `songs`
-/// metadata if a saved station was pruned upstream.
-pub fn list_saved_stations(
-    conn: &Connection,
-    hide_unsupported: bool,
-) -> Result<Vec<RadioDirectoryStation>> {
-    let sql = "
-        SELECT rs.stationuuid,
-               rd.stationuuid, rd.name, rd.url_resolved, rd.homepage, rd.favicon,
-               rd.tags, rd.country, rd.countrycode, rd.language, rd.codec,
-               rd.bitrate, rd.hls, rd.votes, rd.clickcount, rd.lastcheckok,
-               rd.changeuuid, rd.updated_at,
-               s.title, s.stream_url, s.url, s.art_manual, s.genre, s.artist,
-               s.bitrate, s.mtime
-        FROM radio_saved rs
-        LEFT JOIN radio_directory rd ON rd.stationuuid = rs.stationuuid
-        LEFT JOIN songs s ON s.path = (?1 || rs.stationuuid)
-        ORDER BY rs.saved_at DESC, rs.stationuuid ASC";
-    let mut stmt = conn.prepare(sql)?;
-    let rows = stmt.query_map(params![crate::media_source::RADIO_URI_SCHEME], |row| {
-        let saved_uuid: String = row.get(0)?;
-        station_from_joined_row(row, saved_uuid, true)
-    })?;
+const JOINED_STATION_COLS: &str = "
+    rd.stationuuid, rd.name, rd.url_resolved, rd.homepage, rd.favicon,
+    rd.tags, rd.country, rd.countrycode, rd.language, rd.codec,
+    rd.bitrate, rd.hls, rd.votes, rd.clickcount, rd.lastcheckok,
+    rd.changeuuid, rd.updated_at,
+    s.title, s.stream_url, s.url, s.art_manual, s.genre, s.artist,
+    s.bitrate, COALESCE(s.lastplayed, s.mtime, s.added, 0)
+";
 
+fn collect_joined_stations<I>(rows: I, hide_unsupported: bool) -> Result<Vec<RadioDirectoryStation>>
+where
+    I: Iterator<Item = rusqlite::Result<Option<RadioDirectoryStation>>>,
+{
     let mut stations = Vec::new();
     for item in rows {
         if let Some(st) = item? {
@@ -1201,6 +1189,28 @@ pub fn list_saved_stations(
     Ok(stations)
 }
 
+/// Lists user-saved stations ordered by `saved_at DESC` (#2005).
+/// Prefers live `radio_directory` metadata and falls back to materialized `songs`
+/// metadata if a saved station was pruned upstream.
+pub fn list_saved_stations(
+    conn: &Connection,
+    hide_unsupported: bool,
+) -> Result<Vec<RadioDirectoryStation>> {
+    let sql = format!(
+        "SELECT rs.stationuuid, {JOINED_STATION_COLS}
+         FROM radio_saved rs
+         LEFT JOIN radio_directory rd ON rd.stationuuid = rs.stationuuid
+         LEFT JOIN songs s ON s.path = (?1 || rs.stationuuid)
+         ORDER BY rs.saved_at DESC, rs.stationuuid ASC"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![crate::media_source::RADIO_URI_SCHEME], |row| {
+        let saved_uuid: String = row.get(0)?;
+        station_from_joined_row(row, saved_uuid, true)
+    })?;
+    collect_joined_stations(rows, hide_unsupported)
+}
+
 /// Lists recently played/opened radio stations ordered most-recent first (#2005).
 pub fn list_recent_stations(
     conn: &Connection,
@@ -1209,21 +1219,16 @@ pub fn list_recent_stations(
 ) -> Result<Vec<RadioDirectoryStation>> {
     let limit = limit.clamp(1, 200);
     let prefix_len = crate::media_source::RADIO_URI_SCHEME.len() as i64;
-    let sql = "
-        SELECT SUBSTR(s.path, ?1 + 1) AS stationuuid,
-               rd.stationuuid, rd.name, rd.url_resolved, rd.homepage, rd.favicon,
-               rd.tags, rd.country, rd.countrycode, rd.language, rd.codec,
-               rd.bitrate, rd.hls, rd.votes, rd.clickcount, rd.lastcheckok,
-               rd.changeuuid, rd.updated_at,
-               s.title, s.stream_url, s.url, s.art_manual, s.genre, s.artist,
-               s.bitrate, COALESCE(s.lastplayed, s.mtime, s.added, 0) AS played_at
-        FROM songs s
-        LEFT JOIN radio_directory rd ON rd.stationuuid = SUBSTR(s.path, ?1 + 1)
-        WHERE s.source = ?2
-          AND s.path LIKE (?3 || '%')
-        ORDER BY played_at DESC, s.id DESC
-        LIMIT ?4";
-    let mut stmt = conn.prepare(sql)?;
+    let sql = format!(
+        "SELECT SUBSTR(s.path, ?1 + 1) AS stationuuid, {JOINED_STATION_COLS}
+         FROM songs s
+         LEFT JOIN radio_directory rd ON rd.stationuuid = SUBSTR(s.path, ?1 + 1)
+         WHERE s.source = ?2
+           AND s.path LIKE (?3 || '%')
+         ORDER BY COALESCE(s.lastplayed, s.mtime, s.added, 0) DESC, s.id DESC
+         LIMIT ?4"
+    );
+    let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(
         params![
             prefix_len,
@@ -1236,16 +1241,26 @@ pub fn list_recent_stations(
             station_from_joined_row(row, uuid, false)
         },
     )?;
+    collect_joined_stations(rows, hide_unsupported)
+}
 
-    let mut stations = Vec::new();
-    for item in rows {
-        if let Some(st) = item? {
-            if !hide_unsupported || st.playable {
-                stations.push(st);
-            }
-        }
-    }
-    Ok(stations)
+/// Returns IDs of user playlists that contain at least one `RadioBrowser` station (#2005).
+pub fn list_radio_playlist_ids(conn: &Connection) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare(
+        "SELECT DISTINCT p.id
+         FROM playlists p
+         JOIN playlist_items pi ON pi.playlist_id = p.id
+         JOIN songs s ON s.id = pi.song_id
+         WHERE p.is_queue = 0
+           AND s.source = ?1
+         ORDER BY p.id ASC",
+    )?;
+    let ids = stmt
+        .query_map(params![crate::models::SongSource::RADIO_BROWSER_ID], |r| {
+            r.get(0)
+        })?
+        .collect::<rusqlite::Result<Vec<i64>>>()?;
+    Ok(ids)
 }
 
 #[cfg(test)]

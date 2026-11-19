@@ -204,6 +204,14 @@ pub async fn get_recent_radio_stations(
     .map_err(|e| e.to_string())
 }
 
+/// Returns IDs of custom playlists containing at least one radio station (#2005).
+#[tauri::command]
+pub async fn get_radio_playlist_ids(state: State<'_, AppState>) -> Result<Vec<i64>, String> {
+    crate::db::run_blocking(&state.db, radio_directory::list_radio_playlist_ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Materializes `stationuuid` as a `songs` row, replaces the Queue and starts
 /// playback, and dispatches click reporting asynchronously when online (#2005).
 #[tauri::command]
