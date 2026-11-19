@@ -269,15 +269,11 @@ pub async fn play_radio_station(
     Ok(song)
 }
 
-/// Adds a user-defined custom station by stream URL or `.pls`/`.m3u`/`.m3u8`
-/// playlist URL, saving it outside the `radio_directory` mirror (#2009).
-#[tauri::command]
-pub async fn add_custom_radio_station(
+async fn resolve_station_inputs(
     name: String,
     url: String,
     tags: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<RadioDirectoryStation, String> {
+) -> Result<(String, String, String), String> {
     let resolved = radio_directory::resolve_station_url(&url)
         .await
         .map_err(|e| e.to_string())?;
@@ -288,9 +284,21 @@ pub async fn add_custom_radio_station(
     } else {
         name
     };
-    let tags = tags.unwrap_or_default();
+    Ok((final_name, resolved.stream_url, tags.unwrap_or_default()))
+}
+
+/// Adds a user-defined custom station by stream URL or `.pls`/`.m3u`/`.m3u8`
+/// playlist URL, saving it outside the `radio_directory` mirror (#2009).
+#[tauri::command]
+pub async fn add_custom_radio_station(
+    name: String,
+    url: String,
+    tags: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<RadioDirectoryStation, String> {
+    let (final_name, stream_url, tags) = resolve_station_inputs(name, url, tags).await?;
     crate::db::run_blocking(&state.db, move |conn| {
-        radio_directory::add_custom_station(conn, &final_name, &resolved.stream_url, &tags)
+        radio_directory::add_custom_station(conn, &final_name, &stream_url, &tags)
     })
     .await
     .map_err(|e| e.to_string())
@@ -306,25 +314,9 @@ pub async fn update_custom_radio_station(
     tags: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<RadioDirectoryStation, String> {
-    let resolved = radio_directory::resolve_station_url(&url)
-        .await
-        .map_err(|e| e.to_string())?;
-    let final_name = if name.trim().is_empty() {
-        resolved
-            .title
-            .unwrap_or_else(|| resolved.stream_url.clone())
-    } else {
-        name
-    };
-    let tags = tags.unwrap_or_default();
+    let (final_name, stream_url, tags) = resolve_station_inputs(name, url, tags).await?;
     crate::db::run_blocking(&state.db, move |conn| {
-        radio_directory::update_custom_station(
-            conn,
-            &stationuuid,
-            &final_name,
-            &resolved.stream_url,
-            &tags,
-        )
+        radio_directory::update_custom_station(conn, &stationuuid, &final_name, &stream_url, &tags)
     })
     .await
     .map_err(|e| e.to_string())

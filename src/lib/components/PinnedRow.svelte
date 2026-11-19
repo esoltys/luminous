@@ -36,6 +36,7 @@
   import DragGhost from "./DragGhost.svelte";
   import RadioStationCard from "./radio/RadioStationCard.svelte";
   import PinnedStationRowCard from "./radio/PinnedStationRowCard.svelte";
+  import AddStationModal from "./radio/AddStationModal.svelte";
   import { radioStore } from "../stores/radio.svelte";
   import {
     BroadcastIcon as Broadcast,
@@ -437,4 +438,13 @@
       }}
     />
   {/if}
+{/if}
+
+{#if radioStore.editingStation}
+  <AddStationModal
+    station={radioStore.editingStation}
+    onClose={() => {
+      radioStore.editingStation = null;
+    }}
+  />
 {/if}
