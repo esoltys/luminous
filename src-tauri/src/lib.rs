@@ -617,6 +617,21 @@ fn spawn_audio_event_loop(
                                         .await;
                                 }
                             }
+                            if let Some(uuid) = p.take_pending_station_click_uuid() {
+                                if let Some(app_state) = app.try_state::<AppState>() {
+                                    let db = app_state.db.clone();
+                                    tauri::async_runtime::spawn(async move {
+                                        if let Err(e) =
+                                            commands::radio_directory::report_station_click_if_online(
+                                                &db, uuid,
+                                            )
+                                            .await
+                                        {
+                                            log::debug!("Radio Browser click report failed: {e}");
+                                        }
+                                    });
+                                }
+                            }
                             sync_window_title(&app, p.current_song.as_ref(), true);
                             let pipeline = {
                                 let a = audio.lock().await;
@@ -694,6 +709,21 @@ fn spawn_audio_event_loop(
                                         .await;
                                 }
                             }
+                            if let Some(uuid) = p.take_pending_station_click_uuid() {
+                                if let Some(app_state) = app.try_state::<AppState>() {
+                                    let db = app_state.db.clone();
+                                    tauri::async_runtime::spawn(async move {
+                                        if let Err(e) =
+                                            commands::radio_directory::report_station_click_if_online(
+                                                &db, uuid,
+                                            )
+                                            .await
+                                        {
+                                            log::debug!("Radio Browser click report failed: {e}");
+                                        }
+                                    });
+                                }
+                            }
                             sync_window_title(&app, p.current_song.as_ref(), true);
                             let pipeline = {
                                 let a = audio.lock().await;
@@ -755,6 +785,11 @@ fn spawn_audio_event_loop(
                                 let outcome = p.note_playback_error();
 
                                 if let Some(song) = &outcome.failed_song {
+                                    let display_message = if crate::audio::is_live_song(song) {
+                                        "Station offline".to_string()
+                                    } else {
+                                        message.clone()
+                                    };
                                     let _ = app.emit(
                                         "playback-error",
                                         serde_json::json!({
@@ -765,7 +800,7 @@ fn spawn_audio_event_loop(
                                             // server's "Wrong username or
                                             // password" (#1163). Never holds a
                                             // signed URL.
-                                            "message": message,
+                                            "message": display_message,
                                         }),
                                     );
                                 }
@@ -1792,6 +1827,7 @@ pub fn run() {
             commands::radio_directory::query_radio_directory,
             commands::radio_directory::get_radio_directory_station,
             commands::radio_directory::get_radio_directory_facets,
+            commands::radio_directory::materialize_radio_station,
             commands::radio_directory::report_radio_station_click,
             // Portable device commands (#835)
             commands::devices::get_connected_devices,

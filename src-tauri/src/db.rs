@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 89;
+pub const CURRENT_SCHEMA_VERSION: i32 = 90;
 
 struct Migration {
     version: i32,
@@ -953,6 +953,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 89,
         description: "radio_directory local station mirror, FTS5 index and sync metadata (#2003)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_89)?),
+    },
+    Migration {
+        version: 90,
+        description: "Retire unused radio_channels scaffolding (#2004)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_90)?),
     },
 ];
 
@@ -3219,6 +3224,10 @@ CREATE TABLE IF NOT EXISTS radio_directory_meta (
 );
 
 INSERT OR IGNORE INTO radio_directory_meta (id, opted_in) VALUES (1, 0);
+";
+
+const MIGRATION_90: &str = "
+DROP TABLE IF EXISTS radio_channels;
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
