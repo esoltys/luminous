@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">Luminous</h1>
-<p align="center">A high-performance home for the music you already own.</p>
+<p align="center">Your personal home for the music you already own.</p>
 <p align="center">
   <a href="https://esoltys.dev/luminous/"><strong>Luminous Homepage</strong></a>
 </p>
