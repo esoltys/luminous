@@ -305,6 +305,16 @@ fn extract_unique_server_urls(list: Vec<WireServerDescriptor>) -> Vec<String> {
     host_urls
 }
 
+/// One page of `/json/stations`, as returned by [`RadioBrowserClient::fetch_stations_page`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StationsPage {
+    /// The page's stations that passed normalisation (rows with no uuid, URL or name are dropped).
+    pub stations: Vec<RadioBrowserStation>,
+    /// Number of rows the server returned before normalisation. Paging must use this, not
+    /// `stations.len()`: a full page with one dropped row is still a full page (#2199).
+    pub raw_count: usize,
+}
+
 /// Result of querying `/json/stations/changed` and resolving full station details.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChangedStationsBatch {
@@ -550,15 +560,19 @@ impl RadioBrowserClient {
         &self,
         offset: usize,
         limit: usize,
-    ) -> Result<Vec<RadioBrowserStation>, String> {
+    ) -> Result<StationsPage, String> {
         let path = format!(
             "/json/stations?hidebroken=true&order=stationuuid&offset={offset}&limit={limit}"
         );
         let raw: Vec<WireStation> = self.get_json_with_failover(&path).await?;
-        Ok(raw
-            .into_iter()
-            .filter_map(WireStation::into_normalized)
-            .collect())
+        let raw_count = raw.len();
+        Ok(StationsPage {
+            stations: raw
+                .into_iter()
+                .filter_map(WireStation::into_normalized)
+                .collect(),
+            raw_count,
+        })
     }
 
     /// Fetches specific stations by UUID (`/json/stations/byuuid?uuids=...`),
@@ -850,6 +864,8 @@ mod tests {
             .fetch_stations_page(0, 2)
             .await
             .expect("fetch page 0");
+        assert_eq!(page.raw_count, 2);
+        let page = page.stations;
         assert_eq!(page.len(), 2);
 
         let s0 = &page[0];

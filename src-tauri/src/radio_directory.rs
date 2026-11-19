@@ -21,8 +21,8 @@ use crate::remote_scheduler::{RemoteKind, SyncGuard};
 use anyhow::Result;
 use luminous_audio::can_play_stream;
 use luminous_remote::radiobrowser::{
-    RadioBrowserClient, RadioBrowserFacetEntry, RadioBrowserStation, DEFAULT_CHANGED_LIMIT,
-    DEFAULT_STATION_PAGE_SIZE, RADIO_BROWSER_ATTRIBUTION_URL,
+    RadioBrowserClient, RadioBrowserFacetEntry, RadioBrowserStation, StationsPage,
+    DEFAULT_CHANGED_LIMIT, DEFAULT_STATION_PAGE_SIZE, RADIO_BROWSER_ATTRIBUTION_URL,
 };
 use rusqlite::{params, Connection, OptionalExtension, ToSql};
 use serde::{Deserialize, Serialize};
@@ -507,8 +507,12 @@ where
 
         loop {
             page_num += 1;
-            let page = client.fetch_stations_page(offset, page_size).await?;
-            let page_len = page.len();
+            // Page on the server's raw row count: normalisation can drop rows, and a full
+            // page that lost one is still not the last page (#2199).
+            let StationsPage {
+                stations: page,
+                raw_count,
+            } = client.fetch_stations_page(offset, page_size).await?;
 
             for s in &page {
                 if !s.changeuuid.is_empty() {
@@ -542,10 +546,10 @@ where
                 done: false,
             });
 
-            if page_len < page_size {
+            if raw_count < page_size {
                 break;
             }
-            offset += page_len;
+            offset += raw_count;
         }
 
         let newest_uuid = latest_change_uuid.map(|(_, uuid)| uuid);
@@ -1584,6 +1588,87 @@ mod tests {
                 .find(|t| t.name == "jazz")
                 .map(|t| t.stationcount),
             Some(1)
+        );
+    }
+
+    /// #2199: a full page with a row that normalisation drops is still a full page, so the
+    /// next page is fetched, at the raw offset.
+    #[tokio::test]
+    async fn full_sync_keeps_paging_when_normalisation_drops_a_row() {
+        let (_dir, db) = test_db();
+        let server = MockServer::start().await;
+
+        let station = |uuid: &str, chg: &str| {
+            sample_station_json(
+                uuid,
+                chg,
+                uuid,
+                "pop",
+                "Canada",
+                "CA",
+                "english",
+                "MP3",
+                128,
+                0,
+                1,
+                1,
+                "2026-11-10T10:00:00Z",
+            )
+        };
+        let mut urlless = station("s-no-url", "chg-2");
+        urlless["url_resolved"] = serde_json::json!("");
+
+        Mock::given(method("GET"))
+            .and(path("/json/stations"))
+            .and(query_param("offset", "0"))
+            .and(query_param("limit", "2"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!([station("s-a", "chg-1"), urlless])),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/json/stations"))
+            .and(query_param("offset", "2"))
+            .and(query_param("limit", "2"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!([station("s-b", "chg-3")])),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let client = RadioBrowserClient::with_servers(vec![server.uri()], RADIO_BROWSER_USER_AGENT);
+        let stats = sync_with_client(&db, &client, 2, 100, 1_700_000_000, |_| {})
+            .await
+            .expect("full sync succeeds");
+
+        assert_eq!(stats.mode, "full");
+        assert_eq!(stats.upserted, 2);
+        assert_eq!(stats.total_stations, 2);
+        let conn = db.pool.get().unwrap();
+        assert!(get_station_by_uuid(&conn, "s-b").unwrap().is_some());
+        drop(conn);
+        server.verify().await;
+    }
+
+    /// #2199: a mirror whose change cursor was dropped by migration 94 gets a full resync,
+    /// even though it was synced recently.
+    #[test]
+    fn recent_mirror_without_change_cursor_gets_full_resync() {
+        let meta = DirectoryMetaRow {
+            opted_in: true,
+            last_synced_at: Some(1_700_000_000),
+            last_full_sync_at: Some(1_700_000_000),
+            last_change_uuid: None,
+            last_error: None,
+        };
+        assert_eq!(
+            choose_sync_plan(&meta, 1_700_000_100, 10_017),
+            SyncPlan::Full
         );
     }
 
