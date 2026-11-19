@@ -223,6 +223,7 @@ fn resolve_single_local_song(
     }
 }
 
+#[cfg(test)]
 pub(crate) fn resolve_songs_from_paths(
     conn: &rusqlite::Connection,
     cover_manager: &CoverManager,
