@@ -23,6 +23,7 @@ describe("CurationShelf.svelte", () => {
     suspected_provenance_songs: [],
     duplicate_groups: [],
     corrupt_songs: [],
+    integrity_warnings: [],
   };
 
   beforeEach(() => {
@@ -356,5 +357,47 @@ describe("CurationShelf.svelte", () => {
     await waitFor(() => {
       expect(openInFilesSpy).toHaveBeenCalledWith(mockTarget);
     });
+  });
+
+  it("renders integrity warnings collapsed by default and expands on toggle", async () => {
+    const overviewWarnings: CurationOverview = {
+      ...emptyOverview,
+      integrity_warnings: [
+        {
+          id: 88,
+          title: "Playable Track",
+          artist: "Some Artist",
+          album: "Some Album",
+          path: "/music/Some Artist/Some Album/Playable Track.flac",
+          format: "FLAC",
+          error_detail: "FLAC MD5 checksum mismatch",
+          verified_at: 1700000000,
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "get_curation_overview") {
+        return Promise.resolve(overviewWarnings);
+      }
+      return Promise.resolve(null);
+    });
+
+    const { findByTestId, queryByTestId, findByText, queryByText } = render(CurationShelf);
+
+    expect(await findByTestId("curation-integrity-warnings-section")).toBeInTheDocument();
+    expect(queryByTestId("curation-corrupt-section")).toBeNull();
+    expect(queryByText("Playable Track")).toBeNull();
+
+    const toggleBtn = await findByText("Show warnings");
+    await fireEvent.click(toggleBtn);
+
+    expect(await findByText("Playable Track")).toBeInTheDocument();
+    expect(await findByText("Checksum mismatch")).toBeInTheDocument();
+    expect(
+      await findByText(
+        "The file's saved audio fingerprint doesn't match what's inside—usually from an older encoder or tagger. It plays fine; you can ignore this or re-save the FLAC header to clear it.",
+      ),
+    ).toBeInTheDocument();
   });
 });

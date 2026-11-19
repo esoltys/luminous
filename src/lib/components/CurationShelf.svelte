@@ -4,6 +4,7 @@
   import { onDestroy } from "svelte";
   import type {
     AlbumItem,
+    CorruptSongItem,
     CurationAlbumItem,
     IncompleteAlbumItem,
     CurationOverview,
@@ -13,6 +14,7 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { createEventScope } from "../utils/eventScope";
+  import { describeIntegrityIssue } from "../utils/integrityReason";
   import AlbumRowCard from "./AlbumRowCard.svelte";
   import AlbumProfileEditor from "./AlbumProfileEditor.svelte";
   import DuplicateReviewModal from "./DuplicateReviewModal.svelte";
@@ -51,6 +53,8 @@
   // Section list expansion toggles
   let showAllUnillustrated = $state(false);
   let showAllIncomplete = $state(false);
+  let showIntegrityWarnings = $state(false);
+  let showAllWarnings = $state(false);
 
   const INITIAL_VISIBLE_COUNT = 6;
 
@@ -90,14 +94,15 @@
     });
   });
 
-  // Derived total attention count across all 6 curation categories
+  // Derived total attention count across all curation categories
   let totalCount = $derived(
     (overview?.unillustrated_albums.length ?? 0) +
       (overview?.incomplete_albums.length ?? 0) +
       (overview?.missing_core_tags_song_ids.length ?? 0) +
       (overview?.duplicate_groups.length ?? 0) +
       (overview?.suspected_provenance_songs.length ?? 0) +
-      (overview?.corrupt_songs?.length ?? 0),
+      (overview?.corrupt_songs?.length ?? 0) +
+      (overview?.integrity_warnings?.length ?? 0),
   );
 
   $effect(() => {
@@ -129,6 +134,14 @@
       ? showAllIncomplete
         ? overview.incomplete_albums
         : overview.incomplete_albums.slice(0, INITIAL_VISIBLE_COUNT)
+      : [],
+  );
+
+  let displayedWarnings = $derived(
+    overview?.integrity_warnings
+      ? showAllWarnings
+        ? overview.integrity_warnings
+        : overview.integrity_warnings.slice(0, INITIAL_VISIBLE_COUNT)
       : [],
   );
 
@@ -430,6 +443,40 @@
       </div>
     {/if}
 
+    {#snippet integritySongRows(songs: CorruptSongItem[], isWarning: boolean)}
+      <div class="divide-y divide-brand-border/40">
+        {#each songs as song (song.id)}
+          {@const issue = describeIntegrityIssue(song.error_detail, isWarning)}
+          <div class="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-brand-text-primary truncate">
+                  {song.title || i18n.t("collection.unknownTitle")}
+                </span>
+                <span
+                  class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-text-primary/10 text-brand-text-primary font-medium whitespace-nowrap"
+                >
+                  {issue.label}
+                </span>
+              </div>
+              <p class="text-xs text-brand-text-secondary truncate mt-0.5">
+                {song.artist || i18n.t("collection.unknownArtist")}
+              </p>
+              {#if issue.description}
+                <p class="text-xs text-brand-text-secondary/80 mt-0.5">
+                  {issue.description}
+                </p>
+              {/if}
+            </div>
+            <Button variant="secondary" size="sm" onclick={() => locateInFiles(song.id)}>
+              <Folder class="w-3.5 h-3.5" />
+              <span>{i18n.t("curation.viewInFiles")}</span>
+            </Button>
+          </div>
+        {/each}
+      </div>
+    {/snippet}
+
     <!-- Category 6: Corrupted / Unreadable Audio (#1938) -->
     {#if overview.corrupt_songs && overview.corrupt_songs.length > 0}
       <div
@@ -454,31 +501,60 @@
           </div>
         </div>
 
-        <div class="divide-y divide-brand-border/40">
-          {#each overview.corrupt_songs as song (song.id)}
-            <div class="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium text-brand-text-primary truncate">
-                    {song.title || i18n.t("collection.unknownTitle")}
-                  </span>
-                  <span
-                    class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-text-primary/10 text-brand-text-primary font-medium whitespace-nowrap"
-                  >
-                    {song.error_detail}
-                  </span>
-                </div>
-                <p class="text-xs text-brand-text-secondary truncate mt-0.5">
-                  {song.artist || i18n.t("collection.unknownArtist")}
-                </p>
-              </div>
-              <Button variant="secondary" size="sm" onclick={() => locateInFiles(song.id)}>
-                <Folder class="w-3.5 h-3.5" />
-                <span>{i18n.t("curation.viewInFiles")}</span>
-              </Button>
+        {@render integritySongRows(overview.corrupt_songs, false)}
+      </div>
+    {/if}
+
+    <!-- Category 7: Playable Audio Integrity Warnings (#2197) -->
+    {#if overview.integrity_warnings && overview.integrity_warnings.length > 0}
+      <div
+        class="bg-brand-sidebar/40 border border-brand-border/60 rounded-xl p-4 space-y-3"
+        data-testid="curation-integrity-warnings-section"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-bold text-brand-text-primary">
+                {i18n.t("curation.shelfIntegrityWarningsTitle")}
+              </h3>
+              <span
+                class="text-xs px-2 py-0.5 rounded-full bg-brand-text-primary/10 text-brand-text-primary font-semibold"
+              >
+                {overview.integrity_warnings.length}
+              </span>
             </div>
-          {/each}
+            <p class="text-xs text-brand-text-secondary mt-0.5">
+              {i18n.t("curation.shelfIntegrityWarningsHint")}
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onclick={() => (showIntegrityWarnings = !showIntegrityWarnings)}
+          >
+            {showIntegrityWarnings
+              ? i18n.t("curation.hideWarnings")
+              : i18n.t("curation.showWarnings")}
+          </Button>
         </div>
+
+        {#if showIntegrityWarnings}
+          {@render integritySongRows(displayedWarnings, true)}
+
+          {#if overview.integrity_warnings.length > INITIAL_VISIBLE_COUNT}
+            <button
+              type="button"
+              class="text-xs font-medium text-brand-accent-text hover:underline cursor-pointer"
+              onclick={() => (showAllWarnings = !showAllWarnings)}
+            >
+              {showAllWarnings
+                ? i18n.t("curation.showLess")
+                : i18n.t("curation.showAllWithCount", {
+                    count: overview.integrity_warnings.length,
+                  })}
+            </button>
+          {/if}
+        {/if}
       </div>
     {/if}
   </div>

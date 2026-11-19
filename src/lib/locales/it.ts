@@ -3160,7 +3160,36 @@ export const it = {
     shelfProvenanceBadge: "Sospetta transcodifica",
     shelfCorruptTitle: "File audio corrotti o illeggibili",
     shelfCorruptHint:
-      "Brani con errori di decodifica del flusso, verifica del contenitore o convalida del checksum",
+      "Non è stato possibile leggere o decodificare correttamente questi brani. Probabilmente dovrai sostituirli o riscaricarli.",
+    shelfIntegrityWarningsTitle: "Avvisi di integrità audio",
+    shelfIntegrityWarningsHint:
+      "Questi brani vengono riprodotti normalmente, ma presentano lievi discrepanze nell'intestazione o alla fine: di solito puoi lasciarli così.",
+    showWarnings: "Mostra avvisi",
+    hideWarnings: "Nascondi avvisi",
+    integrityMd5Label: "Checksum non corrispondente",
+    integrityMd5Desc:
+      "L'impronta audio salvata non corrisponde al contenuto, spesso a causa di un encoder o editor di tag datato. Si riproduce bene: puoi ignorarlo o risalvare l'intestazione FLAC.",
+    integrityMinorTruncationLabel: "Lieve troncamento finale",
+    integrityMinorTruncationDesc:
+      "Il file termina una frazione di secondo prima di quanto previsto dall'intestazione, spesso per byte di tag finali. Quasi tutto l'audio è integro: controlla la fine e sostituisci solo se si interrompe.",
+    integrityIncompleteFileLabel: "File incompleto",
+    integrityIncompleteFileDesc:
+      "Il file si interrompe a metà brano, probabilmente per un download o una copia interrotta. Riscaricalo o sostituiscilo da un backup.",
+    integrityEmptyFileLabel: "File vuoto",
+    integrityEmptyFileDesc:
+      "Questo file è di 0 byte e non contiene dati audio. Rimuovilo o sostituiscilo da un backup.",
+    integrityUnrecognizedFormatLabel: "Formato non riconosciuto",
+    integrityUnrecognizedFormatDesc:
+      "Luminous non è riuscito a leggere l'intestazione come audio: potrebbe essere danneggiato o avere l'estensione sbagliata. Controllalo o sostituiscilo.",
+    integrityNoAudioLabel: "Nessun audio riproducibile",
+    integrityNoAudioDesc:
+      "Il file è stato aperto, ma non contiene audio decodificabile. Dovrai sostituirlo.",
+    integrityDamagedAudioLabel: "Dati audio danneggiati",
+    integrityDamagedAudioDesc:
+      "Parte del flusso audio è corrotta, quindi la riproduzione potrebbe saltare o bloccarsi. Sostituiscilo con una copia integra se ne hai una.",
+    integrityUnreadableStreamLabel: "Flusso audio illeggibile",
+    integrityUnreadableStreamDesc:
+      "Impossibile decodificare correttamente il flusso audio. Prova a riprodurlo o sostituisci il file con una copia integra.",
     showAllWithCount: "Mostra tutto ({count})",
     showLess: "Mostra meno",
   },

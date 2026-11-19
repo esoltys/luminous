@@ -3167,7 +3167,36 @@ export const es = {
     shelfProvenanceBadge: "Sospecha de transcodificación",
     shelfCorruptTitle: "Archivos de audio dañados o ilegibles",
     shelfCorruptHint:
-      "Canciones con fallos en la decodificación del flujo, verificación del contenedor o validación de la suma de comprobación",
+      "Estas canciones no se pudieron leer ni decodificar correctamente. Seguramente tendrás que reemplazarlas o volver a descargarlas.",
+    shelfIntegrityWarningsTitle: "Advertencias de integridad de audio",
+    shelfIntegrityWarningsHint:
+      "Estas canciones se reproducen con normalidad, pero tienen pequeñas diferencias en el encabezado o al final; normalmente no pasa nada por dejarlas así.",
+    showWarnings: "Mostrar advertencias",
+    hideWarnings: "Ocultar advertencias",
+    integrityMd5Label: "Discrepancia de suma de comprobación",
+    integrityMd5Desc:
+      "La huella de audio guardada no coincide con el contenido, algo habitual con codificadores o editores de etiquetas antiguos. Se reproduce bien; puedes ignorarlo o volver a guardar el encabezado FLAC.",
+    integrityMinorTruncationLabel: "Truncamiento menor al final",
+    integrityMinorTruncationDesc:
+      "El archivo termina una fracción de segundo antes de lo que espera su encabezado, a menudo por bytes de etiquetas al final. Casi todo el audio está intacto: revisa el final y reemplázalo solo si se corta.",
+    integrityIncompleteFileLabel: "Archivo incompleto",
+    integrityIncompleteFileDesc:
+      "El archivo se corta a mitad de la canción, probablemente por una descarga o copia interrumpida. Vuelve a descargarlo o reemplázalo desde una copia de seguridad.",
+    integrityEmptyFileLabel: "Archivo vacío",
+    integrityEmptyFileDesc:
+      "Este archivo ocupa 0 bytes y no tiene ningún dato de audio. Elimínalo o reemplázalo desde una copia de seguridad.",
+    integrityUnrecognizedFormatLabel: "Formato no reconocido",
+    integrityUnrecognizedFormatDesc:
+      "Luminous no pudo leer el encabezado del archivo como audio; puede estar dañado o tener la extensión incorrecta. Revísalo o reemplázalo.",
+    integrityNoAudioLabel: "Sin audio reproducible",
+    integrityNoAudioDesc:
+      "El archivo se abrió, pero no contiene audio decodificable. Tendrás que reemplazarlo.",
+    integrityDamagedAudioLabel: "Datos de audio dañados",
+    integrityDamagedAudioDesc:
+      "Parte del flujo de audio está dañada, por lo que la reproducción puede fallar o dar saltos. Reemplázalo con una copia limpia si tienes una.",
+    integrityUnreadableStreamLabel: "Flujo de audio ilegible",
+    integrityUnreadableStreamDesc:
+      "No se pudo decodificar el flujo de audio correctamente. Prueba a reproducirlo o reemplaza el archivo con una copia limpia.",
     showAllWithCount: "Mostrar todo ({count})",
     showLess: "Mostrar menos",
   },

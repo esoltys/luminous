@@ -3090,7 +3090,36 @@ export const en = {
     shelfProvenanceBadge: "Suspected Transcode",
     shelfCorruptTitle: "Corrupted & Unreadable Audio",
     shelfCorruptHint:
-      "Songs failing stream decoding, container verification, or checksum validation",
+      "These songs couldn't be read or decoded cleanly. You'll likely need to replace or re-download them.",
+    shelfIntegrityWarningsTitle: "Audio integrity warnings",
+    shelfIntegrityWarningsHint:
+      "These songs still play normally, but their headers or endings have minor mismatches—usually safe to leave as-is.",
+    showWarnings: "Show warnings",
+    hideWarnings: "Hide warnings",
+    integrityMd5Label: "Checksum mismatch",
+    integrityMd5Desc:
+      "The file's saved audio fingerprint doesn't match what's inside—usually from an older encoder or tagger. It plays fine; you can ignore this or re-save the FLAC header to clear it.",
+    integrityMinorTruncationLabel: "Minor ending truncation",
+    integrityMinorTruncationDesc:
+      "The file stops a fraction of a second before its header expects, often from trailing tag bytes. Almost all the audio is intact—check the ending, and replace only if it cuts off.",
+    integrityIncompleteFileLabel: "Incomplete file",
+    integrityIncompleteFileDesc:
+      "The file cuts off mid-song, likely from an interrupted download or copy. Re-download or replace it from a backup.",
+    integrityEmptyFileLabel: "Empty file",
+    integrityEmptyFileDesc:
+      "This file is 0 bytes and has no audio data at all. Remove it or replace it from a backup.",
+    integrityUnrecognizedFormatLabel: "Unrecognized format",
+    integrityUnrecognizedFormatDesc:
+      "Luminous couldn't read the file header as audio—it may be damaged or have the wrong extension. Check the file or replace it.",
+    integrityNoAudioLabel: "No playable audio",
+    integrityNoAudioDesc:
+      "The file opened, but there's no decodable audio inside. You'll need to replace it.",
+    integrityDamagedAudioLabel: "Damaged audio data",
+    integrityDamagedAudioDesc:
+      "Part of the audio stream is corrupted, so playback may glitch or fail. Replace it from a clean copy if you have one.",
+    integrityUnreadableStreamLabel: "Unreadable audio stream",
+    integrityUnreadableStreamDesc:
+      "The audio stream couldn't be decoded cleanly. Try playing it or replace the file from a clean copy.",
     showAllWithCount: "Show all ({count})",
     showLess: "Show less",
   },

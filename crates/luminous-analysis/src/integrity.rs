@@ -6,7 +6,7 @@
 //!
 //! Must never depend on Tauri, SQLite, reqwest, or Tokio (#1765, epic #1762).
 
-use luminous_audio::OfflineDecoder;
+use luminous_audio::{IntegrityCheck, OfflineDecoder};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -16,7 +16,10 @@ use std::path::Path;
 pub enum IntegrityVerdict {
     /// Track decoded cleanly and verified against embedded stream checksums.
     Valid,
-    /// Audio stream or container is corrupted, truncated, or failed checksum verification.
+    /// Audio frames decoded and the track is playable, but a non-fatal integrity
+    /// discrepancy was found (e.g., FLAC MD5 mismatch or trailing EOF after audio).
+    Warning { reason: String },
+    /// Audio stream or container is corrupted, truncated, or failed decoding.
     Corrupt { reason: String },
     /// The file couldn't be reached (missing, permission denied, drive unavailable),
     /// so nothing is known about its contents.
@@ -29,15 +32,22 @@ impl IntegrityVerdict {
         matches!(self, IntegrityVerdict::Valid)
     }
 
-    /// True if the track was read and found corrupt.
+    /// True if the track is playable but has a non-fatal integrity warning.
+    pub fn is_warning(&self) -> bool {
+        matches!(self, IntegrityVerdict::Warning { .. })
+    }
+
+    /// True if the track was read and found corrupt/unreadable.
     pub fn is_corrupt(&self) -> bool {
         matches!(self, IntegrityVerdict::Corrupt { .. })
     }
 
-    /// Optional failure detail if corrupt.
+    /// Optional failure or warning detail.
     pub fn error_reason(&self) -> Option<&str> {
         match self {
-            IntegrityVerdict::Corrupt { reason } => Some(reason.as_str()),
+            IntegrityVerdict::Warning { reason } | IntegrityVerdict::Corrupt { reason } => {
+                Some(reason.as_str())
+            }
             _ => None,
         }
     }
@@ -69,8 +79,9 @@ pub fn verify_audio_file(path: &Path) -> IntegrityVerdict {
     // packets and frame decodability.
     let failure = match OfflineDecoder::open_file_verified(path) {
         Ok(decoder) => match decoder.verify_integrity() {
-            Ok(()) => return IntegrityVerdict::Valid,
-            Err(reason) => reason,
+            IntegrityCheck::Valid => return IntegrityVerdict::Valid,
+            IntegrityCheck::Warning(reason) => return IntegrityVerdict::Warning { reason },
+            IntegrityCheck::Corrupt(reason) => reason,
         },
         Err(e) => format!("Container or format probe failed: {e}"),
     };
@@ -155,6 +166,27 @@ mod tests {
         let dir = tempfile::tempdir().expect("create temp dir");
         let verdict = verify_audio_file(&dir.path().join("gone.flac"));
         assert_eq!(verdict, IntegrityVerdict::Unverified);
+    }
+
+    #[test]
+    fn verify_flac_md5_mismatch_is_warning_not_corrupt() {
+        let orig_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../src-tauri/tests/fixtures/audio/song_gamma.flac");
+        let mut bytes = std::fs::read(&orig_path).expect("read flac fixture");
+        // Standard FLAC header: "fLaC" (4) + block header (4) + STREAMINFO (34, MD5 at bytes 18..34).
+        assert_eq!(&bytes[0..4], b"fLaC");
+        bytes[26] ^= 0xff;
+
+        let mut temp = tempfile::Builder::new()
+            .suffix(".flac")
+            .tempfile()
+            .expect("create temp flac");
+        temp.write_all(&bytes).expect("write modified flac");
+
+        let verdict = verify_audio_file(temp.path());
+        assert!(verdict.is_warning(), "expected Warning, got {verdict:?}");
+        assert!(!verdict.is_corrupt());
+        assert_eq!(verdict.error_reason(), Some("FLAC MD5 checksum mismatch"));
     }
 
     #[test]
