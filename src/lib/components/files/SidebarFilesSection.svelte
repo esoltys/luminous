@@ -18,7 +18,7 @@
     SIDEBAR_ROW_IDLE_CLASS,
     SIDEBAR_ROW_SELECTED_CLASS,
     SIDEBAR_SECTION_LABEL_CLASS,
-    SIDEBAR_SUB_ITEM_INDENT_CLASS,
+    SIDEBAR_SUB_TREE_CLASS,
     sidebarSubItemClass,
   } from "../../utils/sidebarNav";
   import type { ConnectedDevice, FileSource } from "../../types";
@@ -110,11 +110,11 @@
   {/if}
 
   {#if showSubItems}
-    <div class="w-full py-0.5 space-y-0">
+    <div class={SIDEBAR_SUB_TREE_CLASS}>
       {#if filesStore.loaded && filesStore.sources.length === 0}
         <button
           onclick={addMusicFolder}
-          class="w-full flex items-center gap-2 {SIDEBAR_SUB_ITEM_INDENT_CLASS} pr-2.5 py-1 rounded-md {SIDEBAR_NAV_TEXT_CLASS} text-brand-accent-text hover:bg-brand-accent/10 transition-colors"
+          class="w-full flex items-center gap-2 px-2.5 py-1 rounded-md {SIDEBAR_NAV_TEXT_CLASS} text-brand-accent-text hover:bg-brand-accent/10 transition-colors"
         >
           <PlusIcon class="w-3.5 h-3.5" />
           <span class="truncate">{i18n.t("files.addMusicFolder")}</span>
@@ -151,7 +151,7 @@
             data-drop-target="device"
             data-device-id={device.id}
             data-device-name={name}
-            class="flex-1 min-w-0 flex items-start gap-2 {SIDEBAR_SUB_ITEM_INDENT_CLASS} pr-2.5 py-1.5 rounded-md {SIDEBAR_NAV_TEXT_CLASS} text-left transition-colors {open
+            class="flex-1 min-w-0 flex items-start gap-2 px-2.5 py-1.5 rounded-md {SIDEBAR_NAV_TEXT_CLASS} text-left transition-colors {open
               ? SIDEBAR_ROW_SELECTED_CLASS
               : SIDEBAR_ROW_IDLE_CLASS} {songDrag.isDragging &&
             songDrag.dropTarget?.kind === 'device' &&

@@ -19,15 +19,15 @@ export const SIDEBAR_ROW_SELECTED_CLASS =
 export const SIDEBAR_ROW_IDLE_CLASS =
   "text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10";
 
-/** Left padding that puts a 14px icon on the same vertical line as the main nav icons. */
-export const SIDEBAR_SUB_ITEM_INDENT_CLASS = "pl-[calc(var(--sidebar-icon-axis)_-_7px)]";
+/** Indented sub-item container with a vertical margin line aligned to the parent icon axis. */
+export const SIDEBAR_SUB_TREE_CLASS =
+  "pl-[9px] pr-1 py-0.5 space-y-0 border-l-2 border-brand-accent/30 ml-[calc(var(--sidebar-icon-axis)_-_1px)] my-0.5";
 
 /**
- * A single-line sub-item row under a section label. `--sidebar-icon-axis` is defined by
- * Sidebar.svelte; the indent is that axis minus half the icon's width.
+ * A single-line sub-item row inside a `SIDEBAR_SUB_TREE_CLASS` container.
  */
 export function sidebarSubItemClass(active: boolean): string {
-  return `w-full flex items-center ${SIDEBAR_SUB_ITEM_INDENT_CLASS} pr-2.5 py-1 rounded-md ${SIDEBAR_NAV_TEXT_CLASS} transition-colors ${
+  return `w-full flex items-center px-2.5 py-1 rounded-md ${SIDEBAR_NAV_TEXT_CLASS} transition-colors ${
     active ? SIDEBAR_ROW_SELECTED_CLASS : SIDEBAR_ROW_IDLE_CLASS
   }`;
 }
