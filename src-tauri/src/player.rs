@@ -1308,14 +1308,21 @@ impl Player {
             // library view (which all filter on `unavailable = 0`). They're managed by
             // their server sync instead, mirroring the same exemption in
             // `find_missing_song_ids` (see collection.rs).
-            let missing_on_disk = !song.source.is_remote()
-                && !crate::audio::is_live_song(song)
-                && song
-                    .path
-                    .as_deref()
-                    .map(|p| !std::path::Path::new(p).exists())
-                    .unwrap_or(false);
-            if missing_on_disk {
+            //
+            // Live stations (radio://) *do* get flagged `unavailable = 1` when offline so
+            // they receive the same treatment as missing files; `materialize_station` resets
+            // `unavailable = 0` on directory sync or explicit play from Discover/My Stations.
+            let should_flag_unavailable = if crate::audio::is_live_song(song) {
+                true
+            } else {
+                !song.source.is_remote()
+                    && song
+                        .path
+                        .as_deref()
+                        .map(|p| !std::path::Path::new(p).exists())
+                        .unwrap_or(false)
+            };
+            if should_flag_unavailable {
                 if let Ok(conn) = self._db.pool.get() {
                     flagged_unavailable = conn
                         .execute(
@@ -3883,9 +3890,9 @@ mod tests {
         assert!(player.on_position_update(100_000_000_000).is_none());
         assert!(player.note_manual_skip().is_none());
 
-        // Playback error does not flag the station unavailable = 1.
+        // Playback error flags an offline station unavailable = 1 (same as a missing file).
         let outcome = player.note_playback_error();
-        assert!(!outcome.flagged_unavailable);
+        assert!(outcome.flagged_unavailable);
         let unavailable: i32 = db
             .pool
             .get()
@@ -3896,7 +3903,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(unavailable, 0);
+        assert_eq!(unavailable, 1);
 
         // Click UUID is emitted once per play.
         assert_eq!(
@@ -4055,7 +4062,7 @@ mod tests {
 
         let outcome = player.note_playback_error();
         assert!(!outcome.should_stop);
-        assert!(!outcome.flagged_unavailable);
+        assert!(outcome.flagged_unavailable);
         assert_eq!(outcome.failed_song.as_ref().map(|s| s.id), Some(id1));
 
         // Handover advances to the next station in the list (even if stream open fails offline, index advances).
