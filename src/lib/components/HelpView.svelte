@@ -13,6 +13,15 @@
 
   import { navigationStore } from "../stores/navigation.svelte";
 
+  /**
+   * Shown as icon-only buttons in narrow windows, so the name lives in the
+   * tooltip and accessible label rather than only in the visible text.
+   */
+  const supportLinks = [
+    { key: "help.getHelp", fallback: "Get help", url: GET_HELP_URL, icon: Lifebuoy },
+    { key: "help.reportBug", fallback: "Report a bug", url: REPORT_BUG_URL, icon: Bug },
+  ] as const;
+
   let isLoading = $state(true);
   let frameElement = $state<HTMLIFrameElement | null>(null);
 
@@ -64,26 +73,19 @@
     </div>
   {/if}
   <div class="absolute top-4 right-6 z-20 flex flex-wrap justify-end gap-2">
-    <Button
-      onclick={() => openExternalUrl(GET_HELP_URL)}
-      variant="secondary"
-      size="sm"
-      title={i18n.t("help.getHelp", {}, "Get help")}
-      aria-label={i18n.t("help.getHelp", {}, "Get help")}
-    >
-      <Lifebuoy class="w-3.5 h-3.5" />
-      <span class="hidden @3xl:inline">{i18n.t("help.getHelp", {}, "Get help")}</span>
-    </Button>
-    <Button
-      onclick={() => openExternalUrl(REPORT_BUG_URL)}
-      variant="secondary"
-      size="sm"
-      title={i18n.t("help.reportBug", {}, "Report a bug")}
-      aria-label={i18n.t("help.reportBug", {}, "Report a bug")}
-    >
-      <Bug class="w-3.5 h-3.5" />
-      <span class="hidden @3xl:inline">{i18n.t("help.reportBug", {}, "Report a bug")}</span>
-    </Button>
+    {#each supportLinks as link (link.key)}
+      {@const label = i18n.t(link.key, {}, link.fallback)}
+      <Button
+        onclick={() => openExternalUrl(link.url)}
+        variant="secondary"
+        size="sm"
+        title={label}
+        aria-label={label}
+      >
+        <link.icon class="w-3.5 h-3.5" />
+        <span class="hidden @3xl:inline">{label}</span>
+      </Button>
+    {/each}
     <Button onclick={() => walkthroughStore.start()} variant="secondary" size="sm">
       <Compass class="w-3.5 h-3.5" />
       {i18n.t("walkthrough.restartTour", {}, "Restart Feature Walkthrough")}
