@@ -10,6 +10,7 @@
   import { navigationStore } from "../../stores/navigation.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import RadioStationRow from "./RadioStationRow.svelte";
+  import RadioStationCard from "./RadioStationCard.svelte";
 
   let scrollEl: HTMLElement | null = $state(null);
 
@@ -65,11 +66,12 @@
         {/if}
       </div>
     {:else}
-      <div class="space-y-1.5">
+      <div
+        class="grid grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-4 @4xl:grid-cols-5 @6xl:grid-cols-6 gap-4"
+      >
         {#each radioStore.savedStations as station (station.stationuuid)}
-          <RadioStationRow
+          <RadioStationCard
             {station}
-            saved={true}
             playing={radioStore.isPlayingStation(station.stationuuid)}
             onPlay={(s) => void radioStore.playStation(s)}
             onToggleSave={(s) => void radioStore.toggleSaveStation(s)}
