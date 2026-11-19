@@ -26,6 +26,42 @@ const STORAGE_HIDE_UNSUPPORTED = "radio_hideUnsupported";
 const STORAGE_SCROLL_MY = "radio_scrollTop_my_stations";
 const STORAGE_SCROLL_DISCOVER = "radio_scrollTop_discover";
 const STORAGE_ORDER_BY = "radio_orderBy";
+const STORAGE_DISCOVER_FILTERS = "radio_discoverFilters";
+
+/** Discover search and filters, persisted so the tab reopens as the user left it. */
+interface DiscoverFilters {
+  searchQuery: string;
+  country: string | null;
+  language: string | null;
+  codec: string | null;
+  minBitrate: number | null;
+}
+
+function readDiscoverFilters(): DiscoverFilters {
+  const empty: DiscoverFilters = {
+    searchQuery: "",
+    country: null,
+    language: null,
+    codec: null,
+    minBitrate: null,
+  };
+  const raw = readStorage(STORAGE_DISCOVER_FILTERS);
+  if (!raw) return empty;
+  try {
+    const parsed = JSON.parse(raw) as Partial<DiscoverFilters>;
+    const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
+    return {
+      searchQuery: typeof parsed.searchQuery === "string" ? parsed.searchQuery : "",
+      country: str(parsed.country),
+      language: str(parsed.language),
+      codec: str(parsed.codec),
+      minBitrate:
+        typeof parsed.minBitrate === "number" && parsed.minBitrate > 0 ? parsed.minBitrate : null,
+    };
+  } catch {
+    return empty;
+  }
+}
 
 const STALE_THRESHOLD_SECS = 24 * 3600;
 
@@ -96,11 +132,14 @@ class RadioStore {
   loadingStatus = $state(false);
 
   // Discover state
-  searchQuery = $state("");
-  selectedCountry = $state<string | null>(null);
-  selectedLanguage = $state<string | null>(null);
-  selectedCodec = $state<string | null>(null);
-  selectedMinBitrate = $state<number | null>(null);
+  private restoredFilters = readDiscoverFilters();
+  searchQuery = $state(this.restoredFilters.searchQuery);
+  selectedCountry = $state<string | null>(this.restoredFilters.country);
+  selectedLanguage = $state<string | null>(this.restoredFilters.language);
+  selectedCodec = $state<string | null>(this.restoredFilters.codec);
+  selectedMinBitrate = $state<number | null>(this.restoredFilters.minBitrate);
+  // Restored selections are checked once against the directory's facets.
+  private restoredFiltersChecked = false;
 
   discoverStations = $state<RadioDirectoryStation[]>([]);
   discoverLoading = $state(false);
@@ -224,6 +263,7 @@ class RadioStore {
       this.syncError = status.lastError ?? null;
       await this.loadMyStations();
       if (status.optedIn && status.stationCount > 0) {
+        await this.dropMissingRestoredFilters();
         await Promise.all([this.loadFacets(), this.loadDiscover()]);
       }
     } catch (err) {
@@ -231,6 +271,49 @@ class RadioStore {
     } finally {
       this.loadingStatus = false;
     }
+  }
+
+  /**
+   * A restored country, language or format may have left the directory since the
+   * last session (a re-sync dropped it). Clear such a selection rather than keep
+   * filtering on a value the dropdown can no longer show.
+   */
+  private async dropMissingRestoredFilters(): Promise<void> {
+    if (this.restoredFiltersChecked) return;
+    this.restoredFiltersChecked = true;
+    if (!this.selectedCountry && !this.selectedLanguage && !this.selectedCodec) return;
+    try {
+      const facets = await invoke<RadioDirectoryFacets>("get_radio_directory_facets", {
+        hideUnsupported: this._hideUnsupported,
+        tagLimit: 1,
+      });
+      if (!facets) return;
+      const has = (list: { name: string; code?: string | null }[], value: string) =>
+        list.some((e) => e.name === value || e.code === value);
+      if (this.selectedCountry && !has(facets.countries, this.selectedCountry)) {
+        this.selectedCountry = null;
+      }
+      if (this.selectedLanguage && !has(facets.languages, this.selectedLanguage)) {
+        this.selectedLanguage = null;
+      }
+      if (this.selectedCodec && !has(facets.codecs, this.selectedCodec)) {
+        this.selectedCodec = null;
+      }
+      this.persistFilters();
+    } catch {
+      // Keep the restored selection; the query still runs with it.
+    }
+  }
+
+  private persistFilters() {
+    const filters: DiscoverFilters = {
+      searchQuery: this.searchQuery,
+      country: this.selectedCountry,
+      language: this.selectedLanguage,
+      codec: this.selectedCodec,
+      minBitrate: this.selectedMinBitrate,
+    };
+    writeStorage(STORAGE_DISCOVER_FILTERS, JSON.stringify(filters));
   }
 
   async refreshAll(): Promise<void> {
@@ -421,11 +504,13 @@ class RadioStore {
   }
 
   private refreshDiscoverAndFacets() {
+    this.persistFilters();
     void Promise.all([this.loadDiscover(), this.loadFacets()]);
   }
 
   setSearchQuery(query: string, immediate = false) {
     this.searchQuery = query;
+    this.persistFilters();
     if (this.searchTimer) {
       clearTimeout(this.searchTimer);
       this.searchTimer = null;
@@ -457,6 +542,7 @@ class RadioStore {
     this.selectedCodec = codec;
     this._hideUnsupported = hideUnsupported;
     writeStorage(STORAGE_HIDE_UNSUPPORTED, String(hideUnsupported));
+    this.persistFilters();
     if (hideChanged) {
       void this.refreshAll();
     } else {
