@@ -3481,6 +3481,10 @@ export const ru = {
     exportStationsBtn: "Экспортировать сохранённые станции",
     exportStationsTooltip: "Экспортировать сохранённые станции",
     customStationAdded: "Добавлена станция {name}",
+    editStationMenu: "Редактировать станцию",
+    editStationTitle: "Редактировать свою станцию",
+    savingStation: "Сохранение…",
+    customStationUpdated: "Обновлена станция {name}",
     customStationsImported: {
       one: "Импортирована {count} станция",
       few: "Импортировано {count} станции",

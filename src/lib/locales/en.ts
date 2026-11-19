@@ -3204,6 +3204,10 @@ export const en = {
     exportStationsBtn: "Export Saved Stations",
     exportStationsTooltip: "Export saved stations",
     customStationAdded: "Added {name}",
+    editStationMenu: "Edit station",
+    editStationTitle: "Edit custom station",
+    savingStation: "Saving…",
+    customStationUpdated: "Updated {name}",
     customStationsImported: {
       one: "{count} station imported",
       other: "{count} stations imported",

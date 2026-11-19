@@ -3274,6 +3274,10 @@ export const it = {
     exportStationsBtn: "Esporta stazioni salvate",
     exportStationsTooltip: "Esporta stazioni salvate",
     customStationAdded: "{name} aggiunta",
+    editStationMenu: "Modifica stazione",
+    editStationTitle: "Modifica stazione personalizzata",
+    savingStation: "Salvataggio…",
+    customStationUpdated: "{name} aggiornata",
     customStationsImported: {
       one: "{count} stazione importata",
       other: "{count} stazioni importate",

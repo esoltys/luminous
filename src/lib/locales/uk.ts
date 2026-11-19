@@ -3471,6 +3471,10 @@ export const uk = {
     exportStationsBtn: "Експортувати збережені станції",
     exportStationsTooltip: "Експортувати збережені станції",
     customStationAdded: "Додано станцію {name}",
+    editStationMenu: "Редагувати станцію",
+    editStationTitle: "Редагувати власну станцію",
+    savingStation: "Збереження…",
+    customStationUpdated: "Оновлено станцію {name}",
     customStationsImported: {
       one: "Імпортовано {count} станцію",
       few: "Імпортовано {count} станції",

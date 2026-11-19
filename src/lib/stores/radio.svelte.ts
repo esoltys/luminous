@@ -155,6 +155,7 @@ class RadioStore {
   savedStations = $state<RadioDirectoryStation[]>([]);
   recentStations = $state<RadioDirectoryStation[]>([]);
   radioPlaylistIds = $state<number[]>([]);
+  editingStation = $state<RadioDirectoryStation | null>(null);
   myStationsLoading = $state(false);
 
   // Global search (TopNavigation) directory matches, see `searchStationsGlobal`.
@@ -510,6 +511,28 @@ class RadioStore {
     const rest = this.savedStations.filter((s) => s.stationuuid !== station.stationuuid);
     this.savedStations = [station, ...rest];
     toastStore.show(i18n.t("radio.customStationAdded", { name: station.name }), "success");
+    return station;
+  }
+
+  async updateCustomStation(
+    stationuuid: string,
+    name: string,
+    url: string,
+    tags: string,
+  ): Promise<RadioDirectoryStation> {
+    const station = await invoke<RadioDirectoryStation>("update_custom_radio_station", {
+      stationuuid,
+      name,
+      url,
+      tags,
+    });
+    this.savedStations = this.savedStations.map((s) =>
+      s.stationuuid === station.stationuuid ? station : s,
+    );
+    this.recentStations = this.recentStations.map((s) =>
+      s.stationuuid === station.stationuuid ? station : s,
+    );
+    toastStore.show(i18n.t("radio.customStationUpdated", { name: station.name }), "success");
     return station;
   }
 

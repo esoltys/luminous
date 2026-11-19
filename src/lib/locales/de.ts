@@ -3289,6 +3289,10 @@ export const de = {
     exportStationsBtn: "Gespeicherte Sender exportieren",
     exportStationsTooltip: "Gespeicherte Sender exportieren",
     customStationAdded: "{name} hinzugefügt",
+    editStationMenu: "Sender bearbeiten",
+    editStationTitle: "Eigenen Sender bearbeiten",
+    savingStation: "Wird gespeichert…",
+    customStationUpdated: "{name} aktualisiert",
     customStationsImported: {
       one: "{count} Sender importiert",
       other: "{count} Sender importiert",

@@ -296,6 +296,40 @@ pub async fn add_custom_radio_station(
     .map_err(|e| e.to_string())
 }
 
+/// Updates an existing custom radio station's name, URL (resolving `.pls`/`.m3u`/`.m3u8`
+/// playlists if needed), and tags (#2009).
+#[tauri::command]
+pub async fn update_custom_radio_station(
+    stationuuid: String,
+    name: String,
+    url: String,
+    tags: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<RadioDirectoryStation, String> {
+    let resolved = radio_directory::resolve_station_url(&url)
+        .await
+        .map_err(|e| e.to_string())?;
+    let final_name = if name.trim().is_empty() {
+        resolved
+            .title
+            .unwrap_or_else(|| resolved.stream_url.clone())
+    } else {
+        name
+    };
+    let tags = tags.unwrap_or_default();
+    crate::db::run_blocking(&state.db, move |conn| {
+        radio_directory::update_custom_station(
+            conn,
+            &stationuuid,
+            &final_name,
+            &resolved.stream_url,
+            &tags,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// Imports all `http(s)://` stream entries from a local `.pls`/`.m3u`/`.m3u8`/`.xspf`
 /// file as saved custom radio stations (#2009).
 #[tauri::command]

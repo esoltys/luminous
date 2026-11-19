@@ -447,4 +447,68 @@ describe("RadioView", () => {
     });
     expect(await screen.findByText("My Custom FM")).toBeInTheDocument();
   });
+
+  it("edits a custom station from its context menu", async () => {
+    const customStation = makeStation({
+      stationuuid: "custom-123",
+      name: "My Custom FM",
+      urlResolved: "https://custom.example/live.mp3",
+      tags: "indie",
+    });
+    const updatedStation = makeStation({
+      stationuuid: "custom-123",
+      name: "Updated FM",
+      urlResolved: "https://custom.example/hd.mp3",
+      tags: "jazz",
+    });
+    const status: RadioDirectoryStatus = {
+      optedIn: false,
+      stationCount: 0,
+      playableStationCount: 0,
+      lastSyncedAt: null,
+      lastFullSyncAt: null,
+      nextAutoSyncAt: null,
+      syncInProgress: false,
+      lastError: null,
+      attributionUrl: "https://www.radio-browser.info",
+    };
+
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_radio_directory_status") return status;
+      if (cmd === "get_saved_radio_stations") return [customStation];
+      if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
+      if (cmd === "update_custom_radio_station") return updatedStation;
+      return null;
+    });
+
+    radioStore.subView = "my_stations";
+    render(RadioView);
+
+    const card = await screen.findByTestId("radio-station-card");
+    await fireEvent.contextMenu(card);
+
+    const editItem = await screen.findByRole("menuitem", { name: "Edit station" });
+    await fireEvent.click(editItem);
+
+    const nameInput = await screen.findByTestId("add-station-name");
+    const urlInput = screen.getByTestId("add-station-url");
+    const tagsInput = screen.getByTestId("add-station-tags");
+    expect((nameInput as HTMLInputElement).value).toBe("My Custom FM");
+
+    await fireEvent.input(nameInput, { target: { value: "Updated FM" } });
+    await fireEvent.input(urlInput, { target: { value: "https://custom.example/hd.mp3" } });
+    await fireEvent.input(tagsInput, { target: { value: "jazz" } });
+    await fireEvent.click(screen.getByTestId("add-station-submit"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("update_custom_radio_station", {
+        stationuuid: "custom-123",
+        name: "Updated FM",
+        url: "https://custom.example/hd.mp3",
+        tags: "jazz",
+      });
+    });
+    expect(await screen.findByText("Updated FM")).toBeInTheDocument();
+  });
 });

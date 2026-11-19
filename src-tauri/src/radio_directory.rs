@@ -1569,6 +1569,48 @@ pub fn add_custom_station(
     find_station(conn, &uuid)?.ok_or_else(|| anyhow::anyhow!("Failed to load saved custom station"))
 }
 
+/// Updates an existing user-added custom station's name, stream URL, and tags (#2009).
+pub fn update_custom_station(
+    conn: &Connection,
+    stationuuid: &str,
+    name: &str,
+    stream_url: &str,
+    tags: &str,
+) -> Result<RadioDirectoryStation> {
+    let uuid = stationuuid.trim();
+    if !uuid.starts_with(CUSTOM_STATION_UUID_PREFIX) {
+        anyhow::bail!("Only custom stations can be edited");
+    }
+    let trimmed_name = name.trim();
+    if trimmed_name.is_empty() {
+        anyhow::bail!("Station name cannot be empty");
+    }
+    let url = stream_url.trim();
+    if !luminous_metadata::playlist::is_http_url(url) {
+        anyhow::bail!("Station URL must start with http:// or https://");
+    }
+    let uri = station_uri(uuid);
+    let genre = (!tags.trim().is_empty()).then_some(tags.trim());
+    let updated = conn.execute(
+        "UPDATE songs
+         SET title = ?1, stream_url = ?2, genre = ?3, mtime = ?4
+         WHERE path = ?5 AND source = ?6",
+        params![
+            trimmed_name,
+            url,
+            genre,
+            crate::clock::unix_now(),
+            uri,
+            crate::models::SongSource::STREAM_ID,
+        ],
+    )?;
+    if updated == 0 {
+        anyhow::bail!("Custom station '{uuid}' not found");
+    }
+    find_station(conn, uuid)?
+        .ok_or_else(|| anyhow::anyhow!("Failed to load updated custom station"))
+}
+
 fn playlist_extension_kind(
     url: &reqwest::Url,
 ) -> Option<luminous_metadata::playlist::PlaylistFormat> {
@@ -2855,6 +2897,19 @@ mod tests {
         export_saved_stations(&conn, &m3u_out).unwrap();
         let m3u_text = std::fs::read_to_string(&m3u_out).unwrap();
         assert!(m3u_text.contains("https://custom.example.com/stream%201"));
+
+        let updated = update_custom_station(
+            &conn,
+            &added.stationuuid,
+            "My Updated FM",
+            "https://custom.example.com/hd.aac",
+            "jazz",
+        )
+        .unwrap();
+        assert_eq!(updated.name, "My Updated FM");
+        assert_eq!(updated.url_resolved, "https://custom.example.com/hd.aac");
+        assert_eq!(updated.tags, "jazz");
+        assert!(update_custom_station(&conn, "dir-1", "X", "https://x.com/s", "").is_err());
     }
 
     #[tokio::test]

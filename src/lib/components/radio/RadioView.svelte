@@ -238,10 +238,12 @@
   </ContextMenu>
 {/if}
 
-{#if showAddStationModal}
+{#if showAddStationModal || radioStore.editingStation}
   <AddStationModal
+    station={radioStore.editingStation}
     onClose={() => {
       showAddStationModal = false;
+      radioStore.editingStation = null;
     }}
   />
 {/if}

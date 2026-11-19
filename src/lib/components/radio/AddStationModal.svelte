@@ -7,19 +7,29 @@
   } from "phosphor-svelte";
   import { radioStore } from "../../stores/radio.svelte";
   import { i18n } from "../../stores/i18n.svelte";
+  import type { RadioDirectoryStation } from "../../types";
   import Modal from "../Modal.svelte";
 
   interface Props {
+    station?: RadioDirectoryStation | null;
     onClose: () => void;
   }
 
-  let { onClose }: Props = $props();
+  let { station = null, onClose }: Props = $props();
+
+  const isEditing = $derived(station !== null);
 
   let name = $state("");
   let url = $state("");
   let tags = $state("");
   let submitting = $state(false);
   let error = $state<string | null>(null);
+
+  $effect(() => {
+    name = station?.name ?? "";
+    url = station?.urlResolved ?? "";
+    tags = station?.tags ?? "";
+  });
 
   const canSubmit = $derived(!submitting && name.trim().length > 0 && url.trim().length > 0);
 
@@ -29,7 +39,16 @@
     submitting = true;
     error = null;
     try {
-      await radioStore.addCustomStation(name.trim(), url.trim(), tags.trim());
+      if (station) {
+        await radioStore.updateCustomStation(
+          station.stationuuid,
+          name.trim(),
+          url.trim(),
+          tags.trim(),
+        );
+      } else {
+        await radioStore.addCustomStation(name.trim(), url.trim(), tags.trim());
+      }
       onClose();
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
@@ -68,7 +87,7 @@
 <Modal {onClose} closeOnBackdropClick ariaLabelledby="add-station-title">
   <div class="flex items-center justify-between px-5 py-4 border-b border-brand-border/50">
     <h2 id="add-station-title" class="text-base font-semibold text-brand-text-primary">
-      {i18n.t("radio.addStationTitle")}
+      {isEditing ? i18n.t("radio.editStationTitle") : i18n.t("radio.addStationTitle")}
     </h2>
     <button
       type="button"
@@ -140,16 +159,20 @@
     </div>
 
     <div class="flex items-center justify-between gap-2 pt-2 border-t border-brand-border/40">
-      <button
-        type="button"
-        disabled={submitting}
-        onclick={() => void handleImportFile()}
-        data-testid="add-station-import-file"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-surface disabled:opacity-50 transition-colors"
-      >
-        <FileUp class="w-3.5 h-3.5" />
-        <span>{i18n.t("radio.importStationFileBtn")}</span>
-      </button>
+      {#if !isEditing}
+        <button
+          type="button"
+          disabled={submitting}
+          onclick={() => void handleImportFile()}
+          data-testid="add-station-import-file"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-surface disabled:opacity-50 transition-colors"
+        >
+          <FileUp class="w-3.5 h-3.5" />
+          <span>{i18n.t("radio.importStationFileBtn")}</span>
+        </button>
+      {:else}
+        <span></span>
+      {/if}
 
       <div class="flex items-center gap-2">
         <button
@@ -165,7 +188,11 @@
           data-testid="add-station-submit"
           class="px-4 py-1.5 rounded-lg bg-brand-accent text-brand-accent-contrast text-xs font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
         >
-          {submitting ? i18n.t("radio.addingStation") : i18n.t("radio.addStationBtn")}
+          {#if submitting}
+            {isEditing ? i18n.t("radio.savingStation") : i18n.t("radio.addingStation")}
+          {:else}
+            {isEditing ? i18n.t("common.save") : i18n.t("radio.addStationBtn")}
+          {/if}
         </button>
       </div>
     </div>

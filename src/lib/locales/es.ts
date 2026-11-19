@@ -3281,6 +3281,10 @@ export const es = {
     exportStationsBtn: "Exportar emisoras guardadas",
     exportStationsTooltip: "Exportar emisoras guardadas",
     customStationAdded: "{name} añadida",
+    editStationMenu: "Editar emisora",
+    editStationTitle: "Editar emisora personalizada",
+    savingStation: "Guardando…",
+    customStationUpdated: "{name} actualizada",
     customStationsImported: {
       one: "{count} emisora importada",
       other: "{count} emisoras importadas",
