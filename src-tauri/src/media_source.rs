@@ -787,6 +787,8 @@ pub fn parse_icy_stream_title(block: &[u8]) -> Option<String> {
 
 struct ConnectedLiveStream {
     reader: Box<dyn Read + Send + Sync>,
+    /// The URL that answered, after redirects: HLS resolves segment URIs against it.
+    final_url: String,
     mime_type: Option<String>,
     metaint: Option<usize>,
     icy_headers: IcyHeaders,
@@ -864,7 +866,10 @@ impl LiveHttpSource {
         reconnect_backoffs: Vec<Duration>,
     ) -> Result<OpenedSource, String> {
         let label_str = label.unwrap_or(url).to_string();
-        let connected = connect_live_stream(url, &label_str)?;
+        let mut connected = connect_live_stream(url, &label_str)?;
+        if let Some(playlist) = take_hls_playlist(&mut connected)? {
+            return crate::hls::HlsLiveSource::open(&connected.final_url, &playlist, &label_str);
+        }
         let (metadata_tx, metadata_rx) = mpsc::channel();
         let can_reconnect_in_place = is_frame_resyncable_mime(connected.mime_type.as_deref(), url);
         let mime_type = connected.mime_type;
@@ -1094,6 +1099,45 @@ impl MediaSource for LiveHttpSource {
     }
 }
 
+/// If the live URL answered with an HLS playlist rather than audio, reads and
+/// returns the playlist text (#2012). Detected by content, not only by a
+/// `.m3u8` extension, which many stations' URLs don't have: a playlist MIME
+/// type, the extension, or any non-audio type is enough to peek at the body
+/// for `#EXTM3U`. Peeked bytes go back in front of the stream otherwise, so a
+/// mislabelled audio stream still plays.
+fn take_hls_playlist(connected: &mut ConnectedLiveStream) -> Result<Option<String>, String> {
+    let mime = connected.mime_type.as_deref();
+    let declared = mime.is_some_and(crate::hls::is_playlist_mime)
+        || crate::hls::has_m3u8_extension(&connected.final_url);
+    let audio_typed = mime.is_some_and(|m| {
+        let m = m.to_ascii_lowercase();
+        m.starts_with("audio/") || m.starts_with("application/ogg") || m.starts_with("video/")
+    });
+    if !declared && audio_typed {
+        return Ok(None);
+    }
+
+    let mut reader = std::mem::replace(&mut connected.reader, Box::new(std::io::empty()));
+    let mut prefix = Vec::with_capacity(16);
+    (&mut reader)
+        .take(16)
+        .read_to_end(&mut prefix)
+        .map_err(|e| e.to_string())?;
+    let head = prefix.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&prefix);
+    if !head.starts_with(b"#EXTM3U") {
+        connected.reader = Box::new(std::io::Cursor::new(prefix).chain(reader));
+        return Ok(None);
+    }
+
+    let rest = crate::hls::read_playlist_body(reader, 2 * 1024 * 1024)?;
+    let text = format!("{}{rest}", String::from_utf8_lossy(&prefix));
+    if crate::hls::playlist::looks_like_hls(&text) {
+        Ok(Some(text))
+    } else {
+        Err("The station's URL is a playlist file, not an audio stream".to_string())
+    }
+}
+
 fn parse_icy_header_values<'a>(
     mut get_str: impl FnMut(&str) -> Option<&'a str>,
 ) -> (Option<usize>, IcyHeaders) {
@@ -1156,8 +1200,10 @@ fn connect_live_stream(url: &str, label: &str) -> Result<ConnectedLiveStream, St
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty());
             let (metaint, icy_headers) = parse_icy_headers_from_map(resp.headers());
+            let final_url = resp.url().to_string();
             Ok(ConnectedLiveStream {
                 reader: Box::new(resp),
+                final_url,
                 mime_type,
                 metaint,
                 icy_headers,
@@ -1279,6 +1325,7 @@ fn connect_shoutcast_v1_fallback(
 
     Ok(ConnectedLiveStream {
         reader: Box::new(reader),
+        final_url: url.to_string(),
         mime_type,
         metaint,
         icy_headers,
