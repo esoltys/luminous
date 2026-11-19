@@ -2129,6 +2129,31 @@ export const it = {
     disbanded: "Scioglimento",
     lessThanOneYearAgo: "<1 anno fa",
   },
+  airplay: {
+    title: "Ora in radio",
+    consentBody:
+      "Mostra quali stazioni radio online stanno trasmettendo questo brano in questo momento. Attivandolo, artista e titolo del brano vengono inviati a Tuneping.",
+    consentAccept: "Mostra stazioni",
+    consentDecline: "Non ora",
+    loading: "Controllo delle stazioni…",
+    empty: "Nessuna stazione sta trasmettendo questo brano in questo momento.",
+    unavailable: "Impossibile raggiungere Tuneping. Riprova tra poco.",
+    unavailableStale: "Impossibile raggiungere Tuneping. Viene mostrato l'ultimo risultato.",
+    confirmedAgo: "Confermato {age}",
+    bitrate: "{bitrate} kbit/s",
+    more: {
+      one: "+{count} altra stazione",
+      other: "+{count} altre stazioni",
+    },
+    refresh: "Aggiorna stazioni",
+    attribution: "Dati di Tuneping",
+    detectedLabel: "Informazioni su questi dati",
+    detectedHint:
+      "Rilevato dai metadati delle stazioni: Tuneping legge il brano che ogni stazione annuncia nel suo flusso. L'annuncio può essere leggermente in anticipo o in ritardo rispetto alla musica.",
+    settingsTitle: "Ora in radio",
+    settingsHint:
+      "Mostra nel pannello Informazioni quali stazioni radio online stanno trasmettendo il brano. Attivandolo, artista e titolo vengono inviati a Tuneping.",
+  },
   artistEvents: {
     panelTitle: "Prossimi concerti ed eventi",
     noEvents: "Nessun concerto in programma trovato",

@@ -1,4 +1,5 @@
 pub mod addons;
+pub mod airplay;
 pub mod collection;
 pub mod context;
 pub mod cover;

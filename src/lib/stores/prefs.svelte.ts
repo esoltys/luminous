@@ -26,6 +26,8 @@ interface UiPreferences {
   save_artwork_to_folders: boolean;
   detect_tempo_and_key: boolean;
   verify_audio_integrity_and_provenance: boolean;
+  airplay_enabled: boolean;
+  airplay_prompt_dismissed: boolean;
   auto_playlists_genre: boolean;
   auto_playlists_decade: boolean;
   auto_playlists_artist_tag: boolean;
@@ -66,6 +68,10 @@ class PrefsStore {
   detectTempoAndKey = $state<boolean>(false);
   /** Verify audio file integrity and lossless provenance in the background (#2189). Off by default. */
   verifyAudioIntegrityAndProvenance = $state<boolean>(false);
+  /** Show "On the radio now" in the right panel; sends artist and title to TunePing (#1998). Off by default. */
+  airplayEnabled = $state<boolean>(false);
+  /** The user chose "Not now" on the "On the radio now" consent card, so it stays hidden. */
+  airplayPromptDismissed = $state<boolean>(false);
   /** Which families of auto-playlists the library keeps; all on by default. */
   autoPlaylists = $state<Record<AutoPlaylistFamily, boolean>>({
     genre: true,
@@ -121,6 +127,8 @@ class PrefsStore {
     this.saveArtworkToFolders = prefs.save_artwork_to_folders;
     this.detectTempoAndKey = prefs.detect_tempo_and_key ?? false;
     this.verifyAudioIntegrityAndProvenance = prefs.verify_audio_integrity_and_provenance ?? false;
+    this.airplayEnabled = prefs.airplay_enabled ?? false;
+    this.airplayPromptDismissed = prefs.airplay_prompt_dismissed ?? false;
     this.autoPlaylists = {
       genre: prefs.auto_playlists_genre ?? true,
       decade: prefs.auto_playlists_decade ?? true,
@@ -193,6 +201,8 @@ class PrefsStore {
       save_artwork_to_folders: this.saveArtworkToFolders,
       detect_tempo_and_key: this.detectTempoAndKey,
       verify_audio_integrity_and_provenance: this.verifyAudioIntegrityAndProvenance,
+      airplay_enabled: this.airplayEnabled,
+      airplay_prompt_dismissed: this.airplayPromptDismissed,
       auto_playlists_genre: this.autoPlaylists.genre,
       auto_playlists_decade: this.autoPlaylists.decade,
       auto_playlists_artist_tag: this.autoPlaylists.artist_tag,
@@ -262,6 +272,19 @@ class PrefsStore {
 
   setVerifyAudioIntegrityAndProvenance(enabled: boolean) {
     this.verifyAudioIntegrityAndProvenance = enabled;
+    this.save();
+  }
+
+  /** Turns "On the radio now" on or off; either answer retires the consent card. */
+  setAirplayEnabled(enabled: boolean) {
+    this.airplayEnabled = enabled;
+    if (!enabled) this.airplayPromptDismissed = true;
+    this.save();
+  }
+
+  /** "Not now" on the consent card: hide the card without turning the section on. */
+  dismissAirplayPrompt() {
+    this.airplayPromptDismissed = true;
     this.save();
   }
 

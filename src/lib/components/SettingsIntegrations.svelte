@@ -26,6 +26,7 @@
     HeartIcon as Heart,
     WifiHighIcon as WifiHigh,
     WifiSlashIcon as WifiSlash,
+    RadioIcon as Radio,
     DiscordLogoIcon as DiscordLogo,
   } from "phosphor-svelte";
 
@@ -234,6 +235,30 @@
   {#if showMusicBrainzLoginModal}
     <MusicBrainzLoginModal onClose={() => (showMusicBrainzLoginModal = false)} />
   {/if}
+
+  <!-- "On the radio now" via TunePing (#1998): opt-in, it sends artist and title -->
+  <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
+    <div class="flex justify-between items-center gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+          <Radio class="w-5 h-5" />
+        </div>
+        <div class="space-y-1 min-w-0">
+          <h3 class="font-bold text-sm text-brand-text-primary">
+            {i18n.t("airplay.settingsTitle")}
+          </h3>
+          <p class="text-xs text-brand-text-secondary leading-relaxed">
+            {i18n.t("airplay.settingsHint")}
+          </p>
+        </div>
+      </div>
+      <Toggle
+        checked={prefs.airplayEnabled}
+        onchange={(v) => prefs.setAirplayEnabled(v)}
+        label={i18n.t("airplay.settingsTitle")}
+      />
+    </div>
+  </div>
 {/if}
 
 <!-- MusicBrainz Picard Card -->

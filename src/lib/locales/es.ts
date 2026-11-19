@@ -2129,6 +2129,31 @@ export const es = {
     disbanded: "Disolución",
     lessThanOneYearAgo: "Hace menos de 1 año",
   },
+  airplay: {
+    title: "Ahora en la radio",
+    consentBody:
+      "Muestra qué emisoras de radio por internet están poniendo esta canción ahora mismo. Al activarlo, se envían el artista y el título de la canción a Tuneping.",
+    consentAccept: "Mostrar emisoras",
+    consentDecline: "Ahora no",
+    loading: "Comprobando emisoras…",
+    empty: "Ninguna emisora está poniendo esta canción ahora mismo.",
+    unavailable: "No se pudo contactar con Tuneping. Inténtalo de nuevo en un momento.",
+    unavailableStale: "No se pudo contactar con Tuneping. Se muestra el último resultado.",
+    confirmedAgo: "Confirmado {age}",
+    bitrate: "{bitrate} kb/s",
+    more: {
+      one: "+{count} emisora más",
+      other: "+{count} emisoras más",
+    },
+    refresh: "Actualizar emisoras",
+    attribution: "Datos de Tuneping",
+    detectedLabel: "Acerca de estos datos",
+    detectedHint:
+      "Detectado a partir de los metadatos de las emisoras: Tuneping lee la canción que cada emisora anuncia en su transmisión. El anuncio puede ir un poco adelantado o atrasado respecto a la música.",
+    settingsTitle: "Ahora en la radio",
+    settingsHint:
+      "Muestra en el panel Información qué emisoras de radio por internet están poniendo la canción. Al activarlo, se envían el artista y el título a Tuneping.",
+  },
   artistEvents: {
     panelTitle: "Próximos conciertos y eventos",
     noEvents: "No se encontraron próximos conciertos",
