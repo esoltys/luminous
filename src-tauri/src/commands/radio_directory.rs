@@ -306,8 +306,19 @@ pub async fn get_radio_station_list_tags(
     .map_err(|e| e.to_string())
 }
 
-/// Creates a new dynamic station list (`playlists` row with `dynamic_enabled = 1`
-/// and a `radio:` spec) and populates it immediately (#2006).
+fn apply_radio_spec_and_fetch(
+    pm: &mut crate::playlist::PlaylistManager,
+    playlist_id: i64,
+    spec_str: &str,
+) -> anyhow::Result<Playlist> {
+    pm.set_playlist_dynamic_spec(playlist_id, spec_str)?;
+    pm.get_playlists()?
+        .into_iter()
+        .find(|p| p.id == playlist_id)
+        .ok_or_else(|| anyhow::anyhow!("Station list {playlist_id} not found"))
+}
+
+/// Creates a new dynamic radio station list and populates it from the directory (#2006).
 #[tauri::command]
 pub async fn create_radio_station_list(
     name: String,
@@ -317,17 +328,13 @@ pub async fn create_radio_station_list(
     let spec_str = spec.to_spec_string();
     crate::playlist::with_playlists(&state.playlists, move |pm| {
         let created = pm.create_playlist(&name)?;
-        pm.set_playlist_dynamic_spec(created.id, &spec_str)?;
-        pm.get_playlists()?
-            .into_iter()
-            .find(|p| p.id == created.id)
-            .ok_or_else(|| anyhow::anyhow!("Created station list {} missing", created.id))
+        apply_radio_spec_and_fetch(pm, created.id, &spec_str)
     })
     .await
     .map_err(|e| e.to_string())
 }
 
-/// Updates an existing dynamic station list's name and `radio:` spec, and
+/// Updates an existing dynamic radio station list's name and filters, and
 /// repopulates it immediately (#2006).
 #[tauri::command]
 pub async fn update_radio_station_list(
@@ -339,11 +346,7 @@ pub async fn update_radio_station_list(
     let spec_str = spec.to_spec_string();
     crate::playlist::with_playlists(&state.playlists, move |pm| {
         pm.rename_playlist(playlist_id, &name)?;
-        pm.set_playlist_dynamic_spec(playlist_id, &spec_str)?;
-        pm.get_playlists()?
-            .into_iter()
-            .find(|p| p.id == playlist_id)
-            .ok_or_else(|| anyhow::anyhow!("Station list {playlist_id} not found"))
+        apply_radio_spec_and_fetch(pm, playlist_id, &spec_str)
     })
     .await
     .map_err(|e| e.to_string())

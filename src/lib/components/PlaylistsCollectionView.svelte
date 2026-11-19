@@ -604,6 +604,31 @@
             {/each}
           </div>
         {:else}
+          {#snippet playlistGrid(items: typeof sortedPlaylists)}
+            <div
+              class="grid {activeViewMode === 'rows'
+                ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2'
+                : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}"
+            >
+              {#each items as pl (pl.id)}
+                {#if activeViewMode === "rows"}
+                  <PlaylistRowCard
+                    playlist={pl}
+                    onClick={() => openPlaylist(pl)}
+                    oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
+                  />
+                {:else}
+                  <PlaylistCard
+                    playlist={pl}
+                    widthClass="w-full"
+                    onClick={() => openPlaylist(pl)}
+                    oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
+                  />
+                {/if}
+              {/each}
+            </div>
+          {/snippet}
+
           {#if sortedPlaylists.length === 0 && sortedStationLists.length === 0}
             <div class="col-span-full py-16 text-center">
               <EmptyState
@@ -616,28 +641,7 @@
             </div>
           {:else}
             {#if sortedPlaylists.length > 0}
-              <div
-                class="grid {activeViewMode === 'rows'
-                  ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2'
-                  : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}"
-              >
-                {#each sortedPlaylists as pl (pl.id)}
-                  {#if activeViewMode === "rows"}
-                    <PlaylistRowCard
-                      playlist={pl}
-                      onClick={() => openPlaylist(pl)}
-                      oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
-                    />
-                  {:else}
-                    <PlaylistCard
-                      playlist={pl}
-                      widthClass="w-full"
-                      onClick={() => openPlaylist(pl)}
-                      oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
-                    />
-                  {/if}
-                {/each}
-              </div>
+              {@render playlistGrid(sortedPlaylists)}
             {/if}
 
             {#if sortedStationLists.length > 0}
@@ -645,28 +649,7 @@
                 <h3 class="label-heading text-brand-text-secondary">
                   {i18n.t("radio.stationListsTitle")}
                 </h3>
-                <div
-                  class="grid {activeViewMode === 'rows'
-                    ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2'
-                    : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}"
-                >
-                  {#each sortedStationLists as pl (pl.id)}
-                    {#if activeViewMode === "rows"}
-                      <PlaylistRowCard
-                        playlist={pl}
-                        onClick={() => openPlaylist(pl)}
-                        oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
-                      />
-                    {:else}
-                      <PlaylistCard
-                        playlist={pl}
-                        widthClass="w-full"
-                        onClick={() => openPlaylist(pl)}
-                        oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
-                      />
-                    {/if}
-                  {/each}
-                </div>
+                {@render playlistGrid(sortedStationLists)}
               </section>
             {/if}
           {/if}
