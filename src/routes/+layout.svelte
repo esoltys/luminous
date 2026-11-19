@@ -630,13 +630,17 @@
                   >
                     {playerStore.currentSongDisplayTitle}
                   </h1>
+                  {#if playerStore.currentSong.album?.trim()}
+                    <p
+                      class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold"
+                    >
+                      {playerStore.currentSong.album}
+                    </p>
+                  {/if}
                   <p
-                    class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold"
-                  >
-                    {playerStore.currentSong.album || i18n.t("collection.unknownAlbum")}
-                  </p>
-                  <p
-                    class="mt-0.5 text-base md:text-lg text-brand-text-secondary/70 select-text font-medium"
+                    class="{playerStore.currentSong.album?.trim()
+                      ? 'mt-0.5'
+                      : 'mt-3'} text-base md:text-lg text-brand-text-secondary/70 select-text font-medium"
                   >
                     {playerStore.currentSong.artist || i18n.t("collection.unknownArtist")}
                   </p>

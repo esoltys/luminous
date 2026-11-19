@@ -15,6 +15,8 @@
   import { prefs } from "../stores/prefs.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
+  import RadioSaveButton from "./radio/RadioSaveButton.svelte";
+  import { stationUuidFromPath } from "../stores/radio.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
@@ -455,13 +457,18 @@
             {playerStore.currentSongDisplayTitle}
           </span>
           {#if playerStore.currentSong}
-            <SongRating
-              rating={playerStore.currentSong.rating}
-              loved={playerStore.currentSong.loved}
-              onRate={(r) => playerStore.rateCurrent(r)}
-              onSetLoved={(l) => playerStore.setLovedCurrent(l)}
-              size="sm"
-            />
+            {@const radioUuid = stationUuidFromPath(playerStore.currentSong.path)}
+            {#if radioUuid}
+              <RadioSaveButton stationuuid={radioUuid} size="sm" />
+            {:else}
+              <SongRating
+                rating={playerStore.currentSong.rating}
+                loved={playerStore.currentSong.loved}
+                onRate={(r) => playerStore.rateCurrent(r)}
+                onSetLoved={(l) => playerStore.setLovedCurrent(l)}
+                size="sm"
+              />
+            {/if}
           {/if}
         </div>
         {#if playerStore.currentSong?.album?.trim()}

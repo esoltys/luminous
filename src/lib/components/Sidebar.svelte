@@ -24,6 +24,7 @@
     ChartBarIcon as BarChart2,
     BroomIcon as Broom,
     HouseIcon as Home,
+    BroadcastIcon as Radio,
     MicrophoneStageIcon as Mic2,
     DiscIcon as DiscAlbum,
     MusicNotesIcon as Music,
@@ -414,6 +415,9 @@
 
     <!-- Files stays on an empty library: it's where a new user adds music. -->
     <SidebarFilesSection collapsed={layoutCollapsed} showSubItems={subItemsVisible} />
+
+    <!-- Internet Radio works without a local music library too (#2005). -->
+    {@render navButton("radio", i18n.t("sidebar.radio"), Radio)}
 
     {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0 || walkthroughStore.isActive}
       {@render navButton("organize", i18n.t("sidebar.organize"), Broom)}

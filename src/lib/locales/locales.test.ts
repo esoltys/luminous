@@ -181,6 +181,7 @@ const IDENTICAL_OK_FR = new Set([
   "shortcuts.groupNavigation", // "Navigation"
   "sidebar.albums", // "Albums"
   "sidebar.genres", // "Genres"
+  "radio.stationCount", // "{count} stations"
   "smartPlaylistBuilder.fieldAlbum", // "Album"
   "smartPlaylistBuilder.fieldBpm", // "BPM"
   "smartPlaylistBuilder.fieldCompilation", // "Compilation"
@@ -226,6 +227,7 @@ const IDENTICAL_OK_IT = new Set<string>([
   "collection.tableHeaderAlbum", // "Album"
   "collection.albumPlaylistName", // "Album: {name}"
   "collection.columnBitrate", // "Bitrate"
+  "radio.sortBitrate", // "Bitrate"
   "collection.columnBpm", // "BPM"
   "collection.booleanNo", // "No"
   "collection.columnAlbum", // "Album"
@@ -403,6 +405,8 @@ const IDENTICAL_OK_DE = new Set<string>([
   "units.db",
   "units.lufs",
   "sidebar.genres",
+  "radio.sortName", // "Name"
+  "radio.sortBitrate", // "Bitrate"
   "sidebar.scanningPhaseLabel",
   "collection.tableHeaderTrack",
   "collection.tableHeaderAlbum",

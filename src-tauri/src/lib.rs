@@ -1816,6 +1816,12 @@ pub fn run() {
             commands::radio_directory::get_radio_directory_facets,
             commands::radio_directory::materialize_radio_station,
             commands::radio_directory::report_radio_station_click,
+            commands::radio_directory::save_radio_station,
+            commands::radio_directory::unsave_radio_station,
+            commands::radio_directory::get_saved_radio_stations,
+            commands::radio_directory::get_recent_radio_stations,
+            commands::radio_directory::get_radio_playlist_ids,
+            commands::radio_directory::play_radio_station,
             // Portable device commands (#835)
             commands::devices::get_connected_devices,
             commands::files::list_file_sources,

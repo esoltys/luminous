@@ -22,6 +22,7 @@ export type ScriptTab =
   | "collection"
   | "playlists"
   | "files"
+  | "radio"
   | "settings"
   | "lyrics"
   | "stats"

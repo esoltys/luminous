@@ -50,6 +50,15 @@
         version: collectionStore.coverArtVersion,
       }),
   );
+  // Only set crossorigin="anonymous" for local luminous-art URLs; external HTTP(S)
+  // radio station favicons often omit CORS headers and would otherwise be blocked.
+  let isLocalArtUrl = $derived(
+    Boolean(
+      displaySrc &&
+      (displaySrc.startsWith("luminous-art://") ||
+        displaySrc.startsWith("http://luminous-art.localhost/")),
+    ),
+  );
 
   $effect(() => {
     const node = box;
@@ -168,7 +177,7 @@
   {#if displaySrc && boxPixels !== null && !hasFailed}
     <img
       src={displaySrc}
-      crossorigin="anonymous"
+      crossorigin={isLocalArtUrl ? "anonymous" : undefined}
       alt={i18n.t("common.albumArtAlt")}
       loading="lazy"
       class="w-full h-full object-cover transition-opacity duration-300 {isLoading

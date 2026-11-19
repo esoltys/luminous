@@ -162,6 +162,10 @@
       {#await import("../lib/components/files/FilesView.svelte") then { default: FilesView }}
         <FilesView />
       {/await}
+    {:else if navigationStore.activeTab === "radio"}
+      {#await import("../lib/components/radio/RadioView.svelte") then { default: RadioView }}
+        <RadioView />
+      {/await}
     {:else if navigationStore.activeTab === "settings"}
       {#await import("../lib/components/SettingsView.svelte") then { default: SettingsView }}
         <SettingsView />

@@ -1279,16 +1279,19 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
  */
 export function resolveArtUrl(art: string | null | undefined, original = false): string | null {
   if (!art || typeof art !== "string") return null;
-  if (art.startsWith("http://") || art.startsWith("https://")) {
-    return art;
+  const trimmed = art.trim();
+  const lower = trimmed.toLowerCase();
+  if (!trimmed || lower === "null" || lower === "undefined") return null;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
   }
-  if (art.startsWith("luminous-art://")) {
-    return getCoverArtUrl(art);
+  if (trimmed.startsWith("luminous-art://")) {
+    return getCoverArtUrl(trimmed);
   }
-  if (art.startsWith("album-")) {
-    return getCoverArtUrl(`luminous-art://${art}`);
+  if (trimmed.startsWith("album-")) {
+    return getCoverArtUrl(`luminous-art://${trimmed}`);
   }
-  return getCoverArtUrl(`luminous-art://${original ? "local" : "thumb"}/${art}`);
+  return getCoverArtUrl(`luminous-art://${original ? "local" : "thumb"}/${trimmed}`);
 }
 
 /**
@@ -1584,4 +1587,80 @@ export interface RestoreTagHistoryResult {
   unchangedTracks: number;
   skippedTracks: number;
   errors: string[];
+}
+
+export interface RadioDirectoryStatus {
+  optedIn: boolean;
+  stationCount: number;
+  playableStationCount: number;
+  lastSyncedAt: number | null;
+  lastFullSyncAt: number | null;
+  nextAutoSyncAt: number | null;
+  syncInProgress: boolean;
+  lastError: string | null;
+  attributionUrl: string;
+}
+
+export interface RadioDirectorySyncProgress {
+  mode: "incremental" | "full" | string;
+  fetchedStations: number;
+  page: number;
+  done: boolean;
+}
+
+export interface RadioDirectorySyncStats {
+  mode: "incremental" | "full" | string;
+  upserted: number;
+  removed: number;
+  totalStations: number;
+  syncedAt: number;
+}
+
+export interface RadioDirectoryStation {
+  stationuuid: string;
+  name: string;
+  urlResolved: string;
+  homepage: string;
+  favicon: string;
+  tags: string;
+  country: string;
+  countrycode: string;
+  language: string;
+  codec: string;
+  bitrate: number;
+  hls: boolean;
+  votes: number;
+  clickcount: number;
+  lastcheckok: boolean;
+  changeuuid: string;
+  updatedAt: number;
+  playable: boolean;
+}
+
+export type RadioDirectoryOrder = "clickcount" | "votes" | "name" | "bitrate";
+
+export interface RadioDirectoryQuery {
+  search?: string | null;
+  tag?: string | null;
+  countrycode?: string | null;
+  language?: string | null;
+  codec?: string | null;
+  minBitrate?: number | null;
+  hideUnsupported?: boolean;
+  orderBy?: RadioDirectoryOrder;
+  offset?: number;
+  limit?: number;
+}
+
+export interface RadioBrowserFacetEntry {
+  name: string;
+  code?: string | null;
+  stationcount: number;
+}
+
+export interface RadioDirectoryFacets {
+  tags: RadioBrowserFacetEntry[];
+  countries: RadioBrowserFacetEntry[];
+  languages: RadioBrowserFacetEntry[];
+  codecs: RadioBrowserFacetEntry[];
 }

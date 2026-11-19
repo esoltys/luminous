@@ -699,12 +699,14 @@ pub fn get_station_by_uuid(
         .optional()?)
 }
 
-/// Queries stations from the local `radio_directory` mirror using FTS5 full-text search
-/// and optional tag, country, language, codec, bitrate, and playability filters.
-pub fn query_stations(
-    conn: &Connection,
+/// Builds SQL WHERE clauses and bind parameters for `query_stations` and
+/// `compute_filtered_facets`. When `include_facets` is false, `countrycode`,
+/// `language`, and `codec` are omitted so cross-linked facet counts can be
+/// accumulated in a single scan.
+fn build_where_clauses(
     query: &RadioDirectoryQuery,
-) -> Result<Vec<RadioDirectoryStation>> {
+    include_facets: bool,
+) -> (Vec<String>, Vec<Box<dyn ToSql>>) {
     let mut clauses = vec!["lastcheckok = 1".to_string()];
     let mut bind_params: Vec<Box<dyn ToSql>> = Vec::new();
 
@@ -728,30 +730,32 @@ pub fn query_stations(
         }
     }
 
-    if let Some(ref cc) = query.countrycode {
-        let clean_cc = cc.trim().to_ascii_uppercase();
-        if !clean_cc.is_empty() {
-            bind_params.push(Box::new(clean_cc));
-            let idx = bind_params.len();
-            clauses.push(format!("countrycode = ?{idx}"));
+    if include_facets {
+        if let Some(ref cc) = query.countrycode {
+            let clean_cc = cc.trim().to_ascii_uppercase();
+            if !clean_cc.is_empty() {
+                bind_params.push(Box::new(clean_cc));
+                let idx = bind_params.len();
+                clauses.push(format!("(countrycode = ?{idx} OR UPPER(country) = ?{idx})"));
+            }
         }
-    }
 
-    if let Some(ref lang) = query.language {
-        let clean_lang = lang.trim().to_lowercase();
-        if !clean_lang.is_empty() {
-            bind_params.push(Box::new(format!("%,{clean_lang},%")));
-            let idx = bind_params.len();
-            clauses.push(format!("(',' || language || ',') LIKE ?{idx}"));
+        if let Some(ref lang) = query.language {
+            let clean_lang = lang.trim().to_lowercase();
+            if !clean_lang.is_empty() {
+                bind_params.push(Box::new(format!("%,{clean_lang},%")));
+                let idx = bind_params.len();
+                clauses.push(format!("(',' || language || ',') LIKE ?{idx}"));
+            }
         }
-    }
 
-    if let Some(ref codec) = query.codec {
-        let clean_codec = codec.trim().to_ascii_uppercase();
-        if !clean_codec.is_empty() {
-            bind_params.push(Box::new(clean_codec));
-            let idx = bind_params.len();
-            clauses.push(format!("codec = ?{idx}"));
+        if let Some(ref codec) = query.codec {
+            let clean_codec = codec.trim().to_ascii_uppercase();
+            if !clean_codec.is_empty() {
+                bind_params.push(Box::new(clean_codec));
+                let idx = bind_params.len();
+                clauses.push(format!("codec = ?{idx}"));
+            }
         }
     }
 
@@ -764,6 +768,17 @@ pub fn query_stations(
     if query.hide_unsupported {
         clauses.push("hls = 0".to_string());
     }
+
+    (clauses, bind_params)
+}
+
+/// Queries stations from the local `radio_directory` mirror using FTS5 full-text search
+/// and optional tag, country, language, codec, bitrate, and playability filters.
+pub fn query_stations(
+    conn: &Connection,
+    query: &RadioDirectoryQuery,
+) -> Result<Vec<RadioDirectoryStation>> {
+    let (clauses, bind_params) = build_where_clauses(query, true);
 
     let order_sql = match query.order_by {
         RadioDirectoryOrder::Clickcount => "clickcount DESC, votes DESC, name COLLATE NOCASE ASC",
@@ -811,12 +826,31 @@ pub fn compute_local_facets(
     hide_unsupported: bool,
     tag_limit: usize,
 ) -> Result<RadioDirectoryFacets> {
-    let mut stmt = conn.prepare(
+    let query = RadioDirectoryQuery {
+        hide_unsupported,
+        ..Default::default()
+    };
+    compute_filtered_facets(conn, &query, tag_limit)
+}
+
+/// Computes cross-linked facet counts for `query` in a single scan: each facet
+/// (countries, languages, codecs) applies all other active filters except its own
+/// dimension so users can still switch values within that dimension (#2005).
+pub fn compute_filtered_facets(
+    conn: &Connection,
+    query: &RadioDirectoryQuery,
+    tag_limit: usize,
+) -> Result<RadioDirectoryFacets> {
+    let (clauses, bind_params) = build_where_clauses(query, false);
+    let sql = format!(
         "SELECT tags, country, countrycode, language, codec, hls
          FROM radio_directory
-         WHERE lastcheckok = 1",
-    )?;
-    let rows = stmt.query_map([], |r| {
+         WHERE {}",
+        clauses.join(" AND ")
+    );
+    let param_refs: Vec<&dyn ToSql> = bind_params.iter().map(|b| b.as_ref()).collect();
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(param_refs.as_slice(), |r| {
         Ok((
             r.get::<_, String>(0)?,
             r.get::<_, String>(1)?,
@@ -827,6 +861,22 @@ pub fn compute_local_facets(
         ))
     })?;
 
+    let filter_cc = query
+        .countrycode
+        .as_deref()
+        .map(|s| s.trim().to_ascii_uppercase())
+        .filter(|s| !s.is_empty());
+    let filter_lang = query
+        .language
+        .as_deref()
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty());
+    let filter_codec = query
+        .codec
+        .as_deref()
+        .map(|s| s.trim().to_ascii_uppercase())
+        .filter(|s| !s.is_empty());
+
     let mut tag_counts: HashMap<String, i64> = HashMap::new();
     let mut country_counts: HashMap<String, (String, i64)> = HashMap::new();
     let mut language_counts: HashMap<String, i64> = HashMap::new();
@@ -834,15 +884,25 @@ pub fn compute_local_facets(
 
     for row in rows {
         let (tags, country, countrycode, language, codec, hls) = row?;
-        if hide_unsupported && !can_play_stream(&codec, hls) {
+        if query.hide_unsupported && !can_play_stream(&codec, hls) {
             continue;
         }
 
-        if !codec.is_empty() {
+        let matches_cc = filter_cc.as_ref().is_none_or(|cc| {
+            countrycode.eq_ignore_ascii_case(cc) || country.eq_ignore_ascii_case(cc)
+        });
+        let matches_lang = filter_lang
+            .as_ref()
+            .is_none_or(|lang| language.split(',').any(|l| l.eq_ignore_ascii_case(lang)));
+        let matches_codec = filter_codec
+            .as_ref()
+            .is_none_or(|c| codec.eq_ignore_ascii_case(c));
+
+        if matches_cc && matches_lang && !codec.is_empty() {
             *codec_counts.entry(codec).or_default() += 1;
         }
 
-        if !countrycode.is_empty() || !country.is_empty() {
+        if matches_lang && matches_codec && (!countrycode.is_empty() || !country.is_empty()) {
             let key = if !countrycode.is_empty() {
                 countrycode.clone()
             } else {
@@ -857,13 +917,13 @@ pub fn compute_local_facets(
             entry.1 += 1;
         }
 
-        if !language.is_empty() {
+        if matches_cc && matches_codec && !language.is_empty() {
             for lang in language.split(',').filter(|l| !l.is_empty()) {
                 *language_counts.entry(lang.to_string()).or_default() += 1;
             }
         }
 
-        if !tags.is_empty() {
+        if matches_cc && matches_lang && matches_codec && !tags.is_empty() {
             for tag in tags.split(',').filter(|t| !t.is_empty()) {
                 *tag_counts.entry(tag.to_string()).or_default() += 1;
             }
@@ -952,14 +1012,27 @@ pub fn resolve_station_stream_url(conn: &Connection, stationuuid: &str) -> Resul
 /// a normal playable item (#2004). Idempotent: updates station metadata if the
 /// row already exists.
 pub fn materialize_station(conn: &Connection, stationuuid: &str) -> Result<crate::models::Song> {
-    let station = get_station_by_uuid(conn, stationuuid)?
-        .ok_or_else(|| anyhow::anyhow!("Radio station '{stationuuid}' not found in directory"))?;
-    let uri = station_uri(&station.stationuuid);
+    let uri = station_uri(stationuuid);
+    let Some(station) = get_station_by_uuid(conn, stationuuid)? else {
+        // If a saved/recent station was pruned from `radio_directory` upstream,
+        // fall back to its already-materialized `songs` row when present.
+        let sql = format!(
+            "SELECT {} FROM songs WHERE path = ?1 LIMIT 1",
+            crate::collection::SONG_SELECT_COLS
+        );
+        return conn
+            .query_row(&sql, params![uri], crate::collection::row_to_song)
+            .map_err(|_| anyhow::anyhow!("Radio station '{stationuuid}' not found in directory"));
+    };
     let now = crate::clock::unix_now();
     let bitrate = (station.bitrate > 0).then_some(station.bitrate);
     let genre = (!station.tags.trim().is_empty()).then_some(station.tags.as_str());
     let homepage = (!station.homepage.trim().is_empty()).then_some(station.homepage.as_str());
-    let favicon = (!station.favicon.trim().is_empty()).then_some(station.favicon.as_str());
+    let favicon_trimmed = station.favicon.trim();
+    let favicon = (!favicon_trimmed.is_empty()
+        && !favicon_trimmed.eq_ignore_ascii_case("null")
+        && !favicon_trimmed.eq_ignore_ascii_case("undefined"))
+    .then_some(favicon_trimmed);
     let artist = (!station.country.trim().is_empty()).then_some(station.country.as_str());
 
     let existing_id: Option<i64> = conn
@@ -982,7 +1055,7 @@ pub fn materialize_station(conn: &Connection, stationuuid: &str) -> Result<crate
                 genre = ?7,
                 bitrate = ?8,
                 length_nanosec = NULL,
-                art_manual = COALESCE(?9, art_manual),
+                art_manual = COALESCE(?9, NULLIF(art_manual, 'null')),
                 mtime = ?10,
                 unavailable = 0
              WHERE id = ?11",
@@ -1052,6 +1125,9 @@ pub fn gc_unreferenced_stations(
            AND CAST(id AS TEXT) NOT IN (
                SELECT ref_key FROM pinned_items WHERE item_type = 'song'
            )
+           AND path NOT IN (
+               SELECT ?4 || stationuuid FROM radio_saved
+           )
            AND id NOT IN (
                SELECT id FROM songs
                WHERE source = ?1
@@ -1062,9 +1138,191 @@ pub fn gc_unreferenced_stations(
             crate::models::SongSource::RADIO_BROWSER_ID,
             protected_song_id,
             keep_recent as i64,
+            crate::media_source::RADIO_URI_SCHEME,
         ],
     )?;
     Ok(deleted)
+}
+
+/// Saves a station in `radio_saved` (idempotent) and materializes its fallback
+/// `songs` row if present in `radio_directory` so it survives directory prunes (#2005).
+pub fn save_station(conn: &Connection, stationuuid: &str) -> Result<()> {
+    let uuid = stationuuid.trim();
+    if uuid.is_empty() {
+        return Ok(());
+    }
+    let now = crate::clock::unix_now();
+    conn.execute(
+        "INSERT OR IGNORE INTO radio_saved (stationuuid, saved_at) VALUES (?1, ?2)",
+        params![uuid, now],
+    )?;
+    let _ = materialize_station(conn, uuid);
+    Ok(())
+}
+
+/// Removes a station from `radio_saved` (idempotent) (#2005).
+pub fn unsave_station(conn: &Connection, stationuuid: &str) -> Result<()> {
+    conn.execute(
+        "DELETE FROM radio_saved WHERE stationuuid = ?1",
+        params![stationuuid.trim()],
+    )?;
+    Ok(())
+}
+
+fn station_from_joined_row(
+    row: &rusqlite::Row<'_>,
+    stationuuid: String,
+    require_song_fallback: bool,
+) -> rusqlite::Result<Option<RadioDirectoryStation>> {
+    let dir_uuid: Option<String> = row.get(1)?;
+    if let Some(dir_uuid) = dir_uuid {
+        let codec: String = row.get(10)?;
+        let hls: bool = row.get::<_, i32>(12)? != 0;
+        let playable = can_play_stream(&codec, hls);
+        return Ok(Some(RadioDirectoryStation {
+            stationuuid: dir_uuid,
+            name: row.get(2)?,
+            url_resolved: row.get(3)?,
+            homepage: row.get(4)?,
+            favicon: row.get(5)?,
+            tags: row.get(6)?,
+            country: row.get(7)?,
+            countrycode: row.get(8)?,
+            language: row.get(9)?,
+            codec,
+            bitrate: row.get(11)?,
+            hls,
+            votes: row.get(13)?,
+            clickcount: row.get(14)?,
+            lastcheckok: row.get::<_, i32>(15)? != 0,
+            changeuuid: row.get(16)?,
+            updated_at: row.get(17)?,
+            playable,
+        }));
+    }
+
+    let song_title: Option<String> = row.get(18)?;
+    let song_stream_url: Option<String> = row.get(19)?;
+    if require_song_fallback && song_title.is_none() && song_stream_url.is_none() {
+        return Ok(None);
+    }
+
+    Ok(Some(RadioDirectoryStation {
+        stationuuid,
+        name: song_title.unwrap_or_default(),
+        url_resolved: song_stream_url.unwrap_or_default(),
+        homepage: row.get::<_, Option<String>>(20)?.unwrap_or_default(),
+        favicon: row.get::<_, Option<String>>(21)?.unwrap_or_default(),
+        tags: row.get::<_, Option<String>>(22)?.unwrap_or_default(),
+        country: row.get::<_, Option<String>>(23)?.unwrap_or_default(),
+        countrycode: String::new(),
+        language: String::new(),
+        codec: String::new(),
+        bitrate: row.get::<_, Option<i32>>(24)?.unwrap_or(0),
+        hls: false,
+        votes: 0,
+        clickcount: 0,
+        lastcheckok: true,
+        changeuuid: String::new(),
+        updated_at: row.get::<_, Option<i64>>(25)?.unwrap_or(0),
+        playable: true,
+    }))
+}
+
+const JOINED_STATION_COLS: &str = "
+    rd.stationuuid, rd.name, rd.url_resolved, rd.homepage, rd.favicon,
+    rd.tags, rd.country, rd.countrycode, rd.language, rd.codec,
+    rd.bitrate, rd.hls, rd.votes, rd.clickcount, rd.lastcheckok,
+    rd.changeuuid, rd.updated_at,
+    s.title, s.stream_url, s.url, s.art_manual, s.genre, s.artist,
+    s.bitrate, COALESCE(s.lastplayed, s.mtime, s.added, 0)
+";
+
+fn collect_joined_stations<I>(rows: I, hide_unsupported: bool) -> Result<Vec<RadioDirectoryStation>>
+where
+    I: Iterator<Item = rusqlite::Result<Option<RadioDirectoryStation>>>,
+{
+    let mut stations = Vec::new();
+    for item in rows {
+        if let Some(st) = item? {
+            if !hide_unsupported || st.playable {
+                stations.push(st);
+            }
+        }
+    }
+    Ok(stations)
+}
+
+/// Lists user-saved stations ordered by `saved_at DESC` (#2005).
+/// Prefers live `radio_directory` metadata and falls back to materialized `songs`
+/// metadata if a saved station was pruned upstream.
+pub fn list_saved_stations(
+    conn: &Connection,
+    hide_unsupported: bool,
+) -> Result<Vec<RadioDirectoryStation>> {
+    let sql = format!(
+        "SELECT rs.stationuuid, {JOINED_STATION_COLS}
+         FROM radio_saved rs
+         LEFT JOIN radio_directory rd ON rd.stationuuid = rs.stationuuid
+         LEFT JOIN songs s ON s.path = (?1 || rs.stationuuid)
+         ORDER BY rs.saved_at DESC, rs.stationuuid ASC"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![crate::media_source::RADIO_URI_SCHEME], |row| {
+        let saved_uuid: String = row.get(0)?;
+        station_from_joined_row(row, saved_uuid, true)
+    })?;
+    collect_joined_stations(rows, hide_unsupported)
+}
+
+/// Lists recently played/opened radio stations ordered most-recent first (#2005).
+pub fn list_recent_stations(
+    conn: &Connection,
+    limit: usize,
+    hide_unsupported: bool,
+) -> Result<Vec<RadioDirectoryStation>> {
+    let limit = limit.clamp(1, 200);
+    let prefix_len = crate::media_source::RADIO_URI_SCHEME.len() as i64;
+    let sql = format!(
+        "SELECT SUBSTR(s.path, ?1 + 1) AS stationuuid, {JOINED_STATION_COLS}
+         FROM songs s
+         LEFT JOIN radio_directory rd ON rd.stationuuid = SUBSTR(s.path, ?1 + 1)
+         WHERE s.source = ?2
+           AND s.path LIKE (?3 || '%')
+         ORDER BY COALESCE(s.lastplayed, s.mtime, s.added, 0) DESC, s.id DESC
+         LIMIT ?4"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(
+        params![
+            prefix_len,
+            crate::models::SongSource::RADIO_BROWSER_ID,
+            crate::media_source::RADIO_URI_SCHEME,
+            limit as i64
+        ],
+        |row| {
+            let uuid: String = row.get(0)?;
+            station_from_joined_row(row, uuid, false)
+        },
+    )?;
+    collect_joined_stations(rows, hide_unsupported)
+}
+
+/// Returns IDs of playlists that contain at least one `RadioBrowser` station (#2005).
+pub fn list_radio_playlist_ids(conn: &Connection) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare(
+        "SELECT DISTINCT pi.playlist_id
+         FROM playlist_items pi
+         JOIN songs s ON s.id = pi.song_id
+         WHERE s.source = ?1
+         ORDER BY pi.playlist_id ASC",
+    )?;
+    let ids = stmt
+        .query_map(params![crate::models::SongSource::RADIO_BROWSER_ID], |r| {
+            r.get(0)
+        })?
+        .collect::<rusqlite::Result<Vec<i64>>>()?;
+    Ok(ids)
 }
 
 #[cfg(test)]
@@ -1708,5 +1966,132 @@ mod tests {
         };
         assert_eq!(surviving_ids, vec![s1.id, s2.id, s3.id, s5.id]);
         let _ = s4;
+    }
+
+    #[test]
+    fn save_unsave_and_recent_stations_round_trip_with_pruned_fallback() {
+        let (_dir, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+
+        let stations = vec![
+            RadioBrowserStation {
+                stationuuid: "uuid-a".into(),
+                changeuuid: "c-a".into(),
+                name: "Station A".into(),
+                url_resolved: "https://stream.example/uuid-a.mp3".into(),
+                homepage: "https://example.com/uuid-a".into(),
+                favicon: String::new(),
+                tags: "jazz".into(),
+                country: "Canada".into(),
+                countrycode: "CA".into(),
+                language: "english".into(),
+                codec: "MP3".into(),
+                bitrate: 128,
+                hls: false,
+                votes: 10,
+                clickcount: 50,
+                lastcheckok: true,
+                lastchangetime_iso8601: Some("2026-06-01T00:00:00Z".into()),
+            },
+            RadioBrowserStation {
+                stationuuid: "uuid-b".into(),
+                changeuuid: "c-b".into(),
+                name: "Station B".into(),
+                url_resolved: "https://stream.example/uuid-b.aac".into(),
+                homepage: "https://example.com/uuid-b".into(),
+                favicon: String::new(),
+                tags: "rock".into(),
+                country: "Germany".into(),
+                countrycode: "DE".into(),
+                language: "german".into(),
+                codec: "AAC".into(),
+                bitrate: 192,
+                hls: true, // HLS -> unsupported
+                votes: 10,
+                clickcount: 30,
+                lastcheckok: true,
+                lastchangetime_iso8601: Some("2026-06-01T00:00:00Z".into()),
+            },
+        ];
+        let tx = conn.transaction().unwrap();
+        upsert_stations_tx(&tx, &stations, 1000).unwrap();
+        tx.commit().unwrap();
+
+        // Save both (idempotent), verify hide_unsupported filtering.
+        save_station(&conn, "uuid-a").unwrap();
+        save_station(&conn, "uuid-a").unwrap();
+        save_station(&conn, "uuid-b").unwrap();
+
+        let playable_saved = list_saved_stations(&conn, true).unwrap();
+        assert_eq!(playable_saved.len(), 1);
+        assert_eq!(playable_saved[0].stationuuid, "uuid-a");
+
+        let all_saved = list_saved_stations(&conn, false).unwrap();
+        assert_eq!(all_saved.len(), 2);
+
+        // Recent stations includes materialized stations.
+        let recent = list_recent_stations(&conn, 10, true).unwrap();
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].stationuuid, "uuid-a");
+
+        // Country facet -> query_stations round-trip
+        let facets = compute_local_facets(&conn, true, 50).unwrap();
+        let canada = facets
+            .countries
+            .iter()
+            .find(|c| c.name == "Canada")
+            .unwrap();
+        assert_eq!(canada.code.as_deref(), Some("CA"));
+        let ca_stations = query_stations(
+            &conn,
+            &RadioDirectoryQuery {
+                countrycode: canada.code.clone(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(ca_stations.len(), 1);
+        assert_eq!(ca_stations[0].stationuuid, "uuid-a");
+
+        // Cross-linked facets: filtering by CA narrows languages to CA's languages while keeping all countries selectable.
+        let ca_facets = compute_filtered_facets(
+            &conn,
+            &RadioDirectoryQuery {
+                countrycode: Some("CA".into()),
+                hide_unsupported: false,
+                ..Default::default()
+            },
+            50,
+        )
+        .unwrap();
+        assert_eq!(ca_facets.languages.len(), 1);
+        assert_eq!(ca_facets.languages[0].name, "english");
+        assert_eq!(ca_facets.countries.len(), 2);
+
+        // Prune uuid-a from radio_directory; saved + materialize still resolve via songs fallback,
+        // and GC keeps uuid-a because it is saved.
+        conn.execute(
+            "DELETE FROM radio_directory WHERE stationuuid = 'uuid-a'",
+            [],
+        )
+        .unwrap();
+        let deleted = gc_unreferenced_stations(&conn, 0, None).unwrap();
+        assert_eq!(deleted, 0);
+
+        let fallback_saved = list_saved_stations(&conn, true).unwrap();
+        assert_eq!(fallback_saved.len(), 1);
+        assert_eq!(fallback_saved[0].name, "Station A");
+
+        let rematerialized = materialize_station(&conn, "uuid-a").unwrap();
+        assert_eq!(rematerialized.title.as_deref(), Some("Station A"));
+
+        unsave_station(&conn, "uuid-a").unwrap();
+        unsave_station(&conn, "uuid-a").unwrap();
+        unsave_station(&conn, "uuid-b").unwrap();
+        assert!(list_saved_stations(&conn, false).unwrap().is_empty());
+
+        // list_radio_playlist_ids executes cleanly against the real playlists schema.
+        let pl_ids = list_radio_playlist_ids(&conn).unwrap();
+        assert!(pl_ids.is_empty());
     }
 }

@@ -85,12 +85,14 @@ pub async fn get_radio_directory_station(
 pub async fn get_radio_directory_facets(
     hide_unsupported: Option<bool>,
     tag_limit: Option<usize>,
+    query: Option<RadioDirectoryQuery>,
     state: State<'_, AppState>,
 ) -> Result<RadioDirectoryFacets, String> {
     let hide_unsupported = hide_unsupported.unwrap_or(true);
     let tag_limit = tag_limit.unwrap_or(500);
-    crate::db::run_blocking(&state.db, move |conn| {
-        radio_directory::compute_local_facets(conn, hide_unsupported, tag_limit)
+    crate::db::run_blocking(&state.db, move |conn| match query {
+        Some(q) => radio_directory::compute_filtered_facets(conn, &q, tag_limit),
+        None => radio_directory::compute_local_facets(conn, hide_unsupported, tag_limit),
     })
     .await
     .map_err(|e| e.to_string())
@@ -146,4 +148,104 @@ pub async fn report_radio_station_click(
     state: State<'_, AppState>,
 ) -> Result<Option<String>, String> {
     report_station_click_if_online(&state.db, stationuuid).await
+}
+
+/// Saves a radio station to `radio_saved` (idempotent) (#2005).
+#[tauri::command]
+pub async fn save_radio_station(
+    stationuuid: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    crate::db::run_blocking(&state.db, move |conn| {
+        radio_directory::save_station(conn, &stationuuid)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Removes a radio station from `radio_saved` (idempotent) (#2005).
+#[tauri::command]
+pub async fn unsave_radio_station(
+    stationuuid: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    crate::db::run_blocking(&state.db, move |conn| {
+        radio_directory::unsave_station(conn, &stationuuid)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Returns all user-saved radio stations ordered most-recently-saved first (#2005).
+#[tauri::command]
+pub async fn get_saved_radio_stations(
+    hide_unsupported: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<Vec<RadioDirectoryStation>, String> {
+    let hide_unsupported = hide_unsupported.unwrap_or(true);
+    crate::db::run_blocking(&state.db, move |conn| {
+        radio_directory::list_saved_stations(conn, hide_unsupported)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Returns recently played/opened radio stations ordered most-recent first (#2005).
+#[tauri::command]
+pub async fn get_recent_radio_stations(
+    limit: Option<usize>,
+    hide_unsupported: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<Vec<RadioDirectoryStation>, String> {
+    let limit = limit.unwrap_or(20);
+    let hide_unsupported = hide_unsupported.unwrap_or(true);
+    crate::db::run_blocking(&state.db, move |conn| {
+        radio_directory::list_recent_stations(conn, limit, hide_unsupported)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Returns IDs of custom playlists containing at least one radio station (#2005).
+#[tauri::command]
+pub async fn get_radio_playlist_ids(state: State<'_, AppState>) -> Result<Vec<i64>, String> {
+    crate::db::run_blocking(&state.db, radio_directory::list_radio_playlist_ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Materializes `stationuuid` as a `songs` row, replaces the Queue and starts
+/// playback, and dispatches click reporting asynchronously when online (#2005).
+#[tauri::command]
+pub async fn play_radio_station(
+    stationuuid: String,
+    state: State<'_, AppState>,
+) -> Result<crate::models::Song, String> {
+    let uuid_for_db = stationuuid.clone();
+    let song = crate::db::run_blocking(&state.db, move |conn| {
+        let song = crate::radio_directory::materialize_station(conn, &uuid_for_db)?;
+        let _ = crate::radio_directory::gc_unreferenced_stations(
+            conn,
+            crate::radio_directory::DEFAULT_RECENT_STATION_TAIL,
+            Some(song.id),
+        );
+        Ok(song)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    crate::commands::player::replace_queue_and_play(
+        &state,
+        &[song.id],
+        0,
+        Some(crate::models::PlayContext::Song),
+    )
+    .await?;
+
+    let db = Arc::clone(&state.db);
+    tauri::async_runtime::spawn(async move {
+        let _ = report_station_click_if_online(&db, stationuuid).await;
+    });
+
+    Ok(song)
 }

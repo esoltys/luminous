@@ -260,6 +260,11 @@
     cursor: default;
   }
 
+  select option {
+    background-color: var(--color-brand-sidebar);
+    color: var(--color-brand-text-primary);
+  }
+
   input[type="text"],
   input[type="search"],
   input[type="number"],

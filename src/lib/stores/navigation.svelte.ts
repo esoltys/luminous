@@ -11,6 +11,7 @@ export type ActiveTab =
   | "collection"
   | "playlists"
   | "files"
+  | "radio"
   | "settings"
   | "lyrics"
   | "stats"
