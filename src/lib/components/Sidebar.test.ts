@@ -384,4 +384,25 @@ describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
     const { getByRole } = render(Sidebar, { props: { width: 256 } });
     expect(getByRole("button", { name: /custom/i })).not.toHaveAttribute("data-drop-target");
   });
+
+  it("uses a consistent text-sm font-medium scale across all expanded nav buttons and text-xs for section labels", () => {
+    const { getByRole, getByText } = render(Sidebar, { props: { width: 256 } });
+    for (const name of [
+      /home/i,
+      /artists/i,
+      /songs/i,
+      /auto/i,
+      /organize/i,
+      /settings/i,
+      /help/i,
+    ]) {
+      const btn = getByRole("button", { name });
+      expect(btn).toHaveClass("text-sm", "font-medium");
+      expect(btn).not.toHaveClass("text-xs", "font-semibold");
+    }
+    for (const heading of ["Library", "Playlists", "Files"]) {
+      const label = getByText(heading);
+      expect(label).toHaveClass("text-xs", "font-medium");
+    }
+  });
 });

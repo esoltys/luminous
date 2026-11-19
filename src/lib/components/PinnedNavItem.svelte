@@ -6,6 +6,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { resolveArtistPortraitUrl, getArtistCoverStack } from "../utils/covers";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
+  import { SIDEBAR_CAPTION_TEXT_CLASS, SIDEBAR_NAV_TEXT_CLASS } from "../utils/sidebarNav";
   import type { ExtendedArtworkResponse } from "../types";
 
   interface Props {
@@ -91,7 +92,7 @@
     : ''} {collapsed
     ? 'w-10 h-10 flex items-center justify-center rounded-xl mx-auto'
     : 'w-full flex items-center gap-3 px-3 py-1 rounded-lg'} {pin.isActive
-    ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
+    ? 'bg-brand-accent/20 text-brand-accent-text'
     : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
 >
   {#if isDragOver}
@@ -158,11 +159,11 @@
   <!-- Text metadata (expanded only) -->
   {#if !collapsed}
     <div class="flex-1 min-w-0 flex flex-col justify-center leading-tight">
-      <span class="truncate text-xs font-medium text-brand-text-primary">
+      <span class="truncate {SIDEBAR_NAV_TEXT_CLASS}">
         {pin.title}
       </span>
       {#if pin.subtitle}
-        <span class="truncate text-[11px] text-brand-text-secondary/80">
+        <span class="truncate {SIDEBAR_CAPTION_TEXT_CLASS} text-brand-text-secondary/80">
           {pin.subtitle}
         </span>
       {/if}
