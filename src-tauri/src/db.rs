@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 94;
+pub const CURRENT_SCHEMA_VERSION: i32 = 95;
 
 struct Migration {
     version: i32,
