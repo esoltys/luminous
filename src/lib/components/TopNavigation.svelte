@@ -68,10 +68,7 @@
     if (!q) return;
     filesStore.clearFilter();
     isSearchFocused = false;
-    navigationStore.activeTab = "collection";
-    navigationStore.activeSubTab = "songs";
-    collectionStore.searchQuery = q;
-    collectionStore.search(q);
+    navigationStore.searchLibrary(q);
   }
 
   function openSearchedFolder(folder: FolderSearchResult) {

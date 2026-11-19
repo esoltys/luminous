@@ -247,10 +247,10 @@ fn seed_tooltip(app: AppHandle, tray: TrayIcon) {
 }
 
 fn tooltip_text(state: &PlaybackState) -> String {
-    match &state.current_song {
-        Some(song) => match &song.artist {
-            Some(artist) => format!("{} — {}", song.display_title(), artist),
-            None => song.display_title().to_string(),
+    match crate::now_playing::labels(state) {
+        Some(l) => match l.artist {
+            Some(artist) => format!("{} — {}", l.title, artist),
+            None => l.title,
         },
         None => "Luminous".to_string(),
     }
@@ -284,6 +284,23 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(tooltip_text(&state), "Money");
+    }
+
+    #[test]
+    fn tooltip_shows_the_track_a_station_announces() {
+        let state = PlaybackState {
+            current_song: Some(Song {
+                title: Some("Groove Salad".to_string()),
+                artist: Some("US".to_string()),
+                ..Default::default()
+            }),
+            station_now_playing: Some(crate::now_playing::StationNowPlaying {
+                artist: Some("Air".to_string()),
+                title: "Alone in Kyoto".to_string(),
+            }),
+            ..Default::default()
+        };
+        assert_eq!(tooltip_text(&state), "Alone in Kyoto — Air");
     }
 
     #[test]

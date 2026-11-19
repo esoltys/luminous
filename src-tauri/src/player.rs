@@ -191,6 +191,10 @@ pub struct Player {
     /// True once the Radio Browser click report has been dispatched for the
     /// current live station play (#2004).
     click_reported_for_play: bool,
+    /// The track the playing station announces in its stream metadata
+    /// (#2008). Lives here, never on the song row, and is cleared whenever a
+    /// track starts or playback stops, so it never outlives its station play.
+    station_now_playing: Option<crate::now_playing::StationNowPlaying>,
 
     /// Consecutive playback failures since the last successful `Playing`
     /// event — see `MAX_CONSECUTIVE_PLAYBACK_ERRORS`.
@@ -414,6 +418,7 @@ impl Player {
             scrobbled: false,
             scrobbler: None,
             click_reported_for_play: false,
+            station_now_playing: None,
             consecutive_playback_errors: 0,
             remote_streaming_active: None,
         };
@@ -810,6 +815,7 @@ impl Player {
         };
         self.scrobbled = false;
         self.click_reported_for_play = false;
+        self.station_now_playing = None;
 
         match kind {
             GaplessTargetKind::Replay => {
@@ -1176,6 +1182,32 @@ impl Player {
         self.audio.lock().await.resume(fade_ms)
     }
 
+    /// Records the `StreamTitle` the engine reported for `track_id` (#2008).
+    /// Ignored unless that track is the live station playing now, so a late
+    /// title from the previous station never lands on the next one. Returns
+    /// whether the announced track changed (an unparseable title clears it).
+    pub fn note_stream_title(&mut self, track_id: i64, raw: &str) -> bool {
+        let Some(song) = self
+            .current_song
+            .as_ref()
+            .filter(|s| s.id == track_id && crate::audio::is_live_song(s))
+        else {
+            return false;
+        };
+        let parsed = crate::now_playing::parse_stream_title(raw, song.title.as_deref());
+        if parsed == self.station_now_playing {
+            return false;
+        }
+        self.station_now_playing = parsed;
+        true
+    }
+
+    /// Forgets the station's announced track, e.g. when its stream drops.
+    /// Returns whether there was one.
+    pub fn clear_station_now_playing(&mut self) -> bool {
+        self.station_now_playing.take().is_some()
+    }
+
     /// Returns the Radio Browser `stationuuid` once per play when a `radio://`
     /// station begins playing, so the caller can dispatch the click report (#2004).
     pub fn take_pending_station_click_uuid(&mut self) -> Option<String> {
@@ -1313,6 +1345,7 @@ impl Player {
         self.current_song = None;
         self.current_item_uuid = None;
         self.current_playlist_id = None;
+        self.station_now_playing = None;
         self.persist_current_song().await;
         self.persist_position(0).await;
         let fade_ms = self.fade_duration_ms().await;
@@ -2087,6 +2120,7 @@ impl Player {
             playlist_total,
             volume_safety: self.volume_safety,
             playback_speed: self.playback_speed,
+            station_now_playing: self.station_now_playing.clone(),
         }
     }
 
@@ -3867,5 +3901,95 @@ mod tests {
             Some("station-test-1")
         );
         assert_eq!(player.take_pending_station_click_uuid(), None);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn station_now_playing_follows_its_station_and_clears_on_change_and_stop() {
+        let (_dir, db) = setup_test_db();
+        let db = Arc::new(db);
+        let audio = Arc::new(tokio::sync::Mutex::new(crate::audio::AudioEngine::new()));
+        let mut player = Player::new(db, audio);
+        let station = |id: i64, name: &str| Song {
+            id,
+            title: Some(name.to_string()),
+            source: crate::models::SongSource::RadioBrowser,
+            path: Some(format!("radio://station-{id}")),
+            ..Song::default()
+        };
+        let announced = |p: &Player| {
+            p.station_now_playing
+                .as_ref()
+                .map(|np| (np.artist.clone(), np.title.clone()))
+        };
+
+        player
+            .start_track(
+                station(1, "Groove Salad"),
+                None,
+                GaplessTargetKind::Queue,
+                false,
+            )
+            .await
+            .unwrap();
+        assert!(player.note_stream_title(1, "Air - Alone in Kyoto"));
+        assert_eq!(
+            announced(&player),
+            Some((Some("Air".to_string()), "Alone in Kyoto".to_string()))
+        );
+        assert!(
+            !player.note_stream_title(1, "Air - Alone in Kyoto"),
+            "unchanged title: nothing to emit"
+        );
+        let state = player.get_state().await;
+        assert_eq!(
+            state.station_now_playing.map(|np| np.title).as_deref(),
+            Some("Alone in Kyoto")
+        );
+        assert_eq!(
+            state.current_song.and_then(|s| s.title).as_deref(),
+            Some("Groove Salad"),
+            "the song row keeps the station name"
+        );
+
+        // The station repeating its own name clears the announced track.
+        assert!(player.note_stream_title(1, "Groove Salad"));
+        assert_eq!(announced(&player), None);
+        assert!(player.note_stream_title(1, "Air - Alone in Kyoto"));
+
+        // A new station starts with nothing announced, and a late title from
+        // the old station is ignored.
+        player
+            .start_track(
+                station(2, "Drone Zone"),
+                None,
+                GaplessTargetKind::Queue,
+                false,
+            )
+            .await
+            .unwrap();
+        assert_eq!(announced(&player), None);
+        assert!(!player.note_stream_title(1, "Late - Title"));
+        assert_eq!(announced(&player), None);
+
+        // The stream dropping, and stop, both clear it.
+        assert!(player.note_stream_title(2, "Stars of the Lid - Requiem"));
+        assert!(player.clear_station_now_playing());
+        assert!(!player.clear_station_now_playing());
+        assert!(player.note_stream_title(2, "Stars of the Lid - Requiem"));
+        player.stop().await.unwrap();
+        assert_eq!(announced(&player), None);
+
+        // A library song never takes a station title.
+        let local = Song {
+            id: 3,
+            title: Some("Roygbiv".to_string()),
+            ..Song::default()
+        };
+        player
+            .start_track(local, None, GaplessTargetKind::Queue, false)
+            .await
+            .unwrap();
+        assert!(!player.note_stream_title(3, "Some - Thing"));
+        assert_eq!(announced(&player), None);
     }
 }

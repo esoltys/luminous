@@ -141,10 +141,16 @@ impl MediaSessionHandle {
         let cover_url = cover_path
             .filter(|p| p.exists())
             .map(|p| format!("file://{}", p.display()));
+        // A station's announced track (#2008) wins over the station's own row.
+        let labels = crate::now_playing::labels(playback);
+        let (title, artist, album) = match labels {
+            Some(l) => (Some(l.title), l.artist, l.album),
+            None => (None, None, None),
+        };
         let cmd = Command::Update {
-            title: song.map(|s| s.display_title().to_string()),
-            artist: song.and_then(|s| s.artist.clone()),
-            album: song.and_then(|s| s.album.clone()),
+            title,
+            artist,
+            album,
             duration: song
                 .and_then(|s| s.length_nanosec)
                 .filter(|&ns| ns > 0)

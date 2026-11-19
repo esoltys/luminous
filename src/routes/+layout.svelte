@@ -642,7 +642,7 @@
                       ? 'mt-0.5'
                       : 'mt-3'} text-base md:text-lg text-brand-text-secondary/70 select-text font-medium"
                   >
-                    {playerStore.currentSong.artist || i18n.t("collection.unknownArtist")}
+                    {playerStore.currentSongDisplaySubtitle}
                   </p>
                 </div>
               {:else if playerStore.completedSession}

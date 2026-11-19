@@ -489,12 +489,15 @@ impl ScrobblerManager {
         Ok(username)
     }
 
-    /// Update or clear Discord Rich Presence based on playback state.
+    /// Update or clear Discord Rich Presence based on playback state. For a
+    /// station announcing its current track (#2008), that track is shown with
+    /// the station name in the album's place.
     pub async fn update_discord(
         &self,
         song: Option<&Song>,
         is_playing: bool,
         position_nanosec: i64,
+        station_now_playing: Option<&crate::now_playing::StationNowPlaying>,
     ) {
         let settings = self.effective_settings().await;
         if !settings.discord_enabled || settings.scrobble_paused {
@@ -520,9 +523,18 @@ impl ScrobblerManager {
             }
         };
 
-        let artist = song.artist.as_deref().unwrap_or("Unknown Artist");
-        let title = song.title.as_deref().unwrap_or("Unknown Track");
-        let album = song.album.as_deref();
+        let (title, artist, album) = match station_now_playing {
+            Some(np) => (
+                np.title.as_str(),
+                np.artist.as_deref().unwrap_or("Unknown Artist"),
+                Some(song.display_title()),
+            ),
+            None => (
+                song.title.as_deref().unwrap_or("Unknown Track"),
+                song.artist.as_deref().unwrap_or("Unknown Artist"),
+                song.album.as_deref(),
+            ),
+        };
 
         let state_str = if is_playing {
             if settings.discord_show_album {
@@ -614,8 +626,9 @@ impl ScrobblerManager {
         song: Option<&Song>,
         is_playing: bool,
         position_nanosec: i64,
+        station_now_playing: Option<&crate::now_playing::StationNowPlaying>,
     ) {
-        self.update_discord(song, is_playing, position_nanosec)
+        self.update_discord(song, is_playing, position_nanosec, station_now_playing)
             .await;
     }
 

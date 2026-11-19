@@ -1735,6 +1735,8 @@ export const es = {
     trackSkippedRemoteToast: "No se pudo reproducir «{title}»: {message}. Se omitió.",
     stationOfflineToast: "«{title}» — Emisora sin conexión.",
     liveBadge: "En vivo",
+    findInLibrary: "Buscar en la biblioteca",
+    onAirLabel: "Al aire",
     openNothingPlayable: "No se encontraron archivos de audio compatibles para reproducir.",
     playSongFailed: "No se pudo reproducir esta canción.",
     noSongPlaying: "No hay ninguna canción en reproducción",

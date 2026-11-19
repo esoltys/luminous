@@ -785,6 +785,10 @@ pub struct PlaybackState {
     /// Playback speed (#2142), 1.0 = normal. Pitch is preserved.
     #[serde(default = "default_playback_speed")]
     pub playback_speed: f32,
+    /// The track the playing station announces (#2008). `None` for library
+    /// songs, stations that send no metadata, and while stopped.
+    #[serde(default)]
+    pub station_now_playing: Option<crate::now_playing::StationNowPlaying>,
 }
 
 fn default_playback_speed() -> f32 {

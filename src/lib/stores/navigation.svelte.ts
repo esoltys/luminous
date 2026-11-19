@@ -535,6 +535,17 @@ class NavigationStore {
     this.viewKeyedAutoPlaylist("language", "language:", code);
   }
 
+  /** Searches the whole library for `query` and shows the matching songs,
+   * as the top search bar's "search the library" does. */
+  searchLibrary(query: string) {
+    const q = query.trim();
+    if (!q) return;
+    this.activeTab = "collection";
+    this.activeSubTab = "songs";
+    collectionStore.searchQuery = q;
+    void collectionStore.search(q);
+  }
+
   viewArtist(name: string) {
     collectionStore.searchQuery = "";
     collectionStore.searchResults = [];
