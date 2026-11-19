@@ -35,15 +35,10 @@
 >
   <!-- Saved stations -->
   <section class="space-y-3">
-    <div class="flex items-center justify-between">
-      <h2 class="flex items-center gap-2 text-xl font-semibold text-brand-text-primary">
-        <Bookmark class="w-5 h-5 text-brand-accent-text" />
-        <span>{i18n.t("radio.savedStationsTitle")}</span>
-      </h2>
-      <span class="text-xs text-brand-text-secondary">
-        {radioStore.savedStations.length}
-      </span>
-    </div>
+    <h2 class="flex items-center gap-2 text-xl font-semibold text-brand-text-primary">
+      <Bookmark class="w-5 h-5 text-brand-accent-text" />
+      <span>{i18n.t("radio.savedStationsTitle")}</span>
+    </h2>
 
     {#if radioStore.savedStations.length === 0}
       <div
