@@ -697,7 +697,9 @@
     </div>
   {:else if col.key === "artist"}
     <div class="{secondaryColor(song)} truncate pr-4 flex items-center min-w-0">
-      {#if disabledPlaceholder && rowDisabled(row)}
+      {#if isLiveSong(song)}
+        <span class="{secondaryColor(song)} truncate min-w-0">—</span>
+      {:else if disabledPlaceholder && rowDisabled(row)}
         <span class="text-brand-text-secondary italic text-xs truncate min-w-0"
           >{song.artist || row.disabledTooltip}</span
         >
@@ -715,8 +717,6 @@
             {name}
           </LinkButton>
         {/each}
-      {:else if isLiveSong(song)}
-        <span class="{secondaryColor(song)} truncate min-w-0">—</span>
       {:else}
         <span class="{secondaryColor(song)} truncate min-w-0"
           >{i18n.t("collection.unknownArtist")}</span
