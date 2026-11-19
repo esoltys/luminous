@@ -196,6 +196,12 @@ async fn sync_all_auto_playlists_cooperative(
     // The genre pass is one acquisition per curated tag: a large library has hundreds,
     // and holding the lock for all of them kept Play waiting for minutes (#1968).
     // `tokio::sync::Mutex` is FIFO, so a waiting command gets the lock at the next release.
+    // The Daypart Mix leads: it is the one pass that depends on the clock, so it
+    // is what the Home greeting can visibly disagree with ("Good Evening" over
+    // "Afternoon Mix"), and a large library's genre pass takes long enough to
+    // show it. It is a no-op when the bucket hasn't changed (#2172).
+    with_playlists(playlists, |pm| pm.sync_daypart_auto_playlist()).await?;
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     let genre_tags = with_playlists(playlists, |pm| pm.genre_auto_playlist_tags()).await?;
     for name in genre_tags {
         with_playlists(playlists, move |pm| pm.sync_genre_auto_playlist(&name)).await?;
@@ -210,8 +216,6 @@ async fn sync_all_auto_playlists_cooperative(
     with_playlists(playlists, |pm| pm.sync_missing_metadata_auto_playlist()).await?;
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     with_playlists(playlists, |pm| pm.sync_missing_musicbrainz_auto_playlist()).await?;
-    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    with_playlists(playlists, |pm| pm.sync_daypart_auto_playlist()).await?;
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     with_playlists(playlists, |pm| pm.sync_language_auto_playlists()).await?;
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
@@ -554,6 +558,67 @@ mod tests {
 
         let res = sync_handle.await.unwrap();
         assert!(res.is_ok());
+    }
+
+    /// The Daypart Mix must be written before the genre pass starts, so the
+    /// pinned tile never trails the Home greeting while hundreds of genre
+    /// playlists are built (#2172).
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_daypart_mix_syncs_before_the_genre_pass() {
+        const GENRES: i64 = 40;
+        let (_temp_dir, db) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let mut conn = db_arc.pool.get().unwrap();
+            let tx = conn.transaction().unwrap();
+            for genre in 0..GENRES {
+                for track in 0..auto_sync::MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST {
+                    tx.execute(
+                        "INSERT INTO songs (title, artist, path, genre, source) VALUES (?1, 'Artist', ?2, ?3, 1)",
+                        params![
+                            format!("Track {genre}-{track}"),
+                            format!("/g{genre}/t{track}.mp3"),
+                            format!("Genre {genre}")
+                        ],
+                    )
+                    .unwrap();
+                }
+            }
+            tx.commit().unwrap();
+        }
+        let count = |like: &'static str| -> i64 {
+            db_arc
+                .pool
+                .get()
+                .unwrap()
+                .query_row(
+                    "SELECT COUNT(*) FROM playlists WHERE dynamic_spec LIKE ?1",
+                    [like],
+                    |r| r.get(0),
+                )
+                .unwrap()
+        };
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let playlists = std::sync::Arc::new(tokio::sync::Mutex::new(manager));
+        let playlists_clone = playlists.clone();
+        let sync_handle =
+            tokio::spawn(
+                async move { sync_all_auto_playlists_cooperative(&playlists_clone).await },
+            );
+
+        let started = std::time::Instant::now();
+        while count("tag:%") == 0 {
+            assert!(started.elapsed().as_secs() < 60, "genre pass never started");
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        }
+        assert_eq!(
+            count("daypart:%"),
+            1,
+            "the genre pass started before the Daypart Mix was written"
+        );
+
+        sync_handle.await.unwrap().unwrap();
     }
 
     /// A large library's genre pass must not hold the playlists lock for all
