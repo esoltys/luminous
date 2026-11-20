@@ -3227,6 +3227,7 @@ export const uk = {
     equalizerActive: "{mode} (активних: {bands})",
     eqModeGraphic: "10-смуговий графічний",
     limiter: "Лімітер",
+    aacCoreOnly: "Лише ядро AAC половинної частоти (знижена якість)",
     outputFormat: "Формат",
     outputDevice: "Пристрій",
     outputBackend: "Бекенд",

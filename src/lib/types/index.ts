@@ -679,6 +679,8 @@ export interface AudioPipelineInfo {
   input_bit_depth?: number;
   input_channels?: number;
   input_path?: string;
+  /** True when an HE-AAC stream is playing only its half-rate AAC core (no SBR/PS). */
+  input_aac_core_only?: boolean;
   // Stage 2: Processing
   decoder_name: string;
   headroom: string;

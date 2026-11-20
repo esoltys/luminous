@@ -3067,6 +3067,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     equalizerActive: "{mode} ({bands} active(s))",
     eqModeGraphic: "Graphique à 10 bandes",
     limiter: "Limiteur",
+    aacCoreOnly: "Noyau AAC demi-fréquence uniquement (qualité réduite)",
     outputFormat: "Format",
     outputDevice: "Périphérique",
     outputBackend: "Moteur audio",

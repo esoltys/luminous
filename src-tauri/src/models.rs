@@ -944,6 +944,9 @@ pub struct AudioPipelineInfo {
     pub input_bit_depth: Option<i32>,
     pub input_channels: Option<u16>,
     pub input_path: Option<String>,
+    /// True when an HE-AAC stream is playing only its half-rate AAC core (no SBR/PS).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub input_aac_core_only: bool,
 
     // Stage 2: Processing
     pub decoder_name: String,

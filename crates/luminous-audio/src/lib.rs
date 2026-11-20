@@ -295,6 +295,25 @@ pub struct OutputInfo {
     pub hardware_volume: bool,
 }
 
+/// Facts about the input stage (decoded stream), for the app's pipeline display.
+/// Keyed by [`Track::id`] so the UI never pairs one track's format with another.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InputInfo {
+    pub track_id: i64,
+    /// Codec short name reported by the active decoder (e.g. `"aac"`, `"mp3"`, `"opus"`, `"flac"`).
+    pub codec: String,
+    /// Human-readable format name derived from `codec` (e.g. `"AAC"`, `"MP3"`, `"Opus"`, `"FLAC"`).
+    pub format: String,
+    /// Decoded sample rate in Hz.
+    pub sample_rate: u32,
+    /// Decoded channel count.
+    pub channels: u16,
+    /// Decoder chosen by the engine (e.g. `"Symphonia FLAC decoder"`, `"libopus (via Symphonia)"`, `"Media Foundation AAC"`).
+    pub decoder_name: String,
+    /// True when an HE-AAC stream is decoded by Symphonia's core-only decoder at <= 24 kHz (no SBR/PS).
+    pub aac_core_only: bool,
+}
+
 // ---------------------------------------------------------------------------
 // Events emitted from the decode thread back to the player
 // ---------------------------------------------------------------------------
@@ -375,6 +394,7 @@ pub(crate) struct AudioShared {
     pub(crate) output_fell_back: std::sync::atomic::AtomicBool,
     pub(crate) output_format: parking_lot::RwLock<&'static str>,
     pub(crate) output_config: parking_lot::RwLock<AudioOutputConfig>,
+    pub(crate) input_info: parking_lot::RwLock<Option<InputInfo>>,
     pub(crate) equalizer: Mutex<luminous_equalizer::Equalizer>,
     pub(crate) loudness_gain: AtomicU32,
     /// Bumped by every loudness-gain write that isn't a ramp step, so an
@@ -577,6 +597,7 @@ impl AudioEngine {
             output_fell_back: std::sync::atomic::AtomicBool::new(false),
             output_format: parking_lot::RwLock::new("32-bit float PCM"),
             output_config: parking_lot::RwLock::new(AudioOutputConfig::default()),
+            input_info: parking_lot::RwLock::new(None),
             equalizer: Mutex::new(luminous_equalizer::Equalizer::new()),
             loudness_gain: AtomicU32::new(1.0f32.to_bits()),
             loudness_generation: AtomicU64::new(0),
@@ -847,6 +868,11 @@ impl AudioEngine {
         }
     }
 
+    /// The input stage for the currently playing track, if a decoder is open.
+    pub fn input_info(&self) -> Option<InputInfo> {
+        self.shared.input_info.read().clone()
+    }
+
     /// Update the preferred audio output configuration (backend and device).
     pub fn set_output_config(&self, config: AudioOutputConfig) -> Result<()> {
         *self.shared.output_config.write() = config;
@@ -929,9 +955,86 @@ struct ActiveTrack {
     /// Live in-stream `StreamTitle` updates from an ICY reader (#2002),
     /// forwarded as [`AudioEvent::StreamTitle`] by the decode loop (#2008).
     metadata_rx: Option<mpsc::Receiver<String>>,
+    /// Decoded input stage details for this track. Held per-track rather than
+    /// written directly to `AudioShared` from `decode_track_packet` so an
+    /// outgoing crossfade tail never overwrites the incoming track's format.
+    input_info: InputInfo,
+    /// Set when `decode_track_packet` updates `input_info` mid-stream.
+    input_changed: bool,
+}
+
+fn display_format_name(codec: &str) -> String {
+    match codec {
+        "mp3" => "MP3".to_string(),
+        "flac" => "FLAC".to_string(),
+        "vorbis" => "Vorbis".to_string(),
+        "opus" => "Opus".to_string(),
+        "speex" => "Speex".to_string(),
+        "aac" => "AAC".to_string(),
+        "alac" => "ALAC".to_string(),
+        "wavpack" => "WavPack".to_string(),
+        "musepack" | "mpc" => "Musepack".to_string(),
+        "trueaudio" | "tta" => "TrueAudio".to_string(),
+        "monkeys_audio" | "ape" => "Monkey's Audio".to_string(),
+        "wma" | "wmav1" | "wmav2" => "WMA/ASF".to_string(),
+        s if s.starts_with("pcm_") => "PCM".to_string(),
+        other => other.to_ascii_uppercase(),
+    }
+}
+
+fn build_input_info(
+    track_id: i64,
+    decoder: &dyn symphonia::core::codecs::audio::AudioDecoder,
+    sample_rate: u32,
+    channels: usize,
+) -> InputInfo {
+    input_info_from_codec(track_id, decoder.codec_info(), sample_rate, channels)
+}
+
+fn input_info_from_codec(
+    track_id: i64,
+    info: &symphonia::core::codecs::CodecInfo,
+    sample_rate: u32,
+    channels: usize,
+) -> InputInfo {
+    let codec = info.short_name.to_string();
+    let format = display_format_name(&codec);
+    let is_mf_aac = info.long_name == aac::MF_AAC_LONG_NAME;
+    let aac_core_only = codec == "aac" && !is_mf_aac && sample_rate <= aac::HE_AAC_MAX_CORE_RATE;
+    let decoder_name = if is_mf_aac {
+        aac::MF_AAC_LONG_NAME.to_string()
+    } else if codec == "opus" {
+        "libopus (via Symphonia)".to_string()
+    } else {
+        format!("Symphonia {format} decoder")
+    };
+    InputInfo {
+        track_id,
+        codec,
+        format,
+        sample_rate,
+        channels: channels as u16,
+        decoder_name,
+        aac_core_only,
+    }
 }
 
 impl ActiveTrack {
+    /// Recomputes `input_info` from the active decoder and marks
+    /// `input_changed` if anything visible to the pipeline panel changed.
+    fn refresh_input_info(&mut self) {
+        let updated = build_input_info(
+            self.spec.id,
+            &*self.decoder,
+            self.src_rate,
+            self.src_channels,
+        );
+        if updated != self.input_info {
+            self.input_info = updated;
+            self.input_changed = true;
+        }
+    }
+
     /// Resample to `rate`/`channels` from here on (the track hasn't been
     /// decoded yet, so there's no resampler state to keep).
     fn retarget(&mut self, rate: u32, channels: u16) {
@@ -993,6 +1096,8 @@ impl ActiveTrack {
             end_ns.or(spec.length_ns)
         };
 
+        let input_info = build_input_info(spec.id, &*decoder, src_rate, src_channels);
+
         Ok(Self {
             spec,
             format,
@@ -1009,6 +1114,8 @@ impl ActiveTrack {
             eof: false,
             icy_headers,
             metadata_rx,
+            input_info,
+            input_changed: false,
         })
     }
 }
@@ -2242,6 +2349,7 @@ fn decode_thread(
             *s = EngineState::Playing;
         }
         shared.position.store(current.start_ns, Ordering::Relaxed);
+        *shared.input_info.write() = Some(current.input_info.clone());
         let _ = event_tx.send(AudioEvent::Playing { track_id });
 
         let mut session = DecodeSession {
@@ -2294,7 +2402,7 @@ fn decode_thread(
                 }
             }
 
-            advance_transition_and_preload_signal(out, &mut session, &shared.position, &event_tx);
+            advance_transition_and_preload_signal(out, &mut session, &shared, &event_tx);
             forward_stream_title(&session.current, &event_tx);
 
             maybe_start_crossfade(&mut session, &shared);
@@ -2305,7 +2413,7 @@ fn decode_thread(
                 EofOutcome::BreakDecode => break 'decode,
             }
 
-            match decode_one_packet(out, &mut session, &event_tx) {
+            match decode_one_packet(out, &mut session, &shared, &event_tx) {
                 DecodeStepOutcome::Decoded => {}
                 DecodeStepOutcome::ContinueDecode => continue 'decode,
                 DecodeStepOutcome::BreakDecode => break 'decode,
@@ -2842,7 +2950,7 @@ fn latest_queued(rx: &mpsc::Receiver<String>) -> Option<String> {
 fn advance_transition_and_preload_signal(
     out: &AudioOutput,
     session: &mut DecodeSession,
-    position: &AtomicU64,
+    shared: &AudioShared,
     event_tx: &mpsc::Sender<AudioEvent>,
 ) {
     // Complete a pending gapless handover once the output callback has
@@ -2867,7 +2975,11 @@ fn advance_transition_and_preload_signal(
                 out.played_samples.fetch_add(delta, Ordering::Relaxed);
                 session.pushed_samples += delta;
             }
-            position.store(session.current.start_ns, Ordering::Relaxed);
+            shared
+                .position
+                .store(session.current.start_ns, Ordering::Relaxed);
+            *shared.input_info.write() = Some(session.current.input_info.clone());
+            session.current.input_changed = false;
             let finished_track_id = t.finished.id;
             let _ = event_tx.send(AudioEvent::TrackTransitioned {
                 finished_track_id,
@@ -2883,7 +2995,7 @@ fn advance_transition_and_preload_signal(
     // to the previous track then).
     if !session.current.about_to_finish_sent && session.transition.is_none() {
         if let Some(about_end) = session.current.about_end_ns {
-            let pos = position.load(Ordering::Relaxed);
+            let pos = shared.position.load(Ordering::Relaxed);
             if pos + PRELOAD_LEAD_NS >= about_end {
                 session.current.about_to_finish_sent = true;
                 let _ = event_tx.send(AudioEvent::AboutToFinish {
@@ -2960,6 +3072,7 @@ fn handle_eof(
 fn decode_one_packet(
     out: &mut AudioOutput,
     session: &mut DecodeSession,
+    shared: &AudioShared,
     event_tx: &mpsc::Sender<AudioEvent>,
 ) -> DecodeStepOutcome {
     // Rate limit: if the buffer is full (more than 1.5 seconds of audio), sleep
@@ -2972,7 +3085,13 @@ fn decode_one_packet(
     }
 
     let channels = session.target_channels as usize;
-    let mut resampled = match decode_track_packet(&mut session.current, channels) {
+    let step = decode_track_packet(&mut session.current, channels);
+    if session.current.input_changed && session.transition.is_none() {
+        session.current.input_changed = false;
+        *shared.input_info.write() = Some(session.current.input_info.clone());
+        let _ = event_tx.send(AudioEvent::PipelineChanged);
+    }
+    let mut resampled = match step {
         PacketStep::Samples(samples) => samples,
         PacketStep::Skip => return DecodeStepOutcome::ContinueDecode,
         PacketStep::DecoderFailed => return DecodeStepOutcome::BreakDecode,
@@ -3044,14 +3163,15 @@ fn decode_track_packet(track: &mut ActiveTrack, target_channels: usize) -> Packe
                     // #2011); follow it rather than resample at a stale rate.
                     let spec = decoded.spec();
                     let (rate, channels) = (spec.rate(), spec.channels().count());
+                    let mut sample_vec: Vec<f32> = Vec::new();
+                    decoded.copy_to_vec_interleaved(&mut sample_vec);
                     if rate != track.src_rate || channels != track.src_channels {
                         track.src_rate = rate;
                         track.src_channels = channels;
                         track.resampler =
                             Resampler::new(rate, track.resampler.to_rate, target_channels);
+                        track.refresh_input_info();
                     }
-                    let mut sample_vec: Vec<f32> = Vec::new();
-                    decoded.copy_to_vec_interleaved(&mut sample_vec);
                     let mut samples: &[f32] = &sample_vec;
 
                     // Enforce the CUE end boundary (`end_nanosec`):
@@ -3110,6 +3230,7 @@ fn decode_track_packet(track: &mut ActiveTrack, target_channels: usize) -> Packe
                         track.resampler =
                             Resampler::new(sample_rate, track.resampler.to_rate, target_channels);
                     }
+                    track.refresh_input_info();
                     PacketStep::Skip
                 }
                 Err(message) => PacketStep::ReadFailed(message),
@@ -3473,6 +3594,7 @@ mod tests {
             output_fell_back: std::sync::atomic::AtomicBool::new(false),
             output_format: parking_lot::RwLock::new("32-bit float PCM"),
             output_config: parking_lot::RwLock::new(crate::sink::AudioOutputConfig::default()),
+            input_info: parking_lot::RwLock::new(None),
             equalizer: Mutex::new(luminous_equalizer::Equalizer::new()),
             loudness_gain: AtomicU32::new(1.0f32.to_bits()),
             loudness_generation: AtomicU64::new(0),
@@ -4169,5 +4291,76 @@ id 76, type PipeWire:Interface:Node
             parse_wpctl_default_sink(no_desc).as_deref(),
             Some("alsa_output.pci-0000_00_1f.3.analog-stereo")
         );
+    }
+
+    #[test]
+    fn active_track_populates_input_info_and_detects_format_changes_per_track() {
+        let dir = std::env::temp_dir().join(format!(
+            "luminous_input_info_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let wav = dir.join("tone.wav");
+        write_test_pcm16_wav(&wav, 44_100, &[vec![100; 441]]);
+        let real = wav.to_string_lossy().into_owned();
+        let location = real.clone();
+        let opener = move |_: &str| open_file(&real);
+        let spec = Track {
+            id: 77,
+            location,
+            extension_hint: None,
+            end_ns: None,
+            length_ns: None,
+            live: false,
+        };
+        let mut track = ActiveTrack::open(&opener, spec, 0, 48_000, 2).expect("opens wav");
+        assert_eq!(track.input_info.track_id, 77);
+        assert_eq!(track.input_info.codec, "pcm_s16le");
+        assert_eq!(track.input_info.format, "PCM");
+        assert_eq!(track.input_info.sample_rate, 44_100);
+        assert_eq!(track.input_info.channels, 1);
+        assert_eq!(track.input_info.decoder_name, "Symphonia PCM decoder");
+        assert!(!track.input_info.aac_core_only);
+        assert!(!track.input_changed);
+
+        // Simulate a stale initial rate before the first packet settles on 44.1 kHz:
+        // decode_track_packet marks `track.input_changed` without touching `AudioShared`.
+        track.src_rate = 22_050;
+        track.input_info.sample_rate = 22_050;
+        let step = decode_track_packet(&mut track, 2);
+        assert!(matches!(step, PacketStep::Samples(_)));
+        assert!(track.input_changed);
+        assert_eq!(track.input_info.sample_rate, 44_100);
+
+        // Verify AAC core-only flag logic via build_input_info.
+        let mf_info = symphonia::core::codecs::CodecInfo {
+            short_name: "aac",
+            long_name: "Media Foundation AAC",
+            profiles: &[],
+        };
+        let core_info = symphonia::core::codecs::CodecInfo {
+            short_name: "aac",
+            long_name: "Advanced Audio Coding",
+            profiles: &[],
+        };
+        let opus_info = symphonia::core::codecs::CodecInfo {
+            short_name: "opus",
+            long_name: "Opus",
+            profiles: &[],
+        };
+        assert!(input_info_from_codec(1, &core_info, 24_000, 2).aac_core_only);
+        assert!(!input_info_from_codec(1, &core_info, 44_100, 2).aac_core_only);
+        let mf = input_info_from_codec(1, &mf_info, 24_000, 2);
+        assert!(!mf.aac_core_only);
+        assert_eq!(mf.decoder_name, "Media Foundation AAC");
+        assert_eq!(
+            input_info_from_codec(1, &opus_info, 48_000, 2).decoder_name,
+            "libopus (via Symphonia)"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

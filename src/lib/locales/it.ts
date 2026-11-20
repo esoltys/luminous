@@ -3047,6 +3047,7 @@ export const it = {
     equalizerActive: "{mode} ({bands} attive)",
     eqModeGraphic: "Grafico a 10 bande",
     limiter: "Limitatore",
+    aacCoreOnly: "Solo core AAC a metà frequenza (qualità ridotta)",
     outputFormat: "Formato",
     outputDevice: "Dispositivo",
     outputBackend: "Backend",
