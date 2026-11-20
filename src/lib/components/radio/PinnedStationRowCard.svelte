@@ -66,7 +66,7 @@
         onerror={() => {
           artFailed = true;
         }}
-        class="w-full h-full object-cover"
+        class="w-full h-full object-contain"
       />
     {:else}
       <Broadcast class="w-5 h-5 text-brand-text-secondary/60" />

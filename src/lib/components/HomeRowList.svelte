@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { HomeItem, Song, Playlist, AlbumItem } from "../types";
+  import { isLiveSong, type HomeItem, type Song, type Playlist, type AlbumItem } from "../types";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -179,6 +179,7 @@
               artAutomatic={item.song.art_automatic}
               artManual={item.song.art_manual}
               sizeClass="w-11 h-11"
+              contain={isLiveSong(item.song)}
             />
           {:else if item.type === "album"}
             <CoverArt

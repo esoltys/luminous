@@ -73,15 +73,37 @@
     spareWidth = $bindable(0),
   }: Props = $props();
 
+  function coverKey(c: CoverStackItem): string {
+    return `${c.songId ?? ""}|${c.artManual ?? ""}|${c.artAutomatic ?? ""}|${c.artEmbedded ? 1 : 0}`;
+  }
+
+  let failedKeys = $state(new Set<string>());
+
+  $effect(() => {
+    void covers;
+    failedKeys = new Set();
+  });
+
+  function markFailed(c: CoverStackItem) {
+    const key = coverKey(c);
+    if (failedKeys.has(key)) return;
+    const next = new Set(failedKeys);
+    next.add(key);
+    failedKeys = next;
+  }
+
+  let activeCovers = $derived((covers ?? []).filter((c) => !failedKeys.has(coverKey(c))));
   let hasHero = $derived(!!heroImageUrl);
-  let bigCover = $derived(hasHero ? null : ((covers ?? [])[0] ?? null));
+  let bigCover = $derived(hasHero ? null : (activeCovers[0] ?? null));
   let hasBigTile = $derived(hasHero || !!bigCover);
   // When a hero image supplies the big tile, every cover is a quarter-tile
   // candidate; otherwise covers[0] was already used as the big tile above.
   let quarterCovers = $derived.by(() => {
-    const list = covers ?? [];
-    if (fit) return hasHero ? list.slice(0, maxCovers) : list.slice(1, maxCovers + 1);
-    return hasHero ? list.slice(0, Math.min(maxCovers, 4)) : list.slice(1, Math.min(maxCovers, 5));
+    if (fit)
+      return hasHero ? activeCovers.slice(0, maxCovers) : activeCovers.slice(1, maxCovers + 1);
+    return hasHero
+      ? activeCovers.slice(0, Math.min(maxCovers, 4))
+      : activeCovers.slice(1, Math.min(maxCovers, 5));
   });
   // 1 or 2 columns of H/2-wide quarter tiles, just enough to hold them
   // (1-2 fit a single column; 3-4 need two, with the last cell left empty
@@ -181,6 +203,8 @@
       artAutomatic={bigCover?.artAutomatic}
       artManual={bigCover?.artManual}
       sizeClass={tileClass}
+      contain={bigCover?.contain}
+      onError={() => bigCover && markFailed(bigCover)}
     />
   {/if}
 {/snippet}
@@ -216,7 +240,7 @@
         >
           {@render bigTile()}
         </div>
-        {#each quarterCovers.slice(0, fitLayout.shown) as cover, i (i)}
+        {#each quarterCovers.slice(0, fitLayout.shown) as cover (coverKey(cover))}
           <div class="min-w-0 min-h-0">
             <CoverArt
               songId={cover.songId}
@@ -224,6 +248,8 @@
               artAutomatic={cover.artAutomatic}
               artManual={cover.artManual}
               sizeClass={tileClass}
+              contain={cover.contain}
+              onError={() => markFailed(cover)}
             />
           </div>
         {/each}
@@ -268,13 +294,15 @@
       <div
         class="grid grid-rows-2 gap-0.5 h-full {quarterCols === 2 ? 'grid-cols-2' : 'grid-cols-1'}"
       >
-        {#each quarterCovers as cover, i (i)}
+        {#each quarterCovers as cover (coverKey(cover))}
           <CoverArt
             songId={cover.songId}
             artEmbedded={cover.artEmbedded}
             artAutomatic={cover.artAutomatic}
             artManual={cover.artManual}
             sizeClass={tileClass}
+            contain={cover.contain}
+            onError={() => markFailed(cover)}
           />
         {/each}
       </div>

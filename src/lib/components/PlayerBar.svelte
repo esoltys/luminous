@@ -446,6 +446,7 @@
           artAutomatic={playerStore.currentSong?.art_automatic}
           artManual={playerStore.currentSong?.art_manual}
           sizeClass="w-12 h-12 transition-all duration-300 group-hover:scale-105"
+          contain={isLiveSong(playerStore.currentSong)}
         />
       </button>
       <div class="flex flex-col truncate">

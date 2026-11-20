@@ -224,3 +224,30 @@ describe("CoverMosaic.svelte spareWidth", () => {
     expect(spare()).toBe(0);
   });
 });
+
+describe("CoverMosaic.svelte failed covers", () => {
+  it("drops a failed cover and promotes the next candidate instead of showing a placeholder", async () => {
+    const covers = [
+      { songId: 1, artManual: "https://example.com/1.png", contain: true },
+      { songId: 2, artManual: "https://example.com/2.png", contain: true },
+      { songId: 3, artManual: "https://example.com/3.png", contain: true },
+      { songId: 4, artManual: "https://example.com/4.png", contain: true },
+      { songId: 5, artManual: "https://example.com/5.png", contain: true },
+      { songId: 6, artManual: "https://example.com/6.png", contain: true },
+    ];
+    const { container } = render(CoverMosaic, { props: { covers } });
+
+    await vi.waitFor(() => {
+      expect(container.querySelectorAll("img")).toHaveLength(5);
+    });
+
+    const brokenImg = container.querySelector('img[src="https://example.com/4.png"]')!;
+    brokenImg.dispatchEvent(new Event("error"));
+
+    await vi.waitFor(() => {
+      expect(container.querySelector('img[src="https://example.com/4.png"]')).toBeNull();
+      expect(container.querySelector('img[src="https://example.com/6.png"]')).toBeInTheDocument();
+      expect(container.querySelectorAll("img")).toHaveLength(5);
+    });
+  });
+});

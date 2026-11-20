@@ -683,7 +683,8 @@
               artEmbedded={playerStore.currentSong?.art_embedded}
               artAutomatic={playerStore.currentSong?.art_automatic}
               artManual={playerStore.currentSong?.art_manual}
-              sizeClass="w-full h-full object-cover"
+              sizeClass="w-full h-full"
+              contain={isLiveSong(playerStore.currentSong)}
             />
           </div>
         {/if}

@@ -1,4 +1,4 @@
-import { getCoverArtUrl, isLiveSong, type SongSource } from "../types";
+import { getCoverArtUrl, isLiveSong, resolveArtUrl, type SongSource } from "../types";
 import { prefs } from "../stores/prefs.svelte";
 import { albumKey } from "./albumKey";
 
@@ -112,6 +112,7 @@ export interface CoverStackItem {
   artEmbedded?: boolean;
   artAutomatic?: string | null;
   artManual?: string | null;
+  contain?: boolean;
 }
 
 export interface AlbumCoverSource {
@@ -137,7 +138,9 @@ export function songsToCoverStack(songs: CoverSource[], max = 6): CoverStackItem
   const seenAlbums = new Set<string>();
   const list: CoverStackItem[] = [];
   for (const s of songs) {
-    const key = s.art_manual || s.art_automatic || (s.art_embedded ? `embed-${s.id}` : null);
+    const resolvedManual = resolveArtUrl(s.art_manual);
+    const resolvedAutomatic = resolveArtUrl(s.art_automatic);
+    const key = resolvedManual || resolvedAutomatic || (s.art_embedded ? `embed-${s.id}` : null);
     if (key && !seen.has(key)) {
       seen.add(key);
       if (s.album) seenAlbums.add(albumKey(s.album));
@@ -146,13 +149,14 @@ export function songsToCoverStack(songs: CoverSource[], max = 6): CoverStackItem
         artEmbedded: s.art_embedded,
         artAutomatic: s.art_automatic,
         artManual: s.art_manual,
+        ...(isLiveSong(s) ? { contain: true } : {}),
       });
       if (list.length >= max) return list;
     }
   }
   for (const s of songs) {
     if (s.art_unset) continue;
-    if (s.art_manual || s.art_automatic || s.art_embedded) continue;
+    if (resolveArtUrl(s.art_manual) || resolveArtUrl(s.art_automatic) || s.art_embedded) continue;
     // Live radio stations have no local/embedded/remote library cover lookup;
     // adding one here would render the generic musical-note placeholder in a mosaic.
     if (isLiveSong(s)) continue;

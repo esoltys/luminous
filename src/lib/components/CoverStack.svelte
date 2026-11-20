@@ -13,13 +13,9 @@
     COVER_STACK_OPACITY_STEP,
   } from "../constants";
   import { HOVER_ZOOM, HOVER_ZOOM_STACKED } from "../utils/cardAppearance";
+  import type { CoverStackItem } from "../utils/covers";
 
-  export interface CoverItem {
-    songId?: number;
-    artEmbedded?: boolean;
-    artAutomatic?: string | null;
-    artManual?: string | null;
-  }
+  export type CoverItem = CoverStackItem;
 
   interface Props {
     covers?: CoverItem[];
@@ -142,6 +138,7 @@
           artAutomatic={activeCovers[0].artAutomatic}
           artManual={activeCovers[0].artManual}
           sizeClass="w-full h-full"
+          contain={activeCovers[0].contain}
         />
         {#if showExtendedArtworkUi}
           {#if extraArtworkCount > 0}
@@ -192,6 +189,7 @@
               artAutomatic={cover.artAutomatic}
               artManual={cover.artManual}
               sizeClass="w-full h-full"
+              contain={cover.contain}
             />
           </div>
         {/each}
