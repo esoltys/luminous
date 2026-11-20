@@ -18,7 +18,7 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { radioStore } from "../stores/radio.svelte";
-  import type { AirplayNow, Song } from "../types";
+  import { isLiveSong, type AirplayNow, type Song } from "../types";
   import { countryDisplayName } from "../utils/country";
   import { openExternalUrl } from "../utils/openExternalUrl";
   import HelpTip from "./HelpTip.svelte";
@@ -39,7 +39,7 @@
   let loading = $state(false);
   let now = $state(Date.now());
 
-  let isStation = $derived(!!song.path?.startsWith("radio://"));
+  let isStation = $derived(isLiveSong(song));
   let active = $derived(prefs.onlineEnabled && prefs.airplayEnabled && !isStation);
   let showConsent = $derived(
     prefs.onlineEnabled && !prefs.airplayEnabled && !prefs.airplayPromptDismissed && !isStation,

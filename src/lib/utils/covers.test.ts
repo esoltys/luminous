@@ -90,7 +90,7 @@ describe("getArtistCoverStack", () => {
       {
         id: 10,
         path: "radio://uuid-1",
-        source: "radio_directory",
+        source: "radio_browser",
         art_manual: null,
         art_automatic: "https://example.com/logo1.png",
         art_embedded: false,
@@ -98,7 +98,7 @@ describe("getArtistCoverStack", () => {
       {
         id: 11,
         path: "radio://uuid-2",
-        source: "radio_directory",
+        source: "radio_browser",
         art_manual: null,
         art_automatic: null,
         art_embedded: false,
