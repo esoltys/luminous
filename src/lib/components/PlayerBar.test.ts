@@ -761,7 +761,7 @@ describe("PlayerBar.svelte", () => {
     songDrag.end();
   });
 
-  it("shows LIVE badge and hides seek bar for live radio stations (#2004)", () => {
+  it("shows LIVE badge in duration slot and placeholder seek bar for live radio stations", () => {
     playerStore.currentSong = {
       ...mockSong,
       source: "radio_browser",
@@ -772,6 +772,6 @@ describe("PlayerBar.svelte", () => {
 
     const { container } = render(PlayerBar);
     expect(container.querySelector("[data-live-badge]")).toBeInTheDocument();
-    expect(container.querySelector("[data-waveform-container]")).not.toBeInTheDocument();
+    expect(container.querySelector("[data-waveform-container]")).toBeInTheDocument();
   });
 });

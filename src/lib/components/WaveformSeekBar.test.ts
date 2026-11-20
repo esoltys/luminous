@@ -91,7 +91,7 @@ describe("WaveformSeekBar.svelte", () => {
     }
   });
 
-  it("renders no seek bar when the current song is a live radio station", () => {
+  it("renders the placeholder seek bar for a live radio station without seeking on click", () => {
     playerStore.currentSong = {
       id: 99,
       source: "radio_browser",
@@ -100,6 +100,6 @@ describe("WaveformSeekBar.svelte", () => {
     } as any;
 
     const { container } = render(WaveformSeekBar);
-    expect(container.querySelector("[data-waveform-container]")).not.toBeInTheDocument();
+    expect(container.querySelector("[data-waveform-container]")).toBeInTheDocument();
   });
 });

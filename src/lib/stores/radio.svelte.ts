@@ -521,6 +521,33 @@ class RadioStore {
     }
   }
 
+  async reorderSavedStations(order: string[]): Promise<void> {
+    const byUuid = new Map(this.savedStations.map((s) => [s.stationuuid, s]));
+    const reordered: RadioDirectoryStation[] = [];
+    const seen = new Set<string>();
+    for (const uuid of order) {
+      const station = byUuid.get(uuid);
+      if (station && !seen.has(uuid)) {
+        seen.add(uuid);
+        reordered.push(station);
+      }
+    }
+    for (const station of this.savedStations) {
+      if (!seen.has(station.stationuuid)) {
+        reordered.push(station);
+      }
+    }
+    const previous = this.savedStations;
+    this.savedStations = reordered;
+    try {
+      await invoke("reorder_saved_stations", { order: reordered.map((s) => s.stationuuid) });
+    } catch (err) {
+      this.savedStations = previous;
+      const msg = err instanceof Error ? err.message : String(err);
+      toastStore.show(msg, "error");
+    }
+  }
+
   async addCustomStation(name: string, url: string, tags: string): Promise<RadioDirectoryStation> {
     const station = await invoke<RadioDirectoryStation>("add_custom_radio_station", {
       name,

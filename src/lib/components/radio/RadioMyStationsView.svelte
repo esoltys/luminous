@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
+    BroadcastIcon as Broadcast,
     PlayIcon as Play,
     PauseIcon as Pause,
     PencilSimpleIcon as Pencil,
@@ -11,11 +12,16 @@
   import { playlistsStore } from "../../stores/playlists.svelte";
   import { playerStore } from "../../stores/player.svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
+  import { prefs } from "../../stores/prefs.svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import { isStationList, parseStationListSpec } from "../../utils/playlist";
   import { rowClasses, rowListGap, useCardAppearance } from "../../utils/cardAppearance";
+  import { startPointerDrag, type PointerDragHandle } from "../../utils/pointerDrag";
   import type { Playlist, RadioDirectoryStation, RadioStationListSpec } from "../../types";
+  import CardSection from "../CardSection.svelte";
+  import DragGhost from "../DragGhost.svelte";
   import RadioStationCard from "./RadioStationCard.svelte";
+  import PinnedStationRowCard from "./PinnedStationRowCard.svelte";
   import RadioSaveButton from "./RadioSaveButton.svelte";
   import StationFavicon from "./StationFavicon.svelte";
   import PlaylistCoverThumb from "../PlaylistCoverThumb.svelte";
@@ -26,6 +32,50 @@
   let scrollEl: HTMLElement | null = $state(null);
   let showStationListModal = $state(false);
   let editingList = $state<{ id: number; name: string; spec: RadioStationListSpec } | null>(null);
+
+  let draggedIndex = $state<number | null>(null);
+  let dragOverIndex = $state<number | null>(null);
+  let ghostPos = $state<{ x: number; y: number } | null>(null);
+  let stationDrag: PointerDragHandle | null = null;
+
+  function commitSavedReorder(targetIndex: number) {
+    if (draggedIndex === null || targetIndex === draggedIndex) return;
+    const items = [...radioStore.savedStations];
+    const [moved] = items.splice(draggedIndex, 1);
+    if (!moved) return;
+    items.splice(targetIndex, 0, moved);
+    void radioStore.reorderSavedStations(items.map((s) => s.stationuuid));
+  }
+
+  function resetStationDrag() {
+    draggedIndex = null;
+    dragOverIndex = null;
+    ghostPos = null;
+    stationDrag = null;
+  }
+
+  function handleStationPointerDown(e: PointerEvent, index: number) {
+    stationDrag = startPointerDrag(e, {
+      captureOn: "arm",
+      onMove: (pos) => {
+        ghostPos = pos;
+        const el = document
+          .elementFromPoint(pos.x, pos.y)
+          ?.closest("[data-saved-station-index]") as HTMLElement | null;
+        const idx = el?.dataset.savedStationIndex;
+        dragOverIndex = idx !== undefined ? Number(idx) : null;
+      },
+      onDrop: () => {
+        if (dragOverIndex !== null) commitSavedReorder(dragOverIndex);
+        resetStationDrag();
+      },
+      onTap: resetStationDrag,
+      onCancel: resetStationDrag,
+    });
+    if (stationDrag) draggedIndex = index;
+  }
+
+  $effect(() => () => stationDrag?.cancel());
 
   const recentStations = $derived(radioStore.recentStations.slice(0, 10));
 
@@ -106,11 +156,10 @@
 >
   <!-- Saved stations -->
   <section class="space-y-4">
-    <h2 class="text-xl font-semibold text-brand-text-primary">
-      {i18n.t("radio.savedStationsTitle")}
-    </h2>
-
     {#if radioStore.savedStations.length === 0}
+      <h2 class="text-xl font-semibold text-brand-text-primary">
+        {i18n.t("radio.savedStationsTitle")}
+      </h2>
       <div
         data-testid="radio-saved-empty"
         class="p-6 rounded-xl border border-brand-border/40 bg-brand-surface/40 text-center space-y-2"
@@ -131,17 +180,47 @@
         {/if}
       </div>
     {:else}
-      <div
-        class="grid grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-4 @4xl:grid-cols-5 @6xl:grid-cols-6 gap-4"
+      <CardSection
+        title={i18n.t("radio.savedStationsTitle")}
+        viewMode={prefs.radioSavedViewMode}
+        onViewModeChange={(m) => prefs.setRadioSavedViewMode(m)}
       >
-        {#each radioStore.savedStations as station (station.stationuuid)}
-          <RadioStationCard
-            {station}
-            playing={radioStore.isPlayingStation(station.stationuuid)}
-            onPlay={(s) => void radioStore.playStation(s)}
-          />
-        {/each}
-      </div>
+        {#snippet children(mode)}
+          {@const rows = mode === "rows"}
+          {#each radioStore.savedStations as station, index (station.stationuuid)}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              data-saved-station-index={index}
+              onpointerdown={(e) => handleStationPointerDown(e, index)}
+              ondragstart={(e) => e.preventDefault()}
+              class="relative h-full [&>*:first-child]:h-full transition-opacity cursor-grab active:cursor-grabbing [&_[role=button]]:cursor-[inherit] {rows
+                ? 'rounded-lg'
+                : 'rounded-xl'} {draggedIndex === index ? 'opacity-40' : ''}"
+            >
+              {#if rows}
+                <PinnedStationRowCard
+                  {station}
+                  playing={radioStore.isPlayingStation(station.stationuuid)}
+                  onPlay={(s) => void radioStore.playStation(s)}
+                />
+              {:else}
+                <RadioStationCard
+                  {station}
+                  playing={radioStore.isPlayingStation(station.stationuuid)}
+                  onPlay={(s) => void radioStore.playStation(s)}
+                />
+              {/if}
+              {#if dragOverIndex === index && draggedIndex !== null && draggedIndex !== index}
+                <div
+                  class="absolute inset-0 bg-brand-accent/30 pointer-events-none {rows
+                    ? 'rounded-lg'
+                    : 'rounded-xl'}"
+                ></div>
+              {/if}
+            </div>
+          {/each}
+        {/snippet}
+      </CardSection>
     {/if}
   </section>
 
@@ -360,6 +439,19 @@
     </section>
   </div>
 </div>
+
+{#if ghostPos && draggedIndex !== null && radioStore.savedStations[draggedIndex]}
+  {@const dragged = radioStore.savedStations[draggedIndex]}
+  <DragGhost
+    x={ghostPos.x}
+    y={ghostPos.y}
+    overTarget={dragOverIndex !== null && dragOverIndex !== draggedIndex}
+    testId="saved-station-drag-ghost"
+  >
+    <Broadcast class="w-3.5 h-3.5 text-brand-accent shrink-0" />
+    <span class="max-w-[180px] truncate">{dragged.name || i18n.t("radio.unnamedStation")}</span>
+  </DragGhost>
+{/if}
 
 {#if showStationListModal}
   <StationListModal

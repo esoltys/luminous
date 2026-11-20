@@ -39,7 +39,7 @@
   function startLoadingAnimation() {
     if (animFrameId !== null) return;
     function step() {
-      if (isLoadingWaveform || isLoadingBands) {
+      if (isLoadingWaveform || isLoadingBands || isLiveSong(playerStore.currentSong)) {
         pulseAngle = (pulseAngle + 0.08) % (Math.PI * 2);
         draw();
         animFrameId = requestAnimationFrame(step);
@@ -121,7 +121,7 @@
 
   function draw() {
     if (typeof document !== "undefined" && document.hidden) return;
-    if (!canvas || !containerEl || isLiveSong(playerStore.currentSong)) return;
+    if (!canvas || !containerEl) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -336,6 +336,7 @@
       loadedMode = mode;
       waveformData = [];
       bandData = [];
+      startLoadingAnimation();
       return;
     }
 
@@ -422,22 +423,20 @@
 
 <svelte:window onmouseup={handleMouseUp} onmousemove={handleMouseMove} />
 
-{#if !isLiveSong(playerStore.currentSong)}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    bind:this={containerEl}
-    onmousedown={handleMouseDown}
-    data-waveform-container
-    data-waveform-loading={isLoadingWaveform || isLoadingBands ? "true" : "false"}
-    class="relative flex-1 h-7 overflow-hidden flex items-center group select-none"
-    title={prefs.seekBarMode === "bands"
-      ? i18n.t(
-          "playerBar.bandsLegend",
-          {},
-          "Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy",
-        )
-      : undefined}
-  >
-    <canvas bind:this={canvas} class="block w-full h-7 opacity-100"></canvas>
-  </div>
-{/if}
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  bind:this={containerEl}
+  onmousedown={handleMouseDown}
+  data-waveform-container
+  data-waveform-loading={isLoadingWaveform || isLoadingBands ? "true" : "false"}
+  class="relative flex-1 h-7 overflow-hidden flex items-center group select-none"
+  title={prefs.seekBarMode === "bands" && !isLiveSong(playerStore.currentSong)
+    ? i18n.t(
+        "playerBar.bandsLegend",
+        {},
+        "Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy",
+      )
+    : undefined}
+>
+  <canvas bind:this={canvas} class="block w-full h-7 opacity-100"></canvas>
+</div>

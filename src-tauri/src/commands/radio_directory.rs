@@ -195,7 +195,7 @@ pub async fn unsave_radio_station(
     .map_err(|e| e.to_string())
 }
 
-/// Returns all user-saved radio stations ordered most-recently-saved first (#2005).
+/// Returns all user-saved radio stations ordered by custom position (#2005, #2209).
 #[tauri::command]
 pub async fn get_saved_radio_stations(
     hide_unsupported: Option<bool>,
@@ -204,6 +204,19 @@ pub async fn get_saved_radio_stations(
     let hide_unsupported = hide_unsupported.unwrap_or(true);
     crate::db::run_blocking(&state.db, move |conn| {
         radio_directory::list_saved_stations(conn, hide_unsupported)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Persists a custom display order for saved radio stations (#2209).
+#[tauri::command]
+pub async fn reorder_saved_stations(
+    order: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    crate::db::run_blocking(&state.db, move |conn| {
+        radio_directory::reorder_saved_stations(conn, &order)
     })
     .await
     .map_err(|e| e.to_string())

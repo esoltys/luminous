@@ -1352,8 +1352,11 @@ pub fn save_station(conn: &Connection, stationuuid: &str) -> Result<()> {
         return Ok(());
     }
     let now = crate::clock::unix_now();
+    // Place newly saved stations at the front of the custom order so they
+    // appear first just like `saved_at DESC` did before #2209.
     conn.execute(
-        "INSERT OR IGNORE INTO radio_saved (stationuuid, saved_at) VALUES (?1, ?2)",
+        "INSERT OR IGNORE INTO radio_saved (stationuuid, saved_at, position)
+         VALUES (?1, ?2, COALESCE((SELECT MIN(position) - 1 FROM radio_saved), 0))",
         params![uuid, now],
     )?;
     let _ = materialize_station(conn, uuid);
@@ -1505,7 +1508,7 @@ where
     Ok(stations)
 }
 
-/// Lists user-saved stations ordered by `saved_at DESC` (#2005).
+/// Lists user-saved stations ordered by custom `position ASC`, then `saved_at DESC` (#2005, #2209).
 /// Prefers live `radio_directory` metadata and falls back to materialized `songs`
 /// metadata if a saved station was pruned upstream.
 pub fn list_saved_stations(
@@ -1517,7 +1520,7 @@ pub fn list_saved_stations(
          FROM radio_saved rs
          LEFT JOIN radio_directory rd ON rd.stationuuid = rs.stationuuid
          LEFT JOIN songs s ON s.path = (?1 || rs.stationuuid)
-         ORDER BY rs.saved_at DESC, rs.stationuuid ASC"
+         ORDER BY rs.position ASC, rs.saved_at DESC, rs.stationuuid ASC"
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(params![crate::media_source::RADIO_URI_SCHEME], |row| {
@@ -1525,6 +1528,21 @@ pub fn list_saved_stations(
         station_from_joined_row(row, saved_uuid, true)
     })?;
     collect_joined_stations(rows, hide_unsupported)
+}
+
+/// Persists a custom display order for saved radio stations (#2209).
+/// Unknown UUIDs are ignored; any saved stations omitted from `order` keep
+/// their relative order after the explicitly ordered ones.
+pub fn reorder_saved_stations(conn: &Connection, order: &[String]) -> Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    {
+        let mut stmt = tx.prepare("UPDATE radio_saved SET position = ?1 WHERE stationuuid = ?2")?;
+        for (idx, uuid) in order.iter().enumerate() {
+            stmt.execute(params![idx as i64, uuid.trim()])?;
+        }
+    }
+    tx.commit()?;
+    Ok(())
 }
 
 /// Lists recently played/opened radio stations ordered most-recent first (#2005).
@@ -2844,6 +2862,50 @@ mod tests {
         // list_radio_playlist_ids executes cleanly against the real playlists schema.
         let pl_ids = list_radio_playlist_ids(&conn).unwrap();
         assert!(pl_ids.is_empty());
+    }
+
+    #[test]
+    fn reorder_saved_stations_persists_custom_order_and_new_saves_prepend() {
+        let (_dir, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+        let tx = conn.transaction().unwrap();
+        upsert_stations_tx(
+            &tx,
+            &[
+                search_station("uuid-1", "One", "jazz", "MP3", 128),
+                search_station("uuid-2", "Two", "rock", "MP3", 128),
+                search_station("uuid-3", "Three", "pop", "MP3", 128),
+            ],
+            1000,
+        )
+        .unwrap();
+        tx.commit().unwrap();
+
+        save_station(&conn, "uuid-1").unwrap();
+        save_station(&conn, "uuid-2").unwrap();
+        let initial: Vec<String> = list_saved_stations(&conn, false)
+            .unwrap()
+            .into_iter()
+            .map(|s| s.stationuuid)
+            .collect();
+        assert_eq!(initial, vec!["uuid-2", "uuid-1"]);
+
+        reorder_saved_stations(&conn, &["uuid-1".into(), "uuid-2".into()]).unwrap();
+        let reordered: Vec<String> = list_saved_stations(&conn, false)
+            .unwrap()
+            .into_iter()
+            .map(|s| s.stationuuid)
+            .collect();
+        assert_eq!(reordered, vec!["uuid-1", "uuid-2"]);
+
+        // Saving a new station puts it at the front without disturbing the rest.
+        save_station(&conn, "uuid-3").unwrap();
+        let after_new: Vec<String> = list_saved_stations(&conn, false)
+            .unwrap()
+            .into_iter()
+            .map(|s| s.stationuuid)
+            .collect();
+        assert_eq!(after_new, vec!["uuid-3", "uuid-1", "uuid-2"]);
     }
 
     fn search_station(

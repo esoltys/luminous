@@ -633,17 +633,17 @@
           <!-- Quality indicator badge (opens pipeline popover on click) -->
           <QualityBadge />
           <span>{formatDuration(playerStore.positionNanosec)}</span>
+          <div class="flex-1 flex flex-col gap-1">
+            <WaveformSeekBar />
+          </div>
           {#if isLiveSong(playerStore.currentSong)}
             <span
               data-live-badge
-              class="absolute left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-brand-accent/15 text-brand-accent"
+              class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-brand-accent/15 text-brand-accent shrink-0"
             >
               {i18n.t("playerBar.liveBadge", undefined, "Live")}
             </span>
           {:else}
-            <div class="flex-1 flex flex-col gap-1">
-              <WaveformSeekBar />
-            </div>
             <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
           {/if}
         </div>
