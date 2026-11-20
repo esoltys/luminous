@@ -254,7 +254,7 @@ where
     Ok(Some(handle))
 }
 
-fn spawn_chunk<P: AsRef<std::ffi::OsStr>>(exe: &Path, chunk: &[P]) -> Result<()> {
+fn spawn_chunk(exe: &Path, chunk: &[PathBuf]) -> Result<()> {
     // Picard would otherwise inherit our stdout/stderr, so its Qt chatter
     // ("QEventDispatcherWin32::wakeUp ...") lands in Luminous's log looking
     // like ours.
@@ -577,12 +577,13 @@ mod tests {
 
     #[test]
     fn launch_picard_single_chunk_does_not_spawn_background_thread() {
-        use std::sync::{Arc, Mutex};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
 
         let paths: Vec<PathBuf> = (0..5)
             .map(|i| PathBuf::from(format!("song{i}.mp3")))
             .collect();
-        let count = Arc::new(Mutex::new(0usize));
+        let count = Arc::new(AtomicUsize::new(0));
         let count_clone = Arc::clone(&count);
 
         let handle = launch_picard_with(
@@ -591,14 +592,14 @@ mod tests {
             std::time::Duration::ZERO,
             move |_, chunk| {
                 assert_eq!(chunk.len(), 5);
-                *count_clone.lock().unwrap() += 1;
+                count_clone.fetch_add(1, Ordering::SeqCst);
                 Ok(())
             },
         )
         .expect("single-chunk launch should succeed");
 
         assert!(handle.is_none(), "single chunk should not spawn a thread");
-        assert_eq!(*count.lock().unwrap(), 1);
+        assert_eq!(count.load(Ordering::SeqCst), 1);
     }
 
     #[test]
