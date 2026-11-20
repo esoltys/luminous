@@ -16,6 +16,7 @@
   import { openExternalUrl } from "../utils/openExternalUrl";
   import { getAlbumFolderPath, getParentFolder } from "../utils/pathUtils";
   import { openInPicard } from "../utils/picard";
+  import { isLiveSong } from "../types";
   import { isRemoteSource } from "../utils/remoteSource";
   import ArtistInformationPanel from "./ArtistInformationPanel.svelte";
   import ArtistEventsSection from "./ArtistEventsSection.svelte";
@@ -41,8 +42,9 @@
   let countryCode = $derived(
     profileArtist ? collectionStore.getArtistProfile(profileArtist)?.country : null,
   );
-  let canOpenPicard = $derived(song != null && !isRemoteSource(song));
-  let canEditTags = $derived(song != null);
+  let isLive = $derived(song != null && isLiveSong(song));
+  let canOpenPicard = $derived(song != null && !isRemoteSource(song) && !isLive);
+  let canEditTags = $derived(song != null && !isLive);
 
   let editingSongId = $state<number | null>(null);
 
@@ -246,7 +248,7 @@
         {i18n.t("playerBar.contextRetry", {}, "Retry")}
       </button>
     </div>
-  {:else if sections.length === 0 && !view.offline}
+  {:else if sections.length === 0 && !view.offline && !isLive}
     <div class="space-y-3.5 py-1">
       <div class="space-y-1">
         <h3 class="text-sm font-semibold text-brand-text-primary">
