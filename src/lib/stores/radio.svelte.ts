@@ -653,6 +653,17 @@ class RadioStore {
     this.refreshDiscoverAndFacets();
   }
 
+  /** Switches to Discover with a clean filter state seeded to `stationName`. */
+  openStationInDiscover(stationName: string) {
+    this.selectedCountry = null;
+    this.selectedLanguage = null;
+    this.selectedCodec = null;
+    this.selectedMinBitrate = null;
+    this.searchQuery = stationName.trim();
+    this.subView = "discover";
+    this.refreshDiscoverAndFacets();
+  }
+
   async loadStationListTags(): Promise<void> {
     this.stationListTagsLoading = true;
     try {

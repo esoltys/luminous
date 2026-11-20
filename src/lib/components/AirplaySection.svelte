@@ -11,11 +11,13 @@
   import { invoke } from "@tauri-apps/api/core";
   import {
     ArrowsClockwiseIcon as RefreshCw,
-    ArrowSquareOutIcon as ExternalLink,
+    ArrowRightIcon as ArrowRight,
     RadioIcon as Radio,
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { prefs } from "../stores/prefs.svelte";
+  import { radioStore } from "../stores/radio.svelte";
   import type { AirplayNow, Song } from "../types";
   import { countryDisplayName } from "../utils/country";
   import { openExternalUrl } from "../utils/openExternalUrl";
@@ -165,28 +167,24 @@
         {#if stations.length > 0}
           <ul class="space-y-2" class:opacity-60={unavailable}>
             {#each stations.slice(0, VISIBLE_STATIONS) as station (station.id)}
-              {@const homepage = station.homepage}
               <li class="min-w-0">
-                {#if homepage}
-                  <button
-                    type="button"
-                    onclick={() => openExternalUrl(homepage)}
-                    class="group/st inline-flex items-center gap-1 max-w-full text-left cursor-pointer"
-                    title={homepage}
-                  >
-                    <span
-                      class="font-medium text-brand-text-primary truncate underline decoration-brand-text-secondary/40 group-hover/st:decoration-brand-accent"
-                      >{station.name}</span
-                    >
-                    <ExternalLink
-                      class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/st:opacity-100 group-focus-visible/st:opacity-100 transition-opacity shrink-0"
-                    />
-                  </button>
-                {:else}
-                  <span class="font-medium text-brand-text-primary truncate block"
+                <button
+                  type="button"
+                  onclick={() => {
+                    radioStore.openStationInDiscover(station.name);
+                    navigationStore.activeTab = "radio";
+                  }}
+                  class="group/st inline-flex items-center gap-1 max-w-full text-left cursor-pointer"
+                  title={i18n.t("airplay.openInRadio", {}, "Open in Internet Radio")}
+                >
+                  <span
+                    class="font-medium text-brand-text-primary truncate underline decoration-brand-text-secondary/40 group-hover/st:decoration-brand-accent"
                     >{station.name}</span
                   >
-                {/if}
+                  <ArrowRight
+                    class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/st:opacity-100 group-focus-visible/st:opacity-100 transition-opacity shrink-0"
+                  />
+                </button>
                 <div class="text-brand-text-secondary/70 truncate">
                   {[details(station), ageLabel(station.confirmed_at)].filter(Boolean).join(" · ")}
                 </div>

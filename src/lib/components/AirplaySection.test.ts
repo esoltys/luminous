@@ -4,7 +4,9 @@ import { fireEvent, render } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { openExternalUrl } from "../utils/openExternalUrl";
 import AirplaySection from "./AirplaySection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { prefs } from "../stores/prefs.svelte";
+import { radioStore } from "../stores/radio.svelte";
 import type { AirplayNow, AirplayStation, Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -170,12 +172,15 @@ describe("AirplaySection", () => {
     });
   });
 
-  it("opens the station's homepage", async () => {
+  it("navigates to the station in Internet Radio Discover when clicked", async () => {
     respondWith(answer({ kind: "ready" }, [station(1)]));
     const { getByText } = render(AirplaySection, { props: { song } });
     await settle();
     await fireEvent.click(getByText("Station 1"));
-    expect(openExternalUrl).toHaveBeenCalledWith("https://station1.example");
+    expect(openExternalUrl).not.toHaveBeenCalled();
+    expect(navigationStore.activeTab).toBe("radio");
+    expect(radioStore.subView).toBe("discover");
+    expect(radioStore.searchQuery).toBe("Station 1");
   });
 
   it("skipping songs inside the debounce sends one request, for the last song", async () => {
