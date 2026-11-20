@@ -4039,9 +4039,9 @@ mod tests {
         );
     }
 
-    /// Polls `cond` every 5 ms until it returns `true`, panicking with `msg` if `timeout` elapses.
-    fn poll_until(timeout: std::time::Duration, msg: &str, mut cond: impl FnMut() -> bool) {
-        let deadline = std::time::Instant::now() + timeout;
+    /// Waits for `cond` to become `true`, panicking with `msg` if the deadline expires.
+    fn poll_until(msg: &str, mut cond: impl FnMut() -> bool) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
         while !cond() {
             assert!(std::time::Instant::now() < deadline, "{msg}");
             std::thread::sleep(std::time::Duration::from_millis(5));
@@ -4053,22 +4053,18 @@ mod tests {
         let engine = AudioEngine::new();
         engine.set_loudness_gain(1.0);
         engine.ramp_loudness_gain(0.25, 30);
-        poll_until(
-            std::time::Duration::from_secs(2),
-            "ramp never reached its target",
-            || f32::from_bits(engine.shared.loudness_gain.load(Ordering::Relaxed)) == 0.25,
-        );
+        poll_until("ramp never reached its target", || {
+            f32::from_bits(engine.shared.loudness_gain.load(Ordering::Relaxed)) == 0.25
+        });
     }
 
     #[test]
     fn ramp_fade_gain_lands_on_its_target() {
         let shared = Arc::new(test_shared());
         shared.ramp_fade_gain(0.0, 1.0, 30);
-        poll_until(
-            std::time::Duration::from_secs(2),
-            "fade ramp never reached unity",
-            || f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)) == 1.0,
-        );
+        poll_until("fade ramp never reached unity", || {
+            f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)) == 1.0
+        });
     }
 
     #[test]
@@ -4089,11 +4085,9 @@ mod tests {
         shared.ramp_fade_gain(0.0, 1.0, 2_000);
         // Wait for the background ramp thread to advance past 0.0 rather than
         // sleeping a fixed duration that can flake under heavy CPU contention.
-        poll_until(
-            std::time::Duration::from_secs(2),
-            "fade ramp never started advancing",
-            || f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)) > 0.0,
-        );
+        poll_until("fade ramp never started advancing", || {
+            f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)) > 0.0
+        });
         let mid_gain = f32::from_bits(shared.fade_gain.load(Ordering::Relaxed));
         assert!(mid_gain > 0.0 && mid_gain < 1.0);
 
