@@ -201,6 +201,24 @@ const LAUNCH_STAGGER: std::time::Duration = std::time::Duration::from_secs(2);
 /// to the caller immediately; any further launches happen from a
 /// background thread, spaced apart, and log rather than propagate errors.
 pub fn launch_picard(exe: &Path, paths: &[PathBuf]) -> Result<()> {
+    launch_picard_with(exe, paths, LAUNCH_STAGGER, spawn_chunk).map(|_| ())
+}
+
+/// Core implementation of [`launch_picard`] with an injectable spawner and
+/// stagger duration so tests can verify chunking and background handoff
+/// without spawning real processes or sleeping.
+///
+/// Returns `Ok(Some(handle))` when remaining chunks were deferred to a
+/// background thread, or `Ok(None)` when everything fit in the first chunk.
+fn launch_picard_with<F>(
+    exe: &Path,
+    paths: &[PathBuf],
+    stagger: std::time::Duration,
+    mut spawn: F,
+) -> Result<Option<std::thread::JoinHandle<()>>>
+where
+    F: FnMut(&Path, &[PathBuf]) -> Result<()> + Send + 'static,
+{
     if paths.is_empty() {
         return Err(anyhow!("No files to open in Picard"));
     }
@@ -208,28 +226,32 @@ pub fn launch_picard(exe: &Path, paths: &[PathBuf]) -> Result<()> {
     #[cfg(not(windows))]
     check_flatpak_filesystem_access(exe, paths)?;
 
-    let mut chunks = chunk_paths_by_length(paths, MAX_COMMAND_LINE_CHARS).into_iter();
+    let mut chunks = chunk_paths_by_length(paths, MAX_COMMAND_LINE_CHARS)
+        .into_iter()
+        .map(|chunk| chunk.into_iter().cloned().collect::<Vec<PathBuf>>());
     let first = chunks
         .next()
         .expect("paths is non-empty, so at least one chunk exists");
-    spawn_chunk(exe, &first).context("failed to launch MusicBrainz Picard")?;
+    spawn(exe, &first).context("failed to launch MusicBrainz Picard")?;
 
-    let remaining: Vec<Vec<PathBuf>> = chunks
-        .map(|chunk| chunk.into_iter().cloned().collect())
-        .collect();
-    if !remaining.is_empty() {
-        let exe = exe.to_path_buf();
-        std::thread::spawn(move || {
-            for chunk in remaining {
-                std::thread::sleep(LAUNCH_STAGGER);
-                if let Err(e) = spawn_chunk(&exe, &chunk) {
-                    log::warn!("Failed to hand additional paths to Picard: {e}");
-                }
-            }
-        });
+    let remaining: Vec<Vec<PathBuf>> = chunks.collect();
+    if remaining.is_empty() {
+        return Ok(None);
     }
 
-    Ok(())
+    let exe = exe.to_path_buf();
+    let handle = std::thread::spawn(move || {
+        for chunk in remaining {
+            if !stagger.is_zero() {
+                std::thread::sleep(stagger);
+            }
+            if let Err(e) = spawn(&exe, &chunk) {
+                log::warn!("Failed to hand additional paths to Picard: {e}");
+            }
+        }
+    });
+
+    Ok(Some(handle))
 }
 
 fn spawn_chunk<P: AsRef<std::ffi::OsStr>>(exe: &Path, chunk: &[P]) -> Result<()> {
@@ -491,21 +513,144 @@ mod tests {
     }
 
     #[test]
-    fn launch_picard_returns_promptly_for_a_large_selection() {
-        let exe = std::env::current_exe().unwrap();
+    fn launch_picard_spawns_first_chunk_inline_and_defers_rest_to_background() {
+        use std::sync::{Arc, Mutex};
+        use std::thread::ThreadId;
+
+        let exe = Path::new("/fake/picard");
         let paths: Vec<PathBuf> = (0..1500)
             .map(|i| PathBuf::from(format!(r"C:\Music\Artist\Album{i:04}")))
             .collect();
-        // `current_exe()` isn't Picard, but this checks that (a) the first
-        // chunk's spawn succeeds without hitting a command-line length
-        // error — it would previously fail as one oversized argument list
-        // (#804) — and (b) any remaining chunks are handed off to a
-        // background thread rather than staggered inline, so this returns
-        // immediately rather than blocking for `LAUNCH_STAGGER` per chunk.
-        let start = std::time::Instant::now();
-        let result = launch_picard(&exe, &paths);
-        assert!(result.is_ok());
-        assert!(start.elapsed() < LAUNCH_STAGGER);
+
+        type RecordedChunks = Arc<Mutex<Vec<(ThreadId, Vec<PathBuf>)>>>;
+
+        let caller_tid = std::thread::current().id();
+        let recorded: RecordedChunks = Arc::new(Mutex::new(Vec::new()));
+        let recorded_clone = Arc::clone(&recorded);
+
+        let handle = launch_picard_with(
+            exe,
+            &paths,
+            std::time::Duration::ZERO,
+            move |spawned_exe, chunk| {
+                assert_eq!(spawned_exe, Path::new("/fake/picard"));
+                recorded_clone
+                    .lock()
+                    .unwrap()
+                    .push((std::thread::current().id(), chunk.to_vec()));
+                Ok(())
+            },
+        )
+        .expect("launch_picard_with should succeed")
+        .expect("1500 paths should spill into a background thread");
+
+        handle.join().expect("background thread should not panic");
+
+        let calls = recorded.lock().unwrap();
+        assert!(
+            calls.len() > 1,
+            "expected multiple chunks, got {}",
+            calls.len()
+        );
+        assert_eq!(
+            calls[0].0, caller_tid,
+            "first chunk must be spawned inline on the calling thread"
+        );
+        for (idx, (tid, _)) in calls.iter().enumerate().skip(1) {
+            assert_ne!(
+                *tid, caller_tid,
+                "chunk {idx} must be deferred to a background thread"
+            );
+        }
+
+        for (idx, (_, chunk)) in calls.iter().enumerate() {
+            let cmd_len: usize = chunk.iter().map(|p| p.as_os_str().len() + 1).sum();
+            assert!(
+                cmd_len <= MAX_COMMAND_LINE_CHARS,
+                "chunk {idx} length {cmd_len} exceeds MAX_COMMAND_LINE_CHARS ({MAX_COMMAND_LINE_CHARS})"
+            );
+        }
+
+        let flattened: Vec<PathBuf> = calls.iter().flat_map(|(_, c)| c.iter().cloned()).collect();
+        assert_eq!(flattened, paths);
+    }
+
+    #[test]
+    fn launch_picard_single_chunk_does_not_spawn_background_thread() {
+        use std::sync::{Arc, Mutex};
+
+        let paths: Vec<PathBuf> = (0..5)
+            .map(|i| PathBuf::from(format!("song{i}.mp3")))
+            .collect();
+        let count = Arc::new(Mutex::new(0usize));
+        let count_clone = Arc::clone(&count);
+
+        let handle = launch_picard_with(
+            Path::new("/fake/picard"),
+            &paths,
+            std::time::Duration::ZERO,
+            move |_, chunk| {
+                assert_eq!(chunk.len(), 5);
+                *count_clone.lock().unwrap() += 1;
+                Ok(())
+            },
+        )
+        .expect("single-chunk launch should succeed");
+
+        assert!(handle.is_none(), "single chunk should not spawn a thread");
+        assert_eq!(*count.lock().unwrap(), 1);
+    }
+
+    #[test]
+    fn launch_picard_propagates_first_chunk_error_and_continues_on_background_errors() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let paths: Vec<PathBuf> = (0..1500)
+            .map(|i| PathBuf::from(format!(r"C:\Music\Artist\Album{i:04}")))
+            .collect();
+
+        // First-chunk failure propagates immediately.
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_clone = Arc::clone(&calls);
+        let err = launch_picard_with(
+            Path::new("/fake/picard"),
+            &paths,
+            std::time::Duration::ZERO,
+            move |_, _| {
+                calls_clone.fetch_add(1, Ordering::SeqCst);
+                Err(anyhow!("spawn failed"))
+            },
+        )
+        .expect_err("first-chunk failure should propagate");
+        assert!(err
+            .to_string()
+            .contains("failed to launch MusicBrainz Picard"));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+        // Background-chunk failure logs a warning and continues spawning remaining chunks.
+        let expected_chunks = chunk_paths_by_length(&paths, MAX_COMMAND_LINE_CHARS).len();
+        assert!(expected_chunks >= 3, "test requires >= 3 chunks");
+        let bg_calls = Arc::new(AtomicUsize::new(0));
+        let bg_calls_clone = Arc::clone(&bg_calls);
+        let handle = launch_picard_with(
+            Path::new("/fake/picard"),
+            &paths,
+            std::time::Duration::ZERO,
+            move |_, _| {
+                let n = bg_calls_clone.fetch_add(1, Ordering::SeqCst);
+                if n == 1 {
+                    Err(anyhow!("transient second-chunk failure"))
+                } else {
+                    Ok(())
+                }
+            },
+        )
+        .expect("background failure must not fail launch_picard_with")
+        .expect("expected background thread handle");
+
+        handle.join().expect("background thread should not panic");
+        assert_eq!(bg_calls.load(Ordering::SeqCst), expected_chunks);
     }
 
     #[cfg(not(windows))]
