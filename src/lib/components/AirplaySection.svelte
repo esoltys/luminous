@@ -129,7 +129,7 @@
       </button>
     </div>
   </section>
-{:else if active && !hidden}
+{:else if active && !hidden && stations.length > 0}
   <section class="space-y-1.5 text-xs pt-1" aria-labelledby="airplay-title" aria-busy={loading}>
     <div class="flex items-center gap-1.5 font-semibold text-brand-text-secondary">
       <Radio class="w-3.5 h-3.5 text-brand-accent shrink-0" />

@@ -109,7 +109,7 @@ describe("AirplaySection", () => {
 
     await vi.advanceTimersByTimeAsync(1000);
     expect(mockInvoke).not.toHaveBeenCalled();
-    expect(getByText("Checking stations…")).toBeInTheDocument();
+    expect(container.textContent).toBe("");
 
     await settle();
     expect(getByText("Station 1")).toBeInTheDocument();
@@ -135,10 +135,10 @@ describe("AirplaySection", () => {
     expect(getByText("+3 more stations")).toBeInTheDocument();
   });
 
-  it("says so when no station is playing the song", async () => {
-    const { getByText } = render(AirplaySection, { props: { song } });
+  it("renders nothing when no station is playing the song", async () => {
+    const { container } = render(AirplaySection, { props: { song } });
     await settle();
-    expect(getByText("No stations are playing this right now.")).toBeInTheDocument();
+    expect(container.textContent).toBe("");
   });
 
   it("serves the last result, marked stale, while Tuneping is unavailable", async () => {
@@ -149,11 +149,11 @@ describe("AirplaySection", () => {
     expect(getByText("Station 1")).toBeInTheDocument();
   });
 
-  it("reports an outage with nothing cached", async () => {
+  it("renders nothing on outage with nothing cached", async () => {
     respondWith(answer({ kind: "unavailable", retry_after: 30 }));
-    const { getByText } = render(AirplaySection, { props: { song } });
+    const { container } = render(AirplaySection, { props: { song } });
     await settle();
-    expect(getByText("Couldn't reach Tuneping. Try again in a moment.")).toBeInTheDocument();
+    expect(container.textContent).toBe("");
   });
 
   it("hides itself when the backend says the song can't be looked up", async () => {
@@ -164,6 +164,7 @@ describe("AirplaySection", () => {
   });
 
   it("refreshes on demand, skipping the cache", async () => {
+    respondWith(answer({ kind: "ready" }, [station(1)]));
     const { getByRole } = render(AirplaySection, { props: { song } });
     await settle();
     await fireEvent.click(getByRole("button", { name: "Refresh stations" }));
