@@ -1873,6 +1873,7 @@ pub fn run() {
             commands::radio_directory::import_custom_radio_stations,
             commands::radio_directory::export_saved_radio_stations,
             commands::radio_directory::get_saved_radio_stations,
+            commands::radio_directory::reorder_saved_stations,
             commands::radio_directory::get_recent_radio_stations,
             commands::radio_directory::get_radio_playlist_ids,
             commands::radio_directory::play_radio_station,

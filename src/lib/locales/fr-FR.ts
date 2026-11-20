@@ -2264,9 +2264,10 @@ export const frFR: DeepStringRecord<typeof en> = {
     detectedLabel: "À propos de ces données",
     detectedHint:
       "Détecté à partir des métadonnées des stations : Tuneping lit le morceau que chaque station annonce dans son flux. L'annonce peut être légèrement en avance ou en retard sur la musique.",
-    settingsTitle: "À l'antenne maintenant",
+    settingsTitle: "TunePing",
+    openInRadio: "Ouvrir dans Radio Internet",
     settingsHint:
-      "Affichez dans le panneau Informations les webradios qui diffusent le morceau. L'activation envoie l'artiste et le titre du morceau à Tuneping.",
+      "Découvrez de nouvelles webradios qui diffusent le morceau en cours. L'activation envoie l'artiste et le titre du morceau à TunePing.",
   },
   artistEvents: {
     panelTitle: "Concerts et événements à venir",

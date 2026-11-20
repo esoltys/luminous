@@ -45,6 +45,8 @@ pub struct UiPreferences {
     pub genre_cards_view_mode: String,
     /// Cards/Rows layout of Home > Pinned (#1620).
     pub pinned_view_mode: String,
+    /// Cards/Rows layout of Internet Radio > Saved stations (#2209).
+    pub radio_saved_view_mode: String,
     /// Cards/Rows layout shared by every release and playlist section of the
     /// artist view (#1620).
     pub artist_releases_view_mode: String,
@@ -103,6 +105,7 @@ impl Default for UiPreferences {
             genre_view_mode: "genre".into(),
             genre_cards_view_mode: "cards".into(),
             pinned_view_mode: "cards".into(),
+            radio_saved_view_mode: "cards".into(),
             artist_releases_view_mode: "cards".into(),
             genre_sort_field: "name".into(),
             genre_sort_asc: true,
@@ -131,7 +134,7 @@ impl Default for UiPreferences {
 impl UiPreferences {
     /// Field ↔ app_state key mapping, shared by load and store so the two
     /// can't drift.
-    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 13] {
+    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 14] {
         const RATING: &[&str] = &["heart", "stars", "both"];
         const SEEKBAR: &[&str] = &["waveform", "bands"];
         const VIEW: &[&str] = &["cards", "rows"];
@@ -162,6 +165,11 @@ impl UiPreferences {
                 VIEW,
             ),
             ("pinned_view_mode", &mut self.pinned_view_mode, VIEW),
+            (
+                "radio_saved_view_mode",
+                &mut self.radio_saved_view_mode,
+                VIEW,
+            ),
             (
                 "artist_releases_view_mode",
                 &mut self.artist_releases_view_mode,

@@ -2096,9 +2096,10 @@ export const en = {
     detectedLabel: "About this data",
     detectedHint:
       "Detected from station metadata: Tuneping reads the song each station announces in its stream. A station's announcement can run a little ahead of or behind the music.",
-    settingsTitle: "On the radio now",
+    settingsTitle: "TunePing",
+    openInRadio: "Open in Internet Radio",
     settingsHint:
-      "Show which internet radio stations are playing the song in the Information panel. Turning this on sends the song's artist and title to Tuneping.",
+      "Discover new Internet Radio stations playing the current song. Turning this on sends the song's artist and title to TunePing.",
   },
   artistEvents: {
     panelTitle: "Upcoming Concerts & Events",

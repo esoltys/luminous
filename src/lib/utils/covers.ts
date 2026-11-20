@@ -1,4 +1,4 @@
-import { getCoverArtUrl } from "../types";
+import { getCoverArtUrl, isLiveSong, type SongSource } from "../types";
 import { prefs } from "../stores/prefs.svelte";
 import { albumKey } from "./albumKey";
 
@@ -98,6 +98,8 @@ export function coverRequestUrl(
 
 export interface CoverSource {
   id: number;
+  path?: string;
+  source?: SongSource;
   album?: string | null;
   art_manual?: string | null;
   art_automatic?: string | null;
@@ -151,6 +153,9 @@ export function songsToCoverStack(songs: CoverSource[], max = 6): CoverStackItem
   for (const s of songs) {
     if (s.art_unset) continue;
     if (s.art_manual || s.art_automatic || s.art_embedded) continue;
+    // Live radio stations have no local/embedded/remote library cover lookup;
+    // adding one here would render the generic musical-note placeholder in a mosaic.
+    if (isLiveSong(s)) continue;
     const normAlbum = s.album ? albumKey(s.album) : "";
     if (normAlbum && seenAlbums.has(normAlbum)) continue;
     const fallbackKey = normAlbum ? `album:${normAlbum}` : `song:${s.id}`;

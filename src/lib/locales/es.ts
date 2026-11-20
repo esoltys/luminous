@@ -2150,9 +2150,10 @@ export const es = {
     detectedLabel: "Acerca de estos datos",
     detectedHint:
       "Detectado a partir de los metadatos de las emisoras: Tuneping lee la canción que cada emisora anuncia en su transmisión. El anuncio puede ir un poco adelantado o atrasado respecto a la música.",
-    settingsTitle: "Ahora en la radio",
+    settingsTitle: "TunePing",
+    openInRadio: "Abrir en Radio por Internet",
     settingsHint:
-      "Muestra en el panel Información qué emisoras de radio por internet están poniendo la canción. Al activarlo, se envían el artista y el título a Tuneping.",
+      "Descubre nuevas emisoras de radio por internet que están poniendo la canción actual. Al activarlo, se envían el artista y el título a TunePing.",
   },
   artistEvents: {
     panelTitle: "Próximos conciertos y eventos",

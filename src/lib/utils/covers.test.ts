@@ -84,6 +84,36 @@ describe("getArtistCoverStack", () => {
       { songId: 3, artEmbedded: false, artAutomatic: null, artManual: null },
     ]);
   });
+
+  it("skips coverless live radio stations in songsToCoverStack so mosaics only use station artwork", () => {
+    const result = songsToCoverStack([
+      {
+        id: 10,
+        path: "radio://uuid-1",
+        source: "radio_browser",
+        art_manual: null,
+        art_automatic: "https://example.com/logo1.png",
+        art_embedded: false,
+      },
+      {
+        id: 11,
+        path: "radio://uuid-2",
+        source: "radio_browser",
+        art_manual: null,
+        art_automatic: null,
+        art_embedded: false,
+      },
+    ]);
+
+    expect(result).toEqual([
+      {
+        songId: 10,
+        artEmbedded: false,
+        artAutomatic: "https://example.com/logo1.png",
+        artManual: null,
+      },
+    ]);
+  });
 });
 
 describe("artist image resolvers (#1276)", () => {

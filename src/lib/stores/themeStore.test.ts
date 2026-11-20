@@ -644,6 +644,53 @@ describe("Image Extraction Fallbacks", () => {
     vi.unstubAllGlobals();
   });
 
+  it("extractColorsFromImage composites transparent PNGs onto a dark backdrop instead of flipping light", async () => {
+    class MockImage {
+      crossOrigin = "";
+      onerror: (() => void) | null = null;
+      onload: (() => void) | null = null;
+      set src(_url: string) {
+        setTimeout(() => this.onload?.(), 0);
+      }
+    }
+
+    // 40x40 = 1600 pixels: 90% transparent, 10% pure white logo
+    const data = new Uint8ClampedArray(40 * 40 * 4);
+    for (let i = 0; i < 1600; i++) {
+      const idx = i * 4;
+      if (i < 160) {
+        data[idx] = 255;
+        data[idx + 1] = 255;
+        data[idx + 2] = 255;
+        data[idx + 3] = 255;
+      } else {
+        data[idx + 3] = 0;
+      }
+    }
+
+    const origCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      if (tag === "canvas") {
+        return {
+          width: 40,
+          height: 40,
+          getContext: () => ({
+            drawImage: () => {},
+            getImageData: () => ({ data }),
+          }),
+        } as unknown as HTMLCanvasElement;
+      }
+      return origCreateElement(tag);
+    });
+    vi.stubGlobal("Image", MockImage);
+
+    const colors = await extractColorsFromImage("https://example.com/logo.png");
+    expect(colors.isLight).toBe(false);
+
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it("updateArtworkColors resets or clears artwork colors when song is undefined or art unavailable", async () => {
     const themeStore = new ThemeStore();
 

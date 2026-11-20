@@ -2158,9 +2158,10 @@ export const de = {
     detectedLabel: "Über diese Daten",
     detectedHint:
       "Aus Sender-Metadaten erkannt: Tuneping liest den Titel, den jeder Sender in seinem Stream ankündigt. Die Ankündigung kann der Musik etwas voraus sein oder hinterherhinken.",
-    settingsTitle: "Jetzt im Radio",
+    settingsTitle: "TunePing",
+    openInRadio: "Im Internetradio öffnen",
     settingsHint:
-      "Zeige im Bereich „Informationen“, welche Internetradiosender den Titel spielen. Beim Einschalten werden Interpret und Titel an Tuneping gesendet.",
+      "Entdecke neue Internetradiosender, die den aktuellen Titel spielen. Beim Einschalten werden Interpret und Titel an TunePing gesendet.",
   },
   artistEvents: {
     panelTitle: "Kommende Konzerte und Veranstaltungen",

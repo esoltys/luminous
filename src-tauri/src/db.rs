@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 95;
+pub const CURRENT_SCHEMA_VERSION: i32 = 96;
 
 struct Migration {
     version: i32,
@@ -1000,6 +1000,29 @@ const MIGRATIONS: &[Migration] = &[
                 *crate::models::LIVE_STREAM_SOURCES_SQL
             );
             conn.execute(&sql, [])?;
+            Ok(())
+        },
+    },
+    Migration {
+        version: 96,
+        description: "add position column to radio_saved for custom ordering (#2209)",
+        apply: |conn| {
+            let has_column: bool = conn.query_row(
+                "SELECT COUNT(*) > 0 FROM pragma_table_info('radio_saved') WHERE name = 'position'",
+                [],
+                |r| r.get(0),
+            )?;
+            if !has_column {
+                conn.execute_batch(
+                    "ALTER TABLE radio_saved ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+                     WITH ordered AS (
+                         SELECT stationuuid, ROW_NUMBER() OVER (ORDER BY saved_at DESC, stationuuid ASC) - 1 AS pos
+                         FROM radio_saved
+                     )
+                     UPDATE radio_saved
+                     SET position = (SELECT pos FROM ordered WHERE ordered.stationuuid = radio_saved.stationuuid);",
+                )?;
+            }
             Ok(())
         },
     },

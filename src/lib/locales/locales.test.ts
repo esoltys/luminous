@@ -134,6 +134,7 @@ const IDENTICAL_OK_FR = new Set([
   "collection.tableHeaderMusicBrainzId", // "MBID"
   "collection.tableHeaderTrack", // "#"
   "discord.integrationTitle", // "Discord Rich Presence"
+  "airplay.settingsTitle", // "TunePing"
   "equalizer.gain", // "Gain"
   "equalizer.jazzPreset", // "Jazz"
   "equalizer.modeLabel", // "Mode"
@@ -296,6 +297,7 @@ const IDENTICAL_OK_IT = new Set<string>([
   "picard.customPathPlaceholderLinux", // "/var/lib/flatpak/exports/bin/org.musicbrainz.Picard"
   "listenbrainz.critiquebrainzUserPlaceholder", // "https://critiquebrainz.org/user/..."
   "discord.integrationTitle", // "Discord Rich Presence"
+  "airplay.settingsTitle", // "TunePing"
   "smartPlaylistBuilder.mixWord", // "Mix"
   "smartPlaylistBuilder.playlistWord", // "Playlist"
   "smartPlaylistBuilder.fieldAlbum", // "Album"
@@ -374,6 +376,7 @@ const IDENTICAL_OK_ES = new Set<string>([
   "listenbrainz.integrationTitle", // "ListenBrainz Scrobbler"
   "listenbrainz.critiquebrainzUserPlaceholder", // a URL
   "discord.integrationTitle", // "Discord Rich Presence"
+  "airplay.settingsTitle", // "TunePing"
   "smartPlaylistBuilder.fieldBpm", // "BPM"
   "smartPlaylistBuilder.opEquals", // "="
   "smartPlaylistBuilder.opNotEquals", // "!="
@@ -507,6 +510,7 @@ const IDENTICAL_OK_DE = new Set<string>([
   "listenbrainz.integrationTitle",
   "listenbrainz.critiquebrainzUserPlaceholder",
   "discord.integrationTitle",
+  "airplay.settingsTitle",
   "smartPlaylistBuilder.mixWord",
   "smartPlaylistBuilder.fieldAlbum",
   "smartPlaylistBuilder.fieldGenre",
@@ -564,6 +568,7 @@ const IDENTICAL_OK_UK = new Set<string>([
   "picard.customPathPlaceholderLinux", // a Linux path
   "listenbrainz.critiquebrainzUserPlaceholder", // a URL
   "discord.integrationTitle", // Discord Rich Presence
+  "airplay.settingsTitle", // TunePing
   "smartPlaylistBuilder.fieldBpm", // BPM
   "smartPlaylistBuilder.opEquals", // "="
   "smartPlaylistBuilder.opNotEquals", // "!="
@@ -608,6 +613,7 @@ const IDENTICAL_OK_RU = new Set<string>([
   "picard.customPathPlaceholderLinux", // a Linux path
   "listenbrainz.critiquebrainzUserPlaceholder", // a URL
   "discord.integrationTitle", // Discord Rich Presence
+  "airplay.settingsTitle", // TunePing
   "smartPlaylistBuilder.fieldBpm", // BPM
   "smartPlaylistBuilder.opEquals", // "="
   "smartPlaylistBuilder.opNotEquals", // "!="

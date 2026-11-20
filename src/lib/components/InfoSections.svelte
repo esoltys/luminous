@@ -16,9 +16,9 @@
   import { openExternalUrl } from "../utils/openExternalUrl";
   import { getAlbumFolderPath, getParentFolder } from "../utils/pathUtils";
   import { openInPicard } from "../utils/picard";
+  import { isLiveSong } from "../types";
   import { isRemoteSource } from "../utils/remoteSource";
   import ArtistInformationPanel from "./ArtistInformationPanel.svelte";
-  import AirplaySection from "./AirplaySection.svelte";
   import ArtistEventsSection from "./ArtistEventsSection.svelte";
   import CommunityRating from "./CommunityRating.svelte";
   import MarkdownBio from "./MarkdownBio.svelte";
@@ -42,21 +42,11 @@
   let countryCode = $derived(
     profileArtist ? collectionStore.getArtistProfile(profileArtist)?.country : null,
   );
-  let canOpenPicard = $derived(song != null && !isRemoteSource(song));
-  let canEditTags = $derived(song != null);
+  let isLive = $derived(song != null && isLiveSong(song));
+  let canOpenPicard = $derived(song != null && !isRemoteSource(song) && !isLive);
+  let canEditTags = $derived(song != null && !isLive);
 
   let editingSongId = $state<number | null>(null);
-
-  // "On the radio now" (#1998) is about one song, so albums and artists don't get it. It sits
-  // with the other "what's happening now" section: after the events if shown, else after the bio.
-  let airplayAfter = $derived.by(() => {
-    if (view.subject?.kind !== "song") return undefined;
-    const ids = sections.map((s) => s.id);
-    if (ids.includes("events")) return "events";
-    if (ids.includes("bio")) return "bio";
-    if (ids.includes("facts")) return "facts";
-    return null;
-  });
 
   let folderPath = $derived(
     song?.path ? getAlbumFolderPath([song.path]) || getParentFolder(song.path) : "",
@@ -78,10 +68,6 @@
 <div class="@container space-y-6 text-xs">
   {#if view.offline}
     <p class="text-brand-text-secondary/60">{i18n.t("playerBar.contextOffline")}</p>
-  {/if}
-
-  {#if airplayAfter === null && song}
-    <AirplaySection {song} />
   {/if}
 
   {#each sections as section (section.id)}
@@ -238,9 +224,6 @@
         </div>
       {/if}
     {/if}
-    {#if section.id === airplayAfter && song}
-      <AirplaySection {song} />
-    {/if}
   {/each}
 
   {#if view.loading}
@@ -265,7 +248,7 @@
         {i18n.t("playerBar.contextRetry", {}, "Retry")}
       </button>
     </div>
-  {:else if sections.length === 0 && !view.offline}
+  {:else if sections.length === 0 && !view.offline && !isLive}
     <div class="space-y-3.5 py-1">
       <div class="space-y-1">
         <h3 class="text-sm font-semibold text-brand-text-primary">

@@ -2150,9 +2150,10 @@ export const it = {
     detectedLabel: "Informazioni su questi dati",
     detectedHint:
       "Rilevato dai metadati delle stazioni: Tuneping legge il brano che ogni stazione annuncia nel suo flusso. L'annuncio può essere leggermente in anticipo o in ritardo rispetto alla musica.",
-    settingsTitle: "Ora in radio",
+    settingsTitle: "TunePing",
+    openInRadio: "Apri in Radio Internet",
     settingsHint:
-      "Mostra nel pannello Informazioni quali stazioni radio online stanno trasmettendo il brano. Attivandolo, artista e titolo vengono inviati a Tuneping.",
+      "Scopri nuove stazioni radio online che stanno trasmettendo il brano attuale. Attivandolo, artista e titolo vengono inviati a TunePing.",
   },
   artistEvents: {
     panelTitle: "Prossimi concerti ed eventi",

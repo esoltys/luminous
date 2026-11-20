@@ -4,7 +4,9 @@ import { fireEvent, render } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { openExternalUrl } from "../utils/openExternalUrl";
 import AirplaySection from "./AirplaySection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { prefs } from "../stores/prefs.svelte";
+import { radioStore } from "../stores/radio.svelte";
 import type { AirplayNow, AirplayStation, Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -107,13 +109,15 @@ describe("AirplaySection", () => {
 
     await vi.advanceTimersByTimeAsync(1000);
     expect(mockInvoke).not.toHaveBeenCalled();
-    expect(getByText("Checking stations…")).toBeInTheDocument();
+    expect(container.textContent).toBe("");
 
     await settle();
     expect(getByText("Station 1")).toBeInTheDocument();
     expect(getByText("Station 2")).toBeInTheDocument();
-    expect(container.textContent).toContain("128 kbps");
-    expect(container.textContent).toContain("Confirmed 30 seconds ago");
+    expect(getByText("Station 1").closest("button")?.getAttribute("title")).toContain("128 kbps");
+    expect(getByText("Station 1").closest("button")?.getAttribute("title")).toContain(
+      "Confirmed 30 seconds ago",
+    );
     expect(getByText("Data by Tuneping")).toBeInTheDocument();
   });
 
@@ -131,10 +135,10 @@ describe("AirplaySection", () => {
     expect(getByText("+3 more stations")).toBeInTheDocument();
   });
 
-  it("says so when no station is playing the song", async () => {
-    const { getByText } = render(AirplaySection, { props: { song } });
+  it("renders nothing when no station is playing the song", async () => {
+    const { container } = render(AirplaySection, { props: { song } });
     await settle();
-    expect(getByText("No stations are playing this right now.")).toBeInTheDocument();
+    expect(container.textContent).toBe("");
   });
 
   it("serves the last result, marked stale, while Tuneping is unavailable", async () => {
@@ -145,11 +149,11 @@ describe("AirplaySection", () => {
     expect(getByText("Station 1")).toBeInTheDocument();
   });
 
-  it("reports an outage with nothing cached", async () => {
+  it("renders nothing on outage with nothing cached", async () => {
     respondWith(answer({ kind: "unavailable", retry_after: 30 }));
-    const { getByText } = render(AirplaySection, { props: { song } });
+    const { container } = render(AirplaySection, { props: { song } });
     await settle();
-    expect(getByText("Couldn't reach Tuneping. Try again in a moment.")).toBeInTheDocument();
+    expect(container.textContent).toBe("");
   });
 
   it("hides itself when the backend says the song can't be looked up", async () => {
@@ -160,6 +164,7 @@ describe("AirplaySection", () => {
   });
 
   it("refreshes on demand, skipping the cache", async () => {
+    respondWith(answer({ kind: "ready" }, [station(1)]));
     const { getByRole } = render(AirplaySection, { props: { song } });
     await settle();
     await fireEvent.click(getByRole("button", { name: "Refresh stations" }));
@@ -170,12 +175,15 @@ describe("AirplaySection", () => {
     });
   });
 
-  it("opens the station's homepage", async () => {
+  it("navigates to the station in Internet Radio Discover when clicked", async () => {
     respondWith(answer({ kind: "ready" }, [station(1)]));
     const { getByText } = render(AirplaySection, { props: { song } });
     await settle();
     await fireEvent.click(getByText("Station 1"));
-    expect(openExternalUrl).toHaveBeenCalledWith("https://station1.example");
+    expect(openExternalUrl).not.toHaveBeenCalled();
+    expect(navigationStore.activeTab).toBe("radio");
+    expect(radioStore.subView).toBe("discover");
+    expect(radioStore.searchQuery).toBe("Station 1");
   });
 
   it("skipping songs inside the debounce sends one request, for the last song", async () => {

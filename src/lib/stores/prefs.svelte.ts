@@ -42,6 +42,7 @@ interface UiPreferences {
   genre_view_mode: string;
   genre_cards_view_mode: CollectionViewMode;
   pinned_view_mode: CollectionViewMode;
+  radio_saved_view_mode: CollectionViewMode;
   artist_releases_view_mode: CollectionViewMode;
   genre_sort_field: GenreSortField;
   genre_sort_asc: boolean;
@@ -90,6 +91,7 @@ class PrefsStore {
    * Genres tab (mirrors the Albums/Artists cards-vs-rows toggle). */
   genreCardsViewMode = $state<CollectionViewMode>("cards");
   pinnedViewMode = $state<CollectionViewMode>("cards");
+  radioSavedViewMode = $state<CollectionViewMode>("cards");
   /** Shared by every release and playlist section of the artist view. */
   artistReleasesViewMode = $state<CollectionViewMode>("cards");
   /** Sorts both the primary-genre cards and each card's own sub-genre chips —
@@ -144,6 +146,7 @@ class PrefsStore {
     this.playlistsCustomViewMode = prefs.playlists_custom_view_mode;
     this.genreCardsViewMode = prefs.genre_cards_view_mode;
     this.pinnedViewMode = prefs.pinned_view_mode;
+    this.radioSavedViewMode = prefs.radio_saved_view_mode ?? "cards";
     this.artistReleasesViewMode = prefs.artist_releases_view_mode;
     this.genreSortField = prefs.genre_sort_field;
     this.genreSortAsc = prefs.genre_sort_asc;
@@ -217,6 +220,7 @@ class PrefsStore {
       genre_view_mode: "genre",
       genre_cards_view_mode: this.genreCardsViewMode,
       pinned_view_mode: this.pinnedViewMode,
+      radio_saved_view_mode: this.radioSavedViewMode,
       artist_releases_view_mode: this.artistReleasesViewMode,
       genre_sort_field: this.genreSortField,
       genre_sort_asc: this.genreSortAsc,
@@ -332,6 +336,11 @@ class PrefsStore {
 
   setPinnedViewMode(mode: CollectionViewMode) {
     this.pinnedViewMode = mode;
+    this.save();
+  }
+
+  setRadioSavedViewMode(mode: CollectionViewMode) {
+    this.radioSavedViewMode = mode;
     this.save();
   }
 

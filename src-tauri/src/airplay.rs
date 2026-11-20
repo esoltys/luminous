@@ -365,6 +365,30 @@ pub fn load_song(conn: &rusqlite::Connection, song_id: i64) -> Option<AirplaySon
     .ok()
 }
 
+/// Filters `stations` to those present in our local `radio_directory` or `radio_saved`
+/// tables, so the UI never shows stations that can't be opened in Internet Radio.
+pub fn filter_known_stations(
+    conn: &rusqlite::Connection,
+    stations: Vec<AirplayStation>,
+) -> anyhow::Result<Vec<AirplayStation>> {
+    if stations.is_empty() {
+        return Ok(stations);
+    }
+    let mut stmt = conn.prepare(
+        "SELECT 1 FROM radio_directory WHERE stationuuid = ?1
+         UNION ALL
+         SELECT 1 FROM radio_saved WHERE stationuuid = ?1
+         LIMIT 1",
+    )?;
+    let mut kept = Vec::with_capacity(stations.len());
+    for station in stations {
+        if stmt.exists([&station.id])? {
+            kept.push(station);
+        }
+    }
+    Ok(kept)
+}
+
 /// Shared entry point for the command: decides from the database whether anything may
 /// be sent, then asks the service.
 pub async fn get_airplay_now(
@@ -379,7 +403,21 @@ pub async fn get_airplay_now(
     match loaded {
         Ok((false, _)) => AirplayNow::empty(AirplayStatus::Disabled),
         Ok((true, None)) => AirplayNow::empty(AirplayStatus::Unsupported),
-        Ok((true, Some(song))) => service().lookup(&song, force).await,
+        Ok((true, Some(song))) => {
+            let mut answer = service().lookup(&song, force).await;
+            if !answer.stations.is_empty() {
+                let stations = std::mem::take(&mut answer.stations);
+                match crate::db::run_blocking(db, move |conn| filter_known_stations(conn, stations))
+                    .await
+                {
+                    Ok(known) => answer.stations = known,
+                    Err(e) => {
+                        log::warn!("airplay: failed to filter stations against directory: {e}");
+                    }
+                }
+            }
+            answer
+        }
         Err(e) => {
             log::warn!("airplay: could not read song {song_id}: {e}");
             AirplayNow::empty(AirplayStatus::Unsupported)
@@ -691,5 +729,35 @@ mod tests {
         assert!(!song.is_station);
         assert!(load_song(&conn, 2).unwrap().is_station);
         assert!(load_song(&conn, 3).is_none());
+    }
+
+    #[test]
+    fn filter_known_stations_keeps_only_directory_or_saved_stations() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE radio_directory (stationuuid TEXT PRIMARY KEY);
+             CREATE TABLE radio_saved (stationuuid TEXT PRIMARY KEY);
+             INSERT INTO radio_directory VALUES ('in-dir');
+             INSERT INTO radio_saved VALUES ('in-saved');",
+        )
+        .unwrap();
+
+        let mk = |id: &str| AirplayStation {
+            id: id.into(),
+            name: id.into(),
+            country: None,
+            codec: None,
+            bitrate: None,
+            homepage: None,
+            confirmed_at: NOW,
+        };
+
+        let kept = filter_known_stations(
+            &conn,
+            vec![mk("in-dir"), mk("unknown-station"), mk("in-saved")],
+        )
+        .unwrap();
+        let ids: Vec<&str> = kept.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids, vec!["in-dir", "in-saved"]);
     }
 }

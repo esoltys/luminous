@@ -587,4 +587,47 @@ describe("RadioView", () => {
     });
     expect(await screen.findByText("Updated FM")).toBeInTheDocument();
   });
+
+  it("toggles Saved stations between cards and compact rows and reorders saved stations (#2209)", async () => {
+    const s1 = makeStation({ stationuuid: "uuid-1", name: "Alpha FM" });
+    const s2 = makeStation({ stationuuid: "uuid-2", name: "Beta Radio" });
+    const status: RadioDirectoryStatus = {
+      optedIn: false,
+      stationCount: 0,
+      playableStationCount: 0,
+      lastSyncedAt: null,
+      lastFullSyncAt: null,
+      nextAutoSyncAt: null,
+      syncInProgress: false,
+      lastError: null,
+      attributionUrl: "https://www.radio-browser.info",
+    };
+
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_radio_directory_status") return status;
+      if (cmd === "get_saved_radio_stations") return [s1, s2];
+      if (cmd === "get_recent_radio_stations") return [];
+      if (cmd === "get_radio_playlist_ids") return [];
+      return null;
+    });
+
+    radioStore.savedStations = [];
+    radioStore.subView = "my_stations";
+    render(RadioView);
+
+    expect(await screen.findAllByTestId("radio-station-card")).toHaveLength(2);
+    expect(screen.queryByTestId("pinned-station-row-card")).toBeNull();
+
+    const rowsBtn = screen.getByRole("button", { name: "Row view" });
+    await fireEvent.click(rowsBtn);
+
+    expect(await screen.findAllByTestId("pinned-station-row-card")).toHaveLength(2);
+    expect(screen.queryByTestId("radio-station-card")).toBeNull();
+
+    await radioStore.reorderSavedStations(["uuid-2", "uuid-1"]);
+    expect(radioStore.savedStations.map((s) => s.stationuuid)).toEqual(["uuid-2", "uuid-1"]);
+    expect(mockInvoke).toHaveBeenCalledWith("reorder_saved_stations", {
+      order: ["uuid-2", "uuid-1"],
+    });
+  });
 });

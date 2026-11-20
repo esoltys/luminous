@@ -642,17 +642,18 @@ export function extractColorsFromImage(imgUrl: string): Promise<ExtractedColors>
         const data = imgData.data;
 
         const colorBuckets = new Map<string, number>();
-        let count = 0;
+        // Composite semi/fully transparent pixels (e.g. PNG radio station logos)
+        // over a dark neutral backdrop so white/colored logos don't lose their
+        // background or flip the entire UI light.
+        const BACKDROP_R = 30;
+        const BACKDROP_G = 34;
+        const BACKDROP_B = 42;
 
         for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          const a = data[i + 3];
-
-          if (a < 200) continue; // skip transparent
-
-          count++;
+          const alpha = data[i + 3] / 255;
+          const r = Math.round(data[i] * alpha + BACKDROP_R * (1 - alpha));
+          const g = Math.round(data[i + 1] * alpha + BACKDROP_G * (1 - alpha));
+          const b = Math.round(data[i + 2] * alpha + BACKDROP_B * (1 - alpha));
 
           // Pre-quantize to a 16-step RGB grid so Median Cut works over a
           // manageable candidate pool instead of up to 1600 raw pixels.
@@ -664,7 +665,7 @@ export function extractColorsFromImage(imgUrl: string): Promise<ExtractedColors>
           colorBuckets.set(key, (colorBuckets.get(key) || 0) + 1);
         }
 
-        if (count === 0) {
+        if (colorBuckets.size === 0) {
           resolve(getFallbackColors());
           return;
         }
