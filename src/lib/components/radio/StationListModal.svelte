@@ -172,7 +172,7 @@
                 type="button"
                 onclick={() => toggleTag(genre.name)}
                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors {active
-                  ? 'bg-brand-accent text-white border-brand-accent'
+                  ? 'bg-brand-accent text-brand-accent-contrast border-brand-accent'
                   : 'bg-brand-bg/60 text-brand-text-primary border-brand-border/60 hover:bg-brand-surface-hover'}"
               >
                 <span>{genre.name}</span>
@@ -237,7 +237,7 @@
                 type="button"
                 onclick={() => toggleTag(tag.name)}
                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border transition-colors {active
-                  ? 'bg-brand-accent text-white border-brand-accent'
+                  ? 'bg-brand-accent text-brand-accent-contrast border-brand-accent'
                   : 'bg-brand-surface/70 text-brand-text-primary border-brand-border/40 hover:bg-brand-surface-hover'}"
               >
                 {#if active}<Check class="w-3 h-3" />{/if}

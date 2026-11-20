@@ -574,7 +574,7 @@
           </div>
         {:else}
           <div
-            class="mb-8 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-border bg-brand-sidebar text-[11px] font-semibold text-brand-text-secondary/60 select-none shadow-sm"
+            class="mb-8 inline-flex items-center gap-2 px-3 py-1.5 rounded-full chip-neutral text-[11px] font-semibold select-none shadow-sm"
           >
             <span class="w-1.5 h-1.5 rounded-full bg-brand-accent animate-pulse"></span>
             {i18n.t(

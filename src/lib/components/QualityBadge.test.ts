@@ -107,7 +107,9 @@ describe("QualityBadge.svelte", () => {
       bitdepth: undefined,
     };
     const { getByText } = render(QualityBadge);
-    expect(getByText("LQ")).toBeInTheDocument();
+    const badge = getByText("LQ");
+    expect(badge).toBeInTheDocument();
+    expect(badge.className).toContain("chip-neutral");
   });
 
   it("uses quality_tier from audioPipeline when available", () => {

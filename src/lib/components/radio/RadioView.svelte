@@ -83,7 +83,7 @@
       {#if radioStore.status?.optedIn && radioStore.isStale && radioStore.status.lastSyncedAt}
         <span
           data-testid="radio-stale-indicator"
-          class="label-small px-2.5 py-1 rounded-full bg-brand-sidebar border border-brand-border text-brand-text-secondary"
+          class="label-small px-2.5 py-1 rounded-full chip-neutral"
         >
           {formatUpdatedAgo(radioStore.status.lastSyncedAt)}
         </span>

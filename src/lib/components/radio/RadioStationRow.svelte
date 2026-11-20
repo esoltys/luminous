@@ -112,7 +112,7 @@
       </span>
       {#if !station.playable}
         <span
-          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-brand-surface border border-brand-border/60 label-small text-brand-text-secondary shrink-0"
+          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded chip-neutral label-small shrink-0"
         >
           <AlertCircle class="w-3.5 h-3.5" />
           {i18n.t("radio.unsupportedBadge")}
@@ -120,7 +120,7 @@
         <HelpTip text={i18n.t("radio.unsupportedHint")} label={i18n.t("radio.unsupportedBadge")} />
       {:else if station.reducedQuality}
         <span
-          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-brand-surface border border-brand-border/60 label-small text-brand-text-secondary shrink-0"
+          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded chip-neutral label-small shrink-0"
         >
           {i18n.t("radio.reducedQualityBadge")}
         </span>
@@ -154,14 +154,12 @@
               <button
                 type="button"
                 onclick={() => onTagClick(tag)}
-                class="label-small px-1.5 py-0.5 rounded-md bg-brand-accent/10 text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-accent/20 transition-colors"
+                class="label-small px-1.5 py-0.5 rounded-md bg-brand-accent/10 text-brand-text-primary hover:text-brand-accent-text hover:bg-brand-accent/20 transition-colors"
               >
                 {tag}
               </button>
             {:else}
-              <span
-                class="label-small px-1.5 py-0.5 rounded-md bg-brand-surface text-brand-text-secondary"
-              >
+              <span class="label-small px-1.5 py-0.5 rounded-md chip-neutral">
                 {tag}
               </span>
             {/if}

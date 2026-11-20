@@ -138,18 +138,12 @@
           {i18n.t("auth.scrobbling", {}, "Scrobbling")}
         </span>
         {#if scrobblerStore.enabled}
-          <span
-            class="text-[10px] px-1.5 py-0.5 rounded bg-brand-surface border border-brand-border text-brand-text-secondary font-medium"
-          >
+          <span class="text-[10px] px-1.5 py-0.5 rounded chip-neutral font-medium">
             ListenBrainz
           </span>
         {/if}
         {#if scrobblerStore.lastfmEnabled}
-          <span
-            class="text-[10px] px-1.5 py-0.5 rounded bg-brand-surface border border-brand-border text-brand-text-secondary font-medium"
-          >
-            Last.fm
-          </span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded chip-neutral font-medium"> Last.fm </span>
         {/if}
         {#if scrobblerStore.status === "paused"}
           <span
@@ -167,7 +161,7 @@
           </span>
         {:else}
           <span
-            class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-500/15 text-zinc-400 font-medium"
+            class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full chip-neutral font-medium"
           >
             {i18n.t("common.inactive", {}, "Inactive")}
           </span>

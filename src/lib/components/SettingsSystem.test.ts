@@ -305,4 +305,23 @@ describe("SettingsSystem.svelte", () => {
 
     expect(queryByLabelText("Output Mode")).not.toBeInTheDocument();
   });
+
+  it("renders the Standard Mode chip with contrast-safe chip-neutral styling", async () => {
+    const prevImpl = vi.mocked(invoke).getMockImplementation();
+    vi.mocked(invoke).mockImplementation((cmd: string, ...args) => {
+      if (cmd === "get_data_directory_info") {
+        return Promise.resolve({ path: "/home/user/.local/share/luminous", is_portable: false });
+      }
+      return prevImpl ? prevImpl(cmd, ...args) : Promise.resolve([]);
+    });
+
+    const { findByText } = render(SettingsSystem);
+    const chip = await findByText("Standard Mode");
+    expect(chip).toBeInTheDocument();
+    expect(chip.className).toContain("chip-neutral");
+    expect(chip.className).not.toContain("text-brand-text-secondary");
+    expect(chip.className).not.toContain("bg-brand-border");
+
+    vi.mocked(invoke).mockImplementation(prevImpl!);
+  });
 });

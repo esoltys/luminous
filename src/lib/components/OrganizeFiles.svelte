@@ -1297,9 +1297,7 @@
                           <span class="sr-only">{i18n.t("organizer.statusOk")}</span>
                         </span>
                       {:else if st === "unchanged"}
-                        <span
-                          class="px-2 py-0.5 rounded bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary"
-                        >
+                        <span class="px-2 py-0.5 rounded chip-neutral">
                           {i18n.t("organizer.statusUnchanged")}
                         </span>
                       {:else if st === "duplicate"}
