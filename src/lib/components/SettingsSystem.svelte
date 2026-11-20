@@ -445,7 +445,7 @@
         <span
           class="px-2 py-0.5 text-[10px] font-bold rounded-full {dataDirectory.is_portable
             ? 'bg-brand-accent/20 text-brand-accent-text border border-brand-accent/40'
-            : 'bg-brand-border/60 text-brand-text-secondary border border-brand-border'}"
+            : 'chip-neutral'}"
         >
           {dataDirectory.is_portable
             ? i18n.t("settings.dataStoragePortableBadge", {}, "Portable Mode")

@@ -76,10 +76,10 @@
       case "hq":
         return "bg-brand-accent/20 text-brand-accent-text border border-brand-accent/40 font-bold hover:bg-brand-accent/30";
       case "sq":
-        return "bg-brand-border/40 text-brand-text-primary border border-brand-border/70 font-semibold hover:border-brand-accent/50";
+        return "chip-neutral font-semibold hover:border-brand-accent/50";
       case "lq":
       default:
-        return "bg-brand-border/20 text-brand-text-secondary/80 border border-brand-border/40 font-medium hover:text-brand-text-primary";
+        return "chip-neutral font-medium hover:border-brand-accent/50";
     }
   });
 

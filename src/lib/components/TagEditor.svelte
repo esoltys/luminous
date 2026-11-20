@@ -1131,9 +1131,7 @@
                 <div class="flex items-center gap-2">
                   <span>{i18n.t("tagEditor.historyHeading")}</span>
                   {#if tagHistory.entries.length > 0}
-                    <span
-                      class="px-1.5 py-0.5 text-[10px] rounded-full bg-brand-surface text-brand-text-secondary font-normal"
-                    >
+                    <span class="px-1.5 py-0.5 text-[10px] rounded-full chip-neutral font-normal">
                       {tagHistory.entries.length}
                     </span>
                   {/if}

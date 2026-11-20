@@ -156,7 +156,7 @@
       {/each}
       {#if remainingCount > 0}
         <span
-          class="inline-flex items-center px-2 py-1 rounded-full bg-brand-sidebar text-brand-text-secondary border border-brand-border text-xs font-medium select-none shrink-0"
+          class="inline-flex items-center px-2 py-1 rounded-full chip-neutral text-xs font-medium select-none shrink-0"
           title={remainingItems.map((i) => i.label).join(", ")}
         >
           +{remainingCount}

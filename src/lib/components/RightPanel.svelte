@@ -185,9 +185,9 @@
       case "suspected_lossy":
       case "suspected_upsampled":
       case "padded_bit_depth":
-        return "bg-brand-bg/80 text-brand-text-primary border border-brand-border";
+        return "chip-neutral";
       default:
-        return "bg-brand-bg/60 text-brand-text-secondary border border-brand-border/40";
+        return "chip-neutral";
     }
   }
 
@@ -476,7 +476,7 @@
                       {/if}
                     {:else}
                       <span
-                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-bg/60 text-brand-text-secondary/80 border border-brand-border/40"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium chip-neutral"
                       >
                         {i18n.t("playerBar.provenanceUnverified", {}, "Unverified")}
                       </span>
@@ -518,10 +518,7 @@
                   >
                   <div class="flex flex-wrap gap-x-1.5 gap-y-1 leading-relaxed">
                     {#each contextData.mb_tags as tag (tag)}
-                      <span
-                        class="px-2 py-0.5 rounded-full bg-brand-bg/60 text-brand-text-secondary text-[11px]"
-                        >{tag}</span
-                      >
+                      <span class="px-2 py-0.5 rounded-full chip-neutral text-[11px]">{tag}</span>
                     {/each}
                   </div>
                 </div>
