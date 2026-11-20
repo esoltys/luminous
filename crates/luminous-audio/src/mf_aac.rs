@@ -19,7 +19,6 @@ use symphonia::core::audio::{
     GenericAudioBufferRef,
 };
 use symphonia::core::codecs::audio::{AudioCodecParameters, AudioDecoder, FinalizeResult};
-use symphonia::core::codecs::registry::RegisterableAudioDecoder;
 use symphonia::core::codecs::CodecInfo;
 use symphonia::core::errors::{Error as SymphoniaError, Result};
 use symphonia::core::packet::PacketRef;
