@@ -1,3 +1,7 @@
+# Note on HE-AAC radio streams (#2203): org.gnome.Platform//50 ships
+# libavcodec.so.61 in the base runtime with the LGPL `aac` decoder enabled,
+# which luminous-audio loads dynamically via dlopen. No codecs-extra extension
+# or bundled FFmpeg library is required.
 id: org.luminous.music
 runtime: org.gnome.Platform
 runtime-version: '50'

@@ -3360,6 +3360,7 @@ dependencies = [
  "anyhow",
  "azo",
  "cpal",
+ "libc",
  "log",
  "luminous-equalizer",
  "parking_lot",

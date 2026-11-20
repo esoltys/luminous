@@ -5,7 +5,8 @@
 //! whose SBR is signalled implicitly (every ADTS Shoutcast/Icecast "AAC+"
 //! station) still decodes, but only its half-rate AAC core: the high band is
 //! missing and HE-AACv2 comes out mono. On Windows, those streams go to
-//! Media Foundation's AAC decoder instead, which decodes SBR and PS.
+//! Media Foundation's AAC decoder (#2011); on Linux, they go to a dynamically
+//! loaded `libavcodec` `aac` decoder (#2203). Both decode SBR and PS.
 //!
 //! Routing is on the bitstream, not on a station's codec label (labels are
 //! wrong both ways): an ADTS stream (no AudioSpecificConfig) whose core rate
@@ -33,9 +34,37 @@ pub(crate) const HE_AAC_MAX_CORE_RATE: u32 = 24_000;
 /// `input_info` detection doesn't duplicate the literal across modules.
 pub(crate) const MF_AAC_LONG_NAME: &str = "Media Foundation AAC";
 
+/// `CodecInfo::long_name` for [`crate::libavcodec_aac::LibavcodecAacDecoder`].
+pub(crate) const LIBAVCODEC_AAC_LONG_NAME: &str = "libavcodec AAC";
+
+/// True when `long_name` belongs to one of Luminous's full HE-AAC decoders.
+pub(crate) fn is_full_he_aac_decoder(long_name: &str) -> bool {
+    long_name == MF_AAC_LONG_NAME || long_name == LIBAVCODEC_AAC_LONG_NAME
+}
+
+/// Two-byte `AudioSpecificConfig` for an AAC-LC core (`audioObjectType = 2`);
+/// SBR stays implicit in the ADTS blocks so platform decoders detect it.
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+pub(crate) fn audio_specific_config(
+    core_rate: u32,
+    channels: u8,
+) -> std::result::Result<[u8; 2], String> {
+    const RATES: [u32; 13] = [
+        96_000, 88_200, 64_000, 48_000, 44_100, 32_000, 24_000, 22_050, 16_000, 12_000, 11_025,
+        8_000, 7_350,
+    ];
+    let index = RATES
+        .iter()
+        .position(|&r| r == core_rate)
+        .ok_or_else(|| format!("no AAC rate index for {core_rate} Hz"))? as u16;
+    // audioObjectType 2 (LC): 5 bits, samplingFrequencyIndex: 4, channelConfiguration: 4, 3 zero bits.
+    let asc = (2u16 << 11) | (index << 7) | (u16::from(channels) << 3);
+    Ok(asc.to_be_bytes())
+}
+
 /// True when the stream described by `params` is HE-AAC in practice: ADTS
 /// (no AudioSpecificConfig) at a core rate of 24 kHz or less.
-#[cfg_attr(not(windows), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
 fn is_implicit_he_aac(params: &AudioCodecParameters) -> bool {
     params.extra_data.is_none()
         && params
@@ -50,14 +79,18 @@ pub fn decodes_full_he_aac() -> bool {
     {
         crate::mf_aac::available()
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
+    {
+        crate::libavcodec_aac::available()
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
     {
         false
     }
 }
 
 /// The registered AAC decoder: Symphonia's core decoder (below), unless
-/// routing hands the stream to Media Foundation (see the module docs).
+/// routing hands the stream to a platform HE-AAC decoder (see the module docs).
 impl RegisterableAudioDecoder for AacDecoder {
     fn try_registry_new(
         params: &AudioCodecParameters,
@@ -68,6 +101,13 @@ impl RegisterableAudioDecoder for AacDecoder {
             match crate::mf_aac::MfAacDecoder::try_new(params) {
                 Ok(decoder) => return Ok(Box::new(decoder)),
                 Err(e) => log::warn!("HE-AAC: Media Foundation unavailable, core only: {e}"),
+            }
+        }
+        #[cfg(target_os = "linux")]
+        if is_implicit_he_aac(params) {
+            match crate::libavcodec_aac::LibavcodecAacDecoder::try_new(params) {
+                Ok(decoder) => return Ok(Box::new(decoder)),
+                Err(e) => log::warn!("HE-AAC: libavcodec unavailable, core only: {e}"),
             }
         }
         Ok(Box::new(Self::try_new(params, opts)?))

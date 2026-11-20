@@ -193,52 +193,6 @@ describe("PlayerStore", () => {
     if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
   });
 
-  it("shows the track a station announces, and drops it when the station stops announcing (#2008)", async () => {
-    const originalListenImpl = vi.mocked(listen).getMockImplementation();
-    let nowPlayingCallback: ((event: { payload: unknown }) => void) | undefined;
-    const registered = new Promise<void>((resolve) => {
-      vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
-        if (event === "station-now-playing") {
-          nowPlayingCallback = callback;
-          resolve();
-        }
-        return () => {};
-      });
-    });
-
-    try {
-      store = new PlayerStore();
-      await registered;
-      store.currentSong = {
-        id: 7,
-        title: "Groove Salad",
-        artist: "US",
-        source: "radio_browser",
-        path: "radio://gs",
-      } as Song;
-
-      expect(store.currentSongDisplayTitle).toBe("Groove Salad");
-      expect(store.currentSongDisplaySubtitle).toBe("US");
-      expect(store.stationNowPlayingQuery).toBeNull();
-
-      nowPlayingCallback?.({ payload: { artist: "Air", title: "Alone in Kyoto" } });
-      expect(store.currentSongDisplayTitle).toBe("Alone in Kyoto");
-      expect(store.currentSongDisplaySubtitle).toBe("Air · Groove Salad");
-      expect(store.stationNowPlayingQuery).toBe("Air Alone in Kyoto");
-      expect(store.currentSong?.title).toBe("Groove Salad");
-
-      nowPlayingCallback?.({ payload: { artist: null, title: "Live from the studio" } });
-      expect(store.currentSongDisplaySubtitle).toBe("Groove Salad");
-      expect(store.stationNowPlayingQuery).toBe("Live from the studio");
-
-      nowPlayingCallback?.({ payload: null });
-      expect(store.currentSongDisplayTitle).toBe("Groove Salad");
-      expect(store.stationNowPlayingQuery).toBeNull();
-    } finally {
-      if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
-    }
-  });
-
   it("shows the backend's reason when a remote track fails to play", async () => {
     const originalListenImpl = vi.mocked(listen).getMockImplementation();
     let errorCallback: ((event: { payload: unknown }) => void) | undefined;
@@ -829,5 +783,57 @@ describe("PlayerStore", () => {
       expect(store.playlistTotal).toBe(0);
       expect(store.queueProgressText).toBeNull();
     });
+  });
+});
+
+describe("PlayerStore (mocked listeners)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows the track a station announces, and drops it when the station stops announcing (#2008)", async () => {
+    const originalListenImpl = vi.mocked(listen).getMockImplementation();
+    let nowPlayingCallback: ((event: { payload: unknown }) => void) | undefined;
+    const registered = new Promise<void>((resolve) => {
+      vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+        if (event === "station-now-playing") {
+          nowPlayingCallback = callback;
+          resolve();
+        }
+        return () => {};
+      });
+    });
+
+    try {
+      const store = new PlayerStore();
+      await registered;
+      store.currentSong = {
+        id: 7,
+        title: "Groove Salad",
+        artist: "US",
+        source: "radio_browser",
+        path: "radio://gs",
+      } as Song;
+
+      expect(store.currentSongDisplayTitle).toBe("Groove Salad");
+      expect(store.currentSongDisplaySubtitle).toBe("US");
+      expect(store.stationNowPlayingQuery).toBeNull();
+
+      nowPlayingCallback?.({ payload: { artist: "Air", title: "Alone in Kyoto" } });
+      expect(store.currentSongDisplayTitle).toBe("Alone in Kyoto");
+      expect(store.currentSongDisplaySubtitle).toBe("Air · Groove Salad");
+      expect(store.stationNowPlayingQuery).toBe("Air Alone in Kyoto");
+      expect(store.currentSong?.title).toBe("Groove Salad");
+
+      nowPlayingCallback?.({ payload: { artist: null, title: "Live from the studio" } });
+      expect(store.currentSongDisplaySubtitle).toBe("Groove Salad");
+      expect(store.stationNowPlayingQuery).toBe("Live from the studio");
+
+      nowPlayingCallback?.({ payload: null });
+      expect(store.currentSongDisplayTitle).toBe("Groove Salad");
+      expect(store.stationNowPlayingQuery).toBeNull();
+    } finally {
+      if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+    }
   });
 });

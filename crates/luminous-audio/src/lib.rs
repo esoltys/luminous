@@ -52,6 +52,8 @@ mod speed;
 // only called on its own platform, but are built and tested everywhere.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 mod alsa_direct;
+#[cfg(target_os = "linux")]
+mod libavcodec_aac;
 #[cfg(windows)]
 mod mf_aac;
 #[cfg(target_os = "linux")]
@@ -999,10 +1001,11 @@ fn input_info_from_codec(
 ) -> InputInfo {
     let codec = info.short_name.to_string();
     let format = display_format_name(&codec);
-    let is_mf_aac = info.long_name == aac::MF_AAC_LONG_NAME;
-    let aac_core_only = codec == "aac" && !is_mf_aac && sample_rate <= aac::HE_AAC_MAX_CORE_RATE;
-    let decoder_name = if is_mf_aac {
-        aac::MF_AAC_LONG_NAME.to_string()
+    let is_full_he_aac = aac::is_full_he_aac_decoder(info.long_name);
+    let aac_core_only =
+        codec == "aac" && !is_full_he_aac && sample_rate <= aac::HE_AAC_MAX_CORE_RATE;
+    let decoder_name = if is_full_he_aac {
+        info.long_name.to_string()
     } else if codec == "opus" {
         "libopus (via Symphonia)".to_string()
     } else {
@@ -4341,6 +4344,11 @@ id 76, type PipeWire:Interface:Node
             long_name: "Media Foundation AAC",
             profiles: &[],
         };
+        let libav_info = symphonia::core::codecs::CodecInfo {
+            short_name: "aac",
+            long_name: "libavcodec AAC",
+            profiles: &[],
+        };
         let core_info = symphonia::core::codecs::CodecInfo {
             short_name: "aac",
             long_name: "Advanced Audio Coding",
@@ -4356,6 +4364,9 @@ id 76, type PipeWire:Interface:Node
         let mf = input_info_from_codec(1, &mf_info, 24_000, 2);
         assert!(!mf.aac_core_only);
         assert_eq!(mf.decoder_name, "Media Foundation AAC");
+        let libav = input_info_from_codec(1, &libav_info, 24_000, 2);
+        assert!(!libav.aac_core_only);
+        assert_eq!(libav.decoder_name, "libavcodec AAC");
         assert_eq!(
             input_info_from_codec(1, &opus_info, 48_000, 2).decoder_name,
             "libopus (via Symphonia)"
