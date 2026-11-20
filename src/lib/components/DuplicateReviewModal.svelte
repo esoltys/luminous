@@ -359,9 +359,7 @@
                         {candidate.song.title || currentGroup.title}
                       </span>
                       {#if isRecommended}
-                        <span
-                          class="px-1.5 py-0.5 rounded text-[10px] font-medium border border-brand-border bg-brand-sidebar text-brand-text-secondary"
-                        >
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium chip-neutral">
                           {i18n.t("curation.recommendedBadge")}
                         </span>
                       {/if}

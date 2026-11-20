@@ -471,7 +471,7 @@
         {#if isFilesFilterMode}
           {#if filesStore.filterQuery.trim() !== ""}
             <span
-              class="text-[10px] bg-brand-border/60 px-1.5 py-0.5 rounded text-brand-text-secondary font-mono flex-shrink-0 select-none"
+              class="text-[10px] chip-neutral px-1.5 py-0.5 rounded font-mono flex-shrink-0 select-none"
               data-testid="files-filter-badge"
             >
               {i18n.t("files.filterCountBadge", {
@@ -496,7 +496,7 @@
           ></div>
         {:else if collectionStore.searchQuery}
           <span
-            class="text-[10px] bg-brand-border/60 px-1.5 py-0.5 rounded text-brand-text-secondary font-mono flex-shrink-0 select-none"
+            class="text-[10px] chip-neutral px-1.5 py-0.5 rounded font-mono flex-shrink-0 select-none"
           >
             {i18n.plural("topNav.tracksCount", collectionStore.searchResults.length)}
           </span>

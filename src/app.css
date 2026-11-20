@@ -24,6 +24,12 @@
   /* chips, captions and micro-labels; 11px floor so they stay legible without caps */
   @apply text-[11px] font-semibold;
 }
+@utility chip-neutral {
+  /* Neutral/inactive chips sit on a contrast-checked theme surface with primary
+     text so they stay >= 4.5:1 on every theme (never bg-brand-border/* +
+     text-brand-text-secondary, which collapses when border and secondary share lightness). */
+  @apply bg-brand-sidebar text-brand-text-primary border border-brand-border;
+}
 
 /* Bottom padding (pb-dock) that clears the floating PlayerBar dock (see PLAYER_DOCK_* in
    constants.ts). --dock-content-inset is set on <main> by routes/+layout.svelte: the

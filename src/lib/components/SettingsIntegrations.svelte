@@ -959,7 +959,7 @@
             </span>
           {:else}
             <span
-              class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-border/40 text-brand-text-secondary border border-brand-border font-medium shrink-0"
+              class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full chip-neutral font-medium shrink-0"
             >
               {i18n.t("discord.statusDisconnected")}
             </span>
