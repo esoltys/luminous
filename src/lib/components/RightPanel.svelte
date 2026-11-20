@@ -185,7 +185,7 @@
       case "suspected_lossy":
       case "suspected_upsampled":
       case "padded_bit_depth":
-        return "bg-brand-bg/80 text-brand-text-primary border border-brand-border";
+        return "chip-neutral";
       default:
         return "chip-neutral";
     }

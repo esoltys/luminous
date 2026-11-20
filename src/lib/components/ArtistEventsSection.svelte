@@ -309,7 +309,7 @@
                       <button
                         type="button"
                         onclick={() => onOpenUrl?.(primaryTicketUrl)}
-                        class="px-2.5 py-1 rounded bg-brand-accent/15 text-brand-accent hover:bg-brand-accent hover:text-white text-[11px] font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        class="px-2.5 py-1 rounded bg-brand-accent/15 text-brand-accent-text hover:bg-brand-accent hover:text-brand-accent-contrast text-[11px] font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
                         title={primaryTicketUrl}
                       >
                         <Ticket class="w-3 h-3" />

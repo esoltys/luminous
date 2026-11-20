@@ -138,9 +138,7 @@
         <span class="truncate max-w-[14rem]">{station.country}</span>
       {/if}
       {#if station.codec}
-        <span
-          class="code-caps px-1.5 py-0.2 rounded bg-brand-surface/80 border border-brand-border/40"
-        >
+        <span class="code-caps px-1.5 py-0.5 rounded chip-neutral">
           {station.codec}
         </span>
       {/if}
