@@ -338,6 +338,38 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     expect(activeTask?.label).toBe("Fast SSD: Library refreshed");
   });
 
+  it("does not create task or toast notifications for silent watcher scans", async () => {
+    await (collectionStore as any).init();
+    const startSpy = vi.spyOn(tasksStore, "startTask");
+    const completeSpy = vi.spyOn(tasksStore, "completeTask");
+    const toastSpy = vi.spyOn(toastStore, "show");
+
+    eventCallbacks["scan-progress"]({
+      payload: {
+        phase: "scanning",
+        current_path: "/music/song.flac",
+        scanned: 1,
+        total: 10,
+        directory_name: "Music Library",
+        silent: true,
+      },
+    });
+    eventCallbacks["scan-progress"]({
+      payload: {
+        phase: "done",
+        current_path: "",
+        scanned: 10,
+        total: 10,
+        directory_name: "Music Library",
+        silent: true,
+      },
+    });
+
+    expect(startSpy).not.toHaveBeenCalled();
+    expect(completeSpy).not.toHaveBeenCalled();
+    expect(toastSpy).not.toHaveBeenCalled();
+  });
+
   it("shows persistent toast when scan completes with external tag changes", async () => {
     await (collectionStore as any).init();
     const toastSpy = vi.spyOn(toastStore, "show");

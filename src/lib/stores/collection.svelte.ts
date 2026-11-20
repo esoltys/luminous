@@ -454,7 +454,7 @@ class CollectionStore {
         const libraryName = resolveScanLibraryName(event.payload, this.directories);
         const scanTaskId = "library-scan";
 
-        if (event.payload.phase !== "done") {
+        if (event.payload.phase !== "done" && !event.payload.silent) {
           const phaseName = getScanPhaseLabel(event.payload.phase);
           const label = `${libraryName}: ${phaseName}`;
 
@@ -476,8 +476,10 @@ class CollectionStore {
         }
 
         if (event.payload.phase === "done") {
-          const doneLabel = `${libraryName}: ${i18n.t("tasks.libraryScanDone", {}, "Library refreshed")}`;
-          tasksStore.completeTask(scanTaskId, doneLabel);
+          if (!event.payload.silent || tasksStore.isTaskActive(scanTaskId)) {
+            const doneLabel = `${libraryName}: ${i18n.t("tasks.libraryScanDone", {}, "Library refreshed")}`;
+            tasksStore.completeTask(scanTaskId, doneLabel);
+          }
           const nowStr = new Date().toLocaleString();
           this.lastScanTime = nowStr;
           this.refreshDirectories();
