@@ -114,8 +114,10 @@ describe("AirplaySection", () => {
     await settle();
     expect(getByText("Station 1")).toBeInTheDocument();
     expect(getByText("Station 2")).toBeInTheDocument();
-    expect(container.textContent).toContain("128 kbps");
-    expect(container.textContent).toContain("Confirmed 30 seconds ago");
+    expect(getByText("Station 1").closest("button")?.getAttribute("title")).toContain("128 kbps");
+    expect(getByText("Station 1").closest("button")?.getAttribute("title")).toContain(
+      "Confirmed 30 seconds ago",
+    );
     expect(getByText("Data by Tuneping")).toBeInTheDocument();
   });
 

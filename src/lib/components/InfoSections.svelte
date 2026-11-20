@@ -18,7 +18,6 @@
   import { openInPicard } from "../utils/picard";
   import { isRemoteSource } from "../utils/remoteSource";
   import ArtistInformationPanel from "./ArtistInformationPanel.svelte";
-  import AirplaySection from "./AirplaySection.svelte";
   import ArtistEventsSection from "./ArtistEventsSection.svelte";
   import CommunityRating from "./CommunityRating.svelte";
   import MarkdownBio from "./MarkdownBio.svelte";
@@ -47,17 +46,6 @@
 
   let editingSongId = $state<number | null>(null);
 
-  // "On the radio now" (#1998) is about one song, so albums and artists don't get it. It sits
-  // with the other "what's happening now" section: after the events if shown, else after the bio.
-  let airplayAfter = $derived.by(() => {
-    if (view.subject?.kind !== "song") return undefined;
-    const ids = sections.map((s) => s.id);
-    if (ids.includes("events")) return "events";
-    if (ids.includes("bio")) return "bio";
-    if (ids.includes("facts")) return "facts";
-    return null;
-  });
-
   let folderPath = $derived(
     song?.path ? getAlbumFolderPath([song.path]) || getParentFolder(song.path) : "",
   );
@@ -78,10 +66,6 @@
 <div class="@container space-y-6 text-xs">
   {#if view.offline}
     <p class="text-brand-text-secondary/60">{i18n.t("playerBar.contextOffline")}</p>
-  {/if}
-
-  {#if airplayAfter === null && song}
-    <AirplaySection {song} />
   {/if}
 
   {#each sections as section (section.id)}
@@ -237,9 +221,6 @@
           </div>
         </div>
       {/if}
-    {/if}
-    {#if section.id === airplayAfter && song}
-      <AirplaySection {song} />
     {/if}
   {/each}
 

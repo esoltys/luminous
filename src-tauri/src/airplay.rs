@@ -370,7 +370,7 @@ pub fn load_song(conn: &rusqlite::Connection, song_id: i64) -> Option<AirplaySon
 pub fn filter_known_stations(
     conn: &rusqlite::Connection,
     stations: Vec<AirplayStation>,
-) -> crate::error::Result<Vec<AirplayStation>> {
+) -> crate::core::error::Result<Vec<AirplayStation>> {
     if stations.is_empty() {
         return Ok(stations);
     }
