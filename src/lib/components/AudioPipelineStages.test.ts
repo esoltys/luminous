@@ -118,4 +118,32 @@ describe("AudioPipelineStages", () => {
     expect(getByText("Volume control")).toBeInTheDocument();
     expect(getByText("Software")).toBeInTheDocument();
   });
+
+  it("shows the half-rate AAC core note only when input_aac_core_only is true", () => {
+    const { getByText, rerender, queryByText } = render(AudioPipelineStages, {
+      pipeline: pipeline({
+        input_source: "stream",
+        input_format: "AAC",
+        input_codec: "aac",
+        input_sample_rate: 24_000,
+        decoder_name: "Symphonia AAC decoder",
+        input_aac_core_only: true,
+      }),
+    });
+
+    expect(getByText("Half-rate AAC core only (reduced quality)")).toBeInTheDocument();
+
+    rerender({
+      pipeline: pipeline({
+        input_source: "stream",
+        input_format: "AAC",
+        input_codec: "aac",
+        input_sample_rate: 48_000,
+        decoder_name: "Media Foundation AAC",
+        input_aac_core_only: false,
+      }),
+    });
+
+    expect(queryByText("Half-rate AAC core only (reduced quality)")).not.toBeInTheDocument();
+  });
 });

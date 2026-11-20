@@ -160,6 +160,11 @@
           <span class="text-brand-text-primary font-semibold wrap-anywhere"
             >{pipeline.decoder_name}</span
           >
+          {#if pipeline.input_aac_core_only}
+            <span class="label-small text-brand-text-secondary mt-0.5">
+              {i18n.t("audioPipeline.aacCoreOnly", {}, "Half-rate AAC core only (reduced quality)")}
+            </span>
+          {/if}
         </div>
       </div>
     </div>

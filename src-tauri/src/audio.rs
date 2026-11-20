@@ -8,7 +8,7 @@
 use crate::models::{
     AudioPipelineInfo, FileType, LoudnessGainSource, PlayState, QualityTier, Song,
 };
-use luminous_audio::{EngineState, OutputInfo, Track};
+use luminous_audio::{EngineState, InputInfo, OutputInfo, Track};
 use luminous_equalizer::{EqMode, Equalizer};
 
 pub use luminous_audio::{AudioEngine, AudioEvent};
@@ -123,9 +123,10 @@ pub fn pipeline_info(
     loudness_gain_db: Option<f32>,
 ) -> Option<AudioPipelineInfo> {
     let song = song?;
+    let input = audio.input_info().filter(|i| i.track_id == song.id);
     let output = audio.output_info();
     Some(audio.with_equalizer(|eq| {
-        assemble_pipeline_info(song, loudness_source, loudness_gain_db, eq, output)
+        assemble_pipeline_info(song, loudness_source, loudness_gain_db, eq, input, output)
     }))
 }
 
@@ -134,10 +135,14 @@ fn assemble_pipeline_info(
     loudness_source: LoudnessGainSource,
     loudness_gain_db: Option<f32>,
     eq: &Equalizer,
+    input: Option<InputInfo>,
     output: OutputInfo,
 ) -> AudioPipelineInfo {
-    let sample_rate = song.samplerate.map(|r| r as u32);
-    let input_codec = match song.filetype {
+    let sample_rate = input
+        .as_ref()
+        .map(|i| i.sample_rate)
+        .or_else(|| song.samplerate.map(|r| r as u32));
+    let fallback_codec = match song.filetype {
         FileType::Mp3 => "mp3",
         FileType::Flac | FileType::OggFlac => "flac",
         FileType::OggVorbis => "vorbis",
@@ -156,15 +161,35 @@ fn assemble_pipeline_info(
         FileType::Stream => "stream",
         FileType::Unknown => "unknown",
     };
+    let input_codec = input
+        .as_ref()
+        .map(|i| i.codec.as_str())
+        .unwrap_or(fallback_codec)
+        .to_string();
+    let input_format = match (&input, song.filetype) {
+        (Some(i), FileType::Stream | FileType::Unknown) => i.format.clone(),
+        _ => song.filetype.display_name().to_string(),
+    };
     // Every format decodes natively inside Symphonia except Opus (#1121),
     // which has no first-party Symphonia decoder and goes through the
-    // engine's libopus adapter instead — label it distinctly so the panel
-    // doesn't misattribute the decode to Symphonia itself.
-    let decoder_name = if song.filetype == FileType::OggOpus {
-        "libopus (via Symphonia)".to_string()
-    } else {
-        format!("Symphonia {} decoder", song.filetype.display_name())
-    };
+    // engine's libopus adapter instead — and AAC streams routed to Media
+    // Foundation on Windows (#2011). Prefer the engine's actual decoder label
+    // when available, falling back to the Song row before playback starts.
+    let decoder_name = input
+        .as_ref()
+        .map(|i| i.decoder_name.clone())
+        .unwrap_or_else(|| {
+            if song.filetype == FileType::OggOpus {
+                "libopus (via Symphonia)".to_string()
+            } else {
+                format!("Symphonia {} decoder", song.filetype.display_name())
+            }
+        });
+    let input_channels = input
+        .as_ref()
+        .map(|i| i.channels)
+        .or_else(|| song.channels.map(|c| c as u16));
+    let input_aac_core_only = input.as_ref().is_some_and(|i| i.aac_core_only);
     let resample_rate = sample_rate.filter(|&r| r != output.sample_rate);
     let config = eq.config();
     let eq_mode = match config.mode {
@@ -180,13 +205,14 @@ fn assemble_pipeline_info(
             song.bitdepth,
         ),
         input_source: song.source,
-        input_format: song.filetype.display_name().to_string(),
-        input_codec: input_codec.to_string(),
+        input_format,
+        input_codec,
         input_bitrate_kbps: song.bitrate,
         input_sample_rate: sample_rate,
         input_bit_depth: song.bitdepth,
-        input_channels: song.channels.map(|c| c as u16),
+        input_channels,
         input_path: song.path.clone().or_else(|| song.url.clone()),
+        input_aac_core_only,
         decoder_name,
         headroom: "32-bit float PCM".to_string(),
         resample_rate: resample_rate.map(|_| output.sample_rate),
@@ -300,6 +326,7 @@ mod tests {
             LoudnessGainSource::Analyzed,
             Some(-3.5),
             &eq,
+            None,
             test_output(),
         );
         assert_eq!(
@@ -319,6 +346,7 @@ mod tests {
             LoudnessGainSource::Disabled,
             None,
             &eq,
+            None,
             test_output(),
         );
         assert_eq!(
@@ -402,5 +430,109 @@ mod tests {
             classify_quality_tier(FileType::Unknown, None, None, None),
             QualityTier::Lq
         );
+    }
+
+    #[test]
+    fn stream_pipeline_info_uses_engine_input_and_tracks_id() {
+        let eq = Equalizer::new();
+        let radio = Song {
+            id: 42,
+            filetype: FileType::Stream,
+            bitrate: Some(128),
+            source: crate::models::SongSource::RadioBrowser,
+            url: Some("https://radio.example/stream".into()),
+            ..Song::default()
+        };
+
+        // MP3 stream: format, codec, rate, channels, resampling, and decoder all come from InputInfo.
+        let mp3_input = InputInfo {
+            track_id: 42,
+            codec: "mp3".into(),
+            format: "MP3".into(),
+            sample_rate: 44_100,
+            channels: 2,
+            decoder_name: "Symphonia MP3 decoder".into(),
+            aac_core_only: false,
+        };
+        let info = assemble_pipeline_info(
+            &radio,
+            LoudnessGainSource::Disabled,
+            None,
+            &eq,
+            Some(mp3_input),
+            test_output(),
+        );
+        assert_eq!(info.input_format, "MP3");
+        assert_eq!(info.input_codec, "mp3");
+        assert_eq!(info.input_sample_rate, Some(44_100));
+        assert_eq!(info.input_channels, Some(2));
+        assert_eq!(info.decoder_name, "Symphonia MP3 decoder");
+        assert_eq!(info.resample_rate, Some(48_000));
+        assert!(!info.input_aac_core_only);
+
+        // HE-AAC core-only stream: flags input_aac_core_only.
+        let core_aac_input = InputInfo {
+            track_id: 42,
+            codec: "aac".into(),
+            format: "AAC".into(),
+            sample_rate: 24_000,
+            channels: 2,
+            decoder_name: "Symphonia AAC decoder".into(),
+            aac_core_only: true,
+        };
+        let info = assemble_pipeline_info(
+            &radio,
+            LoudnessGainSource::Disabled,
+            None,
+            &eq,
+            Some(core_aac_input),
+            test_output(),
+        );
+        assert_eq!(info.input_format, "AAC");
+        assert_eq!(info.input_sample_rate, Some(24_000));
+        assert_eq!(info.decoder_name, "Symphonia AAC decoder");
+        assert!(info.input_aac_core_only);
+
+        // Media Foundation AAC on a local .aac file overrides decoder_name without losing file format.
+        let aac_file = Song {
+            id: 7,
+            filetype: FileType::Aac,
+            samplerate: Some(24_000),
+            channels: Some(2),
+            source: crate::models::SongSource::Collection,
+            path: Some("/music/he.aac".into()),
+            ..Song::default()
+        };
+        let mf_input = InputInfo {
+            track_id: 7,
+            codec: "aac".into(),
+            format: "AAC".into(),
+            sample_rate: 48_000,
+            channels: 2,
+            decoder_name: "Media Foundation AAC".into(),
+            aac_core_only: false,
+        };
+        let info = assemble_pipeline_info(
+            &aac_file,
+            LoudnessGainSource::Disabled,
+            None,
+            &eq,
+            Some(mf_input),
+            test_output(),
+        );
+        assert_eq!(info.input_format, "AAC");
+        assert_eq!(info.input_sample_rate, Some(48_000));
+        assert_eq!(info.decoder_name, "Media Foundation AAC");
+        assert!(!info.input_aac_core_only);
+        assert_eq!(info.resample_rate, None);
+
+        // Mismatched track_id in Engine input_info is ignored by pipeline_info().
+        let engine = AudioEngine::new();
+        // Fresh engine has no InputInfo, so stream falls back cleanly to Song row.
+        let fallback = pipeline_info(&engine, Some(&radio), LoudnessGainSource::Disabled, None)
+            .expect("returns pipeline info");
+        assert_eq!(fallback.input_format, "Stream");
+        assert_eq!(fallback.input_codec, "stream");
+        assert_eq!(fallback.input_sample_rate, None);
     }
 }

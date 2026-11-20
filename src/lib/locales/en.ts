@@ -2963,6 +2963,7 @@ export const en = {
     bitrate: "Bitrate",
     channels: "Channels",
     decoder: "Decoder",
+    aacCoreOnly: "Half-rate AAC core only (reduced quality)",
     headroom: "Headroom",
     resampling: "Resampling",
     resamplingDirect: "Direct (no resampling)",

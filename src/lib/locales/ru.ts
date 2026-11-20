@@ -3238,6 +3238,7 @@ export const ru = {
     equalizerActive: "{mode} (активных полос: {bands})",
     eqModeGraphic: "10-полосный графический",
     limiter: "Лимитер",
+    aacCoreOnly: "Только ядро AAC половинной частоты (сниженное качество)",
     outputFormat: "Формат",
     outputDevice: "Устройство",
     outputBackend: "Звуковой интерфейс",

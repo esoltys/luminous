@@ -3059,6 +3059,7 @@ export const de = {
     equalizerActive: "{mode} ({bands} aktiv)",
     eqModeGraphic: "Grafisch (10 Bänder)",
     limiter: "Begrenzer",
+    aacCoreOnly: "Nur AAC-Kern mit halber Abtastrate (reduzierte Qualität)",
     outputFormat: "Format",
     outputDevice: "Gerät",
     outputBackend: "Audioschnittstelle",

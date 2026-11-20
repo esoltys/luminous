@@ -275,6 +275,12 @@ fn channels_for(count: usize) -> Channels {
     }
 }
 
+const MF_AAC_CODEC_INFO: symphonia::core::codecs::CodecInfo = symphonia::core::codecs::CodecInfo {
+    short_name: "aac",
+    long_name: "Media Foundation AAC",
+    profiles: &[],
+};
+
 impl AudioDecoder for MfAacDecoder {
     fn reset(&mut self) {
         // SAFETY: COM call on the owned MFT.
@@ -283,7 +289,7 @@ impl AudioDecoder for MfAacDecoder {
     }
 
     fn codec_info(&self) -> &CodecInfo {
-        &crate::aac::AacDecoder::supported_codecs()[0].info
+        &MF_AAC_CODEC_INFO
     }
 
     fn codec_params(&self) -> &AudioCodecParameters {
