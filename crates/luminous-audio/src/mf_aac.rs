@@ -238,19 +238,9 @@ impl MfAacDecoder {
 
 /// The MFT's `MF_MT_USER_DATA` for raw AAC: the `HEAACWAVEINFO` fields after
 /// its `WAVEFORMATEX` (payload type 0 = raw, profile 0xFE = unspecified),
-/// then a two-byte AudioSpecificConfig for the AAC-LC core. SBR stays
-/// implicit, as in the ADTS stream; the decoder finds it in the blocks.
+/// then a two-byte AudioSpecificConfig for the AAC-LC core.
 fn user_data(core_rate: u32, channels: u8) -> std::result::Result<[u8; 14], String> {
-    const RATES: [u32; 13] = [
-        96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350,
-    ];
-    let index = RATES
-        .iter()
-        .position(|&r| r == core_rate)
-        .ok_or_else(|| format!("no AAC rate index for {core_rate} Hz"))? as u16;
-    // audioObjectType 2 (LC): 5 bits, samplingFrequencyIndex: 4, channelConfiguration: 4, 3 zero bits.
-    let asc = (2u16 << 11) | (index << 7) | (u16::from(channels) << 3);
-    let [hi, lo] = asc.to_be_bytes();
+    let [hi, lo] = crate::aac::audio_specific_config(core_rate, channels)?;
     Ok([0, 0, 0xFE, 0, 0, 0, 0, 0, 0, 0, 0, 0, hi, lo])
 }
 

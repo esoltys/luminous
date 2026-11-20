@@ -35,11 +35,6 @@ const SONAMES: &[&CStr] = &[
     c"libavcodec.so.58",
 ];
 
-const ADTS_RATES: [u32; 13] = [
-    96_000, 88_200, 64_000, 48_000, 44_100, 32_000, 24_000, 22_050, 16_000, 12_000, 11_025, 8_000,
-    7_350,
-];
-
 const AVMEDIA_TYPE_AUDIO: c_int = 1;
 const AV_CODEC_ID_AAC: c_int = 0x15002;
 const AV_INPUT_BUFFER_PADDING_SIZE: usize = 64;
@@ -292,7 +287,7 @@ impl LibavcodecAacDecoder {
         if !(1..=2).contains(&core_channels) {
             return Err(format!("{core_channels} channels"));
         }
-        let asc = audio_specific_config(core_rate, core_channels as u8)?;
+        let asc = crate::aac::audio_specific_config(core_rate, core_channels as u8)?;
 
         // SAFETY: `api.aac_codec` is valid for the process lifetime; we free
         // partially allocated handles on any error path.
@@ -488,39 +483,49 @@ unsafe fn append_frame_samples(
     }
     match format {
         AV_SAMPLE_FMT_FLTP => {
-            let planes: Vec<&[f32]> = (0..channels)
-                .map(|ch| {
-                    let ptr = frame.data[ch].cast::<f32>();
-                    std::slice::from_raw_parts(ptr, nb_samples)
-                })
-                .collect();
+            let mut planes: [&[f32]; 8] = [&[]; 8];
+            for (ch, slot) in planes.iter_mut().enumerate().take(channels) {
+                let ptr = frame.data[ch];
+                if ptr.is_null() {
+                    return Err("aac (libavcodec): missing planar audio buffer");
+                }
+                *slot = std::slice::from_raw_parts(ptr.cast::<f32>(), nb_samples);
+            }
             out.reserve(nb_samples * channels);
             for i in 0..nb_samples {
-                for plane in &planes {
+                for plane in &planes[..channels] {
                     out.push(plane[i]);
                 }
             }
         }
         AV_SAMPLE_FMT_FLT => {
+            if frame.data[0].is_null() {
+                return Err("aac (libavcodec): missing interleaved audio buffer");
+            }
             let slice =
                 std::slice::from_raw_parts(frame.data[0].cast::<f32>(), nb_samples * channels);
             out.extend_from_slice(slice);
         }
         AV_SAMPLE_FMT_S16P => {
-            let planes: Vec<&[i16]> = (0..channels)
-                .map(|ch| {
-                    let ptr = frame.data[ch].cast::<i16>();
-                    std::slice::from_raw_parts(ptr, nb_samples)
-                })
-                .collect();
+            let mut planes: [&[i16]; 8] = [&[]; 8];
+            for (ch, slot) in planes.iter_mut().enumerate().take(channels) {
+                let ptr = frame.data[ch];
+                if ptr.is_null() {
+                    return Err("aac (libavcodec): missing planar audio buffer");
+                }
+                *slot = std::slice::from_raw_parts(ptr.cast::<i16>(), nb_samples);
+            }
             out.reserve(nb_samples * channels);
             for i in 0..nb_samples {
-                for plane in &planes {
+                for plane in &planes[..channels] {
                     out.push(f32::from(plane[i]) / 32768.0);
                 }
             }
         }
         AV_SAMPLE_FMT_S16 => {
+            if frame.data[0].is_null() {
+                return Err("aac (libavcodec): missing interleaved audio buffer");
+            }
             let slice =
                 std::slice::from_raw_parts(frame.data[0].cast::<i16>(), nb_samples * channels);
             out.extend(slice.iter().map(|&s| f32::from(s) / 32768.0));
@@ -528,17 +533,6 @@ unsafe fn append_frame_samples(
         _ => return Err("aac (libavcodec): unsupported sample format"),
     }
     Ok(())
-}
-
-/// Two-byte `AudioSpecificConfig` for an AAC-LC core; SBR stays implicit and
-/// `libavcodec` picks it up from the raw blocks.
-fn audio_specific_config(core_rate: u32, channels: u8) -> std::result::Result<[u8; 2], String> {
-    let index = ADTS_RATES
-        .iter()
-        .position(|&r| r == core_rate)
-        .ok_or_else(|| format!("no AAC rate index for {core_rate} Hz"))? as u16;
-    let asc = (2u16 << 11) | (index << 7) | (u16::from(channels) << 3);
-    Ok(asc.to_be_bytes())
 }
 
 fn channels_for(count: usize) -> Channels {
@@ -606,9 +600,15 @@ mod tests {
 
     #[test]
     fn audio_specific_config_describes_the_lc_core() {
-        assert_eq!(audio_specific_config(22_050, 2).unwrap(), [0x13, 0x90]);
-        assert_eq!(audio_specific_config(24_000, 1).unwrap(), [0x13, 0x08]);
-        assert!(audio_specific_config(22_000, 2).is_err());
+        assert_eq!(
+            crate::aac::audio_specific_config(22_050, 2).unwrap(),
+            [0x13, 0x90]
+        );
+        assert_eq!(
+            crate::aac::audio_specific_config(24_000, 1).unwrap(),
+            [0x13, 0x08]
+        );
+        assert!(crate::aac::audio_specific_config(22_000, 2).is_err());
     }
 
     #[test]
