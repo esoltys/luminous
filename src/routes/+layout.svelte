@@ -38,6 +38,7 @@
   import { welcomeStore } from "../lib/stores/welcome.svelte";
   import { themeStore } from "../lib/stores/theme.svelte";
   import { generateEllipseGradientSvg } from "../lib/utils/ellipseGradient";
+  import { isLiveSong } from "../lib/types";
   import { formatWindowTitle } from "../lib/utils/formatters";
   import { publishScrollbarWidth } from "../lib/utils/scrollbarWidth";
   import { FrontendErrorReporter } from "../lib/utils/frontendError";
@@ -612,8 +613,9 @@
                     artEmbedded={playerStore.currentSong?.art_embedded}
                     artAutomatic={playerStore.currentSong?.art_automatic}
                     artManual={playerStore.currentSong?.art_manual}
-                    sizeClass="w-full h-full object-cover"
+                    sizeClass="w-full h-full"
                     fullResolution
+                    contain={isLiveSong(playerStore.currentSong)}
                   />
                 </div>
 

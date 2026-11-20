@@ -161,7 +161,7 @@
       <img
         src={stationArtUrl}
         alt=""
-        class="w-full h-full object-cover"
+        class="w-full h-full object-contain"
         onerror={() => {
           stationArtFailed = true;
         }}

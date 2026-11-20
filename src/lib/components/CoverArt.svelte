@@ -21,6 +21,10 @@
     animateSpin?: boolean;
     /** Show the original embedded picture rather than the downscaled cache copy (#1272). */
     fullResolution?: boolean;
+    /** Fit the image inside the frame without cropping (e.g. radio station logos). */
+    contain?: boolean;
+    /** Called if the resolved image fails to load. */
+    onError?: () => void;
   }
 
   let {
@@ -31,6 +35,8 @@
     sizeClass = "w-12 h-12",
     animateSpin = false,
     fullResolution = false,
+    contain = false,
+    onError,
   }: Props = $props();
 
   let imgSrc = $state<string | null>(null);
@@ -127,29 +133,34 @@
     }
   }
 
-  async function triggerRemoteFetch(targetSongId: number | undefined = songId, token = loadToken) {
-    if (!targetSongId || !prefs.onlineEnabled) return;
+  async function triggerRemoteFetch(
+    targetSongId: number | undefined = songId,
+    token = loadToken,
+  ): Promise<boolean> {
+    if (!targetSongId || !prefs.onlineEnabled) return false;
     try {
       const uri = await invoke<string | null>("fetch_remote_cover", { songId: targetSongId });
-      if (token !== loadToken) return;
+      if (token !== loadToken) return true;
       if (uri) {
         imgSrc = getCoverArtUrl(`luminous-art://${uri}`);
         hasFailed = false;
         collectionStore.applyAutomaticCover(targetSongId, uri);
-        return;
+        return true;
       }
       // iTunes has now missed too, which makes the fanart.tv cover the
       // fallback (#1277): ask once more rather than re-running
       // loadCoverArt, which would loop back here.
       const fallback = await invoke<string | null>("get_cover_art_uri", { songId: targetSongId });
-      if (token !== loadToken) return;
+      if (token !== loadToken) return true;
       if (fallback) {
         imgSrc = getCoverArtUrl(fallback);
         hasFailed = false;
+        return true;
       }
     } catch (e) {
       console.error("Failed to fetch remote cover:", e);
     }
+    return false;
   }
 
   $effect(() => {
@@ -180,13 +191,16 @@
       crossorigin={isLocalArtUrl ? "anonymous" : undefined}
       alt={i18n.t("common.albumArtAlt")}
       loading="lazy"
-      class="w-full h-full object-cover transition-opacity duration-300 {isLoading
+      class="w-full h-full {contain
+        ? 'object-contain'
+        : 'object-cover'} transition-opacity duration-300 {isLoading
         ? 'opacity-0'
         : 'opacity-100'} {animateSpin ? 'animate-spin' : ''}"
       style={animateSpin ? "animation-duration: 6s;" : ""}
-      onerror={() => {
+      onerror={async () => {
         hasFailed = true;
-        triggerRemoteFetch();
+        const recovered = await triggerRemoteFetch();
+        if (!recovered) onError?.();
       }}
     />
   {:else if isLoading}

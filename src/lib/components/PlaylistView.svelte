@@ -361,10 +361,12 @@
     });
   });
 
-  // Top distinct album covers sampled for hero 3D card stack
+  // Sample up to 24 covers (beyond the 5 mosaic slots) so failed remote
+  // station logos can fall back to the next working logo without placeholders.
   let topAlbums = $derived(
     songsToCoverStack(
       playlistsStore.activePlaylistTracks.filter((t) => !!t.song).map((t) => t.song!),
+      24,
     ),
   );
 
@@ -989,6 +991,7 @@
                         artAutomatic={playerStore.currentSong.art_automatic}
                         artManual={playerStore.currentSong.art_manual}
                         sizeClass="w-full h-full"
+                        contain={isLiveSong(playerStore.currentSong)}
                       />
                     {:else}
                       <div class="w-full h-full flex items-center justify-center">

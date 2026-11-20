@@ -25,7 +25,7 @@
       onerror={() => {
         failed = true;
       }}
-      class="w-full h-full object-cover"
+      class="w-full h-full object-contain"
     />
   {:else}
     <Broadcast class="w-4 h-4 text-brand-text-secondary" />

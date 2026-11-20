@@ -176,3 +176,25 @@ describe("CoverArt.svelte - remote cover propagation (#1823)", () => {
     expect(collectionStore.albums[0].art_automatic).toBe("album-remote-123.jpg");
   });
 });
+
+describe("CoverArt.svelte - image fit", () => {
+  it("uses object-cover by default and object-contain when contain is true", async () => {
+    const defaultRender = render(CoverArt, {
+      props: { songId: 7, artAutomatic: "https://example.com/cover.png" },
+    });
+    await vi.waitFor(() => {
+      const img = defaultRender.container.querySelector("img");
+      expect(img).toHaveClass("object-cover");
+      expect(img).not.toHaveClass("object-contain");
+    });
+
+    const containRender = render(CoverArt, {
+      props: { songId: 7, artAutomatic: "https://example.com/logo.png", contain: true },
+    });
+    await vi.waitFor(() => {
+      const img = containRender.container.querySelector("img");
+      expect(img).toHaveClass("object-contain");
+      expect(img).not.toHaveClass("object-cover");
+    });
+  });
+});

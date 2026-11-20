@@ -103,6 +103,14 @@ describe("getArtistCoverStack", () => {
         art_automatic: null,
         art_embedded: false,
       },
+      {
+        id: 12,
+        path: "radio://uuid-3",
+        source: "radio_browser",
+        art_manual: "null",
+        art_automatic: "   ",
+        art_embedded: false,
+      },
     ]);
 
     expect(result).toEqual([
@@ -111,6 +119,7 @@ describe("getArtistCoverStack", () => {
         artEmbedded: false,
         artAutomatic: "https://example.com/logo1.png",
         artManual: null,
+        contain: true,
       },
     ]);
   });

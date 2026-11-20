@@ -64,7 +64,7 @@
         onerror={() => {
           artFailed = true;
         }}
-        class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        class="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
       />
     {:else}
       <Broadcast class="w-12 h-12 text-brand-text-secondary/50" />

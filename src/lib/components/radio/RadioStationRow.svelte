@@ -83,7 +83,7 @@
         onerror={() => {
           artFailed = true;
         }}
-        class="w-full h-full object-cover"
+        class="w-full h-full object-contain"
       />
       {#if station.playable}
         <span

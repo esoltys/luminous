@@ -671,6 +671,7 @@
         artAutomatic={song.art_automatic}
         artManual={song.art_manual}
         sizeClass="w-7 h-7 rounded shrink-0"
+        contain={isLiveSong(song)}
       />
       {#if rowDisabled(row)}
         <span title={row.disabledTooltip} role="img" aria-label={row.disabledTooltip}>
