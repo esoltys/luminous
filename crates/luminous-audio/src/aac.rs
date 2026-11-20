@@ -29,6 +29,10 @@ use symphonia::core::packet::PacketRef;
 /// Highest ADTS core rate routed to the full HE-AAC decoder.
 pub(crate) const HE_AAC_MAX_CORE_RATE: u32 = 24_000;
 
+/// `CodecInfo::long_name` for [`crate::mf_aac::MfAacDecoder`], shared so
+/// `input_info` detection doesn't duplicate the literal across modules.
+pub(crate) const MF_AAC_LONG_NAME: &str = "Media Foundation AAC";
+
 /// True when the stream described by `params` is HE-AAC in practice: ADTS
 /// (no AudioSpecificConfig) at a core rate of 24 kHz or less.
 #[cfg_attr(not(windows), allow(dead_code))]

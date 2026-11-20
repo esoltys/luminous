@@ -999,10 +999,10 @@ fn input_info_from_codec(
 ) -> InputInfo {
     let codec = info.short_name.to_string();
     let format = display_format_name(&codec);
-    let is_mf_aac = info.long_name == "Media Foundation AAC";
+    let is_mf_aac = info.long_name == aac::MF_AAC_LONG_NAME;
     let aac_core_only = codec == "aac" && !is_mf_aac && sample_rate <= aac::HE_AAC_MAX_CORE_RATE;
     let decoder_name = if is_mf_aac {
-        "Media Foundation AAC".to_string()
+        aac::MF_AAC_LONG_NAME.to_string()
     } else if codec == "opus" {
         "libopus (via Symphonia)".to_string()
     } else {
@@ -1020,6 +1020,21 @@ fn input_info_from_codec(
 }
 
 impl ActiveTrack {
+    /// Recomputes `input_info` from the active decoder and marks
+    /// `input_changed` if anything visible to the pipeline panel changed.
+    fn refresh_input_info(&mut self) {
+        let updated = build_input_info(
+            self.spec.id,
+            &*self.decoder,
+            self.src_rate,
+            self.src_channels,
+        );
+        if updated != self.input_info {
+            self.input_info = updated;
+            self.input_changed = true;
+        }
+    }
+
     /// Resample to `rate`/`channels` from here on (the track hasn't been
     /// decoded yet, so there's no resampler state to keep).
     fn retarget(&mut self, rate: u32, channels: u16) {
@@ -3155,12 +3170,7 @@ fn decode_track_packet(track: &mut ActiveTrack, target_channels: usize) -> Packe
                         track.src_channels = channels;
                         track.resampler =
                             Resampler::new(rate, track.resampler.to_rate, target_channels);
-                        let updated =
-                            build_input_info(track.spec.id, &*track.decoder, rate, channels);
-                        if updated != track.input_info {
-                            track.input_info = updated;
-                            track.input_changed = true;
-                        }
+                        track.refresh_input_info();
                     }
                     let mut samples: &[f32] = &sample_vec;
 
@@ -3220,16 +3230,7 @@ fn decode_track_packet(track: &mut ActiveTrack, target_channels: usize) -> Packe
                         track.resampler =
                             Resampler::new(sample_rate, track.resampler.to_rate, target_channels);
                     }
-                    let updated = build_input_info(
-                        track.spec.id,
-                        &*track.decoder,
-                        track.src_rate,
-                        track.src_channels,
-                    );
-                    if updated != track.input_info {
-                        track.input_info = updated;
-                        track.input_changed = true;
-                    }
+                    track.refresh_input_info();
                     PacketStep::Skip
                 }
                 Err(message) => PacketStep::ReadFailed(message),

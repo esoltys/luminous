@@ -277,7 +277,7 @@ fn channels_for(count: usize) -> Channels {
 
 const MF_AAC_CODEC_INFO: symphonia::core::codecs::CodecInfo = symphonia::core::codecs::CodecInfo {
     short_name: "aac",
-    long_name: "Media Foundation AAC",
+    long_name: crate::aac::MF_AAC_LONG_NAME,
     profiles: &[],
 };
 
