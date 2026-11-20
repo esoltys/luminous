@@ -4351,14 +4351,8 @@ id 76, type PipeWire:Interface:Node
             long_name: "Opus",
             profiles: &[],
         };
-        assert_eq!(
-            input_info_from_codec(1, &core_info, 24_000, 2).aac_core_only,
-            true
-        );
-        assert_eq!(
-            input_info_from_codec(1, &core_info, 44_100, 2).aac_core_only,
-            false
-        );
+        assert!(input_info_from_codec(1, &core_info, 24_000, 2).aac_core_only);
+        assert!(!input_info_from_codec(1, &core_info, 44_100, 2).aac_core_only);
         let mf = input_info_from_codec(1, &mf_info, 24_000, 2);
         assert!(!mf.aac_core_only);
         assert_eq!(mf.decoder_name, "Media Foundation AAC");
