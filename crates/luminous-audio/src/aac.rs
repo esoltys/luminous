@@ -33,9 +33,17 @@ pub(crate) const HE_AAC_MAX_CORE_RATE: u32 = 24_000;
 /// `input_info` detection doesn't duplicate the literal across modules.
 pub(crate) const MF_AAC_LONG_NAME: &str = "Media Foundation AAC";
 
+/// `CodecInfo::long_name` for [`crate::libavcodec_aac::LibavcodecAacDecoder`].
+pub(crate) const LIBAVCODEC_AAC_LONG_NAME: &str = "libavcodec AAC";
+
+/// True when `long_name` belongs to one of Luminous's full HE-AAC decoders.
+pub(crate) fn is_full_he_aac_decoder(long_name: &str) -> bool {
+    long_name == MF_AAC_LONG_NAME || long_name == LIBAVCODEC_AAC_LONG_NAME
+}
+
 /// True when the stream described by `params` is HE-AAC in practice: ADTS
 /// (no AudioSpecificConfig) at a core rate of 24 kHz or less.
-#[cfg_attr(not(windows), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
 fn is_implicit_he_aac(params: &AudioCodecParameters) -> bool {
     params.extra_data.is_none()
         && params
@@ -50,14 +58,18 @@ pub fn decodes_full_he_aac() -> bool {
     {
         crate::mf_aac::available()
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
+    {
+        crate::libavcodec_aac::available()
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
     {
         false
     }
 }
 
 /// The registered AAC decoder: Symphonia's core decoder (below), unless
-/// routing hands the stream to Media Foundation (see the module docs).
+/// routing hands the stream to a platform HE-AAC decoder (see the module docs).
 impl RegisterableAudioDecoder for AacDecoder {
     fn try_registry_new(
         params: &AudioCodecParameters,
@@ -68,6 +80,13 @@ impl RegisterableAudioDecoder for AacDecoder {
             match crate::mf_aac::MfAacDecoder::try_new(params) {
                 Ok(decoder) => return Ok(Box::new(decoder)),
                 Err(e) => log::warn!("HE-AAC: Media Foundation unavailable, core only: {e}"),
+            }
+        }
+        #[cfg(target_os = "linux")]
+        if is_implicit_he_aac(params) {
+            match crate::libavcodec_aac::LibavcodecAacDecoder::try_new(params) {
+                Ok(decoder) => return Ok(Box::new(decoder)),
+                Err(e) => log::warn!("HE-AAC: libavcodec unavailable, core only: {e}"),
             }
         }
         Ok(Box::new(Self::try_new(params, opts)?))
