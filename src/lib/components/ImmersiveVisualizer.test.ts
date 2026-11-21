@@ -116,21 +116,10 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
     expect(getByTestId("immersive-visualizer-canvas")).toHaveAttribute("data-preset", "voxel");
   });
 
+  // The built-in voxel spectrum and voxel logo (#2252) are the two presets to switch between.
   describe("preset switching (#2245)", () => {
-    let unregister: (() => void) | null = null;
-
-    beforeEach(() => {
-      unregister = registerPreset({
-        id: "fake",
-        labelKey: "Fake preset",
-        needs: ["spectrum"],
-        create: () => ({ setTheme() {}, push() {}, step: () => false, render() {} }),
-      });
-    });
-
     afterEach(() => {
       visualizerStore.select("voxel");
-      unregister?.();
       localStorage.clear();
     });
 
@@ -138,7 +127,10 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
       const { getByTestId } = render(ImmersiveVisualizer, { active: true });
       visualizerStore.cycle(1);
       await tick();
-      expect(getByTestId("immersive-visualizer-canvas")).toHaveAttribute("data-preset", "fake");
+      expect(getByTestId("immersive-visualizer-canvas")).toHaveAttribute(
+        "data-preset",
+        "voxel-logo",
+      );
     });
 
     it("hands the preset each frame's onset exactly once", async () => {

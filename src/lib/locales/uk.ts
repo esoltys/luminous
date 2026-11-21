@@ -3537,6 +3537,7 @@ export const uk = {
   },
   visualizers: {
     voxel: "Воксельний спектр",
+    voxelLogo: "Воксельний логотип",
     menuTitle: "Візуалізатор",
     previous: "Попередній візуалізатор: {name}",
     next: "Наступний візуалізатор: {name}",

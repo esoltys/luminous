@@ -3345,6 +3345,7 @@ export const es = {
   },
   visualizers: {
     voxel: "Espectro de vóxeles",
+    voxelLogo: "Logotipo de vóxeles",
     menuTitle: "Visualizador",
     previous: "Visualizador anterior: {name}",
     next: "Visualizador siguiente: {name}",

@@ -3337,6 +3337,7 @@ export const it = {
   },
   visualizers: {
     voxel: "Spettro a voxel",
+    voxelLogo: "Logo a voxel",
     menuTitle: "Visualizzatore",
     previous: "Visualizzatore precedente: {name}",
     next: "Visualizzatore successivo: {name}",

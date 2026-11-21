@@ -62,6 +62,18 @@ function mixRgb(
 }
 
 /**
+ * The fill of an unlit LED cell, shared by the voxel presets so their matrix housings match:
+ * the theme's border colour, faint against `bg-main`.
+ */
+export function voxelUnlitCellColor(colors: ThemeColors): string {
+  const bgMain = colors["bg-main"] || "#191918";
+  const borderHex =
+    colors["color-border"] || clampForContrast(colors["color-accent"] || "#4f5bd5", bgMain, 3.0);
+  const { r, g, b } = hexToRgb(borderHex);
+  return `rgba(${r}, ${g}, ${b}, ${isLightColor(bgMain) ? 0.13 : 0.1})`;
+}
+
+/**
  * Builds a pre-computed, theme-reactive color palette for the voxel visualizer
  * from `themeStore.resolvedColors`. Pre-calculating every row's CSS color string
  * when the theme changes avoids parsing hex or allocating color strings inside
@@ -113,8 +125,7 @@ export function buildVoxelThemePalette(
     4.5,
   );
 
-  const unlitAlpha = isLight ? 0.13 : 0.1;
-  const unlitCellColor = `rgba(${borderRgb.r}, ${borderRgb.g}, ${borderRgb.b}, ${unlitAlpha})`;
+  const unlitCellColor = voxelUnlitCellColor(colors);
   const baselineAlpha = isLight ? 0.32 : 0.26;
   const baselineColor = `rgba(${borderRgb.r}, ${borderRgb.g}, ${borderRgb.b}, ${baselineAlpha})`;
 

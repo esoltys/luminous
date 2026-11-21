@@ -3360,6 +3360,7 @@ export const frFR: DeepStringRecord<typeof en> = {
   },
   visualizers: {
     voxel: "Spectre en voxels",
+    voxelLogo: "Logo en voxels",
     menuTitle: "Visualiseur",
     previous: "Visualiseur précédent : {name}",
     next: "Visualiseur suivant : {name}",
