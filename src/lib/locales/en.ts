@@ -3263,4 +3263,10 @@ export const en = {
       "Create a station list to follow genres that update automatically from the directory.",
     stationsCount: "stations",
   },
+  visualizers: {
+    voxel: "Voxel spectrum",
+    menuTitle: "Visualizer",
+    previous: "Previous visualizer: {name}",
+    next: "Next visualizer: {name}",
+  },
 };

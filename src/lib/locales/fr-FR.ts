@@ -3356,4 +3356,10 @@ export const frFR: DeepStringRecord<typeof en> = {
       "Créez une liste de stations pour suivre des genres qui se mettent à jour automatiquement.",
     stationsCount: "stations",
   },
+  visualizers: {
+    voxel: "Spectre en voxels",
+    menuTitle: "Visualiseur",
+    previous: "Visualiseur précédent : {name}",
+    next: "Visualiseur suivant : {name}",
+  },
 };

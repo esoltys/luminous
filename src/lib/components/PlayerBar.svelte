@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fade, fly, prefersReducedMotion } from "../utils/motion";
   import { cubicOut } from "svelte/easing";
+  import { untrack } from "svelte";
   import { playerStore } from "../stores/player.svelte";
   import { setVolumeFromSlider, volumeSliderBackground } from "../volumeSlider";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -20,6 +21,8 @@
   import { i18n } from "../stores/i18n.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
+  import VisualizerPresetMenu from "./VisualizerPresetMenu.svelte";
+  import { visualizerStore } from "../stores/visualizer.svelte";
   import LinkButton from "./LinkButton.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
@@ -71,6 +74,8 @@
     InfoIcon as Info,
     SubtitlesIcon as Lyrics,
     StackIcon as Layers,
+    CaretUpIcon as CaretUp,
+    CaretDownIcon as CaretDown,
   } from "phosphor-svelte";
   import MoreIcon from "./MoreIcon.svelte";
 
@@ -280,6 +285,54 @@
 
     windowLayoutStore.toggleImmersiveMode("visualizer");
   }
+
+  // Visualizer preset selection (#2245): arrows above/below the slot, the mouse wheel and
+  // ↑/↓ on the focused slot step through presets; right-click lists them with thumbnails.
+  const WHEEL_STEP_INTERVAL_MS = 180;
+  const NAME_FLASH_MS = 1000;
+  let lastWheelStep = 0;
+  let presetMenu = $state<{ x: number; y: number } | null>(null);
+  let flashedPresetName = $state<string | null>(null);
+
+  const previousPresetLabel = $derived(
+    i18n.t("visualizers.previous", { name: i18n.t(visualizerStore.neighbour(-1).labelKey) }),
+  );
+  const nextPresetLabel = $derived(
+    i18n.t("visualizers.next", { name: i18n.t(visualizerStore.neighbour(1).labelKey) }),
+  );
+
+  function handleVisualizerWheel(e: WheelEvent) {
+    if (!visualizerStore.canSwitch || e.deltaY === 0) return;
+    // A trackpad sends a burst of small deltas per gesture; take one step per burst slice.
+    if (e.timeStamp - lastWheelStep < WHEEL_STEP_INTERVAL_MS) return;
+    lastWheelStep = e.timeStamp;
+    visualizerStore.cycle(e.deltaY > 0 ? 1 : -1);
+  }
+
+  function handleVisualizerKeydown(e: KeyboardEvent) {
+    if (!visualizerStore.canSwitch || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    visualizerStore.cycle(e.key === "ArrowDown" ? 1 : -1);
+  }
+
+  function openPresetMenu(e: MouseEvent) {
+    if (!visualizerStore.canSwitch) return;
+    e.preventDefault();
+    presetMenu = { x: e.clientX, y: e.clientY };
+  }
+
+  // Show the new preset's name over the slot after each switch made while this bar is
+  // mounted (not on a remount, e.g. crossing the playbar-only breakpoint).
+  let seenSwitchCount = untrack(() => visualizerStore.switchCount);
+  $effect(() => {
+    const count = visualizerStore.switchCount;
+    if (count === seenSwitchCount) return;
+    seenSwitchCount = count;
+    flashedPresetName = untrack(() => i18n.t(visualizerStore.preset.labelKey));
+    const timer = setTimeout(() => (flashedPresetName = null), NAME_FLASH_MS);
+    return () => clearTimeout(timer);
+  });
 
   // Locale-appropriate name of the Ctrl key ("Strg" in German), as the user guide writes it.
   const ctrlKey = $derived(i18n.t("playerBar.ctrlKey", {}, "Ctrl"));
@@ -681,21 +734,69 @@
       >
         <div class="h-7 flex items-center gap-3">
           {#if !windowLayoutStore.isDockSpectrumHidden}
-            <button
-              type="button"
+            <!-- The hover/focus group spans the slot and the playbar room above and below it,
+                 where the preset arrows sit, so the pointer can reach them. -->
+            <div
               transition:collapseFade={{ duration: 250 }}
-              onclick={handleVisualizerClick}
-              disabled={!playerStore.currentSong}
-              aria-pressed={isImmersiveVisualizerActive}
-              aria-label={i18n.t("playerBar.visualizerTooltip", {}, "Toggle audio visualizer")}
-              title={visualizerTitle}
-              data-testid="player-bar-visualizer-btn"
-              class="group w-24 h-7 px-1 py-0.5 rounded-md block flex-shrink-0 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-accent disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-all duration-200 {isImmersiveVisualizerActive
-                ? 'bg-brand-accent/15 ring-1 ring-brand-border'
-                : 'hover:bg-brand-accent/10 hover:ring-1 hover:ring-brand-border'}"
+              onwheel={handleVisualizerWheel}
+              oncontextmenu={openPresetMenu}
+              role="group"
+              aria-label={i18n.t("visualizers.menuTitle")}
+              data-testid="player-bar-visualizer"
+              class="group/vis relative flex-shrink-0"
             >
-              <SpectrumVisualizer preview={isImmersiveVisualizerActive} />
-            </button>
+              {#if visualizerStore.canSwitch}
+                <button
+                  type="button"
+                  tabindex="-1"
+                  onclick={() => visualizerStore.cycle(-1)}
+                  aria-label={previousPresetLabel}
+                  title={previousPresetLabel}
+                  data-testid="visualizer-prev"
+                  class="absolute bottom-full left-0 right-0 h-6 flex items-end justify-center pb-0.5 text-brand-text-secondary hover:text-brand-text-primary opacity-0 group-hover/vis:opacity-100 group-focus-within/vis:opacity-100 transition-opacity duration-150"
+                >
+                  <CaretUp class="w-3.5 h-3.5" weight="bold" />
+                </button>
+              {/if}
+              <button
+                type="button"
+                onclick={handleVisualizerClick}
+                onkeydown={handleVisualizerKeydown}
+                disabled={!playerStore.currentSong}
+                aria-pressed={isImmersiveVisualizerActive}
+                aria-label={i18n.t("playerBar.visualizerTooltip", {}, "Toggle audio visualizer")}
+                aria-keyshortcuts={visualizerStore.canSwitch ? "ArrowUp ArrowDown" : undefined}
+                title={visualizerTitle}
+                data-testid="player-bar-visualizer-btn"
+                class="group relative w-24 h-7 px-1 py-0.5 rounded-md block focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-accent disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-all duration-200 {isImmersiveVisualizerActive
+                  ? 'bg-brand-accent/15 ring-1 ring-brand-border'
+                  : 'hover:bg-brand-accent/10 hover:ring-1 hover:ring-brand-border'}"
+              >
+                <SpectrumVisualizer preview={isImmersiveVisualizerActive} />
+                {#if flashedPresetName}
+                  <span
+                    transition:fade={{ duration: prefersReducedMotion() ? 0 : 200 }}
+                    data-testid="visualizer-preset-flash"
+                    class="absolute inset-0 flex items-center justify-center rounded-md bg-brand-playerbar/85 text-[10px] font-semibold leading-none text-brand-text-primary truncate px-1 pointer-events-none"
+                  >
+                    {flashedPresetName}
+                  </span>
+                {/if}
+              </button>
+              {#if visualizerStore.canSwitch}
+                <button
+                  type="button"
+                  tabindex="-1"
+                  onclick={() => visualizerStore.cycle(1)}
+                  aria-label={nextPresetLabel}
+                  title={nextPresetLabel}
+                  data-testid="visualizer-next"
+                  class="absolute top-full left-0 right-0 h-6 flex items-start justify-center pt-0.5 text-brand-text-secondary hover:text-brand-text-primary opacity-0 group-hover/vis:opacity-100 group-focus-within/vis:opacity-100 transition-opacity duration-150"
+                >
+                  <CaretDown class="w-3.5 h-3.5" weight="bold" />
+                </button>
+              {/if}
+            </div>
           {/if}
           <button
             onclick={navigateToQueue}
@@ -741,6 +842,10 @@
     {/if}
   </footer>
 </div>
+
+{#if presetMenu}
+  <VisualizerPresetMenu x={presetMenu.x} y={presetMenu.y} onClose={() => (presetMenu = null)} />
+{/if}
 
 {#if contextMenuState && playerStore.currentSong}
   {@const song = playerStore.currentSong}

@@ -3349,4 +3349,10 @@ export const de = {
       "Erstelle eine Senderliste, um Genres zu folgen, die sich automatisch aktualisieren.",
     stationsCount: "Sender",
   },
+  visualizers: {
+    voxel: "Voxel-Spektrum",
+    menuTitle: "Visualisierung",
+    previous: "Vorherige Visualisierung: {name}",
+    next: "Nächste Visualisierung: {name}",
+  },
 };

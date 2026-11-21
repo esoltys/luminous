@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -13,6 +13,8 @@ vi.mock("@tauri-apps/api/window", () => ({
 import ImmersiveVisualizer from "./ImmersiveVisualizer.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
+import { visualizerStore } from "../stores/visualizer.svelte";
+import { registerPreset } from "../visualizers/registry";
 import type { Song } from "../types";
 
 describe("ImmersiveVisualizer.svelte (#2236)", () => {
@@ -94,5 +96,67 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
     expect(listen).toHaveBeenCalledWith("spectrum-data", expect.any(Function));
 
     spectrumCallback?.({ payload: new Array(32).fill(0.8) });
+  });
+
+  it("turns the spectrum feed on while active and draws the selected preset", () => {
+    const { getByTestId } = render(ImmersiveVisualizer, { active: true });
+    expect(invoke).toHaveBeenCalledWith("set_spectrum_enabled", { enabled: true });
+    expect(getByTestId("immersive-visualizer-canvas")).toHaveAttribute("data-preset", "voxel");
+  });
+
+  describe("preset switching (#2245)", () => {
+    let unregister: (() => void) | null = null;
+
+    beforeEach(() => {
+      unregister = registerPreset({
+        id: "fake",
+        labelKey: "Fake preset",
+        needs: ["spectrum"],
+        create: () => ({ setTheme() {}, push() {}, step: () => false, render() {} }),
+      });
+    });
+
+    afterEach(() => {
+      visualizerStore.select("voxel");
+      unregister?.();
+      localStorage.clear();
+    });
+
+    it("steps through presets with ←/→ and redraws with the new one", async () => {
+      const { getByTestId } = render(ImmersiveVisualizer, { active: true });
+      await fireEvent.keyDown(window, { key: "ArrowRight" });
+      expect(visualizerStore.preset.id).toBe("fake");
+      expect(getByTestId("immersive-visualizer-canvas")).toHaveAttribute("data-preset", "fake");
+      await fireEvent.keyDown(window, { key: "ArrowLeft" });
+      expect(visualizerStore.preset.id).toBe("voxel");
+    });
+
+    it("leaves ←/→ alone while inactive, with a modifier, or in a slider or text field", async () => {
+      const { unmount } = render(ImmersiveVisualizer, { active: false });
+      await fireEvent.keyDown(window, { key: "ArrowRight" });
+      expect(visualizerStore.preset.id).toBe("voxel");
+      unmount();
+
+      render(ImmersiveVisualizer, { active: true });
+      await fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true });
+
+      const slider = document.createElement("input");
+      slider.type = "range";
+      const field = document.createElement("div");
+      field.setAttribute("contenteditable", "true");
+      document.body.append(slider, field);
+      await fireEvent.keyDown(slider, { key: "ArrowRight" });
+      await fireEvent.keyDown(field, { key: "ArrowLeft" });
+      slider.remove();
+      field.remove();
+
+      expect(visualizerStore.preset.id).toBe("voxel");
+    });
+
+    it("opens the preset menu on right-click of the stage", async () => {
+      const { getByTestId, getAllByRole } = render(ImmersiveVisualizer, { active: true });
+      await fireEvent.contextMenu(getByTestId("immersive-visualizer-canvas"));
+      expect(getAllByRole("menuitemradio")).toHaveLength(2);
+    });
   });
 });

@@ -3341,4 +3341,10 @@ export const es = {
       "Crea una lista de emisoras para seguir géneros que se actualizan automáticamente.",
     stationsCount: "emisoras",
   },
+  visualizers: {
+    voxel: "Espectro de vóxeles",
+    menuTitle: "Visualizador",
+    previous: "Visualizador anterior: {name}",
+    next: "Visualizador siguiente: {name}",
+  },
 };

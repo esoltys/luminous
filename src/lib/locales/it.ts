@@ -3333,4 +3333,10 @@ export const it = {
       "Crea una lista di stazioni per seguire i generi che si aggiornano automaticamente.",
     stationsCount: "stazioni",
   },
+  visualizers: {
+    voxel: "Spettro a voxel",
+    menuTitle: "Visualizzatore",
+    previous: "Visualizzatore precedente: {name}",
+    next: "Visualizzatore successivo: {name}",
+  },
 };

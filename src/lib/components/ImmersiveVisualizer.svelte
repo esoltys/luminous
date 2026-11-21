@@ -1,178 +1,42 @@
 <script lang="ts">
-  import { listen } from "@tauri-apps/api/event";
-  import { onMount, onDestroy } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { themeStore } from "../stores/theme.svelte";
+  import { visualizerStore } from "../stores/visualizer.svelte";
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { isLiveSong } from "../types";
-  import { prefersReducedMotion } from "../utils/motion";
-  import { acquireSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
-  import {
-    VOXEL_VISUALIZER_PRESET,
-    VoxelSpectrumEngine,
-    buildVoxelThemePalette,
-    prepareCanvas2d,
-    type VisualizerPreset,
-    type VoxelThemePalette,
-  } from "../utils/visualizerEngine";
   import CoverArt from "./CoverArt.svelte";
+  import VisualizerCanvas from "./VisualizerCanvas.svelte";
+  import VisualizerPresetMenu from "./VisualizerPresetMenu.svelte";
 
-  interface Props {
-    active?: boolean;
-    preset?: VisualizerPreset;
-  }
+  let { active = true }: { active?: boolean } = $props();
 
-  let { active = true, preset = VOXEL_VISUALIZER_PRESET }: Props = $props();
-
-  const COLUMNS = 64;
-  const ROWS = 28;
-  const engine = new VoxelSpectrumEngine(COLUMNS, ROWS);
-
-  let canvas = $state<HTMLCanvasElement | null>(null);
   let detailsHeight = $state(0);
-  let unlisten: (() => void) | null = null;
-  let resizeObserver: ResizeObserver | null = null;
-  let rafId = 0;
-  let lastFrameTime = 0;
-  let hasAcquiredSpectrum = false;
-  let palette: VoxelThemePalette = buildVoxelThemePalette(themeStore.resolvedColors, ROWS);
+  let presetMenu = $state<{ x: number; y: number } | null>(null);
 
-  function syncSpectrumSubscription(shouldAcquire: boolean) {
-    if (shouldAcquire && !hasAcquiredSpectrum) {
-      acquireSpectrum();
-      hasAcquiredSpectrum = true;
-    } else if (!shouldAcquire && hasAcquiredSpectrum) {
-      releaseSpectrum();
-      hasAcquiredSpectrum = false;
-    }
+  // Widgets that use ←/→ themselves: text fields, sliders (seek, volume), menus, lists.
+  const ARROW_KEY_WIDGETS =
+    "input, textarea, select, [contenteditable]:not([contenteditable='false']), " +
+    "[role='slider'], [role='menu'], [role='menubar'], [role='listbox'], [role='tablist'], " +
+    "[role='grid'], [role='tree'], [role='radiogroup']";
+
+  /** ←/→ step through presets while this view is shown, unless focus is somewhere using them. */
+  function handleWindowKeydown(e: KeyboardEvent) {
+    if (!active || e.defaultPrevented || !visualizerStore.canSwitch) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.target instanceof Element && e.target.closest(ARROW_KEY_WIDGETS)) return;
+    e.preventDefault();
+    visualizerStore.cycle(e.key === "ArrowRight" ? 1 : -1);
   }
 
-  function stopLoop() {
-    if (rafId) {
-      cancelAnimationFrame(rafId);
-      rafId = 0;
-    }
-    lastFrameTime = 0;
+  function openPresetMenu(e: MouseEvent) {
+    if (!visualizerStore.canSwitch) return;
+    e.preventDefault();
+    presetMenu = { x: e.clientX, y: e.clientY };
   }
-
-  function drawFrame() {
-    if (typeof document !== "undefined" && document.hidden) return;
-    const target = prepareCanvas2d(canvas);
-    if (!target) return;
-    const { ctx, width, height } = target;
-    preset.render(ctx, width, height, engine, palette, {
-      reducedMotion: prefersReducedMotion(),
-    });
-  }
-
-  function tick(now: number) {
-    rafId = 0;
-    if (!active || (typeof document !== "undefined" && document.hidden)) {
-      lastFrameTime = 0;
-      return;
-    }
-
-    const dtMs = lastFrameTime > 0 ? now - lastFrameTime : 16.67;
-    lastFrameTime = now;
-
-    const stillMoving = engine.step(dtMs, prefersReducedMotion());
-    drawFrame();
-
-    if (stillMoving || playerStore.state === "playing") {
-      rafId = requestAnimationFrame(tick);
-    } else {
-      lastFrameTime = 0;
-    }
-  }
-
-  function ensureLoop() {
-    if (!active || (typeof document !== "undefined" && document.hidden)) return;
-    if (!rafId) {
-      rafId = requestAnimationFrame(tick);
-    }
-  }
-
-  // Re-build the voxel color ramp whenever any theme setting changes
-  $effect(() => {
-    const colors = themeStore.resolvedColors;
-    palette = buildVoxelThemePalette(colors, ROWS);
-    if (active) {
-      drawFrame();
-    }
-  });
-
-  // Acquire spectrum and run loop only while this immersive view is active
-  $effect(() => {
-    syncSpectrumSubscription(active);
-    if (active) {
-      drawFrame();
-      if (playerStore.state === "playing") {
-        ensureLoop();
-      }
-    } else {
-      stopLoop();
-    }
-  });
-
-  // When playback pauses or stops, zero the target bins so bars and peak caps fall to rest
-  $effect(() => {
-    const state = playerStore.state;
-    if (state !== "playing") {
-      engine.clearTargets();
-      if (active) {
-        ensureLoop();
-      }
-    }
-  });
-
-  function handleVisibilityChange() {
-    if (typeof document === "undefined") return;
-    if (document.hidden) {
-      stopLoop();
-    } else if (active) {
-      drawFrame();
-      ensureLoop();
-    }
-  }
-
-  onMount(async () => {
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", handleVisibilityChange);
-    }
-    if (canvas && typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(() => {
-        if (active) drawFrame();
-      });
-      resizeObserver.observe(canvas);
-    }
-    try {
-      unlisten = await listen<number[]>("spectrum-data", (event) => {
-        engine.pushSpectrum(event.payload);
-        if (active && (typeof document === "undefined" || !document.hidden)) {
-          ensureLoop();
-        }
-      });
-    } catch (e) {
-      console.error("Failed to initialize immersive spectrum visualizer:", e);
-    }
-    if (active) {
-      drawFrame();
-    }
-  });
-
-  onDestroy(() => {
-    stopLoop();
-    syncSpectrumSubscription(false);
-    resizeObserver?.disconnect();
-    if (typeof document !== "undefined") {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    }
-    if (unlisten) {
-      unlisten();
-    }
-  });
 </script>
+
+<svelte:window onkeydown={handleWindowKeydown} />
 
 <div
   data-testid="immersive-visualizer"
@@ -236,11 +100,22 @@
     </div>
   {/if}
 
-  <!-- Voxel LED Spectrum Matrix Stage -->
+  <!-- Visualizer stage: draws the selected preset; right-click lists the presets -->
   <div
+    oncontextmenu={openPresetMenu}
+    role="presentation"
     class="flex-1 min-h-[220px] md:min-h-[320px] w-full rounded-2xl border border-brand-border/40 bg-brand-sidebar/65 p-4 md:p-6 flex items-center justify-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.45)]"
   >
-    <canvas bind:this={canvas} data-testid="immersive-visualizer-canvas" class="w-full h-full block"
-    ></canvas>
+    <VisualizerCanvas
+      preset={visualizerStore.preset}
+      size="full"
+      {active}
+      testId="immersive-visualizer-canvas"
+      class="w-full h-full block"
+    />
   </div>
 </div>
+
+{#if presetMenu}
+  <VisualizerPresetMenu x={presetMenu.x} y={presetMenu.y} onClose={() => (presetMenu = null)} />
+{/if}

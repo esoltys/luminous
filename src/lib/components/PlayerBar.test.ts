@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom";
 import { tick } from "svelte";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent, screen } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import PlayerBar from "./PlayerBar.svelte";
@@ -9,6 +9,8 @@ import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { visualizerStore } from "../stores/visualizer.svelte";
+import { registerPreset } from "../visualizers/registry";
 import type { Song, Playlist } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -676,7 +678,10 @@ describe("PlayerBar.svelte", () => {
     expect(
       canvas.compareDocumentPosition(queueBtn) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(canvas.closest("button.w-24")!.nextElementSibling).toBe(queueBtn);
+    // The slot sits in its preset-selector group (#2245), which is the Queue button's neighbour.
+    expect(canvas.closest('[data-testid="player-bar-visualizer"]')!.nextElementSibling).toBe(
+      queueBtn,
+    );
   });
 
   it("shows the album and the artist on separate lines (#2042)", () => {
@@ -835,5 +840,87 @@ describe("PlayerBar.svelte", () => {
     const { container } = render(PlayerBar);
     expect(container.querySelector("[data-live-badge]")).toBeInTheDocument();
     expect(container.querySelector("[data-waveform-container]")).toBeInTheDocument();
+  });
+
+  describe("visualizer preset selector (#2245)", () => {
+    let unregister: (() => void) | null = null;
+
+    function registerSecondPreset() {
+      unregister = registerPreset({
+        id: "fake",
+        labelKey: "Fake preset",
+        needs: ["spectrum"],
+        create: () => ({ setTheme() {}, push() {}, step: () => false, render() {} }),
+      });
+    }
+
+    afterEach(() => {
+      visualizerStore.select("voxel");
+      unregister?.();
+      unregister = null;
+      localStorage.clear();
+    });
+
+    it("shows no arrows and no menu while only one preset is registered", async () => {
+      playerStore.currentSong = mockSong;
+      const { queryByTestId, getByTestId } = render(PlayerBar);
+      expect(queryByTestId("visualizer-prev")).toBeNull();
+      expect(queryByTestId("visualizer-next")).toBeNull();
+      await fireEvent.contextMenu(getByTestId("player-bar-visualizer"));
+      expect(screen.queryByRole("menuitemradio")).toBeNull();
+    });
+
+    it("steps through presets with the arrows, naming the target and flashing the new name", async () => {
+      registerSecondPreset();
+      playerStore.currentSong = mockSong;
+      const { getByTestId, findByTestId } = render(PlayerBar);
+      const next = getByTestId("visualizer-next");
+      expect(next).toHaveAttribute("aria-label", "Next visualizer: Fake preset");
+      expect(next).toHaveAttribute("tabindex", "-1");
+
+      await fireEvent.click(next);
+      expect(visualizerStore.preset.id).toBe("fake");
+      expect(await findByTestId("visualizer-preset-flash")).toHaveTextContent("Fake preset");
+      expect(getByTestId("player-bar-visualizer-btn").querySelector("canvas")).toHaveAttribute(
+        "data-preset",
+        "fake",
+      );
+
+      await fireEvent.click(getByTestId("visualizer-prev"));
+      expect(visualizerStore.preset.id).toBe("voxel");
+    });
+
+    it("steps with ↑/↓ on the focused slot and with the mouse wheel", async () => {
+      registerSecondPreset();
+      playerStore.currentSong = mockSong;
+      const { getByTestId } = render(PlayerBar);
+      const slot = getByTestId("player-bar-visualizer-btn");
+      expect(slot).toHaveAttribute("aria-keyshortcuts", "ArrowUp ArrowDown");
+
+      await fireEvent.keyDown(slot, { key: "ArrowDown" });
+      expect(visualizerStore.preset.id).toBe("fake");
+      await fireEvent.keyDown(slot, { key: "ArrowUp" });
+      expect(visualizerStore.preset.id).toBe("voxel");
+
+      await fireEvent.wheel(getByTestId("player-bar-visualizer"), { deltaY: 100 });
+      expect(visualizerStore.preset.id).toBe("fake");
+    });
+
+    it("lists presets with thumbnails on right-click and selects the chosen one", async () => {
+      registerSecondPreset();
+      playerStore.currentSong = mockSong;
+      const { getByTestId } = render(PlayerBar);
+      await fireEvent.contextMenu(getByTestId("player-bar-visualizer"));
+
+      const options = screen.getAllByRole("menuitemradio");
+      expect(options.map((o) => o.getAttribute("data-preset"))).toEqual(["voxel", "fake"]);
+      expect(options[0]).toHaveAttribute("aria-checked", "true");
+      expect(options[1]).toHaveAttribute("aria-checked", "false");
+      expect(options[1].querySelector("canvas")).not.toBeNull();
+
+      await fireEvent.click(options[1]);
+      expect(visualizerStore.preset.id).toBe("fake");
+      expect(screen.queryByRole("menuitemradio")).toBeNull();
+    });
   });
 });
