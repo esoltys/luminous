@@ -1,13 +1,71 @@
 import "@testing-library/jest-dom";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
+import { tick } from "svelte";
+import { listen } from "@tauri-apps/api/event";
 import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
 import { playerStore } from "../stores/player.svelte";
+import type { SpectrumFrame } from "../utils/spectrumEnable";
+
+let reducedMotion = false;
+vi.mock("../utils/motion", () => ({ prefersReducedMotion: () => reducedMotion }));
+
+/** Renders the playing logo and returns a way to send it spectrum frames. */
+async function renderPlaying() {
+  let send: ((frame: SpectrumFrame) => void) | undefined;
+  vi.mocked(listen).mockImplementation(async (event, cb) => {
+    if (event === "spectrum-data") {
+      send = (frame) => (cb as (e: { payload: SpectrumFrame }) => void)({ payload: frame });
+    }
+    return () => {};
+  });
+  playerStore.state = "playing";
+  const view = render(ReactiveLogoBrand, { props: { size: "lg" } });
+  await tick();
+  await tick();
+  const burstLayer = () =>
+    view.container.querySelector('circle[data-layer="burst"]')
+      ?.parentElement as unknown as SVGElement;
+  const emit = async (frame: SpectrumFrame) => {
+    send?.(frame);
+    await tick();
+  };
+  return { emit, burstLayer };
+}
 
 describe("ReactiveLogoBrand.svelte", () => {
   beforeEach(() => {
     localStorage.clear();
     playerStore.state = "stopped";
+    reducedMotion = false;
+  });
+
+  it("flares the coronal burst on a bass onset, then lets it fade", async () => {
+    const { emit, burstLayer } = await renderPlaying();
+    const quiet = new Array(32).fill(0);
+    await emit({ bands: quiet, onset: 0 });
+    const restOpacity = Number(burstLayer().style.opacity);
+    const restTransform = burstLayer().style.transform;
+
+    await emit({ bands: quiet, onset: 1 });
+    expect(Number(burstLayer().style.opacity)).toBeGreaterThan(restOpacity + 0.5);
+    expect(burstLayer().style.transform).not.toBe(restTransform);
+
+    for (let i = 0; i < 10; i++) await emit({ bands: quiet, onset: 0 });
+    expect(Number(burstLayer().style.opacity)).toBeCloseTo(restOpacity);
+  });
+
+  it("under reduced motion, a kick brightens the burst without growing it", async () => {
+    reducedMotion = true;
+    const { emit, burstLayer } = await renderPlaying();
+    const quiet = new Array(32).fill(0);
+    await emit({ bands: quiet, onset: 0 });
+    const restTransform = burstLayer().style.transform;
+    const restOpacity = Number(burstLayer().style.opacity);
+
+    await emit({ bands: quiet, onset: 1 });
+    expect(burstLayer().style.transform).toBe(restTransform);
+    expect(Number(burstLayer().style.opacity)).toBeGreaterThan(restOpacity + 0.5);
   });
 
   it("renders the crisp authentic Luminous brand mark in resting state when playback is stopped", () => {

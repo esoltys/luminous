@@ -1,4 +1,5 @@
 import { isWindows } from "../platform";
+import type { SpectrumFrame } from "./spectrumEnable";
 
 /**
  * Host→overlay message API for add-on overlays (#1413). One-way: the overlay
@@ -32,6 +33,8 @@ export type OverlayMessage =
       mid: number;
       treble: number;
       bars: number[];
+      /** Strength in (0, 1] of a bass onset (a kick) since the previous message; 0 means none. */
+      onset: number;
     };
 
 /**
@@ -53,9 +56,10 @@ function average(bins: number[], from: number, to: number): number {
 
 /**
  * Collapse the backend's 32 spectrum bins into bass/mid/treble plus the raw
- * bars, using the same bin ranges as the logo (`ReactiveLogoBrand`).
+ * bars, using the same bin ranges as the logo (`ReactiveLogoBrand`), and pass
+ * the onset through.
  */
-export function spectrumMessage(bins: number[]): OverlayMessage {
+export function spectrumMessage({ bands: bins, onset }: SpectrumFrame): OverlayMessage {
   return {
     luminousAddon: 1,
     kind: "spectrum",
@@ -63,5 +67,6 @@ export function spectrumMessage(bins: number[]): OverlayMessage {
     mid: clamp01(average(bins, 8, 20)),
     treble: clamp01(average(bins, 20, 32)),
     bars: bins.map(clamp01),
+    onset: clamp01(onset),
   };
 }

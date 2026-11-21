@@ -1,9 +1,9 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
-  import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { acquireSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
+  import { acquireSpectrum, listenSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
+  import { prefersReducedMotion } from "../utils/motion";
 
   interface Props {
     size?: "sm" | "md" | "lg" | "xl" | "2xl";
@@ -24,6 +24,11 @@
   let bassIntensity = $state(0);
   let midIntensity = $state(0);
   let coronalIntensity = $state(0);
+  // A bass onset (kick) flares the coronal burst, then fades over a few frames.
+  let kickIntensity = $state(0);
+  // Kept per spectrum event (~33 ms apart): about a 100 ms fade.
+  const KICK_DECAY = 0.55;
+  const KICK_FLOOR = 0.05;
   let unlisten: (() => void) | null = null;
   // Tracks whether this component currently holds a spectrum acquisition, so
   // onDestroy/togglePulsing release exactly the acquisitions this instance
@@ -52,15 +57,18 @@
     }
 
     try {
-      unlisten = await listen<number[]>("spectrum-data", (event) => {
+      unlisten = await listenSpectrum(({ bands: data, onset }) => {
         if (typeof document !== "undefined" && document.hidden) return;
         if (!isPulsingEnabled) {
           bassIntensity = 0;
           midIntensity = 0;
           coronalIntensity = 0;
+          kickIntensity = 0;
           return;
         }
-        const data = event.payload;
+        // Not `settle`d: its small decay steps would hold a fading kick above 0.
+        const kick = Math.max(onset, kickIntensity * KICK_DECAY);
+        kickIntensity = kick < KICK_FLOOR ? 0 : kick;
         if (data && data.length > 0) {
           // Segment and average the 32 spectrum bins into Bass, Mids, and Coronal/Treble
           // to prevent single-bin noise/leakage from driving unrelated components
@@ -69,7 +77,7 @@
           const coronalAvg = data.slice(20, 32).reduce((sum, v) => sum + v, 0) / 12;
 
           // Backend bins already arrive normalized to the frame's own peak
-          // (see analyzer::calculate_spectrum), so only a modest boost is
+          // (see VisualizerAnalyzer::bands), so only a modest boost is
           // needed for visual punch — a large fixed multiplier here would
           // just re-saturate every band back to the ceiling.
           bassIntensity = settle(bassIntensity, Math.min(1.0, bassAvg * 1.4));
@@ -101,6 +109,7 @@
       bassIntensity = 0;
       midIntensity = 0;
       coronalIntensity = 0;
+      kickIntensity = 0;
       if (hasAcquiredSpectrum) {
         releaseSpectrum();
         hasAcquiredSpectrum = false;
@@ -129,7 +138,7 @@
   // visualizer driven live by the current track's frequency bands:
   // - Mid frequencies drive the ambient glow halo and inner rim (re-targeting to active theme accent)
   // - Treble frequencies drive the outer eclipse ring (re-targeting to theme accent-hover)
-  // - Bass frequencies drive the coronal burst flare halo
+  // - Bass frequencies and kicks (bass onsets) drive the coronal burst flare halo
 
   // Rendering: each blurred element is its own layer whose SVG never changes
   // while playing — its blur is rasterized once — and the audio drives only
@@ -154,10 +163,14 @@
   // Eclipse ring (treble-driven): stroke 5–21, as a thin/thick cross-fade
   let ringOpacity = $derived(0.5 + coronalIntensity * 0.5);
 
-  // Coronal burst halo (bass-driven): radius 18–44, drawn at BURST_BASE_R
+  // Coronal burst halo (bass-driven, flared by kicks): radius 18–44, drawn at
+  // BURST_BASE_R. Under reduced motion a kick only brightens it, never grows it.
   const BURST_BASE_R = 31;
-  let burstScale = $derived((18 + bassIntensity * 26) / BURST_BASE_R);
-  let burstOpacity = $derived(0.15 + bassIntensity * 0.7);
+  let burstSize = $derived(
+    prefersReducedMotion() ? bassIntensity : Math.max(bassIntensity, kickIntensity),
+  );
+  let burstScale = $derived((18 + burstSize * 26) / BURST_BASE_R);
+  let burstOpacity = $derived(0.15 + Math.max(bassIntensity, kickIntensity) * 0.7);
 
   let maxIntensity = $derived(Math.max(bassIntensity, midIntensity, coronalIntensity));
   let saturationVal = $derived(0.15 + maxIntensity * 2.35);

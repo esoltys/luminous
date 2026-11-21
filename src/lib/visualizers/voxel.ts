@@ -34,8 +34,12 @@ class VoxelFullInstance implements VisualizerInstance {
 
   push(frame: VisualizerFrame): void {
     // Paused or stopped: zero the targets so bars and peak caps fall to rest.
-    if (frame.playing) this.engine.pushSpectrum(frame.bands);
-    else this.engine.clearTargets();
+    if (frame.playing) {
+      this.engine.pushSpectrum(frame.bands);
+      if (frame.onset > 0) this.engine.pushOnset(frame.onset);
+    } else {
+      this.engine.clearTargets();
+    }
   }
 
   step(dtMs: number, reducedMotion: boolean): boolean {

@@ -17,6 +17,8 @@ import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { visualizerStore } from "../stores/visualizer.svelte";
 import { registerPreset } from "../visualizers/registry.svelte";
 import type { Song } from "../types";
+import type { SpectrumFrame } from "../utils/spectrumEnable";
+import type { VisualizerFrame } from "../visualizers/types";
 
 describe("ImmersiveVisualizer.svelte (#2236)", () => {
   const mockSong: Song = {
@@ -93,10 +95,10 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
   });
 
   it("subscribes to spectrum-data events and renders on the canvas when active", async () => {
-    let spectrumCallback: ((event: { payload: number[] }) => void) | undefined;
+    let spectrumCallback: ((event: { payload: SpectrumFrame }) => void) | undefined;
     vi.mocked(listen).mockImplementation(async (eventName, cb) => {
       if (eventName === "spectrum-data") {
-        spectrumCallback = cb as (event: { payload: number[] }) => void;
+        spectrumCallback = cb as (event: { payload: SpectrumFrame }) => void;
       }
       return () => {};
     });
@@ -105,7 +107,7 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
     expect(getByTestId("immersive-visualizer-canvas")).toBeInTheDocument();
     expect(listen).toHaveBeenCalledWith("spectrum-data", expect.any(Function));
 
-    spectrumCallback?.({ payload: new Array(32).fill(0.8) });
+    spectrumCallback?.({ payload: { bands: new Array(32).fill(0.8), onset: 0 } });
   });
 
   it("turns the spectrum feed on while active and draws the selected preset", () => {
@@ -137,6 +139,42 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
       visualizerStore.cycle(1);
       await tick();
       expect(getByTestId("immersive-visualizer-canvas")).toHaveAttribute("data-preset", "fake");
+    });
+
+    it("hands the preset each frame's onset exactly once", async () => {
+      const pushed: VisualizerFrame[] = [];
+      const unregisterSpy = registerPreset({
+        id: "spy",
+        labelKey: "Spy preset",
+        needs: ["spectrum"],
+        create: () => ({
+          setTheme() {},
+          push: (frame) => void pushed.push(frame),
+          step: () => false,
+          render() {},
+        }),
+      });
+      let send: ((frame: SpectrumFrame) => void) | undefined;
+      vi.mocked(listen).mockImplementation(async (eventName, cb) => {
+        if (eventName === "spectrum-data") {
+          send = (frame) => (cb as (e: { payload: SpectrumFrame }) => void)({ payload: frame });
+        }
+        return () => {};
+      });
+      try {
+        visualizerStore.select("spy");
+        render(ImmersiveVisualizer, { active: true });
+        await tick();
+        await tick();
+        send?.({ bands: new Array(32).fill(0.5), onset: 0.7 });
+        expect(pushed.at(-1)?.onset).toBe(0.7);
+        // A later push without new data (playback stopping) carries no stale onset.
+        playerStore.state = "paused";
+        await tick();
+        expect(pushed.at(-1)?.onset).toBe(0);
+      } finally {
+        unregisterSpy();
+      }
     });
 
     it("opens the preset menu on right-click of the stage", async () => {

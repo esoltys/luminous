@@ -8,7 +8,8 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 const acquire = vi.fn();
 const release = vi.fn();
-vi.mock("../utils/spectrumEnable", () => ({
+vi.mock("../utils/spectrumEnable", async (importActual) => ({
+  ...(await importActual<typeof import("../utils/spectrumEnable")>()),
   acquireSpectrum: () => acquire(),
   releaseSpectrum: () => release(),
 }));

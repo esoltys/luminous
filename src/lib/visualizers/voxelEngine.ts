@@ -41,6 +41,12 @@ const DECAY_RATE = 10.5;
 const DECAY_RATE_REDUCED = 6.5;
 const EPSILON = 0.002;
 const REFLECTION_ROWS = 4;
+/** A beat flash fades with this time constant. */
+const BEAT_DECAY_MS = 120;
+/** The bottom share of rows (the bass end of each bar) a beat lights up. */
+const BEAT_ROW_SHARE = 0.3;
+/** Opacity of the beat flash at full strength. */
+const BEAT_FLASH_ALPHA = 0.55;
 
 function mixRgb(
   a: { r: number; g: number; b: number },
@@ -137,6 +143,7 @@ export class VoxelSpectrumEngine {
   readonly rowCount: number;
   private readonly targetLevels: Float32Array;
   private readonly columnStates: VoxelColumnState[];
+  private beatLevel = 0;
 
   constructor(columnCount = DEFAULT_COLUMNS, rowCount = DEFAULT_ROWS) {
     this.columnCount = Math.max(1, columnCount);
@@ -154,6 +161,16 @@ export class VoxelSpectrumEngine {
 
   get columns(): readonly VoxelColumnState[] {
     return this.columnStates;
+  }
+
+  /** Brightness in [0, 1] of the current beat flash; fades on its own in `step()`. */
+  get beat(): number {
+    return this.beatLevel;
+  }
+
+  /** A bass onset of `strength` in (0, 1]: flashes the base of every lit bar. */
+  pushOnset(strength: number): void {
+    this.beatLevel = Math.max(this.beatLevel, Math.min(1, strength));
   }
 
   /**
@@ -190,11 +207,13 @@ export class VoxelSpectrumEngine {
    */
   clearTargets(): void {
     this.targetLevels.fill(0);
+    this.beatLevel = 0;
   }
 
   /** Immediately resets all bars and peak-hold blocks to zero. */
   reset(): void {
     this.targetLevels.fill(0);
+    this.beatLevel = 0;
     for (let i = 0; i < this.columnCount; i++) {
       const col = this.columnStates[i];
       col.level = 0;
@@ -221,7 +240,10 @@ export class VoxelSpectrumEngine {
     const gravity = reducedMotion ? PEAK_GRAVITY_REDUCED : PEAK_GRAVITY;
     const rows = this.rowCount;
 
-    let anyActive = false;
+    // The flash is brightness only, so it is the same under reduced motion.
+    this.beatLevel *= Math.exp(-clampedDtMs / BEAT_DECAY_MS);
+    if (this.beatLevel < EPSILON) this.beatLevel = 0;
+    let anyActive = this.beatLevel > 0;
 
     for (let i = 0; i < this.columnCount; i++) {
       const col = this.columnStates[i];
@@ -359,6 +381,24 @@ export function renderVoxelMatrix(
       const x = originX + c * (cellWidth + colGap);
       ctx.fillRect(x, y, cellWidth, cellHeight);
     }
+  }
+
+  // 2b. Beat flash: the bass end of every lit bar glows in the peak colour
+  const beat = engine.beat;
+  if (beat > 0) {
+    const beatRows = Math.max(1, Math.round(rows * BEAT_ROW_SHARE));
+    ctx.globalAlpha = beat * BEAT_FLASH_ALPHA;
+    ctx.fillStyle = palette.peakCapColor;
+    for (let r = 0; r < beatRows; r++) {
+      const rowIndex1 = r + 1;
+      const y = baselineY - rowIndex1 * cellHeight - r * rowGap;
+      for (let c = 0; c < cols; c++) {
+        const col = columns[c];
+        if (col.activeCells < rowIndex1 || col.peakCell === rowIndex1) continue;
+        ctx.fillRect(originX + c * (cellWidth + colGap), y, cellWidth, cellHeight);
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   // 3. Pushed-up Peak-Hold blocks (batched in a single fillStyle pass)
