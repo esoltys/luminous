@@ -216,24 +216,28 @@
       </button>
 
       <div class="flex flex-col min-w-0 flex-1">
-        <div class="flex items-center gap-2">
-          <span
-            class="label-small px-2.5 py-0.5 bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
-          >
-            {i18n.t("playerBar.nowPlaying")}
-          </span>
-          {#if playerStore.currentSong.album?.trim()}
-            <span class="text-xs text-brand-text-secondary/80 truncate select-text">
-              {playerStore.currentSong.album}
-            </span>
-          {/if}
-        </div>
+        <span
+          class="label-small self-start px-2.5 py-0.5 bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
+        >
+          {i18n.t("playerBar.nowPlaying")}
+        </span>
         <h1
-          class="mt-1 text-2xl md:text-3xl font-heading font-bold text-brand-text-primary truncate select-text"
+          class="mt-1.5 text-2xl md:text-3xl font-heading font-bold text-brand-text-primary leading-tight tracking-tight truncate select-text"
         >
           {playerStore.currentSongDisplayTitle}
         </h1>
-        <p class="text-sm md:text-base text-brand-text-secondary/80 truncate select-text">
+        {#if playerStore.currentSong.album?.trim()}
+          <p
+            class="mt-1 text-sm md:text-base text-brand-text-secondary font-semibold truncate select-text"
+          >
+            {playerStore.currentSong.album}
+          </p>
+        {/if}
+        <p
+          class="{playerStore.currentSong.album?.trim()
+            ? 'mt-0.5'
+            : 'mt-1'} text-xs md:text-sm text-brand-text-secondary/70 font-medium truncate select-text"
+        >
           {playerStore.currentSongDisplaySubtitle}
         </p>
       </div>

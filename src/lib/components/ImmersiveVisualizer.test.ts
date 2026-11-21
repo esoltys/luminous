@@ -59,9 +59,14 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
 
     expect(getByTestId("immersive-visualizer")).toBeInTheDocument();
     expect(getByTestId("immersive-visualizer-canvas")).toBeInTheDocument();
-    expect(getByText("Neon Horizon")).toBeInTheDocument();
-    expect(getByText("Midnight Grid")).toBeInTheDocument();
-    expect(getByText("Synthwave Collective")).toBeInTheDocument();
+    const badge = getByText("Now playing");
+    const title = getByText("Neon Horizon");
+    const album = getByText("Midnight Grid");
+    const artist = getByText("Synthwave Collective");
+
+    expect(badge.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(title.compareDocumentPosition(album) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(album.compareDocumentPosition(artist) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     const thumbBtn = getByTitle("Immersive Mode");
     await fireEvent.click(thumbBtn);
