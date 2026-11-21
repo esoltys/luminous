@@ -3,6 +3,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 const windowGeometryCallbacks = vi.hoisted(() => [] as Array<() => void>);
+const windowState = vi.hoisted(() => ({
+  fullscreen: false,
+  setFullscreen: vi.fn(async (enabled: boolean) => {
+    windowState.fullscreen = enabled;
+  }),
+  isFullscreen: vi.fn(async () => windowState.fullscreen),
+}));
 
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: vi.fn(() => ({
@@ -14,6 +21,8 @@ vi.mock("@tauri-apps/api/window", () => ({
       windowGeometryCallbacks.push(cb);
       return Promise.resolve(() => {});
     }),
+    setFullscreen: windowState.setFullscreen,
+    isFullscreen: windowState.isFullscreen,
   })),
 }));
 
@@ -23,6 +32,8 @@ import { windowLayoutStore } from "./windowLayout.svelte";
 describe("CollectionStore - miniplayer geometry and window-geometry IPC races", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    windowState.fullscreen = false;
+    windowLayoutStore.isFullscreen = false;
     // windowGeometryCallbacks is populated once, when the collectionStore
     // singleton's constructor calls initWindowGeometryTracking() at module
     // import time — it must not be cleared per-test, there's no later call
@@ -182,5 +193,39 @@ describe("CollectionStore - miniplayer geometry and window-geometry IPC races", 
     await windowLayoutStore.exitMiniplayerMode();
     expect(exitCallCount).toBe(1);
     expect(windowLayoutStore.isMiniplayer).toBe(false);
+  });
+
+  it("toggles fullscreen mode, exits miniplayer first, and suppresses geometry capture while fullscreen", async () => {
+    vi.useFakeTimers();
+    try {
+      windowLayoutStore.setSavedWindowGeometry(1280, 800, 100, 100);
+      await windowLayoutStore.enterMiniplayerMode();
+      expect(windowLayoutStore.isMiniplayer).toBe(true);
+
+      await windowLayoutStore.toggleFullscreenMode();
+      expect(windowLayoutStore.isMiniplayer).toBe(false);
+      expect(windowLayoutStore.isFullscreen).toBe(true);
+      expect(windowState.setFullscreen).toHaveBeenCalledWith(true);
+
+      // Resize events while fullscreen must not overwrite saved windowed geometry.
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "get_window_geometry") return { width: 2560, height: 1440, x: 0, y: 0 };
+        return null;
+      });
+      windowGeometryCallbacks.forEach((cb) => cb());
+      await vi.advanceTimersByTimeAsync(400);
+      expect(windowLayoutStore.savedWindowWidth).toBe(1280);
+      expect(windowLayoutStore.savedWindowHeight).toBe(800);
+
+      // Entering miniplayer while fullscreen exits fullscreen first.
+      await windowLayoutStore.enterMiniplayerMode();
+      expect(windowLayoutStore.isFullscreen).toBe(false);
+      expect(windowState.setFullscreen).toHaveBeenCalledWith(false);
+      expect(windowLayoutStore.isMiniplayer).toBe(true);
+
+      await windowLayoutStore.exitMiniplayerMode();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

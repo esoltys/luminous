@@ -223,9 +223,20 @@
     }
 
     function handleGlobalHotkeys(e: KeyboardEvent) {
+      if (e.key === "F11" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        void windowLayoutStore.toggleFullscreenMode();
+        return;
+      }
+
       if (!(e.ctrlKey || e.metaKey)) return;
 
       switch (e.key.toLowerCase()) {
+        case "f":
+          if (!e.shiftKey) break;
+          e.preventDefault();
+          void windowLayoutStore.toggleFullscreenMode();
+          break;
         case "m":
           if (!e.shiftKey) break;
           e.preventDefault();

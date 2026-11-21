@@ -40,6 +40,8 @@
         { keys: ["Ctrl", "2"], label: i18n.t("shortcuts.toggleImmersive") },
         { keys: ["Ctrl", "I"], label: i18n.t("shortcuts.toggleRightPanel") },
         { keys: ["Ctrl", "Shift", "M"], label: i18n.t("shortcuts.toggleMiniplayer") },
+        { keys: ["Ctrl", "Shift", "F"], label: i18n.t("shortcuts.toggleFullscreen") },
+        { keys: ["F11"], label: i18n.t("shortcuts.toggleFullscreen") },
         { keys: ["Ctrl", "Shift", "E"], label: i18n.t("shortcuts.openEqualizer") },
         { keys: ["Ctrl", ","], label: i18n.t("shortcuts.openSettings") },
         { keys: ["Ctrl", "/"], label: i18n.t("shortcuts.showShortcuts") },
