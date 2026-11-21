@@ -63,10 +63,6 @@
   // condition drives the `pb-dock` bottom padding (app.css) every view uses to clear it.
   const dockVisible = $derived(!!playerStore.currentSong && navigationStore.activeTab !== "help");
 
-  function revealImmersiveDock() {
-    windowLayoutStore.revealImmersiveDock();
-  }
-
   function handleDockPointerDown() {
     if (!windowLayoutStore.effectiveImmersiveMode) return;
     windowLayoutStore.setImmersiveDockHeld(true);
@@ -734,7 +730,7 @@
           onpointermove={() => windowLayoutStore.setImmersiveDockHovered(true)}
           onpointerleave={() => windowLayoutStore.setImmersiveDockHovered(false)}
           onpointerdown={handleDockPointerDown}
-          onfocusin={revealImmersiveDock}
+          onfocusin={() => windowLayoutStore.revealImmersiveDock()}
         >
           <div
             data-testid="immersive-dock-motion"

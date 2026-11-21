@@ -208,7 +208,7 @@ class WindowLayoutStore {
     }
   }
 
-  scheduleImmersiveDockHide() {
+  private scheduleImmersiveDockHide() {
     this.clearImmersiveDockTimer();
     if (!this.effectiveImmersiveMode || this.immersiveDockHeld || this.immersiveDockHovered) return;
     this.immersiveDockHideTimer = setTimeout(() => {

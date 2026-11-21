@@ -12,6 +12,7 @@
     VOXEL_VISUALIZER_PRESET,
     VoxelSpectrumEngine,
     buildVoxelThemePalette,
+    prepareCanvas2d,
     type VisualizerPreset,
     type VoxelThemePalette,
   } from "../utils/visualizerEngine";
@@ -57,28 +58,12 @@
 
   function drawFrame() {
     if (typeof document !== "undefined" && document.hidden) return;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    if (width === 0 || height === 0) return;
-
-    const targetW = Math.round(width * dpr);
-    const targetH = Math.round(height * dpr);
-    if (canvas.width !== targetW || canvas.height !== targetH) {
-      canvas.width = targetW;
-      canvas.height = targetH;
-    }
-
-    ctx.save();
-    ctx.scale(dpr, dpr);
+    const target = prepareCanvas2d(canvas);
+    if (!target) return;
+    const { ctx, width, height } = target;
     preset.render(ctx, width, height, engine, palette, {
       reducedMotion: prefersReducedMotion(),
     });
-    ctx.restore();
   }
 
   function tick(now: number) {
@@ -151,10 +136,6 @@
     }
   }
 
-  function switchToCoverView() {
-    windowLayoutStore.toggleImmersiveMode("cover");
-  }
-
   onMount(async () => {
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -203,7 +184,7 @@
     <div class="flex items-end gap-4 px-1">
       <button
         type="button"
-        onclick={switchToCoverView}
+        onclick={() => windowLayoutStore.toggleImmersiveMode("cover")}
         title={i18n.t("playerBar.immersiveTitle", {}, "Immersive Mode")}
         style={detailsHeight > 0
           ? `width: ${detailsHeight}px; height: ${detailsHeight}px;`

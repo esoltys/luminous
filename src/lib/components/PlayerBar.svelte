@@ -432,13 +432,11 @@
       style:opacity={dockGlowOpacity(isDarkTheme)}
       aria-hidden="true"
     >
-      <div class="dock-glow-cutout absolute inset-0">
-        {#key dockGlowKey}
-          <div class="dock-glow-svg absolute inset-0" transition:fade={{ duration: 300 }}>
-            {@html dockGlowSvg}
-          </div>
-        {/key}
-      </div>
+      {#key dockGlowKey}
+        <div class="dock-glow-svg absolute inset-0" transition:fade={{ duration: 300 }}>
+          {@html dockGlowSvg}
+        </div>
+      {/key}
     </div>
   {/if}
   <footer
@@ -897,10 +895,6 @@
       72px top,
       right top;
     mask-repeat: no-repeat;
-  }
-
-  .dock-glow-cutout {
-    /* Distance-field mask on .dock-glow-wrapper already attenuates the interior. */
   }
 
   .dock-glow-svg :global(svg) {
