@@ -43,6 +43,7 @@
 mod aac;
 pub mod asio;
 mod codecs;
+mod onset;
 pub mod pcm;
 pub mod sink;
 mod source;
@@ -73,6 +74,7 @@ pub use sink::{
     OutputFallbackReason,
 };
 pub use source::{normalize_probe_mime, IntegrityCheck, OfflineDecoder};
+pub use spectrum::VisualizerFrame;
 pub use speed::{snap_speed, MAX_SPEED, MIN_SPEED, SPEED_STEP};
 pub use symphonia::core::io::MediaSource;
 
@@ -565,6 +567,8 @@ pub struct AudioEngine {
     cmd_tx: mpsc::SyncSender<AudioCommand>,
     event_rx: Mutex<Option<mpsc::Receiver<AudioEvent>>>,
     shared: Arc<AudioShared>,
+    /// Reader side of `shared.visualizer_buf`: read position and onset state.
+    visualizer: Mutex<spectrum::VisualizerAnalyzer>,
 }
 
 impl AudioEngine {
@@ -590,7 +594,7 @@ impl AudioEngine {
             volume: AtomicU32::new(1.0f32.to_bits()),
             volume_ceiling: AtomicU32::new(1.0f32.to_bits()),
             play_state: Mutex::new(EngineState::Stopped),
-            visualizer_buf: spectrum::AudioVisualizerBuffer::new(4096),
+            visualizer_buf: spectrum::AudioVisualizerBuffer::new(),
             spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
             output_sample_rate: AtomicU32::new(44100),
             output_channels: std::sync::atomic::AtomicU16::new(2),
@@ -627,6 +631,7 @@ impl AudioEngine {
         Self {
             cmd_tx,
             event_rx: Mutex::new(Some(event_rx)),
+            visualizer: Mutex::new(spectrum::VisualizerAnalyzer::new()),
             shared,
         }
     }
@@ -638,6 +643,8 @@ impl AudioEngine {
     }
 
     pub fn play(&self, track: Track, start_nanosec: u64) -> Result<()> {
+        // A jump to other audio, not a beat.
+        self.visualizer.lock().reset();
         self.send_cmd(AudioCommand::Play(PlayRequest {
             track,
             start_nanosec,
@@ -708,6 +715,8 @@ impl AudioEngine {
     }
 
     pub fn seek_to(&self, position_nanosec: u64) -> Result<()> {
+        // A jump to other audio, not a beat.
+        self.visualizer.lock().reset();
         self.send_cmd(AudioCommand::SeekTo(position_nanosec))
     }
 
@@ -826,20 +835,26 @@ impl AudioEngine {
         self.shared.spectrum_enabled.load(Ordering::Relaxed)
     }
 
-    /// Start or stop feeding the spectrum analyzer. While it is off the
-    /// output callback skips the work, and `spectrum_snapshot` describes
-    /// whatever played before it was turned off.
+    /// Start or stop feeding the visualizer. While it is off the output
+    /// callback skips the work and `visualizer_frame` returns `None`.
     pub fn set_spectrum_enabled(&self, enabled: bool) {
         self.shared
             .spectrum_enabled
             .store(enabled, Ordering::Relaxed);
     }
 
-    /// Magnitude spectrum of what was most recently played, `fft_size / 2`
-    /// bins scaled for display, computed at the output's actual sample rate.
-    pub fn spectrum_snapshot(&self, fft_size: usize) -> Vec<f32> {
+    /// The spectrum of what is playing now, and the strongest bass onset
+    /// played since the previous call, for a loop calling this ~30 times a
+    /// second. `None` while the visualizer is off or playback isn't running;
+    /// the onset detector then starts afresh, so resuming isn't a beat.
+    pub fn visualizer_frame(&self) -> Option<VisualizerFrame> {
+        let mut analyzer = self.visualizer.lock();
+        if !self.spectrum_enabled() || self.current_state() != EngineState::Playing {
+            analyzer.reset();
+            return None;
+        }
         let sample_rate = self.shared.output_sample_rate.load(Ordering::Relaxed);
-        spectrum::calculate_spectrum(&self.shared.visualizer_buf, fft_size, sample_rate)
+        Some(analyzer.frame(&self.shared.visualizer_buf, sample_rate))
     }
 
     /// The output stage as currently configured, with sensible defaults
@@ -1711,7 +1726,7 @@ impl OutputRenderer {
                 self.mono_scratch
                     .push((sum / self.channels as f32) * vis_scale);
             }
-            // Bounded ring buffer: evicts the oldest block at max_size.
+            // Fixed-size ring buffer: overwrites the oldest samples, never allocates.
             // ast-grep-ignore: audio-callback-no-alloc
             self.shared.visualizer_buf.push(&self.mono_scratch);
         }
@@ -3588,7 +3603,7 @@ mod tests {
             volume_ceiling: AtomicU32::new(1.0f32.to_bits()),
             open_source: Box::new(open_file),
             play_state: Mutex::new(EngineState::Playing),
-            visualizer_buf: spectrum::AudioVisualizerBuffer::new(4096),
+            visualizer_buf: spectrum::AudioVisualizerBuffer::new(),
             spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
             output_sample_rate: AtomicU32::new(44100),
             output_channels: std::sync::atomic::AtomicU16::new(2),
