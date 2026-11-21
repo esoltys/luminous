@@ -444,33 +444,17 @@
             {i18n.t("artistEvents.otherPlatforms", {}, "Find tickets and tour dates on:")}
           </span>
           <div class="flex items-center gap-3">
-            <button
-              type="button"
-              onclick={() => onOpenUrl?.(effectiveSongkickUrl)}
-              class="inline-flex items-center gap-1 text-brand-text-secondary hover:text-brand-accent underline decoration-brand-text-secondary/40 hover:decoration-brand-accent transition-colors cursor-pointer"
-              title="Songkick"
-            >
-              <span>Songkick</span>
-              <ExternalLink class="w-2.5 h-2.5 opacity-60" />
-            </button>
-            <button
-              type="button"
-              onclick={() => onOpenUrl?.(effectiveBandsintownUrl)}
-              class="inline-flex items-center gap-1 text-brand-text-secondary hover:text-brand-accent underline decoration-brand-text-secondary/40 hover:decoration-brand-accent transition-colors cursor-pointer"
-              title="Bandsintown"
-            >
-              <span>Bandsintown</span>
-              <ExternalLink class="w-2.5 h-2.5 opacity-60" />
-            </button>
-            <button
-              type="button"
-              onclick={() => onOpenUrl?.(effectiveSetlistfmUrl)}
-              class="inline-flex items-center gap-1 text-brand-text-secondary hover:text-brand-accent underline decoration-brand-text-secondary/40 hover:decoration-brand-accent transition-colors cursor-pointer"
-              title="Setlist.fm"
-            >
-              <span>Setlist.fm</span>
-              <ExternalLink class="w-2.5 h-2.5 opacity-60" />
-            </button>
+            {#each [{ label: "Songkick", url: effectiveSongkickUrl }, { label: "Bandsintown", url: effectiveBandsintownUrl }, { label: "Setlist.fm", url: effectiveSetlistfmUrl }] as platform (platform.label)}
+              <button
+                type="button"
+                onclick={() => onOpenUrl?.(platform.url)}
+                class="inline-flex items-center gap-1 text-brand-text-secondary hover:text-brand-accent underline decoration-brand-text-secondary/40 hover:decoration-brand-accent transition-colors cursor-pointer"
+                title={platform.label}
+              >
+                <span>{platform.label}</span>
+                <ExternalLink class="w-2.5 h-2.5 opacity-60" />
+              </button>
+            {/each}
           </div>
         </div>
       {/if}
