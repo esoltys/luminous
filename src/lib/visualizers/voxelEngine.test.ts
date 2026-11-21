@@ -150,6 +150,59 @@ describe("VoxelSpectrumEngine (#2236)", () => {
   });
 });
 
+describe("voxel beat flash (#2246)", () => {
+  it("flashes on an onset, fades within a second, then lets the engine rest", () => {
+    const engine = new VoxelSpectrumEngine(8, 10);
+    engine.pushOnset(0.8);
+    expect(engine.beat).toBeCloseTo(0.8);
+    // A weaker onset during the flash doesn't dim it.
+    engine.pushOnset(0.3);
+    expect(engine.beat).toBeCloseTo(0.8);
+
+    expect(engine.step(16)).toBe(true);
+    let moving = true;
+    for (let i = 0; i < 60 && moving; i++) moving = engine.step(16);
+    expect(engine.beat).toBe(0);
+    expect(moving).toBe(false);
+  });
+
+  it("fades the same way under reduced motion, since it is brightness only", () => {
+    const normal = new VoxelSpectrumEngine(8, 10);
+    const reduced = new VoxelSpectrumEngine(8, 10);
+    normal.pushOnset(1);
+    reduced.pushOnset(1);
+    normal.step(50, false);
+    reduced.step(50, true);
+    expect(reduced.beat).toBeCloseTo(normal.beat);
+  });
+
+  it("draws the flash over the bass rows of lit bars and restores opacity", () => {
+    const engine = new VoxelSpectrumEngine(4, 10);
+    engine.pushSpectrum([1, 1, 1, 1]);
+    for (let i = 0; i < 20; i++) engine.step(16);
+    const palette = buildVoxelThemePalette(LUMINOUS_DARK_COLORS, 10);
+    const alphas: number[] = [];
+    const ctx = {
+      clearRect: vi.fn(),
+      fillRect: vi.fn(function (this: CanvasRenderingContext2D) {
+        alphas.push(this.globalAlpha);
+      }),
+      fillStyle: "",
+      globalAlpha: 1,
+    } as unknown as CanvasRenderingContext2D;
+
+    renderVoxelMatrix(ctx, 200, 200, engine, palette, { reducedMotion: true });
+    expect(alphas.every((a) => a === 1)).toBe(true);
+
+    alphas.length = 0;
+    engine.pushOnset(1);
+    renderVoxelMatrix(ctx, 200, 200, engine, palette, { reducedMotion: true });
+    // 3 bass rows (30% of 10) × 4 lit columns drawn translucent.
+    expect(alphas.filter((a) => a < 1)).toHaveLength(12);
+    expect(ctx.globalAlpha).toBe(1);
+  });
+});
+
 describe("voxel preset (#2245)", () => {
   function fakeCtx() {
     return {
