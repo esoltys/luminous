@@ -5,7 +5,6 @@ import SettingsSystem from "./SettingsSystem.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { prefs } from "../stores/prefs.svelte";
 import { i18n } from "../stores/i18n.svelte";
-import { updaterStore } from "../stores/updater.svelte";
 import { flushSync } from "svelte";
 
 const platform = vi.hoisted(() => ({ isWindows: false, isLinux: false }));
@@ -90,12 +89,6 @@ describe("SettingsSystem.svelte", () => {
     i18n.currentLocale = "en-CA";
   });
 
-  it("renders the version number and build commit hash", async () => {
-    const { findByText } = render(SettingsSystem);
-    expect(await findByText(/v0\.75\.0/)).toBeInTheDocument();
-    expect(await findByText(/build 048f421/)).toBeInTheDocument();
-  });
-
   it("reflects prefs.autostartEnabled and calls set_autostart_enabled on toggle", async () => {
     prefs.autostartEnabled = false;
     const { findByRole } = render(SettingsSystem);
@@ -121,33 +114,8 @@ describe("SettingsSystem.svelte", () => {
     platform.isWindows = false;
     const { findByText, queryByText } = render(SettingsSystem);
 
-    await findByText(/v0\.75\.0/);
+    await findByText("Launch at login");
     expect(queryByText("Make Luminous the default music player")).not.toBeInTheDocument();
-  });
-
-  it("pops the up-to-date check after a manual Check for Updates (#1239)", async () => {
-    vi.spyOn(updaterStore, "checkForUpdates").mockImplementation(async () => {
-      updaterStore.checkStatus = "up-to-date";
-    });
-    updaterStore.checkStatus = "idle";
-    const { findByRole, container } = render(SettingsSystem);
-
-    await fireEvent.click(await findByRole("button", { name: "Check for Updates" }));
-
-    await vi.waitFor(() => expect(container.querySelector(".anim-check-pop")).not.toBeNull());
-  });
-
-  it("does not pop the check when a background check comes back up-to-date (#1239)", async () => {
-    updaterStore.checkStatus = "idle";
-    const { findByText, container } = render(SettingsSystem);
-    await findByText(/v0\.75\.0/);
-
-    updaterStore.checkStatus = "checking";
-    flushSync();
-    updaterStore.checkStatus = "up-to-date";
-    flushSync();
-
-    expect(container.querySelector(".anim-check-pop")).toBeNull();
   });
 
   it("renders the audio output settings card with devices", async () => {

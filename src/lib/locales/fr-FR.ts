@@ -702,7 +702,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     tabAbout: "À propos",
     aboutTitle: "À propos de Luminous",
     aboutAppName: "Lecteur de musique Luminous",
-    aboutTagline: "Un foyer haute performance pour la musique que vous possédez déjà.",
+    aboutTagline: "Votre foyer personnel pour la musique que vous possédez déjà.",
     aboutLicense: "Licence MIT",
     copyVersionHint: "Cliquez pour copier la version dans le presse-papiers",
     copiedLabel: "Copié !",

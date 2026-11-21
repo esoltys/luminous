@@ -774,7 +774,7 @@ export const ru = {
     tabAbout: "О программе и благодарности",
     aboutTitle: "О Luminous",
     aboutAppName: "Luminous Music Player",
-    aboutTagline: "Быстрый дом для музыки, которая у вас уже есть.",
+    aboutTagline: "Ваш личный дом для музыки, которая у вас уже есть.",
     aboutLicense: "Лицензия MIT",
     copyVersionHint: "Нажмите, чтобы скопировать версию в буфер обмена",
     copiedLabel: "Скопировано!",

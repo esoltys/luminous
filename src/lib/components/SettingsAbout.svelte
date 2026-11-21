@@ -9,6 +9,7 @@
     RedditLogoIcon as Reddit,
     BugIcon as Bug,
   } from "phosphor-svelte";
+  import SettingsUpdatesCard from "./SettingsUpdatesCard.svelte";
 </script>
 
 <div class="space-y-6 max-w-4xl">
@@ -43,6 +44,8 @@
       </p>
     </div>
   </div>
+
+  <SettingsUpdatesCard />
 
   <div class="grid grid-cols-1 @3xl:grid-cols-3 gap-4">
     <button
