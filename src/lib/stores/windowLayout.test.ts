@@ -165,14 +165,16 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
       vi.advanceTimersByTime(1);
       expect(windowLayoutStore.isImmersiveDockHidden).toBe(true);
 
-      // 2. Moving pointer into the dock area pops it back up and restarts the 2.5s countdown
-      windowLayoutStore.revealImmersiveDock();
+      // 2. While the cursor rests inside the dock area, the playbar stays visible indefinitely;
+      // leaving the dock area restarts the 2.5s countdown.
+      windowLayoutStore.setImmersiveDockHovered(true);
       expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
-      vi.advanceTimersByTime(1500);
-      windowLayoutStore.revealImmersiveDock();
-      vi.advanceTimersByTime(1500);
+      vi.advanceTimersByTime(10000);
       expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
-      vi.advanceTimersByTime(1000);
+      windowLayoutStore.setImmersiveDockHovered(false);
+      vi.advanceTimersByTime(2499);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(1);
       expect(windowLayoutStore.isImmersiveDockHidden).toBe(true);
 
       // 3. Holding the dock (e.g. pointer drag on seek/volume) reveals it and prevents hiding until released

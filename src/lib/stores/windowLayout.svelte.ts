@@ -39,6 +39,7 @@ class WindowLayoutStore {
   immersiveDockHidden = $state<boolean>(false);
   static readonly IMMERSIVE_DOCK_HIDE_DELAY_MS = 2500;
   private immersiveDockHeld = false;
+  private immersiveDockHovered = false;
   private immersiveDockHideTimer: ReturnType<typeof setTimeout> | null = null;
   isFullscreen = $state<boolean>(false);
   isMiniplayer = $state<boolean>(
@@ -209,18 +210,18 @@ class WindowLayoutStore {
 
   scheduleImmersiveDockHide() {
     this.clearImmersiveDockTimer();
-    if (!this.effectiveImmersiveMode || this.immersiveDockHeld) return;
+    if (!this.effectiveImmersiveMode || this.immersiveDockHeld || this.immersiveDockHovered) return;
     this.immersiveDockHideTimer = setTimeout(() => {
       this.immersiveDockHideTimer = null;
-      if (this.effectiveImmersiveMode && !this.immersiveDockHeld) {
+      if (this.effectiveImmersiveMode && !this.immersiveDockHeld && !this.immersiveDockHovered) {
         this.immersiveDockHidden = true;
       }
     }, WindowLayoutStore.IMMERSIVE_DOCK_HIDE_DELAY_MS);
   }
 
   /**
-   * Reveals the floating PlayerBar dock in immersive mode (e.g. when the pointer
-   * moves into the bottom dock zone) and restarts the auto-hide countdown.
+   * Reveals the floating PlayerBar dock in immersive mode and starts the
+   * auto-hide timer (unless the cursor is currently resting inside the dock).
    */
   revealImmersiveDock() {
     this.immersiveDockHidden = false;
@@ -232,8 +233,23 @@ class WindowLayoutStore {
   }
 
   /**
+   * Tracks whether the pointer is resting inside the playerbar area. While
+   * hovered, the playbar stays visible indefinitely; leaving starts the hide countdown.
+   */
+  setImmersiveDockHovered(hovered: boolean) {
+    if (this.immersiveDockHovered === hovered && (!hovered || !this.immersiveDockHidden)) return;
+    this.immersiveDockHovered = hovered;
+    if (hovered) {
+      this.immersiveDockHidden = false;
+      this.clearImmersiveDockTimer();
+    } else if (this.effectiveImmersiveMode) {
+      this.scheduleImmersiveDockHide();
+    }
+  }
+
+  /**
    * Holds the immersive dock visible while an interaction (pointer drag) is active;
-   * releasing the hold restarts the auto-hide timer.
+   * releasing the hold restarts the auto-hide timer if the pointer is no longer hovering.
    */
   setImmersiveDockHeld(held: boolean) {
     this.immersiveDockHeld = held;
@@ -255,6 +271,8 @@ class WindowLayoutStore {
   exitImmersiveMode() {
     this.clearImmersiveDockTimer();
     this.immersiveDockHidden = false;
+    this.immersiveDockHovered = false;
+    this.immersiveDockHeld = false;
     if (!this.immersiveMode) return;
     this.immersiveMode = false;
     if (typeof window !== "undefined") {

@@ -409,9 +409,8 @@
 
     const handleImmersivePointerMove = (e: PointerEvent) => {
       if (!windowLayoutStore.effectiveImmersiveMode) return;
-      if (e.clientY >= window.innerHeight - PLAYER_DOCK_CONTENT_RESERVE_PX) {
-        revealImmersiveDock();
-      }
+      const inDockZone = e.clientY >= window.innerHeight - PLAYER_DOCK_CONTENT_RESERVE_PX;
+      windowLayoutStore.setImmersiveDockHovered(inDockZone);
     };
 
     window.addEventListener("keydown", handleGlobalHotkeys);
@@ -731,8 +730,9 @@
         <div
           class="absolute inset-x-4 bottom-4 z-40"
           data-testid="player-dock-zone"
-          onpointerenter={revealImmersiveDock}
-          onpointermove={revealImmersiveDock}
+          onpointerenter={() => windowLayoutStore.setImmersiveDockHovered(true)}
+          onpointermove={() => windowLayoutStore.setImmersiveDockHovered(true)}
+          onpointerleave={() => windowLayoutStore.setImmersiveDockHovered(false)}
           onpointerdown={handleDockPointerDown}
           onfocusin={revealImmersiveDock}
         >
