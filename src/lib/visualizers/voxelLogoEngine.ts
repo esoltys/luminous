@@ -179,8 +179,9 @@ export interface VoxelLogoPalette {
 
 /**
  * Builds the logo's fills against the surface it's drawn on (`bg-playerbar` for the playbar
- * slot, `bg-main` for the stage): rim in the accent, ring in accent-hover, burst near white,
- * each contrast-clamped, and the disc as the mark's dark silhouette.
+ * slot, `bg-main` for the stage): rim and glow in the accent, ring in accent-hover (the colours
+ * the reactive logo uses while playing), burst near white, each contrast-clamped, and the disc as
+ * the mark's dark silhouette.
  */
 export function buildVoxelLogoPalette(
   colors: ThemeColors,
