@@ -93,9 +93,10 @@
   let dockGlowSvg = $derived.by(() =>
     generateEllipseGradientSvg({
       colors: dockGlowColors,
-      layersPerColor: 2,
+      layersPerColor: 3,
       seed: playerStore.currentSong?.id ?? "dock-glow",
       saturation: null,
+      baseRect: false,
     }),
   );
   let dockRimGlow = $derived(
@@ -427,7 +428,7 @@
          over Queue/Album BlurredCover tables. Keyed on song + resolved colors
          so it cross-fades smoothly once artwork extraction finishes. -->
     <div
-      class="dock-glow-wrapper pointer-events-none select-none absolute -inset-x-8 -inset-y-7 rounded-full overflow-hidden z-0"
+      class="dock-glow-wrapper pointer-events-none select-none absolute -inset-8 rounded-full overflow-hidden z-0"
       style:opacity={dockGlowOpacity(isDarkTheme)}
       aria-hidden="true"
     >
@@ -851,77 +852,55 @@
 {/if}
 
 <style>
-  /* Capsule-shaped outer falloff: Gaussian-eased multi-stop gradients peak near
-     the dock rim and taper asymptotically to zero before reaching the wrapper
-     boundary so the glow's outer limits never show a visible edge or seam. */
+  /* True concentric capsule distance-field mask around the 80px-tall pill dock
+     with 32px (-inset-8) bleed (total height 144px, cap radius R = 72px):
+     - Left cap (0..72px): radial-gradient centered at (72px, 50%)
+     - Center span (72px..calc(100% - 72px)): matching symmetric vertical gradient
+     - Right cap (calc(100% - 72px)..100%): radial-gradient centered at (0px, 50%)
+     Peaks gently at the pill border (r = 40px / 54% of R) and decays with a
+     Gaussian tail to 0 before reaching r = 72px, eliminating rectangular corners
+     and any visible outer boundary. */
   .dock-glow-wrapper {
-    --dock-glow-outer-mask:
-      linear-gradient(
-        to right,
-        transparent 0%,
-        rgba(0, 0, 0, 0.02) 8px,
-        rgba(0, 0, 0, 0.12) 18px,
-        rgba(0, 0, 0, 0.38) 30px,
-        rgba(0, 0, 0, 0.72) 44px,
-        rgba(0, 0, 0, 0.94) 58px,
-        black 72px,
-        black calc(100% - 72px),
-        rgba(0, 0, 0, 0.94) calc(100% - 58px),
-        rgba(0, 0, 0, 0.72) calc(100% - 44px),
-        rgba(0, 0, 0, 0.38) calc(100% - 30px),
-        rgba(0, 0, 0, 0.12) calc(100% - 18px),
-        rgba(0, 0, 0, 0.02) calc(100% - 8px),
-        transparent 100%
-      ),
-      linear-gradient(
-        to bottom,
-        transparent 0%,
-        rgba(0, 0, 0, 0.02) 6%,
-        rgba(0, 0, 0, 0.1) 12%,
-        rgba(0, 0, 0, 0.28) 18%,
-        rgba(0, 0, 0, 0.56) 24%,
-        rgba(0, 0, 0, 0.84) 31%,
-        black 38%,
-        black 62%,
-        rgba(0, 0, 0, 0.84) 69%,
-        rgba(0, 0, 0, 0.56) 76%,
-        rgba(0, 0, 0, 0.28) 82%,
-        rgba(0, 0, 0, 0.1) 88%,
-        rgba(0, 0, 0, 0.02) 94%,
-        transparent 100%
-      );
-    -webkit-mask-image: var(--dock-glow-outer-mask);
-    -webkit-mask-composite: source-in;
-    mask-image: var(--dock-glow-outer-mask);
-    mask-composite: intersect;
+    --dock-glow-radial-stops:
+      rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.15) 46%, rgba(0, 0, 0, 0.78) 54%,
+      rgba(0, 0, 0, 0.54) 62%, rgba(0, 0, 0, 0.32) 70%, rgba(0, 0, 0, 0.16) 78%,
+      rgba(0, 0, 0, 0.06) 86%, rgba(0, 0, 0, 0.015) 93%, transparent 100%;
+    --dock-glow-linear-stops:
+      transparent 0%, rgba(0, 0, 0, 0.015) 3.5%, rgba(0, 0, 0, 0.06) 7%, rgba(0, 0, 0, 0.16) 11%,
+      rgba(0, 0, 0, 0.32) 15%, rgba(0, 0, 0, 0.54) 19%, rgba(0, 0, 0, 0.78) 23%,
+      rgba(0, 0, 0, 0.15) 27%, rgba(0, 0, 0, 0.15) 73%, rgba(0, 0, 0, 0.78) 77%,
+      rgba(0, 0, 0, 0.54) 81%, rgba(0, 0, 0, 0.32) 85%, rgba(0, 0, 0, 0.16) 89%,
+      rgba(0, 0, 0, 0.06) 93%, rgba(0, 0, 0, 0.015) 96.5%, transparent 100%;
+    -webkit-mask-image:
+      radial-gradient(72px 72px at 72px 50%, var(--dock-glow-radial-stops)),
+      linear-gradient(to bottom, var(--dock-glow-linear-stops)),
+      radial-gradient(72px 72px at 0px 50%, var(--dock-glow-radial-stops));
+    -webkit-mask-size:
+      72px 100%,
+      calc(100% - 144px) 100%,
+      72px 100%;
+    -webkit-mask-position:
+      left top,
+      72px top,
+      right top;
+    -webkit-mask-repeat: no-repeat;
+    mask-image:
+      radial-gradient(72px 72px at 72px 50%, var(--dock-glow-radial-stops)),
+      linear-gradient(to bottom, var(--dock-glow-linear-stops)),
+      radial-gradient(72px 72px at 0px 50%, var(--dock-glow-radial-stops));
+    mask-size:
+      72px 100%,
+      calc(100% - 144px) 100%,
+      72px 100%;
+    mask-position:
+      left top,
+      72px top,
+      right top;
+    mask-repeat: no-repeat;
   }
 
-  /* Soften the center behind <footer> while letting the halo peak gently
-     around the pill's perimeter and fade outward smoothly. */
   .dock-glow-cutout {
-    --dock-glow-cutout-mask:
-      linear-gradient(
-        to right,
-        rgba(0, 0, 0, 0.75) 0%,
-        rgba(0, 0, 0, 0.95) 28px,
-        rgba(0, 0, 0, 0.12) 64px,
-        rgba(0, 0, 0, 0.12) calc(100% - 64px),
-        rgba(0, 0, 0, 0.95) calc(100% - 28px),
-        rgba(0, 0, 0, 0.75) 100%
-      ),
-      linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0.75) 0%,
-        rgba(0, 0, 0, 0.95) 22px,
-        rgba(0, 0, 0, 0.12) 48px,
-        rgba(0, 0, 0, 0.12) calc(100% - 48px),
-        rgba(0, 0, 0, 0.95) calc(100% - 22px),
-        rgba(0, 0, 0, 0.75) 100%
-      );
-    -webkit-mask-image: var(--dock-glow-cutout-mask);
-    -webkit-mask-composite: source-over;
-    mask-image: var(--dock-glow-cutout-mask);
-    mask-composite: add;
+    /* Distance-field mask on .dock-glow-wrapper already attenuates the interior. */
   }
 
   .dock-glow-svg :global(svg) {
