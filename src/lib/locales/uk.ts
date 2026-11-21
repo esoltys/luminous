@@ -460,7 +460,7 @@ export const uk = {
     fileFilterPlaylists: "Плейлисти",
     goBack: "Назад",
     goForward: "Уперед",
-    searchPlaceholder: "Пошук і фільтр… (Ctrl+L)",
+    searchPlaceholder: "Пошук і фільтр… (Ctrl+F)",
     open: "Відкрити…",
     openFilesTooltip: "Відкрити аудіофайли або списки відтворення (*.m3u)",
     openFilesTitle: "Відкрити аудіофайли або списки відтворення",

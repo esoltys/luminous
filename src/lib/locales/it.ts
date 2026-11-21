@@ -404,7 +404,7 @@ export const it = {
     fileFilterPlaylists: "Playlist",
     goBack: "Indietro",
     goForward: "Avanti",
-    searchPlaceholder: "Cerca e filtra... (Ctrl+L)",
+    searchPlaceholder: "Cerca e filtra... (Ctrl+F)",
     open: "Apri…",
     openFilesTooltip: "Apri file audio o playlist (*.m3u)",
     openFilesTitle: "Apri file audio o playlist",
