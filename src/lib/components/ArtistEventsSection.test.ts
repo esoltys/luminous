@@ -75,7 +75,7 @@ describe("ArtistEventsSection", () => {
     expect(handleOpenUrl).toHaveBeenCalledWith("https://tickets.example.com/london");
   });
 
-  it("displays no events message when upcoming list is empty", () => {
+  it("renders nothing when events list is empty and not loading", () => {
     const { container } = render(ArtistEventsSection, {
       props: {
         events: [],
@@ -83,6 +83,19 @@ describe("ArtistEventsSection", () => {
       },
     });
 
+    expect(screen.queryByText("Upcoming Concerts & Events")).toBeNull();
+    expect(container.textContent?.trim()).toBe("");
+  });
+
+  it("displays no upcoming concerts message when only past events exist", () => {
+    render(ArtistEventsSection, {
+      props: {
+        events: [sampleEvents[1]],
+        artistName: "Radiohead",
+      },
+    });
+
+    expect(screen.getByText("Upcoming Concerts & Events")).toBeTruthy();
     expect(screen.getByText("No upcoming concerts found")).toBeTruthy();
   });
 
