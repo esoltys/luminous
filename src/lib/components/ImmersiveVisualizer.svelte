@@ -26,7 +26,9 @@
 >
   {#if playerStore.currentSong}
     <!-- Compact Song Context Header: Now playing pill sits above the heading, while the square
-         album artwork spans from the cap-top of the heading to the descender-bottom of the artist line. -->
+         album artwork spans from the cap-top of the heading to the descender-bottom of the artist line.
+         The leading-none truncated lines carry pb/-mb 0.2em so their overflow clip box reaches below
+         the 1em line box and descenders (g, y, p) are not cut off, without changing the layout. -->
     <div class="flex items-end gap-4 px-1">
       <button
         type="button"
@@ -59,7 +61,7 @@
           class="flex flex-col min-w-0"
         >
           <h1
-            class="text-2xl md:text-3xl font-heading font-bold text-brand-text-primary leading-none -mt-[0.12em] tracking-tight truncate select-text"
+            class="text-2xl md:text-3xl font-heading font-bold text-brand-text-primary leading-none -mt-[0.12em] pb-[0.2em] -mb-[0.2em] tracking-tight truncate select-text"
           >
             {playerStore.currentSongDisplayTitle}
           </h1>
@@ -73,7 +75,7 @@
           <p
             class="{playerStore.currentSong.album?.trim()
               ? 'mt-1'
-              : 'mt-1.5'} text-xs md:text-sm text-brand-text-secondary/70 font-medium leading-none truncate select-text"
+              : 'mt-1.5'} text-xs md:text-sm text-brand-text-secondary/70 font-medium leading-none pb-[0.2em] -mb-[0.2em] truncate select-text"
           >
             {playerStore.currentSongDisplaySubtitle}
           </p>
