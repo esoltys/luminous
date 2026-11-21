@@ -33,6 +33,7 @@ class WindowLayoutStore {
   lastExpandedSidebarWidth = $state<number>(256);
   rightPanelWidth = $state<number>(288);
   immersiveMode = $state<boolean>(false);
+  isFullscreen = $state<boolean>(false);
   isMiniplayer = $state<boolean>(
     typeof window !== "undefined" && localStorage.getItem("layout_isMiniplayer") === "true",
   );
@@ -41,6 +42,7 @@ class WindowLayoutStore {
   // guards is async, so a second toggle fired before that call resolves
   // could apply a stale target size on top of an in-progress one.
   private miniplayerTransitionInFlight = false;
+  private fullscreenTransitionInFlight = false;
   // Debounce for the settled-geometry capture below: only commit a size/
   // position once resize/move events stop firing for this long, so a mode
   // toggle's own programmatic resize/reposition never gets captured as "the
@@ -129,6 +131,8 @@ class WindowLayoutStore {
       const savedIsMiniplayer = localStorage.getItem("layout_isMiniplayer");
       if (savedIsMiniplayer === "true") {
         void this.enterMiniplayerMode(true);
+      } else {
+        void this.syncFullscreenFromWindow();
       }
     }
   }
@@ -214,6 +218,9 @@ class WindowLayoutStore {
 
   async enterMiniplayerMode(force = false) {
     if ((this.isMiniplayer && !force) || this.miniplayerTransitionInFlight) return;
+    if (this.isFullscreen) {
+      await this.setFullscreenMode(false);
+    }
     this.miniplayerTransitionInFlight = true;
     this.isMiniplayer = true;
     if (typeof window !== "undefined") {
@@ -306,8 +313,22 @@ class WindowLayoutStore {
     window.addEventListener("resize", update);
   }
 
+  private async syncFullscreenFromWindow() {
+    if (this.fullscreenTransitionInFlight) return;
+    try {
+      const win = getCurrentWindow();
+      if (typeof win.isFullscreen === "function") {
+        this.isFullscreen = await win.isFullscreen();
+      }
+    } catch {
+      // Ignore in environments without a Tauri window runtime.
+    }
+  }
+
   private async captureCurrentWindowGeometry() {
-    if (this.miniplayerTransitionInFlight) return;
+    if (this.miniplayerTransitionInFlight || this.fullscreenTransitionInFlight) return;
+    await this.syncFullscreenFromWindow();
+    if (this.isFullscreen) return;
     try {
       const geo = await invoke<{
         width: number;
@@ -340,6 +361,33 @@ class WindowLayoutStore {
     } else {
       await this.enterMiniplayerMode();
     }
+  }
+
+  /**
+   * Transitions the main window into or out of fullscreen mode.
+   * Exits miniplayer mode first if active, and suppresses geometry capture
+   * while fullscreen or transitioning so monitor dimensions do not overwrite
+   * saved windowed geometry.
+   */
+  async setFullscreenMode(enabled: boolean): Promise<void> {
+    if (this.isFullscreen === enabled || this.fullscreenTransitionInFlight) return;
+    if (enabled && this.isMiniplayer) {
+      await this.exitMiniplayerMode();
+    }
+    this.fullscreenTransitionInFlight = true;
+    this.isFullscreen = enabled;
+    try {
+      await getCurrentWindow().setFullscreen(enabled);
+    } catch (e) {
+      console.warn("Failed to set fullscreen window mode:", e);
+    } finally {
+      this.fullscreenTransitionInFlight = false;
+    }
+  }
+
+  /** Toggles the main window between windowed and fullscreen mode. */
+  async toggleFullscreenMode(): Promise<void> {
+    await this.setFullscreenMode(!this.isFullscreen);
   }
 
   // "Show or hide the info sidebar" (Ctrl+I, the player bar button, the tour).

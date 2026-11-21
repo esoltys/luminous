@@ -60,6 +60,8 @@
     WaveformIcon as AudioWaveform,
     PaletteIcon as Palette,
     PictureInPictureIcon as PictureInPicture,
+    CornersOutIcon as CornersOut,
+    CornersInIcon as CornersIn,
     SlidersIcon as Sliders,
     GaugeIcon as Gauge,
     DiscIcon as DiscAlbum,
@@ -785,6 +787,14 @@
         label={i18n.t("playerBar.menuMiniplayer", {}, "Mini-player")}
         shortcut={`${ctrlKey}+Shift+M`}
         onclick={() => chooseMenuItem(() => windowLayoutStore.toggleMiniplayerMode())}
+      />
+      <ContextMenuItem
+        icon={windowLayoutStore.isFullscreen ? CornersIn : CornersOut}
+        label={windowLayoutStore.isFullscreen
+          ? i18n.t("playerBar.menuExitFullscreen", {}, "Exit fullscreen")
+          : i18n.t("playerBar.menuFullscreen", {}, "Fullscreen")}
+        shortcut={`${ctrlKey}+Shift+F`}
+        onclick={() => chooseMenuItem(() => windowLayoutStore.toggleFullscreenMode())}
       />
       {#if !windowLayoutStore.isPlayerBarCompact}
         <ContextMenuItem

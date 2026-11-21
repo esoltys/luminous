@@ -414,6 +414,26 @@ describe("PlayerBar.svelte", () => {
     expect(toggleSpy).toHaveBeenCalled();
   });
 
+  it("lists Fullscreen with its Ctrl+Shift+F shortcut in the song menu and reflects isFullscreen", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.isFullscreen = false;
+    const toggleSpy = vi
+      .spyOn(windowLayoutStore, "toggleFullscreenMode")
+      .mockImplementation(async () => {});
+    const utils = render(PlayerBar);
+
+    await fireEvent.click(utils.getByTitle("Song menu"));
+    expect(utils.getByText("Ctrl+Shift+F")).toBeInTheDocument();
+
+    await fireEvent.click(utils.getByText("Fullscreen"));
+    expect(toggleSpy).toHaveBeenCalled();
+
+    windowLayoutStore.isFullscreen = true;
+    await fireEvent.click(utils.getByTitle("Song menu"));
+    expect(utils.getByText("Exit fullscreen")).toBeInTheDocument();
+    windowLayoutStore.isFullscreen = false;
+  });
+
   it("handles mute toggle correctly", async () => {
     playerStore.volume = 0.8;
     const volSpy = vi.spyOn(playerStore, "setVolume").mockImplementation(async (v) => {
@@ -663,6 +683,26 @@ describe("PlayerBar.svelte", () => {
 
     await fireEvent.click(utils.getByText("Mini-player"));
     expect(toggleSpy).toHaveBeenCalled();
+  });
+
+  it("lists Fullscreen with its Ctrl+Shift+F shortcut in the song menu and reflects isFullscreen", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.isFullscreen = false;
+    const toggleSpy = vi
+      .spyOn(windowLayoutStore, "toggleFullscreenMode")
+      .mockImplementation(async () => {});
+    const utils = render(PlayerBar);
+
+    await fireEvent.click(utils.getByTitle("Song menu"));
+    expect(utils.getByText("Ctrl+Shift+F")).toBeInTheDocument();
+
+    await fireEvent.click(utils.getByText("Fullscreen"));
+    expect(toggleSpy).toHaveBeenCalled();
+
+    windowLayoutStore.isFullscreen = true;
+    await fireEvent.click(utils.getByTitle("Song menu"));
+    expect(utils.getByText("Exit fullscreen")).toBeInTheDocument();
+    windowLayoutStore.isFullscreen = false;
   });
 
   it("lists Equalizer with its Ctrl+Shift+E shortcut in the song menu", async () => {
