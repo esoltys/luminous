@@ -2,7 +2,15 @@
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
   import { themeStore } from "../stores/theme.svelte";
+  import { clampForContrast } from "../utils/colorUtils";
   import { acquireSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
+  import {
+    buildVoxelThemePalette,
+    renderStaticVoxelPreview,
+    type VoxelThemePalette,
+  } from "../utils/visualizerEngine";
+
+  let { preview = false }: { preview?: boolean } = $props();
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let unlisten: (() => void) | null = null;
@@ -13,6 +21,7 @@
   let pendingFrame = 0;
   let accentColor = "#8b5cf6";
   let hoverColor = "#a78bfa";
+  let previewPalette: VoxelThemePalette = buildVoxelThemePalette(themeStore.resolvedColors, 6);
 
   function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
     const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
@@ -42,6 +51,11 @@
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       ctx.scale(dpr, dpr);
+    }
+
+    if (preview) {
+      renderStaticVoxelPreview(ctx, width, height, previewPalette);
+      return;
     }
 
     ctx.clearRect(0, 0, width, height);
@@ -88,8 +102,13 @@
 
   $effect(() => {
     const colors = themeStore.resolvedColors;
-    accentColor = colors["color-accent"] || "#8b5cf6";
-    hoverColor = colors["color-accent-hover"] || "#a78bfa";
+    const surfaceBg = colors["bg-playerbar"] || colors["bg-main"] || "#191918";
+    accentColor = clampForContrast(colors["color-accent"] || "#8b5cf6", surfaceBg, 3.0);
+    hoverColor = clampForContrast(colors["color-accent-hover"] || "#a78bfa", surfaceBg, 3.0);
+    previewPalette = buildVoxelThemePalette(colors, 6);
+    // Reading `preview` subscribes the effect so toggling between live and
+    // static preview mode repaints immediately.
+    void preview;
     scheduleDraw();
   });
 
@@ -107,7 +126,9 @@
     try {
       unlisten = await listen<number[]>("spectrum-data", (event) => {
         spectrumData = event.payload;
-        if (typeof document === "undefined" || !document.hidden) {
+        // When the immersive visualizer is active (`preview === true`), the
+        // dock shows a static voxel preview and skips per-frame canvas draws.
+        if (!preview && (typeof document === "undefined" || !document.hidden)) {
           scheduleDraw();
         }
       });
@@ -130,5 +151,6 @@
 
 <canvas
   bind:this={canvas}
-  class="w-full h-full opacity-85 hover:opacity-100 transition-opacity duration-300"
+  data-preview={preview ? "true" : "false"}
+  class="w-full h-full opacity-85 group-hover:opacity-100 hover:opacity-100 transition-opacity duration-200"
 ></canvas>

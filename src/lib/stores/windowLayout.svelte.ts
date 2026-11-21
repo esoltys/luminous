@@ -11,6 +11,8 @@ import {
   HEIGHT_BREAKPOINT_SHORT_PX,
 } from "../constants";
 
+type ImmersiveView = "cover" | "visualizer";
+
 class WindowLayoutStore {
   // Layout panel states
   sidebarOpen = $state<boolean>(true);
@@ -33,6 +35,7 @@ class WindowLayoutStore {
   lastExpandedSidebarWidth = $state<number>(256);
   rightPanelWidth = $state<number>(288);
   immersiveMode = $state<boolean>(false);
+  immersiveView = $state<ImmersiveView>("cover");
   isFullscreen = $state<boolean>(false);
   isMiniplayer = $state<boolean>(
     typeof window !== "undefined" && localStorage.getItem("layout_isMiniplayer") === "true",
@@ -97,6 +100,11 @@ class WindowLayoutStore {
       const savedImmersive = localStorage.getItem("layout_immersiveMode");
       if (savedImmersive !== null) this.immersiveMode = savedImmersive === "true";
 
+      const savedImmersiveView = localStorage.getItem("layout_immersiveView");
+      if (savedImmersiveView === "cover" || savedImmersiveView === "visualizer") {
+        this.immersiveView = savedImmersiveView;
+      }
+
       const savedWindowWidthStr = localStorage.getItem("layout_savedWindowWidth");
       if (savedWindowWidthStr) this.savedWindowWidth = parseInt(savedWindowWidthStr, 10);
 
@@ -153,10 +161,31 @@ class WindowLayoutStore {
     }
   }
 
-  toggleImmersiveMode() {
+  /**
+   * Toggles immersive mode or switches between immersive views ("cover" vs "visualizer").
+   * - If `view` is omitted: flips `immersiveMode` on/off, preserving the current `immersiveView`.
+   * - If `view` is provided while not in immersive mode: enters immersive mode showing `view`.
+   * - If `view` is provided while already in immersive mode: exits immersive mode if `immersiveView === view`,
+   *   or switches `immersiveView` to `view` in place if showing a different view.
+   */
+  toggleImmersiveMode(view?: ImmersiveView) {
+    if (view !== undefined) {
+      if (this.immersiveMode && this.immersiveView !== view) {
+        this.setImmersiveView(view);
+        return;
+      }
+      this.setImmersiveView(view);
+    }
     this.immersiveMode = !this.immersiveMode;
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_immersiveMode", this.immersiveMode.toString());
+    }
+  }
+
+  setImmersiveView(view: ImmersiveView) {
+    this.immersiveView = view;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_immersiveView", view);
     }
   }
 

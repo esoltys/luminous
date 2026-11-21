@@ -13,6 +13,7 @@
   import CoverArt from "../lib/components/CoverArt.svelte";
   import Miniplayer from "../lib/components/Miniplayer.svelte";
   import ImmersiveSessionWrap from "../lib/components/ImmersiveSessionWrap.svelte";
+  import ImmersiveVisualizer from "../lib/components/ImmersiveVisualizer.svelte";
   import KeyboardShortcutsModal from "../lib/components/KeyboardShortcutsModal.svelte";
   import Toast from "../lib/components/Toast.svelte";
   import SongDragGhost from "../lib/components/SongDragGhost.svelte";
@@ -606,58 +607,66 @@
               {/key}
             {/if}
 
-            <!-- Center Container: Card and Details. Below md, the layout would
-               stack the text under the cover art — at that point it's just
-               clutter (the floating PlayerBar dock repeats the same info),
-               so it's hidden and the cover art stands alone. At md+, where
-               there's room to sit it beside the art instead, it stays. -->
+            <!-- Center Container: Card and Details (or Immersive Visualizer Stage).
+               Below md, the cover-view layout would stack the text under the cover
+               art — at that point it's just clutter (the floating PlayerBar dock
+               repeats the same info), so it's hidden and the cover art stands
+               alone. At md+, where there's room to sit it beside the art instead,
+               it stays. -->
             <div
-              class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-4xl w-full justify-center"
+              class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-5xl w-full h-full justify-center"
             >
               {#if playerStore.currentSong}
-                <!-- Floating Cover Art Frame -->
-                <div
-                  class="w-56 h-56 xs:w-72 xs:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-200 bg-brand-sidebar flex items-center justify-center relative select-none"
-                >
-                  <CoverArt
-                    songId={playerStore.currentSong?.id}
-                    artEmbedded={playerStore.currentSong?.art_embedded}
-                    artAutomatic={playerStore.currentSong?.art_automatic}
-                    artManual={playerStore.currentSong?.art_manual}
-                    sizeClass="w-full h-full"
-                    fullResolution
-                    contain={isLiveSong(playerStore.currentSong)}
+                {#if windowLayoutStore.immersiveView === "visualizer"}
+                  <ImmersiveVisualizer
+                    active={windowLayoutStore.effectiveImmersiveMode &&
+                      windowLayoutStore.immersiveView === "visualizer"}
                   />
-                </div>
+                {:else}
+                  <!-- Floating Cover Art Frame -->
+                  <div
+                    class="w-56 h-56 xs:w-72 xs:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-200 bg-brand-sidebar flex items-center justify-center relative select-none"
+                  >
+                    <CoverArt
+                      songId={playerStore.currentSong?.id}
+                      artEmbedded={playerStore.currentSong?.art_embedded}
+                      artAutomatic={playerStore.currentSong?.art_automatic}
+                      artManual={playerStore.currentSong?.art_manual}
+                      sizeClass="w-full h-full"
+                      fullResolution
+                      contain={isLiveSong(playerStore.currentSong)}
+                    />
+                  </div>
 
-                <!-- Song Details Info: hidden below md, where it would stack
-                   under the cover art instead of sitting beside it. -->
-                <div class="hidden md:flex flex-col text-center md:text-left w-full max-w-md">
-                  <span
-                    class="label-heading self-start px-3 py-1 bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
-                  >
-                    {i18n.t("playerBar.nowPlaying")}
-                  </span>
-                  <h1
-                    class="mt-3 text-4xl md:text-6xl font-heading font-bold text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance"
-                  >
-                    {playerStore.currentSongDisplayTitle}
-                  </h1>
-                  {#if playerStore.currentSong.album?.trim()}
-                    <p
-                      class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold"
+                  <!-- Song Details Info: hidden below md, where it would stack
+                     under the cover art instead of sitting beside it. -->
+                  <div class="hidden md:flex flex-col text-center md:text-left w-full max-w-md">
+                    <span
+                      class="label-heading self-start px-3 py-1 bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
                     >
-                      {playerStore.currentSong.album}
+                      {i18n.t("playerBar.nowPlaying")}
+                    </span>
+                    <h1
+                      class="mt-3 text-4xl md:text-6xl font-heading font-bold text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance"
+                    >
+                      {playerStore.currentSongDisplayTitle}
+                    </h1>
+                    {#if playerStore.currentSong.album?.trim()}
+                      <p
+                        class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold"
+                      >
+                        {playerStore.currentSong.album}
+                      </p>
+                    {/if}
+                    <p
+                      class="{playerStore.currentSong.album?.trim()
+                        ? 'mt-0.5'
+                        : 'mt-3'} text-base md:text-lg text-brand-text-secondary/70 select-text font-medium"
+                    >
+                      {playerStore.currentSongDisplaySubtitle}
                     </p>
-                  {/if}
-                  <p
-                    class="{playerStore.currentSong.album?.trim()
-                      ? 'mt-0.5'
-                      : 'mt-3'} text-base md:text-lg text-brand-text-secondary/70 select-text font-medium"
-                  >
-                    {playerStore.currentSongDisplaySubtitle}
-                  </p>
-                </div>
+                  </div>
+                {/if}
               {:else if playerStore.completedSession}
                 <!-- Immersive Session Wrap Screen (#1380) -->
                 <ImmersiveSessionWrap session={playerStore.completedSession} />

@@ -247,6 +247,16 @@
     playerStore.currentSong ? i18n.t("playerBar.immersiveTitle", {}, "Immersive Mode") : "",
   );
 
+  let visualizerTitle = $derived(
+    playerStore.currentSong
+      ? i18n.t("playerBar.visualizerTooltip", {}, "Toggle audio visualizer")
+      : "",
+  );
+
+  let isImmersiveVisualizerActive = $derived(
+    windowLayoutStore.effectiveImmersiveMode && windowLayoutStore.immersiveView === "visualizer",
+  );
+
   // Cover art now only toggles Immersive View (#876) — navigating to the
   // Queue is the dedicated Queue button's job.
   function handleCoverClick(e: MouseEvent) {
@@ -258,7 +268,16 @@
     // this toggles, so leave it alone until the window widens back out.
     if (windowLayoutStore.isImmersiveForced) return;
 
-    windowLayoutStore.toggleImmersiveMode();
+    windowLayoutStore.toggleImmersiveMode("cover");
+  }
+
+  function handleVisualizerClick(e: MouseEvent) {
+    if (!playerStore.currentSong) return;
+    e.stopPropagation();
+
+    if (windowLayoutStore.isImmersiveForced) return;
+
+    windowLayoutStore.toggleImmersiveMode("visualizer");
   }
 
   // Locale-appropriate name of the Ctrl key ("Strg" in German), as the user guide writes it.
@@ -663,9 +682,21 @@
       >
         <div class="h-7 flex items-center gap-3">
           {#if !windowLayoutStore.isDockSpectrumHidden}
-            <div transition:collapseFade={{ duration: 250 }} class="w-24 h-7 block flex-shrink-0">
-              <SpectrumVisualizer />
-            </div>
+            <button
+              type="button"
+              transition:collapseFade={{ duration: 250 }}
+              onclick={handleVisualizerClick}
+              disabled={!playerStore.currentSong}
+              aria-pressed={isImmersiveVisualizerActive}
+              aria-label={i18n.t("playerBar.visualizerTooltip", {}, "Toggle audio visualizer")}
+              title={visualizerTitle}
+              data-testid="player-bar-visualizer-btn"
+              class="group w-24 h-7 px-1 py-0.5 rounded-md block flex-shrink-0 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-accent disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-all duration-200 {isImmersiveVisualizerActive
+                ? 'bg-brand-accent/15 ring-1 ring-brand-border'
+                : 'hover:bg-brand-accent/10'}"
+            >
+              <SpectrumVisualizer preview={isImmersiveVisualizerActive} />
+            </button>
           {/if}
           <button
             onclick={navigateToQueue}

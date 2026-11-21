@@ -114,6 +114,42 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
     expect(windowLayoutStore.immersiveMode).toBe(false);
   });
 
+  it("switches between cover and visualizer immersive views in place and toggles off when clicking the active view (#2236)", () => {
+    localStorage.clear();
+    windowLayoutStore.immersiveMode = false;
+    windowLayoutStore.setImmersiveView("cover");
+
+    // 1. Entering via visualizer from normal view opens immersive visualizer
+    windowLayoutStore.toggleImmersiveMode("visualizer");
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveView).toBe("visualizer");
+    expect(localStorage.getItem("layout_immersiveMode")).toBe("true");
+    expect(localStorage.getItem("layout_immersiveView")).toBe("visualizer");
+
+    // 2. Clicking cover while in immersive visualizer switches view in place without exiting immersive mode
+    windowLayoutStore.toggleImmersiveMode("cover");
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveView).toBe("cover");
+    expect(localStorage.getItem("layout_immersiveView")).toBe("cover");
+
+    // 3. Clicking visualizer while in immersive cover switches back to visualizer in place
+    windowLayoutStore.toggleImmersiveMode("visualizer");
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveView).toBe("visualizer");
+
+    // 4. Clicking visualizer again while already in immersive visualizer exits immersive mode
+    windowLayoutStore.toggleImmersiveMode("visualizer");
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+    expect(localStorage.getItem("layout_immersiveMode")).toBe("false");
+
+    // 5. Argument-less toggle (e.g. Ctrl+2 hotkey) flips immersiveMode while preserving the last immersiveView
+    windowLayoutStore.toggleImmersiveMode();
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveView).toBe("visualizer");
+    windowLayoutStore.toggleImmersiveMode();
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+  });
+
   it("derives responsive breakpoint flags from viewportWidth/viewportHeight without touching stored preferences", () => {
     windowLayoutStore.sidebarOpen = true;
     windowLayoutStore.setSidebarWidth(300);

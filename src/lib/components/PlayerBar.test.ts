@@ -67,6 +67,7 @@ describe("PlayerBar.svelte", () => {
     // "viewing the Queue" (or immersive mode) don't leak into later tests
     // via the shared collectionStore/playlistsStore singletons.
     windowLayoutStore.immersiveMode = false;
+    windowLayoutStore.setImmersiveView("cover");
     navigationStore.activeTab = "collection";
     navigationStore.playlistsSubTab = "custom";
     navigationStore.selectedPlaylistId = null;
@@ -201,6 +202,7 @@ describe("PlayerBar.svelte", () => {
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
     windowLayoutStore.immersiveMode = false;
+    windowLayoutStore.setImmersiveView("cover");
     navigationStore.activeTab = "collection";
 
     const toggleImmersiveModeSpy = vi.spyOn(windowLayoutStore, "toggleImmersiveMode");
@@ -228,6 +230,46 @@ describe("PlayerBar.svelte", () => {
 
     expect(toggleImmersiveModeSpy).toHaveBeenCalled();
     expect(windowLayoutStore.immersiveMode).toBe(false);
+  });
+
+  it("toggles the immersive visualizer view and switches the dock canvas to static preview mode when clicked (#2236)", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    windowLayoutStore.immersiveMode = false;
+    windowLayoutStore.setImmersiveView("cover");
+
+    const { getByTestId, getByTitle } = render(PlayerBar);
+    const visualizerBtn = getByTestId("player-bar-visualizer-btn");
+    const coverBtn = getByTitle("Immersive Mode");
+
+    expect(visualizerBtn).toHaveAttribute("aria-pressed", "false");
+    expect(visualizerBtn.querySelector("canvas")).toHaveAttribute("data-preview", "false");
+
+    // 1. Clicking the dock visualizer enters immersive visualizer view and freezes the dock canvas to preview mode
+    await fireEvent.click(visualizerBtn);
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveView).toBe("visualizer");
+    expect(visualizerBtn).toHaveAttribute("aria-pressed", "true");
+    expect(visualizerBtn.querySelector("canvas")).toHaveAttribute("data-preview", "true");
+
+    // 2. Clicking the album cover while in immersive visualizer switches to immersive cover view in place
+    await fireEvent.click(coverBtn);
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveView).toBe("cover");
+    expect(visualizerBtn).toHaveAttribute("aria-pressed", "false");
+    expect(visualizerBtn.querySelector("canvas")).toHaveAttribute("data-preview", "false");
+
+    // 3. Clicking the dock visualizer from immersive cover switches back to immersive visualizer
+    await fireEvent.click(visualizerBtn);
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveView).toBe("visualizer");
+    expect(visualizerBtn).toHaveAttribute("aria-pressed", "true");
+
+    // 4. Clicking the dock visualizer again while in immersive visualizer exits immersive mode
+    await fireEvent.click(visualizerBtn);
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+    expect(visualizerBtn).toHaveAttribute("aria-pressed", "false");
+    expect(visualizerBtn.querySelector("canvas")).toHaveAttribute("data-preview", "false");
   });
 
   it("calls playerStore.resume() when play button is clicked in paused/stopped state", async () => {
@@ -634,7 +676,7 @@ describe("PlayerBar.svelte", () => {
     expect(
       canvas.compareDocumentPosition(queueBtn) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(canvas.closest("div.w-24")!.nextElementSibling).toBe(queueBtn);
+    expect(canvas.closest("button.w-24")!.nextElementSibling).toBe(queueBtn);
   });
 
   it("shows the album and the artist on separate lines (#2042)", () => {
