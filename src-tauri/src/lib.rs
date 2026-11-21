@@ -464,22 +464,11 @@ fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEng
                 continue;
             }
 
-            let (enabled, spectrum) = {
-                let engine = audio.lock().await;
-                let enabled = engine.spectrum_enabled();
-                let state = engine.current_state();
-                let spectrum = if enabled && state == luminous_audio::EngineState::Playing {
-                    Some(engine.spectrum_snapshot(1024))
-                } else {
-                    None
-                };
-                (enabled, spectrum)
-            };
-
-            if enabled {
-                if let Some(spec) = spectrum {
-                    let _ = app_handle.emit("spectrum-data", spec);
-                }
+            // `{ bands, onset }`: the onset covers everything played since the
+            // previous frame, so a tick skipped above only drops stale beats.
+            let frame = audio.lock().await.visualizer_frame();
+            if let Some(frame) = frame {
+                let _ = app_handle.emit("spectrum-data", frame);
             }
         }
     });

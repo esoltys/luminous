@@ -462,7 +462,7 @@ export const ru = {
     fileFilterPlaylists: "Плейлисты",
     goBack: "Назад",
     goForward: "Вперёд",
-    searchPlaceholder: "Поиск и фильтр… (Ctrl+L)",
+    searchPlaceholder: "Поиск и фильтр… (Ctrl+F)",
     open: "Открыть…",
     openFilesTooltip: "Открыть аудиофайлы или списки воспроизведения (*.m3u)",
     openFilesTitle: "Открыть аудиофайлы или списки воспроизведения",

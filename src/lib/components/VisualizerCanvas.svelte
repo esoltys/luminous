@@ -5,12 +5,11 @@
    * listening for spectrum data, drawing on animation frames only while there's something
    * new to show, pausing while the window is hidden, redrawing on resize and re-theming.
    */
-  import { listen } from "@tauri-apps/api/event";
   import { onDestroy, onMount, untrack } from "svelte";
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { prefersReducedMotion } from "../utils/motion";
-  import { acquireSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
+  import { acquireSpectrum, listenSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
   import { prepareCanvas2d } from "../visualizers/canvas";
   import type {
     VisualizerFeed,
@@ -62,8 +61,9 @@
     return typeof document !== "undefined" && document.hidden;
   }
 
-  function pushCurrent() {
-    instance.push({ bands, playing: isPlaying, onset: 0 });
+  /** Hands the preset the latest data. `onset` belongs to one event, so only it passes one. */
+  function pushCurrent(onset = 0) {
+    instance.push({ bands, playing: isPlaying, onset });
   }
 
   function frame(now: number) {
@@ -159,9 +159,9 @@
       resizeObserver.observe(canvas);
     }
     try {
-      const stop = await listen<number[]>("spectrum-data", (event) => {
-        bands = event.payload;
-        pushCurrent();
+      const stop = await listenSpectrum((data) => {
+        bands = data.bands;
+        pushCurrent(data.onset);
         // A still preview doesn't change with the data, so only live views redraw.
         if (!preview) requestFrame();
       });

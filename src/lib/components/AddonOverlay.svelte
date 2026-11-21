@@ -4,7 +4,7 @@
   import type { AddonTheme } from "../stores/addons.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
-  import { acquireSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
+  import { acquireSpectrum, listenSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
   import { prefersReducedMotion } from "../utils/motion";
   import { addonFrameUrl, spectrumMessage, type OverlayMessage } from "../utils/addonBridge";
 
@@ -57,9 +57,9 @@
     acquireSpectrum();
     let unlisten: (() => void) | undefined;
     let cancelled = false;
-    void listen<number[]>("spectrum-data", (event) => {
-      if (loaded && !document.hidden && event.payload?.length) {
-        post(spectrumMessage(event.payload));
+    void listenSpectrum((data) => {
+      if (loaded && !document.hidden && data.bands.length) {
+        post(spectrumMessage(data));
       }
     }).then((fn) => {
       if (cancelled) fn();

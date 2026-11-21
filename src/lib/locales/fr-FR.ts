@@ -414,7 +414,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     fileFilterPlaylists: "Listes de lecture",
     goBack: "Retour",
     goForward: "Avancer",
-    searchPlaceholder: "Rechercher et filtrer... (Ctrl+L)",
+    searchPlaceholder: "Rechercher et filtrer... (Ctrl+F)",
     open: "Ouvrir…",
     openFilesTooltip: "Ouvrir des fichiers audio ou listes de lecture (*.m3u)",
     openFilesTitle: "Ouvrir des fichiers audio ou des listes de lecture",

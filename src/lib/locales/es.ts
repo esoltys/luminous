@@ -406,7 +406,7 @@ export const es = {
     fileFilterPlaylists: "Listas de reproducción",
     goBack: "Atrás",
     goForward: "Adelante",
-    searchPlaceholder: "Buscar y filtrar... (Ctrl+L)",
+    searchPlaceholder: "Buscar y filtrar... (Ctrl+F)",
     open: "Abrir…",
     openFilesTooltip: "Abrir archivos de audio o listas de reproducción (*.m3u)",
     openFilesTitle: "Abrir archivos de audio o listas de reproducción",

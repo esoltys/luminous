@@ -409,7 +409,7 @@ export const de = {
     fileFilterPlaylists: "Wiedergabelisten",
     goBack: "Zurück",
     goForward: "Vorwärts",
-    searchPlaceholder: "Suchen und filtern ... (Strg+L)",
+    searchPlaceholder: "Suchen und filtern ... (Strg+F)",
     open: "Öffnen …",
     openFilesTooltip: "Audiodateien oder Wiedergabelisten öffnen (*.m3u)",
     openFilesTitle: "Audiodateien oder Wiedergabelisten öffnen",
