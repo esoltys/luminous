@@ -15,6 +15,7 @@ import ImmersiveVisualizer from "./ImmersiveVisualizer.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { visualizerStore } from "../stores/visualizer.svelte";
+import { registerPreset } from "../visualizers/registry.svelte";
 import type { Song } from "../types";
 import type { SpectrumFrame } from "../utils/spectrumEnable";
 import type { VisualizerFrame } from "../visualizers/types";
