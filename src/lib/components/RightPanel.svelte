@@ -342,10 +342,7 @@
       {:else}
         <div class="space-y-3">
           {#if isPlayingSubject}
-            <AudioPipelineStages
-              pipeline={playerStore.audioPipeline}
-              class="pb-3 border-b border-brand-border/40"
-            />
+            <AudioPipelineStages pipeline={playerStore.audioPipeline} />
           {/if}
           {#if currentSong.dynamic_range != null}
             <div class="flex items-start justify-between gap-3 text-xs">
@@ -359,7 +356,7 @@
           {/if}
 
           {#if musicbrainzRows.length > 0 || musicbrainzMetaRows.length > 0 || (contextData?.mb_tags?.length ?? 0) > 0 || contextData?.mb_rating != null}
-            <div class="space-y-2 text-xs pt-4 border-t border-brand-border/40">
+            <div class="space-y-2 text-xs pt-2">
               <img
                 src="/musicbrainz-logo.svg"
                 alt={i18n.t("playerBar.musicbrainzSectionLabel", {}, "MusicBrainz")}
