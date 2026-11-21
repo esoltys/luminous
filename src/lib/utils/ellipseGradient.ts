@@ -27,6 +27,12 @@ export interface EllipseGradientOptions {
    * Pass `null` (or `100`) to omit the CSS filter attribute altogether.
    */
   saturation?: number | null;
+  /**
+   * Whether to fill the full SVG canvas with a solid background rect behind the
+   * radial ellipses. Defaults to `true` for opaque backdrops; pass `false` for
+   * floating halo glows so the outer corners aren't filled with a flat slab.
+   */
+  baseRect?: boolean;
 }
 
 const DEFAULT_COLORS = ["#5135FF", "#FF5828", "#F69CFF", "#FFA50F"];
@@ -124,12 +130,17 @@ export function generateEllipseGradientSvg(options: EllipseGradientOptions = {})
     );
   }
 
+  const includeBaseRect = options.baseRect ?? true;
+  const baseRectMarkup = includeBaseRect
+    ? `<rect x="0" y="0" width="100%" height="100%" fill="${backgroundColor}"/>`
+    : "";
+
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ` +
     `width="${width}" height="${height}" viewBox="0 0 ${size} ${size}"${styleAttr} ` +
     `preserveAspectRatio="xMidYMid slice">` +
     `<defs>${gradientDefs.join("")}</defs>` +
-    `<rect x="0" y="0" width="100%" height="100%" fill="${backgroundColor}"/>` +
+    baseRectMarkup +
     layerRects.join("") +
     `</svg>`
   );

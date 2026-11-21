@@ -114,6 +114,92 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
     expect(windowLayoutStore.immersiveMode).toBe(false);
   });
 
+  it("switches between cover and visualizer immersive views in place and toggles off when clicking the active view (#2236)", () => {
+    localStorage.clear();
+    windowLayoutStore.immersiveMode = false;
+    windowLayoutStore.setImmersiveView("cover");
+
+    // 1. Entering via visualizer from normal view opens immersive visualizer
+    windowLayoutStore.toggleImmersiveMode("visualizer");
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveView).toBe("visualizer");
+    expect(localStorage.getItem("layout_immersiveMode")).toBe("true");
+    expect(localStorage.getItem("layout_immersiveView")).toBe("visualizer");
+
+    // 2. Clicking cover while in immersive visualizer switches view in place without exiting immersive mode
+    windowLayoutStore.toggleImmersiveMode("cover");
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveView).toBe("cover");
+    expect(localStorage.getItem("layout_immersiveView")).toBe("cover");
+
+    // 3. Clicking visualizer while in immersive cover switches back to visualizer in place
+    windowLayoutStore.toggleImmersiveMode("visualizer");
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveView).toBe("visualizer");
+
+    // 4. Clicking visualizer again while already in immersive visualizer exits immersive mode
+    windowLayoutStore.toggleImmersiveMode("visualizer");
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+    expect(localStorage.getItem("layout_immersiveMode")).toBe("false");
+
+    // 5. Argument-less toggle (e.g. Ctrl+2 hotkey) flips immersiveMode while preserving the last immersiveView
+    windowLayoutStore.toggleImmersiveMode();
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveView).toBe("visualizer");
+    windowLayoutStore.toggleImmersiveMode();
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+  });
+
+  it("drops the playbar out of view after 2.5s in immersive mode (cover or visualizer) and pops it back up on dock-zone activity (#2236)", () => {
+    vi.useFakeTimers();
+    try {
+      windowLayoutStore.viewportWidth = 1280;
+      windowLayoutStore.exitImmersiveMode();
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+
+      // 1. Enter immersive visualizer view: dock starts visible, then drops out after 2.5s
+      windowLayoutStore.toggleImmersiveMode("visualizer");
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(2499);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(1);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(true);
+
+      // 2. While the cursor rests inside the dock area, the playbar stays visible indefinitely;
+      // leaving the dock area restarts the 2.5s countdown.
+      windowLayoutStore.setImmersiveDockHovered(true);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(10000);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      windowLayoutStore.setImmersiveDockHovered(false);
+      vi.advanceTimersByTime(2499);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(1);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(true);
+
+      // 3. Holding the dock (e.g. pointer drag on seek/volume) reveals it and prevents hiding until released
+      windowLayoutStore.setImmersiveDockHeld(true);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(5000);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      windowLayoutStore.setImmersiveDockHeld(false);
+      vi.advanceTimersByTime(2500);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(true);
+
+      // 4. Switching to cover view reveals the dock, then drops it out after 2.5s; exiting immersive restores it
+      windowLayoutStore.toggleImmersiveMode("cover");
+      expect(windowLayoutStore.immersiveView).toBe("cover");
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(2500);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(true);
+
+      windowLayoutStore.exitImmersiveMode();
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("derives responsive breakpoint flags from viewportWidth/viewportHeight without touching stored preferences", () => {
     windowLayoutStore.sidebarOpen = true;
     windowLayoutStore.setSidebarWidth(300);

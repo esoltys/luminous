@@ -93,13 +93,14 @@
   let dockGlowSvg = $derived.by(() =>
     generateEllipseGradientSvg({
       colors: dockGlowColors,
-      layersPerColor: 2,
+      layersPerColor: 3,
       seed: playerStore.currentSong?.id ?? "dock-glow",
       saturation: null,
+      baseRect: false,
     }),
   );
   let dockRimGlow = $derived(
-    `0 0 24px 2px color-mix(in srgb, ${dockGlowColors[0]} ${isDarkTheme ? "48%" : "30%"}, transparent)`,
+    `0 0 28px -4px color-mix(in srgb, ${dockGlowColors[0]} ${isDarkTheme ? "34%" : "20%"}, transparent)`,
   );
 
   function handleSeek(e: Event) {
@@ -247,6 +248,16 @@
     playerStore.currentSong ? i18n.t("playerBar.immersiveTitle", {}, "Immersive Mode") : "",
   );
 
+  let visualizerTitle = $derived(
+    playerStore.currentSong
+      ? i18n.t("playerBar.visualizerTooltip", {}, "Toggle audio visualizer")
+      : "",
+  );
+
+  let isImmersiveVisualizerActive = $derived(
+    windowLayoutStore.effectiveImmersiveMode && windowLayoutStore.immersiveView === "visualizer",
+  );
+
   // Cover art now only toggles Immersive View (#876) — navigating to the
   // Queue is the dedicated Queue button's job.
   function handleCoverClick(e: MouseEvent) {
@@ -258,7 +269,16 @@
     // this toggles, so leave it alone until the window widens back out.
     if (windowLayoutStore.isImmersiveForced) return;
 
-    windowLayoutStore.toggleImmersiveMode();
+    windowLayoutStore.toggleImmersiveMode("cover");
+  }
+
+  function handleVisualizerClick(e: MouseEvent) {
+    if (!playerStore.currentSong) return;
+    e.stopPropagation();
+
+    if (windowLayoutStore.isImmersiveForced) return;
+
+    windowLayoutStore.toggleImmersiveMode("visualizer");
   }
 
   // Locale-appropriate name of the Ctrl key ("Strg" in German), as the user guide writes it.
@@ -408,17 +428,15 @@
          over Queue/Album BlurredCover tables. Keyed on song + resolved colors
          so it cross-fades smoothly once artwork extraction finishes. -->
     <div
-      class="dock-glow-wrapper pointer-events-none select-none absolute -inset-x-16 -inset-y-12 z-0"
+      class="dock-glow-wrapper pointer-events-none select-none absolute -inset-8 rounded-full overflow-hidden z-0"
       style:opacity={dockGlowOpacity(isDarkTheme)}
       aria-hidden="true"
     >
-      <div class="dock-glow-cutout absolute inset-0">
-        {#key dockGlowKey}
-          <div class="dock-glow-svg absolute inset-0" transition:fade={{ duration: 300 }}>
-            {@html dockGlowSvg}
-          </div>
-        {/key}
-      </div>
+      {#key dockGlowKey}
+        <div class="dock-glow-svg absolute inset-0" transition:fade={{ duration: 300 }}>
+          {@html dockGlowSvg}
+        </div>
+      {/key}
     </div>
   {/if}
   <footer
@@ -663,9 +681,21 @@
       >
         <div class="h-7 flex items-center gap-3">
           {#if !windowLayoutStore.isDockSpectrumHidden}
-            <div transition:collapseFade={{ duration: 250 }} class="w-24 h-7 block flex-shrink-0">
-              <SpectrumVisualizer />
-            </div>
+            <button
+              type="button"
+              transition:collapseFade={{ duration: 250 }}
+              onclick={handleVisualizerClick}
+              disabled={!playerStore.currentSong}
+              aria-pressed={isImmersiveVisualizerActive}
+              aria-label={i18n.t("playerBar.visualizerTooltip", {}, "Toggle audio visualizer")}
+              title={visualizerTitle}
+              data-testid="player-bar-visualizer-btn"
+              class="group w-24 h-7 px-1 py-0.5 rounded-md block flex-shrink-0 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-accent disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-all duration-200 {isImmersiveVisualizerActive
+                ? 'bg-brand-accent/15 ring-1 ring-brand-border'
+                : 'hover:bg-brand-accent/10'}"
+            >
+              <SpectrumVisualizer preview={isImmersiveVisualizerActive} />
+            </button>
           {/if}
           <button
             onclick={navigateToQueue}
@@ -820,42 +850,51 @@
 {/if}
 
 <style>
-  /* Capsule-shaped outer falloff: two intersected linear gradients keep the
-     glow full-strength across the entire pill width and fade smoothly outward
-     in all directions without pinching at the ends. */
+  /* True concentric capsule distance-field mask around the 80px-tall pill dock
+     with 32px (-inset-8) bleed (total height 144px, cap radius R = 72px):
+     - Left cap (0..72px): radial-gradient centered at (72px, 50%)
+     - Center span (72px..calc(100% - 72px)): matching symmetric vertical gradient
+     - Right cap (calc(100% - 72px)..100%): radial-gradient centered at (0px, 50%)
+     Peaks gently at the pill border (r = 40px / 54% of R) and decays with a
+     Gaussian tail to 0 before reaching r = 72px, eliminating rectangular corners
+     and any visible outer boundary. */
   .dock-glow-wrapper {
-    --dock-glow-outer-mask:
-      linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%),
-      linear-gradient(to bottom, transparent 0%, black 35%, black 65%, transparent 100%);
-    -webkit-mask-image: var(--dock-glow-outer-mask);
-    -webkit-mask-composite: source-in;
-    mask-image: var(--dock-glow-outer-mask);
-    mask-composite: intersect;
-  }
-
-  /* Hollow out the interior behind <footer> with a gradual ramp from the
-     outer edge (no plateau at 48px/64px) so there is no visible seam above or
-     around the dock while keeping the glass interior translucent. */
-  .dock-glow-cutout {
-    --dock-glow-cutout-mask:
-      linear-gradient(
-        to right,
-        black 0%,
-        rgba(0, 0, 0, 0.05) 72px,
-        rgba(0, 0, 0, 0.05) calc(100% - 72px),
-        black 100%
-      ),
-      linear-gradient(
-        to bottom,
-        black 0%,
-        rgba(0, 0, 0, 0.05) 56px,
-        rgba(0, 0, 0, 0.05) calc(100% - 56px),
-        black 100%
-      );
-    -webkit-mask-image: var(--dock-glow-cutout-mask);
-    -webkit-mask-composite: source-over;
-    mask-image: var(--dock-glow-cutout-mask);
-    mask-composite: add;
+    --dock-glow-radial-stops:
+      rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.15) 46%, rgba(0, 0, 0, 0.78) 54%,
+      rgba(0, 0, 0, 0.54) 62%, rgba(0, 0, 0, 0.32) 70%, rgba(0, 0, 0, 0.16) 78%,
+      rgba(0, 0, 0, 0.06) 86%, rgba(0, 0, 0, 0.015) 93%, transparent 100%;
+    --dock-glow-linear-stops:
+      transparent 0%, rgba(0, 0, 0, 0.015) 3.5%, rgba(0, 0, 0, 0.06) 7%, rgba(0, 0, 0, 0.16) 11%,
+      rgba(0, 0, 0, 0.32) 15%, rgba(0, 0, 0, 0.54) 19%, rgba(0, 0, 0, 0.78) 23%,
+      rgba(0, 0, 0, 0.15) 27%, rgba(0, 0, 0, 0.15) 73%, rgba(0, 0, 0, 0.78) 77%,
+      rgba(0, 0, 0, 0.54) 81%, rgba(0, 0, 0, 0.32) 85%, rgba(0, 0, 0, 0.16) 89%,
+      rgba(0, 0, 0, 0.06) 93%, rgba(0, 0, 0, 0.015) 96.5%, transparent 100%;
+    -webkit-mask-image:
+      radial-gradient(72px 72px at 72px 50%, var(--dock-glow-radial-stops)),
+      linear-gradient(to bottom, var(--dock-glow-linear-stops)),
+      radial-gradient(72px 72px at 0px 50%, var(--dock-glow-radial-stops));
+    -webkit-mask-size:
+      72px 100%,
+      calc(100% - 144px) 100%,
+      72px 100%;
+    -webkit-mask-position:
+      left top,
+      72px top,
+      right top;
+    -webkit-mask-repeat: no-repeat;
+    mask-image:
+      radial-gradient(72px 72px at 72px 50%, var(--dock-glow-radial-stops)),
+      linear-gradient(to bottom, var(--dock-glow-linear-stops)),
+      radial-gradient(72px 72px at 0px 50%, var(--dock-glow-radial-stops));
+    mask-size:
+      72px 100%,
+      calc(100% - 144px) 100%,
+      72px 100%;
+    mask-position:
+      left top,
+      72px top,
+      right top;
+    mask-repeat: no-repeat;
   }
 
   .dock-glow-svg :global(svg) {

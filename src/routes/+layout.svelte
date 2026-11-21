@@ -13,6 +13,7 @@
   import CoverArt from "../lib/components/CoverArt.svelte";
   import Miniplayer from "../lib/components/Miniplayer.svelte";
   import ImmersiveSessionWrap from "../lib/components/ImmersiveSessionWrap.svelte";
+  import ImmersiveVisualizer from "../lib/components/ImmersiveVisualizer.svelte";
   import KeyboardShortcutsModal from "../lib/components/KeyboardShortcutsModal.svelte";
   import Toast from "../lib/components/Toast.svelte";
   import SongDragGhost from "../lib/components/SongDragGhost.svelte";
@@ -61,6 +62,28 @@
   // The floating PlayerBar dock renders only with a song, and never on Help. The same
   // condition drives the `pb-dock` bottom padding (app.css) every view uses to clear it.
   const dockVisible = $derived(!!playerStore.currentSong && navigationStore.activeTab !== "help");
+
+  function handleDockPointerDown() {
+    if (!windowLayoutStore.effectiveImmersiveMode) return;
+    windowLayoutStore.setImmersiveDockHeld(true);
+    const onPointerUp = () => {
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      windowLayoutStore.setImmersiveDockHeld(false);
+    };
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+  }
+
+  $effect(() => {
+    const isImmersive = windowLayoutStore.effectiveImmersiveMode;
+    const _view = windowLayoutStore.immersiveView;
+    if (isImmersive) {
+      windowLayoutStore.revealImmersiveDock();
+    } else {
+      windowLayoutStore.immersiveDockHidden = false;
+    }
+  });
 
   function handleWelcomeGetStarted() {
     // Unconditional: this is an explicit user request to start the tour, not
@@ -380,7 +403,14 @@
         console.warn("Failed to attach window focus listener:", e);
       });
 
+    const handleImmersivePointerMove = (e: PointerEvent) => {
+      if (!windowLayoutStore.effectiveImmersiveMode) return;
+      const inDockZone = e.clientY >= window.innerHeight - PLAYER_DOCK_CONTENT_RESERVE_PX;
+      windowLayoutStore.setImmersiveDockHovered(inDockZone);
+    };
+
     window.addEventListener("keydown", handleGlobalHotkeys);
+    window.addEventListener("pointermove", handleImmersivePointerMove, { passive: true });
 
     // Forwards uncaught JS errors/rejections to the backend crash log (#684)
     // with benign notice filtering and burst repeat-collapsing (#1261) — without
@@ -392,6 +422,7 @@
 
     return () => {
       window.removeEventListener("keydown", handleGlobalHotkeys);
+      window.removeEventListener("pointermove", handleImmersivePointerMove);
       window.removeEventListener("focus", handleWindowFocus);
       window.removeEventListener("error", errorReporter.handleWindowError);
       window.removeEventListener("unhandledrejection", errorReporter.handleUnhandledRejection);
@@ -606,58 +637,66 @@
               {/key}
             {/if}
 
-            <!-- Center Container: Card and Details. Below md, the layout would
-               stack the text under the cover art — at that point it's just
-               clutter (the floating PlayerBar dock repeats the same info),
-               so it's hidden and the cover art stands alone. At md+, where
-               there's room to sit it beside the art instead, it stays. -->
+            <!-- Center Container: Card and Details (or Immersive Visualizer Stage).
+               Below md, the cover-view layout would stack the text under the cover
+               art — at that point it's just clutter (the floating PlayerBar dock
+               repeats the same info), so it's hidden and the cover art stands
+               alone. At md+, where there's room to sit it beside the art instead,
+               it stays. -->
             <div
-              class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-4xl w-full justify-center"
+              class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-5xl w-full h-full justify-center"
             >
               {#if playerStore.currentSong}
-                <!-- Floating Cover Art Frame -->
-                <div
-                  class="w-56 h-56 xs:w-72 xs:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-200 bg-brand-sidebar flex items-center justify-center relative select-none"
-                >
-                  <CoverArt
-                    songId={playerStore.currentSong?.id}
-                    artEmbedded={playerStore.currentSong?.art_embedded}
-                    artAutomatic={playerStore.currentSong?.art_automatic}
-                    artManual={playerStore.currentSong?.art_manual}
-                    sizeClass="w-full h-full"
-                    fullResolution
-                    contain={isLiveSong(playerStore.currentSong)}
+                {#if windowLayoutStore.immersiveView === "visualizer"}
+                  <ImmersiveVisualizer
+                    active={windowLayoutStore.effectiveImmersiveMode &&
+                      windowLayoutStore.immersiveView === "visualizer"}
                   />
-                </div>
+                {:else}
+                  <!-- Floating Cover Art Frame -->
+                  <div
+                    class="w-56 h-56 xs:w-72 xs:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-200 bg-brand-sidebar flex items-center justify-center relative select-none"
+                  >
+                    <CoverArt
+                      songId={playerStore.currentSong?.id}
+                      artEmbedded={playerStore.currentSong?.art_embedded}
+                      artAutomatic={playerStore.currentSong?.art_automatic}
+                      artManual={playerStore.currentSong?.art_manual}
+                      sizeClass="w-full h-full"
+                      fullResolution
+                      contain={isLiveSong(playerStore.currentSong)}
+                    />
+                  </div>
 
-                <!-- Song Details Info: hidden below md, where it would stack
-                   under the cover art instead of sitting beside it. -->
-                <div class="hidden md:flex flex-col text-center md:text-left w-full max-w-md">
-                  <span
-                    class="label-heading self-start px-3 py-1 bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
-                  >
-                    {i18n.t("playerBar.nowPlaying")}
-                  </span>
-                  <h1
-                    class="mt-3 text-4xl md:text-6xl font-heading font-bold text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance"
-                  >
-                    {playerStore.currentSongDisplayTitle}
-                  </h1>
-                  {#if playerStore.currentSong.album?.trim()}
-                    <p
-                      class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold"
+                  <!-- Song Details Info: hidden below md, where it would stack
+                     under the cover art instead of sitting beside it. -->
+                  <div class="hidden md:flex flex-col text-center md:text-left w-full max-w-md">
+                    <span
+                      class="label-heading self-start px-3 py-1 bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
                     >
-                      {playerStore.currentSong.album}
+                      {i18n.t("playerBar.nowPlaying")}
+                    </span>
+                    <h1
+                      class="mt-3 text-4xl md:text-6xl font-heading font-bold text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance"
+                    >
+                      {playerStore.currentSongDisplayTitle}
+                    </h1>
+                    {#if playerStore.currentSong.album?.trim()}
+                      <p
+                        class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold"
+                      >
+                        {playerStore.currentSong.album}
+                      </p>
+                    {/if}
+                    <p
+                      class="{playerStore.currentSong.album?.trim()
+                        ? 'mt-0.5'
+                        : 'mt-3'} text-base md:text-lg text-brand-text-secondary/70 select-text font-medium"
+                    >
+                      {playerStore.currentSongDisplaySubtitle}
                     </p>
-                  {/if}
-                  <p
-                    class="{playerStore.currentSong.album?.trim()
-                      ? 'mt-0.5'
-                      : 'mt-3'} text-base md:text-lg text-brand-text-secondary/70 select-text font-medium"
-                  >
-                    {playerStore.currentSongDisplaySubtitle}
-                  </p>
-                </div>
+                  </div>
+                {/if}
               {:else if playerStore.completedSession}
                 <!-- Immersive Session Wrap Screen (#1380) -->
                 <ImmersiveSessionWrap session={playerStore.completedSession} />
@@ -683,8 +722,23 @@
          whenever there's no current song, so it doesn't linger showing
          "Nothing playing" after the queue ends. -->
       {#if dockVisible}
-        <div class="absolute inset-x-4 bottom-4 z-40">
-          <PlayerBar />
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="absolute inset-x-4 bottom-4 z-40"
+          data-testid="player-dock-zone"
+          onpointerenter={() => windowLayoutStore.setImmersiveDockHovered(true)}
+          onpointermove={() => windowLayoutStore.setImmersiveDockHovered(true)}
+          onpointerleave={() => windowLayoutStore.setImmersiveDockHovered(false)}
+          onpointerdown={handleDockPointerDown}
+          onfocusin={() => windowLayoutStore.revealImmersiveDock()}
+        >
+          <div
+            data-testid="immersive-dock-motion"
+            class="immersive-dock"
+            class:immersive-dock-hidden={windowLayoutStore.isImmersiveDockHidden}
+          >
+            <PlayerBar />
+          </div>
         </div>
       {/if}
     {/if}
@@ -762,6 +816,63 @@
     width: 100%;
     height: 100%;
     display: block;
+  }
+
+  /* Immersive PlayDock auto-hide & reappear motion (#2236):
+     Animates `bottom` on the out-of-flow absolute dock container rather than
+     `transform`/`opacity`/`will-change`: any transform or opacity effect node on
+     an ancestor of `footer.glass-surface` creates a CSS Backdrop Root in Blink/
+     WebKit and disables the dock's `backdrop-filter` acrylic blur.
+     - Reappearing (default .immersive-dock): launches upward from below the
+       viewport, overshoots its resting height by ~16px, and cushions into place.
+     - Dropping out (.immersive-dock.immersive-dock-hidden): first lifts up
+       ~16px (anticipation crest), then drops downward out of view. */
+  .immersive-dock {
+    position: relative;
+    bottom: 0;
+    transition-property: bottom;
+    transition-duration: 560ms;
+    transition-timing-function: cubic-bezier(0.22, 1.35, 0.36, 1);
+    transition-timing-function: linear(
+      0,
+      0.14 8%,
+      0.44 20%,
+      0.78 34%,
+      1.03 46%,
+      1.11 58%,
+      1.09 66%,
+      1.035 78%,
+      0.996 90%,
+      1
+    );
+  }
+
+  .immersive-dock.immersive-dock-hidden {
+    bottom: -9rem;
+    pointer-events: none;
+    transition-property: bottom;
+    transition-duration: 580ms;
+    transition-timing-function: cubic-bezier(0.38, -0.32, 0.7, 1);
+    transition-timing-function: linear(
+      0,
+      -0.045 8%,
+      -0.095 18%,
+      -0.11 25%,
+      -0.08 33%,
+      0 43%,
+      0.19 55%,
+      0.5 70%,
+      0.82 85%,
+      0.96 94%,
+      1
+    );
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .immersive-dock,
+    .immersive-dock.immersive-dock-hidden {
+      transition-duration: 0ms !important;
+    }
   }
 
   .flip-perspective {
