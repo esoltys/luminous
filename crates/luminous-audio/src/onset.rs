@@ -11,7 +11,9 @@
 //! onset is flux above `mean + K·σ` of the last second of flux and above
 //! [`MIN_FLUX_DB`], followed by [`REFRACTORY_SECS`] of silence. Working in dB
 //! makes the threshold independent of playback volume, which scales the
-//! visualizer copy.
+//! visualizer copy. A sudden volume change looks exactly like an attack to
+//! anything that only sees samples, so the caller resets the detector when
+//! the volume jumps (`VisualizerAnalyzer::gain_changed`).
 
 use std::collections::VecDeque;
 
@@ -39,9 +41,10 @@ const SILENCE_DB: f32 = -70.0;
 const REFRACTORY_SECS: f32 = 0.100;
 /// Flux this far above the threshold reports full strength.
 const FULL_STRENGTH_DB: f32 = 12.0;
-/// Hops of flux history needed before anything can fire, so the threshold
-/// has something to stand on after a reset.
-const MIN_HISTORY_HOPS: usize = 4;
+/// After a start or reset nothing fires for this long, so the threshold has
+/// history to stand on and audio already queued for output at an old gain
+/// (see `VisualizerAnalyzer::gain_changed`) has played out.
+const WARMUP_SECS: f32 = 0.25;
 
 /// Direct-form-I biquad low-pass (RBJ cookbook, Butterworth Q).
 #[derive(Clone, Copy)]
@@ -109,6 +112,7 @@ pub(crate) struct OnsetDetector {
     history_len: usize,
     refractory_hops: usize,
     refractory_left: usize,
+    warmup_hops: usize,
 }
 
 impl OnsetDetector {
@@ -129,6 +133,7 @@ impl OnsetDetector {
             history_len,
             refractory_hops: (REFRACTORY_SECS * hops_per_sec).round() as usize,
             refractory_left: 0,
+            warmup_hops: (WARMUP_SECS * hops_per_sec).round() as usize,
         }
     }
 
@@ -183,7 +188,7 @@ impl OnsetDetector {
         let mut strength = 0.0;
         if self.refractory_left > 0 {
             self.refractory_left -= 1;
-        } else if self.flux_history.len() >= MIN_HISTORY_HOPS {
+        } else if self.flux_history.len() >= self.warmup_hops {
             let n = self.flux_history.len() as f32;
             let mean = self.flux_history.iter().sum::<f32>() / n;
             let var = self
@@ -254,8 +259,8 @@ mod tests {
         }
         let period = (period_secs * sample_rate as f32) as usize;
         let mut kicks = 0;
-        // First kick after the detector has some history.
-        let mut at = sample_rate as usize / 4;
+        // First kick once the detector has warmed up.
+        let mut at = sample_rate as usize / 2;
         while at < len {
             add_kick(&mut out, at, sample_rate, gain);
             kicks += 1;

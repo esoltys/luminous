@@ -735,7 +735,9 @@ impl AudioEngine {
     /// (see [`set_volume_ceiling`](Self::set_volume_ceiling)). A level above
     /// the ceiling sets the ceiling. Returns the volume applied.
     pub fn set_volume(&self, vol: f32) -> f32 {
+        let before = self.shared.current_volume();
         let applied = self.shared.store_volume(vol);
+        self.visualizer.lock().gain_changed(before, applied);
         let _ = self.send_cmd(AudioCommand::SyncHardwareVolume);
         applied
     }
@@ -749,6 +751,7 @@ impl AudioEngine {
         let before = self.shared.current_volume();
         let after = self.shared.set_volume_ceiling(ceiling);
         if after != before {
+            self.visualizer.lock().gain_changed(before, after);
             let _ = self.send_cmd(AudioCommand::SyncHardwareVolume);
         }
         after

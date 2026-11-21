@@ -17,6 +17,8 @@ const FFT_SIZE: usize = 1024;
 /// the onset detector restarts: the reader was away (window minimized, say)
 /// and a beat from that long ago is no use to anyone.
 const MAX_BACKLOG_MS: u64 = 250;
+/// A gain change bigger than this restarts onset detection.
+const GAIN_JUMP_DB: f32 = 3.0;
 
 // ---------------------------------------------------------------------------
 // Real-time playback buffer
@@ -178,6 +180,21 @@ impl VisualizerAnalyzer {
     pub(crate) fn reset(&mut self) {
         self.read_pos = None;
         self.onset.reset();
+    }
+
+    /// The playback gain is moving from `before` to `after` (linear). A jump
+    /// of more than [`GAIN_JUMP_DB`], or to or from silence (mute), would read
+    /// as an attack, so it restarts onset detection; smaller steps, like a
+    /// volume drag's, don't.
+    pub(crate) fn gain_changed(&mut self, before: f32, after: f32) {
+        let jump = if before <= 0.0 || after <= 0.0 {
+            before != after
+        } else {
+            (20.0 * (after / before).log10()).abs() > GAIN_JUMP_DB
+        };
+        if jump {
+            self.reset();
+        }
     }
 
     /// The next frame, from what `buffer` received at `sample_rate` since the
@@ -396,6 +413,75 @@ mod tests {
         // A whole second (kick included) played while nobody read.
         buf.push(&kick_after_silence(rate));
         assert_eq!(analyzer.frame(&buf, rate).onset, 0.0);
+    }
+
+    /// Feeds `samples` to `analyzer` in ~33 ms ticks; counts frames with an onset.
+    fn count_frames_with_onsets(
+        analyzer: &mut VisualizerAnalyzer,
+        buf: &AudioVisualizerBuffer,
+        samples: &[f32],
+        rate: u32,
+    ) -> usize {
+        samples
+            .chunks(1600)
+            .filter(|tick| {
+                buf.push(tick);
+                analyzer.frame(buf, rate).onset > 0.0
+            })
+            .count()
+    }
+
+    fn bass_tone(secs: f32, gain: f32, rate: u32) -> Vec<f32> {
+        (0..(secs * rate as f32) as usize)
+            .map(|i| {
+                gain * 0.1 * (2.0 * std::f32::consts::PI * 70.0 * i as f32 / rate as f32).sin()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_volume_jump_is_not_an_onset() {
+        let rate = 48_000;
+        let buf = AudioVisualizerBuffer::new();
+        let mut analyzer = VisualizerAnalyzer::new();
+        analyzer.frame(&buf, rate);
+        let mut onsets =
+            count_frames_with_onsets(&mut analyzer, &buf, &bass_tone(1.0, 1.0, rate), rate);
+        // +12 dB, with 50 ms still queued for output at the old gain.
+        analyzer.gain_changed(1.0, 4.0);
+        onsets += count_frames_with_onsets(&mut analyzer, &buf, &bass_tone(0.05, 1.0, rate), rate);
+        onsets += count_frames_with_onsets(&mut analyzer, &buf, &bass_tone(1.0, 4.0, rate), rate);
+        assert_eq!(onsets, 0);
+    }
+
+    #[test]
+    fn unmuting_is_not_an_onset() {
+        let rate = 48_000;
+        let buf = AudioVisualizerBuffer::new();
+        let mut analyzer = VisualizerAnalyzer::new();
+        analyzer.frame(&buf, rate);
+        let mut onsets =
+            count_frames_with_onsets(&mut analyzer, &buf, &bass_tone(1.0, 5.0, rate), rate);
+        analyzer.gain_changed(1.0, 0.0);
+        onsets +=
+            count_frames_with_onsets(&mut analyzer, &buf, &vec![0.0; rate as usize / 2], rate);
+        analyzer.gain_changed(0.0, 1.0);
+        onsets += count_frames_with_onsets(&mut analyzer, &buf, &vec![0.0; 2400], rate);
+        onsets += count_frames_with_onsets(&mut analyzer, &buf, &bass_tone(1.0, 5.0, rate), rate);
+        assert_eq!(onsets, 0);
+    }
+
+    #[test]
+    fn a_small_volume_step_keeps_detecting() {
+        let rate = 48_000;
+        let buf = AudioVisualizerBuffer::new();
+        let mut analyzer = VisualizerAnalyzer::new();
+        analyzer.frame(&buf, rate);
+        count_frames_with_onsets(&mut analyzer, &buf, &vec![0.0; rate as usize / 2], rate);
+        // A 1 dB nudge, then a kick 100 ms later: a reset would hide it.
+        analyzer.gain_changed(1.0, 1.12);
+        let kick = &kick_after_silence(rate)[rate as usize * 4 / 10..];
+        assert_eq!(count_frames_with_onsets(&mut analyzer, &buf, kick, rate), 1);
     }
 
     #[test]

@@ -116,7 +116,7 @@ class VoxelMiniInstance implements VisualizerInstance {
     const numBars = 32;
     const barWidth = (width - (numBars - 1) * MINI_BAR_GAP) / numBars;
     for (let i = 0; i < numBars; i++) {
-      // Bands already arrive normalized to the frame's own peak (see calculate_spectrum),
+      // Bands already arrive normalized to the frame's own peak (see VisualizerAnalyzer::bands),
       // so no extra gain: a fixed multiplier would clip most bars to the same height.
       const val = this.bands[i] || 0;
       const barHeight = Math.min(height, Math.max(1.5, val * height));
