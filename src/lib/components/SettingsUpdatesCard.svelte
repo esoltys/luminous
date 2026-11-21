@@ -157,6 +157,19 @@
     }
   }
 
+  let formatName = $derived(
+    getFormatName(updaterStore.installFormat.format, updaterStore.installFormat.human_name),
+  );
+
+  let installedAsText = $derived(
+    updaterStore.installFormat.source
+      ? i18n.t("settings.updateInstalledAsFromFooter", {
+          format: formatName,
+          source: updaterStore.installFormat.source,
+        })
+      : i18n.t("settings.updateInstalledAsFooter", { format: formatName }),
+  );
+
   onMount(async () => {
     let ver = "";
     try {
@@ -240,12 +253,7 @@
           {:else}
             {i18n.t(
               "settings.updateManagedByPackageManagerDesc",
-              {
-                format: getFormatName(
-                  updaterStore.installFormat.format,
-                  updaterStore.installFormat.human_name,
-                ),
-              },
+              { format: formatName },
               "Updates for your {format} install are handled by your system package manager.",
             )}
           {/if}
@@ -266,22 +274,7 @@
       </button>
     {:else}
       <div class="pt-3 border-t border-brand-border/50 text-xs text-brand-text-secondary">
-        {#if updaterStore.installFormat.source}
-          {i18n.t("settings.updateInstalledAsFromFooter", {
-            format: getFormatName(
-              updaterStore.installFormat.format,
-              updaterStore.installFormat.human_name,
-            ),
-            source: updaterStore.installFormat.source,
-          })}
-        {:else}
-          {i18n.t("settings.updateInstalledAsFooter", {
-            format: getFormatName(
-              updaterStore.installFormat.format,
-              updaterStore.installFormat.human_name,
-            ),
-          })}
-        {/if}
+        {installedAsText}
       </div>
     {/if}
   </div>
@@ -504,22 +497,7 @@
       class="flex items-center justify-between gap-4 pt-3 border-t border-brand-border/50 text-xs text-brand-text-secondary"
     >
       <span>
-        {#if updaterStore.installFormat.source}
-          {i18n.t("settings.updateInstalledAsFromFooter", {
-            format: getFormatName(
-              updaterStore.installFormat.format,
-              updaterStore.installFormat.human_name,
-            ),
-            source: updaterStore.installFormat.source,
-          })}
-        {:else}
-          {i18n.t("settings.updateInstalledAsFooter", {
-            format: getFormatName(
-              updaterStore.installFormat.format,
-              updaterStore.installFormat.human_name,
-            ),
-          })}
-        {/if}
+        {installedAsText}
         — {updaterStore.installFormat.supports_self_update
           ? i18n.t("settings.updateAutoSupportedFooter")
           : updaterStore.installFormat.format === "appimage"
