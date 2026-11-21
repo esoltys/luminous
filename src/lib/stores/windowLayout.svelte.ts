@@ -218,10 +218,10 @@ class WindowLayoutStore {
 
   async enterMiniplayerMode(force = false) {
     if ((this.isMiniplayer && !force) || this.miniplayerTransitionInFlight) return;
+    this.miniplayerTransitionInFlight = true;
     if (this.isFullscreen) {
       await this.setFullscreenMode(false);
     }
-    this.miniplayerTransitionInFlight = true;
     this.isMiniplayer = true;
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_isMiniplayer", "true");
@@ -364,10 +364,8 @@ class WindowLayoutStore {
   }
 
   /**
-   * Transitions the main window into or out of fullscreen mode.
-   * Exits miniplayer mode first if active, and suppresses geometry capture
-   * while fullscreen or transitioning so monitor dimensions do not overwrite
-   * saved windowed geometry.
+   * Transitions the main window into or out of fullscreen mode, exiting
+   * miniplayer mode first if active.
    */
   async setFullscreenMode(enabled: boolean): Promise<void> {
     if (this.isFullscreen === enabled || this.fullscreenTransitionInFlight) return;
@@ -375,10 +373,12 @@ class WindowLayoutStore {
       await this.exitMiniplayerMode();
     }
     this.fullscreenTransitionInFlight = true;
+    const previous = this.isFullscreen;
     this.isFullscreen = enabled;
     try {
       await getCurrentWindow().setFullscreen(enabled);
     } catch (e) {
+      this.isFullscreen = previous;
       console.warn("Failed to set fullscreen window mode:", e);
     } finally {
       this.fullscreenTransitionInFlight = false;
