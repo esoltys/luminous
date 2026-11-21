@@ -2910,6 +2910,8 @@ export const de = {
     toggleRightPanel: "Rechten Bereich umschalten",
     toggleMiniplayer: "Miniplayer umschalten",
     toggleFullscreen: "Vollbild umschalten",
+    previousVisualizer: "Vorherige Visualisierung",
+    nextVisualizer: "Nächste Visualisierung",
     openEqualizer: "Equalizer-Einstellungen öffnen",
     openSettings: "Einstellungen öffnen",
     showShortcuts: "Diese Liste anzeigen",
@@ -3348,5 +3350,11 @@ export const de = {
     noStationLists:
       "Erstelle eine Senderliste, um Genres zu folgen, die sich automatisch aktualisieren.",
     stationsCount: "Sender",
+  },
+  visualizers: {
+    voxel: "Voxel-Spektrum",
+    menuTitle: "Visualisierung",
+    previous: "Vorherige Visualisierung: {name}",
+    next: "Nächste Visualisierung: {name}",
   },
 };

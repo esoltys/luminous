@@ -1,12 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS } from "../stores/theme.svelte";
-import { calculateContrastRatio } from "./colorUtils";
+import { calculateContrastRatio } from "../utils/colorUtils";
 import {
   VoxelSpectrumEngine,
   buildVoxelThemePalette,
   renderStaticVoxelPreview,
   renderVoxelMatrix,
-} from "./visualizerEngine";
+} from "./voxelEngine";
+import { VOXEL_PRESET } from "./voxel";
 
 describe("VoxelSpectrumEngine (#2236)", () => {
   it("upsamples 32 spectrum bins smoothly into 64 columns and pushes peak-hold blocks to the apex", () => {
@@ -146,5 +147,45 @@ describe("VoxelSpectrumEngine (#2236)", () => {
     vi.mocked(ctx.fillRect).mockClear();
     renderStaticVoxelPreview(ctx, 96, 28, palette);
     expect(vi.mocked(ctx.fillRect).mock.calls.length).toBeGreaterThan(16);
+  });
+});
+
+describe("voxel preset (#2245)", () => {
+  function fakeCtx() {
+    return {
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      beginPath: vi.fn(),
+      roundRect: vi.fn(),
+      fill: vi.fn(),
+      createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+      fillStyle: "",
+    } as unknown as CanvasRenderingContext2D;
+  }
+
+  it("draws the mini slot once per frame of data, with no animation of its own", () => {
+    const mini = VOXEL_PRESET.create("mini");
+    mini.setTheme(LUMINOUS_DARK_COLORS);
+    mini.push({ bands: new Array(32).fill(0.5), playing: true, onset: 0 });
+    expect(mini.step(16, false)).toBe(false);
+
+    const ctx = fakeCtx();
+    mini.render(ctx, 96, 28, { reducedMotion: false, preview: false });
+    expect(ctx.roundRect).toHaveBeenCalledTimes(32);
+    mini.render(ctx, 96, 28, { reducedMotion: false, preview: false });
+    // The bar gradient is built once per theme and height, not per draw.
+    expect(ctx.createLinearGradient).toHaveBeenCalledTimes(1);
+  });
+
+  it("settles the full matrix to rest when playback stops", () => {
+    const full = VOXEL_PRESET.create("full");
+    full.setTheme(LUMINOUS_DARK_COLORS);
+    full.push({ bands: new Array(32).fill(0.9), playing: true, onset: 0 });
+    expect(full.step(16, false)).toBe(true);
+
+    full.push({ bands: new Array(32).fill(0.9), playing: false, onset: 0 });
+    let moving = true;
+    for (let i = 0; i < 500 && moving; i++) moving = full.step(16, false);
+    expect(moving).toBe(false);
   });
 });

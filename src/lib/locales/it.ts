@@ -2899,6 +2899,8 @@ export const it = {
     toggleRightPanel: "Mostra/nascondi pannello destro",
     toggleMiniplayer: "Attiva/disattiva miniplayer",
     toggleFullscreen: "Attiva/disattiva schermo intero",
+    previousVisualizer: "Visualizzatore precedente",
+    nextVisualizer: "Visualizzatore successivo",
     openEqualizer: "Apri impostazioni equalizzatore",
     openSettings: "Apri Impostazioni",
     showShortcuts: "Mostra questo elenco",
@@ -3332,5 +3334,11 @@ export const it = {
     noStationLists:
       "Crea una lista di stazioni per seguire i generi che si aggiornano automaticamente.",
     stationsCount: "stazioni",
+  },
+  visualizers: {
+    voxel: "Spettro a voxel",
+    menuTitle: "Visualizzatore",
+    previous: "Visualizzatore precedente: {name}",
+    next: "Visualizzatore successivo: {name}",
   },
 };

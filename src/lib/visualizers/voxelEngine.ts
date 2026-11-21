@@ -1,5 +1,5 @@
 import type { ThemeColors } from "../stores/theme.svelte";
-import { clampForContrast, hexToRgb, isLightColor, rgbToHex } from "./colorUtils";
+import { clampForContrast, hexToRgb, isLightColor, rgbToHex } from "../utils/colorUtils";
 
 export interface VoxelColumnState {
   /** Current smoothed bar height in [0, 1]. */
@@ -28,23 +28,6 @@ export interface VoxelThemePalette {
   baselineColor: string;
   /** Pre-computed decaying alpha colors for the mirrored reflection rows below the baseline. */
   reflectionRowColors: readonly string[];
-}
-
-export interface VisualizerRenderOptions {
-  reducedMotion?: boolean;
-}
-
-export interface VisualizerPreset {
-  id: string;
-  labelKey: string;
-  render(
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-    engine: VoxelSpectrumEngine,
-    palette: VoxelThemePalette,
-    options?: VisualizerRenderOptions,
-  ): void;
 }
 
 const DEFAULT_COLUMNS = 64;
@@ -304,33 +287,6 @@ export class VoxelSpectrumEngine {
 }
 
 /**
- * Prepares a `<canvas>` for HiDPI 2D rendering at its current CSS layout size,
- * resizing the backing store only when dimensions or `devicePixelRatio` change
- * and resetting the transform matrix idempotently via `setTransform`.
- * Returns `null` if the canvas is detached, zero-sized, or lacks a 2D context.
- */
-export function prepareCanvas2d(
-  canvas: HTMLCanvasElement | null,
-): { ctx: CanvasRenderingContext2D; width: number; height: number } | null {
-  if (!canvas) return null;
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
-  if (width <= 0 || height <= 0) return null;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-
-  const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
-  const targetW = Math.round(width * dpr);
-  const targetH = Math.round(height * dpr);
-  if (canvas.width !== targetW || canvas.height !== targetH) {
-    canvas.width = targetW;
-    canvas.height = targetH;
-  }
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { ctx, width, height };
-}
-
-/**
  * Renders the voxel LED matrix with pushed-up peak-hold blocks and mirrored
  * floor reflection onto `ctx`. Batches `fillRect` draws by row color so `ctx.fillStyle`
  * changes at most `O(rows)` times per frame rather than `O(columns * rows)`.
@@ -341,7 +297,7 @@ export function renderVoxelMatrix(
   height: number,
   engine: VoxelSpectrumEngine,
   palette: VoxelThemePalette,
-  options: VisualizerRenderOptions = {},
+  options: { reducedMotion?: boolean } = {},
 ): void {
   if (width <= 0 || height <= 0) return;
 
@@ -488,9 +444,3 @@ export function renderStaticVoxelPreview(
     }
   }
 }
-
-export const VOXEL_VISUALIZER_PRESET: VisualizerPreset = {
-  id: "voxel",
-  labelKey: "playerBar.visualizerTooltip",
-  render: renderVoxelMatrix,
-};

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { shouldSkipGlobalShortcut } from "./globalShortcuts";
+import { shouldSkipGlobalShortcut, visualizerStepForKey } from "./globalShortcuts";
 
 describe("shouldSkipGlobalShortcut", () => {
   afterEach(() => {
@@ -38,5 +38,25 @@ describe("shouldSkipGlobalShortcut", () => {
   it("ignores auto-repeat", () => {
     const div = document.body.appendChild(document.createElement("div"));
     expect(skipped(div, { repeat: true })).toBe(true);
+  });
+});
+
+describe("visualizerStepForKey (#2245)", () => {
+  const step = (init: KeyboardEventInit) =>
+    visualizerStepForKey(new KeyboardEvent("keydown", init));
+
+  it("maps [ to the previous visualizer and ] to the next", () => {
+    expect(step({ key: "[" })).toBe(-1);
+    expect(step({ key: "]" })).toBe(1);
+  });
+
+  it("accepts AltGr (Ctrl+Alt), which types the brackets on some layouts", () => {
+    expect(step({ key: "[", ctrlKey: true, altKey: true })).toBe(-1);
+  });
+
+  it("leaves Ctrl+[ / Ctrl+] (Back / Forward), Cmd and other keys alone", () => {
+    expect(step({ key: "[", ctrlKey: true })).toBe(0);
+    expect(step({ key: "]", metaKey: true })).toBe(0);
+    expect(step({ key: "ArrowRight" })).toBe(0);
   });
 });

@@ -253,6 +253,9 @@
       }
 
       if (!(e.ctrlKey || e.metaKey)) return;
+      // AltGr arrives as Ctrl+Alt on Windows. It types characters such as [ and ] on German
+      // and French layouts (the visualizer keys, #2245), so it is never a Ctrl shortcut here.
+      if (e.ctrlKey && e.altKey) return;
 
       switch (e.key.toLowerCase()) {
         case "f":

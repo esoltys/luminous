@@ -2918,6 +2918,8 @@ export const fr: DeepStringRecord<typeof en> = {
     toggleRightPanel: "Basculer le panneau droit",
     toggleMiniplayer: "Basculer le mini-lecteur",
     toggleFullscreen: "Basculer le plein écran",
+    previousVisualizer: "Visualiseur précédent",
+    nextVisualizer: "Visualiseur suivant",
     openEqualizer: "Ouvrir l'égaliseur",
     openSettings: "Ouvrir les paramètres",
     showShortcuts: "Afficher cette liste",
@@ -3354,5 +3356,11 @@ export const fr: DeepStringRecord<typeof en> = {
     noStationLists:
       "Créez une liste de stations pour suivre des genres qui se mettent à jour automatiquement.",
     stationsCount: "stations",
+  },
+  visualizers: {
+    voxel: "Spectre en voxels",
+    menuTitle: "Visualiseur",
+    previous: "Visualiseur précédent : {name}",
+    next: "Visualiseur suivant : {name}",
   },
 };

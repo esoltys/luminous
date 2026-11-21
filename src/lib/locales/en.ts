@@ -2830,6 +2830,8 @@ export const en = {
     toggleRightPanel: "Toggle right panel",
     toggleMiniplayer: "Toggle miniplayer",
     toggleFullscreen: "Toggle fullscreen",
+    previousVisualizer: "Previous visualizer",
+    nextVisualizer: "Next visualizer",
     openEqualizer: "Open Equalizer settings",
     openSettings: "Open Settings",
     showShortcuts: "Show this list",
@@ -3262,5 +3264,11 @@ export const en = {
     noStationLists:
       "Create a station list to follow genres that update automatically from the directory.",
     stationsCount: "stations",
+  },
+  visualizers: {
+    voxel: "Voxel spectrum",
+    menuTitle: "Visualizer",
+    previous: "Previous visualizer: {name}",
+    next: "Next visualizer: {name}",
   },
 };

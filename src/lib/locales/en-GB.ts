@@ -22,6 +22,7 @@ export const enGB: Messages = {
       "Organise files automatically in the background using your active template when new tracks arrive or tags are edited.",
   },
   playerBar: {
+    visualizerTooltip: "Toggle audio visualiser",
     shuffleAllDesc: "Play all tracks in a randomised order",
     shuffleInsideAlbumDesc:
       "Play albums in their normal order, but randomise the tracks within each album",
@@ -87,5 +88,14 @@ export const enGB: Messages = {
   },
   auth: {
     waitingForBrowser: "Waiting for authorisation in browser…",
+  },
+  shortcuts: {
+    previousVisualizer: "Previous visualiser",
+    nextVisualizer: "Next visualiser",
+  },
+  visualizers: {
+    menuTitle: "Visualiser",
+    previous: "Previous visualiser: {name}",
+    next: "Next visualiser: {name}",
   },
 };

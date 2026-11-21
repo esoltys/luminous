@@ -11,7 +11,8 @@
   } from "../lib/stores/navigation.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
   import { playlistsStore } from "../lib/stores/playlists.svelte";
-  import { shouldSkipGlobalShortcut } from "../lib/utils/globalShortcuts";
+  import { shouldSkipGlobalShortcut, visualizerStepForKey } from "../lib/utils/globalShortcuts";
+  import { visualizerStore } from "../lib/stores/visualizer.svelte";
 
   let isInitialized = $state(false);
 
@@ -20,6 +21,14 @@
 
   function handleKeyboardShortcut(event: KeyboardEvent) {
     if (shouldSkipGlobalShortcut(event)) return;
+
+    const visualizerStep = visualizerStepForKey(event);
+    if (visualizerStep !== 0) {
+      if (!visualizerStore.canSwitch) return;
+      event.preventDefault();
+      visualizerStore.cycle(visualizerStep);
+      return;
+    }
 
     switch (event.code) {
       case "Space":

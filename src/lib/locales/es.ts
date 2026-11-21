@@ -2902,6 +2902,8 @@ export const es = {
     toggleRightPanel: "Alternar el panel derecho",
     toggleMiniplayer: "Alternar el minirreproductor",
     toggleFullscreen: "Alternar pantalla completa",
+    previousVisualizer: "Visualizador anterior",
+    nextVisualizer: "Visualizador siguiente",
     openEqualizer: "Abrir ajustes del ecualizador",
     openSettings: "Abrir Configuración",
     showShortcuts: "Mostrar esta lista",
@@ -3340,5 +3342,11 @@ export const es = {
     noStationLists:
       "Crea una lista de emisoras para seguir géneros que se actualizan automáticamente.",
     stationsCount: "emisoras",
+  },
+  visualizers: {
+    voxel: "Espectro de vóxeles",
+    menuTitle: "Visualizador",
+    previous: "Visualizador anterior: {name}",
+    next: "Visualizador siguiente: {name}",
   },
 };

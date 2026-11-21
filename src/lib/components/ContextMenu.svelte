@@ -14,9 +14,11 @@
     y: number;
     onClose: () => void;
     children: Snippet;
+    /** Menu width in px, for rows that carry more than an icon and a label. Default: w-52. */
+    widthPx?: number;
   }
 
-  let { x, y, onClose, children }: Props = $props();
+  let { x, y, onClose, children, widthPx }: Props = $props();
 
   let menuEl = $state<HTMLDivElement | null>(null);
   // Real rendered height measured on mount, so callers never supply a height.
@@ -25,7 +27,10 @@
   // Keep menu inside viewport boundaries
   let adjustedX = $derived.by(() => {
     if (typeof window === "undefined") return x;
-    return Math.min(x, window.innerWidth - CONTEXT_MENU_WIDTH_PX - VIEWPORT_EDGE_PADDING_PX);
+    return Math.min(
+      x,
+      window.innerWidth - (widthPx ?? CONTEXT_MENU_WIDTH_PX) - VIEWPORT_EDGE_PADDING_PX,
+    );
   });
 
   // Tallest the menu may be: a menu taller than this scrolls instead of
@@ -71,10 +76,13 @@
   use:portal
   bind:this={menuEl}
   bind:offsetHeight={measuredHeight}
+  style:width={widthPx === undefined ? undefined : `${widthPx}px`}
   style="left: {adjustedX}px; top: {adjustedY}px;{maxHeight === undefined
     ? ''
     : ` max-height: ${maxHeight}px;`}"
-  class="fixed z-50 w-52 overflow-y-auto acrylic-float border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none"
+  class="fixed z-50 {widthPx === undefined
+    ? 'w-52'
+    : ''} overflow-y-auto acrylic-float border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary select-none"
   role="menu"
   tabindex="-1"
 >

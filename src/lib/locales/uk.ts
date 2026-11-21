@@ -3072,6 +3072,8 @@ export const uk = {
     toggleRightPanel: "Перемкнути праву панель",
     toggleMiniplayer: "Перемкнути міні-плеєр",
     toggleFullscreen: "Перемкнути повноекранний режим",
+    previousVisualizer: "Попередній візуалізатор",
+    nextVisualizer: "Наступний візуалізатор",
     openEqualizer: "Відкрити налаштування еквалайзера",
     openSettings: "Відкрити налаштування",
     showShortcuts: "Показати цей список",
@@ -3532,5 +3534,11 @@ export const uk = {
     stationLimit: "Макс. станцій",
     noStationLists: "Створіть список станцій, щоб стежити за жанрами, які оновлюються автоматично.",
     stationsCount: "станцій",
+  },
+  visualizers: {
+    voxel: "Воксельний спектр",
+    menuTitle: "Візуалізатор",
+    previous: "Попередній візуалізатор: {name}",
+    next: "Наступний візуалізатор: {name}",
   },
 };
