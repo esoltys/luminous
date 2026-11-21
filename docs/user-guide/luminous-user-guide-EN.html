@@ -87,7 +87,7 @@
 
     <section id="collection" data-section>
       <h1>Your library</h1>
-      <p>Your music lives under <b>Library</b> in the sidebar, in four views: Artists, Albums, Songs and Genres. Each one opens with its name, a count underneath ("315 albums", or "42 of 315 albums" while you search), and sort and view controls at the top right. Settings and Help stay at the bottom of the sidebar.</p>
+      <p>Your music lives under <b>Library</b> in the sidebar, in four views: Artists, Albums, Songs and Genres. Each one opens with its name, a count underneath ("315 albums", or "42 of 315 albums" while you search), and sort and view controls at the top right. Settings, <b>Connect…</b> / <b>Connected</b> (when Online Services are on), and Help stay at the bottom of the sidebar.</p>
       <figure class="shot mw-700 mb-28">
         <img src="assets/en-CA/screenshots/dark/albums.webp" alt="Albums grid" width="1440" height="900" loading="lazy">
       </figure>
@@ -225,7 +225,7 @@
         <div class="row"><div class="mk">•</div><div>Hover over the mini-player to show its controls and rate the song.</div></div>
         <div class="row"><div class="mk">•</div><div>Drag along its top edge to move it.</div></div>
         <div class="row"><div class="mk">•</div><div>Use the lyrics button to switch between the cover and live lyrics.</div></div>
-        <div class="row"><div class="mk">•</div><div>Click <b>Restore Full Window</b> (<kbd>Ctrl</kbd><kbd>M</kbd>) at the bottom right to go back.</div></div>
+        <div class="row"><div class="mk">•</div><div>Click <b>Restore Full Window</b> (<kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>M</kbd>) at the bottom right to go back.</div></div>
       </div>
       <div class="pair-native mb-28">
         <div><figure class="shot"><img src="assets/en-CA/screenshots/dark/miniplayer.webp" alt="Mini-player" width="340" height="420" loading="lazy"></figure><div class="caption">Resting</div></div>
@@ -487,7 +487,6 @@
         <div class="row"><div class="mk">•</div><div><b>Launch at login</b>: start Luminous when you sign in.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Export Diagnostics</b>: save a log file of recent crashes and errors to attach to a bug report.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Data Storage Location</b>: where your library database, artwork cache and preferences are kept. The Windows ZIP runs in <b>Portable Mode</b>, keeping everything in a <code>data</code> folder beside the app. Music folders on the same drive follow it when the drive gets a new letter on another computer. On Linux, put an empty file named <code>portable</code> beside the AppImage to do the same.</div></div>
-        <div class="row"><div class="mk">•</div><div>Updates: check for a new version and choose what happens when one is out. Microsoft Store installs update themselves.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/en-CA/screenshots/dark/settings-system.webp" alt="System settings" width="1440" height="1100" loading="lazy">
@@ -523,8 +522,8 @@
       <p>Every integration is optional, so you can keep any part of Luminous offline.</p>
       <div class="list">
         <div class="row"><div class="mk">•</div><div><b>Online Services</b>: the master switch at the top right. Turn it to <b>Offline</b> and Luminous makes no requests to external services (cover art, lyrics, bios, ListenBrainz, MusicBrainz sign-in, Discord presence and update checks); saved lyrics and art still show, and your Subsonic and WebDAV libraries keep working.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>ListenBrainz Scrobbler</b>: paste your <b>User Token</b>, click <b>Validate &amp; Save</b>, then turn on scrobbling. Choose whether to also send ratings. Toggle now-playing broadcasts and pause scrobbling from the MusicBrainz profile popup in the sidebar.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Pause all scrobbling</b> (in the sidebar profile popup or system tray) stops sending without disconnecting. Listens made offline wait until you click <b>Sync Now</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>ListenBrainz Scrobbler</b>: paste your <b>User Token</b>, click <b>Validate &amp; Save</b>, then turn on scrobbling. Choose whether to also send ratings. Toggle now-playing broadcasts and pause scrobbling from the <b>Connected</b> button in the sidebar.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Pause all scrobbling</b> (from the <b>Connected</b> button in the sidebar or the system tray) stops sending without disconnecting. Listens made offline wait until you click <b>Sync Now</b>.</div></div>
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard</b>: Luminous finds Picard or lets you browse to it, so you can open files in Picard.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Last.fm</b>: Last.fm needs your own API key, and a key needs a Last.fm Pro subscription on the account that owns it. Click <b>Create an API key</b>, enter the key and shared secret in <b>Last.fm API key</b> and <b>Last.fm shared secret</b>, and click <b>Save key</b>. Then click <b>Connect Last.fm</b>, approve Luminous in your browser, then click <b>Finish Login</b>. Turn on <b>Enable Last.fm scrobbling</b> to send completed listens, and <b>Synchronize loved songs</b> to keep your favourites in step with your loved tracks. Listens made offline are queued and sent when you reconnect.</div></div>
         <div class="row"><div class="mk">•</div><div><b>On the radio now</b>: show which internet radio stations are playing a song, using Tuneping. Turning it on sends the artist and title of the song in the info panel to Tuneping; nothing is sent while it's off or while Luminous is offline.</div></div>
@@ -666,7 +665,7 @@
       </div>
       <div class="kb-label">Navigation</div>
       <div class="kb-table">
-      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>L</kbd></div><div>Focus the search bar</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>L</kbd><span class="kb-or">or</span><kbd>Ctrl</kbd><kbd>F</kbd><span class="kb-or">or</span><kbd>/</kbd></div><div>Focus the search bar</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Esc</kbd></div><div>Close search dropdown</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>O</kbd></div><div>Open song</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>[</kbd></div><div>Go back</div></div>
@@ -682,6 +681,7 @@
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>F</kbd><span class="kb-or">or</span><kbd>F11</kbd></div><div>Toggle fullscreen</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>[</kbd></div><div>Previous visualizer</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>]</kbd></div><div>Next visualizer</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>E</kbd></div><div>Open Equalizer settings</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>,</kbd></div><div>Open Settings</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>/</kbd></div><div>Show this list</div></div>
       </div>
@@ -693,6 +693,9 @@
       <p class="note">Hi, I'm Eric, the Canadian senior software developer behind Luminous. I really enjoy working on this app, and I hope it shows. Please reach out to say hello and share your feedback. You'll find me at <a href="https://esoltys.dev" target="_blank" rel="noopener">esoltys.dev</a>.</p>
       <span class="signature" role="img" aria-label="Eric"></span>
       <p>The source code is on <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>, with the credits for every library Luminous uses and the licence it's shared under. Open Source means, to me, that we can learn and build upon what came before.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Updates</b>: check for a new version and choose what happens when one is out. Microsoft Store installs update themselves.</div></div>
+      </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/en-CA/screenshots/dark/settings-about.webp" alt="About &amp; Credits" width="1440" height="950" loading="lazy">
       </figure>
