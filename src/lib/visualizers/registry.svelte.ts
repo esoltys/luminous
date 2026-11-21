@@ -1,18 +1,14 @@
-import { DEV_TEST_PATTERN_PRESET } from "./devTestPattern";
 import type { VisualizerPreset } from "./types";
 import { VOXEL_PRESET } from "./voxel";
+import { VOXEL_LOGO_PRESET } from "./voxelLogo";
 
 /** The preset shown when nothing (or something no longer registered) was saved. */
 export const DEFAULT_PRESET: VisualizerPreset = VOXEL_PRESET;
 
 // Built-ins in selector order. Add-on packs will register through `registerPreset` later.
-// The dev test pattern is left out of unit tests so they see only what ships.
 // Reactive, so the selector updates when a preset registers or leaves; `raw` keeps the
 // presets themselves unproxied, so identity comparisons hold.
-let presets = $state.raw<readonly VisualizerPreset[]>([
-  VOXEL_PRESET,
-  ...(import.meta.env.DEV && import.meta.env.MODE !== "test" ? [DEV_TEST_PATTERN_PRESET] : []),
-]);
+let presets = $state.raw<readonly VisualizerPreset[]>([VOXEL_PRESET, VOXEL_LOGO_PRESET]);
 
 /** Every registered preset, in selector order. */
 export function listPresets(): readonly VisualizerPreset[] {

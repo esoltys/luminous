@@ -6,6 +6,7 @@ import {
   registerPreset,
 } from "../visualizers/registry.svelte";
 import type { VisualizerPreset } from "../visualizers/types";
+import { VOXEL_LOGO_PRESET } from "../visualizers/voxelLogo";
 import { VisualizerStore } from "./visualizer.svelte";
 
 function fakePreset(id: string): VisualizerPreset {
@@ -18,8 +19,8 @@ function fakePreset(id: string): VisualizerPreset {
 }
 
 describe("visualizer registry (#2245)", () => {
-  it("ships the voxel spectrum as the only preset outside dev builds", () => {
-    expect(listPresets().map((p) => p.id)).toEqual(["voxel"]);
+  it("ships the voxel spectrum and voxel logo, spectrum first", () => {
+    expect(listPresets().map((p) => p.id)).toEqual(["voxel", "voxel-logo"]);
     expect(DEFAULT_PRESET.id).toBe("voxel");
   });
 
@@ -53,13 +54,18 @@ describe("VisualizerStore (#2245)", () => {
     localStorage.clear();
   });
 
-  it("has nothing to switch between with only the voxel preset", () => {
+  it("has nothing to switch between with a single preset registered", () => {
+    // Set the other built-in aside; re-registering restores it at the end of the list.
+    registerPreset(VOXEL_LOGO_PRESET)();
+    cleanups.push(() => registerPreset(VOXEL_LOGO_PRESET));
     const store = new VisualizerStore();
     expect(store.preset.id).toBe("voxel");
     expect(store.canSwitch).toBe(false);
   });
 
   it("cycles both ways, wrapping at the ends, and counts each switch", () => {
+    registerPreset(VOXEL_LOGO_PRESET)();
+    cleanups.push(() => registerPreset(VOXEL_LOGO_PRESET));
     cleanups.push(registerPreset(fakePreset("b")), registerPreset(fakePreset("c")));
     const store = new VisualizerStore();
     expect(store.canSwitch).toBe(true);

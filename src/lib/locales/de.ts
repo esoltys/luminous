@@ -3353,6 +3353,7 @@ export const de = {
   },
   visualizers: {
     voxel: "Voxel-Spektrum",
+    voxelLogo: "Voxel-Logo",
     menuTitle: "Visualisierung",
     previous: "Vorherige Visualisierung: {name}",
     next: "Nächste Visualisierung: {name}",

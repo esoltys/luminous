@@ -11,6 +11,7 @@ import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { visualizerStore } from "../stores/visualizer.svelte";
 import { registerPreset } from "../visualizers/registry.svelte";
+import { VOXEL_LOGO_PRESET } from "../visualizers/voxelLogo";
 import type { Song, Playlist } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -845,6 +846,12 @@ describe("PlayerBar.svelte", () => {
   describe("visualizer preset selector (#2245)", () => {
     let unregister: (() => void) | null = null;
 
+    // These tests drive the selector with a single fake preset beside the voxel spectrum, so
+    // the other built-in is set aside (re-registering restores it at the end of the list).
+    beforeEach(() => {
+      registerPreset(VOXEL_LOGO_PRESET)();
+    });
+
     function registerSecondPreset() {
       unregister = registerPreset({
         id: "fake",
@@ -858,6 +865,7 @@ describe("PlayerBar.svelte", () => {
       visualizerStore.select("voxel");
       unregister?.();
       unregister = null;
+      registerPreset(VOXEL_LOGO_PRESET);
       localStorage.clear();
     });
 
@@ -925,5 +933,18 @@ describe("PlayerBar.svelte", () => {
       expect(visualizerStore.preset.id).toBe("fake");
       expect(screen.queryByRole("menuitemradio")).toBeNull();
     });
+  });
+
+  it("offers the built-in voxel spectrum and voxel logo presets (#2252)", async () => {
+    playerStore.currentSong = mockSong;
+    const { getByTestId } = render(PlayerBar);
+    expect(getByTestId("visualizer-next")).toHaveAttribute(
+      "aria-label",
+      "Next visualizer: Voxel logo",
+    );
+    await fireEvent.contextMenu(getByTestId("player-bar-visualizer"));
+    const options = screen.getAllByRole("menuitemradio");
+    expect(options.map((o) => o.getAttribute("data-preset"))).toEqual(["voxel", "voxel-logo"]);
+    expect(options[1]).toHaveTextContent("Voxel logo");
   });
 });

@@ -3548,6 +3548,7 @@ export const ru = {
   },
   visualizers: {
     voxel: "Воксельный спектр",
+    voxelLogo: "Воксельный логотип",
     menuTitle: "Визуализатор",
     previous: "Предыдущий визуализатор: {name}",
     next: "Следующий визуализатор: {name}",
