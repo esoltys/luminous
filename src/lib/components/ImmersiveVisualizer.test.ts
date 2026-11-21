@@ -83,6 +83,15 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
     expect(windowLayoutStore.immersiveView).toBe("cover");
   });
 
+  it("keeps descenders of the leading-none truncated title and artist lines inside their clip box (#2250)", () => {
+    const { getByText } = render(ImmersiveVisualizer, { active: true });
+    // jsdom has no layout, so assert the mechanism: bottom padding extends the overflow clip box
+    // below the 1em line box, and the matching negative margin keeps the header height unchanged.
+    for (const line of [getByText("Neon Horizon"), getByText("Synthwave Collective")]) {
+      expect(line).toHaveClass("leading-none", "truncate", "pb-[0.2em]", "-mb-[0.2em]");
+    }
+  });
+
   it("subscribes to spectrum-data events and renders on the canvas when active", async () => {
     let spectrumCallback: ((event: { payload: number[] }) => void) | undefined;
     vi.mocked(listen).mockImplementation(async (eventName, cb) => {
