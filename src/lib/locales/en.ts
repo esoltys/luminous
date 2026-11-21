@@ -395,7 +395,7 @@ export const en = {
     fileFilterPlaylists: "Playlists",
     goBack: "Go back",
     goForward: "Go forward",
-    searchPlaceholder: "Search and filter... (Ctrl+L)",
+    searchPlaceholder: "Search and filter... (Ctrl+F)",
     open: "Open…",
     openFilesTooltip: "Open Audio Files or Playlists (*.m3u)",
     openFilesTitle: "Open Audio Files or Playlists",
