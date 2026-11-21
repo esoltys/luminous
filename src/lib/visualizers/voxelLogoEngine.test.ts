@@ -4,6 +4,8 @@ import { calculateContrastRatio, rgbToHex } from "../utils/colorUtils";
 import type { VisualizerFrame } from "./types";
 import { VOXEL_LOGO_PRESET } from "./voxelLogo";
 import {
+  LOGO_REST,
+  LOGO_STYLE,
   LogoGrid,
   LogoLevels,
   VoxelLogoRenderer,
@@ -48,20 +50,19 @@ function cellAt(grid: LogoGrid, min: number, x: number, y: number): number {
   return row * grid.size + col;
 }
 
-const REST = { none: 0, disc: 1, rim: 2, ring: 3 };
-
-// Layer ranges in a palette's style list: housing, disc, then a 10-step ladder per lit layer.
-const LAYER = { rim: 3, ring: 13, glow: 23, burst: 33 } as const;
+type Layer = "rim" | "ring" | "glow" | "burst";
 
 /** A palette whose fills are their own style indices, so a drawn cell says which layer it is. */
-const TAGGED: VoxelLogoPalette = { styles: Array.from({ length: 43 }, (_, i) => String(i)) };
+const TAGGED: VoxelLogoPalette = {
+  styles: Array.from({ length: LOGO_STYLE.count }, (_, i) => String(i)),
+};
 
 /** Positions of the cells drawn in `layer`'s ladder. */
-function cellsIn(rects: Rect[], layer: keyof typeof LAYER): Set<string> {
-  const from = LAYER[layer];
+function cellsIn(rects: Rect[], layer: Layer): Set<string> {
+  const from = LOGO_STYLE[layer];
   return new Set(
     rects
-      .filter((r) => Number(r.style) >= from && Number(r.style) < from + 10)
+      .filter((r) => Number(r.style) >= from && Number(r.style) < from + LOGO_STYLE.ladder)
       .map((r) => `${r.x},${r.y}`),
   );
 }
@@ -74,7 +75,7 @@ describe("LogoGrid (#2252)", () => {
     [9, -4, 204],
   ])("keeps the disc, rim and ring as closed shapes at %i cells", (size, min, max) => {
     const grid = new LogoGrid(size, min, max);
-    expect(grid.restLayer[cellAt(grid, min, 100, 100)]).toBe(REST.disc);
+    expect(grid.restLayer[cellAt(grid, min, 100, 100)]).toBe(LOGO_REST.disc);
 
     // Walking out from the centre along each axis crosses disc, then rim, then ring.
     for (const [dx, dy] of [
@@ -88,7 +89,11 @@ describe("LogoGrid (#2252)", () => {
         const layer = grid.restLayer[cellAt(grid, min, 100 + dx * t, 100 + dy * t)];
         if (layer !== seen[seen.length - 1]) seen.push(layer);
       }
-      expect(seen.filter((l) => l !== REST.none)).toEqual([REST.disc, REST.rim, REST.ring]);
+      expect(seen.filter((l) => l !== LOGO_REST.none)).toEqual([
+        LOGO_REST.disc,
+        LOGO_REST.rim,
+        LOGO_REST.ring,
+      ]);
     }
   });
 
@@ -220,7 +225,7 @@ describe("VoxelLogoRenderer (#2252)", () => {
     }
     // The halo and glow fade in within a fixed reach rather than growing to their full size.
     expect(cellsIn(loud, "burst").size).toBeLessThan(cellsIn(draw(1, false), "burst").size);
-    const fills = (rects: Rect[], layer: keyof typeof LAYER) =>
+    const fills = (rects: Rect[], layer: Layer) =>
       new Set(rects.filter((r) => cellsIn([r], layer).size > 0).map((r) => r.style));
     expect(fills(loud, "rim")).not.toEqual(fills(quiet, "rim"));
     expect(fills(loud, "ring")).not.toEqual(fills(quiet, "ring"));
@@ -242,7 +247,7 @@ describe("buildVoxelLogoPalette (#2252)", () => {
   ] as const)("keeps the burst visible against the %s theme's surfaces", (_, colors) => {
     for (const surface of ["bg-main", "bg-playerbar"] as const) {
       const palette = buildVoxelLogoPalette(colors, surface);
-      const burst = topRgbHex(palette.styles[palette.styles.length - 1]);
+      const burst = topRgbHex(palette.styles[LOGO_STYLE.burst + LOGO_STYLE.ladder - 1]);
       expect(calculateContrastRatio(burst, colors[surface])).toBeGreaterThanOrEqual(3);
     }
   });

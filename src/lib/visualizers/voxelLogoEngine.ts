@@ -1,6 +1,7 @@
 import type { ThemeColors } from "../stores/theme.svelte";
-import { clampForContrast, hexToRgb, isLightColor } from "../utils/colorUtils";
+import { clampForContrast, hexToRgb } from "../utils/colorUtils";
 import type { VisualizerFrame } from "./types";
+import { voxelUnlitCellColor } from "./voxelEngine";
 
 // The brand mark (docs/luminous-mark.svg), in its own 200×200 units.
 const CENTER = 100;
@@ -39,11 +40,8 @@ const EPSILON = 0.002;
 /** Steps in each layer's brightness ladder. */
 const LADDER = 10;
 
-/** What a cell shows when no audio-driven layer reaches it. */
-const REST_NONE = 0;
-const REST_DISC = 1;
-const REST_RIM = 2;
-const REST_RING = 3;
+/** Values of `LogoGrid.restLayer`: what a cell shows when no audio-driven layer reaches it. */
+export const LOGO_REST = { none: 0, disc: 1, rim: 2, ring: 3 } as const;
 
 /**
  * The mark rasterized onto a square grid of `size` cells covering `[min, max]` mark units on
@@ -80,12 +78,12 @@ export class LogoGrid {
         // The ring is painted over the rim, so it wins where the widened strokes overlap.
         this.restLayer[i] =
           d <= DISC_R
-            ? REST_DISC
+            ? LOGO_REST.disc
             : Math.abs(d - RING_R) <= ringReach
-              ? REST_RING
+              ? LOGO_REST.ring
               : Math.abs(d - RIM_R) <= rimReach
-                ? REST_RIM
-                : REST_NONE;
+                ? LOGO_REST.rim
+                : LOGO_REST.none;
       }
     }
   }
@@ -162,18 +160,25 @@ function approach(current: number, target: number, attack: number, decay: number
   return Math.abs(target - next) < EPSILON ? target : next;
 }
 
-// Style indices into `VoxelLogoPalette.styles`. 0 means "draw nothing".
-const STYLE_NONE = 0;
-const STYLE_HOUSING = 1;
-const STYLE_DISC = 2;
-const STYLE_RIM = 3;
-const STYLE_RING = STYLE_RIM + LADDER;
-const STYLE_GLOW = STYLE_RING + LADDER;
-const STYLE_BURST = STYLE_GLOW + LADDER;
-const STYLE_COUNT = STYLE_BURST + LADDER;
+/**
+ * The layout of `VoxelLogoPalette.styles`. `none` (draw nothing), `housing` and `disc` are single
+ * fills; `rim`, `ring`, `glow` and `burst` each start a brightness ladder of `ladder` fills, dimmest
+ * first. `count` is the number of styles.
+ */
+export const LOGO_STYLE = {
+  none: 0,
+  housing: 1,
+  disc: 2,
+  rim: 3,
+  ring: 3 + LADDER,
+  glow: 3 + 2 * LADDER,
+  burst: 3 + 3 * LADDER,
+  ladder: LADDER,
+  count: 3 + 4 * LADDER,
+} as const;
 
 export interface VoxelLogoPalette {
-  /** Every fill the renderer uses, indexed by style; one brightness ladder per lit layer. */
+  /** Every fill the renderer uses, laid out as `LOGO_STYLE` describes. */
   readonly styles: readonly string[];
 }
 
@@ -188,28 +193,27 @@ export function buildVoxelLogoPalette(
   surface: "bg-main" | "bg-playerbar",
 ): VoxelLogoPalette {
   const bg = colors[surface] || colors["bg-main"] || "#191918";
-  const isLight = isLightColor(bg);
   const accent = hexToRgb(clampForContrast(colors["color-accent"] || "#4f5bd5", bg, 3.0));
   const hover = hexToRgb(
     clampForContrast(colors["color-accent-hover"] || colors["color-accent"] || "#a78bfa", bg, 3.0),
   );
   const burst = hexToRgb(clampForContrast("#ffffff", bg, 3.0));
-  const border = hexToRgb(colors["color-border"] || "#4f5bd5");
 
-  const styles: string[] = new Array(STYLE_COUNT);
-  styles[STYLE_NONE] = "transparent";
-  styles[STYLE_HOUSING] = `rgba(${border.r}, ${border.g}, ${border.b}, ${isLight ? 0.13 : 0.1})`;
-  styles[STYLE_DISC] = "#0a0a0d";
+  const styles: string[] = new Array(LOGO_STYLE.count);
+  styles[LOGO_STYLE.none] = "transparent";
+  // Only the full view draws housing, on `bg-main`, matching the voxel spectrum's.
+  styles[LOGO_STYLE.housing] = voxelUnlitCellColor(colors);
+  styles[LOGO_STYLE.disc] = "#0a0a0d";
   const ladder = (base: number, rgb: { r: number; g: number; b: number }) => {
     for (let k = 0; k < LADDER; k++) {
       const alpha = 0.12 + (0.88 * k) / (LADDER - 1);
       styles[base + k] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha.toFixed(3)})`;
     }
   };
-  ladder(STYLE_RIM, accent);
-  ladder(STYLE_RING, hover);
-  ladder(STYLE_GLOW, accent);
-  ladder(STYLE_BURST, burst);
+  ladder(LOGO_STYLE.rim, accent);
+  ladder(LOGO_STYLE.ring, hover);
+  ladder(LOGO_STYLE.glow, accent);
+  ladder(LOGO_STYLE.burst, burst);
   return { styles };
 }
 
@@ -238,8 +242,8 @@ export class VoxelLogoRenderer {
   private readonly glow: boolean;
   private readonly cellStyle: Uint8Array;
   private readonly order: Int32Array;
-  private readonly bucketStart = new Int32Array(STYLE_COUNT + 1);
-  private readonly bucketFill = new Int32Array(STYLE_COUNT);
+  private readonly bucketStart = new Int32Array(LOGO_STYLE.count + 1);
+  private readonly bucketFill = new Int32Array(LOGO_STYLE.count);
 
   constructor(options: VoxelLogoRendererOptions) {
     this.grids = options.grids;
@@ -292,8 +296,8 @@ export class VoxelLogoRenderer {
     const haloR = reducedMotion ? HALO_R_STILL : HALO_R_MIN + HALO_R_RANGE * levels.bass;
     const glowR = reducedMotion ? GLOW_R_STILL : GLOW_R_MIN + GLOW_R_RANGE * levels.mid;
     const coreR = Math.max(BURST_R, grid.cellUnits * 0.5);
-    const rimStyle = STYLE_RIM + rung(0.7 + 0.3 * levels.mid);
-    const ringStyle = STYLE_RING + rung(0.5 + 0.5 * levels.treble);
+    const rimStyle = LOGO_STYLE.rim + rung(0.7 + 0.3 * levels.mid);
+    const ringStyle = LOGO_STYLE.ring + rung(0.5 + 0.5 * levels.treble);
     const haloOpacity = 0.15 + 0.7 * levels.bass;
     const glowOpacity = (0.2 + 0.7 * levels.mid) * GLOW_PEAK;
 
@@ -306,36 +310,36 @@ export class VoxelLogoRenderer {
       const d = grid.markDistance[i];
       const db = grid.burstDistance[i];
       const rest = grid.restLayer[i];
-      let style = STYLE_NONE;
+      let style: number = LOGO_STYLE.none;
       if (db <= coreR) {
-        style = STYLE_BURST + LADDER - 1;
+        style = LOGO_STYLE.burst + LADDER - 1;
       } else if (db <= haloR) {
         const k = rung(haloOpacity * (1 - (db - BURST_R) / (haloR - BURST_R)));
-        if (k > 0) style = STYLE_BURST + k;
+        if (k > 0) style = LOGO_STYLE.burst + k;
       }
-      if (style === STYLE_NONE) {
-        if (rest === REST_DISC) style = STYLE_DISC;
-        else if (rest === REST_RING || Math.abs(d - RING_R) <= ringHalf) style = ringStyle;
-        else if (rest === REST_RIM || Math.abs(d - RIM_R) <= rimHalf) style = rimStyle;
+      if (style === LOGO_STYLE.none) {
+        if (rest === LOGO_REST.disc) style = LOGO_STYLE.disc;
+        else if (rest === LOGO_REST.ring || Math.abs(d - RING_R) <= ringHalf) style = ringStyle;
+        else if (rest === LOGO_REST.rim || Math.abs(d - RIM_R) <= rimHalf) style = rimStyle;
         else if (this.glow && d <= glowR) {
           const k = rung(glowOpacity * (1 - (d - RING_OUTER) / (glowR - RING_OUTER)));
-          if (k > 0) style = STYLE_GLOW + k;
+          if (k > 0) style = LOGO_STYLE.glow + k;
         }
-        if (style === STYLE_NONE && this.housing) style = STYLE_HOUSING;
+        if (style === LOGO_STYLE.none && this.housing) style = LOGO_STYLE.housing;
       }
       styleOf[i] = style;
       starts[style + 1]++;
     }
 
     // 2. Bucket the cells by style (a counting sort into preallocated buffers).
-    for (let s = 0; s < STYLE_COUNT; s++) starts[s + 1] += starts[s];
+    for (let s = 0; s < LOGO_STYLE.count; s++) starts[s + 1] += starts[s];
     const fill = this.bucketFill;
-    for (let s = 0; s < STYLE_COUNT; s++) fill[s] = starts[s];
+    for (let s = 0; s < LOGO_STYLE.count; s++) fill[s] = starts[s];
     for (let i = 0; i < count; i++) this.order[fill[styleOf[i]]++] = i;
 
     // 3. Housing cells around the grid, aligned to its pitch.
     if (this.housing) {
-      ctx.fillStyle = palette.styles[STYLE_HOUSING];
+      ctx.fillStyle = palette.styles[LOGO_STYLE.housing];
       const firstCol = -Math.ceil(originX / pitch);
       const firstRow = -Math.ceil(originY / pitch);
       const lastCol = Math.ceil((width - originX) / pitch);
@@ -351,7 +355,7 @@ export class VoxelLogoRenderer {
     }
 
     // 4. The grid's cells, one fillStyle per bucket.
-    for (let s = STYLE_NONE + 1; s < STYLE_COUNT; s++) {
+    for (let s = LOGO_STYLE.none + 1; s < LOGO_STYLE.count; s++) {
       const from = starts[s];
       const to = starts[s + 1];
       if (from === to) continue;

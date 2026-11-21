@@ -14,78 +14,71 @@ import {
   type VoxelLogoPalette,
 } from "./voxelLogoEngine";
 
-/** The full view's frame, in mark units: the mark plus room for the glow halo (radius up to 130). */
-const FULL_FRAME_MIN = -40;
-const FULL_FRAME_MAX = 240;
-const FULL_GRID = 56;
-/** The mini view drops the glow, so its frame is the mark with a little margin. */
-const MINI_FRAME_MIN = -4;
-const MINI_FRAME_MAX = 204;
-// 9 cells is the coarsest grid that still has a cell for each of the disc, rim and ring.
-const MINI_GRIDS = [13, 11, 9] as const;
+interface VoxelLogoSizeConfig {
+  /** Grids from finest to coarsest, in mark units; the renderer picks the finest that fits. */
+  readonly grids: () => LogoGrid[];
+  /** Unlit housing cells around the mark, as the voxel spectrum's matrix has. */
+  readonly housing: boolean;
+  /** The mid-driven glow halo around the ring. */
+  readonly glow: boolean;
+  /** The surface the canvas sits on, which colours are contrast-checked against. */
+  readonly surface: "bg-main" | "bg-playerbar";
+  /**
+   * Ease levels between frames of data. Without it the levels jump to each frame and the view
+   * draws once per frame of data, as the voxel spectrum's mini view does.
+   */
+  readonly smoothed: boolean;
+}
+
+const SIZES: Record<VisualizerSize, VoxelLogoSizeConfig> = {
+  // The immersive stage: the mark plus room for the glow halo (radius up to 130) in a 56-cell
+  // field, set in unlit housing.
+  full: {
+    grids: () => [new LogoGrid(56, -40, 240)],
+    housing: true,
+    glow: true,
+    surface: "bg-main",
+    smoothed: true,
+  },
+  // The playbar slot and menu thumbnail: just the mark with a little margin, on the finest of
+  // three grids whose cells stay crisp at the slot's height. 9 cells is the coarsest grid that
+  // still gives the disc, rim and ring a cell each.
+  mini: {
+    grids: () => [13, 11, 9].map((size) => new LogoGrid(size, -4, 204)),
+    housing: false,
+    glow: false,
+    surface: "bg-playerbar",
+    smoothed: false,
+  },
+};
 
 /** Still-preview levels: a calm mark with a little burst halo, so it reads as the reactive logo. */
 const PREVIEW_LEVELS = LogoLevels.fixed(0.55, 0.45, 0.4);
 
-/** The immersive stage: a 56-cell mark with a glow halo, set in a field of unlit housing cells. */
-class VoxelLogoFullInstance implements VisualizerInstance {
+class VoxelLogoInstance implements VisualizerInstance {
   private readonly levels = new LogoLevels();
-  private readonly renderer = new VoxelLogoRenderer({
-    grids: [new LogoGrid(FULL_GRID, FULL_FRAME_MIN, FULL_FRAME_MAX)],
-    housing: true,
-    glow: true,
-  });
+  private readonly renderer: VoxelLogoRenderer;
   private palette!: VoxelLogoPalette;
 
+  constructor(private readonly config: VoxelLogoSizeConfig) {
+    this.renderer = new VoxelLogoRenderer({
+      grids: config.grids(),
+      housing: config.housing,
+      glow: config.glow,
+    });
+  }
+
   setTheme(colors: ThemeColors): void {
-    this.palette = buildVoxelLogoPalette(colors, "bg-main");
+    this.palette = buildVoxelLogoPalette(colors, this.config.surface);
   }
 
   push(frame: VisualizerFrame): void {
     this.levels.push(frame);
+    if (!this.config.smoothed) this.levels.settle();
   }
 
   step(dtMs: number, reducedMotion: boolean): boolean {
-    return this.levels.step(dtMs, reducedMotion);
-  }
-
-  render(
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-    options: VisualizerRenderOptions,
-  ): void {
-    const levels = options.preview ? PREVIEW_LEVELS : this.levels;
-    this.renderer.render(ctx, width, height, levels, this.palette, options.reducedMotion);
-  }
-}
-
-/**
- * The playbar slot and menu thumbnail: the coarsest grid that keeps cells crisp at the slot's
- * height, with no glow or housing. It has no smoothing of its own and draws once per frame of
- * data, so it costs no more than the voxel spectrum's mini view.
- */
-class VoxelLogoMiniInstance implements VisualizerInstance {
-  private readonly levels = new LogoLevels();
-  private readonly renderer = new VoxelLogoRenderer({
-    grids: MINI_GRIDS.map((size) => new LogoGrid(size, MINI_FRAME_MIN, MINI_FRAME_MAX)),
-    housing: false,
-    glow: false,
-  });
-  private palette!: VoxelLogoPalette;
-
-  setTheme(colors: ThemeColors): void {
-    // The slot sits on the playbar surface, so contrast is checked against that.
-    this.palette = buildVoxelLogoPalette(colors, "bg-playerbar");
-  }
-
-  push(frame: VisualizerFrame): void {
-    this.levels.push(frame);
-    this.levels.settle();
-  }
-
-  step(): boolean {
-    return false;
+    return this.config.smoothed && this.levels.step(dtMs, reducedMotion);
   }
 
   render(
@@ -105,6 +98,6 @@ export const VOXEL_LOGO_PRESET: VisualizerPreset = {
   labelKey: "visualizers.voxelLogo",
   needs: ["spectrum"],
   create(size: VisualizerSize): VisualizerInstance {
-    return size === "mini" ? new VoxelLogoMiniInstance() : new VoxelLogoFullInstance();
+    return new VoxelLogoInstance(SIZES[size]);
   },
 };
