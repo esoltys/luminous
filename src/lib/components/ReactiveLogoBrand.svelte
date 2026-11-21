@@ -57,7 +57,7 @@
     }
 
     try {
-      unlisten = await listenSpectrum(({ bands: data, onset }) => {
+      unlisten = await listenSpectrum(({ bands, onset }) => {
         if (typeof document !== "undefined" && document.hidden) return;
         if (!isPulsingEnabled) {
           bassIntensity = 0;
@@ -69,12 +69,12 @@
         // Not `settle`d: its small decay steps would hold a fading kick above 0.
         const kick = Math.max(onset, kickIntensity * KICK_DECAY);
         kickIntensity = kick < KICK_FLOOR ? 0 : kick;
-        if (data && data.length > 0) {
+        if (bands.length > 0) {
           // Segment and average the 32 spectrum bins into Bass, Mids, and Coronal/Treble
           // to prevent single-bin noise/leakage from driving unrelated components
-          const bassAvg = data.slice(0, 8).reduce((sum, v) => sum + v, 0) / 8;
-          const midAvg = data.slice(8, 20).reduce((sum, v) => sum + v, 0) / 12;
-          const coronalAvg = data.slice(20, 32).reduce((sum, v) => sum + v, 0) / 12;
+          const bassAvg = bands.slice(0, 8).reduce((sum, v) => sum + v, 0) / 8;
+          const midAvg = bands.slice(8, 20).reduce((sum, v) => sum + v, 0) / 12;
+          const coronalAvg = bands.slice(20, 32).reduce((sum, v) => sum + v, 0) / 12;
 
           // Backend bins already arrive normalized to the frame's own peak
           // (see VisualizerAnalyzer::bands), so only a modest boost is

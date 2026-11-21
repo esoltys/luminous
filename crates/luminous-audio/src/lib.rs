@@ -735,9 +735,7 @@ impl AudioEngine {
     /// (see [`set_volume_ceiling`](Self::set_volume_ceiling)). A level above
     /// the ceiling sets the ceiling. Returns the volume applied.
     pub fn set_volume(&self, vol: f32) -> f32 {
-        let before = self.shared.current_volume();
         let applied = self.shared.store_volume(vol);
-        self.visualizer.lock().gain_changed(before, applied);
         let _ = self.send_cmd(AudioCommand::SyncHardwareVolume);
         applied
     }
@@ -751,7 +749,6 @@ impl AudioEngine {
         let before = self.shared.current_volume();
         let after = self.shared.set_volume_ceiling(ceiling);
         if after != before {
-            self.visualizer.lock().gain_changed(before, after);
             let _ = self.send_cmd(AudioCommand::SyncHardwareVolume);
         }
         after
@@ -857,7 +854,8 @@ impl AudioEngine {
             return None;
         }
         let sample_rate = self.shared.output_sample_rate.load(Ordering::Relaxed);
-        Some(analyzer.frame(&self.shared.visualizer_buf, sample_rate))
+        let gain = self.shared.current_volume();
+        Some(analyzer.frame(&self.shared.visualizer_buf, sample_rate, gain))
     }
 
     /// The output stage as currently configured, with sensible defaults

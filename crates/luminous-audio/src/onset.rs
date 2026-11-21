@@ -9,11 +9,11 @@
 //! kick, a one-pole envelope smooths its power, and every [`HOP_SECS`] the
 //! envelope's rise in dB over the last [`FLUX_LAG_HOPS`] hops is the flux. An
 //! onset is flux above `mean + K·σ` of the last second of flux and above
-//! [`MIN_FLUX_DB`], followed by [`REFRACTORY_SECS`] of silence. Working in dB
+//! [`MIN_FLUX_DB`]; after one, none fires for [`REFRACTORY_SECS`]. Working in dB
 //! makes the threshold independent of playback volume, which scales the
 //! visualizer copy. A sudden volume change looks exactly like an attack to
 //! anything that only sees samples, so the caller resets the detector when
-//! the volume jumps (`VisualizerAnalyzer::gain_changed`).
+//! the volume jumps (`VisualizerAnalyzer::frame`).
 
 use std::collections::VecDeque;
 
@@ -43,7 +43,7 @@ const REFRACTORY_SECS: f32 = 0.100;
 const FULL_STRENGTH_DB: f32 = 12.0;
 /// After a start or reset nothing fires for this long, so the threshold has
 /// history to stand on and audio already queued for output at an old gain
-/// (see `VisualizerAnalyzer::gain_changed`) has played out.
+/// (see `VisualizerAnalyzer::frame`) has played out.
 const WARMUP_SECS: f32 = 0.25;
 
 /// Direct-form-I biquad low-pass (RBJ cookbook, Butterworth Q).
