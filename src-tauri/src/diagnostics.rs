@@ -10,9 +10,16 @@ use std::collections::{HashMap, VecDeque};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-/// Crash/error log is capped at this size before rotating to `crash.log.old`,
-/// so a long-running session doesn't grow the log file unbounded.
-const MAX_LOG_BYTES: u64 = 1_000_000;
+/// Each log file (`crash.log` and `crash.log.old`) is capped at 500 KB so the
+/// combined on-disk footprint and exported diagnostics bundle stay within 1 MB.
+const MAX_LOG_BYTES: u64 = 500_000;
+
+/// Combined diagnostics export (header, session operations, `crash.log.old`,
+/// and `crash.log`) is capped at 1 MB, keeping the newest entries if trimmed.
+const MAX_EXPORT_BYTES: usize = 1_000_000;
+
+/// Log entries older than 7 days are pruned on startup and excluded from exports.
+const LOG_RETENTION_DAYS: i64 = 7;
 
 struct RepeatTracker {
     kind: String,
@@ -72,8 +79,10 @@ fn log_file_path(app_data_dir: &Path) -> PathBuf {
 
 /// Installs a Rust panic hook that appends the panic message and a
 /// backtrace to `<app_data_dir>/logs/crash.log`, in addition to running the
-/// default hook (which still prints to stderr). Call once, early in `run()`.
+/// default hook (which still prints to stderr). Also prunes log entries older
+/// than [`LOG_RETENTION_DAYS`] on startup. Call once, early in `run()`.
 pub fn install_panic_hook(app_data_dir: PathBuf) {
+    prune_stale_logs(&app_data_dir, jiff::Timestamp::now());
     let path = log_file_path(&app_data_dir);
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -196,9 +205,85 @@ fn append_log_entry(path: &Path, kind: &str, body: &str) {
     raw_append_log_entry(path, kind, body);
 }
 
+struct LogEntry {
+    ts: Option<jiff::Timestamp>,
+    text: String,
+}
+
+fn cutoff_timestamp(now: jiff::Timestamp) -> jiff::Timestamp {
+    jiff::Timestamp::from_second(now.as_second().saturating_sub(LOG_RETENTION_DAYS * 86_400))
+        .unwrap_or(now)
+}
+
+fn parse_entry_timestamp(line: &str) -> Option<jiff::Timestamp> {
+    let rest = line.strip_prefix('[')?;
+    let end = rest.find(']')?;
+    rest[..end].parse::<jiff::Timestamp>().ok()
+}
+
+fn split_log_entries(contents: &str) -> Vec<LogEntry> {
+    let mut entries: Vec<LogEntry> = Vec::new();
+    for line in contents.split_inclusive('\n') {
+        if let Some(ts) = parse_entry_timestamp(line) {
+            entries.push(LogEntry {
+                ts: Some(ts),
+                text: line.to_string(),
+            });
+        } else if let Some(last) = entries.last_mut() {
+            last.text.push_str(line);
+        } else {
+            entries.push(LogEntry {
+                ts: None,
+                text: line.to_string(),
+            });
+        }
+    }
+    entries
+}
+
+fn filter_recent_entries(contents: &str, cutoff: jiff::Timestamp) -> Vec<String> {
+    split_log_entries(contents)
+        .into_iter()
+        .filter(|entry| entry.ts.is_some_and(|ts| ts >= cutoff))
+        .map(|entry| entry.text)
+        .collect()
+}
+
+/// Removes log entries older than [`LOG_RETENTION_DAYS`] from `crash.log.old`
+/// and `crash.log`, deleting a file if no recent entries remain.
+fn prune_stale_logs(app_data_dir: &Path, now: jiff::Timestamp) {
+    let cutoff = cutoff_timestamp(now);
+    let log_dir = app_data_dir.join("logs");
+    for name in ["crash.log.old", "crash.log"] {
+        let path = log_dir.join(name);
+        let Ok(contents) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let kept = filter_recent_entries(&contents, cutoff);
+        let pruned: String = kept.concat();
+        if pruned != contents {
+            if pruned.is_empty() {
+                let _ = std::fs::remove_file(&path);
+            } else {
+                let _ = std::fs::write(&path, pruned);
+            }
+        }
+    }
+}
+
 /// Gathers the crash log(s) plus app/OS metadata into a single text blob
 /// for `export_diagnostics` to write wherever the user picks a save path.
+/// Excludes entries older than [`LOG_RETENTION_DAYS`] and caps the combined
+/// bundle at [`MAX_EXPORT_BYTES`], keeping the newest entries.
 pub fn build_diagnostics_bundle(app_data_dir: &Path, app_version: &str) -> String {
+    build_diagnostics_bundle_at(app_data_dir, app_version, jiff::Timestamp::now())
+}
+
+fn build_diagnostics_bundle_at(
+    app_data_dir: &Path,
+    app_version: &str,
+    now: jiff::Timestamp,
+) -> String {
     let path = log_file_path(app_data_dir);
     flush_repeated_entries_for_path(&path);
 
@@ -221,20 +306,75 @@ pub fn build_diagnostics_bundle(app_data_dir: &Path, app_version: &str) -> Strin
         }
     }
 
+    let cutoff = cutoff_timestamp(now);
     let log_dir = app_data_dir.join("logs");
-    let mut wrote_any = false;
+    let mut sections: Vec<(&str, Vec<String>)> = Vec::new();
     for name in ["crash.log.old", "crash.log"] {
-        let path = log_dir.join(name);
-        if let Ok(contents) = std::fs::read_to_string(&path) {
-            if !contents.is_empty() {
-                out.push_str(&format!("\n--- {name} ---\n"));
-                out.push_str(&contents);
-                wrote_any = true;
+        let log_path = log_dir.join(name);
+        if let Ok(contents) = std::fs::read_to_string(&log_path) {
+            let entries = filter_recent_entries(&contents, cutoff);
+            if !entries.is_empty() {
+                sections.push((name, entries));
             }
         }
     }
-    if !wrote_any {
+
+    if sections.is_empty() {
         out.push_str("\n(no log entries recorded yet)\n");
+        return out;
+    }
+
+    const TRUNCATION_NOTICE: &str = "\n... (older entries omitted to stay within 1 MB limit)\n";
+    let mut budget = MAX_EXPORT_BYTES.saturating_sub(out.len());
+    let mut selected_sections: Vec<(&str, Vec<String>)> = Vec::new();
+    let mut truncated = false;
+
+    // Walk newest-to-oldest so the most recent diagnostics are preserved first.
+    for (name, entries) in sections.into_iter().rev() {
+        let header = format!("\n--- {name} ---\n");
+        let needed_overhead = header.len() + TRUNCATION_NOTICE.len();
+        if budget <= needed_overhead {
+            truncated = true;
+            break;
+        }
+        budget -= header.len();
+
+        let mut kept: Vec<String> = Vec::new();
+        for entry in entries.into_iter().rev() {
+            let reserve = if truncated {
+                0
+            } else {
+                TRUNCATION_NOTICE.len()
+            };
+            if entry.len() + reserve <= budget {
+                budget -= entry.len();
+                kept.push(entry);
+            } else {
+                truncated = true;
+                break;
+            }
+        }
+        if !kept.is_empty() {
+            kept.reverse();
+            selected_sections.push((name, kept));
+        } else {
+            budget += header.len();
+        }
+        if truncated {
+            break;
+        }
+    }
+
+    if truncated && out.len() + TRUNCATION_NOTICE.len() <= MAX_EXPORT_BYTES {
+        out.push_str(TRUNCATION_NOTICE);
+    }
+
+    selected_sections.reverse();
+    for (name, entries) in selected_sections {
+        out.push_str(&format!("\n--- {name} ---\n"));
+        for entry in entries {
+            out.push_str(&entry);
+        }
     }
     out
 }
@@ -334,5 +474,94 @@ mod tests {
         assert!(bundle.contains("FRONTEND ERROR: first error"));
         assert!(bundle.contains("FRONTEND ERROR: (message repeated 5 times)"));
         assert!(bundle.contains("FRONTEND ERROR: second error"));
+    }
+
+    #[test]
+    fn bundle_excludes_entries_older_than_seven_days_including_multiline() {
+        let dir = tempdir().unwrap();
+        let log_dir = dir.path().join("logs");
+        std::fs::create_dir_all(&log_dir).unwrap();
+
+        let now: jiff::Timestamp = "2026-11-21T13:00:00Z".parse().unwrap();
+        let old_content = "\
+[2026-11-10T10:00:00Z] FRONTEND ERROR: stale error
+    at old.js:1
+[2026-11-14T12:59:59Z] FRONTEND ERROR: just over 7 days
+[2026-11-14T13:00:00Z] FRONTEND ERROR: exact 7 day boundary
+";
+        let current_content = "\
+[2026-11-20T09:00:00Z] PANIC: recent panic
+stack line 1
+stack line 2
+";
+        std::fs::write(log_dir.join("crash.log.old"), old_content).unwrap();
+        std::fs::write(log_dir.join("crash.log"), current_content).unwrap();
+
+        let bundle = build_diagnostics_bundle_at(dir.path(), "4.0.0", now);
+        assert!(!bundle.contains("stale error"));
+        assert!(!bundle.contains("at old.js:1"));
+        assert!(!bundle.contains("just over 7 days"));
+        assert!(bundle.contains("exact 7 day boundary"));
+        assert!(bundle.contains("recent panic"));
+        assert!(bundle.contains("stack line 2"));
+    }
+
+    #[test]
+    fn prune_stale_logs_rewrites_and_removes_empty_files() {
+        let dir = tempdir().unwrap();
+        let log_dir = dir.path().join("logs");
+        std::fs::create_dir_all(&log_dir).unwrap();
+
+        let now: jiff::Timestamp = "2026-11-21T13:00:00Z".parse().unwrap();
+        std::fs::write(
+            log_dir.join("crash.log.old"),
+            "[2026-09-27T23:29:10-07:00] FRONTEND ERROR: ancient\n",
+        )
+        .unwrap();
+        std::fs::write(
+            log_dir.join("crash.log"),
+            "[2026-11-01T00:00:00Z] FRONTEND ERROR: old\n[2026-11-21T12:00:00Z] FRONTEND ERROR: fresh\n",
+        )
+        .unwrap();
+
+        prune_stale_logs(dir.path(), now);
+
+        assert!(!log_dir.join("crash.log.old").exists());
+        let current = std::fs::read_to_string(log_dir.join("crash.log")).unwrap();
+        assert!(!current.contains("old"));
+        assert!(current.contains("fresh"));
+    }
+
+    #[test]
+    fn combined_export_is_capped_at_one_megabyte_keeping_newest_entries() {
+        let dir = tempdir().unwrap();
+        let log_dir = dir.path().join("logs");
+        std::fs::create_dir_all(&log_dir).unwrap();
+
+        let now: jiff::Timestamp = "2026-11-21T13:00:00Z".parse().unwrap();
+        let pad = "x".repeat(4_000);
+        let mut old_log = String::new();
+        let mut cur_log = String::new();
+        // ~600 KB in crash.log.old + ~600 KB in crash.log = ~1.2 MB total
+        for i in 0..150 {
+            old_log.push_str(&format!(
+                "[2026-11-18T12:00:00Z] FRONTEND ERROR: old-{i:03} {pad}\n"
+            ));
+            cur_log.push_str(&format!(
+                "[2026-11-21T12:00:00Z] FRONTEND ERROR: new-{i:03} {pad}\n"
+            ));
+        }
+        std::fs::write(log_dir.join("crash.log.old"), old_log).unwrap();
+        std::fs::write(log_dir.join("crash.log"), cur_log).unwrap();
+
+        let bundle = build_diagnostics_bundle_at(dir.path(), "4.0.0", now);
+        assert!(
+            bundle.len() <= MAX_EXPORT_BYTES,
+            "Bundle size {} exceeded MAX_EXPORT_BYTES ({MAX_EXPORT_BYTES})",
+            bundle.len()
+        );
+        assert!(bundle.contains("older entries omitted to stay within 1 MB limit"));
+        assert!(!bundle.contains("old-000"));
+        assert!(bundle.contains("new-149"));
     }
 }
