@@ -1,4 +1,4 @@
-import { getPreset, listPresets } from "../visualizers/registry";
+import { getPreset, listPresets } from "../visualizers/registry.svelte";
 import type { VisualizerPreset } from "../visualizers/types";
 
 // Saved in localStorage, like the immersive view next to it (layout_immersiveView): it is

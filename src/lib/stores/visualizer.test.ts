@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_PRESET, getPreset, listPresets, registerPreset } from "../visualizers/registry";
+import {
+  DEFAULT_PRESET,
+  getPreset,
+  listPresets,
+  registerPreset,
+} from "../visualizers/registry.svelte";
 import type { VisualizerPreset } from "../visualizers/types";
 import { VisualizerStore } from "./visualizer.svelte";
 

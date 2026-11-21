@@ -20,7 +20,7 @@
   import { stationUuidFromPath } from "../stores/radio.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
-  import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
+  import VisualizerCanvas from "./VisualizerCanvas.svelte";
   import VisualizerPresetMenu from "./VisualizerPresetMenu.svelte";
   import { visualizerStore } from "../stores/visualizer.svelte";
   import LinkButton from "./LinkButton.svelte";
@@ -765,7 +765,14 @@
                   ? 'bg-brand-accent/15 ring-1 ring-brand-border'
                   : 'hover:bg-brand-accent/10 hover:ring-1 hover:ring-brand-border'}"
               >
-                <SpectrumVisualizer preview={isImmersiveVisualizerActive} />
+                <!-- Live mini-view of the selected visualizer; its still preview while the
+                     immersive visualizer is open and owns the live animation. -->
+                <VisualizerCanvas
+                  preset={visualizerStore.preset}
+                  size="mini"
+                  preview={isImmersiveVisualizerActive}
+                  class="w-full h-full opacity-85 group-hover:opacity-100 hover:opacity-100 transition-opacity duration-200"
+                />
                 {#if flashedPresetName}
                   <span
                     transition:fade={{ duration: prefersReducedMotion() ? 0 : 200 }}

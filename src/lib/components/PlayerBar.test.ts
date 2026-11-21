@@ -10,7 +10,7 @@ import { navigationStore } from "../stores/navigation.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { visualizerStore } from "../stores/visualizer.svelte";
-import { registerPreset } from "../visualizers/registry";
+import { registerPreset } from "../visualizers/registry.svelte";
 import type { Song, Playlist } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -868,6 +868,15 @@ describe("PlayerBar.svelte", () => {
       expect(queryByTestId("visualizer-next")).toBeNull();
       await fireEvent.contextMenu(getByTestId("player-bar-visualizer"));
       expect(screen.queryByRole("menuitemradio")).toBeNull();
+    });
+
+    it("shows the arrows once a second preset registers while the bar is showing", async () => {
+      playerStore.currentSong = mockSong;
+      const { queryByTestId } = render(PlayerBar);
+      expect(queryByTestId("visualizer-next")).toBeNull();
+      registerSecondPreset();
+      await tick();
+      expect(queryByTestId("visualizer-next")).toBeInTheDocument();
     });
 
     it("steps through presets with the arrows, naming the target and flashing the new name", async () => {

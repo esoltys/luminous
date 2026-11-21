@@ -7,10 +7,12 @@ export const DEFAULT_PRESET: VisualizerPreset = VOXEL_PRESET;
 
 // Built-ins in selector order. Add-on packs will register through `registerPreset` later.
 // The dev test pattern is left out of unit tests so they see only what ships.
-const presets: VisualizerPreset[] = [
+// Reactive, so the selector updates when a preset registers or leaves; `raw` keeps the
+// presets themselves unproxied, so identity comparisons hold.
+let presets = $state.raw<readonly VisualizerPreset[]>([
   VOXEL_PRESET,
   ...(import.meta.env.DEV && import.meta.env.MODE !== "test" ? [DEV_TEST_PATTERN_PRESET] : []),
-];
+]);
 
 /** Every registered preset, in selector order. */
 export function listPresets(): readonly VisualizerPreset[] {
@@ -27,11 +29,8 @@ export function getPreset(id: string | null | undefined): VisualizerPreset {
  * function that removes it again.
  */
 export function registerPreset(preset: VisualizerPreset): () => void {
-  const existing = presets.findIndex((p) => p.id === preset.id);
-  if (existing >= 0) presets.splice(existing, 1);
-  presets.push(preset);
+  presets = [...presets.filter((p) => p.id !== preset.id), preset];
   return () => {
-    const i = presets.indexOf(preset);
-    if (i >= 0) presets.splice(i, 1);
+    presets = presets.filter((p) => p !== preset);
   };
 }

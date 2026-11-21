@@ -46,13 +46,14 @@
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   // Plain (non-reactive) on purpose: the draw loop reads these, and as $state the effects
-  // below would re-run on every spectrum event.
-  // Created by the first run of the $effect.pre below, before any other effect reads it.
+  // below would re-run on every spectrum event. `instance` is created by the first run of
+  // the $effect.pre below, before any other effect reads it.
   let instance!: VisualizerInstance;
   let bands: readonly number[] = NO_BANDS;
   let rafId = 0;
   let lastFrameTime = 0;
   let unlisten: (() => void) | null = null;
+  let destroyed = false;
   let resizeObserver: ResizeObserver | null = null;
 
   const isPlaying = $derived(playerStore.state === "playing");
@@ -158,18 +159,22 @@
       resizeObserver.observe(canvas);
     }
     try {
-      unlisten = await listen<number[]>("spectrum-data", (event) => {
+      const stop = await listen<number[]>("spectrum-data", (event) => {
         bands = event.payload;
         pushCurrent();
         // A still preview doesn't change with the data, so only live views redraw.
         if (!preview) requestFrame();
       });
+      // Unmounted while the listener was being registered: drop it straight away.
+      if (destroyed) stop();
+      else unlisten = stop;
     } catch (e) {
       console.error("Failed to listen for spectrum data:", e);
     }
   });
 
   onDestroy(() => {
+    destroyed = true;
     stopLoop();
     resizeObserver?.disconnect();
     if (typeof document !== "undefined") {
