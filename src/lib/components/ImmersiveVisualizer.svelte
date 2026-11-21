@@ -29,6 +29,7 @@
   const engine = new VoxelSpectrumEngine(COLUMNS, ROWS);
 
   let canvas = $state<HTMLCanvasElement | null>(null);
+  let detailsHeight = $state(0);
   let unlisten: (() => void) | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let rafId = 0;
@@ -197,13 +198,17 @@
   class="relative z-10 flex flex-col w-full max-w-5xl h-full max-h-[600px] gap-4 md:gap-6 justify-center"
 >
   {#if playerStore.currentSong}
-    <!-- Compact Song Context Header: keeps track identity accessible and lets the user click cover art to flip to the artwork stage -->
-    <div class="flex items-center gap-4 px-1">
+    <!-- Compact Song Context Header: Now playing pill sits above the heading, while the square
+         album artwork spans from the cap-top of the heading to the descender-bottom of the artist line. -->
+    <div class="flex items-end gap-4 px-1">
       <button
         type="button"
         onclick={switchToCoverView}
         title={i18n.t("playerBar.immersiveTitle", {}, "Immersive Mode")}
-        class="w-14 h-14 md:w-16 md:h-16 rounded-xl overflow-hidden border border-brand-border/50 bg-brand-sidebar flex-shrink-0 shadow-md hover:scale-105 active:scale-95 transition-transform duration-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-accent"
+        style={detailsHeight > 0
+          ? `width: ${detailsHeight}px; height: ${detailsHeight}px;`
+          : undefined}
+        class="w-16 h-16 md:w-[4.5rem] md:h-[4.5rem] rounded-xl overflow-hidden border border-brand-border/50 bg-brand-sidebar flex-shrink-0 shadow-md hover:scale-105 active:scale-95 transition-transform duration-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-accent"
       >
         <CoverArt
           songId={playerStore.currentSong.id}
@@ -217,29 +222,35 @@
 
       <div class="flex flex-col min-w-0 flex-1">
         <span
-          class="label-small self-start px-2.5 py-0.5 bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
+          class="label-small self-start mb-2 px-2.5 py-0.5 bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
         >
           {i18n.t("playerBar.nowPlaying")}
         </span>
-        <h1
-          class="mt-1.5 text-2xl md:text-3xl font-heading font-bold text-brand-text-primary leading-tight tracking-tight truncate select-text"
+        <div
+          bind:clientHeight={detailsHeight}
+          data-testid="immersive-visualizer-song-details"
+          class="flex flex-col min-w-0"
         >
-          {playerStore.currentSongDisplayTitle}
-        </h1>
-        {#if playerStore.currentSong.album?.trim()}
-          <p
-            class="mt-1 text-sm md:text-base text-brand-text-secondary font-semibold truncate select-text"
+          <h1
+            class="text-2xl md:text-3xl font-heading font-bold text-brand-text-primary leading-none -mt-[0.12em] tracking-tight truncate select-text"
           >
-            {playerStore.currentSong.album}
+            {playerStore.currentSongDisplayTitle}
+          </h1>
+          {#if playerStore.currentSong.album?.trim()}
+            <p
+              class="mt-1.5 text-sm md:text-base text-brand-text-secondary font-semibold leading-tight truncate select-text"
+            >
+              {playerStore.currentSong.album}
+            </p>
+          {/if}
+          <p
+            class="{playerStore.currentSong.album?.trim()
+              ? 'mt-1'
+              : 'mt-1.5'} text-xs md:text-sm text-brand-text-secondary/70 font-medium leading-none truncate select-text"
+          >
+            {playerStore.currentSongDisplaySubtitle}
           </p>
-        {/if}
-        <p
-          class="{playerStore.currentSong.album?.trim()
-            ? 'mt-0.5'
-            : 'mt-1'} text-xs md:text-sm text-brand-text-secondary/70 font-medium truncate select-text"
-        >
-          {playerStore.currentSongDisplaySubtitle}
-        </p>
+        </div>
       </div>
     </div>
   {/if}
