@@ -823,56 +823,59 @@
   }
 
   /* Immersive PlayDock auto-hide & reappear motion (#2236):
+     Animates `bottom` on the out-of-flow absolute dock container rather than
+     `transform`/`opacity`/`will-change`: any transform or opacity effect node on
+     an ancestor of `footer.glass-surface` creates a CSS Backdrop Root in Blink/
+     WebKit and disables the dock's `backdrop-filter` acrylic blur.
      - Reappearing (default .immersive-dock): launches upward from below the
-       viewport, overshoots its resting height by ~11% (~11px) with a subtle
-       scale swell, and cushions back down into place.
+       viewport, overshoots its resting height by ~16px, and cushions into place.
      - Dropping out (.immersive-dock.immersive-dock-hidden): first lifts up
-       slightly (~11% / ~11px anticipation crest), then accelerates downward
-       with gravity out of view while tapering scale and opacity. */
+       ~16px (anticipation crest), then drops downward out of view. */
   .immersive-dock {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 1;
-    will-change: transform, opacity;
-    transition-property: transform, opacity;
-    transition-duration: 560ms, 220ms;
-    transition-delay: 0ms, 0ms;
-    transition-timing-function: cubic-bezier(0.22, 1.35, 0.36, 1), ease-out;
-    transition-timing-function:
-      linear(0, 0.14 8%, 0.44 20%, 0.78 34%, 1.03 46%, 1.11 58%, 1.09 66%, 1.035 78%, 0.996 90%, 1),
-      ease-out;
+    position: relative;
+    bottom: 0;
+    transition-property: bottom;
+    transition-duration: 560ms;
+    transition-timing-function: cubic-bezier(0.22, 1.35, 0.36, 1);
+    transition-timing-function: linear(
+      0,
+      0.14 8%,
+      0.44 20%,
+      0.78 34%,
+      1.03 46%,
+      1.11 58%,
+      1.09 66%,
+      1.035 78%,
+      0.996 90%,
+      1
+    );
   }
 
   .immersive-dock.immersive-dock-hidden {
-    transform: translate3d(0, calc(100% + 28px), 0) scale(0.965);
-    opacity: 0;
+    bottom: -9rem;
     pointer-events: none;
-    transition-property: transform, opacity;
-    transition-duration: 580ms, 240ms;
-    transition-delay: 0ms, 320ms;
-    transition-timing-function: cubic-bezier(0.38, -0.32, 0.7, 1), ease-out;
-    transition-timing-function:
-      linear(
-        0,
-        -0.045 8%,
-        -0.095 18%,
-        -0.11 25%,
-        -0.08 33%,
-        0 43%,
-        0.19 55%,
-        0.5 70%,
-        0.82 85%,
-        0.96 94%,
-        1
-      ),
-      ease-out;
+    transition-property: bottom;
+    transition-duration: 580ms;
+    transition-timing-function: cubic-bezier(0.38, -0.32, 0.7, 1);
+    transition-timing-function: linear(
+      0,
+      -0.045 8%,
+      -0.095 18%,
+      -0.11 25%,
+      -0.08 33%,
+      0 43%,
+      0.19 55%,
+      0.5 70%,
+      0.82 85%,
+      0.96 94%,
+      1
+    );
   }
 
   @media (prefers-reduced-motion: reduce) {
     .immersive-dock,
     .immersive-dock.immersive-dock-hidden {
-      transform: none !important;
-      transition: opacity 200ms ease-out !important;
-      transition-delay: 0ms !important;
+      transition-duration: 0ms !important;
     }
   }
 
