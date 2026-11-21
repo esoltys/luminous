@@ -698,7 +698,7 @@ export const de = {
     tabAbout: "Info",
     aboutTitle: "Über Luminous",
     aboutAppName: "Luminous Music Player",
-    aboutTagline: "Ein leistungsstarkes Zuhause für die Musik, die dir bereits gehört.",
+    aboutTagline: "Dein persönliches Zuhause für die Musik, die dir bereits gehört.",
     aboutLicense: "MIT-Lizenz",
     copyVersionHint: "Klicken, um die Version in die Zwischenablage zu kopieren",
     copiedLabel: "Kopiert!",
