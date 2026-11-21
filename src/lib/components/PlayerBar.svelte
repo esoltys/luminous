@@ -692,7 +692,7 @@
               data-testid="player-bar-visualizer-btn"
               class="group w-24 h-7 px-1 py-0.5 rounded-md block flex-shrink-0 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-accent disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-all duration-200 {isImmersiveVisualizerActive
                 ? 'bg-brand-accent/15 ring-1 ring-brand-border'
-                : 'hover:bg-brand-accent/10'}"
+                : 'hover:bg-brand-accent/10 hover:ring-1 hover:ring-brand-border'}"
             >
               <SpectrumVisualizer preview={isImmersiveVisualizerActive} />
             </button>
