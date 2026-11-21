@@ -39,13 +39,6 @@ interface LinkItem {
   isOfficial: boolean;
 }
 
-interface ListenBrainzRow {
-  label: string;
-  id: string;
-  url: string;
-  name?: string;
-}
-
 /** An info section the store has decided is worth showing; the order of the list is the display order. */
 export type InfoSection =
   | { id: "facts"; context: SongContextEnrichment }
@@ -63,8 +56,7 @@ export type InfoSection =
   | { id: "links"; items: LinkItem[] }
   | {
       id: "external";
-      listenbrainz: { url: string; rows: ListenBrainzRow[] } | null;
-      critiquebrainz: { rating: number; count?: number; releaseGroupMbid?: string } | null;
+      critiquebrainz: { rating: number; count?: number; releaseGroupMbid?: string };
     };
 
 export interface CommunityRatingInfo {
@@ -148,60 +140,6 @@ function linkItems(
     if (b.key === "website") return 1;
     return a.label.localeCompare(b.label);
   });
-}
-
-function listenbrainz(subject: ContextSubject): { url: string; rows: ListenBrainzRow[] } | null {
-  const song = subject.song;
-  const albumMbid = song.musicbrainz_release_group_id || song.musicbrainz_album_id;
-  const albumPath = song.musicbrainz_release_group_id ? "album" : "release";
-  const recordingMbid = song.musicbrainz_recording_id || song.musicbrainz_track_id;
-  const recordingPath = song.musicbrainz_recording_id ? "recording" : "track";
-  const t = (key: string, fallback: string) => i18n.t(`playerBar.${key}`, {}, fallback);
-  const rows: ListenBrainzRow[] = [
-    {
-      label: t("listenbrainzArtistLabel", "Artist"),
-      id: song.musicbrainz_artist_id ?? "",
-      url: song.musicbrainz_artist_id
-        ? `https://listenbrainz.org/artist/${song.musicbrainz_artist_id}/`
-        : "",
-      name: song.artist ?? undefined,
-    },
-    ...(song.musicbrainz_album_artist_id &&
-    song.musicbrainz_album_artist_id !== song.musicbrainz_artist_id
-      ? [
-          {
-            label: t("listenbrainzAlbumArtistLabel", "Album Artist"),
-            id: song.musicbrainz_album_artist_id,
-            url: `https://listenbrainz.org/artist/${song.musicbrainz_album_artist_id}/`,
-            name: song.album_artist ?? undefined,
-          },
-        ]
-      : []),
-    {
-      label: t("listenbrainzAlbumLabel", "Album"),
-      id: albumMbid ?? "",
-      url: albumMbid ? `https://listenbrainz.org/${albumPath}/${albumMbid}/` : "",
-      name: song.album ?? undefined,
-    },
-    // A recording belongs to a song, not to an album or artist.
-    ...(subject.kind === "song"
-      ? [
-          {
-            label: t("listenbrainzRecordingLabel", "Track"),
-            id: recordingMbid ?? "",
-            url: recordingMbid ? `https://listenbrainz.org/${recordingPath}/${recordingMbid}/` : "",
-            name: song.title,
-          },
-        ]
-      : []),
-  ].filter((r) => r.id);
-  if (rows.length === 0) return null;
-  const url = albumMbid
-    ? `https://listenbrainz.org/${albumPath}/${albumMbid}/`
-    : song.musicbrainz_artist_id
-      ? `https://listenbrainz.org/artist/${song.musicbrainz_artist_id}/`
-      : "https://listenbrainz.org";
-  return { url, rows };
 }
 
 /**
@@ -328,7 +266,7 @@ export class ContextView {
       const setlistfmUrl = linkFor("setlistfm");
       const bandsintownUrl = linkFor("bandsintown");
       const events = this.entry?.events ?? [];
-      if (events.length > 0 || songkickUrl || setlistfmUrl || bandsintownUrl || artistMbid) {
+      if (events.length > 0) {
         sections.push({
           id: "events",
           events,
@@ -367,7 +305,6 @@ export class ContextView {
       if (items.length > 0) sections.push({ id: "links", items });
     }
 
-    const lb = listenbrainz(subject);
     const cb =
       subject.kind !== "artist" && ctx?.critiquebrainz_rating != null
         ? {
@@ -376,7 +313,7 @@ export class ContextView {
             releaseGroupMbid: subject.song.musicbrainz_release_group_id ?? undefined,
           }
         : null;
-    if (lb || cb) sections.push({ id: "external", listenbrainz: lb, critiquebrainz: cb });
+    if (cb) sections.push({ id: "external", critiquebrainz: cb });
 
     return sections;
   }

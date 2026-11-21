@@ -219,7 +219,7 @@ describe("RightPanel.svelte", () => {
       musicbrainz_artist_id: "same-uuid",
       musicbrainz_album_artist_id: "same-uuid",
     };
-    const { getByText, queryByText } = render(RightPanel);
+    const { getByText, queryByText } = renderTechnical();
 
     expect(getByText("Artist")).toBeInTheDocument();
     expect(queryByText("Album Artist")).not.toBeInTheDocument();
@@ -231,7 +231,7 @@ describe("RightPanel.svelte", () => {
       title: "",
       musicbrainz_recording_id: "recording-uuid",
     };
-    const { getByText } = render(RightPanel);
+    const { getByText } = renderTechnical();
 
     expect(getByText("recording-uuid")).toBeInTheDocument();
   });
@@ -278,65 +278,27 @@ describe("RightPanel.svelte", () => {
     expect(queryByText("Artist")).not.toBeInTheDocument();
   });
 
-  it("hides the ListenBrainz section on the Information tab when no MusicBrainz IDs are present", async () => {
-    playerStore.currentSong = mockSong;
-    const { getByText, queryByAltText } = render(RightPanel);
-    await fireEvent.click(getByText("Information"));
-
-    expect(queryByAltText("ListenBrainz")).not.toBeInTheDocument();
-  });
-
-  it("shows the ListenBrainz section on the Information tab and opens entity pages on click", async () => {
+  it("never shows the ListenBrainz section on the Information tab", async () => {
     playerStore.currentSong = {
       ...mockSong,
       musicbrainz_artist_id: "artist-uuid",
       musicbrainz_release_group_id: "4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39",
       musicbrainz_recording_id: "recording-uuid",
     };
-    const { getByText, getByAltText } = render(RightPanel);
+    const { getByText, queryByAltText } = render(RightPanel);
     await fireEvent.click(getByText("Information"));
 
-    expect(getByAltText("ListenBrainz")).toBeInTheDocument();
-    expect(getByText("Test Artist")).toBeInTheDocument();
-    expect(getByText("Test Album")).toBeInTheDocument();
-    expect(getByText("Test Track Title")).toBeInTheDocument();
-
-    await fireEvent.click(getByText("Test Track Title"));
-    expect(openExternalUrlMock).toHaveBeenCalledWith(
-      "https://listenbrainz.org/recording/recording-uuid/",
-    );
-
-    await fireEvent.click(getByText("Test Album"));
-    expect(openExternalUrlMock).toHaveBeenCalledWith(
-      "https://listenbrainz.org/album/4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39/",
-    );
-
-    await fireEvent.click(getByText("Test Artist"));
-    expect(openExternalUrlMock).toHaveBeenCalledWith(
-      "https://listenbrainz.org/artist/artist-uuid/",
-    );
+    expect(queryByAltText("ListenBrainz")).not.toBeInTheDocument();
   });
 
-  it("opens the album page on ListenBrainz when clicking the ListenBrainz logo button", async () => {
-    playerStore.currentSong = {
-      ...mockSong,
-      musicbrainz_release_group_id: "4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39",
-    };
-    const { getByText, getByAltText } = render(RightPanel);
-    await fireEvent.click(getByText("Information"));
-
-    await fireEvent.click(getByAltText("ListenBrainz"));
-    expect(openExternalUrlMock).toHaveBeenCalledWith(
-      "https://listenbrainz.org/album/4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39/",
-    );
-  });
-
-  it("shows the File Path row on the Technicals tab", () => {
+  it("does not show Format, Lyrics, or File Path rows on the Technical tab", () => {
     playerStore.currentSong = mockSong;
-    const { getByText } = renderTechnical();
+    const { queryByText, queryByTestId } = renderTechnical();
 
-    expect(getByText("File Path:")).toBeInTheDocument();
-    expect(getByText("/music/test.flac")).toBeInTheDocument();
+    expect(queryByTestId("provenance-row")).toBeNull();
+    expect(queryByText("Lyrics")).toBeNull();
+    expect(queryByText("File Path:")).toBeNull();
+    expect(queryByText("/music/test.flac")).toBeNull();
   });
 
   it("renders the Wikipedia bio extract as a plain card on the Information tab", async () => {
@@ -521,71 +483,5 @@ describe("RightPanel.svelte", () => {
     flushSync();
 
     expect(scrollEl.scrollTop).toBe(0);
-  });
-
-  it("shows Unverified badge on Technical tab for lossless song without cached provenance", async () => {
-    playerStore.currentSong = mockSong;
-    const { getByTestId, queryByRole } = renderTechnical();
-    const row = getByTestId("provenance-row");
-    expect(row).toHaveTextContent("Format");
-    expect(row).toHaveTextContent("Unverified");
-    expect(queryByRole("button", { name: "Verify" })).toBeNull();
-    expect(queryByRole("button", { name: "Verify Album" })).toBeNull();
-  });
-
-  it("displays cached provenance badge when available", async () => {
-    const invokeMock = vi.mocked(invoke);
-    invokeMock.mockImplementation(async (cmd: string, args?: any) => {
-      if (cmd === "get_song_provenance") {
-        return {
-          song_id: 42,
-          verdict: "authentic",
-          cutoff_hz: 21800,
-          effective_bit_depth: 16,
-          effective_sample_rate: 44100,
-          description: "Authentic lossless audio (16-bit, 21.8 kHz cutoff)",
-          is_stale: false,
-          analyzed_at: 1000,
-        };
-      }
-      return null;
-    });
-
-    playerStore.currentSong = mockSong;
-    const { findByText } = renderTechnical();
-    const badge = await findByText(/Authentic Lossless/);
-    expect(badge).toBeInTheDocument();
-  });
-
-  it("displays stale indicator when cached provenance is stale", async () => {
-    const invokeMock = vi.mocked(invoke);
-    invokeMock.mockImplementation(async (cmd: string, args?: any) => {
-      if (cmd === "get_song_provenance") {
-        return {
-          song_id: 42,
-          verdict: "authentic",
-          cutoff_hz: 21800,
-          effective_bit_depth: 16,
-          effective_sample_rate: 44100,
-          description: "Authentic lossless",
-          is_stale: true,
-          analyzed_at: 1000,
-        };
-      }
-      return null;
-    });
-
-    playerStore.currentSong = mockSong;
-    const { findByText, queryByRole } = renderTechnical();
-    expect(await findByText("(stale)")).toBeInTheDocument();
-    expect(queryByRole("button", { name: "Re-verify" })).toBeNull();
-  });
-
-  it("hides provenance actions for lossy tracks", async () => {
-    playerStore.currentSong = { ...mockSong, filetype: "MP3" };
-    const { getByTestId, queryByText } = renderTechnical();
-    const row = getByTestId("provenance-row");
-    expect(row).toHaveTextContent("MP3");
-    expect(queryByText("Unverified")).toBeNull();
   });
 });

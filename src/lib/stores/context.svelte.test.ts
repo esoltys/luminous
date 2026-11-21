@@ -80,8 +80,14 @@ describe("contextStore", () => {
     vi.useRealTimers();
   });
 
-  it("orders artist sections facts, bio, events, links, external", async () => {
+  it("orders artist sections facts, bio, events, links", async () => {
     context = ctx({ artist_begin_date: "1965", wikipedia_extract: "Wiki bio" });
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_context") return context;
+      if (cmd === "get_artist_events")
+        return [{ id: "e1", name: "Live", ticket_urls: [], event_urls: [] }];
+      return null;
+    });
     collectionStore.artistProfiles = {
       "pink floyd": {
         artist_key: "Pink Floyd",
@@ -92,7 +98,7 @@ describe("contextStore", () => {
       },
     } as never;
     const view = await mount(() => artist(song(1, { musicbrainz_artist_id: MBID })));
-    expect(view.sections.map((s) => s.id)).toEqual(["facts", "bio", "events", "links", "external"]);
+    expect(view.sections.map((s) => s.id)).toEqual(["facts", "bio", "events", "links"]);
   });
 
   it("leaves empty sections out", async () => {
@@ -174,13 +180,37 @@ describe("contextStore", () => {
     const withRg = song(1, { musicbrainz_release_group_id: MBID });
     const artistView = await mount(() => artist(withRg));
     const external = artistView.sections.find((s) => s.id === "external");
-    expect(external && external.id === "external" && external.critiquebrainz).toBeNull();
+    expect(external).toBeUndefined();
     expect(artistView.communityRating).toMatchObject({ rating: 4.2, source: "critiquebrainz" });
     const albumView = await mount(() => album(withRg));
     const albumExternal = albumView.sections.find((s) => s.id === "external");
     expect(
       albumExternal && albumExternal.id === "external" && albumExternal.critiquebrainz,
     ).toMatchObject({ rating: 4.2 });
+  });
+
+  it("omits the events section when no events are returned even if MBIDs or links exist", async () => {
+    collectionStore.artistProfiles = {
+      "pink floyd": {
+        artist_key: "Pink Floyd",
+        social_links: [
+          { platform: "songkick", handle_or_url: "https://www.songkick.com/artists/1" },
+        ],
+        tags: [],
+        musicbrainz_artist_id: MBID,
+      },
+    } as never;
+    const emptyView = await mount(() => artist());
+    expect(emptyView.sections.find((s) => s.id === "events")).toBeUndefined();
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_context") return context;
+      if (cmd === "get_artist_events")
+        return [{ id: "e1", name: "Live", ticket_urls: [], event_urls: [] }];
+      return null;
+    });
+    await emptyView.refresh();
+    expect(emptyView.sections.find((s) => s.id === "events")).toBeDefined();
   });
 
   it("falls back to the MusicBrainz rating", async () => {

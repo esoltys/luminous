@@ -155,43 +155,6 @@
         {/each}
       </div>
     {:else if section.id === "external"}
-      {#if section.listenbrainz}
-        {@const lb = section.listenbrainz}
-        <div class="space-y-2">
-          <button
-            type="button"
-            onclick={() => openExternalUrl(lb.url)}
-            class="group relative inline-flex items-center gap-1 cursor-pointer"
-          >
-            <img
-              src="/listenbrainz-logo.png"
-              alt={i18n.t("playerBar.listenbrainzSectionLabel", {}, "ListenBrainz")}
-              class="h-4.5 w-auto opacity-80 group-hover:opacity-100 transition-opacity"
-            />
-            <ExternalLink
-              class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity"
-            />
-          </button>
-          {#each lb.rows as row (row.label)}
-            <div class="flex items-start justify-between gap-3">
-              <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
-              <button
-                type="button"
-                onclick={() => openExternalUrl(row.url)}
-                class="group relative text-right transition-colors cursor-pointer min-w-0"
-              >
-                <span
-                  class="text-brand-text-primary underline decoration-brand-text-secondary/40 break-words transition-colors"
-                  >{row.name || row.id}</span
-                >
-                <ExternalLink
-                  class="absolute -right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity"
-                />
-              </button>
-            </div>
-          {/each}
-        </div>
-      {/if}
       {#if section.critiquebrainz}
         {@const cb = section.critiquebrainz}
         <div class="space-y-1.5">
