@@ -191,27 +191,34 @@ describe("Sidebar.svelte", () => {
     });
   });
 
-  // Settings and Help scroll with the rest of <nav>; the fixed footer holds only the
-  // online integrations button while online.
-  describe("scrolling nav & footer", () => {
+  // Settings, Connect/Connected (when online), and Help all live inside the scrolling <nav>.
+  describe("scrolling nav & integrations placement", () => {
     afterEach(() => {
       prefs.onlineEnabled = true;
       updaterStore.updateAvailable = false;
     });
 
     it.each([256, 64])(
-      "renders Settings and Help inside the scrolling nav at width %i",
+      "renders Settings, Connect..., and Help inside the scrolling nav without a footer at width %i",
       (width) => {
         const { container, getByTitle } = render(Sidebar, { props: { width } });
         const nav = container.querySelector("nav")!;
         expect(nav).toHaveClass("overflow-y-auto");
-        for (const title of ["Settings", "Help"]) {
-          const btn = getByTitle(title);
+        expect(container.querySelector('[data-testid="sidebar-footer"]')).toBeNull();
+
+        const settingsBtn = getByTitle("Settings");
+        const connectBtn = getByTitle("Connect...");
+        const helpBtn = getByTitle("Help");
+        for (const btn of [settingsBtn, connectBtn, helpBtn]) {
           expect(nav.contains(btn)).toBe(true);
-          expect(container.querySelector('[data-testid="sidebar-footer"]')!.contains(btn)).toBe(
-            false,
-          );
         }
+
+        const navButtons = Array.from<HTMLElement>(nav.querySelectorAll("button"));
+        const settingsIdx = navButtons.indexOf(settingsBtn);
+        const connectIdx = navButtons.indexOf(connectBtn);
+        const helpIdx = navButtons.indexOf(helpBtn);
+        expect(connectIdx).toBe(settingsIdx + 1);
+        expect(helpIdx).toBe(connectIdx + 1);
       },
     );
 
@@ -220,7 +227,7 @@ describe("Sidebar.svelte", () => {
       expect(container.querySelector("nav")!.contains(getByTitle("Stats"))).toBe(true);
     });
 
-    it("still shows Settings and Help while Offline, and omits the footer without Connect", () => {
+    it("still shows Settings and Help while Offline, and omits Connect...", () => {
       prefs.onlineEnabled = false;
       const { container, getByTitle, queryByTitle } = render(Sidebar, { props: { width: 256 } });
       expect(getByTitle("Settings")).toBeInTheDocument();

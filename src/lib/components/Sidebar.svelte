@@ -429,18 +429,7 @@
       walkthroughTarget: "library-folders",
       updateBadge: showUpdateBadge,
     })}
-    {@render navButton("help", i18n.t("sidebar.help"), HelpCircle)}
-  </nav>
-
-  <!-- Fixed footer: holds the Connected / Connect... integrations entry while online (#1398);
-       Settings and Help scroll with the rest of the nav above. -->
-  {#if prefs.onlineEnabled}
-    <div
-      data-testid="sidebar-footer"
-      class="{layoutCollapsed
-        ? 'p-2'
-        : 'px-4 py-2'} border-t border-brand-border/40 w-full flex flex-col items-center space-y-0.5"
-    >
+    {#if prefs.onlineEnabled}
       {#if isConnected}
         <button
           bind:this={profileButtonEl}
@@ -488,14 +477,17 @@
             <LightningSlash class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0" />
           </div>
           {#if !layoutCollapsed}
-            <span class="text-left leading-tight min-w-0"
+            <span class="truncate text-left flex-1 min-w-0"
               >{i18n.t("sidebar.connectIntegrations", {}, "Connect...")}</span
             >
           {/if}
         </button>
       {/if}
-    </div>
+    {/if}
+    {@render navButton("help", i18n.t("sidebar.help"), HelpCircle)}
+  </nav>
 
+  {#if prefs.onlineEnabled}
     <MusicBrainzProfilePopover
       isOpen={showProfilePopover}
       anchorEl={profileButtonEl}
@@ -510,9 +502,8 @@
 <style>
   /* Horizontal centre of the expanded nav icons, measured from the content edge
      inside the sidebar's p-4: nav button px-3 (12) + half the w-7 icon slot
-     (14). The footer's logo slot uses the same padding, and the sub-item rails
-     are centred on this line (margin = axis - half the 2px border), so change
-     this value together with those paddings. */
+     (14). The sub-item rails are centred on this line (margin = axis - half the
+     2px border), so change this value together with those paddings. */
   aside {
     --sidebar-icon-axis: 26px;
   }
