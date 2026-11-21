@@ -13,30 +13,12 @@
   let detailsHeight = $state(0);
   let presetMenu = $state<{ x: number; y: number } | null>(null);
 
-  // Widgets that use ←/→ themselves: text fields, sliders (seek, volume), menus, lists.
-  const ARROW_KEY_WIDGETS =
-    "input, textarea, select, [contenteditable]:not([contenteditable='false']), " +
-    "[role='slider'], [role='menu'], [role='menubar'], [role='listbox'], [role='tablist'], " +
-    "[role='grid'], [role='tree'], [role='radiogroup']";
-
-  /** ←/→ step through presets while this view is shown, unless focus is somewhere using them. */
-  function handleWindowKeydown(e: KeyboardEvent) {
-    if (!active || e.defaultPrevented || !visualizerStore.canSwitch) return;
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    if (e.target instanceof Element && e.target.closest(ARROW_KEY_WIDGETS)) return;
-    e.preventDefault();
-    visualizerStore.cycle(e.key === "ArrowRight" ? 1 : -1);
-  }
-
   function openPresetMenu(e: MouseEvent) {
     if (!visualizerStore.canSwitch) return;
     e.preventDefault();
     presetMenu = { x: e.clientX, y: e.clientY };
   }
 </script>
-
-<svelte:window onkeydown={handleWindowKeydown} />
 
 <div
   data-testid="immersive-visualizer"

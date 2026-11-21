@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
+import { tick } from "svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -122,35 +123,11 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
       localStorage.clear();
     });
 
-    it("steps through presets with ←/→ and redraws with the new one", async () => {
+    it("redraws with the newly selected preset", async () => {
       const { getByTestId } = render(ImmersiveVisualizer, { active: true });
-      await fireEvent.keyDown(window, { key: "ArrowRight" });
-      expect(visualizerStore.preset.id).toBe("fake");
+      visualizerStore.cycle(1);
+      await tick();
       expect(getByTestId("immersive-visualizer-canvas")).toHaveAttribute("data-preset", "fake");
-      await fireEvent.keyDown(window, { key: "ArrowLeft" });
-      expect(visualizerStore.preset.id).toBe("voxel");
-    });
-
-    it("leaves ←/→ alone while inactive, with a modifier, or in a slider or text field", async () => {
-      const { unmount } = render(ImmersiveVisualizer, { active: false });
-      await fireEvent.keyDown(window, { key: "ArrowRight" });
-      expect(visualizerStore.preset.id).toBe("voxel");
-      unmount();
-
-      render(ImmersiveVisualizer, { active: true });
-      await fireEvent.keyDown(window, { key: "ArrowRight", ctrlKey: true });
-
-      const slider = document.createElement("input");
-      slider.type = "range";
-      const field = document.createElement("div");
-      field.setAttribute("contenteditable", "true");
-      document.body.append(slider, field);
-      await fireEvent.keyDown(slider, { key: "ArrowRight" });
-      await fireEvent.keyDown(field, { key: "ArrowLeft" });
-      slider.remove();
-      field.remove();
-
-      expect(visualizerStore.preset.id).toBe("voxel");
     });
 
     it("opens the preset menu on right-click of the stage", async () => {

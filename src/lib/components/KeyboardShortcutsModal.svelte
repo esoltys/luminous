@@ -42,6 +42,8 @@
         { keys: ["Ctrl", "Shift", "M"], label: i18n.t("shortcuts.toggleMiniplayer") },
         { keys: ["Ctrl", "Shift", "F"], label: i18n.t("shortcuts.toggleFullscreen") },
         { keys: ["F11"], label: i18n.t("shortcuts.toggleFullscreen") },
+        { keys: ["["], label: i18n.t("shortcuts.previousVisualizer") },
+        { keys: ["]"], label: i18n.t("shortcuts.nextVisualizer") },
         { keys: ["Ctrl", "Shift", "E"], label: i18n.t("shortcuts.openEqualizer") },
         { keys: ["Ctrl", ","], label: i18n.t("shortcuts.openSettings") },
         { keys: ["Ctrl", "/"], label: i18n.t("shortcuts.showShortcuts") },

@@ -2899,6 +2899,8 @@ export const it = {
     toggleRightPanel: "Mostra/nascondi pannello destro",
     toggleMiniplayer: "Attiva/disattiva miniplayer",
     toggleFullscreen: "Attiva/disattiva schermo intero",
+    previousVisualizer: "Visualizzatore precedente",
+    nextVisualizer: "Visualizzatore successivo",
     openEqualizer: "Apri impostazioni equalizzatore",
     openSettings: "Apri Impostazioni",
     showShortcuts: "Mostra questo elenco",

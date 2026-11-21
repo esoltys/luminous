@@ -2830,6 +2830,8 @@ export const en = {
     toggleRightPanel: "Toggle right panel",
     toggleMiniplayer: "Toggle miniplayer",
     toggleFullscreen: "Toggle fullscreen",
+    previousVisualizer: "Previous visualizer",
+    nextVisualizer: "Next visualizer",
     openEqualizer: "Open Equalizer settings",
     openSettings: "Open Settings",
     showShortcuts: "Show this list",

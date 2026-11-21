@@ -890,17 +890,11 @@ describe("PlayerBar.svelte", () => {
       expect(visualizerStore.preset.id).toBe("voxel");
     });
 
-    it("steps with ↑/↓ on the focused slot and with the mouse wheel", async () => {
+    it("steps with the mouse wheel and announces the [ ] shortcuts", async () => {
       registerSecondPreset();
       playerStore.currentSong = mockSong;
       const { getByTestId } = render(PlayerBar);
-      const slot = getByTestId("player-bar-visualizer-btn");
-      expect(slot).toHaveAttribute("aria-keyshortcuts", "ArrowUp ArrowDown");
-
-      await fireEvent.keyDown(slot, { key: "ArrowDown" });
-      expect(visualizerStore.preset.id).toBe("fake");
-      await fireEvent.keyDown(slot, { key: "ArrowUp" });
-      expect(visualizerStore.preset.id).toBe("voxel");
+      expect(getByTestId("player-bar-visualizer-btn")).toHaveAttribute("aria-keyshortcuts", "[ ]");
 
       await fireEvent.wheel(getByTestId("player-bar-visualizer"), { deltaY: 100 });
       expect(visualizerStore.preset.id).toBe("fake");

@@ -89,6 +89,10 @@ export const enGB: Messages = {
   auth: {
     waitingForBrowser: "Waiting for authorisation in browser…",
   },
+  shortcuts: {
+    previousVisualizer: "Previous visualiser",
+    nextVisualizer: "Next visualiser",
+  },
   visualizers: {
     menuTitle: "Visualiser",
     previous: "Previous visualiser: {name}",

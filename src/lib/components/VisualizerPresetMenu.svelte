@@ -20,6 +20,9 @@
 
   let { x, y, onClose }: Props = $props();
 
+  // Wider than other menus: each row carries a thumbnail as well as the name.
+  const MENU_WIDTH_PX = 288;
+
   const thumbnails: (HTMLCanvasElement | null)[] = $state([]);
 
   // Drawn once when the menu opens; thumbnails are still images, so nothing animates here.
@@ -43,7 +46,7 @@
   }
 </script>
 
-<ContextMenu {x} {y} {onClose}>
+<ContextMenu {x} {y} {onClose} widthPx={MENU_WIDTH_PX}>
   <div class="label-heading px-3 pt-0.5 pb-1.5 text-brand-text-secondary" role="presentation">
     {i18n.t("visualizers.menuTitle", {}, "Visualizer")}
   </div>

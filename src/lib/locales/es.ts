@@ -2902,6 +2902,8 @@ export const es = {
     toggleRightPanel: "Alternar el panel derecho",
     toggleMiniplayer: "Alternar el minirreproductor",
     toggleFullscreen: "Alternar pantalla completa",
+    previousVisualizer: "Visualizador anterior",
+    nextVisualizer: "Visualizador siguiente",
     openEqualizer: "Abrir ajustes del ecualizador",
     openSettings: "Abrir Configuración",
     showShortcuts: "Mostrar esta lista",

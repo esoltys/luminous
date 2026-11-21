@@ -286,8 +286,9 @@
     windowLayoutStore.toggleImmersiveMode("visualizer");
   }
 
-  // Visualizer preset selection (#2245): arrows above/below the slot, the mouse wheel and
-  // ↑/↓ on the focused slot step through presets; right-click lists them with thumbnails.
+  // Visualizer preset selection (#2245): arrows above/below the slot and the mouse wheel step
+  // through presets, as do [ and ] anywhere (+page.svelte); right-click lists them with
+  // thumbnails.
   const WHEEL_STEP_INTERVAL_MS = 180;
   const NAME_FLASH_MS = 1000;
   let lastWheelStep = 0;
@@ -307,13 +308,6 @@
     if (e.timeStamp - lastWheelStep < WHEEL_STEP_INTERVAL_MS) return;
     lastWheelStep = e.timeStamp;
     visualizerStore.cycle(e.deltaY > 0 ? 1 : -1);
-  }
-
-  function handleVisualizerKeydown(e: KeyboardEvent) {
-    if (!visualizerStore.canSwitch || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-    e.preventDefault();
-    visualizerStore.cycle(e.key === "ArrowDown" ? 1 : -1);
   }
 
   function openPresetMenu(e: MouseEvent) {
@@ -761,11 +755,10 @@
               <button
                 type="button"
                 onclick={handleVisualizerClick}
-                onkeydown={handleVisualizerKeydown}
                 disabled={!playerStore.currentSong}
                 aria-pressed={isImmersiveVisualizerActive}
                 aria-label={i18n.t("playerBar.visualizerTooltip", {}, "Toggle audio visualizer")}
-                aria-keyshortcuts={visualizerStore.canSwitch ? "ArrowUp ArrowDown" : undefined}
+                aria-keyshortcuts={visualizerStore.canSwitch ? "[ ]" : undefined}
                 title={visualizerTitle}
                 data-testid="player-bar-visualizer-btn"
                 class="group relative w-24 h-7 px-1 py-0.5 rounded-md block focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-accent disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-all duration-200 {isImmersiveVisualizerActive
