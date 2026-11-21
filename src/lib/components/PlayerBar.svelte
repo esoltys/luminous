@@ -99,7 +99,7 @@
     }),
   );
   let dockRimGlow = $derived(
-    `0 0 24px 2px color-mix(in srgb, ${dockGlowColors[0]} ${isDarkTheme ? "48%" : "30%"}, transparent)`,
+    `0 0 28px -4px color-mix(in srgb, ${dockGlowColors[0]} ${isDarkTheme ? "34%" : "20%"}, transparent)`,
   );
 
   function handleSeek(e: Event) {
@@ -427,7 +427,7 @@
          over Queue/Album BlurredCover tables. Keyed on song + resolved colors
          so it cross-fades smoothly once artwork extraction finishes. -->
     <div
-      class="dock-glow-wrapper pointer-events-none select-none absolute -inset-x-16 -inset-y-12 z-0"
+      class="dock-glow-wrapper pointer-events-none select-none absolute -inset-x-8 -inset-y-7 rounded-full overflow-hidden z-0"
       style:opacity={dockGlowOpacity(isDarkTheme)}
       aria-hidden="true"
     >
@@ -851,37 +851,72 @@
 {/if}
 
 <style>
-  /* Capsule-shaped outer falloff: two intersected linear gradients keep the
-     glow full-strength across the entire pill width and fade smoothly outward
-     in all directions without pinching at the ends. */
+  /* Capsule-shaped outer falloff: Gaussian-eased multi-stop gradients peak near
+     the dock rim and taper asymptotically to zero before reaching the wrapper
+     boundary so the glow's outer limits never show a visible edge or seam. */
   .dock-glow-wrapper {
     --dock-glow-outer-mask:
-      linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%),
-      linear-gradient(to bottom, transparent 0%, black 35%, black 65%, transparent 100%);
+      linear-gradient(
+        to right,
+        transparent 0%,
+        rgba(0, 0, 0, 0.02) 8px,
+        rgba(0, 0, 0, 0.12) 18px,
+        rgba(0, 0, 0, 0.38) 30px,
+        rgba(0, 0, 0, 0.72) 44px,
+        rgba(0, 0, 0, 0.94) 58px,
+        black 72px,
+        black calc(100% - 72px),
+        rgba(0, 0, 0, 0.94) calc(100% - 58px),
+        rgba(0, 0, 0, 0.72) calc(100% - 44px),
+        rgba(0, 0, 0, 0.38) calc(100% - 30px),
+        rgba(0, 0, 0, 0.12) calc(100% - 18px),
+        rgba(0, 0, 0, 0.02) calc(100% - 8px),
+        transparent 100%
+      ),
+      linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(0, 0, 0, 0.02) 6%,
+        rgba(0, 0, 0, 0.1) 12%,
+        rgba(0, 0, 0, 0.28) 18%,
+        rgba(0, 0, 0, 0.56) 24%,
+        rgba(0, 0, 0, 0.84) 31%,
+        black 38%,
+        black 62%,
+        rgba(0, 0, 0, 0.84) 69%,
+        rgba(0, 0, 0, 0.56) 76%,
+        rgba(0, 0, 0, 0.28) 82%,
+        rgba(0, 0, 0, 0.1) 88%,
+        rgba(0, 0, 0, 0.02) 94%,
+        transparent 100%
+      );
     -webkit-mask-image: var(--dock-glow-outer-mask);
     -webkit-mask-composite: source-in;
     mask-image: var(--dock-glow-outer-mask);
     mask-composite: intersect;
   }
 
-  /* Hollow out the interior behind <footer> with a gradual ramp from the
-     outer edge (no plateau at 48px/64px) so there is no visible seam above or
-     around the dock while keeping the glass interior translucent. */
+  /* Soften the center behind <footer> while letting the halo peak gently
+     around the pill's perimeter and fade outward smoothly. */
   .dock-glow-cutout {
     --dock-glow-cutout-mask:
       linear-gradient(
         to right,
-        black 0%,
-        rgba(0, 0, 0, 0.05) 72px,
-        rgba(0, 0, 0, 0.05) calc(100% - 72px),
-        black 100%
+        rgba(0, 0, 0, 0.75) 0%,
+        rgba(0, 0, 0, 0.95) 28px,
+        rgba(0, 0, 0, 0.12) 64px,
+        rgba(0, 0, 0, 0.12) calc(100% - 64px),
+        rgba(0, 0, 0, 0.95) calc(100% - 28px),
+        rgba(0, 0, 0, 0.75) 100%
       ),
       linear-gradient(
         to bottom,
-        black 0%,
-        rgba(0, 0, 0, 0.05) 56px,
-        rgba(0, 0, 0, 0.05) calc(100% - 56px),
-        black 100%
+        rgba(0, 0, 0, 0.75) 0%,
+        rgba(0, 0, 0, 0.95) 22px,
+        rgba(0, 0, 0, 0.12) 48px,
+        rgba(0, 0, 0, 0.12) calc(100% - 48px),
+        rgba(0, 0, 0, 0.95) calc(100% - 22px),
+        rgba(0, 0, 0, 0.75) 100%
       );
     -webkit-mask-image: var(--dock-glow-cutout-mask);
     -webkit-mask-composite: source-over;
