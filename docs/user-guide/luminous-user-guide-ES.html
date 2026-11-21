@@ -87,7 +87,7 @@
 
     <section id="collection" data-section>
       <h1>Tu biblioteca</h1>
-      <p>Tu música vive en <b>Biblioteca</b>, en la barra lateral, con cuatro vistas: artistas, álbumes, canciones y géneros. Cada una se abre con su nombre, el total debajo («315 álbumes», o «42 de 315 álbumes» mientras buscas) y los controles de orden y vista arriba a la derecha. Configuración y Ayuda se quedan al final de la barra lateral.</p>
+      <p>Tu música vive en <b>Biblioteca</b>, en la barra lateral, con cuatro vistas: artistas, álbumes, canciones y géneros. Cada una se abre con su nombre, el total debajo («315 álbumes», o «42 de 315 álbumes» mientras buscas) y los controles de orden y vista arriba a la derecha. Configuración, <b>Conectar…</b> / <b>Conectado</b> (cuando los Servicios en línea están activados) y Ayuda se quedan al final de la barra lateral.</p>
       <figure class="shot mw-700 mb-28">
         <img src="assets/es/screenshots/dark/albums.webp" alt="Cuadrícula de álbumes" width="1440" height="900" loading="lazy">
       </figure>
@@ -225,7 +225,7 @@
         <div class="row"><div class="mk">•</div><div>Pasa el cursor sobre el minirreproductor para mostrar sus controles y valorar la canción.</div></div>
         <div class="row"><div class="mk">•</div><div>Arrastra su borde superior para moverlo.</div></div>
         <div class="row"><div class="mk">•</div><div>Usa el botón de letras para alternar entre la carátula y la letra en vivo.</div></div>
-        <div class="row"><div class="mk">•</div><div>Haz clic en <b>Restaurar la ventana completa</b> (<kbd>Ctrl</kbd><kbd>M</kbd>), abajo a la derecha, para volver.</div></div>
+        <div class="row"><div class="mk">•</div><div>Haz clic en <b>Restaurar la ventana completa</b> (<kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>M</kbd>), abajo a la derecha, para volver.</div></div>
       </div>
       <div class="pair-native mb-28">
         <div><figure class="shot"><img src="assets/es/screenshots/dark/miniplayer.webp" alt="Minirreproductor" width="340" height="420" loading="lazy"></figure><div class="caption">En reposo</div></div>
@@ -487,7 +487,6 @@
         <div class="row"><div class="mk">•</div><div><b>Iniciar al iniciar sesión</b>: abre Luminous cuando inicias sesión.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Exportar diagnósticos</b>: guarda un archivo de registro con los errores y bloqueos recientes para adjuntarlo a un informe de error.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Ubicación de almacenamiento de datos</b>: dónde se guardan la base de datos de tu biblioteca, la caché de carátulas y las preferencias. El ZIP de Windows funciona en <b>Modo portátil</b> y guarda todo en una carpeta <code>data</code> junto a la aplicación. Las carpetas de música de la misma unidad lo siguen cuando la unidad recibe otra letra en otra computadora. En Linux, coloca un archivo vacío llamado <code>portable</code> junto al AppImage para hacer lo mismo.</div></div>
-        <div class="row"><div class="mk">•</div><div>Actualizaciones: busca una versión nueva y elige qué ocurre cuando hay una. Las instalaciones de Microsoft Store se actualizan solas.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/es/screenshots/dark/settings-system.webp" alt="Ajustes del sistema" width="1440" height="1100" loading="lazy">
@@ -523,8 +522,8 @@
       <p>Todas las integraciones son opcionales, así que puedes mantener cualquier parte de Luminous sin conexión.</p>
       <div class="list">
         <div class="row"><div class="mk">•</div><div><b>Servicios en línea</b>: el interruptor general, arriba a la derecha. Cámbialo a <b>Sin conexión</b> y Luminous no hace ninguna solicitud a servicios externos (carátulas, letras, biografías, ListenBrainz, inicio de sesión de MusicBrainz, presencia en Discord y búsqueda de actualizaciones); las letras y carátulas guardadas se siguen mostrando, y tus bibliotecas Subsonic y WebDAV siguen funcionando.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>ListenBrainz Scrobbler</b>: pega tu <b>Token de usuario</b>, haz clic en <b>Validar y guardar</b> y activa el scrobbling. Elige si también se envían las valoraciones. Activa o desactiva las transmisiones de «reproduciendo ahora» y pausa el scrobbling desde la ventana del perfil de MusicBrainz en la barra lateral.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Pausar todo el scrobbling</b> (en la ventana del perfil de la barra lateral o en el área de notificación) detiene el envío sin desconectar. Las escuchas hechas sin conexión esperan hasta que hagas clic en <b>Sincronizar ahora</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>ListenBrainz Scrobbler</b>: pega tu <b>Token de usuario</b>, haz clic en <b>Validar y guardar</b> y activa el scrobbling. Elige si también se envían las valoraciones. Activa o desactiva las transmisiones de «reproduciendo ahora» y pausa el scrobbling desde el botón <b>Conectado</b> en la barra lateral.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Pausar todo el scrobbling</b> (desde el botón <b>Conectado</b> de la barra lateral o en el área de notificación) detiene el envío sin desconectar. Las escuchas hechas sin conexión esperan hasta que hagas clic en <b>Sincronizar ahora</b>.</div></div>
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard</b>: Luminous encuentra Picard o te permite buscarlo, para que puedas abrir archivos en Picard.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Last.fm</b>: Last.fm exige tu propia clave de API, y una clave requiere una suscripción a Last.fm Pro en la cuenta que la posee. Haz clic en <b>Crear una clave de API</b>, introduce la clave y el secreto compartido en <b>Clave de API de Last.fm</b> y <b>Secreto compartido de Last.fm</b> y haz clic en <b>Guardar clave</b>. Después haz clic en <b>Conectar Last.fm</b>, autoriza Luminous en tu navegador y luego haz clic en <b>Finalizar inicio de sesión</b>. Activa <b>Activar scrobbling de Last.fm</b> para enviar las escuchas completadas y <b>Sincronizar canciones favoritas</b> para mantener tus favoritas al día con tus canciones favoritas de Last.fm. Las escuchas sin conexión se guardan en cola y se envían al reconectar.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Ahora en la radio</b>: muestra qué emisoras de radio por internet están poniendo una canción, con Tuneping. Al activarlo, se envían a Tuneping el artista y el título de la canción del panel de información; no se envía nada mientras está desactivado o Luminous está sin conexión.</div></div>
@@ -666,7 +665,7 @@
       </div>
       <div class="kb-label">Navegación</div>
       <div class="kb-table">
-      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>L</kbd></div><div>Ir a la barra de búsqueda</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>L</kbd><span class="kb-or">o</span><kbd>Ctrl</kbd><kbd>F</kbd><span class="kb-or">o</span><kbd>/</kbd></div><div>Ir a la barra de búsqueda</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Esc</kbd></div><div>Cerrar el menú de búsqueda</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>O</kbd></div><div>Abrir canción</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>[</kbd></div><div>Atrás</div></div>
@@ -682,6 +681,7 @@
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>F</kbd><span class="kb-or">o</span><kbd>F11</kbd></div><div>Alternar pantalla completa</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>[</kbd></div><div>Visualizador anterior</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>]</kbd></div><div>Visualizador siguiente</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>E</kbd></div><div>Abrir ajustes del ecualizador</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>,</kbd></div><div>Abrir Configuración</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>/</kbd></div><div>Mostrar esta lista</div></div>
       </div>
@@ -693,6 +693,9 @@
       <p class="note">Hola, soy Eric, el desarrollador de software sénior canadiense detrás de Luminous. Disfruto mucho trabajando en esta aplicación y espero que se note. Escríbeme para saludarme y contarme qué te parece. Me encontrarás en <a href="https://esoltys.dev" target="_blank" rel="noopener">esoltys.dev</a>.</p>
       <span class="signature" role="img" aria-label="Eric"></span>
       <p>El código fuente está en <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>, junto con los créditos de cada biblioteca que usa Luminous y la licencia con la que se comparte. Para mí, el código abierto significa que podemos aprender de lo que vino antes y construir sobre ello.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Actualizaciones</b>: busca una versión nueva y elige qué ocurre cuando hay una. Las instalaciones de Microsoft Store se actualizan solas.</div></div>
+      </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/es/screenshots/dark/settings-about.webp" alt="Acerca de y créditos" width="1440" height="950" loading="lazy">
       </figure>

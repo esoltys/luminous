@@ -87,7 +87,7 @@
 
     <section id="collection" data-section>
       <h1>La tua libreria</h1>
-      <p>La tua musica sta sotto <b>Libreria</b>, nella barra laterale, in quattro viste: Artisti, Album, Brani e Generi. Ognuna si apre con il suo nome, il conteggio sotto («315 album», oppure «42 di 315 album» durante una ricerca) e i controlli di ordinamento e visualizzazione in alto a destra. Impostazioni e Guida restano in fondo alla barra laterale.</p>
+      <p>La tua musica sta sotto <b>Libreria</b>, nella barra laterale, in quattro viste: Artisti, Album, Brani e Generi. Ognuna si apre con il suo nome, il conteggio sotto («315 album», oppure «42 di 315 album» durante una ricerca) e i controlli di ordinamento e visualizzazione in alto a destra. Impostazioni, <b>Connetti…</b> / <b>Connesso</b> (quando i Servizi online sono attivi) e Guida restano in fondo alla barra laterale.</p>
       <figure class="shot mw-700 mb-28">
         <img src="assets/it/screenshots/dark/albums.webp" alt="Griglia degli album" width="1440" height="900" loading="lazy">
       </figure>
@@ -225,7 +225,7 @@
         <div class="row"><div class="mk">•</div><div>Passa il mouse sul miniplayer per mostrare i controlli e valutare il brano.</div></div>
         <div class="row"><div class="mk">•</div><div>Trascina il suo bordo superiore per spostarlo.</div></div>
         <div class="row"><div class="mk">•</div><div>Usa il pulsante dei testi per passare dalla copertina ai testi in tempo reale.</div></div>
-        <div class="row"><div class="mk">•</div><div>Fai clic su <b>Ripristina finestra intera</b> (<kbd>Ctrl</kbd><kbd>M</kbd>), in basso a destra, per tornare indietro.</div></div>
+        <div class="row"><div class="mk">•</div><div>Fai clic su <b>Ripristina finestra intera</b> (<kbd>Ctrl</kbd><kbd>Maiusc</kbd><kbd>M</kbd>), in basso a destra, per tornare indietro.</div></div>
       </div>
       <div class="pair-native mb-28">
         <div><figure class="shot"><img src="assets/it/screenshots/dark/miniplayer.webp" alt="Miniplayer" width="340" height="420" loading="lazy"></figure><div class="caption">A riposo</div></div>
@@ -487,7 +487,6 @@
         <div class="row"><div class="mk">•</div><div><b>Avvia all'accesso</b>: avvia Luminous quando accedi.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Esporta diagnostica</b>: salva un file di log con gli arresti anomali e gli errori recenti da allegare a una segnalazione di bug.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Posizione di archiviazione dei dati</b>: dove vengono conservati il database della libreria, la cache delle copertine e le preferenze. Lo ZIP per Windows funziona in <b>Modalità portatile</b> e conserva tutto in una cartella <code>data</code> accanto all'app. Le cartelle di musica sulla stessa unità la seguono quando l'unità riceve una nuova lettera su un altro computer. Su Linux, metti un file vuoto chiamato <code>portable</code> accanto all'AppImage per ottenere lo stesso risultato.</div></div>
-        <div class="row"><div class="mk">•</div><div>Aggiornamenti: cerca una nuova versione e scegli cosa succede quando ce n'è una. Le installazioni da Microsoft Store si aggiornano da sole.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/it/screenshots/dark/settings-system.webp" alt="Impostazioni di sistema" width="1440" height="1100" loading="lazy">
@@ -523,8 +522,8 @@
       <p>Ogni integrazione è facoltativa, così puoi tenere offline qualsiasi parte di Luminous.</p>
       <div class="list">
         <div class="row"><div class="mk">•</div><div><b>Servizi online</b>: l'interruttore generale in alto a destra. Impostalo su <b>Offline</b> e Luminous non invia richieste a servizi esterni (copertine, testi, biografie, ListenBrainz, accesso a MusicBrainz, Discord Rich Presence e controllo degli aggiornamenti); i testi e le copertine salvati restano visibili e le tue librerie Subsonic e WebDAV continuano a funzionare.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Scrobbler ListenBrainz</b>: incolla il tuo <b>Token utente</b>, fai clic su <b>Convalida e salva</b>, poi attiva lo scrobbling. Scegli se inviare anche le valutazioni. Attiva o disattiva le trasmissioni di «in riproduzione» e metti in pausa lo scrobbling dal popup del profilo MusicBrainz nella barra laterale.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Metti in pausa tutto lo scrobbling</b> (nel popup del profilo nella barra laterale o nell'area di notifica) interrompe l'invio senza scollegare. Gli ascolti fatti offline restano in attesa finché non fai clic su <b>Sincronizza ora</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Scrobbler ListenBrainz</b>: incolla il tuo <b>Token utente</b>, fai clic su <b>Convalida e salva</b>, poi attiva lo scrobbling. Scegli se inviare anche le valutazioni. Attiva o disattiva le trasmissioni di «in riproduzione» e metti in pausa lo scrobbling dal pulsante <b>Connesso</b> nella barra laterale.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Metti in pausa tutto lo scrobbling</b> (dal pulsante <b>Connesso</b> nella barra laterale o nell'area di notifica) interrompe l'invio senza scollegare. Gli ascolti fatti offline restano in attesa finché non fai clic su <b>Sincronizza ora</b>.</div></div>
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard</b>: Luminous trova Picard oppure ti permette di cercarlo, così puoi aprire i file in Picard.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Last.fm</b>: Last.fm richiede la tua chiave API personale, e una chiave richiede un abbonamento Last.fm Pro sull'account che la possiede. Fai clic su <b>Crea una chiave API</b>, inserisci la chiave e il segreto condiviso in <b>Chiave API di Last.fm</b> e <b>Segreto condiviso di Last.fm</b> e fai clic su <b>Salva chiave</b>. Poi fai clic su <b>Connetti Last.fm</b>, autorizza Luminous nel browser, poi fai clic su <b>Completa accesso</b>. Attiva <b>Abilita scrobbling Last.fm</b> per inviare gli ascolti completati e <b>Sincronizza brani preferiti</b> per allineare i tuoi preferiti ai brani amati. Gli ascolti offline vengono messi in coda e inviati alla riconnessione.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Ora in radio</b>: mostra quali stazioni radio online stanno trasmettendo un brano, tramite Tuneping. Attivandolo, artista e titolo del brano nel pannello informazioni vengono inviati a Tuneping; non viene inviato nulla finché è disattivato o Luminous è offline.</div></div>
@@ -666,7 +665,7 @@
       </div>
       <div class="kb-label">Navigazione</div>
       <div class="kb-table">
-      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>L</kbd></div><div>Vai alla barra di ricerca</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>L</kbd><span class="kb-or">oppure</span><kbd>Ctrl</kbd><kbd>F</kbd><span class="kb-or">oppure</span><kbd>/</kbd></div><div>Vai alla barra di ricerca</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Esc</kbd></div><div>Chiudi il menu a discesa della ricerca</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>O</kbd></div><div>Apri brano</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>[</kbd></div><div>Indietro</div></div>
@@ -682,6 +681,7 @@
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>Maiusc</kbd><kbd>F</kbd><span class="kb-or">oppure</span><kbd>F11</kbd></div><div>Attiva o disattiva schermo intero</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>[</kbd></div><div>Visualizzatore precedente</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>]</kbd></div><div>Visualizzatore successivo</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>Maiusc</kbd><kbd>E</kbd></div><div>Apri impostazioni equalizzatore</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>,</kbd></div><div>Apri Impostazioni</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>/</kbd></div><div>Mostra questo elenco</div></div>
       </div>
@@ -693,6 +693,9 @@
       <p class="note">Ciao, sono Eric, lo sviluppatore software senior canadese dietro Luminous. Mi piace molto lavorare a questa app e spero che si veda. Scrivimi per salutarmi e dirmi cosa ne pensi. Mi trovi su <a href="https://esoltys.dev" target="_blank" rel="noopener">esoltys.dev</a>.</p>
       <span class="signature" role="img" aria-label="Eric"></span>
       <p>Il codice sorgente è su <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>, insieme ai crediti di ogni libreria usata da Luminous e alla licenza con cui è condiviso. Per me, open source significa poter imparare da ciò che è venuto prima e costruirci sopra.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Aggiornamenti</b>: cerca una nuova versione e scegli cosa succede quando ce n'è una. Le installazioni da Microsoft Store si aggiornano da sole.</div></div>
+      </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/it/screenshots/dark/settings-about.webp" alt="Informazioni e crediti" width="1440" height="950" loading="lazy">
       </figure>

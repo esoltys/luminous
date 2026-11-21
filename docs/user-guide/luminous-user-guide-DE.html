@@ -87,7 +87,7 @@
 
     <section id="collection" data-section>
       <h1>Deine Mediathek</h1>
-      <p>Deine Musik findest du unter <b>Mediathek</b> in der Seitenleiste, in vier Ansichten: Interpreten, Alben, Titel und Genres. Jede beginnt mit ihrem Namen, darunter steht die Anzahl („315 Alben“ oder „42 von 315 Alben“ während einer Suche), und oben rechts findest du Sortier- und Ansichtssteuerung. Einstellungen und Hilfe bleiben unten in der Seitenleiste.</p>
+      <p>Deine Musik findest du unter <b>Mediathek</b> in der Seitenleiste, in vier Ansichten: Interpreten, Alben, Titel und Genres. Jede beginnt mit ihrem Namen, darunter steht die Anzahl („315 Alben“ oder „42 von 315 Alben“ während einer Suche), und oben rechts findest du Sortier- und Ansichtssteuerung. Einstellungen, <b>Verbinden…</b> / <b>Verbunden</b> (wenn Online-Dienste aktiviert sind) und Hilfe bleiben unten in der Seitenleiste.</p>
       <figure class="shot mw-700 mb-28">
         <img src="assets/de/screenshots/dark/albums.webp" alt="Albenraster" width="1440" height="900" loading="lazy">
       </figure>
@@ -225,7 +225,7 @@
         <div class="row"><div class="mk">•</div><div>Den Mauszeiger über den Miniplayer bewegen, um die Steuerung einzublenden und den Titel zu bewerten.</div></div>
         <div class="row"><div class="mk">•</div><div>Am oberen Rand ziehen, um ihn zu verschieben.</div></div>
         <div class="row"><div class="mk">•</div><div>Mit der Songtext-Schaltfläche zwischen Cover und Live-Songtext umschalten.</div></div>
-        <div class="row"><div class="mk">•</div><div>Unten rechts auf <b>Vollständiges Fenster wiederherstellen</b> (<kbd>Strg</kbd><kbd>M</kbd>) klicken, um zurückzukehren.</div></div>
+        <div class="row"><div class="mk">•</div><div>Unten rechts auf <b>Vollständiges Fenster wiederherstellen</b> (<kbd>Strg</kbd><kbd>Umschalt</kbd><kbd>M</kbd>) klicken, um zurückzukehren.</div></div>
       </div>
       <div class="pair-native mb-28">
         <div><figure class="shot"><img src="assets/de/screenshots/dark/miniplayer.webp" alt="Miniplayer" width="340" height="420" loading="lazy"></figure><div class="caption">Im Ruhezustand</div></div>
@@ -487,7 +487,6 @@
         <div class="row"><div class="mk">•</div><div><b>Beim Anmelden starten</b>: Luminous beim Anmelden starten.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Diagnosedaten exportieren</b>: eine Protokolldatei der letzten Abstürze und Fehler speichern, um sie einem Fehlerbericht anzuhängen.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Speicherort der Daten</b>: wo die Datenbank der Mediathek, der Cover-Cache und die Einstellungen liegen. Beim Windows-ZIP ist <b>Portabler Modus</b> aktiv und alles liegt in einem Ordner <code>data</code> neben der App. Musikordner auf demselben Laufwerk folgen ihm, wenn das Laufwerk auf einem anderen Computer einen neuen Buchstaben erhält. Unter Linux eine leere Datei namens <code>portable</code> neben das AppImage legen, um dasselbe zu erreichen.</div></div>
-        <div class="row"><div class="mk">•</div><div>Updates: nach einer neuen Version suchen und festlegen, was geschieht, wenn eine verfügbar ist. Installationen aus dem Microsoft Store aktualisieren sich selbst.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/de/screenshots/dark/settings-system.webp" alt="Systemeinstellungen" width="1440" height="1100" loading="lazy">
@@ -523,8 +522,8 @@
       <p>Jede Integration ist optional, du kannst also jeden Teil von Luminous offline lassen.</p>
       <div class="list">
         <div class="row"><div class="mk">•</div><div><b>Online-Dienste</b>: der Hauptschalter oben rechts. Auf <b>Offline</b> gestellt, sendet Luminous keine Anfragen an externe Dienste (Cover, Songtexte, Biografien, ListenBrainz, MusicBrainz-Anmeldung, Discord-Präsenz und Update-Suche); gespeicherte Songtexte und Cover werden weiter angezeigt, und deine Subsonic- und WebDAV-Mediatheken funktionieren weiter.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>ListenBrainz Scrobbler</b>: dein <b>Benutzertoken</b> einfügen, auf <b>Prüfen und speichern</b> klicken und dann das Scrobbling einschalten. Festlegen, ob auch Bewertungen gesendet werden. Die Übertragung von „Aktuelle Wiedergabe“ umschalten und das Scrobbling im Profil-Popup von MusicBrainz in der Seitenleiste pausieren.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Gesamtes Scrobbling pausieren</b> (im Profil-Popup der Seitenleiste oder im Infobereich) beendet das Senden, ohne die Verbindung zu trennen. Offline gehörte Titel warten, bis auf <b>Jetzt synchronisieren</b> geklickt wird.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>ListenBrainz Scrobbler</b>: dein <b>Benutzertoken</b> einfügen, auf <b>Prüfen und speichern</b> klicken und dann das Scrobbling einschalten. Festlegen, ob auch Bewertungen gesendet werden. Die Übertragung von „Aktuelle Wiedergabe“ umschalten und das Scrobbling über die Schaltfläche <b>Verbunden</b> in der Seitenleiste pausieren.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Gesamtes Scrobbling pausieren</b> (über die Schaltfläche <b>Verbunden</b> in der Seitenleiste oder im Infobereich) beendet das Senden, ohne die Verbindung zu trennen. Offline gehörte Titel warten, bis auf <b>Jetzt synchronisieren</b> geklickt wird.</div></div>
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard</b>: Luminous findet Picard oder lässt dich danach suchen, damit Dateien in Picard geöffnet werden können.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Last.fm</b>: Last.fm erfordert deinen eigenen API-Schlüssel, und ein Schlüssel setzt ein Last.fm-Pro-Abonnement für das Konto voraus, dem er gehört. Klicke auf <b>API-Schlüssel erstellen</b>, gib Schlüssel und Shared Secret in <b>Last.fm-API-Schlüssel</b> und <b>Last.fm Shared Secret</b> ein und klicke auf <b>Schlüssel speichern</b>. Klicke dann auf <b>Last.fm verbinden</b>, erlaube Luminous in deinem Browser und klicke dann auf <b>Anmeldung abschließen</b>. Schalte <b>Last.fm-Scrobbling aktivieren</b> ein, um abgeschlossene Wiedergaben zu senden, und <b>Lieblingstitel synchronisieren</b>, um deine Favoriten mit deinen Loved Tracks abzugleichen. Offline gehörte Titel werden zwischengespeichert und bei Verbindung gesendet.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Jetzt im Radio</b>: zeigt mit Tuneping, welche Internetradiosender einen Titel spielen. Beim Einschalten werden Interpret und Titel des Songs in der Info-Seitenleiste an Tuneping gesendet; solange die Funktion aus ist oder Luminous offline ist, wird nichts gesendet.</div></div>
@@ -666,7 +665,7 @@
       </div>
       <div class="kb-label">Navigation</div>
       <div class="kb-table">
-      <div class="kb-row"><div class="kb-keys"><kbd>Strg</kbd><kbd>L</kbd></div><div>Suchleiste fokussieren</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Strg</kbd><kbd>L</kbd><span class="kb-or">oder</span><kbd>Strg</kbd><kbd>F</kbd><span class="kb-or">oder</span><kbd>/</kbd></div><div>Suchleiste fokussieren</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Esc</kbd></div><div>Such-Dropdown schließen</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Strg</kbd><kbd>O</kbd></div><div>Titel öffnen</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Strg</kbd><kbd>[</kbd></div><div>Zurück</div></div>
@@ -682,6 +681,7 @@
       <div class="kb-row"><div class="kb-keys"><kbd>Strg</kbd><kbd>Umschalt</kbd><kbd>F</kbd><span class="kb-or">oder</span><kbd>F11</kbd></div><div>Vollbild umschalten</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>[</kbd></div><div>Vorherige Visualisierung</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>]</kbd></div><div>Nächste Visualisierung</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Strg</kbd><kbd>Umschalt</kbd><kbd>E</kbd></div><div>Equalizer-Einstellungen öffnen</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Strg</kbd><kbd>,</kbd></div><div>Einstellungen öffnen</div></div>
       <div class="kb-row"><div class="kb-keys"><kbd>Strg</kbd><kbd>/</kbd></div><div>Diese Liste anzeigen</div></div>
       </div>
@@ -693,6 +693,9 @@
       <p class="note">Hallo, ich bin Eric, der kanadische Senior-Softwareentwickler hinter Luminous. Ich arbeite sehr gern an dieser App und hoffe, dass man das merkt. Melde dich gern, sag Hallo und schick mir dein Feedback. Du findest mich unter <a href="https://esoltys.dev" target="_blank" rel="noopener">esoltys.dev</a>.</p>
       <span class="signature" role="img" aria-label="Eric"></span>
       <p>Der Quellcode liegt auf <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>, mit den Danksagungen für jede von Luminous verwendete Bibliothek und der Lizenz, unter der es geteilt wird. Open Source bedeutet für mich, dass wir aus dem lernen und auf dem aufbauen können, was vor uns da war.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Updates</b>: nach einer neuen Version suchen und festlegen, was geschieht, wenn eine verfügbar ist. Installationen aus dem Microsoft Store aktualisieren sich selbst.</div></div>
+      </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/de/screenshots/dark/settings-about.webp" alt="Info &amp; Danksagungen" width="1440" height="950" loading="lazy">
       </figure>
