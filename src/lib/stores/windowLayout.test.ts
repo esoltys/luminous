@@ -150,6 +150,54 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
     expect(windowLayoutStore.immersiveMode).toBe(false);
   });
 
+  it("drops the playbar out of view after 2.5s in immersive mode (cover or visualizer) and pops it back up on dock-zone activity (#2236)", () => {
+    vi.useFakeTimers();
+    try {
+      windowLayoutStore.viewportWidth = 1280;
+      windowLayoutStore.exitImmersiveMode();
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+
+      // 1. Enter immersive visualizer view: dock starts visible, then drops out after 2.5s
+      windowLayoutStore.toggleImmersiveMode("visualizer");
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(2499);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(1);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(true);
+
+      // 2. Moving pointer into the dock area pops it back up and restarts the 2.5s countdown
+      windowLayoutStore.revealImmersiveDock();
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(1500);
+      windowLayoutStore.revealImmersiveDock();
+      vi.advanceTimersByTime(1500);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(1000);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(true);
+
+      // 3. Holding the dock (e.g. pointer drag on seek/volume) reveals it and prevents hiding until released
+      windowLayoutStore.setImmersiveDockHeld(true);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(5000);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      windowLayoutStore.setImmersiveDockHeld(false);
+      vi.advanceTimersByTime(2500);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(true);
+
+      // 4. Switching to cover view reveals the dock, then drops it out after 2.5s; exiting immersive restores it
+      windowLayoutStore.toggleImmersiveMode("cover");
+      expect(windowLayoutStore.immersiveView).toBe("cover");
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+      vi.advanceTimersByTime(2500);
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(true);
+
+      windowLayoutStore.exitImmersiveMode();
+      expect(windowLayoutStore.isImmersiveDockHidden).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("derives responsive breakpoint flags from viewportWidth/viewportHeight without touching stored preferences", () => {
     windowLayoutStore.sidebarOpen = true;
     windowLayoutStore.setSidebarWidth(300);

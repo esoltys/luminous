@@ -63,6 +63,32 @@
   // condition drives the `pb-dock` bottom padding (app.css) every view uses to clear it.
   const dockVisible = $derived(!!playerStore.currentSong && navigationStore.activeTab !== "help");
 
+  function revealImmersiveDock() {
+    windowLayoutStore.revealImmersiveDock();
+  }
+
+  function handleDockPointerDown() {
+    if (!windowLayoutStore.effectiveImmersiveMode) return;
+    windowLayoutStore.setImmersiveDockHeld(true);
+    const onPointerUp = () => {
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      windowLayoutStore.setImmersiveDockHeld(false);
+    };
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+  }
+
+  $effect(() => {
+    const isImmersive = windowLayoutStore.effectiveImmersiveMode;
+    const _view = windowLayoutStore.immersiveView;
+    if (isImmersive) {
+      windowLayoutStore.revealImmersiveDock();
+    } else {
+      windowLayoutStore.immersiveDockHidden = false;
+    }
+  });
+
   function handleWelcomeGetStarted() {
     // Unconditional: this is an explicit user request to start the tour, not
     // the auto-resume-on-launch path below — it should never be suppressed
@@ -381,7 +407,15 @@
         console.warn("Failed to attach window focus listener:", e);
       });
 
+    const handleImmersivePointerMove = (e: PointerEvent) => {
+      if (!windowLayoutStore.effectiveImmersiveMode) return;
+      if (e.clientY >= window.innerHeight - PLAYER_DOCK_CONTENT_RESERVE_PX) {
+        revealImmersiveDock();
+      }
+    };
+
     window.addEventListener("keydown", handleGlobalHotkeys);
+    window.addEventListener("pointermove", handleImmersivePointerMove, { passive: true });
 
     // Forwards uncaught JS errors/rejections to the backend crash log (#684)
     // with benign notice filtering and burst repeat-collapsing (#1261) — without
@@ -393,6 +427,7 @@
 
     return () => {
       window.removeEventListener("keydown", handleGlobalHotkeys);
+      window.removeEventListener("pointermove", handleImmersivePointerMove);
       window.removeEventListener("focus", handleWindowFocus);
       window.removeEventListener("error", errorReporter.handleWindowError);
       window.removeEventListener("unhandledrejection", errorReporter.handleUnhandledRejection);
@@ -692,8 +727,22 @@
          whenever there's no current song, so it doesn't linger showing
          "Nothing playing" after the queue ends. -->
       {#if dockVisible}
-        <div class="absolute inset-x-4 bottom-4 z-40">
-          <PlayerBar />
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="absolute inset-x-4 bottom-4 z-40"
+          data-testid="player-dock-zone"
+          onpointerenter={revealImmersiveDock}
+          onpointermove={revealImmersiveDock}
+          onpointerdown={handleDockPointerDown}
+          onfocusin={revealImmersiveDock}
+        >
+          <div
+            data-testid="immersive-dock-motion"
+            class="immersive-dock"
+            class:immersive-dock-hidden={windowLayoutStore.isImmersiveDockHidden}
+          >
+            <PlayerBar />
+          </div>
         </div>
       {/if}
     {/if}
@@ -771,6 +820,60 @@
     width: 100%;
     height: 100%;
     display: block;
+  }
+
+  /* Immersive PlayDock auto-hide & reappear motion (#2236):
+     - Reappearing (default .immersive-dock): launches upward from below the
+       viewport, overshoots its resting height by ~11% (~11px) with a subtle
+       scale swell, and cushions back down into place.
+     - Dropping out (.immersive-dock.immersive-dock-hidden): first lifts up
+       slightly (~11% / ~11px anticipation crest), then accelerates downward
+       with gravity out of view while tapering scale and opacity. */
+  .immersive-dock {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+    will-change: transform, opacity;
+    transition-property: transform, opacity;
+    transition-duration: 560ms, 220ms;
+    transition-delay: 0ms, 0ms;
+    transition-timing-function: cubic-bezier(0.22, 1.35, 0.36, 1), ease-out;
+    transition-timing-function:
+      linear(0, 0.14 8%, 0.44 20%, 0.78 34%, 1.03 46%, 1.11 58%, 1.09 66%, 1.035 78%, 0.996 90%, 1),
+      ease-out;
+  }
+
+  .immersive-dock.immersive-dock-hidden {
+    transform: translate3d(0, calc(100% + 28px), 0) scale(0.965);
+    opacity: 0;
+    pointer-events: none;
+    transition-property: transform, opacity;
+    transition-duration: 580ms, 240ms;
+    transition-delay: 0ms, 320ms;
+    transition-timing-function: cubic-bezier(0.38, -0.32, 0.7, 1), ease-out;
+    transition-timing-function:
+      linear(
+        0,
+        -0.045 8%,
+        -0.095 18%,
+        -0.11 25%,
+        -0.08 33%,
+        0 43%,
+        0.19 55%,
+        0.5 70%,
+        0.82 85%,
+        0.96 94%,
+        1
+      ),
+      ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .immersive-dock,
+    .immersive-dock.immersive-dock-hidden {
+      transform: none !important;
+      transition: opacity 200ms ease-out !important;
+      transition-delay: 0ms !important;
+    }
   }
 
   .flip-perspective {
