@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { createEventScope } from "../utils/eventScope";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { collectionStore } from "../stores/collection.svelte";
@@ -836,10 +837,22 @@
     }
   }
 
+  const events = createEventScope();
+  let libraryRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
   onMount(() => {
     window.addEventListener("keydown", handleKeydown);
+    events.listen("library-changed", () => {
+      if (!effectiveOpen || isApplying) return;
+      if (libraryRefreshTimer) clearTimeout(libraryRefreshTimer);
+      libraryRefreshTimer = setTimeout(() => {
+        if (effectiveOpen && !isApplying) fetchPreview();
+      }, PREVIEW_DEBOUNCE_MS);
+    });
     return () => {
       window.removeEventListener("keydown", handleKeydown);
+      if (libraryRefreshTimer) clearTimeout(libraryRefreshTimer);
+      events.dispose();
     };
   });
 </script>

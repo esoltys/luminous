@@ -74,8 +74,19 @@ const { defaultInvokeHandler } = vi.hoisted(() => {
   return { defaultInvokeHandler };
 });
 
+const { listenCallbacks } = vi.hoisted(() => ({
+  listenCallbacks: {} as Record<string, () => void>,
+}));
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((cmd: string) => defaultInvokeHandler(cmd)),
+}));
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn().mockImplementation((event: string, cb: () => void) => {
+    listenCallbacks[event] = cb;
+    return Promise.resolve(() => {});
+  }),
 }));
 
 describe("OrganizeFiles safeguards", () => {
@@ -572,5 +583,26 @@ describe("OrganizeFiles safeguards", () => {
     expect(customBar.querySelector("code")).toHaveTextContent(
       "%albumartist/{%year - }{%album/}{%disc-}{%track }%title",
     );
+  });
+
+  it("refreshes preview when library-changed fires while open", async () => {
+    render(OrganizeFiles, { embedded: true, songIds: [] });
+
+    await waitFor(() =>
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith("preview_organize", expect.anything()),
+    );
+    const initialCalls = vi
+      .mocked(invoke)
+      .mock.calls.filter(([cmd]) => cmd === "preview_organize").length;
+
+    expect(listenCallbacks["library-changed"]).toBeDefined();
+    listenCallbacks["library-changed"]();
+
+    await waitFor(() => {
+      const nextCalls = vi
+        .mocked(invoke)
+        .mock.calls.filter(([cmd]) => cmd === "preview_organize").length;
+      expect(nextCalls).toBeGreaterThan(initialCalls);
+    });
   });
 });

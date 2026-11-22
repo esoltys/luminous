@@ -1258,12 +1258,13 @@ impl Player {
         let Some(song_id) = self.current_song.as_ref().map(|s| s.id) else {
             return false;
         };
-        let mtime = crate::collection::get_mtime(&healed).unwrap_or(0);
+        // Preserve `mtime` so the next scan still detects any tag edits made
+        // alongside the external case rename (see `repath_song_preserving_mtime`).
         let updated = match self._db.pool.get() {
             Ok(conn) => conn
                 .execute(
-                    "UPDATE songs SET path = ?1, mtime = ?2 WHERE id = ?3",
-                    rusqlite::params![healed_str, mtime, song_id],
+                    "UPDATE songs SET path = ?1 WHERE id = ?2",
+                    rusqlite::params![healed_str, song_id],
                 )
                 .map(|n| n > 0)
                 .unwrap_or(false),

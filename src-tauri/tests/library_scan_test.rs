@@ -446,3 +446,61 @@ async fn test_scan_automatically_merges_duplicate_case_variant_songs() {
         "survivor must reflect real on-disk casing"
     );
 }
+
+#[tokio::test]
+async fn test_scan_refreshes_tags_after_case_only_rename_with_tag_edit() {
+    let env = ScanTestEnv::new();
+    env.scanner
+        .add_directory(&env.scan_dir.to_string_lossy())
+        .expect("failed to add watched directory");
+
+    env.copy_fixture("song_alpha.mp3", "Stranger in the Alps");
+    env.run_scan(false).await;
+
+    // Simulate another machine (e.g. Linux/NAS) editing the album tag AND
+    // renaming the folder's casing to match, advancing the file's mtime.
+    let initial_dir = env.scan_dir.join("Stranger in the Alps");
+    let renamed_dir = env.scan_dir.join("Stranger In The Alps");
+    let tmp_dir = env.scan_dir.join(".tmp-case-rename");
+    std::fs::rename(&initial_dir, &tmp_dir).unwrap();
+    std::fs::rename(&tmp_dir, &renamed_dir).unwrap();
+    let renamed_path = renamed_dir.join("song_alpha.mp3");
+
+    let prev_mtime = std::fs::metadata(&renamed_path)
+        .unwrap()
+        .modified()
+        .unwrap();
+    luminous_metadata::audio::write_tags(
+        &renamed_path,
+        &luminous_metadata::audio::TagWriteRequest {
+            title: "Smoke Signals",
+            artist: "Phoebe Bridgers",
+            album: "Stranger In The Alps",
+            ..Default::default()
+        },
+    )
+    .expect("failed to write updated tags");
+    std::fs::File::options()
+        .write(true)
+        .open(&renamed_path)
+        .unwrap()
+        .set_modified(prev_mtime + std::time::Duration::from_secs(2))
+        .expect("failed to advance mtime");
+
+    // Non-force scan must reconcile the case-only path AND still re-read the
+    // updated tags because `reconcile_moved_songs` preserved the old `mtime`.
+    let report = env.run_scan_report(false).await;
+    assert_eq!(
+        report.reread, 1,
+        "scan must re-read tags when mtime changed alongside a case-only rename"
+    );
+
+    let conn = env.db.pool.get().unwrap();
+    let (path, album): (String, String) = conn
+        .query_row("SELECT path, album FROM songs", [], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
+        .unwrap();
+    assert_eq!(path, renamed_path.to_string_lossy().to_string());
+    assert_eq!(album, "Stranger In The Alps");
+}

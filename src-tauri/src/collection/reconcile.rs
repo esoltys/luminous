@@ -55,6 +55,34 @@ pub(crate) fn resolve_case_insensitive_path(path: &Path) -> Option<PathBuf> {
     Some(current)
 }
 
+/// Updates a song's `path` and folder `art_automatic` after a move/rename has
+/// been matched to its on-disk file, without touching `mtime`.
+///
+/// Leaving `mtime` untouched is deliberate: path reconciliation owns *location*
+/// only, while `scan_directory`'s `mtime` comparison owns *content freshness*.
+/// If the file's tags were edited before or alongside the rename (e.g. on
+/// another machine sharing a NAS), preserving the old `mtime` ensures the
+/// subsequent `known_mtimes` check in `scan_directory` sees the mismatch and
+/// re-reads the updated tags; if only the path changed, `mtime` still matches
+/// and no extra tag read occurs.
+pub(crate) fn repath_song_preserving_mtime(
+    conn: &rusqlite::Connection,
+    song_id: i64,
+    new_path: &Path,
+    old_art_automatic: Option<&str>,
+) -> Result<()> {
+    let new_path_str = new_path.to_string_lossy().to_string();
+    let new_art_automatic = match old_art_automatic {
+        Some(auto) if auto.starts_with("album-") => Some(auto.to_string()),
+        _ => crate::covermanager::CoverManager::scan_folder_art_static(new_path)
+            .map(|p| p.to_string_lossy().to_string()),
+    };
+    let mut stmt =
+        conn.prepare_cached("UPDATE songs SET path = ?1, art_automatic = ?2 WHERE id = ?3")?;
+    stmt.execute(params![new_path_str, new_art_automatic, song_id])?;
+    Ok(())
+}
+
 /// Matches DB rows whose file has vanished from its recorded path ("orphans")
 /// against freshly discovered files that have no DB row yet ("candidates"),
 /// using filename + file size as the identity heuristic, and repoints the
@@ -155,8 +183,6 @@ pub(crate) fn reconcile_moved_songs(
     }
 
     let mut reconciled = 0usize;
-    let mut update_stmt =
-        conn.prepare("UPDATE songs SET path = ?1, mtime = ?2, art_automatic = ?3 WHERE id = ?4")?;
 
     // Phase 1: Case-only rename in the same directory.
     // If a file at the exact same path changed only in letter case, it is
@@ -189,16 +215,8 @@ pub(crate) fn reconcile_moved_songs(
         let orphan_idx = orphan_indices[0];
         let orphan = &raw_orphans[orphan_idx];
         let new_path = candidate_paths[0];
-        let new_path_str = new_path.to_string_lossy().to_string();
-        let mtime = super::get_mtime(new_path).unwrap_or(0);
 
-        let new_art_automatic = match orphan.art_automatic.as_deref() {
-            Some(auto) if auto.starts_with("album-") => Some(auto.to_string()),
-            _ => crate::covermanager::CoverManager::scan_folder_art_static(new_path)
-                .map(|p| p.to_string_lossy().to_string()),
-        };
-
-        update_stmt.execute(params![new_path_str, mtime, new_art_automatic, orphan.id])?;
+        repath_song_preserving_mtime(conn, orphan.id, new_path, orphan.art_automatic.as_deref())?;
         reconciled += 1;
         matched_orphan_indices.insert(orphan_idx);
         matched_candidate_paths.insert(new_path.clone());
@@ -243,16 +261,8 @@ pub(crate) fn reconcile_moved_songs(
 
         let (orphan_id, old_art_automatic) = &orphan_records[0];
         let new_path = *available_candidates[0];
-        let new_path_str = new_path.to_string_lossy().to_string();
-        let mtime = super::get_mtime(new_path).unwrap_or(0);
 
-        let new_art_automatic = match old_art_automatic.as_deref() {
-            Some(auto) if auto.starts_with("album-") => Some(auto.to_string()),
-            _ => crate::covermanager::CoverManager::scan_folder_art_static(new_path)
-                .map(|p| p.to_string_lossy().to_string()),
-        };
-
-        update_stmt.execute(params![new_path_str, mtime, new_art_automatic, orphan_id])?;
+        repath_song_preserving_mtime(conn, *orphan_id, new_path, old_art_automatic.as_deref())?;
         reconciled += 1;
     }
 
