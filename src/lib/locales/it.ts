@@ -3338,6 +3338,17 @@ export const it = {
   visualizers: {
     voxel: "Spettro a voxel",
     voxelLogo: "Logo a voxel",
+    vectorscope: "Vettorscopio",
+    scope: {
+      left: "S",
+      right: "D",
+      centre: "C",
+      momentary: "Momentanea",
+      shortTerm: "Breve termine",
+      truePeak: "Picco reale",
+      balance: "Bilanciamento",
+      correlation: "Correlazione",
+    },
     menuTitle: "Visualizzatore",
     previous: "Visualizzatore precedente: {name}",
     next: "Visualizzatore successivo: {name}",

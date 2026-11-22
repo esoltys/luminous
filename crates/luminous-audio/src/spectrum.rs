@@ -55,7 +55,7 @@ impl AudioVisualizerBuffer {
         Self::with_capacity(BUFFER_CAPACITY)
     }
 
-    fn with_capacity(capacity: usize) -> Self {
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self {
             ring: Mutex::new(Ring {
                 data: vec![0.0; capacity.max(1)].into_boxed_slice(),

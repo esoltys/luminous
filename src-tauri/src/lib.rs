@@ -423,8 +423,8 @@ fn restore_audio_output_from_db(db: &Database, audio_engine: &AudioEngine) {
     let _ = audio_engine.set_output_config(config);
 }
 
-/// Spawns the ~30 FPS spectrum-emission loop that pushes `spectrum-data`
-/// events to the frontend while the spectrum visualizer is enabled and
+/// Spawns the ~30 FPS visualizer loop that pushes `spectrum-data` and
+/// `scope-data` events to the frontend while their feed is enabled and
 /// something is playing.
 fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEngine>>) {
     tauri::async_runtime::spawn(async move {
@@ -466,9 +466,17 @@ fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEng
 
             // `{ bands, onset }`: the onset covers everything played since the
             // previous frame, so a tick skipped above only drops stale beats.
-            let frame = audio.lock().await.visualizer_frame();
-            if let Some(frame) = frame {
+            // Each feed is on only while something shows it, so either can
+            // be `None` while the other runs.
+            let (spectrum, scope) = {
+                let engine = audio.lock().await;
+                (engine.visualizer_frame(), engine.scope_frame())
+            };
+            if let Some(frame) = spectrum {
                 let _ = app_handle.emit("spectrum-data", frame);
+            }
+            if let Some(frame) = scope {
+                let _ = app_handle.emit("scope-data", frame);
             }
         }
     });
@@ -1671,6 +1679,7 @@ pub fn run() {
             commands::visualizer::get_waveform_data,
             commands::visualizer::get_band_waveform_data,
             commands::visualizer::set_spectrum_enabled,
+            commands::visualizer::set_scope_enabled,
             // Equalizer commands
             commands::equalizer::get_active_output_device_name,
             commands::equalizer::get_equalizer_state,

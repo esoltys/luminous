@@ -58,23 +58,22 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
   });
 
   it("renders the compact song header and voxel visualizer canvas, and switches to cover view when the thumbnail is clicked", async () => {
-    const { getByTestId, getByText, getByTitle } = render(ImmersiveVisualizer, {
+    const { getByTestId, getByText, getByTitle, queryByText } = render(ImmersiveVisualizer, {
       active: true,
     });
 
     expect(getByTestId("immersive-visualizer")).toBeInTheDocument();
     expect(getByTestId("immersive-visualizer-canvas")).toBeInTheDocument();
     const detailsBox = getByTestId("immersive-visualizer-song-details");
-    const badge = getByText("Now playing");
     const title = getByText("Neon Horizon");
     const album = getByText("Midnight Grid");
     const artist = getByText("Synthwave Collective");
 
-    expect(detailsBox).not.toContainElement(badge);
+    // The header is the song itself, with no "Now playing" chip above it.
+    expect(queryByText("Now playing")).toBeNull();
     expect(detailsBox).toContainElement(title);
     expect(detailsBox).toContainElement(album);
     expect(detailsBox).toContainElement(artist);
-    expect(badge.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(title.compareDocumentPosition(album) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(album.compareDocumentPosition(artist) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
@@ -179,7 +178,7 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
     it("opens the preset menu on right-click of the stage", async () => {
       const { getByTestId, getAllByRole } = render(ImmersiveVisualizer, { active: true });
       await fireEvent.contextMenu(getByTestId("immersive-visualizer-canvas"));
-      expect(getAllByRole("menuitemradio")).toHaveLength(2);
+      expect(getAllByRole("menuitemradio")).toHaveLength(3);
     });
   });
 });

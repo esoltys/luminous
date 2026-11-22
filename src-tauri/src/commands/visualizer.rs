@@ -130,6 +130,14 @@ pub async fn set_spectrum_enabled(state: State<'_, AppState>, enabled: bool) -> 
     Ok(())
 }
 
+/// Start or stop the vectorscope feed (`scope-data` events).
+#[tauri::command]
+pub async fn set_scope_enabled(state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
+    let engine = state.audio.lock().await;
+    engine.set_scope_enabled(enabled);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;

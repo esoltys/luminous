@@ -3361,6 +3361,17 @@ export const frFR: DeepStringRecord<typeof en> = {
   visualizers: {
     voxel: "Spectre en voxels",
     voxelLogo: "Logo en voxels",
+    vectorscope: "Vectorscope",
+    scope: {
+      left: "G",
+      right: "D",
+      centre: "C",
+      momentary: "Momentanée",
+      shortTerm: "Court terme",
+      truePeak: "Crête réelle",
+      balance: "Balance",
+      correlation: "Corrélation",
+    },
     menuTitle: "Visualiseur",
     previous: "Visualiseur précédent : {name}",
     next: "Visualiseur suivant : {name}",

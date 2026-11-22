@@ -379,15 +379,15 @@ mod imp {
 
         let stream_error_flag = Arc::new(AtomicBool::new(false));
 
-        let mono_scratch_size = active_rate as usize * 2 * 2;
-        let renderer = OutputRenderer {
-            shared: Arc::clone(shared),
+        let max_block = active_rate as usize * 2 * 2;
+        let renderer = OutputRenderer::new(
+            Arc::clone(shared),
             consumer,
             played_samples,
-            mono_scratch: Vec::with_capacity(mono_scratch_size),
-            sample_rate: active_rate,
-            channels: 2,
-        };
+            active_rate,
+            2,
+            max_block,
+        );
 
         let scratch_len = buffer_size * 2;
         let interleaved_scratch = vec![0.0f32; scratch_len];

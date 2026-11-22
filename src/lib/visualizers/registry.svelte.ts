@@ -1,4 +1,5 @@
 import type { VisualizerPreset } from "./types";
+import { VECTORSCOPE_PRESET } from "./vectorscope";
 import { VOXEL_PRESET } from "./voxel";
 import { VOXEL_LOGO_PRESET } from "./voxelLogo";
 
@@ -8,7 +9,11 @@ export const DEFAULT_PRESET: VisualizerPreset = VOXEL_PRESET;
 // Built-ins in selector order. Add-on packs will register through `registerPreset` later.
 // Reactive, so the selector updates when a preset registers or leaves; `raw` keeps the
 // presets themselves unproxied, so identity comparisons hold.
-let presets = $state.raw<readonly VisualizerPreset[]>([VOXEL_PRESET, VOXEL_LOGO_PRESET]);
+let presets = $state.raw<readonly VisualizerPreset[]>([
+  VOXEL_PRESET,
+  VOXEL_LOGO_PRESET,
+  VECTORSCOPE_PRESET,
+]);
 
 /** Every registered preset, in selector order. */
 export function listPresets(): readonly VisualizerPreset[] {

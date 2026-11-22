@@ -45,6 +45,7 @@ pub mod asio;
 mod codecs;
 mod onset;
 pub mod pcm;
+mod scope;
 pub mod sink;
 mod source;
 mod spectrum;
@@ -69,6 +70,7 @@ use std::path::Path;
 
 pub use aac::decodes_full_he_aac;
 pub use codecs::{can_play_stream, plays_at_reduced_quality};
+pub use scope::ScopeFrame;
 pub use sink::{
     enumerate_output_devices, AudioBackendKind, AudioDeviceInfo, AudioOutputConfig, AudioSink,
     OutputFallbackReason,
@@ -395,6 +397,16 @@ pub(crate) struct AudioShared {
     /// output buffer after feeding `visualizer_buf` so visualizers still
     /// react without playing sound out of speakers.
     pub(crate) silent_output: bool,
+    /// L/R pairs of what plays, taken before master volume, for the
+    /// vectorscope (`scope.rs`).
+    pub(crate) scope_buf: spectrum::AudioVisualizerBuffer,
+    /// Whether the output callback feeds `scope_buf`: the copy is skipped
+    /// while no vectorscope is shown.
+    pub(crate) scope_enabled: std::sync::atomic::AtomicBool,
+    /// Bumped whenever the programme changes (a seek, a new track, gapless
+    /// or not, or a rebuilt device), so the vectorscope's meters, peak hold
+    /// and loudness history start afresh instead of spanning the change.
+    pub(crate) scope_epoch: AtomicU64,
     pub(crate) output_sample_rate: AtomicU32,
     pub(crate) output_channels: std::sync::atomic::AtomicU16,
     pub(crate) output_device_name: parking_lot::RwLock<Option<String>>,
@@ -503,6 +515,11 @@ impl AudioShared {
         f32::from_bits(self.volume.load(Ordering::Relaxed))
     }
 
+    /// Tell the vectorscope meters the programme changed (see `scope_epoch`).
+    fn restart_scope(&self) {
+        self.scope_epoch.fetch_add(1, Ordering::Relaxed);
+    }
+
     /// Drop a scheduled loudness switch: the played-sample space it was
     /// measured in has been reset (seek, new track, device rebuild).
     fn cancel_loudness_switch(&self) {
@@ -573,6 +590,8 @@ pub struct AudioEngine {
     shared: Arc<AudioShared>,
     /// Reader side of `shared.visualizer_buf`: read position and onset state.
     visualizer: Mutex<spectrum::VisualizerAnalyzer>,
+    /// Reader side of `shared.scope_buf`: read position and meter state.
+    scope: Mutex<scope::ScopeAnalyzer>,
 }
 
 impl AudioEngine {
@@ -602,6 +621,9 @@ impl AudioEngine {
             spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
             silent_output: std::env::var_os("LUMINOUS_SILENT_AUDIO")
                 .is_some_and(|v| !v.is_empty() && v != "0"),
+            scope_buf: scope::new_stereo_buffer(),
+            scope_enabled: std::sync::atomic::AtomicBool::new(false),
+            scope_epoch: AtomicU64::new(0),
             output_sample_rate: AtomicU32::new(44100),
             output_channels: std::sync::atomic::AtomicU16::new(2),
             output_device_name: parking_lot::RwLock::new(get_default_device_name()),
@@ -638,6 +660,7 @@ impl AudioEngine {
             cmd_tx,
             event_rx: Mutex::new(Some(event_rx)),
             visualizer: Mutex::new(spectrum::VisualizerAnalyzer::new()),
+            scope: Mutex::new(scope::ScopeAnalyzer::new()),
             shared,
         }
     }
@@ -862,6 +885,31 @@ impl AudioEngine {
         let sample_rate = self.shared.output_sample_rate.load(Ordering::Relaxed);
         let gain = self.shared.current_volume();
         Some(analyzer.frame(&self.shared.visualizer_buf, sample_rate, gain))
+    }
+
+    /// Start or stop feeding the vectorscope. While it is off the output
+    /// callback skips the stereo copy and `scope_frame` returns `None`.
+    pub fn set_scope_enabled(&self, enabled: bool) {
+        self.shared.scope_enabled.store(enabled, Ordering::Relaxed);
+    }
+
+    /// The stereo trace and meters of what played since the previous call,
+    /// measured before master volume, for a loop calling this ~30 times a
+    /// second. `None` while the scope is off (the meters then start afresh)
+    /// or playback isn't running (they carry on after a pause, which is
+    /// still the same programme).
+    pub fn scope_frame(&self) -> Option<ScopeFrame> {
+        let mut analyzer = self.scope.lock();
+        if !self.shared.scope_enabled.load(Ordering::Relaxed) {
+            analyzer.reset();
+            return None;
+        }
+        if self.current_state() != EngineState::Playing {
+            return None;
+        }
+        let sample_rate = self.shared.output_sample_rate.load(Ordering::Relaxed);
+        let epoch = self.shared.scope_epoch.load(Ordering::Relaxed);
+        Some(analyzer.frame(&self.shared.scope_buf, sample_rate, epoch))
     }
 
     /// The output stage as currently configured, with sensible defaults
@@ -1613,11 +1661,39 @@ pub(crate) struct OutputRenderer {
     pub(crate) consumer: Arc<Mutex<ringbuf::HeapCons<f32>>>,
     pub(crate) played_samples: Arc<AtomicU64>,
     pub(crate) mono_scratch: Vec<f32>,
+    /// The vectorscope's fold to L/R for layouts other than stereo.
+    pub(crate) stereo_scratch: Vec<f32>,
     pub(crate) sample_rate: u32,
     pub(crate) channels: u16,
 }
 
 impl OutputRenderer {
+    /// A renderer whose callback bursts never exceed `max_block` samples
+    /// (interleaved), with every scratch buffer reserved for that up front:
+    /// the callback must never allocate.
+    pub(crate) fn new(
+        shared: Arc<AudioShared>,
+        consumer: Arc<Mutex<ringbuf::HeapCons<f32>>>,
+        played_samples: Arc<AtomicU64>,
+        sample_rate: u32,
+        channels: u16,
+        max_block: usize,
+    ) -> Self {
+        Self {
+            shared,
+            consumer,
+            played_samples,
+            // Built before the stream starts, never on the audio thread.
+            // ast-grep-ignore: audio-callback-no-alloc
+            mono_scratch: Vec::with_capacity(max_block),
+            // Mono doubles into pairs; every other layout shrinks.
+            // ast-grep-ignore: audio-callback-no-alloc
+            stereo_scratch: Vec::with_capacity(2 * max_block),
+            sample_rate,
+            channels,
+        }
+    }
+
     /// Fill one device buffer from the ring buffer and run the gain chain.
     /// Runs on the real-time audio thread: never allocates or blocks.
     pub(crate) fn render(&mut self, output: &mut [f32]) {
@@ -1696,6 +1772,13 @@ impl OutputRenderer {
             for sample in output[..played].iter_mut() {
                 *sample *= fade;
             }
+        }
+
+        // The vectorscope meters what is playing (normalized, equalized,
+        // faded) but not how loud the listener set it, so it taps here,
+        // before volume, in both the software and hardware volume paths.
+        if played > 0 && self.shared.scope_enabled.load(Ordering::Relaxed) {
+            self.tap_stereo(&output[..played]);
         }
 
         // 4) Master volume: bypassed when hardware volume is active (keeps samples bit-perfect)
@@ -1953,17 +2036,16 @@ fn build_output(
     let shared_consumer = Arc::new(Mutex::new(cons));
 
     let played_samples = Arc::new(AtomicU64::new(0));
-    let mut renderer = OutputRenderer {
-        shared: Arc::clone(shared),
-        consumer: Arc::clone(&shared_consumer),
-        played_samples: Arc::clone(&played_samples),
-        // Pre-allocated scratch for the visualizer's mono downmix — the
-        // output callback must never allocate. Sized for the whole ring
-        // buffer, far larger than any single callback burst.
-        mono_scratch: Vec::with_capacity(buffer_capacity),
-        sample_rate: target_sample_rate,
-        channels: target_channels,
-    };
+    // Scratch sized for the whole ring buffer, far larger than any single
+    // callback burst (CPAL may not honour the fixed buffer size).
+    let mut renderer = OutputRenderer::new(
+        Arc::clone(shared),
+        Arc::clone(&shared_consumer),
+        Arc::clone(&played_samples),
+        target_sample_rate,
+        target_channels,
+        buffer_capacity,
+    );
 
     let stream_error_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let err_flag_cpal = Arc::clone(&stream_error_flag);
@@ -2360,6 +2442,7 @@ fn decode_thread(
         let start_samples = samples_for_ns(current.start_ns, target_sample_rate, target_channels);
         out.played_samples.store(start_samples, Ordering::Relaxed);
         shared.cancel_loudness_switch();
+        shared.restart_scope();
 
         if resume_fade_ms > 0 {
             shared.ramp_fade_gain(0.0, 1.0, resume_fade_ms);
@@ -2650,6 +2733,7 @@ fn check_and_rebuild_output(
 
                 session.outgoing = None;
                 shared.cancel_loudness_switch();
+                shared.restart_scope();
                 if let Some(t) = session.transition.take() {
                     // Mid-handover: `cur_pos` is still on the finished
                     // track's timeline, so reopen that track there (as
@@ -2890,6 +2974,7 @@ fn seek_session(
     // A seek cuts any crossfade tail still being mixed in.
     session.outgoing = None;
     shared.cancel_loudness_switch();
+    shared.restart_scope();
     if let Some(t) = session.transition.take() {
         // Mid-handover seek: the audible position is still in
         // the finished track but its decoder is gone — reopen
@@ -3010,6 +3095,9 @@ fn advance_transition_and_preload_signal(
                 .store(session.current.start_ns, Ordering::Relaxed);
             *shared.input_info.write() = Some(session.current.input_info.clone());
             session.current.input_changed = false;
+            // A new track is a new programme for the vectorscope's peak
+            // hold and loudness history, gapless or not.
+            shared.restart_scope();
             let finished_track_id = t.finished.id;
             let _ = event_tx.send(AudioEvent::TrackTransitioned {
                 finished_track_id,
@@ -3617,6 +3705,9 @@ mod tests {
             visualizer_buf: spectrum::AudioVisualizerBuffer::new(),
             spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
             silent_output: false,
+            scope_buf: scope::new_stereo_buffer(),
+            scope_enabled: std::sync::atomic::AtomicBool::new(false),
+            scope_epoch: AtomicU64::new(0),
             output_sample_rate: AtomicU32::new(44100),
             output_channels: std::sync::atomic::AtomicU16::new(2),
             output_device_name: parking_lot::RwLock::new(None),
@@ -3738,14 +3829,14 @@ mod tests {
         let _ = prod.try_push(-0.4);
         let _ = prod.try_push(-0.4);
 
-        let mut renderer = OutputRenderer {
-            shared: Arc::clone(&shared),
-            consumer: Arc::new(Mutex::new(cons)),
-            played_samples: Arc::new(AtomicU64::new(0)),
-            mono_scratch: Vec::new(),
-            sample_rate: 44100,
-            channels: 2,
-        };
+        let mut renderer = OutputRenderer::new(
+            Arc::clone(&shared),
+            Arc::new(Mutex::new(cons)),
+            Arc::new(AtomicU64::new(0)),
+            44100,
+            2,
+            0,
+        );
 
         // 1) With hardware volume inactive, 0.5 software gain is applied: 0.8 * 0.5 = 0.4
         let mut out = [0.0f32; 2];
@@ -3961,14 +4052,14 @@ mod tests {
         shared.spectrum_enabled.store(true, Ordering::Relaxed);
         let len = FRAMES * CHANNELS as usize;
         let (mut producer, consumer) = HeapRb::<f32>::new(len * 2).split();
-        let mut renderer = OutputRenderer {
-            shared: Arc::clone(&shared),
-            consumer: Arc::new(Mutex::new(consumer)),
-            played_samples: Arc::new(AtomicU64::new(0)),
-            mono_scratch: Vec::with_capacity(len),
-            sample_rate: 48_000,
-            channels: CHANNELS,
-        };
+        let mut renderer = OutputRenderer::new(
+            Arc::clone(&shared),
+            Arc::new(Mutex::new(consumer)),
+            Arc::new(AtomicU64::new(0)),
+            48_000,
+            CHANNELS,
+            len,
+        );
         let input: Vec<f32> = (0..len).map(|i| ((i as f32) * 0.01).sin() * 0.5).collect();
         let mut output = vec![0.0f32; len];
         let mut total = std::time::Duration::ZERO;
@@ -3998,14 +4089,14 @@ mod tests {
         let (mut producer, consumer) = HeapRb::<f32>::new(len).split();
         producer.push_slice(&vec![0.0f32; len]);
         let played = Arc::new(AtomicU64::new(0));
-        let renderer = OutputRenderer {
-            shared: Arc::clone(shared),
-            consumer: Arc::new(Mutex::new(consumer)),
-            played_samples: Arc::clone(&played),
-            mono_scratch: Vec::with_capacity(len),
-            sample_rate: 48_000,
-            channels: 2,
-        };
+        let renderer = OutputRenderer::new(
+            Arc::clone(shared),
+            Arc::new(Mutex::new(consumer)),
+            Arc::clone(&played),
+            48_000,
+            2,
+            len,
+        );
         (renderer, played)
     }
 
@@ -4133,6 +4224,44 @@ mod tests {
         );
     }
 
+    /// What the vectorscope tap receives from one rendered buffer of
+    /// `input`, interleaved at `channels`, with master volume at `volume`.
+    fn scope_tap_of(input: &[f32], channels: u16, volume: f32) -> Vec<f32> {
+        let shared = Arc::new(test_shared());
+        shared.scope_enabled.store(true, Ordering::Relaxed);
+        shared.volume.store(volume.to_bits(), Ordering::Relaxed);
+        let (mut producer, consumer) = HeapRb::<f32>::new(input.len()).split();
+        producer.push_slice(input);
+        let mut renderer = OutputRenderer::new(
+            Arc::clone(&shared),
+            Arc::new(Mutex::new(consumer)),
+            Arc::new(AtomicU64::new(0)),
+            48_000,
+            channels,
+            input.len(),
+        );
+        let mut output = vec![0.0f32; input.len()];
+        renderer.render(&mut output);
+        let mut tapped = Vec::new();
+        shared.scope_buf.read_since(0, usize::MAX, &mut tapped);
+        tapped
+    }
+
+    #[test]
+    fn scope_tap_is_taken_before_master_volume() {
+        let input = [0.5, -0.25, 0.4, 0.1];
+        assert_eq!(scope_tap_of(&input, 2, 0.3), input);
+        assert_eq!(scope_tap_of(&input, 2, 0.0), input);
+    }
+
+    #[test]
+    fn scope_tap_folds_mono_into_pairs() {
+        assert_eq!(
+            scope_tap_of(&[0.5, -0.25], 1, 1.0),
+            [0.5, 0.5, -0.25, -0.25]
+        );
+    }
+
     #[test]
     fn resume_with_fade_leaves_fade_gain_below_one_at_first_rendered_buffer() {
         let shared = Arc::new(test_shared());
@@ -4142,14 +4271,14 @@ mod tests {
         const CHANNELS: u16 = 2;
         let len = FRAMES * CHANNELS as usize;
         let (mut producer, consumer) = HeapRb::<f32>::new(len * 2).split();
-        let mut renderer = OutputRenderer {
-            shared: Arc::clone(&shared),
-            consumer: Arc::new(Mutex::new(consumer)),
-            played_samples: Arc::new(AtomicU64::new(0)),
-            mono_scratch: Vec::with_capacity(len),
-            sample_rate: 48_000,
-            channels: CHANNELS,
-        };
+        let mut renderer = OutputRenderer::new(
+            Arc::clone(&shared),
+            Arc::new(Mutex::new(consumer)),
+            Arc::new(AtomicU64::new(0)),
+            48_000,
+            CHANNELS,
+            len,
+        );
         let input = vec![1.0f32; len];
         producer.push_slice(&input);
 

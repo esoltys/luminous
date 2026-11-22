@@ -3538,6 +3538,17 @@ export const uk = {
   visualizers: {
     voxel: "Воксельний спектр",
     voxelLogo: "Воксельний логотип",
+    vectorscope: "Векторскоп",
+    scope: {
+      left: "Л",
+      right: "П",
+      centre: "Ц",
+      momentary: "Миттєва",
+      shortTerm: "Короткочасна",
+      truePeak: "Справжній пік",
+      balance: "Баланс",
+      correlation: "Кореляція",
+    },
     menuTitle: "Візуалізатор",
     previous: "Попередній візуалізатор: {name}",
     next: "Наступний візуалізатор: {name}",
