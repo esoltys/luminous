@@ -1,12 +1,12 @@
 import type { ScopeFrame } from "../utils/scopeFeed";
 
-/** The backend's floor for every level readout (`METER_FLOOR_DB`): silence, not a level. */
+/** The backend's floor for every level readout (`METER_FLOOR_DB` in `scope.rs`): silence, not a level. */
 export const LEVEL_FLOOR_DB = -70;
 /** Short-term loudness samples the history strip keeps: two minutes at one per ~200 ms. */
 export const HISTORY_LENGTH = 600;
 /** Scope frames (~30 a second) per history sample. */
 const FRAMES_PER_HISTORY_SAMPLE = 6;
-/** Most L/R pairs one scope frame carries. */
+/** Most L/R pairs one scope frame carries (the backend's `MAX_POINTS` in `scope.rs`). */
 const MAX_TRACE_POINTS = 512;
 
 /**
@@ -113,11 +113,11 @@ export function formatLevel(db: number): string {
   return db < 0 && text !== "0.0" ? MINUS + text : text;
 }
 
-/** Balance as the louder side and by how much, e.g. "L 1.2"; under 0.1 dB reads as centred. */
+/** Balance as the louder side and by how much, e.g. "L 1.2 dB"; under 0.1 dB reads as centred. */
 export function formatBalance(db: number, labels: ScopeLabels): string {
   const text = Math.abs(db).toFixed(1);
   if (text === "0.0") return labels.centre;
-  return `${db < 0 ? labels.left : labels.right} ${text}`;
+  return `${db < 0 ? labels.left : labels.right} ${text} dB`;
 }
 
 /** Correlation to two decimals with a sign, e.g. "+0.87". */

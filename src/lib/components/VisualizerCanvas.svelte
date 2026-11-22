@@ -41,7 +41,7 @@
 
   const FEEDS: Record<VisualizerFeed, { acquire(): void; release(): void }> = {
     spectrum: { acquire: acquireSpectrum, release: releaseSpectrum },
-    stereo: { acquire: acquireScope, release: releaseScope },
+    scope: { acquire: acquireScope, release: releaseScope },
   };
   const NO_BANDS: readonly number[] = [];
 

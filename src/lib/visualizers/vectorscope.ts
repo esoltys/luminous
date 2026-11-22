@@ -79,7 +79,7 @@ const PREVIEW_TRACE = (() => {
   return trace;
 })();
 
-/** A value of `withUnit`: "−14.2 LUFS", or the bare dash when there's no level yet. */
+/** `value` followed by `unit`, e.g. "−14.2 LUFS"; the bare dash when there's no level yet. */
 function withUnit(value: string, unit: string): string {
   return value === NO_VALUE ? value : `${value} ${unit}`;
 }
@@ -161,12 +161,13 @@ class VectorscopeFullInstance implements VisualizerInstance {
   private readonly meters = new ScopeMeters();
   private readonly trace = new ScopeTrace();
   private palette!: ScopePalette;
-  private labels: CachedLabels = readLabels();
+  private labels!: CachedLabels;
 
   // Text is rebuilt at the readout rate (and on a language change), never per draw.
   private readonly cells = readoutCells();
   private readonly previewCells = readoutCells();
   private correlationText = "";
+  /** Starts past any threshold so the first frame of data refreshes the readouts at once. */
   private framesSinceReadout = Number.MAX_SAFE_INTEGER;
   private reducedMotion = false;
   /** New points not yet drawn into the glow layer. */
@@ -174,14 +175,13 @@ class VectorscopeFullInstance implements VisualizerInstance {
   /** Fraction of the glow layer still to fade away at the next draw. */
   private fadePending = 0;
   private msSinceTrace = Number.MAX_SAFE_INTEGER;
-  private playing = false;
   // The afterglow layer: the scope square only, in device pixels.
   private glow: HTMLCanvasElement | null = null;
   private glowCtx: CanvasRenderingContext2D | null = null;
   private glowSize = 0;
 
   constructor() {
-    this.refreshReadouts();
+    this.applyLabels();
   }
 
   setTheme(colors: ThemeColors): void {
@@ -190,11 +190,11 @@ class VectorscopeFullInstance implements VisualizerInstance {
   }
 
   push(frame: VisualizerFrame): void {
-    this.playing = frame.playing;
     const scope = frame.scope;
     if (!scope) {
-      // Without the glow a paused trace would stay frozen on screen: drop it.
-      if (!frame.playing && this.reducedMotion) this.trace.clear();
+      // Paused: the afterglow layer keeps its own pixels and fades them out; without it
+      // the last trace would stay frozen on screen.
+      if (!frame.playing) this.trace.clear();
       return;
     }
     this.meters.push(scope);
@@ -216,28 +216,29 @@ class VectorscopeFullInstance implements VisualizerInstance {
     return this.msSinceTrace < GLOW_LIFETIME_MS;
   }
 
+  /** Read the labels in the current language into every cell, then refresh the values. */
+  private applyLabels(): void {
+    const l = (this.labels = readLabels());
+    for (const cells of [this.cells, this.previewCells]) {
+      cells[0].label = l.momentary;
+      cells[1].label = l.shortTerm;
+      cells[2].label = l.truePeak;
+      cells[3].label = l.balanceTitle;
+    }
+    this.previewCells[3].value = l.centre;
+    this.refreshReadouts();
+  }
+
+  /** Rebuild the readout values from the meters. */
   private refreshReadouts(): void {
-    const l = this.labels;
     const m = this.meters;
     const [momentary, shortTerm, peak, balance] = this.cells;
-    momentary.label = l.momentary;
     momentary.value = withUnit(formatLevel(m.momentaryLufs), "LUFS");
-    shortTerm.label = l.shortTerm;
     shortTerm.value = withUnit(formatLevel(m.shortTermLufs), "LUFS");
-    peak.label = l.truePeak;
     peak.value = withUnit(formatLevel(m.peakHoldDb), "dBTP");
     peak.warn = m.peakHoldDb > 0;
-    balance.label = l.balanceTitle;
-    const balanceText = formatBalance(m.balanceDb, l);
-    balance.value = balanceText === l.centre ? balanceText : withUnit(balanceText, "dB");
-    this.correlationText = `${l.correlationTitle} ${formatCorrelation(m.correlation)}`;
-
-    const preview = this.previewCells;
-    preview[0].label = l.momentary;
-    preview[1].label = l.shortTerm;
-    preview[2].label = l.truePeak;
-    preview[3].label = l.balanceTitle;
-    preview[3].value = l.centre;
+    balance.value = formatBalance(m.balanceDb, this.labels);
+    this.correlationText = `${this.labels.correlationTitle} ${formatCorrelation(m.correlation)}`;
   }
 
   private clearGlow(): void {
@@ -270,10 +271,7 @@ class VectorscopeFullInstance implements VisualizerInstance {
   ): void {
     if (width <= 0 || height <= 0) return;
     ctx.clearRect(0, 0, width, height);
-    if (this.labels.locale !== i18n.currentLocale) {
-      this.labels = readLabels();
-      this.refreshReadouts();
-    }
+    if (this.labels.locale !== i18n.currentLocale) this.applyLabels();
 
     const pad = Math.max(12, Math.min(32, Math.min(width, height) * 0.04));
     const gap = Math.max(8, pad * 0.6);
@@ -354,10 +352,10 @@ class VectorscopeFullInstance implements VisualizerInstance {
   ): void {
     const glow = reducedMotion ? null : this.glowLayer(size);
     if (!glow || !this.glow) {
-      // No afterglow: just the latest frame's points.
+      // No afterglow: just the latest frame's points (none once paused).
       ctx.strokeStyle = this.palette.trace;
       ctx.lineWidth = 1.2;
-      ctx.globalAlpha = this.playing || reducedMotion ? 0.85 : 0;
+      ctx.globalAlpha = 0.85;
       strokeTrace(ctx, this.trace, x + size / 2, y + size / 2, radius);
       ctx.globalAlpha = 1;
       return;
@@ -553,7 +551,7 @@ class VectorscopeMiniInstance implements VisualizerInstance {
 export const VECTORSCOPE_PRESET: VisualizerPreset = {
   id: "vectorscope",
   labelKey: "visualizers.vectorscope",
-  needs: ["stereo"],
+  needs: ["scope"],
   create(size: VisualizerSize): VisualizerInstance {
     return size === "full" ? new VectorscopeFullInstance() : new VectorscopeMiniInstance();
   },

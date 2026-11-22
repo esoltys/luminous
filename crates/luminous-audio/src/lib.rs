@@ -70,7 +70,7 @@ use std::path::Path;
 
 pub use aac::decodes_full_he_aac;
 pub use codecs::{can_play_stream, plays_at_reduced_quality};
-pub use scope::{ScopeFrame, METER_FLOOR_DB};
+pub use scope::ScopeFrame;
 pub use sink::{
     enumerate_output_devices, AudioBackendKind, AudioDeviceInfo, AudioOutputConfig, AudioSink,
     OutputFallbackReason,
@@ -887,10 +887,6 @@ impl AudioEngine {
         Some(analyzer.frame(&self.shared.visualizer_buf, sample_rate, gain))
     }
 
-    pub fn scope_enabled(&self) -> bool {
-        self.shared.scope_enabled.load(Ordering::Relaxed)
-    }
-
     /// Start or stop feeding the vectorscope. While it is off the output
     /// callback skips the stereo copy and `scope_frame` returns `None`.
     pub fn set_scope_enabled(&self, enabled: bool) {
@@ -904,7 +900,7 @@ impl AudioEngine {
     /// still the same programme).
     pub fn scope_frame(&self) -> Option<ScopeFrame> {
         let mut analyzer = self.scope.lock();
-        if !self.scope_enabled() {
+        if !self.shared.scope_enabled.load(Ordering::Relaxed) {
             analyzer.reset();
             return None;
         }

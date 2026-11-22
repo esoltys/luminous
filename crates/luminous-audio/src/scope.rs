@@ -16,7 +16,8 @@ use serde::Serialize;
 /// so a ~33 ms reader tick never loses samples to eviction.
 const STEREO_CAPACITY: usize = 1 << 18;
 /// Most L/R pairs a frame carries; what played since the previous frame is
-/// evenly thinned to this many for the scope trace.
+/// evenly thinned to this many for the scope trace. Mirrored by
+/// `MAX_TRACE_POINTS` in `src/lib/visualizers/vectorscopeEngine.ts`.
 const MAX_POINTS: usize = 512;
 /// Meter blocks: BS.1770 gates and windows in 100 ms steps.
 const BLOCKS_PER_SECOND: u32 = 10;
@@ -29,8 +30,9 @@ const SHORT_TERM_BLOCKS: usize = 30;
 const PHASE_BLOCKS: usize = 3;
 
 /// Lowest value any level readout takes (LUFS and dBTP). Silence reads this
-/// instead of −∞, so every frame is finite.
-pub const METER_FLOOR_DB: f32 = -70.0;
+/// instead of −∞, so every frame is finite. Mirrored by `LEVEL_FLOOR_DB` in
+/// `src/lib/visualizers/vectorscopeEngine.ts`, which shows it as "no level".
+pub(crate) const METER_FLOOR_DB: f32 = -70.0;
 /// Balance readouts are clamped to ± this many dB (one silent channel).
 const BALANCE_LIMIT_DB: f32 = 60.0;
 
@@ -299,9 +301,9 @@ impl ScopeAnalyzer {
         analyzer
     }
 
-    /// Forget the stream so far, as when playback pauses, the scope is
-    /// switched off, or the reader fell too far behind: the next frame reads
-    /// from then, and every meter starts from silence.
+    /// Forget the stream so far, as when the scope is switched off or the
+    /// output rate changes: the next frame reads from then, and every meter
+    /// starts from silence.
     pub(crate) fn reset(&mut self) {
         self.read_pos = None;
         self.clear_meters();

@@ -12,7 +12,7 @@ export type VisualizerSize = "mini" | "full";
  * A backend data feed a preset reads. The host turns on only the feeds the selected
  * preset needs, so an unused feed costs nothing.
  */
-export type VisualizerFeed = "spectrum" | "stereo";
+export type VisualizerFeed = "spectrum" | "scope";
 
 /** The latest audio data, handed to a preset each time it changes. */
 export interface VisualizerFrame {
@@ -23,7 +23,7 @@ export interface VisualizerFrame {
   /** Strength in (0, 1] of a beat detected since the previous frame; 0 means none. */
   readonly onset: number;
   /**
-   * New stereo data (`stereo` feed) that arrived with this push; null when the push
+   * New vectorscope data (`scope` feed) that arrived with this push; null when the push
    * carries none, e.g. a playback-state change or a spectrum event.
    */
   readonly scope: ScopeFrame | null;

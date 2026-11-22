@@ -83,8 +83,8 @@ describe("readout formatting", () => {
   });
 
   it("names the louder side for balance and centres small differences", () => {
-    expect(formatBalance(-1.24, LABELS)).toBe("L 1.2");
-    expect(formatBalance(2, LABELS)).toBe("R 2.0");
+    expect(formatBalance(-1.24, LABELS)).toBe("L 1.2 dB");
+    expect(formatBalance(2, LABELS)).toBe("R 2.0 dB");
     expect(formatBalance(0.04, LABELS)).toBe("C");
   });
 
