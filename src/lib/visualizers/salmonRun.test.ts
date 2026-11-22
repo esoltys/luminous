@@ -13,6 +13,13 @@ describe("buildSalmonRunPalette", () => {
       expect(calculateContrastRatio(p.fishBody, p.water)).toBeGreaterThanOrEqual(3);
       expect(calculateContrastRatio(p.leaf, p.water)).toBeGreaterThanOrEqual(3);
     });
+
+    it(`keeps the playbar's lone salmon and leaf visible on the playbar in the ${name} theme`, () => {
+      const p = buildSalmonRunPalette(colors, "bg-playerbar", [], false);
+      const bar = colors["bg-playerbar"];
+      expect(calculateContrastRatio(p.fishBody, bar)).toBeGreaterThanOrEqual(3);
+      expect(calculateContrastRatio(p.leaf, bar)).toBeGreaterThanOrEqual(3);
+    });
   }
 
   it("tints the water and current from the cover colours", () => {

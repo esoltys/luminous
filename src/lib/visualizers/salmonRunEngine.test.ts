@@ -17,7 +17,26 @@ const FULL: SalmonRunConfig = {
   pebbles: 10,
   fishLength: 0.075,
   leaf: true,
-  leaps: true,
+  leafSize: 0.065,
+  leafCrossS: 20,
+  ripples: true,
+  transients: "leap",
+  holdStation: false,
+};
+
+/** The playbar's lone salmon. */
+const LONE: SalmonRunConfig = {
+  fish: [1, 1],
+  boulders: [0, 0],
+  streaks: 0,
+  pebbles: 0,
+  fishLength: 0.85,
+  leaf: true,
+  leafSize: 0.3,
+  leafCrossS: 6,
+  ripples: false,
+  transients: "surge",
+  holdStation: true,
 };
 
 const QUIET = new Array(32).fill(0.2);
@@ -104,7 +123,18 @@ describe("SalmonRun layout", () => {
     const startX = river.leafX;
     run(river, 1);
     expect(river.leafX).toBeGreaterThan(startX);
-    run(river, 30);
+    run(river, FULL.leafCrossS + 1);
+    expect(river.leafActive).toBe(false);
+  });
+
+  it("drifts the leaf across in about its crossing time, whatever the canvas shape", () => {
+    const river = new SalmonRun(LONE);
+    river.setAspect(3.7);
+    river.setTrack("1");
+    river.setTrack("2");
+    run(river, LONE.leafCrossS * 0.9);
+    expect(river.leafActive).toBe(true);
+    run(river, LONE.leafCrossS * 0.2);
     expect(river.leafActive).toBe(false);
   });
 
@@ -199,14 +229,35 @@ describe("SalmonRun motion", () => {
     expect(river.glow).toBeGreaterThan(0);
   });
 
-  it("only ripples on beats when the size has no leaps", () => {
-    const river = new SalmonRun({ ...FULL, boulders: [0, 0], leaps: false });
+  it("keeps a station-holding salmon in frame, facing into the current", () => {
+    const river = new SalmonRun(LONE);
+    river.setAspect(3.7);
+    river.setTrack("1");
+    expect(river.fishCount).toBe(1);
+    river.push(frame(QUIET));
+    for (let t = 0; t < 60 * 60; t++) {
+      if (t % 90 === 0) river.push(frame(t % 180 === 0 ? LOUD_TREBLE : QUIET, 0.9));
+      river.step(1000 / 60, false);
+      expect(river.fishX[0]).toBeGreaterThan(LONE.fishLength * 0.5);
+      expect(river.fishX[0]).toBeLessThan(river.aspect - LONE.fishLength * 0.5);
+      expect(river.fishY[0]).toBeGreaterThan(0.25);
+      expect(river.fishY[0]).toBeLessThan(0.75);
+    }
+  });
+
+  it("darts a station-holding salmon forward on a transient, without leaping or rippling", () => {
+    const river = new SalmonRun(LONE);
+    river.setAspect(3.7);
     river.setTrack("1");
     river.push(frame(QUIET));
-    run(river, 1);
+    run(river, 2);
     river.push(frame(LOUD_TREBLE, 1));
     river.step(1000 / 60, false);
+    expect(river.fishSurge[0]).toBeGreaterThan(0);
     expect(leaping(river)).toBe(false);
-    expect(activeRipples(river)).toBe(1);
+    expect(activeRipples(river)).toBe(0);
+    const before = river.fishVX[0];
+    run(river, 0.2);
+    expect(river.fishVX[0]).toBeLessThan(before);
   });
 });

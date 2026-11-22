@@ -18,9 +18,8 @@ export const RIPPLE_LIFE_S = 1.6;
 const RIPPLE_GROWTH = 0.11;
 /** How long a leap lasts, from leaving the water to the landing splash. */
 export const LEAP_S = 0.8;
-/** Leaf drift speed, slower than the current so it reads as floating. */
-const LEAF_SPEED = 0.11;
-const LEAF_SPEED_REDUCED = 0.06;
+/** Under reduced motion the leaf drifts at this fraction of its usual speed. */
+const LEAF_REDUCED_PACE = 0.55;
 
 /** Time constant of the river easing between calm (paused) and running, in seconds. */
 const ACTIVITY_TAU_S = 0.5;
@@ -35,6 +34,12 @@ const TAIL_BASE_HZ = 1.4;
 const TAIL_ENERGY_HZ = 2.6;
 /** Under reduced motion salmon swim and beat their tails at this fraction of their usual pace. */
 const REDUCED_PACE = 0.6;
+/**
+ * How far a station-holding salmon's home wanders from mid-frame, as fractions of the width and
+ * height: enough to read as alive, little enough to stay clear of the edges.
+ */
+const HOLD_ROAM_X = 0.22;
+const HOLD_ROAM_Y = 0.08;
 /** Bank margin the salmon keep, as a fraction of the height. */
 const BANK = 0.14;
 /** Treble jump over its running average that counts as a transient. */
@@ -66,8 +71,19 @@ export interface SalmonRunConfig {
   readonly fishLength: number;
   /** Whether a maple leaf drifts past on a track change. */
   readonly leaf: boolean;
-  /** Whether salmon surge and leap on treble transients. */
-  readonly leaps: boolean;
+  /** The leaf's width, in world units. */
+  readonly leafSize: number;
+  /** Seconds the leaf takes to cross from edge to edge (slower under reduced motion). */
+  readonly leafCrossS: number;
+  /** Whether beats drop ripples on the water. */
+  readonly ripples: boolean;
+  /** What a treble transient does to a salmon: a surge forward, or a surge and a leap. */
+  readonly transients: "surge" | "leap";
+  /**
+   * Salmon hold station mid-frame against the current, wandering slowly about, instead of
+   * swimming upstream through the frame and rejoining downstream.
+   */
+  readonly holdStation: boolean;
 }
 
 /** A small, fast, seedable PRNG (mulberry32), so a track's river is the same every time. */
@@ -191,6 +207,9 @@ export class SalmonRun {
   leafAngle = 0;
   private leafSpin = 0;
 
+  /** Bumped whenever the riverbed is laid out again, so a cached drawing of it can tell it's stale. */
+  layoutVersion = 0;
+
   private key: string | null = null;
   private readonly rng = new SeededRandom(0);
   private playing = false;
@@ -227,7 +246,7 @@ export class SalmonRun {
     this.layOut(key);
     if (!first && this.config.leaf) {
       this.leafActive = true;
-      this.leafX = -0.08;
+      this.leafX = -this.config.leafSize;
       this.leafY = this.rng.range(0.25, 0.75);
       this.leafAngle = this.rng.range(0, Math.PI * 2);
       this.leafSpin = this.rng.range(-0.6, 0.6);
@@ -344,7 +363,7 @@ export class SalmonRun {
       if (onset > 0) this.glow = Math.max(this.glow, onset * GLOW_PER_ONSET);
       return;
     }
-    if (onset > 0) {
+    if (onset > 0 && this.config.ripples) {
       // A riffle: just downstream of a boulder, or anywhere on the water if there are none.
       if (this.boulderCount > 0) {
         const b = this.rng.int(0, this.boulderCount - 1);
@@ -362,7 +381,7 @@ export class SalmonRun {
         );
       }
     }
-    if (transient > 0 && this.cooldown === 0 && this.config.leaps && this.fishCount > 0) {
+    if (transient > 0 && this.cooldown === 0 && this.fishCount > 0) {
       this.cooldown = TRANSIENT_COOLDOWN_S;
       // The first fish not already surging or leaping, starting from a random one.
       const start = this.rng.int(0, this.fishCount - 1);
@@ -370,9 +389,9 @@ export class SalmonRun {
         const i = (start + k) % this.fishCount;
         if (this.fishLeap[i] > 0 || this.fishSurge[i] > 0.2) continue;
         this.fishSurge[i] = 1;
-        if (transient >= LEAP_THRESHOLD) {
+        if (this.config.transients === "leap" && transient >= LEAP_THRESHOLD) {
           this.fishLeap[i] = LEAP_S;
-          this.spawnRipple(this.fishX[i], this.fishY[i], 0.9);
+          if (this.config.ripples) this.spawnRipple(this.fishX[i], this.fishY[i], 0.9);
         }
         break;
       }
@@ -436,9 +455,21 @@ export class SalmonRun {
       if (y < BANK) steerY += (BANK - y) * 1.5;
       if (y > 1 - BANK) steerY -= (y - (1 - BANK)) * 1.5;
 
-      // Steering may slow a salmon but never turn it downstream: it goes around, not back.
-      const targetVX = Math.min(-speed + steerX * a * pace, -speed * 0.3);
-      const targetVY = steerY * a * pace;
+      let targetVX: number;
+      let targetVY: number;
+      if (this.config.holdStation) {
+        // Matching the current around a home that wanders slowly about mid-frame; a surge darts
+        // it forward and the current carries it back.
+        const w = this.fishWander[i];
+        const homeX = this.aspect * (0.5 + HOLD_ROAM_X * Math.sin(w * 0.6));
+        const homeY = 0.5 + HOLD_ROAM_Y * Math.sin(w * 1.3);
+        targetVX = ((homeX - x) * 0.8 - SURGE_SPEED * surge * pace) * a;
+        targetVY = (homeY - y) * 1.2 * a * pace;
+      } else {
+        // Steering may slow a salmon but never turn it downstream: it goes around, not back.
+        targetVX = Math.min(-speed + steerX * a * pace, -speed * 0.3);
+        targetVY = steerY * a * pace;
+      }
       const ease = 1 - Math.exp(-3 * dt);
       this.fishVX[i] += (targetVX - this.fishVX[i]) * ease;
       this.fishVY[i] += (targetVY - this.fishVY[i]) * ease;
@@ -451,11 +482,13 @@ export class SalmonRun {
       this.fishSurge[i] = surge > EPSILON ? surge * Math.exp(-SURGE_DECAY * dt) : 0;
       if (this.fishLeap[i] > 0) {
         this.fishLeap[i] = Math.max(0, this.fishLeap[i] - dt);
-        if (this.fishLeap[i] === 0) this.spawnRipple(this.fishX[i], this.fishY[i], 1);
+        if (this.fishLeap[i] === 0 && this.config.ripples) {
+          this.spawnRipple(this.fishX[i], this.fishY[i], 1);
+        }
       }
 
       // Past the upstream edge: rejoin the run downstream, out of sight.
-      if (this.fishX[i] < -len * 1.5) {
+      if (!this.config.holdStation && this.fishX[i] < -len * 1.5) {
         this.fishX[i] = this.aspect + len * this.rng.range(1.5, 4);
         this.fishY[i] = this.rng.range(BANK + 0.05, 1 - BANK - 0.05);
         this.fishLeap[i] = 0;
@@ -477,10 +510,12 @@ export class SalmonRun {
 
   private moveLeaf(dt: number, reducedMotion: boolean): void {
     if (!this.leafActive) return;
-    this.leafX += (reducedMotion ? LEAF_SPEED_REDUCED : LEAF_SPEED) * dt;
-    this.leafY += Math.sin(this.leafX * 4) * 0.01 * dt;
+    const size = this.config.leafSize;
+    const speed = (this.aspect + 2 * size) / this.config.leafCrossS;
+    this.leafX += speed * dt * (reducedMotion ? LEAF_REDUCED_PACE : 1);
+    this.leafY += Math.sin((this.leafX / size) * 0.3) * size * 0.15 * dt;
     this.leafAngle += this.leafSpin * dt * (reducedMotion ? 0.4 : 1);
-    if (this.leafX > this.aspect + 0.08) this.leafActive = false;
+    if (this.leafX > this.aspect + size) this.leafActive = false;
   }
 
   /** Radius of ripple `i`, in world units. */
@@ -498,6 +533,7 @@ export class SalmonRun {
   private layOut(key: string): void {
     const rng = this.rng;
     rng.reseed(seedFromKey(key));
+    this.layoutVersion++;
     const c = this.config;
 
     this.boulderCount = Math.min(MAX_BOULDERS, rng.int(c.boulders[0], c.boulders[1]));
@@ -534,8 +570,13 @@ export class SalmonRun {
 
     this.fishCount = Math.min(MAX_FISH, rng.int(c.fish[0], c.fish[1]));
     for (let i = 0; i < this.fishCount; i++) {
-      this.fishX[i] = rng.range(0.1, 0.9) * this.aspect;
-      this.fishY[i] = rng.range(BANK + 0.05, 1 - BANK - 0.05);
+      if (c.holdStation) {
+        this.fishX[i] = this.aspect * 0.5;
+        this.fishY[i] = 0.5;
+      } else {
+        this.fishX[i] = rng.range(0.1, 0.9) * this.aspect;
+        this.fishY[i] = rng.range(BANK + 0.05, 1 - BANK - 0.05);
+      }
       this.fishVX[i] = -SWIM_BASE;
       this.fishVY[i] = 0;
       this.fishTail[i] = rng.range(0, Math.PI * 2);
