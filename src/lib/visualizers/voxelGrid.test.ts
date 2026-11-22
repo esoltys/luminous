@@ -138,8 +138,8 @@ describe("voxel theme fills", () => {
       "rgba(255, 0, 0, 1)",
     ]);
     expect(voxelAlphaLadder("#ff0000", 2, 0.1, 0.5)).toEqual([
-      "rgba(255, 0, 0, 0.100)",
-      "rgba(255, 0, 0, 0.500)",
+      "rgba(255, 0, 0, 0.1)",
+      "rgba(255, 0, 0, 0.5)",
     ]);
   });
 });
