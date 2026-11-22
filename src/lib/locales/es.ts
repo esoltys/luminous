@@ -3272,9 +3272,9 @@ export const es = {
     },
     importStationListTitle: "¿Importar emisoras de radio?",
     importStationListMessage: {
-      one: "Se encontró {count} emisora en streaming en {files}.\n\n¿Importarla como lista de emisoras? Aparecerá en Radio por internet → Mis emisoras → Listas de emisoras.",
+      one: "Se encontró {count} emisora en streaming en {files}.\n\n¿Importarla como lista de reproducción de emisoras? Aparecerá en Radio por internet → Mis emisoras → Listas de reproducción de emisoras.",
       other:
-        "Se encontraron {count} emisoras en streaming en {files}.\n\n¿Importarlas como lista de emisoras? Aparecerá en Radio por internet → Mis emisoras → Listas de emisoras.",
+        "Se encontraron {count} emisoras en streaming en {files}.\n\n¿Importarlas como lista de reproducción de emisoras? Aparecerá en Radio por internet → Mis emisoras → Listas de reproducción de emisoras.",
     },
     importStationListConfirm: "Importar",
     stationListImported: {
@@ -3291,7 +3291,7 @@ export const es = {
     browseStationsAction: "Explorar emisoras",
     recentStationsTitle: "Escuchadas recientemente",
     noRecentStations: "Reproduce una emisora para verla aquí.",
-    stationListsTitle: "Listas de emisoras",
+    stationListsTitle: "Listas de reproducción de emisoras",
     playStation: "Reproducir {name}",
     playStationMenu: "Reproducir emisora",
     playingLabel: "Reproduciendo {name}",
@@ -3306,13 +3306,13 @@ export const es = {
     reducedQualityBadge: "Calidad reducida",
     reducedQualityHint:
       "Esta transmisión HE-AAC se reproduce sin sus frecuencias altas y algunas emisoras en mono, porque este sistema aún no tiene un decodificador HE-AAC completo.",
-    newStationList: "Nueva lista de emisoras",
-    editStationList: "Editar lista de emisoras",
-    stationListName: "Nombre de la lista",
+    newStationList: "Nueva lista de reproducción de emisoras",
+    editStationList: "Editar lista de reproducción de emisoras",
+    stationListName: "Nombre de la lista de reproducción",
     stationListNamePlaceholder: "p. ej. Folk Metal en Canadá",
-    stationListNameRequired: "Introduce un nombre para la lista de emisoras.",
-    stationListCreated: "Lista de emisoras creada",
-    stationListUpdated: "Lista de emisoras actualizada",
+    stationListNameRequired: "Introduce un nombre para la lista de reproducción de emisoras.",
+    stationListCreated: "Lista de reproducción de emisoras creada",
+    stationListUpdated: "Lista de reproducción de emisoras actualizada",
     suggestFromLibrary: "Sugerir desde mi biblioteca",
     genresLabel: "Géneros",
     selectedCount: "seleccionado(s)",
@@ -3326,7 +3326,7 @@ export const es = {
     sortOrder: "Orden",
     stationLimit: "Máx. emisoras",
     noStationLists:
-      "Crea una lista de emisoras para seguir géneros que se actualizan automáticamente.",
+      "Crea una lista de reproducción de emisoras para seguir géneros que se actualizan automáticamente.",
     stationsCount: "emisoras",
   },
   visualizers: {

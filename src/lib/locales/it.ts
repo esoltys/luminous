@@ -3265,9 +3265,9 @@ export const it = {
     },
     importStationListTitle: "Importare le stazioni radio?",
     importStationListMessage: {
-      one: "Trovata {count} stazione in streaming in {files}.\n\nImportarla come lista di stazioni? Apparirà in Radio internet → Le mie stazioni → Liste di stazioni.",
+      one: "Trovata {count} stazione in streaming in {files}.\n\nImportarla come playlist di stazioni? Apparirà in Radio internet → Le mie stazioni → Playlist di stazioni.",
       other:
-        "Trovate {count} stazioni in streaming in {files}.\n\nImportarle come lista di stazioni? Apparirà in Radio internet → Le mie stazioni → Liste di stazioni.",
+        "Trovate {count} stazioni in streaming in {files}.\n\nImportarle come playlist di stazioni? Apparirà in Radio internet → Le mie stazioni → Playlist di stazioni.",
     },
     importStationListConfirm: "Importa",
     stationListImported: {
@@ -3284,7 +3284,7 @@ export const it = {
     browseStationsAction: "Sfoglia stazioni",
     recentStationsTitle: "Ascoltate di recente",
     noRecentStations: "Riproduci una stazione per vederla qui.",
-    stationListsTitle: "Liste di stazioni",
+    stationListsTitle: "Playlist di stazioni",
     playStation: "Riproduci {name}",
     playStationMenu: "Riproduci stazione",
     playingLabel: "In riproduzione {name}",
@@ -3298,13 +3298,13 @@ export const it = {
     reducedQualityBadge: "Qualità ridotta",
     reducedQualityHint:
       "Questo flusso HE-AAC viene riprodotto senza le frequenze alte e alcune stazioni in mono, perché questo sistema non ha ancora un decodificatore HE-AAC completo.",
-    newStationList: "Nuova lista di stazioni",
-    editStationList: "Modifica lista di stazioni",
-    stationListName: "Nome della lista",
+    newStationList: "Nuova playlist di stazioni",
+    editStationList: "Modifica playlist di stazioni",
+    stationListName: "Nome della playlist",
     stationListNamePlaceholder: "es. Folk Metal in Canada",
-    stationListNameRequired: "Inserisci un nome per la lista di stazioni.",
-    stationListCreated: "Lista di stazioni creata",
-    stationListUpdated: "Lista di stazioni aggiornata",
+    stationListNameRequired: "Inserisci un nome per la playlist di stazioni.",
+    stationListCreated: "Playlist di stazioni creata",
+    stationListUpdated: "Playlist di stazioni aggiornata",
     suggestFromLibrary: "Suggerisci dalla mia libreria",
     genresLabel: "Generi",
     selectedCount: "selezionati",
@@ -3318,7 +3318,7 @@ export const it = {
     sortOrder: "Ordine",
     stationLimit: "Stazioni massime",
     noStationLists:
-      "Crea una lista di stazioni per seguire i generi che si aggiornano automaticamente.",
+      "Crea una playlist di stazioni per seguire i generi che si aggiornano automaticamente.",
     stationsCount: "stazioni",
   },
   visualizers: {
