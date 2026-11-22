@@ -275,15 +275,6 @@ pub(crate) fn reconcile_moved_songs(
 /// then deletes `dup`. Used wherever two rows turn out to be the same file
 /// (`merge_duplicate_songs`, `relocate::relocate_root`, duplicate curation #1678).
 pub(crate) fn merge_song_rows(conn: &rusqlite::Connection, survivor: i64, dup: i64) -> Result<()> {
-    // Playlists kept in sync with a file (#2280) get the merged entries
-    // written back. Counted here once rather than by a per-row trigger on
-    // the deletes below.
-    conn.execute(
-        "UPDATE playlist_files SET edit_rev = edit_rev + 1
-         WHERE playlist_id IN (SELECT playlist_id FROM playlist_items WHERE song_id = ?1)",
-        params![dup],
-    )?;
-
     // 1. Playlist deduplication:
     // Delete any rows for `dup` where the target playlist already contains `survivor`.
     conn.execute(

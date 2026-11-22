@@ -4,21 +4,22 @@
 //!
 //! A playlist file (`.m3u`, `.m3u8`, `.pls`, `.xspf`) found in a library
 //! folder becomes a Custom playlist linked to it by a `playlist_files` row.
-//! The row records the file's content hash from the last time the two
-//! agreed, which is how each side tells whether the other changed:
+//! The row records, from the last time the two agreed, a hash of the file's
+//! bytes and a hash of what Luminous would write for the playlist. Each side
+//! has changed exactly when its hash no longer matches:
 //!
 //! - **File → playlist.** [`PlaylistManager::sync_playlist_files`] re-reads a
-//!   file whose hash moved and replaces its playlist's items in place, so the
-//!   playlist keeps its id, pins, sort and play position.
-//! - **Playlist → file.** Every change the file depends on bumps the row's
-//!   `edit_rev` (playlist edits through [`PlaylistManager::mark_file_edited`],
-//!   changes made elsewhere through the triggers of migration 98), and
-//!   [`PlaylistFileWriter`] rewrites the file shortly after, in the style it
-//!   was read in. A write never happens inside the edit's
-//!   transaction: the writer reads the committed revision.
-//! - **Both.** A file that changed while its playlist has unwritten edits is
-//!   a conflict. Neither side is written until the user picks one with
-//!   [`PlaylistManager::resolve_file_conflict`].
+//!   file whose bytes changed and replaces its playlist's items in place, so
+//!   the playlist keeps its id, pins, sort and play position.
+//! - **Playlist → file.** [`PlaylistFileWriter`] renders each file-backed
+//!   playlist again and rewrites the file when the rendering changed, in the
+//!   style it was read in. Nothing counts edits: whatever changed the
+//!   playlist (an edit, undo, a sort, a duplicate merge, the organizer
+//!   moving a song, a tag edit) shows in the rendering. Edits only nudge
+//!   the writer to look soon; a missed nudge delays a write, never loses it.
+//! - **Both.** A file that changed while its playlist's rendering changed
+//!   too is a conflict. Neither side is written until the user picks one
+//!   with [`PlaylistManager::resolve_file_conflict`].
 //!
 //! Renaming a playlist renames its file; deleting it moves the file to the
 //! trash; a file that disappears leaves its playlist as a plain Custom one.
@@ -125,27 +126,27 @@ pub fn announce(app: &tauri::AppHandle, report: &FileSyncReport) {
 struct LinkedFile {
     playlist_id: i64,
     path: PathBuf,
-    content_hash: String,
+    /// The file's bytes when the two last agreed.
+    file_hash: String,
+    /// What Luminous would have written for the playlist then.
+    render_hash: String,
     style: FileStyle,
-    edit_rev: i64,
-    synced_rev: i64,
     conflict: bool,
 }
 
 const LINKED_COLS: &str =
-    "playlist_id, path, content_hash, style, edit_rev, synced_rev, conflict FROM playlist_files";
+    "playlist_id, path, file_hash, render_hash, style, conflict FROM playlist_files";
 
 impl LinkedFile {
     fn from_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
-        let style: String = row.get(3)?;
+        let style: String = row.get(4)?;
         Ok(Self {
             playlist_id: row.get(0)?,
             path: PathBuf::from(row.get::<_, String>(1)?),
-            content_hash: row.get(2)?,
+            file_hash: row.get(2)?,
+            render_hash: row.get(3)?,
             style: serde_json::from_str(&style).unwrap_or_default(),
-            edit_rev: row.get(4)?,
-            synced_rev: row.get(5)?,
-            conflict: row.get(6)?,
+            conflict: row.get(5)?,
         })
     }
 
@@ -168,6 +169,36 @@ impl LinkedFile {
             )
             .optional()?)
     }
+
+    /// The hash of what Luminous would write for this playlist now.
+    fn render_hash_now(&self, conn: &Connection) -> Result<String> {
+        Ok(content_hash(&render(
+            conn,
+            self.playlist_id,
+            &self.path,
+            &self.style,
+        )?))
+    }
+}
+
+/// What Luminous writes to `path` for `playlist_id`: its name and tracks in
+/// the file's format and `style`.
+fn render(conn: &Connection, playlist_id: i64, path: &Path, style: &FileStyle) -> Result<Vec<u8>> {
+    let format = PlaylistFormat::from_path(path)
+        .ok_or_else(|| anyhow!("Not a playlist file: {}", path.display()))?;
+    let name: String = conn.query_row(
+        "SELECT name FROM playlists WHERE id = ?1",
+        params![playlist_id],
+        |r| r.get(0),
+    )?;
+    let items = PlaylistManager::get_playlist_tracks_from_conn(conn, playlist_id)?;
+    Ok(playlist::playlist_file_bytes(
+        &name,
+        &export_tracks(&items),
+        format,
+        path,
+        style,
+    ))
 }
 
 fn path_key(path: &Path) -> String {
@@ -182,9 +213,9 @@ fn content_hash(bytes: &[u8]) -> String {
         .collect()
 }
 
-/// Records that `playlist_id` and the file at `path` agree, as `bytes` in
-/// `style`: the link is created or repointed, every edit so far counts as
-/// written, and any conflict is over.
+/// Records that `playlist_id` and the file at `path` agree, the file holding
+/// `bytes` in `style`: the link is created or repointed, the playlist's
+/// rendering as it is now becomes the agreed one, and any conflict is over.
 fn record_agreement(
     conn: &Connection,
     playlist_id: i64,
@@ -192,18 +223,20 @@ fn record_agreement(
     bytes: &[u8],
     style: &FileStyle,
 ) -> Result<()> {
+    let rendered = render(conn, playlist_id, path, style)?;
     conn.execute(
-        "INSERT INTO playlist_files (playlist_id, path, path_key, content_hash, style)
-         VALUES (?1, ?2, ?3, ?4, ?5)
+        "INSERT INTO playlist_files (playlist_id, path, path_key, file_hash, render_hash, style)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
          ON CONFLICT(playlist_id) DO UPDATE SET
              path = excluded.path, path_key = excluded.path_key,
-             content_hash = excluded.content_hash, style = excluded.style,
-             synced_rev = edit_rev, conflict = 0",
+             file_hash = excluded.file_hash, render_hash = excluded.render_hash,
+             style = excluded.style, conflict = 0",
         params![
             playlist_id,
             path.to_string_lossy(),
             path_key(path),
             content_hash(bytes),
+            content_hash(&rendered),
             serde_json::to_string(style)?,
         ],
     )?;
@@ -378,8 +411,11 @@ impl PlaylistManager {
     /// rule doesn't apply to it.
     fn sync_file(&mut self, path: &Path, chosen: bool) -> Result<Inbound> {
         let conn = self.db.pool.get()?;
+        // The file before its row: the writer records a new hash before it
+        // writes, so bytes Luminous just wrote always find their hash here.
+        let read = std::fs::read(path);
         let linked = LinkedFile::by_path(&conn, path)?;
-        let bytes = match std::fs::read(path) {
+        let bytes = match read {
             Ok(bytes) => bytes,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 return Ok(match linked {
@@ -398,13 +434,13 @@ impl PlaylistManager {
         let hash = content_hash(&bytes);
 
         if let Some(l) = &linked {
-            if l.conflict || l.content_hash == hash {
+            if l.conflict || l.file_hash == hash {
                 return Ok(Inbound::Synced {
                     playlist_id: l.playlist_id,
                     changed: false,
                 });
             }
-            if l.edit_rev != l.synced_rev {
+            if l.render_hash_now(&conn)? != l.render_hash {
                 return Ok(Inbound::Conflict(set_conflict(&conn, l.playlist_id)?));
             }
         }
@@ -432,9 +468,8 @@ impl PlaylistManager {
                 },
             },
         };
-        // One transaction, so the edit counter the item triggers bump is
-        // caught up in the same commit and the writer never sees this read
-        // as an unwritten edit.
+        // One transaction, so the writer never sees the new items without
+        // the agreement that says they came from the file.
         let tx = conn.unchecked_transaction()?;
         replace_items(&tx, playlist_id, &entries)?;
         if let Some(name) = name {
@@ -455,87 +490,98 @@ impl PlaylistManager {
         })
     }
 
-    /// Writes every file-backed playlist with edits its file doesn't have
-    /// yet, in the style the file was read in. A file changed on disk since
-    /// the two last agreed is not overwritten: its playlist goes into
+    /// Writes every file-backed playlist whose rendering changed since it
+    /// last agreed with its file, in the style the file was read in. A file
+    /// changed on disk meanwhile is not overwritten: its playlist goes into
     /// conflict instead. A file that's gone unlinks its playlist. Run by
-    /// [`PlaylistFileWriter`]; a failed write is logged and retried after
-    /// the next edit.
+    /// [`PlaylistFileWriter`]; a failed write is logged and retried on the
+    /// next pass.
     pub fn write_edited_playlist_files(&self) -> Result<FileSyncReport> {
         let conn = self.db.pool.get()?;
-        let pending: Vec<LinkedFile> = conn
-            .prepare(&format!(
-                "SELECT {LINKED_COLS} WHERE edit_rev != synced_rev AND conflict = 0"
-            ))?
-            .query_map([], LinkedFile::from_row)?
+        let linked: Vec<i64> = conn
+            .prepare("SELECT playlist_id FROM playlist_files WHERE conflict = 0")?
+            .query_map([], |r| r.get(0))?
             .collect::<rusqlite::Result<_>>()?;
         let mut report = FileSyncReport::default();
-        for linked in pending {
-            match self.write_file(&conn, &linked) {
+        for playlist_id in linked {
+            match self.write_file(&conn, playlist_id) {
                 Ok(inbound) => report.record(inbound),
-                Err(e) => log::warn!(
-                    "Couldn't write playlist file {}: {e}",
-                    linked.path.display()
-                ),
+                Err(e) => log::warn!("Couldn't write the file of playlist {playlist_id}: {e}"),
             }
         }
         Ok(report)
     }
 
-    /// Writes one playlist to its file. The playlist itself is unchanged
-    /// unless the file was gone (unlinked) or changed meanwhile (conflict).
-    fn write_file(&self, conn: &Connection, linked: &LinkedFile) -> Result<Inbound> {
+    /// Writes one playlist to its file if its rendering changed. The
+    /// playlist itself is unchanged unless the file was gone (unlinked) or
+    /// changed too (conflict).
+    fn write_file(&self, conn: &Connection, playlist_id: i64) -> Result<Inbound> {
+        let unchanged = Inbound::Synced {
+            playlist_id,
+            changed: false,
+        };
+        // The row and the rendering from one snapshot, so a file read in
+        // between can't pair a new rendering with the old agreement.
+        let snapshot = conn.unchecked_transaction()?;
+        let Some(linked) = LinkedFile::by_playlist(&snapshot, playlist_id)? else {
+            return Ok(Inbound::Skipped);
+        };
+        let bytes = render(&snapshot, playlist_id, &linked.path, &linked.style)?;
+        snapshot.commit()?;
+        let hash = content_hash(&bytes);
+        if linked.conflict || hash == linked.render_hash {
+            return Ok(unchanged);
+        }
         let on_disk = match std::fs::read(&linked.path) {
             Ok(bytes) => bytes,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                unlink(conn, linked.playlist_id)?;
-                return Ok(Inbound::Detached(linked.playlist_id));
+                unlink(conn, playlist_id)?;
+                return Ok(Inbound::Detached(playlist_id));
             }
             Err(e) => return Err(e.into()),
         };
-        if content_hash(&on_disk) != linked.content_hash {
-            return Ok(Inbound::Conflict(set_conflict(conn, linked.playlist_id)?));
+        if content_hash(&on_disk) != linked.file_hash {
+            return Ok(Inbound::Conflict(set_conflict(conn, playlist_id)?));
         }
-        let format = PlaylistFormat::from_path(&linked.path)
-            .ok_or_else(|| anyhow!("Not a playlist file: {}", linked.path.display()))?;
-        let name: String = conn.query_row(
-            "SELECT name FROM playlists WHERE id = ?1",
-            params![linked.playlist_id],
-            |r| r.get(0),
+        // Record the new agreement before writing, so the watcher's notice
+        // for this write finds the file already agreed and does nothing.
+        // That, not the watcher's self-write list, keeps Luminous from
+        // reading its own writes back: the list would also hide an edit made
+        // elsewhere moments later. Only if the row is still the one this
+        // pass read: a file read in meanwhile wins, and the next pass looks
+        // again.
+        let swap = "UPDATE playlist_files SET file_hash = ?1, render_hash = ?2
+                    WHERE playlist_id = ?3 AND file_hash = ?4 AND render_hash = ?5
+                      AND conflict = 0";
+        let claimed = conn.execute(
+            swap,
+            params![
+                hash,
+                hash,
+                playlist_id,
+                linked.file_hash,
+                linked.render_hash
+            ],
         )?;
-        let items = Self::get_playlist_tracks_from_conn(conn, linked.playlist_id)?;
-        let bytes = playlist::playlist_file_bytes(
-            &name,
-            &export_tracks(&items),
-            format,
-            &linked.path,
-            &linked.style,
-        );
-        let hash = content_hash(&bytes);
-        // Record the new hash before writing, so the watcher's notice for
-        // this write finds the file already agreed and does nothing. That,
-        // not the watcher's self-write list, is what keeps Luminous from
-        // reading its own writes back: the list would also hide an edit
-        // made elsewhere shortly after. Catch up only to the revision this
-        // write read: an edit made meanwhile keeps the playlist pending,
-        // and its nudge writes again.
-        conn.execute(
-            "UPDATE playlist_files SET content_hash = ?1, synced_rev = ?2 WHERE playlist_id = ?3",
-            params![hash, linked.edit_rev, linked.playlist_id],
-        )?;
-        if hash != linked.content_hash {
+        if claimed == 0 {
+            return Ok(unchanged);
+        }
+        if hash != linked.file_hash {
             if let Err(e) = std::fs::write(&linked.path, &bytes) {
                 conn.execute(
-                    "UPDATE playlist_files SET content_hash = ?1, synced_rev = ?2 WHERE playlist_id = ?3",
-                    params![linked.content_hash, linked.synced_rev, linked.playlist_id],
+                    swap,
+                    params![
+                        linked.file_hash,
+                        linked.render_hash,
+                        playlist_id,
+                        hash,
+                        hash
+                    ],
                 )?;
                 return Err(e.into());
             }
         }
-        Ok(Inbound::Synced {
-            playlist_id: linked.playlist_id,
-            changed: false,
-        })
+        Ok(unchanged)
     }
 
     /// Ends a conflict by keeping one side: [`KeepSide::Luminous`] writes the
@@ -558,25 +604,25 @@ impl PlaylistManager {
         report.add_changed(playlist_id);
         match keep {
             KeepSide::Luminous => {
-                // Take the file as it is now as the agreed base, and mark an
-                // edit so the writer puts the playlist over it.
+                // Agree on the file as it is now and on no rendering at all,
+                // so the writer finds the playlist changed and writes it.
                 let on_disk = std::fs::read(&linked.path).unwrap_or_default();
                 conn.execute(
                     "UPDATE playlist_files
-                     SET conflict = 0, content_hash = ?1, edit_rev = edit_rev + 1
+                     SET conflict = 0, file_hash = ?1, render_hash = ''
                      WHERE playlist_id = ?2",
                     params![content_hash(&on_disk), playlist_id],
                 )?;
                 self.nudge_writer();
             }
             KeepSide::File => {
-                // Drop the unwritten edits and forget the agreed hash, so the
-                // file reads in as changed.
+                // Agree on the playlist as it is now and on no file at all,
+                // so the file reads in over it.
                 conn.execute(
                     "UPDATE playlist_files
-                     SET conflict = 0, content_hash = '', synced_rev = edit_rev
-                     WHERE playlist_id = ?1",
-                    params![playlist_id],
+                     SET conflict = 0, file_hash = '', render_hash = ?1
+                     WHERE playlist_id = ?2",
+                    params![linked.render_hash_now(&conn)?, playlist_id],
                 )?;
                 drop(conn);
                 self.sync_file(&linked.path, true)?;
@@ -588,8 +634,7 @@ impl PlaylistManager {
     /// Renames `playlist_id`'s file to match its new name, keeping the
     /// extension and folder. If a file of that name already exists the file
     /// keeps its old name; the playlist is renamed either way. An `.xspf`
-    /// also stores the name inside; the rename trigger (migration 98) marks
-    /// it edited, so the writer rewrites it.
+    /// also stores the name inside, so the writer is nudged to rewrite it.
     pub(super) fn rename_linked_file(
         &self,
         conn: &Connection,
@@ -614,6 +659,7 @@ impl PlaylistManager {
                 params![target.to_string_lossy(), path_key(&target), playlist_id],
             )?;
         }
+        self.nudge_writer();
         Ok(())
     }
 
@@ -664,23 +710,10 @@ impl PlaylistManager {
         record_agreement(conn, playlist_id, path, bytes, style)
     }
 
-    /// Counts an edit to `playlist_id` against its file, if it has one, and
-    /// wakes the writer. Every `PlaylistManager` edit calls this once, which
-    /// is far cheaper than a trigger firing per changed row; it may run
-    /// inside the edit's transaction, since the writer reads the committed
-    /// revision.
-    pub(super) fn mark_file_edited(&self, conn: &Connection, playlist_id: i64) -> Result<()> {
-        let counted = conn.execute(
-            "UPDATE playlist_files SET edit_rev = edit_rev + 1 WHERE playlist_id = ?1",
-            params![playlist_id],
-        )?;
-        if counted > 0 {
-            self.nudge_writer();
-        }
-        Ok(())
-    }
-
-    fn nudge_writer(&self) {
+    /// Asks the writer to look at file-backed playlists soon. Call it after
+    /// any change to a playlist; it is a channel send, and a playlist
+    /// without a file costs nothing more.
+    pub(super) fn nudge_writer(&self) {
         if let Some(writer) = &self.file_writer {
             writer.nudge();
         }
@@ -693,7 +726,7 @@ impl PlaylistManager {
 /// detached copy beside a new one.
 fn moved_playlist(conn: &Connection, hash: &str) -> Result<Option<i64>> {
     let mut stmt =
-        conn.prepare("SELECT playlist_id, path FROM playlist_files WHERE content_hash = ?1")?;
+        conn.prepare("SELECT playlist_id, path FROM playlist_files WHERE file_hash = ?1")?;
     let candidates = stmt.query_map(params![hash], |r| {
         Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
     })?;
@@ -1243,5 +1276,54 @@ mod tests {
         assert_eq!(lib.playlist(id).source_path, None);
         lib.pm.delete_playlist(id).unwrap();
         assert!(lib.pm.get_playlists().unwrap().is_empty());
+    }
+
+    #[test]
+    fn reading_a_file_in_never_rewrites_it_on_its_own() {
+        // Luminous would write this file with #EXTINF lines; that is no
+        // reason to rewrite a file nobody changed.
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        lib.only_synced(&path);
+
+        assert!(lib.pm.write_edited_playlist_files().unwrap().is_empty());
+
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), MIX);
+    }
+
+    #[test]
+    fn a_change_made_outside_the_playlist_editor_reaches_the_file() {
+        // A duplicate merge rewrites playlist rows without going through
+        // the editor and without nudging; the next pass still finds it.
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        lib.only_synced(&path);
+
+        let conn = lib.db.pool.get().unwrap();
+        crate::collection::reconcile::merge_song_rows(&conn, 2, 1).unwrap();
+        drop(conn);
+        assert!(lib.pm.write_edited_playlist_files().unwrap().is_empty());
+
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("01.mp3"), "{text}");
+        assert!(text.contains("02.mp3"), "{text}");
+    }
+
+    #[test]
+    fn a_tag_edit_reaches_the_titles_in_the_file() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let id = lib.only_synced(&path);
+        lib.pm.add_songs_to_playlist(id, &[1]).unwrap();
+        lib.pm.write_edited_playlist_files().unwrap();
+
+        let conn = lib.db.pool.get().unwrap();
+        conn.execute("UPDATE songs SET title = 'Renamed' WHERE id = 2", [])
+            .unwrap();
+        drop(conn);
+        lib.pm.write_edited_playlist_files().unwrap();
+
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("#EXTINF:-1,Band - Renamed\r\n"), "{text}");
     }
 }

@@ -283,6 +283,8 @@ impl PlaylistManager {
             "UPDATE playlists SET sort_field = ?1, sort_asc = ?2 WHERE id = ?3",
             params![field, asc, playlist_id],
         )?;
+        // The sort orders a file-backed playlist's file too.
+        self.nudge_writer();
         Ok(())
     }
 }

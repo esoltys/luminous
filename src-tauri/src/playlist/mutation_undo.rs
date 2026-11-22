@@ -245,8 +245,8 @@ impl PlaylistManager {
 
     /// Bumps a playlist's `updated` timestamp to now — called whenever its
     /// contents or name change, so "Updated" sort/display stays accurate —
-    /// and counts the edit against the playlist's file, if it has one, so it
-    /// is written there too (`file_sync`).
+    /// and nudges the writer of a playlist kept in sync with a file
+    /// (`file_sync`).
     pub(super) fn touch_updated(
         &self,
         conn: &rusqlite::Connection,
@@ -256,7 +256,8 @@ impl PlaylistManager {
             "UPDATE playlists SET updated = ?1 WHERE id = ?2",
             params![crate::clock::unix_now(), playlist_id],
         )?;
-        self.mark_file_edited(conn, playlist_id)
+        self.nudge_writer();
+        Ok(())
     }
 
     fn reorder_item_internal(&self, playlist_id: i64, from: i32, to: i32) -> Result<()> {
@@ -681,7 +682,7 @@ impl PlaylistManager {
                 }
             }
         }
-        self.mark_file_edited(&*self.db.pool.get()?, op.playlist_id())?;
+        self.nudge_writer();
         self.redo_stack.push(op);
         Ok(true)
     }
@@ -745,7 +746,7 @@ impl PlaylistManager {
                 }
             }
         }
-        self.mark_file_edited(&*self.db.pool.get()?, op.playlist_id())?;
+        self.nudge_writer();
         self.undo_stack.push(op);
         Ok(true)
     }

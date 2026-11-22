@@ -3378,54 +3378,25 @@ DELETE FROM app_state WHERE key IN ('airplay_enabled', 'airplay_prompt_dismissed
 /// The playlist file in a library folder that a playlist is kept in sync
 /// with (#2280); see `playlist::file_sync`. `path_key` is `path` as
 /// `library_paths::key` spells it, so two spellings of one file share a row.
-/// `content_hash` is the file's
-/// content when the two last agreed and `style` its `FileStyle` as JSON.
-/// Every edit in Luminous bumps `edit_rev`; a write to the file catches
-/// `synced_rev` up with it, so the playlist has unwritten edits exactly when
-/// the two differ. `conflict` is set while both sides changed and the user
-/// hasn't yet chosen which to keep.
+/// When the two last agreed, `file_hash` was the hash of the file's bytes
+/// and `render_hash` the hash of what Luminous would write for the
+/// playlist; either side has changed since exactly when its hash no longer
+/// matches. `style` is the file's `FileStyle` as JSON. `conflict` is set
+/// while both sides changed and the user hasn't yet chosen which to keep.
 ///
-/// Edits made through `PlaylistManager` (adding, removing, moving, undo)
-/// are counted there, once per edit. The triggers count the changes made
-/// elsewhere: an entry repointed to another song (duplicate merges), the
-/// organizer moving a song, a sort change, and a rename, which counts only
-/// for `.xspf`, the one format that stores the name (an `.m3u` just has its
-/// file renamed). There is deliberately no trigger on inserting, deleting or
-/// renumbering items: SQLite would run it once per row, which made adding
-/// 1,000 songs to any playlist, file-backed or not, up to 50 times slower.
-/// Changes `file_sync` itself makes while reading a file are caught up in
-/// the same transaction.
+/// Deliberately no triggers and no edit counters: whether the playlist
+/// changed is found by rendering it again, so every way of changing it
+/// counts and nothing has to remember to say so.
 const MIGRATION_98: &str = "
 CREATE TABLE IF NOT EXISTS playlist_files (
-    playlist_id  INTEGER PRIMARY KEY REFERENCES playlists(id) ON DELETE CASCADE,
-    path         TEXT NOT NULL,
-    path_key     TEXT NOT NULL UNIQUE,
-    content_hash TEXT NOT NULL,
-    style        TEXT NOT NULL,
-    edit_rev     INTEGER NOT NULL DEFAULT 0,
-    synced_rev   INTEGER NOT NULL DEFAULT 0,
-    conflict     INTEGER NOT NULL DEFAULT 0
+    playlist_id INTEGER PRIMARY KEY REFERENCES playlists(id) ON DELETE CASCADE,
+    path        TEXT NOT NULL,
+    path_key    TEXT NOT NULL UNIQUE,
+    file_hash   TEXT NOT NULL,
+    render_hash TEXT NOT NULL,
+    style       TEXT NOT NULL,
+    conflict    INTEGER NOT NULL DEFAULT 0
 );
-CREATE TRIGGER IF NOT EXISTS playlist_files_item_update
-AFTER UPDATE OF playlist_id, song_id, url ON playlist_items BEGIN
-    UPDATE playlist_files SET edit_rev = edit_rev + 1
-    WHERE playlist_id IN (OLD.playlist_id, NEW.playlist_id);
-END;
-CREATE TRIGGER IF NOT EXISTS playlist_files_song_moved
-AFTER UPDATE OF path ON songs WHEN OLD.path IS NOT NEW.path BEGIN
-    UPDATE playlist_files SET edit_rev = edit_rev + 1
-    WHERE playlist_id IN (SELECT playlist_id FROM playlist_items WHERE song_id = NEW.id);
-END;
-CREATE TRIGGER IF NOT EXISTS playlist_files_sorted
-AFTER UPDATE OF sort_field, sort_asc ON playlists
-WHEN OLD.sort_field IS NOT NEW.sort_field OR OLD.sort_asc IS NOT NEW.sort_asc BEGIN
-    UPDATE playlist_files SET edit_rev = edit_rev + 1 WHERE playlist_id = NEW.id;
-END;
-CREATE TRIGGER IF NOT EXISTS playlist_files_xspf_renamed
-AFTER UPDATE OF name ON playlists WHEN OLD.name IS NOT NEW.name BEGIN
-    UPDATE playlist_files SET edit_rev = edit_rev + 1
-    WHERE playlist_id = NEW.id AND path_key LIKE '%.xspf';
-END;
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
