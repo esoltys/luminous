@@ -71,7 +71,7 @@ export interface SalmonRunConfig {
   readonly fishLength: number;
   /** Whether a leaf drifts past on a track change. */
   readonly leaf: boolean;
-  /** The leaf's width, in world units. */
+  /** The leaf's length, stem to tip, in world units. */
   readonly leafSize: number;
   /** Seconds the leaf takes to cross from edge to edge (slower under reduced motion). */
   readonly leafCrossS: number;
@@ -184,9 +184,9 @@ export class SalmonRun {
   readonly boulderY = new Float32Array(MAX_BOULDERS);
   readonly boulderR = new Float32Array(MAX_BOULDERS);
 
+  /** Riverbed pebbles, one cell each: x as a fraction of the width, y in world units. */
   readonly pebbleFX: Float32Array;
   readonly pebbleY: Float32Array;
-  readonly pebbleR: Float32Array;
 
   /** Streak positions in world units, lengths in world units. */
   readonly streakX: Float32Array;
@@ -225,7 +225,6 @@ export class SalmonRun {
     this.config = config;
     this.pebbleFX = new Float32Array(config.pebbles);
     this.pebbleY = new Float32Array(config.pebbles);
-    this.pebbleR = new Float32Array(config.pebbles);
     this.streakX = new Float32Array(config.streaks);
     this.streakY = new Float32Array(config.streaks);
     this.streakLen = new Float32Array(config.streaks);
@@ -555,7 +554,6 @@ export class SalmonRun {
     for (let i = 0; i < c.pebbles; i++) {
       this.pebbleFX[i] = rng.next();
       this.pebbleY[i] = rng.range(0.03, 0.97);
-      this.pebbleR[i] = rng.range(0.006, 0.02);
     }
     for (let i = 0; i < c.streaks; i++) {
       this.streakX[i] = rng.range(-0.2, this.aspect + 0.1);

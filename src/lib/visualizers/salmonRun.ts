@@ -6,6 +6,7 @@ import {
   VoxelGrid,
   VoxelLayerCache,
   voxelAlphaLadder,
+  voxelRgba,
   voxelUnlitCellColor,
   type Ctx2D,
 } from "./voxelGrid";
@@ -140,12 +141,6 @@ function mix(a: string, b: string, t: number): string {
   );
 }
 
-/** `hex` at opacity `alpha`, as a fill. */
-function rgba(hex: string, alpha: number): string {
-  const { r, g, b } = hexToRgb(hex);
-  return `rgba(${r}, ${g}, ${b}, ${Number(Math.min(1, alpha).toFixed(3))})`;
-}
-
 /** Builds the river's fills from the theme, for a canvas on `surface`. */
 export function buildSalmonRunPalette(
   colors: ThemeColors,
@@ -164,9 +159,9 @@ export function buildSalmonRunPalette(
     const fills: string[] = new Array(BED.water + WATER_SHADES);
     fills[BED.none] = "transparent";
     fills[BED.pebble] = voxelUnlitCellColor(colors, 2.4);
-    fills[BED.stone] = rgba(border, light ? 0.5 : 0.42);
-    fills[BED.stoneLight] = rgba(border, light ? 0.72 : 0.62);
-    fills[BED.stoneFoam] = rgba(hover, 0.3);
+    fills[BED.stone] = voxelRgba(border, light ? 0.5 : 0.42);
+    fills[BED.stoneLight] = voxelRgba(border, light ? 0.72 : 0.62);
+    fills[BED.stoneFoam] = voxelRgba(hover, 0.3);
     for (let b = 0; b < WATER_SHADES; b++) {
       const depth = b < BANK_BANDS ? BANK_STRENGTH * (1 - (b + 0.5) / BANK_BANDS) : 0;
       fills[BED.water + b] = voxelUnlitCellColor(colors, (1 + depth) * lift);
@@ -199,7 +194,7 @@ const LEAF_STEM = 0.16;
  */
 class RiverbedLayer {
   /** A `BED` kind per cell, row-major. */
-  styles = new Uint8Array(0);
+  private styles = new Uint8Array(0);
   private readonly painter = new VoxelCellPainter();
   private readonly layer = new VoxelLayerCache();
   private layoutVersion = -1;
@@ -263,6 +258,12 @@ class RiverbedLayer {
     }
   }
 
+  /** Whether the cell at (`col`, `row`) is on the grid and open water, which effects may light. */
+  isOpenWater(col: number, row: number): boolean {
+    const g = this.grid;
+    return g.contains(col, row) && this.styles[row * g.cols + col] >= BED.water;
+  }
+
   /** Draws the riverbed, at reduced-motion `light` step, over the whole canvas. */
   draw(
     ctx: CanvasRenderingContext2D,
@@ -320,16 +321,6 @@ class VoxelRiverRenderer {
     if (river.leafActive) this.drawLeaf(ctx, river, p);
   }
 
-  private fillCell(ctx: CanvasRenderingContext2D, col: number, row: number): void {
-    this.grid.fillCell(ctx, col, row);
-  }
-
-  /** Whether the cell at (`col`, `row`) is on the grid and open water, which effects may light. */
-  private isWater(col: number, row: number): boolean {
-    const g = this.grid;
-    return g.contains(col, row) && this.bed.styles[row * g.cols + col] >= BED.water;
-  }
-
   /** `FOAM_STEPS` rung for brightness `b` in [0, 1], or -1 when too faint to show. */
   private rung(b: number): number {
     const k = Math.round(b * FOAM_STEPS) - 1;
@@ -363,7 +354,7 @@ class VoxelRiverRenderer {
       for (let c = c0; c <= c1; c++) {
         const x = (c + 0.5) / rows;
         const r = Math.floor((y + this.deflect(river, x, y)) * rows);
-        if (this.isWater(c, r)) this.fillCell(ctx, c, r);
+        if (this.bed.isOpenWater(c, r)) this.grid.fillCell(ctx, c, r);
       }
     }
   }
@@ -395,7 +386,7 @@ class VoxelRiverRenderer {
           const onArc =
             (Math.abs(d - rad * 1.6) <= unit * 0.5 && a <= 0.55) ||
             (Math.abs(d - rad * 2.3) <= unit * 0.5 && a <= 0.4);
-          if (onArc && this.isWater(c, r)) this.fillCell(ctx, c, r);
+          if (onArc && this.bed.isOpenWater(c, r)) this.grid.fillCell(ctx, c, r);
         }
       }
     }
@@ -420,7 +411,8 @@ class VoxelRiverRenderer {
         const y = (r + 0.5) * unit - cy;
         for (let c = c0; c <= c1; c++) {
           const d = Math.hypot((c + 0.5) * unit - cx, y);
-          if (Math.abs(d - rad) <= unit * 0.55 && this.isWater(c, r)) this.fillCell(ctx, c, r);
+          if (Math.abs(d - rad) <= unit * 0.55 && this.bed.isOpenWater(c, r))
+            this.grid.fillCell(ctx, c, r);
         }
       }
     }
@@ -468,7 +460,7 @@ class VoxelRiverRenderer {
             let v = -dx * sin + dy * cos;
             if (u < 0) v -= flex * (u / 0.5) * (u / 0.5);
             const part = fishPart(u, Math.abs(v), len, minHalf);
-            if (part === pass + 1) this.fillCell(ctx, c, r);
+            if (part === pass + 1) this.grid.fillCell(ctx, c, r);
           }
         }
       }
@@ -504,7 +496,7 @@ class VoxelRiverRenderer {
           const u = ((dx - dy) * Math.SQRT1_2) / len + 0.5;
           const v = Math.abs(dx + dy) * Math.SQRT1_2;
           const part = leafPart(u, v, len, halfWidth, vein);
-          if (part === pass + 1) this.fillCell(ctx, c, r);
+          if (part === pass + 1) this.grid.fillCell(ctx, c, r);
         }
       }
     }

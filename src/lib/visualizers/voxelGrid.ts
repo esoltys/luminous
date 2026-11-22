@@ -206,6 +206,12 @@ export class VoxelLayerCache {
   }
 }
 
+/** `hex` at opacity `alpha` (clamped to 1), as a fill. */
+export function voxelRgba(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${Number(Math.min(1, alpha).toFixed(3))})`;
+}
+
 /** Opacity of an unlit cell over `bg-main`, by theme polarity. */
 function unlitAlpha(colors: ThemeColors): number {
   return isLightColor(colors["bg-main"] || "#191918") ? 0.13 : 0.1;
@@ -225,9 +231,7 @@ function unlitBase(colors: ThemeColors): string {
  * cells a shade deeper than the housing.
  */
 export function voxelUnlitCellColor(colors: ThemeColors, strength = 1): string {
-  const { r, g, b } = hexToRgb(unlitBase(colors));
-  const alpha = Number(Math.min(1, unlitAlpha(colors) * strength).toFixed(3));
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  return voxelRgba(unlitBase(colors), unlitAlpha(colors) * strength);
 }
 
 /**
@@ -235,11 +239,12 @@ export function voxelUnlitCellColor(colors: ThemeColors, strength = 1): string {
  * k has opacity `floor + (ceiling - floor) * k / (steps - 1)`.
  */
 export function voxelAlphaLadder(hex: string, steps: number, floor = 0.12, ceiling = 1): string[] {
-  const { r, g, b } = hexToRgb(hex);
   const ladder: string[] = new Array(steps);
   for (let k = 0; k < steps; k++) {
-    const alpha = steps <= 1 ? ceiling : floor + ((ceiling - floor) * k) / (steps - 1);
-    ladder[k] = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+    ladder[k] = voxelRgba(
+      hex,
+      steps <= 1 ? ceiling : floor + ((ceiling - floor) * k) / (steps - 1),
+    );
   }
   return ladder;
 }

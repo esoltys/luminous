@@ -49,7 +49,10 @@ export interface VisualizerRenderOptions {
 export interface VisualizerInstance {
   /** Called on creation and whenever the theme changes. */
   setTheme(colors: ThemeColors): void;
-  /** Optional. Called on creation and whenever the track changes; null when nothing is loaded. */
+  /**
+   * Optional. Called on creation and whenever the track changes; null when nothing is loaded.
+   * It may be called again with the same track, which should change nothing.
+   */
   setTrack?(track: VisualizerTrack | null): void;
   /** Called with each new frame of audio data, and when playback starts or stops. */
   push(frame: VisualizerFrame): void;
