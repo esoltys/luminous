@@ -410,6 +410,8 @@ figure { margin: 0; }
   position: relative;
 }
 .shot img { display: block; width: 100%; height: auto; cursor: zoom-in; }
+.shot-native { width: fit-content; max-width: 100%; }
+.shot-native img { width: auto; max-width: 100%; height: auto; }
 .caption { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 /* Low-resolution shots (the mini player): always side by side, never
