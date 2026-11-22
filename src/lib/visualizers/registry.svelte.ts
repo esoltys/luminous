@@ -1,3 +1,4 @@
+import { SALMON_RUN_PRESET } from "./salmonRun";
 import type { VisualizerPreset } from "./types";
 import { VECTORSCOPE_PRESET } from "./vectorscope";
 import { VOXEL_PRESET } from "./voxel";
@@ -13,6 +14,7 @@ let presets = $state.raw<readonly VisualizerPreset[]>([
   VOXEL_PRESET,
   VOXEL_LOGO_PRESET,
   VECTORSCOPE_PRESET,
+  SALMON_RUN_PRESET,
 ]);
 
 /** Every registered preset, in selector order. */

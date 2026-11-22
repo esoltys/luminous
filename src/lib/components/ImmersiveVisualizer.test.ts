@@ -18,7 +18,8 @@ import { visualizerStore } from "../stores/visualizer.svelte";
 import { registerPreset } from "../visualizers/registry.svelte";
 import type { Song } from "../types";
 import type { SpectrumFrame } from "../utils/spectrumEnable";
-import type { VisualizerFrame } from "../visualizers/types";
+import type { VisualizerFrame, VisualizerTrack } from "../visualizers/types";
+import { themeStore } from "../stores/theme.svelte";
 
 describe("ImmersiveVisualizer.svelte (#2236)", () => {
   const mockSong: Song = {
@@ -175,10 +176,54 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
       }
     });
 
+    it("hands the preset the track and its cover colours as they change (#2248)", async () => {
+      const tracks: (VisualizerTrack | null)[] = [];
+      const unregisterSpy = registerPreset({
+        id: "track-spy",
+        labelKey: "Track spy",
+        needs: ["spectrum"],
+        create: () => ({
+          setTheme() {},
+          setTrack: (track) => void tracks.push(track),
+          push() {},
+          step: () => false,
+          render() {},
+        }),
+      });
+      try {
+        themeStore.artworkColors = null;
+        visualizerStore.select("track-spy");
+        render(ImmersiveVisualizer, { active: true });
+        await tick();
+        expect(tracks.at(-1)).toEqual({ key: "42", artwork: [] });
+
+        themeStore.artworkColors = {
+          vibrant: "#e0b020",
+          muted: "#803060",
+          primary: "#111111",
+          sidebar: "#111111",
+          playerbar: "#111111",
+          accent: "#e0b020",
+          accentHover: "#e0b020",
+          border: "#222222",
+        };
+        await tick();
+        expect(tracks.at(-1)).toEqual({ key: "42", artwork: ["#e0b020", "#803060"] });
+
+        playerStore.currentSong = { ...mockSong, id: 43 };
+        await tick();
+        expect(tracks.at(-1)?.key).toBe("43");
+      } finally {
+        themeStore.artworkColors = null;
+        playerStore.currentSong = mockSong;
+        unregisterSpy();
+      }
+    });
+
     it("opens the preset menu on right-click of the stage", async () => {
       const { getByTestId, getAllByRole } = render(ImmersiveVisualizer, { active: true });
       await fireEvent.contextMenu(getByTestId("immersive-visualizer-canvas"));
-      expect(getAllByRole("menuitemradio")).toHaveLength(3);
+      expect(getAllByRole("menuitemradio")).toHaveLength(4);
     });
   });
 });

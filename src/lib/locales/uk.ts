@@ -3539,6 +3539,7 @@ export const uk = {
     voxel: "Воксельний спектр",
     voxelLogo: "Воксельний логотип",
     vectorscope: "Векторскоп",
+    salmonRun: "Хід лосося",
     scope: {
       left: "Л",
       right: "П",

@@ -10,9 +10,8 @@ import { navigationStore } from "../stores/navigation.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { visualizerStore } from "../stores/visualizer.svelte";
-import { registerPreset } from "../visualizers/registry.svelte";
-import { VECTORSCOPE_PRESET } from "../visualizers/vectorscope";
-import { VOXEL_LOGO_PRESET } from "../visualizers/voxelLogo";
+import { DEFAULT_PRESET, listPresets, registerPreset } from "../visualizers/registry.svelte";
+import type { VisualizerPreset } from "../visualizers/types";
 import type { Song, Playlist } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -846,12 +845,13 @@ describe("PlayerBar.svelte", () => {
 
   describe("visualizer preset selector (#2245)", () => {
     let unregister: (() => void) | null = null;
+    let setAside: VisualizerPreset[] = [];
 
     // These tests drive the selector with a single fake preset beside the voxel spectrum, so
     // the other built-ins are set aside (re-registering restores them at the end of the list).
     beforeEach(() => {
-      registerPreset(VOXEL_LOGO_PRESET)();
-      registerPreset(VECTORSCOPE_PRESET)();
+      setAside = listPresets().filter((p) => p !== DEFAULT_PRESET);
+      for (const preset of setAside) registerPreset(preset)();
     });
 
     function registerSecondPreset() {
@@ -867,8 +867,7 @@ describe("PlayerBar.svelte", () => {
       visualizerStore.select("voxel");
       unregister?.();
       unregister = null;
-      registerPreset(VOXEL_LOGO_PRESET);
-      registerPreset(VECTORSCOPE_PRESET);
+      for (const preset of setAside) registerPreset(preset);
       localStorage.clear();
     });
 
@@ -938,7 +937,7 @@ describe("PlayerBar.svelte", () => {
     });
   });
 
-  it("offers the built-in voxel spectrum, voxel logo and vectorscope presets (#2252, #2247)", async () => {
+  it("offers the built-in voxel spectrum, voxel logo, vectorscope and salmon run presets (#2252, #2247, #2248)", async () => {
     playerStore.currentSong = mockSong;
     const { getByTestId } = render(PlayerBar);
     expect(getByTestId("visualizer-next")).toHaveAttribute(
@@ -951,8 +950,10 @@ describe("PlayerBar.svelte", () => {
       "voxel",
       "voxel-logo",
       "vectorscope",
+      "salmon-run",
     ]);
     expect(options[1]).toHaveTextContent("Voxel logo");
     expect(options[2]).toHaveTextContent("Vectorscope");
+    expect(options[3]).toHaveTextContent("Salmon run");
   });
 });

@@ -3355,6 +3355,7 @@ export const de = {
     voxel: "Voxel-Spektrum",
     voxelLogo: "Voxel-Logo",
     vectorscope: "Vektorskop",
+    salmonRun: "Lachswanderung",
     scope: {
       left: "L",
       right: "R",

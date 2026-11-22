@@ -3347,6 +3347,7 @@ export const es = {
     voxel: "Espectro de vóxeles",
     voxelLogo: "Logotipo de vóxeles",
     vectorscope: "Vectorscopio",
+    salmonRun: "Remonte del salmón",
     scope: {
       left: "I",
       right: "D",
