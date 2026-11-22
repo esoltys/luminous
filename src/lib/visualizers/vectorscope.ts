@@ -32,6 +32,11 @@ const HISTORY_BOTTOM_LUFS = -48;
 const HISTORY_REFERENCE_LUFS = -14;
 /** A negative correlation reads in this red (contrast-checked against the surface). */
 const OUT_OF_PHASE_RED = "#ef4444";
+/**
+ * Guides (graticule, empty bar track, strip frame) sit well behind the data: themes pick
+ * `color-border` to be seen, and at full strength it outshines a quiet trace.
+ */
+const GUIDE_ALPHA = 0.45;
 const FONT_STACK = '"Fira Sans", system-ui, sans-serif';
 const LABEL_FONT = `500 11px ${FONT_STACK}`;
 const AXIS_FONT = `600 12px ${FONT_STACK}`;
@@ -147,9 +152,6 @@ class VectorscopeFullInstance implements VisualizerInstance {
   private palette!: ScopePalette;
   private labels: CachedLabels = readLabels();
 
-  constructor() {
-    this.refreshReadouts();
-  }
   // Text is rebuilt at the readout rate (and on a language change), never per draw.
   private readonly cells = readoutCells();
   private readonly previewCells = readoutCells();
@@ -166,6 +168,10 @@ class VectorscopeFullInstance implements VisualizerInstance {
   private glow: HTMLCanvasElement | null = null;
   private glowCtx: CanvasRenderingContext2D | null = null;
   private glowSize = 0;
+
+  constructor() {
+    this.refreshReadouts();
+  }
 
   setTheme(colors: ThemeColors): void {
     this.palette = buildPalette(colors, "bg-main");
@@ -299,6 +305,7 @@ class VectorscopeFullInstance implements VisualizerInstance {
     const p = this.palette;
     ctx.strokeStyle = p.grid;
     ctx.lineWidth = 1;
+    ctx.globalAlpha = GUIDE_ALPHA;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     // Mid (vertical) and side (horizontal) axes.
@@ -309,7 +316,7 @@ class VectorscopeFullInstance implements VisualizerInstance {
     ctx.stroke();
     // L and R diagonals, fainter: where a hard-panned signal lies.
     const d = r * Math.SQRT1_2;
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = GUIDE_ALPHA / 2;
     ctx.beginPath();
     ctx.moveTo(cx - d, cy - d);
     ctx.lineTo(cx + d, cy + d);
@@ -375,7 +382,9 @@ class VectorscopeFullInstance implements VisualizerInstance {
     const barH = 6;
     const mid = x + w / 2;
     ctx.fillStyle = p.grid;
+    ctx.globalAlpha = GUIDE_ALPHA;
     ctx.fillRect(x, y, w, barH);
+    ctx.globalAlpha = 1;
     const end = mid + (w / 2) * Math.max(-1, Math.min(1, value));
     ctx.fillStyle = value < 0 ? p.warn : p.trace;
     ctx.fillRect(Math.min(mid, end), y, Math.abs(end - mid), barH);
@@ -422,6 +431,7 @@ class VectorscopeFullInstance implements VisualizerInstance {
     const p = this.palette;
     ctx.strokeStyle = p.grid;
     ctx.lineWidth = 1;
+    ctx.globalAlpha = GUIDE_ALPHA;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
@@ -430,6 +440,7 @@ class VectorscopeFullInstance implements VisualizerInstance {
     ctx.lineTo(x + w, refY);
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
 
     const m = this.meters;
     if (m.historyCount < 2) return;
@@ -503,6 +514,7 @@ class VectorscopeMiniInstance implements VisualizerInstance {
 
     ctx.strokeStyle = p.grid;
     ctx.lineWidth = 1;
+    ctx.globalAlpha = GUIDE_ALPHA;
     ctx.beginPath();
     ctx.moveTo(cx, 0);
     ctx.lineTo(cx, size);
@@ -517,7 +529,9 @@ class VectorscopeMiniInstance implements VisualizerInstance {
     const value = options.preview ? 0.7 : this.correlation;
     const y = height - tickH;
     ctx.fillStyle = p.grid;
+    ctx.globalAlpha = GUIDE_ALPHA;
     ctx.fillRect(0, y, width, tickH);
+    ctx.globalAlpha = 1;
     ctx.fillStyle = value < 0 ? p.warn : p.trace;
     const tickX = cx + (width / 2 - 2) * Math.max(-1, Math.min(1, value));
     ctx.fillRect(tickX - 1.5, y - 1, 3, tickH + 1);
