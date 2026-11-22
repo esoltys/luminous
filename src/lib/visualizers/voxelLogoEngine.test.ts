@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS } from "../stores/theme.svelte";
 import { calculateContrastRatio, rgbToHex } from "../utils/colorUtils";
 import type { VisualizerFrame } from "./types";
@@ -229,6 +229,92 @@ describe("VoxelLogoRenderer (#2252)", () => {
       new Set(rects.filter((r) => cellsIn([r], layer).size > 0).map((r) => r.style));
     expect(fills(loud, "rim")).not.toEqual(fills(quiet, "rim"));
     expect(fills(loud, "ring")).not.toEqual(fills(quiet, "ring"));
+  });
+
+  it("skips outer housing tiling when pitch drops below 3 px and ignores invalid sizes (#2262)", () => {
+    const renderer = fullRenderer();
+    const { ctx, rects } = recordingContext();
+    renderer.render(ctx, 1920, 60, LogoLevels.fixed(0.5, 0.5, 0.5), palette, false);
+    expect(rects.length).toBeLessThanOrEqual(56 * 56);
+
+    rects.length = 0;
+    for (const [w, h] of [
+      [0, 100],
+      [100, 0],
+      [-50, 100],
+      [Number.NaN, 100],
+    ]) {
+      renderer.render(ctx, w, h, LogoLevels.fixed(0.5, 0.5, 0.5), palette, false);
+      expect(rects).toHaveLength(0);
+    }
+  });
+
+  it("never produces NaN styles when mid is near zero (#2262)", () => {
+    const renderer = fullRenderer();
+    const { ctx, rects } = recordingContext();
+    for (const mid of [0, 1 / 35, 0.01]) {
+      renderer.render(ctx, 560, 560, LogoLevels.fixed(0, mid, 0), TAGGED, false);
+      for (const r of rects) {
+        expect(Number.isNaN(Number(r.style))).toBe(false);
+      }
+    }
+  });
+
+  it("caches outer housing offscreen and blits via drawImage across frames (#2262)", () => {
+    let offscreenFillCount = 0;
+    const origOffscreen = globalThis.OffscreenCanvas;
+    const origDoc = globalThis.document;
+    // Force OffscreenCanvas path by stubbing document.createElement to return null context
+    // and providing a minimal OffscreenCanvas mock.
+    class FakeOffscreenCanvas {
+      width: number;
+      height: number;
+      constructor(w: number, h: number) {
+        this.width = w;
+        this.height = h;
+      }
+      getContext() {
+        return {
+          fillStyle: "",
+          setTransform() {},
+          clearRect() {},
+          fillRect() {
+            offscreenFillCount++;
+          },
+        };
+      }
+    }
+    vi.stubGlobal("OffscreenCanvas", FakeOffscreenCanvas);
+    vi.stubGlobal("document", undefined);
+
+    try {
+      const renderer = fullRenderer();
+      const drawImages: unknown[] = [];
+      const { ctx, rects } = recordingContext();
+      (ctx as unknown as { drawImage: (...args: unknown[]) => void }).drawImage = (...args) => {
+        drawImages.push(args);
+      };
+      (ctx as unknown as { getTransform: () => { a: number } }).getTransform = () => ({ a: 1 });
+
+      renderer.render(ctx, 1920, 1080, LogoLevels.fixed(0.5, 0.5, 0.5), palette, false);
+      expect(drawImages).toHaveLength(1);
+      expect(rects.length).toBeLessThanOrEqual(56 * 56);
+      const firstOffscreenFills = offscreenFillCount;
+      expect(firstOffscreenFills).toBeGreaterThan(0);
+
+      // Second frame at same size & theme: reuses cached offscreen housing without re-filling it.
+      renderer.render(ctx, 1920, 1080, LogoLevels.fixed(0.8, 0.2, 0.9), palette, false);
+      expect(drawImages).toHaveLength(2);
+      expect(offscreenFillCount).toBe(firstOffscreenFills);
+
+      // Resize invalidates the cache and rebuilds once.
+      renderer.render(ctx, 1280, 720, LogoLevels.fixed(0.8, 0.2, 0.9), palette, false);
+      expect(drawImages).toHaveLength(3);
+      expect(offscreenFillCount).toBeGreaterThan(firstOffscreenFills);
+    } finally {
+      vi.stubGlobal("OffscreenCanvas", origOffscreen);
+      vi.stubGlobal("document", origDoc);
+    }
   });
 });
 

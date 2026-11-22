@@ -22,8 +22,8 @@ const RING_HALF_MIN = 2.5;
 const RING_HALF_RANGE = 8;
 const HALO_R_MIN = 18;
 const HALO_R_RANGE = 26;
-const GLOW_R_MIN = 95;
-const GLOW_R_RANGE = 35;
+const GLOW_R_MIN = RING_OUTER;
+const GLOW_R_RANGE = 34;
 /** Under reduced motion the geometry holds at mid-range sizes and only brightness follows the music. */
 const RIM_HALF_STILL = 9;
 const RING_HALF_STILL = 6.5;
@@ -231,6 +231,139 @@ export interface VoxelLogoRendererOptions {
   readonly glow: boolean;
 }
 
+/** Minimum cell pitch (CSS px) at which outer housing cells are drawn. */
+const MIN_HOUSING_PITCH = 3;
+
+type HousingSurface = HTMLCanvasElement | OffscreenCanvas;
+
+function drawOuterHousing(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  width: number,
+  height: number,
+  n: number,
+  pitch: number,
+  cell: number,
+  originX: number,
+  originY: number,
+  fill: string,
+): void {
+  ctx.fillStyle = fill;
+  const firstCol = -Math.ceil(originX / pitch);
+  const firstRow = -Math.ceil(originY / pitch);
+  const lastCol = Math.ceil((width - originX) / pitch);
+  const lastRow = Math.ceil((height - originY) / pitch);
+  for (let row = firstRow; row < lastRow; row++) {
+    const inRows = row >= 0 && row < n;
+    const y = originY + row * pitch;
+    for (let col = firstCol; col < lastCol; col++) {
+      if (inRows && col >= 0 && col < n) continue;
+      ctx.fillRect(originX + col * pitch, y, cell, cell);
+    }
+  }
+}
+
+function createHousingSurface(
+  backingW: number,
+  backingH: number,
+): {
+  surface: HousingSurface;
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+} | null {
+  if (typeof document !== "undefined") {
+    const canvas = document.createElement("canvas");
+    canvas.width = backingW;
+    canvas.height = backingH;
+    const ctx = canvas.getContext("2d");
+    if (ctx) return { surface: canvas, ctx };
+  }
+  if (typeof OffscreenCanvas !== "undefined") {
+    const canvas = new OffscreenCanvas(backingW, backingH);
+    const ctx = canvas.getContext("2d");
+    if (ctx) return { surface: canvas, ctx };
+  }
+  return null;
+}
+
+/**
+ * Caches the static outer housing grid onto an offscreen surface so animated frames blit it
+ * with a single `drawImage` instead of issuing thousands of `fillRect` calls per frame.
+ */
+class HousingCache {
+  private surface: HousingSurface | null = null;
+  private surfaceCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
+  private width = 0;
+  private height = 0;
+  private dpr = 0;
+  private n = 0;
+  private pitch = 0;
+  private originX = 0;
+  private originY = 0;
+  private fill = "";
+
+  draw(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    n: number,
+    pitch: number,
+    cell: number,
+    originX: number,
+    originY: number,
+    fill: string,
+  ): void {
+    if (typeof ctx.drawImage !== "function") {
+      drawOuterHousing(ctx, width, height, n, pitch, cell, originX, originY, fill);
+      return;
+    }
+
+    const dpr = typeof ctx.getTransform === "function" ? ctx.getTransform().a || 1 : 1;
+    const backingW = Math.max(1, Math.round(width * dpr));
+    const backingH = Math.max(1, Math.round(height * dpr));
+
+    if (
+      !this.surface ||
+      !this.surfaceCtx ||
+      this.width !== width ||
+      this.height !== height ||
+      this.dpr !== dpr ||
+      this.n !== n ||
+      this.pitch !== pitch ||
+      this.originX !== originX ||
+      this.originY !== originY ||
+      this.fill !== fill
+    ) {
+      if (!this.surface || !this.surfaceCtx) {
+        const created = createHousingSurface(backingW, backingH);
+        if (!created) {
+          drawOuterHousing(ctx, width, height, n, pitch, cell, originX, originY, fill);
+          return;
+        }
+        this.surface = created.surface;
+        this.surfaceCtx = created.ctx;
+      } else if (this.surface.width !== backingW || this.surface.height !== backingH) {
+        this.surface.width = backingW;
+        this.surface.height = backingH;
+      }
+
+      this.surfaceCtx.setTransform(1, 0, 0, 1, 0, 0);
+      this.surfaceCtx.clearRect(0, 0, backingW, backingH);
+      this.surfaceCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawOuterHousing(this.surfaceCtx, width, height, n, pitch, cell, originX, originY, fill);
+
+      this.width = width;
+      this.height = height;
+      this.dpr = dpr;
+      this.n = n;
+      this.pitch = pitch;
+      this.originX = originX;
+      this.originY = originY;
+      this.fill = fill;
+    }
+
+    ctx.drawImage(this.surface, 0, 0, width, height);
+  }
+}
+
 /**
  * Draws the mark as an LED grid. Cells are bucketed by fill so `fillStyle` changes once per
  * fill rather than once per cell; the buckets live in buffers sized for the largest grid, so
@@ -240,6 +373,7 @@ export class VoxelLogoRenderer {
   private readonly grids: readonly LogoGrid[];
   private readonly housing: boolean;
   private readonly glow: boolean;
+  private readonly housingCache = new HousingCache();
   private readonly cellStyle: Uint8Array;
   private readonly order: Int32Array;
   private readonly bucketStart = new Int32Array(LOGO_STYLE.count + 1);
@@ -277,7 +411,7 @@ export class VoxelLogoRenderer {
     palette: VoxelLogoPalette,
     reducedMotion: boolean,
   ): void {
-    if (width <= 0 || height <= 0) return;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
     ctx.clearRect(0, 0, width, height);
 
     const grid = this.gridFor(width, height);
@@ -321,7 +455,7 @@ export class VoxelLogoRenderer {
         if (rest === LOGO_REST.disc) style = LOGO_STYLE.disc;
         else if (rest === LOGO_REST.ring || Math.abs(d - RING_R) <= ringHalf) style = ringStyle;
         else if (rest === LOGO_REST.rim || Math.abs(d - RIM_R) <= rimHalf) style = rimStyle;
-        else if (this.glow && d <= glowR) {
+        else if (this.glow && d <= glowR && glowR > RING_OUTER) {
           const k = rung(glowOpacity * (1 - (d - RING_OUTER) / (glowR - RING_OUTER)));
           if (k > 0) style = LOGO_STYLE.glow + k;
         }
@@ -337,21 +471,19 @@ export class VoxelLogoRenderer {
     for (let s = 0; s < LOGO_STYLE.count; s++) fill[s] = starts[s];
     for (let i = 0; i < count; i++) this.order[fill[styleOf[i]]++] = i;
 
-    // 3. Housing cells around the grid, aligned to its pitch.
-    if (this.housing) {
-      ctx.fillStyle = palette.styles[LOGO_STYLE.housing];
-      const firstCol = -Math.ceil(originX / pitch);
-      const firstRow = -Math.ceil(originY / pitch);
-      const lastCol = Math.ceil((width - originX) / pitch);
-      const lastRow = Math.ceil((height - originY) / pitch);
-      for (let row = firstRow; row < lastRow; row++) {
-        const inRows = row >= 0 && row < n;
-        const y = originY + row * pitch;
-        for (let col = firstCol; col < lastCol; col++) {
-          if (inRows && col >= 0 && col < n) continue;
-          ctx.fillRect(originX + col * pitch, y, cell, cell);
-        }
-      }
+    // 3. Housing cells around the grid, aligned to its pitch (cached offscreen across frames).
+    if (this.housing && pitch >= MIN_HOUSING_PITCH) {
+      this.housingCache.draw(
+        ctx,
+        width,
+        height,
+        n,
+        pitch,
+        cell,
+        originX,
+        originY,
+        palette.styles[LOGO_STYLE.housing],
+      );
     }
 
     // 4. The grid's cells, one fillStyle per bucket.
