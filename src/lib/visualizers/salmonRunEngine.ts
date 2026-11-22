@@ -69,7 +69,7 @@ export interface SalmonRunConfig {
   readonly pebbles: number;
   /** Salmon length, in world units (fractions of the height). */
   readonly fishLength: number;
-  /** Whether a maple leaf drifts past on a track change. */
+  /** Whether a leaf drifts past on a track change. */
   readonly leaf: boolean;
   /** The leaf's width, in world units. */
   readonly leafSize: number;
@@ -200,12 +200,10 @@ export class SalmonRun {
   /** Starting brightness in (0, 1]; 0 marks a free slot. */
   readonly rippleStrength = new Float32Array(RIPPLE_POOL);
 
-  /** The leaf's position (world units) and spin; `leafActive` is false when none is drifting. */
+  /** The leaf's position (world units); `leafActive` is false when none is drifting. */
   leafActive = false;
   leafX = 0;
   leafY = 0;
-  leafAngle = 0;
-  private leafSpin = 0;
 
   /** Bumped whenever the riverbed is laid out again, so a cached drawing of it can tell it's stale. */
   layoutVersion = 0;
@@ -237,7 +235,7 @@ export class SalmonRun {
   /**
    * Shows the river for the track `key`. A new key lays out a new riverbed and school from a
    * seed of the key (the same key always gives the same river) and, after the first track, sets
-   * a maple leaf drifting downstream. The same key again is a no-op.
+   * a leaf drifting downstream. The same key again is a no-op.
    */
   setTrack(key: string): void {
     if (key === this.key) return;
@@ -248,8 +246,6 @@ export class SalmonRun {
       this.leafActive = true;
       this.leafX = -this.config.leafSize;
       this.leafY = this.rng.range(0.25, 0.75);
-      this.leafAngle = this.rng.range(0, Math.PI * 2);
-      this.leafSpin = this.rng.range(-0.6, 0.6);
     }
   }
 
@@ -514,7 +510,6 @@ export class SalmonRun {
     const speed = (this.aspect + 2 * size) / this.config.leafCrossS;
     this.leafX += speed * dt * (reducedMotion ? LEAF_REDUCED_PACE : 1);
     this.leafY += Math.sin((this.leafX / size) * 0.3) * size * 0.15 * dt;
-    this.leafAngle += this.leafSpin * dt * (reducedMotion ? 0.4 : 1);
     if (this.leafX > this.aspect + size) this.leafActive = false;
   }
 

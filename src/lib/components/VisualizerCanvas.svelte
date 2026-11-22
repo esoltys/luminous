@@ -61,17 +61,10 @@
 
   const isPlaying = $derived(playerStore.state === "playing");
 
-  // The track handed to presets that vary with it: the current song and the cover colours the
-  // theme store has already extracted for it, so nothing is extracted twice.
-  const track = $derived.by((): VisualizerTrack | null => {
-    const song = playerStore.currentSong;
-    if (!song) return null;
-    const art = themeStore.artworkColors;
-    const artwork = art
-      ? [art.vibrant, art.muted, art.darkVibrant, art.lightVibrant].filter((c): c is string => !!c)
-      : [];
-    return { key: String(song.id), artwork };
-  });
+  // The track handed to presets that vary with it. Keyed by song id, so it only changes (and
+  // presets only hear about it) when a different song loads.
+  const trackKey = $derived(playerStore.currentSong ? String(playerStore.currentSong.id) : null);
+  const track = $derived<VisualizerTrack | null>(trackKey === null ? null : { key: trackKey });
 
   function isHidden(): boolean {
     return typeof document !== "undefined" && document.hidden;

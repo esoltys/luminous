@@ -19,7 +19,6 @@ import { registerPreset } from "../visualizers/registry.svelte";
 import type { Song } from "../types";
 import type { SpectrumFrame } from "../utils/spectrumEnable";
 import type { VisualizerFrame, VisualizerTrack } from "../visualizers/types";
-import { themeStore } from "../stores/theme.svelte";
 
 describe("ImmersiveVisualizer.svelte (#2236)", () => {
   const mockSong: Song = {
@@ -191,30 +190,21 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
         }),
       });
       try {
-        themeStore.artworkColors = null;
         visualizerStore.select("track-spy");
         render(ImmersiveVisualizer, { active: true });
         await tick();
-        expect(tracks.at(-1)).toEqual({ key: "42", artwork: [] });
+        expect(tracks.at(-1)).toEqual({ key: "42" });
+        const handedOver = tracks.length;
 
-        themeStore.artworkColors = {
-          vibrant: "#e0b020",
-          muted: "#803060",
-          primary: "#111111",
-          sidebar: "#111111",
-          playerbar: "#111111",
-          accent: "#e0b020",
-          accentHover: "#e0b020",
-          border: "#222222",
-        };
+        // Another copy of the same song is not a new track.
+        playerStore.currentSong = { ...mockSong };
         await tick();
-        expect(tracks.at(-1)).toEqual({ key: "42", artwork: ["#e0b020", "#803060"] });
+        expect(tracks).toHaveLength(handedOver);
 
         playerStore.currentSong = { ...mockSong, id: 43 };
         await tick();
-        expect(tracks.at(-1)?.key).toBe("43");
+        expect(tracks.at(-1)).toEqual({ key: "43" });
       } finally {
-        themeStore.artworkColors = null;
         playerStore.currentSong = mockSong;
         unregisterSpy();
       }

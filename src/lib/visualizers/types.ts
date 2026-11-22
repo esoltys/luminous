@@ -33,12 +33,6 @@ export interface VisualizerFrame {
 export interface VisualizerTrack {
   /** Stable while one track plays and different for the next, e.g. to seed a per-track layout. */
   readonly key: string;
-  /**
-   * Hex colours extracted from the track's cover art, most characteristic first; empty when the
-   * track has no art or extraction hasn't finished. Arrives separately from `key`: a new track
-   * is usually handed over with no colours first, then again once they're extracted.
-   */
-  readonly artwork: readonly string[];
 }
 
 export interface VisualizerRenderOptions {
@@ -55,10 +49,7 @@ export interface VisualizerRenderOptions {
 export interface VisualizerInstance {
   /** Called on creation and whenever the theme changes. */
   setTheme(colors: ThemeColors): void;
-  /**
-   * Optional. Called on creation and whenever the track or its cover colours change; null when
-   * nothing is loaded. Like `setTheme`, build anything colour-derived here, not in `render`.
-   */
+  /** Optional. Called on creation and whenever the track changes; null when nothing is loaded. */
   setTrack?(track: VisualizerTrack | null): void;
   /** Called with each new frame of audio data, and when playback starts or stops. */
   push(frame: VisualizerFrame): void;
