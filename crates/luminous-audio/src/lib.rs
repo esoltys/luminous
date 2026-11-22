@@ -2262,8 +2262,8 @@ fn decode_thread(
                             r.track.clone(),
                             r.start_nanosec,
                         ) {
-                            // Cueing never plays, so a louder rebuilt
-                            // output needs no extra care here.
+                            // Cueing never plays, so an output that lost
+                            // system volume needs no extra care here.
                             Ok(_) => {
                                 let out = output.as_ref().expect("output was just readied");
                                 cue_paused(out, &shared, &event_tx, &mut paused_req, r);
@@ -2414,15 +2414,15 @@ fn decode_thread(
             req.track,
             req.start_nanosec,
         ) {
-            Ok(Started {
+            Ok(Readied {
                 track,
-                louder: false,
+                lost_system_volume: false,
             }) => track,
             // Same guard as `DeviceCheckOutcome::PauseOnLouder`: the level
             // jump waits for the user to press play again.
-            Ok(Started {
+            Ok(Readied {
                 track,
-                louder: true,
+                lost_system_volume: true,
             }) => {
                 log::info!(
                     "Output reopened without system volume: cueing paused until playback resumes"
@@ -2565,13 +2565,13 @@ enum StartFailure {
 }
 
 /// A track readied by [`start_on_output`].
-struct Started {
+struct Readied {
     /// Decoding for the format the output actually runs at.
     track: ActiveTrack,
     /// The output was reopened onto a backend that skips the system volume
     /// the old one went through (see `bypasses_system_volume`), so starting
     /// playback could jump in level: cue the track paused instead of playing.
-    louder: bool,
+    lost_system_volume: bool,
 }
 
 /// Opens `track` at `start_nanosec` and readies a live output to play it:
@@ -2585,7 +2585,7 @@ fn start_on_output(
     event_tx: &mpsc::Sender<AudioEvent>,
     track: Track,
     start_nanosec: u64,
-) -> Result<Started, StartFailure> {
+) -> Result<Readied, StartFailure> {
     // The output format isn't settled until the track's rate is known, so
     // open for the current one and retarget below.
     let (rate, channels) = output
@@ -2606,7 +2606,7 @@ fn start_on_output(
         None => Some(active.src_rate),
         Some(out) => out.reopen_rate_for(active.src_rate),
     };
-    let mut louder = false;
+    let mut lost_system_volume = false;
     if let Some(rate) = reopen_at {
         let old_backend = output.as_ref().map(|o| o.sink.backend());
         if let Some(old_out) = output.take() {
@@ -2619,7 +2619,8 @@ fn start_on_output(
         }
         let new_out = build_output_on_fresh_thread(shared, Some(rate))
             .map_err(|message| StartFailure::NoOutput(active.spec.clone(), message))?;
-        louder = old_backend.is_some_and(|old| bypasses_system_volume(old, new_out.sink.backend()));
+        lost_system_volume =
+            old_backend.is_some_and(|old| bypasses_system_volume(old, new_out.sink.backend()));
         new_out.publish(shared, event_tx);
         *output = Some(new_out);
         if old_backend.is_some() {
@@ -2628,9 +2629,9 @@ fn start_on_output(
     }
     let out = output.as_ref().expect("output was just built");
     active.retarget(out.sample_rate, out.channels);
-    Ok(Started {
+    Ok(Readied {
         track: active,
-        louder,
+        lost_system_volume,
     })
 }
 
@@ -4082,10 +4083,10 @@ mod tests {
             Ok(())
         }
         fn sample_rate(&self) -> u32 {
-            unreachable!("AudioOutput keeps its own rate")
+            unreachable!("AudioOutput keeps its own format")
         }
         fn channels(&self) -> u16 {
-            2
+            unreachable!("AudioOutput keeps its own format")
         }
         fn device_name(&self) -> Option<String> {
             None
