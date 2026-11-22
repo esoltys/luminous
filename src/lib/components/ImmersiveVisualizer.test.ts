@@ -179,7 +179,7 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
     it("opens the preset menu on right-click of the stage", async () => {
       const { getByTestId, getAllByRole } = render(ImmersiveVisualizer, { active: true });
       await fireEvent.contextMenu(getByTestId("immersive-visualizer-canvas"));
-      expect(getAllByRole("menuitemradio")).toHaveLength(2);
+      expect(getAllByRole("menuitemradio")).toHaveLength(3);
     });
   });
 });

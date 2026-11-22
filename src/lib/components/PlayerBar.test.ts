@@ -11,6 +11,7 @@ import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { visualizerStore } from "../stores/visualizer.svelte";
 import { registerPreset } from "../visualizers/registry.svelte";
+import { VECTORSCOPE_PRESET } from "../visualizers/vectorscope";
 import { VOXEL_LOGO_PRESET } from "../visualizers/voxelLogo";
 import type { Song, Playlist } from "../types";
 
@@ -847,9 +848,10 @@ describe("PlayerBar.svelte", () => {
     let unregister: (() => void) | null = null;
 
     // These tests drive the selector with a single fake preset beside the voxel spectrum, so
-    // the other built-in is set aside (re-registering restores it at the end of the list).
+    // the other built-ins are set aside (re-registering restores them at the end of the list).
     beforeEach(() => {
       registerPreset(VOXEL_LOGO_PRESET)();
+      registerPreset(VECTORSCOPE_PRESET)();
     });
 
     function registerSecondPreset() {
@@ -866,6 +868,7 @@ describe("PlayerBar.svelte", () => {
       unregister?.();
       unregister = null;
       registerPreset(VOXEL_LOGO_PRESET);
+      registerPreset(VECTORSCOPE_PRESET);
       localStorage.clear();
     });
 
@@ -935,7 +938,7 @@ describe("PlayerBar.svelte", () => {
     });
   });
 
-  it("offers the built-in voxel spectrum and voxel logo presets (#2252)", async () => {
+  it("offers the built-in voxel spectrum, voxel logo and vectorscope presets (#2252, #2247)", async () => {
     playerStore.currentSong = mockSong;
     const { getByTestId } = render(PlayerBar);
     expect(getByTestId("visualizer-next")).toHaveAttribute(
@@ -944,7 +947,12 @@ describe("PlayerBar.svelte", () => {
     );
     await fireEvent.contextMenu(getByTestId("player-bar-visualizer"));
     const options = screen.getAllByRole("menuitemradio");
-    expect(options.map((o) => o.getAttribute("data-preset"))).toEqual(["voxel", "voxel-logo"]);
+    expect(options.map((o) => o.getAttribute("data-preset"))).toEqual([
+      "voxel",
+      "voxel-logo",
+      "vectorscope",
+    ]);
     expect(options[1]).toHaveTextContent("Voxel logo");
+    expect(options[2]).toHaveTextContent("Vectorscope");
   });
 });

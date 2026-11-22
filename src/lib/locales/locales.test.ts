@@ -92,6 +92,11 @@ function extractPlaceholders(str: string): string[] {
  * (e.g. loanwords, shared musical terminology, technical acronyms, brand names, or symbols).
  */
 const IDENTICAL_OK_FR = new Set([
+  // Vectorscope: channel letters, "Balance" and the instrument name are shared words.
+  "visualizers.vectorscope",
+  "visualizers.scope.centre",
+  "visualizers.scope.balance",
+
   "playerBar.ctrlKey", // "Ctrl"
   "smartPlaylistBuilder.fieldTempo", // "Tempo"
   "smartPlaylistBuilder.fieldFormat", // "Format"
@@ -216,6 +221,9 @@ const IDENTICAL_OK_FR = new Set([
 ]);
 
 const IDENTICAL_OK_IT = new Set<string>([
+  // Vectorscope: channel letters, "Balance" and the instrument name are shared words.
+  "visualizers.scope.centre",
+
   "playerBar.ctrlKey", // "Ctrl"
   "smartPlaylistBuilder.fieldTempo", // "Tempo"
   "settings.onlineLabel", // "Online" is the usual word in this language
@@ -323,6 +331,10 @@ const IDENTICAL_OK_IT = new Set<string>([
 ]);
 
 const IDENTICAL_OK_ES = new Set<string>([
+  // Vectorscope: channel letters, "Balance" and the instrument name are shared words.
+  "visualizers.scope.centre",
+  "visualizers.scope.balance",
+
   "playerBar.playbackSpeedNormal", // "Normal" is the same word in this language
   "playerBar.ctrlKey", // "Ctrl"
   "smartPlaylistBuilder.fieldTempo", // "Tempo"
@@ -393,6 +405,11 @@ const IDENTICAL_OK_ES = new Set<string>([
 
 // Cognates, loanwords and technical terms Windows and the field also leave in English, plus brands, acronyms and symbols.
 const IDENTICAL_OK_DE = new Set<string>([
+  // Vectorscope: channel letters, "Balance" and the instrument name are shared words.
+  "visualizers.scope.left",
+  "visualizers.scope.right",
+  "visualizers.scope.balance",
+
   "playerBar.liveBadge", // "Live" is the usual word in this language
   "playerBar.playbackSpeedNormal", // "Normal" is the same word in this language
   "smartPlaylistBuilder.fieldTempo", // "Tempo"

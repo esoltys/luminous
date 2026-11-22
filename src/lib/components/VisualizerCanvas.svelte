@@ -2,13 +2,14 @@
   /**
    * Draws one visualizer preset on a canvas. Owns everything that's the same for every
    * preset and every place one is shown: turning on the data feeds the preset needs,
-   * listening for spectrum data, drawing on animation frames only while there's something
+   * listening for their data, drawing on animation frames only while there's something
    * new to show, pausing while the window is hidden, redrawing on resize and re-theming.
    */
   import { onDestroy, onMount, untrack } from "svelte";
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { prefersReducedMotion } from "../utils/motion";
+  import { acquireScope, listenScope, releaseScope, type ScopeFrame } from "../utils/scopeFeed";
   import { acquireSpectrum, listenSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
   import { prepareCanvas2d } from "../visualizers/canvas";
   import type {
@@ -40,6 +41,7 @@
 
   const FEEDS: Record<VisualizerFeed, { acquire(): void; release(): void }> = {
     spectrum: { acquire: acquireSpectrum, release: releaseSpectrum },
+    stereo: { acquire: acquireScope, release: releaseScope },
   };
   const NO_BANDS: readonly number[] = [];
 
@@ -51,7 +53,7 @@
   let bands: readonly number[] = NO_BANDS;
   let rafId = 0;
   let lastFrameTime = 0;
-  let unlisten: (() => void) | null = null;
+  let unlisteners: (() => void)[] = [];
   let destroyed = false;
   let resizeObserver: ResizeObserver | null = null;
 
@@ -61,9 +63,12 @@
     return typeof document !== "undefined" && document.hidden;
   }
 
-  /** Hands the preset the latest data. `onset` belongs to one event, so only it passes one. */
-  function pushCurrent(onset = 0) {
-    instance.push({ bands, playing: isPlaying, onset });
+  /**
+   * Hands the preset the latest data. `onset` and `scope` belong to one event, so only
+   * that event passes them.
+   */
+  function pushCurrent(onset = 0, scope: ScopeFrame | null = null) {
+    instance.push({ bands, playing: isPlaying, onset, scope });
   }
 
   function frame(now: number) {
@@ -158,20 +163,37 @@
       resizeObserver = new ResizeObserver(() => requestFrame());
       resizeObserver.observe(canvas);
     }
+    // Listening costs nothing while a feed is off: events only flow for feeds held above.
+    // A still preview doesn't change with the data, so only live views redraw.
+    await Promise.all([
+      keepListening(
+        listenSpectrum((data) => {
+          bands = data.bands;
+          pushCurrent(data.onset);
+          if (!preview) requestFrame();
+        }),
+        "spectrum",
+      ),
+      keepListening(
+        listenScope((data) => {
+          pushCurrent(0, data);
+          if (!preview) requestFrame();
+        }),
+        "scope",
+      ),
+    ]);
+  });
+
+  async function keepListening(registering: Promise<() => void>, feed: string) {
     try {
-      const stop = await listenSpectrum((data) => {
-        bands = data.bands;
-        pushCurrent(data.onset);
-        // A still preview doesn't change with the data, so only live views redraw.
-        if (!preview) requestFrame();
-      });
+      const stop = await registering;
       // Unmounted while the listener was being registered: drop it straight away.
       if (destroyed) stop();
-      else unlisten = stop;
+      else unlisteners.push(stop);
     } catch (e) {
-      console.error("Failed to listen for spectrum data:", e);
+      console.error(`Failed to listen for ${feed} data:`, e);
     }
-  });
+  }
 
   onDestroy(() => {
     destroyed = true;
@@ -180,7 +202,7 @@
     if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     }
-    unlisten?.();
+    for (const stop of unlisteners) stop();
   });
 </script>
 

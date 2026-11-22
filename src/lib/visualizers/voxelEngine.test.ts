@@ -219,7 +219,7 @@ describe("voxel preset (#2245)", () => {
   it("draws the mini slot once per frame of data, with no animation of its own", () => {
     const mini = VOXEL_PRESET.create("mini");
     mini.setTheme(LUMINOUS_DARK_COLORS);
-    mini.push({ bands: new Array(32).fill(0.5), playing: true, onset: 0 });
+    mini.push({ bands: new Array(32).fill(0.5), playing: true, onset: 0, scope: null });
     expect(mini.step(16, false)).toBe(false);
 
     const ctx = fakeCtx();
@@ -233,10 +233,10 @@ describe("voxel preset (#2245)", () => {
   it("settles the full matrix to rest when playback stops", () => {
     const full = VOXEL_PRESET.create("full");
     full.setTheme(LUMINOUS_DARK_COLORS);
-    full.push({ bands: new Array(32).fill(0.9), playing: true, onset: 0 });
+    full.push({ bands: new Array(32).fill(0.9), playing: true, onset: 0, scope: null });
     expect(full.step(16, false)).toBe(true);
 
-    full.push({ bands: new Array(32).fill(0.9), playing: false, onset: 0 });
+    full.push({ bands: new Array(32).fill(0.9), playing: false, onset: 0, scope: null });
     let moving = true;
     for (let i = 0; i < 500 && moving; i++) moving = full.step(16, false);
     expect(moving).toBe(false);

@@ -6,6 +6,7 @@ import {
   registerPreset,
 } from "../visualizers/registry.svelte";
 import type { VisualizerPreset } from "../visualizers/types";
+import { VECTORSCOPE_PRESET } from "../visualizers/vectorscope";
 import { VOXEL_LOGO_PRESET } from "../visualizers/voxelLogo";
 import { VisualizerStore } from "./visualizer.svelte";
 
@@ -18,9 +19,19 @@ function fakePreset(id: string): VisualizerPreset {
   };
 }
 
+/** Leaves only the voxel spectrum registered; the returned function restores the rest in order. */
+function setOtherBuiltinsAside(): () => void {
+  registerPreset(VOXEL_LOGO_PRESET)();
+  registerPreset(VECTORSCOPE_PRESET)();
+  return () => {
+    registerPreset(VOXEL_LOGO_PRESET);
+    registerPreset(VECTORSCOPE_PRESET);
+  };
+}
+
 describe("visualizer registry (#2245)", () => {
-  it("ships the voxel spectrum and voxel logo, spectrum first", () => {
-    expect(listPresets().map((p) => p.id)).toEqual(["voxel", "voxel-logo"]);
+  it("ships the voxel spectrum, voxel logo and vectorscope, spectrum first", () => {
+    expect(listPresets().map((p) => p.id)).toEqual(["voxel", "voxel-logo", "vectorscope"]);
     expect(DEFAULT_PRESET.id).toBe("voxel");
   });
 
@@ -55,17 +66,14 @@ describe("VisualizerStore (#2245)", () => {
   });
 
   it("has nothing to switch between with a single preset registered", () => {
-    // Set the other built-in aside; re-registering restores it at the end of the list.
-    registerPreset(VOXEL_LOGO_PRESET)();
-    cleanups.push(() => registerPreset(VOXEL_LOGO_PRESET));
+    cleanups.push(setOtherBuiltinsAside());
     const store = new VisualizerStore();
     expect(store.preset.id).toBe("voxel");
     expect(store.canSwitch).toBe(false);
   });
 
   it("cycles both ways, wrapping at the ends, and counts each switch", () => {
-    registerPreset(VOXEL_LOGO_PRESET)();
-    cleanups.push(() => registerPreset(VOXEL_LOGO_PRESET));
+    cleanups.push(setOtherBuiltinsAside());
     cleanups.push(registerPreset(fakePreset("b")), registerPreset(fakePreset("c")));
     const store = new VisualizerStore();
     expect(store.canSwitch).toBe(true);

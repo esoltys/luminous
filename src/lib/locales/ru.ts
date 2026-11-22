@@ -3549,6 +3549,17 @@ export const ru = {
   visualizers: {
     voxel: "Воксельный спектр",
     voxelLogo: "Воксельный логотип",
+    vectorscope: "Векторскоп",
+    scope: {
+      left: "Л",
+      right: "П",
+      centre: "Ц",
+      momentary: "Моментальная",
+      shortTerm: "Кратковременная",
+      truePeak: "Истинный пик",
+      balance: "Баланс",
+      correlation: "Корреляция",
+    },
     menuTitle: "Визуализатор",
     previous: "Предыдущий визуализатор: {name}",
     next: "Следующий визуализатор: {name}",

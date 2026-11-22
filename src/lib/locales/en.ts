@@ -3268,6 +3268,17 @@ export const en = {
   visualizers: {
     voxel: "Voxel spectrum",
     voxelLogo: "Voxel logo",
+    vectorscope: "Vectorscope",
+    scope: {
+      left: "L",
+      right: "R",
+      centre: "C",
+      momentary: "Momentary",
+      shortTerm: "Short-term",
+      truePeak: "True peak",
+      balance: "Balance",
+      correlation: "Correlation",
+    },
     menuTitle: "Visualizer",
     previous: "Previous visualizer: {name}",
     next: "Next visualizer: {name}",

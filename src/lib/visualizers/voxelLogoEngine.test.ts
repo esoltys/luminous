@@ -35,7 +35,7 @@ function recordingContext() {
 }
 
 function frame(bands: number[], onset = 0, playing = true): VisualizerFrame {
-  return { bands, playing, onset };
+  return { bands, playing, onset, scope: null };
 }
 
 /** 32 bands with `value` in [from, to) and silence elsewhere. */

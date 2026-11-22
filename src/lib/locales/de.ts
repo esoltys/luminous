@@ -3354,6 +3354,17 @@ export const de = {
   visualizers: {
     voxel: "Voxel-Spektrum",
     voxelLogo: "Voxel-Logo",
+    vectorscope: "Vektorskop",
+    scope: {
+      left: "L",
+      right: "R",
+      centre: "M",
+      momentary: "Momentan",
+      shortTerm: "Kurzzeit",
+      truePeak: "True Peak",
+      balance: "Balance",
+      correlation: "Korrelation",
+    },
     menuTitle: "Visualisierung",
     previous: "Vorherige Visualisierung: {name}",
     next: "Nächste Visualisierung: {name}",
