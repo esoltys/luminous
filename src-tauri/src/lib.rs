@@ -9,7 +9,6 @@
 //   collection — Library scanner + file watcher
 //   playlist  — Playlist CRUD + undo/redo
 
-pub mod airplay;
 pub mod album_key;
 pub mod artist_image;
 pub mod audio;
@@ -1719,8 +1718,6 @@ pub fn run() {
             // Details pane context enrichment (#23)
             commands::context::get_song_context,
             commands::context::get_artist_events,
-            // "On the radio now" (#1998)
-            commands::airplay::get_airplay_now,
             commands::context::is_context_enrichment_enabled,
             commands::context::set_online_enabled,
             // Tag Editor commands

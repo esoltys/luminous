@@ -17,7 +17,6 @@
   import GenreChips from "./GenreChips.svelte";
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
   import InfoSections from "./InfoSections.svelte";
-  import AirplaySection from "./AirplaySection.svelte";
   import { contextStore } from "../stores/context.svelte";
   import FindInLibraryButton from "./radio/FindInLibraryButton.svelte";
 
@@ -309,10 +308,6 @@
           </div>
         {/if}
       </div>
-
-      {#if !isEntitySubject}
-        <AirplaySection song={currentSong} />
-      {/if}
 
       <div class="flex gap-1 p-1 rounded-lg bg-brand-bg/40 text-xs font-semibold">
         <button

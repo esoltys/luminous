@@ -894,34 +894,6 @@
       {/each}
     </div>
   </div>
-  <!-- "On the radio now" via TunePing (#1998): opt-in, it sends artist and title -->
-  <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
-    <div class="flex justify-between items-center gap-4">
-      <div class="flex items-center gap-3 min-w-0">
-        <img src="/tuneping-icon.svg" alt="TunePing" class="w-9 h-9 shrink-0 object-contain" />
-        <div class="space-y-1 min-w-0">
-          <h3 class="font-bold text-sm text-brand-text-primary">
-            {i18n.t("airplay.settingsTitle")}
-          </h3>
-          <p class="text-xs text-brand-text-secondary leading-relaxed">
-            {i18n.t("airplay.settingsHint")}
-            <button
-              type="button"
-              onclick={() => openExternalUrl("https://tuneping.com")}
-              class="text-brand-accent hover:underline cursor-pointer"
-            >
-              tuneping.com
-            </button>
-          </p>
-        </div>
-      </div>
-      <Toggle
-        checked={prefs.airplayEnabled}
-        onchange={(v) => prefs.setAirplayEnabled(v)}
-        label={i18n.t("airplay.settingsTitle")}
-      />
-    </div>
-  </div>
   <!-- Discord Rich Presence Card -->
   <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
     <div class="flex justify-between items-center gap-4">
