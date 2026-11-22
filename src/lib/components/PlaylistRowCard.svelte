@@ -18,8 +18,14 @@
     playlist,
     onClick,
     oncontextmenu,
-  }: { playlist: Playlist; onClick: () => void; oncontextmenu?: (e: MouseEvent) => void } =
-    $props();
+    countLabel,
+  }: {
+    playlist: Playlist;
+    onClick: () => void;
+    oncontextmenu?: (e: MouseEvent) => void;
+    /** Replaces the song/item count, e.g. "43 stations" for a radio station list. */
+    countLabel?: string;
+  } = $props();
 
   let cardTitle = $derived(getPlaylistDisplayName(playlist));
 
@@ -63,7 +69,7 @@
 
   <div class="shrink-0 max-w-40 text-right">
     <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">
-      {formatPlaylistItemCount(playlist, playlist.track_count)}
+      {countLabel ?? formatPlaylistItemCount(playlist, playlist.track_count)}
     </p>
     <p class="text-xs text-brand-text-secondary truncate">{updatedLabel}</p>
   </div>

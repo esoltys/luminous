@@ -3215,7 +3215,6 @@ export const en = {
     recentStationsTitle: "Recently Played",
     noRecentStations: "Play a station to see it here.",
     stationListsTitle: "Station Lists",
-    openList: "Open",
     playStation: "Play {name}",
     playStationMenu: "Play station",
     playingLabel: "Playing {name}",

@@ -3285,7 +3285,6 @@ export const it = {
     recentStationsTitle: "Ascoltate di recente",
     noRecentStations: "Riproduci una stazione per vederla qui.",
     stationListsTitle: "Liste di stazioni",
-    openList: "Apri",
     playStation: "Riproduci {name}",
     playStationMenu: "Riproduci stazione",
     playingLabel: "In riproduzione {name}",

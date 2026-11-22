@@ -1,37 +1,29 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import {
-    BroadcastIcon as Broadcast,
-    PlayIcon as Play,
-    PauseIcon as Pause,
-    PencilSimpleIcon as Pencil,
-    TrashIcon as Trash,
-  } from "phosphor-svelte";
+  import { BroadcastIcon as Broadcast } from "phosphor-svelte";
   import Plus from "../PlusIcon.svelte";
   import { formatUpdatedAgo, radioStore } from "../../stores/radio.svelte";
   import { playlistsStore } from "../../stores/playlists.svelte";
-  import { playerStore } from "../../stores/player.svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { prefs } from "../../stores/prefs.svelte";
   import { i18n } from "../../stores/i18n.svelte";
-  import { isStationList, parseStationListSpec } from "../../utils/playlist";
-  import { rowClasses, rowListGap, useCardAppearance } from "../../utils/cardAppearance";
+  import { isStationList } from "../../utils/playlist";
+  import { rowListGap, useCardAppearance } from "../../utils/cardAppearance";
   import { startPointerDrag, type PointerDragHandle } from "../../utils/pointerDrag";
-  import type { Playlist, RadioDirectoryStation, RadioStationListSpec } from "../../types";
+  import type { Playlist } from "../../types";
   import CardSection from "../CardSection.svelte";
   import DragGhost from "../DragGhost.svelte";
+  import PlaylistRowCard from "../PlaylistRowCard.svelte";
+  import PlaylistCardContextMenu from "../PlaylistCardContextMenu.svelte";
   import RadioStationCard from "./RadioStationCard.svelte";
   import PinnedStationRowCard from "./PinnedStationRowCard.svelte";
-  import RadioSaveButton from "./RadioSaveButton.svelte";
-  import StationFavicon from "./StationFavicon.svelte";
-  import PlaylistCoverThumb from "../PlaylistCoverThumb.svelte";
   import StationListModal from "./StationListModal.svelte";
 
   const appearance = useCardAppearance();
 
   let scrollEl: HTMLElement | null = $state(null);
   let showStationListModal = $state(false);
-  let editingList = $state<{ id: number; name: string; spec: RadioStationListSpec } | null>(null);
+  let listMenu = $state<{ x: number; y: number; playlist: Playlist } | null>(null);
 
   let draggedIndex = $state<number | null>(null);
   let dragOverIndex = $state<number | null>(null);
@@ -90,54 +82,8 @@
 
   const updatedAgoLabel = $derived(formatUpdatedAgo(radioStore.status?.lastSyncedAt ?? null));
 
-  function formatSpecSummary(pl: Playlist): string {
-    const spec = parseStationListSpec(pl.dynamic_spec);
-    if (!spec) return "";
-    const parts: string[] = [];
-    if (spec.tags.length > 0) parts.push(spec.tags.join(", "));
-    if (spec.country) parts.push(spec.country);
-    if (spec.lang) parts.push(spec.lang);
-    if (spec.minBitrate) parts.push(`${spec.minBitrate}+ kbps`);
-    return parts.join(" · ");
-  }
-
-  function formatStationSubtitle(station: RadioDirectoryStation): string {
-    const parts: string[] = [];
-    if (station.countrycode || station.country) {
-      parts.push(station.countrycode || station.country);
-    }
-    if (station.codec) {
-      parts.push(station.codec);
-    }
-    if (station.tags) {
-      const firstTags = station.tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean)
-        .slice(0, 2)
-        .join(", ");
-      if (firstTags) parts.push(firstTags);
-    }
-    return parts.join(" · ");
-  }
-
   function openNewStationList() {
-    editingList = null;
     showStationListModal = true;
-  }
-
-  function openEditStationList(pl: Playlist) {
-    const spec = parseStationListSpec(pl.dynamic_spec);
-    if (!spec) return;
-    editingList = { id: pl.id, name: pl.name, spec };
-    showStationListModal = true;
-  }
-
-  function onRowKeydown(e: KeyboardEvent, action: () => void) {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      action();
-    }
   }
 
   onMount(() => {
@@ -239,61 +185,11 @@
       {:else}
         <div class="flex-1 flex flex-col {rowListGap(appearance)}">
           {#each recentStations as station (station.stationuuid)}
-            {@const playing = radioStore.isPlayingStation(station.stationuuid)}
-            {@const subtitle = formatStationSubtitle(station)}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              role="button"
-              tabindex="0"
-              onclick={() => void radioStore.playStation(station)}
-              onkeydown={(e) => onRowKeydown(e, () => void radioStore.playStation(station))}
-              class={rowClasses(appearance)}
-            >
-              <div class="relative shrink-0 overflow-hidden">
-                <StationFavicon favicon={station.favicon} sizeClass="w-11 h-11" />
-              </div>
-
-              <div class="min-w-0 flex-1 flex flex-col gap-0.5">
-                <div class="flex items-center justify-between gap-2">
-                  <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
-                    {station.name || i18n.t("radio.unnamedStation")}
-                  </p>
-                  {#if station.bitrate > 0}
-                    <span
-                      class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0"
-                    >
-                      {station.bitrate} kbps
-                    </span>
-                  {/if}
-                </div>
-                <div class="flex items-center justify-between gap-2">
-                  <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">
-                    {subtitle}
-                  </p>
-                  <div
-                    class="flex items-center gap-1 shrink-0"
-                    onclick={(e) => e.stopPropagation()}
-                  >
-                    <RadioSaveButton stationuuid={station.stationuuid} size="sm" />
-                    <button
-                      type="button"
-                      onclick={() => void radioStore.playStation(station)}
-                      aria-label={playing
-                        ? i18n.t("radio.playingLabel", { name: station.name })
-                        : i18n.t("radio.playStation", { name: station.name })}
-                      class="p-1 rounded-md text-brand-text-secondary hover:text-brand-accent-text transition-colors"
-                    >
-                      {#if playing}
-                        <Pause class="w-3.5 h-3.5" weight="fill" />
-                      {:else}
-                        <Play class="w-3.5 h-3.5" weight="fill" />
-                      {/if}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <PinnedStationRowCard
+              {station}
+              playing={radioStore.isPlayingStation(station.stationuuid)}
+              onPlay={(st) => void radioStore.playStation(st)}
+            />
           {/each}
         </div>
       {/if}
@@ -338,101 +234,19 @@
         </div>
       {:else}
         <div class="flex-1 flex flex-col {rowListGap(appearance)}">
-          {#each dynamicStationLists as pl (pl.id)}
-            {@const summary = formatSpecSummary(pl)}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              role="button"
-              tabindex="0"
-              data-testid="station-list-card"
-              onclick={() => navigationStore.viewPlaylist(pl.id)}
-              onkeydown={(e) => onRowKeydown(e, () => navigationStore.viewPlaylist(pl.id))}
-              class={rowClasses(appearance)}
-            >
-              <div class="relative shrink-0 overflow-hidden">
-                <PlaylistCoverThumb playlist={pl} sizeClass="w-11 h-11" />
-              </div>
-
-              <div class="min-w-0 flex-1 flex flex-col gap-0.5">
-                <div class="flex items-center justify-between gap-2">
-                  <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
-                    {pl.name}
-                  </p>
-                  <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">
-                    {pl.track_count}
-                    {i18n.t("radio.stationsCount")}
-                  </span>
-                </div>
-                <div class="flex items-center justify-between gap-2">
-                  <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">
-                    {summary}
-                  </p>
-                  <div
-                    class="flex items-center gap-0.5 shrink-0"
-                    onclick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      type="button"
-                      onclick={() => void playerStore.playPlaylistItem(pl.id, 0)}
-                      aria-label={i18n.t("playlists.playPlaylistTooltip")}
-                      title={i18n.t("playlists.playPlaylistTooltip")}
-                      disabled={pl.track_count === 0}
-                      class="p-1 rounded-md text-brand-text-secondary hover:text-brand-accent-text disabled:opacity-40 transition-colors"
-                    >
-                      <Play class="w-3.5 h-3.5" weight="fill" />
-                    </button>
-                    <button
-                      type="button"
-                      onclick={() => openEditStationList(pl)}
-                      aria-label={i18n.t("radio.editStationList")}
-                      title={i18n.t("radio.editStationList")}
-                      class="p-1 rounded-md text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-                    >
-                      <Pencil class="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onclick={() => void radioStore.deleteStationList(pl.id)}
-                      aria-label={i18n.t("playlists.delete")}
-                      title={i18n.t("playlists.delete")}
-                      class="p-1 rounded-md text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-                    >
-                      <Trash class="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          {/each}
-
-          {#each manualRadioPlaylists as pl (pl.id)}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              role="button"
-              tabindex="0"
-              onclick={() => navigationStore.viewPlaylist(pl.id)}
-              onkeydown={(e) => onRowKeydown(e, () => navigationStore.viewPlaylist(pl.id))}
-              class={rowClasses(appearance)}
-            >
-              <div class="relative shrink-0 overflow-hidden">
-                <PlaylistCoverThumb playlist={pl} sizeClass="w-11 h-11" />
-              </div>
-              <div class="min-w-0 flex-1 flex flex-col gap-0.5">
-                <div class="flex items-center justify-between gap-2">
-                  <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">
-                    {pl.name}
-                  </p>
-                  <span class="text-xs text-brand-text-secondary font-medium shrink-0">
-                    {i18n.t("radio.openList")}
-                  </span>
-                </div>
-                <p class="truncate text-xs text-brand-text-secondary font-medium">
-                  {i18n.t("sidebar.playlistsCustom")}
-                </p>
-              </div>
-            </div>
+          <!-- Station lists read like playlists elsewhere (PlaylistRowCard, no
+               inline controls): open one to play, refresh, edit or delete it,
+               or right-click it. Imported lists (#2279) count stations too. -->
+          {#each [...dynamicStationLists, ...manualRadioPlaylists] as pl (pl.id)}
+            <PlaylistRowCard
+              playlist={pl}
+              countLabel={i18n.t("radio.stationCount", { count: pl.track_count })}
+              onClick={() => navigationStore.viewPlaylist(pl.id)}
+              oncontextmenu={(e) => {
+                e.preventDefault();
+                listMenu = { x: e.clientX, y: e.clientY, playlist: pl };
+              }}
+            />
           {/each}
         </div>
       {/if}
@@ -455,10 +269,17 @@
 
 {#if showStationListModal}
   <StationListModal
-    editing={editingList}
     onClose={() => {
       showStationListModal = false;
-      editingList = null;
     }}
+  />
+{/if}
+
+{#if listMenu}
+  <PlaylistCardContextMenu
+    x={listMenu.x}
+    y={listMenu.y}
+    playlist={listMenu.playlist}
+    onClose={() => (listMenu = null)}
   />
 {/if}

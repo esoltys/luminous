@@ -3292,7 +3292,6 @@ export const es = {
     recentStationsTitle: "Escuchadas recientemente",
     noRecentStations: "Reproduce una emisora para verla aquí.",
     stationListsTitle: "Listas de emisoras",
-    openList: "Abrir",
     playStation: "Reproducir {name}",
     playStationMenu: "Reproducir emisora",
     playingLabel: "Reproduciendo {name}",

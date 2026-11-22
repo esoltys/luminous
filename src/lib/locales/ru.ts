@@ -3498,7 +3498,6 @@ export const ru = {
     recentStationsTitle: "Недавно прослушанные",
     noRecentStations: "Включите станцию, чтобы она появилась здесь.",
     stationListsTitle: "Списки станций",
-    openList: "Открыть",
     playStation: "Воспроизвести {name}",
     playStationMenu: "Воспроизвести станцию",
     playingLabel: "Воспроизводится {name}",

@@ -3300,7 +3300,6 @@ export const de = {
     recentStationsTitle: "Zuletzt gehört",
     noRecentStations: "Spielen Sie einen Sender ab, um ihn hier zu sehen.",
     stationListsTitle: "Senderlisten",
-    openList: "Öffnen",
     playStation: "{name} abspielen",
     playStationMenu: "Sender abspielen",
     playingLabel: "{name} wird abgespielt",

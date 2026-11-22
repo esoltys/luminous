@@ -3488,7 +3488,6 @@ export const uk = {
     recentStationsTitle: "Нещодавно прослухані",
     noRecentStations: "Увімкніть станцію, щоб вона з'явилася тут.",
     stationListsTitle: "Списки станцій",
-    openList: "Відкрити",
     playStation: "Відтворити {name}",
     playStationMenu: "Відтворити станцію",
     playingLabel: "Відтворюється {name}",

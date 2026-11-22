@@ -3308,7 +3308,6 @@ export const frFR: DeepStringRecord<typeof en> = {
     recentStationsTitle: "Écoutées récemment",
     noRecentStations: "Écoutez une station pour l'afficher ici.",
     stationListsTitle: "Listes de stations",
-    openList: "Ouvrir",
     playStation: "Lire {name}",
     playStationMenu: "Écouter la station",
     playingLabel: "Lecture de {name}",
