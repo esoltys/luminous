@@ -93,10 +93,10 @@ vi.mock("@tauri-apps/api/core", () => {
         };
       }
       if (cmd === "open_and_play") {
-        return { played: 1, skipped: 0 };
+        return { played: 1, skipped: 0, station_lists: [] };
       }
       if (cmd === "add_paths_to_queue") {
-        return { added: 1, skipped: 0 };
+        return { added: 1, skipped: 0, station_lists: [] };
       }
       if (cmd === "is_shift_key_held") {
         return false;

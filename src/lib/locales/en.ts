@@ -3193,6 +3193,19 @@ export const en = {
       one: "{count} station imported",
       other: "{count} stations imported",
     },
+    importStationListTitle: "Import radio stations?",
+    importStationListMessage: {
+      one: "Found {count} streaming station in {files}.\n\nImport it as a station playlist? It will appear under Internet Radio → My stations → Station Playlists.",
+      other:
+        "Found {count} streaming stations in {files}.\n\nImport them as a station playlist? It will appear under Internet Radio → My stations → Station Playlists.",
+    },
+    importStationListConfirm: "Import",
+    stationListImported: {
+      one: "Imported {name} with {count} station",
+      other: "Imported {name} with {count} stations",
+    },
+    stationListImportFailed: "Couldn't import {name}: {error}",
+    showStationLists: "Show",
     stationsExported: {
       one: "{count} station exported",
       other: "{count} stations exported",
@@ -3201,8 +3214,7 @@ export const en = {
     browseStationsAction: "Browse stations",
     recentStationsTitle: "Recently Played",
     noRecentStations: "Play a station to see it here.",
-    stationListsTitle: "Station Lists",
-    openList: "Open",
+    stationListsTitle: "Station Playlists",
     playStation: "Play {name}",
     playStationMenu: "Play station",
     playingLabel: "Playing {name}",
@@ -3216,13 +3228,13 @@ export const en = {
     reducedQualityBadge: "Reduced quality",
     reducedQualityHint:
       "This HE-AAC stream plays without its high frequencies, and some stations play in mono, because this system has no full HE-AAC decoder yet.",
-    newStationList: "New Station List",
-    editStationList: "Edit Station List",
-    stationListName: "List name",
+    newStationList: "New Station Playlist",
+    editStationList: "Edit Station Playlist",
+    stationListName: "Playlist name",
     stationListNamePlaceholder: "e.g. Folk Metal in Canada",
-    stationListNameRequired: "Please enter a name for the station list.",
-    stationListCreated: "Station list created",
-    stationListUpdated: "Station list updated",
+    stationListNameRequired: "Please enter a name for the station playlist.",
+    stationListCreated: "Station playlist created",
+    stationListUpdated: "Station playlist updated",
     suggestFromLibrary: "Suggest from my library",
     genresLabel: "Genres",
     selectedCount: "selected",
@@ -3236,7 +3248,7 @@ export const en = {
     sortOrder: "Sort order",
     stationLimit: "Max stations",
     noStationLists:
-      "Create a station list to follow genres that update automatically from the directory.",
+      "Create a station playlist to follow genres that update automatically from the directory.",
     stationsCount: "stations",
   },
   visualizers: {

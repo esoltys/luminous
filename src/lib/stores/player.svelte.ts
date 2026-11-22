@@ -19,6 +19,7 @@ import {
   type AudioBackendKind,
   type VolumeSafety,
   type StationNowPlaying,
+  type StationListFile,
 } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { createEventScope } from "../utils/eventScope";
@@ -76,6 +77,10 @@ export class PlayerStore {
   playlistIndex = $state<number | null>(null);
   /** Total number of tracks in the active play order (#1605). */
   playlistTotal = $state<number>(0);
+  /** Station-list playlist files the user just opened or dropped, waiting
+   * for them to confirm the import; `+layout.svelte` shows the dialog while
+   * this is non-empty (#2279). */
+  pendingStationLists = $state<StationListFile[]>([]);
 
   /**
    * Formatted progress string for the active playlist/queue (e.g. "3/10"),
@@ -483,14 +488,37 @@ export class PlayerStore {
     await playlistsStore.selectPlaylist(queuePl.id);
   }
 
+  /** Holds station-list files from an open/drop outcome for the import
+   * confirmation, and reports whether there were any. */
+  private offerStationLists(lists: StationListFile[] | undefined): boolean {
+    if (!lists?.length) return false;
+    this.pendingStationLists = lists;
+    return true;
+  }
+
+  /** Takes the station lists awaiting confirmation, clearing the offer —
+   * called by the dialog's Import (to import them) and Cancel (to drop them). */
+  takePendingStationLists(): StationListFile[] {
+    const lists = this.pendingStationLists;
+    this.pendingStationLists = [];
+    return lists;
+  }
+
   async openAndPlay(paths: string[]) {
     this.completedSession = null;
-    const outcome = await invoke<{ played: number; skipped: number }>("open_and_play", { paths });
+    const outcome = await invoke<{
+      played: number;
+      skipped: number;
+      station_lists: StationListFile[];
+    }>("open_and_play", { paths });
+    const offeredStations = this.offerStationLists(outcome.station_lists);
     if (outcome.played === 0) {
-      toastStore.show(
-        i18n.t("playerBar.openNothingPlayable", {}, "No supported audio files found to play."),
-        "error",
-      );
+      if (!offeredStations) {
+        toastStore.show(
+          i18n.t("playerBar.openNothingPlayable", {}, "No supported audio files found to play."),
+          "error",
+        );
+      }
       return outcome;
     }
     if (outcome.skipped > 0) {
@@ -508,14 +536,19 @@ export class PlayerStore {
    * `openAndPlay`. Playback is left untouched. */
   async addPathsToQueue(paths: string[]) {
     this.completedSession = null;
-    const outcome = await invoke<{ added: number; skipped: number }>("add_paths_to_queue", {
-      paths,
-    });
+    const outcome = await invoke<{
+      added: number;
+      skipped: number;
+      station_lists: StationListFile[];
+    }>("add_paths_to_queue", { paths });
+    const offeredStations = this.offerStationLists(outcome.station_lists);
     if (outcome.added === 0) {
-      toastStore.show(
-        i18n.t("dragDrop.nothingToAdd", {}, "No supported audio files found to add."),
-        "error",
-      );
+      if (!offeredStations) {
+        toastStore.show(
+          i18n.t("dragDrop.nothingToAdd", {}, "No supported audio files found to add."),
+          "error",
+        );
+      }
       return outcome;
     }
     if (outcome.skipped > 0) {

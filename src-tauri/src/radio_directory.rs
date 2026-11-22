@@ -1365,8 +1365,9 @@ pub fn save_station(conn: &Connection, stationuuid: &str) -> Result<()> {
 
 /// Creates the fallback `songs` row for `stationuuid` when it has none, so a
 /// pinned station still resolves after an upstream directory prune (#2010).
-/// Leaves an existing row alone: re-materializing bumps its `mtime`, which
-/// would reorder Recents just because the station was pinned.
+/// Leaves an existing row alone: re-materializing bumps its `mtime`, and
+/// pinning has no reason to rewrite a row that already resolves. (Recents
+/// follow `lastplayed`, not `mtime`, since #2279.)
 pub fn ensure_station_materialized(conn: &Connection, stationuuid: &str) -> Result<()> {
     let uuid = stationuuid.trim();
     if uuid.is_empty() {
@@ -1545,7 +1546,22 @@ pub fn reorder_saved_stations(conn: &Connection, order: &[String]) -> Result<()>
     Ok(())
 }
 
-/// Lists recently played/opened radio stations ordered most-recent first (#2005).
+/// Stamps `song_id`'s `lastplayed` with `now` if it is a live station — the
+/// only thing that puts a station in Recently Played. Called by the player
+/// when a station actually starts playing; a library track is left alone
+/// (its plays are recorded through play history and scrobbling instead).
+pub fn record_station_play(conn: &Connection, song_id: i64, now: i64) -> Result<()> {
+    let sources_sql = &*crate::models::LIVE_STREAM_SOURCES_SQL;
+    conn.execute(
+        &format!("UPDATE songs SET lastplayed = ?1 WHERE id = ?2 AND source IN ({sources_sql})"),
+        params![now, song_id],
+    )?;
+    Ok(())
+}
+
+/// Lists the radio stations the user actually played, most recent first
+/// (#2005). A station that only has a row — saved, added, imported into a
+/// station list or pinned, but never played — isn't listed (#2279).
 pub fn list_recent_stations(
     conn: &Connection,
     limit: usize,
@@ -1560,7 +1576,8 @@ pub fn list_recent_stations(
          LEFT JOIN radio_directory rd ON rd.stationuuid = SUBSTR(s.path, ?1 + 1)
          WHERE s.source IN ({sources_sql})
            AND s.path LIKE (?2 || '%')
-         ORDER BY COALESCE(s.lastplayed, s.mtime, s.added, 0) DESC, s.id DESC
+           AND s.lastplayed IS NOT NULL
+         ORDER BY s.lastplayed DESC, s.id DESC
          LIMIT ?3"
     );
     let mut stmt = conn.prepare(&sql)?;
@@ -2703,7 +2720,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(mtime, 5, "re-pinning must not reorder Recents");
+        assert_eq!(mtime, 5, "re-pinning must not rewrite an existing row");
         assert_eq!(
             crate::pins::pinned_refs(&conn).unwrap(),
             vec![("station".to_string(), "uuid-p".to_string())]
@@ -2735,6 +2752,51 @@ mod tests {
 
         crate::pins::unpin(&conn, "station", "uuid-p").unwrap();
         assert!(crate::pins::pinned_refs(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn recent_stations_lists_only_played_stations_most_recent_first() {
+        let (_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        // Rows created the way an imported station list creates them (#2279).
+        let groove =
+            upsert_stream_station(&conn, "http://ice.example/groove", Some("Groove"), None)
+                .unwrap();
+        let drone =
+            upsert_stream_station(&conn, "http://ice.example/drone", Some("Drone"), None).unwrap();
+        upsert_stream_station(&conn, "http://ice.example/lush", Some("Lush"), None).unwrap();
+        assert!(list_recent_stations(&conn, 10, false).unwrap().is_empty());
+
+        record_station_play(&conn, drone.id, 1_000).unwrap();
+        record_station_play(&conn, groove.id, 2_000).unwrap();
+
+        let names: Vec<String> = list_recent_stations(&conn, 10, false)
+            .unwrap()
+            .into_iter()
+            .map(|s| s.name)
+            .collect();
+        assert_eq!(names, vec!["Groove", "Drone"]);
+    }
+
+    #[test]
+    fn record_station_play_leaves_library_tracks_alone() {
+        let (_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO songs (path, title, source) VALUES ('C:/Music/a.flac', 'A', ?1)",
+            params![crate::models::SongSource::LocalFile as i32],
+        )
+        .unwrap();
+        let id = conn.last_insert_rowid();
+
+        record_station_play(&conn, id, 1_000).unwrap();
+
+        let lastplayed: Option<i64> = conn
+            .query_row("SELECT lastplayed FROM songs WHERE id = ?1", [id], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(lastplayed, None);
     }
 
     #[test]
@@ -2798,7 +2860,18 @@ mod tests {
         let all_saved = list_saved_stations(&conn, false).unwrap();
         assert_eq!(all_saved.len(), 2);
 
-        // Recent stations includes materialized stations.
+        // Saving isn't playing: Recents stays empty until a station plays (#2279).
+        assert!(list_recent_stations(&conn, 10, false).unwrap().is_empty());
+        for uuid in ["uuid-a", "uuid-b"] {
+            let song_id: i64 = conn
+                .query_row(
+                    "SELECT id FROM songs WHERE path = ?1",
+                    params![station_uri(uuid)],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            record_station_play(&conn, song_id, 5_000).unwrap();
+        }
         let recent = list_recent_stations(&conn, 10, true).unwrap();
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0].stationuuid, "uuid-a");

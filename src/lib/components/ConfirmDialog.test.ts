@@ -35,6 +35,23 @@ describe("ConfirmDialog.svelte", () => {
     });
   });
 
+  it("shows the warning icon only for a dangerous choice", () => {
+    const props = {
+      title: "Import radio stations?",
+      message: "Found 43 streaming stations.",
+      confirmLabel: "Import",
+      cancelLabel: "Cancel",
+      onConfirm: vi.fn(),
+      onCancel: vi.fn(),
+    };
+    const safe = render(ConfirmDialog, { props: { ...props, danger: false } });
+    expect(safe.queryByTestId("confirm-danger-icon")).toBeNull();
+    safe.unmount();
+
+    const risky = render(ConfirmDialog, { props: { ...props, danger: true } });
+    expect(risky.getByTestId("confirm-danger-icon")).toBeInTheDocument();
+  });
+
   it("calls onConfirm and onCancel callbacks", async () => {
     const onConfirm = vi.fn();
     const onCancel = vi.fn();

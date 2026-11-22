@@ -1722,6 +1722,15 @@ export interface RadioDirectoryFacets {
   codecs: RadioBrowserFacetEntry[];
 }
 
+/** An opened/dropped playlist file made up entirely of radio streams, set
+ * aside by `open_and_play` / `add_paths_to_queue` for the user to import as a
+ * station list instead of playing it (#2279). */
+export interface StationListFile {
+  path: string;
+  name: string;
+  station_count: number;
+}
+
 export interface RadioStationListSpec {
   tags: string[];
   country?: string | null;

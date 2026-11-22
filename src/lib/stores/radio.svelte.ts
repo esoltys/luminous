@@ -12,7 +12,9 @@ import type {
   RadioStationListSpec,
   RadioStationListTags,
   Song,
+  StationListFile,
 } from "../types";
+import { navigationStore } from "./navigation.svelte";
 import { playerStore } from "./player.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { toastStore } from "./toast.svelte";
@@ -589,6 +591,49 @@ class RadioStore {
     await this.loadMyStations();
     toastStore.show(i18n.plural("radio.customStationsImported", added.length), "success");
     return added;
+  }
+
+  /**
+   * Imports opened/dropped station-list playlist files as station lists — one
+   * playlist of station items per file, listed under My Stations → Station
+   * Lists — and confirms each with a toast that can jump there (#2279). A file
+   * that fails to import gets an error toast; the others still import.
+   */
+  async importStationLists(lists: StationListFile[]): Promise<void> {
+    if (lists.length === 0) return;
+    const showMyStations = {
+      label: i18n.t("radio.showStationLists"),
+      onClick: () => {
+        this.subView = "my_stations";
+        navigationStore.activeTab = "radio";
+      },
+    };
+    let imported = 0;
+    for (const list of lists) {
+      try {
+        const playlist = await invoke<Playlist>("import_playlist", { filePath: list.path });
+        imported++;
+        toastStore.show(
+          i18n.plural("radio.stationListImported", list.station_count, { name: playlist.name }),
+          "success",
+          undefined,
+          undefined,
+          showMyStations,
+        );
+      } catch (err) {
+        toastStore.show(
+          i18n.t("radio.stationListImportFailed", {
+            name: list.name,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+          "error",
+        );
+      }
+    }
+    if (imported > 0) {
+      await playlistsStore.refreshPlaylists();
+      await this.loadMyStations();
+    }
   }
 
   async exportSavedStations(exportPath: string): Promise<number> {

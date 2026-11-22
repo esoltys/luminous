@@ -10,6 +10,7 @@
   import { navigationStore } from "../lib/stores/navigation.svelte";
   import { windowLayoutStore } from "../lib/stores/windowLayout.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
+  import StationListImportDialog from "../lib/components/radio/StationListImportDialog.svelte";
   import CoverArt from "../lib/components/CoverArt.svelte";
   import Miniplayer from "../lib/components/Miniplayer.svelte";
   import ImmersiveSessionWrap from "../lib/components/ImmersiveSessionWrap.svelte";
@@ -449,18 +450,17 @@
     }
   });
 
-  // Collection/Playlists/Lyrics are hidden from the sidebar until the library
-  // has songs (see Sidebar.svelte). If the last watched folder is removed
-  // while one of those tabs is active, its nav button vanishes — bounce back
-  // to Home rather than stranding the user on a tab they can no longer reach.
+  // Collection/Playlists/Lyrics are hidden from the sidebar while they have
+  // nothing to show (navigationStore.libraryTabsAvailable /
+  // playlistsTabAvailable). If the last watched folder is removed while one
+  // of those tabs is active, its nav button vanishes — bounce back to Home
+  // rather than stranding the user on a tab they can no longer reach.
   $effect(() => {
-    if (
-      collectionStore.statsLoaded &&
-      collectionStore.stats.total_songs === 0 &&
-      (navigationStore.activeTab === "collection" ||
-        navigationStore.activeTab === "playlists" ||
-        navigationStore.activeTab === "lyrics")
-    ) {
+    const tab = navigationStore.activeTab;
+    const stranded =
+      ((tab === "collection" || tab === "lyrics") && !navigationStore.libraryTabsAvailable) ||
+      (tab === "playlists" && !navigationStore.playlistsTabAvailable);
+    if (stranded) {
       navigationStore.activeTab = "home";
     }
   });
@@ -811,6 +811,8 @@
       onCancel={() => collectionStore.resolveActiveMassRemoval("keep")}
     />
   {/if}
+
+  <StationListImportDialog />
 
   <Toast />
   <SongDragGhost />

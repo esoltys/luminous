@@ -61,15 +61,72 @@ enum DroppedItem {
     StreamUrl(playlist::ParsedTrack),
 }
 
+/// Fewest stream entries a playlist file needs to count as a station list.
+/// A one-stream `.pls`/`.m3u` is the "Listen" link radio websites hand out,
+/// and opening it means "tune in", so it plays like any other file.
+const MIN_STATION_LIST_STREAMS: usize = 2;
+
+/// An opened playlist file made up entirely of internet radio streams (#2279).
+/// It is a list of stations to keep, not tracks to play, so the open/drop
+/// commands hand it back for the user to import instead of filling the Queue
+/// with it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct StationListFile {
+    /// The playlist file, for `import_playlist`.
+    pub path: String,
+    /// The name `import_playlist` gives the list: the file's own title, else its stem.
+    pub name: String,
+    pub station_count: usize,
+}
+
+impl StationListFile {
+    /// `Some` when every entry of `parsed` is an `http(s)://` stream and
+    /// there are at least `MIN_STATION_LIST_STREAMS` of them.
+    fn classify(path: &Path, parsed: &playlist::ParsedPlaylist) -> Option<Self> {
+        let count = parsed.tracks.len();
+        let all_streams = parsed
+            .tracks
+            .iter()
+            .all(|t| playlist::is_http_url(&t.path_or_url));
+        if count < MIN_STATION_LIST_STREAMS || !all_streams {
+            return None;
+        }
+        let name = parsed.title.clone().unwrap_or_else(|| {
+            path.file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default()
+        });
+        Some(Self {
+            path: path.to_string_lossy().to_string(),
+            name,
+            station_count: count,
+        })
+    }
+}
+
+/// What `resolve_dropped_paths` found in the user's opened/dropped paths.
+#[derive(Debug, Default)]
+struct ResolvedDrop {
+    /// Playable items, in the order the user gave them.
+    items: Vec<DroppedItem>,
+    /// Every candidate entry considered, so callers can report
+    /// `skipped = attempted - played` (station-list entries aren't counted:
+    /// they are offered for import, not skipped).
+    attempted: usize,
+    /// Playlist files set aside as station lists rather than played.
+    station_lists: Vec<StationListFile>,
+}
+
 /// Expands user-dropped/opened `paths` — audio files, playlist files
 /// (M3U/M3U8/PLS/XSPF, including `http(s)://` stream entries), and
-/// directories (recursed) — into concrete items. Returns the resolved items
-/// plus a count of every candidate entry considered, so callers can report
-/// `skipped = attempted - resolved.len()` (further narrowed once DB/tag
-/// resolution runs below).
-fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<DroppedItem>, usize) {
+/// directories (recursed) — into concrete items. A playlist file that is a
+/// station list (see [`StationListFile::classify`]) is set aside instead of
+/// expanded. Playable items are further narrowed once DB/tag resolution
+/// runs in `resolve_songs_from_dropped_items`.
+fn resolve_dropped_paths(paths: Vec<String>) -> ResolvedDrop {
     let mut resolved = Vec::new();
     let mut attempted: usize = 0;
+    let mut station_lists = Vec::new();
 
     for path_str in paths {
         if playlist::is_http_url(&path_str) {
@@ -105,6 +162,10 @@ fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<DroppedItem>, usize) {
                         continue;
                     }
                 };
+                if let Some(station_list) = StationListFile::classify(path, &parsed) {
+                    station_lists.push(station_list);
+                    continue;
+                }
                 let parent_dir = path.parent();
 
                 for track in parsed.tracks {
@@ -146,7 +207,11 @@ fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<DroppedItem>, usize) {
         }
     }
 
-    (resolved, attempted)
+    ResolvedDrop {
+        items: resolved,
+        attempted,
+        station_lists,
+    }
 }
 
 /// Resolves already-expanded file paths into `Song` rows: matches existing
@@ -583,10 +648,13 @@ pub async fn set_auto_continue(
 /// What actually happened to the files the user opened. Unplayable inputs
 /// are an outcome to report (the store shows a toast), not an error to
 /// throw — a Result::Err here would escape as an unhandled rejection.
+/// Station-list playlist files are neither played nor skipped: they come back
+/// in `station_lists` for the frontend to offer as an import (#2279).
 #[derive(serde::Serialize)]
 pub struct OpenAndPlayOutcome {
     pub played: usize,
     pub skipped: usize,
+    pub station_lists: Vec<StationListFile>,
 }
 
 /// What actually happened to the files the user dropped/added to the Queue.
@@ -596,6 +664,31 @@ pub struct OpenAndPlayOutcome {
 pub struct AddPathsOutcome {
     pub added: usize,
     pub skipped: usize,
+    pub station_lists: Vec<StationListFile>,
+}
+
+/// Resolves opened/dropped `paths` into playable `Song` rows, plus the
+/// station-list files set aside for import. Returns
+/// `(songs, attempted, station_lists)`.
+async fn resolve_opened_paths(
+    state: &State<'_, AppState>,
+    paths: Vec<String>,
+) -> Result<(Vec<crate::models::Song>, usize, Vec<StationListFile>), String> {
+    let ResolvedDrop {
+        items,
+        attempted,
+        station_lists,
+    } = resolve_dropped_paths(paths);
+    if items.is_empty() {
+        return Ok((Vec::new(), attempted, station_lists));
+    }
+    let cover_manager = state.cover_manager.clone();
+    let songs = crate::db::run_blocking(&state.db, move |conn| {
+        resolve_songs_from_dropped_items(conn, &cover_manager, items).map_err(anyhow::Error::msg)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok((songs, attempted, station_lists))
 }
 
 fn resolve_songs_from_dropped_items(
@@ -639,28 +732,14 @@ pub async fn open_and_play(
 ) -> Result<OpenAndPlayOutcome, String> {
     use tauri::Emitter;
 
-    let (resolved_items, attempted) = resolve_dropped_paths(paths);
-
-    if resolved_items.is_empty() {
-        return Ok(OpenAndPlayOutcome {
-            played: 0,
-            skipped: attempted,
-        });
-    }
-
-    let cover_manager = state.cover_manager.clone();
-    let songs = crate::db::run_blocking(&state.db, move |conn| {
-        resolve_songs_from_dropped_items(conn, &cover_manager, resolved_items)
-            .map_err(anyhow::Error::msg)
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+    let (songs, attempted, station_lists) = resolve_opened_paths(&state, paths).await?;
 
     if songs.is_empty() {
         // Nothing decodable — leave the current Queue untouched.
         return Ok(OpenAndPlayOutcome {
             played: 0,
             skipped: attempted,
+            station_lists,
         });
     }
 
@@ -671,6 +750,7 @@ pub async fn open_and_play(
     Ok(OpenAndPlayOutcome {
         played: songs.len(),
         skipped: attempted.saturating_sub(songs.len()),
+        station_lists,
     })
 }
 
@@ -683,27 +763,13 @@ pub async fn add_paths_to_queue(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<AddPathsOutcome, String> {
-    let (resolved_items, attempted) = resolve_dropped_paths(paths);
-
-    if resolved_items.is_empty() {
-        return Ok(AddPathsOutcome {
-            added: 0,
-            skipped: attempted,
-        });
-    }
-
-    let cover_manager = state.cover_manager.clone();
-    let songs = crate::db::run_blocking(&state.db, move |conn| {
-        resolve_songs_from_dropped_items(conn, &cover_manager, resolved_items)
-            .map_err(anyhow::Error::msg)
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+    let (songs, attempted, station_lists) = resolve_opened_paths(&state, paths).await?;
 
     if songs.is_empty() {
         return Ok(AddPathsOutcome {
             added: 0,
             skipped: attempted,
+            station_lists,
         });
     }
 
@@ -713,6 +779,7 @@ pub async fn add_paths_to_queue(
     Ok(AddPathsOutcome {
         added: songs.len(),
         skipped: attempted.saturating_sub(songs.len()),
+        station_lists,
     })
 }
 
@@ -1043,8 +1110,11 @@ mod tests {
         fs::write(dir.path().join("notes.txt"), b"").unwrap();
         fs::write(dir.path().join("disc2/c.wav"), b"").unwrap();
 
-        let (resolved, attempted) =
-            resolve_dropped_paths(vec![dir.path().to_string_lossy().to_string()]);
+        let ResolvedDrop {
+            items: resolved,
+            attempted,
+            ..
+        } = resolve_dropped_paths(vec![dir.path().to_string_lossy().to_string()]);
 
         assert_eq!(attempted, 3);
         let names: Vec<String> = resolved
@@ -1061,8 +1131,11 @@ mod tests {
     fn resolve_dropped_paths_counts_an_empty_directory_as_one_skipped_candidate() {
         let dir = tempfile::tempdir().unwrap();
 
-        let (resolved, attempted) =
-            resolve_dropped_paths(vec![dir.path().to_string_lossy().to_string()]);
+        let ResolvedDrop {
+            items: resolved,
+            attempted,
+            ..
+        } = resolve_dropped_paths(vec![dir.path().to_string_lossy().to_string()]);
 
         assert!(resolved.is_empty());
         assert_eq!(attempted, 1);
@@ -1074,8 +1147,11 @@ mod tests {
         let file_path = dir.path().join("song.mp3");
         fs::write(&file_path, b"").unwrap();
 
-        let (resolved, attempted) =
-            resolve_dropped_paths(vec![file_path.to_string_lossy().to_string()]);
+        let ResolvedDrop {
+            items: resolved,
+            attempted,
+            ..
+        } = resolve_dropped_paths(vec![file_path.to_string_lossy().to_string()]);
 
         assert_eq!(attempted, 1);
         assert_eq!(resolved, vec![DroppedItem::LocalPath(file_path)]);
@@ -1091,8 +1167,11 @@ mod tests {
         )
         .unwrap();
 
-        let (resolved, attempted) =
-            resolve_dropped_paths(vec![pls_path.to_string_lossy().to_string()]);
+        let ResolvedDrop {
+            items: resolved,
+            attempted,
+            ..
+        } = resolve_dropped_paths(vec![pls_path.to_string_lossy().to_string()]);
 
         assert_eq!(attempted, 1);
         assert_eq!(
@@ -1108,13 +1187,68 @@ mod tests {
     }
 
     #[test]
+    fn resolve_dropped_paths_sets_aside_an_all_stream_playlist_as_a_station_list() {
+        let dir = tempfile::tempdir().unwrap();
+        let m3u_path = dir.path().join("soma_fm.m3u");
+        // Shaped like the SomaFM channel list: comment header, no #EXTM3U, CRLF.
+        fs::write(
+            &m3u_path,
+            "# SomaFM channels\r\n#\r\n#EXTINF:0,SomaFM: Groove Salad: Ambient beats\r\nhttp://ice5.somafm.com/groovesalad-128-mp3\r\n#EXTINF:0,SomaFM: Drone Zone: Atmospheric textures\r\nhttp://ice5.somafm.com/dronezone-128-mp3\r\n#EXTINF:0,SomaFM: Lush: Sensuous vocals\r\nhttp://ice5.somafm.com/lush-128-mp3\r\n",
+        )
+        .unwrap();
+        let audio_path = dir.path().join("song.mp3");
+        fs::write(&audio_path, b"").unwrap();
+
+        let drop = resolve_dropped_paths(vec![
+            m3u_path.to_string_lossy().to_string(),
+            audio_path.to_string_lossy().to_string(),
+        ]);
+
+        assert_eq!(drop.items, vec![DroppedItem::LocalPath(audio_path)]);
+        assert_eq!(
+            drop.attempted, 1,
+            "station entries are not skipped candidates"
+        );
+        assert_eq!(
+            drop.station_lists,
+            vec![StationListFile {
+                path: m3u_path.to_string_lossy().to_string(),
+                name: "soma_fm".to_string(),
+                station_count: 3,
+            }]
+        );
+    }
+
+    #[test]
+    fn resolve_dropped_paths_plays_a_playlist_mixing_streams_and_local_files() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("song.mp3"), b"").unwrap();
+        let m3u_path = dir.path().join("mixed.m3u");
+        fs::write(
+            &m3u_path,
+            "#EXTM3U\nhttp://a.example.com/live\nhttp://b.example.com/live\nsong.mp3\n",
+        )
+        .unwrap();
+
+        let drop = resolve_dropped_paths(vec![m3u_path.to_string_lossy().to_string()]);
+
+        assert!(drop.station_lists.is_empty());
+        assert_eq!(drop.items.len(), 3);
+        assert_eq!(drop.attempted, 3);
+    }
+
+    #[test]
     fn resolve_dropped_paths_skips_non_audio_files_and_missing_paths() {
         let dir = tempfile::tempdir().unwrap();
         let text_path = dir.path().join("readme.txt");
         fs::write(&text_path, b"").unwrap();
         let missing_path = dir.path().join("missing.mp3");
 
-        let (resolved, attempted) = resolve_dropped_paths(vec![
+        let ResolvedDrop {
+            items: resolved,
+            attempted,
+            ..
+        } = resolve_dropped_paths(vec![
             text_path.to_string_lossy().to_string(),
             missing_path.to_string_lossy().to_string(),
         ]);

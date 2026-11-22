@@ -853,6 +853,16 @@ impl Player {
         self.preload_upcoming_waveforms();
         if is_live {
             if let Ok(conn) = self._db.pool.get() {
+                // Only a real start counts as a play: restoring the last
+                // station at launch (`real_play == false`) must not move it
+                // up Recently Played.
+                if real_play {
+                    let _ = crate::radio_directory::record_station_play(
+                        &conn,
+                        song.id,
+                        crate::clock::unix_now(),
+                    );
+                }
                 let _ = crate::radio_directory::gc_unreferenced_stations(
                     &conn,
                     crate::radio_directory::DEFAULT_RECENT_STATION_TAIL,

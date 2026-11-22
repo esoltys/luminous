@@ -3286,6 +3286,19 @@ export const frFR: DeepStringRecord<typeof en> = {
       one: "{count} station importée",
       other: "{count} stations importées",
     },
+    importStationListTitle: "Importer des stations de radio ?",
+    importStationListMessage: {
+      one: "{count} station en streaming trouvée dans {files}.\n\nL'importer comme liste de lecture radio ? Elle apparaîtra dans Radio Internet → Mes stations → Listes de lecture radio.",
+      other:
+        "{count} stations en streaming trouvées dans {files}.\n\nLes importer comme liste de lecture radio ? Elle apparaîtra dans Radio Internet → Mes stations → Listes de lecture radio.",
+    },
+    importStationListConfirm: "Importer",
+    stationListImported: {
+      one: "Liste « {name} » importée : {count} station",
+      other: "Liste « {name} » importée : {count} stations",
+    },
+    stationListImportFailed: "Impossible d'importer « {name} » : {error}",
+    showStationLists: "Afficher",
     stationsExported: {
       one: "{count} station exportée",
       other: "{count} stations exportées",
@@ -3294,8 +3307,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     browseStationsAction: "Parcourir les stations",
     recentStationsTitle: "Écoutées récemment",
     noRecentStations: "Écoutez une station pour l'afficher ici.",
-    stationListsTitle: "Listes de stations",
-    openList: "Ouvrir",
+    stationListsTitle: "Listes de lecture radio",
     playStation: "Lire {name}",
     playStationMenu: "Écouter la station",
     playingLabel: "Lecture de {name}",
@@ -3309,13 +3321,13 @@ export const frFR: DeepStringRecord<typeof en> = {
     reducedQualityBadge: "Qualité réduite",
     reducedQualityHint:
       "Ce flux HE-AAC est lu sans ses hautes fréquences, et certaines stations sont lues en mono, car ce système n'a pas encore de décodeur HE-AAC complet.",
-    newStationList: "Nouvelle liste de stations",
-    editStationList: "Modifier la liste de stations",
-    stationListName: "Nom de la liste",
+    newStationList: "Nouvelle liste de lecture radio",
+    editStationList: "Modifier la liste de lecture radio",
+    stationListName: "Nom de la liste de lecture",
     stationListNamePlaceholder: "ex. Folk Metal au Canada",
-    stationListNameRequired: "Veuillez saisir un nom pour la liste de stations.",
-    stationListCreated: "Liste de stations créée",
-    stationListUpdated: "Liste de stations mise à jour",
+    stationListNameRequired: "Veuillez saisir un nom pour la liste de lecture radio.",
+    stationListCreated: "Liste de lecture radio créée",
+    stationListUpdated: "Liste de lecture radio mise à jour",
     suggestFromLibrary: "Suggérer depuis ma bibliothèque",
     genresLabel: "Genres",
     selectedCount: "sélectionné(s)",
@@ -3329,7 +3341,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     sortOrder: "Ordre de tri",
     stationLimit: "Nombre maximal de stations",
     noStationLists:
-      "Créez une liste de stations pour suivre des genres qui se mettent à jour automatiquement.",
+      "Créez une liste de lecture radio pour suivre des genres qui se mettent à jour automatiquement.",
     stationsCount: "stations",
   },
   visualizers: {

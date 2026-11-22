@@ -3,6 +3,7 @@ import { tick } from "svelte";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import Sidebar from "./Sidebar.svelte";
+import type { Playlist } from "../types";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
@@ -288,6 +289,27 @@ describe("Sidebar.svelte - Files section", () => {
     expect(queryByRole("button", { name: "Files" })).toBeNull();
     expect(getByRole("button", { name: /add a music folder/i })).toBeInTheDocument();
     expect(queryByRole("button", { name: /artists/i })).toBeNull();
+  });
+
+  it("shows Playlists on an empty library once there is a playlist of the user's own (#2279)", () => {
+    const queue = { id: 1, name: "Queue", is_queue: true, dynamic_enabled: false };
+    const stationList = { id: 4, name: "soma_fm", is_queue: false, dynamic_enabled: false };
+    const saved = playlistsStore.playlists;
+    collectionStore.statsLoaded = true;
+    collectionStore.stats = { ...collectionStore.stats!, total_songs: 0 };
+    try {
+      playlistsStore.playlists = [queue] as Playlist[];
+      const onlyQueue = render(Sidebar, { props: { width: 256 } });
+      expect(onlyQueue.queryByText("Playlists")).toBeNull();
+      onlyQueue.unmount();
+
+      playlistsStore.playlists = [queue, stationList] as Playlist[];
+      const withList = render(Sidebar, { props: { width: 256 } });
+      expect(withList.getByText("Playlists")).toBeInTheDocument();
+      expect(withList.queryByRole("button", { name: /artists/i })).toBeNull();
+    } finally {
+      playlistsStore.playlists = saved;
+    }
   });
 
   it("lists each source without a count and opens it in the Files view", async () => {

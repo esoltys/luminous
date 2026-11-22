@@ -307,6 +307,27 @@ class NavigationStore {
   private isNavigatingHistory = false;
   private historyRecordScheduled = false;
 
+  /** Whether Library/Organize/Stats/Lyrics have anything to show: they stay
+   * hidden until the library has songs (and while stats are still loading,
+   * so they don't flicker out on startup). Read by the sidebar and by the
+   * layout's guard that bounces a stranded tab back to Home. */
+  get libraryTabsAvailable(): boolean {
+    return !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0;
+  }
+
+  /** Whether Playlists has anything to show: library songs, or a playlist
+   * of the user's own — such as an imported radio station list, which a
+   * radio-only user with no library still needs to open (#2279). Playlists
+   * not loaded yet (no Queue row) count as available, so a restored
+   * Playlists tab isn't bounced before they arrive. */
+  get playlistsTabAvailable(): boolean {
+    return (
+      this.libraryTabsAvailable ||
+      playlistsStore.playlists.length === 0 ||
+      playlistsStore.customPlaylists.length > 0
+    );
+  }
+
   get canGoBack(): boolean {
     return this.historyIndex > 0;
   }

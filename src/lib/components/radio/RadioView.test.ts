@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
 import type {
+  Playlist,
   RadioDirectoryFacets,
   RadioDirectoryStation,
   RadioDirectoryStatus,
@@ -35,6 +36,8 @@ vi.mock("@tauri-apps/api/event", () => ({
 import RadioView from "./RadioView.svelte";
 import { radioStore } from "../../stores/radio.svelte";
 import { playerStore } from "../../stores/player.svelte";
+import { playlistsStore } from "../../stores/playlists.svelte";
+import { navigationStore } from "../../stores/navigation.svelte";
 
 function makeStation(overrides: Partial<RadioDirectoryStation> = {}): RadioDirectoryStation {
   return {
@@ -400,6 +403,57 @@ describe("RadioView", () => {
         },
       });
     });
+  });
+
+  it("lists an imported station list as a plain playlist row that opens it (#2279)", async () => {
+    const imported = {
+      id: 4,
+      name: "soma_fm",
+      track_count: 43,
+      dynamic_enabled: false,
+      dynamic_spec: null,
+      is_system: false,
+      is_queue: false,
+      created: 1000,
+      updated: 1000,
+    };
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_radio_directory_status") {
+        return {
+          optedIn: false,
+          stationCount: 0,
+          playableStationCount: 0,
+          lastSyncedAt: null,
+          lastFullSyncAt: null,
+          nextAutoSyncAt: null,
+          syncInProgress: false,
+          lastError: null,
+          attributionUrl: "https://www.radio-browser.info",
+        };
+      }
+      if (cmd === "get_radio_playlist_ids") return [4];
+      if (cmd === "get_playlists") return [imported];
+      return [];
+    });
+    const savedPlaylists = playlistsStore.playlists;
+    playlistsStore.playlists = [imported] as unknown as Playlist[];
+    const viewPlaylist = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
+    try {
+      render(RadioView);
+      await fireEvent.click(await screen.findByTestId("radio-tab-my-stations"));
+
+      const section = await screen.findByTestId("radio-station-lists-section");
+      const name = await within(section).findByText("soma_fm");
+      expect(section).toHaveTextContent("43 stations");
+      // Like playlist rows elsewhere: no inline Play/Delete, open it to act on it.
+      expect(within(section).queryAllByRole("button")).toHaveLength(0);
+
+      await fireEvent.click(name);
+      expect(viewPlaylist).toHaveBeenCalledWith(4);
+    } finally {
+      viewPlaylist.mockRestore();
+      playlistsStore.playlists = savedPlaylists;
+    }
   });
 
   it("toggles play, pause, and resume when clicking a saved station card", async () => {

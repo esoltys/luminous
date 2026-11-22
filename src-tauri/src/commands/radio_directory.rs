@@ -222,7 +222,7 @@ pub async fn reorder_saved_stations(
     .map_err(|e| e.to_string())
 }
 
-/// Returns recently played/opened radio stations ordered most-recent first (#2005).
+/// Returns the radio stations the user actually played, most recent first (#2005, #2279).
 #[tauri::command]
 pub async fn get_recent_radio_stations(
     limit: Option<usize>,

@@ -17,6 +17,8 @@
     message: string;
     confirmLabel: string;
     cancelLabel: string;
+    /** Marks a destructive or risky choice with a warning icon. False for a
+     * plain yes/no, such as offering an import. */
     danger?: boolean;
     onConfirm: () => void;
     onCancel: () => void;
@@ -37,7 +39,9 @@
     class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main"
   >
     <div class="flex items-center gap-2">
-      <AlertTriangle class="w-4 h-4 text-brand-accent-text" />
+      {#if danger}
+        <AlertTriangle class="w-4 h-4 text-brand-accent-text" data-testid="confirm-danger-icon" />
+      {/if}
       <h3 class="text-sm font-bold text-balance text-brand-text-primary">{title}</h3>
     </div>
     <button

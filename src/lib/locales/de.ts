@@ -3278,6 +3278,19 @@ export const de = {
       one: "{count} Sender importiert",
       other: "{count} Sender importiert",
     },
+    importStationListTitle: "Radiosender importieren?",
+    importStationListMessage: {
+      one: "{count} Streaming-Sender in {files} gefunden.\n\nAls Sender-Wiedergabeliste importieren? Sie erscheint unter Internetradio → Meine Sender → Sender-Wiedergabelisten.",
+      other:
+        "{count} Streaming-Sender in {files} gefunden.\n\nAls Sender-Wiedergabeliste importieren? Sie erscheint unter Internetradio → Meine Sender → Sender-Wiedergabelisten.",
+    },
+    importStationListConfirm: "Importieren",
+    stationListImported: {
+      one: "{name} mit {count} Sender importiert",
+      other: "{name} mit {count} Sendern importiert",
+    },
+    stationListImportFailed: "{name} konnte nicht importiert werden: {error}",
+    showStationLists: "Anzeigen",
     stationsExported: {
       one: "{count} Sender exportiert",
       other: "{count} Sender exportiert",
@@ -3286,8 +3299,7 @@ export const de = {
     browseStationsAction: "Sender durchsuchen",
     recentStationsTitle: "Zuletzt gehört",
     noRecentStations: "Spielen Sie einen Sender ab, um ihn hier zu sehen.",
-    stationListsTitle: "Senderlisten",
-    openList: "Öffnen",
+    stationListsTitle: "Sender-Wiedergabelisten",
     playStation: "{name} abspielen",
     playStationMenu: "Sender abspielen",
     playingLabel: "{name} wird abgespielt",
@@ -3302,13 +3314,13 @@ export const de = {
     reducedQualityBadge: "Reduzierte Qualität",
     reducedQualityHint:
       "Dieser HE-AAC-Stream wird ohne hohe Frequenzen wiedergegeben, manche Sender nur in Mono, da diesem System noch ein vollständiger HE-AAC-Decoder fehlt.",
-    newStationList: "Neue Senderliste",
-    editStationList: "Senderliste bearbeiten",
-    stationListName: "Listenname",
+    newStationList: "Neue Sender-Wiedergabeliste",
+    editStationList: "Sender-Wiedergabeliste bearbeiten",
+    stationListName: "Name der Wiedergabeliste",
     stationListNamePlaceholder: "z. B. Folk Metal in Kanada",
-    stationListNameRequired: "Bitte gib einen Namen für die Senderliste ein.",
-    stationListCreated: "Senderliste erstellt",
-    stationListUpdated: "Senderliste aktualisiert",
+    stationListNameRequired: "Bitte gib einen Namen für die Sender-Wiedergabeliste ein.",
+    stationListCreated: "Sender-Wiedergabeliste erstellt",
+    stationListUpdated: "Sender-Wiedergabeliste aktualisiert",
     suggestFromLibrary: "Aus meiner Bibliothek vorschlagen",
     genresLabel: "Genres",
     selectedCount: "ausgewählt",
@@ -3322,7 +3334,7 @@ export const de = {
     sortOrder: "Sortierung",
     stationLimit: "Max. Sender",
     noStationLists:
-      "Erstelle eine Senderliste, um Genres zu folgen, die sich automatisch aktualisieren.",
+      "Erstelle eine Sender-Wiedergabeliste, um Genres zu folgen, die sich automatisch aktualisieren.",
     stationsCount: "Sender",
   },
   visualizers: {

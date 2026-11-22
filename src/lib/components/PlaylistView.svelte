@@ -491,15 +491,8 @@
     navigationStore.selectedPlaylistId = null;
   }
 
-  /** Plays the clicked row the same way `playSelected`/`handlePlayAll` do:
-   * resolve songIds + a start index entirely from in-memory reactive state
-   * and hand the whole batch to `playSongs` in one shot. Earlier this went
-   * through a uuid lookup (`playPlaylistItemByUuid`) resolved fresh on the
-   * backend, which turned out to still occasionally fail to find a uuid
-   * that demonstrably existed in the DB a moment later — an unresolved
-   * server-side race. Since there's nothing to race against when the whole
-   * request is built synchronously from state already in hand, this path
-   * sidesteps it rather than chasing it further. */
+  /** Plays the playlist in place, starting at the clicked row (looked up by
+   * item uuid on the backend). The Queue is left as it is. */
   function handlePlayPlaylistItem(item: PlaylistItem) {
     if (!item || isItemUnavailable(item) || !activePlaylist) return;
     playerStore.playPlaylistItemByUuid(activePlaylist.id, item.uuid);
