@@ -2077,32 +2077,6 @@ export const en = {
     disbanded: "Disbanded",
     lessThanOneYearAgo: "<1 year ago",
   },
-  airplay: {
-    title: "On the radio now",
-    consentBody:
-      "Show which internet radio stations are playing this song right now. Turning this on sends the song's artist and title to Tuneping.",
-    consentAccept: "Show stations",
-    consentDecline: "Not now",
-    loading: "Checking stations…",
-    empty: "No stations are playing this right now.",
-    unavailable: "Couldn't reach Tuneping. Try again in a moment.",
-    unavailableStale: "Couldn't reach Tuneping. Showing the last result.",
-    confirmedAgo: "Confirmed {age}",
-    bitrate: "{bitrate} kbps",
-    more: {
-      one: "+{count} more station",
-      other: "+{count} more stations",
-    },
-    refresh: "Refresh stations",
-    attribution: "Data by Tuneping",
-    detectedLabel: "About this data",
-    detectedHint:
-      "Detected from station metadata: Tuneping reads the song each station announces in its stream. A station's announcement can run a little ahead of or behind the music.",
-    settingsTitle: "TunePing",
-    openInRadio: "Open in Internet Radio",
-    settingsHint:
-      "Discover new Internet Radio stations playing the current song. Turning this on sends the song's artist and title to TunePing.",
-  },
   artistEvents: {
     panelTitle: "Upcoming Concerts & Events",
     noEvents: "No upcoming concerts found",

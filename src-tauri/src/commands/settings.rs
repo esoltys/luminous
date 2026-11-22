@@ -74,12 +74,6 @@ pub struct UiPreferences {
     /// Off by default: decoding every track once is costly on large or external libraries.
     /// Manual context-menu verification stays available regardless of this setting.
     pub verify_audio_integrity_and_provenance: bool,
-    /// Show "On the radio now" in the right panel (#1998), which sends the shown song's
-    /// artist and title to TunePing. Off by default; `crate::airplay` reads it backend-side
-    /// too, so nothing is sent while it is off whatever the frontend does.
-    pub airplay_enabled: bool,
-    /// The user answered "Not now" on the "On the radio now" consent card, so it stays hidden.
-    pub airplay_prompt_dismissed: bool,
     /// Which families of system-generated auto-playlists the library keeps (#2131). A family that is
     /// off has its playlists deleted and is not regenerated (`PlaylistManager::family_enabled`).
     /// All on by default, so existing libraries are unchanged.
@@ -118,8 +112,6 @@ impl Default for UiPreferences {
             save_artwork_to_folders: false,
             detect_tempo_and_key: false,
             verify_audio_integrity_and_provenance: false,
-            airplay_enabled: false,
-            airplay_prompt_dismissed: false,
             auto_playlists_genre: true,
             auto_playlists_decade: true,
             auto_playlists_artist_tag: true,
@@ -183,7 +175,7 @@ impl UiPreferences {
     /// Bool fields, persisted as a literal "true"/"false" string the same
     /// way the FadeSettings bools are — not part of `fields()` since they
     /// aren't domain-checked Strings.
-    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 18] {
+    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 16] {
         [
             ("genre_sort_asc", &mut self.genre_sort_asc),
             ("fanart_fetch_photo", &mut self.fanart_fetch_photo),
@@ -199,14 +191,6 @@ impl UiPreferences {
             (
                 "verify_audio_integrity_and_provenance",
                 &mut self.verify_audio_integrity_and_provenance,
-            ),
-            (
-                crate::airplay::AIRPLAY_ENABLED_KEY,
-                &mut self.airplay_enabled,
-            ),
-            (
-                "airplay_prompt_dismissed",
-                &mut self.airplay_prompt_dismissed,
             ),
             ("auto_playlists_genre", &mut self.auto_playlists_genre),
             ("auto_playlists_decade", &mut self.auto_playlists_decade),

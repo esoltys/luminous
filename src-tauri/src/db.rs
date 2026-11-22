@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 96;
+pub const CURRENT_SCHEMA_VERSION: i32 = 97;
 
 struct Migration {
     version: i32,
@@ -1025,6 +1025,11 @@ const MIGRATIONS: &[Migration] = &[
             }
             Ok(())
         },
+    },
+    Migration {
+        version: 97,
+        description: "drop the removed TunePing \"On the radio now\" preferences (#2278)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_97)?),
     },
 ];
 
@@ -3359,6 +3364,12 @@ const MIGRATION_94: &str = "
 UPDATE radio_directory_meta SET last_change_uuid = NULL;
 ";
 
+/// The TunePing "On the radio now" feature was removed (#2278). Its opt-in rows go too, so a
+/// stale consent can never carry over to anything that reuses these keys.
+const MIGRATION_97: &str = "
+DELETE FROM app_state WHERE key IN ('airplay_enabled', 'airplay_prompt_dismissed');
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -4078,6 +4089,37 @@ mod tests {
         assert_eq!(count, 0);
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_97_drops_tuneping_prefs_only() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration97_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES
+             ('airplay_enabled', 'true'), ('airplay_prompt_dismissed', 'true'),
+             ('detect_tempo_and_key', 'true')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute_batch(MIGRATION_97).unwrap();
+
+        let keys: Vec<String> = conn
+            .prepare(
+                "SELECT key FROM app_state
+                 WHERE key IN ('airplay_enabled', 'airplay_prompt_dismissed', 'detect_tempo_and_key')",
+            )
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(keys, vec!["detect_tempo_and_key".to_string()]);
     }
 
     #[test]

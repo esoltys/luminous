@@ -223,32 +223,6 @@ export interface SongContextEnrichment {
   fetched_at?: number;
 }
 
-/** A station playing a song right now, from `get_airplay_now` (#1998). */
-export interface AirplayStation {
-  /** Radio Browser station UUID. */
-  id: string;
-  name: string;
-  country: string | null;
-  codec: string | null;
-  bitrate: number | null;
-  homepage: string | null;
-  /** Unix seconds of the station's latest poll: "still playing as of". */
-  confirmed_at: number;
-}
-
-/** "On the radio now" for one song. The command never fails; `status` says why there is nothing. */
-export interface AirplayNow {
-  status:
-    | { kind: "disabled" }
-    | { kind: "unsupported" }
-    | { kind: "ready" }
-    | { kind: "unavailable"; retry_after: number };
-  /** Best first; on `unavailable`, the last result for the song (if any). */
-  stations: AirplayStation[];
-  fetched_at: number | null;
-  attribution_url: string;
-}
-
 export interface ArtistEvent {
   id: string;
   name: string;
