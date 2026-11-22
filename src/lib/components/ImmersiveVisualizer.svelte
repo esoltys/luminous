@@ -52,11 +52,6 @@
       </button>
 
       <div class="flex flex-col min-w-0 flex-1">
-        <span
-          class="label-small self-start mb-2 px-2.5 py-0.5 bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
-        >
-          {i18n.t("playerBar.nowPlaying")}
-        </span>
         <div
           bind:clientHeight={detailsHeight}
           data-testid="immersive-visualizer-song-details"
