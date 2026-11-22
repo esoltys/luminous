@@ -4,6 +4,8 @@
     PlaylistIcon as ListMusic,
     BroadcastIcon as Radio,
     SparkleIcon as Sparkles,
+    FileAudioIcon,
+    WarningIcon,
   } from "phosphor-svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { Playlist, PlaylistItem } from "../types";
@@ -39,6 +41,7 @@
 
   const queueTheme = getPlaylistCardTheme("queue");
   const smartTheme = getPlaylistCardTheme("smart");
+  const fileTheme = getPlaylistCardTheme("file");
 
   let cardTitle = $derived(getPlaylistDisplayName(playlist));
 
@@ -99,6 +102,15 @@
       label={i18n.t("playlists.smartBadgeLabel")}
       title={i18n.t("playlists.smartRuleBasedTooltip")}
       colorClass={smartTheme.badgeColorClass}
+    />
+  {:else if playlist.source_path}
+    <CardBadge
+      icon={playlist.source_conflict ? WarningIcon : FileAudioIcon}
+      label={i18n.t("playlists.fileBadgeLabel")}
+      title={playlist.source_conflict
+        ? i18n.t("playlists.fileConflictBadgeTooltip", { path: playlist.source_path })
+        : i18n.t("playlists.fileBadgeTooltip", { path: playlist.source_path })}
+      colorClass={fileTheme.badgeColorClass}
     />
   {/if}
 {/snippet}

@@ -1263,6 +1263,10 @@ export const it = {
     tableHeaderDuration: "Durata",
     tableHeaderRemove: "Rimuovi",
     confirmDeletePlaylist: "Eliminare la playlist «{name}»?",
+    confirmDeleteFilePlaylist:
+      "Eliminare la playlist «{name}»? Il suo file, {path}, verrà spostato nel cestino.",
+    fileTrashFailed:
+      "Impossibile spostare {path} nel cestino, quindi la playlist non è stata eliminata. Elimina il file manualmente, poi elimina la playlist.",
     confirmDeletePlaylistTitle: "Elimina playlist",
     cancel: "Annulla",
     playTrack: "Riproduci brano",
@@ -1460,6 +1464,17 @@ export const it = {
     smartRulePlaylistLabel: "Playlist con regole intelligenti",
     smartRuleBasedTooltip: "Playlist basata su regole intelligenti",
     smartBadgeLabel: "Intelligente",
+    fileBadgeLabel: "File",
+    fileBadgeTooltip: "Sincronizzata con {path}",
+    fileConflictBadgeTooltip:
+      "Modificata in Luminous e in {path}. Apri la playlist per scegliere quale versione tenere",
+    fileConflictToast:
+      "«{name}» è stata modificata sia in Luminous sia nel suo file. Scegli quale versione tenere.",
+    fileConflictShowBtn: "Scegli",
+    fileConflictBanner:
+      "Questa playlist e il suo file ({path}) sono stati modificati entrambi. Tieni una versione; l’altra verrà sostituita.",
+    fileConflictKeepLuminous: "Tieni la versione di Luminous",
+    fileConflictKeepFile: "Tieni la versione del file",
     saveRenameTooltip: "Salva",
     historyCleared: "Cronologia di riproduzione cancellata",
     saveQueueNameLabel: "Nome della playlist",

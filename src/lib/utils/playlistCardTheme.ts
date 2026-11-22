@@ -2,6 +2,7 @@ import type { Component } from "svelte";
 import {
   CalendarIcon,
   ClockIcon,
+  FileAudioIcon,
   GaugeIcon,
   HeartIcon,
   HourglassIcon,
@@ -20,6 +21,7 @@ export type PlaylistCardThemeKind =
   | "genre"
   | "decade"
   | "smart"
+  | "file"
   | "bpm"
   | "artist_tag"
   | "favourites"
@@ -80,6 +82,14 @@ const THEMES: Record<PlaylistCardThemeKind, PlaylistCardTheme> = {
       "from-[#7E22CE]/25 to-[#A855F7]/15 border-[#A855F7]/30 shadow-[0_0_20px_2px_rgba(168,85,247,0.35)]",
     iconColorClass: "text-[#A855F7]",
     badgeColorClass: "bg-[#7E22CE] text-white",
+  },
+  file: {
+    icon: FileAudioIcon,
+    tintClass: "bg-[#EC4899]/15 border-[#EC4899]/30",
+    gradientClass:
+      "from-[#DB2777]/25 to-[#EC4899]/15 border-[#EC4899]/30 shadow-[0_0_20px_2px_rgba(236,72,153,0.35)]",
+    iconColorClass: "text-[#EC4899]",
+    badgeColorClass: "bg-[#DB2777] text-white",
   },
   bpm: {
     icon: GaugeIcon,

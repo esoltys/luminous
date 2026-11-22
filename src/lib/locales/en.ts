@@ -1229,6 +1229,10 @@ export const en = {
     tableHeaderDuration: "Duration",
     tableHeaderRemove: "Remove",
     confirmDeletePlaylist: 'Are you sure you want to delete the playlist "{name}"?',
+    confirmDeleteFilePlaylist:
+      "Delete the playlist “{name}”? Its file, {path}, moves to the trash.",
+    fileTrashFailed:
+      "Couldn’t move {path} to the trash, so the playlist wasn’t deleted. Delete the file yourself, then delete the playlist.",
     confirmDeletePlaylistTitle: "Delete Playlist",
     cancel: "Cancel",
     playTrack: "Play song",
@@ -1425,6 +1429,17 @@ export const en = {
     smartRulePlaylistLabel: "Smart Rule Playlist",
     smartRuleBasedTooltip: "Smart Rule-Based Playlist",
     smartBadgeLabel: "Smart",
+    fileBadgeLabel: "File",
+    fileBadgeTooltip: "Kept in sync with {path}",
+    fileConflictBadgeTooltip:
+      "Changed in Luminous and in {path}. Open the playlist to choose which version to keep",
+    fileConflictToast:
+      "“{name}” changed in both Luminous and in its file. Choose which version to keep.",
+    fileConflictShowBtn: "Choose",
+    fileConflictBanner:
+      "This playlist and its file ({path}) both changed. Keep one version; the other is replaced.",
+    fileConflictKeepLuminous: "Keep Luminous version",
+    fileConflictKeepFile: "Keep file version",
     saveRenameTooltip: "Save",
     historyCleared: "Play history cleared",
     saveQueueNameLabel: "Playlist name",

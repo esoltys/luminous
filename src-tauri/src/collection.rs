@@ -138,6 +138,12 @@ pub struct ScanReport {
     /// Paths whose rows this scan wrote (new or re-read files), so a caller can
     /// act on exactly what the scan picked up — e.g. auto-organize.
     pub upserted_paths: Vec<String>,
+    /// Playlist files (`.m3u`, `.pls`, ...) found in the walked folders, for
+    /// `scan_all` to sync into file-backed playlists (#2280).
+    pub playlist_files: Vec<PathBuf>,
+    /// The folders this scan walked that were there to walk; a linked
+    /// playlist file under one of them that the scan didn't find is gone.
+    pub walked_roots: Vec<PathBuf>,
     pub artwork_albums: usize,
     pub remote_art_fetches: usize,
     pub discovery_ms: u128,
@@ -1041,6 +1047,40 @@ impl CollectionScanner {
         if is_folder_added {
             report.external_changes = 0;
         }
+        // After the songs are saved, so the playlists' entries can match them.
+        // The playlists lock is taken per file, so a library with a playlist
+        // in every folder doesn't hold up Play for the whole pass (#1807).
+        if let Some(state) = app.try_state::<crate::AppState>() {
+            let paths = self
+                .db
+                .pool
+                .get()
+                .map_err(anyhow::Error::from)
+                .and_then(|conn| {
+                    crate::playlist::file_sync::scanned_playlist_files(
+                        &conn,
+                        &report.playlist_files,
+                        &report.walked_roots,
+                    )
+                });
+            match paths {
+                Ok(paths) => {
+                    let mut synced = crate::playlist::file_sync::FileSyncReport::default();
+                    for path in paths {
+                        match crate::playlist::with_playlists(&state.playlists, move |pm| {
+                            pm.sync_playlist_files(&[path])
+                        })
+                        .await
+                        {
+                            Ok(one) => synced.merge(one),
+                            Err(e) => log::warn!("Couldn't sync a library playlist file: {e}"),
+                        }
+                    }
+                    crate::playlist::file_sync::announce(&app, &synced);
+                }
+                Err(e) => log::warn!("Couldn't list library playlist files to sync: {e}"),
+            }
+        }
         let summary = report.summary(trigger);
         log::info!("{summary}");
         crate::diagnostics::record_operation(&summary);
@@ -1366,6 +1406,9 @@ impl CollectionScanner {
         let mut all_paths: Vec<PathBuf> = Vec::new();
         let mut cue_paths: Vec<PathBuf> = Vec::new();
         for (dir, walk_root) in self.walk_roots(&dirs) {
+            if walk_root.is_dir() {
+                report.walked_roots.push(walk_root.clone());
+            }
             let dir_name = directory_display_name(dir);
             on_progress(ScanProgress {
                 phase: ScanPhase::Discovering,
@@ -1390,6 +1433,8 @@ impl CollectionScanner {
                     all_paths.push(path);
                 } else if is_cue_file(&path) {
                     cue_paths.push(path);
+                } else if crate::playlist::file_sync::is_playlist_file(&path) {
+                    report.playlist_files.push(path);
                 }
             }
         }

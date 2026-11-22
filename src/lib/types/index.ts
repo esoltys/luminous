@@ -274,6 +274,12 @@ export interface Playlist {
   is_queue: boolean;
   /** True for system-managed auto-playlists; false for user custom and Smart Playlists (#2136). */
   is_system?: boolean;
+  /** The playlist file in a library folder this playlist is kept in sync with
+   * (#2280); absent/null for a playlist that lives only in Luminous. */
+  source_path?: string | null;
+  /** Both the playlist and its file changed since they last agreed; nothing is
+   * written to either until the user keeps one (`resolve_playlist_file_conflict`). */
+  source_conflict?: boolean;
   /** Size budget for the songs at the top of the playlist, in bytes (#344). */
   size_limit_bytes?: number | null;
   /** The device (a device profile id) the limit is measured for, in its

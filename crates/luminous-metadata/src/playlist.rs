@@ -36,6 +36,103 @@ impl PlaylistFormat {
 pub struct ParsedPlaylist {
     pub title: Option<String>,
     pub tracks: Vec<ParsedTrack>,
+    /// How the file was laid out, so a rewrite can keep it that way.
+    pub style: FileStyle,
+}
+
+/// The text encoding a playlist file was read in. Players differ in what
+/// they write (Winamp-era `.m3u` files are often Latin-1 or UTF-16), and a
+/// rewrite in another encoding can leave the file unreadable to the player
+/// that made it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextEncoding {
+    #[default]
+    Utf8,
+    Utf8Bom,
+    Utf16Le,
+    Utf16LeNoBom,
+    Utf16Be,
+    /// Bytes that aren't valid UTF-8, read one byte per character.
+    Latin1,
+}
+
+/// How a playlist file is laid out on disk: everything a rewrite must keep
+/// for the program that wrote it to read it the same way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct FileStyle {
+    pub encoding: TextEncoding,
+    pub line_ending: LineEnding,
+    /// Track locations are relative to the playlist file's folder.
+    pub relative: bool,
+    /// Track locations separate folders with a backslash.
+    pub backslash: bool,
+}
+
+/// Decodes playlist file bytes, reporting the encoding they were in.
+pub fn decode_text(bytes: &[u8]) -> (String, TextEncoding) {
+    let utf16 = |units: &[u8], le: bool| -> String {
+        let u16_units: Vec<u16> = units
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| {
+                if le {
+                    u16::from_le_bytes(*c)
+                } else {
+                    u16::from_be_bytes(*c)
+                }
+            })
+            .collect();
+        String::from_utf16_lossy(&u16_units)
+    };
+    if let Some(rest) = bytes.strip_prefix(&[0xFF, 0xFE]) {
+        (utf16(rest, true), TextEncoding::Utf16Le)
+    } else if let Some(rest) = bytes.strip_prefix(&[0xFE, 0xFF]) {
+        (utf16(rest, false), TextEncoding::Utf16Be)
+    } else if let Some(rest) = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]) {
+        (
+            String::from_utf8_lossy(rest).into_owned(),
+            TextEncoding::Utf8Bom,
+        )
+    } else if bytes.len() >= 4 && bytes.iter().skip(1).step_by(2).all(|&b| b == 0) {
+        (utf16(bytes, true), TextEncoding::Utf16LeNoBom)
+    } else {
+        match std::str::from_utf8(bytes) {
+            Ok(s) => (s.to_string(), TextEncoding::Utf8),
+            Err(_) => (
+                bytes.iter().map(|&b| b as char).collect(),
+                TextEncoding::Latin1,
+            ),
+        }
+    }
+}
+
+/// Encodes `text` the way [`decode_text`] read it. A character Latin-1
+/// can't hold is written as `?`.
+pub fn encode_text(text: &str, encoding: TextEncoding) -> Vec<u8> {
+    let utf16 = |bom: &[u8], le: bool| -> Vec<u8> {
+        let mut out = bom.to_vec();
+        for unit in text.encode_utf16() {
+            out.extend(if le {
+                unit.to_le_bytes()
+            } else {
+                unit.to_be_bytes()
+            });
+        }
+        out
+    };
+    match encoding {
+        TextEncoding::Utf8 => text.as_bytes().to_vec(),
+        TextEncoding::Utf8Bom => [&[0xEF, 0xBB, 0xBF][..], text.as_bytes()].concat(),
+        TextEncoding::Utf16Le => utf16(&[0xFF, 0xFE], true),
+        TextEncoding::Utf16LeNoBom => utf16(&[], true),
+        TextEncoding::Utf16Be => utf16(&[0xFE, 0xFF], false),
+        TextEncoding::Latin1 => text
+            .chars()
+            .map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?'))
+            .collect(),
+    }
 }
 
 fn percent_decode(s: &str) -> String {
@@ -96,55 +193,55 @@ pub fn parse_playlist<P: AsRef<Path>>(file_path: P) -> Result<ParsedPlaylist> {
 
     let bytes = std::fs::read(path)
         .map_err(|e| anyhow!("Failed to read playlist file '{}': {}", path.display(), e))?;
+    parse_playlist_bytes(&bytes, format)
+}
 
-    let raw_content = if bytes.starts_with(&[0xFF, 0xFE]) {
-        // UTF-16LE with BOM
-        let u16_units: Vec<u16> = bytes[2..]
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|c| u16::from_le_bytes(*c))
-            .collect();
-        String::from_utf16_lossy(&u16_units)
-    } else if bytes.starts_with(&[0xFE, 0xFF]) {
-        // UTF-16BE with BOM
-        let u16_units: Vec<u16> = bytes[2..]
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|c| u16::from_be_bytes(*c))
-            .collect();
-        String::from_utf16_lossy(&u16_units)
-    } else if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
-        // UTF-8 with BOM
-        String::from_utf8_lossy(&bytes[3..]).into_owned()
-    } else if bytes.len() >= 4 && bytes.iter().step_by(2).skip(1).all(|&b| b == 0) {
-        // UTF-16LE without BOM
-        let u16_units: Vec<u16> = bytes
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|c| u16::from_le_bytes(*c))
-            .collect();
-        String::from_utf16_lossy(&u16_units)
-    } else {
-        // Standard UTF-8 / ANSI / ISO-8859-1
-        String::from_utf8_lossy(&bytes).into_owned()
-    };
-
+/// Parses the bytes of a playlist file in `format`, detecting its
+/// [`FileStyle`] along the way.
+pub fn parse_playlist_bytes(bytes: &[u8], format: PlaylistFormat) -> Result<ParsedPlaylist> {
+    let (raw_content, encoding) = decode_text(bytes);
     let content = raw_content.strip_prefix('\u{feff}').unwrap_or(&raw_content);
 
-    match format {
-        PlaylistFormat::M3u | PlaylistFormat::M3u8 => Ok(ParsedPlaylist {
-            title: None,
-            tracks: parse_m3u(content),
-        }),
-        PlaylistFormat::Pls => Ok(ParsedPlaylist {
-            title: None,
-            tracks: parse_pls(content),
-        }),
-        PlaylistFormat::Xspf => parse_xspf(content),
-    }
+    let (title, tracks) = match format {
+        PlaylistFormat::M3u | PlaylistFormat::M3u8 => (None, parse_m3u(content)),
+        PlaylistFormat::Pls => (None, parse_pls(content)),
+        PlaylistFormat::Xspf => {
+            let parsed = parse_xspf(content)?;
+            (parsed.title, parsed.tracks)
+        }
+    };
+
+    let local: Vec<&str> = tracks
+        .iter()
+        .map(|t| t.path_or_url.as_str())
+        .filter(|p| !is_http_url(p))
+        .collect();
+    let relative_count = local.iter().filter(|p| is_relative_location(p)).count();
+    let backslash_count = local.iter().filter(|p| p.contains('\\')).count();
+    let style = FileStyle {
+        encoding,
+        line_ending: if content.contains("\r\n") {
+            LineEnding::CrLf
+        } else {
+            LineEnding::Lf
+        },
+        relative: relative_count * 2 > local.len(),
+        backslash: backslash_count * 2 > local.len(),
+    };
+    Ok(ParsedPlaylist {
+        title,
+        tracks,
+        style,
+    })
+}
+
+/// Whether a track location is relative on any platform: `C:\Music`,
+/// `\\server\share` and `/music` are all absolute, whichever OS reads the
+/// playlist.
+fn is_relative_location(location: &str) -> bool {
+    let b = location.as_bytes();
+    let drive = b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':';
+    !(drive || location.starts_with('/') || location.starts_with('\\'))
 }
 
 /// Parses M3U / M3U8 content.
@@ -348,6 +445,7 @@ pub fn parse_xspf(content: &str) -> Result<ParsedPlaylist> {
     Ok(ParsedPlaylist {
         title: playlist_title,
         tracks,
+        style: FileStyle::default(),
     })
 }
 
@@ -383,7 +481,8 @@ pub struct PlaylistEntry<'a> {
     pub duration_sec: Option<i64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum LineEnding {
     #[default]
     Lf,
@@ -408,39 +507,66 @@ pub fn export_playlist(
     export_path: &Path,
     relative: bool,
 ) -> Result<String> {
-    let base_dir = export_path.parent();
-
-    let format_path = |track_path: &Path| -> String {
-        let raw = track_path.to_string_lossy();
-        if is_http_url(&raw) {
-            return raw.into_owned();
-        }
-        if relative {
-            if let Some(base) = base_dir {
-                if let Ok(rel) = pathdiff::diff_paths(track_path, base) {
-                    return rel.to_string_lossy().replace('\\', "/");
-                }
-            }
-        }
-        raw.into_owned()
+    let style = FileStyle {
+        relative,
+        ..FileStyle::default()
     };
-
-    let entries: Vec<PlaylistEntry> = tracks
-        .iter()
-        .map(|track| PlaylistEntry {
-            location: format_path(track.path),
-            title: track.title,
-            artist: track.artist,
-            album: track.album,
-            duration_sec: track.duration_sec,
-        })
-        .collect();
+    let entries = entries_in_style(tracks, export_path, &style);
     Ok(render_playlist(
         playlist_name,
         &entries,
         format,
         LineEnding::Lf,
     ))
+}
+
+/// The bytes of a playlist file at `playlist_path` holding `tracks`, laid
+/// out in `style`: its encoding, line endings, and relative or absolute
+/// locations with the folder separator it used. Rewriting a file with the
+/// style [`parse_playlist_bytes`] detected keeps it readable by the program
+/// that wrote it.
+pub fn playlist_file_bytes(
+    playlist_name: &str,
+    tracks: &[ExportTrack],
+    format: PlaylistFormat,
+    playlist_path: &Path,
+    style: &FileStyle,
+) -> Vec<u8> {
+    let entries = entries_in_style(tracks, playlist_path, style);
+    let text = render_playlist(playlist_name, &entries, format, style.line_ending);
+    encode_text(&text, style.encoding)
+}
+
+fn entries_in_style<'a>(
+    tracks: &[ExportTrack<'a>],
+    playlist_path: &Path,
+    style: &FileStyle,
+) -> Vec<PlaylistEntry<'a>> {
+    let base_dir = playlist_path.parent();
+    let separator = if style.backslash { "\\" } else { "/" };
+    let location = |track_path: &Path| -> String {
+        let raw = track_path.to_string_lossy();
+        if is_http_url(&raw) {
+            return raw.into_owned();
+        }
+        if style.relative {
+            if let Some(rel) = base_dir.and_then(|base| pathdiff::diff_paths(track_path, base).ok())
+            {
+                return rel.to_string_lossy().replace(['\\', '/'], separator);
+            }
+        }
+        raw.into_owned()
+    };
+    tracks
+        .iter()
+        .map(|track| PlaylistEntry {
+            location: location(track.path),
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            duration_sec: track.duration_sec,
+        })
+        .collect()
 }
 
 /// The text of a playlist in `format`, every line ended with `line_ending`.
@@ -774,5 +900,88 @@ Length2=150
         let reparsed = parse_pls(&exported_pls);
         assert_eq!(reparsed.len(), 1);
         assert_eq!(reparsed[0].path_or_url, url);
+    }
+
+    #[test]
+    fn every_encoding_round_trips_through_decode_and_encode() {
+        let text = "#EXTM3U\nCafé/Ünïcode.mp3\n";
+        for encoding in [
+            TextEncoding::Utf8,
+            TextEncoding::Utf8Bom,
+            TextEncoding::Utf16Le,
+            TextEncoding::Utf16LeNoBom,
+            TextEncoding::Utf16Be,
+            TextEncoding::Latin1,
+        ] {
+            let bytes = encode_text(text, encoding);
+            assert_eq!(
+                decode_text(&bytes),
+                (text.to_string(), encoding),
+                "{encoding:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn latin1_bytes_decode_to_their_characters_instead_of_replacement_marks() {
+        // "Café.mp3" as Windows-1252/Latin-1: é is the single byte 0xE9.
+        let bytes = b"Caf\xE9.mp3\n";
+        let (text, encoding) = decode_text(bytes);
+        assert_eq!(text, "Café.mp3\n");
+        assert_eq!(encoding, TextEncoding::Latin1);
+    }
+
+    #[test]
+    fn parse_detects_the_file_style_and_a_rewrite_keeps_it() {
+        let original = "#EXTM3U\r\n#EXTINF:10,A - One\r\nAlbum\\01.mp3\r\n#EXTINF:20,B - Two\r\nAlbum\\02.mp3\r\n";
+        let bytes = encode_text(original, TextEncoding::Utf16Le);
+        let parsed = parse_playlist_bytes(&bytes, PlaylistFormat::M3u).unwrap();
+        assert_eq!(
+            parsed.style,
+            FileStyle {
+                encoding: TextEncoding::Utf16Le,
+                line_ending: LineEnding::CrLf,
+                relative: true,
+                backslash: true,
+            }
+        );
+
+        let dir = std::env::temp_dir().join("lum-style");
+        let playlist_path = dir.join("mix.m3u");
+        let one = dir.join("Album").join("01.mp3");
+        let two = dir.join("Album").join("02.mp3");
+        let tracks = [
+            ExportTrack {
+                path: &one,
+                title: Some("One"),
+                artist: Some("A"),
+                album: None,
+                duration_sec: Some(10),
+            },
+            ExportTrack {
+                path: &two,
+                title: Some("Two"),
+                artist: Some("B"),
+                album: None,
+                duration_sec: Some(20),
+            },
+        ];
+        let rewritten = playlist_file_bytes(
+            "mix",
+            &tracks,
+            PlaylistFormat::M3u,
+            &playlist_path,
+            &parsed.style,
+        );
+        assert_eq!(rewritten, bytes);
+    }
+
+    #[test]
+    fn absolute_locations_from_any_platform_are_not_relative() {
+        for location in ["C:\\Music\\a.mp3", "\\\\nas\\music\\a.mp3", "/music/a.mp3"] {
+            assert!(!is_relative_location(location), "{location}");
+        }
+        assert!(is_relative_location("../a.mp3"));
+        assert!(is_relative_location("a.mp3"));
     }
 }

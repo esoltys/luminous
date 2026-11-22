@@ -1,12 +1,17 @@
 //! Playlist import (`.m3u`/`.pls`/etc.) and export. Split out of `playlist.rs`
 //! (#577 item 18) — a second `impl PlaylistManager` block alongside the one
 //! in `playlist.rs` that owns CRUD/auto-playlist-sync/dynamic-playlist logic.
+//! The resolve/replace helpers here are shared with `file_sync`, which keeps
+//! playlist files in library folders in sync with their playlists (#2280).
 
 use super::snapshot::{strip_snapshot, TrackSnapshot};
 use super::PlaylistManager;
-use crate::models::Playlist;
+use crate::models::{Playlist, PlaylistItem};
 use anyhow::{anyhow, Result};
+use luminous_metadata::playlist::{ExportTrack, ParsedTrack};
 use rusqlite::params;
+use std::collections::{HashMap, VecDeque};
+use std::path::Path;
 use uuid::Uuid;
 
 /// Normalize a path to the same form used for `songs.path` in the DB, so an
@@ -17,7 +22,7 @@ use uuid::Uuid;
 /// matches how `collection.rs` stores paths); if the path doesn't exist on
 /// disk yet, or lives on a mapped network drive, falls back to lexically
 /// collapsing `.`/`..` components without touching the filesystem.
-fn clean_path<P: AsRef<std::path::Path>>(path: P) -> std::path::PathBuf {
+pub(super) fn clean_path<P: AsRef<std::path::Path>>(path: P) -> std::path::PathBuf {
     let p = path.as_ref();
     if let Ok(canonical) = std::fs::canonicalize(p) {
         let s = canonical.to_string_lossy();
@@ -99,121 +104,283 @@ fn match_library_song(
     .ok()
 }
 
-impl PlaylistManager {
-    /// Parse an `.m3u`/`.pls`/etc. playlist file (format detected from the
-    /// extension) and create a new playlist from it. Each track is matched
-    /// against the library first by cleaned path (relative entries resolved
-    /// against the playlist file's own directory), then by title+artist(+
-    /// duration) tag metadata as a fallback. Tracks that still don't match
-    /// any library song are added anyway with `song_id = NULL`, preserving
-    /// their title/artist/album/path in `additional_metadata` — nothing
-    /// from the source file is silently dropped.
-    pub fn import_playlist<P: AsRef<std::path::Path>>(&mut self, file_path: P) -> Result<Playlist> {
-        use luminous_metadata::playlist;
+/// One entry of a playlist file, resolved against the library.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct ResolvedEntry {
+    /// The library song (or radio station row) the entry is, if any.
+    pub song_id: Option<i64>,
+    /// Where the entry points, relative locations resolved against the
+    /// playlist file's folder: what the playlist item keeps as its `url`.
+    pub url: String,
+    /// For an entry the library doesn't have, what the file said about it
+    /// (a `TrackSnapshot`), so it still shows and can be relinked later.
+    pub snapshot: Option<String>,
+}
 
-        let path = file_path.as_ref();
-        let parsed = playlist::parse_playlist(path)?;
+/// Resolves the entries of the playlist file at `playlist_path`: a stream URL
+/// becomes a radio station row, and a file is matched to a library song by
+/// path, then by title + artist (+ duration). Nothing is dropped — an entry
+/// that matches nothing comes back with `song_id: None` and a snapshot.
+pub(super) fn resolve_entries(
+    conn: &rusqlite::Connection,
+    tracks: &[ParsedTrack],
+    playlist_path: &Path,
+) -> Result<Vec<ResolvedEntry>> {
+    use luminous_metadata::playlist;
 
-        let playlist_name = parsed.title.unwrap_or_else(|| {
-            path.file_stem()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_else(|| "Imported Playlist".to_string())
-        });
-
-        let playlist = self.create_playlist(&playlist_name)?;
-        let base_dir = path.parent();
-
-        let conn = self.db.pool.get()?;
-
-        for (pos, track) in parsed.tracks.iter().enumerate() {
-            if playlist::is_http_url(&track.path_or_url) {
-                let song = crate::radio_directory::upsert_stream_station(
-                    &conn,
-                    &track.path_or_url,
-                    track.title.as_deref(),
-                    None,
-                )?;
-                let uuid = Uuid::new_v4().to_string();
-                let item_url = song.path.as_deref().unwrap_or(&track.path_or_url);
-                conn.execute(
-                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url)
-                     VALUES (?1, ?2, ?3, ?4, 0, ?5)",
-                    params![playlist.id, song.id, pos as i32, uuid, item_url],
-                )?;
-                continue;
-            }
-
-            let mut resolved_path = std::path::PathBuf::from(&track.path_or_url);
-            if resolved_path.is_relative() {
-                if let Some(base) = base_dir {
-                    resolved_path = base.join(&resolved_path);
-                }
-            }
-
-            let cleaned_path = clean_path(&resolved_path);
-            let path_str = cleaned_path.to_string_lossy().to_string();
-
-            // Read metadata tags from file if missing from playlist track entry
-            let mut title = track.title.clone();
-            let mut artist = track.artist.clone();
-            let mut album = track.album.clone();
-
-            if (title.is_none() || artist.is_none()) && cleaned_path.is_file() {
-                if let Ok(meta) = luminous_metadata::audio::read_tags(&cleaned_path) {
-                    if title.is_none() {
-                        title = meta.title;
-                    }
-                    if artist.is_none() {
-                        artist = meta.artist;
-                    }
-                    if album.is_none() {
-                        album = meta.album;
-                    }
-                }
-            }
-
-            if title.is_none() && cleaned_path.is_file() {
-                title = cleaned_path
-                    .file_stem()
-                    .map(|s| s.to_string_lossy().to_string());
-            }
-
-            let matched_song_id = match_library_song(
-                &conn,
-                &[&path_str, &track.path_or_url],
+    let base_dir = playlist_path.parent();
+    let mut entries = Vec::with_capacity(tracks.len());
+    for track in tracks {
+        if playlist::is_http_url(&track.path_or_url) {
+            let song = crate::radio_directory::upsert_stream_station(
+                conn,
+                &track.path_or_url,
+                track.title.as_deref(),
                 None,
-                title.as_deref(),
-                artist.as_deref(),
-                track.duration_sec,
-            );
-
-            let uuid = Uuid::new_v4().to_string();
-
-            if let Some(song_id) = matched_song_id {
-                conn.execute(
-                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url)
-                     VALUES (?1, ?2, ?3, ?4, 0, ?5)",
-                    params![playlist.id, song_id, pos as i32, uuid, path_str],
-                )?;
-            } else {
-                // Keep what the playlist file said about the track, so it still
-                // shows, and can be relinked, although nothing matched.
-                let snapshot = TrackSnapshot {
-                    title,
-                    artist,
-                    album,
-                    path: Some(path_str.clone()),
-                    duration_sec: track.duration_sec,
-                    beginning_nanosec: 0,
-                };
-                conn.execute(
-                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url, additional_metadata)
-                     VALUES (?1, NULL, ?2, ?3, 0, ?4, ?5)",
-                    params![playlist.id, pos as i32, uuid, path_str, snapshot.to_json()],
-                )?;
-            }
+            )?;
+            entries.push(ResolvedEntry {
+                song_id: Some(song.id),
+                url: song.path.unwrap_or_else(|| track.path_or_url.clone()),
+                snapshot: None,
+            });
+            continue;
         }
 
+        // A playlist written on Windows separates folders with `\`, which
+        // only Windows reads as a separator; elsewhere the whole location
+        // would be one file name. The parsed text keeps its `\` so the
+        // file's style (`FileStyle::backslash`) survives a rewrite.
+        let location = if cfg!(windows) {
+            track.path_or_url.clone()
+        } else {
+            track.path_or_url.replace('\\', "/")
+        };
+        let mut resolved_path = std::path::PathBuf::from(&location);
+        if resolved_path.is_relative() {
+            if let Some(base) = base_dir {
+                resolved_path = base.join(&resolved_path);
+            }
+        }
+        let cleaned_path = clean_path(&resolved_path);
+        let path_str = cleaned_path.to_string_lossy().to_string();
+        let paths = [path_str.as_str(), track.path_or_url.as_str()];
+
+        // Path first: it settles almost every entry without opening the file.
+        if let Some(song_id) = match_library_song(conn, &paths, None, None, None, None) {
+            entries.push(ResolvedEntry {
+                song_id: Some(song_id),
+                url: path_str,
+                snapshot: None,
+            });
+            continue;
+        }
+
+        let mut title = track.title.clone();
+        let mut artist = track.artist.clone();
+        let mut album = track.album.clone();
+        if (title.is_none() || artist.is_none()) && cleaned_path.is_file() {
+            if let Ok(meta) = luminous_metadata::audio::read_tags(&cleaned_path) {
+                title = title.or(meta.title);
+                artist = artist.or(meta.artist);
+                album = album.or(meta.album);
+            }
+        }
+        if title.is_none() && cleaned_path.is_file() {
+            title = cleaned_path
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string());
+        }
+
+        let song_id = match_library_song(
+            conn,
+            &paths,
+            None,
+            title.as_deref(),
+            artist.as_deref(),
+            track.duration_sec,
+        );
+        let snapshot = song_id.is_none().then(|| {
+            TrackSnapshot {
+                title,
+                artist,
+                album,
+                path: Some(path_str.clone()),
+                duration_sec: track.duration_sec,
+                beginning_nanosec: 0,
+            }
+            .to_json()
+        });
+        entries.push(ResolvedEntry {
+            song_id,
+            url: path_str,
+            snapshot,
+        });
+    }
+    Ok(entries)
+}
+
+/// Replaces `playlist_id`'s items with `entries`, in order. An item already
+/// in the playlist for the same song (or, for one not in the library, the
+/// same location) keeps its uuid and its other item keys, so re-reading a
+/// changed playlist file doesn't disturb what Luminous remembers about the
+/// tracks that stayed. Doesn't touch the playlist row itself. Run it inside
+/// a transaction: it deletes before it inserts.
+pub(super) fn replace_items(
+    tx: &rusqlite::Connection,
+    playlist_id: i64,
+    entries: &[ResolvedEntry],
+) -> Result<()> {
+    // Each key's existing items, in order, as (uuid, additional_metadata).
+    type Kept = VecDeque<(String, Option<String>)>;
+    let mut kept: HashMap<(Option<i64>, String), Kept> = HashMap::new();
+    {
+        let mut stmt = tx.prepare(
+            "SELECT song_id, url, uuid, additional_metadata FROM playlist_items
+             WHERE playlist_id = ?1 ORDER BY position",
+        )?;
+        let rows = stmt.query_map(params![playlist_id], |r| {
+            Ok((
+                r.get::<_, Option<i64>>(0)?,
+                r.get::<_, Option<String>>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, Option<String>>(3)?,
+            ))
+        })?;
+        for row in rows {
+            let (song_id, url, uuid, meta) = row?;
+            let key = entry_key(song_id, url.as_deref().unwrap_or_default());
+            kept.entry(key).or_default().push_back((uuid, meta));
+        }
+    }
+    tx.execute(
+        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+        params![playlist_id],
+    )?;
+    {
+        let mut insert = tx.prepare(
+            "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url, additional_metadata)
+             VALUES (?1, ?2, ?3, ?4, 0, ?5, ?6)",
+        )?;
+        for (pos, entry) in entries.iter().enumerate() {
+            let previous = kept
+                .get_mut(&entry_key(entry.song_id, &entry.url))
+                .and_then(VecDeque::pop_front);
+            let (uuid, meta) = match previous {
+                // A library song's snapshot keys are stale once it is matched.
+                Some((uuid, meta)) if entry.song_id.is_some() => {
+                    (uuid, meta.as_deref().and_then(strip_snapshot))
+                }
+                Some((uuid, _)) => (uuid, entry.snapshot.clone()),
+                None => (Uuid::new_v4().to_string(), entry.snapshot.clone()),
+            };
+            insert.execute(params![
+                playlist_id,
+                entry.song_id,
+                pos as i32,
+                uuid,
+                entry.url,
+                meta
+            ])?;
+        }
+    }
+    Ok(())
+}
+
+/// What identifies an item across a re-read: its song, or for one not in
+/// the library, its location.
+pub(super) fn entry_key(song_id: Option<i64>, url: &str) -> (Option<i64>, String) {
+    match song_id {
+        Some(id) => (Some(id), String::new()),
+        None => (None, crate::library_paths::key(url)),
+    }
+}
+
+/// The playlist's items as tracks to write to a playlist file. A radio
+/// station is written as its stream URL, not its internal `radio://` id; an
+/// item not in the library keeps the location it was imported with.
+pub(super) fn export_tracks(items: &[PlaylistItem]) -> Vec<ExportTrack<'_>> {
+    items
+        .iter()
+        .filter_map(|item| {
+            let Some(song) = &item.song else {
+                return item.url.as_ref().map(|url| ExportTrack {
+                    path: Path::new(url),
+                    title: None,
+                    artist: None,
+                    album: None,
+                    duration_sec: None,
+                });
+            };
+            let is_radio_uri = song
+                .path
+                .as_deref()
+                .is_some_and(|p| p.starts_with(crate::media_source::RADIO_URI_SCHEME));
+            let location = if is_radio_uri || song.source.is_live_stream() {
+                song.stream_url
+                    .as_deref()
+                    .or(song.path.as_deref())
+                    .or(item.url.as_deref())?
+            } else {
+                song.path.as_deref().or(item.url.as_deref())?
+            };
+            Some(ExportTrack {
+                path: Path::new(location),
+                title: song.title.as_deref(),
+                artist: song.artist.as_deref(),
+                album: song.album.as_deref(),
+                duration_sec: song.length_nanosec.map(|ns| ns / 1_000_000_000),
+            })
+        })
+        .collect()
+}
+
+/// The name a playlist read from the file at `path` gets: the file's own
+/// title (XSPF), else its file name without extension. A name reserved for
+/// the built-in Queue keeps its extension, so a `Queue.m3u` still imports.
+pub(super) fn playlist_name_for(path: &Path, title: Option<String>) -> String {
+    let stem = || {
+        path.file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "Imported Playlist".to_string())
+    };
+    let name = title.filter(|t| !t.trim().is_empty()).unwrap_or_else(stem);
+    if super::is_reserved_playlist_name(&name) {
+        path.file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "Imported Playlist".to_string())
+    } else {
+        name
+    }
+}
+
+impl PlaylistManager {
+    /// Parse an `.m3u`/`.pls`/etc. playlist file (format detected from the
+    /// extension) and create a new playlist from it, resolving each entry
+    /// with [`resolve_entries`]. A file inside a library folder becomes a
+    /// file-backed playlist kept in sync with it (see `file_sync`); importing
+    /// one that already is returns its playlist instead of a duplicate.
+    pub fn import_playlist<P: AsRef<std::path::Path>>(&mut self, file_path: P) -> Result<Playlist> {
+        use luminous_metadata::playlist::{self, PlaylistFormat};
+
+        let path = file_path.as_ref();
+        if let Some(id) = self.import_library_playlist_file(path)? {
+            return self
+                .get_playlists()?
+                .into_iter()
+                .find(|p| p.id == id)
+                .ok_or_else(|| anyhow!("Imported playlist {id} not found"));
+        }
+
+        let format = PlaylistFormat::from_path(path)
+            .ok_or_else(|| anyhow!("Unsupported playlist format: {}", path.display()))?;
+        let bytes = std::fs::read(path)?;
+        let parsed = playlist::parse_playlist_bytes(&bytes, format)?;
+        let playlist = self.create_playlist(&playlist_name_for(path, parsed.title))?;
+        let conn = self.db.pool.get()?;
+        let entries = resolve_entries(&conn, &parsed.tracks, path)?;
+        let tx = conn.unchecked_transaction()?;
+        replace_items(&tx, playlist.id, &entries)?;
+        tx.commit()?;
         Ok(playlist)
     }
 
@@ -271,14 +438,16 @@ impl PlaylistManager {
     /// from its extension (fails if unsupported). `relative` controls
     /// whether track paths are written relative to `export_path`'s
     /// directory or as absolute paths — matters for moving the exported
-    /// file to another machine/directory alongside its music.
+    /// file to another machine/directory alongside its music. A file written
+    /// into a library folder is linked to the playlist (see `file_sync`), so
+    /// the next scan keeps the two in sync instead of importing a twin.
     pub fn export_playlist<P: AsRef<std::path::Path>>(
         &self,
         playlist_id: i64,
         export_path: P,
         relative: bool,
     ) -> Result<()> {
-        use luminous_metadata::playlist::{self, ExportTrack, PlaylistFormat};
+        use luminous_metadata::playlist::{self, FileStyle, PlaylistFormat};
 
         let path = export_path.as_ref();
         let format = PlaylistFormat::from_path(path).ok_or_else(|| {
@@ -294,59 +463,24 @@ impl PlaylistManager {
             params![playlist_id],
             |row| row.get(0),
         )?;
-        // `get_playlist_tracks` takes its own connection.
-        drop(conn);
-
-        let items = self.get_playlist_tracks(playlist_id)?;
-        let export_tracks: Vec<ExportTrack> = items
-            .iter()
-            .filter_map(|item| {
-                if let Some(ref song) = item.song {
-                    let is_radio_uri = song
-                        .path
-                        .as_deref()
-                        .is_some_and(|p| p.starts_with(crate::media_source::RADIO_URI_SCHEME));
-                    let p = if is_radio_uri || song.source.is_live_stream() {
-                        if let Some(ref stream_url) = song.stream_url {
-                            std::path::Path::new(stream_url)
-                        } else if let Some(ref path) = song.path {
-                            std::path::Path::new(path)
-                        } else {
-                            std::path::Path::new(item.url.as_ref()?)
-                        }
-                    } else if let Some(ref path) = song.path {
-                        std::path::Path::new(path)
-                    } else {
-                        std::path::Path::new(item.url.as_ref()?)
-                    };
-                    let dur_sec = song.length_nanosec.map(|ns| ns / 1_000_000_000);
-                    Some(ExportTrack {
-                        path: p,
-                        title: song.title.as_deref(),
-                        artist: song.artist.as_deref(),
-                        album: song.album.as_deref(),
-                        duration_sec: dur_sec,
-                    })
-                } else {
-                    item.url.as_ref().map(|url| ExportTrack {
-                        path: std::path::Path::new(url),
-                        title: None,
-                        artist: None,
-                        album: None,
-                        duration_sec: None,
-                    })
-                }
-            })
-            .collect();
-
-        let content =
-            playlist::export_playlist(&playlist_name, &export_tracks, format, path, relative)?;
+        let items = Self::get_playlist_tracks_from_conn(&conn, playlist_id)?;
+        let style = FileStyle {
+            relative,
+            ..FileStyle::default()
+        };
+        let bytes = playlist::playlist_file_bytes(
+            &playlist_name,
+            &export_tracks(&items),
+            format,
+            path,
+            &style,
+        );
 
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(path, content)?;
-
+        std::fs::write(path, &bytes)?;
+        self.link_exported_file(&conn, playlist_id, path, &bytes, &style)?;
         Ok(())
     }
 }

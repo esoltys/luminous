@@ -119,6 +119,7 @@ percent-encoding = "2"
 rayon = "1"
 md-5 = "0.11"
 sha2 = "0.11"
+trash = "5"
 
 [features]
 # Non-release capture build flavor: enables the remote devtools CDP port (9222)

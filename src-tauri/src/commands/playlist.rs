@@ -424,6 +424,20 @@ pub async fn export_playlist(
     .await
 }
 
+/// Ends a file-backed playlist's conflict by keeping `keep` (`"luminous"` or
+/// `"file"`), then announces the playlist as changed (#2280).
+#[tauri::command]
+pub async fn resolve_playlist_file_conflict(
+    playlist_id: i64,
+    keep: crate::playlist::file_sync::KeepSide,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let report = with_playlists(&state, |pm| pm.resolve_file_conflict(playlist_id, keep)).await?;
+    crate::playlist::file_sync::announce(&app, &report);
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn set_playlist_dynamic_spec(
     playlist_id: i64,

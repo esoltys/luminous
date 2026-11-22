@@ -1265,6 +1265,10 @@ export const de = {
     tableHeaderDuration: "Dauer",
     tableHeaderRemove: "Entfernen",
     confirmDeletePlaylist: "Soll die Wiedergabeliste „{name}“ wirklich gelöscht werden?",
+    confirmDeleteFilePlaylist:
+      "Wiedergabeliste „{name}“ löschen? Ihre Datei {path} wird in den Papierkorb verschoben.",
+    fileTrashFailed:
+      "{path} konnte nicht in den Papierkorb verschoben werden, daher wurde die Wiedergabeliste nicht gelöscht. Lösche die Datei selbst und danach die Wiedergabeliste.",
     confirmDeletePlaylistTitle: "Wiedergabeliste löschen",
     cancel: "Abbrechen",
     playTrack: "Titel abspielen",
@@ -1464,6 +1468,17 @@ export const de = {
     smartRulePlaylistLabel: "Regelbasierte Wiedergabeliste",
     smartRuleBasedTooltip: "Intelligente regelbasierte Wiedergabeliste",
     smartBadgeLabel: "Intelligent",
+    fileBadgeLabel: "Datei",
+    fileBadgeTooltip: "Mit {path} synchronisiert",
+    fileConflictBadgeTooltip:
+      "In Luminous und in {path} geändert. Öffne die Wiedergabeliste, um zu wählen, welche Fassung bleibt",
+    fileConflictToast:
+      "„{name}“ wurde sowohl in Luminous als auch in der Datei geändert. Wähle, welche Fassung bleibt.",
+    fileConflictShowBtn: "Auswählen",
+    fileConflictBanner:
+      "Diese Wiedergabeliste und ihre Datei ({path}) wurden beide geändert. Behalte eine Fassung; die andere wird ersetzt.",
+    fileConflictKeepLuminous: "Fassung aus Luminous behalten",
+    fileConflictKeepFile: "Fassung aus der Datei behalten",
     saveRenameTooltip: "Speichern",
     historyCleared: "Wiedergabeverlauf gelöscht",
     saveQueueNameLabel: "Name der Wiedergabeliste",

@@ -3,7 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { Playlist, PlaylistItem, Song } from "../types";
 
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { PlaylistsStore, playlistsStore } from "./playlists.svelte";
+
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  revealItemInDir: vi.fn().mockResolvedValue(undefined),
+}));
 
 describe("PlaylistsStore", () => {
   let eventCallbacks: Record<string, Function> = {};
@@ -565,6 +570,81 @@ describe("PlaylistsStore", () => {
       await vi.advanceTimersByTimeAsync(300);
 
       expect(invoke).toHaveBeenCalledWith("get_favourite_songs");
+    });
+
+    it("asks the user to settle a playlist file conflict with a persistent toast", async () => {
+      const { toastStore } = await import("./toast.svelte");
+      toastStore.messages = [];
+      new PlaylistsStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      eventCallbacks["playlist-file-conflict"]({ payload: { playlistId: 102, name: "Workout" } });
+
+      const toast = toastStore.messages.find((m) => m.text.includes("Workout"));
+      expect(toast?.variant).toBe("warning");
+      expect(toast?.action?.label).toBe("Choose");
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(toastStore.messages).toContain(toast);
+    });
+
+    it("announces conflicts that were already there when the window opened", async () => {
+      const { toastStore } = await import("./toast.svelte");
+      toastStore.messages = [];
+      const conflicted = [{ ...mockPlaylists[0], source_path: "/m/a.m3u", source_conflict: true }];
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "get_playlists") return conflicted;
+        if (cmd === "get_all_app_settings") return {};
+        return [];
+      });
+
+      new PlaylistsStore();
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+
+      expect(toastStore.messages.some((m) => m.text.includes("Favorites"))).toBe(true);
+    });
+
+    it("says when a playlist file couldn't go to the trash and offers its folder", async () => {
+      const { toastStore } = await import("./toast.svelte");
+      toastStore.messages = [];
+      const store = new PlaylistsStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      store.playlists = [{ ...mockPlaylists[0], source_path: "Z:/m/Road Trip.m3u" }];
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "delete_playlist") throw "the Recycle Bin is not available on this drive";
+        return [];
+      });
+
+      await store.deletePlaylist(101);
+
+      const toast = toastStore.messages.find((m) => m.text.includes("Z:/m/Road Trip.m3u"));
+      expect(toast?.variant).toBe("error");
+      toast?.action?.onClick();
+      expect(revealItemInDir).toHaveBeenCalledWith("Z:/m/Road Trip.m3u");
+    });
+
+    it("sends the kept side of a conflict to the backend", async () => {
+      const store = new PlaylistsStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await store.resolveFileConflict(101, "file");
+
+      expect(invoke).toHaveBeenCalledWith("resolve_playlist_file_conflict", {
+        playlistId: 101,
+        keep: "file",
+      });
+    });
+
+    it("closes a conflict's toast once the user keeps a side", async () => {
+      const { toastStore } = await import("./toast.svelte");
+      toastStore.messages = [];
+      const store = new PlaylistsStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      eventCallbacks["playlist-file-conflict"]({ payload: { playlistId: 102, name: "Workout" } });
+      expect(toastStore.messages.some((m) => m.text.includes("Workout"))).toBe(true);
+
+      await store.resolveFileConflict(102, "luminous");
+
+      expect(toastStore.messages.some((m) => m.text.includes("Workout"))).toBe(false);
     });
 
     it("refreshes auto-playlist counts when library-changed fires", async () => {

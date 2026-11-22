@@ -244,7 +244,9 @@ impl PlaylistManager {
     }
 
     /// Bumps a playlist's `updated` timestamp to now — called whenever its
-    /// contents or name change, so "Updated" sort/display stays accurate.
+    /// contents or name change, so "Updated" sort/display stays accurate —
+    /// and nudges the writer of a playlist kept in sync with a file
+    /// (`file_sync`).
     pub(super) fn touch_updated(
         &self,
         conn: &rusqlite::Connection,
@@ -254,6 +256,7 @@ impl PlaylistManager {
             "UPDATE playlists SET updated = ?1 WHERE id = ?2",
             params![crate::clock::unix_now(), playlist_id],
         )?;
+        self.nudge_writer();
         Ok(())
     }
 
@@ -679,6 +682,7 @@ impl PlaylistManager {
                 }
             }
         }
+        self.nudge_writer();
         self.redo_stack.push(op);
         Ok(true)
     }
@@ -742,6 +746,7 @@ impl PlaylistManager {
                 }
             }
         }
+        self.nudge_writer();
         self.undo_stack.push(op);
         Ok(true)
     }

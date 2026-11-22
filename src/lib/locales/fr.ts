@@ -1276,6 +1276,10 @@ export const fr: DeepStringRecord<typeof en> = {
     tableHeaderDuration: "Durée",
     tableHeaderRemove: "Retirer",
     confirmDeletePlaylist: "Êtes-vous sûr de vouloir supprimer la liste de lecture « {name} »?",
+    confirmDeleteFilePlaylist:
+      "Supprimer la liste de lecture « {name} »? Son fichier, {path}, ira à la corbeille.",
+    fileTrashFailed:
+      "Impossible d’envoyer {path} à la corbeille; la liste de lecture n’a donc pas été supprimée. Supprimez le fichier vous-même, puis la liste de lecture.",
     confirmDeletePlaylistTitle: "Supprimer la liste de lecture",
     cancel: "Annuler",
     playTrack: "Lire la chanson",
@@ -1475,6 +1479,17 @@ export const fr: DeepStringRecord<typeof en> = {
     smartRulePlaylistLabel: "Liste intelligente",
     smartRuleBasedTooltip: "Liste intelligente basée sur des règles",
     smartBadgeLabel: "Intelligente",
+    fileBadgeLabel: "Fichier",
+    fileBadgeTooltip: "Synchronisée avec {path}",
+    fileConflictBadgeTooltip:
+      "Modifiée dans Luminous et dans {path}. Ouvrez la liste de lecture pour choisir la version à garder",
+    fileConflictToast:
+      "« {name} » a été modifiée à la fois dans Luminous et dans son fichier. Choisissez la version à garder.",
+    fileConflictShowBtn: "Choisir",
+    fileConflictBanner:
+      "Cette liste de lecture et son fichier ({path}) ont tous deux été modifiés. Gardez une version; l’autre sera remplacée.",
+    fileConflictKeepLuminous: "Garder la version de Luminous",
+    fileConflictKeepFile: "Garder la version du fichier",
     saveRenameTooltip: "Enregistrer",
     historyCleared: "Historique de lecture effacé",
     saveQueueNameLabel: "Nom de la liste de lecture",

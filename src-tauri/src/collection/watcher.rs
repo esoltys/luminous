@@ -300,6 +300,8 @@ fn is_mutating_watcher_event(kind: &notify::EventKind) -> bool {
 enum WatchedPathChange {
     Removed,
     Audio,
+    /// A playlist file appeared or changed (#2280).
+    Playlist,
     /// A directory appeared (created, or renamed/moved in) — its contents may
     /// never get per-file events of their own, so it needs a rescan.
     NewDir,
@@ -314,6 +316,8 @@ fn classify_watched_path(kind: &notify::EventKind, path: &Path) -> WatchedPathCh
         WatchedPathChange::Removed
     } else if path.is_file() && super::is_audio_file(path) {
         WatchedPathChange::Audio
+    } else if path.is_file() && crate::playlist::file_sync::is_playlist_file(path) {
+        WatchedPathChange::Playlist
     } else if path.is_dir()
         && matches!(
             kind,
@@ -547,6 +551,7 @@ fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 let mut removed_paths = std::collections::HashSet::new();
                 let mut added_paths = std::collections::HashSet::new();
                 let mut dir_paths = std::collections::HashSet::new();
+                let mut playlist_paths = std::collections::HashSet::new();
                 let roots = db_for_thread
                     .pool
                     .get()
@@ -563,15 +568,30 @@ fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         // coarse `watcher_paused` window above has already
                         // elapsed, since that's exactly the race this exists
                         // to close (#514).
-                        if self_writes.contains_recent(&path) {
+                        // Playlist files are exempt: their sync compares
+                        // contents with what Luminous last wrote, so a late
+                        // notice for its own write is already a no-op, and
+                        // skipping by path would also hide an edit made
+                        // elsewhere moments later (#2280).
+                        if self_writes.contains_recent(&path)
+                            && !crate::playlist::file_sync::is_playlist_file(&path)
+                        {
                             continue;
                         }
                         match classify_watched_path(&event.kind, &path) {
                             WatchedPathChange::Removed => {
+                                if crate::playlist::file_sync::is_playlist_file(&path) {
+                                    playlist_paths.insert(path.clone());
+                                }
                                 removed_paths.insert(path);
                             }
-                            WatchedPathChange::Audio | WatchedPathChange::NewDir
+                            WatchedPathChange::Audio
+                            | WatchedPathChange::NewDir
+                            | WatchedPathChange::Playlist
                                 if is_in_reserved_folder(&path, &roots) => {}
+                            WatchedPathChange::Playlist => {
+                                playlist_paths.insert(path);
+                            }
                             WatchedPathChange::Audio => {
                                 added_paths.insert(path);
                             }
@@ -584,6 +604,21 @@ fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 }
                 let removed_paths: Vec<PathBuf> = removed_paths.into_iter().collect();
                 let added_paths: Vec<PathBuf> = added_paths.into_iter().collect();
+                if !playlist_paths.is_empty() {
+                    let playlist_paths: Vec<PathBuf> = playlist_paths.into_iter().collect();
+                    let app = app_clone.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let state = app.state::<crate::AppState>();
+                        match crate::playlist::with_playlists(&state.playlists, move |pm| {
+                            pm.sync_playlist_files(&playlist_paths)
+                        })
+                        .await
+                        {
+                            Ok(report) => crate::playlist::file_sync::announce(&app, &report),
+                            Err(e) => log::warn!("Couldn't sync changed playlist files: {e}"),
+                        }
+                    });
+                }
 
                 if let Ok(conn) = db_for_thread.pool.get() {
                     let (still_removed, still_added) =

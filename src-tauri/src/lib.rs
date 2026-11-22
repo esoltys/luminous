@@ -1219,6 +1219,27 @@ pub fn run() {
 
             let self_writes = Arc::new(collection::SelfWriteTracker::new());
 
+            // Edits to playlists kept in sync with a file in a library
+            // folder are written there in the background (#2280).
+            {
+                let handle = app.handle().clone();
+                match crate::playlist::file_sync::PlaylistFileWriter::spawn(
+                    Arc::clone(&db),
+                    move |report| crate::playlist::file_sync::announce(&handle, &report),
+                ) {
+                    Ok(writer) => {
+                        // The organizer and duplicate merges change songs
+                        // under file-backed playlists without an edit of
+                        // their own; their library change wakes the writer.
+                        use tauri::Listener;
+                        let nudger = writer.clone();
+                        app.listen("library-changed", move |_| nudger.nudge());
+                        playlists.blocking_lock().attach_file_sync(writer);
+                    }
+                    Err(e) => log::error!("Failed to start the playlist file writer: {e}"),
+                }
+            }
+
             let cover_manager = Arc::new(
                 CoverManager::new(Arc::clone(&db), crate::paths::resolve_app_data_dir(app))
                     .with_self_writes(Arc::clone(&self_writes)),
@@ -1661,6 +1682,7 @@ pub fn run() {
             commands::playlist::redo_playlist,
             commands::playlist::import_playlist,
             commands::playlist::export_playlist,
+            commands::playlist::resolve_playlist_file_conflict,
             commands::playlist::set_playlist_population_mode,
             commands::playlist::set_playlist_dynamic_spec,
             commands::playlist::set_playlist_dynamic_config,
