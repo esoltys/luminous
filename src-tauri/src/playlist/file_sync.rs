@@ -11,9 +11,10 @@
 //!   file whose hash moved and replaces its playlist's items in place, so the
 //!   playlist keeps its id, pins, sort and play position.
 //! - **Playlist → file.** Every change the file depends on bumps the row's
-//!   `edit_rev`, through triggers (migration 97) so edits made anywhere
-//!   count, and [`PlaylistFileWriter`] rewrites the file shortly after, in
-//!   the style it was read in. A write never happens inside the edit's
+//!   `edit_rev` (playlist edits through [`PlaylistManager::mark_file_edited`],
+//!   changes made elsewhere through the triggers of migration 98), and
+//!   [`PlaylistFileWriter`] rewrites the file shortly after, in the style it
+//!   was read in. A write never happens inside the edit's
 //!   transaction: the writer reads the committed revision.
 //! - **Both.** A file that changed while its playlist has unwritten edits is
 //!   a conflict. Neither side is written until the user picks one with
@@ -587,7 +588,7 @@ impl PlaylistManager {
     /// Renames `playlist_id`'s file to match its new name, keeping the
     /// extension and folder. If a file of that name already exists the file
     /// keeps its old name; the playlist is renamed either way. An `.xspf`
-    /// also stores the name inside; the rename trigger (migration 97) marks
+    /// also stores the name inside; the rename trigger (migration 98) marks
     /// it edited, so the writer rewrites it.
     pub(super) fn rename_linked_file(
         &self,
@@ -663,9 +664,23 @@ impl PlaylistManager {
         record_agreement(conn, playlist_id, path, bytes, style)
     }
 
-    /// Wakes the writer after an edit. The triggers have already counted
-    /// it; for a playlist without a file the pass finds nothing to write.
-    pub(super) fn nudge_writer(&self) {
+    /// Counts an edit to `playlist_id` against its file, if it has one, and
+    /// wakes the writer. Every `PlaylistManager` edit calls this once, which
+    /// is far cheaper than a trigger firing per changed row; it may run
+    /// inside the edit's transaction, since the writer reads the committed
+    /// revision.
+    pub(super) fn mark_file_edited(&self, conn: &Connection, playlist_id: i64) -> Result<()> {
+        let counted = conn.execute(
+            "UPDATE playlist_files SET edit_rev = edit_rev + 1 WHERE playlist_id = ?1",
+            params![playlist_id],
+        )?;
+        if counted > 0 {
+            self.nudge_writer();
+        }
+        Ok(())
+    }
+
+    fn nudge_writer(&self) {
         if let Some(writer) = &self.file_writer {
             writer.nudge();
         }

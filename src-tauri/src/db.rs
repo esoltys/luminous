@@ -3385,12 +3385,16 @@ DELETE FROM app_state WHERE key IN ('airplay_enabled', 'airplay_prompt_dismissed
 /// the two differ. `conflict` is set while both sides changed and the user
 /// hasn't yet chosen which to keep.
 ///
-/// The triggers count every change that alters what the file would hold as
-/// an edit, whoever makes it — the playlist editor, undo, duplicate merges,
-/// the organizer moving a song, a sort change — so no writer can forget to.
-/// A rename counts only for `.xspf`, the one format that stores the name; an
-/// `.m3u` just has its file renamed. Changes `file_sync` itself makes while
-/// reading a file are caught up in the same transaction.
+/// Edits made through `PlaylistManager` (adding, removing, moving, undo)
+/// are counted there, once per edit. The triggers count the changes made
+/// elsewhere: an entry repointed to another song (duplicate merges), the
+/// organizer moving a song, a sort change, and a rename, which counts only
+/// for `.xspf`, the one format that stores the name (an `.m3u` just has its
+/// file renamed). There is deliberately no trigger on inserting, deleting or
+/// renumbering items: SQLite would run it once per row, which made adding
+/// 1,000 songs to any playlist, file-backed or not, up to 50 times slower.
+/// Changes `file_sync` itself makes while reading a file are caught up in
+/// the same transaction.
 const MIGRATION_98: &str = "
 CREATE TABLE IF NOT EXISTS playlist_files (
     playlist_id  INTEGER PRIMARY KEY REFERENCES playlists(id) ON DELETE CASCADE,
@@ -3402,14 +3406,8 @@ CREATE TABLE IF NOT EXISTS playlist_files (
     synced_rev   INTEGER NOT NULL DEFAULT 0,
     conflict     INTEGER NOT NULL DEFAULT 0
 );
-CREATE TRIGGER IF NOT EXISTS playlist_files_item_insert AFTER INSERT ON playlist_items BEGIN
-    UPDATE playlist_files SET edit_rev = edit_rev + 1 WHERE playlist_id = NEW.playlist_id;
-END;
-CREATE TRIGGER IF NOT EXISTS playlist_files_item_delete AFTER DELETE ON playlist_items BEGIN
-    UPDATE playlist_files SET edit_rev = edit_rev + 1 WHERE playlist_id = OLD.playlist_id;
-END;
 CREATE TRIGGER IF NOT EXISTS playlist_files_item_update
-AFTER UPDATE OF playlist_id, song_id, position, url ON playlist_items BEGIN
+AFTER UPDATE OF playlist_id, song_id, url ON playlist_items BEGIN
     UPDATE playlist_files SET edit_rev = edit_rev + 1
     WHERE playlist_id IN (OLD.playlist_id, NEW.playlist_id);
 END;

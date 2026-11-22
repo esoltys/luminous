@@ -125,6 +125,19 @@ enum PlaylistOp {
     },
 }
 
+impl PlaylistOp {
+    fn playlist_id(&self) -> i64 {
+        match self {
+            PlaylistOp::Insert { playlist_id, .. }
+            | PlaylistOp::Remove { playlist_id, .. }
+            | PlaylistOp::Clear { playlist_id, .. }
+            | PlaylistOp::Move { playlist_id, .. }
+            | PlaylistOp::BatchMove { playlist_id, .. }
+            | PlaylistOp::Rearrange { playlist_id, .. } => *playlist_id,
+        }
+    }
+}
+
 /// Playlist CRUD, item mutation, import/export, and auto-playlist sync, all
 /// backed by SQLite. Mutating item operations (`add_songs_to_playlist`,
 /// `remove_from_playlist`, `clear_playlist`, the `reorder_*` methods) push a
