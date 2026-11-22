@@ -3269,6 +3269,7 @@ export const en = {
     voxel: "Voxel spectrum",
     voxelLogo: "Voxel logo",
     vectorscope: "Vectorscope",
+    salmonRun: "Salmon run",
     scope: {
       left: "L",
       right: "R",

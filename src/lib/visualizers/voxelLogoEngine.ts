@@ -1,7 +1,14 @@
 import type { ThemeColors } from "../stores/theme.svelte";
-import { clampForContrast, hexToRgb } from "../utils/colorUtils";
+import { clampForContrast } from "../utils/colorUtils";
 import type { VisualizerFrame } from "./types";
-import { voxelUnlitCellColor } from "./voxelEngine";
+import {
+  VoxelCellPainter,
+  VoxelGrid,
+  VoxelLayerCache,
+  voxelAlphaLadder,
+  voxelUnlitCellColor,
+  type Ctx2D,
+} from "./voxelGrid";
 
 // The brand mark (docs/luminous-mark.svg), in its own 200×200 units.
 const CENTER = 100;
@@ -278,22 +285,22 @@ export function buildVoxelLogoPalette(
   surface: "bg-main" | "bg-playerbar",
 ): VoxelLogoPalette {
   const bg = colors[surface] || colors["bg-main"] || "#191918";
-  const accent = hexToRgb(clampForContrast(colors["color-accent"] || "#4f5bd5", bg, 3.0));
-  const hover = hexToRgb(
-    clampForContrast(colors["color-accent-hover"] || colors["color-accent"] || "#a78bfa", bg, 3.0),
+  const accent = clampForContrast(colors["color-accent"] || "#4f5bd5", bg, 3.0);
+  const hover = clampForContrast(
+    colors["color-accent-hover"] || colors["color-accent"] || "#a78bfa",
+    bg,
+    3.0,
   );
-  const burst = hexToRgb(clampForContrast("#ffffff", bg, 3.0));
+  const burst = clampForContrast("#ffffff", bg, 3.0);
 
   const styles: string[] = new Array(LOGO_STYLE.count);
   styles[LOGO_STYLE.none] = "transparent";
   // Only the full view draws housing, on `bg-main`, matching the voxel spectrum's.
   styles[LOGO_STYLE.housing] = voxelUnlitCellColor(colors);
   styles[LOGO_STYLE.disc] = "#0a0a0d";
-  const ladder = (base: number, rgb: { r: number; g: number; b: number }) => {
-    for (let k = 0; k < LADDER; k++) {
-      const alpha = 0.12 + (0.88 * k) / (LADDER - 1);
-      styles[base + k] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha.toFixed(3)})`;
-    }
+  const ladder = (base: number, hex: string) => {
+    const steps = voxelAlphaLadder(hex, LADDER);
+    for (let k = 0; k < LADDER; k++) styles[base + k] = steps[k];
   };
   ladder(LOGO_STYLE.rim, accent);
   ladder(LOGO_STYLE.ring, hover);
@@ -324,8 +331,6 @@ export interface VoxelLogoRendererOptions {
 /** Minimum cell pitch (CSS px) at which outer housing cells are drawn. */
 const MIN_HOUSING_PITCH = 3;
 
-type HousingSurface = HTMLCanvasElement | OffscreenCanvas;
-
 /**
  * The style of a cell `d` mark units from the centre under the ripples in `levels`: a step of
  * the ring's ladder, or `LOGO_STYLE.none` where no ripple is bright enough to show.
@@ -335,50 +340,22 @@ function rippleStyle(levels: LogoLevels, d: number, halfWidth: number): number {
   return k > 0 ? LOGO_STYLE.ring + k : LOGO_STYLE.none;
 }
 
-/**
- * The housing: cells at the grid's pitch, aligned to it, covering the rest of a
- * `width`×`height` canvas around the `n`×`n` grid at (`originX`, `originY`). Writes the
- * half-open column and row ranges to walk, which may run negative, into `out` as
- * [firstCol, firstRow, lastCol, lastRow]; cells inside the grid itself are not housing.
- */
-function housingSpan(
-  width: number,
-  height: number,
-  pitch: number,
-  originX: number,
-  originY: number,
-  out: Int32Array,
-): void {
-  out[0] = -Math.ceil(originX / pitch);
-  out[1] = -Math.ceil(originY / pitch);
-  out[2] = Math.ceil((width - originX) / pitch);
-  out[3] = Math.ceil((height - originY) / pitch);
-}
+const housingSpan = new Int32Array(4);
 
-function inGrid(col: number, row: number, n: number): boolean {
-  return row >= 0 && row < n && col >= 0 && col < n;
-}
-
-const housingCacheSpan = new Int32Array(4);
-
+/** The housing: unlit cells covering the rest of a `width`×`height` canvas around `grid`. */
 function drawOuterHousing(
-  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  ctx: Ctx2D,
   width: number,
   height: number,
-  n: number,
-  pitch: number,
-  cell: number,
-  originX: number,
-  originY: number,
+  grid: VoxelGrid,
   fill: string,
 ): void {
   ctx.fillStyle = fill;
-  const span = housingCacheSpan;
-  housingSpan(width, height, pitch, originX, originY, span);
+  const span = housingSpan;
+  grid.span(width, height, span);
   for (let row = span[1]; row < span[3]; row++) {
-    const y = originY + row * pitch;
     for (let col = span[0]; col < span[2]; col++) {
-      if (!inGrid(col, row, n)) ctx.fillRect(originX + col * pitch, y, cell, cell);
+      if (!grid.contains(col, row)) grid.fillCell(ctx, col, row);
     }
   }
 }
@@ -394,152 +371,52 @@ function drawOuterRipples(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
-  grid: LogoGrid,
-  pitch: number,
-  cell: number,
-  originX: number,
-  originY: number,
+  grid: VoxelGrid,
+  logo: LogoGrid,
   levels: LogoLevels,
   halfWidth: number,
   styles: readonly string[],
 ): void {
   const span = rippleSpan;
-  housingSpan(width, height, pitch, originX, originY, span);
+  grid.span(width, height, span);
   let current: number = LOGO_STYLE.none;
   for (let row = span[1]; row < span[3]; row++) {
-    const y = originY + row * pitch;
+    const y = grid.originY + row * grid.pitch;
     for (let col = span[0]; col < span[2]; col++) {
-      if (inGrid(col, row, grid.size)) continue;
-      const style = rippleStyle(levels, grid.markDistanceAt(col, row), halfWidth);
+      if (grid.contains(col, row)) continue;
+      const style = rippleStyle(levels, logo.markDistanceAt(col, row), halfWidth);
       if (style === LOGO_STYLE.none) continue;
       if (style !== current) {
         ctx.fillStyle = styles[style];
         current = style;
       }
-      const x = originX + col * pitch;
-      ctx.clearRect(x, y, cell, cell);
-      ctx.fillRect(x, y, cell, cell);
+      const x = grid.originX + col * grid.pitch;
+      ctx.clearRect(x, y, grid.cell, grid.cell);
+      ctx.fillRect(x, y, grid.cell, grid.cell);
     }
-  }
-}
-
-function createHousingSurface(
-  backingW: number,
-  backingH: number,
-): {
-  surface: HousingSurface;
-  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-} | null {
-  if (typeof document !== "undefined") {
-    const canvas = document.createElement("canvas");
-    canvas.width = backingW;
-    canvas.height = backingH;
-    const ctx = canvas.getContext("2d");
-    if (ctx) return { surface: canvas, ctx };
-  }
-  if (typeof OffscreenCanvas !== "undefined") {
-    const canvas = new OffscreenCanvas(backingW, backingH);
-    const ctx = canvas.getContext("2d");
-    if (ctx) return { surface: canvas, ctx };
-  }
-  return null;
-}
-
-/**
- * Caches the static outer housing grid onto an offscreen surface so animated frames blit it
- * with a single `drawImage` instead of issuing thousands of `fillRect` calls per frame.
- */
-class HousingCache {
-  private surface: HousingSurface | null = null;
-  private surfaceCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
-  private width = 0;
-  private height = 0;
-  private dpr = 0;
-  private n = 0;
-  private pitch = 0;
-  private originX = 0;
-  private originY = 0;
-  private fill = "";
-
-  draw(
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-    n: number,
-    pitch: number,
-    cell: number,
-    originX: number,
-    originY: number,
-    fill: string,
-  ): void {
-    if (typeof ctx.drawImage !== "function") {
-      drawOuterHousing(ctx, width, height, n, pitch, cell, originX, originY, fill);
-      return;
-    }
-
-    const dpr = typeof ctx.getTransform === "function" ? ctx.getTransform().a || 1 : 1;
-    const backingW = Math.max(1, Math.round(width * dpr));
-    const backingH = Math.max(1, Math.round(height * dpr));
-
-    if (
-      !this.surface ||
-      !this.surfaceCtx ||
-      this.width !== width ||
-      this.height !== height ||
-      this.dpr !== dpr ||
-      this.n !== n ||
-      this.pitch !== pitch ||
-      this.originX !== originX ||
-      this.originY !== originY ||
-      this.fill !== fill
-    ) {
-      if (!this.surface || !this.surfaceCtx) {
-        const created = createHousingSurface(backingW, backingH);
-        if (!created) {
-          drawOuterHousing(ctx, width, height, n, pitch, cell, originX, originY, fill);
-          return;
-        }
-        this.surface = created.surface;
-        this.surfaceCtx = created.ctx;
-      } else if (this.surface.width !== backingW || this.surface.height !== backingH) {
-        this.surface.width = backingW;
-        this.surface.height = backingH;
-      }
-
-      this.surfaceCtx.setTransform(1, 0, 0, 1, 0, 0);
-      this.surfaceCtx.clearRect(0, 0, backingW, backingH);
-      this.surfaceCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawOuterHousing(this.surfaceCtx, width, height, n, pitch, cell, originX, originY, fill);
-
-      this.width = width;
-      this.height = height;
-      this.dpr = dpr;
-      this.n = n;
-      this.pitch = pitch;
-      this.originX = originX;
-      this.originY = originY;
-      this.fill = fill;
-    }
-
-    ctx.drawImage(this.surface, 0, 0, width, height);
   }
 }
 
 /**
- * Draws the mark as an LED grid. Cells are bucketed by fill so `fillStyle` changes once per
- * fill rather than once per cell; the buckets live in buffers sized for the largest grid, so
- * drawing allocates nothing.
+ * Draws the mark as an LED grid, classifying each cell into a fill and painting them with the
+ * shared voxel cell painter; the housing around the grid is a cached layer. Drawing allocates
+ * nothing once the largest grid has been drawn.
  */
 export class VoxelLogoRenderer {
   private readonly grids: readonly LogoGrid[];
   private readonly housing: boolean;
   private readonly glow: boolean;
   private readonly ripples: boolean;
-  private readonly housingCache = new HousingCache();
+  private readonly cells = new VoxelGrid();
+  private readonly painter = new VoxelCellPainter();
+  private readonly housingLayer = new VoxelLayerCache();
   private readonly cellStyle: Uint8Array;
-  private readonly order: Int32Array;
-  private readonly bucketStart = new Int32Array(LOGO_STYLE.count + 1);
-  private readonly bucketFill = new Int32Array(LOGO_STYLE.count);
+  // What the cached housing was painted with, and what the next repaint paints.
+  private housingFill = "";
+  private housingWidth = 0;
+  private housingHeight = 0;
+  private readonly paintHousing = (c: Ctx2D): void =>
+    drawOuterHousing(c, this.housingWidth, this.housingHeight, this.cells, this.housingFill);
 
   constructor(options: VoxelLogoRendererOptions) {
     this.grids = options.grids;
@@ -549,7 +426,6 @@ export class VoxelLogoRenderer {
     let largest = 1;
     for (const grid of this.grids) largest = Math.max(largest, grid.size * grid.size);
     this.cellStyle = new Uint8Array(largest);
-    this.order = new Int32Array(largest);
   }
 
   /**
@@ -579,11 +455,8 @@ export class VoxelLogoRenderer {
 
     const grid = this.gridFor(width, height);
     const n = grid.size;
-    const pitch = Math.max(1, Math.floor(Math.min(width, height) / n));
-    const gap = pitch >= 5 ? Math.max(1, Math.round(pitch * 0.18)) : pitch >= 2 ? 1 : 0;
-    const cell = pitch - gap;
-    const originX = Math.floor((width - n * pitch) / 2);
-    const originY = Math.floor((height - n * pitch) / 2);
+    const cells = this.cells;
+    const layoutChanged = cells.fit(width, height, n, n);
 
     // Geometry for this frame, in mark units. Reduced motion holds it still.
     const rimHalf = reducedMotion ? RIM_HALF_STILL : RIM_HALF_MIN + RIM_HALF_RANGE * levels.mid;
@@ -603,8 +476,6 @@ export class VoxelLogoRenderer {
     // 1. Classify every cell, topmost layer first (the SVG's paint order reversed).
     const count = n * n;
     const styleOf = this.cellStyle;
-    const starts = this.bucketStart;
-    starts.fill(0);
     for (let i = 0; i < count; i++) {
       const d = grid.markDistance[i];
       const db = grid.burstDistance[i];
@@ -629,60 +500,25 @@ export class VoxelLogoRenderer {
         if (style === LOGO_STYLE.none && this.housing) style = LOGO_STYLE.housing;
       }
       styleOf[i] = style;
-      starts[style + 1]++;
     }
 
-    // 2. Bucket the cells by style (a counting sort into preallocated buffers).
-    for (let s = 0; s < LOGO_STYLE.count; s++) starts[s + 1] += starts[s];
-    const fill = this.bucketFill;
-    for (let s = 0; s < LOGO_STYLE.count; s++) fill[s] = starts[s];
-    for (let i = 0; i < count; i++) this.order[fill[styleOf[i]]++] = i;
-
-    // 3. Housing cells around the grid, aligned to its pitch (cached offscreen across frames).
-    if (this.housing && pitch >= MIN_HOUSING_PITCH) {
-      this.housingCache.draw(
-        ctx,
-        width,
-        height,
-        n,
-        pitch,
-        cell,
-        originX,
-        originY,
-        palette.styles[LOGO_STYLE.housing],
-      );
+    // 2. Housing cells around the grid, aligned to its pitch (cached offscreen across frames).
+    if (this.housing && cells.pitch >= MIN_HOUSING_PITCH) {
+      const fill = palette.styles[LOGO_STYLE.housing];
+      const stale = layoutChanged || fill !== this.housingFill;
+      this.housingFill = fill;
+      this.housingWidth = width;
+      this.housingHeight = height;
+      this.housingLayer.blit(ctx, width, height, stale, this.paintHousing);
     }
 
-    // 4. The grid's cells, one fillStyle per bucket.
-    for (let s = LOGO_STYLE.none + 1; s < LOGO_STYLE.count; s++) {
-      const from = starts[s];
-      const to = starts[s + 1];
-      if (from === to) continue;
-      ctx.fillStyle = palette.styles[s];
-      for (let j = from; j < to; j++) {
-        const i = this.order[j];
-        const row = (i / n) | 0;
-        const col = i - row * n;
-        ctx.fillRect(originX + col * pitch, originY + row * pitch, cell, cell);
-      }
-    }
+    // 3. The grid's cells, one fillStyle per style.
+    this.painter.paint(ctx, cells, styleOf, palette.styles);
 
-    // 5. Ripples carry on across the housing around the grid, out to the canvas edges (at the
+    // 4. Ripples carry on across the housing around the grid, out to the canvas edges (at the
     // same pitches the housing is drawn at).
-    if (ripples && pitch >= MIN_HOUSING_PITCH && levels.rippling) {
-      drawOuterRipples(
-        ctx,
-        width,
-        height,
-        grid,
-        pitch,
-        cell,
-        originX,
-        originY,
-        levels,
-        rippleHalf,
-        palette.styles,
-      );
+    if (ripples && cells.pitch >= MIN_HOUSING_PITCH && levels.rippling) {
+      drawOuterRipples(ctx, width, height, cells, grid, levels, rippleHalf, palette.styles);
     }
   }
 }

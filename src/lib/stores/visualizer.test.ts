@@ -6,8 +6,6 @@ import {
   registerPreset,
 } from "../visualizers/registry.svelte";
 import type { VisualizerPreset } from "../visualizers/types";
-import { VECTORSCOPE_PRESET } from "../visualizers/vectorscope";
-import { VOXEL_LOGO_PRESET } from "../visualizers/voxelLogo";
 import { VisualizerStore } from "./visualizer.svelte";
 
 function fakePreset(id: string): VisualizerPreset {
@@ -21,17 +19,21 @@ function fakePreset(id: string): VisualizerPreset {
 
 /** Leaves only the voxel spectrum registered; the returned function restores the rest in order. */
 function setOtherBuiltinsAside(): () => void {
-  registerPreset(VOXEL_LOGO_PRESET)();
-  registerPreset(VECTORSCOPE_PRESET)();
+  const others = listPresets().filter((p) => p !== DEFAULT_PRESET);
+  for (const preset of others) registerPreset(preset)();
   return () => {
-    registerPreset(VOXEL_LOGO_PRESET);
-    registerPreset(VECTORSCOPE_PRESET);
+    for (const preset of others) registerPreset(preset);
   };
 }
 
 describe("visualizer registry (#2245)", () => {
-  it("ships the voxel spectrum, voxel logo and vectorscope, spectrum first", () => {
-    expect(listPresets().map((p) => p.id)).toEqual(["voxel", "voxel-logo", "vectorscope"]);
+  it("ships the voxel spectrum, voxel logo, vectorscope and salmon run, spectrum first", () => {
+    expect(listPresets().map((p) => p.id)).toEqual([
+      "voxel",
+      "voxel-logo",
+      "vectorscope",
+      "salmon-run",
+    ]);
     expect(DEFAULT_PRESET.id).toBe("voxel");
   });
 

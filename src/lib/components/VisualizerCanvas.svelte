@@ -3,7 +3,8 @@
    * Draws one visualizer preset on a canvas. Owns everything that's the same for every
    * preset and every place one is shown: turning on the data feeds the preset needs,
    * listening for their data, drawing on animation frames only while there's something
-   * new to show, pausing while the window is hidden, redrawing on resize and re-theming.
+   * new to show, pausing while the window is hidden, redrawing on resize, re-theming and
+   * handing over the current track.
    */
   import { onDestroy, onMount, untrack } from "svelte";
   import { playerStore } from "../stores/player.svelte";
@@ -17,6 +18,7 @@
     VisualizerInstance,
     VisualizerPreset,
     VisualizerSize,
+    VisualizerTrack,
   } from "../visualizers/types";
 
   interface Props {
@@ -58,6 +60,11 @@
   let resizeObserver: ResizeObserver | null = null;
 
   const isPlaying = $derived(playerStore.state === "playing");
+
+  // The track handed to presets that vary with it. Keyed by song id, so it only changes (and
+  // presets only hear about it) when a different song loads.
+  const trackKey = $derived(playerStore.currentSong ? String(playerStore.currentSong.id) : null);
+  const track = $derived<VisualizerTrack | null>(trackKey === null ? null : { key: trackKey });
 
   function isHidden(): boolean {
     return typeof document !== "undefined" && document.hidden;
@@ -113,6 +120,7 @@
     untrack(() => {
       instance = p.create(s);
       instance.setTheme(themeStore.resolvedColors);
+      instance.setTrack?.(track);
       pushCurrent();
       lastFrameTime = 0;
       requestFrame();
@@ -121,6 +129,11 @@
 
   $effect(() => {
     instance.setTheme(themeStore.resolvedColors);
+    untrack(requestFrame);
+  });
+
+  $effect(() => {
+    instance.setTrack?.(track);
     untrack(requestFrame);
   });
 

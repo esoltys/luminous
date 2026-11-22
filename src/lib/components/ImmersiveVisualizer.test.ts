@@ -18,7 +18,7 @@ import { visualizerStore } from "../stores/visualizer.svelte";
 import { registerPreset } from "../visualizers/registry.svelte";
 import type { Song } from "../types";
 import type { SpectrumFrame } from "../utils/spectrumEnable";
-import type { VisualizerFrame } from "../visualizers/types";
+import type { VisualizerFrame, VisualizerTrack } from "../visualizers/types";
 
 describe("ImmersiveVisualizer.svelte (#2236)", () => {
   const mockSong: Song = {
@@ -175,10 +175,45 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
       }
     });
 
+    it("hands the preset the track and its cover colours as they change (#2248)", async () => {
+      const tracks: (VisualizerTrack | null)[] = [];
+      const unregisterSpy = registerPreset({
+        id: "track-spy",
+        labelKey: "Track spy",
+        needs: ["spectrum"],
+        create: () => ({
+          setTheme() {},
+          setTrack: (track) => void tracks.push(track),
+          push() {},
+          step: () => false,
+          render() {},
+        }),
+      });
+      try {
+        visualizerStore.select("track-spy");
+        render(ImmersiveVisualizer, { active: true });
+        await tick();
+        expect(tracks.at(-1)).toEqual({ key: "42" });
+        const handedOver = tracks.length;
+
+        // Another copy of the same song is not a new track.
+        playerStore.currentSong = { ...mockSong };
+        await tick();
+        expect(tracks).toHaveLength(handedOver);
+
+        playerStore.currentSong = { ...mockSong, id: 43 };
+        await tick();
+        expect(tracks.at(-1)).toEqual({ key: "43" });
+      } finally {
+        playerStore.currentSong = mockSong;
+        unregisterSpy();
+      }
+    });
+
     it("opens the preset menu on right-click of the stage", async () => {
       const { getByTestId, getAllByRole } = render(ImmersiveVisualizer, { active: true });
       await fireEvent.contextMenu(getByTestId("immersive-visualizer-canvas"));
-      expect(getAllByRole("menuitemradio")).toHaveLength(3);
+      expect(getAllByRole("menuitemradio")).toHaveLength(4);
     });
   });
 });

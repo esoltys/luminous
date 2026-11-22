@@ -3550,6 +3550,7 @@ export const ru = {
     voxel: "Воксельный спектр",
     voxelLogo: "Воксельный логотип",
     vectorscope: "Векторскоп",
+    salmonRun: "Ход лосося",
     scope: {
       left: "Л",
       right: "П",
