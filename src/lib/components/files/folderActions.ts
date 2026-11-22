@@ -1,12 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { playerStore } from "../../stores/player.svelte";
 import { playlistsStore } from "../../stores/playlists.svelte";
 import { devicesStore } from "../../stores/devices.svelte";
 import { toastStore } from "../../stores/toast.svelte";
 import { i18n } from "../../stores/i18n.svelte";
 import { deviceName } from "../../utils/devices";
-import { isWindows, isLinux } from "../../platform";
 import type { ConnectedDevice, FileEntry, FileSource, Song } from "../../types";
 
 /**
@@ -111,22 +109,6 @@ export async function addFolderToDeviceSync(
   } catch (err) {
     console.error("Failed to add folder to device sync:", err);
     toastStore.show(i18n.t("files.addToSyncFailed", { device: deviceLabel }), "error");
-  }
-}
-
-/** "Show in File Explorer", "Show in Finder" or "Show in file manager". */
-export function revealLabel(): string {
-  return i18n.t(
-    isWindows ? "files.revealWindows" : isLinux ? "files.revealLinux" : "files.revealMac",
-  );
-}
-
-/** Shows a local file or folder selected in the system file manager. */
-export async function reveal(location: string) {
-  try {
-    await revealItemInDir(location);
-  } catch (err) {
-    console.error("Failed to show a file in the file manager:", err);
   }
 }
 

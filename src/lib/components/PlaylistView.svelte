@@ -1045,21 +1045,21 @@
               </span>
             </InlineMessage>
             <div class="flex gap-2">
-              <button
-                class="px-3 py-1 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-primary hover:border-transparent transition-colors duration-150"
+              <Button
+                size="sm"
                 onclick={() =>
                   activePlaylist &&
                   playlistsStore.resolveFileConflict(activePlaylist.id, "luminous")}
               >
                 {i18n.t("playlists.fileConflictKeepLuminous")}
-              </button>
-              <button
-                class="px-3 py-1 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-primary hover:border-transparent transition-colors duration-150"
+              </Button>
+              <Button
+                size="sm"
                 onclick={() =>
                   activePlaylist && playlistsStore.resolveFileConflict(activePlaylist.id, "file")}
               >
                 {i18n.t("playlists.fileConflictKeepFile")}
-              </button>
+              </Button>
             </div>
           </div>
         {/if}

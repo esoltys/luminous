@@ -33,10 +33,9 @@
     playFolder,
     playlistFromFolder,
     queueFolder,
-    reveal,
-    revealLabel,
     scanFolder,
   } from "./folderActions";
+  import { reveal, revealLabel } from "../../utils/reveal";
 
   /**
    * The context and overflow menu for rows and headers of the Files view

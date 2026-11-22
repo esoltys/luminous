@@ -137,8 +137,6 @@ pub struct PlaylistManager {
     db: Arc<Database>,
     undo_stack: Vec<PlaylistOp>,
     redo_stack: Vec<PlaylistOp>,
-    /// Registers the playlist files this manager writes, so the watcher
-    /// doesn't read them back as outside changes. `None` in tests.
     /// Writes edited file-backed playlists to their files (#2280). `None`
     /// in tests, which call `write_edited_playlist_files` directly.
     file_writer: Option<file_sync::PlaylistFileWriter>,
@@ -241,8 +239,8 @@ impl PlaylistManager {
         })
     }
 
-    /// Connects this manager to the file watcher and the playlist file
-    /// writer, so edits to file-backed playlists reach their files (#2280).
+    /// Connects this manager to the playlist file writer, so edits to
+    /// file-backed playlists reach their files (#2280).
     pub fn attach_file_sync(&mut self, writer: file_sync::PlaylistFileWriter) {
         self.file_writer = Some(writer);
     }

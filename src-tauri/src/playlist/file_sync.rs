@@ -10,10 +10,11 @@
 //! - **File → playlist.** [`PlaylistManager::sync_playlist_files`] re-reads a
 //!   file whose hash moved and replaces its playlist's items in place, so the
 //!   playlist keeps its id, pins, sort and play position.
-//! - **Playlist → file.** Every edit bumps the row's `edit_rev` (through
-//!   `touch_updated`), and [`PlaylistFileWriter`] rewrites the file shortly
-//!   after, in the style it was read in. A write never happens inside the
-//!   edit's transaction: the writer reads the committed revision.
+//! - **Playlist → file.** Every change the file depends on bumps the row's
+//!   `edit_rev`, through triggers (migration 97) so edits made anywhere
+//!   count, and [`PlaylistFileWriter`] rewrites the file shortly after, in
+//!   the style it was read in. A write never happens inside the edit's
+//!   transaction: the writer reads the committed revision.
 //! - **Both.** A file that changed while its playlist has unwritten edits is
 //!   a conflict. Neither side is written until the user picks one with
 //!   [`PlaylistManager::resolve_file_conflict`].
@@ -60,12 +61,28 @@ impl FileSyncReport {
     /// Folds `other` into this report.
     pub fn merge(&mut self, other: FileSyncReport) {
         for id in other.changed {
-            self.changed(id);
+            self.add_changed(id);
         }
         self.new_conflicts.extend(other.new_conflicts);
     }
 
-    fn changed(&mut self, playlist_id: i64) {
+    /// Notes what syncing one file did to its playlist.
+    fn record(&mut self, inbound: Inbound) {
+        match inbound {
+            Inbound::Synced {
+                playlist_id,
+                changed: true,
+            }
+            | Inbound::Detached(playlist_id) => self.add_changed(playlist_id),
+            Inbound::Conflict(conflict) => {
+                self.add_changed(conflict.playlist_id);
+                self.new_conflicts.push(conflict);
+            }
+            Inbound::Synced { changed: false, .. } | Inbound::Skipped => {}
+        }
+    }
+
+    fn add_changed(&mut self, playlist_id: i64) {
         if !self.changed.contains(&playlist_id) {
             self.changed.push(playlist_id);
         }
@@ -333,16 +350,7 @@ impl PlaylistManager {
         let mut report = FileSyncReport::default();
         for path in present.into_iter().chain(missing) {
             match self.sync_file(path, false) {
-                Ok(Inbound::Synced {
-                    playlist_id,
-                    changed: true,
-                })
-                | Ok(Inbound::Detached(playlist_id)) => report.changed(playlist_id),
-                Ok(Inbound::Conflict(conflict)) => {
-                    report.changed(conflict.playlist_id);
-                    report.new_conflicts.push(conflict);
-                }
-                Ok(_) => {}
+                Ok(inbound) => report.record(inbound),
                 Err(e) => log::warn!("Couldn't sync playlist file {}: {e}", path.display()),
             }
         }
@@ -463,12 +471,7 @@ impl PlaylistManager {
         let mut report = FileSyncReport::default();
         for linked in pending {
             match self.write_file(&conn, &linked) {
-                Ok(Some(Inbound::Conflict(conflict))) => {
-                    report.changed(conflict.playlist_id);
-                    report.new_conflicts.push(conflict);
-                }
-                Ok(Some(_)) => report.changed(linked.playlist_id),
-                Ok(None) => {}
+                Ok(inbound) => report.record(inbound),
                 Err(e) => log::warn!(
                     "Couldn't write playlist file {}: {e}",
                     linked.path.display()
@@ -478,22 +481,19 @@ impl PlaylistManager {
         Ok(report)
     }
 
-    /// Writes one playlist to its file; `Some` when that changed the link
-    /// rather than the file (a conflict or an unlink).
-    fn write_file(&self, conn: &Connection, linked: &LinkedFile) -> Result<Option<Inbound>> {
+    /// Writes one playlist to its file. The playlist itself is unchanged
+    /// unless the file was gone (unlinked) or changed meanwhile (conflict).
+    fn write_file(&self, conn: &Connection, linked: &LinkedFile) -> Result<Inbound> {
         let on_disk = match std::fs::read(&linked.path) {
             Ok(bytes) => bytes,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 unlink(conn, linked.playlist_id)?;
-                return Ok(Some(Inbound::Detached(linked.playlist_id)));
+                return Ok(Inbound::Detached(linked.playlist_id));
             }
             Err(e) => return Err(e.into()),
         };
         if content_hash(&on_disk) != linked.content_hash {
-            return Ok(Some(Inbound::Conflict(set_conflict(
-                conn,
-                linked.playlist_id,
-            )?)));
+            return Ok(Inbound::Conflict(set_conflict(conn, linked.playlist_id)?));
         }
         let format = PlaylistFormat::from_path(&linked.path)
             .ok_or_else(|| anyhow!("Not a playlist file: {}", linked.path.display()))?;
@@ -531,7 +531,10 @@ impl PlaylistManager {
                 return Err(e.into());
             }
         }
-        Ok(None)
+        Ok(Inbound::Synced {
+            playlist_id: linked.playlist_id,
+            changed: false,
+        })
     }
 
     /// Ends a conflict by keeping one side: [`KeepSide::Luminous`] writes the
@@ -551,7 +554,7 @@ impl PlaylistManager {
             return Ok(FileSyncReport::default());
         }
         let mut report = FileSyncReport::default();
-        report.changed(playlist_id);
+        report.add_changed(playlist_id);
         match keep {
             KeepSide::Luminous => {
                 // Take the file as it is now as the agreed base, and mark an
@@ -579,21 +582,6 @@ impl PlaylistManager {
             }
         }
         Ok(report)
-    }
-
-    /// Counts an edit to `playlist_id` against its file, if it has one, and
-    /// wakes the writer. Called by `touch_updated`, which every edit goes
-    /// through, so this may run inside the edit's transaction: it only bumps
-    /// a counter, and the writer reads it once committed.
-    pub(super) fn mark_file_edited(&self, conn: &Connection, playlist_id: i64) -> Result<()> {
-        let bumped = conn.execute(
-            "UPDATE playlist_files SET edit_rev = edit_rev + 1 WHERE playlist_id = ?1",
-            params![playlist_id],
-        )?;
-        if bumped > 0 {
-            self.nudge_writer();
-        }
-        Ok(())
     }
 
     /// Renames `playlist_id`'s file to match its new name, keeping the
@@ -675,7 +663,9 @@ impl PlaylistManager {
         record_agreement(conn, playlist_id, path, bytes, style)
     }
 
-    fn nudge_writer(&self) {
+    /// Wakes the writer after an edit. The triggers have already counted
+    /// it; for a playlist without a file the pass finds nothing to write.
+    pub(super) fn nudge_writer(&self) {
         if let Some(writer) = &self.file_writer {
             writer.nudge();
         }
@@ -705,14 +695,14 @@ fn moved_playlist(conn: &Connection, hash: &str) -> Result<Option<i64>> {
 /// `name` that holds exactly `entries` — one imported by hand from this file
 /// before it was synced. Linking it avoids a duplicate.
 fn unlinked_twin(conn: &Connection, name: &str, entries: &[ResolvedEntry]) -> Result<Option<i64>> {
+    if crate::models::Playlist::is_queue_row(name, false) {
+        return Ok(None);
+    }
     let mut stmt = conn.prepare(
         "SELECT p.id FROM playlists p
          WHERE p.name = ?1 AND p.dynamic_enabled = 0 AND COALESCE(p.is_system, 0) = 0
            AND NOT EXISTS (SELECT 1 FROM playlist_files pf WHERE pf.playlist_id = p.id)",
     )?;
-    if crate::models::Playlist::is_queue_row(name, false) {
-        return Ok(None);
-    }
     let ids: Vec<i64> = stmt
         .query_map(params![name], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?;
@@ -743,7 +733,7 @@ fn unlinked_twin(conn: &Connection, name: &str, entries: &[ResolvedEntry]) -> Re
 
 /// Writes edited playlists to their files from a background thread, a
 /// moment after the last edit (see [`WRITE_DEBOUNCE`]). Cloned into the
-/// playlist manager; [`PlaylistManager::mark_file_edited`] nudges it.
+/// playlist manager, whose edits nudge it.
 #[derive(Clone, Debug)]
 pub struct PlaylistFileWriter {
     nudge: mpsc::Sender<()>,
