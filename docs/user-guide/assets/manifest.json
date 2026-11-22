@@ -72,6 +72,12 @@
           "height": 900
         },
         {
+          "src": "assets/de/screenshots/dark/device-sync.webp",
+          "name": "device-sync",
+          "width": 1440,
+          "height": 900
+        },
+        {
           "src": "assets/de/screenshots/dark/searchbar.webp",
           "name": "searchbar",
           "width": 1200,
@@ -302,6 +308,12 @@
         {
           "src": "assets/en-CA/screenshots/dark/files.webp",
           "name": "files",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/device-sync.webp",
+          "name": "device-sync",
           "width": 1440,
           "height": 900
         },
@@ -540,6 +552,12 @@
           "height": 900
         },
         {
+          "src": "assets/es/screenshots/dark/device-sync.webp",
+          "name": "device-sync",
+          "width": 1440,
+          "height": 900
+        },
+        {
           "src": "assets/es/screenshots/dark/searchbar.webp",
           "name": "searchbar",
           "width": 1200,
@@ -770,6 +788,12 @@
         {
           "src": "assets/fr-CA/screenshots/dark/files.webp",
           "name": "files",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/device-sync.webp",
+          "name": "device-sync",
           "width": 1440,
           "height": 900
         },
@@ -1008,6 +1032,12 @@
           "height": 900
         },
         {
+          "src": "assets/it/screenshots/dark/device-sync.webp",
+          "name": "device-sync",
+          "width": 1440,
+          "height": 900
+        },
+        {
           "src": "assets/it/screenshots/dark/searchbar.webp",
           "name": "searchbar",
           "width": 1200,
@@ -1242,6 +1272,12 @@
           "height": 900
         },
         {
+          "src": "assets/ru/screenshots/dark/device-sync.webp",
+          "name": "device-sync",
+          "width": 1440,
+          "height": 900
+        },
+        {
           "src": "assets/ru/screenshots/dark/searchbar.webp",
           "name": "searchbar",
           "width": 1200,
@@ -1472,6 +1508,12 @@
         {
           "src": "assets/uk/screenshots/dark/files.webp",
           "name": "files",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/device-sync.webp",
+          "name": "device-sync",
           "width": 1440,
           "height": 900
         },
