@@ -223,7 +223,8 @@ export class LogoLevels {
   /**
    * Brightness in [0, 1] of the ripples at distance `d` from the mark's centre: the brightest of
    * those whose band, `halfWidth` either side of its radius, covers `d`; 0 where none does. A
-   * ripple fades linearly from its starting brightness at the ring to nothing at the field's edge.
+   * ripple fades linearly from its starting brightness at the ring to nothing at `RIPPLE_END_R`,
+   * which on most stages is past the canvas edge.
    */
   rippleAt(d: number, halfWidth: number): number {
     let brightest = 0;
@@ -325,6 +326,41 @@ const MIN_HOUSING_PITCH = 3;
 
 type HousingSurface = HTMLCanvasElement | OffscreenCanvas;
 
+/**
+ * The style of a cell `d` mark units from the centre under the ripples in `levels`: a step of
+ * the ring's ladder, or `LOGO_STYLE.none` where no ripple is bright enough to show.
+ */
+function rippleStyle(levels: LogoLevels, d: number, halfWidth: number): number {
+  const k = rung(levels.rippleAt(d, halfWidth));
+  return k > 0 ? LOGO_STYLE.ring + k : LOGO_STYLE.none;
+}
+
+/**
+ * The housing: cells at the grid's pitch, aligned to it, covering the rest of a
+ * `width`×`height` canvas around the `n`×`n` grid at (`originX`, `originY`). Writes the
+ * half-open column and row ranges to walk, which may run negative, into `out` as
+ * [firstCol, firstRow, lastCol, lastRow]; cells inside the grid itself are not housing.
+ */
+function housingSpan(
+  width: number,
+  height: number,
+  pitch: number,
+  originX: number,
+  originY: number,
+  out: Int32Array,
+): void {
+  out[0] = -Math.ceil(originX / pitch);
+  out[1] = -Math.ceil(originY / pitch);
+  out[2] = Math.ceil((width - originX) / pitch);
+  out[3] = Math.ceil((height - originY) / pitch);
+}
+
+function inGrid(col: number, row: number, n: number): boolean {
+  return row >= 0 && row < n && col >= 0 && col < n;
+}
+
+const housingCacheSpan = new Int32Array(4);
+
 function drawOuterHousing(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   width: number,
@@ -337,24 +373,22 @@ function drawOuterHousing(
   fill: string,
 ): void {
   ctx.fillStyle = fill;
-  const firstCol = -Math.ceil(originX / pitch);
-  const firstRow = -Math.ceil(originY / pitch);
-  const lastCol = Math.ceil((width - originX) / pitch);
-  const lastRow = Math.ceil((height - originY) / pitch);
-  for (let row = firstRow; row < lastRow; row++) {
-    const inRows = row >= 0 && row < n;
+  const span = housingCacheSpan;
+  housingSpan(width, height, pitch, originX, originY, span);
+  for (let row = span[1]; row < span[3]; row++) {
     const y = originY + row * pitch;
-    for (let col = firstCol; col < lastCol; col++) {
-      if (inRows && col >= 0 && col < n) continue;
-      ctx.fillRect(originX + col * pitch, y, cell, cell);
+    for (let col = span[0]; col < span[2]; col++) {
+      if (!inGrid(col, row, n)) ctx.fillRect(originX + col * pitch, y, cell, cell);
     }
   }
 }
 
+const rippleSpan = new Int32Array(4);
+
 /**
- * Draws the ripples where they cross the housing around the grid, so they travel on to the
- * canvas edges. Each lit cell is cleared first, so it shows the same fill over the stage as the
- * ripple cells inside the grid do rather than that fill over a housing cell.
+ * Draws the ripples where they cross the housing, so they travel on to the canvas edges. Each
+ * lit cell is cleared first, so it shows the same fill over the stage as the ripple cells inside
+ * the grid do rather than that fill over a housing cell.
  */
 function drawOuterRipples(
   ctx: CanvasRenderingContext2D,
@@ -369,22 +403,18 @@ function drawOuterRipples(
   halfWidth: number,
   styles: readonly string[],
 ): void {
-  const n = grid.size;
-  const firstCol = -Math.ceil(originX / pitch);
-  const firstRow = -Math.ceil(originY / pitch);
-  const lastCol = Math.ceil((width - originX) / pitch);
-  const lastRow = Math.ceil((height - originY) / pitch);
-  let current = -1;
-  for (let row = firstRow; row < lastRow; row++) {
-    const inRows = row >= 0 && row < n;
+  const span = rippleSpan;
+  housingSpan(width, height, pitch, originX, originY, span);
+  let current: number = LOGO_STYLE.none;
+  for (let row = span[1]; row < span[3]; row++) {
     const y = originY + row * pitch;
-    for (let col = firstCol; col < lastCol; col++) {
-      if (inRows && col >= 0 && col < n) continue;
-      const k = rung(levels.rippleAt(grid.markDistanceAt(col, row), halfWidth));
-      if (k === 0) continue;
-      if (k !== current) {
-        ctx.fillStyle = styles[LOGO_STYLE.ring + k];
-        current = k;
+    for (let col = span[0]; col < span[2]; col++) {
+      if (inGrid(col, row, grid.size)) continue;
+      const style = rippleStyle(levels, grid.markDistanceAt(col, row), halfWidth);
+      if (style === LOGO_STYLE.none) continue;
+      if (style !== current) {
+        ctx.fillStyle = styles[style];
+        current = style;
       }
       const x = originX + col * pitch;
       ctx.clearRect(x, y, cell, cell);
@@ -591,10 +621,7 @@ export class VoxelLogoRenderer {
         else if (rest === LOGO_REST.ring || Math.abs(d - RING_R) <= ringHalf) style = ringStyle;
         else if (rest === LOGO_REST.rim || Math.abs(d - RIM_R) <= rimHalf) style = rimStyle;
         // Ripples are drawn in the ring's colour, over the glow and housing.
-        if (style === LOGO_STYLE.none && ripples) {
-          const k = rung(levels.rippleAt(d, rippleHalf));
-          if (k > 0) style = LOGO_STYLE.ring + k;
-        }
+        if (style === LOGO_STYLE.none && ripples) style = rippleStyle(levels, d, rippleHalf);
         if (style === LOGO_STYLE.none && this.glow && d <= glowR && glowR > RING_OUTER) {
           const k = rung(glowOpacity * (1 - (d - RING_OUTER) / (glowR - RING_OUTER)));
           if (k > 0) style = LOGO_STYLE.glow + k;

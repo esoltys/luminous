@@ -21,7 +21,10 @@ interface VoxelLogoSizeConfig {
   readonly housing: boolean;
   /** The mid-driven glow halo around the ring. */
   readonly glow: boolean;
-  /** Beat ripples travelling out across the housing; needs `smoothed`, as ripples move in `step`. */
+  /**
+   * Beat ripples travelling out across the stage. No effect without `smoothed`: ripples only
+   * move in `step`, and settling each frame drops them.
+   */
   readonly ripples: boolean;
   /** The surface the canvas sits on, which colours are contrast-checked against. */
   readonly surface: "bg-main" | "bg-playerbar";
