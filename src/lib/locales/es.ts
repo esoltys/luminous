@@ -3270,6 +3270,19 @@ export const es = {
       one: "{count} emisora importada",
       other: "{count} emisoras importadas",
     },
+    importStationListTitle: "¿Importar emisoras de radio?",
+    importStationListMessage: {
+      one: "Se encontró {count} emisora en streaming en {files}.\n\n¿Importarla como lista de emisoras? Aparecerá en Radio por internet → Mis emisoras → Listas de emisoras.",
+      other:
+        "Se encontraron {count} emisoras en streaming en {files}.\n\n¿Importarlas como lista de emisoras? Aparecerá en Radio por internet → Mis emisoras → Listas de emisoras.",
+    },
+    importStationListConfirm: "Importar",
+    stationListImported: {
+      one: "{name} importada con {count} emisora",
+      other: "{name} importada con {count} emisoras",
+    },
+    stationListImportFailed: "No se pudo importar {name}: {error}",
+    showStationLists: "Mostrar",
     stationsExported: {
       one: "{count} emisora exportada",
       other: "{count} emisoras exportadas",

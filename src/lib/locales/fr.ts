@@ -3285,6 +3285,19 @@ export const fr: DeepStringRecord<typeof en> = {
       one: "{count} station importée",
       other: "{count} stations importées",
     },
+    importStationListTitle: "Importer des stations de radio?",
+    importStationListMessage: {
+      one: "{count} station en diffusion en continu trouvée dans {files}.\n\nL'importer comme liste de stations? Elle apparaîtra dans Radio Internet → Mes stations → Listes de stations.",
+      other:
+        "{count} stations en diffusion en continu trouvées dans {files}.\n\nLes importer comme liste de stations? Elle apparaîtra dans Radio Internet → Mes stations → Listes de stations.",
+    },
+    importStationListConfirm: "Importer",
+    stationListImported: {
+      one: "Liste « {name} » importée : {count} station",
+      other: "Liste « {name} » importée : {count} stations",
+    },
+    stationListImportFailed: "Impossible d'importer « {name} » : {error}",
+    showStationLists: "Afficher",
     stationsExported: {
       one: "{count} station exportée",
       other: "{count} stations exportées",

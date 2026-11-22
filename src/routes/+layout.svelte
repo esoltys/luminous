@@ -10,6 +10,7 @@
   import { navigationStore } from "../lib/stores/navigation.svelte";
   import { windowLayoutStore } from "../lib/stores/windowLayout.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
+  import { radioStore } from "../lib/stores/radio.svelte";
   import CoverArt from "../lib/components/CoverArt.svelte";
   import Miniplayer from "../lib/components/Miniplayer.svelte";
   import ImmersiveSessionWrap from "../lib/components/ImmersiveSessionWrap.svelte";
@@ -809,6 +810,23 @@
       danger={true}
       onConfirm={() => collectionStore.resolveActiveMassRemoval("prune")}
       onCancel={() => collectionStore.resolveActiveMassRemoval("keep")}
+    />
+  {/if}
+
+  {#if playerStore.pendingStationLists.length > 0}
+    {@const lists = playerStore.pendingStationLists}
+    <ConfirmDialog
+      title={i18n.t("radio.importStationListTitle")}
+      message={i18n.plural(
+        "radio.importStationListMessage",
+        lists.reduce((sum, l) => sum + l.station_count, 0),
+        { files: lists.map((l) => l.path.split(/[\\/]/).pop()).join(", ") },
+      )}
+      confirmLabel={i18n.t("radio.importStationListConfirm")}
+      cancelLabel={i18n.t("common.cancel")}
+      danger={false}
+      onConfirm={() => void radioStore.importStationLists(playerStore.takePendingStationLists())}
+      onCancel={() => playerStore.takePendingStationLists()}
     />
   {/if}
 

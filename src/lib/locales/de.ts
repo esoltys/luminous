@@ -3278,6 +3278,19 @@ export const de = {
       one: "{count} Sender importiert",
       other: "{count} Sender importiert",
     },
+    importStationListTitle: "Radiosender importieren?",
+    importStationListMessage: {
+      one: "{count} Streaming-Sender in {files} gefunden.\n\nAls Senderliste importieren? Sie erscheint unter Internetradio → Meine Sender → Senderlisten.",
+      other:
+        "{count} Streaming-Sender in {files} gefunden.\n\nAls Senderliste importieren? Sie erscheint unter Internetradio → Meine Sender → Senderlisten.",
+    },
+    importStationListConfirm: "Importieren",
+    stationListImported: {
+      one: "{name} mit {count} Sender importiert",
+      other: "{name} mit {count} Sendern importiert",
+    },
+    stationListImportFailed: "{name} konnte nicht importiert werden: {error}",
+    showStationLists: "Anzeigen",
     stationsExported: {
       one: "{count} Sender exportiert",
       other: "{count} Sender exportiert",

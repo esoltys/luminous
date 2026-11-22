@@ -3193,6 +3193,19 @@ export const en = {
       one: "{count} station imported",
       other: "{count} stations imported",
     },
+    importStationListTitle: "Import radio stations?",
+    importStationListMessage: {
+      one: "Found {count} streaming station in {files}.\n\nImport it as a station list? It will appear under Internet Radio → My stations → Station Lists.",
+      other:
+        "Found {count} streaming stations in {files}.\n\nImport them as a station list? It will appear under Internet Radio → My stations → Station Lists.",
+    },
+    importStationListConfirm: "Import",
+    stationListImported: {
+      one: "Imported {name} with {count} station",
+      other: "Imported {name} with {count} stations",
+    },
+    stationListImportFailed: "Couldn't import {name}: {error}",
+    showStationLists: "Show",
     stationsExported: {
       one: "{count} station exported",
       other: "{count} stations exported",
