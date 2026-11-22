@@ -24,8 +24,11 @@ function recordingContext() {
   const rects: Rect[] = [];
   const ctx = {
     fillStyle: "",
-    clearRect() {
+    /** Removes the cells drawn inside the cleared rectangle. */
+    clearRect(x: number, y: number, w: number, h: number) {
+      const kept = rects.filter((r) => r.x < x || r.x >= x + w || r.y < y || r.y >= y + h);
       rects.length = 0;
+      rects.push(...kept);
     },
     fillRect(x: number, y: number) {
       rects.push({ style: ctx.fillStyle, x, y });
@@ -157,6 +160,98 @@ describe("LogoLevels (#2252)", () => {
   });
 });
 
+describe("LogoLevels beat ripples (#2270)", () => {
+  const RING_OUTER = 96;
+
+  it("sends a ripple outward from the ring on each beat, fading until it is gone", () => {
+    const levels = new LogoLevels();
+    expect(levels.rippleAt(RING_OUTER, 1)).toBe(0);
+
+    levels.push(frame(bandsIn(0, 0), 0.8));
+    const start = levels.rippleAt(RING_OUTER, 1);
+    expect(start).toBeGreaterThan(0);
+
+    // 100 ms at 150 units/s carries it 15 units out, dimmer than it started.
+    expect(levels.step(100, false)).toBe(true);
+    expect(levels.rippleAt(RING_OUTER, 1)).toBe(0);
+    const later = levels.rippleAt(RING_OUTER + 15, 1);
+    expect(later).toBeGreaterThan(0);
+    expect(later).toBeLessThan(start);
+    expect(levels.rippling).toBe(true);
+
+    let frames = 0;
+    while (levels.step(16, false)) {
+      frames++;
+      expect(frames).toBeLessThan(200);
+    }
+    expect(levels.rippling).toBe(false);
+    for (let d = 0; d <= 400; d += 2) expect(levels.rippleAt(d, 1)).toBe(0);
+  });
+
+  it("keeps animating while a ripple is in flight, even once the levels have arrived", () => {
+    // Full bass already settled, so the beat leaves every level where it is.
+    const levels = new LogoLevels();
+    levels.push(frame(bandsIn(0, 8)));
+    levels.settle();
+    levels.push(frame(bandsIn(0, 8), 1));
+    let frames = 0;
+    while (levels.step(16, false)) {
+      frames++;
+      expect(frames).toBeLessThan(200);
+    }
+    // 220 units of travel at 150 units/s.
+    expect(frames * 16).toBeGreaterThan(1400);
+    expect(levels.bass).toBe(1);
+  });
+
+  it("is still lit at a 16:9 stage's side edges, about 250 units out, and gone by 316", () => {
+    const levels = new LogoLevels();
+    levels.push(frame(bandsIn(0, 0), 1));
+    let atSides = 0;
+    // Probing 3 units either side, nothing past 319 means no ripple is alive beyond 316.
+    do {
+      for (let d = 319.5; d <= 400; d += 1) expect(levels.rippleAt(d, 3)).toBe(0);
+      atSides = Math.max(atSides, levels.rippleAt(250, 3));
+    } while (levels.step(16, false));
+    expect(atSides).toBeGreaterThan(0.25);
+  });
+
+  it("starts stronger beats brighter", () => {
+    const soft = new LogoLevels();
+    const hard = new LogoLevels();
+    soft.push(frame(bandsIn(0, 0), 0.1));
+    hard.push(frame(bandsIn(0, 0), 1));
+    expect(hard.rippleAt(RING_OUTER, 1)).toBeGreaterThan(soft.rippleAt(RING_OUTER, 1));
+    expect(hard.rippleAt(RING_OUTER, 1)).toBeLessThanOrEqual(1);
+  });
+
+  it("replaces the oldest ripple when a seventh beat arrives with six in flight", () => {
+    const levels = new LogoLevels();
+    for (let beat = 0; beat < 7; beat++) {
+      levels.push(frame(bandsIn(0, 0), 1));
+      if (beat < 6) levels.step(20, false);
+    }
+    // 20 ms steps move each ripple 3 units: the first would now be at 114, the next at 111.
+    expect(levels.rippleAt(114, 1)).toBe(0);
+    for (let r = RING_OUTER; r <= 111; r += 3) {
+      expect(levels.rippleAt(r, 1)).toBeGreaterThan(0);
+    }
+  });
+
+  it("drops ripples under reduced motion and on settle()", () => {
+    const reduced = new LogoLevels();
+    reduced.push(frame(bandsIn(0, 0), 1));
+    reduced.step(16, true);
+    for (let d = 0; d <= 240; d += 2) expect(reduced.rippleAt(d, 1)).toBe(0);
+
+    const settled = new LogoLevels();
+    settled.push(frame(bandsIn(0, 0), 1));
+    settled.settle();
+    expect(settled.rippleAt(RING_OUTER, 1)).toBe(0);
+    expect(settled.step(16, false)).toBe(false);
+  });
+});
+
 describe("VoxelLogoRenderer (#2252)", () => {
   const palette = buildVoxelLogoPalette(LUMINOUS_DARK_COLORS, "bg-main");
 
@@ -165,6 +260,7 @@ describe("VoxelLogoRenderer (#2252)", () => {
       grids: [new LogoGrid(56, -40, 240)],
       housing: true,
       glow: true,
+      ripples: true,
     });
   }
 
@@ -173,6 +269,7 @@ describe("VoxelLogoRenderer (#2252)", () => {
       grids: [13, 11, 9].map((n) => new LogoGrid(n, -4, 204)),
       housing: false,
       glow: false,
+      ripples: false,
     });
     expect(renderer.gridFor(96, 40).size).toBe(13);
     expect(renderer.gridFor(96, 28).size).toBe(9);
@@ -229,6 +326,93 @@ describe("VoxelLogoRenderer (#2252)", () => {
       new Set(rects.filter((r) => cellsIn([r], layer).size > 0).map((r) => r.style));
     expect(fills(loud, "rim")).not.toEqual(fills(quiet, "rim"));
     expect(fills(loud, "ring")).not.toEqual(fills(quiet, "ring"));
+  });
+
+  describe("beat ripples (#2270)", () => {
+    /**
+     * Mark-unit distance from the centre of the cell drawn at (x, y) on a canvas 560 px tall and
+     * `width` wide: 10 px pitch, the 56-cell grid centred horizontally.
+     */
+    function markDistanceOf(r: Rect, width = 560): number {
+      const cellUnits = 280 / 56;
+      const originX = (width - 560) / 2;
+      const mx = -40 + ((r.x - originX) / 10 + 0.5) * cellUnits;
+      const my = -40 + (r.y / 10 + 0.5) * cellUnits;
+      return Math.hypot(mx - 100, my - 100);
+    }
+
+    /** Levels with one strong ripple `ms` out (at 150 units/s from radius 96). */
+    function rippling(ms = 200): LogoLevels {
+      const levels = new LogoLevels();
+      levels.push(frame(bandsIn(0, 32, 0.5), 1));
+      for (let t = 0; t < ms; t += 100) levels.step(100, false);
+      return levels;
+    }
+
+    function drawWith(
+      ripples: boolean,
+      levels: LogoLevels,
+      reducedMotion = false,
+      width = 560,
+    ): Rect[] {
+      const { ctx, rects } = recordingContext();
+      new VoxelLogoRenderer({
+        grids: [new LogoGrid(56, -40, 240)],
+        housing: true,
+        glow: true,
+        ripples,
+      }).render(ctx, width, 560, levels, TAGGED, reducedMotion);
+      return rects;
+    }
+
+    /** Cells whose fill differs between two renders of the same grid. */
+    function changed(a: Rect[], b: Rect[]): { before: Rect; after: Rect }[] {
+      const byPos = new Map(a.map((r) => [`${r.x},${r.y}`, r]));
+      return b
+        .filter((r) => byPos.get(`${r.x},${r.y}`)?.style !== r.style)
+        .map((after) => ({ before: byPos.get(`${after.x},${after.y}`)!, after }));
+    }
+
+    it("lights a ring of cells at the ripple's radius in the ring's colour", () => {
+      const levels = rippling();
+      const lit = changed(drawWith(false, levels), drawWith(true, levels));
+      expect(lit.length).toBeGreaterThan(40);
+      for (const { after } of lit) {
+        expect(cellsIn([after], "ring").size).toBe(1);
+        // The band is 3 units either side of the radius, measured at cell centres.
+        expect(Math.abs(markDistanceOf(after) - 126)).toBeLessThanOrEqual(3.01);
+      }
+    });
+
+    it("carries on past the grid across a wide stage's housing, out to the left and right", () => {
+      // 700 ms out: radius 201, past the grid's sides (140 units from the centre).
+      const levels = rippling(700);
+      const width = 1120;
+      const lit = changed(
+        drawWith(false, levels, false, width),
+        drawWith(true, levels, false, width),
+      );
+      const outside = lit.filter(({ after }) => after.x < 280 || after.x >= 840);
+      expect(outside.filter(({ after }) => after.x < 280).length).toBeGreaterThan(10);
+      expect(outside.filter(({ after }) => after.x >= 840).length).toBeGreaterThan(10);
+      for (const { after } of lit) {
+        expect(cellsIn([after], "ring").size).toBe(1);
+        expect(Math.abs(markDistanceOf(after, width) - 201)).toBeLessThanOrEqual(3.01);
+      }
+    });
+
+    it("only replaces housing and glow cells, never the mark's own layers", () => {
+      const levels = rippling();
+      const housing = String(LOGO_STYLE.housing);
+      for (const { before } of changed(drawWith(false, levels), drawWith(true, levels))) {
+        expect(before.style === housing || cellsIn([before], "glow").size === 1).toBe(true);
+      }
+    });
+
+    it("draws no ripples under reduced motion", () => {
+      const levels = rippling();
+      expect(changed(drawWith(false, levels, true), drawWith(true, levels, true))).toHaveLength(0);
+    });
   });
 
   it("skips outer housing tiling when pitch drops below 3 px and ignores invalid sizes (#2262)", () => {

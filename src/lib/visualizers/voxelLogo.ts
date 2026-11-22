@@ -21,6 +21,11 @@ interface VoxelLogoSizeConfig {
   readonly housing: boolean;
   /** The mid-driven glow halo around the ring. */
   readonly glow: boolean;
+  /**
+   * Beat ripples travelling out across the stage. No effect without `smoothed`: ripples only
+   * move in `step`, and settling each frame drops them.
+   */
+  readonly ripples: boolean;
   /** The surface the canvas sits on, which colours are contrast-checked against. */
   readonly surface: "bg-main" | "bg-playerbar";
   /**
@@ -37,6 +42,7 @@ const SIZES: Record<VisualizerSize, VoxelLogoSizeConfig> = {
     grids: () => [new LogoGrid(56, -40, 240)],
     housing: true,
     glow: true,
+    ripples: true,
     surface: "bg-main",
     smoothed: true,
   },
@@ -47,6 +53,7 @@ const SIZES: Record<VisualizerSize, VoxelLogoSizeConfig> = {
     grids: () => [13, 11, 9].map((size) => new LogoGrid(size, -4, 204)),
     housing: false,
     glow: false,
+    ripples: false,
     surface: "bg-playerbar",
     smoothed: false,
   },
@@ -65,6 +72,7 @@ class VoxelLogoInstance implements VisualizerInstance {
       grids: config.grids(),
       housing: config.housing,
       glow: config.glow,
+      ripples: config.ripples,
     });
   }
 
@@ -92,7 +100,10 @@ class VoxelLogoInstance implements VisualizerInstance {
   }
 }
 
-/** The Luminous mark as an LED grid: mids light the rim, treble the ring, bass flares the burst. */
+/**
+ * The Luminous mark as an LED grid: mids light the rim, treble the ring, bass flares the burst,
+ * and in the full view each beat sends a ripple out from the ring.
+ */
 export const VOXEL_LOGO_PRESET: VisualizerPreset = {
   id: "voxel-logo",
   labelKey: "visualizers.voxelLogo",
