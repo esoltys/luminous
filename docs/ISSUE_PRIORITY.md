@@ -83,4 +83,8 @@ indicate when they should be worked on after 1.0 ships):
 - **P3** — Lower-frequency or power-user features.
 - **P4** — Speculative, large-scope, or low-demand work; revisit after core 2.0 features ship.
 
+### Epics
+An epic takes the Priority of its highest-priority sub-issue (any P1 sub-issue makes the epic P1).
+Set it once the sub-issues have priorities, and update it whenever a sub-issue is added or changes priority.
+
 Don't default new issues to P2/P3 — assign a priority using the same criteria above.
