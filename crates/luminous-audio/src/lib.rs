@@ -1380,6 +1380,22 @@ impl AudioOutput {
         )
     }
 
+    /// The rate to reopen this output at before starting a track at
+    /// `track_rate` afresh, or `None` to reuse it. An output whose stream has
+    /// errored is dead whatever its rate, so it always reopens, at the track's
+    /// rate as if there were no output; otherwise only a rate switch reopens
+    /// it. The error check can't be left to `check_and_rebuild_output`: that
+    /// runs only inside the decode loop, which Pause and Stop leave, so an
+    /// error landing while idle (sleep/resume, a device change) is first seen
+    /// here, when playback starts again.
+    fn reopen_rate_for(&self, track_rate: u32) -> Option<u32> {
+        if self.sink.is_errored() {
+            Some(track_rate)
+        } else {
+            self.rate_switch_for(track_rate)
+        }
+    }
+
     /// Make this the output `AudioEngine::output_info` describes, and report
     /// a backend fallback if it is one.
     fn publish(&self, shared: &AudioShared, event_tx: &mpsc::Sender<AudioEvent>) {
@@ -2246,28 +2262,11 @@ fn decode_thread(
                             r.track.clone(),
                             r.start_nanosec,
                         ) {
+                            // Cueing never plays, so a louder rebuilt
+                            // output needs no extra care here.
                             Ok(_) => {
-                                let out = output.as_mut().unwrap();
-                                let target_sample_rate = out.sample_rate;
-                                let target_channels = out.channels;
-                                {
-                                    let mut consumer = out.consumer.lock();
-                                    while consumer.try_pop().is_some() {}
-                                }
-                                let start_samples = samples_for_ns(
-                                    r.start_nanosec,
-                                    target_sample_rate,
-                                    target_channels,
-                                );
-                                out.played_samples.store(start_samples, Ordering::Relaxed);
-                                let _ = out.sink.pause();
-                                {
-                                    let mut s = shared.play_state.lock();
-                                    *s = EngineState::Paused;
-                                }
-                                shared.position.store(r.start_nanosec, Ordering::Relaxed);
-                                paused_req = Some(r);
-                                let _ = event_tx.send(AudioEvent::Paused);
+                                let out = output.as_ref().expect("output was just readied");
+                                cue_paused(out, &shared, &event_tx, &mut paused_req, r);
                             }
                             Err(StartFailure::Track(message)) => {
                                 let _ = event_tx.send(AudioEvent::Error { message });
@@ -2400,9 +2399,10 @@ fn decode_thread(
             }
         }
 
-        // Ensure the persistent output stream exists (built lazily on the
+        // Ensure a live persistent output stream exists (built lazily on the
         // first track this thread ever plays; reused for every track after,
-        // unless a bit-perfect one must reopen at this track's rate).
+        // unless its stream errored while idle or a bit-perfect one must
+        // reopen at this track's rate — see `AudioOutput::reopen_rate_for`).
         // Built on a fresh thread — `output` can already be `None` here after
         // a mid-session device-change rebuild (see `check_and_rebuild_output`),
         // and re-touching COM on `decode_thread`'s own long-lived OS thread a
@@ -2414,7 +2414,27 @@ fn decode_thread(
             req.track,
             req.start_nanosec,
         ) {
-            Ok(t) => t,
+            Ok(Started {
+                track,
+                louder: false,
+            }) => track,
+            // Same guard as `DeviceCheckOutcome::PauseOnLouder`: the level
+            // jump waits for the user to press play again.
+            Ok(Started {
+                track,
+                louder: true,
+            }) => {
+                log::info!(
+                    "Output reopened without system volume: cueing paused until playback resumes"
+                );
+                let out = output.as_ref().expect("output was just readied");
+                let req = PlayRequest {
+                    track: track.spec,
+                    start_nanosec: req.start_nanosec,
+                };
+                cue_paused(out, &shared, &event_tx, &mut paused_req, req);
+                continue;
+            }
             Err(StartFailure::Track(message)) => {
                 let _ = event_tx.send(AudioEvent::Error { message });
                 continue;
@@ -2544,18 +2564,28 @@ enum StartFailure {
     NoOutput(Track, String),
 }
 
-/// Opens `track` at `start_nanosec` and readies the output to play it: builds
-/// one if there is none, and reopens a bit-perfect one at the track's own
-/// rate when it was opened for another (see `rate_switch`). The track comes
-/// back decoding for the format the output actually runs at. Only called
-/// where playback starts afresh, so nothing queued in the ring buffer is lost.
+/// A track readied by [`start_on_output`].
+struct Started {
+    /// Decoding for the format the output actually runs at.
+    track: ActiveTrack,
+    /// The output was reopened onto a backend that skips the system volume
+    /// the old one went through (see `bypasses_system_volume`), so starting
+    /// playback could jump in level: cue the track paused instead of playing.
+    louder: bool,
+}
+
+/// Opens `track` at `start_nanosec` and readies a live output to play it:
+/// builds one if there is none, and reopens the existing one when
+/// [`AudioOutput::reopen_rate_for`] says it can't be reused (its stream
+/// errored, or it is bit-perfect at another rate). Only called where playback
+/// starts afresh, so nothing queued in the ring buffer is lost.
 fn start_on_output(
     output: &mut Option<AudioOutput>,
     shared: &Arc<AudioShared>,
     event_tx: &mpsc::Sender<AudioEvent>,
     track: Track,
     start_nanosec: u64,
-) -> Result<ActiveTrack, StartFailure> {
+) -> Result<Started, StartFailure> {
     // The output format isn't settled until the track's rate is known, so
     // open for the current one and retarget below.
     let (rate, channels) = output
@@ -2574,25 +2604,59 @@ fn start_on_output(
 
     let reopen_at = match output.as_ref() {
         None => Some(active.src_rate),
-        Some(out) => out.rate_switch_for(active.src_rate),
+        Some(out) => out.reopen_rate_for(active.src_rate),
     };
+    let mut louder = false;
     if let Some(rate) = reopen_at {
-        let reopening = output.is_some();
+        let old_backend = output.as_ref().map(|o| o.sink.backend());
         if let Some(old_out) = output.take() {
-            log::info!("Reopening the output at {rate} Hz for the next track");
+            if old_out.sink.is_errored() {
+                log::warn!("Output stream errored while idle: rebuilding it before playing");
+            } else {
+                log::info!("Reopening the output at {rate} Hz for the next track");
+            }
             let _ = old_out.sink.pause();
         }
         let new_out = build_output_on_fresh_thread(shared, Some(rate))
             .map_err(|message| StartFailure::NoOutput(active.spec.clone(), message))?;
+        louder = old_backend.is_some_and(|old| bypasses_system_volume(old, new_out.sink.backend()));
         new_out.publish(shared, event_tx);
         *output = Some(new_out);
-        if reopening {
+        if old_backend.is_some() {
             let _ = event_tx.send(AudioEvent::PipelineChanged);
         }
     }
     let out = output.as_ref().expect("output was just built");
     active.retarget(out.sample_rate, out.channels);
-    Ok(active)
+    Ok(Started {
+        track: active,
+        louder,
+    })
+}
+
+/// Leaves `req` cued on `out` without playing it: the buffer emptied and
+/// positioned at its start, the sink paused and the engine `Paused`, so
+/// Resume starts it from there.
+fn cue_paused(
+    out: &AudioOutput,
+    shared: &AudioShared,
+    event_tx: &mpsc::Sender<AudioEvent>,
+    paused_req: &mut Option<PlayRequest>,
+    req: PlayRequest,
+) {
+    {
+        let mut consumer = out.consumer.lock();
+        while consumer.try_pop().is_some() {}
+    }
+    out.played_samples.store(
+        samples_for_ns(req.start_nanosec, out.sample_rate, out.channels),
+        Ordering::Relaxed,
+    );
+    let _ = out.sink.pause();
+    *shared.play_state.lock() = EngineState::Paused;
+    shared.position.store(req.start_nanosec, Ordering::Relaxed);
+    *paused_req = Some(req);
+    let _ = event_tx.send(AudioEvent::Paused);
 }
 
 /// Opens the queued next track for a handover from the current one, or
@@ -4002,6 +4066,81 @@ mod tests {
             rate_switch(AudioBackendKind::Cpal, 44_100, 48_000, 96_000),
             None
         );
+    }
+
+    /// A sink that only reports its backend and whether its stream errored.
+    struct FakeSink {
+        backend: AudioBackendKind,
+        errored: bool,
+    }
+
+    impl crate::sink::AudioSink for FakeSink {
+        fn play(&self) -> Result<(), String> {
+            Ok(())
+        }
+        fn pause(&self) -> Result<(), String> {
+            Ok(())
+        }
+        fn sample_rate(&self) -> u32 {
+            unreachable!("AudioOutput keeps its own rate")
+        }
+        fn channels(&self) -> u16 {
+            2
+        }
+        fn device_name(&self) -> Option<String> {
+            None
+        }
+        fn backend(&self) -> AudioBackendKind {
+            self.backend
+        }
+        fn output_format(&self) -> &'static str {
+            "test"
+        }
+        fn is_errored(&self) -> bool {
+            self.errored
+        }
+    }
+
+    /// An output on `backend` opened at (and asked for) `rate`.
+    fn fake_output(backend: AudioBackendKind, rate: u32, errored: bool) -> AudioOutput {
+        let (producer, consumer) = HeapRb::<f32>::new(16).split();
+        AudioOutput {
+            sink: Box::new(FakeSink { backend, errored }),
+            producer,
+            consumer: Arc::new(Mutex::new(consumer)),
+            played_samples: Arc::new(AtomicU64::new(0)),
+            sample_rate: rate,
+            channels: 2,
+            device_name: None,
+            backend_name: backend.to_string(),
+            fallback: None,
+            stands_in: false,
+            requested_rate: rate,
+        }
+    }
+
+    #[test]
+    fn an_errored_output_reopens_before_playing_on_any_backend() {
+        use AudioBackendKind::*;
+        // Shared output never switches rate, so without the error check a
+        // dead stream would be reused forever (#2275).
+        for backend in [Cpal, WasapiExclusive, Asio, Alsa] {
+            let out = fake_output(backend, 44_100, true);
+            assert_eq!(out.reopen_rate_for(44_100), Some(44_100), "{backend}");
+            assert_eq!(out.reopen_rate_for(96_000), Some(96_000), "{backend}");
+        }
+    }
+
+    #[test]
+    fn a_healthy_output_reopens_only_for_a_rate_switch() {
+        use AudioBackendKind::*;
+        let shared = fake_output(Cpal, 48_000, false);
+        assert_eq!(shared.reopen_rate_for(48_000), None);
+        assert_eq!(shared.reopen_rate_for(96_000), None);
+
+        let bit_perfect = fake_output(WasapiExclusive, 44_100, false);
+        assert_eq!(bit_perfect.reopen_rate_for(44_100), None);
+        assert_eq!(bit_perfect.reopen_rate_for(96_000), Some(96_000));
     }
 
     #[test]
