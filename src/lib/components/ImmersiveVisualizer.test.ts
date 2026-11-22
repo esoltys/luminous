@@ -94,6 +94,13 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
     }
   });
 
+  it("fills the available container without fixed pixel caps so large windows expand the stage (#2259)", () => {
+    const { getByTestId } = render(ImmersiveVisualizer, { active: true });
+    const root = getByTestId("immersive-visualizer");
+    expect(root).toHaveClass("w-full", "h-full", "@container");
+    expect(root).not.toHaveClass("max-w-5xl", "max-h-[600px]");
+  });
+
   it("subscribes to spectrum-data events and renders on the canvas when active", async () => {
     let spectrumCallback: ((event: { payload: SpectrumFrame }) => void) | undefined;
     vi.mocked(listen).mockImplementation(async (eventName, cb) => {

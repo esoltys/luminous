@@ -20,9 +20,11 @@
   }
 </script>
 
+<!-- Fills .flip-back's available space without fixed pixel caps so presets scale up to
+     fullscreen; @container queries add breathing room and keep the header legible on large windows. -->
 <div
   data-testid="immersive-visualizer"
-  class="relative z-10 flex flex-col w-full max-w-5xl h-full max-h-[600px] gap-4 md:gap-6 justify-center"
+  class="@container relative z-10 flex flex-col w-full h-full gap-4 @3xl:gap-6 justify-center @3xl:px-6 @6xl:px-12"
 >
   {#if playerStore.currentSong}
     <!-- Compact Song Context Header: Now playing pill sits above the heading, while the square
@@ -37,7 +39,7 @@
         style={detailsHeight > 0
           ? `width: ${detailsHeight}px; height: ${detailsHeight}px;`
           : undefined}
-        class="w-16 h-16 md:w-[4.5rem] md:h-[4.5rem] rounded-xl overflow-hidden border border-brand-border/50 bg-brand-sidebar flex-shrink-0 shadow-md hover:scale-105 active:scale-95 transition-transform duration-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-accent"
+        class="w-16 h-16 @3xl:w-[4.5rem] @3xl:h-[4.5rem] rounded-xl overflow-hidden border border-brand-border/50 bg-brand-sidebar flex-shrink-0 shadow-md hover:scale-105 active:scale-95 transition-transform duration-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-accent"
       >
         <CoverArt
           songId={playerStore.currentSong.id}
@@ -61,13 +63,13 @@
           class="flex flex-col min-w-0"
         >
           <h1
-            class="text-2xl md:text-3xl font-heading font-bold text-brand-text-primary leading-none -mt-[0.12em] pb-[0.2em] -mb-[0.2em] tracking-tight truncate select-text"
+            class="text-2xl @3xl:text-3xl @5xl:text-4xl font-heading font-bold text-brand-text-primary leading-none -mt-[0.12em] pb-[0.2em] -mb-[0.2em] tracking-tight truncate select-text"
           >
             {playerStore.currentSongDisplayTitle}
           </h1>
           {#if playerStore.currentSong.album?.trim()}
             <p
-              class="mt-1.5 text-sm md:text-base text-brand-text-secondary font-semibold leading-tight truncate select-text"
+              class="mt-1.5 text-sm @3xl:text-base @5xl:text-lg text-brand-text-secondary font-semibold leading-tight truncate select-text"
             >
               {playerStore.currentSong.album}
             </p>
@@ -75,7 +77,7 @@
           <p
             class="{playerStore.currentSong.album?.trim()
               ? 'mt-1'
-              : 'mt-1.5'} text-xs md:text-sm text-brand-text-secondary/70 font-medium leading-none pb-[0.2em] -mb-[0.2em] truncate select-text"
+              : 'mt-1.5'} text-xs @3xl:text-sm @5xl:text-base text-brand-text-secondary/70 font-medium leading-none pb-[0.2em] -mb-[0.2em] truncate select-text"
           >
             {playerStore.currentSongDisplaySubtitle}
           </p>
@@ -88,7 +90,7 @@
   <div
     oncontextmenu={openPresetMenu}
     role="presentation"
-    class="flex-1 min-h-[220px] md:min-h-[320px] w-full rounded-2xl border border-brand-border/40 bg-brand-sidebar/65 p-4 md:p-6 flex items-center justify-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.45)]"
+    class="flex-1 min-h-[220px] w-full rounded-2xl border border-brand-border/40 bg-brand-sidebar/65 p-4 @3xl:p-6 flex items-center justify-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.45)]"
   >
     <VisualizerCanvas
       preset={visualizerStore.preset}
