@@ -7,6 +7,8 @@ import { i18n } from "./i18n.svelte";
 import { picardStore } from "./picard.svelte";
 import { getDaypartBucket } from "../utils/daypart";
 import { navigationStore } from "./navigation.svelte";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { isWindows, isLinux } from "../platform";
 
 /** How often to check whether the Daypart Mix's local-time bucket has
  * crossed a boundary while the app stays open (#223) — cheap since the
@@ -304,8 +306,31 @@ export class PlaylistsStore {
     try {
       await invoke("delete_playlist", { id });
     } catch (err) {
-      // A file-backed playlist whose file couldn't go to the trash (#2280).
-      toastStore.show(String(err), "error");
+      console.error("Failed to delete playlist:", err);
+      // A file-backed playlist whose file couldn't go to the trash (#2280),
+      // e.g. on a network drive with no Recycle Bin: nothing was deleted.
+      const path = this.playlists.find((p) => p.id === id)?.source_path;
+      if (!path) {
+        toastStore.show(String(err), "error");
+        return;
+      }
+      const label = i18n.t(
+        isWindows ? "files.revealWindows" : isLinux ? "files.revealLinux" : "files.revealMac",
+      );
+      toastStore.show(
+        i18n.t("playlists.fileTrashFailed", { path }),
+        "error",
+        undefined,
+        undefined,
+        {
+          label,
+          onClick: () => {
+            revealItemInDir(path).catch((e) =>
+              console.error("Failed to show the playlist file:", e),
+            );
+          },
+        },
+      );
       return;
     }
     await this.refreshPlaylists();

@@ -1278,6 +1278,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     confirmDeletePlaylist: "Êtes-vous sûr de vouloir supprimer la liste de lecture « {name} » ?",
     confirmDeleteFilePlaylist:
       "Supprimer la liste de lecture « {name} » ? Son fichier, {path}, sera placé dans la corbeille.",
+    fileTrashFailed:
+      "Impossible de placer {path} dans la corbeille ; la liste de lecture n’a donc pas été supprimée. Supprimez le fichier vous-même, puis la liste de lecture.",
     confirmDeletePlaylistTitle: "Supprimer la liste de lecture",
     cancel: "Annuler",
     playTrack: "Lire la chanson",

@@ -1351,6 +1351,8 @@ export const uk = {
     confirmDeletePlaylist: "Справді видалити список відтворення «{name}»?",
     confirmDeleteFilePlaylist:
       "Видалити список відтворення «{name}»? Його файл {path} буде переміщено до кошика.",
+    fileTrashFailed:
+      "Не вдалося перемістити {path} до кошика, тому список відтворення не видалено. Видаліть файл самостійно, а потім видаліть список.",
     confirmDeletePlaylistTitle: "Видалення списку відтворення",
     cancel: "Скасувати",
     playTrack: "Відтворити пісню",

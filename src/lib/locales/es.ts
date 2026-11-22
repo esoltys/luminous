@@ -1264,6 +1264,8 @@ export const es = {
     confirmDeletePlaylist: "¿Seguro que quieres eliminar la lista de reproducción «{name}»?",
     confirmDeleteFilePlaylist:
       "¿Eliminar la lista de reproducción «{name}»? Su archivo, {path}, irá a la papelera.",
+    fileTrashFailed:
+      "No se pudo enviar {path} a la papelera, así que la lista de reproducción no se eliminó. Elimina el archivo tú mismo y después la lista.",
     confirmDeletePlaylistTitle: "Eliminar lista de reproducción",
     cancel: "Cancelar",
     playTrack: "Reproducir canción",

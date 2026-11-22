@@ -1265,6 +1265,8 @@ export const it = {
     confirmDeletePlaylist: "Eliminare la playlist «{name}»?",
     confirmDeleteFilePlaylist:
       "Eliminare la playlist «{name}»? Il suo file, {path}, verrà spostato nel cestino.",
+    fileTrashFailed:
+      "Impossibile spostare {path} nel cestino, quindi la playlist non è stata eliminata. Elimina il file manualmente, poi elimina la playlist.",
     confirmDeletePlaylistTitle: "Elimina playlist",
     cancel: "Annulla",
     playTrack: "Riproduci brano",

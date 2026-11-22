@@ -1231,6 +1231,8 @@ export const en = {
     confirmDeletePlaylist: 'Are you sure you want to delete the playlist "{name}"?',
     confirmDeleteFilePlaylist:
       "Delete the playlist “{name}”? Its file, {path}, moves to the trash.",
+    fileTrashFailed:
+      "Couldn’t move {path} to the trash, so the playlist wasn’t deleted. Delete the file yourself, then delete the playlist.",
     confirmDeletePlaylistTitle: "Delete Playlist",
     cancel: "Cancel",
     playTrack: "Play song",

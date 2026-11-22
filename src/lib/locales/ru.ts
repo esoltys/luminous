@@ -1357,6 +1357,8 @@ export const ru = {
     confirmDeletePlaylist: "Удалить список воспроизведения «{name}»?",
     confirmDeleteFilePlaylist:
       "Удалить список воспроизведения «{name}»? Его файл {path} будет перемещён в корзину.",
+    fileTrashFailed:
+      "Не удалось переместить {path} в корзину, поэтому список воспроизведения не удалён. Удалите файл сами, а затем удалите список.",
     confirmDeletePlaylistTitle: "Удаление списка воспроизведения",
     cancel: "Отмена",
     playTrack: "Воспроизвести песню",

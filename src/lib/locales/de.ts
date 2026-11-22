@@ -1267,6 +1267,8 @@ export const de = {
     confirmDeletePlaylist: "Soll die Wiedergabeliste „{name}“ wirklich gelöscht werden?",
     confirmDeleteFilePlaylist:
       "Wiedergabeliste „{name}“ löschen? Ihre Datei {path} wird in den Papierkorb verschoben.",
+    fileTrashFailed:
+      "{path} konnte nicht in den Papierkorb verschoben werden, daher wurde die Wiedergabeliste nicht gelöscht. Lösche die Datei selbst und danach die Wiedergabeliste.",
     confirmDeletePlaylistTitle: "Wiedergabeliste löschen",
     cancel: "Abbrechen",
     playTrack: "Titel abspielen",

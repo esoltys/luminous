@@ -3,7 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { Playlist, PlaylistItem, Song } from "../types";
 
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { PlaylistsStore, playlistsStore } from "./playlists.svelte";
+
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  revealItemInDir: vi.fn().mockResolvedValue(undefined),
+}));
 
 describe("PlaylistsStore", () => {
   let eventCallbacks: Record<string, Function> = {};
@@ -596,6 +601,25 @@ describe("PlaylistsStore", () => {
       for (let i = 0; i < 20; i++) await Promise.resolve();
 
       expect(toastStore.messages.some((m) => m.text.includes("Favorites"))).toBe(true);
+    });
+
+    it("says when a playlist file couldn't go to the trash and offers its folder", async () => {
+      const { toastStore } = await import("./toast.svelte");
+      toastStore.messages = [];
+      const store = new PlaylistsStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      store.playlists = [{ ...mockPlaylists[0], source_path: "Z:/m/Road Trip.m3u" }];
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "delete_playlist") throw "the Recycle Bin is not available on this drive";
+        return [];
+      });
+
+      await store.deletePlaylist(101);
+
+      const toast = toastStore.messages.find((m) => m.text.includes("Z:/m/Road Trip.m3u"));
+      expect(toast?.variant).toBe("error");
+      toast?.action?.onClick();
+      expect(revealItemInDir).toHaveBeenCalledWith("Z:/m/Road Trip.m3u");
     });
 
     it("sends the kept side of a conflict to the backend", async () => {
