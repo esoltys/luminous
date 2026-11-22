@@ -34,15 +34,15 @@ const GLOW_PEAK = 0.45;
 
 // Beat ripples (#2270): rings of light that leave the ring's outer edge on each onset.
 /** Ripples in flight at once; a new beat replaces the oldest beyond this. */
-const RIPPLE_POOL = 4;
-/** Outward speed, in mark units per second: a ripple lives about half a second. */
-const RIPPLE_SPEED = 90;
+const RIPPLE_POOL = 6;
+/** Outward speed, in mark units per second: a ripple lives about 1.5 s. */
+const RIPPLE_SPEED = 150;
 /**
- * Radius at which a ripple has faded out: the full grid's inscribed circle (it spans 140 units
- * either side of the centre). The housing beyond the grid is a static cached blit, so a ripple
- * still lit at the grid's edge would be cut off square.
+ * Radius at which a ripple has faded out. The stage is drawn edge to edge (the grid plus the
+ * housing around it), so on a 16:9 stage, about 250 units to either side, a ripple leaves the
+ * left and right edges at about a third of its brightness rather than vanishing mid-field.
  */
-const RIPPLE_END_R = 140;
+const RIPPLE_END_R = RING_OUTER + 220;
 /** Half the ripple's width, in mark units, before widening to at least half a cell. */
 const RIPPLE_HALF = 3;
 /** Brightness of the faintest onset's ripple as it leaves the ring; the strongest starts at 1. */
@@ -72,9 +72,12 @@ export class LogoGrid {
   readonly markDistance: Float32Array;
   readonly burstDistance: Float32Array;
   readonly restLayer: Uint8Array;
+  /** Mark units at the grid's top-left corner, on both axes. */
+  private readonly min: number;
 
   constructor(size: number, min: number, max: number) {
     this.size = Math.max(1, Math.floor(size));
+    this.min = min;
     this.cellUnits = (max - min) / this.size;
     const n = this.size * this.size;
     this.markDistance = new Float32Array(n);
@@ -102,6 +105,16 @@ export class LogoGrid {
                 : LOGO_REST.none;
       }
     }
+  }
+
+  /**
+   * Distance from the mark's centre of the cell at (`col`, `row`), which may lie outside the
+   * grid: cells beyond it continue at the same pitch (the housing around the grid).
+   */
+  markDistanceAt(col: number, row: number): number {
+    const x = this.min + (col + 0.5) * this.cellUnits;
+    const y = this.min + (row + 0.5) * this.cellUnits;
+    return Math.hypot(x - CENTER, y - CENTER);
   }
 }
 
@@ -201,6 +214,12 @@ export class LogoLevels {
     );
   }
 
+  /** Whether any ripple is in flight. */
+  get rippling(): boolean {
+    for (let i = 0; i < RIPPLE_POOL; i++) if (this.rippleStrength[i] > 0) return true;
+    return false;
+  }
+
   /**
    * Brightness in [0, 1] of the ripples at distance `d` from the mark's centre: the brightest of
    * those whose band, `halfWidth` either side of its radius, covers `d`; 0 where none does. A
@@ -294,7 +313,10 @@ export interface VoxelLogoRendererOptions {
   readonly housing: boolean;
   /** Draw the mid-driven glow halo around the ring. */
   readonly glow: boolean;
-  /** Draw beat ripples travelling out from the ring (never under reduced motion). */
+  /**
+   * Draw beat ripples travelling out from the ring to the canvas edges (never under reduced
+   * motion).
+   */
   readonly ripples: boolean;
 }
 
@@ -325,6 +347,48 @@ function drawOuterHousing(
     for (let col = firstCol; col < lastCol; col++) {
       if (inRows && col >= 0 && col < n) continue;
       ctx.fillRect(originX + col * pitch, y, cell, cell);
+    }
+  }
+}
+
+/**
+ * Draws the ripples where they cross the housing around the grid, so they travel on to the
+ * canvas edges. Each lit cell is cleared first, so it shows the same fill over the stage as the
+ * ripple cells inside the grid do rather than that fill over a housing cell.
+ */
+function drawOuterRipples(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  grid: LogoGrid,
+  pitch: number,
+  cell: number,
+  originX: number,
+  originY: number,
+  levels: LogoLevels,
+  halfWidth: number,
+  styles: readonly string[],
+): void {
+  const n = grid.size;
+  const firstCol = -Math.ceil(originX / pitch);
+  const firstRow = -Math.ceil(originY / pitch);
+  const lastCol = Math.ceil((width - originX) / pitch);
+  const lastRow = Math.ceil((height - originY) / pitch);
+  let current = -1;
+  for (let row = firstRow; row < lastRow; row++) {
+    const inRows = row >= 0 && row < n;
+    const y = originY + row * pitch;
+    for (let col = firstCol; col < lastCol; col++) {
+      if (inRows && col >= 0 && col < n) continue;
+      const k = rung(levels.rippleAt(grid.markDistanceAt(col, row), halfWidth));
+      if (k === 0) continue;
+      if (k !== current) {
+        ctx.fillStyle = styles[LOGO_STYLE.ring + k];
+        current = k;
+      }
+      const x = originX + col * pitch;
+      ctx.clearRect(x, y, cell, cell);
+      ctx.fillRect(x, y, cell, cell);
     }
   }
 }
@@ -574,6 +638,24 @@ export class VoxelLogoRenderer {
         const col = i - row * n;
         ctx.fillRect(originX + col * pitch, originY + row * pitch, cell, cell);
       }
+    }
+
+    // 5. Ripples carry on across the housing around the grid, out to the canvas edges (at the
+    // same pitches the housing is drawn at).
+    if (ripples && pitch >= MIN_HOUSING_PITCH && levels.rippling) {
+      drawOuterRipples(
+        ctx,
+        width,
+        height,
+        grid,
+        pitch,
+        cell,
+        originX,
+        originY,
+        levels,
+        rippleHalf,
+        palette.styles,
+      );
     }
   }
 }

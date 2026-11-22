@@ -24,8 +24,11 @@ function recordingContext() {
   const rects: Rect[] = [];
   const ctx = {
     fillStyle: "",
-    clearRect() {
+    /** Removes the cells drawn inside the cleared rectangle. */
+    clearRect(x: number, y: number, w: number, h: number) {
+      const kept = rects.filter((r) => r.x < x || r.x >= x + w || r.y < y || r.y >= y + h);
       rects.length = 0;
+      rects.push(...kept);
     },
     fillRect(x: number, y: number) {
       rects.push({ style: ctx.fillStyle, x, y });
@@ -168,19 +171,21 @@ describe("LogoLevels beat ripples (#2270)", () => {
     const start = levels.rippleAt(RING_OUTER, 1);
     expect(start).toBeGreaterThan(0);
 
-    // 100 ms at 90 units/s carries it 9 units out, dimmer than it started.
+    // 100 ms at 150 units/s carries it 15 units out, dimmer than it started.
     expect(levels.step(100, false)).toBe(true);
     expect(levels.rippleAt(RING_OUTER, 1)).toBe(0);
-    const later = levels.rippleAt(RING_OUTER + 9, 1);
+    const later = levels.rippleAt(RING_OUTER + 15, 1);
     expect(later).toBeGreaterThan(0);
     expect(later).toBeLessThan(start);
+    expect(levels.rippling).toBe(true);
 
     let frames = 0;
     while (levels.step(16, false)) {
       frames++;
       expect(frames).toBeLessThan(200);
     }
-    for (let d = 0; d <= 240; d += 2) expect(levels.rippleAt(d, 1)).toBe(0);
+    expect(levels.rippling).toBe(false);
+    for (let d = 0; d <= 400; d += 2) expect(levels.rippleAt(d, 1)).toBe(0);
   });
 
   it("keeps animating while a ripple is in flight, even once the levels have arrived", () => {
@@ -194,19 +199,21 @@ describe("LogoLevels beat ripples (#2270)", () => {
       frames++;
       expect(frames).toBeLessThan(200);
     }
-    // 44 units from the ring to the grid's inscribed circle, at 90 units/s.
-    expect(frames * 16).toBeGreaterThan(400);
+    // 220 units of travel at 150 units/s.
+    expect(frames * 16).toBeGreaterThan(1400);
     expect(levels.bass).toBe(1);
   });
 
-  it("has faded out by the full grid's inscribed circle, 140 units from the centre", () => {
+  it("is still lit at a 16:9 stage's side edges, about 250 units out, and gone by 316", () => {
     const levels = new LogoLevels();
     levels.push(frame(bandsIn(0, 0), 1));
-    // Probing 3 units either side, nothing past 143 means no ripple is alive beyond 140.
+    let atSides = 0;
+    // Probing 3 units either side, nothing past 319 means no ripple is alive beyond 316.
     do {
-      for (let d = 143.5; d <= 240; d += 1) expect(levels.rippleAt(d, 3)).toBe(0);
-      expect(levels.rippleAt(138, 3)).toBeLessThan(0.15);
+      for (let d = 319.5; d <= 400; d += 1) expect(levels.rippleAt(d, 3)).toBe(0);
+      atSides = Math.max(atSides, levels.rippleAt(250, 3));
     } while (levels.step(16, false));
+    expect(atSides).toBeGreaterThan(0.25);
   });
 
   it("starts stronger beats brighter", () => {
@@ -218,16 +225,16 @@ describe("LogoLevels beat ripples (#2270)", () => {
     expect(hard.rippleAt(RING_OUTER, 1)).toBeLessThanOrEqual(1);
   });
 
-  it("replaces the oldest ripple when a fifth beat arrives with four in flight", () => {
+  it("replaces the oldest ripple when a seventh beat arrives with six in flight", () => {
     const levels = new LogoLevels();
-    for (let beat = 0; beat < 5; beat++) {
+    for (let beat = 0; beat < 7; beat++) {
       levels.push(frame(bandsIn(0, 0), 1));
-      if (beat < 4) levels.step(20, false);
+      if (beat < 6) levels.step(20, false);
     }
-    // 20 ms steps move each ripple 1.8 units: the first would now be at 103.2, the second 101.4.
-    expect(levels.rippleAt(103.2, 0.4)).toBe(0);
-    for (const r of [101.4, 99.6, 97.8, RING_OUTER]) {
-      expect(levels.rippleAt(r, 0.5)).toBeGreaterThan(0);
+    // 20 ms steps move each ripple 3 units: the first would now be at 114, the next at 111.
+    expect(levels.rippleAt(114, 1)).toBe(0);
+    for (let r = RING_OUTER; r <= 111; r += 3) {
+      expect(levels.rippleAt(r, 1)).toBeGreaterThan(0);
     }
   });
 
@@ -322,30 +329,39 @@ describe("VoxelLogoRenderer (#2252)", () => {
   });
 
   describe("beat ripples (#2270)", () => {
-    /** Mark-unit distance from the centre of the 56-cell full grid's cell drawn at (x, y), 10 px pitch. */
-    function markDistanceOf(r: Rect): number {
+    /**
+     * Mark-unit distance from the centre of the cell drawn at (x, y) on a canvas 560 px tall and
+     * `width` wide: 10 px pitch, the 56-cell grid centred horizontally.
+     */
+    function markDistanceOf(r: Rect, width = 560): number {
       const cellUnits = 280 / 56;
-      const mx = -40 + (r.x / 10 + 0.5) * cellUnits;
+      const originX = (width - 560) / 2;
+      const mx = -40 + ((r.x - originX) / 10 + 0.5) * cellUnits;
       const my = -40 + (r.y / 10 + 0.5) * cellUnits;
       return Math.hypot(mx - 100, my - 100);
     }
 
-    /** Levels with one strong ripple 300 ms out (radius about 123). */
-    function rippling(): LogoLevels {
+    /** Levels with one strong ripple `ms` out (at 150 units/s from radius 96). */
+    function rippling(ms = 200): LogoLevels {
       const levels = new LogoLevels();
       levels.push(frame(bandsIn(0, 32, 0.5), 1));
-      for (let i = 0; i < 3; i++) levels.step(100, false);
+      for (let t = 0; t < ms; t += 100) levels.step(100, false);
       return levels;
     }
 
-    function drawWith(ripples: boolean, levels: LogoLevels, reducedMotion = false): Rect[] {
+    function drawWith(
+      ripples: boolean,
+      levels: LogoLevels,
+      reducedMotion = false,
+      width = 560,
+    ): Rect[] {
       const { ctx, rects } = recordingContext();
       new VoxelLogoRenderer({
         grids: [new LogoGrid(56, -40, 240)],
         housing: true,
         glow: true,
         ripples,
-      }).render(ctx, 560, 560, levels, TAGGED, reducedMotion);
+      }).render(ctx, width, 560, levels, TAGGED, reducedMotion);
       return rects;
     }
 
@@ -364,7 +380,24 @@ describe("VoxelLogoRenderer (#2252)", () => {
       for (const { after } of lit) {
         expect(cellsIn([after], "ring").size).toBe(1);
         // The band is 3 units either side of the radius, measured at cell centres.
-        expect(Math.abs(markDistanceOf(after) - 123)).toBeLessThanOrEqual(3.01);
+        expect(Math.abs(markDistanceOf(after) - 126)).toBeLessThanOrEqual(3.01);
+      }
+    });
+
+    it("carries on past the grid across a wide stage's housing, out to the left and right", () => {
+      // 700 ms out: radius 201, past the grid's sides (140 units from the centre).
+      const levels = rippling(700);
+      const width = 1120;
+      const lit = changed(
+        drawWith(false, levels, false, width),
+        drawWith(true, levels, false, width),
+      );
+      const outside = lit.filter(({ after }) => after.x < 280 || after.x >= 840);
+      expect(outside.filter(({ after }) => after.x < 280).length).toBeGreaterThan(10);
+      expect(outside.filter(({ after }) => after.x >= 840).length).toBeGreaterThan(10);
+      for (const { after } of lit) {
+        expect(cellsIn([after], "ring").size).toBe(1);
+        expect(Math.abs(markDistanceOf(after, width) - 201)).toBeLessThanOrEqual(3.01);
       }
     });
 
