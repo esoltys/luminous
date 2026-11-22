@@ -642,6 +642,14 @@
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+  function schedulePreview() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      if (effectiveOpen && !isApplying) fetchPreview();
+    }, PREVIEW_DEBOUNCE_MS);
+  }
+
   function handleKeydown(e: KeyboardEvent) {
     if (!effectiveOpen) return;
     if (e.key === "Escape") {
@@ -720,10 +728,7 @@
     const _refresh = refreshKey;
 
     if (_open) {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        fetchPreview();
-      }, PREVIEW_DEBOUNCE_MS);
+      schedulePreview();
     }
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -838,20 +843,16 @@
   }
 
   const events = createEventScope();
-  let libraryRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
   onMount(() => {
     window.addEventListener("keydown", handleKeydown);
     events.listen("library-changed", () => {
       if (!effectiveOpen || isApplying) return;
-      if (libraryRefreshTimer) clearTimeout(libraryRefreshTimer);
-      libraryRefreshTimer = setTimeout(() => {
-        if (effectiveOpen && !isApplying) fetchPreview();
-      }, PREVIEW_DEBOUNCE_MS);
+      schedulePreview();
     });
     return () => {
       window.removeEventListener("keydown", handleKeydown);
-      if (libraryRefreshTimer) clearTimeout(libraryRefreshTimer);
+      if (debounceTimer) clearTimeout(debounceTimer);
       events.dispose();
     };
   });
