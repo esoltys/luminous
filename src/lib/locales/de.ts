@@ -1473,7 +1473,7 @@ export const de = {
     fileConflictBadgeTooltip:
       "In Luminous und in {path} geändert. Öffne die Wiedergabeliste, um zu wählen, welche Fassung bleibt",
     fileConflictToast:
-      "„{name}“ wurde in Luminous und in der Datei geändert. Wähle, welche Fassung bleibt.",
+      "„{name}“ wurde sowohl in Luminous als auch in der Datei geändert. Wähle, welche Fassung bleibt.",
     fileConflictShowBtn: "Auswählen",
     fileConflictBanner:
       "Diese Wiedergabeliste und ihre Datei ({path}) wurden beide geändert. Behalte eine Fassung; die andere wird ersetzt.",

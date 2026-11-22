@@ -634,6 +634,19 @@ describe("PlaylistsStore", () => {
       });
     });
 
+    it("closes a conflict's toast once the user keeps a side", async () => {
+      const { toastStore } = await import("./toast.svelte");
+      toastStore.messages = [];
+      const store = new PlaylistsStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      eventCallbacks["playlist-file-conflict"]({ payload: { playlistId: 102, name: "Workout" } });
+      expect(toastStore.messages.some((m) => m.text.includes("Workout"))).toBe(true);
+
+      await store.resolveFileConflict(102, "luminous");
+
+      expect(toastStore.messages.some((m) => m.text.includes("Workout"))).toBe(false);
+    });
+
     it("refreshes auto-playlist counts when library-changed fires", async () => {
       const store = new PlaylistsStore();
       for (let i = 0; i < 10; i++) await Promise.resolve();

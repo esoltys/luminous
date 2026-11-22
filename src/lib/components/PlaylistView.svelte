@@ -1038,7 +1038,11 @@
             data-testid="playlist-file-conflict"
           >
             <InlineMessage class="flex-1 min-w-60">
-              {i18n.t("playlists.fileConflictBanner", { path: activePlaylist.source_path ?? "" })}
+              <span title={activePlaylist.source_path}>
+                {i18n.t("playlists.fileConflictBanner", {
+                  path: (activePlaylist.source_path ?? "").split(/[\\/]/).pop() ?? "",
+                })}
+              </span>
             </InlineMessage>
             <div class="flex gap-2">
               <button

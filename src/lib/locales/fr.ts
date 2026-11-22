@@ -1484,7 +1484,7 @@ export const fr: DeepStringRecord<typeof en> = {
     fileConflictBadgeTooltip:
       "Modifiée dans Luminous et dans {path}. Ouvrez la liste de lecture pour choisir la version à garder",
     fileConflictToast:
-      "« {name} » a été modifiée dans Luminous et dans son fichier. Choisissez la version à garder.",
+      "« {name} » a été modifiée à la fois dans Luminous et dans son fichier. Choisissez la version à garder.",
     fileConflictShowBtn: "Choisir",
     fileConflictBanner:
       "Cette liste de lecture et son fichier ({path}) ont tous deux été modifiés. Gardez une version; l’autre sera remplacée.",

@@ -1469,7 +1469,8 @@ export const es = {
     fileBadgeTooltip: "Sincronizada con {path}",
     fileConflictBadgeTooltip:
       "Cambiada en Luminous y en {path}. Abre la lista de reproducción para elegir qué versión conservar",
-    fileConflictToast: "«{name}» cambió en Luminous y en su archivo. Elige qué versión conservar.",
+    fileConflictToast:
+      "«{name}» cambió tanto en Luminous como en su archivo. Elige qué versión conservar.",
     fileConflictShowBtn: "Elegir",
     fileConflictBanner:
       "Esta lista de reproducción y su archivo ({path}) cambiaron. Conserva una versión; la otra se reemplazará.",

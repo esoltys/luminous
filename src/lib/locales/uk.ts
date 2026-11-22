@@ -1578,7 +1578,8 @@ export const uk = {
     fileBadgeTooltip: "Синхронізується з {path}",
     fileConflictBadgeTooltip:
       "Змінено в Luminous і в {path}. Відкрийте список відтворення, щоб вибрати, яку версію залишити",
-    fileConflictToast: "«{name}» змінено в Luminous і в його файлі. Виберіть, яку версію залишити.",
+    fileConflictToast:
+      "«{name}» змінено і в Luminous, і в його файлі. Виберіть, яку версію залишити.",
     fileConflictShowBtn: "Вибрати",
     fileConflictBanner:
       "Цей список відтворення та його файл ({path}) змінено. Залиште одну версію — іншу буде замінено.",

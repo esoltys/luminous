@@ -1434,7 +1434,7 @@ export const en = {
     fileConflictBadgeTooltip:
       "Changed in Luminous and in {path}. Open the playlist to choose which version to keep",
     fileConflictToast:
-      "“{name}” changed in Luminous and in its file. Choose which version to keep.",
+      "“{name}” changed in both Luminous and in its file. Choose which version to keep.",
     fileConflictShowBtn: "Choose",
     fileConflictBanner:
       "This playlist and its file ({path}) both changed. Keep one version; the other is replaced.",

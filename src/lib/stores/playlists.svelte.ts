@@ -268,8 +268,12 @@ export class PlaylistsStore {
 
   /** Persistent toast for a file-backed playlist in conflict, opening it so the
    * user can choose which side to keep. */
+  /** Each conflicted playlist's toast, closed once the conflict is settled. */
+  private fileConflictToasts = new Map<number, number>();
+
   private announceFileConflict(playlistId: number, name: string) {
-    toastStore.show(
+    this.closeFileConflictToast(playlistId);
+    const toastId = toastStore.show(
       i18n.t("playlists.fileConflictToast", { name }),
       "warning",
       undefined,
@@ -282,6 +286,14 @@ export class PlaylistsStore {
         },
       },
     );
+    this.fileConflictToasts.set(playlistId, toastId);
+  }
+
+  private closeFileConflictToast(playlistId: number) {
+    const toastId = this.fileConflictToasts.get(playlistId);
+    if (toastId === undefined) return;
+    toastStore.dismiss(toastId);
+    this.fileConflictToasts.delete(playlistId);
   }
 
   /** Ends a file-backed playlist's conflict by keeping one side; the backend's
@@ -289,6 +301,7 @@ export class PlaylistsStore {
   async resolveFileConflict(playlistId: number, keep: "luminous" | "file") {
     try {
       await invoke("resolve_playlist_file_conflict", { playlistId, keep });
+      this.closeFileConflictToast(playlistId);
     } catch (err) {
       console.error("Failed to resolve playlist file conflict:", err);
       toastStore.show(String(err), "error");
@@ -333,6 +346,7 @@ export class PlaylistsStore {
       );
       return;
     }
+    this.closeFileConflictToast(id);
     await this.refreshPlaylists();
     if (this.activePlaylistId === id) {
       if (Array.isArray(this.playlists) && this.playlists.length > 0) {
