@@ -1225,7 +1225,6 @@ pub fn run() {
                 let handle = app.handle().clone();
                 match crate::playlist::file_sync::PlaylistFileWriter::spawn(
                     Arc::clone(&db),
-                    Arc::clone(&self_writes),
                     move |report| crate::playlist::file_sync::announce(&handle, &report),
                 ) {
                     Ok(writer) => {
@@ -1235,9 +1234,7 @@ pub fn run() {
                         use tauri::Listener;
                         let nudger = writer.clone();
                         app.listen("library-changed", move |_| nudger.nudge());
-                        playlists
-                            .blocking_lock()
-                            .attach_file_sync(Arc::clone(&self_writes), writer);
+                        playlists.blocking_lock().attach_file_sync(writer);
                     }
                     Err(e) => log::error!("Failed to start the playlist file writer: {e}"),
                 }

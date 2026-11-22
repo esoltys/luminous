@@ -470,7 +470,6 @@ impl PlaylistManager {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        self.mark_self_written(path);
         std::fs::write(path, &bytes)?;
         self.link_exported_file(&conn, playlist_id, path, &bytes, &style)?;
         Ok(())

@@ -25,7 +25,6 @@ use super::import_export::{
     entry_key, export_tracks, playlist_name_for, replace_items, resolve_entries, ResolvedEntry,
 };
 use super::PlaylistManager;
-use crate::collection::SelfWriteTracker;
 use crate::library_paths;
 use anyhow::{anyhow, Result};
 use luminous_metadata::playlist::{self, FileStyle, ParsedTrack, PlaylistFormat};
@@ -512,16 +511,26 @@ impl PlaylistManager {
             &linked.style,
         );
         let hash = content_hash(&bytes);
-        if hash != linked.content_hash {
-            self.mark_self_written(&linked.path);
-            std::fs::write(&linked.path, &bytes)?;
-        }
-        // Catch up only to the revision this write read: an edit made
-        // meanwhile keeps the playlist pending, and its nudge writes again.
+        // Record the new hash before writing, so the watcher's notice for
+        // this write finds the file already agreed and does nothing. That,
+        // not the watcher's self-write list, is what keeps Luminous from
+        // reading its own writes back: the list would also hide an edit
+        // made elsewhere shortly after. Catch up only to the revision this
+        // write read: an edit made meanwhile keeps the playlist pending,
+        // and its nudge writes again.
         conn.execute(
             "UPDATE playlist_files SET content_hash = ?1, synced_rev = ?2 WHERE playlist_id = ?3",
             params![hash, linked.edit_rev, linked.playlist_id],
         )?;
+        if hash != linked.content_hash {
+            if let Err(e) = std::fs::write(&linked.path, &bytes) {
+                conn.execute(
+                    "UPDATE playlist_files SET content_hash = ?1, synced_rev = ?2 WHERE playlist_id = ?3",
+                    params![linked.content_hash, linked.synced_rev, linked.playlist_id],
+                )?;
+                return Err(e.into());
+            }
+        }
         Ok(None)
     }
 
@@ -610,8 +619,6 @@ impl PlaylistManager {
             .path
             .with_file_name(format!("{}.{ext}", file_stem_for(name)));
         if !library_paths::same(&target, &linked.path) && !target.exists() {
-            self.mark_self_written(&linked.path);
-            self.mark_self_written(&target);
             std::fs::rename(&linked.path, &target)?;
             conn.execute(
                 "UPDATE playlist_files SET path = ?1, path_key = ?2 WHERE playlist_id = ?3",
@@ -630,7 +637,6 @@ impl PlaylistManager {
             return Ok(());
         };
         if linked.path.exists() {
-            self.mark_self_written(&linked.path);
             trash::delete(&linked.path).map_err(|e| {
                 anyhow!("Couldn't move {} to the trash: {e}", linked.path.display())
             })?;
@@ -667,12 +673,6 @@ impl PlaylistManager {
             return Ok(());
         }
         record_agreement(conn, playlist_id, path, bytes, style)
-    }
-
-    pub(super) fn mark_self_written(&self, path: &Path) {
-        if let Some(self_writes) = &self.self_writes {
-            self_writes.mark_written([path.to_path_buf()]);
-        }
     }
 
     fn nudge_writer(&self) {
@@ -756,12 +756,10 @@ impl PlaylistFileWriter {
     /// unlinked a playlist or found a conflict.
     pub fn spawn(
         db: Arc<crate::db::Database>,
-        self_writes: Arc<SelfWriteTracker>,
         on_report: impl Fn(FileSyncReport) + Send + 'static,
     ) -> Result<Self> {
         let (nudge, nudges) = mpsc::channel::<()>();
-        let mut writer = PlaylistManager::new(db)?;
-        writer.self_writes = Some(self_writes);
+        let writer = PlaylistManager::new(db)?;
         std::thread::Builder::new()
             .name("playlist-file-writer".into())
             .spawn(move || loop {
@@ -961,6 +959,17 @@ mod tests {
             .unwrap();
         assert!(reread.is_empty(), "the write doesn't read back as a change");
         assert_eq!(lib.song_ids(id), vec![Some(2)]);
+
+        // An edit elsewhere straight after Luminous's write still lands.
+        std::fs::write(
+            &path,
+            "..\\Band\\Album\\01.mp3\r\n..\\Band\\Album\\02.mp3\r\n",
+        )
+        .unwrap();
+        lib.pm
+            .sync_playlist_files(std::slice::from_ref(&path))
+            .unwrap();
+        assert_eq!(lib.song_ids(id), vec![Some(1), Some(2)]);
     }
 
     #[test]

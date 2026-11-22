@@ -568,7 +568,14 @@ fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         // coarse `watcher_paused` window above has already
                         // elapsed, since that's exactly the race this exists
                         // to close (#514).
-                        if self_writes.contains_recent(&path) {
+                        // Playlist files are exempt: their sync compares
+                        // contents with what Luminous last wrote, so a late
+                        // notice for its own write is already a no-op, and
+                        // skipping by path would also hide an edit made
+                        // elsewhere moments later (#2280).
+                        if self_writes.contains_recent(&path)
+                            && !crate::playlist::file_sync::is_playlist_file(&path)
+                        {
                             continue;
                         }
                         match classify_watched_path(&event.kind, &path) {
