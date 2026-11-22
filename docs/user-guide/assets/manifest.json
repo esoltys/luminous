@@ -36,6 +36,12 @@
           "height": 900
         },
         {
+          "src": "assets/de/screenshots/dark/song-context-menu.webp",
+          "name": "song-context-menu",
+          "width": 392,
+          "height": 618
+        },
+        {
           "src": "assets/de/screenshots/dark/genres.webp",
           "name": "genres",
           "width": 1440,
@@ -56,6 +62,12 @@
         {
           "src": "assets/de/screenshots/dark/artist-detail.webp",
           "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/files.webp",
+          "name": "files",
           "width": 1440,
           "height": 900
         },
@@ -84,6 +96,24 @@
           "height": 900
         },
         {
+          "src": "assets/de/screenshots/dark/immersive.webp",
+          "name": "immersive",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/visualizer-menu.webp",
+          "name": "visualizer-menu",
+          "width": 336,
+          "height": 173
+        },
+        {
+          "src": "assets/de/screenshots/dark/playback-speed.webp",
+          "name": "playback-speed",
+          "width": 355,
+          "height": 167
+        },
+        {
           "src": "assets/de/screenshots/dark/miniplayer.webp",
           "name": "miniplayer",
           "width": 340,
@@ -108,6 +138,12 @@
           "height": 900
         },
         {
+          "src": "assets/de/screenshots/dark/playlist-size-limit.webp",
+          "name": "playlist-size-limit",
+          "width": 368,
+          "height": 391
+        },
+        {
           "src": "assets/de/screenshots/dark/radio-my-stations.webp",
           "name": "radio-my-stations",
           "width": 1440,
@@ -122,6 +158,12 @@
         {
           "src": "assets/de/screenshots/dark/stats.webp",
           "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/share-card.webp",
+          "name": "share-card",
           "width": 1440,
           "height": 900
         },
@@ -228,6 +270,12 @@
           "height": 900
         },
         {
+          "src": "assets/en-CA/screenshots/dark/song-context-menu.webp",
+          "name": "song-context-menu",
+          "width": 392,
+          "height": 554
+        },
+        {
           "src": "assets/en-CA/screenshots/dark/genres.webp",
           "name": "genres",
           "width": 1440,
@@ -248,6 +296,12 @@
         {
           "src": "assets/en-CA/screenshots/dark/artist-detail.webp",
           "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/files.webp",
+          "name": "files",
           "width": 1440,
           "height": 900
         },
@@ -276,6 +330,24 @@
           "height": 900
         },
         {
+          "src": "assets/en-CA/screenshots/dark/immersive.webp",
+          "name": "immersive",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/visualizer-menu.webp",
+          "name": "visualizer-menu",
+          "width": 336,
+          "height": 173
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/playback-speed.webp",
+          "name": "playback-speed",
+          "width": 355,
+          "height": 167
+        },
+        {
           "src": "assets/en-CA/screenshots/dark/miniplayer.webp",
           "name": "miniplayer",
           "width": 340,
@@ -300,6 +372,12 @@
           "height": 900
         },
         {
+          "src": "assets/en-CA/screenshots/dark/playlist-size-limit.webp",
+          "name": "playlist-size-limit",
+          "width": 368,
+          "height": 371
+        },
+        {
           "src": "assets/en-CA/screenshots/dark/radio-my-stations.webp",
           "name": "radio-my-stations",
           "width": 1440,
@@ -314,6 +392,12 @@
         {
           "src": "assets/en-CA/screenshots/dark/stats.webp",
           "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/share-card.webp",
+          "name": "share-card",
           "width": 1440,
           "height": 900
         },
@@ -420,6 +504,12 @@
           "height": 900
         },
         {
+          "src": "assets/es/screenshots/dark/song-context-menu.webp",
+          "name": "song-context-menu",
+          "width": 392,
+          "height": 586
+        },
+        {
           "src": "assets/es/screenshots/dark/genres.webp",
           "name": "genres",
           "width": 1440,
@@ -440,6 +530,12 @@
         {
           "src": "assets/es/screenshots/dark/artist-detail.webp",
           "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/files.webp",
+          "name": "files",
           "width": 1440,
           "height": 900
         },
@@ -468,6 +564,24 @@
           "height": 900
         },
         {
+          "src": "assets/es/screenshots/dark/immersive.webp",
+          "name": "immersive",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/visualizer-menu.webp",
+          "name": "visualizer-menu",
+          "width": 336,
+          "height": 173
+        },
+        {
+          "src": "assets/es/screenshots/dark/playback-speed.webp",
+          "name": "playback-speed",
+          "width": 355,
+          "height": 167
+        },
+        {
           "src": "assets/es/screenshots/dark/miniplayer.webp",
           "name": "miniplayer",
           "width": 340,
@@ -492,6 +606,12 @@
           "height": 900
         },
         {
+          "src": "assets/es/screenshots/dark/playlist-size-limit.webp",
+          "name": "playlist-size-limit",
+          "width": 368,
+          "height": 391
+        },
+        {
           "src": "assets/es/screenshots/dark/radio-my-stations.webp",
           "name": "radio-my-stations",
           "width": 1440,
@@ -506,6 +626,12 @@
         {
           "src": "assets/es/screenshots/dark/stats.webp",
           "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/share-card.webp",
+          "name": "share-card",
           "width": 1440,
           "height": 900
         },
@@ -612,6 +738,12 @@
           "height": 900
         },
         {
+          "src": "assets/fr-CA/screenshots/dark/song-context-menu.webp",
+          "name": "song-context-menu",
+          "width": 392,
+          "height": 618
+        },
+        {
           "src": "assets/fr-CA/screenshots/dark/genres.webp",
           "name": "genres",
           "width": 1440,
@@ -632,6 +764,12 @@
         {
           "src": "assets/fr-CA/screenshots/dark/artist-detail.webp",
           "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/files.webp",
+          "name": "files",
           "width": 1440,
           "height": 900
         },
@@ -660,6 +798,24 @@
           "height": 900
         },
         {
+          "src": "assets/fr-CA/screenshots/dark/immersive.webp",
+          "name": "immersive",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/visualizer-menu.webp",
+          "name": "visualizer-menu",
+          "width": 336,
+          "height": 173
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/playback-speed.webp",
+          "name": "playback-speed",
+          "width": 355,
+          "height": 167
+        },
+        {
           "src": "assets/fr-CA/screenshots/dark/miniplayer.webp",
           "name": "miniplayer",
           "width": 340,
@@ -684,6 +840,12 @@
           "height": 900
         },
         {
+          "src": "assets/fr-CA/screenshots/dark/playlist-size-limit.webp",
+          "name": "playlist-size-limit",
+          "width": 368,
+          "height": 391
+        },
+        {
           "src": "assets/fr-CA/screenshots/dark/radio-my-stations.webp",
           "name": "radio-my-stations",
           "width": 1440,
@@ -698,6 +860,12 @@
         {
           "src": "assets/fr-CA/screenshots/dark/stats.webp",
           "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/share-card.webp",
+          "name": "share-card",
           "width": 1440,
           "height": 900
         },
@@ -804,6 +972,12 @@
           "height": 900
         },
         {
+          "src": "assets/it/screenshots/dark/song-context-menu.webp",
+          "name": "song-context-menu",
+          "width": 392,
+          "height": 570
+        },
+        {
           "src": "assets/it/screenshots/dark/genres.webp",
           "name": "genres",
           "width": 1440,
@@ -824,6 +998,12 @@
         {
           "src": "assets/it/screenshots/dark/artist-detail.webp",
           "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/files.webp",
+          "name": "files",
           "width": 1440,
           "height": 900
         },
@@ -852,6 +1032,24 @@
           "height": 900
         },
         {
+          "src": "assets/it/screenshots/dark/immersive.webp",
+          "name": "immersive",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/visualizer-menu.webp",
+          "name": "visualizer-menu",
+          "width": 336,
+          "height": 173
+        },
+        {
+          "src": "assets/it/screenshots/dark/playback-speed.webp",
+          "name": "playback-speed",
+          "width": 355,
+          "height": 167
+        },
+        {
           "src": "assets/it/screenshots/dark/miniplayer.webp",
           "name": "miniplayer",
           "width": 340,
@@ -876,6 +1074,12 @@
           "height": 900
         },
         {
+          "src": "assets/it/screenshots/dark/playlist-size-limit.webp",
+          "name": "playlist-size-limit",
+          "width": 368,
+          "height": 391
+        },
+        {
           "src": "assets/it/screenshots/dark/radio-my-stations.webp",
           "name": "radio-my-stations",
           "width": 1440,
@@ -890,6 +1094,12 @@
         {
           "src": "assets/it/screenshots/dark/stats.webp",
           "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/share-card.webp",
+          "name": "share-card",
           "width": 1440,
           "height": 900
         },
@@ -996,6 +1206,12 @@
           "height": 900
         },
         {
+          "src": "assets/ru/screenshots/dark/song-context-menu.webp",
+          "name": "song-context-menu",
+          "width": 392,
+          "height": 586
+        },
+        {
           "src": "assets/ru/screenshots/dark/genres.webp",
           "name": "genres",
           "width": 1440,
@@ -1016,6 +1232,12 @@
         {
           "src": "assets/ru/screenshots/dark/artist-detail.webp",
           "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/files.webp",
+          "name": "files",
           "width": 1440,
           "height": 900
         },
@@ -1044,6 +1266,24 @@
           "height": 900
         },
         {
+          "src": "assets/ru/screenshots/dark/immersive.webp",
+          "name": "immersive",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/visualizer-menu.webp",
+          "name": "visualizer-menu",
+          "width": 336,
+          "height": 173
+        },
+        {
+          "src": "assets/ru/screenshots/dark/playback-speed.webp",
+          "name": "playback-speed",
+          "width": 355,
+          "height": 167
+        },
+        {
           "src": "assets/ru/screenshots/dark/miniplayer.webp",
           "name": "miniplayer",
           "width": 340,
@@ -1068,6 +1308,12 @@
           "height": 900
         },
         {
+          "src": "assets/ru/screenshots/dark/playlist-size-limit.webp",
+          "name": "playlist-size-limit",
+          "width": 368,
+          "height": 391
+        },
+        {
           "src": "assets/ru/screenshots/dark/radio-my-stations.webp",
           "name": "radio-my-stations",
           "width": 1440,
@@ -1082,6 +1328,12 @@
         {
           "src": "assets/ru/screenshots/dark/stats.webp",
           "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/share-card.webp",
+          "name": "share-card",
           "width": 1440,
           "height": 900
         },
@@ -1188,6 +1440,12 @@
           "height": 900
         },
         {
+          "src": "assets/uk/screenshots/dark/song-context-menu.webp",
+          "name": "song-context-menu",
+          "width": 392,
+          "height": 602
+        },
+        {
           "src": "assets/uk/screenshots/dark/genres.webp",
           "name": "genres",
           "width": 1440,
@@ -1208,6 +1466,12 @@
         {
           "src": "assets/uk/screenshots/dark/artist-detail.webp",
           "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/files.webp",
+          "name": "files",
           "width": 1440,
           "height": 900
         },
@@ -1236,6 +1500,24 @@
           "height": 900
         },
         {
+          "src": "assets/uk/screenshots/dark/immersive.webp",
+          "name": "immersive",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/visualizer-menu.webp",
+          "name": "visualizer-menu",
+          "width": 336,
+          "height": 173
+        },
+        {
+          "src": "assets/uk/screenshots/dark/playback-speed.webp",
+          "name": "playback-speed",
+          "width": 355,
+          "height": 167
+        },
+        {
           "src": "assets/uk/screenshots/dark/miniplayer.webp",
           "name": "miniplayer",
           "width": 340,
@@ -1260,6 +1542,12 @@
           "height": 900
         },
         {
+          "src": "assets/uk/screenshots/dark/playlist-size-limit.webp",
+          "name": "playlist-size-limit",
+          "width": 368,
+          "height": 391
+        },
+        {
           "src": "assets/uk/screenshots/dark/radio-my-stations.webp",
           "name": "radio-my-stations",
           "width": 1440,
@@ -1274,6 +1562,12 @@
         {
           "src": "assets/uk/screenshots/dark/stats.webp",
           "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/share-card.webp",
+          "name": "share-card",
           "width": 1440,
           "height": 900
         },
