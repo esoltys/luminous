@@ -410,6 +410,7 @@ figure { margin: 0; }
   position: relative;
 }
 .shot img { display: block; width: 100%; height: auto; cursor: zoom-in; }
+/* Cropped menus/popovers: render at <=1x natural size instead of stretching to .mw-*. */
 .shot-native { width: fit-content; max-width: 100%; }
 .shot-native img { width: auto; max-width: 100%; height: auto; }
 .caption { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
