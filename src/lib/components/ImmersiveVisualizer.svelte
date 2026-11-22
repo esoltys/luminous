@@ -20,7 +20,7 @@
   }
 </script>
 
-<!-- Fills .flip-back's available space without fixed pixel caps so presets scale up to
+<!-- Fills the available immersive area without fixed pixel caps so presets scale up to
      fullscreen; @container queries add breathing room and keep the header legible on large windows. -->
 <div
   data-testid="immersive-visualizer"
