@@ -62,11 +62,11 @@ describe("user guide image manifest & validation", () => {
     expect(manifestLangs).toEqual(expectedLangs);
   });
 
-  it("maintains the required 29 screenshots per language with positive dimensions", () => {
+  it("maintains the required 31 screenshots per language with positive dimensions", () => {
     for (const lang of MANUAL_LANGUAGES) {
       const langManifest = manifest.languages[lang];
       expect(langManifest, `Manifest missing language ${lang}`).toBeDefined();
-      expect(langManifest.images.length).toBe(29);
+      expect(langManifest.images.length).toBe(31);
 
       for (const img of langManifest.images) {
         expect(img.width).toBeGreaterThan(0);
