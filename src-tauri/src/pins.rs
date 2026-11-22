@@ -614,6 +614,8 @@ mod tests {
             sort_field: None,
             sort_asc: true,
             is_system: true,
+            source_path: None,
+            source_conflict: false,
         }
     }
 

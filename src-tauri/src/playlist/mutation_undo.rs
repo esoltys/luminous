@@ -244,7 +244,9 @@ impl PlaylistManager {
     }
 
     /// Bumps a playlist's `updated` timestamp to now — called whenever its
-    /// contents or name change, so "Updated" sort/display stays accurate.
+    /// contents or name change, so "Updated" sort/display stays accurate —
+    /// and counts the change against the playlist's file, if it has one, so
+    /// it is written there too (`file_sync`).
     pub(super) fn touch_updated(
         &self,
         conn: &rusqlite::Connection,
@@ -254,7 +256,7 @@ impl PlaylistManager {
             "UPDATE playlists SET updated = ?1 WHERE id = ?2",
             params![crate::clock::unix_now(), playlist_id],
         )?;
-        Ok(())
+        self.mark_file_edited(conn, playlist_id)
     }
 
     fn reorder_item_internal(&self, playlist_id: i64, from: i32, to: i32) -> Result<()> {

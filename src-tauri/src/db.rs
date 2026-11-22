@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 97;
+pub const CURRENT_SCHEMA_VERSION: i32 = 98;
 
 struct Migration {
     version: i32,
@@ -1030,6 +1030,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 97,
         description: "drop the removed TunePing \"On the radio now\" preferences (#2278)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_97)?),
+    },
+    Migration {
+        version: 98,
+        description: "playlist files kept in sync with a library playlist (#2280)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_98)?),
     },
 ];
 
@@ -3368,6 +3373,28 @@ UPDATE radio_directory_meta SET last_change_uuid = NULL;
 /// stale consent can never carry over to anything that reuses these keys.
 const MIGRATION_97: &str = "
 DELETE FROM app_state WHERE key IN ('airplay_enabled', 'airplay_prompt_dismissed');
+";
+
+/// The playlist file in a library folder that a playlist is kept in sync
+/// with (#2280); see `playlist::file_sync`. `path_key` is `path` as
+/// `library_paths::key` spells it, so two spellings of one file share a row.
+/// `content_hash` is the file's
+/// content when the two last agreed and `style` its `FileStyle` as JSON.
+/// Every edit in Luminous bumps `edit_rev`; a write to the file catches
+/// `synced_rev` up with it, so the playlist has unwritten edits exactly when
+/// the two differ. `conflict` is set while both sides changed and the user
+/// hasn't yet chosen which to keep.
+const MIGRATION_98: &str = "
+CREATE TABLE IF NOT EXISTS playlist_files (
+    playlist_id  INTEGER PRIMARY KEY REFERENCES playlists(id) ON DELETE CASCADE,
+    path         TEXT NOT NULL,
+    path_key     TEXT NOT NULL UNIQUE,
+    content_hash TEXT NOT NULL,
+    style        TEXT NOT NULL,
+    edit_rev     INTEGER NOT NULL DEFAULT 0,
+    synced_rev   INTEGER NOT NULL DEFAULT 0,
+    conflict     INTEGER NOT NULL DEFAULT 0
+);
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {

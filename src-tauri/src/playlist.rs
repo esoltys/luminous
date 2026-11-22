@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 mod auto_sync;
 mod dynamic;
+pub mod file_sync;
 mod import_export;
 mod mutation_undo;
 mod size_limit;
@@ -136,6 +137,12 @@ pub struct PlaylistManager {
     db: Arc<Database>,
     undo_stack: Vec<PlaylistOp>,
     redo_stack: Vec<PlaylistOp>,
+    /// Registers the playlist files this manager writes, so the watcher
+    /// doesn't read them back as outside changes. `None` in tests.
+    self_writes: Option<Arc<crate::collection::SelfWriteTracker>>,
+    /// Writes edited file-backed playlists to their files (#2280). `None`
+    /// in tests, which call `write_edited_playlist_files` directly.
+    file_writer: Option<file_sync::PlaylistFileWriter>,
 }
 
 /// Runs a synchronous `PlaylistManager` operation while `playlists`'s async
@@ -231,7 +238,20 @@ impl PlaylistManager {
             db,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
+            self_writes: None,
+            file_writer: None,
         })
+    }
+
+    /// Connects this manager to the file watcher and the playlist file
+    /// writer, so edits to file-backed playlists reach their files (#2280).
+    pub fn attach_file_sync(
+        &mut self,
+        self_writes: Arc<crate::collection::SelfWriteTracker>,
+        writer: file_sync::PlaylistFileWriter,
+    ) {
+        self.self_writes = Some(self_writes);
+        self.file_writer = Some(writer);
     }
 
     // -----------------------------------------------------------------------
@@ -279,6 +299,8 @@ impl PlaylistManager {
             sort_field: None,
             sort_asc: true,
             is_system: false,
+            source_path: None,
+            source_conflict: false,
         })
     }
 
@@ -317,15 +339,20 @@ impl PlaylistManager {
             ));
         }
         let conn = self.db.pool.get()?;
+        // Not `touch_updated`: a rename leaves the tracks alone, so an
+        // `.m3u` only needs its file renamed, not rewritten.
         conn.execute(
             "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
             params![name, crate::clock::unix_now(), id],
         )?;
-        Ok(())
+        self.rename_linked_file(&conn, id, name)
     }
 
+    /// Deletes the playlist; a file-backed one's file goes to the trash
+    /// first (see `file_sync`), and if that fails nothing is deleted.
     pub fn delete_playlist(&self, id: i64) -> Result<()> {
         let conn = self.db.pool.get()?;
+        self.trash_linked_file(&conn, id)?;
         // Cascade deletes playlist_items too (via FK)
         conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
         Ok(())

@@ -1,0 +1,1135 @@
+//! Playlist files in library folders, kept in two-way sync with a playlist
+//! (#2280). A third `impl PlaylistManager` block beside `playlist.rs` and
+//! `import_export.rs`.
+//!
+//! A playlist file (`.m3u`, `.m3u8`, `.pls`, `.xspf`) found in a library
+//! folder becomes a Custom playlist linked to it by a `playlist_files` row.
+//! The row records the file's content hash from the last time the two
+//! agreed, which is how each side tells whether the other changed:
+//!
+//! - **File → playlist.** [`PlaylistManager::sync_playlist_files`] re-reads a
+//!   file whose hash moved and replaces its playlist's items in place, so the
+//!   playlist keeps its id, pins, sort and play position.
+//! - **Playlist → file.** Every edit bumps the row's `edit_rev` (through
+//!   `touch_updated`), and [`PlaylistFileWriter`] rewrites the file shortly
+//!   after, in the style it was read in. A write never happens inside the
+//!   edit's transaction: the writer reads the committed revision.
+//! - **Both.** A file that changed while its playlist has unwritten edits is
+//!   a conflict. Neither side is written until the user picks one with
+//!   [`PlaylistManager::resolve_file_conflict`].
+//!
+//! Renaming a playlist renames its file; deleting it moves the file to the
+//! trash; a file that disappears leaves its playlist as a plain Custom one.
+
+use super::import_export::{
+    entry_key, export_tracks, playlist_name_for, replace_items, resolve_entries, ResolvedEntry,
+};
+use super::PlaylistManager;
+use crate::collection::SelfWriteTracker;
+use crate::library_paths;
+use anyhow::{anyhow, Result};
+use luminous_metadata::playlist::{self, FileStyle, PlaylistFormat};
+use rusqlite::{params, Connection, OptionalExtension};
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use std::sync::{mpsc, Arc};
+use std::time::Duration;
+
+/// How long the writer waits after the last edit before writing files, so a
+/// burst of edits (a drag-reorder, a multi-select remove) is one write.
+const WRITE_DEBOUNCE: Duration = Duration::from_millis(750);
+
+/// The playlist file extensions a scan or the watcher treats as playlists.
+pub(crate) fn is_playlist_file(path: &Path) -> bool {
+    PlaylistFormat::from_path(path).is_some()
+}
+
+/// What a sync pass changed, for the caller to announce to the UI.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct FileSyncReport {
+    /// Playlists created, re-read, unlinked, or put in conflict.
+    pub changed: Vec<i64>,
+    /// Playlists that entered a conflict in this pass.
+    pub new_conflicts: Vec<FileConflict>,
+}
+
+impl FileSyncReport {
+    pub fn is_empty(&self) -> bool {
+        self.changed.is_empty() && self.new_conflicts.is_empty()
+    }
+
+    fn changed(&mut self, playlist_id: i64) {
+        if !self.changed.contains(&playlist_id) {
+            self.changed.push(playlist_id);
+        }
+    }
+}
+
+/// A playlist whose file changed while it had edits not yet written.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileConflict {
+    pub playlist_id: i64,
+    pub name: String,
+}
+
+/// Which side of a conflict the user keeps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KeepSide {
+    /// The playlist as it is in Luminous; it overwrites the file.
+    Luminous,
+    /// The file as it is on disk; it replaces the playlist's tracks.
+    File,
+}
+
+/// Announces a sync pass: `playlists-changed` for the playlists it touched,
+/// and `playlist-file-conflict` for each new conflict (the UI asks the user
+/// which side to keep).
+pub fn announce(app: &tauri::AppHandle, report: &FileSyncReport) {
+    use tauri::Emitter;
+    if !report.changed.is_empty() {
+        let _ = app.emit("playlists-changed", report.changed.clone());
+    }
+    for conflict in &report.new_conflicts {
+        let _ = app.emit("playlist-file-conflict", conflict);
+    }
+}
+
+/// One `playlist_files` row.
+struct LinkedFile {
+    playlist_id: i64,
+    path: PathBuf,
+    content_hash: String,
+    style: FileStyle,
+    edit_rev: i64,
+    synced_rev: i64,
+    conflict: bool,
+}
+
+const LINKED_COLS: &str =
+    "playlist_id, path, content_hash, style, edit_rev, synced_rev, conflict FROM playlist_files";
+
+impl LinkedFile {
+    fn from_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
+        let style: String = row.get(3)?;
+        Ok(Self {
+            playlist_id: row.get(0)?,
+            path: PathBuf::from(row.get::<_, String>(1)?),
+            content_hash: row.get(2)?,
+            style: serde_json::from_str(&style).unwrap_or_default(),
+            edit_rev: row.get(4)?,
+            synced_rev: row.get(5)?,
+            conflict: row.get(6)?,
+        })
+    }
+
+    fn by_path(conn: &Connection, path: &Path) -> Result<Option<Self>> {
+        Ok(conn
+            .query_row(
+                &format!("SELECT {LINKED_COLS} WHERE path_key = ?1"),
+                params![path_key(path)],
+                Self::from_row,
+            )
+            .optional()?)
+    }
+
+    fn by_playlist(conn: &Connection, playlist_id: i64) -> Result<Option<Self>> {
+        Ok(conn
+            .query_row(
+                &format!("SELECT {LINKED_COLS} WHERE playlist_id = ?1"),
+                params![playlist_id],
+                Self::from_row,
+            )
+            .optional()?)
+    }
+}
+
+fn path_key(path: &Path) -> String {
+    library_paths::key(&path.to_string_lossy())
+}
+
+fn content_hash(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// Records that `playlist_id` and the file at `path` agree, as `bytes` in
+/// `style`: the link is created or repointed, every edit so far counts as
+/// written, and any conflict is over.
+fn record_agreement(
+    conn: &Connection,
+    playlist_id: i64,
+    path: &Path,
+    bytes: &[u8],
+    style: &FileStyle,
+) -> Result<()> {
+    conn.execute(
+        "INSERT INTO playlist_files (playlist_id, path, path_key, content_hash, style)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(playlist_id) DO UPDATE SET
+             path = excluded.path, path_key = excluded.path_key,
+             content_hash = excluded.content_hash, style = excluded.style,
+             synced_rev = edit_rev, conflict = 0",
+        params![
+            playlist_id,
+            path.to_string_lossy(),
+            path_key(path),
+            content_hash(bytes),
+            serde_json::to_string(style)?,
+        ],
+    )?;
+    Ok(())
+}
+
+fn unlink(conn: &Connection, playlist_id: i64) -> Result<()> {
+    conn.execute(
+        "DELETE FROM playlist_files WHERE playlist_id = ?1",
+        params![playlist_id],
+    )?;
+    Ok(())
+}
+
+fn set_conflict(conn: &Connection, playlist_id: i64) -> Result<FileConflict> {
+    conn.execute(
+        "UPDATE playlist_files SET conflict = 1 WHERE playlist_id = ?1",
+        params![playlist_id],
+    )?;
+    let name = conn.query_row(
+        "SELECT name FROM playlists WHERE id = ?1",
+        params![playlist_id],
+        |r| r.get(0),
+    )?;
+    Ok(FileConflict { playlist_id, name })
+}
+
+/// Whether `path` is inside one of the library's folders.
+fn in_library_folder(conn: &Connection, path: &Path) -> Result<bool> {
+    let path = path.to_string_lossy();
+    let mut stmt = conn.prepare("SELECT path FROM directories")?;
+    let folders = stmt.query_map([], |r| r.get::<_, String>(0))?;
+    for folder in folders {
+        if library_paths::is_under(&path, &folder?) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// A playlist that only lists files from its own folder — the per-album
+/// `.m3u` a CD ripper writes next to the tracks. Importing every one of
+/// those would bury the user's own playlists, so a scan skips them.
+fn is_album_folder_playlist(path: &Path, entries: &[ResolvedEntry]) -> bool {
+    let Some(dir) = path.parent() else {
+        return false;
+    };
+    !entries.is_empty()
+        && entries.iter().all(|e| {
+            Path::new(&e.url)
+                .parent()
+                .is_some_and(|parent| library_paths::same(parent, dir))
+        })
+}
+
+/// A file name for a playlist called `name`: characters no file system
+/// accepts become `_`, and trailing dots and spaces (which Windows drops)
+/// are trimmed.
+fn file_stem_for(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| {
+            if c.is_control() || matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*') {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let trimmed = cleaned.trim().trim_end_matches(['.', ' ']);
+    if trimmed.is_empty() {
+        "Playlist".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// What reading one playlist file did.
+enum Inbound {
+    /// The playlist now matches the file (it may already have).
+    Synced {
+        playlist_id: i64,
+        changed: bool,
+    },
+    Conflict(FileConflict),
+    /// The file is gone; its playlist stays as a plain one.
+    Detached(i64),
+    /// Not a playlist Luminous keeps (unknown format, an album-folder
+    /// playlist, or a missing file nothing was linked to).
+    Skipped,
+}
+
+impl PlaylistManager {
+    /// Reads the playlist files at `paths` into their playlists: a new file
+    /// becomes a file-backed Custom playlist, a changed one updates its
+    /// playlist in place, and a path that no longer exists unlinks its
+    /// playlist (which stays, as a plain Custom playlist). Files still there
+    /// are read before missing ones are unlinked, so a file moved within
+    /// the batch keeps its playlist. A file that fails to read is logged and
+    /// skipped; the rest of the batch still syncs.
+    pub fn sync_playlist_files(&mut self, paths: &[PathBuf]) -> Result<FileSyncReport> {
+        let (present, missing): (Vec<&PathBuf>, Vec<&PathBuf>) =
+            paths.iter().partition(|p| p.is_file());
+        let mut report = FileSyncReport::default();
+        for path in present.into_iter().chain(missing) {
+            match self.sync_file(path, false) {
+                Ok(Inbound::Synced {
+                    playlist_id,
+                    changed: true,
+                })
+                | Ok(Inbound::Detached(playlist_id)) => report.changed(playlist_id),
+                Ok(Inbound::Conflict(conflict)) => {
+                    report.changed(conflict.playlist_id);
+                    report.new_conflicts.push(conflict);
+                }
+                Ok(_) => {}
+                Err(e) => log::warn!("Couldn't sync playlist file {}: {e}", path.display()),
+            }
+        }
+        Ok(report)
+    }
+
+    /// [`Self::sync_playlist_files`] for a scan of the library folders
+    /// `roots`: the playlist files it `found`, plus every linked file under
+    /// those roots it didn't find, so playlists whose files were deleted
+    /// while Luminous was closed are unlinked. Pass only roots the scan
+    /// actually walked — an unplugged drive's files aren't gone.
+    pub fn sync_scanned_playlist_files(
+        &mut self,
+        found: &[PathBuf],
+        roots: &[PathBuf],
+    ) -> Result<FileSyncReport> {
+        let found_keys: HashSet<String> = found.iter().map(|p| path_key(p)).collect();
+        let root_keys: Vec<String> = roots.iter().map(|r| path_key(r)).collect();
+        let mut paths = found.to_vec();
+        {
+            let conn = self.db.pool.get()?;
+            let mut stmt = conn.prepare("SELECT path, path_key FROM playlist_files")?;
+            let linked =
+                stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+            for row in linked {
+                let (path, key) = row?;
+                let under_root = root_keys
+                    .iter()
+                    .any(|root| library_paths::is_under_key(&key, root));
+                if under_root && !found_keys.contains(&key) {
+                    paths.push(PathBuf::from(path));
+                }
+            }
+        }
+        self.sync_playlist_files(&paths)
+    }
+
+    /// The playlist for the file at `path` the user chose to import, when
+    /// that file is in a library folder: it becomes (or already is) a
+    /// file-backed playlist. `None` for a file outside the library, which
+    /// imports as a plain copy.
+    pub(super) fn import_library_playlist_file(&mut self, path: &Path) -> Result<Option<i64>> {
+        if !in_library_folder(&*self.db.pool.get()?, path)? {
+            return Ok(None);
+        }
+        Ok(match self.sync_file(path, true)? {
+            Inbound::Synced { playlist_id, .. } => Some(playlist_id),
+            Inbound::Conflict(c) => Some(c.playlist_id),
+            Inbound::Detached(_) | Inbound::Skipped => None,
+        })
+    }
+
+    /// Brings the playlist linked to `path` (or a new one) in line with the
+    /// file. `chosen` is a file the user picked themself, so the album-folder
+    /// rule doesn't apply to it.
+    fn sync_file(&mut self, path: &Path, chosen: bool) -> Result<Inbound> {
+        let conn = self.db.pool.get()?;
+        let linked = LinkedFile::by_path(&conn, path)?;
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(match linked {
+                    Some(l) => {
+                        unlink(&conn, l.playlist_id)?;
+                        Inbound::Detached(l.playlist_id)
+                    }
+                    None => Inbound::Skipped,
+                });
+            }
+            Err(e) => return Err(e.into()),
+        };
+        let Some(format) = PlaylistFormat::from_path(path) else {
+            return Ok(Inbound::Skipped);
+        };
+        let hash = content_hash(&bytes);
+
+        if let Some(l) = &linked {
+            if l.conflict || l.content_hash == hash {
+                return Ok(Inbound::Synced {
+                    playlist_id: l.playlist_id,
+                    changed: false,
+                });
+            }
+            if l.edit_rev != l.synced_rev {
+                return Ok(Inbound::Conflict(set_conflict(&conn, l.playlist_id)?));
+            }
+        }
+
+        let parsed = playlist::parse_playlist_bytes(&bytes, format)?;
+        let entries = resolve_entries(&conn, &parsed.tracks, path)?;
+        let name = playlist_name_for(path, parsed.title);
+        let playlist_id = match linked {
+            Some(l) => l.playlist_id,
+            None => {
+                if !chosen && is_album_folder_playlist(path, &entries) {
+                    return Ok(Inbound::Skipped);
+                }
+                match moved_playlist(&conn, &hash)? {
+                    Some(id) => id,
+                    None => match unlinked_twin(&conn, &name, &entries)? {
+                        Some(id) => id,
+                        None => self.create_playlist(&name)?.id,
+                    },
+                }
+            }
+        };
+        replace_items(&conn, playlist_id, &entries)?;
+        conn.execute(
+            "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
+            params![name, crate::clock::unix_now(), playlist_id],
+        )?;
+        record_agreement(&conn, playlist_id, path, &bytes, &parsed.style)?;
+        Ok(Inbound::Synced {
+            playlist_id,
+            changed: true,
+        })
+    }
+
+    /// Writes every file-backed playlist with edits its file doesn't have
+    /// yet, in the style the file was read in. A file changed on disk since
+    /// the two last agreed is not overwritten: its playlist goes into
+    /// conflict instead. A file that's gone unlinks its playlist. Run by
+    /// [`PlaylistFileWriter`]; a failed write is logged and retried after
+    /// the next edit.
+    pub fn write_edited_playlist_files(&self) -> Result<FileSyncReport> {
+        let conn = self.db.pool.get()?;
+        let pending: Vec<LinkedFile> = conn
+            .prepare(&format!(
+                "SELECT {LINKED_COLS} WHERE edit_rev != synced_rev AND conflict = 0"
+            ))?
+            .query_map([], LinkedFile::from_row)?
+            .collect::<rusqlite::Result<_>>()?;
+        let mut report = FileSyncReport::default();
+        for linked in pending {
+            match self.write_file(&conn, &linked) {
+                Ok(Some(Inbound::Conflict(conflict))) => {
+                    report.changed(conflict.playlist_id);
+                    report.new_conflicts.push(conflict);
+                }
+                Ok(Some(_)) => report.changed(linked.playlist_id),
+                Ok(None) => {}
+                Err(e) => log::warn!(
+                    "Couldn't write playlist file {}: {e}",
+                    linked.path.display()
+                ),
+            }
+        }
+        Ok(report)
+    }
+
+    /// Writes one playlist to its file; `Some` when that changed the link
+    /// rather than the file (a conflict or an unlink).
+    fn write_file(&self, conn: &Connection, linked: &LinkedFile) -> Result<Option<Inbound>> {
+        let on_disk = match std::fs::read(&linked.path) {
+            Ok(bytes) => bytes,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                unlink(conn, linked.playlist_id)?;
+                return Ok(Some(Inbound::Detached(linked.playlist_id)));
+            }
+            Err(e) => return Err(e.into()),
+        };
+        if content_hash(&on_disk) != linked.content_hash {
+            return Ok(Some(Inbound::Conflict(set_conflict(
+                conn,
+                linked.playlist_id,
+            )?)));
+        }
+        let format = PlaylistFormat::from_path(&linked.path)
+            .ok_or_else(|| anyhow!("Not a playlist file: {}", linked.path.display()))?;
+        let name: String = conn.query_row(
+            "SELECT name FROM playlists WHERE id = ?1",
+            params![linked.playlist_id],
+            |r| r.get(0),
+        )?;
+        let items = Self::get_playlist_tracks_from_conn(conn, linked.playlist_id)?;
+        let bytes = playlist::playlist_file_bytes(
+            &name,
+            &export_tracks(&items),
+            format,
+            &linked.path,
+            &linked.style,
+        );
+        let hash = content_hash(&bytes);
+        if hash != linked.content_hash {
+            self.mark_self_written(&linked.path);
+            std::fs::write(&linked.path, &bytes)?;
+        }
+        // Catch up only to the revision this write read: an edit made
+        // meanwhile keeps the playlist pending, and its nudge writes again.
+        conn.execute(
+            "UPDATE playlist_files SET content_hash = ?1, synced_rev = ?2 WHERE playlist_id = ?3",
+            params![hash, linked.edit_rev, linked.playlist_id],
+        )?;
+        Ok(None)
+    }
+
+    /// Ends a conflict by keeping one side: [`KeepSide::Luminous`] writes the
+    /// playlist over the file, [`KeepSide::File`] reads the file over the
+    /// playlist. A playlist that isn't in conflict (or isn't file-backed) is
+    /// left alone, so a second click is harmless.
+    pub fn resolve_file_conflict(
+        &mut self,
+        playlist_id: i64,
+        keep: KeepSide,
+    ) -> Result<FileSyncReport> {
+        let conn = self.db.pool.get()?;
+        let Some(linked) = LinkedFile::by_playlist(&conn, playlist_id)? else {
+            return Ok(FileSyncReport::default());
+        };
+        if !linked.conflict {
+            return Ok(FileSyncReport::default());
+        }
+        let mut report = FileSyncReport::default();
+        report.changed(playlist_id);
+        match keep {
+            KeepSide::Luminous => {
+                // Take the file as it is now as the agreed base, and mark an
+                // edit so the writer puts the playlist over it.
+                let on_disk = std::fs::read(&linked.path).unwrap_or_default();
+                conn.execute(
+                    "UPDATE playlist_files
+                     SET conflict = 0, content_hash = ?1, edit_rev = edit_rev + 1
+                     WHERE playlist_id = ?2",
+                    params![content_hash(&on_disk), playlist_id],
+                )?;
+                self.nudge_writer();
+            }
+            KeepSide::File => {
+                // Drop the unwritten edits and forget the agreed hash, so the
+                // file reads in as changed.
+                conn.execute(
+                    "UPDATE playlist_files
+                     SET conflict = 0, content_hash = '', synced_rev = edit_rev
+                     WHERE playlist_id = ?1",
+                    params![playlist_id],
+                )?;
+                drop(conn);
+                self.sync_file(&linked.path, true)?;
+            }
+        }
+        Ok(report)
+    }
+
+    /// Counts an edit to `playlist_id` against its file, if it has one, and
+    /// wakes the writer. Called by `touch_updated`, which every edit goes
+    /// through, so this may run inside the edit's transaction: it only bumps
+    /// a counter, and the writer reads it once committed.
+    pub(super) fn mark_file_edited(&self, conn: &Connection, playlist_id: i64) -> Result<()> {
+        let bumped = conn.execute(
+            "UPDATE playlist_files SET edit_rev = edit_rev + 1 WHERE playlist_id = ?1",
+            params![playlist_id],
+        )?;
+        if bumped > 0 {
+            self.nudge_writer();
+        }
+        Ok(())
+    }
+
+    /// Renames `playlist_id`'s file to match its new name, keeping the
+    /// extension and folder. If a file of that name already exists the file
+    /// keeps its old name; the playlist is renamed either way. An `.xspf`
+    /// also stores the name inside, so it is marked edited and rewritten.
+    pub(super) fn rename_linked_file(
+        &self,
+        conn: &Connection,
+        playlist_id: i64,
+        name: &str,
+    ) -> Result<()> {
+        let Some(linked) = LinkedFile::by_playlist(conn, playlist_id)? else {
+            return Ok(());
+        };
+        let ext = linked
+            .path
+            .extension()
+            .map(|e| e.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let target = linked
+            .path
+            .with_file_name(format!("{}.{ext}", file_stem_for(name)));
+        if !library_paths::same(&target, &linked.path) && !target.exists() {
+            self.mark_self_written(&linked.path);
+            self.mark_self_written(&target);
+            std::fs::rename(&linked.path, &target)?;
+            conn.execute(
+                "UPDATE playlist_files SET path = ?1, path_key = ?2 WHERE playlist_id = ?3",
+                params![target.to_string_lossy(), path_key(&target), playlist_id],
+            )?;
+        }
+        if PlaylistFormat::from_path(&target) == Some(PlaylistFormat::Xspf) {
+            self.mark_file_edited(conn, playlist_id)?;
+        }
+        Ok(())
+    }
+
+    /// Moves `playlist_id`'s file to the system trash before the playlist
+    /// is deleted, so the next scan doesn't bring it back. A file already
+    /// gone is fine; one that can't be trashed fails the delete, leaving
+    /// both in place.
+    pub(super) fn trash_linked_file(&self, conn: &Connection, playlist_id: i64) -> Result<()> {
+        let Some(linked) = LinkedFile::by_playlist(conn, playlist_id)? else {
+            return Ok(());
+        };
+        if linked.path.exists() {
+            self.mark_self_written(&linked.path);
+            trash::delete(&linked.path).map_err(|e| {
+                anyhow!("Couldn't move {} to the trash: {e}", linked.path.display())
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Links a playlist just exported to `path` with the file, when `path`
+    /// is in a library folder and the playlist is one a user edits by hand
+    /// (not the Queue, a smart or an auto playlist) and isn't linked yet.
+    /// Without this, the next scan would import the export as a twin.
+    pub(super) fn link_exported_file(
+        &self,
+        conn: &Connection,
+        playlist_id: i64,
+        path: &Path,
+        bytes: &[u8],
+        style: &FileStyle,
+    ) -> Result<()> {
+        if !in_library_folder(conn, path)? {
+            return Ok(());
+        }
+        let (name, dynamic, system): (String, bool, bool) = conn.query_row(
+            "SELECT name, dynamic_enabled, COALESCE(is_system, 0) FROM playlists WHERE id = ?1",
+            params![playlist_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )?;
+        if dynamic || system || crate::models::Playlist::is_queue_row(&name, dynamic) {
+            return Ok(());
+        }
+        if LinkedFile::by_playlist(conn, playlist_id)?.is_some()
+            || LinkedFile::by_path(conn, path)?.is_some()
+        {
+            return Ok(());
+        }
+        record_agreement(conn, playlist_id, path, bytes, style)
+    }
+
+    pub(super) fn mark_self_written(&self, path: &Path) {
+        if let Some(self_writes) = &self.self_writes {
+            self_writes.mark_written([path.to_path_buf()]);
+        }
+    }
+
+    fn nudge_writer(&self) {
+        if let Some(writer) = &self.file_writer {
+            writer.nudge();
+        }
+    }
+}
+
+/// The linked playlist whose file vanished from its recorded path and whose
+/// last agreed content is exactly `hash`: the same file, moved or renamed
+/// outside Luminous. Taking it over keeps the playlist instead of leaving a
+/// detached copy beside a new one.
+fn moved_playlist(conn: &Connection, hash: &str) -> Result<Option<i64>> {
+    let mut stmt =
+        conn.prepare("SELECT playlist_id, path FROM playlist_files WHERE content_hash = ?1")?;
+    let candidates = stmt.query_map(params![hash], |r| {
+        Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
+    })?;
+    for candidate in candidates {
+        let (id, path) = candidate?;
+        if !Path::new(&path).exists() {
+            return Ok(Some(id));
+        }
+    }
+    Ok(None)
+}
+
+/// A plain playlist (not linked, not the Queue, not smart or auto) named
+/// `name` that holds exactly `entries` — one imported by hand from this file
+/// before it was synced. Linking it avoids a duplicate.
+fn unlinked_twin(conn: &Connection, name: &str, entries: &[ResolvedEntry]) -> Result<Option<i64>> {
+    let mut stmt = conn.prepare(
+        "SELECT p.id FROM playlists p
+         WHERE p.name = ?1 AND p.dynamic_enabled = 0 AND COALESCE(p.is_system, 0) = 0
+           AND NOT EXISTS (SELECT 1 FROM playlist_files pf WHERE pf.playlist_id = p.id)",
+    )?;
+    if crate::models::Playlist::is_queue_row(name, false) {
+        return Ok(None);
+    }
+    let ids: Vec<i64> = stmt
+        .query_map(params![name], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    let wanted: Vec<_> = entries
+        .iter()
+        .map(|e| entry_key(e.song_id, &e.url))
+        .collect();
+    for id in ids {
+        let have: Vec<_> = conn
+            .prepare(
+                "SELECT song_id, url FROM playlist_items WHERE playlist_id = ?1 ORDER BY position",
+            )?
+            .query_map(params![id], |r| {
+                Ok(entry_key(
+                    r.get(0)?,
+                    r.get::<_, Option<String>>(1)?
+                        .as_deref()
+                        .unwrap_or_default(),
+                ))
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        if have == wanted {
+            return Ok(Some(id));
+        }
+    }
+    Ok(None)
+}
+
+/// Writes edited playlists to their files from a background thread, a
+/// moment after the last edit (see [`WRITE_DEBOUNCE`]). Cloned into the
+/// playlist manager; [`PlaylistManager::mark_file_edited`] nudges it.
+#[derive(Clone, Debug)]
+pub struct PlaylistFileWriter {
+    nudge: mpsc::Sender<()>,
+}
+
+impl PlaylistFileWriter {
+    /// Starts the writer thread. It makes one pass straight away, so edits
+    /// a previous session didn't get to write (it quit inside the debounce)
+    /// still reach their files. `on_report` hears about each pass that
+    /// unlinked a playlist or found a conflict.
+    pub fn spawn(
+        db: Arc<crate::db::Database>,
+        self_writes: Arc<SelfWriteTracker>,
+        on_report: impl Fn(FileSyncReport) + Send + 'static,
+    ) -> Result<Self> {
+        let (nudge, nudges) = mpsc::channel::<()>();
+        let mut writer = PlaylistManager::new(db)?;
+        writer.self_writes = Some(self_writes);
+        std::thread::Builder::new()
+            .name("playlist-file-writer".into())
+            .spawn(move || loop {
+                // Wait out the burst; a closed channel still gets its last pass.
+                while nudges.recv_timeout(WRITE_DEBOUNCE).is_ok() {}
+                match writer.write_edited_playlist_files() {
+                    Ok(report) if !report.is_empty() => on_report(report),
+                    Ok(_) => {}
+                    Err(e) => log::warn!("Couldn't write edited playlist files: {e}"),
+                }
+                if nudges.recv().is_err() {
+                    break;
+                }
+            })?;
+        Ok(Self { nudge })
+    }
+
+    fn nudge(&self) {
+        let _ = self.nudge.send(());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::import_export::clean_path;
+    use super::*;
+    use crate::db::Database;
+
+    /// A library folder `Music` with two songs, and a manager over it.
+    struct Library {
+        _dir: tempfile::TempDir,
+        root: PathBuf,
+        db: Arc<Database>,
+        pm: PlaylistManager,
+        songs: [PathBuf; 2],
+    }
+
+    impl Library {
+        fn new() -> Self {
+            let dir = tempfile::tempdir().unwrap();
+            let db = Arc::new(Database::new(dir.path().join("data")).unwrap());
+            let root = clean_path(dir.path()).join("Music");
+            let album = root.join("Band").join("Album");
+            std::fs::create_dir_all(&album).unwrap();
+            let songs = [album.join("01.mp3"), album.join("02.mp3")];
+            let conn = db.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO directories (path) VALUES (?1)",
+                params![root.to_string_lossy()],
+            )
+            .unwrap();
+            for (i, song) in songs.iter().enumerate() {
+                std::fs::write(song, b"audio").unwrap();
+                conn.execute(
+                    "INSERT INTO songs (id, title, artist, path) VALUES (?1, ?2, 'Band', ?3)",
+                    params![
+                        i as i64 + 1,
+                        format!("Song {}", i + 1),
+                        song.to_string_lossy()
+                    ],
+                )
+                .unwrap();
+            }
+            drop(conn);
+            let pm = PlaylistManager::new(Arc::clone(&db)).unwrap();
+            Self {
+                _dir: dir,
+                root,
+                db,
+                pm,
+                songs,
+            }
+        }
+
+        /// Writes `text` to `Music/Playlists/<name>` and returns its path.
+        fn playlist_file(&self, name: &str, text: &str) -> PathBuf {
+            let path = self.root.join("Playlists").join(name);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, text).unwrap();
+            path
+        }
+
+        fn song_ids(&self, playlist_id: i64) -> Vec<Option<i64>> {
+            self.pm
+                .get_playlist_tracks(playlist_id)
+                .unwrap()
+                .iter()
+                .map(|i| i.song.as_ref().map(|s| s.id))
+                .collect()
+        }
+
+        fn playlist(&self, id: i64) -> crate::models::Playlist {
+            self.pm
+                .get_playlists()
+                .unwrap()
+                .into_iter()
+                .find(|p| p.id == id)
+                .unwrap()
+        }
+
+        fn only_synced(&mut self, path: &Path) -> i64 {
+            let report = self.pm.sync_playlist_files(&[path.to_path_buf()]).unwrap();
+            assert_eq!(report.changed.len(), 1, "{report:?}");
+            report.changed[0]
+        }
+    }
+
+    const MIX: &str = "#EXTM3U\r\n..\\Band\\Album\\01.mp3\r\n..\\Band\\Album\\02.mp3\r\n";
+
+    #[test]
+    fn a_library_playlist_file_becomes_a_file_backed_playlist_once() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let id = lib.only_synced(&path);
+
+        let playlist = lib.playlist(id);
+        assert_eq!(playlist.name, "Mix");
+        assert_eq!(
+            playlist.source_path.as_deref(),
+            Some(&*path.to_string_lossy())
+        );
+        assert!(!playlist.source_conflict);
+        assert_eq!(lib.song_ids(id), vec![Some(1), Some(2)]);
+
+        let again = lib
+            .pm
+            .sync_scanned_playlist_files(
+                std::slice::from_ref(&path),
+                std::slice::from_ref(&lib.root),
+            )
+            .unwrap();
+        assert!(again.is_empty(), "an unchanged file is left alone");
+        assert_eq!(lib.pm.get_playlists().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn an_outside_edit_updates_the_playlist_in_place_keeping_item_ids() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let id = lib.only_synced(&path);
+        let uuid_of_second = lib.pm.get_playlist_tracks(id).unwrap()[1].uuid.clone();
+
+        std::fs::write(&path, "..\\Band\\Album\\02.mp3\r\n").unwrap();
+        assert_eq!(lib.only_synced(&path), id);
+
+        let items = lib.pm.get_playlist_tracks(id).unwrap();
+        assert_eq!(lib.song_ids(id), vec![Some(2)]);
+        assert_eq!(items[0].uuid, uuid_of_second);
+    }
+
+    #[test]
+    fn a_scan_skips_an_album_folders_own_playlist_but_an_explicit_import_keeps_it() {
+        let mut lib = Library::new();
+        let album = lib.songs[0].parent().unwrap().to_path_buf();
+        let path = album.join("Album.m3u");
+        std::fs::write(&path, "01.mp3\n02.mp3\n").unwrap();
+
+        let report = lib
+            .pm
+            .sync_playlist_files(std::slice::from_ref(&path))
+            .unwrap();
+        assert!(report.is_empty());
+        assert!(lib.pm.get_playlists().unwrap().is_empty());
+
+        let imported = lib.pm.import_playlist(&path).unwrap();
+        assert!(imported.source_path.is_some());
+    }
+
+    #[test]
+    fn an_edit_in_luminous_is_written_in_the_files_own_style() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let id = lib.only_synced(&path);
+        let first = lib.pm.get_playlist_tracks(id).unwrap()[0].uuid.clone();
+
+        lib.pm.remove_from_playlist(id, &[first]).unwrap();
+        assert!(lib.pm.write_edited_playlist_files().unwrap().is_empty());
+
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            text,
+            "#EXTM3U\r\n#EXTINF:-1,Band - Song 2\r\n..\\Band\\Album\\02.mp3\r\n"
+        );
+        let reread = lib
+            .pm
+            .sync_playlist_files(std::slice::from_ref(&path))
+            .unwrap();
+        assert!(reread.is_empty(), "the write doesn't read back as a change");
+        assert_eq!(lib.song_ids(id), vec![Some(2)]);
+    }
+
+    #[test]
+    fn both_sides_changing_is_a_conflict_until_the_user_keeps_one() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let id = lib.only_synced(&path);
+
+        lib.pm.add_songs_to_playlist(id, &[1]).unwrap();
+        std::fs::write(&path, "..\\Band\\Album\\02.mp3\r\n").unwrap();
+
+        let report = lib
+            .pm
+            .sync_playlist_files(std::slice::from_ref(&path))
+            .unwrap();
+        assert_eq!(
+            report.new_conflicts,
+            vec![FileConflict {
+                playlist_id: id,
+                name: "Mix".into()
+            }]
+        );
+        assert!(lib.playlist(id).source_conflict);
+        lib.pm.write_edited_playlist_files().unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "..\\Band\\Album\\02.mp3\r\n",
+            "a conflict writes nothing"
+        );
+        assert_eq!(lib.song_ids(id), vec![Some(1), Some(2), Some(1)]);
+
+        lib.pm.resolve_file_conflict(id, KeepSide::File).unwrap();
+        assert_eq!(lib.song_ids(id), vec![Some(2)]);
+        assert!(!lib.playlist(id).source_conflict);
+    }
+
+    #[test]
+    fn keeping_luminous_in_a_conflict_overwrites_the_file() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let id = lib.only_synced(&path);
+        lib.pm.add_songs_to_playlist(id, &[1]).unwrap();
+        std::fs::write(&path, "..\\Band\\Album\\02.mp3\r\n").unwrap();
+        lib.pm
+            .sync_playlist_files(std::slice::from_ref(&path))
+            .unwrap();
+
+        lib.pm
+            .resolve_file_conflict(id, KeepSide::Luminous)
+            .unwrap();
+        lib.pm.write_edited_playlist_files().unwrap();
+
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text.matches("01.mp3").count(), 2, "{text}");
+        assert!(lib.pm.sync_playlist_files(&[path]).unwrap().is_empty());
+        assert_eq!(lib.song_ids(id), vec![Some(1), Some(2), Some(1)]);
+    }
+
+    #[test]
+    fn a_deleted_file_leaves_a_plain_playlist_but_an_unwalked_root_does_not() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let id = lib.only_synced(&path);
+
+        std::fs::remove_file(&path).unwrap();
+        let elsewhere = PathBuf::from("/not/scanned");
+        let report = lib
+            .pm
+            .sync_scanned_playlist_files(&[], &[elsewhere])
+            .unwrap();
+        assert!(
+            report.is_empty(),
+            "a root the scan didn't walk unlinks nothing"
+        );
+        assert!(lib.playlist(id).source_path.is_some());
+
+        let root = lib.root.clone();
+        let report = lib.pm.sync_scanned_playlist_files(&[], &[root]).unwrap();
+        assert_eq!(report.changed, vec![id]);
+        assert_eq!(lib.playlist(id).source_path, None);
+        assert_eq!(lib.song_ids(id), vec![Some(1), Some(2)]);
+    }
+
+    #[test]
+    fn a_file_moved_outside_luminous_keeps_its_playlist() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let id = lib.only_synced(&path);
+        let moved = lib.root.join("Playlists").join("Road Trip.m3u");
+        std::fs::rename(&path, &moved).unwrap();
+
+        let report = lib.pm.sync_playlist_files(&[path, moved.clone()]).unwrap();
+        assert_eq!(report.changed, vec![id]);
+        let playlist = lib.playlist(id);
+        assert_eq!(playlist.name, "Road Trip");
+        assert_eq!(
+            playlist.source_path.as_deref(),
+            Some(&*moved.to_string_lossy())
+        );
+        assert_eq!(lib.pm.get_playlists().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn renaming_the_playlist_renames_its_file() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let id = lib.only_synced(&path);
+
+        lib.pm.rename_playlist(id, "Night: Drive?").unwrap();
+
+        let renamed = lib.root.join("Playlists").join("Night_ Drive_.m3u");
+        assert!(!path.exists());
+        assert_eq!(
+            std::fs::read_to_string(&renamed).unwrap(),
+            MIX,
+            "content untouched"
+        );
+        assert_eq!(
+            lib.playlist(id).source_path.as_deref(),
+            Some(&*renamed.to_string_lossy())
+        );
+        assert!(lib.pm.sync_playlist_files(&[renamed]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn an_export_into_the_library_links_and_one_elsewhere_does_not() {
+        let mut lib = Library::new();
+        let playlist = lib.pm.create_playlist("Mine").unwrap();
+        lib.pm.add_songs_to_playlist(playlist.id, &[2]).unwrap();
+
+        let outside = lib.root.parent().unwrap().join("Mine.m3u8");
+        lib.pm.export_playlist(playlist.id, &outside, true).unwrap();
+        assert_eq!(lib.playlist(playlist.id).source_path, None);
+
+        let inside = lib.root.join("Mine.m3u8");
+        lib.pm.export_playlist(playlist.id, &inside, true).unwrap();
+        assert!(lib.playlist(playlist.id).source_path.is_some());
+        assert!(lib.pm.sync_playlist_files(&[inside]).unwrap().is_empty());
+        assert_eq!(lib.pm.get_playlists().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn an_earlier_manual_import_of_the_file_is_linked_not_duplicated() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let manual = lib.pm.create_playlist("Mix").unwrap();
+        lib.pm.add_songs_to_playlist(manual.id, &[1, 2]).unwrap();
+        // A by-hand import stores each entry's resolved path as its url.
+        let conn = lib.db.pool.get().unwrap();
+        for (pos, song) in lib.songs.iter().enumerate() {
+            conn.execute(
+                "UPDATE playlist_items SET url = ?1 WHERE playlist_id = ?2 AND position = ?3",
+                params![song.to_string_lossy(), manual.id, pos as i32],
+            )
+            .unwrap();
+        }
+        drop(conn);
+
+        assert_eq!(lib.only_synced(&path), manual.id);
+        assert_eq!(lib.pm.get_playlists().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_station_list_in_the_library_is_one_file_playlist_however_it_is_imported() {
+        let mut lib = Library::new();
+        let url = "https://stream.example.com/groove";
+        let path = lib.playlist_file(
+            "Stations.pls",
+            &format!("[playlist]\nNumberOfEntries=1\nFile1={url}\nTitle1=Groove\n"),
+        );
+        let id = lib.only_synced(&path);
+        let station = lib.pm.get_playlist_tracks(id).unwrap()[0]
+            .song
+            .clone()
+            .unwrap();
+        assert_eq!(station.stream_url.as_deref(), Some(url));
+
+        // The Radio view's "Import as a station list?" calls import_playlist.
+        assert_eq!(lib.pm.import_playlist(&path).unwrap().id, id);
+        assert_eq!(lib.pm.get_playlists().unwrap().len(), 1);
+
+        lib.pm.add_songs_to_playlist(id, &[station.id]).unwrap();
+        lib.pm.write_edited_playlist_files().unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text.matches(url).count(), 2, "{text}");
+        assert!(!text.contains("radio://"));
+    }
+
+    #[test]
+    fn a_file_named_after_the_queue_imports_under_its_file_name() {
+        let mut lib = Library::new();
+        lib.pm.queue().unwrap();
+        let path = lib.playlist_file("Queue.m3u", MIX);
+        let id = lib.only_synced(&path);
+        assert_eq!(lib.playlist(id).name, "Queue.m3u");
+    }
+
+    #[test]
+    fn a_vanished_file_unlinks_on_write_and_deleting_needs_no_file() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let id = lib.only_synced(&path);
+        lib.pm.add_songs_to_playlist(id, &[1]).unwrap();
+        std::fs::remove_file(&path).unwrap();
+
+        assert_eq!(
+            lib.pm.write_edited_playlist_files().unwrap().changed,
+            vec![id]
+        );
+        assert_eq!(lib.playlist(id).source_path, None);
+        lib.pm.delete_playlist(id).unwrap();
+        assert!(lib.pm.get_playlists().unwrap().is_empty());
+    }
+}

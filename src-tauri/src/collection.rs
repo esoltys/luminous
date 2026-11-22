@@ -138,6 +138,12 @@ pub struct ScanReport {
     /// Paths whose rows this scan wrote (new or re-read files), so a caller can
     /// act on exactly what the scan picked up — e.g. auto-organize.
     pub upserted_paths: Vec<String>,
+    /// Playlist files (`.m3u`, `.pls`, ...) found in the walked folders, for
+    /// `scan_all` to sync into file-backed playlists (#2280).
+    pub playlist_files: Vec<PathBuf>,
+    /// The folders this scan walked that were there to walk; a linked
+    /// playlist file under one of them that the scan didn't find is gone.
+    pub walked_roots: Vec<PathBuf>,
     pub artwork_albums: usize,
     pub remote_art_fetches: usize,
     pub discovery_ms: u128,
@@ -1041,6 +1047,18 @@ impl CollectionScanner {
         if is_folder_added {
             report.external_changes = 0;
         }
+        // After the songs are saved, so the playlists' entries can match them.
+        if let Some(state) = app.try_state::<crate::AppState>() {
+            let (found, roots) = (report.playlist_files.clone(), report.walked_roots.clone());
+            match crate::playlist::with_playlists(&state.playlists, move |pm| {
+                pm.sync_scanned_playlist_files(&found, &roots)
+            })
+            .await
+            {
+                Ok(synced) => crate::playlist::file_sync::announce(&app, &synced),
+                Err(e) => log::warn!("Couldn't sync library playlist files: {e}"),
+            }
+        }
         let summary = report.summary(trigger);
         log::info!("{summary}");
         crate::diagnostics::record_operation(&summary);
@@ -1366,6 +1384,9 @@ impl CollectionScanner {
         let mut all_paths: Vec<PathBuf> = Vec::new();
         let mut cue_paths: Vec<PathBuf> = Vec::new();
         for (dir, walk_root) in self.walk_roots(&dirs) {
+            if walk_root.is_dir() {
+                report.walked_roots.push(walk_root.clone());
+            }
             let dir_name = directory_display_name(dir);
             on_progress(ScanProgress {
                 phase: ScanPhase::Discovering,
@@ -1390,6 +1411,8 @@ impl CollectionScanner {
                     all_paths.push(path);
                 } else if is_cue_file(&path) {
                     cue_paths.push(path);
+                } else if crate::playlist::file_sync::is_playlist_file(&path) {
+                    report.playlist_files.push(path);
                 }
             }
         }

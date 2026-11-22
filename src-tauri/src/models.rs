@@ -680,6 +680,14 @@ pub struct Playlist {
     /// custom and Smart Playlists (#2136).
     #[serde(default)]
     pub is_system: bool,
+    /// The playlist file in a library folder this playlist is kept in sync
+    /// with, or `None` for a playlist that lives only in Luminous (#2280).
+    #[serde(default)]
+    pub source_path: Option<String>,
+    /// Both this playlist and its file changed since they last agreed, and
+    /// the user hasn't chosen which to keep; neither is written meanwhile.
+    #[serde(default)]
+    pub source_conflict: bool,
 }
 
 fn default_true() -> bool {
@@ -688,7 +696,7 @@ fn default_true() -> bool {
 
 /// Columns of `playlists p` that `Playlist::from_row` maps, in order. A
 /// query selects these followed by one `track_count` column.
-pub const PLAYLIST_SELECT_COLS: &str = "p.id, p.name, p.dynamic_enabled, p.dynamic_spec,      p.population_mode, p.last_played_row, p.created, p.updated,      p.size_limit_bytes, p.sort_field, p.sort_asc, p.size_limit_device,      p.is_system";
+pub const PLAYLIST_SELECT_COLS: &str = "p.id, p.name, p.dynamic_enabled, p.dynamic_spec,      p.population_mode, p.last_played_row, p.created, p.updated,      p.size_limit_bytes, p.sort_field, p.sort_asc, p.size_limit_device,      p.is_system,      (SELECT pf.path FROM playlist_files pf WHERE pf.playlist_id = p.id),      (SELECT pf.conflict FROM playlist_files pf WHERE pf.playlist_id = p.id)";
 
 impl Playlist {
     /// The single definition of what makes a row "the Queue".
@@ -722,7 +730,9 @@ impl Playlist {
             sort_asc: row.get::<_, Option<bool>>(10)?.unwrap_or(true),
             size_limit_device: row.get(11)?,
             is_system: row.get::<_, Option<bool>>(12)?.unwrap_or(false),
-            track_count: row.get(13)?,
+            source_path: row.get(13)?,
+            source_conflict: row.get::<_, Option<bool>>(14)?.unwrap_or(false),
+            track_count: row.get(15)?,
             is_queue,
         })
     }
