@@ -391,6 +391,10 @@ pub(crate) struct AudioShared {
     /// Whether the output callback feeds `visualizer_buf` at all: the
     /// downmix is skipped while nothing displays a spectrum.
     pub(crate) spectrum_enabled: std::sync::atomic::AtomicBool,
+    /// When `LUMINOUS_SILENT_AUDIO` is set (automated capture), zeroes the
+    /// output buffer after feeding `visualizer_buf` so visualizers still
+    /// react without playing sound out of speakers.
+    pub(crate) silent_output: bool,
     pub(crate) output_sample_rate: AtomicU32,
     pub(crate) output_channels: std::sync::atomic::AtomicU16,
     pub(crate) output_device_name: parking_lot::RwLock<Option<String>>,
@@ -596,6 +600,8 @@ impl AudioEngine {
             play_state: Mutex::new(EngineState::Stopped),
             visualizer_buf: spectrum::AudioVisualizerBuffer::new(),
             spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
+            silent_output: std::env::var_os("LUMINOUS_SILENT_AUDIO")
+                .is_some_and(|v| !v.is_empty() && v != "0"),
             output_sample_rate: AtomicU32::new(44100),
             output_channels: std::sync::atomic::AtomicU16::new(2),
             output_device_name: parking_lot::RwLock::new(get_default_device_name()),
@@ -1730,6 +1736,10 @@ impl OutputRenderer {
             // Fixed-size ring buffer: overwrites the oldest samples, never allocates.
             // ast-grep-ignore: audio-callback-no-alloc
             self.shared.visualizer_buf.push(&self.mono_scratch);
+        }
+
+        if self.shared.silent_output && played > 0 {
+            output[..played].fill(0.0);
         }
 
         // `played_samples` is on the track's own timeline, so at another
@@ -3606,6 +3616,7 @@ mod tests {
             play_state: Mutex::new(EngineState::Playing),
             visualizer_buf: spectrum::AudioVisualizerBuffer::new(),
             spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
+            silent_output: false,
             output_sample_rate: AtomicU32::new(44100),
             output_channels: std::sync::atomic::AtomicU16::new(2),
             output_device_name: parking_lot::RwLock::new(None),
