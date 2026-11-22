@@ -90,7 +90,12 @@ function historyY(lufs: number, top: number, height: number): number {
   return top + height - Math.max(0, Math.min(1, t)) * height;
 }
 
-/** Strokes `trace` as one connected path centred on (cx, cy), unit circle → `radius` px. */
+/**
+ * Strokes `trace` as one smooth path centred on (cx, cy), unit circle → `radius` px. An
+ * analogue scope's beam follows the continuous signal, so rather than joining the thinned
+ * samples with straight segments (sharp corners), the path curves through the midpoint of
+ * each pair of neighbours, using each sample as the control point.
+ */
 function strokeTrace(
   ctx: CanvasRenderingContext2D,
   trace: ScopeTrace,
@@ -98,13 +103,19 @@ function strokeTrace(
   cy: number,
   radius: number,
 ): void {
-  if (trace.count === 0) return;
+  const n = trace.count;
+  if (n === 0) return;
   const p = trace.points;
   ctx.beginPath();
   ctx.moveTo(cx + p[0] * radius, cy - p[1] * radius);
-  for (let i = 1; i < trace.count; i++) {
-    ctx.lineTo(cx + p[2 * i] * radius, cy - p[2 * i + 1] * radius);
+  for (let i = 1; i < n - 1; i++) {
+    const x = cx + p[2 * i] * radius;
+    const y = cy - p[2 * i + 1] * radius;
+    const nextX = cx + p[2 * i + 2] * radius;
+    const nextY = cy - p[2 * i + 3] * radius;
+    ctx.quadraticCurveTo(x, y, (x + nextX) / 2, (y + nextY) / 2);
   }
+  if (n > 1) ctx.lineTo(cx + p[2 * n - 2] * radius, cy - p[2 * n - 1] * radius);
   ctx.stroke();
 }
 

@@ -403,9 +403,9 @@ pub(crate) struct AudioShared {
     /// Whether the output callback feeds `scope_buf`: the copy is skipped
     /// while no vectorscope is shown.
     pub(crate) scope_enabled: std::sync::atomic::AtomicBool,
-    /// Bumped whenever playback jumps (seek, a track started from scratch,
-    /// a rebuilt device), so the vectorscope's meters don't average across
-    /// the jump. Gapless handovers aren't jumps.
+    /// Bumped whenever the programme changes (a seek, a new track, gapless
+    /// or not, or a rebuilt device), so the vectorscope's meters, peak hold
+    /// and loudness history start afresh instead of spanning the change.
     pub(crate) scope_epoch: AtomicU64,
     pub(crate) output_sample_rate: AtomicU32,
     pub(crate) output_channels: std::sync::atomic::AtomicU16,
@@ -515,7 +515,7 @@ impl AudioShared {
         f32::from_bits(self.volume.load(Ordering::Relaxed))
     }
 
-    /// Tell the vectorscope meters playback jumped (see `scope_epoch`).
+    /// Tell the vectorscope meters the programme changed (see `scope_epoch`).
     fn restart_scope(&self) {
         self.scope_epoch.fetch_add(1, Ordering::Relaxed);
     }
@@ -3099,6 +3099,9 @@ fn advance_transition_and_preload_signal(
                 .store(session.current.start_ns, Ordering::Relaxed);
             *shared.input_info.write() = Some(session.current.input_info.clone());
             session.current.input_changed = false;
+            // A new track is a new programme for the vectorscope's peak
+            // hold and loudness history, gapless or not.
+            shared.restart_scope();
             let finished_track_id = t.finished.id;
             let _ = event_tx.send(AudioEvent::TrackTransitioned {
                 finished_track_id,

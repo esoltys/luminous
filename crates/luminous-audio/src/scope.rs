@@ -57,7 +57,7 @@ pub struct ScopeFrame {
     /// right, negative left, 0 centred (or silent).
     pub balance_db: f32,
     /// The meters started afresh since the previous frame (the scope was
-    /// switched on, playback jumped, or the reader fell behind), so anything
+    /// switched on, the programme changed, or the reader fell behind), so anything
     /// a reader accumulates from them, such as peak hold or a loudness
     /// history, should start afresh too.
     pub restarted: bool,
@@ -323,7 +323,7 @@ impl ScopeAnalyzer {
     }
 
     /// The next frame, from what `buffer` received at `sample_rate` since the
-    /// previous one; a new `epoch` means playback jumped. The first frame
+    /// previous one; a new `epoch` means the programme changed. The first frame
     /// after a reset carries no points.
     pub(crate) fn frame(
         &mut self,
