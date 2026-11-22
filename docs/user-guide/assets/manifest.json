@@ -108,6 +108,18 @@
           "height": 900
         },
         {
+          "src": "assets/de/screenshots/dark/radio-my-stations.webp",
+          "name": "radio-my-stations",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/radio-discover.webp",
+          "name": "radio-discover",
+          "width": 1440,
+          "height": 900
+        },
+        {
           "src": "assets/de/screenshots/dark/stats.webp",
           "name": "stats",
           "width": 1440,
@@ -284,6 +296,18 @@
         {
           "src": "assets/en-CA/screenshots/dark/playlist-smart-edit.webp",
           "name": "playlist-smart-edit",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/radio-my-stations.webp",
+          "name": "radio-my-stations",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/radio-discover.webp",
+          "name": "radio-discover",
           "width": 1440,
           "height": 900
         },
@@ -468,6 +492,18 @@
           "height": 900
         },
         {
+          "src": "assets/es/screenshots/dark/radio-my-stations.webp",
+          "name": "radio-my-stations",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/radio-discover.webp",
+          "name": "radio-discover",
+          "width": 1440,
+          "height": 900
+        },
+        {
           "src": "assets/es/screenshots/dark/stats.webp",
           "name": "stats",
           "width": 1440,
@@ -644,6 +680,18 @@
         {
           "src": "assets/fr-CA/screenshots/dark/playlist-smart-edit.webp",
           "name": "playlist-smart-edit",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/radio-my-stations.webp",
+          "name": "radio-my-stations",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/radio-discover.webp",
+          "name": "radio-discover",
           "width": 1440,
           "height": 900
         },
@@ -828,6 +876,18 @@
           "height": 900
         },
         {
+          "src": "assets/it/screenshots/dark/radio-my-stations.webp",
+          "name": "radio-my-stations",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/radio-discover.webp",
+          "name": "radio-discover",
+          "width": 1440,
+          "height": 900
+        },
+        {
           "src": "assets/it/screenshots/dark/stats.webp",
           "name": "stats",
           "width": 1440,
@@ -1008,6 +1068,18 @@
           "height": 900
         },
         {
+          "src": "assets/ru/screenshots/dark/radio-my-stations.webp",
+          "name": "radio-my-stations",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/radio-discover.webp",
+          "name": "radio-discover",
+          "width": 1440,
+          "height": 900
+        },
+        {
           "src": "assets/ru/screenshots/dark/stats.webp",
           "name": "stats",
           "width": 1440,
@@ -1184,6 +1256,18 @@
         {
           "src": "assets/uk/screenshots/dark/playlist-smart-edit.webp",
           "name": "playlist-smart-edit",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/radio-my-stations.webp",
+          "name": "radio-my-stations",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/radio-discover.webp",
+          "name": "radio-discover",
           "width": 1440,
           "height": 900
         },
