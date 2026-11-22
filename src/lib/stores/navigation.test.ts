@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { Song, AlbumItem, ArtistItem, Playlist } from "../types";
@@ -346,5 +346,47 @@ describe("navigationStore - Files location", () => {
       expect(navigationStore.filesLocation?.selectedName).toBe("11 The Itch.flac");
       expect(navigationStore.pendingFilesArrival).toBeNull();
     });
+  });
+});
+
+describe("navigationStore - tab availability (#2279)", () => {
+  const queue = { id: 1, name: "Queue", is_queue: true, dynamic_enabled: false } as Playlist;
+  const stationList = {
+    id: 4,
+    name: "soma_fm",
+    is_queue: false,
+    dynamic_enabled: false,
+  } as Playlist;
+  let savedPlaylists: Playlist[];
+
+  beforeEach(() => {
+    savedPlaylists = playlistsStore.playlists;
+    collectionStore.statsLoaded = true;
+    collectionStore.stats = { ...collectionStore.stats!, total_songs: 0 };
+  });
+
+  afterEach(() => {
+    playlistsStore.playlists = savedPlaylists;
+  });
+
+  it("keeps library tabs available while stats load, and hides them on an empty library", () => {
+    collectionStore.statsLoaded = false;
+    expect(navigationStore.libraryTabsAvailable).toBe(true);
+    collectionStore.statsLoaded = true;
+    expect(navigationStore.libraryTabsAvailable).toBe(false);
+    collectionStore.stats = { ...collectionStore.stats!, total_songs: 1 };
+    expect(navigationStore.libraryTabsAvailable).toBe(true);
+  });
+
+  it("makes Playlists available on an empty library once the user has a playlist", () => {
+    playlistsStore.playlists = [queue];
+    expect(navigationStore.playlistsTabAvailable).toBe(false);
+    playlistsStore.playlists = [queue, stationList];
+    expect(navigationStore.playlistsTabAvailable).toBe(true);
+  });
+
+  it("counts Playlists as available until playlists have loaded, so a restored tab isn't bounced", () => {
+    playlistsStore.playlists = [];
+    expect(navigationStore.playlistsTabAvailable).toBe(true);
   });
 });

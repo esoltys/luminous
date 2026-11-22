@@ -210,11 +210,11 @@
 
     <PinnedNavList collapsed={layoutCollapsed} />
 
-    <!-- Library/Playlists/Organize/Stats stay hidden until the library has
+    <!-- Library/Organize/Stats stay hidden until the library has
          songs — except during the walkthrough, whose "sidebar" step
          narrates all of them, so an empty-library first-run tour would
          otherwise describe nav items the user can't see. -->
-    {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0 || walkthroughStore.isActive}
+    {#if navigationStore.libraryTabsAvailable || walkthroughStore.isActive}
       <div class="w-full flex flex-col {layoutCollapsed ? 'items-center' : ''}">
         {#if layoutCollapsed}
           <button
@@ -325,7 +325,11 @@
           </div>
         {/if}
       </div>
+    {/if}
 
+    <!-- Playlists also shows on an empty library once the user has a playlist
+         of their own, such as an imported radio station list (#2279). -->
+    {#if navigationStore.playlistsTabAvailable || walkthroughStore.isActive}
       <div class="w-full flex flex-col {layoutCollapsed ? 'items-center' : ''}">
         {#if layoutCollapsed}
           <button
@@ -420,7 +424,7 @@
     <!-- Internet Radio works without a local music library too (#2005). -->
     {@render navButton("radio", i18n.t("sidebar.radio"), Radio)}
 
-    {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0 || walkthroughStore.isActive}
+    {#if navigationStore.libraryTabsAvailable || walkthroughStore.isActive}
       {@render navButton("organize", i18n.t("sidebar.organize"), Broom)}
       {@render navButton("stats", i18n.t("sidebar.stats"), BarChart2)}
     {/if}
