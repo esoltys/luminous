@@ -32,6 +32,18 @@ const GLOW_R_STILL = 112;
 /** The glow is a faint halo: its brightest cell is this fraction of full brightness. */
 const GLOW_PEAK = 0.45;
 
+// Beat ripples (#2270): rings of light that leave the ring's outer edge on each onset.
+/** Ripples in flight at once; a new beat replaces the oldest beyond this. */
+const RIPPLE_POOL = 4;
+/** Outward speed, in mark units per second. */
+const RIPPLE_SPEED = 130;
+/** Radius at which a ripple has faded out: just past the full grid's corners (about 198). */
+const RIPPLE_END_R = 200;
+/** Half the ripple's width, in mark units, before widening to at least half a cell. */
+const RIPPLE_HALF = 3;
+/** Brightness of the faintest onset's ripple as it leaves the ring; the strongest starts at 1. */
+const RIPPLE_FLOOR = 0.4;
+
 const ATTACK_RATE = 38;
 const DECAY_RATE = 10.5;
 const DECAY_RATE_REDUCED = 6.5;
@@ -96,9 +108,11 @@ function bandAverage(bands: readonly number[], from: number, to: number): number
 }
 
 /**
- * The logo's audio state: bass (burst), mids (rim and glow) and treble (ring), each in [0, 1].
- * `push` sets targets from a frame, using the band split and gains of the reactive logo; a beat
- * onset lifts the burst target, so it flares and then decays with the bass smoothing.
+ * The logo's audio state: bass (burst), mids (rim and glow) and treble (ring), each in [0, 1],
+ * plus the beat ripples in flight. `push` sets targets from a frame, using the band split and
+ * gains of the reactive logo; a beat onset lifts the burst target, so it flares and then decays
+ * with the bass smoothing, and sends a ripple outward from the ring. Ripples only move in `step`;
+ * `settle` and reduced motion drop them, since a ripple is pure motion with no resting state.
  */
 export class LogoLevels {
   bass = 0;
@@ -107,6 +121,9 @@ export class LogoLevels {
   private bassTarget = 0;
   private midTarget = 0;
   private trebleTarget = 0;
+  /** Each ripple's radius in mark units, and its starting brightness (0 = free slot). */
+  private readonly rippleRadius = new Float32Array(RIPPLE_POOL);
+  private readonly rippleStrength = new Float32Array(RIPPLE_POOL);
 
   /** Levels held at fixed values, e.g. for a still preview. */
   static fixed(bass: number, mid: number, treble: number): LogoLevels {
@@ -123,22 +140,40 @@ export class LogoLevels {
       this.bassTarget = this.midTarget = this.trebleTarget = 0;
       return;
     }
+    const onset = Math.min(1, frame.onset || 0);
     const bass = Math.min(1, bandAverage(bands, 0, 8) * 1.4);
-    this.bassTarget = Math.max(bass, Math.min(1, frame.onset || 0));
+    this.bassTarget = Math.max(bass, onset);
     this.midTarget = Math.min(1, bandAverage(bands, 8, 20) * 1.4);
     this.trebleTarget = Math.min(1, bandAverage(bands, 20, 32) * 1.6);
+    if (onset > 0) this.spawnRipple(onset);
   }
 
-  /** Jumps straight to the targets. */
+  /** Starts a ripple at the ring's outer edge, in a free slot or else over the oldest one. */
+  private spawnRipple(onset: number): void {
+    let slot = 0;
+    for (let i = 0; i < RIPPLE_POOL; i++) {
+      if (this.rippleStrength[i] === 0) {
+        slot = i;
+        break;
+      }
+      if (this.rippleRadius[i] > this.rippleRadius[slot]) slot = i;
+    }
+    this.rippleRadius[slot] = RING_OUTER;
+    this.rippleStrength[slot] = RIPPLE_FLOOR + (1 - RIPPLE_FLOOR) * onset;
+  }
+
+  /** Jumps straight to the targets, dropping any ripples. */
   settle(): void {
     this.bass = this.bassTarget;
     this.mid = this.midTarget;
     this.treble = this.trebleTarget;
+    this.rippleStrength.fill(0);
   }
 
   /**
-   * Eases towards the targets: fast attack, slower decay (slower still under reduced motion).
-   * Returns false once every level has arrived.
+   * Eases towards the targets: fast attack, slower decay (slower still under reduced motion), and
+   * moves ripples outward (reduced motion drops them). Returns false once every level has arrived
+   * and no ripple is in flight.
    */
   step(dtMs: number, reducedMotion: boolean): boolean {
     const dtSec = Math.max(0, Math.min(100, dtMs)) / 1000;
@@ -147,11 +182,37 @@ export class LogoLevels {
     this.bass = approach(this.bass, this.bassTarget, attack, decay);
     this.mid = approach(this.mid, this.midTarget, attack, decay);
     this.treble = approach(this.treble, this.trebleTarget, attack, decay);
+    let rippling = false;
+    for (let i = 0; i < RIPPLE_POOL; i++) {
+      if (this.rippleStrength[i] === 0) continue;
+      this.rippleRadius[i] += RIPPLE_SPEED * dtSec;
+      if (reducedMotion || this.rippleRadius[i] >= RIPPLE_END_R) this.rippleStrength[i] = 0;
+      else rippling = true;
+    }
     return (
+      rippling ||
       this.bass !== this.bassTarget ||
       this.mid !== this.midTarget ||
       this.treble !== this.trebleTarget
     );
+  }
+
+  /**
+   * Brightness in [0, 1] of the ripples at distance `d` from the mark's centre: the brightest of
+   * those whose band, `halfWidth` either side of its radius, covers `d`; 0 where none does. A
+   * ripple fades linearly from its starting brightness at the ring to nothing at the field's edge.
+   */
+  rippleAt(d: number, halfWidth: number): number {
+    let brightest = 0;
+    for (let i = 0; i < RIPPLE_POOL; i++) {
+      const strength = this.rippleStrength[i];
+      if (strength === 0) continue;
+      const r = this.rippleRadius[i];
+      if (Math.abs(d - r) > halfWidth) continue;
+      const b = strength * (1 - (r - RING_OUTER) / (RIPPLE_END_R - RING_OUTER));
+      if (b > brightest) brightest = b;
+    }
+    return brightest;
   }
 }
 
@@ -229,6 +290,8 @@ export interface VoxelLogoRendererOptions {
   readonly housing: boolean;
   /** Draw the mid-driven glow halo around the ring. */
   readonly glow: boolean;
+  /** Draw beat ripples travelling out from the ring (never under reduced motion). */
+  readonly ripples: boolean;
 }
 
 /** Minimum cell pitch (CSS px) at which outer housing cells are drawn. */
@@ -373,6 +436,7 @@ export class VoxelLogoRenderer {
   private readonly grids: readonly LogoGrid[];
   private readonly housing: boolean;
   private readonly glow: boolean;
+  private readonly ripples: boolean;
   private readonly housingCache = new HousingCache();
   private readonly cellStyle: Uint8Array;
   private readonly order: Int32Array;
@@ -383,6 +447,7 @@ export class VoxelLogoRenderer {
     this.grids = options.grids;
     this.housing = options.housing;
     this.glow = options.glow;
+    this.ripples = options.ripples;
     let largest = 1;
     for (const grid of this.grids) largest = Math.max(largest, grid.size * grid.size);
     this.cellStyle = new Uint8Array(largest);
@@ -434,6 +499,8 @@ export class VoxelLogoRenderer {
     const ringStyle = LOGO_STYLE.ring + rung(0.5 + 0.5 * levels.treble);
     const haloOpacity = 0.15 + 0.7 * levels.bass;
     const glowOpacity = (0.2 + 0.7 * levels.mid) * GLOW_PEAK;
+    const ripples = this.ripples && !reducedMotion;
+    const rippleHalf = Math.max(RIPPLE_HALF, grid.cellUnits * 0.5);
 
     // 1. Classify every cell, topmost layer first (the SVG's paint order reversed).
     const count = n * n;
@@ -455,7 +522,12 @@ export class VoxelLogoRenderer {
         if (rest === LOGO_REST.disc) style = LOGO_STYLE.disc;
         else if (rest === LOGO_REST.ring || Math.abs(d - RING_R) <= ringHalf) style = ringStyle;
         else if (rest === LOGO_REST.rim || Math.abs(d - RIM_R) <= rimHalf) style = rimStyle;
-        else if (this.glow && d <= glowR && glowR > RING_OUTER) {
+        // Ripples are drawn in the ring's colour, over the glow and housing.
+        if (style === LOGO_STYLE.none && ripples) {
+          const k = rung(levels.rippleAt(d, rippleHalf));
+          if (k > 0) style = LOGO_STYLE.ring + k;
+        }
+        if (style === LOGO_STYLE.none && this.glow && d <= glowR && glowR > RING_OUTER) {
           const k = rung(glowOpacity * (1 - (d - RING_OUTER) / (glowR - RING_OUTER)));
           if (k > 0) style = LOGO_STYLE.glow + k;
         }
