@@ -1,5 +1,6 @@
 import type { ThemeColors } from "../stores/theme.svelte";
 import { clampForContrast, hexToRgb, isLightColor, rgbToHex } from "../utils/colorUtils";
+import { voxelUnlitCellColor } from "./voxelGrid";
 
 export interface VoxelColumnState {
   /** Current smoothed bar height in [0, 1]. */
@@ -59,18 +60,6 @@ function mixRgb(
     g: Math.round(a.g + (b.g - a.g) * clamped),
     b: Math.round(a.b + (b.b - a.b) * clamped),
   };
-}
-
-/**
- * The fill of an unlit LED cell, shared by the voxel presets so their matrix housings match:
- * the theme's border colour, faint against `bg-main`.
- */
-export function voxelUnlitCellColor(colors: ThemeColors): string {
-  const bgMain = colors["bg-main"] || "#191918";
-  const borderHex =
-    colors["color-border"] || clampForContrast(colors["color-accent"] || "#4f5bd5", bgMain, 3.0);
-  const { r, g, b } = hexToRgb(borderHex);
-  return `rgba(${r}, ${g}, ${b}, ${isLightColor(bgMain) ? 0.13 : 0.1})`;
 }
 
 /**
