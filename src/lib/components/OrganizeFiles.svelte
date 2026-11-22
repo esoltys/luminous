@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { createEventScope } from "../utils/eventScope";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { collectionStore } from "../stores/collection.svelte";
@@ -641,6 +642,14 @@
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+  function schedulePreview() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      if (effectiveOpen && !isApplying) fetchPreview();
+    }, PREVIEW_DEBOUNCE_MS);
+  }
+
   function handleKeydown(e: KeyboardEvent) {
     if (!effectiveOpen) return;
     if (e.key === "Escape") {
@@ -719,10 +728,7 @@
     const _refresh = refreshKey;
 
     if (_open) {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        fetchPreview();
-      }, PREVIEW_DEBOUNCE_MS);
+      schedulePreview();
     }
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -836,10 +842,18 @@
     }
   }
 
+  const events = createEventScope();
+
   onMount(() => {
     window.addEventListener("keydown", handleKeydown);
+    events.listen("library-changed", () => {
+      if (!effectiveOpen || isApplying) return;
+      schedulePreview();
+    });
     return () => {
       window.removeEventListener("keydown", handleKeydown);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      events.dispose();
     };
   });
 </script>

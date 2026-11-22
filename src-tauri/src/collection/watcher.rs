@@ -184,8 +184,6 @@ fn reconcile_watcher_batch(
 
     let mut matched_removed = std::collections::HashSet::new();
     let mut matched_added = std::collections::HashSet::new();
-    let mut update_stmt =
-        conn.prepare("UPDATE songs SET path = ?1, mtime = ?2, art_automatic = ?3 WHERE id = ?4")?;
 
     for (key, orphan_list) in &orphans {
         if orphan_list.len() != 1 {
@@ -200,16 +198,13 @@ fn reconcile_watcher_batch(
 
         let (song_id, old_art_automatic, old_path) = &orphan_list[0];
         let new_path = candidate_list[0];
-        let new_path_str = new_path.to_string_lossy().to_string();
-        let mtime = super::get_mtime(new_path).unwrap_or(0);
 
-        let new_art_automatic = match old_art_automatic.as_deref() {
-            Some(auto) if auto.starts_with("album-") => Some(auto.to_string()),
-            _ => CoverManager::scan_folder_art_static(new_path)
-                .map(|p| p.to_string_lossy().to_string()),
-        };
-
-        update_stmt.execute(params![new_path_str, mtime, new_art_automatic, song_id])?;
+        super::reconcile::repath_song_preserving_mtime(
+            conn,
+            *song_id,
+            new_path,
+            old_art_automatic.as_deref(),
+        )?;
         matched_removed.insert(*old_path);
         matched_added.insert(new_path);
     }
