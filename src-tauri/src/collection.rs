@@ -1048,15 +1048,37 @@ impl CollectionScanner {
             report.external_changes = 0;
         }
         // After the songs are saved, so the playlists' entries can match them.
+        // The playlists lock is taken per file, so a library with a playlist
+        // in every folder doesn't hold up Play for the whole pass (#1807).
         if let Some(state) = app.try_state::<crate::AppState>() {
-            let (found, roots) = (report.playlist_files.clone(), report.walked_roots.clone());
-            match crate::playlist::with_playlists(&state.playlists, move |pm| {
-                pm.sync_scanned_playlist_files(&found, &roots)
-            })
-            .await
-            {
-                Ok(synced) => crate::playlist::file_sync::announce(&app, &synced),
-                Err(e) => log::warn!("Couldn't sync library playlist files: {e}"),
+            let paths = self
+                .db
+                .pool
+                .get()
+                .map_err(anyhow::Error::from)
+                .and_then(|conn| {
+                    crate::playlist::file_sync::scanned_playlist_files(
+                        &conn,
+                        &report.playlist_files,
+                        &report.walked_roots,
+                    )
+                });
+            match paths {
+                Ok(paths) => {
+                    let mut synced = crate::playlist::file_sync::FileSyncReport::default();
+                    for path in paths {
+                        match crate::playlist::with_playlists(&state.playlists, move |pm| {
+                            pm.sync_playlist_files(&[path])
+                        })
+                        .await
+                        {
+                            Ok(one) => synced.merge(one),
+                            Err(e) => log::warn!("Couldn't sync a library playlist file: {e}"),
+                        }
+                    }
+                    crate::playlist::file_sync::announce(&app, &synced);
+                }
+                Err(e) => log::warn!("Couldn't list library playlist files to sync: {e}"),
             }
         }
         let summary = report.summary(trigger);

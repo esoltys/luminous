@@ -3384,6 +3384,13 @@ DELETE FROM app_state WHERE key IN ('airplay_enabled', 'airplay_prompt_dismissed
 /// `synced_rev` up with it, so the playlist has unwritten edits exactly when
 /// the two differ. `conflict` is set while both sides changed and the user
 /// hasn't yet chosen which to keep.
+///
+/// The triggers count every change that alters what the file would hold as
+/// an edit, whoever makes it — the playlist editor, undo, duplicate merges,
+/// the organizer moving a song, a sort change — so no writer can forget to.
+/// A rename counts only for `.xspf`, the one format that stores the name; an
+/// `.m3u` just has its file renamed. Changes `file_sync` itself makes while
+/// reading a file are caught up in the same transaction.
 const MIGRATION_98: &str = "
 CREATE TABLE IF NOT EXISTS playlist_files (
     playlist_id  INTEGER PRIMARY KEY REFERENCES playlists(id) ON DELETE CASCADE,
@@ -3395,6 +3402,32 @@ CREATE TABLE IF NOT EXISTS playlist_files (
     synced_rev   INTEGER NOT NULL DEFAULT 0,
     conflict     INTEGER NOT NULL DEFAULT 0
 );
+CREATE TRIGGER IF NOT EXISTS playlist_files_item_insert AFTER INSERT ON playlist_items BEGIN
+    UPDATE playlist_files SET edit_rev = edit_rev + 1 WHERE playlist_id = NEW.playlist_id;
+END;
+CREATE TRIGGER IF NOT EXISTS playlist_files_item_delete AFTER DELETE ON playlist_items BEGIN
+    UPDATE playlist_files SET edit_rev = edit_rev + 1 WHERE playlist_id = OLD.playlist_id;
+END;
+CREATE TRIGGER IF NOT EXISTS playlist_files_item_update
+AFTER UPDATE OF playlist_id, song_id, position, url ON playlist_items BEGIN
+    UPDATE playlist_files SET edit_rev = edit_rev + 1
+    WHERE playlist_id IN (OLD.playlist_id, NEW.playlist_id);
+END;
+CREATE TRIGGER IF NOT EXISTS playlist_files_song_moved
+AFTER UPDATE OF path ON songs WHEN OLD.path IS NOT NEW.path BEGIN
+    UPDATE playlist_files SET edit_rev = edit_rev + 1
+    WHERE playlist_id IN (SELECT playlist_id FROM playlist_items WHERE song_id = NEW.id);
+END;
+CREATE TRIGGER IF NOT EXISTS playlist_files_sorted
+AFTER UPDATE OF sort_field, sort_asc ON playlists
+WHEN OLD.sort_field IS NOT NEW.sort_field OR OLD.sort_asc IS NOT NEW.sort_asc BEGIN
+    UPDATE playlist_files SET edit_rev = edit_rev + 1 WHERE playlist_id = NEW.id;
+END;
+CREATE TRIGGER IF NOT EXISTS playlist_files_xspf_renamed
+AFTER UPDATE OF name ON playlists WHEN OLD.name IS NOT NEW.name BEGIN
+    UPDATE playlist_files SET edit_rev = edit_rev + 1
+    WHERE playlist_id = NEW.id AND path_key LIKE '%.xspf';
+END;
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {

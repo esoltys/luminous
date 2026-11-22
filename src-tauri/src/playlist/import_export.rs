@@ -214,13 +214,13 @@ pub(super) fn resolve_entries(
 /// in the playlist for the same song (or, for one not in the library, the
 /// same location) keeps its uuid and its other item keys, so re-reading a
 /// changed playlist file doesn't disturb what Luminous remembers about the
-/// tracks that stayed. Doesn't touch the playlist row itself.
+/// tracks that stayed. Doesn't touch the playlist row itself. Run it inside
+/// a transaction: it deletes before it inserts.
 pub(super) fn replace_items(
-    conn: &rusqlite::Connection,
+    tx: &rusqlite::Connection,
     playlist_id: i64,
     entries: &[ResolvedEntry],
 ) -> Result<()> {
-    let tx = conn.unchecked_transaction()?;
     // Each key's existing items, in order, as (uuid, additional_metadata).
     type Kept = VecDeque<(String, Option<String>)>;
     let mut kept: HashMap<(Option<i64>, String), Kept> = HashMap::new();
@@ -274,7 +274,6 @@ pub(super) fn replace_items(
             ])?;
         }
     }
-    tx.commit()?;
     Ok(())
 }
 
@@ -370,7 +369,9 @@ impl PlaylistManager {
         let playlist = self.create_playlist(&playlist_name_for(path, parsed.title))?;
         let conn = self.db.pool.get()?;
         let entries = resolve_entries(&conn, &parsed.tracks, path)?;
-        replace_items(&conn, playlist.id, &entries)?;
+        let tx = conn.unchecked_transaction()?;
+        replace_items(&tx, playlist.id, &entries)?;
+        tx.commit()?;
         Ok(playlist)
     }
 

@@ -1228,9 +1228,17 @@ pub fn run() {
                     Arc::clone(&self_writes),
                     move |report| crate::playlist::file_sync::announce(&handle, &report),
                 ) {
-                    Ok(writer) => playlists
-                        .blocking_lock()
-                        .attach_file_sync(Arc::clone(&self_writes), writer),
+                    Ok(writer) => {
+                        // The organizer and duplicate merges change songs
+                        // under file-backed playlists without an edit of
+                        // their own; their library change wakes the writer.
+                        use tauri::Listener;
+                        let nudger = writer.clone();
+                        app.listen("library-changed", move |_| nudger.nudge());
+                        playlists
+                            .blocking_lock()
+                            .attach_file_sync(Arc::clone(&self_writes), writer);
+                    }
                     Err(e) => log::error!("Failed to start the playlist file writer: {e}"),
                 }
             }
