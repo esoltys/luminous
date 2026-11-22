@@ -6,6 +6,7 @@ import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
 import { picardStore } from "./picard.svelte";
 import { getDaypartBucket } from "../utils/daypart";
+import { navigationStore } from "./navigation.svelte";
 
 /** How often to check whether the Daypart Mix's local-time bucket has
  * crossed a boundary while the app stays open (#223) — cheap since the
@@ -101,6 +102,13 @@ export class PlaylistsStore {
         this.scheduleRefreshAutoPlaylistCounts(300);
       });
 
+      // A file-backed playlist and its file both changed (#2280): nothing is
+      // written until the user keeps one side, from the playlist's banner.
+      await this.events.listen<{ playlistId: number; name: string }>(
+        "playlist-file-conflict",
+        (event) => this.announceFileConflict(event.payload.playlistId, event.payload.name),
+      );
+
       // Library changes (rescans, deletions) alter Recently Added and Favourites
       // count totals (#1960).
       await this.events.listen("library-changed", () => {
@@ -108,6 +116,10 @@ export class PlaylistsStore {
       });
 
       await this.refreshPlaylists();
+      // Conflicts found before this window was listening (the startup write pass).
+      for (const p of this.playlists) {
+        if (p.source_conflict) this.announceFileConflict(p.id, p.name);
+      }
       this.refreshAutoPlaylistCounts();
       const queuePl = await this.requireQueue();
 
@@ -252,6 +264,35 @@ export class PlaylistsStore {
     }
   }
 
+  /** Persistent toast for a file-backed playlist in conflict, opening it so the
+   * user can choose which side to keep. */
+  private announceFileConflict(playlistId: number, name: string) {
+    toastStore.show(
+      i18n.t("playlists.fileConflictToast", { name }),
+      "warning",
+      undefined,
+      undefined,
+      {
+        label: i18n.t("playlists.fileConflictShowBtn"),
+        onClick: () => {
+          this.selectPlaylist(playlistId);
+          navigationStore.viewPlaylist(playlistId);
+        },
+      },
+    );
+  }
+
+  /** Ends a file-backed playlist's conflict by keeping one side; the backend's
+   * `playlists-changed` event then reloads it. */
+  async resolveFileConflict(playlistId: number, keep: "luminous" | "file") {
+    try {
+      await invoke("resolve_playlist_file_conflict", { playlistId, keep });
+    } catch (err) {
+      console.error("Failed to resolve playlist file conflict:", err);
+      toastStore.show(String(err), "error");
+    }
+  }
+
   async deletePlaylist(id: number) {
     if (Array.isArray(this.playlists)) {
       const target = this.playlists.find((p) => p && p.id === id);
@@ -260,7 +301,13 @@ export class PlaylistsStore {
         return;
       }
     }
-    await invoke("delete_playlist", { id });
+    try {
+      await invoke("delete_playlist", { id });
+    } catch (err) {
+      // A file-backed playlist whose file couldn't go to the trash (#2280).
+      toastStore.show(String(err), "error");
+      return;
+    }
     await this.refreshPlaylists();
     if (this.activePlaylistId === id) {
       if (Array.isArray(this.playlists) && this.playlists.length > 0) {

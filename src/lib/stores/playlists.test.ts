@@ -567,6 +567,49 @@ describe("PlaylistsStore", () => {
       expect(invoke).toHaveBeenCalledWith("get_favourite_songs");
     });
 
+    it("asks the user to settle a playlist file conflict with a persistent toast", async () => {
+      const { toastStore } = await import("./toast.svelte");
+      toastStore.messages = [];
+      new PlaylistsStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      eventCallbacks["playlist-file-conflict"]({ payload: { playlistId: 102, name: "Workout" } });
+
+      const toast = toastStore.messages.find((m) => m.text.includes("Workout"));
+      expect(toast?.variant).toBe("warning");
+      expect(toast?.action?.label).toBe("Choose");
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(toastStore.messages).toContain(toast);
+    });
+
+    it("announces conflicts that were already there when the window opened", async () => {
+      const { toastStore } = await import("./toast.svelte");
+      toastStore.messages = [];
+      const conflicted = [{ ...mockPlaylists[0], source_path: "/m/a.m3u", source_conflict: true }];
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "get_playlists") return conflicted;
+        if (cmd === "get_all_app_settings") return {};
+        return [];
+      });
+
+      new PlaylistsStore();
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+
+      expect(toastStore.messages.some((m) => m.text.includes("Favorites"))).toBe(true);
+    });
+
+    it("sends the kept side of a conflict to the backend", async () => {
+      const store = new PlaylistsStore();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await store.resolveFileConflict(101, "file");
+
+      expect(invoke).toHaveBeenCalledWith("resolve_playlist_file_conflict", {
+        playlistId: 101,
+        keep: "file",
+      });
+    });
+
     it("refreshes auto-playlist counts when library-changed fires", async () => {
       const store = new PlaylistsStore();
       for (let i = 0; i < 10; i++) await Promise.resolve();

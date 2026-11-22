@@ -1355,6 +1355,8 @@ export const ru = {
     tableHeaderDuration: "Длительность",
     tableHeaderRemove: "Удалить",
     confirmDeletePlaylist: "Удалить список воспроизведения «{name}»?",
+    confirmDeleteFilePlaylist:
+      "Удалить список воспроизведения «{name}»? Его файл {path} будет перемещён в корзину.",
     confirmDeletePlaylistTitle: "Удаление списка воспроизведения",
     cancel: "Отмена",
     playTrack: "Воспроизвести песню",
@@ -1577,6 +1579,17 @@ export const ru = {
     smartRulePlaylistLabel: "Умный список с правилами",
     smartRuleBasedTooltip: "Умный список воспроизведения с правилами",
     smartBadgeLabel: "Умный",
+    fileBadgeLabel: "Файл",
+    fileBadgeTooltip: "Синхронизируется с {path}",
+    fileConflictBadgeTooltip:
+      "Изменён в Luminous и в {path}. Откройте список воспроизведения, чтобы выбрать, какую версию оставить",
+    fileConflictToast:
+      "«{name}» изменён в Luminous и в своём файле. Выберите, какую версию оставить.",
+    fileConflictShowBtn: "Выбрать",
+    fileConflictBanner:
+      "Этот список воспроизведения и его файл ({path}) изменены. Оставьте одну версию — другая будет заменена.",
+    fileConflictKeepLuminous: "Оставить версию Luminous",
+    fileConflictKeepFile: "Оставить версию файла",
     saveRenameTooltip: "Сохранить",
     historyCleared: "История воспроизведения очищена",
     saveQueueNameLabel: "Название списка",

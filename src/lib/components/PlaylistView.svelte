@@ -36,6 +36,7 @@
     LinkIcon as Link,
   } from "phosphor-svelte";
   import MoreIcon from "./MoreIcon.svelte";
+  import InlineMessage from "./InlineMessage.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { isLiveSong, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -1029,6 +1030,35 @@
             {/if}
           </div>
         {/if}
+        {#if activePlaylist?.source_conflict}
+          <!-- Both the playlist and its file changed (#2280): nothing is written
+               until the user keeps one side. -->
+          <div
+            class="mb-3 px-4 py-3 rounded-xl border border-brand-border/60 acrylic-chrome flex flex-wrap items-center gap-3"
+            data-testid="playlist-file-conflict"
+          >
+            <InlineMessage class="flex-1 min-w-60">
+              {i18n.t("playlists.fileConflictBanner", { path: activePlaylist.source_path ?? "" })}
+            </InlineMessage>
+            <div class="flex gap-2">
+              <button
+                class="px-3 py-1 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-primary hover:border-transparent transition-colors duration-150"
+                onclick={() =>
+                  activePlaylist &&
+                  playlistsStore.resolveFileConflict(activePlaylist.id, "luminous")}
+              >
+                {i18n.t("playlists.fileConflictKeepLuminous")}
+              </button>
+              <button
+                class="px-3 py-1 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-primary hover:border-transparent transition-colors duration-150"
+                onclick={() =>
+                  activePlaylist && playlistsStore.resolveFileConflict(activePlaylist.id, "file")}
+              >
+                {i18n.t("playlists.fileConflictKeepFile")}
+              </button>
+            </div>
+          </div>
+        {/if}
         <div
           class="border border-brand-border/60 rounded-xl acrylic-chrome relative overflow-hidden"
         >
@@ -1371,7 +1401,12 @@
 {#if showDeleteConfirm && activePlaylist}
   <ConfirmDialog
     title={i18n.t("playlists.confirmDeletePlaylistTitle")}
-    message={i18n.t("playlists.confirmDeletePlaylist", { name: activePlaylist.name })}
+    message={activePlaylist.source_path
+      ? i18n.t("playlists.confirmDeleteFilePlaylist", {
+          name: activePlaylist.name,
+          path: activePlaylist.source_path,
+        })
+      : i18n.t("playlists.confirmDeletePlaylist", { name: activePlaylist.name })}
     confirmLabel={i18n.t("playlists.deletePlaylistBtn")}
     cancelLabel={i18n.t("playlists.cancel")}
     onConfirm={handleDeletePlaylist}

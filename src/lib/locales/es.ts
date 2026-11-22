@@ -1262,6 +1262,8 @@ export const es = {
     tableHeaderDuration: "Duración",
     tableHeaderRemove: "Quitar",
     confirmDeletePlaylist: "¿Seguro que quieres eliminar la lista de reproducción «{name}»?",
+    confirmDeleteFilePlaylist:
+      "¿Eliminar la lista de reproducción «{name}»? Su archivo, {path}, irá a la papelera.",
     confirmDeletePlaylistTitle: "Eliminar lista de reproducción",
     cancel: "Cancelar",
     playTrack: "Reproducir canción",
@@ -1461,6 +1463,16 @@ export const es = {
     smartRulePlaylistLabel: "Lista con reglas inteligentes",
     smartRuleBasedTooltip: "Lista de reproducción basada en reglas inteligentes",
     smartBadgeLabel: "Inteligente",
+    fileBadgeLabel: "Archivo",
+    fileBadgeTooltip: "Sincronizada con {path}",
+    fileConflictBadgeTooltip:
+      "Cambiada en Luminous y en {path}. Abre la lista de reproducción para elegir qué versión conservar",
+    fileConflictToast: "«{name}» cambió en Luminous y en su archivo. Elige qué versión conservar.",
+    fileConflictShowBtn: "Elegir",
+    fileConflictBanner:
+      "Esta lista de reproducción y su archivo ({path}) cambiaron. Conserva una versión; la otra se reemplazará.",
+    fileConflictKeepLuminous: "Conservar la versión de Luminous",
+    fileConflictKeepFile: "Conservar la versión del archivo",
     saveRenameTooltip: "Guardar",
     historyCleared: "Historial de reproducción borrado",
     saveQueueNameLabel: "Nombre de la lista de reproducción",

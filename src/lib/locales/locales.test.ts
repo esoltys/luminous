@@ -260,6 +260,7 @@ const IDENTICAL_OK_IT = new Set<string>([
   "playlists.populationModeTitleFormat", // "{base} {suffix}"
   "playlists.bpmAutoPlaylist", // "BPM"
   "settings.autoPlaylistsBpm", // "BPM"
+  "playlists.fileBadgeLabel", // "File"
   "playlists.playlistTypeLabel", // "Playlist"
   "stats.minuteCount", // "{count} min"
   "stats.minuteUnderOne", // "< 1 min"

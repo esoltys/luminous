@@ -1349,6 +1349,8 @@ export const uk = {
     tableHeaderDuration: "Тривалість",
     tableHeaderRemove: "Вилучити",
     confirmDeletePlaylist: "Справді видалити список відтворення «{name}»?",
+    confirmDeleteFilePlaylist:
+      "Видалити список відтворення «{name}»? Його файл {path} буде переміщено до кошика.",
     confirmDeletePlaylistTitle: "Видалення списку відтворення",
     cancel: "Скасувати",
     playTrack: "Відтворити пісню",
@@ -1570,6 +1572,16 @@ export const uk = {
     smartRulePlaylistLabel: "Список відтворення за правилами",
     smartRuleBasedTooltip: "Розумний список відтворення за правилами",
     smartBadgeLabel: "Розумний",
+    fileBadgeLabel: "Файл",
+    fileBadgeTooltip: "Синхронізується з {path}",
+    fileConflictBadgeTooltip:
+      "Змінено в Luminous і в {path}. Відкрийте список відтворення, щоб вибрати, яку версію залишити",
+    fileConflictToast: "«{name}» змінено в Luminous і в його файлі. Виберіть, яку версію залишити.",
+    fileConflictShowBtn: "Вибрати",
+    fileConflictBanner:
+      "Цей список відтворення та його файл ({path}) змінено. Залиште одну версію — іншу буде замінено.",
+    fileConflictKeepLuminous: "Залишити версію Luminous",
+    fileConflictKeepFile: "Залишити версію файлу",
     saveRenameTooltip: "Зберегти",
     historyCleared: "Історію відтворення очищено",
     saveQueueNameLabel: "Назва списку відтворення",
