@@ -168,10 +168,10 @@ describe("LogoLevels beat ripples (#2270)", () => {
     const start = levels.rippleAt(RING_OUTER, 1);
     expect(start).toBeGreaterThan(0);
 
-    // 100 ms at 130 units/s carries it 13 units out, dimmer than it started.
+    // 100 ms at 90 units/s carries it 9 units out, dimmer than it started.
     expect(levels.step(100, false)).toBe(true);
     expect(levels.rippleAt(RING_OUTER, 1)).toBe(0);
-    const later = levels.rippleAt(RING_OUTER + 13, 1);
+    const later = levels.rippleAt(RING_OUTER + 9, 1);
     expect(later).toBeGreaterThan(0);
     expect(later).toBeLessThan(start);
 
@@ -184,13 +184,29 @@ describe("LogoLevels beat ripples (#2270)", () => {
   });
 
   it("keeps animating while a ripple is in flight, even once the levels have arrived", () => {
+    // Full bass already settled, so the beat leaves every level where it is.
     const levels = new LogoLevels();
-    levels.push(frame(bandsIn(0, 0), 0.5));
-    levels.push(frame([], 0, false));
-    // The bass flare decays in about 0.5 s; the ripple takes about 0.8 s to cross the field.
+    levels.push(frame(bandsIn(0, 8)));
+    levels.settle();
+    levels.push(frame(bandsIn(0, 8), 1));
     let frames = 0;
-    while (levels.step(16, false)) frames++;
-    expect(frames * 16).toBeGreaterThan(700);
+    while (levels.step(16, false)) {
+      frames++;
+      expect(frames).toBeLessThan(200);
+    }
+    // 44 units from the ring to the grid's inscribed circle, at 90 units/s.
+    expect(frames * 16).toBeGreaterThan(400);
+    expect(levels.bass).toBe(1);
+  });
+
+  it("has faded out by the full grid's inscribed circle, 140 units from the centre", () => {
+    const levels = new LogoLevels();
+    levels.push(frame(bandsIn(0, 0), 1));
+    // Probing 3 units either side, nothing past 143 means no ripple is alive beyond 140.
+    do {
+      for (let d = 143.5; d <= 240; d += 1) expect(levels.rippleAt(d, 3)).toBe(0);
+      expect(levels.rippleAt(138, 3)).toBeLessThan(0.15);
+    } while (levels.step(16, false));
   });
 
   it("starts stronger beats brighter", () => {
@@ -208,9 +224,9 @@ describe("LogoLevels beat ripples (#2270)", () => {
       levels.push(frame(bandsIn(0, 0), 1));
       if (beat < 4) levels.step(20, false);
     }
-    // 20 ms steps move each ripple 2.6 units: the first would now be at 106.4, the second 103.8.
-    expect(levels.rippleAt(106.4, 0.5)).toBe(0);
-    for (const r of [103.8, 101.2, 98.6, RING_OUTER]) {
+    // 20 ms steps move each ripple 1.8 units: the first would now be at 103.2, the second 101.4.
+    expect(levels.rippleAt(103.2, 0.4)).toBe(0);
+    for (const r of [101.4, 99.6, 97.8, RING_OUTER]) {
       expect(levels.rippleAt(r, 0.5)).toBeGreaterThan(0);
     }
   });
@@ -314,7 +330,7 @@ describe("VoxelLogoRenderer (#2252)", () => {
       return Math.hypot(mx - 100, my - 100);
     }
 
-    /** Levels with one strong ripple 300 ms out (radius about 135). */
+    /** Levels with one strong ripple 300 ms out (radius about 123). */
     function rippling(): LogoLevels {
       const levels = new LogoLevels();
       levels.push(frame(bandsIn(0, 32, 0.5), 1));
@@ -348,7 +364,7 @@ describe("VoxelLogoRenderer (#2252)", () => {
       for (const { after } of lit) {
         expect(cellsIn([after], "ring").size).toBe(1);
         // The band is 3 units either side of the radius, measured at cell centres.
-        expect(Math.abs(markDistanceOf(after) - 135)).toBeLessThanOrEqual(3.01);
+        expect(Math.abs(markDistanceOf(after) - 123)).toBeLessThanOrEqual(3.01);
       }
     });
 

@@ -35,10 +35,14 @@ const GLOW_PEAK = 0.45;
 // Beat ripples (#2270): rings of light that leave the ring's outer edge on each onset.
 /** Ripples in flight at once; a new beat replaces the oldest beyond this. */
 const RIPPLE_POOL = 4;
-/** Outward speed, in mark units per second. */
-const RIPPLE_SPEED = 130;
-/** Radius at which a ripple has faded out: just past the full grid's corners (about 198). */
-const RIPPLE_END_R = 200;
+/** Outward speed, in mark units per second: a ripple lives about half a second. */
+const RIPPLE_SPEED = 90;
+/**
+ * Radius at which a ripple has faded out: the full grid's inscribed circle (it spans 140 units
+ * either side of the centre). The housing beyond the grid is a static cached blit, so a ripple
+ * still lit at the grid's edge would be cut off square.
+ */
+const RIPPLE_END_R = 140;
 /** Half the ripple's width, in mark units, before widening to at least half a cell. */
 const RIPPLE_HALF = 3;
 /** Brightness of the faintest onset's ripple as it leaves the ring; the strongest starts at 1. */
