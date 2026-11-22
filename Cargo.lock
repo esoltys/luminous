@@ -3359,6 +3359,7 @@ dependencies = [
  "alsa",
  "anyhow",
  "azo",
+ "bs1770",
  "cpal",
  "libc",
  "log",

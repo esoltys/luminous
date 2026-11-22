@@ -63,3 +63,5 @@ test-util = []
 
 [dev-dependencies]
 serde_json.workspace = true
+# Cross-checks the live K-weighting meter against the library analyser's.
+bs1770 = "1"

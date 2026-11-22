@@ -732,14 +732,14 @@ mod imp {
                         Ok(stream) => {
                             let samples = stream.period_frames * CHANNELS as usize;
                             let period = RenderPeriod {
-                                renderer: OutputRenderer {
+                                renderer: OutputRenderer::new(
                                     shared,
                                     consumer,
                                     played_samples,
-                                    mono_scratch: Vec::with_capacity(samples),
-                                    sample_rate: stream.rate,
-                                    channels: CHANNELS,
-                                },
+                                    stream.rate,
+                                    CHANNELS,
+                                    samples,
+                                ),
                                 scratch: vec![0.0; samples],
                                 bytes: vec![0; samples * stream.format.container_bytes()],
                                 format: stream.format,
