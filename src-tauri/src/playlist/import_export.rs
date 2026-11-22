@@ -146,7 +146,16 @@ pub(super) fn resolve_entries(
             continue;
         }
 
-        let mut resolved_path = std::path::PathBuf::from(&track.path_or_url);
+        // A playlist written on Windows separates folders with `\`, which
+        // only Windows reads as a separator; elsewhere the whole location
+        // would be one file name. The parsed text keeps its `\` so the
+        // file's style (`FileStyle::backslash`) survives a rewrite.
+        let location = if cfg!(windows) {
+            track.path_or_url.clone()
+        } else {
+            track.path_or_url.replace('\\', "/")
+        };
+        let mut resolved_path = std::path::PathBuf::from(&location);
         if resolved_path.is_relative() {
             if let Some(base) = base_dir {
                 resolved_path = base.join(&resolved_path);
