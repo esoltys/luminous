@@ -268,7 +268,8 @@ describe("RadioView", () => {
     await waitFor(() => {
       expect(screen.getByText("Jazz FM91")).toBeInTheDocument();
     });
-    expect(screen.getByTestId("radio-stale-indicator")).toBeInTheDocument();
+    expect(screen.getByText(/Updated 2d ago/)).toBeInTheDocument();
+    expect(screen.queryByTestId("radio-stale-indicator")).not.toBeInTheDocument();
 
     // Select "All formats (incl. unsupported)" in Formats dropdown -> passes hideUnsupported: false.
     const codecSelect = screen.getByLabelText("Filter by format");

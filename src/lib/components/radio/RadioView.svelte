@@ -80,15 +80,6 @@
 <div class="@container flex flex-col h-full min-h-0" data-testid="radio-view">
   <CollectionHeader title={i18n.t("radio.title")} subtitle={headerSubtitle}>
     {#snippet actions()}
-      {#if radioStore.status?.optedIn && radioStore.isStale && radioStore.status.lastSyncedAt}
-        <span
-          data-testid="radio-stale-indicator"
-          class="label-small px-2.5 py-1 rounded-full chip-neutral"
-        >
-          {formatUpdatedAgo(radioStore.status.lastSyncedAt)}
-        </span>
-      {/if}
-
       <!-- Sub-view switcher -->
       <div
         role="tablist"
