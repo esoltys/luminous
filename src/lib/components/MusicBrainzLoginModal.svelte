@@ -191,7 +191,7 @@
               <ArrowUpRight class="w-3 h-3" />
             </button>
           </div>
-          <span class="text-brand-text-secondary/40 select-none">•</span>
+          <span class="text-brand-text-secondary select-none">•</span>
           <button
             type="button"
             onclick={() => openExternalUrl("https://musicbrainz.org/doc/About")}

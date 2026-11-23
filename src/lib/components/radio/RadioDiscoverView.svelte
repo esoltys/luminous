@@ -54,7 +54,7 @@
         value={radioStore.searchQuery}
         oninput={(e) => radioStore.setSearchQuery(e.currentTarget.value)}
         placeholder={i18n.t("radio.searchPlaceholder")}
-        class="w-full pl-9 pr-8 py-1.5 rounded-lg bg-brand-surface border border-brand-border/60 text-sm text-brand-text-primary placeholder:text-brand-text-secondary/70 focus:outline-none focus:border-brand-accent"
+        class="w-full pl-9 pr-8 py-1.5 rounded-lg bg-brand-surface border border-brand-border/60 text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent"
       />
       {#if radioStore.searchQuery}
         <button

@@ -100,6 +100,6 @@
       </div>
     {/each}
 
-    <p class="text-xs text-brand-text-secondary/60 text-center">{i18n.t("shortcuts.footnote")}</p>
+    <p class="text-xs text-brand-text-secondary text-center">{i18n.t("shortcuts.footnote")}</p>
   </div>
 </Modal>

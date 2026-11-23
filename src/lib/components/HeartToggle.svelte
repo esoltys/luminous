@@ -93,7 +93,7 @@
     ? 'text-brand-accent-text'
     : lovedState === -1
       ? 'text-brand-accent-text/80 hover:text-brand-text-primary'
-      : 'text-brand-text-primary/60 hover:text-brand-accent-text'}"
+      : 'text-brand-text-primary hover:text-brand-accent-text'}"
   title={lovedState === 1
     ? i18n.t("rating.unfavoriteTooltip", {}, "Remove from favourites")
     : lovedState === -1

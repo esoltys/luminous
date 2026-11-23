@@ -122,7 +122,7 @@
         bind:value={name}
         required
         placeholder={i18n.t("radio.stationNamePlaceholder")}
-        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent"
+        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent"
       />
     </div>
 
@@ -137,7 +137,7 @@
         bind:value={url}
         required
         placeholder="https://example.com/stream.mp3"
-        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent"
+        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent"
       />
       <p class="text-[11px] text-brand-text-secondary">
         {i18n.t("radio.stationUrlHint")}
@@ -154,7 +154,7 @@
         type="text"
         bind:value={tags}
         placeholder={i18n.t("radio.stationTagsPlaceholder")}
-        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent"
+        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent"
       />
     </div>
 

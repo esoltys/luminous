@@ -12,4 +12,4 @@
 </script>
 
 <LoaderCircle class="{sizeClass} animate-spin text-brand-accent-text" />
-<span class="text-xs text-brand-text-secondary/60 font-medium">{label}</span>
+<span class="text-xs text-brand-text-secondary font-medium">{label}</span>

@@ -72,7 +72,7 @@
           <p
             class="{playerStore.currentSong.album?.trim()
               ? 'mt-1'
-              : 'mt-1.5'} text-xs @3xl:text-sm @5xl:text-base text-brand-text-secondary/70 font-medium leading-none pb-[0.2em] -mb-[0.2em] truncate select-text"
+              : 'mt-1.5'} text-xs @3xl:text-sm @5xl:text-base text-brand-text-secondary font-medium leading-none pb-[0.2em] -mb-[0.2em] truncate select-text"
           >
             {playerStore.currentSongDisplaySubtitle}
           </p>

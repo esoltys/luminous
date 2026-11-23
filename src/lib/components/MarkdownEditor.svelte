@@ -289,7 +289,7 @@
               {},
               "Write markdown bio or description here...",
             )}
-            class="w-full h-full p-4 rounded-lg bg-brand-main/60 border border-brand-border text-brand-text-primary text-sm font-mono leading-relaxed placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none overflow-y-auto transition-colors"
+            class="w-full h-full p-4 rounded-lg bg-brand-main/60 border border-brand-border text-brand-text-primary text-sm font-mono leading-relaxed placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none overflow-y-auto transition-colors"
           ></textarea>
         {:else}
           <div
@@ -310,7 +310,7 @@
       <div
         class="px-4 sm:px-6 py-2 border-t border-brand-border/60 bg-brand-sidebar/40 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-text-secondary select-none shrink-0"
       >
-        <span class="font-medium text-brand-text-secondary/70"
+        <span class="font-medium text-brand-text-secondary"
           >{i18n.t("markdownEditor.syntaxTitle", {}, "Formatting:")}</span
         >
         <code

@@ -91,7 +91,7 @@
       </Button>
     </div>
 
-    <p class="text-xs text-brand-text-secondary/80 leading-relaxed text-pretty mt-5">
+    <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty mt-5">
       {i18n.t("emptyLibrary.dropHint")}
     </p>
 

@@ -463,7 +463,7 @@
                 {song.artist || i18n.t("collection.unknownArtist")}
               </p>
               {#if issue.description}
-                <p class="text-xs text-brand-text-secondary/80 mt-0.5">
+                <p class="text-xs text-brand-text-secondary mt-0.5">
                   {issue.description}
                 </p>
               {/if}

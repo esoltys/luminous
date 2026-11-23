@@ -18,7 +18,7 @@
     subtitle,
     pulse = true,
     card = false,
-    subtitleClass = "text-xs text-brand-text-secondary/60 font-medium",
+    subtitleClass = "text-xs text-brand-text-secondary font-medium",
   }: Props = $props();
 </script>
 

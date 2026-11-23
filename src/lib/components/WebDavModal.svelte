@@ -135,7 +135,7 @@
           <h2 class="text-base font-bold text-brand-text-primary truncate">
             {server ? i18n.t("settings.editWebdavServer") : i18n.t("settings.addWebdavServer")}
           </h2>
-          <p class="text-xs text-brand-text-secondary/70 truncate">
+          <p class="text-xs text-brand-text-secondary truncate">
             {i18n.t("settings.webdavSubtitle")}
           </p>
         </div>

@@ -69,7 +69,7 @@
         class="w-full h-full object-contain"
       />
     {:else}
-      <Broadcast class="w-5 h-5 text-brand-text-secondary/60" />
+      <Broadcast class="w-5 h-5 text-brand-text-secondary" />
     {/if}
 
     {#if station.playable}

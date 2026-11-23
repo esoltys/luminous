@@ -265,7 +265,7 @@
               {},
               "Add a bio or background notes for this artist...",
             )}
-            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none transition-colors"
+            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none transition-colors"
           ></textarea>
         </div>
 
@@ -278,7 +278,7 @@
             <Mic class="w-3.5 h-3.5 text-brand-accent" />
             {i18n.t("artistProfileEditor.tags", {}, "Tags")}
           </label>
-          <p class="text-xs text-brand-text-secondary/70 -mt-1">
+          <p class="text-xs text-brand-text-secondary -mt-1">
             {i18n.t("artistProfileEditor.tagsNote")}
           </p>
 
@@ -330,7 +330,7 @@
                 {},
                 "Add a tag and press Enter...",
               )}
-              class="flex-1 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 text-xs focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+              class="flex-1 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary text-xs focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
             />
             <button
               type="button"
@@ -362,7 +362,7 @@
               {},
               "https://www.artist.com or www.artist.com",
             )}
-            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
           />
         </div>
 
@@ -383,7 +383,7 @@
             oninput={() => (countryError = false)}
             aria-invalid={countryError}
             placeholder={i18n.t("artistProfileEditor.countryPlaceholder", {}, "e.g. Canada or CA")}
-            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
           />
           <datalist id="artist-country-options">
             {#each countryChoices as option (option.code)}
@@ -420,7 +420,7 @@
 
           {#if socialLinks.length === 0}
             <div
-              class="px-4 py-3 rounded-lg border border-dashed border-brand-border text-center text-xs text-brand-text-secondary/60"
+              class="px-4 py-3 rounded-lg border border-dashed border-brand-border text-center text-xs text-brand-text-secondary"
             >
               {i18n.t(
                 "artistProfileEditor.noLinks",
@@ -462,7 +462,7 @@
                       type="text"
                       bind:value={link.handle_or_url}
                       placeholder={platformInfo.placeholder}
-                      class="w-full min-w-0 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs placeholder:text-brand-text-secondary/40 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+                      class="w-full min-w-0 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
                     />
                     <button
                       type="button"

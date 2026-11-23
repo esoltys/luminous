@@ -181,7 +181,7 @@
                 class="{SIDEBAR_CAPTION_TEXT_CLASS} truncate {open
                   ? 'text-brand-accent-contrast/80'
                   : fraction === null
-                    ? 'text-brand-text-secondary/80'
+                    ? 'text-brand-text-secondary'
                     : 'text-brand-accent-text'}"
               >
                 {fraction === null ? space.free : syncingText(device.id)}

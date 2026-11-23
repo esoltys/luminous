@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { LYRIC_LINE_IDLE, LYRIC_WORD_UNSUNG } from "../utils/lyricsStyle";
   import { playerStore } from "../stores/player.svelte";
   import { setVolumeFromSlider, volumeSliderBackground } from "../volumeSlider";
   import { collectionStore } from "../stores/collection.svelte";
@@ -397,7 +398,7 @@
     role="button"
     tabindex="0"
     aria-label={i18n.t("miniplayer.dragHint", {}, "Drag window")}
-    class="drag-grabber w-full {sizeClass} flex-shrink-0 cursor-grab active:cursor-grabbing text-brand-text-secondary/40 hover:text-brand-text-secondary/80 transition-colors"
+    class="drag-grabber w-full {sizeClass} flex-shrink-0 cursor-grab active:cursor-grabbing text-brand-text-secondary hover:text-brand-text-primary transition-colors"
     title={i18n.t("miniplayer.dragHint", {}, "Drag window")}
   ></div>
 {/snippet}
@@ -502,7 +503,7 @@
         </h2>
 
         <!-- Subtitle detail (tracks played) -->
-        <p class="text-xs text-brand-text-secondary/70 mt-0.5 text-center truncate max-w-full px-2">
+        <p class="text-xs text-brand-text-secondary mt-0.5 text-center truncate max-w-full px-2">
           {#if (session?.trackCount ?? 0) >= 1}
             {i18n.plural("miniplayer.tracksPlayed", session?.trackCount ?? 0)}
           {:else}
@@ -548,14 +549,14 @@
         </div>
 
         <!-- Drop hint -->
-        <span class="text-[10px] text-brand-text-secondary/40 mt-3 select-none">
+        <span class="text-[10px] text-brand-text-secondary mt-3 select-none">
           {i18n.t("miniplayer.dropToPlay")}
         </span>
       </div>
 
       <!-- Bottom mini window utilities -->
       <div
-        class="w-full flex items-center justify-between pt-1 border-t border-brand-border/20 text-brand-text-secondary/50 text-xs flex-shrink-0"
+        class="w-full flex items-center justify-between pt-1 border-t border-brand-border/20 text-brand-text-secondary text-xs flex-shrink-0"
       >
         <div class="flex items-center gap-1.5">
           <button
@@ -607,7 +608,7 @@
           >
             {#if isLoading}
               <div
-                class="flex-1 flex flex-col items-center justify-center gap-2 text-brand-text-secondary/60"
+                class="flex-1 flex flex-col items-center justify-center gap-2 text-brand-text-secondary"
               >
                 <LoadingSpinner label={i18n.t("lyrics.fetching", {}, "Fetching lyrics...")} />
               </div>
@@ -621,7 +622,7 @@
                 <p class="text-xs font-semibold text-brand-text-primary">
                   {i18n.t("lyrics.instrumentalTitle", {}, "Instrumental Track")}
                 </p>
-                <p class="text-[11px] text-brand-text-secondary/70 max-w-xs">
+                <p class="text-[11px] text-brand-text-secondary max-w-xs">
                   {i18n.t(
                     "lyrics.instrumentalDesc",
                     {},
@@ -641,7 +642,7 @@
                     onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
                     class="text-sm font-bold transition-all duration-300 transform px-2 text-balance leading-relaxed cursor-pointer {isActive
                       ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold'
-                      : 'text-brand-text-secondary/35 hover:text-brand-text-secondary/60'}"
+                      : LYRIC_LINE_IDLE}"
                   >
                     {#if isActive && line.words && line.words.length > 0}
                       {#each line.words as word}
@@ -649,7 +650,7 @@
                         <span
                           class="inline-block whitespace-pre-wrap transition-all duration-150 {isWordSung
                             ? 'text-brand-text-primary opacity-100 filter drop-shadow-[0_0_6px_var(--color-brand-accent)]'
-                            : 'text-brand-text-primary/40 opacity-40'}">{word.text}</span
+                            : LYRIC_WORD_UNSUNG}">{word.text}</span
                         >
                       {/each}
                     {:else}
@@ -661,11 +662,11 @@
             {:else}
               <div class="flex-1 flex flex-col items-center justify-center gap-2 p-4 text-center">
                 <div
-                  class="p-3 rounded-full bg-brand-sidebar/50 border border-brand-border/30 text-brand-text-secondary/50"
+                  class="p-3 rounded-full bg-brand-sidebar/50 border border-brand-border/30 text-brand-text-secondary"
                 >
                   <Lyrics class="w-6 h-6 stroke-[1.5]" />
                 </div>
-                <p class="text-xs font-medium text-brand-text-secondary/70">
+                <p class="text-xs font-medium text-brand-text-secondary">
                   {i18n.t("miniplayer.noLiveLyrics")}
                 </p>
               </div>
@@ -702,7 +703,7 @@
         </span>
         <div class="relative w-full flex items-center justify-center mt-0.5">
           <span
-            class="text-xs text-brand-text-secondary/70 truncate w-full px-8"
+            class="text-xs text-brand-text-secondary truncate w-full px-8"
             title={playerStore.currentSongDisplaySubtitle}
           >
             {playerStore.currentSongDisplaySubtitle}
@@ -710,7 +711,7 @@
           {#if playerStore.queueProgressText}
             <span
               dir="ltr"
-              class="absolute right-0 top-1/2 -translate-y-1/2 text-[10px] font-mono tabular-nums text-brand-text-secondary/50 pointer-events-none select-none tracking-tight leading-none"
+              class="absolute right-0 top-1/2 -translate-y-1/2 text-[10px] font-mono tabular-nums text-brand-text-secondary pointer-events-none select-none tracking-tight leading-none"
               aria-label={i18n.t(
                 "miniplayer.queueProgressAria",
                 { current: playerStore.playlistIndex, total: playerStore.playlistTotal },
@@ -753,7 +754,7 @@
           {playerStore.currentSongDisplayTitle}
         </span>
         <span
-          class="text-xs text-brand-text-secondary/80 truncate w-full"
+          class="text-xs text-brand-text-secondary truncate w-full"
           title={playerStore.currentSongDisplaySubtitle}
         >
           {playerStore.currentSongDisplaySubtitle}
@@ -783,7 +784,7 @@
             class="p-1.5 transition-colors hover:text-brand-text-primary flex items-center gap-1 {playerStore.shuffleMode !==
             'off'
               ? 'text-brand-accent-text font-bold'
-              : 'text-brand-text-secondary/60'}"
+              : 'text-brand-text-secondary'}"
             title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
           >
             {#if shuffleTypeIcon(playerStore.shuffleMode)}
@@ -832,7 +833,7 @@
             class="p-1.5 transition-colors hover:text-brand-text-primary flex items-center gap-1 {playerStore.repeatMode !==
             'off'
               ? 'text-brand-accent-text font-bold'
-              : 'text-brand-text-secondary/60'}"
+              : 'text-brand-text-secondary'}"
             title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
           >
             <Repeat class="w-4.5 h-4.5" />
@@ -843,11 +844,9 @@
           </button>
         </div>
 
-        <div class="flex flex-col gap-1 w-full text-[10px] text-brand-text-secondary/70 px-1">
+        <div class="flex flex-col gap-1 w-full text-[10px] text-brand-text-secondary px-1">
           {#if isLiveSong(playerStore.currentSong)}
-            <div
-              class="flex items-center justify-between w-full px-0.5 font-mono text-[9px] opacity-80"
-            >
+            <div class="flex items-center justify-between w-full px-0.5 font-mono text-[9px]">
               <span>{formatDuration(playerStore.positionNanosec)}</span>
               <span
                 data-live-badge
@@ -858,9 +857,7 @@
             </div>
           {:else}
             <WaveformSeekBar />
-            <div
-              class="flex items-center justify-between w-full px-0.5 font-mono text-[9px] opacity-80"
-            >
+            <div class="flex items-center justify-between w-full px-0.5 font-mono text-[9px]">
               <span>{formatDuration(playerStore.positionNanosec)}</span>
               <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
             </div>
@@ -872,7 +869,7 @@
         <div class="flex items-center gap-1.5">
           <button
             onclick={toggleMute}
-            class="p-1 text-brand-text-secondary/70 hover:text-brand-text-primary transition-colors"
+            class="p-1 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
             title={i18n.t("playerBar.volume")}
           >
             {#if isMuted || playerStore.volume === 0}

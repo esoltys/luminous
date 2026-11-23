@@ -148,7 +148,7 @@
         {i18n.t("collection.columnSelectorVisible")}
       </div>
       {#if visibleInOrder.length === 0}
-        <div class="px-2 py-2 text-[11px] text-brand-text-secondary/60 italic">
+        <div class="px-2 py-2 text-[11px] text-brand-text-secondary italic">
           {i18n.t("collection.columnSelectorNoneVisible")}
         </div>
       {:else}
@@ -177,7 +177,7 @@
           class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs {collectionStore
             .visibleColumns[col.key]
             ? 'text-brand-text-primary'
-            : 'text-brand-text-secondary/70'}"
+            : 'text-brand-text-secondary'}"
         >
           <input
             type="checkbox"
@@ -199,7 +199,7 @@
           class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs {collectionStore
             .visibleColumns[col.key]
             ? 'text-brand-text-primary'
-            : 'text-brand-text-secondary/70'}"
+            : 'text-brand-text-secondary'}"
         >
           <input
             type="checkbox"

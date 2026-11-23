@@ -250,7 +250,7 @@
                 role="presentation"
                 class="pt-1 {groupIdx > 0 ? 'border-t border-brand-border/40 mt-1' : ''}"
               >
-                <div role="presentation" class="label-small px-3 py-1 text-brand-text-secondary/70">
+                <div role="presentation" class="label-small px-3 py-1 text-brand-text-secondary">
                   {group.label}
                 </div>
                 <ul role="group" aria-label={group.label}>
@@ -266,7 +266,7 @@
                       aria-selected={isSelected}
                       aria-disabled={item.disabled}
                       class="px-3 py-1.5 text-xs flex items-center justify-between gap-3 transition-colors {item.disabled
-                        ? 'text-brand-text-secondary/50 italic cursor-not-allowed'
+                        ? 'text-brand-text-secondary italic cursor-not-allowed'
                         : 'cursor-pointer'} {isFocused && !item.disabled
                         ? 'bg-brand-accent/20 text-brand-text-primary'
                         : isSelected
@@ -309,7 +309,7 @@
               aria-selected={isSelected}
               aria-disabled={item.disabled}
               class="px-3 py-1.5 text-xs flex items-center justify-between gap-3 transition-colors {item.disabled
-                ? 'text-brand-text-secondary/50 italic cursor-not-allowed'
+                ? 'text-brand-text-secondary italic cursor-not-allowed'
                 : 'cursor-pointer'} {isFocused && !item.disabled
                 ? 'bg-brand-accent/20 text-brand-text-primary'
                 : isSelected

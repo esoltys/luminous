@@ -343,7 +343,7 @@
           onpointerdown={(e) => handleCardPointerDown(e, group.name)}
           class="shrink-0 touch-none genre-drag-handle {draggedCard === group.name
             ? 'is-dragging'
-            : ''} text-brand-text-secondary/50 hover:text-brand-text-secondary"
+            : ''} text-brand-text-secondary hover:text-brand-text-secondary"
           title={i18n.t(
             "songTags.dragCardTooltip",
             {},
@@ -390,7 +390,7 @@
 
       <div class="px-3 pb-3 flex flex-wrap gap-1.5 min-h-9 {compact ? 'hidden' : ''}">
         {#if group.children.length === 0}
-          <p class="text-xs text-brand-text-secondary/70 italic py-1">
+          <p class="text-xs text-brand-text-secondary italic py-1">
             {i18n.t("songTags.noSubgenresYet", {}, "No sub-genres yet — drag a tag here")}
           </p>
         {/if}

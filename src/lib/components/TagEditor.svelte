@@ -700,7 +700,7 @@
         <p class="text-sm font-semibold text-brand-text-primary">
           {i18n.t("tagEditor.readFailed")}
         </p>
-        <p class="text-xs text-brand-text-secondary/65 max-w-xs">{errorMsg}</p>
+        <p class="text-xs text-brand-text-secondary max-w-xs">{errorMsg}</p>
       </div>
     {:else}
       <div class="flex flex-col gap-4">
@@ -1051,7 +1051,7 @@
             >
               <span>{i18n.t("sortOverrides.heading")}</span>
               <span
-                class="text-[10px] text-brand-text-secondary/70 group-open:rotate-180 transition-transform"
+                class="text-[10px] text-brand-text-secondary group-open:rotate-180 transition-transform"
                 >▼</span
               >
             </summary>
@@ -1137,7 +1137,7 @@
                   {/if}
                 </div>
                 <span
-                  class="text-[10px] text-brand-text-secondary/70 group-open:rotate-180 transition-transform"
+                  class="text-[10px] text-brand-text-secondary group-open:rotate-180 transition-transform"
                   >▼</span
                 >
               </summary>
@@ -1274,7 +1274,7 @@
                                   >
                                 {/if}
                                 {#if entry.batchOtherTracks > 0}
-                                  <span class="text-brand-text-secondary/60">•</span>
+                                  <span class="text-brand-text-secondary">•</span>
                                   <span
                                     >{i18n.t("tagEditor.historyBatchNote", {
                                       count: entry.batchOtherTracks,
@@ -1306,10 +1306,10 @@
                                 <span class="font-medium text-brand-text-primary"
                                   >{getFieldLabel(entry.field)}:</span
                                 >
-                                <span class="text-brand-text-secondary line-through opacity-80"
+                                <span class="text-brand-text-secondary line-through"
                                   >{formatHistoryValue(entry.oldValue)}</span
                                 >
-                                <span class="text-brand-text-secondary/70">→</span>
+                                <span class="text-brand-text-secondary">→</span>
                                 <span class="font-medium">{formatHistoryValue(entry.newValue)}</span
                                 >
                               </div>
