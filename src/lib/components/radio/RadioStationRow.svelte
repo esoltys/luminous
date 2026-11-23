@@ -43,7 +43,7 @@
 
   const tagList = $derived(
     station.tags
-      .split(",")
+      .split(/[,;]/)
       .map((t) => t.trim())
       .filter(Boolean)
       .slice(0, 3),

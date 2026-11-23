@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 98;
+pub const CURRENT_SCHEMA_VERSION: i32 = 99;
 
 struct Migration {
     version: i32,
@@ -1036,7 +1036,43 @@ const MIGRATIONS: &[Migration] = &[
         description: "playlist files kept in sync with a library playlist (#2280)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_98)?),
     },
+    Migration {
+        version: 99,
+        description: "normalize comma-delimited radio station genres to '; '-delimited multi-values",
+        apply: migrate_radio_station_genres,
+    },
 ];
+
+/// Migration 99: previously materialized Radio Browser and custom stream
+/// stations stored raw comma-delimited `tags` in `songs.genre`, whereas
+/// `parse_multi_value` / `GenreChips` expect `; `-delimited values.
+fn migrate_radio_station_genres(conn: &rusqlite::Connection) -> Result<()> {
+    let rows: Vec<(i64, String)> = {
+        let mut stmt = conn.prepare(
+            "SELECT id, genre FROM songs
+             WHERE source IN (?1, ?2) AND genre LIKE '%,%'",
+        )?;
+        let mapped = stmt.query_map(
+            rusqlite::params![
+                crate::models::SongSource::STREAM_ID,
+                crate::models::SongSource::RADIO_BROWSER_ID,
+            ],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        mapped.collect::<std::result::Result<Vec<_>, _>>()?
+    };
+
+    if rows.is_empty() {
+        return Ok(());
+    }
+
+    let mut update = conn.prepare("UPDATE songs SET genre = ?1 WHERE id = ?2")?;
+    for (id, raw_genre) in rows {
+        let normalized = crate::radio_directory::station_tags_to_genre(&raw_genre);
+        update.execute(rusqlite::params![normalized, id])?;
+    }
+    Ok(())
+}
 
 /// Migration 83 (#2097): `artist_profiles.artist_key` becomes
 /// `COLLATE NOCASE`, so a profile is one row per artist whatever casing a
@@ -6165,5 +6201,67 @@ mod tests {
             )
             .unwrap();
         assert_eq!(after_delete, 0);
+    }
+
+    #[test]
+    fn test_migration_99_normalizes_radio_station_genres() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_migration99_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO songs (title, path, source, genre, unavailable)
+             VALUES ('CFOX', 'radio://cfox', ?1, 'alternative rock,commercial,vancouver', 0)",
+            rusqlite::params![crate::models::SongSource::RADIO_BROWSER_ID],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, path, source, genre, unavailable)
+             VALUES ('Custom FM', 'radio://custom-1', ?1, 'jazz, ambient', 0)",
+            rusqlite::params![crate::models::SongSource::STREAM_ID],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, path, source, genre, unavailable)
+             VALUES ('Local Track', '/music/track.mp3', ?1, 'Rock, Indie', 0)",
+            rusqlite::params![crate::models::SongSource::COLLECTION_ID],
+        )
+        .unwrap();
+
+        migrate_radio_station_genres(&conn).unwrap();
+
+        let cfox_genre: Option<String> = conn
+            .query_row(
+                "SELECT genre FROM songs WHERE path = 'radio://cfox'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            cfox_genre.as_deref(),
+            Some("alternative rock; commercial; vancouver")
+        );
+
+        let custom_genre: Option<String> = conn
+            .query_row(
+                "SELECT genre FROM songs WHERE path = 'radio://custom-1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(custom_genre.as_deref(), Some("jazz; ambient"));
+
+        // Non-radio tracks are left untouched.
+        let local_genre: Option<String> = conn
+            .query_row(
+                "SELECT genre FROM songs WHERE path = '/music/track.mp3'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(local_genre.as_deref(), Some("Rock, Indie"));
     }
 }
