@@ -98,8 +98,17 @@ describe("WaveformSeekBar.svelte", () => {
       path: "radio://station-1",
       length_nanosec: undefined,
     } as any;
+    playerStore.state = "paused";
 
-    const { container } = render(WaveformSeekBar);
-    expect(container.querySelector("[data-waveform-container]")).toBeInTheDocument();
+    const rafSpy = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
+    try {
+      const { container } = render(WaveformSeekBar);
+      expect(container.querySelector("[data-waveform-container]")).toBeInTheDocument();
+      expect(rafSpy).not.toHaveBeenCalled();
+
+      playerStore.state = "playing";
+    } finally {
+      rafSpy.mockRestore();
+    }
   });
 });

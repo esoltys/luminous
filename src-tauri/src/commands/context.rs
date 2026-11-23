@@ -6,8 +6,8 @@
 
 use crate::collection::get_artist_profile_conn;
 use crate::context::{
-    is_cache_fresh, is_events_cache_fresh, ArtistEvent, ContextManager, ARTIST_EVENTS_FLIGHT,
-    ARTIST_FLIGHT, RELEASE_GROUP_FLIGHT,
+    is_cache_fresh, is_events_cache_fresh, ArtistEvent, ContextManager, StationContextLookupResult,
+    ARTIST_EVENTS_FLIGHT, ARTIST_FLIGHT, RELEASE_GROUP_FLIGHT, STATION_CONTEXT_FLIGHT,
 };
 use crate::db::Database;
 use crate::AppState;
@@ -15,17 +15,16 @@ use rusqlite::params;
 use serde::Serialize;
 use tauri::State;
 
-/// `(release_group_id, tagged_artist_mbid, tagged_album_artist_mbid, artist,
-/// album_artist)` — the handful of `songs` columns `get_song_context` needs
-/// to resolve what to fetch. Named to keep clippy's `type_complexity` lint
-/// happy on the `query_row` call site.
-type SongIdentifiersRow = (
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-);
+struct SongLookupMeta {
+    online: bool,
+    is_radio: bool,
+    path: Option<String>,
+    title: Option<String>,
+    url: Option<String>,
+    artist: Option<String>,
+    release_group_id: Option<String>,
+    artist_id: Option<String>,
+}
 
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct SongContextEnrichment {
@@ -48,6 +47,11 @@ pub struct SongContextEnrichment {
     pub artist_begin_area_mbid: Option<String>,
     pub artist_area_name: Option<String>,
     pub artist_area_mbid: Option<String>,
+    pub station_country: Option<String>,
+    pub station_language: Option<String>,
+    pub station_homepage: Option<String>,
+    pub station_social_links: Vec<crate::models::ArtistSocialLink>,
+    pub station_wikidata_id: Option<String>,
     pub fetched_at: Option<i64>,
 }
 
@@ -163,18 +167,63 @@ pub async fn get_song_context(
     let force_refresh = force_refresh.unwrap_or(false);
     let wiki_lang = crate::context::wikipedia_language(locale.as_deref());
 
-    let context_result = crate::db::run_blocking(&state.db, move |conn| {
-        if !is_online_enabled(conn) {
+    let song_meta = crate::db::run_blocking(&state.db, move |conn| {
+        let online = is_online_enabled(conn);
+        let row = conn
+            .query_row(
+                "SELECT source, path, title, url, artist,
+                        musicbrainz_release_group_id, musicbrainz_artist_id,
+                        musicbrainz_album_artist_id, album_artist
+                 FROM songs WHERE id = ?1",
+                params![song_id],
+                |row| {
+                    Ok((
+                        row.get::<_, i32>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                        row.get::<_, Option<String>>(4)?,
+                        row.get::<_, Option<String>>(5)?,
+                        row.get::<_, Option<String>>(6)?,
+                        row.get::<_, Option<String>>(7)?,
+                        row.get::<_, Option<String>>(8)?,
+                    ))
+                },
+            )
+            .ok();
+        let Some((
+            source,
+            path,
+            title,
+            url,
+            artist_name,
+            rg,
+            tagged_artist_mbid,
+            tagged_album_artist_mbid,
+            album_artist_name,
+        )) = row
+        else {
+            return Ok(None);
+        };
+
+        let is_radio = source == crate::models::SongSource::RADIO_BROWSER_ID
+            || source == crate::models::SongSource::STREAM_ID;
+        if is_radio {
+            return Ok(Some(SongLookupMeta {
+                online,
+                is_radio: true,
+                path,
+                title,
+                url,
+                artist: artist_name,
+                release_group_id: None,
+                artist_id: None,
+            }));
+        }
+
+        if !online {
             return Ok(None);
         }
-        let row: SongIdentifiersRow = conn
-            .query_row(
-                "SELECT musicbrainz_release_group_id, musicbrainz_artist_id, musicbrainz_album_artist_id, artist, album_artist FROM songs WHERE id = ?1",
-                params![song_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
-            )
-            .unwrap_or((None, None, None, None, None));
-        let (rg, tagged_artist_mbid, tagged_album_artist_mbid, artist_name, album_artist_name) = row;
         let resolved_artist = resolve_song_context_artist_mbid(
             conn,
             tagged_artist_mbid.as_deref(),
@@ -182,15 +231,29 @@ pub async fn get_song_context(
             artist_name.as_deref(),
             album_artist_name.as_deref(),
         );
-        Ok(Some((rg, resolved_artist)))
+        Ok(Some(SongLookupMeta {
+            online,
+            is_radio: false,
+            path,
+            title,
+            url,
+            artist: artist_name,
+            release_group_id: rg,
+            artist_id: resolved_artist,
+        }))
     })
     .await
     .map_err(|e| e.to_string())?;
 
-    let (release_group_id, artist_id) = match context_result {
-        Some(v) => v,
-        None => return Ok(SongContextEnrichment::default()),
+    let Some(meta) = song_meta else {
+        return Ok(SongContextEnrichment::default());
     };
+
+    if meta.is_radio {
+        return get_radio_station_context(&state.db, force_refresh, &wiki_lang, &meta).await;
+    }
+
+    let (release_group_id, artist_id) = (meta.release_group_id, meta.artist_id);
 
     if release_group_id.is_none() && artist_id.is_none() {
         return Ok(SongContextEnrichment::default());
@@ -413,6 +476,201 @@ pub async fn get_song_context(
     }
 
     Ok(result)
+}
+
+const STATION_NEGATIVE_CACHE_TTL_SECS: i64 = 7 * 86_400;
+
+struct StationContextCacheRow {
+    wikidata_id: Option<String>,
+    wikipedia_extract: Option<String>,
+    wikipedia_page_url: Option<String>,
+    wikipedia_lang: Option<String>,
+    social_links_json: Option<String>,
+    fetched_at: i64,
+}
+
+async fn get_radio_station_context(
+    db: &std::sync::Arc<Database>,
+    force_refresh: bool,
+    wiki_lang: &str,
+    meta: &SongLookupMeta,
+) -> Result<SongContextEnrichment, String> {
+    let online = meta.online;
+    let stationuuid = meta
+        .path
+        .as_deref()
+        .and_then(|p| p.strip_prefix(crate::media_source::RADIO_URI_SCHEME))
+        .filter(|u| !u.is_empty())
+        .map(str::to_string);
+
+    let fallback_title = meta.title.clone();
+    let fallback_url = meta.url.clone();
+    let fallback_country = meta.artist.clone();
+    let uuid_for_db = stationuuid.clone();
+
+    let (dir_meta, cached) = crate::db::run_blocking(db, move |conn| {
+        let Some(ref uuid) = uuid_for_db else {
+            return Ok((None, None));
+        };
+        let dir_meta: Option<(String, String, String, String)> = conn
+            .query_row(
+                "SELECT name, country, language, homepage FROM radio_directory WHERE stationuuid = ?1",
+                params![uuid],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .ok();
+        let cached = conn
+            .query_row(
+                "SELECT wikidata_id, wikipedia_extract, wikipedia_page_url,
+                        wikipedia_lang, social_links_json, fetched_at
+                 FROM radio_station_context WHERE stationuuid = ?1",
+                params![uuid],
+                |r| {
+                    Ok(StationContextCacheRow {
+                        wikidata_id: r.get(0)?,
+                        wikipedia_extract: r.get(1)?,
+                        wikipedia_page_url: r.get(2)?,
+                        wikipedia_lang: r.get(3)?,
+                        social_links_json: r.get(4)?,
+                        fetched_at: r.get(5)?,
+                    })
+                },
+            )
+            .ok();
+        Ok((dir_meta, cached))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let mut result = SongContextEnrichment::default();
+    let (station_name, dir_country, dir_language, dir_homepage) = match dir_meta {
+        Some((n, c, l, h)) => (Some(n), Some(c), Some(l), Some(h)),
+        None => (None, None, None, None),
+    };
+
+    let non_empty = |v: Option<String>| v.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    result.station_country = non_empty(dir_country).or_else(|| non_empty(fallback_country));
+    result.station_language = non_empty(dir_language);
+    result.station_homepage = non_empty(dir_homepage).or_else(|| non_empty(fallback_url));
+
+    let now = now_unix();
+    let cache_is_usable = cached.as_ref().is_some_and(|c| {
+        if !online {
+            return true;
+        }
+        if force_refresh {
+            return false;
+        }
+        let lang_matches = c.wikipedia_lang.as_deref().unwrap_or("en") == wiki_lang;
+        if !lang_matches {
+            return false;
+        }
+        let has_content = c.wikipedia_extract.is_some()
+            || c.social_links_json
+                .as_deref()
+                .is_some_and(|j| j != "[]" && !j.is_empty());
+        if has_content {
+            is_cache_fresh(c.fetched_at, now)
+        } else {
+            now.saturating_sub(c.fetched_at) < STATION_NEGATIVE_CACHE_TTL_SECS
+        }
+    });
+
+    if cache_is_usable {
+        if let Some(c) = cached {
+            apply_station_context_cache(&mut result, c);
+        }
+        return Ok(result);
+    }
+
+    let lookup_name = non_empty(station_name).or_else(|| non_empty(fallback_title));
+    if !online {
+        return Ok(result);
+    }
+    let (Some(uuid), Some(name)) = (stationuuid, lookup_name) else {
+        return Ok(result);
+    };
+
+    let cm = ContextManager::new();
+    let homepage_arg = result.station_homepage.clone();
+    let lang = wiki_lang.to_string();
+    let flight_key = format!("{uuid}:{lang}");
+    let lookup_res = STATION_CONTEXT_FLIGHT
+        .work(&flight_key, move || async move {
+            cm.fetch_station_context(&name, homepage_arg.as_deref(), &lang)
+                .await
+                .map_err(|e| e.to_string())
+        })
+        .await;
+
+    if let Ok(lookup) = lookup_res {
+        let _ = write_station_context_cache(db, &uuid, wiki_lang, &lookup, now).await;
+        apply_station_lookup(&mut result, lookup, now);
+    }
+
+    Ok(result)
+}
+
+fn apply_station_context_cache(result: &mut SongContextEnrichment, cached: StationContextCacheRow) {
+    result.station_wikidata_id = cached.wikidata_id;
+    result.wikipedia_extract = cached.wikipedia_extract;
+    result.wikipedia_page_url = cached.wikipedia_page_url;
+    if let Some(json) = cached.social_links_json {
+        if let Ok(links) = serde_json::from_str::<Vec<crate::models::ArtistSocialLink>>(&json) {
+            result.station_social_links = links;
+        }
+    }
+    result.fetched_at = Some(cached.fetched_at);
+}
+
+fn apply_station_lookup(
+    result: &mut SongContextEnrichment,
+    lookup: StationContextLookupResult,
+    fetched_at: i64,
+) {
+    result.station_wikidata_id = lookup.wikidata_id;
+    if let Some(wiki) = lookup.wikipedia {
+        result.wikipedia_extract = Some(wiki.extract);
+        result.wikipedia_page_url = wiki.page_url;
+    }
+    result.station_social_links = lookup.social_links;
+    result.fetched_at = Some(fetched_at);
+}
+
+async fn write_station_context_cache(
+    db: &std::sync::Arc<Database>,
+    stationuuid: &str,
+    wiki_lang: &str,
+    lookup: &StationContextLookupResult,
+    now: i64,
+) -> Result<(), String> {
+    let stationuuid = stationuuid.to_string();
+    let wiki_lang = wiki_lang.to_string();
+    let wikidata_id = lookup.wikidata_id.clone();
+    let wikipedia_extract = lookup.wikipedia.as_ref().map(|w| w.extract.clone());
+    let wikipedia_page_url = lookup.wikipedia.as_ref().and_then(|w| w.page_url.clone());
+    let social_links_json =
+        serde_json::to_string(&lookup.social_links).unwrap_or_else(|_| "[]".to_string());
+    crate::db::run_blocking(db, move |conn| {
+        conn.execute(
+            "INSERT OR REPLACE INTO radio_station_context (
+                stationuuid, wikidata_id, wikipedia_extract, wikipedia_page_url,
+                wikipedia_lang, social_links_json, fetched_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                stationuuid,
+                wikidata_id,
+                wikipedia_extract,
+                wikipedia_page_url,
+                wiki_lang,
+                social_links_json,
+                now,
+            ],
+        )?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 struct ReleaseGroupCacheRow {

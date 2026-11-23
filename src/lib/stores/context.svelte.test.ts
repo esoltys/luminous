@@ -282,6 +282,47 @@ describe("contextStore", () => {
     flushSync();
     expect(view.communityRating?.rating).toBe(2);
   });
+
+  it("renders station facts, Wikipedia bio, and links without fetching artist events", async () => {
+    context = ctx({
+      wikipedia_extract: "CFOX-FM is a Canadian radio station.",
+      wikipedia_page_url: "https://en.wikipedia.org/wiki/CFOX-FM",
+      station_country: "Canada",
+      station_language: "english",
+      station_homepage: "https://cfox.com/",
+      station_wikidata_id: "Q5010836",
+      station_social_links: [
+        { platform: "website", handle_or_url: "https://www.cfox.com/" },
+        { platform: "instagram", handle_or_url: "cfoxvan" },
+      ],
+    });
+    const stationSubject: ContextSubject = {
+      kind: "song",
+      key: "song:99",
+      name: "Canada",
+      song: song(99, {
+        title: "CFOX 99.3",
+        artist: "Canada",
+        source: "radio_browser",
+        path: "radio://uuid-cfox",
+        url: "https://www.cfox.com/",
+      }),
+    };
+    const view = await mount(() => stationSubject, { songEvents: () => true });
+    expect(calls("get_artist_events")).toHaveLength(0);
+    expect(view.sections.map((s) => s.id)).toEqual(["stationFacts", "bio", "links"]);
+    expect(view.sections[0]).toEqual({
+      id: "stationFacts",
+      country: "Canada",
+      language: "english",
+    });
+    const linksSection = view.sections.find((s) => s.id === "links");
+    expect(linksSection?.id === "links" && linksSection.items.map((i) => i.label)).toEqual([
+      "cfox.com",
+      "Instagram",
+      "Wikidata",
+    ]);
+  });
 });
 
 describe("entitySubject", () => {

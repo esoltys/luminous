@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import type {
-  ArtistEvent,
-  ArtistProfile,
-  AlbumProfile,
-  Song,
-  SongContextEnrichment,
+import {
+  isLiveSong,
+  type ArtistEvent,
+  type ArtistProfile,
+  type AlbumProfile,
+  type Song,
+  type SongContextEnrichment,
 } from "../types";
 import { collectionStore } from "./collection.svelte";
 import { i18n } from "./i18n.svelte";
@@ -42,6 +43,7 @@ interface LinkItem {
 /** An info section the store has decided is worth showing; the order of the list is the display order. */
 export type InfoSection =
   | { id: "facts"; context: SongContextEnrichment }
+  | { id: "stationFacts"; country?: string; language?: string }
   | { id: "bio"; text: string; source: "profile" | "wikipedia"; wikipediaUrl?: string }
   | {
       id: "events";
@@ -104,15 +106,31 @@ interface Entry {
   error: string;
 }
 
+function normalizedLinkKey(url: string): string {
+  return url
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\/(www\.)?/, "")
+    .replace(/\/+$/, "");
+}
+
 function linkItems(
   website: string | null | undefined,
   links: { platform: string; handle_or_url: string }[] | undefined,
   extra: Omit<LinkItem, "isOfficial">[],
 ): LinkItem[] {
   const items: LinkItem[] = [];
+  const seenUrls = new Set<string>();
+  const pushUnique = (item: LinkItem) => {
+    const key = normalizedLinkKey(item.url);
+    if (seenUrls.has(key)) return;
+    seenUrls.add(key);
+    items.push(item);
+  };
+
   if (website?.trim() && !isBlacklistedLink(website, "website")) {
     const url = resolveSocialUrl("website", website);
-    items.push({
+    pushUnique({
       key: "website",
       platform: normalizeWebsitePlatform("website", url),
       url,
@@ -123,7 +141,7 @@ function linkItems(
   for (const link of links ?? []) {
     if (isBlacklistedLink(link.handle_or_url, link.platform)) continue;
     const url = resolveSocialUrl(link.platform, link.handle_or_url);
-    items.push({
+    pushUnique({
       key: `${link.platform}:${link.handle_or_url}`,
       platform: normalizeWebsitePlatform(link.platform, url),
       url,
@@ -132,7 +150,7 @@ function linkItems(
       isOfficial: link.platform === "website",
     });
   }
-  for (const e of extra) items.push({ ...e, isOfficial: false });
+  for (const e of extra) pushUnique({ ...e, isOfficial: false });
   // Official homepage(s) lead as a group, ahead of the alphabetical sort.
   return items.sort((a, b) => {
     if (a.isOfficial !== b.isOfficial) return a.isOfficial ? -1 : 1;
@@ -161,7 +179,8 @@ export class ContextView {
       const subject = this.getSubject();
       const online = prefs.onlineEnabled;
       void i18n.currentLocale;
-      if (!subject || !online) return;
+      // Offline stations still read local radio_directory metadata and cached enrichment without network calls.
+      if (!subject || (!online && !isLiveSong(subject.song))) return;
       const events = this.wantsEvents(subject);
       const timer = setTimeout(() => void contextStore.ensure(subject, { events }), 150);
       return () => clearTimeout(timer);
@@ -169,6 +188,7 @@ export class ContextView {
   }
 
   private wantsEvents(subject: ContextSubject): boolean {
+    if (isLiveSong(subject.song)) return false;
     return subject.kind === "artist" || (subject.kind === "song" && !!this.options.songEvents?.());
   }
 
@@ -217,8 +237,9 @@ export class ContextView {
     if (!subject) return [];
     const ctx = this.context;
     const sections: InfoSection[] = [];
+    const isStation = isLiveSong(subject.song);
     const artistProfile: ArtistProfile | undefined =
-      subject.kind === "album"
+      subject.kind === "album" || isStation
         ? undefined
         : collectionStore.getArtistProfile(
             subject.kind === "artist" ? subject.name : subject.song.artist,
@@ -226,7 +247,17 @@ export class ContextView {
     const albumProfile: AlbumProfile | undefined =
       subject.kind === "album" ? collectionStore.getAlbumProfile(subject.name) : undefined;
 
-    if (
+    if (isStation) {
+      const country = ctx?.station_country?.trim() || subject.song.artist?.trim() || "";
+      const language = ctx?.station_language?.trim() || "";
+      if (country || language) {
+        sections.push({
+          id: "stationFacts",
+          country: country || undefined,
+          language: language || undefined,
+        });
+      }
+    } else if (
       subject.kind !== "album" &&
       ctx &&
       (ctx.artist_begin_date ||
@@ -280,7 +311,21 @@ export class ContextView {
       }
     }
 
-    if (subject.kind === "artist") {
+    if (isStation) {
+      const homepage = ctx?.station_homepage?.trim() || subject.song.url?.trim() || null;
+      const extra = ctx?.station_wikidata_id
+        ? [
+            {
+              key: "wikidata",
+              platform: "wikidata",
+              url: `https://www.wikidata.org/wiki/${ctx.station_wikidata_id}`,
+              label: "Wikidata",
+            },
+          ]
+        : [];
+      const items = linkItems(homepage, ctx?.station_social_links, extra);
+      if (items.length > 0) sections.push({ id: "links", items });
+    } else if (subject.kind === "artist") {
       const musicbrainz = deriveMusicbrainzArtistUrl(artistMbid);
       const fanart = deriveFanartTvUrlFromMbid(artistMbid);
       // MusicBrainz stays here: an artist has no Technical tab, which is where its block lives for a song.
