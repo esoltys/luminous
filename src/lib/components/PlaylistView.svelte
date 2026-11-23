@@ -279,15 +279,6 @@
     playlistsStore.activePlaylistTracks.filter((t) => !!t.song).map((t) => t.song!),
   );
 
-  let isSpecialPlaylist = $derived(
-    activePlaylist !== undefined &&
-      (isQueue ||
-        activePlaylist.is_queue ||
-        activePlaylist.name.toLowerCase() === "history" ||
-        activePlaylist.name.toLowerCase() === "favourites" ||
-        activePlaylist.name.toLowerCase() === "recently added"),
-  );
-
   let isSmartPlaylist = $derived(
     activePlaylist !== undefined && isSmartPlaylistRow(activePlaylist),
   );
@@ -1017,7 +1008,7 @@
       </div>
 
       <div class="p-6 flex flex-col gap-6 pb-dock">
-        {#if !isSpecialPlaylist && !isStationListPlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
+        {#if !isQueue && !isStationListPlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
           <div class="flex flex-wrap items-center gap-3">
             {#if rawGenre}
               <GenreChips genre={rawGenre} variant="full" limit={4} />

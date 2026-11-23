@@ -687,6 +687,17 @@ describe("PlaylistView.svelte", () => {
     expect(coverStackContainer).not.toHaveClass("self-stretch");
   });
 
+  it.each(["History", "Favourites", "Recently Added"])(
+    "shows genre chips for a custom playlist named %s (#2327)",
+    (name) => {
+      playlistsStore.playlists = [{ ...mockPlaylist, name }];
+
+      const { getByTitle } = render(PlaylistView);
+
+      expect(getByTitle("Browse Rock")).toBeInTheDocument();
+    },
+  );
+
   it("synchronizes activePlaylist from navigationStore.selectedPlaylistId when mounted with mismatched activePlaylistId", () => {
     const queuePlaylist: Playlist = {
       id: 99,
