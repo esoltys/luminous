@@ -23,15 +23,10 @@ pub struct NativeLabels {
     pub unknown_song: String,
 }
 
-/// Returns the localized fallback for an untitled song, or `"Unknown Song"`
-/// until the frontend pushes its first label set.
+/// Returns the latest localized fallback for an untitled song pushed by the
+/// frontend, or an empty string before the first `set_native_labels` call.
 pub fn unknown_song_label() -> String {
-    UNKNOWN_SONG_LABEL
-        .read()
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or("Unknown Song")
-        .to_string()
+    UNKNOWN_SONG_LABEL.read().clone().unwrap_or_default()
 }
 
 pub fn apply(app: &AppHandle, labels: &NativeLabels) {
