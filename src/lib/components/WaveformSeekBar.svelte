@@ -36,10 +36,14 @@
   let pulseAngle = $state(0);
   let animFrameId: number | null = null;
 
+  function isAnimatingLive(): boolean {
+    return isLiveSong(playerStore.currentSong) && playerStore.state === "playing";
+  }
+
   function startLoadingAnimation() {
     if (animFrameId !== null) return;
     function step() {
-      if (isLoadingWaveform || isLoadingBands || isLiveSong(playerStore.currentSong)) {
+      if (isLoadingWaveform || isLoadingBands || isAnimatingLive()) {
         pulseAngle = (pulseAngle + 0.08) % (Math.PI * 2);
         draw();
         animFrameId = requestAnimationFrame(step);
@@ -332,11 +336,15 @@
     const mode = prefs.seekBarMode;
 
     if (isLiveSong(song)) {
-      loadedSongId = songId;
-      loadedMode = mode;
-      waveformData = [];
-      bandData = [];
-      startLoadingAnimation();
+      if (songId !== loadedSongId || mode !== loadedMode) {
+        loadedSongId = songId;
+        loadedMode = mode;
+        waveformData = [];
+        bandData = [];
+      }
+      if (playerStore.state === "playing") {
+        startLoadingAnimation();
+      }
       return;
     }
 
@@ -356,6 +364,7 @@
   $effect(() => {
     // Redraw whenever position, length, theme, artwork colors, mode, or data updates
     const _pos = playerStore.positionNanosec;
+    const _state = playerStore.state;
     const _len = playerStore.currentSong?.length_nanosec;
     const _theme = themeStore.activeThemeId;
     const _art = themeStore.artworkColors;
