@@ -30,9 +30,11 @@ export interface SalmonRunPalette {
   readonly cap: IsoFaces;
   /** The top of the far bank. */
   readonly bank: IsoFaces;
-  /** Water below the surface, and the surface per reduced-motion light step. */
+  /** Water below the surface, and the surface. */
   readonly deep: IsoFaces;
-  readonly water: readonly IsoFaces[];
+  readonly water: IsoFaces;
+  /** The reduced-motion light shift washed over the pools, faint to bright, `LIGHT_STEPS` long. */
+  readonly lightWash: readonly string[];
   /** The surface in a weir's notch, where it spills over. */
   readonly spill: IsoFaces;
   /** Falling water from dim to bright, `FOAM_STEPS` long. */
@@ -81,24 +83,22 @@ export function buildSalmonRunPalette(
   // read as white water in both light and dark themes, kept accent-tinted to stay apart from the salmon.
   const bright = light ? bg : text;
   const surfaceWater = mix(bg, accent, 0.6);
-  const water: IsoFaces[] = [];
-  for (let l = 0; l < LIGHT_STEPS; l++) {
-    water.push(isoFaces(mix(surfaceWater, hover, (0.45 * l) / (LIGHT_STEPS - 1))));
-  }
   const foam: IsoFaces[] = [];
   for (let k = 0; k < FOAM_STEPS; k++) {
     foam.push(
       isoFaces(mix(mix(surfaceWater, hover, 0.6), bright, 0.15 + (0.45 * k) / (FOAM_STEPS - 1))),
     );
   }
-  // The salmon lean toward primary text, so they stand out from the accent-blue water.
-  const fishBody = clampForContrast(mix(text, hover, 0.3), bg, 4.5);
+  // On the ladder the salmon lean further toward primary text, to stand out from accent water.
+  const fishBody = clampForContrast(mix(text, hover, 0.5), bg, 4.5);
+  const ladderFish = clampForContrast(mix(text, hover, 0.3), bg, 4.5);
   return {
     stone: isoFaces(mix(bg, text, light ? 0.3 : 0.2)),
     cap: isoFaces(mix(bg, text, light ? 0.4 : 0.3)),
     bank: isoFaces(mix(mix(bg, text, light ? 0.22 : 0.14), accent, 0.12)),
     deep: isoFaces(mix(bg, accent, 0.4)),
-    water,
+    water: isoFaces(surfaceWater),
+    lightWash: voxelAlphaLadder(hover, LIGHT_STEPS, 0.1, 0.4),
     spill: isoFaces(mix(surfaceWater, bright, 0.35)),
     foam,
     // Ripples and glints stay dimmer than the salmon, so the salmon read as the river's subject.
@@ -106,8 +106,8 @@ export function buildSalmonRunPalette(
     glint: voxelAlphaLadder(mix(hover, bright, 0.45), FOAM_STEPS, 0.12, 0.6),
     fishBody,
     fishHead: hover,
-    fishBodyFaces: isoFaces(fishBody),
-    fishHeadFaces: isoFaces(mix(fishBody, hover, 0.5)),
+    fishBodyFaces: isoFaces(ladderFish),
+    fishHeadFaces: isoFaces(mix(ladderFish, hover, 0.5)),
     leaf: clampForContrast(mix(text, hover, 0.15), bg, 4.5),
     leafVein: hover,
   };
@@ -267,10 +267,9 @@ function fishPart(u: number, av: number, len: number, minHalf: number): number {
 class FishLadderInstance implements VisualizerInstance {
   private readonly ladder = new FishLadder();
   private readonly renderer = new FishLadderRenderer();
-  private palette!: SalmonRunPalette;
 
   setTheme(colors: ThemeColors): void {
-    this.palette = buildSalmonRunPalette(colors, "bg-main");
+    this.renderer.setPalette(buildSalmonRunPalette(colors, "bg-main"));
   }
 
   setTrack(track: VisualizerTrack | null): void {
@@ -286,10 +285,9 @@ class FishLadderInstance implements VisualizerInstance {
     return this.ladder.step(dtMs, reducedMotion);
   }
 
-  // The still preview needs no special case: the host doesn't step a preview, and a ladder at
-  // rest already shows a salmon mid-leap and one waiting below a step.
+  // The stage is never a still preview (that's the playbar slot), so there's no preview case.
   render(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-    this.renderer.render(ctx, width, height, this.ladder, this.palette);
+    this.renderer.render(ctx, width, height, this.ladder);
   }
 }
 

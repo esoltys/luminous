@@ -95,7 +95,7 @@ describe("FishLadder layout", () => {
     }
   });
 
-  it("starts with a salmon mid-leap and another waiting, so a still frame shows the climb", () => {
+  it("starts with a salmon mid-leap and another waiting, so the first frame shows the climb", () => {
     const ladder = new FishLadder();
     ladder.setTrack("a");
     expect(leapers(ladder)).toEqual([0]);

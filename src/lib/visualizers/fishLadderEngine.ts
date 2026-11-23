@@ -514,7 +514,7 @@ export class FishLadder {
       this.glintY[g] = rng.range(0.5, RIVER_WIDTH - 0.5);
     }
 
-    // The school is spread up the ladder, and at rest it already shows the climb: one salmon
+    // The school is spread up the ladder, and the first frame already shows the climb: one salmon
     // in mid-leap up a step near the middle and one waiting below the step after it.
     this.fishCount = Math.min(MAX_FISH, rng.int(5, 9));
     const middle = Math.max(1, Math.floor(pools / 2));

@@ -113,6 +113,11 @@ export class IsoView {
       this.quad(ctx, faces.right, a + e, b, z, a + e, b + e, z, a + e, b + e, zt, a + e, b, zt);
   }
 
+  /** Fills the flat rectangle x in [x0, x1], y in [y0, y1] at height z, with no gap. */
+  plane(ctx: Ctx2D, x0: number, y0: number, x1: number, y1: number, z: number, fill: string): void {
+    this.quad(ctx, fill, x0, y0, z, x1, y0, z, x1, y1, z, x0, y1, z);
+  }
+
   /** Draws a flat square of edge `size` lying at height z, low corner at (x, y), in `fill`. */
   tile(ctx: Ctx2D, x: number, y: number, z: number, size: number, fill: string): void {
     const g = size * GAP;

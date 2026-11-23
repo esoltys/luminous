@@ -24,14 +24,14 @@ import type { SalmonRunPalette } from "./salmonRun";
 
 /** Brightness steps of foam (falls, ripples) and glints. */
 export const FOAM_STEPS = 8;
-/** Steps of the reduced-motion light shift, from unlit to fully lit. */
+/** Steps of the reduced-motion light shift above unlit, the last fully lit. */
 export const LIGHT_STEPS = 6;
 /** Edge of the leaf's and ripples' tiles, in terrain cubes: they're finer than the terrain. */
 const FINE = 0.5;
 /** Edge of a salmon's cubes before its own size multiplier: a salmon is seven of them long. */
 const FISH_CUBE = 0.62;
 
-/** Terrain cell kinds, indices into `terrainFaces`. */
+/** Terrain cell kinds, indices into `terrainFaces`; 0 is empty. */
 const T = {
   empty: 0,
   stone: 1,
@@ -170,14 +170,14 @@ class LadderTerrain {
 
 /**
  * Draws a `FishLadder` as isometric voxels in the theme's colours, scaled to fit the canvas.
- * Allocates nothing per frame.
+ * `setPalette` must be called before the first `render`. Allocates nothing per frame.
  */
 export class FishLadderRenderer {
   private readonly view = new IsoView();
   private readonly terrain = new LadderTerrain();
-  /** Terrain faces per reduced-motion light step, rebuilt when the palette changes. */
-  private terrainFaces: (IsoFaces | null)[][] = [];
-  private facesPalette: SalmonRunPalette | null = null;
+  private palette!: SalmonRunPalette;
+  /** Terrain faces by cell kind. */
+  private terrainFaces: (IsoFaces | null)[] = [];
   private fitVersion = -1;
   private fitWidth = 0;
   private fitHeight = 0;
@@ -192,13 +192,7 @@ export class FishLadderRenderer {
   private readonly cubeZ = new Float32Array(FISH_CUBES);
   private readonly cubeOrder = new Int32Array(FISH_CUBES);
 
-  render(
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-    ladder: FishLadder,
-    p: SalmonRunPalette,
-  ): void {
+  render(ctx: CanvasRenderingContext2D, width: number, height: number, ladder: FishLadder): void {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
     const view = this.view;
     let viewChanged = false;
@@ -221,13 +215,28 @@ export class FishLadderRenderer {
       this.fitWidth = width;
       this.fitHeight = height;
     }
-    if (p !== this.facesPalette) this.buildTerrainFaces(p);
-
+    const p = this.palette;
     ctx.clearRect(0, 0, width, height);
     this.terrain.update(ladder);
     // Under reduced motion a beat lifts the light on the water instead of making waves.
-    const light = Math.min(LIGHT_STEPS - 1, Math.round(ladder.glow * (LIGHT_STEPS - 1)));
-    this.terrain.draw(ctx, width, height, view, viewChanged, this.terrainFaces[light]);
+    this.terrain.draw(ctx, width, height, view, viewChanged, this.terrainFaces);
+    // Under reduced motion a beat lifts the light on the water instead of making waves: a wash
+    // over each pool, so the cached terrain never needs repainting for it.
+    const light = Math.min(LIGHT_STEPS, Math.round(ladder.glow * LIGHT_STEPS));
+    if (light > 0) {
+      for (let k = 0; k < ladder.poolCount; k++) {
+        const end = ladder.poolEnd[k] - (k < ladder.poolCount - 1 ? 1 : 0);
+        view.plane(
+          ctx,
+          ladder.poolStart[k],
+          0,
+          end,
+          RIVER_WIDTH,
+          ladder.poolSurface[k],
+          p.lightWash[light - 1],
+        );
+      }
+    }
 
     this.drawGlints(ctx, ladder, p);
     this.drawRipples(ctx, ladder, p);
@@ -257,19 +266,17 @@ export class FishLadderRenderer {
     }
   }
 
-  private buildTerrainFaces(p: SalmonRunPalette): void {
-    this.facesPalette = p;
-    this.terrainFaces = [];
-    for (let l = 0; l < LIGHT_STEPS; l++) {
-      const faces: (IsoFaces | null)[] = new Array(7).fill(null);
-      faces[T.stone] = p.stone;
-      faces[T.cap] = p.cap;
-      faces[T.bankTop] = p.bank;
-      faces[T.deep] = p.deep;
-      faces[T.water] = p.water[l];
-      faces[T.spill] = p.spill;
-      this.terrainFaces.push(faces);
-    }
+  /** Takes the theme's fills, indexing the terrain's by cell kind here so `render` needn't. */
+  setPalette(p: SalmonRunPalette): void {
+    this.palette = p;
+    const faces: (IsoFaces | null)[] = new Array(7).fill(null);
+    faces[T.stone] = p.stone;
+    faces[T.cap] = p.cap;
+    faces[T.bankTop] = p.bank;
+    faces[T.deep] = p.deep;
+    faces[T.water] = p.water;
+    faces[T.spill] = p.spill;
+    this.terrainFaces = faces;
   }
 
   /** `FOAM_STEPS` rung for brightness `b` in [0, 1], or -1 when too faint to show. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS } from "../stores/theme.svelte";
-import { calculateContrastRatio, hexToRgb } from "../utils/colorUtils";
+import { calculateContrastRatio } from "../utils/colorUtils";
 import { SALMON_RUN_PRESET, buildSalmonRunPalette } from "./salmonRun";
 
 /** A 2D context that records the corners of every filled path, and counts fills. */
@@ -30,12 +30,6 @@ function recordingContext(width: number, height: number) {
   return { ctx: ctx as unknown as CanvasRenderingContext2D, points, fills: () => fills };
 }
 
-function distance(a: string, b: string): number {
-  const x = hexToRgb(a);
-  const y = hexToRgb(b);
-  return Math.hypot(x.r - y.r, x.g - y.g, x.b - y.b);
-}
-
 describe("buildSalmonRunPalette", () => {
   for (const [name, colors] of [
     ["dark", LUMINOUS_DARK_COLORS],
@@ -53,7 +47,7 @@ describe("buildSalmonRunPalette", () => {
 
     it(`sets the salmon apart from the water in the ${name} theme`, () => {
       const p = buildSalmonRunPalette(colors, "bg-main");
-      expect(calculateContrastRatio(p.fishBodyFaces.top, p.water[0].top)).toBeGreaterThanOrEqual(2);
+      expect(calculateContrastRatio(p.fishBodyFaces.top, p.water.top)).toBeGreaterThanOrEqual(2);
     });
   }
 
@@ -67,12 +61,10 @@ describe("buildSalmonRunPalette", () => {
     expect(other.water).not.toEqual(plain.water);
   });
 
-  it("lifts the water toward the accent hover under each reduced-motion light step", () => {
+  it("washes more light over the water at each reduced-motion light step", () => {
     const p = buildSalmonRunPalette(LUMINOUS_DARK_COLORS, "bg-main");
-    const hover = LUMINOUS_DARK_COLORS["color-accent-hover"];
-    for (let l = 1; l < p.water.length; l++) {
-      expect(distance(p.water[l].top, hover)).toBeLessThan(distance(p.water[l - 1].top, hover));
-    }
+    const alpha = p.lightWash.map((fill) => Number(/, ([\d.]+)\)$/.exec(fill)![1]));
+    for (let l = 1; l < alpha.length; l++) expect(alpha[l]).toBeGreaterThan(alpha[l - 1]);
   });
 });
 
