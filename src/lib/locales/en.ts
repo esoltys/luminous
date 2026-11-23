@@ -1706,7 +1706,6 @@ export const en = {
     trackSkippedRemoteToast: 'Couldn\'t play "{title}" — {message}. Skipped.',
     stationOfflineToast: '"{title}" — Station offline.',
     liveBadge: "Live",
-    findInLibrary: "Find in library",
     onAirLabel: "On air",
     openNothingPlayable: "No supported audio files found to play.",
     playSongFailed: "Couldn't play this song.",

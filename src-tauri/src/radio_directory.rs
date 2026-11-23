@@ -1200,6 +1200,24 @@ pub fn resolve_station_stream_url(conn: &Connection, stationuuid: &str) -> Resul
     Ok(url)
 }
 
+/// Normalizes comma- or semicolon-delimited station tags into Luminous's
+/// canonical `; `-delimited `songs.genre` format, trimming whitespace and
+/// deduplicating case-insensitively while preserving first-seen casing.
+pub(crate) fn station_tags_to_genre(tags: &str) -> Option<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut values = Vec::new();
+    for part in tags.split([',', ';']) {
+        let trimmed = part.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if seen.insert(trimmed.to_lowercase()) {
+            values.push(trimmed.to_string());
+        }
+    }
+    (!values.is_empty()).then(|| crate::models::join_multi_value(&values))
+}
+
 /// Materialises a directory station as a `songs` row (`source = RadioBrowser`,
 /// `path = radio://<stationuuid>`) so the Queue, playlists, and pins treat it as
 /// a normal playable item (#2004). Idempotent: updates station metadata if the
@@ -1219,7 +1237,7 @@ pub fn materialize_station(conn: &Connection, stationuuid: &str) -> Result<crate
     };
     let now = crate::clock::unix_now();
     let bitrate = (station.bitrate > 0).then_some(station.bitrate);
-    let genre = (!station.tags.trim().is_empty()).then_some(station.tags.as_str());
+    let genre = station_tags_to_genre(&station.tags);
     let homepage = (!station.homepage.trim().is_empty()).then_some(station.homepage.as_str());
     let favicon_trimmed = station.favicon.trim();
     let favicon = (!favicon_trimmed.is_empty()
@@ -1664,7 +1682,7 @@ fn upsert_stream_station_inner(
     {
         if update_existing_stream && existing.source == crate::models::SongSource::Stream {
             let trimmed_name = name.map(str::trim).filter(|s| !s.is_empty());
-            let genre = tags.map(str::trim).filter(|s| !s.is_empty());
+            let genre = tags.and_then(station_tags_to_genre);
             let now = crate::clock::unix_now();
             conn.execute(
                 "UPDATE songs SET title = COALESCE(?1, title), genre = ?2, mtime = ?3 WHERE id = ?4",
@@ -1673,7 +1691,7 @@ fn upsert_stream_station_inner(
             if let Some(t) = trimmed_name {
                 existing.title = Some(t.to_string());
             }
-            existing.genre = genre.map(str::to_string);
+            existing.genre = genre;
             existing.mtime = Some(now);
         }
         return Ok(existing);
@@ -1683,7 +1701,7 @@ fn upsert_stream_station_inner(
     let uri = station_uri(&custom_uuid);
     let now = crate::clock::unix_now();
     let title = name.map(str::trim).filter(|s| !s.is_empty()).unwrap_or(url);
-    let genre = tags.map(str::trim).filter(|s| !s.is_empty());
+    let genre = tags.and_then(station_tags_to_genre);
 
     conn.execute(
         "INSERT INTO songs (
@@ -1759,7 +1777,7 @@ pub fn update_custom_station(
         anyhow::bail!("Station URL must start with http:// or https://");
     }
     let uri = station_uri(uuid);
-    let genre = (!tags.trim().is_empty()).then_some(tags.trim());
+    let genre = station_tags_to_genre(tags);
     let updated = conn.execute(
         "UPDATE songs
          SET title = ?1, stream_url = ?2, genre = ?3, mtime = ?4
@@ -3167,7 +3185,7 @@ mod tests {
         assert!(added.stationuuid.starts_with(CUSTOM_STATION_UUID_PREFIX));
         assert_eq!(added.name, "My Custom FM");
         assert_eq!(added.url_resolved, "https://custom.example.com/stream%201");
-        assert_eq!(added.tags, "indie, folk");
+        assert_eq!(added.tags, "indie; folk");
 
         // Directory full sync (and prune) must not touch custom stations.
         let tx = conn.transaction().unwrap();
@@ -3252,5 +3270,53 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.to_string().contains("Content-Type"));
+    }
+
+    #[test]
+    fn station_tags_to_genre_normalizes_delimiters_trims_and_dedupes() {
+        assert_eq!(
+            station_tags_to_genre("alternative rock,commercial,vancouver"),
+            Some("alternative rock; commercial; vancouver".to_string())
+        );
+        assert_eq!(
+            station_tags_to_genre("  Jazz , jazz ; Ambient , "),
+            Some("Jazz; Ambient".to_string())
+        );
+        assert_eq!(station_tags_to_genre("  , ;  "), None);
+        assert_eq!(station_tags_to_genre(""), None);
+    }
+
+    #[test]
+    fn materialize_station_stores_semicolon_delimited_genre() {
+        let (_dir, db) = test_db();
+        let mut conn = db.pool.get().unwrap();
+        let stations = vec![RadioBrowserStation {
+            stationuuid: "uuid-cfox".into(),
+            changeuuid: "c-1".into(),
+            name: "CFOX 99.3".into(),
+            url_resolved: "https://cfox.example/stream.mp3".into(),
+            homepage: String::new(),
+            favicon: String::new(),
+            tags: "alternative rock,commercial,vancouver".into(),
+            country: "Canada".into(),
+            countrycode: "CA".into(),
+            language: "english".into(),
+            codec: "MP3".into(),
+            bitrate: 128,
+            hls: false,
+            votes: 100,
+            clickcount: 200,
+            lastcheckok: true,
+            lastchangetime_iso8601: None,
+        }];
+        let tx = conn.transaction().unwrap();
+        upsert_stations_tx(&tx, &stations, 1000).unwrap();
+        tx.commit().unwrap();
+
+        let song = materialize_station(&conn, "uuid-cfox").unwrap();
+        assert_eq!(
+            song.genre.as_deref(),
+            Some("alternative rock; commercial; vancouver")
+        );
     }
 }

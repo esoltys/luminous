@@ -130,13 +130,6 @@ export class PlayerStore {
     }
     return song.artist || i18n.t("collection.unknownArtist");
   }
-  /** What to search the library for to find the announced track, or null
-   *  when no station is announcing one. */
-  get stationNowPlayingQuery(): string | null {
-    const np = this.stationNowPlaying;
-    if (!np) return null;
-    return [np.artist, np.title].filter(Boolean).join(" ");
-  }
   /** Height at the bottom of the viewport covered by the floating PlayerBar dock;
    *  0 when no song is loaded and the dock is hidden. Floating menus and modals
    *  keep clear of it. */
