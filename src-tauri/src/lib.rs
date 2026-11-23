@@ -570,10 +570,8 @@ fn spawn_auto_continue_if_due(player: &Player, app: &tauri::AppHandle) {
     }
 }
 
-/// Spawns the OS thread that drains `AudioEngine`'s event channel and turns
-/// each `AudioEvent` into player-state transitions, OS media-session
-/// mirroring, and frontend events. A blocking OS thread rather than a Tokio
-/// task since it blocks on `rx.iter()`.
+/// Reports the pending Radio Browser station click, if any, off the event loop
+/// so the network call never blocks it.
 fn spawn_station_click_report_if_pending(p: &mut player::Player, app: &tauri::AppHandle) {
     let Some(uuid) = p.take_pending_station_click_uuid() else {
         return;
@@ -598,6 +596,10 @@ fn emit_station_now_playing(
     let _ = app.emit("station-now-playing", now_playing);
 }
 
+/// Spawns the OS thread that drains `AudioEngine`'s event channel and turns
+/// each `AudioEvent` into player-state transitions, OS media-session
+/// mirroring, and frontend events. A blocking OS thread rather than a Tokio
+/// task since it blocks on `rx.iter()`.
 fn spawn_audio_event_loop(
     app_handle: tauri::AppHandle,
     audio: Arc<Mutex<AudioEngine>>,
