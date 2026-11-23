@@ -3268,6 +3268,7 @@ export const en = {
   },
   visualizers: {
     voxel: "Voxel spectrum",
+    voxelIso: "Voxel waterfall",
     voxelLogo: "Voxel logo",
     vectorscope: "Vectorscope",
     salmonRun: "Salmon run",

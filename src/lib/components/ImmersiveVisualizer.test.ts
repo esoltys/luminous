@@ -135,7 +135,7 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
       await tick();
       expect(getByTestId("immersive-visualizer-canvas")).toHaveAttribute(
         "data-preset",
-        "voxel-logo",
+        "voxel-iso",
       );
     });
 
@@ -193,7 +193,7 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
         visualizerStore.select("track-spy");
         render(ImmersiveVisualizer, { active: true });
         await tick();
-        expect(tracks.at(-1)).toEqual({ key: "42" });
+        expect(tracks.at(-1)).toEqual({ key: "42", accent: null });
         const handedOver = tracks.length;
 
         // Another copy of the same song is not a new track.
@@ -203,7 +203,7 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
 
         playerStore.currentSong = { ...mockSong, id: 43 };
         await tick();
-        expect(tracks.at(-1)).toEqual({ key: "43" });
+        expect(tracks.at(-1)).toEqual({ key: "43", accent: null });
       } finally {
         playerStore.currentSong = mockSong;
         unregisterSpy();
@@ -213,7 +213,7 @@ describe("ImmersiveVisualizer.svelte (#2236)", () => {
     it("opens the preset menu on right-click of the stage", async () => {
       const { getByTestId, getAllByRole } = render(ImmersiveVisualizer, { active: true });
       await fireEvent.contextMenu(getByTestId("immersive-visualizer-canvas"));
-      expect(getAllByRole("menuitemradio")).toHaveLength(4);
+      expect(getAllByRole("menuitemradio")).toHaveLength(5);
     });
   });
 });

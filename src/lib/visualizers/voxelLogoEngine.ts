@@ -6,6 +6,7 @@ import {
   VoxelGrid,
   VoxelLayerCache,
   voxelAlphaLadder,
+  voxelTrackHighlight,
   voxelUnlitCellColor,
   type Ctx2D,
 } from "./voxelGrid";
@@ -62,6 +63,8 @@ const EPSILON = 0.002;
 
 /** Steps in each layer's brightness ladder. */
 const LADDER = 10;
+/** Angular speed of the treble harmonic shimmer on the outer ring, in radians per second. */
+const SHIMMER_SPEED = 4.2;
 
 /** Values of `LogoGrid.restLayer`: what a cell shows when no audio-driven layer reaches it. */
 export const LOGO_REST = { none: 0, disc: 1, rim: 2, ring: 3 } as const;
@@ -79,6 +82,7 @@ export class LogoGrid {
   readonly markDistance: Float32Array;
   readonly burstDistance: Float32Array;
   readonly restLayer: Uint8Array;
+  readonly cellAngle: Float32Array;
   /** Mark units at the grid's top-left corner, on both axes. */
   private readonly min: number;
 
@@ -90,6 +94,7 @@ export class LogoGrid {
     this.markDistance = new Float32Array(n);
     this.burstDistance = new Float32Array(n);
     this.restLayer = new Uint8Array(n);
+    this.cellAngle = new Float32Array(n);
     const halfCell = this.cellUnits * 0.5;
     const rimReach = Math.max(RIM_HALF, halfCell);
     const ringReach = Math.max(RING_HALF, halfCell);
@@ -101,6 +106,7 @@ export class LogoGrid {
         const d = Math.hypot(x - CENTER, y - CENTER);
         this.markDistance[i] = d;
         this.burstDistance[i] = Math.hypot(x - BURST_X, y - BURST_Y);
+        this.cellAngle[i] = Math.atan2(y - CENTER, x - CENTER);
         // The ring is painted over the rim, so it wins where the widened strokes overlap.
         this.restLayer[i] =
           d <= DISC_R
@@ -142,6 +148,7 @@ export class LogoLevels {
   bass = 0;
   mid = 0;
   treble = 0;
+  shimmerPhase = 0;
   private bassTarget = 0;
   private midTarget = 0;
   private trebleTarget = 0;
@@ -206,6 +213,11 @@ export class LogoLevels {
     this.bass = approach(this.bass, this.bassTarget, attack, decay);
     this.mid = approach(this.mid, this.midTarget, attack, decay);
     this.treble = approach(this.treble, this.trebleTarget, attack, decay);
+    if (reducedMotion) {
+      this.shimmerPhase = 0;
+    } else if (this.treble > 0.12) {
+      this.shimmerPhase = (this.shimmerPhase + SHIMMER_SPEED * dtSec) % (Math.PI * 2);
+    }
     let rippling = false;
     for (let i = 0; i < RIPPLE_POOL; i++) {
       if (this.rippleStrength[i] === 0) continue;
@@ -215,6 +227,7 @@ export class LogoLevels {
     }
     return (
       rippling ||
+      (!reducedMotion && this.treble > 0.2) ||
       this.bass !== this.bassTarget ||
       this.mid !== this.midTarget ||
       this.treble !== this.trebleTarget
@@ -283,15 +296,18 @@ export interface VoxelLogoPalette {
 export function buildVoxelLogoPalette(
   colors: ThemeColors,
   surface: "bg-main" | "bg-playerbar",
+  trackAccent?: string | null,
 ): VoxelLogoPalette {
   const bg = colors[surface] || colors["bg-main"] || "#191918";
   const accent = clampForContrast(colors["color-accent"] || "#4f5bd5", bg, 3.0);
-  const hover = clampForContrast(
+  const baseHover = clampForContrast(
     colors["color-accent-hover"] || colors["color-accent"] || "#a78bfa",
     bg,
     3.0,
   );
-  const burst = clampForContrast("#ffffff", bg, 3.0);
+  const hover = voxelTrackHighlight(baseHover, bg, trackAccent, 0.55);
+  const baseBurst = clampForContrast("#ffffff", bg, 3.0);
+  const burst = voxelTrackHighlight(baseBurst, bg, trackAccent, 0.25);
 
   const styles: string[] = new Array(LOGO_STYLE.count);
   styles[LOGO_STYLE.none] = "transparent";
@@ -411,12 +427,9 @@ export class VoxelLogoRenderer {
   private readonly painter = new VoxelCellPainter();
   private readonly housingLayer = new VoxelLayerCache();
   private readonly cellStyle: Uint8Array;
-  // What the cached housing was painted with, and what the next repaint paints.
   private housingFill = "";
-  private housingWidth = 0;
-  private housingHeight = 0;
-  private readonly paintHousing = (c: Ctx2D): void =>
-    drawOuterHousing(c, this.housingWidth, this.housingHeight, this.cells, this.housingFill);
+  private readonly paintHousing = (c: Ctx2D, w: number, h: number): void =>
+    drawOuterHousing(c, w, h, this.cells, this.housingFill);
 
   constructor(options: VoxelLogoRendererOptions) {
     this.grids = options.grids;
@@ -471,6 +484,7 @@ export class VoxelLogoRenderer {
     const haloOpacity = 0.15 + 0.7 * levels.bass;
     const glowOpacity = (0.2 + 0.7 * levels.mid) * GLOW_PEAK;
     const ripples = this.ripples && !reducedMotion;
+    const shimmer = !reducedMotion && levels.treble > 0.2;
     const rippleHalf = Math.max(RIPPLE_HALF, grid.cellUnits * 0.5);
 
     // 1. Classify every cell, topmost layer first (the SVG's paint order reversed).
@@ -489,8 +503,16 @@ export class VoxelLogoRenderer {
       }
       if (style === LOGO_STYLE.none) {
         if (rest === LOGO_REST.disc) style = LOGO_STYLE.disc;
-        else if (rest === LOGO_REST.ring || Math.abs(d - RING_R) <= ringHalf) style = ringStyle;
-        else if (rest === LOGO_REST.rim || Math.abs(d - RIM_R) <= rimHalf) style = rimStyle;
+        else if (rest === LOGO_REST.ring || Math.abs(d - RING_R) <= ringHalf) {
+          style = shimmer
+            ? LOGO_STYLE.ring +
+              rung(
+                0.5 +
+                  0.5 * levels.treble +
+                  0.22 * Math.sin(grid.cellAngle[i] * 6 + levels.shimmerPhase),
+              )
+            : ringStyle;
+        } else if (rest === LOGO_REST.rim || Math.abs(d - RIM_R) <= rimHalf) style = rimStyle;
         // Ripples are drawn in the ring's colour, over the glow and housing.
         if (style === LOGO_STYLE.none && ripples) style = rippleStyle(levels, d, rippleHalf);
         if (style === LOGO_STYLE.none && this.glow && d <= glowR && glowR > RING_OUTER) {
@@ -505,11 +527,8 @@ export class VoxelLogoRenderer {
     // 2. Housing cells around the grid, aligned to its pitch (cached offscreen across frames).
     if (this.housing && cells.pitch >= MIN_HOUSING_PITCH) {
       const fill = palette.styles[LOGO_STYLE.housing];
-      const stale = layoutChanged || fill !== this.housingFill;
       this.housingFill = fill;
-      this.housingWidth = width;
-      this.housingHeight = height;
-      this.housingLayer.blit(ctx, width, height, stale, this.paintHousing);
+      this.housingLayer.blit(ctx, width, height, layoutChanged, this.paintHousing, fill);
     }
 
     // 3. The grid's cells, one fillStyle per style.

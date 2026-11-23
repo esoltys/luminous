@@ -1,6 +1,12 @@
 import type { ThemeColors } from "../stores/theme.svelte";
-import { clampForContrast, hexToRgb, isLightColor, rgbToHex } from "../utils/colorUtils";
-import { voxelUnlitCellColor } from "./voxelGrid";
+import { clampForContrast, hexToRgb, isLightColor, mixRgb, rgbToHex } from "../utils/colorUtils";
+import {
+  VoxelLayerCache,
+  voxelBloomColor,
+  voxelTrackHighlight,
+  voxelUnlitCellColor,
+  type Ctx2D,
+} from "./voxelGrid";
 
 export interface VoxelColumnState {
   /** Current smoothed bar height in [0, 1]. */
@@ -25,6 +31,8 @@ export interface VoxelThemePalette {
   peakCapColor: string;
   /** Subtle accent fill for the unlit voxel matrix cells. */
   unlitCellColor: string;
+  /** Low-alpha optical phosphor bleed onto neighboring unlit cells. */
+  bloomColor: string;
   /** Horizon separator line between the active matrix and the reflection floor. */
   baselineColor: string;
   /** Pre-computed decaying alpha colors for the mirrored reflection rows below the baseline. */
@@ -48,19 +56,8 @@ const BEAT_DECAY_MS = 120;
 const BEAT_ROW_SHARE = 0.3;
 /** Opacity of the beat flash at full strength. */
 const BEAT_FLASH_ALPHA = 0.55;
-
-function mixRgb(
-  a: { r: number; g: number; b: number },
-  b: { r: number; g: number; b: number },
-  t: number,
-): { r: number; g: number; b: number } {
-  const clamped = Math.max(0, Math.min(1, t));
-  return {
-    r: Math.round(a.r + (b.r - a.r) * clamped),
-    g: Math.round(a.g + (b.g - a.g) * clamped),
-    b: Math.round(a.b + (b.b - a.b) * clamped),
-  };
-}
+/** Duration of the track-change boot sweep across the matrix, in milliseconds. */
+const SWEEP_DURATION_MS = 420;
 
 /**
  * Builds a pre-computed, theme-reactive color palette for the voxel visualizer
@@ -71,17 +68,19 @@ function mixRgb(
 export function buildVoxelThemePalette(
   colors: ThemeColors,
   rowCount = DEFAULT_ROWS,
+  trackAccent?: string | null,
 ): VoxelThemePalette {
   const bgMain = colors["bg-main"] || "#191918";
   const isLight = isLightColor(bgMain);
 
   const safeAccentHex = clampForContrast(colors["color-accent"] || "#4f5bd5", bgMain, 3.0);
   const safeHoverHex = clampForContrast(colors["color-accent-hover"] || safeAccentHex, bgMain, 3.0);
+  const blendedHoverHex = voxelTrackHighlight(safeHoverHex, bgMain, trackAccent, 0.55);
   const textPrimaryHex = colors["color-text-primary"] || (isLight ? "#16181d" : "#f1f3f8");
   const borderHex = colors["color-border"] || safeAccentHex;
 
   const accentRgb = hexToRgb(safeAccentHex);
-  const hoverRgb = hexToRgb(safeHoverHex);
+  const hoverRgb = hexToRgb(blendedHoverHex);
   const textPrimaryRgb = hexToRgb(textPrimaryHex);
   const bgRgb = hexToRgb(bgMain);
   const borderRgb = hexToRgb(borderHex);
@@ -115,6 +114,10 @@ export function buildVoxelThemePalette(
   );
 
   const unlitCellColor = voxelUnlitCellColor(colors);
+  const bloomColor = voxelBloomColor(
+    rgbToHex(hoverRgb.r, hoverRgb.g, hoverRgb.b),
+    isLight ? 0.12 : 0.16,
+  );
   const baselineAlpha = isLight ? 0.32 : 0.26;
   const baselineColor = `rgba(${borderRgb.r}, ${borderRgb.g}, ${borderRgb.b}, ${baselineAlpha})`;
 
@@ -128,6 +131,7 @@ export function buildVoxelThemePalette(
     rowColors,
     peakCapColor,
     unlitCellColor,
+    bloomColor,
     baselineColor,
     reflectionRowColors,
   };
@@ -144,6 +148,8 @@ export class VoxelSpectrumEngine {
   private readonly targetLevels: Float32Array;
   private readonly columnStates: VoxelColumnState[];
   private beatLevel = 0;
+  private sweepProgress = 0;
+  private sweepActive = false;
 
   constructor(columnCount = DEFAULT_COLUMNS, rowCount = DEFAULT_ROWS) {
     this.columnCount = Math.max(1, columnCount);
@@ -166,6 +172,17 @@ export class VoxelSpectrumEngine {
   /** Brightness in [0, 1] of the current beat flash; fades on its own in `step()`. */
   get beat(): number {
     return this.beatLevel;
+  }
+
+  /** Normalized [0, 1] position of the track-change boot sweep, or 0 when idle. */
+  get sweep(): number {
+    return this.sweepActive ? this.sweepProgress : 0;
+  }
+
+  /** Starts a brief left-to-right boot sweep across the matrix on track change. */
+  triggerSweep(): void {
+    this.sweepActive = true;
+    this.sweepProgress = 0.001;
   }
 
   /** A bass onset of `strength` in (0, 1]: flashes the base of every lit bar. */
@@ -243,7 +260,17 @@ export class VoxelSpectrumEngine {
     // The flash is brightness only, so it is the same under reduced motion.
     this.beatLevel *= Math.exp(-clampedDtMs / BEAT_DECAY_MS);
     if (this.beatLevel < EPSILON) this.beatLevel = 0;
-    let anyActive = this.beatLevel > 0;
+    if (reducedMotion) {
+      this.sweepActive = false;
+      this.sweepProgress = 0;
+    } else if (this.sweepActive) {
+      this.sweepProgress += clampedDtMs / SWEEP_DURATION_MS;
+      if (this.sweepProgress >= 1) {
+        this.sweepActive = false;
+        this.sweepProgress = 0;
+      }
+    }
+    let anyActive = this.beatLevel > 0 || this.sweepActive;
 
     for (let i = 0; i < this.columnCount; i++) {
       const col = this.columnStates[i];
@@ -308,10 +335,33 @@ export class VoxelSpectrumEngine {
   }
 }
 
+interface MatrixLayout {
+  readonly cols: number;
+  readonly rows: number;
+  readonly originX: number;
+  readonly baselineY: number;
+  readonly cellWidth: number;
+  readonly cellHeight: number;
+  readonly colGap: number;
+  readonly rowGap: number;
+}
+
+function paintUnlitHousing(ctx: Ctx2D, layout: MatrixLayout, fill: string): void {
+  const { cols, rows, originX, baselineY, cellWidth, cellHeight, colGap, rowGap } = layout;
+  ctx.fillStyle = fill;
+  for (let r = 0; r < rows; r++) {
+    const y = baselineY - (r + 1) * cellHeight - r * rowGap;
+    for (let c = 0; c < cols; c++) {
+      ctx.fillRect(originX + c * (cellWidth + colGap), y, cellWidth, cellHeight);
+    }
+  }
+}
+
 /**
  * Renders the voxel LED matrix with pushed-up peak-hold blocks and mirrored
  * floor reflection onto `ctx`. Batches `fillRect` draws by row color so `ctx.fillStyle`
  * changes at most `O(rows)` times per frame rather than `O(columns * rows)`.
+ * When `housingCache` is provided, the static unlit LED housing is cached offscreen.
  */
 export function renderVoxelMatrix(
   ctx: CanvasRenderingContext2D,
@@ -319,7 +369,7 @@ export function renderVoxelMatrix(
   height: number,
   engine: VoxelSpectrumEngine,
   palette: VoxelThemePalette,
-  options: { reducedMotion?: boolean } = {},
+  options: { reducedMotion?: boolean; housingCache?: VoxelLayerCache } = {},
 ): void {
   if (width <= 0 || height <= 0) return;
 
@@ -354,16 +404,70 @@ export function renderVoxelMatrix(
   const originY = Math.floor((height - gridHeight) / 2);
   const baselineY = originY + rows * cellHeight + (rows - 1) * rowGap;
 
-  // 1. Unlit matrix grid cells (subtle hardware LED matrix housing)
-  ctx.fillStyle = palette.unlitCellColor;
-  for (let r = 0; r < rows; r++) {
-    const y = baselineY - (r + 1) * cellHeight - r * rowGap;
+  // 1. Unlit matrix grid cells (subtle hardware LED matrix housing, cached when possible)
+  const layout: MatrixLayout = {
+    cols,
+    rows,
+    originX,
+    baselineY,
+    cellWidth,
+    cellHeight,
+    colGap,
+    rowGap,
+  };
+  if (options.housingCache) {
+    const housingKey = `${cols}:${rows}:${showReflection ? 1 : 0}:${palette.unlitCellColor}`;
+    options.housingCache.blit(
+      ctx,
+      width,
+      height,
+      false,
+      (c) => paintUnlitHousing(c, layout, palette.unlitCellColor),
+      housingKey,
+    );
+  } else {
+    paintUnlitHousing(ctx, layout, palette.unlitCellColor);
+  }
+
+  // 1b. Optical phosphor bloom onto adjacent unlit cells (skipped under reduced motion)
+  if (!options.reducedMotion) {
+    ctx.fillStyle = palette.bloomColor;
+    const crestThreshold = Math.ceil(rows * 0.6);
     for (let c = 0; c < cols; c++) {
       const col = columns[c];
-      const rowIndex1 = r + 1;
-      if (rowIndex1 <= col.activeCells || col.peakCell === rowIndex1) continue;
-      const x = originX + c * (cellWidth + colGap);
-      ctx.fillRect(x, y, cellWidth, cellHeight);
+      const peak = col.peakCell;
+      if (peak > 0 && peak < rows) {
+        const yAbove = baselineY - (peak + 1) * cellHeight - peak * rowGap;
+        ctx.fillRect(originX + c * (cellWidth + colGap), yAbove, cellWidth, cellHeight);
+      }
+      if (col.activeCells >= crestThreshold) {
+        const topRow = col.activeCells;
+        const yTop = baselineY - topRow * cellHeight - (topRow - 1) * rowGap;
+        if (c > 0 && columns[c - 1].activeCells < topRow && columns[c - 1].peakCell !== topRow) {
+          ctx.fillRect(originX + (c - 1) * (cellWidth + colGap), yTop, cellWidth, cellHeight);
+        }
+        if (
+          c + 1 < cols &&
+          columns[c + 1].activeCells < topRow &&
+          columns[c + 1].peakCell !== topRow
+        ) {
+          ctx.fillRect(originX + (c + 1) * (cellWidth + colGap), yTop, cellWidth, cellHeight);
+        }
+      }
+    }
+    if (engine.sweep > 0) {
+      const center = engine.sweep * (cols - 1);
+      for (
+        let c = Math.max(0, Math.floor(center - 1.5));
+        c <= Math.min(cols - 1, Math.ceil(center + 1.5));
+        c++
+      ) {
+        const x = originX + c * (cellWidth + colGap);
+        for (let r = 0; r < rows; r++) {
+          const y = baselineY - (r + 1) * cellHeight - r * rowGap;
+          ctx.fillRect(x, y, cellWidth, cellHeight);
+        }
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-import { hexToRgb, rgbToHex } from "../utils/colorUtils";
+import { mixHex } from "../utils/colorUtils";
 import type { Ctx2D } from "./voxelGrid";
 
 // Isometric voxels: unit cubes in a scene's (x, y, z) space drawn in a 2:1 isometric projection,
@@ -21,18 +21,13 @@ export const FACE_ALL = FACE_TOP | FACE_LEFT | FACE_RIGHT;
 /** Share of a cube's width left as a gap on each side, so cubes read as separate voxels. */
 const GAP = 0.06;
 
-function shade(hex: string, toward: number, t: number): string {
-  const { r, g, b } = hexToRgb(hex);
-  return rgbToHex(
-    Math.round(r + (toward - r) * t),
-    Math.round(g + (toward - g) * t),
-    Math.round(b + (toward - b) * t),
-  );
-}
-
 /** A cube in `hex`, lit from above: the top in `hex` itself and the sides a step and two darker. */
 export function isoFaces(hex: string): IsoFaces {
-  return { top: hex, left: shade(hex, 0, 0.2), right: shade(hex, 0, 0.36) };
+  return {
+    top: hex,
+    left: mixHex(hex, "#000000", 0.2),
+    right: mixHex(hex, "#000000", 0.36),
+  };
 }
 
 /**
@@ -59,17 +54,20 @@ export class IsoView {
     z0: number,
     z1: number,
   ): boolean {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return false;
+    }
     // Projected extents, in units: x - y across, (x + y) / 2 - z down.
     const left = x0 - y1;
     const right = x1 - y0;
     const top = (x0 + y0) / 2 - z1;
     const bottom = (x1 + y1) / 2 - z0;
-    const unit = Math.max(
-      0.5,
-      Math.min((width * 0.94) / (right - left), (height * 0.92) / (bottom - top)),
-    );
-    const originX = Math.round((width - (right - left) * unit) / 2 - left * unit);
-    const originY = Math.round((height - (bottom - top) * unit) / 2 - top * unit);
+    const spanX = right - left;
+    const spanY = bottom - top;
+    if (spanX <= 0 || spanY <= 0) return false;
+    const unit = Math.max(0.5, Math.min((width * 0.94) / spanX, (height * 0.92) / spanY));
+    const originX = Math.round((width - spanX * unit) / 2 - left * unit);
+    const originY = Math.round((height - spanY * unit) / 2 - top * unit);
     const changed = unit !== this.unit || originX !== this.originX || originY !== this.originY;
     this.unit = unit;
     this.originX = originX;

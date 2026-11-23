@@ -62,9 +62,14 @@
   const isPlaying = $derived(playerStore.state === "playing");
 
   // The track handed to presets that vary with it. Keyed by song id, so it only changes (and
-  // presets only hear about it) when a different song loads.
+  // presets only hear about it) when a different song loads, or when album-art accent arrives.
   const trackKey = $derived(playerStore.currentSong ? String(playerStore.currentSong.id) : null);
-  const track = $derived<VisualizerTrack | null>(trackKey === null ? null : { key: trackKey });
+  const trackAccent = $derived(
+    themeStore.artworkColors?.vibrant ?? themeStore.artworkColors?.accent ?? null,
+  );
+  const track = $derived<VisualizerTrack | null>(
+    trackKey === null ? null : { key: trackKey, accent: trackAccent },
+  );
 
   function isHidden(): boolean {
     return typeof document !== "undefined" && document.hidden;

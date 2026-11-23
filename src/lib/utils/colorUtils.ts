@@ -45,6 +45,30 @@ export function rgbToHex(r: number, g: number, b: number): string {
 }
 
 /**
+ * Linearly interpolates between two RGB colors, clamping `t` to [0, 1].
+ */
+export function mixRgb(
+  a: { r: number; g: number; b: number },
+  b: { r: number; g: number; b: number },
+  t: number,
+): { r: number; g: number; b: number } {
+  const clamped = Math.max(0, Math.min(1, t));
+  return {
+    r: Math.round(a.r + (b.r - a.r) * clamped),
+    g: Math.round(a.g + (b.g - a.g) * clamped),
+    b: Math.round(a.b + (b.b - a.b) * clamped),
+  };
+}
+
+/**
+ * Linearly interpolates between two hex colors (#RRGGBB), clamping `t` to [0, 1].
+ */
+export function mixHex(a: string, b: string, t: number): string {
+  const rgb = mixRgb(hexToRgb(a), hexToRgb(b), t);
+  return rgbToHex(rgb.r, rgb.g, rgb.b);
+}
+
+/**
  * Convert sRGB to Linear RGB
  * Undoes gamma correction to get true physical light measurements
  *

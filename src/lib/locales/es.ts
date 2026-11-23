@@ -3346,6 +3346,7 @@ export const es = {
   },
   visualizers: {
     voxel: "Espectro de vóxeles",
+    voxelIso: "Cascada de vóxeles",
     voxelLogo: "Logotipo de vóxeles",
     vectorscope: "Vectorscopio",
     salmonRun: "Remonte del salmón",

@@ -56,6 +56,15 @@ describe("VoxelGrid", () => {
     grid.span(100, 40, out);
     expect(Array.from(out)).toEqual([-3, 0, 7, 4]);
   });
+
+  it("ignores non-positive or non-finite canvas dimensions", () => {
+    const grid = new VoxelGrid();
+    grid.fit(500, 210, 10, 4);
+    expect(grid.fit(0, 210, 10, 4)).toBe(false);
+    expect(grid.fit(500, -5, 10, 4)).toBe(false);
+    expect(grid.fit(NaN, 210, 10, 4)).toBe(false);
+    expect([grid.cols, grid.rows, grid.pitch]).toEqual([10, 4, 50]);
+  });
 });
 
 describe("VoxelCellPainter", () => {
@@ -72,6 +81,18 @@ describe("VoxelCellPainter", () => {
       [0, 0, "blue"],
       [10, 10, "blue"],
       [20, 10, "blue"],
+    ]);
+  });
+
+  it("ignores out-of-range style indices and short style buffers", () => {
+    const grid = new VoxelGrid();
+    grid.fit(30, 20, 3, 2);
+    const styles = new Uint8Array([1, 99, 1]);
+    const { ctx, rects } = recordingContext();
+    new VoxelCellPainter().paint(ctx, grid, styles, ["none", "red"]);
+    expect(rects.map((r) => [r.x, r.y, r.style])).toEqual([
+      [0, 0, "red"],
+      [20, 0, "red"],
     ]);
   });
 });
@@ -103,12 +124,12 @@ describe("VoxelLayerCache", () => {
       const cache = new VoxelLayerCache();
       const paint = vi.fn((_c: Ctx2D) => {});
       const { ctx, blits } = blittingContext();
-      cache.blit(ctx, 100, 50, false, paint);
-      cache.blit(ctx, 100, 50, false, paint);
+      cache.blit(ctx, 100, 50, false, paint, "k1");
+      cache.blit(ctx, 100, 50, false, paint, "k1");
       expect(paint).toHaveBeenCalledTimes(1);
       expect(blits).toHaveLength(2);
-      cache.blit(ctx, 100, 50, true, paint);
-      cache.blit(ctx, 120, 50, false, paint);
+      cache.blit(ctx, 100, 50, false, paint, "k2");
+      cache.blit(ctx, 120, 50, false, paint, "k2");
       expect(paint).toHaveBeenCalledTimes(3);
       expect(blits).toHaveLength(4);
     } finally {
@@ -116,11 +137,14 @@ describe("VoxelLayerCache", () => {
     }
   });
 
-  it("paints straight onto a context that can't blit", () => {
+  it("paints straight onto a context that can't blit and ignores non-positive sizes", () => {
     const { ctx } = recordingContext();
     const paint = vi.fn((_c: Ctx2D) => {});
-    new VoxelLayerCache().blit(ctx, 100, 50, false, paint);
-    expect(paint).toHaveBeenCalledWith(ctx);
+    const cache = new VoxelLayerCache();
+    cache.blit(ctx, 0, 50, false, paint);
+    expect(paint).not.toHaveBeenCalled();
+    cache.blit(ctx, 100, 50, false, paint);
+    expect(paint).toHaveBeenCalledWith(ctx, 100, 50);
   });
 });
 

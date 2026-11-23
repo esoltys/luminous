@@ -5,6 +5,7 @@ import type {
   VisualizerPreset,
   VisualizerRenderOptions,
   VisualizerSize,
+  VisualizerTrack,
 } from "./types";
 import {
   LogoGrid,
@@ -65,6 +66,8 @@ const PREVIEW_LEVELS = LogoLevels.fixed(0.55, 0.45, 0.4);
 class VoxelLogoInstance implements VisualizerInstance {
   private readonly levels = new LogoLevels();
   private readonly renderer: VoxelLogoRenderer;
+  private colors!: ThemeColors;
+  private trackAccent: string | null = null;
   private palette!: VoxelLogoPalette;
 
   constructor(private readonly config: VoxelLogoSizeConfig) {
@@ -77,7 +80,18 @@ class VoxelLogoInstance implements VisualizerInstance {
   }
 
   setTheme(colors: ThemeColors): void {
-    this.palette = buildVoxelLogoPalette(colors, this.config.surface);
+    this.colors = colors;
+    this.palette = buildVoxelLogoPalette(colors, this.config.surface, this.trackAccent);
+  }
+
+  setTrack(track: VisualizerTrack | null): void {
+    const nextAccent = track?.accent ?? null;
+    if (nextAccent !== this.trackAccent) {
+      this.trackAccent = nextAccent;
+      if (this.colors) {
+        this.palette = buildVoxelLogoPalette(this.colors, this.config.surface, nextAccent);
+      }
+    }
   }
 
   push(frame: VisualizerFrame): void {
