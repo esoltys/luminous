@@ -220,6 +220,11 @@ export interface SongContextEnrichment {
   artist_begin_area_mbid?: string;
   artist_area_name?: string;
   artist_area_mbid?: string;
+  station_country?: string;
+  station_language?: string;
+  station_homepage?: string;
+  station_social_links?: ArtistSocialLink[];
+  station_wikidata_id?: string;
   fetched_at?: number;
 }
 

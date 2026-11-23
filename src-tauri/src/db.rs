@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 99;
+pub const CURRENT_SCHEMA_VERSION: i32 = 100;
 
 struct Migration {
     version: i32,
@@ -1040,6 +1040,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 99,
         description: "normalize comma-delimited radio station genres to '; '-delimited multi-values",
         apply: migrate_radio_station_genres,
+    },
+    Migration {
+        version: 100,
+        description: "cache Wikidata/Wikipedia enrichment and social links for radio stations",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_100)?),
     },
 ];
 
@@ -3432,6 +3437,18 @@ CREATE TABLE IF NOT EXISTS playlist_files (
     render_hash TEXT NOT NULL,
     style       TEXT NOT NULL,
     conflict    INTEGER NOT NULL DEFAULT 0
+);
+";
+
+const MIGRATION_100: &str = "
+CREATE TABLE IF NOT EXISTS radio_station_context (
+    stationuuid        TEXT PRIMARY KEY,
+    wikidata_id        TEXT,
+    wikipedia_extract  TEXT,
+    wikipedia_page_url TEXT,
+    wikipedia_lang     TEXT,
+    social_links_json  TEXT,
+    fetched_at         INTEGER NOT NULL
 );
 ";
 
@@ -6263,5 +6280,42 @@ mod tests {
             )
             .unwrap();
         assert_eq!(local_genre.as_deref(), Some("Rock, Indie"));
+    }
+
+    #[test]
+    fn test_migration_100_creates_radio_station_context() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_migration100_station_ctx_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO radio_station_context (
+                stationuuid, wikidata_id, wikipedia_extract, wikipedia_page_url,
+                wikipedia_lang, social_links_json, fetched_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                "uuid-cfox",
+                "Q5010836",
+                "CFOX-FM is a Canadian radio station...",
+                "https://en.wikipedia.org/wiki/CFOX-FM",
+                "en",
+                "[]",
+                1700000000
+            ],
+        )
+        .unwrap();
+
+        let qid: Option<String> = conn
+            .query_row(
+                "SELECT wikidata_id FROM radio_station_context WHERE stationuuid = 'uuid-cfox'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(qid.as_deref(), Some("Q5010836"));
     }
 }

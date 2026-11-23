@@ -84,6 +84,29 @@
         areaMbid={section.context.artist_area_mbid}
         {countryCode}
       />
+    {:else if section.id === "stationFacts"}
+      <div class="space-y-2 text-xs">
+        {#if section.country}
+          <div class="flex items-start justify-between gap-3">
+            <span class="text-brand-text-secondary/60 shrink-0"
+              >{i18n.t("artistInfo.country", {}, "Country")}</span
+            >
+            <span class="text-brand-text-primary text-right break-words min-w-0"
+              >{section.country}</span
+            >
+          </div>
+        {/if}
+        {#if section.language}
+          <div class="flex items-start justify-between gap-3">
+            <span class="text-brand-text-secondary/60 shrink-0"
+              >{i18n.t("radio.languageLabel", {}, "Language")}</span
+            >
+            <span class="text-brand-text-primary text-right break-words min-w-0 capitalize"
+              >{section.language}</span
+            >
+          </div>
+        {/if}
+      </div>
     {:else if section.id === "bio"}
       {#if section.source === "wikipedia"}
         <section

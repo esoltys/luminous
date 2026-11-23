@@ -113,6 +113,10 @@ pub static RELEASE_GROUP_FLIGHT: LazyLock<FlightGroup<ReleaseGroupFlightResult>>
 pub static ARTIST_EVENTS_FLIGHT: LazyLock<FlightGroup<Result<Vec<ArtistEvent>, String>>> =
     LazyLock::new(FlightGroup::new);
 
+pub static STATION_CONTEXT_FLIGHT: LazyLock<
+    FlightGroup<Result<StationContextLookupResult, String>>,
+> = LazyLock::new(FlightGroup::new);
+
 // ---------------------------------------------------------------------------
 // MusicBrainz rate limiting — MetaBrainz asks for roughly one request per
 // second per client. This is a process-global constraint (their servers
@@ -170,6 +174,14 @@ pub struct WikipediaSummary {
     pub extract: String,
     pub page_url: Option<String>,
     pub thumbnail_url: Option<String>,
+}
+
+/// Station enrichment fetched from Wikidata / Wikipedia.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StationContextLookupResult {
+    pub wikidata_id: Option<String>,
+    pub wikipedia: Option<WikipediaSummary>,
+    pub social_links: Vec<crate::models::ArtistSocialLink>,
 }
 
 // ---------------------------------------------------------------------------
@@ -554,6 +566,36 @@ struct WikidataEntity {
 struct WikidataEntityData {
     #[serde(default)]
     entities: HashMap<String, WikidataEntity>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct WikidataSearchHit {
+    id: String,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct WikidataSearchResponse {
+    #[serde(default)]
+    search: Vec<WikidataSearchHit>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct WikipediaSearchHit {
+    title: String,
+    #[serde(default)]
+    snippet: String,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct WikipediaSearchQuery {
+    #[serde(default)]
+    search: Vec<WikipediaSearchHit>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct WikipediaSearchResponse {
+    #[serde(default)]
+    query: Option<WikipediaSearchQuery>,
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -1040,6 +1082,169 @@ impl ContextManager {
         })
     }
 
+    /// Resolves a radio station's Wikidata entry, Wikipedia summary, and
+    /// external/social links. Prefers Wikidata entities whose `P856` official
+    /// website host matches `homepage` or whose `P31` (instance of) is a radio
+    /// station/network/broadcaster, falling back to a guarded Wikipedia search.
+    pub async fn fetch_station_context(
+        &self,
+        station_name: &str,
+        homepage: Option<&str>,
+        lang: &str,
+    ) -> Result<StationContextLookupResult> {
+        let candidates = station_name_candidates(station_name);
+        if candidates.is_empty() {
+            return Ok(StationContextLookupResult::default());
+        }
+        let homepage_host = homepage.and_then(normalize_url_host);
+
+        for query in &candidates {
+            if let Some(matched) = self
+                .search_wikidata_station(query, homepage_host.as_deref(), lang)
+                .await?
+            {
+                return Ok(matched);
+            }
+        }
+
+        // Fallback: guarded Wikipedia search when Wikidata has no match.
+        for query in &candidates {
+            if let Some(wiki) = self.search_wikipedia_station(query, lang).await? {
+                return Ok(StationContextLookupResult {
+                    wikidata_id: None,
+                    wikipedia: Some(wiki),
+                    social_links: Vec::new(),
+                });
+            }
+        }
+
+        Ok(StationContextLookupResult::default())
+    }
+
+    async fn search_wikidata_station(
+        &self,
+        query: &str,
+        homepage_host: Option<&str>,
+        lang: &str,
+    ) -> Result<Option<StationContextLookupResult>> {
+        let search_url = format!(
+            "https://www.wikidata.org/w/api.php?action=wbsearchentities&search={}&language={}&uselang={}&format=json&limit=5",
+            percent_encoding::utf8_percent_encode(query, percent_encoding::NON_ALPHANUMERIC),
+            percent_encoding::utf8_percent_encode(lang, percent_encoding::NON_ALPHANUMERIC),
+            percent_encoding::utf8_percent_encode(lang, percent_encoding::NON_ALPHANUMERIC),
+        );
+        let resp = self.client.get(&search_url).send().await?;
+        if !resp.status().is_success() {
+            return Ok(None);
+        }
+        let search_data: WikidataSearchResponse = resp.json().await?;
+        let ids: Vec<String> = search_data.search.into_iter().map(|h| h.id).collect();
+        if ids.is_empty() {
+            return Ok(None);
+        }
+
+        let ids_param = ids.join("|");
+        let entities_url = format!(
+            "https://www.wikidata.org/w/api.php?action=wbgetentities&ids={}&props=claims|sitelinks&format=json",
+            percent_encoding::utf8_percent_encode(&ids_param, percent_encoding::NON_ALPHANUMERIC),
+        );
+        let ent_resp = self.client.get(&entities_url).send().await?;
+        if !ent_resp.status().is_success() {
+            return Ok(None);
+        }
+        let ent_data: WikidataEntityData = ent_resp.json().await?;
+
+        // Prefer an entity whose P856 website host matches the station's homepage,
+        // otherwise pick the first radio/broadcaster entity in search order.
+        let mut fallback_qid: Option<(&str, &WikidataEntity)> = None;
+        let mut matched_qid: Option<(&str, &WikidataEntity)> = None;
+        for qid in &ids {
+            let Some(entity) = ent_data.entities.get(qid) else {
+                continue;
+            };
+            if let Some(target_host) = homepage_host {
+                let has_host_match = wikidata_claim_strings(entity, "P856")
+                    .into_iter()
+                    .filter_map(|u| normalize_url_host(&u))
+                    .any(|h| h == target_host);
+                if has_host_match {
+                    matched_qid = Some((qid.as_str(), entity));
+                    break;
+                }
+            }
+            if fallback_qid.is_none() && is_radio_wikidata_entity(entity) {
+                fallback_qid = Some((qid.as_str(), entity));
+            }
+        }
+
+        let Some((qid, entity)) = matched_qid.or(fallback_qid) else {
+            return Ok(None);
+        };
+
+        let sitelinks: HashMap<String, String> = entity
+            .sitelinks
+            .iter()
+            .map(|(site, s)| (site.clone(), s.title.clone()))
+            .collect();
+        let wikipedia = self
+            .fetch_localized_wikipedia_summary(&sitelinks, lang)
+            .await
+            .ok()
+            .flatten();
+        let social_links = extract_station_social_links(entity);
+
+        Ok(Some(StationContextLookupResult {
+            wikidata_id: Some(qid.to_string()),
+            wikipedia,
+            social_links,
+        }))
+    }
+
+    async fn search_wikipedia_station(
+        &self,
+        query: &str,
+        lang: &str,
+    ) -> Result<Option<WikipediaSummary>> {
+        let langs: Vec<&str> = if lang == "en" {
+            vec!["en"]
+        } else {
+            vec![lang, "en"]
+        };
+        let search_term = format!("{query} radio station");
+        for wiki_lang in langs {
+            let url = format!(
+                "https://{wiki_lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch={}&srlimit=3&format=json",
+                percent_encoding::utf8_percent_encode(
+                    &search_term,
+                    percent_encoding::NON_ALPHANUMERIC
+                ),
+            );
+            let Ok(resp) = self.client.get(&url).send().await else {
+                continue;
+            };
+            if !resp.status().is_success() {
+                continue;
+            }
+            let Ok(parsed) = resp.json::<WikipediaSearchResponse>().await else {
+                continue;
+            };
+            let Some(hits) = parsed.query.map(|q| q.search) else {
+                continue;
+            };
+            for hit in hits {
+                if !looks_like_radio_text(&hit.title) && !looks_like_radio_text(&hit.snippet) {
+                    continue;
+                }
+                if let Ok(summary) = self.fetch_wikipedia_summary(wiki_lang, &hit.title).await {
+                    if looks_like_radio_text(&summary.extract) {
+                        return Ok(Some(summary));
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
     /// Aggregate rating + a handful of review links for a release-group.
     /// CritiqueBrainz has no MusicBrainz-style rate limit; a single lookup
     /// per song view doesn't need throttling.
@@ -1130,6 +1335,129 @@ impl ContextManager {
         });
         Ok(events)
     }
+}
+
+/// Builds ordered search candidates from a radio station display name,
+/// stripping trailing `, Region` and frequency/city noise as fallbacks so
+/// names like `"CFOX 99.3 Vancouver, BC"` still match `"CFOX"`.
+fn station_name_candidates(name: &str) -> Vec<String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    let mut out = vec![trimmed.to_string()];
+
+    // Strip trailing `, City/State` suffix (e.g. "CFOX 99.3 Vancouver, BC" -> "CFOX 99.3 Vancouver").
+    let without_comma = trimmed
+        .split(',')
+        .next()
+        .map(str::trim)
+        .unwrap_or("")
+        .to_string();
+    if !without_comma.is_empty() && !out.contains(&without_comma) {
+        out.push(without_comma.clone());
+    }
+
+    // If the name has a frequency token (digits with `.` or `FM`/`AM`), try the
+    // prefix before the frequency token (e.g. "CFOX 99.3 Vancouver" -> "CFOX").
+    let tokens: Vec<&str> = without_comma.split_whitespace().collect();
+    if let Some(freq_idx) = tokens.iter().position(|t| {
+        let lower = t.to_ascii_lowercase();
+        (t.chars().any(|c| c.is_ascii_digit()) && t.contains('.')) || lower == "fm" || lower == "am"
+    }) {
+        if freq_idx > 0 {
+            let prefix = tokens[..freq_idx].join(" ");
+            if !prefix.is_empty() && !out.contains(&prefix) {
+                out.push(prefix);
+            }
+        }
+    }
+
+    out
+}
+
+fn normalize_url_host(raw: &str) -> Option<String> {
+    let parsed = reqwest::Url::parse(raw.trim()).ok()?;
+    let host = parsed.host_str()?.to_ascii_lowercase();
+    Some(host.strip_prefix("www.").unwrap_or(&host).to_string())
+}
+
+fn wikidata_claim_strings(entity: &WikidataEntity, prop: &str) -> Vec<String> {
+    entity
+        .claims
+        .get(prop)
+        .into_iter()
+        .flatten()
+        .filter_map(|c| c.mainsnak.as_ref())
+        .filter_map(|m| m.datavalue.as_ref())
+        .filter_map(|d| d.value.as_ref())
+        .filter_map(|v| v.as_str().map(str::to_string))
+        .collect()
+}
+
+fn is_radio_wikidata_entity(entity: &WikidataEntity) -> bool {
+    const RADIO_QIDS: &[&str] = &[
+        "Q14350",    // radio station
+        "Q192630",   // internet radio station
+        "Q141683",   // radio network
+        "Q15265344", // broadcaster
+        "Q1616075",  // television/radio station
+        "Q27968055", // FM radio station
+    ];
+    entity
+        .claims
+        .get("P31")
+        .into_iter()
+        .flatten()
+        .filter_map(|c| c.mainsnak.as_ref())
+        .filter_map(|m| m.datavalue.as_ref())
+        .filter_map(|d| d.value.as_ref())
+        .filter_map(|v| v.get("id").and_then(|id| id.as_str()))
+        .any(|qid| RADIO_QIDS.contains(&qid))
+}
+
+fn extract_station_social_links(entity: &WikidataEntity) -> Vec<crate::models::ArtistSocialLink> {
+    let mut links = Vec::new();
+    for url in wikidata_claim_strings(entity, "P856") {
+        links.push(crate::models::ArtistSocialLink {
+            platform: "website".to_string(),
+            handle_or_url: url,
+        });
+    }
+    for handle in wikidata_claim_strings(entity, "P2003") {
+        links.push(crate::models::ArtistSocialLink {
+            platform: "instagram".to_string(),
+            handle_or_url: handle,
+        });
+    }
+    for handle in wikidata_claim_strings(entity, "P2013") {
+        links.push(crate::models::ArtistSocialLink {
+            platform: "facebook".to_string(),
+            handle_or_url: handle,
+        });
+    }
+    for channel_id in wikidata_claim_strings(entity, "P2397") {
+        links.push(crate::models::ArtistSocialLink {
+            platform: "youtube".to_string(),
+            handle_or_url: format!("https://www.youtube.com/channel/{channel_id}"),
+        });
+    }
+    links
+}
+
+fn looks_like_radio_text(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    [
+        "radio",
+        "broadcast",
+        "fm ",
+        " am ",
+        "station",
+        "webradio",
+        "internet radio",
+    ]
+    .iter()
+    .any(|kw| lower.contains(kw))
 }
 
 #[cfg(test)]
@@ -1746,5 +2074,57 @@ mod tests {
         assert_eq!(details.ended, Some(true));
         assert_eq!(details.begin_area_name.as_deref(), Some("Aberdeen"));
         assert_eq!(details.area_name.as_deref(), Some("United States"));
+    }
+
+    #[test]
+    fn test_station_name_candidates_and_host_normalization() {
+        assert_eq!(
+            station_name_candidates("CFOX 99.3 Vancouver, BC"),
+            vec![
+                "CFOX 99.3 Vancouver, BC".to_string(),
+                "CFOX 99.3 Vancouver".to_string(),
+                "CFOX".to_string(),
+            ]
+        );
+        assert_eq!(
+            station_name_candidates("BBC Radio 1"),
+            vec!["BBC Radio 1".to_string()]
+        );
+        assert_eq!(
+            normalize_url_host("https://www.cfox.com/listen/"),
+            Some("cfox.com".to_string())
+        );
+        assert_eq!(
+            normalize_url_host("http://somafm.com:8080/groovesalad"),
+            Some("somafm.com".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_station_social_links_and_radio_p31() {
+        let json = r#"{
+            "claims": {
+                "P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q14350"}}}}],
+                "P856": [{"mainsnak": {"datavalue": {"value": "https://www.cfox.com/"}}}],
+                "P2003": [{"mainsnak": {"datavalue": {"value": "cfoxvan"}}}],
+                "P2013": [{"mainsnak": {"datavalue": {"value": "cfoxvancouver"}}}],
+                "P2397": [{"mainsnak": {"datavalue": {"value": "UC12345"}}}]
+            }
+        }"#;
+        let entity: WikidataEntity = serde_json::from_str(json).unwrap();
+        assert!(is_radio_wikidata_entity(&entity));
+        let links = extract_station_social_links(&entity);
+        assert_eq!(links.len(), 4);
+        assert_eq!(links[0].platform, "website");
+        assert_eq!(links[0].handle_or_url, "https://www.cfox.com/");
+        assert_eq!(links[1].platform, "instagram");
+        assert_eq!(links[1].handle_or_url, "cfoxvan");
+        assert_eq!(links[2].platform, "facebook");
+        assert_eq!(links[2].handle_or_url, "cfoxvancouver");
+        assert_eq!(links[3].platform, "youtube");
+        assert_eq!(
+            links[3].handle_or_url,
+            "https://www.youtube.com/channel/UC12345"
+        );
     }
 }
