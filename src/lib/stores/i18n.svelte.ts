@@ -100,7 +100,7 @@ class I18nStore {
     void invoke("set_app_setting", { key: UPDATE_NOTIFICATION_KEY, value }).catch(() => {});
   }
 
-  /** Text the backend shows in the tray menu and taskbar buttons; fire-and-forget (see `native_labels.rs`). */
+  /** Text the backend shows in the tray menu, taskbar buttons, and window title; fire-and-forget (see `native_labels.rs`). */
   private pushNativeLabels() {
     const labels = {
       playPause: this.t("tray.playPause"),
@@ -111,6 +111,7 @@ class I18nStore {
       pauseScrobbling: this.t("listenbrainz.pauseLabel"),
       showHideWindow: this.t("tray.showHideWindow"),
       quit: this.t("tray.quit"),
+      unknownSong: this.t("collection.unknownSong", {}, "Unknown Song"),
     };
     void invoke("set_native_labels", { labels }).catch(() => {});
   }

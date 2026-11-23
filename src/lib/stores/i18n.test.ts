@@ -259,19 +259,24 @@ describe("native labels", () => {
     vi.mocked(invoke).mockResolvedValue(null);
   });
 
-  it("pushes the tray and taskbar labels in the UI language whenever it changes", async () => {
+  it("pushes the tray, taskbar, and window-title labels in the UI language whenever it changes", async () => {
     await i18n.setLocale("de");
     expect(invoke).toHaveBeenCalledWith("set_native_labels", {
       labels: expect.objectContaining({
         playPause: "Wiedergabe/Pause",
         showHideWindow: "Luminous ein-/ausblenden",
         quit: "Beenden",
+        unknownSong: "Unbekannter Titel",
       }),
     });
 
     await i18n.setLocale("en-CA");
     expect(invoke).toHaveBeenCalledWith("set_native_labels", {
-      labels: expect.objectContaining({ playPause: "Play/Pause", quit: "Quit" }),
+      labels: expect.objectContaining({
+        playPause: "Play/Pause",
+        quit: "Quit",
+        unknownSong: "Unknown Song",
+      }),
     });
   });
 
@@ -281,7 +286,10 @@ describe("native labels", () => {
     );
     await i18n.init();
     expect(invoke).toHaveBeenCalledWith("set_native_labels", {
-      labels: expect.objectContaining({ quit: "Salir" }),
+      labels: expect.objectContaining({
+        quit: "Salir",
+        unknownSong: "Canción desconocida",
+      }),
     });
   });
 
