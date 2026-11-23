@@ -62,6 +62,15 @@
 
   let { children } = $props();
 
+  // Visual-only override: never touches the stored sidebarWidth preference,
+  // so widening the window back out restores exactly the width the user had.
+  // Declared before `dockCoversSidebar`, which reads it.
+  let effectiveSidebarWidth = $derived(
+    windowLayoutStore.isSidebarAutoCollapsed
+      ? SIDEBAR_COLLAPSED_WIDTH_PX
+      : windowLayoutStore.sidebarWidth,
+  );
+
   // The floating PlayerBar dock renders only with a song, and never on Help. The same
   // condition drives the `pb-dock` bottom padding (app.css) every view uses to clear it.
   const dockVisible = $derived(!!playerStore.currentSong && navigationStore.activeTab !== "help");
@@ -121,14 +130,6 @@
     requestAnimationFrame(() => requestAnimationFrame(() => (instantLayout = false)));
   }
   const PANEL_SLIDE_MS = 250;
-
-  // Visual-only override: never touches the stored sidebarWidth preference,
-  // so widening the window back out restores exactly the width the user had.
-  let effectiveSidebarWidth = $derived(
-    windowLayoutStore.isSidebarAutoCollapsed
-      ? SIDEBAR_COLLAPSED_WIDTH_PX
-      : windowLayoutStore.sidebarWidth,
-  );
 
   // Immersive ambient background: a layered-ellipse SVG gradient tinted from
   // the current song's extracted artwork colors, seeded by song id so it's
