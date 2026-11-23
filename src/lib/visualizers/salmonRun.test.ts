@@ -1,8 +1,40 @@
 import { describe, expect, it } from "vitest";
 import { LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS } from "../stores/theme.svelte";
-import { calculateContrastRatio } from "../utils/colorUtils";
+import { calculateContrastRatio, hexToRgb } from "../utils/colorUtils";
 import { SALMON_RUN_PRESET, buildSalmonRunPalette } from "./salmonRun";
-import { voxelUnlitCellColor } from "./voxelGrid";
+
+/** A 2D context that records the corners of every filled path, and counts fills. */
+function recordingContext(width: number, height: number) {
+  const points: [number, number][] = [];
+  let fills = 0;
+  const ctx = {
+    canvas: { width, height },
+    fillStyle: "",
+    clearRect() {},
+    fillRect(x: number, y: number) {
+      points.push([x, y]);
+      fills++;
+    },
+    beginPath() {},
+    closePath() {},
+    moveTo(x: number, y: number) {
+      points.push([x, y]);
+    },
+    lineTo(x: number, y: number) {
+      points.push([x, y]);
+    },
+    fill() {
+      fills++;
+    },
+  };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, points, fills: () => fills };
+}
+
+function distance(a: string, b: string): number {
+  const x = hexToRgb(a);
+  const y = hexToRgb(b);
+  return Math.hypot(x.r - y.r, x.g - y.g, x.b - y.b);
+}
 
 describe("buildSalmonRunPalette", () => {
   for (const [name, colors] of [
@@ -13,17 +45,17 @@ describe("buildSalmonRunPalette", () => {
       it(`keeps the salmon and leaf visible on ${surface} in the ${name} theme`, () => {
         const p = buildSalmonRunPalette(colors, surface);
         const bg = colors[surface];
-        expect(calculateContrastRatio(p.fishBody, bg)).toBeGreaterThanOrEqual(3);
+        expect(calculateContrastRatio(p.fishBody, bg)).toBeGreaterThanOrEqual(4.5);
         expect(calculateContrastRatio(p.fishHead, bg)).toBeGreaterThanOrEqual(3);
         expect(calculateContrastRatio(p.leaf, bg)).toBeGreaterThanOrEqual(4.5);
       });
     }
-  }
 
-  it("draws open water in the unlit cell every voxel preset shares", () => {
-    const p = buildSalmonRunPalette(LUMINOUS_DARK_COLORS, "bg-main");
-    expect(p.bed[0]).toContain(voxelUnlitCellColor(LUMINOUS_DARK_COLORS));
-  });
+    it(`sets the salmon apart from the water in the ${name} theme`, () => {
+      const p = buildSalmonRunPalette(colors, "bg-main");
+      expect(calculateContrastRatio(p.fishBodyFaces.top, p.water[0].top)).toBeGreaterThanOrEqual(2);
+    });
+  }
 
   it("takes its colours from the theme", () => {
     const plain = buildSalmonRunPalette(LUMINOUS_DARK_COLORS, "bg-main");
@@ -32,13 +64,15 @@ describe("buildSalmonRunPalette", () => {
       "bg-main",
     );
     expect(other.fishBody).not.toBe(plain.fishBody);
-    expect(other.streak).not.toEqual(plain.streak);
+    expect(other.water).not.toEqual(plain.water);
   });
 
-  it("lifts the water under each reduced-motion light step", () => {
+  it("lifts the water toward the accent hover under each reduced-motion light step", () => {
     const p = buildSalmonRunPalette(LUMINOUS_DARK_COLORS, "bg-main");
-    const water = p.bed.map((fills) => Number(/, ([\d.]+)\)$/.exec(fills.at(-1)!)![1]));
-    for (let l = 1; l < water.length; l++) expect(water[l]).toBeGreaterThan(water[l - 1]);
+    const hover = LUMINOUS_DARK_COLORS["color-accent-hover"];
+    for (let l = 1; l < p.water.length; l++) {
+      expect(distance(p.water[l].top, hover)).toBeLessThan(distance(p.water[l - 1].top, hover));
+    }
   });
 });
 
@@ -52,5 +86,44 @@ describe("SALMON_RUN_PRESET", () => {
       instance.push({ bands: new Array(32).fill(0.3), onset: 0, playing: true, scope: null });
       expect(instance.step(16, false)).toBe(true);
     }
+  });
+
+  it("fits the whole ladder inside the stage, whatever its shape", () => {
+    for (const [width, height] of [
+      [1600, 900],
+      [900, 1600],
+      [3840, 2160],
+      [320, 180],
+    ]) {
+      const instance = SALMON_RUN_PRESET.create("full");
+      instance.setTheme(LUMINOUS_DARK_COLORS);
+      instance.setTrack?.({ key: "fit" });
+      instance.push({ bands: new Array(32).fill(0.5), onset: 0.8, playing: true, scope: null });
+      for (let t = 0; t < 120; t++) instance.step(16, false);
+      const { ctx, points, fills } = recordingContext(width, height);
+      instance.render(ctx, width, height, { reducedMotion: false, preview: false });
+      expect(fills()).toBeGreaterThan(500);
+      const xs = points.map(([x]) => x);
+      const ys = points.map(([, y]) => y);
+      expect(Math.min(...xs)).toBeGreaterThanOrEqual(0);
+      expect(Math.max(...xs)).toBeLessThanOrEqual(width);
+      expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+      expect(Math.max(...ys)).toBeLessThanOrEqual(height);
+      // The ladder fills the stage along at least one side.
+      const spread = Math.max(
+        (Math.max(...xs) - Math.min(...xs)) / width,
+        (Math.max(...ys) - Math.min(...ys)) / height,
+      );
+      expect(spread).toBeGreaterThan(0.85);
+    }
+  });
+
+  it("draws the playbar's lone salmon on its slot", () => {
+    const instance = SALMON_RUN_PRESET.create("mini");
+    instance.setTheme(LUMINOUS_DARK_COLORS);
+    instance.setTrack?.({ key: "1" });
+    const { ctx, points } = recordingContext(96, 28);
+    instance.render(ctx, 96, 28, { reducedMotion: false, preview: true });
+    expect(points.length).toBeGreaterThan(10);
   });
 });
