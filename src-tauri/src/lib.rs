@@ -530,33 +530,53 @@ fn spawn_position_tick_loop(
     });
 }
 
+/// Formats the OS window title for the current track and playback state.
+pub(crate) fn format_window_title(
+    song: Option<&crate::models::Song>,
+    is_playing: bool,
+    unknown_song: &str,
+    app_name: &str,
+) -> String {
+    match (song, is_playing) {
+        (Some(s), true) => {
+            let song_title = s.title.as_deref().unwrap_or("").trim();
+            let display_title = if song_title.is_empty() {
+                let fallback = unknown_song.trim();
+                if fallback.is_empty() {
+                    "Unknown Song"
+                } else {
+                    fallback
+                }
+            } else {
+                song_title
+            };
+            let artist = s.artist.as_deref().unwrap_or("").trim();
+            if artist.is_empty() {
+                format!("{display_title} - {app_name}")
+            } else {
+                format!("{display_title} - {artist} - {app_name}")
+            }
+        }
+        _ => app_name.to_string(),
+    }
+}
+
 /// Keeps the native OS window title in sync with the current track directly
 /// from the backend, ensuring taskbar and titlebar stay accurate even when
-/// the frontend window is minimized or occluded (#892, #1052).
-fn sync_window_title(app: &tauri::AppHandle, song: Option<&crate::models::Song>, is_playing: bool) {
+/// the frontend window is minimized or occluded (#892, #1052, #2317).
+pub(crate) fn sync_window_title(
+    app: &tauri::AppHandle,
+    song: Option<&crate::models::Song>,
+    is_playing: bool,
+) {
     if let Some(w) = app.get_webview_window("main") {
         let app_name = if crate::remote_devtools_enabled() {
             "Luminous Debug"
         } else {
             "Luminous"
         };
-        let title = match (song, is_playing) {
-            (Some(s), true) => {
-                let song_title = s.title.as_deref().unwrap_or("").trim();
-                let display_title = if song_title.is_empty() {
-                    "Unknown Song"
-                } else {
-                    song_title
-                };
-                let artist = s.artist.as_deref().unwrap_or("").trim();
-                if artist.is_empty() {
-                    format!("{display_title} - {app_name}")
-                } else {
-                    format!("{display_title} - {artist} - {app_name}")
-                }
-            }
-            _ => app_name.to_string(),
-        };
+        let unknown_song = crate::native_labels::unknown_song_label();
+        let title = format_window_title(song, is_playing, &unknown_song, app_name);
         let _ = w.set_title(&title);
     }
 }
@@ -2067,6 +2087,64 @@ mod startup_rendering_workaround_tests {
         assert_eq!(
             with_webview2_remote_debugging("--some-flag", 9225),
             "--some-flag --remote-debugging-port=9225"
+        );
+    }
+
+    #[test]
+    fn test_format_window_title() {
+        let song = crate::models::Song {
+            title: Some("Starboy".to_string()),
+            artist: Some("The Weeknd".to_string()),
+            ..Default::default()
+        };
+
+        // Paused / stopped / no song always revert to the app name.
+        assert_eq!(
+            format_window_title(Some(&song), false, "Chanson inconnue", "Luminous"),
+            "Luminous"
+        );
+        assert_eq!(
+            format_window_title(None, true, "Chanson inconnue", "Luminous Debug"),
+            "Luminous Debug"
+        );
+
+        // Playing with title and artist.
+        assert_eq!(
+            format_window_title(Some(&song), true, "Chanson inconnue", "Luminous"),
+            "Starboy - The Weeknd - Luminous"
+        );
+
+        // Playing with title and blank/missing artist.
+        let no_artist = crate::models::Song {
+            title: Some("Prelude".to_string()),
+            artist: Some("   ".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            format_window_title(Some(&no_artist), true, "Chanson inconnue", "Luminous"),
+            "Prelude - Luminous"
+        );
+
+        // Playing with missing/whitespace title uses localized fallback.
+        let untitled = crate::models::Song {
+            title: Some("   ".to_string()),
+            artist: Some("Daft Punk".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            format_window_title(Some(&untitled), true, "Chanson inconnue", "Luminous"),
+            "Chanson inconnue - Daft Punk - Luminous"
+        );
+
+        // Blank unknown_song fallback still falls back to English "Unknown Song".
+        let untitled_no_artist = crate::models::Song {
+            title: None,
+            artist: None,
+            ..Default::default()
+        };
+        assert_eq!(
+            format_window_title(Some(&untitled_no_artist), true, "   ", "Luminous Debug"),
+            "Unknown Song - Luminous Debug"
         );
     }
 }

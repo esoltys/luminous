@@ -152,18 +152,15 @@
     });
   });
 
-  // Dynamically synchronize the OS window title with Now Playing track status (#29).
-  // When playing: "[Song Title] - [Artist] - Luminous" (or "[Song Title] - Luminous").
-  // When stopped/paused: reverts to "Luminous".
+  // Keep the webview's document.title in sync with Now Playing track status (#29).
+  // The backend's sync_window_title owns the native OS window title (via set_title)
+  // so the two writers cannot race or disagree when the window is minimized (#2317).
   $effect(() => {
     void i18n.currentLocale;
     const title = formatWindowTitle(playerStore.currentSong, playerStore.state, windowTitleAppName);
     if (typeof document !== "undefined") {
       document.title = title;
     }
-    void getCurrentWindow()
-      ?.setTitle?.(title)
-      ?.catch(() => {});
   });
 
   // Auto-resumes the walkthrough in "resume" mode (see the onMount comment
