@@ -296,6 +296,7 @@
         filesStore.clearFilter();
       }
       if (isSearchFocused || document.activeElement === searchInput) {
+        e.preventDefault();
         isSearchFocused = false;
         searchInput?.blur();
       }

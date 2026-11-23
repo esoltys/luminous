@@ -2818,6 +2818,7 @@ export const en = {
     toggleRightPanel: "Toggle right panel",
     toggleMiniplayer: "Toggle miniplayer",
     toggleFullscreen: "Toggle fullscreen",
+    exitFullscreen: "Exit fullscreen",
     previousVisualizer: "Previous visualizer",
     nextVisualizer: "Next visualizer",
     openEqualizer: "Open Equalizer settings",

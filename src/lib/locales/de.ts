@@ -2898,6 +2898,7 @@ export const de = {
     toggleRightPanel: "Rechten Bereich umschalten",
     toggleMiniplayer: "Miniplayer umschalten",
     toggleFullscreen: "Vollbild umschalten",
+    exitFullscreen: "Vollbild beenden",
     previousVisualizer: "Vorherige Visualisierung",
     nextVisualizer: "Nächste Visualisierung",
     openEqualizer: "Equalizer-Einstellungen öffnen",

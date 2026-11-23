@@ -8,6 +8,7 @@
   import { cubicOut } from "svelte/easing";
   import { collectionStore } from "../lib/stores/collection.svelte";
   import { navigationStore } from "../lib/stores/navigation.svelte";
+  import { isFallbackEscape } from "../lib/utils/globalShortcuts";
   import { windowLayoutStore } from "../lib/stores/windowLayout.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
   import StationListImportDialog from "../lib/components/radio/StationListImportDialog.svelte";
@@ -251,6 +252,18 @@
     }
 
     function handleGlobalHotkeys(e: KeyboardEvent) {
+      if (windowLayoutStore.isFullscreen && isFallbackEscape(e)) {
+        // Defer past synchronous keydown listeners on document/window so transient
+        // layers mounted after +layout (modals, menus, popovers, search) get first
+        // claim on Escape via e.preventDefault().
+        queueMicrotask(() => {
+          if (!e.defaultPrevented && windowLayoutStore.isFullscreen) {
+            void windowLayoutStore.setFullscreenMode(false);
+          }
+        });
+        return;
+      }
+
       if (e.key === "F11" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
         e.preventDefault();
         void windowLayoutStore.toggleFullscreenMode();
