@@ -1,4 +1,20 @@
 {
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "includeCoAuthoredBy": false,
+  "extraKnownMarketplaces": {
+    "esoltys-skills": {
+      "source": {
+        "source": "github",
+        "repo": "esoltys/esoltys-skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "esoltys-skills@esoltys-skills": true
+  },
   "hooks": {
     "SessionStart": [
       {
