@@ -43,13 +43,14 @@ const T = {
 } as const;
 
 // A salmon as fine cubes, nose first: `u` steps back along the body, `v` across it (centred on
-// -0.5) and `w` up from the belly. Part 0 is body, 1 head, 2 tail (which flexes with the beat).
-const FISH_U = [0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6];
+// -0.5) and `w` up from the belly. Part 0 is body, 1 head, 2 tail (a single vertical fin that
+// flexes with the beat).
+const FISH_U = [0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 6, 6];
 const FISH_V = [
-  -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -0.5, -1, 0, -1, 0, -1, 0, -2, -1, 0, 1,
+  -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -0.5, -1, 0, -1, 0, -0.5, -0.5, -0.5,
 ];
-const FISH_W = [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1];
-const FISH_PART = [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2];
+const FISH_W = [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 0, 0, 1, 1, 0, 0, 1];
+const FISH_PART = [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2];
 const FISH_CUBES = FISH_U.length;
 /** Middle of the body along `u`, which the salmon's position names. */
 const FISH_MID_U = 3;

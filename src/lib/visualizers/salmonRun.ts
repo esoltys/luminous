@@ -1,10 +1,10 @@
 import type { ThemeColors } from "../stores/theme.svelte";
-import { clampForContrast, hexToRgb, isLightColor, rgbToHex } from "../utils/colorUtils";
+import { clampForContrast, isLightColor, mixHex } from "../utils/colorUtils";
 import { FishLadder } from "./fishLadderEngine";
 import { FOAM_STEPS, FishLadderRenderer, LIGHT_STEPS } from "./fishLadderRenderer";
 import { isoFaces, type IsoFaces } from "./isoVoxel";
 import { LoneSalmon, type LoneSalmonConfig } from "./salmonRunEngine";
-import { VoxelGrid, voxelAlphaLadder } from "./voxelGrid";
+import { VoxelGrid, voxelAlphaLadder, voxelTrackHighlight } from "./voxelGrid";
 import type {
   VisualizerFrame,
   VisualizerInstance,
@@ -58,57 +58,51 @@ function hexOr(value: string | undefined, fallback: string): string {
   return value && HEX6.test(value) ? value : fallback;
 }
 
-function mix(a: string, b: string, t: number): string {
-  const x = hexToRgb(a);
-  const y = hexToRgb(b);
-  return rgbToHex(
-    Math.round(x.r + (y.r - x.r) * t),
-    Math.round(x.g + (y.g - x.g) * t),
-    Math.round(x.b + (y.b - x.b) * t),
-  );
-}
-
 /** Builds the salmon run's fills from the theme, for a canvas on `surface`. */
 export function buildSalmonRunPalette(
   colors: ThemeColors,
   surface: "bg-main" | "bg-playerbar",
+  trackAccent?: string | null,
 ): SalmonRunPalette {
   const bg = hexOr(colors[surface], hexOr(colors["bg-main"], "#191918"));
   const light = isLightColor(bg);
   const accent = clampForContrast(hexOr(colors["color-accent"], "#4f5bd5"), bg, 3.0);
-  const hover = clampForContrast(hexOr(colors["color-accent-hover"], accent), bg, 3.0);
+  const baseHover = clampForContrast(hexOr(colors["color-accent-hover"], accent), bg, 3.0);
+  const hover = voxelTrackHighlight(baseHover, bg, trackAccent, 0.5);
   const text = hexOr(colors["color-text-primary"], light ? "#16181d" : "#f1f3f8");
 
   // White water leans toward the lighter of the theme's text and background, so falls and foam
   // read as white water in both light and dark themes, kept accent-tinted to stay apart from the salmon.
   const bright = light ? bg : text;
-  const surfaceWater = mix(bg, accent, 0.6);
+  const surfaceWater = mixHex(bg, accent, 0.6);
   const foam: IsoFaces[] = [];
   for (let k = 0; k < FOAM_STEPS; k++) {
     foam.push(
-      isoFaces(mix(mix(surfaceWater, hover, 0.6), bright, 0.15 + (0.45 * k) / (FOAM_STEPS - 1))),
+      isoFaces(
+        mixHex(mixHex(surfaceWater, hover, 0.6), bright, 0.15 + (0.45 * k) / (FOAM_STEPS - 1)),
+      ),
     );
   }
   // On the ladder the salmon lean further toward primary text, to stand out from accent water.
-  const fishBody = clampForContrast(mix(text, hover, 0.5), bg, 4.5);
-  const ladderFish = clampForContrast(mix(text, hover, 0.3), bg, 4.5);
+  const fishBody = clampForContrast(mixHex(text, hover, 0.5), bg, 4.5);
+  const ladderFish = clampForContrast(mixHex(text, hover, 0.3), bg, 4.5);
   return {
-    stone: isoFaces(mix(bg, text, light ? 0.3 : 0.2)),
-    cap: isoFaces(mix(bg, text, light ? 0.4 : 0.3)),
-    bank: isoFaces(mix(mix(bg, text, light ? 0.22 : 0.14), accent, 0.12)),
-    deep: isoFaces(mix(bg, accent, 0.4)),
+    stone: isoFaces(mixHex(bg, text, light ? 0.3 : 0.2)),
+    cap: isoFaces(mixHex(bg, text, light ? 0.4 : 0.3)),
+    bank: isoFaces(mixHex(mixHex(bg, text, light ? 0.22 : 0.14), accent, 0.12)),
+    deep: isoFaces(mixHex(bg, accent, 0.4)),
     water: isoFaces(surfaceWater),
     lightWash: voxelAlphaLadder(hover, LIGHT_STEPS, 0.1, 0.4),
-    spill: isoFaces(mix(surfaceWater, bright, 0.35)),
+    spill: isoFaces(mixHex(surfaceWater, bright, 0.35)),
     foam,
     // Ripples and glints stay dimmer than the salmon, so the salmon read as the river's subject.
-    ripple: voxelAlphaLadder(mix(hover, bright, 0.6), FOAM_STEPS, 0.15, 0.75),
-    glint: voxelAlphaLadder(mix(hover, bright, 0.45), FOAM_STEPS, 0.12, 0.6),
+    ripple: voxelAlphaLadder(mixHex(hover, bright, 0.6), FOAM_STEPS, 0.15, 0.75),
+    glint: voxelAlphaLadder(mixHex(hover, bright, 0.45), FOAM_STEPS, 0.12, 0.6),
     fishBody,
     fishHead: hover,
     fishBodyFaces: isoFaces(ladderFish),
-    fishHeadFaces: isoFaces(mix(ladderFish, hover, 0.5)),
-    leaf: clampForContrast(mix(text, hover, 0.15), bg, 4.5),
+    fishHeadFaces: isoFaces(mixHex(ladderFish, hover, 0.5)),
+    leaf: clampForContrast(mixHex(text, hover, 0.15), bg, 4.5),
     leafVein: hover,
   };
 }
@@ -267,14 +261,24 @@ function fishPart(u: number, av: number, len: number, minHalf: number): number {
 class FishLadderInstance implements VisualizerInstance {
   private readonly ladder = new FishLadder();
   private readonly renderer = new FishLadderRenderer(this.ladder);
+  private colors!: ThemeColors;
+  private trackAccent: string | null = null;
 
   setTheme(colors: ThemeColors): void {
-    this.renderer.setPalette(buildSalmonRunPalette(colors, "bg-main"));
+    this.colors = colors;
+    this.renderer.setPalette(buildSalmonRunPalette(colors, "bg-main", this.trackAccent));
   }
 
   setTrack(track: VisualizerTrack | null): void {
     // With nothing loaded the ladder stays as it was; the next track still brings a leaf.
     if (track) this.ladder.setTrack(track.key);
+    const nextAccent = track?.accent ?? null;
+    if (nextAccent !== this.trackAccent) {
+      this.trackAccent = nextAccent;
+      if (this.colors) {
+        this.renderer.setPalette(buildSalmonRunPalette(this.colors, "bg-main", nextAccent));
+      }
+    }
   }
 
   push(frame: VisualizerFrame): void {
@@ -295,14 +299,24 @@ class FishLadderInstance implements VisualizerInstance {
 class LoneSalmonInstance implements VisualizerInstance {
   private readonly scene = new LoneSalmon(LONE_SALMON);
   private readonly renderer = new LoneSalmonRenderer();
+  private colors!: ThemeColors;
+  private trackAccent: string | null = null;
   private palette!: SalmonRunPalette;
 
   setTheme(colors: ThemeColors): void {
-    this.palette = buildSalmonRunPalette(colors, "bg-playerbar");
+    this.colors = colors;
+    this.palette = buildSalmonRunPalette(colors, "bg-playerbar", this.trackAccent);
   }
 
   setTrack(track: VisualizerTrack | null): void {
     if (track) this.scene.setTrack(track.key);
+    const nextAccent = track?.accent ?? null;
+    if (nextAccent !== this.trackAccent) {
+      this.trackAccent = nextAccent;
+      if (this.colors) {
+        this.palette = buildSalmonRunPalette(this.colors, "bg-playerbar", nextAccent);
+      }
+    }
   }
 
   push(frame: VisualizerFrame): void {

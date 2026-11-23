@@ -3361,6 +3361,7 @@ export const frFR: DeepStringRecord<typeof en> = {
   },
   visualizers: {
     voxel: "Spectre en voxels",
+    voxelIso: "Cascade en voxels",
     voxelLogo: "Logo en voxels",
     vectorscope: "Vectorscope",
     salmonRun: "Remontée des saumons",

@@ -3354,6 +3354,7 @@ export const de = {
   },
   visualizers: {
     voxel: "Voxel-Spektrum",
+    voxelIso: "Voxel-Wasserfall",
     voxelLogo: "Voxel-Logo",
     vectorscope: "Vektorskop",
     salmonRun: "Lachswanderung",

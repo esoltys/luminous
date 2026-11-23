@@ -241,4 +241,30 @@ describe("voxel preset (#2245)", () => {
     for (let i = 0; i < 500 && moving; i++) moving = full.step(16, false);
     expect(moving).toBe(false);
   });
+
+  it("sweeps across the matrix on triggerSweep and cancels under reduced motion", () => {
+    const engine = new VoxelSpectrumEngine(16, 12);
+    engine.triggerSweep();
+    expect(engine.sweep).toBeGreaterThan(0);
+    expect(engine.step(100, false)).toBe(true);
+    expect(engine.step(100, false)).toBe(true);
+    expect(engine.sweep).toBeGreaterThan(0.4);
+
+    // Finishes on its own
+    for (let i = 0; i < 20; i++) engine.step(50, false);
+    expect(engine.sweep).toBe(0);
+
+    // Cancelled immediately under reduced motion
+    engine.triggerSweep();
+    engine.step(16, true);
+    expect(engine.sweep).toBe(0);
+  });
+
+  it("blends valid trackAccent into crest colors and exposes bloomColor", () => {
+    const base = buildVoxelThemePalette(LUMINOUS_DARK_COLORS, 12);
+    const tinted = buildVoxelThemePalette(LUMINOUS_DARK_COLORS, 12, "#ff5500");
+    expect(base.bloomColor).toMatch(/^rgba\(/);
+    expect(tinted.rowColors[11]).not.toBe(base.rowColors[11]);
+    expect(tinted.rowColors[0]).toBe(base.rowColors[0]);
+  });
 });

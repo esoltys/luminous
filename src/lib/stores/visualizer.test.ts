@@ -30,6 +30,7 @@ describe("visualizer registry (#2245)", () => {
   it("ships the voxel spectrum, voxel logo, vectorscope and salmon run, spectrum first", () => {
     expect(listPresets().map((p) => p.id)).toEqual([
       "voxel",
+      "voxel-iso",
       "voxel-logo",
       "vectorscope",
       "salmon-run",

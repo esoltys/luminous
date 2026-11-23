@@ -942,18 +942,20 @@ describe("PlayerBar.svelte", () => {
     const { getByTestId } = render(PlayerBar);
     expect(getByTestId("visualizer-next")).toHaveAttribute(
       "aria-label",
-      "Next visualizer: Voxel logo",
+      "Next visualizer: Voxel waterfall",
     );
     await fireEvent.contextMenu(getByTestId("player-bar-visualizer"));
     const options = screen.getAllByRole("menuitemradio");
     expect(options.map((o) => o.getAttribute("data-preset"))).toEqual([
       "voxel",
+      "voxel-iso",
       "voxel-logo",
       "vectorscope",
       "salmon-run",
     ]);
-    expect(options[1]).toHaveTextContent("Voxel logo");
-    expect(options[2]).toHaveTextContent("Vectorscope");
-    expect(options[3]).toHaveTextContent("Salmon run");
+    expect(options[1]).toHaveTextContent("Voxel waterfall");
+    expect(options[2]).toHaveTextContent("Voxel logo");
+    expect(options[3]).toHaveTextContent("Vectorscope");
+    expect(options[4]).toHaveTextContent("Salmon run");
   });
 });

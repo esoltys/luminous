@@ -1,5 +1,5 @@
 import type { ThemeColors } from "../stores/theme.svelte";
-import { clampForContrast, hexToRgb, isLightColor } from "../utils/colorUtils";
+import { clampForContrast, hexToRgb, isLightColor, mixHex } from "../utils/colorUtils";
 
 // Shared building blocks for the LED-grid ("voxel") presets: square cells fitted to a canvas, a
 // painter that draws a fill per cell with as few `fillStyle` changes as possible, a cached layer
@@ -28,6 +28,9 @@ export class VoxelGrid {
    * 1 px pitch. Returns whether the layout changed.
    */
   fit(width: number, height: number, cols: number, rows: number): boolean {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return false;
+    }
     const c = Math.max(1, Math.floor(cols));
     const r = Math.max(1, Math.floor(rows));
     const pitch = Math.max(1, Math.floor(Math.min(width / c, height / r)));
@@ -85,8 +88,9 @@ export class VoxelCellPainter {
   private next = new Int32Array(0);
 
   paint(ctx: Ctx2D, grid: VoxelGrid, styles: Uint8Array, fills: readonly string[]): void {
-    const count = grid.cols * grid.rows;
+    const count = Math.min(grid.cols * grid.rows, styles.length);
     const nFills = fills.length;
+    if (count === 0 || nFills === 0) return;
     if (this.order.length < count) this.order = new Int32Array(count);
     if (this.starts.length < nFills + 1) {
       this.starts = new Int32Array(nFills + 1);
@@ -94,11 +98,17 @@ export class VoxelCellPainter {
     }
     const starts = this.starts;
     starts.fill(0, 0, nFills + 1);
-    for (let i = 0; i < count; i++) starts[styles[i] + 1]++;
+    for (let i = 0; i < count; i++) {
+      const s = styles[i];
+      if (s < nFills) starts[s + 1]++;
+    }
     for (let s = 0; s < nFills; s++) starts[s + 1] += starts[s];
     const next = this.next;
     for (let s = 0; s < nFills; s++) next[s] = starts[s];
-    for (let i = 0; i < count; i++) this.order[next[styles[i]]++] = i;
+    for (let i = 0; i < count; i++) {
+      const s = styles[i];
+      if (s < nFills) this.order[next[s]++] = i;
+    }
 
     const cols = grid.cols;
     for (let s = 1; s < nFills; s++) {
@@ -129,27 +139,33 @@ export class VoxelLayerCache {
   private backingW = 0;
   private backingH = 0;
   private painted = false;
+  private lastKey: unknown = undefined;
 
   /**
    * Draws the layer over the `width`×`height` canvas (CSS px), repainting it with `paint` first
-   * if `stale` or the canvas changed size. `paint` draws in CSS px onto a cleared surface.
+   * if `stale`, `key` changed from the last painted value, or the canvas changed size. `paint`
+   * draws in CSS px onto a cleared surface.
    */
   blit(
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
     stale: boolean,
-    paint: (c: Ctx2D) => void,
+    paint: (c: Ctx2D, width: number, height: number) => void,
+    key?: unknown,
   ): void {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
     if (typeof ctx.drawImage !== "function") {
-      paint(ctx);
+      paint(ctx, width, height);
       return;
     }
     const dpr = ctx.canvas?.width ? ctx.canvas.width / width : 1;
     const backingW = Math.max(1, Math.round(width * dpr));
     const backingH = Math.max(1, Math.round(height * dpr));
+    const keyChanged = key !== undefined && !Object.is(key, this.lastKey);
     if (
       stale ||
+      keyChanged ||
       !this.painted ||
       width !== this.width ||
       height !== this.height ||
@@ -157,18 +173,19 @@ export class VoxelLayerCache {
       backingH !== this.backingH
     ) {
       if (!this.ensureSurface(backingW, backingH)) {
-        paint(ctx);
+        paint(ctx, width, height);
         return;
       }
       const c = this.surfaceCtx!;
       c.setTransform(1, 0, 0, 1, 0, 0);
       c.clearRect(0, 0, backingW, backingH);
       c.setTransform(dpr, 0, 0, dpr, 0, 0);
-      paint(c);
+      paint(c, width, height);
       this.width = width;
       this.height = height;
       this.backingW = backingW;
       this.backingH = backingH;
+      this.lastKey = key;
       this.painted = true;
     }
     ctx.drawImage(this.surface!, 0, 0, width, height);
@@ -247,4 +264,29 @@ export function voxelAlphaLadder(hex: string, steps: number, floor = 0.12, ceili
     );
   }
   return ladder;
+}
+
+/**
+ * Low-alpha optical phosphor bleed fill derived from `hex`, for subtle glow onto adjacent
+ * unlit housing cells.
+ */
+export function voxelBloomColor(hex: string, alpha = 0.14): string {
+  return voxelRgba(hex, alpha);
+}
+
+const HEX6 = /^#[0-9a-f]{6}$/i;
+
+/**
+ * Blends an optional `#RRGGBB` track-artwork accent into `baseHex` after clamping it for
+ * contrast against `bgHex`. Returns `baseHex` unchanged when `trackAccent` is absent or invalid.
+ */
+export function voxelTrackHighlight(
+  baseHex: string,
+  bgHex: string,
+  trackAccent: string | null | undefined,
+  weight = 0.55,
+): string {
+  if (!trackAccent || !HEX6.test(trackAccent)) return baseHex;
+  const safeTrack = clampForContrast(trackAccent, bgHex, 3.0);
+  return mixHex(baseHex, safeTrack, weight);
 }

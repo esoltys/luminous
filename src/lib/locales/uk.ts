@@ -3541,6 +3541,7 @@ export const uk = {
   },
   visualizers: {
     voxel: "Воксельний спектр",
+    voxelIso: "Воксельний каскад",
     voxelLogo: "Воксельний логотип",
     vectorscope: "Векторскоп",
     salmonRun: "Хід лосося",

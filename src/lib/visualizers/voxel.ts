@@ -6,6 +6,7 @@ import type {
   VisualizerPreset,
   VisualizerRenderOptions,
   VisualizerSize,
+  VisualizerTrack,
 } from "./types";
 import {
   VoxelSpectrumEngine,
@@ -14,6 +15,7 @@ import {
   renderVoxelMatrix,
   type VoxelThemePalette,
 } from "./voxelEngine";
+import { VoxelLayerCache } from "./voxelGrid";
 
 const FULL_COLUMNS = 64;
 const FULL_ROWS = 28;
@@ -24,12 +26,33 @@ const MINI_BAR_GAP = 2.5;
 /** The immersive LED matrix: 64 smoothed columns with peak-hold caps and a reflection floor. */
 class VoxelFullInstance implements VisualizerInstance {
   private readonly engine = new VoxelSpectrumEngine(FULL_COLUMNS, FULL_ROWS);
+  private readonly housingCache = new VoxelLayerCache();
+  private colors!: ThemeColors;
+  private trackKey: string | null = null;
+  private trackAccent: string | null = null;
   private palette!: VoxelThemePalette;
   private previewPalette!: VoxelThemePalette;
 
   setTheme(colors: ThemeColors): void {
-    this.palette = buildVoxelThemePalette(colors, FULL_ROWS);
-    this.previewPalette = buildVoxelThemePalette(colors, PREVIEW_ROWS);
+    this.colors = colors;
+    this.palette = buildVoxelThemePalette(colors, FULL_ROWS, this.trackAccent);
+    this.previewPalette = buildVoxelThemePalette(colors, PREVIEW_ROWS, this.trackAccent);
+  }
+
+  setTrack(track: VisualizerTrack | null): void {
+    const nextKey = track?.key ?? null;
+    if (nextKey !== null && nextKey !== this.trackKey) {
+      this.engine.triggerSweep();
+    }
+    this.trackKey = nextKey;
+    const nextAccent = track?.accent ?? null;
+    if (nextAccent !== this.trackAccent) {
+      this.trackAccent = nextAccent;
+      if (this.colors) {
+        this.palette = buildVoxelThemePalette(this.colors, FULL_ROWS, nextAccent);
+        this.previewPalette = buildVoxelThemePalette(this.colors, PREVIEW_ROWS, nextAccent);
+      }
+    }
   }
 
   push(frame: VisualizerFrame): void {
@@ -53,7 +76,11 @@ class VoxelFullInstance implements VisualizerInstance {
     options: VisualizerRenderOptions,
   ): void {
     if (options.preview) renderStaticVoxelPreview(ctx, width, height, this.previewPalette);
-    else renderVoxelMatrix(ctx, width, height, this.engine, this.palette, options);
+    else
+      renderVoxelMatrix(ctx, width, height, this.engine, this.palette, {
+        reducedMotion: options.reducedMotion,
+        housingCache: this.housingCache,
+      });
   }
 }
 

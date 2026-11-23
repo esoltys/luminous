@@ -33,6 +33,8 @@ export interface VisualizerFrame {
 export interface VisualizerTrack {
   /** Stable while one track plays and different for the next, e.g. to seed a per-track layout. */
   readonly key: string;
+  /** Dominant/vibrant album-art accent hex (#RRGGBB) when available, for adaptive highlights. */
+  readonly accent?: string | null;
 }
 
 export interface VisualizerRenderOptions {

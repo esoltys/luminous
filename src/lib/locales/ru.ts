@@ -3551,6 +3551,7 @@ export const ru = {
   },
   visualizers: {
     voxel: "Воксельный спектр",
+    voxelIso: "Воксельный каскад",
     voxelLogo: "Воксельный логотип",
     vectorscope: "Векторскоп",
     salmonRun: "Ход лосося",

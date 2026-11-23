@@ -8,7 +8,7 @@ import type { VisualizerFrame } from "./types";
 // the renderer scales the whole scene to fit.
 
 /** Water cells across the river. */
-export const RIVER_WIDTH = 9;
+export const RIVER_WIDTH = 13;
 /** Cells of bank along the far side, at y in [-BANK_WIDTH, 0). */
 export const BANK_WIDTH = 2;
 /** Height of each step, from one pool's surface to the next pool's. */
