@@ -71,7 +71,10 @@
   $effect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") hide();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        hide();
+      }
     };
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("pointerdown", hide, true);

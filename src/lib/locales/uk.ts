@@ -3058,6 +3058,7 @@ export const uk = {
     toggleRightPanel: "Перемкнути праву панель",
     toggleMiniplayer: "Перемкнути міні-плеєр",
     toggleFullscreen: "Перемкнути повноекранний режим",
+    exitFullscreen: "Вийти з повноекранного режиму",
     previousVisualizer: "Попередній візуалізатор",
     nextVisualizer: "Наступний візуалізатор",
     openEqualizer: "Відкрити налаштування еквалайзера",

@@ -3069,6 +3069,7 @@ export const ru = {
     toggleRightPanel: "Показать или скрыть правую панель",
     toggleMiniplayer: "Переключить мини-проигрыватель",
     toggleFullscreen: "Переключить полноэкранный режим",
+    exitFullscreen: "Выйти из полноэкранного режима",
     previousVisualizer: "Предыдущий визуализатор",
     nextVisualizer: "Следующий визуализатор",
     openEqualizer: "Открыть настройки эквалайзера",

@@ -85,6 +85,7 @@
 
   function handleWindowKeydown(e: KeyboardEvent) {
     if (e.key === "Escape" && isOpen) {
+      e.preventDefault();
       onClose();
     }
   }

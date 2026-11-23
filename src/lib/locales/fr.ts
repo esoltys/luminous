@@ -2906,6 +2906,7 @@ export const fr: DeepStringRecord<typeof en> = {
     toggleRightPanel: "Basculer le panneau droit",
     toggleMiniplayer: "Basculer le mini-lecteur",
     toggleFullscreen: "Basculer le plein écran",
+    exitFullscreen: "Quitter le plein écran",
     previousVisualizer: "Visualiseur précédent",
     nextVisualizer: "Visualiseur suivant",
     openEqualizer: "Ouvrir l'égaliseur",

@@ -12,6 +12,16 @@ export function shouldSkipGlobalShortcut(event: KeyboardEvent): boolean {
 }
 
 /**
+ * Whether a keydown is an unmodified, unhandled Escape key that a window-level
+ * fallback (such as exiting fullscreen) may claim.
+ */
+export function isFallbackEscape(event: KeyboardEvent): boolean {
+  if (event.key !== "Escape") return false;
+  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false;
+  return !shouldSkipGlobalShortcut(event);
+}
+
+/**
  * The visualizer step a keydown asks for: `[` is the previous preset (-1), `]` the next (1),
  * anything else 0 (#2245). Matched by character, so it follows the keyboard layout. AltGr
  * (Ctrl+Alt on Windows) types the brackets on some layouts and counts; a plain Ctrl+[ /

@@ -1,5 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { shouldSkipGlobalShortcut, visualizerStepForKey } from "./globalShortcuts";
+import {
+  isFallbackEscape,
+  shouldSkipGlobalShortcut,
+  visualizerStepForKey,
+} from "./globalShortcuts";
 
 describe("shouldSkipGlobalShortcut", () => {
   afterEach(() => {
@@ -58,5 +62,52 @@ describe("visualizerStepForKey (#2245)", () => {
     expect(step({ key: "[", ctrlKey: true })).toBe(0);
     expect(step({ key: "]", metaKey: true })).toBe(0);
     expect(step({ key: "ArrowRight" })).toBe(0);
+  });
+});
+
+describe("isFallbackEscape", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  function checkEscape(
+    target: HTMLElement,
+    init: KeyboardEventInit = {},
+    prevent = false,
+  ): boolean {
+    let result: boolean | undefined;
+    const listener = (e: KeyboardEvent) => {
+      if (prevent) e.preventDefault();
+      result = isFallbackEscape(e);
+    };
+    window.addEventListener("keydown", listener);
+    target.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true, ...init }),
+    );
+    window.removeEventListener("keydown", listener);
+    return result!;
+  }
+
+  it("accepts a plain unmodified Escape on a non-editable element", () => {
+    const div = document.body.appendChild(document.createElement("div"));
+    expect(checkEscape(div)).toBe(true);
+  });
+
+  it("rejects modified Escape, repeat, and non-Escape keys", () => {
+    const div = document.body.appendChild(document.createElement("div"));
+    expect(checkEscape(div, { ctrlKey: true })).toBe(false);
+    expect(checkEscape(div, { metaKey: true })).toBe(false);
+    expect(checkEscape(div, { altKey: true })).toBe(false);
+    expect(checkEscape(div, { shiftKey: true })).toBe(false);
+    expect(checkEscape(div, { repeat: true })).toBe(false);
+    expect(checkEscape(div, { key: "Enter" })).toBe(false);
+  });
+
+  it("rejects Escape inside editable fields or when already defaultPrevented", () => {
+    const input = document.body.appendChild(document.createElement("input"));
+    expect(checkEscape(input)).toBe(false);
+
+    const div = document.body.appendChild(document.createElement("div"));
+    expect(checkEscape(div, {}, true)).toBe(false);
   });
 });

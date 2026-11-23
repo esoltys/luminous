@@ -100,6 +100,7 @@
     if (!showOverlay) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.preventDefault();
         notchSuppressed = true;
         closeOverlay();
       }
