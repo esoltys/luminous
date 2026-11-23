@@ -207,7 +207,7 @@ export class VoxelLayerCache {
 }
 
 /** `hex` at opacity `alpha` (clamped to 1), as a fill. */
-export function voxelRgba(hex: string, alpha: number): string {
+function voxelRgba(hex: string, alpha: number): string {
   const { r, g, b } = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${Number(Math.min(1, alpha).toFixed(3))})`;
 }
