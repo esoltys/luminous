@@ -69,7 +69,7 @@ describe("RiverAudio", () => {
     audio.push(frame(QUIET, 0, false));
     for (let t = 0; t < 600; t++) audio.step(FRAME_MS / 1000);
     expect(audio.activity).toBe(0);
-    expect(audio.settling).toBe(false);
+    expect(audio.stirring).toBe(false);
   });
 });
 

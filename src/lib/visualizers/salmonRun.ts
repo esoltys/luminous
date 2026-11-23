@@ -266,7 +266,7 @@ function fishPart(u: number, av: number, len: number, minHalf: number): number {
 /** The immersive stage: the fish ladder. */
 class FishLadderInstance implements VisualizerInstance {
   private readonly ladder = new FishLadder();
-  private readonly renderer = new FishLadderRenderer();
+  private readonly renderer = new FishLadderRenderer(this.ladder);
 
   setTheme(colors: ThemeColors): void {
     this.renderer.setPalette(buildSalmonRunPalette(colors, "bg-main"));
@@ -287,7 +287,7 @@ class FishLadderInstance implements VisualizerInstance {
 
   // The stage is never a still preview (that's the playbar slot), so there's no preview case.
   render(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-    this.renderer.render(ctx, width, height, this.ladder);
+    this.renderer.render(ctx, width, height);
   }
 }
 

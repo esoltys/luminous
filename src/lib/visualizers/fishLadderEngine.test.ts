@@ -6,7 +6,7 @@ import {
   MAX_POOLS,
   NOTCH_WIDTH,
   PATIENCE_S,
-  RIPPLE_POOL,
+  MAX_RIPPLES,
   RIVER_WIDTH,
 } from "./fishLadderEngine";
 import type { VisualizerFrame } from "./types";
@@ -39,7 +39,7 @@ function layout(ladder: FishLadder): number[] {
 
 function activeRipples(ladder: FishLadder): number {
   let n = 0;
-  for (let i = 0; i < RIPPLE_POOL; i++) if (ladder.rippleStrength[i] > 0) n++;
+  for (let i = 0; i < MAX_RIPPLES; i++) if (ladder.rippleStrength[i] > 0) n++;
   return n;
 }
 
@@ -235,11 +235,11 @@ describe("FishLadder motion", () => {
   it("drops a ripple at the foot of a fall on each beat, capped at the pool size", () => {
     const ladder = settled();
     run(ladder, 1.5);
-    for (let s = 0; s < RIPPLE_POOL + 4; s++) {
+    for (let s = 0; s < MAX_RIPPLES + 4; s++) {
       ladder.push(frame(QUIET, 0.6));
       ladder.step(FRAME_MS, false);
     }
-    expect(activeRipples(ladder)).toBe(RIPPLE_POOL);
+    expect(activeRipples(ladder)).toBe(MAX_RIPPLES);
   });
 
   it("calms and stops asking for frames once paused, and eases back in on resume", () => {

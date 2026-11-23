@@ -4,7 +4,7 @@ import {
   MAX_FISH,
   MAX_POOLS,
   NOTCH_WIDTH,
-  RIPPLE_POOL,
+  MAX_RIPPLES,
   RIVER_WIDTH,
   WATER_DEPTH,
 } from "./fishLadderEngine";
@@ -70,7 +70,7 @@ const D_LEAF = 3;
 /** Falls (one per weir), boulders (at most one per pool), salmon and the leaf. */
 const MAX_DRAWABLES = 2 * MAX_POOLS + MAX_FISH + 1;
 
-/** The terrain, a cell kind per cube, painted onto a cached layer. */
+/** The ladder's terrain, a cell kind per cube, painted onto a cached layer. */
 class LadderTerrain {
   private cells = new Uint8Array(0);
   private sizeX = 0;
@@ -80,11 +80,32 @@ class LadderTerrain {
   private layoutVersion = -1;
   private stale = true;
   private faces: readonly (IsoFaces | null)[] = [];
-  private view!: IsoView;
   private readonly paint = (c: Ctx2D) => this.paintCells(c);
 
-  /** Rebuilds the cells when the ladder has been laid out again. */
-  update(ladder: FishLadder): void {
+  constructor(
+    private readonly ladder: FishLadder,
+    private readonly view: IsoView,
+  ) {}
+
+  /** Takes the fills for each cell kind (indexed by `T`), repainting with them on the next draw. */
+  setFaces(faces: readonly (IsoFaces | null)[]): void {
+    this.faces = faces;
+    this.stale = true;
+  }
+
+  /**
+   * Draws the terrain over the whole `width`×`height` canvas, rebuilding it if the ladder has
+   * been laid out again and repainting it if that, the fills or (`viewChanged`) the view changed.
+   */
+  draw(ctx: CanvasRenderingContext2D, width: number, height: number, viewChanged: boolean): void {
+    this.rebuild();
+    this.layer.blit(ctx, width, height, this.stale || viewChanged, this.paint);
+    this.stale = false;
+  }
+
+  /** Rebuilds the cells from the ladder's layout, if it changed. */
+  private rebuild(): void {
+    const ladder = this.ladder;
     if (ladder.layoutVersion === this.layoutVersion) return;
     this.layoutVersion = ladder.layoutVersion;
     this.stale = true;
@@ -98,9 +119,9 @@ class LadderTerrain {
     this.cells.fill(T.empty, 0, sx * sy * sz);
     for (let k = 0; k < ladder.poolCount; k++) {
       const surface = ladder.poolSurface[k];
-      const weir = k < ladder.poolCount - 1;
+      const weir = ladder.openWaterEnd(k);
       for (let x = ladder.poolStart[k]; x < ladder.poolEnd[k]; x++) {
-        const lip = weir && x === ladder.poolEnd[k] - 1;
+        const lip = x >= weir;
         for (let y = -BANK_WIDTH; y < RIVER_WIDTH; y++) {
           if (y < 0) {
             // The far bank, rising toward the back.
@@ -133,22 +154,6 @@ class LadderTerrain {
     return this.cells[(x * this.sizeY + iy) * this.sizeZ + z];
   }
 
-  /** Draws the terrain over the whole canvas, repainting it if `viewChanged` or anything else. */
-  draw(
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-    view: IsoView,
-    viewChanged: boolean,
-    faces: readonly (IsoFaces | null)[],
-  ): void {
-    const stale = this.stale || viewChanged || faces !== this.faces;
-    this.view = view;
-    this.faces = faces;
-    this.layer.blit(ctx, width, height, stale, this.paint);
-    this.stale = false;
-  }
-
   /** Every cube's visible faces, back to front: x, then y, then z, ascending. */
   private paintCells(ctx: Ctx2D): void {
     const { sizeX, sizeY, sizeZ } = this;
@@ -169,15 +174,13 @@ class LadderTerrain {
 }
 
 /**
- * Draws a `FishLadder` as isometric voxels in the theme's colours, scaled to fit the canvas.
+ * Draws its `FishLadder` as isometric voxels in the theme's colours, scaled to fit the canvas.
  * `setPalette` must be called before the first `render`. Allocates nothing per frame.
  */
 export class FishLadderRenderer {
   private readonly view = new IsoView();
-  private readonly terrain = new LadderTerrain();
+  private readonly terrain: LadderTerrain;
   private palette!: SalmonRunPalette;
-  /** Terrain faces by cell kind. */
-  private terrainFaces: (IsoFaces | null)[] = [];
   private fitVersion = -1;
   private fitWidth = 0;
   private fitHeight = 0;
@@ -192,9 +195,28 @@ export class FishLadderRenderer {
   private readonly cubeZ = new Float32Array(FISH_CUBES);
   private readonly cubeOrder = new Int32Array(FISH_CUBES);
 
-  render(ctx: CanvasRenderingContext2D, width: number, height: number, ladder: FishLadder): void {
+  constructor(private readonly ladder: FishLadder) {
+    this.terrain = new LadderTerrain(ladder, this.view);
+  }
+
+  /** Takes the theme's fills; everything `render` needs from them is built here. */
+  setPalette(p: SalmonRunPalette): void {
+    this.palette = p;
+    const faces: (IsoFaces | null)[] = new Array(7).fill(null);
+    faces[T.stone] = p.stone;
+    faces[T.cap] = p.cap;
+    faces[T.bankTop] = p.bank;
+    faces[T.deep] = p.deep;
+    faces[T.water] = p.water;
+    faces[T.spill] = p.spill;
+    this.terrain.setFaces(faces);
+  }
+
+  render(ctx: CanvasRenderingContext2D, width: number, height: number): void {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
+    const ladder = this.ladder;
     const view = this.view;
+    const p = this.palette;
     let viewChanged = false;
     if (
       ladder.layoutVersion !== this.fitVersion ||
@@ -215,68 +237,40 @@ export class FishLadderRenderer {
       this.fitWidth = width;
       this.fitHeight = height;
     }
-    const p = this.palette;
     ctx.clearRect(0, 0, width, height);
-    this.terrain.update(ladder);
-    // Under reduced motion a beat lifts the light on the water instead of making waves.
-    this.terrain.draw(ctx, width, height, view, viewChanged, this.terrainFaces);
+    this.terrain.draw(ctx, width, height, viewChanged);
     // Under reduced motion a beat lifts the light on the water instead of making waves: a wash
     // over each pool, so the cached terrain never needs repainting for it.
     const light = Math.min(LIGHT_STEPS, Math.round(ladder.glow * LIGHT_STEPS));
     if (light > 0) {
       for (let k = 0; k < ladder.poolCount; k++) {
-        const end = ladder.poolEnd[k] - (k < ladder.poolCount - 1 ? 1 : 0);
-        view.plane(
-          ctx,
-          ladder.poolStart[k],
-          0,
-          end,
-          RIVER_WIDTH,
-          ladder.poolSurface[k],
-          p.lightWash[light - 1],
-        );
+        const z = ladder.poolSurface[k];
+        const end = ladder.openWaterEnd(k);
+        view.plane(ctx, ladder.poolStart[k], 0, end, RIVER_WIDTH, z, p.lightWash[light - 1]);
       }
     }
 
-    this.drawGlints(ctx, ladder, p);
-    this.drawRipples(ctx, ladder, p);
-    this.sortDrawables(ladder);
+    this.drawGlints(ctx);
+    this.drawRipples(ctx);
+    this.sortDrawables();
     for (let d = 0; d < this.drawCount; d++) {
       const i = this.drawIndex[d];
       switch (this.drawKind[d]) {
         case D_FALL:
-          this.drawFall(ctx, ladder, p, i);
+          this.drawFall(ctx, i);
           break;
-        case D_BOULDER:
-          view.cube(
-            ctx,
-            ladder.boulderX[i],
-            ladder.boulderY[i],
-            ladder.poolSurface[ladder.boulderPool[i]],
-            1,
-            p.cap,
-          );
+        case D_BOULDER: {
+          const z = ladder.poolSurface[ladder.boulderPool[i]];
+          view.cube(ctx, ladder.boulderX[i], ladder.boulderY[i], z, 1, p.cap);
           break;
+        }
         case D_FISH:
-          this.drawSalmon(ctx, ladder, p, i);
+          this.drawSalmon(ctx, i);
           break;
         default:
-          this.drawLeaf(ctx, ladder, p);
+          this.drawLeaf(ctx);
       }
     }
-  }
-
-  /** Takes the theme's fills, indexing the terrain's by cell kind here so `render` needn't. */
-  setPalette(p: SalmonRunPalette): void {
-    this.palette = p;
-    const faces: (IsoFaces | null)[] = new Array(7).fill(null);
-    faces[T.stone] = p.stone;
-    faces[T.cap] = p.cap;
-    faces[T.bankTop] = p.bank;
-    faces[T.deep] = p.deep;
-    faces[T.water] = p.water;
-    faces[T.spill] = p.spill;
-    this.terrainFaces = faces;
   }
 
   /** `FOAM_STEPS` rung for brightness `b` in [0, 1], or -1 when too faint to show. */
@@ -298,7 +292,8 @@ export class FishLadderRenderer {
     this.drawDepth[d] = depth;
   }
 
-  private sortDrawables(ladder: FishLadder): void {
+  private sortDrawables(): void {
+    const ladder = this.ladder;
     this.drawCount = 0;
     for (let k = 0; k < ladder.poolCount - 1; k++) {
       const depth = ladder.poolEnd[k] + 0.5 + ladder.notchCenter(k) + ladder.poolSurface[k + 1];
@@ -318,7 +313,8 @@ export class FishLadderRenderer {
   }
 
   /** Current glints: short runs of fine tiles drifting on each pool. */
-  private drawGlints(ctx: Ctx2D, ladder: FishLadder, p: SalmonRunPalette): void {
+  private drawGlints(ctx: Ctx2D): void {
+    const ladder = this.ladder;
     const a = ladder.audio;
     const k = this.rung((0.35 + 0.35 * a.treble) * (0.4 + 0.6 * a.activity));
     if (k < 0) return;
@@ -326,13 +322,15 @@ export class FishLadderRenderer {
       const x = Math.floor(ladder.glintX[g] / FINE) * FINE;
       const y = Math.floor(ladder.glintY[g] / FINE) * FINE;
       const z = ladder.poolSurface[ladder.glintPool[g]];
-      for (let s = 0; s < 3; s++) this.view.tile(ctx, x - s * FINE, y, z, FINE, p.glint[k]);
+      for (let s = 0; s < 3; s++)
+        this.view.tile(ctx, x - s * FINE, y, z, FINE, this.palette.glint[k]);
     }
   }
 
   /** Ripples as rings of fine tiles on the pool they spread on, kept to its open water. */
-  private drawRipples(ctx: Ctx2D, ladder: FishLadder, p: SalmonRunPalette): void {
-    for (let i = 0; i < RIPPLE_POOL; i++) {
+  private drawRipples(ctx: Ctx2D): void {
+    const ladder = this.ladder;
+    for (let i = 0; i < MAX_RIPPLES; i++) {
       const k = this.rung(ladder.rippleAlpha(i));
       if (k < 0) continue;
       const cx = ladder.rippleX[i];
@@ -340,15 +338,15 @@ export class FishLadderRenderer {
       const rad = ladder.rippleRadius(i);
       const pool = ladder.poolAt(cx);
       const x0 = Math.max(ladder.poolStart[pool], Math.floor((cx - rad - FINE) / FINE) * FINE);
-      const lastRow = pool < ladder.poolCount - 1 ? ladder.poolEnd[pool] - 1 : ladder.poolEnd[pool];
-      const x1 = Math.min(lastRow, cx + rad + FINE);
+      const x1 = Math.min(ladder.openWaterEnd(pool), cx + rad + FINE);
       const y0 = Math.max(0, Math.floor((cy - rad - FINE) / FINE) * FINE);
       const y1 = Math.min(RIVER_WIDTH, cy + rad + FINE);
       const z = ladder.rippleZ[i];
+      const fill = this.palette.ripple[k];
       for (let x = x0; x < x1; x += FINE) {
         for (let y = y0; y < y1; y += FINE) {
           const d = Math.hypot(x + FINE / 2 - cx, y + FINE / 2 - cy);
-          if (Math.abs(d - rad) <= FINE * 0.6) this.view.tile(ctx, x, y, z, FINE, p.ripple[k]);
+          if (Math.abs(d - rad) <= FINE * 0.6) this.view.tile(ctx, x, y, z, FINE, fill);
         }
       }
     }
@@ -359,7 +357,9 @@ export class FishLadderRenderer {
    * bands of brighter water running down it, and foam churning at its foot. It brightens with the
    * bass and with the reduced-motion light shift.
    */
-  private drawFall(ctx: Ctx2D, ladder: FishLadder, p: SalmonRunPalette, k: number): void {
+  private drawFall(ctx: Ctx2D, k: number): void {
+    const ladder = this.ladder;
+    const p = this.palette;
     const a = ladder.audio;
     const base = (0.35 + 0.35 * a.bass) * (0.6 + 0.4 * a.activity) + 0.3 * ladder.glow;
     const x = ladder.poolEnd[k];
@@ -389,7 +389,8 @@ export class FishLadderRenderer {
    * either end of the ladder aren't drawn, so salmon appear from the front edge and leave over
    * the back.
    */
-  private drawSalmon(ctx: Ctx2D, ladder: FishLadder, p: SalmonRunPalette, i: number): void {
+  private drawSalmon(ctx: Ctx2D, i: number): void {
+    const ladder = this.ladder;
     const h = FISH_CUBE * ladder.fishScale[i];
     const yaw = Math.max(
       -MAX_YAW,
@@ -428,6 +429,7 @@ export class FishLadderRenderer {
       }
       this.cubeOrder[o] = c;
     }
+    const p = this.palette;
     for (let o = 0; o < count; o++) {
       const c = this.cubeOrder[o];
       const faces = FISH_PART[c] === 1 ? p.fishHeadFaces : p.fishBodyFaces;
@@ -436,13 +438,14 @@ export class FishLadderRenderer {
   }
 
   /** The leaf: fine tiles floating flat, its midrib in the vein colour. */
-  private drawLeaf(ctx: Ctx2D, ladder: FishLadder, p: SalmonRunPalette): void {
+  private drawLeaf(ctx: Ctx2D): void {
+    const ladder = this.ladder;
     const x0 = ladder.leafX - 2 * FINE;
     const y0 = ladder.leafY - FINE / 2;
     for (let t = 0; t < LEAF_U.length; t++) {
       const x = x0 + LEAF_U[t] * FINE;
       if (x < 0 || x + FINE > ladder.length) continue;
-      const fill = LEAF_PART[t] === 2 ? p.leafVein : p.leaf;
+      const fill = LEAF_PART[t] === 2 ? this.palette.leafVein : this.palette.leaf;
       this.view.tile(ctx, x, y0 + LEAF_V[t] * FINE, ladder.leafZ + 0.02, FINE, fill);
     }
   }

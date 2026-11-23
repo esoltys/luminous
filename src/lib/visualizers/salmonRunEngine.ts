@@ -149,8 +149,8 @@ export class RiverAudio {
     return (this.mid + this.treble) * 0.5;
   }
 
-  /** Whether the levels are still easing toward their targets. */
-  get settling(): boolean {
+  /** Whether the music still moves the river: playing, or easing toward calm after a pause. */
+  get stirring(): boolean {
     return (
       this.playing ||
       this.activity > 0 ||
@@ -284,6 +284,6 @@ export class LoneSalmon {
       this.leafY += Math.sin((this.leafX / size) * 0.3) * size * 0.15 * dt;
       if (this.leafX > this.aspect + size) this.leafActive = false;
     }
-    return audio.settling || this.fishSurge > 0 || this.leafActive;
+    return audio.stirring || this.fishSurge > 0 || this.leafActive;
   }
 }

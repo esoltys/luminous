@@ -24,8 +24,8 @@ const MAX_BOULDERS = MAX_POOLS;
 export const MAX_FISH = 9;
 const GLINTS_PER_POOL = 3;
 const MAX_GLINTS = MAX_POOLS * GLINTS_PER_POOL;
-/** Ripples in flight at once; a new one replaces the oldest beyond this. */
-export const RIPPLE_POOL = 12;
+/** Ripples spreading at once; a new one replaces the oldest beyond this. */
+export const MAX_RIPPLES = 12;
 const RIPPLE_LIFE_S = 1.4;
 const RIPPLE_GROWTH = 1.7;
 
@@ -117,9 +117,10 @@ export class FishLadder {
   readonly fishTail = new Float32Array(MAX_FISH);
   /** Size multiplier, so the school isn't uniform. */
   readonly fishScale = new Float32Array(MAX_FISH);
-  /** Seconds into the current leap, and its length; `fishLeapS` is 0 while swimming. */
-  readonly fishLeapT = new Float32Array(MAX_FISH);
+  /** Length of the current leap in seconds; 0 while swimming. */
   readonly fishLeapS = new Float32Array(MAX_FISH);
+  /** Seconds into the current leap. */
+  private readonly fishLeapT = new Float32Array(MAX_FISH);
   private readonly fishFromX = new Float32Array(MAX_FISH);
   private readonly fishFromZ = new Float32Array(MAX_FISH);
   private readonly fishToX = new Float32Array(MAX_FISH);
@@ -139,13 +140,13 @@ export class FishLadder {
   readonly glintY = new Float32Array(MAX_GLINTS);
   readonly glintPool = new Int32Array(MAX_GLINTS);
 
-  readonly rippleX = new Float32Array(RIPPLE_POOL);
-  readonly rippleY = new Float32Array(RIPPLE_POOL);
-  readonly rippleZ = new Float32Array(RIPPLE_POOL);
+  readonly rippleX = new Float32Array(MAX_RIPPLES);
+  readonly rippleY = new Float32Array(MAX_RIPPLES);
+  readonly rippleZ = new Float32Array(MAX_RIPPLES);
   /** Seconds since the ripple started. */
-  readonly rippleAge = new Float32Array(RIPPLE_POOL);
+  readonly rippleAge = new Float32Array(MAX_RIPPLES);
   /** Starting brightness in (0, 1]; 0 marks a free slot. */
-  readonly rippleStrength = new Float32Array(RIPPLE_POOL);
+  readonly rippleStrength = new Float32Array(MAX_RIPPLES);
 
   /** The leaf's position; `leafActive` is false when none is drifting. */
   leafActive = false;
@@ -215,12 +216,20 @@ export class FishLadder {
 
     let leaping = false;
     for (let i = 0; i < this.fishCount; i++) if (this.fishLeapS[i] > 0) leaping = true;
-    return audio.settling || rippling || leaping || this.leafActive || this.glow > 0;
+    return audio.stirring || rippling || leaping || this.leafActive || this.glow > 0;
   }
 
   /** Middle of the notch in pool k's weir, in y. */
   notchCenter(k: number): number {
     return this.notchY[k] + NOTCH_WIDTH / 2;
+  }
+
+  /**
+   * Downstream end of pool k's open water: its weir's row for every pool but the bottom one,
+   * whose water runs to the front edge.
+   */
+  openWaterEnd(k: number): number {
+    return this.poolEnd[k] - (k < this.poolCount - 1 ? 1 : 0);
   }
 
   /** The pool whose water lies under `x`: the top pool upstream of the ladder, the bottom beyond it. */
@@ -242,7 +251,7 @@ export class FishLadder {
 
   private spawnRipple(x: number, y: number, z: number, strength: number): void {
     let slot = 0;
-    for (let i = 0; i < RIPPLE_POOL; i++) {
+    for (let i = 0; i < MAX_RIPPLES; i++) {
       if (this.rippleStrength[i] === 0) {
         slot = i;
         break;
@@ -383,7 +392,10 @@ export class FishLadder {
     }
   }
 
-  /** Starts salmon `i` leaping from where it waits: up a step, or (`clears` false) falling short. */
+  /**
+   * Starts salmon `i` leaping from where it waits: up a step, or (`clears` false) falling short.
+   * Only salmon below a step wait to leap; the top pool's swim off upstream instead.
+   */
   private startLeap(i: number, clears: boolean): void {
     const k = this.fishPool[i];
     const x = this.fishX[i];
@@ -441,14 +453,14 @@ export class FishLadder {
       // Faster mid-channel than near the banks.
       const lane = 1 - Math.abs(this.glintY[g] / RIVER_WIDTH - 0.5);
       this.glintX[g] += dx * lane;
-      const end = this.poolEnd[k] - (k < this.poolCount - 1 ? 1.5 : 0.5);
+      const end = this.openWaterEnd(k) - 0.5;
       if (this.glintX[g] > end) this.glintX[g] = this.poolStart[k] + 0.2;
     }
   }
 
   private moveRipples(dt: number, reducedMotion: boolean): boolean {
     let any = false;
-    for (let i = 0; i < RIPPLE_POOL; i++) {
+    for (let i = 0; i < MAX_RIPPLES; i++) {
       if (this.rippleStrength[i] === 0) continue;
       this.rippleAge[i] += dt;
       if (reducedMotion || this.rippleAge[i] >= RIPPLE_LIFE_S) this.rippleStrength[i] = 0;
@@ -542,6 +554,6 @@ export class FishLadder {
     this.startLeap(0, true);
     this.fishLeapT[0] = LEAP_S * 0.45;
     this.flyLeap(0, 0);
-    for (let i = 0; i < RIPPLE_POOL; i++) this.rippleStrength[i] = 0;
+    for (let i = 0; i < MAX_RIPPLES; i++) this.rippleStrength[i] = 0;
   }
 }
