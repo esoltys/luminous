@@ -36,8 +36,10 @@ const bashAvailable = process.platform !== "win32" || fs.existsSync(gitBashPath)
 
 type Scope = "frontend" | "backend" | "lean" | "actions";
 
+// All tests must invoke `ci-should-run.sh` through `runScopeCheck` so `bashExecutable`
+// (Git Bash on Windows, not bare `bash`/WSL) and `GITHUB_OUTPUT` cleanup are handled uniformly.
 function runScopeCheck(
-  scopes: Scope | Scope[],
+  scopes: Scope | Scope[] | (string & {}),
   envOverrides: Record<string, string>
 ): { stdout: string; githubOutput: string } {
   const scopeArgs = Array.isArray(scopes) ? scopes : [scopes];
@@ -50,6 +52,7 @@ function runScopeCheck(
     const stdout = execFileSync(bashExecutable, [scriptPath, ...scopeArgs], {
       cwd: root,
       encoding: "utf-8",
+      stdio: "pipe",
       env: {
         ...process.env,
         GITHUB_OUTPUT: tmpFile.replaceAll("\\", "/"),
@@ -153,11 +156,7 @@ describeWithBash("scripts/ci-should-run.sh: path-based CI scope filtering (#1824
 
   it("rejects unknown scope names upfront even on non-PR events", () => {
     expect(() =>
-      execFileSync("bash", [scriptPath, "invalid-scope"], {
-        cwd: root,
-        env: { ...process.env, GITHUB_EVENT_NAME: "push" },
-        stdio: "pipe",
-      })
+      runScopeCheck("invalid-scope", { GITHUB_EVENT_NAME: "push" })
     ).toThrow();
   });
 });
