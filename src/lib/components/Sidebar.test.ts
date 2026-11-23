@@ -447,4 +447,14 @@ describe("Sidebar.svelte - File Drag & Drop (#1888)", () => {
       expect(label).toHaveClass("text-xs", "font-medium");
     }
   });
+
+  it("reserves bottom dock space only when reserveDockSpace is true", async () => {
+    const { getByTestId, rerender } = render(Sidebar, {
+      props: { width: 256, reserveDockSpace: false },
+    });
+    expect(getByTestId("sidebar-dock-spacer")).not.toHaveClass("mb-24");
+
+    await rerender({ width: 256, reserveDockSpace: true });
+    expect(getByTestId("sidebar-dock-spacer")).toHaveClass("mb-24");
+  });
 });

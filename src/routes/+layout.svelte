@@ -56,6 +56,7 @@
     SIDEBAR_COLLAPSED_WIDTH_PX,
     PANEL_RESIZE_STEP_PX,
     PLAYER_DOCK_CONTENT_RESERVE_PX,
+    doesPlayerDockCoverLeft,
   } from "../lib/constants";
 
   let { children } = $props();
@@ -63,6 +64,9 @@
   // The floating PlayerBar dock renders only with a song, and never on Help. The same
   // condition drives the `pb-dock` bottom padding (app.css) every view uses to clear it.
   const dockVisible = $derived(!!playerStore.currentSong && navigationStore.activeTab !== "help");
+  const dockCoversSidebar = $derived(
+    dockVisible && doesPlayerDockCoverLeft(windowLayoutStore.viewportWidth, effectiveSidebarWidth),
+  );
 
   function handleDockPointerDown() {
     if (!windowLayoutStore.effectiveImmersiveMode) return;
@@ -570,7 +574,11 @@
                   transition:slide={{ axis: "x", duration: instantLayout ? 0 : PANEL_SLIDE_MS }}
                   class="h-full flex-shrink-0 flex overflow-hidden"
                 >
-                  <Sidebar width={effectiveSidebarWidth} resizing={isResizingSidebar} />
+                  <Sidebar
+                    width={effectiveSidebarWidth}
+                    resizing={isResizingSidebar}
+                    reserveDockSpace={dockCoversSidebar}
+                  />
 
                   <!-- Left Resize Handle: hidden while auto-collapsed — dragging
                      from a visually-64px rail would otherwise jump using the

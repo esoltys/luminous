@@ -21,8 +21,9 @@ export const VIEWPORT_EDGE_PADDING_PX = 10;
  * The floating PlayerBar dock's geometry, defined once. It sits on top of page
  * content whenever a song is loaded.
  *
- * - Height and inset are mirrored by the dock's `h-20` (PlayerBar.svelte) and
- *   `bottom-4` (routes/+layout.svelte) classes; playerDock.test.ts keeps them equal.
+ * - Height, inset, and max width are mirrored by the dock's `h-20` / `max-w-[1200px]`
+ *   (PlayerBar.svelte) and `bottom-4` (routes/+layout.svelte) classes; playerDock.test.ts
+ *   keeps them equal.
  * - Floating menus and modals clamp above PLAYER_DOCK_CLEARANCE_PX.
  * - Scrolling views pad their bottom by PLAYER_DOCK_CONTENT_RESERVE_PX (the clearance
  *   plus a gap) through the `pb-dock` utility, which reads the `--dock-content-inset`
@@ -34,9 +35,22 @@ export const VIEWPORT_EDGE_PADDING_PX = 10;
  */
 export const PLAYER_DOCK_HEIGHT_PX = 80;
 export const PLAYER_DOCK_INSET_PX = 16;
+export const PLAYER_DOCK_MAX_WIDTH_PX = 1200;
 const PLAYER_DOCK_CONTENT_GAP_PX = 16;
 export const PLAYER_DOCK_CLEARANCE_PX = PLAYER_DOCK_HEIGHT_PX + PLAYER_DOCK_INSET_PX;
 export const PLAYER_DOCK_CONTENT_RESERVE_PX = PLAYER_DOCK_CLEARANCE_PX + PLAYER_DOCK_CONTENT_GAP_PX;
+
+/**
+ * Returns true when the centered floating PlayerBar dock extends far enough left
+ * to overlap a left-anchored panel of `leftWidth` pixels.
+ */
+export function doesPlayerDockCoverLeft(viewportWidth: number, leftWidth: number): boolean {
+  const playbarLeft = Math.max(
+    PLAYER_DOCK_INSET_PX,
+    (viewportWidth - PLAYER_DOCK_MAX_WIDTH_PX) / 2,
+  );
+  return playbarLeft < leftWidth;
+}
 
 /** Sidebar width bounds (routes/+layout.svelte resize handle, Sidebar.svelte collapse threshold). */
 export const SIDEBAR_MIN_WIDTH_PX = 180;

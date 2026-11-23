@@ -43,7 +43,11 @@
     sidebarTopItemLayoutClass,
   } from "../utils/sidebarNav";
 
-  let { width = 256, resizing = false }: { width?: number; resizing?: boolean } = $props();
+  let {
+    width = 256,
+    resizing = false,
+    reserveDockSpace = false,
+  }: { width?: number; resizing?: boolean; reserveDockSpace?: boolean } = $props();
 
   let isCollapsed = $derived(width < SIDEBAR_MIN_WIDTH_PX);
   let showUpdateBadge = $derived(
@@ -499,8 +503,8 @@
     />
   {/if}
 
-  <!-- Bottom spacer for player bar -->
-  <div class:mb-24={!!playerStore.currentSong}></div>
+  <!-- Bottom spacer for player bar when it overlaps the sidebar -->
+  <div data-testid="sidebar-dock-spacer" class:mb-24={reserveDockSpace}></div>
 </aside>
 
 <style>
