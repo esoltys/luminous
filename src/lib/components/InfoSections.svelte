@@ -99,7 +99,7 @@
         {#if section.language}
           <div class="flex items-start justify-between gap-3">
             <span class="text-brand-text-secondary/60 shrink-0"
-              >{i18n.t("radio.languageLabel", {}, "Language")}</span
+              >{i18n.t("radio.languageFilter", {}, "Language")}</span
             >
             <span class="text-brand-text-primary text-right break-words min-w-0 capitalize"
               >{section.language}</span
