@@ -863,21 +863,17 @@ describe("PlayerStore (mocked listeners)", () => {
 
       expect(store.currentSongDisplayTitle).toBe("Groove Salad");
       expect(store.currentSongDisplaySubtitle).toBe("US");
-      expect(store.stationNowPlayingQuery).toBeNull();
 
       nowPlayingCallback?.({ payload: { artist: "Air", title: "Alone in Kyoto" } });
       expect(store.currentSongDisplayTitle).toBe("Alone in Kyoto");
       expect(store.currentSongDisplaySubtitle).toBe("Air · Groove Salad");
-      expect(store.stationNowPlayingQuery).toBe("Air Alone in Kyoto");
       expect(store.currentSong?.title).toBe("Groove Salad");
 
       nowPlayingCallback?.({ payload: { artist: null, title: "Live from the studio" } });
       expect(store.currentSongDisplaySubtitle).toBe("Groove Salad");
-      expect(store.stationNowPlayingQuery).toBe("Live from the studio");
 
       nowPlayingCallback?.({ payload: null });
       expect(store.currentSongDisplayTitle).toBe("Groove Salad");
-      expect(store.stationNowPlayingQuery).toBeNull();
     } finally {
       if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
     }

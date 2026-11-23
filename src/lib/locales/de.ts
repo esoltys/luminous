@@ -1753,7 +1753,6 @@ export const de = {
     trackSkippedRemoteToast: "„{title}“ konnte nicht abgespielt werden – {message}. Übersprungen.",
     stationOfflineToast: "„{title}“ – Sender offline.",
     liveBadge: "Live",
-    findInLibrary: "In der Mediathek suchen",
     onAirLabel: "Läuft gerade",
     openNothingPlayable: "Es wurden keine unterstützten Audiodateien zum Abspielen gefunden.",
     playSongFailed: "Dieser Titel konnte nicht abgespielt werden.",

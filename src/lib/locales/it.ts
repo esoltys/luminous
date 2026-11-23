@@ -1749,7 +1749,6 @@ export const it = {
     trackSkippedRemoteToast: "Impossibile riprodurre «{title}»: {message}. Brano saltato.",
     stationOfflineToast: "«{title}» — Stazione offline.",
     liveBadge: "Dal vivo",
-    findInLibrary: "Cerca nella libreria",
     onAirLabel: "In onda",
     openNothingPlayable: "Nessun file audio supportato da riprodurre.",
     playSongFailed: "Impossibile riprodurre questo brano.",
