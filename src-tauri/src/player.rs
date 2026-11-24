@@ -58,6 +58,79 @@ enum GaplessTargetKind {
     Queue,
 }
 
+/// Whether a playback failure should flag a song `unavailable = 1` in the DB.
+///
+/// - Remote server tracks (`WebDav`, `Subsonic`) use `Never`: they have URL/URI
+///   paths for which `Path::exists()` is always false, so a transient network or
+///   auth failure would otherwise get misread as "confirmed missing" and hide
+///   the song from library views (`unavailable = 0`); their availability is owned
+///   by server sync (mirroring `find_missing_song_ids` in `collection.rs`).
+/// - Live stations (`radio://` / stream sources) use `Always`: when offline they
+///   receive the same treatment as missing files, and `materialize_station`
+///   resets `unavailable = 0` on directory sync or explicit play.
+/// - Local files use `WhenMissingOnDisk`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UnavailableOnError {
+    /// Always flag (live internet radio stations that fail to open).
+    Always,
+    /// Flag only when the local file path no longer exists on disk.
+    WhenMissingOnDisk,
+    /// Never flag (remote server tracks whose availability is owned by server sync).
+    Never,
+}
+
+/// Per-track playback behaviour rules derived once from a [`Song`], replacing
+/// scattered `is_live_song` and `is_remote` branches across [`Player`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PlaybackProfile {
+    /// Restore the saved playback position on startup.
+    pub resumes_position: bool,
+    /// Track a 50% scrobble point and record play/skip stats.
+    pub scrobbles: bool,
+    /// Cue the track into the audio engine on startup restore.
+    pub cue_on_restore: bool,
+    /// Proactively generate waveform visualizer data in the background.
+    pub preloads_waveform: bool,
+    /// Apply loudness normalization / ReplayGain.
+    pub normalizes_loudness: bool,
+    /// Reopen a stopped stream from position 0 on resume instead of unpausing.
+    pub restart_on_resume: bool,
+    /// Accept ICY `StreamTitle` updates for `station_now_playing`.
+    pub accepts_stream_titles: bool,
+    /// Record station play history and prune unreferenced stations on start.
+    pub tracks_station_play: bool,
+    /// Signal the background-read runner to yield network bandwidth while streaming (#1785).
+    pub pauses_background_reads: bool,
+    /// How playback errors affect the song's `unavailable` flag.
+    pub unavailable_on_error: UnavailableOnError,
+}
+
+impl PlaybackProfile {
+    /// Derives the playback profile for `song` from its source, file type, and URI scheme.
+    pub(crate) fn for_song(song: &Song) -> Self {
+        let is_live = crate::audio::is_live_song(song);
+        let is_remote = song.source.is_remote();
+        Self {
+            resumes_position: !is_live,
+            scrobbles: !is_live,
+            cue_on_restore: !is_live,
+            preloads_waveform: !is_live && !is_remote,
+            normalizes_loudness: !is_live,
+            restart_on_resume: is_live,
+            accepts_stream_titles: is_live,
+            tracks_station_play: is_live,
+            pauses_background_reads: is_remote,
+            unavailable_on_error: if is_live {
+                UnavailableOnError::Always
+            } else if is_remote {
+                UnavailableOnError::Never
+            } else {
+                UnavailableOnError::WhenMissingOnDisk
+            },
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Restart-persistence helpers — `Player` owns 10 `app_state` keys (volume,
 // volume_safety_enabled, volume_safety_ceiling, shuffle_mode, repeat_mode,
@@ -299,7 +372,7 @@ impl Player {
                     restored_item_uuid = Some(uuid);
                 }
 
-                if !crate::audio::is_live_song(song) {
+                if PlaybackProfile::for_song(song).resumes_position {
                     if let Some(pos) = app_state_get_parsed::<u64>(&conn, "last_position_nanosec") {
                         restored_position_ns = pos;
                     }
@@ -388,10 +461,7 @@ impl Player {
                 (1.0, LoudnessGainSource::Disabled, None)
             };
 
-        let scrobble_point_nanosec = restored_song
-            .as_ref()
-            .filter(|s| !crate::audio::is_live_song(s))
-            .and_then(|s| s.length_nanosec.map(|ns| (ns as u64) / 2));
+        let scrobble_point_nanosec = restored_song.as_ref().and_then(Self::scrobble_point_for);
 
         let mut player = Self {
             _db: db,
@@ -430,7 +500,7 @@ impl Player {
                 engine.set_loudness_gain(loudness_gain);
                 // Live radio stations are restored without opening the stream
                 // until the user explicitly presses play (#2004).
-                if !crate::audio::is_live_song(&song) {
+                if PlaybackProfile::for_song(&song).cue_on_restore {
                     let _ = engine.cue(crate::audio::track_for(&song), restored_position_ns);
                 }
             }
@@ -790,6 +860,23 @@ impl Player {
         }
     }
 
+    /// Half-track scrobble threshold in nanoseconds, or `None` when the track
+    /// does not scrobble or has no known duration.
+    fn scrobble_point_for(song: &Song) -> Option<u64> {
+        if PlaybackProfile::for_song(song).scrobbles {
+            song.length_nanosec.map(|ns| (ns as u64) / 2)
+        } else {
+            None
+        }
+    }
+
+    /// Clears per-play ephemeral state when transitioning to a new track.
+    fn reset_track_ephemeral_state(&mut self) {
+        self.scrobbled = false;
+        self.click_reported_for_play = false;
+        self.station_now_playing = None;
+    }
+
     /// The single "start a track" sequence shared by `play_at_index`,
     /// `next_track`'s queue branch, and `on_gapless_transition`'s commit —
     /// scrobble point, current song/uuid/(index or queue-pop), loudness
@@ -806,16 +893,10 @@ impl Player {
         real_play: bool,
     ) -> Result<()> {
         let start_ns = song.beginning_nanosec.max(0) as u64;
-        let is_live = crate::audio::is_live_song(&song);
+        let profile = PlaybackProfile::for_song(&song);
 
-        self.scrobble_point_nanosec = if is_live {
-            None
-        } else {
-            song.length_nanosec.map(|ns| (ns as u64) / 2)
-        };
-        self.scrobbled = false;
-        self.click_reported_for_play = false;
-        self.station_now_playing = None;
+        self.scrobble_point_nanosec = Self::scrobble_point_for(&song);
+        self.reset_track_ephemeral_state();
 
         match kind {
             GaplessTargetKind::Replay => {
@@ -846,28 +927,14 @@ impl Player {
         self.apply_loudness_gain(&song).await;
         if let Some(ref ind) = self.remote_streaming_active {
             ind.store(
-                song.source.is_remote(),
+                profile.pauses_background_reads,
                 std::sync::atomic::Ordering::Relaxed,
             );
         }
         self.preload_upcoming_waveforms();
-        if is_live {
+        if profile.tracks_station_play {
             if let Ok(conn) = self._db.pool.get() {
-                // Only a real start counts as a play: restoring the last
-                // station at launch (`real_play == false`) must not move it
-                // up Recently Played.
-                if real_play {
-                    let _ = crate::radio_directory::record_station_play(
-                        &conn,
-                        song.id,
-                        crate::clock::unix_now(),
-                    );
-                }
-                let _ = crate::radio_directory::gc_unreferenced_stations(
-                    &conn,
-                    crate::radio_directory::DEFAULT_RECENT_STATION_TAIL,
-                    Some(song.id),
-                );
+                crate::radio_directory::note_station_started(&conn, song.id, real_play);
             }
         }
         self.persist_current_song().await;
@@ -919,18 +986,14 @@ impl Player {
         let db = Arc::clone(&self._db);
         let mut songs_to_preload = Vec::new();
 
-        if let Some(ref song) = self.current_song {
-            if !song.source.is_remote() && !crate::audio::is_live_song(song) {
+        let next_song = self.peek_next_natural().map(|t| t.song);
+        for song in [self.current_song.as_ref(), next_song.as_ref()]
+            .into_iter()
+            .flatten()
+        {
+            if PlaybackProfile::for_song(song).preloads_waveform {
                 if let Some(ref path_str) = song.path {
                     songs_to_preload.push((song.id, std::path::PathBuf::from(path_str)));
-                }
-            }
-        }
-
-        if let Some(target) = self.peek_next_natural() {
-            if !target.song.source.is_remote() && !crate::audio::is_live_song(&target.song) {
-                if let Some(ref path_str) = target.song.path {
-                    songs_to_preload.push((target.song.id, std::path::PathBuf::from(path_str)));
                 }
             }
         }
@@ -1060,7 +1123,7 @@ impl Player {
         song: &Song,
     ) -> (f32, LoudnessGainSource, Option<f32>) {
         // Loudness normalization and ReplayGain are never applied to live streams (#2002).
-        if settings.enabled && !crate::audio::is_live_song(song) {
+        if settings.enabled && PlaybackProfile::for_song(song).normalizes_loudness {
             let result = crate::loudness::compute_gain(
                 song.ebur128_integrated_loudness_lufs,
                 song.replaygain_track_gain,
@@ -1181,7 +1244,7 @@ impl Player {
 
     pub async fn resume(&self) -> Result<()> {
         if let Some(ref song) = self.current_song {
-            if crate::audio::is_live_song(song) {
+            if PlaybackProfile::for_song(song).restart_on_resume {
                 let audio = self.audio.lock().await;
                 if audio.current_state() == luminous_audio::EngineState::Stopped {
                     return audio.play(crate::audio::track_for(song), 0);
@@ -1200,7 +1263,7 @@ impl Player {
         let Some(song) = self
             .current_song
             .as_ref()
-            .filter(|s| s.id == track_id && crate::audio::is_live_song(s))
+            .filter(|s| s.id == track_id && PlaybackProfile::for_song(s).accepts_stream_titles)
         else {
             return false;
         };
@@ -1313,25 +1376,16 @@ impl Player {
 
         let mut flagged_unavailable = false;
         if let Some(song) = &self.current_song {
-            // Remote songs (WebDAV, OpenSubsonic) have URL/URI paths — `Path::exists()`
-            // always returns false for them, so a transient network/auth failure would
-            // otherwise get misread as "confirmed missing" and hide the song from every
-            // library view (which all filter on `unavailable = 0`). They're managed by
-            // their server sync instead, mirroring the same exemption in
-            // `find_missing_song_ids` (see collection.rs).
-            //
-            // Live stations (radio://) *do* get flagged `unavailable = 1` when offline so
-            // they receive the same treatment as missing files; `materialize_station` resets
-            // `unavailable = 0` on directory sync or explicit play from Discover/My Stations.
-            let should_flag_unavailable = if crate::audio::is_live_song(song) {
-                true
-            } else {
-                !song.source.is_remote()
-                    && song
-                        .path
-                        .as_deref()
-                        .map(|p| !std::path::Path::new(p).exists())
-                        .unwrap_or(false)
+            // See `UnavailableOnError` / `PlaybackProfile::for_song` for source-specific policy.
+            let should_flag_unavailable = match PlaybackProfile::for_song(song).unavailable_on_error
+            {
+                UnavailableOnError::Always => true,
+                UnavailableOnError::Never => false,
+                UnavailableOnError::WhenMissingOnDisk => song
+                    .path
+                    .as_deref()
+                    .map(|p| !std::path::Path::new(p).exists())
+                    .unwrap_or(false),
             };
             if should_flag_unavailable {
                 if let Ok(conn) = self._db.pool.get() {
@@ -2120,15 +2174,25 @@ impl Player {
             Some(idx) => (Some(idx + 1), self.virtual_len()),
             None => (None, self.virtual_len()),
         };
+        let state: crate::models::PlayState = audio.current_state().into();
+        let is_live = self
+            .current_song
+            .as_ref()
+            .is_some_and(crate::audio::is_live_song);
+        let can_seek = self.current_song.is_some() && !is_live;
+        let position_nanosec = if is_live && state == crate::models::PlayState::Stopped {
+            0
+        } else {
+            audio
+                .current_position_nanosec()
+                .saturating_sub(self.current_song_beginning_nanosec()) as i64
+        };
         PlaybackState {
-            state: audio.current_state().into(),
+            state,
             current_song: self.current_song.clone(),
             playlist_id: self.current_playlist_id,
             playlist_item_uuid: self.current_item_uuid.clone(),
-            position_nanosec: audio
-                .current_position_nanosec()
-                .saturating_sub(self.current_song_beginning_nanosec())
-                as i64,
+            position_nanosec,
             volume: audio.current_volume(),
             shuffle_mode: self.shuffle_mode,
             repeat_mode: self.repeat_mode,
@@ -2142,6 +2206,7 @@ impl Player {
             volume_safety: self.volume_safety,
             playback_speed: self.playback_speed,
             station_now_playing: self.station_now_playing.clone(),
+            can_seek,
         }
     }
 
@@ -2165,7 +2230,7 @@ impl Player {
         if self
             .current_song
             .as_ref()
-            .is_some_and(crate::audio::is_live_song)
+            .is_some_and(|s| !PlaybackProfile::for_song(s).scrobbles)
         {
             return None;
         }
@@ -2221,7 +2286,7 @@ impl Player {
             || self
                 .current_song
                 .as_ref()
-                .is_some_and(crate::audio::is_live_song)
+                .is_some_and(|s| !PlaybackProfile::for_song(s).scrobbles)
         {
             return None;
         }
@@ -4080,5 +4145,171 @@ mod tests {
         let _ = player.next_track().await;
         assert_eq!(player.current_index, Some(1));
         assert_eq!(player.current_song.as_ref().map(|s| s.id), Some(id2));
+    }
+
+    #[test]
+    fn playback_profile_covers_local_remote_and_live_sources() {
+        use crate::models::{FileType, SongSource};
+
+        let local_expected = PlaybackProfile {
+            resumes_position: true,
+            scrobbles: true,
+            cue_on_restore: true,
+            preloads_waveform: true,
+            normalizes_loudness: true,
+            restart_on_resume: false,
+            accepts_stream_titles: false,
+            tracks_station_play: false,
+            pauses_background_reads: false,
+            unavailable_on_error: UnavailableOnError::WhenMissingOnDisk,
+        };
+        let remote_expected = PlaybackProfile {
+            preloads_waveform: false,
+            pauses_background_reads: true,
+            unavailable_on_error: UnavailableOnError::Never,
+            ..local_expected
+        };
+        let live_expected = PlaybackProfile {
+            resumes_position: false,
+            scrobbles: false,
+            cue_on_restore: false,
+            preloads_waveform: false,
+            normalizes_loudness: false,
+            restart_on_resume: true,
+            accepts_stream_titles: true,
+            tracks_station_play: true,
+            pauses_background_reads: false,
+            unavailable_on_error: UnavailableOnError::Always,
+        };
+
+        let cases = [
+            (
+                "local file",
+                Song {
+                    source: SongSource::LocalFile,
+                    filetype: FileType::Flac,
+                    path: Some("/music/track.flac".to_string()),
+                    length_nanosec: Some(180_000_000_000),
+                    ..Song::default()
+                },
+                local_expected,
+            ),
+            (
+                "webdav remote",
+                Song {
+                    source: SongSource::WebDav,
+                    filetype: FileType::Mp3,
+                    path: Some("http://webdav.example/track.mp3".to_string()),
+                    length_nanosec: Some(180_000_000_000),
+                    ..Song::default()
+                },
+                remote_expected,
+            ),
+            (
+                "subsonic remote",
+                Song {
+                    source: SongSource::Subsonic,
+                    filetype: FileType::Flac,
+                    path: Some("subsonic://123".to_string()),
+                    length_nanosec: Some(180_000_000_000),
+                    ..Song::default()
+                },
+                remote_expected,
+            ),
+            (
+                "radio browser",
+                Song {
+                    source: SongSource::RadioBrowser,
+                    filetype: FileType::Stream,
+                    path: Some("radio://station-1".to_string()),
+                    length_nanosec: Some(180_000_000_000),
+                    ..Song::default()
+                },
+                live_expected,
+            ),
+            (
+                "stream source with http path",
+                Song {
+                    source: SongSource::Stream,
+                    filetype: FileType::Mp3,
+                    path: Some("http://icecast.example/live.mp3".to_string()),
+                    length_nanosec: Some(180_000_000_000),
+                    ..Song::default()
+                },
+                live_expected,
+            ),
+            (
+                "stream filetype alone",
+                Song {
+                    source: SongSource::Unknown,
+                    filetype: FileType::Stream,
+                    path: Some("http://example.com/stream".to_string()),
+                    length_nanosec: Some(180_000_000_000),
+                    ..Song::default()
+                },
+                live_expected,
+            ),
+            (
+                "radio uri path alone",
+                Song {
+                    source: SongSource::Unknown,
+                    filetype: FileType::Unknown,
+                    path: Some("radio://station-2".to_string()),
+                    length_nanosec: Some(180_000_000_000),
+                    ..Song::default()
+                },
+                live_expected,
+            ),
+        ];
+
+        for (label, song, expected) in &cases {
+            let profile = PlaybackProfile::for_song(song);
+            assert_eq!(profile, *expected, "case: {label}");
+            let expected_scrobble = if expected.scrobbles {
+                Some(90_000_000_000)
+            } else {
+                None
+            };
+            assert_eq!(
+                Player::scrobble_point_for(song),
+                expected_scrobble,
+                "scrobble point case: {label}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn get_state_reports_can_seek_and_zero_stopped_position_for_live_stream() {
+        let (_dir, db) = setup_test_db();
+        let db = Arc::new(db);
+        let audio = Arc::new(tokio::sync::Mutex::new(crate::audio::AudioEngine::new()));
+        let mut player = Player::new(db, audio);
+
+        // No current song -> can_seek is false.
+        let empty = player.get_state().await;
+        assert!(!empty.can_seek);
+
+        // Stopped live stream -> can_seek is false, position_nanosec is 0.
+        player.current_song = Some(Song {
+            id: 1,
+            source: crate::models::SongSource::Stream,
+            path: Some("https://icecast.example.com/live.mp3".to_string()),
+            beginning_nanosec: 500,
+            ..Song::default()
+        });
+        let live_state = player.get_state().await;
+        assert!(!live_state.can_seek);
+        assert_eq!(live_state.position_nanosec, 0);
+
+        // Local track -> can_seek is true.
+        player.current_song = Some(Song {
+            id: 2,
+            source: crate::models::SongSource::LocalFile,
+            filetype: crate::models::FileType::Flac,
+            path: Some("/music/track.flac".to_string()),
+            ..Song::default()
+        });
+        let local_state = player.get_state().await;
+        assert!(local_state.can_seek);
     }
 }

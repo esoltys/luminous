@@ -338,7 +338,7 @@
 
     <!-- Axis labels, positioned on the same scales as the plot. -->
     <div
-      class="absolute left-9 right-3 bottom-1 h-4 text-[9px] font-mono text-brand-text-secondary/70 pointer-events-none"
+      class="absolute left-9 right-3 bottom-1 h-4 text-[9px] font-mono text-brand-text-secondary pointer-events-none"
       aria-hidden="true"
     >
       {#each axisFreqs as f}
@@ -346,7 +346,7 @@
       {/each}
     </div>
     <div
-      class="absolute left-0 w-8 top-3 h-56 md:h-64 text-[9px] font-mono text-brand-text-secondary/70 pointer-events-none"
+      class="absolute left-0 w-8 top-3 h-56 md:h-64 text-[9px] font-mono text-brand-text-secondary pointer-events-none"
       aria-hidden="true"
     >
       {#each [ranges.gain_db.max, 0, ranges.gain_db.min] as g}

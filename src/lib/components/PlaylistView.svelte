@@ -742,8 +742,8 @@
       />
     </div>
   {:else}
-    <div class="py-12 text-center text-brand-text-primary/45 select-none">
-      <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-primary/30" />
+    <div class="py-12 text-center text-brand-text-secondary select-none">
+      <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary" />
       {#if capabilities.isQueue}
         {i18n.t("playlists.emptyQueueText")}
       {:else}
@@ -1128,9 +1128,9 @@
       </div>
     {/if}
   {:else}
-    <div class="flex-1 flex flex-col items-center justify-center text-brand-text-primary/60">
-      <ListMusic class="w-16 h-16 mb-4 text-brand-text-primary/30" />
-      <h2 class="text-lg font-bold text-brand-text-primary/80 mb-1">
+    <div class="flex-1 flex flex-col items-center justify-center text-brand-text-primary">
+      <ListMusic class="w-16 h-16 mb-4 text-brand-text-secondary" />
+      <h2 class="text-lg font-bold text-brand-text-primary mb-1">
         {i18n.t("playlists.noPlaylistsTitle")}
       </h2>
       <p class="text-sm">{i18n.t("playlists.noPlaylistsText")}</p>

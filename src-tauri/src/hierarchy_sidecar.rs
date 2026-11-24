@@ -554,6 +554,17 @@ pub fn init(app: &AppHandle) {
     state.hierarchy_sidecar.start_watching(app, &dir);
 }
 
+/// Spawns [`init`] on a dedicated OS thread so loading a slow network-share
+/// sidecar does not block app startup (#1312). Register after
+/// `tags::start_reconcile` so a reconcile it triggers writes back through the
+/// attached sidecar. Requires `AppState` to already be managed on `app`.
+pub fn spawn_init(app: &AppHandle, _state: &crate::AppState) {
+    let handle = app.clone();
+    let _ = std::thread::Builder::new()
+        .name("luminous-hierarchy-init".into())
+        .spawn(move || init(&handle));
+}
+
 /// Designates `dir` (which must be a watched folder) as the default library,
 /// or detaches with `None`. Linking adopts an existing sidecar — replacing the
 /// local hierarchy — or writes the local hierarchy out if there is none. A

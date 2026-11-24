@@ -317,14 +317,14 @@
                 {/if}
                 {#if cell.minutes > 0}
                   <span
-                    class="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] leading-none whitespace-nowrap text-brand-text-primary/70"
+                    class="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] leading-none whitespace-nowrap text-brand-text-primary"
                   >
                     {i18n.t("stats.minuteCount", { count: cell.minutes }, `${cell.minutes} min`)}
                   </span>
                 {/if}
               </div>
             </div>
-            <span class="text-[10px] text-brand-text-secondary/70">
+            <span class="text-[10px] text-brand-text-secondary">
               {dateFromKey(cell.date).toLocaleDateString(i18n.currentLocale, { weekday: "short" })}
             </span>
           </button>
@@ -333,7 +333,7 @@
     {:else if mode === "calendar"}
       <div class="mt-4">
         <div
-          class="grid grid-cols-7 gap-[3px] text-[10px] text-brand-text-secondary/70 leading-none mb-1"
+          class="grid grid-cols-7 gap-[3px] text-[10px] text-brand-text-secondary leading-none mb-1"
         >
           {#each calendarDayLabels as label, i (i)}
             <div class="text-center">{label}</div>
@@ -364,12 +364,12 @@
                       class="w-[28%] h-[28%] text-brand-text-primary drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]"
                     />
                   {:else if !cell.future}
-                    <span class="text-xs font-medium leading-none text-brand-text-primary/70"
+                    <span class="text-xs font-medium leading-none text-brand-text-primary"
                       >{dateFromKey(cell.date).getDate()}</span
                     >
                   {/if}
                   {#if !cell.future && cell.minutes > 0}
-                    <span class="text-[9px] leading-none text-brand-text-primary/60">
+                    <span class="text-[9px] leading-none text-brand-text-primary">
                       {i18n.t("stats.minuteCount", { count: cell.minutes }, `${cell.minutes} min`)}
                     </span>
                   {/if}
@@ -388,7 +388,7 @@
           class="flex-1 min-w-0 overflow-hidden"
           onmouseleave={() => (hovered = null)}
         >
-          <div class="flex gap-[3px] text-[10px] text-brand-text-secondary/70 leading-none mb-1">
+          <div class="flex gap-[3px] text-[10px] text-brand-text-secondary leading-none mb-1">
             {#each monthLabels as label, colIndex (colIndex)}
               <div class="w-[13px] shrink-0">{label}</div>
             {/each}
@@ -419,7 +419,7 @@
             {/each}
           </div>
         </div>
-        <div class="flex flex-col text-[10px] text-brand-text-secondary/70 leading-none shrink-0">
+        <div class="flex flex-col text-[10px] text-brand-text-secondary leading-none shrink-0">
           <div class="invisible mb-1" aria-hidden="true">&nbsp;</div>
           <div class="flex flex-col gap-[3px]">
             {#each dayLabels as label, i (i)}
@@ -434,7 +434,7 @@
       <span class="text-xs text-brand-text-secondary truncate min-w-0"
         >{displayCell ? cellLabel(displayCell) : ""}</span
       >
-      <div class="flex items-center gap-1.5 text-[10px] text-brand-text-secondary/70 shrink-0">
+      <div class="flex items-center gap-1.5 text-[10px] text-brand-text-secondary shrink-0">
         <span>{i18n.t("stats.heatmapLegendLess", {}, "Less")}</span>
         {#each LEVEL_OPACITY as opacity (opacity)}
           <div

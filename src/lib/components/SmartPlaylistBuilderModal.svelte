@@ -495,7 +495,7 @@
               ? i18n.t("smartPlaylistBuilder.editTitle")
               : i18n.t("smartPlaylistBuilder.createTitle")}
           </h2>
-          <p class="text-xs text-brand-text-secondary/70 text-pretty">
+          <p class="text-xs text-brand-text-secondary text-pretty">
             {i18n.t("smartPlaylistBuilder.subtitle")}
           </p>
         </div>
@@ -709,7 +709,7 @@
                 <button
                   type="button"
                   onclick={() => removeRule(rule.id)}
-                  class="text-brand-text-secondary/60 hover:text-brand-text-primary p-1 rounded-lg transition-colors"
+                  class="text-brand-text-secondary hover:text-brand-text-primary p-1 rounded-lg transition-colors"
                   title={i18n.t("smartPlaylistBuilder.removeRuleTooltip")}
                 >
                   <X class="w-4 h-4" />

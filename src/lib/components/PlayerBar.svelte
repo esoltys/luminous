@@ -546,7 +546,7 @@
               windowLayoutStore.exitImmersiveMode();
               navigationStore.viewAlbum(playerStore.currentSong?.album || "");
             }}
-            class="text-xs text-brand-text-secondary/70 truncate"
+            class="text-xs text-brand-text-secondary truncate"
             title={i18n.t("collection.filterByAlbum", { album: playerStore.currentSong.album })}
           >
             {playerStore.currentSong.album}
@@ -556,7 +556,7 @@
           <!-- The station's announced track: its artist and the station, not a library link (#2008). -->
           <span
             data-station-now-playing
-            class="text-xs text-brand-text-secondary/70 truncate"
+            class="text-xs text-brand-text-secondary truncate"
             title={playerStore.currentSongDisplaySubtitle}
           >
             {playerStore.currentSongDisplaySubtitle}
@@ -572,13 +572,13 @@
                   "",
               );
             }}
-            class="text-xs text-brand-text-secondary/70 truncate"
+            class="text-xs text-brand-text-secondary truncate"
             title={i18n.t("collection.filterByArtist", { artist: playerStore.currentSong.artist })}
           >
             {playerStore.currentSong.artist}
           </LinkButton>
         {:else}
-          <span class="text-xs text-brand-text-secondary/70 truncate">
+          <span class="text-xs text-brand-text-secondary truncate">
             {playerStore.currentSong ? i18n.t("collection.unknownArtist") : ""}
           </span>
         {/if}
@@ -610,7 +610,7 @@
               class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.shuffleMode !==
               'off'
                 ? 'text-brand-accent-text font-bold'
-                : 'text-brand-text-secondary/50'}"
+                : 'text-brand-text-secondary'}"
               title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
             >
               {#if shuffleTypeIcon(playerStore.shuffleMode)}
@@ -666,7 +666,7 @@
               class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !==
               'off'
                 ? 'text-brand-accent-text font-bold'
-                : 'text-brand-text-secondary/50'}"
+                : 'text-brand-text-secondary'}"
               title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
             >
               <Repeat class="w-4 h-4" />
@@ -696,7 +696,7 @@
 
       {#if !windowLayoutStore.isPlayerBarCompact}
         <div
-          class="relative flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60"
+          class="relative flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary"
         >
           <!-- Quality indicator badge (opens pipeline popover on click) -->
           <QualityBadge />

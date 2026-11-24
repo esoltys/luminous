@@ -119,7 +119,7 @@
   </div>
 
   <!-- Drag-and-drop file invitation cue -->
-  <div class="flex items-center gap-2 text-xs sm:text-sm text-brand-text-secondary/60 select-none">
+  <div class="flex items-center gap-2 text-xs sm:text-sm text-brand-text-secondary select-none">
     <UploadCloud class="w-4 h-4" />
     <span>{i18n.t("immersive.dropToPlay", {}, "Drop tracks anywhere to play")}</span>
   </div>

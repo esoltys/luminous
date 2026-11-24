@@ -89,7 +89,7 @@
       onkeydown={handleKeydown}
       {disabled}
       {placeholder}
-      class="flex-1 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 text-xs focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+      class="flex-1 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary text-xs focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
     />
     <button
       type="button"

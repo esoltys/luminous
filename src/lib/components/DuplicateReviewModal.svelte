@@ -319,7 +319,7 @@
             <span class="text-sm text-brand-text-secondary ml-2">
               • {currentGroup.artist}
               {#if currentGroup.album}
-                <span class="text-brand-text-secondary/80">({currentGroup.album})</span>
+                <span class="text-brand-text-secondary">({currentGroup.album})</span>
               {/if}
             </span>
           </div>
@@ -379,7 +379,7 @@
                       {/if}
                     </div>
 
-                    <div class="text-[10px] text-brand-text-secondary/70 truncate">
+                    <div class="text-[10px] text-brand-text-secondary truncate">
                       {i18n.t("curation.trackDisc", {
                         track: candidate.song.track || "—",
                         disc: candidate.song.disc || "1",
@@ -557,7 +557,7 @@
                         {/each}
                       </div>
                     {:else}
-                      <span class="text-[10px] text-brand-text-secondary/60 italic">
+                      <span class="text-[10px] text-brand-text-secondary italic">
                         {i18n.t("curation.noTags")}
                       </span>
                     {/if}

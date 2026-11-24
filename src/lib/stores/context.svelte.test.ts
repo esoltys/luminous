@@ -306,6 +306,7 @@ describe("contextStore", () => {
         source: "radio_browser",
         path: "radio://uuid-cfox",
         url: "https://www.cfox.com/",
+        isLive: true,
       }),
     };
     const view = await mount(() => stationSubject, { songEvents: () => true });

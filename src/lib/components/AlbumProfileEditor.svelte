@@ -504,7 +504,7 @@
             >
               <span>{i18n.t("sortOverrides.heading")}</span>
               <span
-                class="text-[10px] text-brand-text-secondary/70 group-open:rotate-180 transition-transform"
+                class="text-[10px] text-brand-text-secondary group-open:rotate-180 transition-transform"
                 >▼</span
               >
             </summary>
@@ -582,7 +582,7 @@
             {},
             "Add album background, liner notes, recording details, or reviews (Markdown links supported e.g. [Review](https://...))...",
           )}
-          class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none transition-colors"
+          class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none transition-colors"
         ></textarea>
       </div>
 
@@ -604,7 +604,7 @@
             {},
             "https://artist.com/album or www.artist.com/album",
           )}
-          class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+          class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
         />
       </div>
 
@@ -627,7 +627,7 @@
 
         {#if links.length === 0}
           <div
-            class="px-4 py-3 rounded-lg border border-dashed border-brand-border text-center text-xs text-brand-text-secondary/60"
+            class="px-4 py-3 rounded-lg border border-dashed border-brand-border text-center text-xs text-brand-text-secondary"
           >
             {i18n.t(
               "albumProfileEditor.noLinks",
@@ -669,7 +669,7 @@
                     type="text"
                     bind:value={link.handle_or_url}
                     placeholder={platformInfo.placeholder}
-                    class="w-full min-w-0 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs placeholder:text-brand-text-secondary/40 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+                    class="w-full min-w-0 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
                   />
                   <button
                     type="button"

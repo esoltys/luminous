@@ -951,7 +951,7 @@
         class="absolute group-hover:opacity-0 transition-opacity"
         title={i18n.t("playlists.notIncludedBadgeTooltip")}
       >
-        <EyeSlash class="w-3.5 h-3.5 text-brand-text-secondary/70" />
+        <EyeSlash class="w-3.5 h-3.5 text-brand-text-secondary" />
       </span>
     {:else if mode === "position"}
       <span

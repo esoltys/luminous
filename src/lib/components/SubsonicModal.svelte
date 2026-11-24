@@ -205,7 +205,7 @@
           <h2 class="text-base font-bold text-brand-text-primary truncate">
             {server ? i18n.t("settings.editSubsonicServer") : i18n.t("settings.addSubsonicServer")}
           </h2>
-          <p class="text-xs text-brand-text-secondary/70 truncate">
+          <p class="text-xs text-brand-text-secondary truncate">
             {i18n.t("settings.subsonicSubtitle")}
           </p>
         </div>

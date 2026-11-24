@@ -191,6 +191,47 @@ pub async fn sync_all_auto_playlists_and_notify(app: &tauri::AppHandle) -> Resul
     Ok(())
 }
 
+/// Starts dynamic-playlist and auto-playlist background reconciliation.
+///
+/// Requires `AppState` to already be managed on `app` (enforced by `_state`),
+/// because the spawned listeners and timers resolve `app.state::<AppState>()`.
+pub fn start_reconcile(app: &tauri::AppHandle, _state: &crate::AppState) {
+    use tauri::Listener;
+
+    // Keep every dynamic playlist's membership in line with its definition the
+    // moment the library or song stats change — additions from scans/tag edits
+    // and stat-driven moves (favourite/unfavourite, deep-cut played) all land
+    // immediately. `reconcile_and_sync` coalesces event bursts into at most one
+    // follow-up pass, and holds the playlists mutex only to apply.
+    let handle = app.clone();
+    for event in [
+        "library-changed",
+        "song-stats-changed",
+        crate::radio_directory::EVENT_RADIO_DIRECTORY_CHANGED,
+    ] {
+        let handle = handle.clone();
+        app.listen(event, move |_| {
+            tauri::async_runtime::spawn(reconcile_and_sync(handle.clone()));
+        });
+    }
+
+    // Relative-date rules ("played in the last 30 days") change with the clock
+    // alone, so also reconcile at startup and at each local midnight.
+    tauri::async_runtime::spawn(reconcile_each_day(handle));
+
+    // Rebuild curated-tag ("tag:") genre auto-playlists in the background once
+    // right after migrations run (see db.rs migration 19, #548), deferred so
+    // startup setup, window render, and initial playback requests proceed
+    // without lock contention (#1807).
+    let auto_sync_handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(STARTUP_AUTO_SYNC_DELAY).await;
+        if let Err(e) = sync_all_auto_playlists_and_notify(&auto_sync_handle).await {
+            log::error!("Failed to sync auto-playlists at startup: {e}");
+        }
+    });
+}
+
 /// Synchronizes all auto-playlists in the background cooperatively, ensuring user
 /// interactions and playback commands (`replace_queue`, `play_song`) take precedence
 /// and are never starved by background maintenance (#1807).

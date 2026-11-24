@@ -823,6 +823,29 @@ impl PlaylistFileWriter {
     }
 }
 
+/// Spawns [`PlaylistFileWriter`], wires the `library-changed` nudge listener,
+/// and attaches the writer to `playlists` (#2280).
+pub fn start(
+    app: &tauri::AppHandle,
+    db: Arc<crate::db::Database>,
+    playlists: &Arc<tokio::sync::Mutex<PlaylistManager>>,
+) {
+    use tauri::Listener;
+
+    let handle = app.clone();
+    match PlaylistFileWriter::spawn(db, move |report| announce(&handle, &report)) {
+        Ok(writer) => {
+            // The organizer and duplicate merges change songs under file-backed
+            // playlists without an edit of their own; their library change wakes
+            // the writer.
+            let nudger = writer.clone();
+            app.listen("library-changed", move |_| nudger.nudge());
+            playlists.blocking_lock().attach_file_sync(writer);
+        }
+        Err(e) => log::error!("Failed to start the playlist file writer: {e}"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::import_export::clean_path;

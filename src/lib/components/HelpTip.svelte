@@ -111,7 +111,7 @@
     ? ''
     : 'cursor-help'} focus-visible:outline focus-visible:outline-1 focus-visible:outline-brand-accent {children
     ? ''
-    : 'rounded-sm text-brand-text-secondary/50 hover:text-brand-text-secondary focus-visible:text-brand-text-secondary'} {className}"
+    : 'rounded-sm text-brand-text-secondary hover:text-brand-text-secondary focus-visible:text-brand-text-secondary'} {className}"
   onpointerenter={(e) => {
     if (e.pointerType === "mouse") show();
   }}

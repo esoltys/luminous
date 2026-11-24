@@ -1577,6 +1577,21 @@ pub fn record_station_play(conn: &Connection, song_id: i64, now: i64) -> Result<
     Ok(())
 }
 
+/// Records a live station play (when `real_play` is true) and prunes
+/// unreferenced station rows beyond the recent-station tail.
+pub fn note_station_started(conn: &Connection, song_id: i64, real_play: bool) {
+    // Only a real start counts as a play: silent commits (`real_play == false`)
+    // must not move the station up Recently Played.
+    if real_play {
+        if let Err(e) = record_station_play(conn, song_id, crate::clock::unix_now()) {
+            log::warn!("Failed to record station play for song {song_id}: {e}");
+        }
+    }
+    if let Err(e) = gc_unreferenced_stations(conn, DEFAULT_RECENT_STATION_TAIL, Some(song_id)) {
+        log::warn!("Failed to prune unreferenced stations for song {song_id}: {e}");
+    }
+}
+
 /// Lists the radio stations the user actually played, most recent first
 /// (#2005). A station that only has a row — saved, added, imported into a
 /// station list or pinned, but never played — isn't listed (#2279).
@@ -2815,6 +2830,63 @@ mod tests {
             })
             .unwrap();
         assert_eq!(lastplayed, None);
+    }
+
+    #[test]
+    fn note_station_started_records_play_only_when_real_and_gcs_unreferenced() {
+        let (_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+
+        let mut ids = Vec::new();
+        for i in 0..(DEFAULT_RECENT_STATION_TAIL + 2) {
+            let song = upsert_stream_station(
+                &conn,
+                &format!("http://ice.example/s{i}"),
+                Some(&format!("Station {i}")),
+                None,
+            )
+            .unwrap();
+            conn.execute(
+                "UPDATE songs SET mtime = ?1 WHERE id = ?2",
+                params![1_000 + i as i64, song.id],
+            )
+            .unwrap();
+            ids.push(song.id);
+        }
+
+        let oldest_id = ids[0];
+        let second_oldest_id = ids[1];
+
+        // A non-real start protects `oldest_id` and GCs excess unreferenced stations
+        // without stamping `lastplayed`.
+        note_station_started(&conn, oldest_id, false);
+        let lastplayed: Option<i64> = conn
+            .query_row(
+                "SELECT lastplayed FROM songs WHERE id = ?1",
+                [oldest_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(lastplayed, None);
+        let second_exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM songs WHERE id = ?1",
+                [second_oldest_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(second_exists, 0);
+
+        // A real start records `lastplayed` and keeps the station alive.
+        note_station_started(&conn, oldest_id, true);
+        let lastplayed: Option<i64> = conn
+            .query_row(
+                "SELECT lastplayed FROM songs WHERE id = ?1",
+                [oldest_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(lastplayed.is_some());
     }
 
     #[test]

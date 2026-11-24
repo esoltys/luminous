@@ -31,7 +31,7 @@
     <Button onclick={onGetStarted} variant="primary" size="md" class="w-full">
       {i18n.t("welcome.getStarted")}
     </Button>
-    <p class="text-xs text-brand-text-secondary/70 mt-5 leading-relaxed text-balance">
+    <p class="text-xs text-brand-text-secondary mt-5 leading-relaxed text-balance">
       {i18n.t("welcome.legalPrefix")}
       <button
         onclick={() => openExternalUrl(legalDocUrl("terms", i18n.currentLocale))}

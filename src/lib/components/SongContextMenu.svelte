@@ -332,7 +332,7 @@
     >
       {#snippet children()}
         {#if playlistsStore.customPlaylists.length === 0}
-          <div class="px-3 py-1.5 text-brand-text-secondary/60 italic select-none">
+          <div class="px-3 py-1.5 text-brand-text-secondary italic select-none">
             {i18n.t("playlists.contextMenuNoCustomPlaylists", {}, "No custom playlists")}
           </div>
         {:else}

@@ -52,6 +52,7 @@ pub mod organizer;
 pub mod paths;
 pub mod picard;
 pub mod pins;
+mod playback_events;
 pub mod player;
 pub mod playlist;
 pub mod provenance;
@@ -339,16 +340,6 @@ fn with_webview2_remote_debugging(current: &str, port: u16) -> String {
     }
 }
 
-async fn sync_eq_to_audio_device(app: &tauri::AppHandle, audio: &Arc<Mutex<AudioEngine>>) -> bool {
-    if let Some(app_state) = app.try_state::<AppState>() {
-        let device_name = audio.lock().await.output_info().device_name;
-        return commands::equalizer::sync_device_equalizer(app, &app_state, device_name)
-            .await
-            .is_some();
-    }
-    false
-}
-
 /// Polls for OS default output device changes while idle/paused so per-device
 /// EQ and the pipeline popover stay in sync even before playback resumes.
 fn spawn_device_eq_watcher(
@@ -528,353 +519,6 @@ fn spawn_position_tick_loop(
             }
         }
     });
-}
-
-/// Formats the OS window title for the current track and playback state.
-pub(crate) fn format_window_title(
-    song: Option<&crate::models::Song>,
-    is_playing: bool,
-    unknown_song: &str,
-    app_name: &str,
-) -> String {
-    match (song, is_playing) {
-        (Some(s), true) => {
-            let song_title = s.title.as_deref().unwrap_or("").trim();
-            let display_title = if song_title.is_empty() {
-                let fallback = unknown_song.trim();
-                if fallback.is_empty() {
-                    "Unknown Song"
-                } else {
-                    fallback
-                }
-            } else {
-                song_title
-            };
-            let artist = s.artist.as_deref().unwrap_or("").trim();
-            if artist.is_empty() {
-                format!("{display_title} - {app_name}")
-            } else {
-                format!("{display_title} - {artist} - {app_name}")
-            }
-        }
-        _ => app_name.to_string(),
-    }
-}
-
-/// Keeps the native OS window title in sync with the current track directly
-/// from the backend, ensuring taskbar and titlebar stay accurate even when
-/// the frontend window is minimized or occluded (#892, #1052, #2317).
-pub(crate) fn sync_window_title(
-    app: &tauri::AppHandle,
-    song: Option<&crate::models::Song>,
-    is_playing: bool,
-) {
-    if let Some(w) = app.get_webview_window("main") {
-        let app_name = if crate::remote_devtools_enabled() {
-            "Luminous Debug"
-        } else {
-            "Luminous"
-        };
-        let unknown_song = crate::native_labels::unknown_song_label();
-        let title = format_window_title(song, is_playing, &unknown_song, app_name);
-        let _ = w.set_title(&title);
-    }
-}
-
-/// Starts an Auto Continue top-up (#1235) when one is due. Spawned rather
-/// than awaited: the event loop holds the player lock here, and the top-up
-/// takes the playlists lock, which must never nest inside it.
-fn spawn_auto_continue_if_due(player: &Player, app: &tauri::AppHandle) {
-    if player.auto_continue_seed().is_some() {
-        tauri::async_runtime::spawn(crate::continue_mix::maybe_extend(app.clone()));
-    }
-}
-
-/// Reports the pending Radio Browser station click, if any, off the event loop
-/// so the network call never blocks it.
-fn spawn_station_click_report_if_pending(p: &mut player::Player, app: &tauri::AppHandle) {
-    let Some(uuid) = p.take_pending_station_click_uuid() else {
-        return;
-    };
-    let Some(app_state) = app.try_state::<AppState>() else {
-        return;
-    };
-    let db = app_state.db.clone();
-    tauri::async_runtime::spawn(async move {
-        if let Err(e) = commands::radio_directory::report_station_click_if_online(&db, uuid).await {
-            log::debug!("Radio Browser click report failed: {e}");
-        }
-    });
-}
-
-/// Tells the frontend which track the playing station announces (#2008), or
-/// `null` once it no longer announces one.
-fn emit_station_now_playing(
-    app: &tauri::AppHandle,
-    now_playing: Option<&crate::now_playing::StationNowPlaying>,
-) {
-    let _ = app.emit("station-now-playing", now_playing);
-}
-
-/// Spawns the OS thread that drains `AudioEngine`'s event channel and turns
-/// each `AudioEvent` into player-state transitions, OS media-session
-/// mirroring, and frontend events. A blocking OS thread rather than a Tokio
-/// task since it blocks on `rx.iter()`.
-fn spawn_audio_event_loop(
-    app_handle: tauri::AppHandle,
-    audio: Arc<Mutex<AudioEngine>>,
-    player: Arc<Mutex<Player>>,
-) {
-    std::thread::Builder::new()
-        .name("luminous-events".to_string())
-        .spawn(move || {
-            let rx = {
-                let engine = tauri::async_runtime::block_on(async { audio.lock().await });
-                engine.take_events()
-            };
-            let Some(rx) = rx else {
-                log::error!("Audio event stream was already taken; player events won't run");
-                return;
-            };
-
-            for event in rx.iter() {
-                log::trace!("Received audio event: {:?}", event);
-                let app = app_handle.clone();
-                let player = player.clone();
-                let audio = audio.clone();
-                tauri::async_runtime::block_on(async move {
-                    let mut p = player.lock().await;
-                    match event {
-                        crate::audio::AudioEvent::Playing { .. } => {
-                            p.reset_playback_errors();
-                            sync_eq_to_audio_device(&app, &audio).await;
-                            let state = p.get_state().await;
-                            if let Some(ref song) = p.current_song {
-                                if let Some(app_state) = app.try_state::<AppState>() {
-                                    app_state.scrobbler.on_now_playing(song).await;
-                                    app_state
-                                        .scrobbler
-                                        .on_playback_state_changed(
-                                            Some(song),
-                                            true,
-                                            state.position_nanosec,
-                                            state.station_now_playing.as_ref(),
-                                        )
-                                        .await;
-                                }
-                            }
-                            spawn_station_click_report_if_pending(&mut p, &app);
-                            sync_window_title(&app, p.current_song.as_ref(), true);
-                            let pipeline = {
-                                let a = audio.lock().await;
-                                p.get_pipeline_info(&a)
-                            };
-                            let _ = app.emit(
-                                "track-changed",
-                                serde_json::json!({
-                                    "song": p.current_song.clone(),
-                                    "pipeline": pipeline,
-                                }),
-                            );
-                            crate::media_session::mirror_state(&app, &state).await;
-                            let _ = app.emit("playback-state", state);
-                            spawn_auto_continue_if_due(&p, &app);
-                        }
-                        crate::audio::AudioEvent::Paused => {
-                            let state = p.get_state().await;
-                            if let Some(app_state) = app.try_state::<AppState>() {
-                                app_state
-                                    .scrobbler
-                                    .on_playback_state_changed(
-                                        p.current_song.as_ref(),
-                                        false,
-                                        state.position_nanosec,
-                                        state.station_now_playing.as_ref(),
-                                    )
-                                    .await;
-                            }
-                            sync_window_title(&app, p.current_song.as_ref(), false);
-                            crate::media_session::mirror_state(&app, &state).await;
-                            let _ = app.emit("playback-state", state);
-                        }
-                        crate::audio::AudioEvent::Stopped => {
-                            if p.clear_station_now_playing() {
-                                emit_station_now_playing(&app, None);
-                            }
-                            if let Some(app_state) = app.try_state::<AppState>() {
-                                app_state.scrobbler.on_playback_stopped().await;
-                            }
-                            let state = p.get_state().await;
-                            sync_window_title(&app, None, false);
-                            crate::media_session::mirror_state(&app, &state).await;
-                            let _ = app.emit("playback-state", state);
-                        }
-                        crate::audio::AudioEvent::TrackFinished { .. } => {
-                            let _ = p.on_track_finished().await;
-                            let state = p.get_state().await;
-                            let is_playing = state.state == crate::models::PlayState::Playing;
-                            if !is_playing {
-                                if let Some(app_state) = app.try_state::<AppState>() {
-                                    app_state.scrobbler.on_playback_stopped().await;
-                                }
-                            }
-                            sync_window_title(&app, p.current_song.as_ref(), is_playing);
-                            crate::media_session::mirror_state(&app, &state).await;
-                            let _ = app.emit("playback-state", state);
-                        }
-                        crate::audio::AudioEvent::AboutToFinish { .. } => {
-                            // Prime the next track so the engine can
-                            // hand over gaplessly at the boundary.
-                            if let Err(e) = p.prepare_gapless_next().await {
-                                log::warn!("Gapless preload failed: {e}");
-                            }
-                        }
-                        crate::audio::AudioEvent::TrackTransitioned { track_id, .. } => {
-                            let _ = p.on_gapless_transition(track_id).await;
-                            let state = p.get_state().await;
-                            if let Some(ref song) = p.current_song {
-                                if let Some(app_state) = app.try_state::<AppState>() {
-                                    app_state.scrobbler.on_now_playing(song).await;
-                                    app_state
-                                        .scrobbler
-                                        .on_playback_state_changed(
-                                            Some(song),
-                                            true,
-                                            state.position_nanosec,
-                                            state.station_now_playing.as_ref(),
-                                        )
-                                        .await;
-                                }
-                            }
-                            spawn_station_click_report_if_pending(&mut p, &app);
-                            sync_window_title(&app, p.current_song.as_ref(), true);
-                            let pipeline = {
-                                let a = audio.lock().await;
-                                p.get_pipeline_info(&a)
-                            };
-                            let _ = app.emit(
-                                "track-changed",
-                                serde_json::json!({
-                                    "song": p.current_song.clone(),
-                                    "pipeline": pipeline,
-                                }),
-                            );
-                            crate::media_session::mirror_state(&app, &state).await;
-                            let _ = app.emit("playback-state", state);
-                            spawn_auto_continue_if_due(&p, &app);
-                        }
-                        // Never reaches the scrobbler or stats: the announced
-                        // track is display-only (#2008).
-                        crate::audio::AudioEvent::StreamTitle { track_id, title } => {
-                            if p.note_stream_title(track_id, &title) {
-                                let state = p.get_state().await;
-                                emit_station_now_playing(&app, state.station_now_playing.as_ref());
-                                if let Some(app_state) = app.try_state::<AppState>() {
-                                    app_state
-                                        .scrobbler
-                                        .on_playback_state_changed(
-                                            p.current_song.as_ref(),
-                                            state.state == crate::models::PlayState::Playing,
-                                            state.position_nanosec,
-                                            state.station_now_playing.as_ref(),
-                                        )
-                                        .await;
-                                }
-                                crate::media_session::mirror_state(&app, &state).await;
-                                let _ = app.emit("playback-state", state);
-                            }
-                        }
-                        crate::audio::AudioEvent::PipelineChanged => {
-                            sync_eq_to_audio_device(&app, &audio).await;
-                            let pipeline = {
-                                let a = audio.lock().await;
-                                p.get_pipeline_info(&a)
-                            };
-                            let _ = app.emit("audio-pipeline-changed", pipeline);
-                        }
-                        crate::audio::AudioEvent::VolumeChanged(vol) => {
-                            p.update_external_volume(vol);
-                            let state = p.get_state().await;
-                            crate::media_session::mirror_state(&app, &state).await;
-                            let _ = app.emit("playback-state", state);
-                        }
-                        // Exclusive/ASIO couldn't open; playback goes on through
-                        // shared output. The UI says why.
-                        crate::audio::AudioEvent::OutputFallback { requested, reason } => {
-                            log::warn!("Audio output fell back from {requested}: {reason:?}");
-                            let _ = app.emit(
-                                "audio-output-fallback",
-                                serde_json::json!({ "requested": requested, "reason": reason }),
-                            );
-                        }
-                        // The engine already parked the track paused (and sent
-                        // `Paused`); this is a device problem, not a bad track,
-                        // so nothing is skipped or counted as a playback error.
-                        crate::audio::AudioEvent::OutputUnavailable { message } => {
-                            log::error!("Audio output unavailable: {}", message);
-                            let _ = app.emit(
-                                "audio-output-unavailable",
-                                serde_json::json!({ "message": message }),
-                            );
-                        }
-                        crate::audio::AudioEvent::Error { message } => {
-                            log::error!("Audio engine error: {}", message);
-                            // A dropped station stream no longer announces anything.
-                            if p.clear_station_now_playing() {
-                                emit_station_now_playing(&app, None);
-                            }
-
-                            if p.try_heal_and_retry_current_track().await {
-                                // Stale-cased path (Linux/case-sensitive
-                                // filesystem quirk) — repointed and retried
-                                // in place, nothing to surface to the user.
-                                let _ = app.emit("library-changed", ());
-                            } else {
-                                let outcome = p.note_playback_error();
-
-                                if let Some(song) = &outcome.failed_song {
-                                    let display_message = if crate::audio::is_live_song(song) {
-                                        "Station offline".to_string()
-                                    } else {
-                                        message.clone()
-                                    };
-                                    let _ = app.emit(
-                                        "playback-error",
-                                        serde_json::json!({
-                                            "songId": song.id,
-                                            "title": song.title,
-                                            "path": song.path,
-                                            // Why it failed, e.g. a Subsonic
-                                            // server's "Wrong username or
-                                            // password" (#1163). Never holds a
-                                            // signed URL.
-                                            "message": display_message,
-                                        }),
-                                    );
-                                }
-                                if outcome.flagged_unavailable {
-                                    let _ = app.emit("library-changed", ());
-                                }
-
-                                if outcome.should_stop {
-                                    log::error!(
-                                        "Stopping playback after {} consecutive audio errors \
-                                         — likely a disconnected drive or dead playlist",
-                                        crate::player::MAX_CONSECUTIVE_PLAYBACK_ERRORS
-                                    );
-                                    let _ = p.stop().await;
-                                } else {
-                                    let _ = p.next_track().await;
-                                }
-                            }
-                            let state = p.get_state().await;
-                            let _ = app.emit("playback-state", state);
-                        }
-                    }
-                });
-            }
-        })
-        .expect("failed to spawn event thread");
 }
 
 /// Registers global OS media-key shortcuts (play/pause, next/prev track,
@@ -1090,24 +734,7 @@ pub fn run() {
 
             // A file association (or `luminous <file>` invocation) launched a
             // second instance; forward the opened paths to the running app.
-            let opened_paths: Vec<String> = args
-                .iter()
-                .skip(1)
-                .filter(|arg| {
-                    let path = std::path::Path::new(arg);
-                    if !path.is_file() {
-                        return false;
-                    }
-                    let ext = path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("")
-                        .to_ascii_lowercase();
-                    luminous_metadata::playlist::PlaylistFormat::from_path(path).is_some()
-                        || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str())
-                })
-                .cloned()
-                .collect();
+            let opened_paths = parse_open_file_args(&args);
 
             if !opened_paths.is_empty() {
                 let _ = app.emit("open-file-request", opened_paths);
@@ -1223,44 +850,11 @@ pub fn run() {
             }
             let playlists = Arc::new(Mutex::new(manager));
 
-            // Rebuild curated-tag ("tag:") genre auto-playlists in the background
-            // once right after migrations run (see db.rs migration 19, #548), deferred
-            // so startup setup, window render, and initial playback requests proceed
-            // without lock contention (#1807).
-            {
-                let handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(crate::playlist::STARTUP_AUTO_SYNC_DELAY).await;
-                    if let Err(e) =
-                        crate::playlist::sync_all_auto_playlists_and_notify(&handle).await
-                    {
-                        log::error!("Failed to sync auto-playlists at startup: {e}");
-                    }
-                });
-            }
-
             let self_writes = Arc::new(collection::SelfWriteTracker::new());
 
             // Edits to playlists kept in sync with a file in a library
             // folder are written there in the background (#2280).
-            {
-                let handle = app.handle().clone();
-                match crate::playlist::file_sync::PlaylistFileWriter::spawn(
-                    Arc::clone(&db),
-                    move |report| crate::playlist::file_sync::announce(&handle, &report),
-                ) {
-                    Ok(writer) => {
-                        // The organizer and duplicate merges change songs
-                        // under file-backed playlists without an edit of
-                        // their own; their library change wakes the writer.
-                        use tauri::Listener;
-                        let nudger = writer.clone();
-                        app.listen("library-changed", move |_| nudger.nudge());
-                        playlists.blocking_lock().attach_file_sync(writer);
-                    }
-                    Err(e) => log::error!("Failed to start the playlist file writer: {e}"),
-                }
-            }
+            playlist::file_sync::start(app.handle(), Arc::clone(&db), &playlists);
 
             let cover_manager = Arc::new(
                 CoverManager::new(Arc::clone(&db), crate::paths::resolve_app_data_dir(app))
@@ -1279,28 +873,7 @@ pub fn run() {
             stall_monitor::spawn();
 
             let args: Vec<String> = std::env::args().collect();
-            let startup_path = if args.len() > 1 {
-                let p = &args[1];
-                let path = std::path::Path::new(p);
-                if path.exists() && path.is_file() {
-                    let ext = path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("")
-                        .to_ascii_lowercase();
-                    if luminous_metadata::playlist::PlaylistFormat::from_path(path).is_some()
-                        || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str())
-                    {
-                        Some(p.clone())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+            let startup_path = parse_open_file_args(&args).into_iter().next();
 
             let watcher = Arc::new(parking_lot::Mutex::new(None));
 
@@ -1416,66 +989,7 @@ pub fn run() {
             // Self-healing sidecar artwork sweep resume (#1274): if the user has
             // opt-in folder artwork enabled, resume sweeping any un-exported cached
             // covers or artist images in the background.
-            let is_save_artwork_enabled = managed_state
-                .db
-                .pool
-                .get()
-                .map(|conn| {
-                    crate::commands::settings::load_ui_preferences(&conn).save_artwork_to_folders
-                })
-                .unwrap_or(false);
-
-            if is_save_artwork_enabled {
-                let db_clone = Arc::clone(&managed_state.db);
-                let cover_mgr = Arc::clone(&managed_state.cover_manager);
-                let covers_dir = cover_mgr.covers_dir().to_path_buf();
-                let app_handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    let has_pending = db_clone
-                        .pool
-                        .get()
-                        .map(|conn| {
-                            let has_albums = conn
-                                .query_row(
-                                    "SELECT 1 FROM songs
-                             WHERE art_automatic LIKE 'album-%'
-                               AND (source IN (1, 2) OR source IS NULL)
-                               AND album IS NOT NULL AND TRIM(album) != ''
-                               AND path IS NOT NULL
-                             LIMIT 1",
-                                    [],
-                                    |_| Ok(true),
-                                )
-                                .unwrap_or(false);
-                            let has_artists = conn
-                                .query_row(
-                                    "SELECT 1 FROM artist_profiles
-                             WHERE fetched_image_filename IS NOT NULL
-                                OR fetched_logo_filename IS NOT NULL
-                                OR fetched_background_filename IS NOT NULL
-                             LIMIT 1",
-                                    [],
-                                    |_| Ok(true),
-                                )
-                                .unwrap_or(false);
-                            has_albums || has_artists
-                        })
-                        .unwrap_or(false);
-
-                    if has_pending {
-                        log::info!("Resuming pending artwork sidecar sweep in background...");
-                        let _ = crate::commands::collection::sweep_artwork_to_folders_core(
-                            db_clone,
-                            cover_mgr,
-                            covers_dir,
-                            move |payload| {
-                                let _ = app_handle.emit("artwork-sweep-progress", payload);
-                            },
-                        )
-                        .await;
-                    }
-                });
-            }
+            covermanager::resume_pending_sweep(app.handle(), &managed_state);
 
             // Spawn position tick loop (Tokio). Spawned after app.manage()
             // above since it calls media_session::mirror_state(), which
@@ -1492,10 +1006,11 @@ pub fn run() {
             // app.manage() for the same reason as the tick loop above — its
             // handler also reaches app.state::<AppState>() via
             // media_session::mirror_state().
-            spawn_audio_event_loop(
+            playback_events::spawn(
                 app.handle().clone(),
                 Arc::clone(&managed_state.audio),
                 Arc::clone(&managed_state.player),
+                Arc::clone(&managed_state.scrobbler),
             );
 
             // Spawn loopback HTTP bridge server for assistant and MCP playback control
@@ -1510,60 +1025,11 @@ pub fn run() {
 
             register_media_shortcuts(app);
 
-            // Keep every dynamic playlist's membership in line with its
-            // definition the moment the library or song stats change —
-            // additions from scans/tag edits and stat-driven moves
-            // (favourite/unfavourite, deep-cut played) all land immediately.
-            // `reconcile_and_sync` coalesces event bursts into at most one
-            // follow-up pass, and holds the playlists mutex only to apply.
-            {
-                use tauri::Listener;
-                let handle = app.handle().clone();
-                for event in [
-                    "library-changed",
-                    "song-stats-changed",
-                    radio_directory::EVENT_RADIO_DIRECTORY_CHANGED,
-                ] {
-                    let handle = handle.clone();
-                    app.listen(event, move |_| {
-                        tauri::async_runtime::spawn(playlist::reconcile_and_sync(handle.clone()));
-                    });
-                }
-                // Relative-date rules ("played in the last 30 days") change
-                // with the clock alone, so also reconcile at startup and at
-                // each local midnight.
-                tauri::async_runtime::spawn(playlist::reconcile_each_day(handle));
-            }
-
-            // Keep the persisted Genres curation hierarchy (#545) in step
-            // with newly-seen or vanished tag names whenever the library
-            // changes (scans, tag edits, bulk merge/delete). Belt-and-braces
-            // alongside `get_tag_hierarchy`'s own reconcile-on-read: this is
-            // what lets an already-open Genres tab pick up a change without
-            // the user having to leave and reopen it.
-            {
-                use tauri::Listener;
-                let handle = app.handle().clone();
-                app.listen("library-changed", move |_| {
-                    tauri::async_runtime::spawn(tags::reconcile_hierarchy_and_notify(
-                        handle.clone(),
-                    ));
-                    tauri::async_runtime::spawn(tags::reconcile_artist_hierarchy_and_notify(
-                        handle.clone(),
-                    ));
-                });
-            }
-
-            // Load the shared hierarchy sidecar (#1312) off the main thread —
-            // the default library may be a slow network share. Registered
-            // after the `library-changed` reconcile listener so a reconcile
-            // it triggers is written back through the attached sidecar.
-            {
-                let handle = app.handle().clone();
-                let _ = std::thread::Builder::new()
-                    .name("luminous-hierarchy-init".into())
-                    .spawn(move || hierarchy_sidecar::init(&handle));
-            }
+            playlist::start_reconcile(app.handle(), &managed_state);
+            tags::start_reconcile(app.handle(), &managed_state);
+            // Registered after `tags::start_reconcile` so a reconcile it
+            // triggers writes back through the attached sidecar.
+            hierarchy_sidecar::spawn_init(app.handle(), &managed_state);
 
             // Startup is done: everything above (DB/migrations, playlist
             // bootstrap, watcher, tray, bridge server) has had a chance to
@@ -1958,6 +1424,22 @@ pub fn run() {
         .expect("error while running Luminous");
 }
 
+/// Filters CLI arguments (skipping `args[0]`, the executable path) to existing
+/// audio and playlist files that Luminous can open on cold start or via
+/// single-instance handoff.
+pub(crate) fn parse_open_file_args(args: &[String]) -> Vec<String> {
+    args.iter()
+        .skip(1)
+        .filter(|arg| {
+            let path = std::path::Path::new(arg);
+            path.is_file()
+                && (luminous_metadata::playlist::PlaylistFormat::from_path(path).is_some()
+                    || crate::collection::is_audio_file(path))
+        })
+        .cloned()
+        .collect()
+}
+
 #[cfg(test)]
 mod startup_rendering_workaround_tests {
     use super::*;
@@ -2091,62 +1573,54 @@ mod startup_rendering_workaround_tests {
             "--some-flag --remote-debugging-port=9225"
         );
     }
+}
+
+#[cfg(test)]
+mod open_file_args_tests {
+    use super::parse_open_file_args;
 
     #[test]
-    fn test_format_window_title() {
-        let song = crate::models::Song {
-            title: Some("Starboy".to_string()),
-            artist: Some("The Weeknd".to_string()),
-            ..Default::default()
-        };
+    fn test_parse_open_file_args_filters_non_files_and_unsupported_extensions() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_open_file_args_")
+            .tempdir()
+            .unwrap();
 
-        // Paused / stopped / no song always revert to the app name.
-        assert_eq!(
-            format_window_title(Some(&song), false, "Chanson inconnue", "Luminous"),
-            "Luminous"
-        );
-        assert_eq!(
-            format_window_title(None, true, "Chanson inconnue", "Luminous Debug"),
-            "Luminous Debug"
-        );
+        let exe = dir.path().join("luminous.exe");
+        let audio = dir.path().join("track.flac");
+        let playlist = dir.path().join("mix.m3u8");
+        let text = dir.path().join("notes.txt");
+        let subdir = dir.path().join("album_dir");
+        std::fs::write(&exe, b"").unwrap();
+        std::fs::write(&audio, b"").unwrap();
+        std::fs::write(&playlist, b"").unwrap();
+        std::fs::write(&text, b"").unwrap();
+        std::fs::create_dir(&subdir).unwrap();
 
-        // Playing with title and artist.
-        assert_eq!(
-            format_window_title(Some(&song), true, "Chanson inconnue", "Luminous"),
-            "Starboy - The Weeknd - Luminous"
-        );
+        let missing = dir.path().join("missing.mp3");
 
-        // Playing with title and blank/missing artist.
-        let no_artist = crate::models::Song {
-            title: Some("Prelude".to_string()),
-            artist: Some("   ".to_string()),
-            ..Default::default()
-        };
-        assert_eq!(
-            format_window_title(Some(&no_artist), true, "Chanson inconnue", "Luminous"),
-            "Prelude - Luminous"
-        );
+        let args = vec![
+            exe.to_string_lossy().into_owned(),
+            "--verbose".to_string(),
+            subdir.to_string_lossy().into_owned(),
+            missing.to_string_lossy().into_owned(),
+            text.to_string_lossy().into_owned(),
+            audio.to_string_lossy().into_owned(),
+            playlist.to_string_lossy().into_owned(),
+        ];
 
-        // Playing with missing/whitespace title uses localized fallback.
-        let untitled = crate::models::Song {
-            title: Some("   ".to_string()),
-            artist: Some("Daft Punk".to_string()),
-            ..Default::default()
-        };
         assert_eq!(
-            format_window_title(Some(&untitled), true, "Chanson inconnue", "Luminous"),
-            "Chanson inconnue - Daft Punk - Luminous"
+            parse_open_file_args(&args),
+            vec![
+                audio.to_string_lossy().into_owned(),
+                playlist.to_string_lossy().into_owned(),
+            ]
         );
+    }
 
-        // Blank unknown_song fallback still falls back to English "Unknown Song".
-        let untitled_no_artist = crate::models::Song {
-            title: None,
-            artist: None,
-            ..Default::default()
-        };
-        assert_eq!(
-            format_window_title(Some(&untitled_no_artist), true, "   ", "Luminous Debug"),
-            "Unknown Song - Luminous Debug"
-        );
+    #[test]
+    fn test_parse_open_file_args_empty_or_exe_only() {
+        assert!(parse_open_file_args(&[]).is_empty());
+        assert!(parse_open_file_args(&["luminous".to_string()]).is_empty());
     }
 }

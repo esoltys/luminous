@@ -101,7 +101,7 @@
       class="relative z-10 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed
         {mode === m.value
         ? 'text-brand-accent-contrast'
-        : 'text-brand-text-secondary/70 hover:text-brand-text-primary'}"
+        : 'text-brand-text-secondary hover:text-brand-text-primary'}"
     >
       {i18n.t(m.labelKey)}
     </button>

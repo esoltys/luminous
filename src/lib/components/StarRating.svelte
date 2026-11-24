@@ -67,7 +67,7 @@
       type="button"
       disabled={rating <= 0}
       onclick={handleClear}
-      class="block text-brand-text-primary/50 hover:text-brand-text-primary transition-colors disabled:cursor-default disabled:pointer-events-none"
+      class="block text-brand-text-primary hover:text-brand-text-primary transition-colors disabled:cursor-default disabled:pointer-events-none"
       title={i18n.t("rating.clearTooltip")}
       aria-label={i18n.t("rating.clearTooltip")}
     >
@@ -86,7 +86,7 @@
       title={onRate ? i18n.t("rating.setTooltip", { value: hoverValue ?? star }) : undefined}
       aria-label={i18n.t("rating.setTooltip", { value: star })}
     >
-      <Star class="{starClass} text-brand-text-primary/50" />
+      <Star class="{starClass} text-brand-text-primary" />
       {#if fillFraction(star) > 0}
         <span
           class="absolute inset-0 overflow-hidden pointer-events-none"

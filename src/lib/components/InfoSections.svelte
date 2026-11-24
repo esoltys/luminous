@@ -67,7 +67,7 @@
 <!-- A container, not a viewport query: this sits in the 288px sidebar and in the wide center pane. -->
 <div class="@container space-y-6 text-xs">
   {#if view.offline}
-    <p class="text-brand-text-secondary/60">{i18n.t("playerBar.contextOffline")}</p>
+    <p class="text-brand-text-secondary">{i18n.t("playerBar.contextOffline")}</p>
   {/if}
 
   {#each sections as section (section.id)}
@@ -88,7 +88,7 @@
       <div class="space-y-2 text-xs">
         {#if section.country}
           <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary/60 shrink-0"
+            <span class="text-brand-text-secondary shrink-0"
               >{i18n.t("artistInfo.country", {}, "Country")}</span
             >
             <span class="text-brand-text-primary text-right break-words min-w-0"
@@ -98,7 +98,7 @@
         {/if}
         {#if section.language}
           <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary/60 shrink-0"
+            <span class="text-brand-text-secondary shrink-0"
               >{i18n.t("radio.languageFilter", {}, "Language")}</span
             >
             <span class="text-brand-text-primary text-right break-words min-w-0 capitalize"
@@ -121,7 +121,7 @@
               <button
                 type="button"
                 onclick={() => openExternalUrl(url)}
-                class="inline-flex items-center text-brand-text-secondary/60 hover:text-brand-accent transition-colors ml-0.5 p-0.5"
+                class="inline-flex items-center text-brand-text-secondary hover:text-brand-accent transition-colors ml-0.5 p-0.5"
                 title={i18n.t("playerBar.wikipediaSectionLabel", {}, "Wikipedia")}
               >
                 <ExternalLink class="w-3 h-3" />
@@ -213,13 +213,13 @@
   {/each}
 
   {#if view.loading}
-    <div class="flex items-center gap-2 text-brand-text-secondary/60">
+    <div class="flex items-center gap-2 text-brand-text-secondary">
       <RefreshCw class="w-3.5 h-3.5 animate-spin" />
       <span>{i18n.t("playerBar.contextLoading", {}, "Fetching context…")}</span>
     </div>
   {:else if view.error}
     <div class="space-y-2">
-      <p class="text-brand-text-secondary/60">
+      <p class="text-brand-text-secondary">
         {i18n.t(
           "playerBar.contextFetchError",
           {},
@@ -242,7 +242,7 @@
             ? i18n.t("playerBar.contextEmptyTitleEntity", {}, "No details found yet")
             : i18n.t("playerBar.contextEmptyTitle", {}, "No details for this song yet")}
         </h3>
-        <p class="text-xs text-brand-text-secondary/80 leading-relaxed">
+        <p class="text-xs text-brand-text-secondary leading-relaxed">
           {i18n.t(
             "playerBar.contextEmptyDesc",
             {},
@@ -291,14 +291,14 @@
 
         {#if picardStore.available && canOpenPicard && song && displayFolderPath}
           <div
-            class="flex items-center gap-1.5 text-xs text-brand-text-secondary/70 min-w-0"
+            class="flex items-center gap-1.5 text-xs text-brand-text-secondary min-w-0"
             title={folderPath}
           >
             <Folder class="w-3.5 h-3.5 shrink-0" />
             <span class="truncate">{displayFolderPath}</span>
           </div>
         {:else if !picardStore.available}
-          <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
+          <p class="text-xs text-brand-text-secondary leading-relaxed">
             {i18n.t(
               "playerBar.contextPicardNotInstalled",
               {},
@@ -306,7 +306,7 @@
             )}
           </p>
         {:else if picardStore.available && !canOpenPicard}
-          <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
+          <p class="text-xs text-brand-text-secondary leading-relaxed">
             {i18n.t("picard.remoteNotSupportedTooltip")}
           </p>
         {/if}

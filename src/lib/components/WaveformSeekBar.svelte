@@ -405,7 +405,7 @@
 
   // Handle seek actions (click / drag)
   function seekToX(clientX: number) {
-    if (!canvas || !playerStore.currentSong || isLiveSong(playerStore.currentSong)) return;
+    if (!canvas || !playerStore.currentSong || !playerStore.canSeek) return;
     const rect = canvas.getBoundingClientRect();
     const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
     const pct = x / rect.width;
@@ -414,7 +414,7 @@
   }
 
   function handleMouseDown(e: MouseEvent) {
-    if (!playerStore.currentSong || isLiveSong(playerStore.currentSong)) return;
+    if (!playerStore.canSeek) return;
     isDragging = true;
     seekToX(e.clientX);
   }

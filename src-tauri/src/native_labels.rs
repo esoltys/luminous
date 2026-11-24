@@ -43,7 +43,7 @@ pub fn apply(app: &AppHandle, labels: &NativeLabels) {
         tauri::async_runtime::spawn(async move {
             let state = app_handle.state::<crate::AppState>();
             let snapshot = state.player.lock().await.get_state().await;
-            crate::sync_window_title(
+            crate::playback_events::sync_window_title(
                 &app_handle,
                 snapshot.current_song.as_ref(),
                 snapshot.state == crate::models::PlayState::Playing,

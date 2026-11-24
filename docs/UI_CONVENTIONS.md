@@ -55,6 +55,13 @@ Moved out of `AGENTS.md`; read this before any UI, animation, copy or locale cha
   they mean with an icon, wording, a sign or a shape change (filled vs hollow). Enforced by
   `bun run lint:state-colours`, with no allowlist (#1878).
 
+- **Readable text has no alpha**: artist names, counts, timestamps, labels and body copy use
+  `text-brand-text-primary` or `text-brand-text-secondary` at full strength, never `text-brand-text-secondary/70`
+  or an `opacity-*` on the text. The themes guarantee 4.5:1 for those two colours only; `/70` of secondary is
+  2.9:1 on Luminous light. Show hierarchy with size, weight or the primary-vs-secondary choice, and a resting
+  secondary / hover primary pair for controls. Enforced by `bun run lint:text-alpha` (#2344); the only
+  exemptions are `disabled:` variants and the synced-lyrics fade in `src/lib/utils/lyricsStyle.ts`.
+
 - **Context-aware completion messages**: End-of-queue or completion toasts must include the name of what
   finished (e.g., "Jazz Classics complete"), not generic text. The `playerStore.activeContextName` field
   carries this name; auto-playlists (Favourites, Recently Added, etc.) must pass their `displayName` to
