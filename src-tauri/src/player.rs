@@ -4277,4 +4277,39 @@ mod tests {
             );
         }
     }
+
+    #[tokio::test]
+    async fn get_state_reports_can_seek_and_zero_stopped_position_for_live_stream() {
+        let (_dir, db) = setup_test_db();
+        let db = Arc::new(db);
+        let audio = Arc::new(tokio::sync::Mutex::new(crate::audio::AudioEngine::new()));
+        let mut player = Player::new(db, audio);
+
+        // No current song -> can_seek is false.
+        let empty = player.get_state().await;
+        assert!(!empty.can_seek);
+
+        // Stopped live stream -> can_seek is false, position_nanosec is 0.
+        player.current_song = Some(Song {
+            id: 1,
+            source: crate::models::SongSource::Stream,
+            path: Some("https://icecast.example.com/live.mp3".to_string()),
+            beginning_nanosec: 500,
+            ..Song::default()
+        });
+        let live_state = player.get_state().await;
+        assert!(!live_state.can_seek);
+        assert_eq!(live_state.position_nanosec, 0);
+
+        // Local track -> can_seek is true.
+        player.current_song = Some(Song {
+            id: 2,
+            source: crate::models::SongSource::LocalFile,
+            filetype: crate::models::FileType::Flac,
+            path: Some("/music/track.flac".to_string()),
+            ..Song::default()
+        });
+        let local_state = player.get_state().await;
+        assert!(local_state.can_seek);
+    }
 }
