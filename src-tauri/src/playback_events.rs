@@ -69,49 +69,25 @@ impl From<(i64, Vec<i64>)> for AutoContinueSeed {
 /// releasing the `Player` lock so [`publish`] needs no `player` lock.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct PlaybackChange {
-    pub track_started: bool,
-    pub sync_device_eq: bool,
-    pub scrobble_action: ScrobbleAction,
+    track_started: bool,
+    sync_device_eq: bool,
+    scrobble_action: ScrobbleAction,
     /// `None` leaves the OS window title untouched; `Some(playing)` syncs it.
-    pub update_window_title: Option<bool>,
-    pub mirror_media_session: bool,
+    update_window_title: Option<bool>,
+    mirror_media_session: bool,
     /// `None` skips `station-now-playing`; `Some(payload)` emits it (including
     /// `Some(None)` to clear the UI when a station drops or stops).
-    pub station_now_playing: Option<Option<StationNowPlaying>>,
-    pub pipeline: Option<AudioPipelineInfo>,
-    pub emit_pipeline_changed: bool,
-    pub emit_playback_state: bool,
-    pub playback_error: Option<PlaybackErrorPayload>,
-    pub library_changed: bool,
-    pub output_fallback: Option<OutputFallbackPayload>,
-    pub output_unavailable: Option<String>,
-    pub state: Option<PlaybackState>,
-    pub pending_station_click_uuid: Option<String>,
-    pub auto_continue_seed: Option<AutoContinueSeed>,
-}
-
-impl PlaybackChange {
-    fn track_started(
-        state: PlaybackState,
-        pipeline: Option<AudioPipelineInfo>,
-        pending_station_click_uuid: Option<String>,
-        auto_continue_seed: Option<AutoContinueSeed>,
-        sync_device_eq: bool,
-    ) -> Self {
-        Self {
-            track_started: true,
-            sync_device_eq,
-            scrobble_action: ScrobbleAction::NowPlaying,
-            update_window_title: Some(true),
-            mirror_media_session: true,
-            pipeline,
-            emit_playback_state: true,
-            state: Some(state),
-            pending_station_click_uuid,
-            auto_continue_seed,
-            ..Default::default()
-        }
-    }
+    station_now_playing: Option<Option<StationNowPlaying>>,
+    pipeline: Option<AudioPipelineInfo>,
+    emit_pipeline_changed: bool,
+    emit_playback_state: bool,
+    playback_error: Option<PlaybackErrorPayload>,
+    library_changed: bool,
+    output_fallback: Option<OutputFallbackPayload>,
+    output_unavailable: Option<String>,
+    state: Option<PlaybackState>,
+    pending_station_click_uuid: Option<String>,
+    auto_continue_seed: Option<AutoContinueSeed>,
 }
 
 /// Side-effect boundary driven by [`publish`]: implemented by
@@ -186,16 +162,30 @@ impl PlaybackEventSink for TauriPlaybackSink {
         self.scrobbler.on_playback_stopped().await;
     }
 
+    /// Reports the pending Radio Browser station click off the event loop so
+    /// the network call never blocks it.
     fn spawn_station_click_report(&self, uuid: String) {
-        spawn_station_click_report_if_pending(&self.app, Some(uuid));
+        let Some(app_state) = self.app.try_state::<AppState>() else {
+            return;
+        };
+        let db = app_state.db.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(e) =
+                crate::commands::radio_directory::report_station_click_if_online(&db, uuid).await
+            {
+                log::debug!("Radio Browser click report failed: {e}");
+            }
+        });
     }
 
     fn sync_window_title(&self, song: Option<&Song>, is_playing: bool) {
         sync_window_title(&self.app, song, is_playing);
     }
 
+    /// Tells the frontend which track the playing station announces (#2008),
+    /// or `null` once it no longer announces one.
     fn emit_station_now_playing(&self, now_playing: Option<&StationNowPlaying>) {
-        emit_station_now_playing(&self.app, now_playing);
+        let _ = self.app.emit("station-now-playing", now_playing);
     }
 
     fn emit_track_changed(&self, song: Option<&Song>, pipeline: Option<&AudioPipelineInfo>) {
@@ -239,8 +229,10 @@ impl PlaybackEventSink for TauriPlaybackSink {
         );
     }
 
-    fn spawn_auto_continue(&self, seed: &AutoContinueSeed) {
-        spawn_auto_continue_if_due(&self.app, Some(seed));
+    /// Starts an Auto Continue top-up (#1235) asynchronously outside the
+    /// `player` lock so the top-up's `playlists` lock never nests inside it.
+    fn spawn_auto_continue(&self, _seed: &AutoContinueSeed) {
+        tauri::async_runtime::spawn(crate::continue_mix::maybe_extend(self.app.clone()));
     }
 }
 
@@ -291,40 +283,6 @@ pub(crate) fn sync_window_title(app: &AppHandle, song: Option<&Song>, is_playing
     }
 }
 
-/// Starts an Auto Continue top-up (#1235) when one is due. Spawned rather
-/// than awaited and always triggered outside the `player` lock so the top-up's
-/// `playlists` lock never nests inside `player`.
-fn spawn_auto_continue_if_due(app: &AppHandle, seed: Option<&AutoContinueSeed>) {
-    if seed.is_some() {
-        tauri::async_runtime::spawn(crate::continue_mix::maybe_extend(app.clone()));
-    }
-}
-
-/// Reports the pending Radio Browser station click, if any, off the event loop
-/// so the network call never blocks it.
-fn spawn_station_click_report_if_pending(app: &AppHandle, uuid: Option<String>) {
-    let Some(uuid) = uuid else {
-        return;
-    };
-    let Some(app_state) = app.try_state::<AppState>() else {
-        return;
-    };
-    let db = app_state.db.clone();
-    tauri::async_runtime::spawn(async move {
-        if let Err(e) =
-            crate::commands::radio_directory::report_station_click_if_online(&db, uuid).await
-        {
-            log::debug!("Radio Browser click report failed: {e}");
-        }
-    });
-}
-
-/// Tells the frontend which track the playing station announces (#2008), or
-/// `null` once it no longer announces one.
-fn emit_station_now_playing(app: &AppHandle, now_playing: Option<&StationNowPlaying>) {
-    let _ = app.emit("station-now-playing", now_playing);
-}
-
 async fn build_track_started(
     p: &mut Player,
     audio: &Arc<Mutex<AudioEngine>>,
@@ -337,13 +295,19 @@ async fn build_track_started(
     };
     let pending_station_click_uuid = p.take_pending_station_click_uuid();
     let auto_continue_seed = p.auto_continue_seed().map(AutoContinueSeed::from);
-    PlaybackChange::track_started(
-        state,
+    PlaybackChange {
+        track_started: true,
+        sync_device_eq,
+        scrobble_action: ScrobbleAction::NowPlaying,
+        update_window_title: Some(true),
+        mirror_media_session: true,
         pipeline,
+        emit_playback_state: true,
+        state: Some(state),
         pending_station_click_uuid,
         auto_continue_seed,
-        sync_device_eq,
-    )
+        ..Default::default()
+    }
 }
 
 /// Applies `event` to `Player`, captures snapshots needed by downstream
@@ -611,7 +575,9 @@ pub(crate) async fn publish<S: PlaybackEventSink>(sink: &S, mut change: Playback
 
     // 4. OS window title
     if let Some(is_playing) = change.update_window_title {
-        let song = change.state.as_ref().and_then(|s| s.current_song.as_ref());
+        let song = is_playing
+            .then(|| change.state.as_ref().and_then(|s| s.current_song.as_ref()))
+            .flatten();
         sink.sync_window_title(song, is_playing);
     }
 
@@ -1092,7 +1058,7 @@ mod tests {
                     station_now_playing: None,
                 },
                 RecordedCall::WindowTitle {
-                    song_id: Some(1),
+                    song_id: None,
                     is_playing: false,
                 },
                 RecordedCall::MediaSession {
@@ -1287,7 +1253,7 @@ mod tests {
             vec![
                 RecordedCall::ScrobbleStopped,
                 RecordedCall::WindowTitle {
-                    song_id: Some(1),
+                    song_id: None,
                     is_playing: false,
                 },
                 RecordedCall::StationNowPlaying(None),
@@ -1459,7 +1425,7 @@ mod tests {
             calls,
             vec![
                 RecordedCall::WindowTitle {
-                    song_id: Some(2),
+                    song_id: None,
                     is_playing: false,
                 },
                 RecordedCall::StationNowPlaying(None),
