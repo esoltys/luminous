@@ -123,6 +123,7 @@ async fn bench_unchanged_large_library_scan() {
 
     let mut discovery_samples = Vec::with_capacity(UNCHANGED_RUNS);
     let mut partition_samples = Vec::with_capacity(UNCHANGED_RUNS);
+    let mut missing_check_samples = Vec::with_capacity(UNCHANGED_RUNS);
     let mut dr_logs_samples = Vec::with_capacity(UNCHANGED_RUNS);
     let mut artwork_samples = Vec::with_capacity(UNCHANGED_RUNS);
     let mut total_samples = Vec::with_capacity(UNCHANGED_RUNS);
@@ -140,15 +141,17 @@ async fn bench_unchanged_large_library_scan() {
         );
         discovery_samples.push(report.discovery_ms);
         partition_samples.push(report.partition_ms);
+        missing_check_samples.push(report.missing_check_ms);
         dr_logs_samples.push(report.dr_logs_ms);
         artwork_samples.push(report.artwork_ms);
         total_samples.push(report.total_ms);
     }
 
     println!(
-        "[median] discovery_ms={} partition_ms={} dr_logs_ms={} artwork_ms={} total_ms={}",
+        "[median] discovery_ms={} partition_ms={} missing_check_ms={} dr_logs_ms={} artwork_ms={} total_ms={}",
         median(&mut discovery_samples),
         median(&mut partition_samples),
+        median(&mut missing_check_samples),
         median(&mut dr_logs_samples),
         median(&mut artwork_samples),
         median(&mut total_samples),
