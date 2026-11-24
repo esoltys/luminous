@@ -59,9 +59,19 @@ enum GaplessTargetKind {
 }
 
 /// Whether a playback failure should flag a song `unavailable = 1` in the DB.
+///
+/// - Remote server tracks (`WebDav`, `Subsonic`) use `Never`: they have URL/URI
+///   paths for which `Path::exists()` is always false, so a transient network or
+///   auth failure would otherwise get misread as "confirmed missing" and hide
+///   the song from library views (`unavailable = 0`); their availability is owned
+///   by server sync (mirroring `find_missing_song_ids` in `collection.rs`).
+/// - Live stations (`radio://` / stream sources) use `Always`: when offline they
+///   receive the same treatment as missing files, and `materialize_station`
+///   resets `unavailable = 0` on directory sync or explicit play.
+/// - Local files use `WhenMissingOnDisk`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UnavailableOnError {
-    /// Always flag (e.g. live internet radio stations that fail to open).
+    /// Always flag (live internet radio stations that fail to open).
     Always,
     /// Flag only when the local file path no longer exists on disk.
     WhenMissingOnDisk,
@@ -89,6 +99,8 @@ pub(crate) struct PlaybackProfile {
     pub accepts_stream_titles: bool,
     /// Record station play history and prune unreferenced stations on start.
     pub tracks_station_play: bool,
+    /// Signal the background-read runner to yield network bandwidth while streaming (#1785).
+    pub pauses_background_reads: bool,
     /// How playback errors affect the song's `unavailable` flag.
     pub unavailable_on_error: UnavailableOnError,
 }
@@ -107,6 +119,7 @@ impl PlaybackProfile {
             restart_on_resume: is_live,
             accepts_stream_titles: is_live,
             tracks_station_play: is_live,
+            pauses_background_reads: is_remote,
             unavailable_on_error: if is_live {
                 UnavailableOnError::Always
             } else if is_remote {
@@ -914,7 +927,7 @@ impl Player {
         self.apply_loudness_gain(&song).await;
         if let Some(ref ind) = self.remote_streaming_active {
             ind.store(
-                song.source.is_remote(),
+                profile.pauses_background_reads,
                 std::sync::atomic::Ordering::Relaxed,
             );
         }
@@ -1363,16 +1376,7 @@ impl Player {
 
         let mut flagged_unavailable = false;
         if let Some(song) = &self.current_song {
-            // Remote songs (WebDAV, OpenSubsonic) have URL/URI paths — `Path::exists()`
-            // always returns false for them, so a transient network/auth failure would
-            // otherwise get misread as "confirmed missing" and hide the song from every
-            // library view (which all filter on `unavailable = 0`). They're managed by
-            // their server sync instead, mirroring the same exemption in
-            // `find_missing_song_ids` (see collection.rs).
-            //
-            // Live stations (radio://) *do* get flagged `unavailable = 1` when offline so
-            // they receive the same treatment as missing files; `materialize_station` resets
-            // `unavailable = 0` on directory sync or explicit play from Discover/My Stations.
+            // See `UnavailableOnError` / `PlaybackProfile::for_song` for source-specific policy.
             let should_flag_unavailable = match PlaybackProfile::for_song(song).unavailable_on_error
             {
                 UnavailableOnError::Always => true,
@@ -4145,10 +4149,12 @@ mod tests {
             restart_on_resume: false,
             accepts_stream_titles: false,
             tracks_station_play: false,
+            pauses_background_reads: false,
             unavailable_on_error: UnavailableOnError::WhenMissingOnDisk,
         };
         let remote_expected = PlaybackProfile {
             preloads_waveform: false,
+            pauses_background_reads: true,
             unavailable_on_error: UnavailableOnError::Never,
             ..local_expected
         };
@@ -4161,6 +4167,7 @@ mod tests {
             restart_on_resume: true,
             accepts_stream_titles: true,
             tracks_station_play: true,
+            pauses_background_reads: false,
             unavailable_on_error: UnavailableOnError::Always,
         };
 
