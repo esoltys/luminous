@@ -8,7 +8,7 @@ import {
   deflectionForPercent,
   deflectionForRms,
   deflectionForVu,
-  referenceForTargetLufs,
+  referenceForLoudness,
 } from "./vuMeterEngine";
 
 /** Interleaved pairs of a constant-amplitude square wave, so RMS equals the amplitude. */
@@ -47,9 +47,24 @@ describe("deflection", () => {
   it("keeps music at the normalization target out of the red", () => {
     // -16 LUFS stereo is about -19 dBFS RMS per channel; the reference leaves headroom above that.
     const atTarget = 10 ** (-19 / 20);
-    expect(deflectionForRms(atTarget, referenceForTargetLufs(-16))).toBeLessThan(
+    expect(deflectionForRms(atTarget, referenceForLoudness(true, -16))).toBeLessThan(
       deflectionForVu(-3),
     );
+  });
+});
+
+describe("reference level", () => {
+  it("follows the target only while normalization is on", () => {
+    expect(referenceForLoudness(true, -16)).toBeLessThan(referenceForLoudness(true, -9));
+    expect(referenceForLoudness(false, -16)).toBe(referenceForLoudness(false, -23));
+  });
+
+  it("keeps a typical unnormalized master out of the red", () => {
+    const reference = referenceForLoudness(false, -16);
+    // -9 LUFS stereo is about -12 dBFS RMS per channel.
+    expect(deflectionForRms(10 ** (-12 / 20), reference)).toBeLessThan(deflectionForVu(-3));
+    // A very loud -6 LUFS master still stays below 0 VU on average.
+    expect(deflectionForRms(10 ** (-9 / 20), reference)).toBeLessThan(deflectionForVu(0));
   });
 });
 

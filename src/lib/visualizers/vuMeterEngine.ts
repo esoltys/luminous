@@ -22,8 +22,27 @@ const PROGRAM_HEADROOM_DB = 6;
  * music normalized to `targetLufs`. An approximation: K-weighting, which emphasises highs,
  * moves real music by another dB or two either way.
  */
-export function referenceForTargetLufs(targetLufs: number): number {
+function referenceForTargetLufs(targetLufs: number): number {
   return targetLufs - CHANNEL_SUM_DB + PROGRAM_HEADROOM_DB;
+}
+
+/**
+ * The loudness a typical track has when nothing normalizes it. Sampled from 18 tracks
+ * across 1981-2026 in a real library: integrated loudness from -15.4 to -6.0 LUFS, median
+ * about -9, mean -9.3. Most listeners never turn normalization on, so their meters have to
+ * work on whatever the masters are; calibrating to the -16 LUFS default target left a
+ * -7 LUFS master in the red two thirds of the time.
+ */
+const UNNORMALIZED_PROGRAM_LUFS = -9;
+
+/**
+ * The per-channel RMS level, in dBFS, of the 0 VU mark. With normalization on, music sits
+ * at the user's target and the meter is calibrated to it, so the red zone means louder than
+ * the target. Otherwise the meter is calibrated to a typical master, like a deck's fixed
+ * reference level.
+ */
+export function referenceForLoudness(normalizationEnabled: boolean, targetLufs: number): number {
+  return referenceForTargetLufs(normalizationEnabled ? targetLufs : UNNORMALIZED_PROGRAM_LUFS);
 }
 
 /** The 0 VU level for the backend's default normalization target (-16 LUFS). */

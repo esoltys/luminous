@@ -15,7 +15,7 @@ import {
   VuMeters,
   deflectionForPercent,
   deflectionForVu,
-  referenceForTargetLufs,
+  referenceForLoudness,
 } from "./vuMeterEngine";
 
 /** Panel width over height: two wide meters, a peak column between them and a label strip below. */
@@ -474,7 +474,7 @@ class VuMeterFullInstance implements VisualizerInstance {
     if (frame.scope) {
       this.meters.push(
         frame.scope.points,
-        referenceForTargetLufs(loudnessStore.targetLufs),
+        referenceForLoudness(loudnessStore.enabled, loudnessStore.targetLufs),
         frame.scope.truePeakDb,
       );
     } else if (!frame.playing) {
@@ -593,7 +593,7 @@ class VuMeterMiniInstance implements VisualizerInstance {
     if (frame.scope) {
       this.meters.push(
         frame.scope.points,
-        referenceForTargetLufs(loudnessStore.targetLufs),
+        referenceForLoudness(loudnessStore.enabled, loudnessStore.targetLufs),
         frame.scope.truePeakDb,
       );
     } else if (!frame.playing) {
