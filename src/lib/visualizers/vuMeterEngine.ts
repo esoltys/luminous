@@ -83,13 +83,14 @@ const MAX_SUBSTEP_MS = 8;
 const REST_EPSILON = 0.0005;
 
 /**
- * Peak lamp thresholds in dBTP, the frame's true peak. Real decks calibrate these against
- * 0 VU, but modern masters peak near full scale all the time, so the lamps are set to mean
- * something on a digital source: the +3 lamp marks a very hot peak and the +8 lamp an
- * over (a true peak at or above full scale).
+ * The +3 lamp lights when a frame's level (~33 ms RMS, the faster cousin of what the needle
+ * reads) reaches +3 VU. It follows level, not absolute peak: a limited master peaks within
+ * a dB of full scale in half its frames (measured: 51% at -1 dBFS and above), so any peak
+ * threshold below full scale left the lamp lit most of the time.
  */
-const PEAK_LAMP_LOW_DBTP = -4;
-const PEAK_LAMP_HIGH_DBTP = 0;
+const LAMP_LOW_VU = 3;
+/** The +8 lamp is an over indicator: the frame's true peak at or above full scale. */
+const LAMP_HIGH_DBTP = 0;
 /** A lit lamp stays at full brightness this long, then fades with the given time constant. */
 const LAMP_HOLD_MS = 250;
 const LAMP_FADE_TAU_MS = 140;
@@ -236,9 +237,11 @@ export class VuMeters {
     const { rmsL, rmsR, peak } = channelLevels(points);
     this.left.setTarget(deflectionForRms(rmsL, referenceDbfs));
     this.right.setTarget(deflectionForRms(rmsR, referenceDbfs));
+    const loudest = Math.max(rmsL, rmsR);
+    const frameVu = loudest > 0 ? 20 * Math.log10(loudest) - referenceDbfs : -Infinity;
+    if (frameVu >= LAMP_LOW_VU) this.lampLow.light();
     const peakDb = peakDbtp ?? (peak > 0 ? 20 * Math.log10(peak) : -Infinity);
-    if (peakDb >= PEAK_LAMP_LOW_DBTP) this.lampLow.light();
-    if (peakDb >= PEAK_LAMP_HIGH_DBTP) this.lampHigh.light();
+    if (peakDb >= LAMP_HIGH_DBTP) this.lampHigh.light();
   }
 
   /** Playback stopped or paused: the needles fall back to rest. */

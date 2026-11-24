@@ -186,6 +186,15 @@ describe("VuMeters", () => {
     expect(m.lampHigh.level).toBe(0);
   });
 
+  it("does not light the +3 lamp for a quiet frame with one full-scale-ish sample", () => {
+    const m = new VuMeters();
+    const points = square(0.05, 0.05);
+    points[10] = 0.99; // a lone spike: a limited master's ceiling, not a loud passage
+    m.push(points);
+    expect(m.lampLow.level).toBe(0);
+    expect(m.lampHigh.level).toBe(0);
+  });
+
   it("reads the true peak when the frame has one", () => {
     const m = new VuMeters();
     m.push(square(0.1, 0.1), undefined, 0.4); // quiet samples, but an inter-sample over
