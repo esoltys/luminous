@@ -114,6 +114,40 @@ pub fn classify_quality_tier(
     }
 }
 
+/// The equalizer fields projected into [`AudioPipelineInfo`]. Extracted so
+/// `playback_events::publish` can patch an already-captured pipeline snapshot
+/// after syncing per-device EQ without reacquiring the `Player` lock.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PipelineEqSnapshot {
+    pub enabled: bool,
+    pub mode: &'static str,
+    pub preamp_db: f32,
+    pub active_bands_count: usize,
+}
+
+impl PipelineEqSnapshot {
+    pub(crate) fn from_equalizer(eq: &Equalizer) -> Self {
+        let config = eq.config();
+        let mode = match config.mode {
+            EqMode::Graphic10 => "10-band Graphic",
+            EqMode::Parametric => "Parametric",
+        };
+        Self {
+            enabled: config.enabled,
+            mode,
+            preamp_db: config.preamp,
+            active_bands_count: eq.active_band_count(),
+        }
+    }
+
+    pub(crate) fn apply_to(&self, info: &mut AudioPipelineInfo) {
+        info.eq_enabled = self.enabled;
+        info.eq_mode = Some(self.mode.to_string());
+        info.eq_preamp_db = Some(self.preamp_db);
+        info.eq_active_bands_count = self.active_bands_count;
+    }
+}
+
 /// Snapshots the audio pipeline for the playing song (#1041), or `None`
 /// when nothing is loaded.
 pub fn pipeline_info(
@@ -191,11 +225,7 @@ fn assemble_pipeline_info(
         .or_else(|| song.channels.map(|c| c as u16));
     let input_aac_core_only = input.as_ref().is_some_and(|i| i.aac_core_only);
     let resample_rate = sample_rate.filter(|&r| r != output.sample_rate);
-    let config = eq.config();
-    let eq_mode = match config.mode {
-        EqMode::Graphic10 => "10-band Graphic",
-        EqMode::Parametric => "Parametric",
-    };
+    let eq_snapshot = PipelineEqSnapshot::from_equalizer(eq);
 
     AudioPipelineInfo {
         quality_tier: classify_quality_tier(
@@ -218,10 +248,10 @@ fn assemble_pipeline_info(
         resample_rate: resample_rate.map(|_| output.sample_rate),
         loudness_source,
         loudness_gain_db,
-        eq_enabled: config.enabled,
-        eq_mode: Some(eq_mode.to_string()),
-        eq_preamp_db: Some(config.preamp),
-        eq_active_bands_count: eq.active_band_count(),
+        eq_enabled: eq_snapshot.enabled,
+        eq_mode: Some(eq_snapshot.mode.to_string()),
+        eq_preamp_db: Some(eq_snapshot.preamp_db),
+        eq_active_bands_count: eq_snapshot.active_bands_count,
         limiter: "-1.0 dBTP True Peak limiter".to_string(),
         output_sample_rate: output.sample_rate,
         output_channels: output.channels,
