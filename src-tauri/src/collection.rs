@@ -148,6 +148,10 @@ pub struct ScanReport {
     pub remote_art_fetches: usize,
     pub discovery_ms: u128,
     pub partition_ms: u128,
+    pub partition_reconcile_ms: u128,
+    pub partition_dedup_ms: u128,
+    pub partition_stamps_ms: u128,
+    pub partition_stat_ms: u128,
     pub tag_read_ms: u128,
     pub missing_check_ms: u128,
     pub dr_logs_ms: u128,
@@ -802,27 +806,42 @@ impl CollectionScanner {
     pub fn merge_duplicate_songs_conn(conn: &rusqlite::Connection) -> Result<usize> {
         let mut stmt =
             conn.prepare("SELECT id, path, beginning_nanosec FROM songs WHERE path IS NOT NULL")?;
-        let rows: Vec<(i64, String, i64)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
-            .filter_map(|r| r.ok())
-            .collect();
-        drop(stmt);
+        let mut rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })?;
 
-        let mut groups: std::collections::HashMap<(String, i64), Vec<(i64, String)>> =
-            std::collections::HashMap::new();
-        for (id, path, beginning_nanosec) in rows {
-            groups
-                .entry((path.to_lowercase(), beginning_nanosec))
-                .or_default()
-                .push((id, path));
+        // Track the first row per (lowercased path, beginning_nanosec) without
+        // allocating a Vec for every unique song; only promote colliding keys
+        // into `dup_groups` so the common zero-duplicate case skips Vec allocs
+        // and opens no transaction.
+        let mut first_seen: HashMap<(String, i64), (i64, String)> = HashMap::new();
+        let mut dup_groups: HashMap<(String, i64), Vec<(i64, String)>> = HashMap::new();
+        while let Some(row) = rows.next().transpose()? {
+            let (id, path, beginning_nanosec) = row;
+            let key = (path.to_lowercase(), beginning_nanosec);
+            if let Some(group) = dup_groups.get_mut(&key) {
+                group.push((id, path));
+            } else if let Some(prev) = first_seen.remove(&key) {
+                dup_groups.insert(key, vec![prev, (id, path)]);
+            } else {
+                first_seen.insert(key, (id, path));
+            }
+        }
+        drop(rows);
+        drop(stmt);
+        drop(first_seen);
+
+        if dup_groups.is_empty() {
+            return Ok(0);
         }
 
         let mut merged = 0usize;
         let tx = conn.unchecked_transaction()?;
-        for mut entries in groups.into_values() {
-            if entries.len() < 2 {
-                continue;
-            }
+        for mut entries in dup_groups.into_values() {
             // Resolve the true on-disk path casing via directory walk.
             let real_path =
                 reconcile::resolve_case_insensitive_path(std::path::Path::new(&entries[0].1));
@@ -1489,17 +1508,21 @@ impl CollectionScanner {
             // (e.g. a library split/reorganization) before doing anything else,
             // so the per-file loop below and mark_missing_unavailable() both see
             // the corrected path instead of treating the move as delete+new-insert.
+            let reconcile_started = Instant::now();
             match reconcile::reconcile_moved_songs(&conn, &all_paths) {
                 Ok(0) => {}
                 Ok(n) => log::info!("Reconciled {n} moved song(s) to their new path"),
                 Err(e) => log::warn!("Failed to reconcile moved songs during scan: {e}"),
             }
+            report.partition_reconcile_ms = reconcile_started.elapsed().as_millis();
 
+            let dedup_started = Instant::now();
             match Self::merge_duplicate_songs_conn(&conn) {
                 Ok(0) => {}
                 Ok(n) => log::info!("Merged {n} duplicate song(s) during scan"),
                 Err(e) => log::warn!("Failed to merge duplicate songs during scan: {e}"),
             }
+            report.partition_dedup_ms = dedup_started.elapsed().as_millis();
 
             // Load every known (path -> FileStamp) pair in one query instead of
             // issuing a SELECT per file — for large libraries this turns
@@ -1507,7 +1530,12 @@ impl CollectionScanner {
             // Opened-file rows are left out so a file the user opened before
             // its folder was watched is re-read and upgraded to a library
             // song, even when the file itself hasn't changed (#1842).
-            let mut known_stamps: HashMap<String, FileStamp> = HashMap::new();
+            let stamps_started = Instant::now();
+            let mut known_stamps: HashMap<String, FileStamp> = if force {
+                HashMap::new()
+            } else {
+                HashMap::with_capacity(all_paths.len())
+            };
             if !force {
                 let mut stmt = conn.prepare(
                     "SELECT path, mtime, filesize FROM songs WHERE unavailable = 0 AND source != ?1",
@@ -1525,6 +1553,7 @@ impl CollectionScanner {
                     known_stamps.insert(row.0, row.1);
                 }
             }
+            report.partition_stamps_ms = stamps_started.elapsed().as_millis();
 
             // Read tags + resolve local art (and stat mtimes during partition)
             // in parallel across a bounded thread pool — these are disk-I/O/
@@ -1536,6 +1565,7 @@ impl CollectionScanner {
             // analysis of CPU. DB writes below stay on the single connection,
             // serialized in batched transactions, which also caps how many
             // decoded `Song`s are held in memory at once.
+            let stat_started = Instant::now();
             let scan_pool = rayon::ThreadPoolBuilder::new()
                 .num_threads(scan_thread_count())
                 .build()
@@ -1576,6 +1606,7 @@ impl CollectionScanner {
                     needs_update.push(path);
                 }
             }
+            report.partition_stat_ms = stat_started.elapsed().as_millis();
 
             report.partition_ms = partition_started.elapsed().as_millis();
             report.unchanged = scanned as usize;

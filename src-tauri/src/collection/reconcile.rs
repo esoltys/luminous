@@ -99,11 +99,26 @@ pub(crate) fn reconcile_moved_songs(
     all_paths: &[PathBuf],
 ) -> Result<usize> {
     let mut existing_paths_stmt = conn.prepare("SELECT path FROM songs WHERE path IS NOT NULL")?;
-    let existing_paths: std::collections::HashSet<String> = existing_paths_stmt
+    let mut existing_paths: HashSet<String> = HashSet::with_capacity(all_paths.len());
+    for row in existing_paths_stmt
         .query_map([], |row| row.get::<_, String>(0))?
         .filter_map(|r| r.ok())
-        .collect();
+    {
+        existing_paths.insert(row);
+    }
     drop(existing_paths_stmt);
+
+    // Borrow UTF-8 paths via `to_string_lossy()` so an unchanged scan does
+    // zero per-file String allocations when every path is already in `songs`.
+    let unmatched_paths: Vec<&PathBuf> = all_paths
+        .iter()
+        .filter(|path| !existing_paths.contains(path.to_string_lossy().as_ref()))
+        .collect();
+    drop(existing_paths);
+
+    if unmatched_paths.is_empty() {
+        return Ok(0);
+    }
 
     // Exact-cased paths this scan actually found on disk. Used below instead of
     // `Path::exists()` — on a case-insensitive-but-case-preserving filesystem
@@ -112,40 +127,8 @@ pub(crate) fn reconcile_moved_songs(
     // match a retagged album name) would never be recognized as needing a
     // repath, and the next scan would insert a second row for the same file
     // instead of updating the first.
-    let disk_paths: std::collections::HashSet<String> = all_paths
-        .iter()
-        .map(|p| p.to_string_lossy().to_string())
-        .collect();
-
-    let mut candidates: std::collections::HashMap<(String, i64), Vec<&PathBuf>> =
-        std::collections::HashMap::new();
-    let mut candidates_by_case_insensitive_path: std::collections::HashMap<String, Vec<&PathBuf>> =
-        std::collections::HashMap::new();
-
-    for path in all_paths {
-        let path_str = path.to_string_lossy().to_string();
-        if existing_paths.contains(&path_str) {
-            continue;
-        }
-        candidates_by_case_insensitive_path
-            .entry(path_str.to_lowercase())
-            .or_default()
-            .push(path);
-
-        if let (Some(filename), Ok(metadata)) = (
-            path.file_name().map(|f| f.to_string_lossy().to_lowercase()),
-            std::fs::metadata(path),
-        ) {
-            candidates
-                .entry((filename, metadata.len() as i64))
-                .or_default()
-                .push(path);
-        }
-    }
-
-    if candidates_by_case_insensitive_path.is_empty() && candidates.is_empty() {
-        return Ok(0);
-    }
+    let disk_paths: HashSet<std::borrow::Cow<'_, str>> =
+        all_paths.iter().map(|p| p.to_string_lossy()).collect();
 
     // Opened files outside the library are never orphans of a move: a device
     // copy repathed onto a newly scanned library file would leave that file
@@ -171,7 +154,7 @@ pub(crate) fn reconcile_moved_songs(
 
     let mut raw_orphans: Vec<RawOrphan> = Vec::new();
     for (id, path, filesize, art_automatic) in rows.flatten() {
-        if disk_paths.contains(&path) {
+        if disk_paths.contains(path.as_str()) {
             continue;
         }
         raw_orphans.push(RawOrphan {
@@ -180,6 +163,36 @@ pub(crate) fn reconcile_moved_songs(
             filesize,
             art_automatic,
         });
+    }
+    drop(disk_paths);
+
+    // Bail out before statting `unmatched_paths` when there are no missing DB
+    // rows to reconcile against (e.g. initial library scan or newly added files).
+    if raw_orphans.is_empty() {
+        return Ok(0);
+    }
+
+    let mut candidates: std::collections::HashMap<(String, i64), Vec<&PathBuf>> =
+        std::collections::HashMap::new();
+    let mut candidates_by_case_insensitive_path: std::collections::HashMap<String, Vec<&PathBuf>> =
+        std::collections::HashMap::new();
+
+    for path in unmatched_paths {
+        let path_str = path.to_string_lossy();
+        candidates_by_case_insensitive_path
+            .entry(path_str.to_lowercase())
+            .or_default()
+            .push(path);
+
+        if let (Some(filename), Ok(metadata)) = (
+            path.file_name().map(|f| f.to_string_lossy().to_lowercase()),
+            std::fs::metadata(path),
+        ) {
+            candidates
+                .entry((filename, metadata.len() as i64))
+                .or_default()
+                .push(path);
+        }
     }
 
     let mut reconciled = 0usize;
