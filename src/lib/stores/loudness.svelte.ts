@@ -8,7 +8,10 @@ import { createEventScope } from "../utils/eventScope";
 class LoudnessStore {
   enabled = $state(false);
   analysisRemaining = $state(0);
-  /** The Loudness Normalization target level in LUFS (the backend default until loaded). */
+  /**
+   * The Loudness Normalization target level in LUFS (the backend default until loaded). The
+   * Equalizer's Target Level knob binds to it, so it is the one copy the VU meter also reads.
+   */
   targetLufs = $state(-16);
   private initialized = false;
   private events = createEventScope(import.meta.hot);
@@ -40,10 +43,6 @@ class LoudnessStore {
 
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
-  }
-
-  setTargetLufs(targetLufs: number) {
-    this.targetLufs = targetLufs;
   }
 
   /** Stops listening to backend events. */

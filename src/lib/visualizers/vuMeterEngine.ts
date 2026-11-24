@@ -28,11 +28,10 @@ function referenceForTargetLufs(targetLufs: number): number {
 
 /**
  * The per-channel RMS level, in dBFS, that reads 0 VU when nothing normalizes the music.
- * Set by ear with a slider on a real library of mostly loud modern masters (stored
- * loudness -15.4 to -6.0 LUFS, median about -9), where -10 looked right. Most listeners
- * never turn normalization on, so their meters have to work on whatever the masters are;
- * calibrating to the -16 LUFS default target left a -7 LUFS master in the red two thirds
- * of the time.
+ * Most listeners never turn normalization on, so the meter has to work on whatever the
+ * masters are. This was chosen by ear on a real library of mostly loud modern masters
+ * (integrated loudness -15.4 to -6.0 LUFS, median about -9): a level derived from the
+ * -16 LUFS default target left a -7 LUFS master in the red two thirds of the time.
  */
 const UNNORMALIZED_REFERENCE_DBFS = -10;
 
@@ -44,9 +43,6 @@ const UNNORMALIZED_REFERENCE_DBFS = -10;
 export function referenceForLoudness(normalizationEnabled: boolean, targetLufs: number): number {
   return normalizationEnabled ? referenceForTargetLufs(targetLufs) : UNNORMALIZED_REFERENCE_DBFS;
 }
-
-/** The 0 VU level for the backend's default normalization target (-16 LUFS). */
-export const VU_REFERENCE_DBFS = referenceForTargetLufs(-16);
 
 /** The needle can swing a little past the end of the scale before it hits the pin. */
 export const NEEDLE_MAX = 1.03;
@@ -67,6 +63,8 @@ const SCALE: readonly (readonly [vu: number, position: number])[] = [
   [3, 0.852],
   [5, 1],
 ];
+/** The VU values of the printed marks, left to right: the scale's labelled positions. */
+export const SCALE_MARK_VUS: readonly number[] = SCALE.map(([vu]) => vu);
 /** Position gained per dB beyond the last mark, until the pin. */
 const OVERSCALE_PER_DB = 0.074;
 
@@ -124,7 +122,7 @@ export function deflectionForPercent(percent: number): number {
 }
 
 /** The needle position for an RMS amplitude (full scale = 1), with 0 VU at `referenceDbfs`. */
-export function deflectionForRms(rms: number, referenceDbfs = VU_REFERENCE_DBFS): number {
+export function deflectionForRms(rms: number, referenceDbfs: number): number {
   if (!(rms > 0)) return 0;
   return deflectionForVu(20 * Math.log10(rms) - referenceDbfs);
 }
@@ -181,11 +179,6 @@ export class Needle {
     }
   }
 
-  /** Signed velocity in needle units per second, for effects that follow motion. */
-  get speed(): number {
-    return this.velocity;
-  }
-
   get atRest(): boolean {
     return (
       Math.abs(this.position - this.target) < REST_EPSILON && Math.abs(this.velocity) < REST_EPSILON
@@ -230,7 +223,7 @@ export class VuMeters {
    * Take a scope frame's L/R pairs as the new level, with 0 VU at `referenceDbfs`. The
    * needles follow each channel's RMS; the lamps follow the louder channel's.
    */
-  push(points: readonly number[], referenceDbfs = VU_REFERENCE_DBFS): void {
+  push(points: readonly number[], referenceDbfs: number): void {
     const { rmsL, rmsR } = channelLevels(points);
     this.left.setTarget(deflectionForRms(rmsL, referenceDbfs));
     this.right.setTarget(deflectionForRms(rmsR, referenceDbfs));

@@ -11,7 +11,7 @@ import type {
 } from "./types";
 import {
   NEEDLE_MAX,
-  type Needle,
+  SCALE_MARK_VUS,
   VuMeters,
   deflectionForPercent,
   deflectionForVu,
@@ -29,31 +29,23 @@ const FONT_STACK = '"Fira Sans", system-ui, sans-serif';
 /** The needle's rest position in a still preview, per channel. */
 const PREVIEW_NEEDLES: readonly [number, number] = [0.5, 0.62];
 
-/** Where the scale marks go, as VU values: labelled marks first, then the unlabelled ones. */
+/** The text printed above a labelled mark: "−20" at the left stop, "5+" at the end, else the value. */
+function markLabel(vu: number): string {
+  if (vu === SCALE_MARK_VUS[0]) return `−${Math.abs(vu)}`;
+  if (vu === SCALE_MARK_VUS[SCALE_MARK_VUS.length - 1]) return `${vu}+`;
+  return String(Math.abs(vu));
+}
+
+/** The unlabelled ticks between the labelled marks, as VU values. */
+const MINOR_MARK_VUS = [-15, -9, -8, -6, -4, -2, -1, 1, 2, 4];
+
+/** Every tick on the scale: the labelled marks the engine's scale defines, then the minor ones. */
 const SCALE_MARKS: readonly { vu: number; label: string | null }[] = [
-  { vu: -20, label: "−20" },
-  { vu: -10, label: "10" },
-  { vu: -7, label: "7" },
-  { vu: -5, label: "5" },
-  { vu: -3, label: "3" },
-  { vu: 0, label: "0" },
-  { vu: 3, label: "3" },
-  { vu: 5, label: "5+" },
-  { vu: -15, label: null },
-  { vu: -9, label: null },
-  { vu: -8, label: null },
-  { vu: -6, label: null },
-  { vu: -4, label: null },
-  { vu: -2, label: null },
-  { vu: -1, label: null },
-  { vu: 1, label: null },
-  { vu: 2, label: null },
-  { vu: 4, label: null },
+  ...SCALE_MARK_VUS.map((vu) => ({ vu, label: markLabel(vu) })),
+  ...MINOR_MARK_VUS.map((vu) => ({ vu, label: null })),
 ];
 /** The percentage scale under the VU scale: modulation, where 100% is 0 VU. */
 const PERCENT_MARKS = [0, 20, 40, 60, 80, 100] as const;
-/** Points the red zone's band is drawn through, since it follows the scale's slight arch. */
-const BAND_SEGMENTS = 12;
 
 interface VuPalette {
   /** Window face: pale silver, tinted a little toward the theme accent. */
@@ -84,12 +76,16 @@ function buildPalette(colors: ThemeColors): VuPalette {
   };
 }
 
+/** How far under the scale the needle pivots, in half-spans: the larger, the less it tilts. */
+const DEPTH_PER_HALF_SPAN = 1.8;
+
 /**
  * One meter's geometry. The scale is printed flat and spread across the whole meter, as on
  * the deck: a mark at needle position `f` (0 = left stop, 1 = end of scale) sits at `x(f)`
- * on one horizontal line, so the left stop block and the red zone are level. The needle pivots far below the window, `depth` under
- * the scale, so it only tilts as it sweeps, and every mark leans along the needle that
- * would point at it: the fan of ticks in the reference.
+ * on the one horizontal line `baseY`, so the left stop block and the red zone are level.
+ * The needle pivots far below the window, `depth` under the scale, so it only tilts as it
+ * sweeps (about 29 degrees at the ends), and every mark leans along the needle that would
+ * point at it: the fan of ticks in the reference.
  */
 class Dial {
   readonly depth: number;
@@ -99,7 +95,7 @@ class Dial {
     readonly halfSpan: number,
     readonly baseY: number,
   ) {
-    this.depth = halfSpan * 1.8;
+    this.depth = halfSpan * DEPTH_PER_HALF_SPAN;
   }
 
   get pivotY(): number {
@@ -117,11 +113,6 @@ class Dial {
    */
   lean(f: number, dy: number): number {
     return (dy * (this.x(f) - this.cx)) / this.depth;
-  }
-
-  /** The y of the scale line; the same for every mark. */
-  y(_f: number): number {
-    return this.baseY;
   }
 
   /** The needle's tilt from vertical, in radians, when it points at position `f`. */
@@ -183,23 +174,6 @@ function roundRectPath(
   ctx.roundRect(x, y, w, h, r);
 }
 
-/** Strokes the stretch of a dial's scale from `f0` to `f1`, `dy` below the marks' base. */
-function strokeBand(
-  ctx: CanvasRenderingContext2D,
-  dial: Dial,
-  f0: number,
-  f1: number,
-  dy: number,
-): void {
-  ctx.beginPath();
-  for (let i = 0; i <= BAND_SEGMENTS; i++) {
-    const f = f0 + ((f1 - f0) * i) / BAND_SEGMENTS;
-    if (i === 0) ctx.moveTo(dial.x(f), dial.y(f) + dy);
-    else ctx.lineTo(dial.x(f), dial.y(f) + dy);
-  }
-  ctx.stroke();
-}
-
 /**
  * Fills the stretch of a dial's scale from `f0` to `f1` between `top` and `top + height`.
  * Each end is cut along the line of the tick at that position, continued down through the
@@ -224,7 +198,62 @@ function fillBand(
   ctx.fill();
 }
 
-/** One meter's static scale: marks, red zone, percentage dots and the "VU" legend. */
+/**
+ * The leftmost stop: a solid block as thick as the red zone and level with it, ending at the
+ * first tick's base. Both its ends lean along that tick, like the red zone's.
+ */
+function drawLeftStop(
+  ctx: CanvasRenderingContext2D,
+  p: VuPalette,
+  dial: Dial,
+  thickness: number,
+): void {
+  const x = dial.x(0);
+  const lean = dial.lean(0, -thickness);
+  ctx.fillStyle = p.ink;
+  ctx.beginPath();
+  ctx.moveTo(x - thickness, dial.baseY);
+  ctx.lineTo(x, dial.baseY);
+  ctx.lineTo(x + lean, dial.baseY + thickness);
+  ctx.lineTo(x - thickness + lean, dial.baseY + thickness);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/**
+ * The percentage scale: a dot per mark on a line under the scale, its number in a row
+ * beneath. Each dot and number sits on the line of the VU mark it corresponds to.
+ */
+function drawPercentScale(
+  ctx: CanvasRenderingContext2D,
+  p: VuPalette,
+  dial: Dial,
+  wh: number,
+): void {
+  const dotY = dial.baseY + wh * 0.1;
+  const labelY = dial.baseY + wh * 0.18;
+  ctx.fillStyle = p.ink;
+  ctx.font = `500 ${wh * 0.065}px ${FONT_STACK}`;
+  for (const pct of PERCENT_MARKS) {
+    const f = deflectionForPercent(pct);
+    ctx.beginPath();
+    ctx.arc(
+      dial.x(f) + dial.lean(f, dial.baseY - dotY),
+      dotY,
+      Math.max(1, wh * 0.012),
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    ctx.fillText(
+      pct === 100 ? "100%" : String(pct),
+      dial.x(f) + dial.lean(f, dial.baseY - labelY),
+      labelY,
+    );
+  }
+}
+
+/** One meter's static scale: marks, red zone, percentage scale and the "VU" legend. */
 function drawScale(
   ctx: CanvasRenderingContext2D,
   p: VuPalette,
@@ -250,7 +279,7 @@ function drawScale(
     const a = dial.angle(f);
     const length = wh * (major ? 0.14 : 0.1);
     const x = dial.x(f);
-    const y = dial.y(f);
+    const y = dial.baseY;
     ctx.lineWidth = Math.max(1, wh * (major ? 0.011 : 0.008));
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -259,44 +288,10 @@ function drawScale(
     // The numbers run in a straight row, each on the line of the tick beneath it.
     if (label) ctx.fillText(label, x + dial.lean(f, y - layout.numbersY), layout.numbersY);
   }
-  // The leftmost stop is a solid block, as thick as the red zone and level with it, ending
-  // at the first tick's base; both its ends lean along that tick, like the red zone's.
+  drawLeftStop(ctx, p, dial, bandHeight);
+  drawPercentScale(ctx, p, dial, wh);
+
   ctx.fillStyle = p.ink;
-  {
-    const x = dial.x(0);
-    const lean = dial.lean(0, -bandHeight);
-    ctx.beginPath();
-    ctx.moveTo(x - bandHeight, dial.baseY);
-    ctx.lineTo(x, dial.baseY);
-    ctx.lineTo(x + lean, dial.baseY + bandHeight);
-    ctx.lineTo(x - bandHeight + lean, dial.baseY + bandHeight);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // Percentage dots on a line under the scale, their numbers in a row beneath.
-  ctx.font = `500 ${wh * 0.065}px ${FONT_STACK}`;
-  for (const pct of PERCENT_MARKS) {
-    const f = deflectionForPercent(pct);
-    ctx.beginPath();
-    // Below the scale line, on the same line as the mark above.
-    const dotY = dial.y(f) + wh * 0.1;
-    const labelY = dial.baseY + wh * 0.18;
-    ctx.arc(
-      dial.x(f) + dial.lean(f, dial.y(f) - dotY),
-      dotY,
-      Math.max(1, wh * 0.012),
-      0,
-      Math.PI * 2,
-    );
-    ctx.fill();
-    ctx.fillText(
-      pct === 100 ? "100%" : String(pct),
-      dial.x(f) + dial.lean(f, dial.y(f) - labelY),
-      labelY,
-    );
-  }
-
   ctx.font = `600 ${wh * 0.14}px ${FONT_STACK}`;
   ctx.fillText(unitLabel, dial.cx, layout.win.y + wh * 0.82);
 }
@@ -470,29 +465,15 @@ function strokeNeedle(
   ctx.stroke();
 }
 
-/** Both needles' positions for this frame: live, or fixed in a preview. */
-function needlePositions(
-  meters: VuMeters,
-  preview: boolean,
-): readonly [Needle | number, Needle | number] {
-  return preview ? PREVIEW_NEEDLES : [meters.left, meters.right];
-}
-
-function positionOf(n: Needle | number): number {
-  return typeof n === "number" ? n : n.position;
-}
-
-/** The immersive stage: the K-550 meter panel with soft shadows for depth. */
-class VuMeterFullInstance implements VisualizerInstance {
-  private readonly meters = new VuMeters();
-  private palette!: VuPalette;
-  private labels = readLabels();
-  private layout: Layout | null = null;
-  // The static panel and the glass sheen, each rendered once per size/theme/language.
-  private base: HTMLCanvasElement | null = null;
-  private glass: HTMLCanvasElement | null = null;
-  private cacheKey = "";
-  private themeVersion = 0;
+/**
+ * What the full and mini meters share: the needles and lamps, the palette, and how scope
+ * frames and time drive them. A subclass only decides how to draw them.
+ */
+abstract class VuMeterBase implements VisualizerInstance {
+  protected readonly meters = new VuMeters();
+  protected palette!: VuPalette;
+  /** Bumped by every theme change, so a subclass's cached drawing knows to be redone. */
+  protected themeVersion = 0;
 
   setTheme(colors: ThemeColors): void {
     this.palette = buildPalette(colors);
@@ -511,12 +492,53 @@ class VuMeterFullInstance implements VisualizerInstance {
     return this.meters.step(dtMs, reducedMotion);
   }
 
+  /** Where needle `i` (0 = left, 1 = right) is drawn: live, or fixed in a still preview. */
+  protected needlePosition(i: 0 | 1, preview: boolean): number {
+    if (preview) return PREVIEW_NEEDLES[i];
+    return (i === 0 ? this.meters.left : this.meters.right).position;
+  }
+
+  abstract render(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    options: VisualizerRenderOptions,
+  ): void;
+}
+
+/**
+ * The immersive stage: the K-550 meter panel with soft shadows for depth. The panel and its
+ * glass sheen are drawn once into offscreen layers, so a frame only blits them and draws the
+ * needles and lamps, without allocating.
+ */
+class VuMeterFullInstance extends VuMeterBase {
+  private labels = readLabels();
+  private layout: Layout | null = null;
+  private base: HTMLCanvasElement | null = null;
+  private glass: HTMLCanvasElement | null = null;
+  // What the cached layers were drawn for; compared field by field on every frame.
+  private cachedWidth = 0;
+  private cachedHeight = 0;
+  private cachedDpr = 0;
+  private cachedTheme = -1;
+  private cachedLocale = "";
+
   /** Rebuild the cached layers if the size, theme, language or pixel ratio changed. */
   private ensureCache(width: number, height: number): Layout | null {
     const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
     if (this.labels.locale !== i18n.currentLocale) this.labels = readLabels();
-    const key = `${width}x${height}@${dpr}/${this.themeVersion}/${this.labels.locale}`;
-    if (key === this.cacheKey && this.layout && this.base && this.glass) return this.layout;
+    if (
+      this.layout &&
+      this.base &&
+      this.glass &&
+      this.cachedWidth === width &&
+      this.cachedHeight === height &&
+      this.cachedDpr === dpr &&
+      this.cachedTheme === this.themeVersion &&
+      this.cachedLocale === this.labels.locale
+    ) {
+      return this.layout;
+    }
     if (typeof document === "undefined") return null;
 
     const pad = Math.max(12, Math.min(32, Math.min(width, height) * 0.04));
@@ -542,7 +564,11 @@ class VuMeterFullInstance implements VisualizerInstance {
     this.base = base;
     this.glass = glass;
     this.layout = layout;
-    this.cacheKey = key;
+    this.cachedWidth = width;
+    this.cachedHeight = height;
+    this.cachedDpr = dpr;
+    this.cachedTheme = this.themeVersion;
+    this.cachedLocale = this.labels.locale;
     return layout;
   }
 
@@ -570,71 +596,52 @@ class VuMeterFullInstance implements VisualizerInstance {
     ctx.beginPath();
     ctx.rect(win.x, win.y, win.w, win.h);
     ctx.clip();
-    const positions = needlePositions(this.meters, options.preview);
     const thickness = Math.max(1.2, win.h * 0.012);
     const lift = win.h * 0.02;
     const tipY = win.y + win.h * 0.19;
-    strokeNeedle(ctx, p, layout.dials[0], positionOf(positions[0]), tipY, thickness, lift);
-    strokeNeedle(ctx, p, layout.dials[1], positionOf(positions[1]), tipY, thickness, lift);
+    const preview = options.preview;
+    strokeNeedle(ctx, p, layout.dials[0], this.needlePosition(0, preview), tipY, thickness, lift);
+    strokeNeedle(ctx, p, layout.dials[1], this.needlePosition(1, preview), tipY, thickness, lift);
     ctx.restore();
 
-    if (!options.preview) this.drawLamps(ctx, layout);
+    if (!preview) {
+      this.drawLamp(ctx, layout, this.meters.lampHigh.level, layout.lamps.yHigh);
+      this.drawLamp(ctx, layout, this.meters.lampLow.level, layout.lamps.yLow);
+    }
     ctx.drawImage(this.glass, -margin, -margin, cacheW, cacheH);
     ctx.restore();
   }
 
-  private drawLamps(ctx: CanvasRenderingContext2D, layout: Layout): void {
-    const { x, w, h, yHigh, yLow } = layout.lamps;
-    const lamps = [
-      [this.meters.lampHigh.level, yHigh],
-      [this.meters.lampLow.level, yLow],
-    ] as const;
-    for (const [level, y] of lamps) {
-      if (level <= 0) continue;
-      ctx.save();
-      ctx.shadowColor = this.palette.lampOn;
-      ctx.shadowBlur = h * 3 * level;
-      ctx.globalAlpha = level;
-      ctx.fillStyle = this.palette.lampOn;
-      roundRectPath(ctx, x - w / 2, y - h / 2, w, h, h * 0.3);
-      ctx.fill();
-      ctx.restore();
-    }
+  /** A lit peak lamp at height `y`, glowing and fading with its `level` (0 draws nothing). */
+  private drawLamp(ctx: CanvasRenderingContext2D, layout: Layout, level: number, y: number): void {
+    if (level <= 0) return;
+    const { x, w, h } = layout.lamps;
+    ctx.save();
+    ctx.shadowColor = this.palette.lampOn;
+    ctx.shadowBlur = h * 3 * level;
+    ctx.globalAlpha = level;
+    ctx.fillStyle = this.palette.lampOn;
+    roundRectPath(ctx, x - w / 2, y - h / 2, w, h, h * 0.3);
+    ctx.fill();
+    ctx.restore();
   }
 }
 
 /** The playbar slot: two tiny dials with shadowed needles, no text. */
-class VuMeterMiniInstance implements VisualizerInstance {
-  private readonly meters = new VuMeters();
-  private palette!: VuPalette;
+class VuMeterMiniInstance extends VuMeterBase {
   private dials: readonly [Dial, Dial] | null = null;
-  private dialsFor = "";
+  private dialsWidth = 0;
+  private dialsHeight = 0;
 
-  setTheme(colors: ThemeColors): void {
-    this.palette = buildPalette(colors);
-  }
-
-  push(frame: VisualizerFrame): void {
-    if (frame.scope) {
-      this.meters.push(frame.scope.points, currentReferenceDbfs());
-    } else if (!frame.playing) {
-      this.meters.rest();
-    }
-  }
-
-  step(dtMs: number, reducedMotion: boolean): boolean {
-    return this.meters.step(dtMs, reducedMotion);
-  }
-
-  private dialsFor_(width: number, height: number): readonly [Dial, Dial] {
-    const key = `${width}x${height}`;
-    if (!this.dials || this.dialsFor !== key) {
+  private dialsForSize(width: number, height: number): readonly [Dial, Dial] {
+    if (!this.dials || this.dialsWidth !== width || this.dialsHeight !== height) {
       const halfSpan = width * 0.21;
       this.dials = [
         new Dial(width * 0.25, halfSpan, height * 0.55),
         new Dial(width * 0.75, halfSpan, height * 0.55),
       ];
-      this.dialsFor = key;
+      this.dialsWidth = width;
+      this.dialsHeight = height;
     }
     return this.dials;
   }
@@ -659,21 +666,34 @@ class VuMeterMiniInstance implements VisualizerInstance {
     ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
     ctx.fillRect(0, height - 1, width, 1);
 
-    const dials = this.dialsFor_(width, height);
-    const positions = needlePositions(this.meters, options.preview);
-    for (let i = 0; i < 2; i++) {
-      // The full scale as a thin guide, with the red zone drawn over its end.
-      ctx.strokeStyle = p.ink;
-      ctx.globalAlpha = 0.45;
-      ctx.lineWidth = 1;
-      strokeBand(ctx, dials[i], 0, 1, 0);
-      ctx.globalAlpha = 1;
-      const band = Math.max(1.5, height * 0.09);
-      ctx.fillStyle = p.red;
-      fillBand(ctx, dials[i], deflectionForVu(0), 1, dials[i].baseY - band / 2, band);
-      strokeNeedle(ctx, p, dials[i], positionOf(positions[i]), height * 0.3, 1.1, 1);
-    }
+    const dials = this.dialsForSize(width, height);
+    const band = Math.max(1.5, height * 0.09);
+    this.drawDial(ctx, dials[0], 0, band, height, options.preview);
+    this.drawDial(ctx, dials[1], 1, band, height, options.preview);
     ctx.restore();
+  }
+
+  /** One dial: the scale as a thin guide, the red zone over its end, then the needle. */
+  private drawDial(
+    ctx: CanvasRenderingContext2D,
+    dial: Dial,
+    i: 0 | 1,
+    band: number,
+    height: number,
+    preview: boolean,
+  ): void {
+    const p = this.palette;
+    ctx.strokeStyle = p.ink;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(dial.x(0), dial.baseY);
+    ctx.lineTo(dial.x(1), dial.baseY);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = p.red;
+    fillBand(ctx, dial, deflectionForVu(0), 1, dial.baseY - band / 2, band);
+    strokeNeedle(ctx, p, dial, this.needlePosition(i, preview), height * 0.3, 1.1, 1);
   }
 }
 

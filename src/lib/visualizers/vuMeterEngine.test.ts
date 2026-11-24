@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   NEEDLE_MAX,
   Needle,
-  VU_REFERENCE_DBFS,
   VuMeters,
   channelLevels,
   deflectionForPercent,
@@ -18,19 +17,26 @@ function square(l: number, r: number, pairs = 64): number[] {
   return out;
 }
 
-const REFERENCE_AMPLITUDE = 10 ** (VU_REFERENCE_DBFS / 20);
+/** 0 VU for music normalized to the backend's default target (-16 LUFS). */
+const REFERENCE = referenceForLoudness(true, -16);
+const REFERENCE_AMPLITUDE = 10 ** (REFERENCE / 20);
+
+/** Feeds a frame with 0 VU at `reference`. */
+function feed(meters: VuMeters, points: number[], reference = REFERENCE): void {
+  meters.push(points, reference);
+}
 
 describe("deflection", () => {
   it("is zero for silence", () => {
-    expect(deflectionForRms(0)).toBe(0);
-    expect(deflectionForRms(NaN)).toBe(0);
+    expect(deflectionForRms(0, REFERENCE)).toBe(0);
+    expect(deflectionForRms(NaN, REFERENCE)).toBe(0);
   });
 
   it("follows the K-550 scale: 0 VU about 70% across, +5 VU at the end", () => {
     expect(deflectionForVu(-20)).toBe(0);
     expect(deflectionForVu(0)).toBeCloseTo(0.696, 6);
     expect(deflectionForVu(5)).toBeCloseTo(1, 6);
-    expect(deflectionForRms(REFERENCE_AMPLITUDE)).toBeCloseTo(deflectionForVu(0), 6);
+    expect(deflectionForRms(REFERENCE_AMPLITUDE, REFERENCE)).toBeCloseTo(deflectionForVu(0), 6);
   });
 
   it("rises steadily through the scale and is pinned past it", () => {
@@ -41,7 +47,7 @@ describe("deflection", () => {
       last = f;
     }
     expect(deflectionForVu(7)).toBeGreaterThan(1);
-    expect(deflectionForRms(1)).toBe(NEEDLE_MAX);
+    expect(deflectionForRms(1, REFERENCE)).toBe(NEEDLE_MAX);
   });
 
   it("keeps music at the normalization target out of the red", () => {
@@ -145,7 +151,7 @@ describe("Needle", () => {
 describe("VuMeters", () => {
   it("moves the channels independently", () => {
     const m = new VuMeters();
-    m.push(square(REFERENCE_AMPLITUDE, 0));
+    feed(m, square(REFERENCE_AMPLITUDE, 0));
     for (let i = 0; i < 100; i++) m.step(10, false);
     expect(m.left.position).toBeGreaterThan(0.4);
     expect(m.right.position).toBe(0);
@@ -155,8 +161,8 @@ describe("VuMeters", () => {
     const quiet = new VuMeters();
     const hot = new VuMeters();
     const signal = square(0.1, 0.1); // -20 dBFS RMS
-    quiet.push(signal, -23); // 3 dB above 0 VU
-    hot.push(signal, -14); // 6 dB below 0 VU
+    feed(quiet, signal, -23); // 3 dB above 0 VU
+    feed(hot, signal, -14); // 6 dB below 0 VU
     for (let i = 0; i < 100; i++) {
       quiet.step(10, false);
       hot.step(10, false);
@@ -167,7 +173,7 @@ describe("VuMeters", () => {
 
   it("lights the lamps on peaks, holds, then fades out", () => {
     const m = new VuMeters();
-    m.push(square(1, 1)); // full scale: both lamps
+    feed(m, square(1, 1)); // full scale: both lamps
     expect(m.lampLow.level).toBe(1);
     expect(m.lampHigh.level).toBe(1);
     m.step(200, false);
@@ -179,7 +185,7 @@ describe("VuMeters", () => {
 
   it("lights only the lower lamp for a loud but unpinned level", () => {
     const m = new VuMeters();
-    m.push(square(0.35, 0.35)); // -9.1 dBFS RMS: +3.9 VU at the default reference, short of the pin
+    feed(m, square(0.35, 0.35)); // -9.1 dBFS RMS: +3.9 VU at the -16 LUFS target's reference, short of the pin
     expect(m.lampLow.level).toBe(1);
     expect(m.lampHigh.level).toBe(0);
   });
@@ -188,21 +194,21 @@ describe("VuMeters", () => {
     const m = new VuMeters();
     const points = square(0.05, 0.05);
     points[10] = 0.99; // a lone spike: a limited master's ceiling, not a loud passage
-    m.push(points);
+    feed(m, points);
     expect(m.lampLow.level).toBe(0);
     expect(m.lampHigh.level).toBe(0);
   });
 
   it("turns lamps off without a fade under reduced motion", () => {
     const m = new VuMeters();
-    m.push(square(1, 1));
+    feed(m, square(1, 1));
     m.step(300, true);
     expect(m.lampHigh.level).toBe(0);
   });
 
   it("returns the needles to rest on silence and stops asking for frames", () => {
     const m = new VuMeters();
-    m.push(square(REFERENCE_AMPLITUDE, REFERENCE_AMPLITUDE));
+    feed(m, square(REFERENCE_AMPLITUDE, REFERENCE_AMPLITUDE));
     for (let i = 0; i < 100; i++) m.step(10, false);
     m.rest();
     let busy = true;

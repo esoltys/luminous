@@ -484,7 +484,6 @@
     return Array.from({ length: count + 1 }, (_, i) => min + ((max - min) * i) / count);
   }
 
-  let targetLufs = $state(-16.0);
   let loudnessMode = $state<LoudnessMode>("track");
   let fallbackGainDb = $state(-6.0);
 
@@ -492,8 +491,7 @@
     try {
       const settings = await invoke<LoudnessSettings>("get_loudness_settings");
       loudnessStore.setEnabled(settings.enabled);
-      targetLufs = settings.target_lufs;
-      loudnessStore.setTargetLufs(targetLufs);
+      loudnessStore.targetLufs = settings.target_lufs;
       loudnessMode = settings.mode;
       fallbackGainDb = settings.fallback_gain_db;
     } catch (e) {
@@ -506,7 +504,7 @@
       await invoke("set_loudness_settings", {
         settings: {
           enabled: loudnessStore.enabled,
-          target_lufs: targetLufs,
+          target_lufs: loudnessStore.targetLufs,
           mode: loudnessMode,
           fallback_gain_db: fallbackGainDb,
         },
@@ -522,7 +520,6 @@
   }
 
   async function handleTargetLufsChange() {
-    loudnessStore.setTargetLufs(targetLufs);
     await saveLoudnessSettings();
   }
 
@@ -1077,7 +1074,7 @@
             min={ranges.target_lufs.min}
             max={ranges.target_lufs.max}
             step={0.25}
-            bind:value={targetLufs}
+            bind:value={loudnessStore.targetLufs}
             oninput={handleTargetLufsChange}
             disabled={!loudnessStore.enabled}
             label={i18n.t("loudness.targetLevel")}
