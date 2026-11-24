@@ -516,7 +516,7 @@ fn read_album_tag(path: &Path) -> Option<String> {
 /// A folder image (`cover.jpg`) can only be one album's cover, so folder art
 /// is meaningful only when this holds; in a flat folder shared by several
 /// albums it would otherwise paint one cover over all of them.
-pub(crate) fn folder_holds_one_album(dir: &Path) -> bool {
+fn folder_holds_one_album(dir: &Path) -> bool {
     let mtime = std::fs::metadata(dir).and_then(|m| m.modified()).ok();
     if let Some(mtime) = mtime {
         if let Some((cached_at, answer)) = ONE_ALBUM_DIRS.lock().get(dir) {
@@ -1685,6 +1685,18 @@ impl CoverManager {
     /// directly (see `get_cover_art_path`).
     pub fn scan_folder_art(&self, audio_path: &Path) -> Option<PathBuf> {
         Self::scan_folder_art_static(audio_path)
+    }
+
+    /// Resolves folder art for `audio_path` from paths already collected during
+    /// `WalkDir` discovery, avoiding `std::fs::read_dir` while still enforcing
+    /// the single-album-per-folder rule (#2367).
+    pub(crate) fn resolve_discovered_folder_art<'a>(
+        audio_path: &Path,
+        folder_art_by_dir: &'a HashMap<PathBuf, PathBuf>,
+    ) -> Option<&'a PathBuf> {
+        let parent_dir = audio_path.parent()?;
+        let art_path = folder_art_by_dir.get(parent_dir)?;
+        folder_holds_one_album(parent_dir).then_some(art_path)
     }
 
     /// Same as `scan_folder_art`, callable without a `CoverManager`

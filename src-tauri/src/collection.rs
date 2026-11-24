@@ -1492,11 +1492,7 @@ impl CollectionScanner {
                     cue_paths.push(path.to_path_buf());
                 } else if crate::playlist::file_sync::is_playlist_file(path) {
                     report.playlist_files.push(path.to_path_buf());
-                } else if path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.eq_ignore_ascii_case("foo_dr.txt"))
-                {
+                } else if is_dr_log_file(path) {
                     if let Some(parent) = path.parent() {
                         dr_log_paths
                             .entry(parent.to_path_buf())
@@ -1934,11 +1930,8 @@ impl CollectionScanner {
                 crate::album_key::album_key_for(&album, None, Some(&effective_artist), false);
             let raw_key = crate::album_key::album_key(&album);
             let try_folder_art = || {
-                let parent_dir = path.parent()?;
-                let folder_art_path = folder_art_by_dir.get(parent_dir)?;
-                if !crate::covermanager::folder_holds_one_album(parent_dir) {
-                    return None;
-                }
+                let folder_art_path =
+                    CoverManager::resolve_discovered_folder_art(path, &folder_art_by_dir)?;
                 self.set_album_art_automatic(
                     &folder_art_path.to_string_lossy(),
                     &effective_artist,
@@ -2152,6 +2145,12 @@ impl FileStamp {
     }
 }
 
+fn is_dr_log_file(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.eq_ignore_ascii_case("foo_dr.txt"))
+}
+
 /// Finds a `foo_dr.txt` DR Meter log directly inside `dir` (#57), matching
 /// case-insensitively since foobar2000 writes it with whatever casing the
 /// user's OS/plugin defaults to.
@@ -2161,11 +2160,7 @@ fn find_dr_log(dir: &Path) -> Option<PathBuf> {
         .filter_map(|e| e.ok())
         .find_map(|entry| {
             let path = entry.path();
-            let is_match = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.eq_ignore_ascii_case("foo_dr.txt"));
-            (path.is_file() && is_match).then_some(path)
+            (path.is_file() && is_dr_log_file(&path)).then_some(path)
         })
 }
 
