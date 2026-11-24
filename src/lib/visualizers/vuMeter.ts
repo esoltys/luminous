@@ -468,7 +468,6 @@ class VuMeterFullInstance implements VisualizerInstance {
       this.meters.push(
         frame.scope.points,
         referenceForLoudness(loudnessStore.enabled, loudnessStore.targetLufs),
-        frame.scope.truePeakDb,
       );
     } else if (!frame.playing) {
       this.meters.rest();
@@ -587,7 +586,6 @@ class VuMeterMiniInstance implements VisualizerInstance {
       this.meters.push(
         frame.scope.points,
         referenceForLoudness(loudnessStore.enabled, loudnessStore.targetLufs),
-        frame.scope.truePeakDb,
       );
     } else if (!frame.playing) {
       this.meters.rest();

@@ -86,14 +86,13 @@ describe("percentage scale", () => {
 
 describe("channelLevels", () => {
   it("reads each channel separately", () => {
-    const { rmsL, rmsR, peak } = channelLevels(square(0.5, 0.1));
+    const { rmsL, rmsR } = channelLevels(square(0.5, 0.1));
     expect(rmsL).toBeCloseTo(0.5, 6);
     expect(rmsR).toBeCloseTo(0.1, 6);
-    expect(peak).toBeCloseTo(0.5, 6);
   });
 
   it("handles no data", () => {
-    expect(channelLevels([])).toEqual({ rmsL: 0, rmsR: 0, peak: 0 });
+    expect(channelLevels([])).toEqual({ rmsL: 0, rmsR: 0 });
   });
 });
 
@@ -179,9 +178,9 @@ describe("VuMeters", () => {
     expect(m.lampLow.level).toBe(0);
   });
 
-  it("lights only the lower lamp for a moderate peak", () => {
+  it("lights only the lower lamp for a loud but unpinned level", () => {
     const m = new VuMeters();
-    m.push(square(0.7, 0.7)); // about -3.1 dBFS
+    m.push(square(0.35, 0.35)); // -9.1 dBFS RMS: +3.9 VU at the default reference, short of the pin
     expect(m.lampLow.level).toBe(1);
     expect(m.lampHigh.level).toBe(0);
   });
@@ -193,12 +192,6 @@ describe("VuMeters", () => {
     m.push(points);
     expect(m.lampLow.level).toBe(0);
     expect(m.lampHigh.level).toBe(0);
-  });
-
-  it("reads the true peak when the frame has one", () => {
-    const m = new VuMeters();
-    m.push(square(0.1, 0.1), undefined, 0.4); // quiet samples, but an inter-sample over
-    expect(m.lampHigh.level).toBe(1);
   });
 
   it("turns lamps off without a fade under reduced motion", () => {

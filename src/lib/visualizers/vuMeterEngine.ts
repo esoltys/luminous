@@ -89,8 +89,12 @@ const REST_EPSILON = 0.0005;
  * threshold below full scale left the lamp lit most of the time.
  */
 const LAMP_LOW_VU = 3;
-/** The +8 lamp is an over indicator: the frame's true peak at or above full scale. */
-const LAMP_HIGH_DBTP = 0;
+/**
+ * The +8 lamp lights when the needle is pinned: a frame's level at the end of the scale
+ * (+5 VU). It is the same kind of reading as the +3 lamp, just further up, so neither lamp
+ * can be lit while the needle is nowhere near.
+ */
+const LAMP_HIGH_VU = 5;
 /** A lit lamp stays at full brightness this long, then fades with the given time constant. */
 const LAMP_HOLD_MS = 250;
 const LAMP_FADE_TAU_MS = 140;
@@ -125,25 +129,19 @@ export function deflectionForRms(rms: number, referenceDbfs = VU_REFERENCE_DBFS)
   return deflectionForVu(20 * Math.log10(rms) - referenceDbfs);
 }
 
-/** RMS and highest sample of each channel in interleaved `[l0, r0, l1, r1, …]` pairs. */
-export function channelLevels(points: readonly number[]): {
-  rmsL: number;
-  rmsR: number;
-  peak: number;
-} {
+/** RMS of each channel in interleaved `[l0, r0, l1, r1, …]` pairs. */
+export function channelLevels(points: readonly number[]): { rmsL: number; rmsR: number } {
   const pairs = points.length >> 1;
-  if (pairs === 0) return { rmsL: 0, rmsR: 0, peak: 0 };
+  if (pairs === 0) return { rmsL: 0, rmsR: 0 };
   let sumL = 0;
   let sumR = 0;
-  let peak = 0;
   for (let i = 0; i < pairs; i++) {
     const l = points[2 * i];
     const r = points[2 * i + 1];
     sumL += l * l;
     sumR += r * r;
-    peak = Math.max(peak, Math.abs(l), Math.abs(r));
   }
-  return { rmsL: Math.sqrt(sumL / pairs), rmsR: Math.sqrt(sumR / pairs), peak };
+  return { rmsL: Math.sqrt(sumL / pairs), rmsR: Math.sqrt(sumR / pairs) };
 }
 
 /** One needle: a damped spring chasing a target deflection. */
@@ -230,18 +228,16 @@ export class VuMeters {
 
   /**
    * Take a scope frame's L/R pairs as the new level, with 0 VU at `referenceDbfs`. The
-   * lamps read `peakDbtp`, the frame's true peak, which sees inter-sample peaks the
-   * thinned pairs miss; without it they fall back to the highest sample in `points`.
+   * needles follow each channel's RMS; the lamps follow the louder channel's.
    */
-  push(points: readonly number[], referenceDbfs = VU_REFERENCE_DBFS, peakDbtp?: number): void {
-    const { rmsL, rmsR, peak } = channelLevels(points);
+  push(points: readonly number[], referenceDbfs = VU_REFERENCE_DBFS): void {
+    const { rmsL, rmsR } = channelLevels(points);
     this.left.setTarget(deflectionForRms(rmsL, referenceDbfs));
     this.right.setTarget(deflectionForRms(rmsR, referenceDbfs));
     const loudest = Math.max(rmsL, rmsR);
     const frameVu = loudest > 0 ? 20 * Math.log10(loudest) - referenceDbfs : -Infinity;
     if (frameVu >= LAMP_LOW_VU) this.lampLow.light();
-    const peakDb = peakDbtp ?? (peak > 0 ? 20 * Math.log10(peak) : -Infinity);
-    if (peakDb >= LAMP_HIGH_DBTP) this.lampHigh.light();
+    if (frameVu >= LAMP_HIGH_VU) this.lampHigh.light();
   }
 
   /** Playback stopped or paused: the needles fall back to rest. */
