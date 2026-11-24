@@ -3350,6 +3350,13 @@ export const es = {
     voxelLogo: "Logotipo de vóxeles",
     vectorscope: "Vectorscopio",
     salmonRun: "Remonte del salmón",
+    vuMeter: "Vúmetro",
+    vu: {
+      left: "IZQUIERDO",
+      right: "DERECHO",
+      unit: "VU",
+      peak: "PICO",
+    },
     scope: {
       left: "I",
       right: "D",

@@ -3272,6 +3272,13 @@ export const en = {
     voxelLogo: "Voxel logo",
     vectorscope: "Vectorscope",
     salmonRun: "Salmon run",
+    vuMeter: "VU meter",
+    vu: {
+      left: "LEFT",
+      right: "RIGHT",
+      unit: "VU",
+      peak: "PEAK",
+    },
     scope: {
       left: "L",
       right: "R",

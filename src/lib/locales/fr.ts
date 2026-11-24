@@ -3364,6 +3364,13 @@ export const fr: DeepStringRecord<typeof en> = {
     voxelLogo: "Logo en voxels",
     vectorscope: "Vectorscope",
     salmonRun: "Montaison des saumons",
+    vuMeter: "Vumètre",
+    vu: {
+      left: "GAUCHE",
+      right: "DROITE",
+      unit: "VU",
+      peak: "CRÊTE",
+    },
     scope: {
       left: "G",
       right: "D",

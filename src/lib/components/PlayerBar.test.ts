@@ -939,7 +939,7 @@ describe("PlayerBar.svelte", () => {
     });
   });
 
-  it("offers the built-in voxel spectrum, voxel logo, vectorscope and salmon run presets (#2252, #2247, #2248)", async () => {
+  it("offers the built-in voxel spectrum, voxel logo, vectorscope, VU meter and salmon run presets (#2252, #2247, #2248)", async () => {
     playerStore.currentSong = mockSong;
     const { getByTestId } = render(PlayerBar);
     expect(getByTestId("visualizer-next")).toHaveAttribute(
@@ -953,11 +953,13 @@ describe("PlayerBar.svelte", () => {
       "voxel-iso",
       "voxel-logo",
       "vectorscope",
+      "vu-meter",
       "salmon-run",
     ]);
     expect(options[1]).toHaveTextContent("Voxel waterfall");
     expect(options[2]).toHaveTextContent("Voxel logo");
     expect(options[3]).toHaveTextContent("Vectorscope");
-    expect(options[4]).toHaveTextContent("Salmon run");
+    expect(options[4]).toHaveTextContent("VU meter");
+    expect(options[5]).toHaveTextContent("Salmon run");
   });
 });
