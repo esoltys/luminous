@@ -53,13 +53,21 @@ impl IntegrityVerdict {
     }
 }
 
-/// Returns `true` if `path` can be stat'd and opened for reading.
+/// Returns the file length in bytes if `path` can be opened and stat'd, or
+/// `None` if it is unreachable.
 ///
 /// Used by both integrity and provenance verification so an asleep drive,
 /// disconnected network share, or permission error is treated as unreachable
 /// rather than a permanent file failure (#2162, #2354).
+pub fn reachable_file_len(path: &Path) -> Option<u64> {
+    let file = std::fs::File::open(path).ok()?;
+    let meta = file.metadata().ok()?;
+    Some(meta.len())
+}
+
+/// Returns `true` if `path` can be opened and stat'd for reading (#2162, #2354).
 pub fn is_file_reachable(path: &Path) -> bool {
-    std::fs::metadata(path).is_ok() && std::fs::File::open(path).is_ok()
+    reachable_file_len(path).is_some()
 }
 
 /// Verifies container structure, frame decodability, and embedded checksums for an audio file.
@@ -69,15 +77,12 @@ pub fn is_file_reachable(path: &Path) -> bool {
 /// can't be reached (missing, permission denied, drive asleep or disconnected) is
 /// `Unverified`, since failing to read it says nothing about its contents (#2162).
 pub fn verify_audio_file(path: &Path) -> IntegrityVerdict {
-    // 1. Reach the file: metadata and an open both work before anything is judged.
-    if !is_file_reachable(path) {
-        return IntegrityVerdict::Unverified;
-    }
-    let Ok(meta) = std::fs::metadata(path) else {
+    // 1. Reach the file: open and stat once before anything is judged.
+    let Some(len) = reachable_file_len(path) else {
         return IntegrityVerdict::Unverified;
     };
 
-    if meta.len() == 0 {
+    if len == 0 {
         return IntegrityVerdict::Corrupt {
             reason: "Empty audio file (0 bytes)".to_string(),
         };

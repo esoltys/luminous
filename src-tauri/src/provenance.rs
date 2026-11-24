@@ -317,13 +317,23 @@ fn verify_song_provenance_inner(db: &Database, song_id: i64) -> Result<VerifyAtt
 mod tests {
     use super::*;
 
+    fn setup_test_db(prefix: &str, enable_bg: bool) -> (tempfile::TempDir, Database) {
+        let temp_dir_guard = tempfile::Builder::new().prefix(prefix).tempdir().unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        if enable_bg {
+            let conn = db.pool.get().unwrap();
+            conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('verify_audio_integrity_and_provenance', 'true')",
+                [],
+            )
+            .unwrap();
+        }
+        (temp_dir_guard, db)
+    }
+
     #[test]
     fn test_provenance_roundtrip_and_staleness() {
-        let temp_dir_guard = tempfile::Builder::new()
-            .prefix("luminous_prov_test_")
-            .tempdir()
-            .unwrap();
-        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let (_temp, db) = setup_test_db("luminous_prov_test_", false);
         let conn = db.pool.get().unwrap();
 
         conn.execute(
@@ -403,11 +413,7 @@ mod tests {
 
     #[test]
     fn background_provenance_records_unreadable_file_and_skips_until_mtime_changes() {
-        let temp_dir_guard = tempfile::Builder::new()
-            .prefix("luminous_prov_unreadable_test_")
-            .tempdir()
-            .unwrap();
-        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let (temp_dir_guard, db) = setup_test_db("luminous_prov_unreadable_test_", true);
         let conn = db.pool.get().unwrap();
 
         let corrupt_path = temp_dir_guard.path().join("corrupt.flac");
@@ -420,11 +426,6 @@ mod tests {
         )
         .unwrap();
         let song_id = conn.last_insert_rowid();
-        conn.execute(
-            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('verify_audio_integrity_and_provenance', 'true')",
-            [],
-        )
-        .unwrap();
 
         // Manual verification still reports an error.
         assert!(verify_song_provenance(&db, song_id).is_err());
@@ -466,11 +467,7 @@ mod tests {
 
     #[test]
     fn background_provenance_stores_nothing_for_unreachable_file() {
-        let temp_dir_guard = tempfile::Builder::new()
-            .prefix("luminous_prov_unreachable_test_")
-            .tempdir()
-            .unwrap();
-        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let (temp_dir_guard, db) = setup_test_db("luminous_prov_unreachable_test_", true);
         let conn = db.pool.get().unwrap();
 
         let missing_path = temp_dir_guard.path().join("unplugged.flac");
@@ -482,11 +479,6 @@ mod tests {
         )
         .unwrap();
         let song_id = conn.last_insert_rowid();
-        conn.execute(
-            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('verify_audio_integrity_and_provenance', 'true')",
-            [],
-        )
-        .unwrap();
 
         let (outcome, emitted) = verify_for_background(&db, song_id);
         assert_eq!(outcome, crate::background_reads::ReadOutcome::NothingStored);
