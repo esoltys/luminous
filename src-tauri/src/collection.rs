@@ -1425,16 +1425,20 @@ impl CollectionScanner {
                 .into_iter()
                 .filter_entry(|e| e.depth() == 0 || !is_reserved_dir_name(e.file_name()));
             for entry in walker.filter_map(|e| e.ok()) {
-                let path = entry.path().to_path_buf();
-                if !path.is_file() {
+                // Reuse the FileType walkdir already fetched during directory
+                // enumeration instead of issuing a second stat() per entry via
+                // path.is_file(), and skip non-media entries before allocating
+                // a PathBuf (#2353).
+                if !entry.file_type().is_file() {
                     continue;
                 }
-                if is_audio_file(&path) {
-                    all_paths.push(path);
-                } else if is_cue_file(&path) {
-                    cue_paths.push(path);
-                } else if crate::playlist::file_sync::is_playlist_file(&path) {
-                    report.playlist_files.push(path);
+                let path = entry.path();
+                if is_audio_file(path) {
+                    all_paths.push(path.to_path_buf());
+                } else if is_cue_file(path) {
+                    cue_paths.push(path.to_path_buf());
+                } else if crate::playlist::file_sync::is_playlist_file(path) {
+                    report.playlist_files.push(path.to_path_buf());
                 }
             }
         }
@@ -1522,16 +1526,37 @@ impl CollectionScanner {
                 }
             }
 
-            // Partition into unchanged (skip tag re-read) vs. needs-update.
-            // Unchanged files still count toward `scanned`, so report them
-            // as they're skipped — on a mostly-unchanged library this is
-            // nearly every file, and without it the counter sits at 0 (#1243).
+            // Read tags + resolve local art (and stat mtimes during partition)
+            // in parallel across a bounded thread pool — these are disk-I/O/
+            // CPU-bound per file and independent of the DB, so they're the
+            // parts worth parallelizing. We deliberately cap the pool below
+            // the machine's full core count (rather than using Rayon's global
+            // default of one thread per core) so a library scan doesn't starve
+            // the audio playback thread or background loudness/waveform
+            // analysis of CPU. DB writes below stay on the single connection,
+            // serialized in batched transactions, which also caps how many
+            // decoded `Song`s are held in memory at once.
+            let scan_pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(scan_thread_count())
+                .build()
+                .context("failed to build scan thread pool")?;
+
+            // Stat file stamps in parallel before partitioning so network
+            // shares, NAS, and spinning disks don't pay O(files) serial stat
+            // latency (#2353).
             let mut needs_update: Vec<&PathBuf> = Vec::new();
-            for path in &all_paths {
-                if !force {
-                    let path_str = path.to_string_lossy().to_string();
-                    let disk_stamp = FileStamp::cacheable_from_path(path);
-                    if FileStamp::is_unchanged(known_stamps.get(&path_str), disk_stamp) {
+            if force {
+                needs_update.extend(all_paths.iter());
+            } else {
+                let disk_stamps: Vec<Option<FileStamp>> = scan_pool.install(|| {
+                    all_paths
+                        .par_iter()
+                        .map(|p| FileStamp::cacheable_from_path(p))
+                        .collect()
+                });
+                for (path, disk_stamp) in all_paths.iter().zip(disk_stamps) {
+                    let path_str = path.to_string_lossy();
+                    if FileStamp::is_unchanged(known_stamps.get(path_str.as_ref()), disk_stamp) {
                         scanned += 1;
                         if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) {
                             let (dir_id, dir_name) = resolve_path_directory(path, &dirs);
@@ -1539,7 +1564,7 @@ impl CollectionScanner {
                                 phase: ScanPhase::ReadingTags,
                                 scanned,
                                 total,
-                                current_path: Some(path_str),
+                                current_path: Some(path_str.into_owned()),
                                 silent,
                                 directory_name: dir_name,
                                 directory_id: dir_id,
@@ -1548,27 +1573,13 @@ impl CollectionScanner {
                         }
                         continue;
                     }
+                    needs_update.push(path);
                 }
-                needs_update.push(path);
             }
 
             report.partition_ms = partition_started.elapsed().as_millis();
             report.unchanged = scanned as usize;
             report.reread = needs_update.len();
-
-            // Read tags + resolve local art in parallel across a bounded thread
-            // pool — this is disk-I/O/CPU-bound per file and independent of the
-            // DB, so it's the part worth parallelizing. We deliberately cap the
-            // pool below the machine's full core count (rather than using
-            // Rayon's global default of one thread per core) so a library scan
-            // doesn't starve the audio playback thread or background loudness/
-            // waveform analysis of CPU. DB writes below stay on the single
-            // connection, serialized in batched transactions, which also caps
-            // how many decoded `Song`s are held in memory at once.
-            let scan_pool = rayon::ThreadPoolBuilder::new()
-                .num_threads(scan_thread_count())
-                .build()
-                .context("failed to build scan thread pool")?;
 
             // Each write batch is read in smaller parallel sub-chunks with a
             // progress event after each, so the counter advances steadily

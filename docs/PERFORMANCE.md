@@ -427,3 +427,28 @@ Fewer (or zero) hits on the "after" build than the "before" build is evidence th
 scheduler contention. A silent run either way isn't proof of nothing changed, though — the 40ms
 threshold only fires on fairly gross stalls, so it can't confirm a change that shaves only a few
 milliseconds rather than removing an outright pileup.
+
+## Large-library unchanged scan benchmark
+
+`src-tauri/tests/scan_perf_test.rs` measures `ScanReport` phase timings (`discovery_ms`,
+`partition_ms`, `tag_read_ms`, `missing_check_ms`, `total_ms`) on a 20,000-file unchanged library:
+
+```bash
+cargo test --release --test scan_perf_test -- --ignored --nocapture
+```
+
+- `LUMINOUS_PERF_FILE_COUNT`: override the synthetic `.mp3` track count (default `20000`).
+- `LUMINOUS_PERF_LIBRARY_DIR`: scan an existing directory (e.g. a NAS or network share) in place
+  instead of generating synthetic files in a temp directory.
+
+### 20k-track baseline vs. stat-cost optimization (#2353)
+
+Measured on Windows 11 (local NVMe SSD, 20,000 synthetic `.mp3` tracks + 2,000 non-audio files,
+median of 3 unchanged scans after initial index):
+
+| Phase | Before (median) | After (median) | Delta |
+| --- | --- | --- | --- |
+| `discovery_ms` | 593 ms | 128 ms | −78.4% (4.6x faster) |
+| `partition_ms` | 403 ms | 194 ms | −51.9% (2.1x faster) |
+| `total_ms` | 1,916 ms | 1,253 ms | −34.6% (1.5x faster) |
+
