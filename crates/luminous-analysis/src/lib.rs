@@ -9,7 +9,7 @@ pub mod musical;
 pub mod provenance;
 pub mod visualizer;
 
-pub use integrity::{verify_audio_file, IntegrityVerdict};
+pub use integrity::{is_file_reachable, verify_audio_file, IntegrityVerdict};
 
 pub use loudness::{
     analyze_integrated_loudness, analyze_integrated_loudness_file, compute_gain, GainResult,

@@ -53,6 +53,15 @@ impl IntegrityVerdict {
     }
 }
 
+/// Returns `true` if `path` can be stat'd and opened for reading.
+///
+/// Used by both integrity and provenance verification so an asleep drive,
+/// disconnected network share, or permission error is treated as unreachable
+/// rather than a permanent file failure (#2162, #2354).
+pub fn is_file_reachable(path: &Path) -> bool {
+    std::fs::metadata(path).is_ok() && std::fs::File::open(path).is_ok()
+}
+
 /// Verifies container structure, frame decodability, and embedded checksums for an audio file.
 ///
 /// Encapsulates format probing, stream packet decoding, and MD5 streaminfo verification.
@@ -61,13 +70,12 @@ impl IntegrityVerdict {
 /// `Unverified`, since failing to read it says nothing about its contents (#2162).
 pub fn verify_audio_file(path: &Path) -> IntegrityVerdict {
     // 1. Reach the file: metadata and an open both work before anything is judged.
-    let meta = match std::fs::metadata(path) {
-        Ok(m) => m,
-        Err(_) => return IntegrityVerdict::Unverified,
-    };
-    if std::fs::File::open(path).is_err() {
+    if !is_file_reachable(path) {
         return IntegrityVerdict::Unverified;
     }
+    let Ok(meta) = std::fs::metadata(path) else {
+        return IntegrityVerdict::Unverified;
+    };
 
     if meta.len() == 0 {
         return IntegrityVerdict::Corrupt {
@@ -88,7 +96,7 @@ pub fn verify_audio_file(path: &Path) -> IntegrityVerdict {
 
     // The decoder reports a read error the same way as bad data. If the file
     // is no longer reachable, the drive went away mid-read: not corruption.
-    if std::fs::metadata(path).is_err() {
+    if !is_file_reachable(path) {
         return IntegrityVerdict::Unverified;
     }
     IntegrityVerdict::Corrupt { reason: failure }
