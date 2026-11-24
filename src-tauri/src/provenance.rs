@@ -87,11 +87,12 @@ fn next_song_to_verify(
              LEFT JOIN song_provenance p ON s.id = p.song_id
              WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
                AND s.filetype IN ({lossless})
-               AND (p.song_id IS NULL OR p.mtime != s.mtime)
+               AND {stale}
                AND {skip}
              ORDER BY s.added DESC, s.id DESC LIMIT 1",
             lib = *LOCAL_SOURCES_SQL,
             lossless = LOSSLESS_FILETYPES_SQL,
+            stale = crate::db::sql_stamp_stale("p"),
             skip = skipped.sql_excluding("s.id")
         ),
         [],
@@ -145,7 +146,7 @@ fn verify_for_background(
 pub fn get_cached_provenance(db: &Database, song_id: i64) -> Result<Option<SongProvenance>> {
     let conn = db.pool.get().context("failed to get db connection")?;
     let mut stmt = conn.prepare_cached(
-        "SELECT p.mtime, p.verdict, p.cutoff_hz, p.effective_bit_depth, p.effective_sample_rate, p.details, p.analyzed_at, s.mtime
+        "SELECT p.mtime, p.verdict, p.cutoff_hz, p.effective_bit_depth, p.effective_sample_rate, p.details, p.analyzed_at, s.mtime, p.filesize, s.filesize
          FROM song_provenance p
          JOIN songs s ON s.id = p.song_id
          WHERE p.song_id = ?1",
@@ -164,11 +165,12 @@ pub fn get_cached_provenance(db: &Database, song_id: i64) -> Result<Option<SongP
             let description: String = row.get(5)?;
             let analyzed_at: i64 = row.get(6)?;
             let s_mtime: Option<i64> = row.get(7)?;
+            let p_filesize: Option<i64> = row.get(8)?;
+            let s_filesize: Option<i64> = row.get(9)?;
 
-            let is_stale = match s_mtime {
-                Some(current_mtime) => current_mtime != p_mtime,
-                None => false,
-            };
+            let mtime_changed = s_mtime.is_some_and(|current_mtime| current_mtime != p_mtime);
+            let size_changed = matches!((p_filesize, s_filesize), (Some(pf), Some(sf)) if pf != sf);
+            let is_stale = mtime_changed || size_changed;
 
             Ok(Some(SongProvenance {
                 song_id,
@@ -221,12 +223,25 @@ pub fn verify_song_provenance(db: &Database, song_id: i64) -> Result<SongProvena
 fn verify_song_provenance_inner(db: &Database, song_id: i64) -> Result<VerifyAttempt> {
     let conn = db.pool.get().context("failed to get db connection")?;
 
-    let (path_str, source_raw, filetype_raw, mtime_val): (Option<String>, i64, i64, Option<i64>) =
-        conn.query_row(
-            "SELECT path, source, filetype, mtime FROM songs WHERE id = ?1",
-            params![song_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-        )?;
+    let (path_str, source_raw, filetype_raw, mtime_val, filesize): (
+        Option<String>,
+        i64,
+        i64,
+        Option<i64>,
+        Option<i64>,
+    ) = conn.query_row(
+        "SELECT path, source, filetype, mtime, filesize FROM songs WHERE id = ?1",
+        params![song_id],
+        |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
+        },
+    )?;
 
     let source = SongSource::from(source_raw);
     if !source.is_local() {
@@ -282,11 +297,12 @@ fn verify_song_provenance_inner(db: &Database, song_id: i64) -> Result<VerifyAtt
 
     conn.execute(
         "INSERT OR REPLACE INTO song_provenance
-         (song_id, mtime, verdict, cutoff_hz, effective_bit_depth, effective_sample_rate, details, analyzed_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, strftime('%s', 'now'))",
+         (song_id, mtime, filesize, verdict, cutoff_hz, effective_bit_depth, effective_sample_rate, details, analyzed_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, strftime('%s', 'now'))",
         params![
             song_id,
             mtime,
+            filesize,
             verdict_str,
             analysis.cutoff_hz,
             analysis.effective_bit_depth,
@@ -497,6 +513,74 @@ mod tests {
         assert_eq!(
             next_song_to_verify(&conn, &skipped).unwrap(),
             Some((song_id, path_str))
+        );
+    }
+
+    #[test]
+    fn test_provenance_staleness_on_filesize_change() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_prov_size_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('verify_audio_integrity_and_provenance', 'true')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (path, title, source, filetype, mtime, filesize) VALUES ('/test.flac', 'Test', 2, 2, 1000, 5000)",
+            [],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+
+        // Legacy row with NULL filesize: not stale when mtime matches.
+        conn.execute(
+            "INSERT INTO song_provenance (song_id, mtime, filesize, verdict, details)
+             VALUES (?1, 1000, NULL, 'authentic', 'Legacy')",
+            params![song_id],
+        )
+        .unwrap();
+        let skipped = crate::background_reads::Skipped::default();
+        assert!(
+            !get_cached_provenance(&db, song_id)
+                .unwrap()
+                .unwrap()
+                .is_stale
+        );
+        assert_eq!(next_song_to_verify(&conn, &skipped).unwrap(), None);
+
+        // Row with recorded filesize: matching size is fresh, changed size is stale.
+        conn.execute(
+            "UPDATE song_provenance SET filesize = 5000 WHERE song_id = ?1",
+            params![song_id],
+        )
+        .unwrap();
+        assert!(
+            !get_cached_provenance(&db, song_id)
+                .unwrap()
+                .unwrap()
+                .is_stale
+        );
+        assert_eq!(next_song_to_verify(&conn, &skipped).unwrap(), None);
+
+        conn.execute(
+            "UPDATE songs SET filesize = 6000 WHERE id = ?1",
+            params![song_id],
+        )
+        .unwrap();
+        assert!(
+            get_cached_provenance(&db, song_id)
+                .unwrap()
+                .unwrap()
+                .is_stale
+        );
+        assert_eq!(
+            next_song_to_verify(&conn, &skipped).unwrap(),
+            Some((song_id, "/test.flac".to_string()))
         );
     }
 }

@@ -1497,22 +1497,28 @@ impl CollectionScanner {
                 Err(e) => log::warn!("Failed to merge duplicate songs during scan: {e}"),
             }
 
-            // Load every known (path -> mtime) pair in one query instead of
+            // Load every known (path -> FileStamp) pair in one query instead of
             // issuing a SELECT per file — for large libraries this turns
             // O(files) round-trips into a single read.
             // Opened-file rows are left out so a file the user opened before
             // its folder was watched is re-read and upgraded to a library
             // song, even when the file itself hasn't changed (#1842).
-            let mut known_mtimes: HashMap<String, i64> = HashMap::new();
+            let mut known_stamps: HashMap<String, FileStamp> = HashMap::new();
             if !force {
                 let mut stmt = conn.prepare(
-                    "SELECT path, mtime FROM songs WHERE unavailable = 0 AND source != ?1",
+                    "SELECT path, mtime, filesize FROM songs WHERE unavailable = 0 AND source != ?1",
                 )?;
                 let rows = stmt.query_map([SongSource::OPENED_FILE_ID], |row| {
-                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        FileStamp {
+                            mtime: row.get::<_, i64>(1)?,
+                            filesize: row.get::<_, Option<i64>>(2)?,
+                        },
+                    ))
                 })?;
                 for row in rows.filter_map(|r| r.ok()) {
-                    known_mtimes.insert(row.0, row.1);
+                    known_stamps.insert(row.0, row.1);
                 }
             }
 
@@ -1524,24 +1530,23 @@ impl CollectionScanner {
             for path in &all_paths {
                 if !force {
                     let path_str = path.to_string_lossy().to_string();
-                    if let Some(mtime) = cacheable_mtime(path) {
-                        if known_mtimes.get(&path_str) == Some(&mtime) {
-                            scanned += 1;
-                            if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) {
-                                let (dir_id, dir_name) = resolve_path_directory(path, &dirs);
-                                on_progress(ScanProgress {
-                                    phase: ScanPhase::ReadingTags,
-                                    scanned,
-                                    total,
-                                    current_path: Some(path_str),
-                                    silent,
-                                    directory_name: dir_name,
-                                    directory_id: dir_id,
-                                    external_changes: 0,
-                                });
-                            }
-                            continue;
+                    let disk_stamp = FileStamp::cacheable_from_path(path);
+                    if FileStamp::is_unchanged(known_stamps.get(&path_str), disk_stamp) {
+                        scanned += 1;
+                        if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) {
+                            let (dir_id, dir_name) = resolve_path_directory(path, &dirs);
+                            on_progress(ScanProgress {
+                                phase: ScanPhase::ReadingTags,
+                                scanned,
+                                total,
+                                current_path: Some(path_str),
+                                silent,
+                                directory_name: dir_name,
+                                directory_id: dir_id,
+                                external_changes: 0,
+                            });
                         }
+                        continue;
                     }
                 }
                 needs_update.push(path);
@@ -1643,16 +1648,13 @@ impl CollectionScanner {
                 let mut built = Vec::with_capacity(cue_chunk.len());
                 for job in cue_chunk {
                     let path_str = job.media_path.to_string_lossy().to_string();
-                    let combined_mtime = cue_combined_mtime(&job.media_path, &job.cue_path);
+                    let cue_stamp = FileStamp::for_cue(&job.media_path, &job.cue_path);
+                    let combined_mtime = cue_stamp.map(|s| s.mtime);
 
-                    if !force {
-                        if let Some(mtime) = combined_mtime {
-                            if known_mtimes.get(&path_str) == Some(&mtime) {
-                                scanned += 1;
-                                report.unchanged += 1;
-                                continue;
-                            }
-                        }
+                    if !force && FileStamp::is_unchanged(known_stamps.get(&path_str), cue_stamp) {
+                        scanned += 1;
+                        report.unchanged += 1;
+                        continue;
                     }
 
                     match build_cue_songs(&cover_manager, job, combined_mtime) {
@@ -1965,14 +1967,17 @@ fn is_cue_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub(crate) fn get_mtime(path: &Path) -> Option<i64> {
-    std::fs::metadata(path)
-        .ok()?
-        .modified()
+fn mtime_from_metadata(meta: &std::fs::Metadata) -> Option<i64> {
+    meta.modified()
         .ok()?
         .duration_since(UNIX_EPOCH)
         .ok()
         .map(|d| d.as_secs() as i64)
+}
+
+pub(crate) fn get_mtime(path: &Path) -> Option<i64> {
+    let meta = std::fs::metadata(path).ok()?;
+    mtime_from_metadata(&meta)
 }
 
 /// Returns `path`'s mtime only when it is trustworthy for skipping re-reads.
@@ -1985,13 +1990,58 @@ pub(crate) fn cacheable_mtime(path: &Path) -> Option<i64> {
     get_mtime(path).filter(|&t| t > 0)
 }
 
-/// Combined mtime for a `(media_path, cue_path)` pair.
-///
-/// Requires both files to have a trustworthy [`cacheable_mtime`] so an
-/// epoch-zero or unreadable media file is not masked by a non-zero `.cue`
-/// sheet (or vice versa).
-fn cue_combined_mtime(media_path: &Path, cue_path: &Path) -> Option<i64> {
-    Some(cacheable_mtime(media_path)?.max(cacheable_mtime(cue_path)?))
+/// On-disk identity of an audio file used by the scanner's unchanged check.
+/// Both `mtime` (whole Unix seconds) and `filesize` (bytes) must match when
+/// `filesize` is known; legacy rows with `filesize: None` fall back to
+/// `mtime`-only matching so existing libraries aren't re-read wholesale on upgrade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FileStamp {
+    mtime: i64,
+    filesize: Option<i64>,
+}
+
+impl FileStamp {
+    fn from_path(path: &Path) -> Option<Self> {
+        let meta = std::fs::metadata(path).ok()?;
+        let mtime = mtime_from_metadata(&meta)?;
+        Some(Self {
+            mtime,
+            filesize: Some(meta.len() as i64),
+        })
+    }
+
+    /// Returns `path`'s stamp only when its mtime is trustworthy for skipping
+    /// re-reads (see [`cacheable_mtime`], #2351).
+    fn cacheable_from_path(path: &Path) -> Option<Self> {
+        Self::from_path(path).filter(|s| s.mtime > 0)
+    }
+
+    fn is_unchanged(stored: Option<&Self>, disk: Option<Self>) -> bool {
+        matches!((stored, disk), (Some(s), Some(d)) if s.matches(d))
+    }
+
+    /// Combined stamp for a `(media_path, cue_path)` pair: requires both files
+    /// to have a trustworthy [`cacheable_mtime`] (#2351) and pairs the newer
+    /// mtime with `media_path`'s `filesize`.
+    fn for_cue(media_path: &Path, cue_path: &Path) -> Option<Self> {
+        let media = Self::cacheable_from_path(media_path)?;
+        let cue_mtime = cacheable_mtime(cue_path)?;
+        Some(Self {
+            mtime: media.mtime.max(cue_mtime),
+            filesize: media.filesize,
+        })
+    }
+
+    fn matches(self, disk: Self) -> bool {
+        if self.mtime != disk.mtime {
+            return false;
+        }
+        match (self.filesize, disk.filesize) {
+            (Some(stored), Some(actual)) => stored == actual,
+            (None, _) => true,
+            (Some(_), None) => false,
+        }
+    }
 }
 
 /// Finds a `foo_dr.txt` DR Meter log directly inside `dir` (#57), matching
@@ -2074,8 +2124,9 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
     let meta = luminous_metadata::audio::read_tags(path)?;
 
     let path_str = path.to_string_lossy().to_string();
-    let mtime = get_mtime(path);
-    let filesize = std::fs::metadata(path).ok().map(|m| m.len() as i64);
+    let stamp = FileStamp::from_path(path);
+    let mtime = stamp.map(|s| s.mtime);
+    let filesize = stamp.and_then(|s| s.filesize);
     let filetype = filetype_for(path, meta.properties.codec);
 
     let mut song = Song {

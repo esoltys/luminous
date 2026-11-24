@@ -41,9 +41,12 @@ pub struct DetectedFlags {
 pub fn detected_flags(conn: &Connection, song_id: i64) -> rusqlite::Result<DetectedFlags> {
     Ok(conn
         .query_row(
-            "SELECT a.bpm_detected, a.key_detected FROM song_musical_analysis a
-             JOIN songs s ON s.id = a.song_id
-             WHERE a.song_id = ?1 AND a.mtime IS s.mtime",
+            &format!(
+                "SELECT a.bpm_detected, a.key_detected FROM song_musical_analysis a
+                 JOIN songs s ON s.id = a.song_id
+                 WHERE a.song_id = ?1 AND {fresh}",
+                fresh = crate::db::sql_stamp_fresh("a")
+            ),
             params![song_id],
             |row| {
                 Ok(DetectedFlags {
@@ -111,8 +114,11 @@ pub fn mark_user_curated(conn: &Connection, song_id: i64) -> rusqlite::Result<()
 fn is_curated(conn: &Connection, song_id: i64) -> rusqlite::Result<bool> {
     Ok(conn
         .query_row(
-            "SELECT a.curated FROM song_musical_analysis a JOIN songs s ON s.id = a.song_id
-             WHERE a.song_id = ?1 AND a.mtime IS s.mtime",
+            &format!(
+                "SELECT a.curated FROM song_musical_analysis a JOIN songs s ON s.id = a.song_id
+                 WHERE a.song_id = ?1 AND {fresh}",
+                fresh = crate::db::sql_stamp_fresh("a")
+            ),
             params![song_id],
             |row| row.get::<_, i64>(0),
         )
@@ -154,10 +160,11 @@ fn upsert_marker(
 ) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT INTO song_musical_analysis
-            (song_id, mtime, version, bpm_detected, key_detected, curated)
-         VALUES (?1, (SELECT mtime FROM songs WHERE id = ?1), ?2, ?3, ?4, ?5)
+            (song_id, mtime, filesize, version, bpm_detected, key_detected, curated)
+         VALUES (?1, (SELECT mtime FROM songs WHERE id = ?1), (SELECT filesize FROM songs WHERE id = ?1), ?2, ?3, ?4, ?5)
          ON CONFLICT(song_id) DO UPDATE SET
             mtime = excluded.mtime,
+            filesize = excluded.filesize,
             version = excluded.version,
             bpm_detected = excluded.bpm_detected,
             key_detected = excluded.key_detected,
@@ -176,16 +183,21 @@ fn upsert_marker(
 /// SQL condition (over `songs s` left-joined to `song_musical_analysis a`, with the current
 /// version as `?1`) for a song that needs analysing: never analysed, its file changed since, or
 /// analysed by an older version, unless the user has curated its tags on this file version.
-const NEEDS_ANALYSIS_SQL: &str =
-    "(a.song_id IS NULL OR a.mtime IS NOT s.mtime OR (a.version != ?1 AND a.curated = 0))";
+fn needs_analysis_sql() -> String {
+    format!(
+        "({stale} OR (a.version != ?1 AND a.curated = 0))",
+        stale = crate::db::sql_stamp_stale("a")
+    )
+}
 
-/// Whether the song still lacks a current analysis (see [`NEEDS_ANALYSIS_SQL`]).
+/// Whether the song still lacks a current analysis (see [`needs_analysis_sql`]).
 pub fn needs_analysis(conn: &Connection, song_id: i64) -> rusqlite::Result<bool> {
     conn.query_row(
         &format!(
-            "SELECT {NEEDS_ANALYSIS_SQL} FROM songs s
+            "SELECT {needs} FROM songs s
              LEFT JOIN song_musical_analysis a ON a.song_id = s.id
-             WHERE s.id = ?2"
+             WHERE s.id = ?2",
+            needs = needs_analysis_sql()
         ),
         params![MUSICAL_ANALYSIS_VERSION, song_id],
         |row| row.get(0),
@@ -212,7 +224,7 @@ fn candidates_sql(select: &str, tail: &str) -> String {
            AND {needs} {tail}",
         lib = *LOCAL_SOURCES_SQL,
         max_nanos = MAX_BACKGROUND_TRACK_SECONDS * 1_000_000_000,
-        needs = NEEDS_ANALYSIS_SQL
+        needs = needs_analysis_sql()
     )
 }
 
@@ -644,5 +656,51 @@ mod tests {
         assert_eq!(song.bpm, None);
         // The key was tagged, so it stays.
         assert_eq!(song.initial_key.as_deref(), Some("Gm"));
+    }
+
+    #[test]
+    fn musical_staleness_on_filesize_change() {
+        let (_dir, db) = setup();
+        let id = add_song(&db, None, None, 10);
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "UPDATE songs SET filesize = 5000 WHERE id = ?1",
+            params![id],
+        )
+        .unwrap();
+
+        record_analysis(&conn, id, &found(120.0, "Am")).unwrap();
+        assert!(!needs_analysis(&conn, id).unwrap());
+        assert_eq!(
+            detected_flags(&conn, id).unwrap(),
+            DetectedFlags {
+                bpm: true,
+                key: true
+            }
+        );
+
+        // Legacy NULL filesize on analysis row stays fresh when mtime matches.
+        conn.execute(
+            "UPDATE song_musical_analysis SET filesize = NULL WHERE song_id = ?1",
+            params![id],
+        )
+        .unwrap();
+        assert!(!needs_analysis(&conn, id).unwrap());
+
+        // Matching filesize is fresh; changed filesize with same mtime invalidates it.
+        conn.execute(
+            "UPDATE song_musical_analysis SET filesize = 5000 WHERE song_id = ?1",
+            params![id],
+        )
+        .unwrap();
+        assert!(!needs_analysis(&conn, id).unwrap());
+
+        conn.execute(
+            "UPDATE songs SET filesize = 6000 WHERE id = ?1",
+            params![id],
+        )
+        .unwrap();
+        assert!(needs_analysis(&conn, id).unwrap());
+        assert_eq!(detected_flags(&conn, id).unwrap(), DetectedFlags::default());
     }
 }

@@ -10,7 +10,25 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 100;
+pub const CURRENT_SCHEMA_VERSION: i32 = 101;
+
+/// SQL predicate (over `songs s` joined to a sidecar table `alias` with `mtime`
+/// and nullable `filesize`) that holds when the sidecar row still matches
+/// `s`'s file stamp. Legacy rows with `filesize IS NULL` match on `mtime` alone.
+pub(crate) fn sql_stamp_fresh(alias: &str) -> String {
+    format!(
+        "({alias}.mtime IS s.mtime AND ({alias}.filesize IS NULL OR s.filesize IS NULL OR {alias}.filesize = s.filesize))"
+    )
+}
+
+/// SQL predicate (over `songs s` left-joined to a sidecar table `alias`) that
+/// holds when the sidecar row is missing or its `(mtime, filesize)` no longer
+/// matches `s`. Legacy rows with `filesize IS NULL` are only stale when `mtime` differs.
+pub(crate) fn sql_stamp_stale(alias: &str) -> String {
+    format!(
+        "({alias}.song_id IS NULL OR {alias}.mtime IS NOT s.mtime OR ({alias}.filesize IS NOT NULL AND s.filesize IS NOT NULL AND {alias}.filesize != s.filesize))"
+    )
+}
 
 struct Migration {
     version: i32,
@@ -1045,6 +1063,25 @@ const MIGRATIONS: &[Migration] = &[
         version: 100,
         description: "cache Wikidata/Wikipedia enrichment and social links for radio stations",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_100)?),
+    },
+    Migration {
+        version: 101,
+        description: "add filesize to song_provenance, song_integrity, and song_musical_analysis (#2352)",
+        apply: |conn| {
+            for table in ["song_provenance", "song_integrity", "song_musical_analysis"] {
+                let has_column: bool = conn
+                    .prepare(&format!(
+                        "SELECT 1 FROM pragma_table_info('{table}') WHERE name = 'filesize'"
+                    ))?
+                    .exists([])?;
+                if !has_column {
+                    conn.execute_batch(&format!(
+                        "ALTER TABLE {table} ADD COLUMN filesize INTEGER;"
+                    ))?;
+                }
+            }
+            Ok(())
+        },
     },
 ];
 
