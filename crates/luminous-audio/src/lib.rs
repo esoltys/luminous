@@ -148,14 +148,13 @@ impl RampedGain {
         }
     }
 
-    /// Reads the current multiplier (`Ordering::Relaxed`).
-    /// Allocation-free for the audio callback.
+    /// Reads the current multiplier. Allocation-free for the audio callback.
     pub(crate) fn get(&self) -> f32 {
         f32::from_bits(self.value.load(Ordering::Relaxed))
     }
 
-    /// Immediately stores `value` and bumps the generation (`Ordering::AcqRel`)
-    /// so any in-flight ramp stops without overwriting it.
+    /// Immediately stores `value` and cancels any in-flight ramp so an older
+    /// background ramp cannot overwrite it.
     pub(crate) fn set(&self, value: f32) {
         self.generation.fetch_add(1, Ordering::AcqRel);
         self.value.store(value.to_bits(), Ordering::Relaxed);
@@ -211,7 +210,7 @@ impl RampedGain {
     /// is cleanly cancelled. With no duration the multiplier is reset to `1.0`
     /// at once, so an instant pause stays bit-identical to playing up to that
     /// point.
-    pub(crate) fn fade_out_then(self: &Arc<Self>, duration_ms: u64, then: impl FnOnce()) {
+    pub(crate) fn fade_out_then(&self, duration_ms: u64, then: impl FnOnce()) {
         if duration_ms == 0 {
             self.set(1.0);
             then();
@@ -1853,8 +1852,8 @@ impl OutputRenderer {
         }
 
         // 4) Master volume: bypassed when hardware volume is active (keeps samples bit-perfect)
-        let hw_vol = self.shared.skip_software_volume.load(Ordering::Relaxed);
-        if !hw_vol && vol != 1.0 {
+        let skip_software_volume = self.shared.skip_software_volume.load(Ordering::Relaxed);
+        if !skip_software_volume && vol != 1.0 {
             for sample in output[..played].iter_mut() {
                 *sample *= vol;
             }
@@ -1885,7 +1884,7 @@ impl OutputRenderer {
             self.mono_scratch.clear();
             // When hardware volume is active, `output` remains bit-perfect at full scale,
             // so scale the visualizer copy by `vol` so spectrum and reactive logo match listening level.
-            let vis_scale = if hw_vol { vol } else { 1.0 };
+            let vis_scale = if skip_software_volume { vol } else { 1.0 };
             for chunk in output[..played].chunks(channels_u) {
                 let sum: f32 = chunk.iter().sum();
                 // Reserved to buffer_capacity up front and cleared per callback.
