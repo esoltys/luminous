@@ -516,7 +516,7 @@ fn read_album_tag(path: &Path) -> Option<String> {
 /// A folder image (`cover.jpg`) can only be one album's cover, so folder art
 /// is meaningful only when this holds; in a flat folder shared by several
 /// albums it would otherwise paint one cover over all of them.
-fn folder_holds_one_album(dir: &Path) -> bool {
+pub(crate) fn folder_holds_one_album(dir: &Path) -> bool {
     let mtime = std::fs::metadata(dir).and_then(|m| m.modified()).ok();
     if let Some(mtime) = mtime {
         if let Some((cached_at, answer)) = ONE_ALBUM_DIRS.lock().get(dir) {
@@ -1739,8 +1739,10 @@ impl CoverManager {
         ];
         const COMMON_EXTENSIONS: [&str; 6] = ["jpg", "jpeg", "png", "webp", "gif", "bmp"];
 
-        COMMON_NAMES.contains(&stem.to_lowercase().as_str())
-            && COMMON_EXTENSIONS.contains(&extension.to_lowercase().as_str())
+        COMMON_NAMES.iter().any(|n| stem.eq_ignore_ascii_case(n))
+            && COMMON_EXTENSIONS
+                .iter()
+                .any(|e| extension.eq_ignore_ascii_case(e))
     }
 
     /// Cleans/detects `data`'s image format and caches it under `covers_dir`
