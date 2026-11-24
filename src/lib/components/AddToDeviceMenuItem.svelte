@@ -93,7 +93,7 @@
             {#if inSync}
               <span class="text-[10px] text-brand-text-secondary">{i18n.t("devices.inSync")}</span>
             {:else if storage}
-              <span class="text-[10px] text-brand-text-secondary/70 shrink-0">
+              <span class="text-[10px] text-brand-text-secondary shrink-0">
                 {formatStorageSize(storage.freeBytes)}
               </span>
             {/if}

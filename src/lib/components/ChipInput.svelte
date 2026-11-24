@@ -190,7 +190,7 @@
         showSuggestions = true;
         oninput?.();
       }}
-      class="flex-1 min-w-[80px] bg-transparent outline-none text-xs text-brand-text-primary placeholder:text-brand-text-secondary/50 py-0.5"
+      class="flex-1 min-w-[80px] bg-transparent outline-none text-xs text-brand-text-primary placeholder:text-brand-text-secondary py-0.5"
     />
   </div>
   {#if showSuggestions && matchingSuggestions.length > 0}

@@ -48,7 +48,7 @@
 >
   <Icon
     class="w-3.5 h-3.5 shrink-0 {disabled
-      ? 'text-brand-text-secondary/50'
+      ? 'text-brand-text-secondary'
       : destructive
         ? 'text-brand-text-primary'
         : accent

@@ -49,7 +49,7 @@
 
 <ContextMenu {x} {y} {onClose}>
   <div
-    class="px-3 py-1 text-[11px] font-medium text-brand-text-secondary/60 border-b border-brand-border/40 mb-1"
+    class="px-3 py-1 text-[11px] font-medium text-brand-text-secondary border-b border-brand-border/40 mb-1"
   >
     {i18n.t("playlists.selectedCount", { count: selectedCount })}
   </div>

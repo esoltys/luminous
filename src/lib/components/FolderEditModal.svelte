@@ -107,7 +107,7 @@
           <h2 class="text-base font-bold text-brand-text-primary truncate">
             {i18n.t("settings.editFolderTitle")}
           </h2>
-          <p class="text-xs text-brand-text-secondary/70 truncate" title={directory.path}>
+          <p class="text-xs text-brand-text-secondary truncate" title={directory.path}>
             {directory.path}
           </p>
         </div>

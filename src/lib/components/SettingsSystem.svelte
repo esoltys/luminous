@@ -282,7 +282,7 @@
       </p>
       <div class="flex items-center gap-3 mt-0.5">
         <div
-          class="text-xs font-mono text-brand-text-secondary/90 truncate select-all bg-brand-main/60 px-2 py-1 rounded border border-brand-border/40 flex-1"
+          class="text-xs font-mono text-brand-text-secondary truncate select-all bg-brand-main/60 px-2 py-1 rounded border border-brand-border/40 flex-1"
           title={dataDirectory.path}
         >
           {dataDirectory.path}

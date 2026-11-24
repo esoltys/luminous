@@ -715,7 +715,7 @@
                     <p
                       class="{playerStore.currentSong.album?.trim()
                         ? 'mt-0.5'
-                        : 'mt-3'} text-base md:text-lg text-brand-text-secondary/70 select-text font-medium"
+                        : 'mt-3'} text-base md:text-lg text-brand-text-secondary select-text font-medium"
                     >
                       {playerStore.currentSongDisplaySubtitle}
                     </p>
@@ -726,11 +726,11 @@
                 <ImmersiveSessionWrap session={playerStore.completedSession} />
               {:else}
                 <div class="flex flex-col items-center justify-center text-center">
-                  <Music class="w-16 h-16 text-brand-text-secondary/20 mb-4 animate-pulse" />
+                  <Music class="w-16 h-16 text-brand-text-secondary mb-4 animate-pulse" />
                   <h2 class="text-2xl font-bold text-brand-text-primary">
                     {i18n.t("playerBar.notPlaying")}
                   </h2>
-                  <p class="text-sm text-brand-text-secondary/60 mt-1">
+                  <p class="text-sm text-brand-text-secondary mt-1">
                     {i18n.t("immersive.emptyStateText")}
                   </p>
                 </div>

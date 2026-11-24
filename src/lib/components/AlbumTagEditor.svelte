@@ -409,7 +409,7 @@
           >
             <span>{i18n.t("sortOverrides.heading")}</span>
             <span
-              class="text-[10px] text-brand-text-secondary/70 group-open:rotate-180 transition-transform"
+              class="text-[10px] text-brand-text-secondary group-open:rotate-180 transition-transform"
               >▼</span
             >
           </summary>

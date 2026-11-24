@@ -102,9 +102,7 @@
     <Icon class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary" />
     <span class="flex-1">{label}</span>
     <CaretRight
-      class="w-3 h-3 shrink-0 text-brand-text-secondary/70 {isOpen
-        ? 'text-brand-text-primary'
-        : ''}"
+      class="w-3 h-3 shrink-0 text-brand-text-secondary {isOpen ? 'text-brand-text-primary' : ''}"
     />
   </button>
 </div>

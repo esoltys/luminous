@@ -776,7 +776,7 @@
               />
               <div class="px-[7px]">
                 <div
-                  class="relative w-full h-3.5 text-[9px] text-brand-text-secondary/60 font-medium mt-0.5"
+                  class="relative w-full h-3.5 text-[9px] text-brand-text-secondary font-medium mt-0.5"
                   aria-hidden="true"
                 >
                   {#each rangeTicks(preampRange, (preampRange.max - preampRange.min) / PREAMP_TICK_DB) as val (val)}
@@ -980,7 +980,7 @@
           <div class="flex flex-col items-center justify-between h-full group">
             <span
               class="text-[10px] font-bold w-full text-center transition-colors {gain === 0
-                ? 'text-brand-text-secondary/70'
+                ? 'text-brand-text-secondary'
                 : 'text-brand-text-primary'}"
             >
               {gain > 0 ? "+" : ""}{formatNumber(gain, {
@@ -1201,9 +1201,7 @@
           style={rangeFillStyle(fadePauseDurationMs, fadeRange.min, fadeRange.max)}
         />
         <div class="px-[7px]">
-          <div
-            class="relative w-full h-4 text-[9px] text-brand-text-secondary/60 font-medium mt-0.5"
-          >
+          <div class="relative w-full h-4 text-[9px] text-brand-text-secondary font-medium mt-0.5">
             {#each rangeTicks(fadeRange, 10) as val}
               <div
                 class="absolute top-0 flex flex-col items-center -translate-x-1/2"
@@ -1254,9 +1252,7 @@
           style={rangeFillStyle(crossfadeAutoDurationSecs, crossfadeRange.min, crossfadeRange.max)}
         />
         <div class="px-[7px]">
-          <div
-            class="relative w-full h-4 text-[9px] text-brand-text-secondary/60 font-medium mt-0.5"
-          >
+          <div class="relative w-full h-4 text-[9px] text-brand-text-secondary font-medium mt-0.5">
             {#each rangeTicks(crossfadeRange, crossfadeRange.max - crossfadeRange.min) as val}
               <div
                 class="absolute top-0 flex flex-col items-center -translate-x-1/2"

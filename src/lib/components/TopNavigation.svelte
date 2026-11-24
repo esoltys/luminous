@@ -519,7 +519,7 @@
         >
           {#if isFilesFilterMode}
             <div
-              class="p-2.5 rounded-xl bg-brand-main/60 border border-brand-border/40 text-xs text-brand-text-secondary/90"
+              class="p-2.5 rounded-xl bg-brand-main/60 border border-brand-border/40 text-xs text-brand-text-secondary"
             >
               <div class="font-semibold text-brand-text-primary mb-2">
                 {i18n.t("files.filterHelpTitle")}
@@ -598,7 +598,7 @@
                     >
                       {i18n.t("topNav.createSmartPlaylistFromSearch")}
                     </div>
-                    <div class="text-[11px] text-brand-text-secondary/80">
+                    <div class="text-[11px] text-brand-text-secondary">
                       {i18n.t("topNav.createSmartPlaylistFromSearchHint")}
                     </div>
                   </div>
@@ -611,7 +611,7 @@
 
             {#if collectionStore.searchQuery.includes(":")}
               <div
-                class="p-2.5 mb-2.5 rounded-xl bg-brand-main/60 border border-brand-border/40 text-xs text-brand-text-secondary/90"
+                class="p-2.5 mb-2.5 rounded-xl bg-brand-main/60 border border-brand-border/40 text-xs text-brand-text-secondary"
               >
                 <div class="font-semibold text-brand-text-primary mb-1 flex items-center gap-1">
                   <span>{i18n.t("topNav.filterSyntaxHint")}</span>
@@ -639,7 +639,7 @@
                     <code class="bg-brand-sidebar px-1 rounded">&lt;</code>
                     <code class="bg-brand-sidebar px-1 rounded">&lt;=</code>
                   </div>
-                  <div class="text-brand-text-secondary/60 italic pt-0.5">
+                  <div class="text-brand-text-secondary italic pt-0.5">
                     {i18n.t("topNav.filterExample")}
                   </div>
                 </div>
@@ -662,7 +662,7 @@
                 </div>
 
                 {#if collectionStore.filteredArtists.length === 0 && collectionStore.filteredAlbums.length === 0 && matchingPlaylists.length === 0 && matchingStations.length === 0 && collectionStore.searchResults.length === 0 && collectionStore.folderSearchResults.length === 0 && !collectionStore.searchLoading}
-                  <div class="p-3 text-center text-xs text-brand-text-secondary/60 select-none">
+                  <div class="p-3 text-center text-xs text-brand-text-secondary select-none">
                     {i18n.t("topNav.noSuggestions", {}, "No matching suggestions")}
                   </div>
                 {:else}
@@ -726,7 +726,7 @@
                             >
                               {artist.name}
                             </span>
-                            <span class="text-xs text-brand-text-secondary/70 truncate">
+                            <span class="text-xs text-brand-text-secondary truncate">
                               {i18n.t("playerBar.artistLabel")}
                             </span>
                           </div>
@@ -785,7 +785,7 @@
                             >
                               {album.album}
                             </span>
-                            <span class="text-xs text-brand-text-secondary/70 truncate">
+                            <span class="text-xs text-brand-text-secondary truncate">
                               {i18n.t("playerBar.albumLabel")} • {album.artist ||
                                 i18n.t("collection.unknownArtist")}
                             </span>
@@ -842,7 +842,7 @@
                             >
                               {item.label}
                             </span>
-                            <span class="text-xs text-brand-text-secondary/70 truncate">
+                            <span class="text-xs text-brand-text-secondary truncate">
                               {item.subtitle}
                             </span>
                           </div>
@@ -897,7 +897,7 @@
                             >
                               {song.title || i18n.t("collection.unknownSong")}
                             </span>
-                            <span class="text-xs text-brand-text-secondary/70 truncate">
+                            <span class="text-xs text-brand-text-secondary truncate">
                               {i18n.t("playerBar.songLabel")} • {song.artist ||
                                 i18n.t("collection.unknownArtist")}
                             </span>
@@ -926,7 +926,7 @@
                             >
                               {station.name || i18n.t("radio.unnamedStation")}
                             </span>
-                            <span class="text-xs text-brand-text-secondary/70 truncate">
+                            <span class="text-xs text-brand-text-secondary truncate">
                               {stationSubtitle(station)}
                             </span>
                           </div>
@@ -969,7 +969,7 @@
                                 >
                                   {folder.name}
                                 </span>
-                                <span class="text-xs text-brand-text-secondary/70 truncate">
+                                <span class="text-xs text-brand-text-secondary truncate">
                                   {folder.breadcrumb}
                                 </span>
                               </div>
@@ -1004,7 +1004,7 @@
             </div>
 
             {#if collectionStore.recentSearches.length === 0}
-              <div class="p-4 text-center text-xs text-brand-text-secondary/60 select-none">
+              <div class="p-4 text-center text-xs text-brand-text-secondary select-none">
                 {i18n.t("topNav.noRecentSearches", {}, "No recent searches")}
               </div>
             {:else}
@@ -1096,7 +1096,7 @@
                         >
                           {item.title}
                         </span>
-                        <span class="text-xs text-brand-text-secondary/70 truncate capitalize">
+                        <span class="text-xs text-brand-text-secondary truncate capitalize">
                           {item.subtitle || item.kind}
                         </span>
                       </div>
@@ -1108,7 +1108,7 @@
                         e.stopPropagation();
                         collectionStore.removeRecentSearch(item.id);
                       }}
-                      class="p-1.5 opacity-0 group-hover:opacity-100 hover:text-brand-text-primary text-brand-text-secondary/60 transition-all rounded"
+                      class="p-1.5 opacity-0 group-hover:opacity-100 hover:text-brand-text-primary text-brand-text-secondary transition-all rounded"
                       title={i18n.t("topNav.removeRecentSearchTooltip")}
                     >
                       <X class="w-3.5 h-3.5" />

@@ -215,7 +215,7 @@
           style="animation-duration: 4s;"
         />
       {:else}
-        <Music class="w-1/2 h-1/2 text-brand-text-secondary/60" />
+        <Music class="w-1/2 h-1/2 text-brand-text-secondary" />
       {/if}
     </div>
   {/if}

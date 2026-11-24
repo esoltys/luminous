@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { LYRIC_LINE_IDLE, LYRIC_WORD_UNSUNG } from "../utils/lyricsStyle";
   import { playerStore } from "../stores/player.svelte";
   import {
     FileTextIcon as FileText,
@@ -374,7 +375,7 @@
         >
           {playerStore.currentSongDisplayTitle}
         </h2>
-        <p class="text-[10px] text-brand-text-secondary/70 truncate max-w-xs @3xl:max-w-md">
+        <p class="text-[10px] text-brand-text-secondary truncate max-w-xs @3xl:max-w-md">
           {playerStore.currentSong
             ? `${playerStore.currentSong.artist || i18n.t("collection.unknownArtist")} — ${playerStore.currentSong.album || i18n.t("collection.unknownAlbum")}`
             : i18n.t("lyrics.lyricsHelpText")}
@@ -426,7 +427,7 @@
                 class="text-[11px] font-mono px-1 hover:text-brand-accent-text transition-colors cursor-pointer {userOffsetMs !==
                 0
                   ? 'text-brand-accent-text font-bold'
-                  : 'text-brand-text-secondary/70'}"
+                  : 'text-brand-text-secondary'}"
                 id="lyrics-offset-value"
               >
                 {formatOffset(userOffsetMs, "exceptZero")}
@@ -517,7 +518,7 @@
           <h3 class="text-base font-bold text-brand-text-primary">
             {i18n.t("lyrics.instrumentalTitle", {}, "Instrumental Track")}
           </h3>
-          <p class="text-xs text-brand-text-secondary/70">
+          <p class="text-xs text-brand-text-secondary">
             {i18n.t(
               "lyrics.instrumentalDesc",
               {},
@@ -528,7 +529,7 @@
       </div>
     {:else if isEditing}
       <div class="max-w-2xl mx-auto h-full flex flex-col gap-3">
-        <label for="lyrics-editor" class="label-heading text-brand-text-secondary/65"
+        <label for="lyrics-editor" class="label-heading text-brand-text-secondary"
           >{i18n.t("lyrics.editorLabel", {}, "Lyrics Text (plain or LRC synced format)")}</label
         >
         <textarea
@@ -555,7 +556,7 @@
                 onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
                 class="text-xl @3xl:text-2xl font-bold transition-all duration-300 transform text-balance {isActive
                   ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold'
-                  : 'text-brand-text-secondary/30 hover:text-brand-text-secondary/60'}"
+                  : LYRIC_LINE_IDLE}"
               >
                 {#if isActive && line.words && line.words.length > 0}
                   {#each line.words as word}
@@ -563,7 +564,7 @@
                     <span
                       class="inline-block whitespace-pre-wrap transition-all duration-150 {isWordSung
                         ? 'text-brand-text-primary opacity-100 filter drop-shadow-[0_0_6px_var(--color-brand-accent)]'
-                        : 'text-brand-text-primary/40 opacity-40'}">{word.text}</span
+                        : LYRIC_WORD_UNSUNG}">{word.text}</span
                     >
                   {/each}
                 {:else}
@@ -585,7 +586,7 @@
           </div>
           <div
             dir="auto"
-            class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary/80 select-text pb-20 font-medium font-sans text-pretty"
+            class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary select-text pb-20 font-medium font-sans text-pretty"
           >
             {lyricsText.startsWith("[synced:false]\n")
               ? lyricsText.substring("[synced:false]\n".length)
@@ -600,7 +601,7 @@
         <p class="text-sm font-semibold text-brand-text-primary">
           {i18n.t("lyrics.lyricsNotFound")}
         </p>
-        <p class="text-xs text-brand-text-secondary/50 max-w-sm">{errorMsg}</p>
+        <p class="text-xs text-brand-text-secondary max-w-sm">{errorMsg}</p>
         <div class="flex items-center gap-2 mt-2">
           {#if prefs.onlineEnabled}
             <Button
@@ -620,14 +621,14 @@
       </div>
     {:else}
       <div
-        class="w-full h-full flex flex-col items-center justify-center gap-2 text-center text-brand-text-secondary/50"
+        class="w-full h-full flex flex-col items-center justify-center gap-2 text-center text-brand-text-secondary"
       >
-        <FileText class="w-12 h-12 stroke-[1] text-brand-text-secondary/30 mb-2" />
+        <FileText class="w-12 h-12 stroke-[1] text-brand-text-secondary mb-2" />
         {#if playerStore.currentSong}
-          <p class="text-sm font-semibold text-brand-text-secondary/80">
+          <p class="text-sm font-semibold text-brand-text-secondary">
             {i18n.t("lyrics.lyricsNotFound")}
           </p>
-          <p class="text-xs text-brand-text-secondary/50 max-w-xs mt-1">
+          <p class="text-xs text-brand-text-secondary max-w-xs mt-1">
             {i18n.t("lyrics.lyricsHelpText")}
           </p>
           <Button
@@ -639,10 +640,10 @@
             {i18n.t("lyrics.markInstrumental", {}, "Mark as Instrumental")}
           </Button>
         {:else}
-          <p class="text-sm font-semibold text-brand-text-secondary/80">
+          <p class="text-sm font-semibold text-brand-text-secondary">
             {i18n.t("playerBar.notPlaying")}
           </p>
-          <p class="text-xs text-brand-text-secondary/50 mt-1">{i18n.t("lyrics.lyricsHelpText")}</p>
+          <p class="text-xs text-brand-text-secondary mt-1">{i18n.t("lyrics.lyricsHelpText")}</p>
         {/if}
       </div>
     {/if}

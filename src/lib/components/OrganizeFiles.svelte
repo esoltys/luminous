@@ -899,7 +899,7 @@
       : 'text-brand-text-primary font-medium'}"
   >
     {#if node.isFile}
-      <Music class="w-3 h-3 shrink-0 text-brand-text-secondary/70" />
+      <Music class="w-3 h-3 shrink-0 text-brand-text-secondary" />
     {:else}
       <Folder class="w-3 h-3 shrink-0 text-brand-accent-text/80" />
     {/if}
@@ -918,12 +918,12 @@
   {#each preset.outline as row, depth (row.labelKey)}
     <span
       class="flex items-start gap-1.5 min-w-0 {row.optional
-        ? 'text-brand-text-secondary/70 italic'
+        ? 'text-brand-text-secondary italic'
         : 'text-brand-text-secondary'}"
       style:padding-inline-start="{depth * 0.75}rem"
     >
       {#if row.kind === "file"}
-        <Music aria-hidden="true" class="w-3 h-3 mt-0.5 shrink-0 text-brand-text-secondary/70" />
+        <Music aria-hidden="true" class="w-3 h-3 mt-0.5 shrink-0 text-brand-text-secondary" />
       {:else}
         <Folder aria-hidden="true" class="w-3 h-3 mt-0.5 shrink-0 text-brand-accent-text/80" />
       {/if}

@@ -11,7 +11,7 @@ export const SIDEBAR_CAPTION_TEXT_CLASS = "text-xs font-normal";
 
 /** A quiet, non-interactive section heading ("Pinned", "Library", "Playlists", "Files"). */
 export const SIDEBAR_SECTION_LABEL_CLASS =
-  "w-full px-3 pt-2.5 pb-0.5 text-xs font-medium text-brand-text-secondary/70 truncate";
+  "w-full px-3 pt-2.5 pb-0.5 text-xs font-medium text-brand-text-secondary truncate";
 
 /** Selected/unselected colours of a sub-item row; the selected one matches the main nav buttons. */
 export const SIDEBAR_ROW_SELECTED_CLASS =

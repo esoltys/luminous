@@ -611,7 +611,7 @@
       <div
         class="border border-dashed border-brand-border rounded-xl px-6 py-12 text-center text-brand-text-secondary"
       >
-        <Folder class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/50" />
+        <Folder class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary" />
         <h4 class="font-semibold text-brand-text-primary mb-1">
           {i18n.t("settings.noFoldersTitle")}
         </h4>
@@ -711,7 +711,7 @@
               {/if}
             </p>
             {#if getWebdavNextSyncText(server)}
-              <p class="text-xs text-brand-text-secondary/70">{getWebdavNextSyncText(server)}</p>
+              <p class="text-xs text-brand-text-secondary">{getWebdavNextSyncText(server)}</p>
             {/if}
           </div>
         </div>
@@ -754,7 +754,7 @@
       <div
         class="border border-dashed border-brand-border rounded-xl px-6 py-8 text-center text-brand-text-secondary"
       >
-        <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary/50" />
+        <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary" />
         <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">
           {i18n.t("settings.webdavNoServersTitle")}
         </h4>
@@ -870,7 +870,7 @@
               {/if}
             </p>
             {#if getSubsonicNextSyncText(server)}
-              <p class="text-xs text-brand-text-secondary/70">{getSubsonicNextSyncText(server)}</p>
+              <p class="text-xs text-brand-text-secondary">{getSubsonicNextSyncText(server)}</p>
             {/if}
           </div>
         </div>
@@ -916,7 +916,7 @@
       <div
         class="border border-dashed border-brand-border rounded-xl px-6 py-8 text-center text-brand-text-secondary"
       >
-        <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary/50" />
+        <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary" />
         <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">
           {i18n.t("settings.subsonicNoServersTitle")}
         </h4>

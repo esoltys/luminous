@@ -366,7 +366,7 @@
               {i18n.t("settings.updateAvailableTitle", { version: updaterStore.latestVersion })}
             </p>
             {#if updaterStore.installStatus === "downloading"}
-              <p class="text-xs text-brand-text-secondary/80">
+              <p class="text-xs text-brand-text-secondary">
                 {downloadPercent !== null
                   ? i18n.t(
                       "settings.updateDownloadingProgress",
@@ -384,7 +384,7 @@
                 </div>
               {/if}
             {:else if updaterStore.installStatus === "ready-to-restart"}
-              <p class="text-xs text-brand-text-secondary/80">
+              <p class="text-xs text-brand-text-secondary">
                 {i18n.t(
                   "settings.updateReadyToRestart",
                   {},
@@ -392,12 +392,12 @@
                 )}
               </p>
             {:else if updaterStore.installStatus === "error"}
-              <p class="text-xs text-brand-text-secondary/80">
+              <p class="text-xs text-brand-text-secondary">
                 {updaterStore.errorMessage ||
                   i18n.t("settings.updateInstallError", {}, "Update failed.")}
               </p>
             {:else}
-              <p class="text-xs text-brand-text-secondary/80">
+              <p class="text-xs text-brand-text-secondary">
                 {updaterStore.installFormat.supports_self_update
                   ? i18n.t(
                       "settings.updateDirectReady",

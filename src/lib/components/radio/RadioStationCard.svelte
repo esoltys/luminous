@@ -67,7 +67,7 @@
         class="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
       />
     {:else}
-      <Broadcast class="w-12 h-12 text-brand-text-secondary/50" />
+      <Broadcast class="w-12 h-12 text-brand-text-secondary" />
     {/if}
 
     {#if station.playable}

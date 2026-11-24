@@ -224,7 +224,7 @@
       title={pinLabel}
       class="absolute top-1.5 left-1.5 z-10 p-1 rounded-md transition-colors {pinned
         ? 'text-brand-accent-text'
-        : 'text-brand-text-secondary/60 hover:text-brand-text-primary'} hover:bg-brand-text-primary/10"
+        : 'text-brand-text-secondary hover:text-brand-text-primary'} hover:bg-brand-text-primary/10"
     >
       <!-- The glyph names the action, like the label: a slashed pin to unpin, a pin to pin. -->
       {#if pinned}<PinOff size={14} />{:else}<Pin size={14} />{/if}
@@ -265,7 +265,7 @@
           {@const np = playerStore.stationNowPlaying}
           <!-- The track the station announces right now (#2008). -->
           <div data-station-now-playing class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary/60 shrink-0"
+            <span class="text-brand-text-secondary shrink-0"
               >{i18n.t("playerBar.onAirLabel", {}, "On air")}</span
             >
             <span class="text-brand-text-secondary text-right break-words min-w-0"
@@ -275,7 +275,7 @@
         {/if}
         {#if currentSong.year}
           <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary/60 shrink-0"
+            <span class="text-brand-text-secondary shrink-0"
               >{i18n.t("playerBar.releasedLabel", {}, "Released")}</span
             >
             <span class="text-brand-text-secondary text-right break-words min-w-0"
@@ -285,7 +285,7 @@
         {/if}
         {#if currentSong.genre}
           <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary/60 shrink-0"
+            <span class="text-brand-text-secondary shrink-0"
               >{i18n.t("playerBar.genreLabel", {}, "Genre")}</span
             >
             <div class="min-w-0 flex justify-end">
@@ -295,7 +295,7 @@
         {/if}
         {#if currentSong.composer}
           <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary/60 shrink-0"
+            <span class="text-brand-text-secondary shrink-0"
               >{i18n.t("playerBar.composerLabel", {}, "Composer")}</span
             >
             <span class="text-brand-text-secondary text-right break-words min-w-0"
@@ -337,7 +337,7 @@
           {/if}
           {#if currentSong.dynamic_range != null}
             <div class="flex items-start justify-between gap-3 text-xs">
-              <span class="text-brand-text-secondary/60 shrink-0"
+              <span class="text-brand-text-secondary shrink-0"
                 >{i18n.t("playerBar.dynamicRangeLabel", {}, "Dynamic Range")}</span
               >
               <span class="text-brand-text-primary text-right break-words min-w-0"
@@ -356,7 +356,7 @@
 
               {#if contextData && (contextData.mb_tags?.length ?? 0) > 0}
                 <div class="space-y-1.5">
-                  <span class="text-brand-text-secondary/60"
+                  <span class="text-brand-text-secondary"
                     >{i18n.t("playerBar.mbTagsSectionLabel", {}, "Community Tags")}:</span
                   >
                   <div class="flex flex-wrap gap-x-1.5 gap-y-1 leading-relaxed">
@@ -369,7 +369,7 @@
 
               {#if contextData?.mb_rating != null}
                 <div class="flex items-start justify-between gap-3">
-                  <span class="text-brand-text-secondary/60 shrink-0"
+                  <span class="text-brand-text-secondary shrink-0"
                     >{i18n.t("playerBar.mbRatingLabel", {}, "Community Rating")}</span
                   >
                   <span class="text-brand-text-primary text-right">
@@ -378,7 +378,7 @@
                       maximumFractionDigits: 2,
                     })} / 5
                     {#if contextData.mb_rating_votes}
-                      <span class="text-brand-text-secondary/60"
+                      <span class="text-brand-text-secondary"
                         >{i18n.plural("playerBar.mbRatingVotes", contextData.mb_rating_votes)}</span
                       >
                     {/if}
@@ -388,7 +388,7 @@
 
               {#each musicbrainzRows as row (row.label)}
                 <div class="flex items-start justify-between gap-3">
-                  <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
+                  <span class="text-brand-text-secondary shrink-0">{row.label}</span>
                   <button
                     type="button"
                     onclick={() =>
@@ -407,7 +407,7 @@
               {/each}
               {#each musicbrainzMetaRows as row (row.label)}
                 <div class="flex items-start justify-between gap-3">
-                  <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
+                  <span class="text-brand-text-secondary shrink-0">{row.label}</span>
                   <span class="text-brand-text-primary text-right break-words min-w-0"
                     >{row.value}</span
                   >
@@ -419,8 +419,8 @@
       {/if}
     {:else}
       <div class="flex flex-col items-center justify-center h-full text-center">
-        <Music class="w-12 h-12 text-brand-text-secondary/30 mb-3" />
-        <p class="text-sm text-brand-text-secondary/60">{i18n.t("playerBar.notPlaying")}</p>
+        <Music class="w-12 h-12 text-brand-text-secondary mb-3" />
+        <p class="text-sm text-brand-text-secondary">{i18n.t("playerBar.notPlaying")}</p>
       </div>
     {/if}
   </div>

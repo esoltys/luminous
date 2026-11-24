@@ -73,7 +73,7 @@
       ? playing
         ? 'bg-brand-accent text-brand-accent-contrast'
         : 'bg-brand-accent/15 text-brand-accent-text hover:bg-brand-accent hover:text-brand-accent-contrast'
-      : 'bg-brand-surface text-brand-text-secondary/40 cursor-not-allowed'}"
+      : 'bg-brand-surface text-brand-text-secondary opacity-60 cursor-not-allowed'}"
   >
     {#if artworkUrl && !artFailed}
       <img

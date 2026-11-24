@@ -182,7 +182,7 @@
         {pin.title}
       </span>
       {#if pin.subtitle}
-        <span class="truncate {SIDEBAR_CAPTION_TEXT_CLASS} text-brand-text-secondary/80">
+        <span class="truncate {SIDEBAR_CAPTION_TEXT_CLASS} text-brand-text-secondary">
           {pin.subtitle}
         </span>
       {/if}

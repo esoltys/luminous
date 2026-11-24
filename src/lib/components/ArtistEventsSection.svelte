@@ -173,7 +173,7 @@
 
     <div class="p-3 border-t border-brand-border/40 space-y-3 text-xs">
       {#if loading}
-        <div class="py-3 text-center text-xs text-brand-text-secondary/70 animate-pulse">
+        <div class="py-3 text-center text-xs text-brand-text-secondary animate-pulse">
           {i18n.t("artistEvents.loading", {}, "Loading upcoming events...")}
         </div>
       {:else}
@@ -253,7 +253,7 @@
                           {event.name}
                         </span>
                         {#if event.disambiguation}
-                          <span class="text-[10px] text-brand-text-secondary/70">
+                          <span class="text-[10px] text-brand-text-secondary">
                             ({event.disambiguation})
                           </span>
                         {/if}
@@ -278,7 +278,7 @@
                         <div
                           class="flex items-center gap-1 text-[11px] text-brand-text-secondary truncate"
                         >
-                          <MapPin class="w-3 h-3 text-brand-text-secondary/70 shrink-0" />
+                          <MapPin class="w-3 h-3 text-brand-text-secondary shrink-0" />
                           <span class="truncate">
                             {#if event.venue_name}
                               <span class="font-medium text-brand-text-secondary"
@@ -298,9 +298,7 @@
                       {/if}
 
                       {#if event.time}
-                        <div
-                          class="flex items-center gap-1 text-[10px] text-brand-text-secondary/70"
-                        >
+                        <div class="flex items-center gap-1 text-[10px] text-brand-text-secondary">
                           <Clock class="w-2.5 h-2.5 shrink-0" />
                           <span>{event.time}</span>
                         </div>
@@ -339,7 +337,7 @@
 
           {#if totalPages > 1}
             <div
-              class="flex items-center justify-between text-[11px] text-brand-text-secondary/70 pt-1 px-0.5 select-none"
+              class="flex items-center justify-between text-[11px] text-brand-text-secondary pt-1 px-0.5 select-none"
             >
               <span>
                 {i18n.t("artistEvents.pagination", {
@@ -372,7 +370,7 @@
             </div>
           {/if}
         {:else}
-          <div class="py-2 text-center text-xs text-brand-text-secondary/70">
+          <div class="py-2 text-center text-xs text-brand-text-secondary">
             {i18n.t("artistEvents.noEvents", {}, "No upcoming concerts found")}
           </div>
         {/if}
@@ -405,16 +403,14 @@
                     class="flex items-center justify-between gap-3 px-2 py-1.5 rounded border border-brand-border/30 bg-brand-main/20 text-[11px]"
                   >
                     <div class="flex items-center gap-2 min-w-0">
-                      <span
-                        class="text-brand-text-secondary/60 shrink-0 font-mono text-[10px] w-20"
-                      >
+                      <span class="text-brand-text-secondary shrink-0 font-mono text-[10px] w-20">
                         {event.begin_date || i18n.t("artistEvents.dateTba", {}, "TBA")}
                       </span>
                       <span class="text-brand-text-primary truncate">
                         {event.name}
                       </span>
                       {#if event.venue_city || event.venue_name}
-                        <span class="text-brand-text-secondary/60 truncate">
+                        <span class="text-brand-text-secondary truncate">
                           — {event.venue_city || event.venue_name}
                         </span>
                       {/if}
@@ -440,7 +436,7 @@
         <div
           class="pt-2 border-t border-brand-border/30 flex flex-wrap items-center justify-between gap-2 text-[11px]"
         >
-          <span class="text-brand-text-secondary/60">
+          <span class="text-brand-text-secondary">
             {i18n.t("artistEvents.otherPlatforms", {}, "Find tickets and tour dates on:")}
           </span>
           <div class="flex items-center gap-3">
