@@ -87,11 +87,12 @@ fn next_song_to_verify(
              LEFT JOIN song_provenance p ON s.id = p.song_id
              WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
                AND s.filetype IN ({lossless})
-               AND (p.song_id IS NULL OR p.mtime != s.mtime OR (p.filesize IS NOT NULL AND s.filesize IS NOT NULL AND p.filesize != s.filesize))
+               AND {stale}
                AND {skip}
              ORDER BY s.added DESC, s.id DESC LIMIT 1",
             lib = *LOCAL_SOURCES_SQL,
             lossless = LOSSLESS_FILETYPES_SQL,
+            stale = crate::db::sql_stamp_stale("p"),
             skip = skipped.sql_excluding("s.id")
         ),
         [],

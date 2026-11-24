@@ -640,5 +640,4 @@ async fn test_scan_skips_legacy_row_with_null_filesize_when_mtime_matches() {
         "legacy row with NULL filesize and matching mtime should be skipped"
     );
     assert_eq!(report.reread, 0);
->>>>>>> f9dd3499 (feat: include file size in scan unchanged and analysis staleness checks (#2352))
 }

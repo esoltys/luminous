@@ -918,10 +918,10 @@ fn query_songs_by_integrity_status(
          WHERE s.source IN ({local_sources})
            AND s.unavailable = 0
            AND i.status = ?1
-           AND i.mtime = s.mtime
-           AND (i.filesize IS NULL OR s.filesize IS NULL OR i.filesize = s.filesize)
+           AND {fresh}
          ORDER BY s.added DESC, s.id DESC",
-        local_sources = *LOCAL_SOURCES_SQL
+        local_sources = *LOCAL_SOURCES_SQL,
+        fresh = crate::db::sql_stamp_fresh("i")
     ))?;
 
     let rows = stmt.query_map(params![status], |row| {
@@ -1074,10 +1074,11 @@ fn next_song_for_integrity(
             "SELECT s.id, s.path FROM songs s
              LEFT JOIN song_integrity i ON s.id = i.song_id
              WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
-               AND (i.song_id IS NULL OR i.mtime != s.mtime OR (i.filesize IS NOT NULL AND s.filesize IS NOT NULL AND i.filesize != s.filesize))
+               AND {stale}
                AND {skip}
              ORDER BY s.added DESC, s.id DESC LIMIT 1",
             lib = *LOCAL_SOURCES_SQL,
+            stale = crate::db::sql_stamp_stale("i"),
             skip = skipped.sql_excluding("s.id")
         ),
         [],
@@ -1122,9 +1123,10 @@ pub fn verify_library_integrity(app: &AppHandle, db: &Database) -> Result<usize>
         "SELECT s.id FROM songs s
          LEFT JOIN song_integrity i ON s.id = i.song_id
          WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
-           AND (i.song_id IS NULL OR i.mtime != s.mtime OR (i.filesize IS NOT NULL AND s.filesize IS NOT NULL AND i.filesize != s.filesize))
+           AND {stale}
          ORDER BY s.added DESC, s.id DESC",
-        lib = *LOCAL_SOURCES_SQL
+        lib = *LOCAL_SOURCES_SQL,
+        stale = crate::db::sql_stamp_stale("i")
     ))?;
 
     let song_ids: Vec<i64> = stmt

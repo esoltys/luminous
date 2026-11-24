@@ -1531,11 +1531,7 @@ impl CollectionScanner {
                 if !force {
                     let path_str = path.to_string_lossy().to_string();
                     let disk_stamp = FileStamp::cacheable_from_path(path);
-                    if disk_stamp.is_some_and(|disk| {
-                        known_stamps
-                            .get(&path_str)
-                            .is_some_and(|stored| stored.matches(disk))
-                    }) {
+                    if FileStamp::is_unchanged(known_stamps.get(&path_str), disk_stamp) {
                         scanned += 1;
                         if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) {
                             let (dir_id, dir_name) = resolve_path_directory(path, &dirs);
@@ -1655,13 +1651,7 @@ impl CollectionScanner {
                     let cue_stamp = FileStamp::for_cue(&job.media_path, &job.cue_path);
                     let combined_mtime = cue_stamp.map(|s| s.mtime);
 
-                    if !force
-                        && cue_stamp.is_some_and(|disk| {
-                            known_stamps
-                                .get(&path_str)
-                                .is_some_and(|stored| stored.matches(disk))
-                        })
-                    {
+                    if !force && FileStamp::is_unchanged(known_stamps.get(&path_str), cue_stamp) {
                         scanned += 1;
                         report.unchanged += 1;
                         continue;
@@ -1977,14 +1967,17 @@ fn is_cue_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub(crate) fn get_mtime(path: &Path) -> Option<i64> {
-    std::fs::metadata(path)
-        .ok()?
-        .modified()
+fn mtime_from_metadata(meta: &std::fs::Metadata) -> Option<i64> {
+    meta.modified()
         .ok()?
         .duration_since(UNIX_EPOCH)
         .ok()
         .map(|d| d.as_secs() as i64)
+}
+
+pub(crate) fn get_mtime(path: &Path) -> Option<i64> {
+    let meta = std::fs::metadata(path).ok()?;
+    mtime_from_metadata(&meta)
 }
 
 /// Returns `path`'s mtime only when it is trustworthy for skipping re-reads.
@@ -2010,12 +2003,7 @@ struct FileStamp {
 impl FileStamp {
     fn from_path(path: &Path) -> Option<Self> {
         let meta = std::fs::metadata(path).ok()?;
-        let mtime = meta
-            .modified()
-            .ok()?
-            .duration_since(UNIX_EPOCH)
-            .ok()?
-            .as_secs() as i64;
+        let mtime = mtime_from_metadata(&meta)?;
         Some(Self {
             mtime,
             filesize: Some(meta.len() as i64),
@@ -2026,6 +2014,10 @@ impl FileStamp {
     /// re-reads (see [`cacheable_mtime`], #2351).
     fn cacheable_from_path(path: &Path) -> Option<Self> {
         Self::from_path(path).filter(|s| s.mtime > 0)
+    }
+
+    fn is_unchanged(stored: Option<&Self>, disk: Option<Self>) -> bool {
+        matches!((stored, disk), (Some(s), Some(d)) if s.matches(d))
     }
 
     /// Combined stamp for a `(media_path, cue_path)` pair: requires both files

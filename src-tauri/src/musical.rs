@@ -41,10 +41,12 @@ pub struct DetectedFlags {
 pub fn detected_flags(conn: &Connection, song_id: i64) -> rusqlite::Result<DetectedFlags> {
     Ok(conn
         .query_row(
-            "SELECT a.bpm_detected, a.key_detected FROM song_musical_analysis a
-             JOIN songs s ON s.id = a.song_id
-             WHERE a.song_id = ?1 AND a.mtime IS s.mtime
-               AND (a.filesize IS NULL OR s.filesize IS NULL OR a.filesize = s.filesize)",
+            &format!(
+                "SELECT a.bpm_detected, a.key_detected FROM song_musical_analysis a
+                 JOIN songs s ON s.id = a.song_id
+                 WHERE a.song_id = ?1 AND {fresh}",
+                fresh = crate::db::sql_stamp_fresh("a")
+            ),
             params![song_id],
             |row| {
                 Ok(DetectedFlags {
@@ -112,9 +114,11 @@ pub fn mark_user_curated(conn: &Connection, song_id: i64) -> rusqlite::Result<()
 fn is_curated(conn: &Connection, song_id: i64) -> rusqlite::Result<bool> {
     Ok(conn
         .query_row(
-            "SELECT a.curated FROM song_musical_analysis a JOIN songs s ON s.id = a.song_id
-             WHERE a.song_id = ?1 AND a.mtime IS s.mtime
-               AND (a.filesize IS NULL OR s.filesize IS NULL OR a.filesize = s.filesize)",
+            &format!(
+                "SELECT a.curated FROM song_musical_analysis a JOIN songs s ON s.id = a.song_id
+                 WHERE a.song_id = ?1 AND {fresh}",
+                fresh = crate::db::sql_stamp_fresh("a")
+            ),
             params![song_id],
             |row| row.get::<_, i64>(0),
         )
@@ -179,16 +183,21 @@ fn upsert_marker(
 /// SQL condition (over `songs s` left-joined to `song_musical_analysis a`, with the current
 /// version as `?1`) for a song that needs analysing: never analysed, its file changed since, or
 /// analysed by an older version, unless the user has curated its tags on this file version.
-const NEEDS_ANALYSIS_SQL: &str =
-    "(a.song_id IS NULL OR a.mtime IS NOT s.mtime OR (a.filesize IS NOT NULL AND s.filesize IS NOT NULL AND a.filesize != s.filesize) OR (a.version != ?1 AND a.curated = 0))";
+fn needs_analysis_sql() -> String {
+    format!(
+        "({stale} OR (a.version != ?1 AND a.curated = 0))",
+        stale = crate::db::sql_stamp_stale("a")
+    )
+}
 
-/// Whether the song still lacks a current analysis (see [`NEEDS_ANALYSIS_SQL`]).
+/// Whether the song still lacks a current analysis (see [`needs_analysis_sql`]).
 pub fn needs_analysis(conn: &Connection, song_id: i64) -> rusqlite::Result<bool> {
     conn.query_row(
         &format!(
-            "SELECT {NEEDS_ANALYSIS_SQL} FROM songs s
+            "SELECT {needs} FROM songs s
              LEFT JOIN song_musical_analysis a ON a.song_id = s.id
-             WHERE s.id = ?2"
+             WHERE s.id = ?2",
+            needs = needs_analysis_sql()
         ),
         params![MUSICAL_ANALYSIS_VERSION, song_id],
         |row| row.get(0),
@@ -215,7 +224,7 @@ fn candidates_sql(select: &str, tail: &str) -> String {
            AND {needs} {tail}",
         lib = *LOCAL_SOURCES_SQL,
         max_nanos = MAX_BACKGROUND_TRACK_SECONDS * 1_000_000_000,
-        needs = NEEDS_ANALYSIS_SQL
+        needs = needs_analysis_sql()
     )
 }
 

@@ -12,6 +12,24 @@ pub type DbPool = Pool<SqliteConnectionManager>;
 /// Current schema version. Increment when adding migrations.
 pub const CURRENT_SCHEMA_VERSION: i32 = 101;
 
+/// SQL predicate (over `songs s` joined to a sidecar table `alias` with `mtime`
+/// and nullable `filesize`) that holds when the sidecar row still matches
+/// `s`'s file stamp. Legacy rows with `filesize IS NULL` match on `mtime` alone.
+pub(crate) fn sql_stamp_fresh(alias: &str) -> String {
+    format!(
+        "({alias}.mtime IS s.mtime AND ({alias}.filesize IS NULL OR s.filesize IS NULL OR {alias}.filesize = s.filesize))"
+    )
+}
+
+/// SQL predicate (over `songs s` left-joined to a sidecar table `alias`) that
+/// holds when the sidecar row is missing or its `(mtime, filesize)` no longer
+/// matches `s`. Legacy rows with `filesize IS NULL` are only stale when `mtime` differs.
+pub(crate) fn sql_stamp_stale(alias: &str) -> String {
+    format!(
+        "({alias}.song_id IS NULL OR {alias}.mtime IS NOT s.mtime OR ({alias}.filesize IS NOT NULL AND s.filesize IS NOT NULL AND {alias}.filesize != s.filesize))"
+    )
+}
+
 struct Migration {
     version: i32,
     description: &'static str,
