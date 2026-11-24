@@ -1687,6 +1687,18 @@ impl CoverManager {
         Self::scan_folder_art_static(audio_path)
     }
 
+    /// Resolves folder art for `audio_path` from paths already collected during
+    /// `WalkDir` discovery, avoiding `std::fs::read_dir` while still enforcing
+    /// the single-album-per-folder rule (#2367).
+    pub(crate) fn resolve_discovered_folder_art<'a>(
+        audio_path: &Path,
+        folder_art_by_dir: &'a HashMap<PathBuf, PathBuf>,
+    ) -> Option<&'a PathBuf> {
+        let parent_dir = audio_path.parent()?;
+        let art_path = folder_art_by_dir.get(parent_dir)?;
+        folder_holds_one_album(parent_dir).then_some(art_path)
+    }
+
     /// Same as `scan_folder_art`, callable without a `CoverManager`
     /// instance — used by `organizer.rs` after relocating a file, where no
     /// manager is in scope.
@@ -1739,8 +1751,10 @@ impl CoverManager {
         ];
         const COMMON_EXTENSIONS: [&str; 6] = ["jpg", "jpeg", "png", "webp", "gif", "bmp"];
 
-        COMMON_NAMES.contains(&stem.to_lowercase().as_str())
-            && COMMON_EXTENSIONS.contains(&extension.to_lowercase().as_str())
+        COMMON_NAMES.iter().any(|n| stem.eq_ignore_ascii_case(n))
+            && COMMON_EXTENSIONS
+                .iter()
+                .any(|e| extension.eq_ignore_ascii_case(e))
     }
 
     /// Cleans/detects `data`'s image format and caches it under `covers_dir`

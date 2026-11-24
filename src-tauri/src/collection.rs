@@ -665,6 +665,26 @@ impl CollectionScanner {
     /// source (`loudness::compute_gain`) for tracks with neither R128
     /// analysis nor a ReplayGain tag.
     pub fn resolve_dynamic_range_logs(&self) -> Result<()> {
+        self.resolve_dynamic_range_logs_inner(None)
+    }
+
+    /// Resolves `foo_dr.txt` DR Meter logs using paths already collected during
+    /// `WalkDir` discovery, skipping the DB query and `find_dr_log` directory
+    /// reads completely when no logs were found (#2367).
+    pub(crate) fn resolve_dynamic_range_logs_for(
+        &self,
+        dr_logs: &HashMap<PathBuf, PathBuf>,
+    ) -> Result<()> {
+        if dr_logs.is_empty() {
+            return Ok(());
+        }
+        self.resolve_dynamic_range_logs_inner(Some(dr_logs))
+    }
+
+    fn resolve_dynamic_range_logs_inner(
+        &self,
+        discovered_logs: Option<&HashMap<PathBuf, PathBuf>>,
+    ) -> Result<()> {
         let conn = self.db.pool.get()?;
 
         // One row per local, available song, grouped below by parent
@@ -697,6 +717,11 @@ impl CollectionScanner {
             let (id, path_str, track, title, dr_log_mtime) = row;
             let path = PathBuf::from(&path_str);
             if let Some(dir) = path.parent() {
+                if let Some(logs) = discovered_logs {
+                    if !logs.contains_key(dir) {
+                        continue;
+                    }
+                }
                 by_dir.entry(dir.to_path_buf()).or_default().push(SongRow {
                     id,
                     path,
@@ -712,8 +737,15 @@ impl CollectionScanner {
         let mut updated_folders = 0usize;
 
         for (dir, songs) in by_dir {
-            let Some(log_path) = find_dr_log(&dir) else {
-                continue;
+            let log_path = match discovered_logs {
+                Some(logs) => match logs.get(&dir) {
+                    Some(p) => p.clone(),
+                    None => continue,
+                },
+                None => match find_dr_log(&dir) {
+                    Some(p) => p,
+                    None => continue,
+                },
             };
             let Some(log_mtime) = get_mtime(&log_path) else {
                 continue;
@@ -1424,6 +1456,8 @@ impl CollectionScanner {
         let discovery_started = Instant::now();
         let mut all_paths: Vec<PathBuf> = Vec::new();
         let mut cue_paths: Vec<PathBuf> = Vec::new();
+        let mut dr_log_paths: HashMap<PathBuf, PathBuf> = HashMap::new();
+        let mut folder_art_by_dir: HashMap<PathBuf, PathBuf> = HashMap::new();
         for (dir, walk_root) in self.walk_roots(&dirs) {
             if walk_root.is_dir() {
                 report.walked_roots.push(walk_root.clone());
@@ -1458,6 +1492,23 @@ impl CollectionScanner {
                     cue_paths.push(path.to_path_buf());
                 } else if crate::playlist::file_sync::is_playlist_file(path) {
                     report.playlist_files.push(path.to_path_buf());
+                } else if is_dr_log_file(path) {
+                    if let Some(parent) = path.parent() {
+                        dr_log_paths
+                            .entry(parent.to_path_buf())
+                            .or_insert_with(|| path.to_path_buf());
+                    }
+                } else if let (Some(stem), Some(ext)) = (
+                    path.file_stem().and_then(|s| s.to_str()),
+                    path.extension().and_then(|e| e.to_str()),
+                ) {
+                    if CoverManager::is_folder_art_filename(stem, ext) {
+                        if let Some(parent) = path.parent() {
+                            folder_art_by_dir
+                                .entry(parent.to_path_buf())
+                                .or_insert_with(|| path.to_path_buf());
+                        }
+                    }
                 }
             }
         }
@@ -1776,18 +1827,25 @@ impl CollectionScanner {
         // Parse foo_dr.txt DR Meter logs (#57) and backfill dynamic range
         // fields for tracks in folders whose log is new or has changed.
         let dr_logs_started = Instant::now();
-        if let Err(e) = self.resolve_dynamic_range_logs() {
+        if let Err(e) = self.resolve_dynamic_range_logs_for(&dr_log_paths) {
             log::error!("Failed to resolve foo_dr.txt logs during scan: {e}");
         }
         report.dr_logs_ms = dr_logs_started.elapsed().as_millis();
 
-        // Phase 3: Resolve missing album artwork (local & remote) and backfill visualizers
+        // Phase 3: Resolve missing album artwork (local & remote) and backfill visualizers.
+        // When nothing was re-read, no remote art is requested, and no folder cover files
+        // were discovered, skip the GROUP BY query and local cover checks completely (#2367).
         log::info!("Starting artwork resolution for missing albums...");
         let artwork_started = Instant::now();
         let mut albums_to_resolve = Vec::new();
-        if let Ok(conn) = self.db.pool.get() {
-            let sql = format!(
-                "SELECT
+        let skip_artwork_pass = report.reread == 0
+            && report.external_changes == 0
+            && !resolve_remote_art
+            && folder_art_by_dir.is_empty();
+        if !skip_artwork_pass {
+            if let Ok(conn) = self.db.pool.get() {
+                let sql = format!(
+                    "SELECT
                     id,
                     path,
                     COALESCE(NULLIF(album_artist, ''), artist) AS effective_artist,
@@ -1798,31 +1856,32 @@ impl CollectionScanner {
                    AND album IS NOT NULL
                    AND (art_unset = 1 OR (art_automatic IS NULL AND art_manual IS NULL))
                  GROUP BY effective_artist, album_key",
-                lib = *LOCAL_SOURCES_SQL
-            );
-            if let Ok(mut stmt) = conn.prepare(&sql) {
-                if let Ok(mut rows) = stmt.query([]) {
-                    while let Ok(Some(row)) = rows.next() {
-                        if let (
-                            Ok(id),
-                            Ok(path_str),
-                            Ok(effective_artist),
-                            Ok(album),
-                            Ok(art_embedded),
-                        ) = (
-                            row.get::<_, i64>(0),
-                            row.get::<_, String>(1),
-                            row.get::<_, String>(2),
-                            row.get::<_, String>(3),
-                            row.get::<_, bool>(4),
-                        ) {
-                            albums_to_resolve.push((
-                                id,
-                                path_str,
-                                effective_artist,
-                                album,
-                                art_embedded,
-                            ));
+                    lib = *LOCAL_SOURCES_SQL
+                );
+                if let Ok(mut stmt) = conn.prepare(&sql) {
+                    if let Ok(mut rows) = stmt.query([]) {
+                        while let Ok(Some(row)) = rows.next() {
+                            if let (
+                                Ok(id),
+                                Ok(path_str),
+                                Ok(effective_artist),
+                                Ok(album),
+                                Ok(art_embedded),
+                            ) = (
+                                row.get::<_, i64>(0),
+                                row.get::<_, String>(1),
+                                row.get::<_, String>(2),
+                                row.get::<_, String>(3),
+                                row.get::<_, bool>(4),
+                            ) {
+                                albums_to_resolve.push((
+                                    id,
+                                    path_str,
+                                    effective_artist,
+                                    album,
+                                    art_embedded,
+                                ));
+                            }
                         }
                     }
                 }
@@ -1871,7 +1930,8 @@ impl CollectionScanner {
                 crate::album_key::album_key_for(&album, None, Some(&effective_artist), false);
             let raw_key = crate::album_key::album_key(&album);
             let try_folder_art = || {
-                let folder_art_path = cover_manager.scan_folder_art(path)?;
+                let folder_art_path =
+                    CoverManager::resolve_discovered_folder_art(path, &folder_art_by_dir)?;
                 self.set_album_art_automatic(
                     &folder_art_path.to_string_lossy(),
                     &effective_artist,
@@ -2085,6 +2145,12 @@ impl FileStamp {
     }
 }
 
+fn is_dr_log_file(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.eq_ignore_ascii_case("foo_dr.txt"))
+}
+
 /// Finds a `foo_dr.txt` DR Meter log directly inside `dir` (#57), matching
 /// case-insensitively since foobar2000 writes it with whatever casing the
 /// user's OS/plugin defaults to.
@@ -2094,11 +2160,7 @@ fn find_dr_log(dir: &Path) -> Option<PathBuf> {
         .filter_map(|e| e.ok())
         .find_map(|entry| {
             let path = entry.path();
-            let is_match = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.eq_ignore_ascii_case("foo_dr.txt"));
-            (path.is_file() && is_match).then_some(path)
+            (path.is_file() && is_dr_log_file(&path)).then_some(path)
         })
 }
 
@@ -4896,6 +4958,111 @@ Official DR value: DR13\n",
         assert_eq!(dr_again, 14);
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_scan_picks_up_user_added_folder_art_when_reread_is_zero() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let app_data_dir = temp_dir.path().join("app_data");
+        let album_dir = temp_dir.path().join("music").join("Pure Heroine");
+        std::fs::create_dir_all(&album_dir).unwrap();
+        let track_path = album_dir.join("01 - Tennis Court.wav");
+        write_tagged_test_wav(&track_path, "Tennis Court");
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner
+            .add_directory(&temp_dir.path().join("music").to_string_lossy())
+            .unwrap();
+
+        let initial = scanner
+            .scan_all_core(app_data_dir.clone(), false, false, false, |_| {})
+            .await
+            .unwrap();
+        assert_eq!(initial.files_found, 1);
+
+        let art_before: Option<String> = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT art_automatic FROM songs WHERE path = ?1",
+                params![track_path.to_string_lossy()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(
+            art_before.is_none(),
+            "expected no artwork before cover.jpg is added"
+        );
+
+        // Drop cover.jpg into the album directory without modifying the audio file.
+        let cover_path = album_dir.join("cover.jpg");
+        std::fs::write(&cover_path, b"fake-jpeg-bytes").unwrap();
+
+        let second = scanner
+            .scan_all_core(app_data_dir, false, false, false, |_| {})
+            .await
+            .unwrap();
+        assert_eq!(second.reread, 0, "audio file was untouched");
+
+        let art_after: Option<String> = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT art_automatic FROM songs WHERE path = ?1",
+                params![track_path.to_string_lossy()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            art_after.as_deref(),
+            Some(cover_path.to_string_lossy().as_ref())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_scan_discovers_and_applies_dr_log_from_walkdir() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let app_data_dir = temp_dir.path().join("app_data");
+        let album_dir = temp_dir.path().join("music").join("Pure Heroine");
+        std::fs::create_dir_all(&album_dir).unwrap();
+        let track_path = album_dir.join("01 - Tennis Court.wav");
+        write_tagged_test_wav(&track_path, "Tennis Court");
+        std::fs::write(
+            album_dir.join("FOO_DR.TXT"),
+            "foobar2000 2.24.1 / Dynamic Range Meter 1.1.1\n\
+DR         Peak         RMS     Duration Track\n\
+--------------------------------------------------------------------------------\n\
+DR11      -0.50 dB   -13.20 dB      3:18 01-Tennis Court\n\
+--------------------------------------------------------------------------------\n\
+Official DR value: DR11\n",
+        )
+        .unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner
+            .add_directory(&temp_dir.path().join("music").to_string_lossy())
+            .unwrap();
+
+        scanner
+            .scan_all_core(app_data_dir, false, false, false, |_| {})
+            .await
+            .unwrap();
+
+        let album_dr: Option<i32> = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT dynamic_range_album FROM songs WHERE path = ?1",
+                params![track_path.to_string_lossy()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(album_dr, Some(11));
     }
 
     #[test]
