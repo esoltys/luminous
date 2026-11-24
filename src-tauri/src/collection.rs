@@ -1605,6 +1605,10 @@ impl CollectionScanner {
         let cover_manager =
             CoverManager::new(Arc::clone(&self.db), app_data_dir).with_per_scan_album_dedup();
 
+        // Bounded thread pool shared across parallel mtime statting, tag reading,
+        // and any fallback missing-track `exists()` checks (#2366). Capped below
+        // the machine's full core count (rather than Rayon's global default) so
+        // a library scan doesn't starve audio playback or background analysis.
         let scan_pool = rayon::ThreadPoolBuilder::new()
             .num_threads(scan_thread_count())
             .build()
