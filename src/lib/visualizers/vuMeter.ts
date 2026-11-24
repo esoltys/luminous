@@ -93,7 +93,7 @@ class Dial {
     readonly halfSpan: number,
     readonly baseY: number,
   ) {
-    this.depth = halfSpan * 1.15;
+    this.depth = halfSpan * 1.5;
   }
 
   get pivotY(): number {
@@ -449,7 +449,11 @@ class VuMeterFullInstance implements VisualizerInstance {
 
   push(frame: VisualizerFrame): void {
     if (frame.scope) {
-      this.meters.push(frame.scope.points, referenceForTargetLufs(loudnessStore.targetLufs));
+      this.meters.push(
+        frame.scope.points,
+        referenceForTargetLufs(loudnessStore.targetLufs),
+        frame.scope.truePeakDb,
+      );
     } else if (!frame.playing) {
       this.meters.rest();
     }
@@ -521,7 +525,7 @@ class VuMeterFullInstance implements VisualizerInstance {
     const positions = needlePositions(this.meters, options.preview);
     const thickness = Math.max(1.2, win.h * 0.012);
     const lift = win.h * 0.02;
-    const tipY = win.y + win.h * 0.1;
+    const tipY = win.y + win.h * 0.3;
     strokeNeedle(ctx, p, layout.dials[0], positionOf(positions[0]), tipY, thickness, lift);
     strokeNeedle(ctx, p, layout.dials[1], positionOf(positions[1]), tipY, thickness, lift);
     ctx.restore();
@@ -564,7 +568,11 @@ class VuMeterMiniInstance implements VisualizerInstance {
 
   push(frame: VisualizerFrame): void {
     if (frame.scope) {
-      this.meters.push(frame.scope.points, referenceForTargetLufs(loudnessStore.targetLufs));
+      this.meters.push(
+        frame.scope.points,
+        referenceForTargetLufs(loudnessStore.targetLufs),
+        frame.scope.truePeakDb,
+      );
     } else if (!frame.playing) {
       this.meters.rest();
     }
@@ -620,7 +628,7 @@ class VuMeterMiniInstance implements VisualizerInstance {
       ctx.lineWidth = Math.max(1.5, height * 0.09);
       ctx.lineCap = "butt";
       strokeBand(ctx, dials[i], deflectionForVu(0), 1, 0);
-      strokeNeedle(ctx, p, dials[i], positionOf(positions[i]), height * 0.14, 1.1, 1);
+      strokeNeedle(ctx, p, dials[i], positionOf(positions[i]), height * 0.3, 1.1, 1);
     }
     ctx.restore();
   }

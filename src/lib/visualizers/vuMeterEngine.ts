@@ -30,7 +30,7 @@ export function referenceForTargetLufs(targetLufs: number): number {
 export const VU_REFERENCE_DBFS = referenceForTargetLufs(-16);
 
 /** The needle can swing a little past the end of the scale before it hits the pin. */
-export const NEEDLE_MAX = 1.06;
+export const NEEDLE_MAX = 1.03;
 
 /**
  * The K-550's printed scale: where each VU mark sits along the sweep (0 = left stop,
@@ -64,12 +64,13 @@ const MAX_SUBSTEP_MS = 8;
 const REST_EPSILON = 0.0005;
 
 /**
- * Peak lamp thresholds in dBFS of the highest sample in a frame. Real decks calibrate
- * these against 0 VU; sample peaks run 10+ dB above RMS in music, so they are set
- * independently to light on genuinely hot peaks rather than constantly.
+ * Peak lamp thresholds in dBTP, the frame's true peak. Real decks calibrate these against
+ * 0 VU, but modern masters peak near full scale all the time, so the lamps are set to mean
+ * something on a digital source: the +3 lamp marks a very hot peak and the +8 lamp an
+ * over (a true peak at or above full scale).
  */
-const PEAK_LAMP_LOW_DBFS = -6;
-const PEAK_LAMP_HIGH_DBFS = -1;
+const PEAK_LAMP_LOW_DBTP = -4;
+const PEAK_LAMP_HIGH_DBTP = 0;
 /** A lit lamp stays at full brightness this long, then fades with the given time constant. */
 const LAMP_HOLD_MS = 250;
 const LAMP_FADE_TAU_MS = 140;
@@ -198,14 +199,18 @@ export class VuMeters {
   /** The +8 dB lamp. */
   readonly lampHigh = new Lamp();
 
-  /** Take a scope frame's L/R pairs as the new level, with 0 VU at `referenceDbfs`. */
-  push(points: readonly number[], referenceDbfs = VU_REFERENCE_DBFS): void {
+  /**
+   * Take a scope frame's L/R pairs as the new level, with 0 VU at `referenceDbfs`. The
+   * lamps read `peakDbtp`, the frame's true peak, which sees inter-sample peaks the
+   * thinned pairs miss; without it they fall back to the highest sample in `points`.
+   */
+  push(points: readonly number[], referenceDbfs = VU_REFERENCE_DBFS, peakDbtp?: number): void {
     const { rmsL, rmsR, peak } = channelLevels(points);
     this.left.setTarget(deflectionForRms(rmsL, referenceDbfs));
     this.right.setTarget(deflectionForRms(rmsR, referenceDbfs));
-    const peakDb = peak > 0 ? 20 * Math.log10(peak) : -Infinity;
-    if (peakDb >= PEAK_LAMP_LOW_DBFS) this.lampLow.light();
-    if (peakDb >= PEAK_LAMP_HIGH_DBFS) this.lampHigh.light();
+    const peakDb = peakDbtp ?? (peak > 0 ? 20 * Math.log10(peak) : -Infinity);
+    if (peakDb >= PEAK_LAMP_LOW_DBTP) this.lampLow.light();
+    if (peakDb >= PEAK_LAMP_HIGH_DBTP) this.lampHigh.light();
   }
 
   /** Playback stopped or paused: the needles fall back to rest. */

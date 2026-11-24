@@ -137,7 +137,7 @@ describe("VuMeters", () => {
 
   it("lights the lamps on peaks, holds, then fades out", () => {
     const m = new VuMeters();
-    m.push(square(0.95, 0.95)); // about -0.4 dBFS: both lamps
+    m.push(square(1, 1)); // full scale: both lamps
     expect(m.lampLow.level).toBe(1);
     expect(m.lampHigh.level).toBe(1);
     m.step(200, false);
@@ -149,14 +149,20 @@ describe("VuMeters", () => {
 
   it("lights only the lower lamp for a moderate peak", () => {
     const m = new VuMeters();
-    m.push(square(0.6, 0.6)); // about -4.4 dBFS
+    m.push(square(0.7, 0.7)); // about -3.1 dBFS
     expect(m.lampLow.level).toBe(1);
     expect(m.lampHigh.level).toBe(0);
   });
 
+  it("reads the true peak when the frame has one", () => {
+    const m = new VuMeters();
+    m.push(square(0.1, 0.1), undefined, 0.4); // quiet samples, but an inter-sample over
+    expect(m.lampHigh.level).toBe(1);
+  });
+
   it("turns lamps off without a fade under reduced motion", () => {
     const m = new VuMeters();
-    m.push(square(0.95, 0.95));
+    m.push(square(1, 1));
     m.step(300, true);
     expect(m.lampHigh.level).toBe(0);
   });
