@@ -504,3 +504,62 @@ async fn test_scan_refreshes_tags_after_case_only_rename_with_tag_edit() {
     assert_eq!(path, renamed_path.to_string_lossy().to_string());
     assert_eq!(album, "Stranger In The Alps");
 }
+
+#[tokio::test]
+async fn test_normal_scan_rereads_epoch_zero_mtime_file() {
+    let env = ScanTestEnv::new();
+    env.scanner
+        .add_directory(&env.scan_dir.to_string_lossy())
+        .expect("failed to add watched directory");
+
+    env.copy_fixture("song_alpha.mp3", "EpochZero");
+    let track_path = env.scan_dir.join("EpochZero").join("song_alpha.mp3");
+    std::fs::File::options()
+        .write(true)
+        .open(&track_path)
+        .unwrap()
+        .set_modified(std::time::UNIX_EPOCH)
+        .expect("failed to set epoch-zero mtime");
+
+    env.run_scan(false).await;
+    assert_eq!(env.available_titles(), vec!["Song Alpha"]);
+
+    // Verify the initial scan recorded mtime = 0 in the DB.
+    let conn = env.db.pool.get().expect("db conn failed");
+    let stored_mtime: Option<i64> = conn
+        .query_row("SELECT mtime FROM songs", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(stored_mtime, Some(0));
+    drop(conn);
+
+    // Externally edit tags while keeping mtime at UNIX_EPOCH (as some archive
+    // extractors, FAT/exFAT mounts, or timestamp-zeroing tools do).
+    luminous_metadata::audio::write_tags(
+        &track_path,
+        &luminous_metadata::audio::TagWriteRequest {
+            title: "Edited At Epoch Zero",
+            artist: "Alpha Artist",
+            album: "Alpha Album",
+            ..Default::default()
+        },
+    )
+    .expect("failed to write tags");
+    std::fs::File::options()
+        .write(true)
+        .open(&track_path)
+        .unwrap()
+        .set_modified(std::time::UNIX_EPOCH)
+        .expect("failed to restore epoch-zero mtime");
+
+    // A normal (non-force) scan must re-read the epoch-zero file and pick up the edit.
+    let report = env.run_scan_report(false).await;
+    assert_eq!(
+        report.reread, 1,
+        "normal scan must not skip epoch-zero mtime file"
+    );
+    assert_eq!(
+        report.external_changes, 1,
+        "normal scan must detect external tag edit on epoch-zero mtime file"
+    );
+    assert_eq!(env.available_titles(), vec!["Edited At Epoch Zero"]);
+}

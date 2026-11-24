@@ -1524,23 +1524,24 @@ impl CollectionScanner {
             for path in &all_paths {
                 if !force {
                     let path_str = path.to_string_lossy().to_string();
-                    let mtime = get_mtime(path).unwrap_or(0);
-                    if known_mtimes.get(&path_str) == Some(&mtime) {
-                        scanned += 1;
-                        if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) {
-                            let (dir_id, dir_name) = resolve_path_directory(path, &dirs);
-                            on_progress(ScanProgress {
-                                phase: ScanPhase::ReadingTags,
-                                scanned,
-                                total,
-                                current_path: Some(path_str),
-                                silent,
-                                directory_name: dir_name,
-                                directory_id: dir_id,
-                                external_changes: 0,
-                            });
+                    if let Some(mtime) = cacheable_mtime(path) {
+                        if known_mtimes.get(&path_str) == Some(&mtime) {
+                            scanned += 1;
+                            if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) {
+                                let (dir_id, dir_name) = resolve_path_directory(path, &dirs);
+                                on_progress(ScanProgress {
+                                    phase: ScanPhase::ReadingTags,
+                                    scanned,
+                                    total,
+                                    current_path: Some(path_str),
+                                    silent,
+                                    directory_name: dir_name,
+                                    directory_id: dir_id,
+                                    external_changes: 0,
+                                });
+                            }
+                            continue;
                         }
-                        continue;
                     }
                 }
                 needs_update.push(path);
@@ -1642,14 +1643,16 @@ impl CollectionScanner {
                 let mut built = Vec::with_capacity(cue_chunk.len());
                 for job in cue_chunk {
                     let path_str = job.media_path.to_string_lossy().to_string();
-                    let combined_mtime = get_mtime(&job.media_path)
-                        .unwrap_or(0)
-                        .max(get_mtime(&job.cue_path).unwrap_or(0));
+                    let combined_mtime = cue_combined_mtime(&job.media_path, &job.cue_path);
 
-                    if !force && known_mtimes.get(&path_str) == Some(&combined_mtime) {
-                        scanned += 1;
-                        report.unchanged += 1;
-                        continue;
+                    if !force {
+                        if let Some(mtime) = combined_mtime {
+                            if known_mtimes.get(&path_str) == Some(&mtime) {
+                                scanned += 1;
+                                report.unchanged += 1;
+                                continue;
+                            }
+                        }
                     }
 
                     match build_cue_songs(&cover_manager, job, combined_mtime) {
@@ -1970,6 +1973,25 @@ pub(crate) fn get_mtime(path: &Path) -> Option<i64> {
         .duration_since(UNIX_EPOCH)
         .ok()
         .map(|d| d.as_secs() as i64)
+}
+
+/// Returns `path`'s mtime only when it is trustworthy for skipping re-reads.
+///
+/// Files with an epoch-zero mtime (`1970-01-01T00:00:00Z` — produced by some
+/// archive extractors, FAT/exFAT mounts, and timestamp-zeroing tools) or an
+/// unreadable/pre-epoch mtime (`None`) return `None` so scans and the watcher
+/// always re-read them instead of treating `0 == 0` as unchanged (#2351).
+pub(crate) fn cacheable_mtime(path: &Path) -> Option<i64> {
+    get_mtime(path).filter(|&t| t > 0)
+}
+
+/// Combined mtime for a `(media_path, cue_path)` pair.
+///
+/// Requires both files to have a trustworthy [`cacheable_mtime`] so an
+/// epoch-zero or unreadable media file is not masked by a non-zero `.cue`
+/// sheet (or vice versa).
+fn cue_combined_mtime(media_path: &Path, cue_path: &Path) -> Option<i64> {
+    Some(cacheable_mtime(media_path)?.max(cacheable_mtime(cue_path)?))
 }
 
 /// Finds a `foo_dr.txt` DR Meter log directly inside `dir` (#57), matching
@@ -2330,7 +2352,11 @@ pub(crate) fn resolve_cue_jobs(cue_paths: &[PathBuf], audio_paths: &[PathBuf]) -
 /// properties, etc. — all shared across every track cut from the same file)
 /// with per-track title/performer/track-number/offsets from the CUE sheet
 /// layered on top.
-fn build_cue_songs(cover_manager: &CoverManager, job: &CueJob, mtime: i64) -> Result<Vec<Song>> {
+fn build_cue_songs(
+    cover_manager: &CoverManager,
+    job: &CueJob,
+    mtime: Option<i64>,
+) -> Result<Vec<Song>> {
     let base = read_and_prepare_song(cover_manager, &job.media_path)?;
     let cue_path_str = job.cue_path.to_string_lossy().to_string();
     let album = job.sheet.album_title.clone().or_else(|| base.album.clone());
@@ -2374,7 +2400,7 @@ fn build_cue_songs(cover_manager: &CoverManager, job: &CueJob, mtime: i64) -> Re
             end_nanosec,
             length_nanosec,
             cue_path: Some(cue_path_str.clone()),
-            mtime: Some(mtime),
+            mtime,
             ..base.clone()
         });
     }
