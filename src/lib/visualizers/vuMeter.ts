@@ -78,9 +78,9 @@ function buildPalette(colors: ThemeColors): VuPalette {
 }
 
 /**
- * One meter's geometry. The scale is printed nearly flat and spread across the whole
- * meter, as on the deck: a mark at needle position `f` (0 = left stop, 1 = end of scale)
- * sits at `x(f)`, on a shallow arch. The needle pivots far below the window, `depth` under
+ * One meter's geometry. The scale is printed flat and spread across the whole meter, as on
+ * the deck: a mark at needle position `f` (0 = left stop, 1 = end of scale) sits at `x(f)`
+ * on one horizontal line, so the left stop block and the red zone are level. The needle pivots far below the window, `depth` under
  * the scale, so it only tilts as it sweeps, and every mark leans along the needle that
  * would point at it: the fan of ticks in the reference.
  */
@@ -91,8 +91,6 @@ class Dial {
     readonly cx: number,
     readonly halfSpan: number,
     readonly baseY: number,
-    /** How far the scale's ends sit below its middle. */
-    readonly arch: number,
   ) {
     this.depth = halfSpan * 1.15;
   }
@@ -105,9 +103,9 @@ class Dial {
     return this.cx + (f - 0.5) * 2 * this.halfSpan;
   }
 
-  y(f: number): number {
-    const u = 2 * f - 1;
-    return this.baseY + this.arch * u * u;
+  /** The y of the scale line; the same for every mark. */
+  y(_f: number): number {
+    return this.baseY;
   }
 
   /** The needle's tilt from vertical, in radians, when it points at position `f`. */
@@ -137,14 +135,13 @@ function computeLayout(width: number, height: number): Layout {
   const meterW = (win.w - win.w * 0.09) / 2;
   const halfSpan = meterW * 0.43;
   const baseY = win.y + win.h * 0.52;
-  const arch = win.h * 0.025;
   return {
     width,
     height,
     win,
     dials: [
-      new Dial(win.x + meterW / 2, halfSpan, baseY, arch),
-      new Dial(win.x + win.w - meterW / 2, halfSpan, baseY, arch),
+      new Dial(win.x + meterW / 2, halfSpan, baseY),
+      new Dial(win.x + win.w - meterW / 2, halfSpan, baseY),
     ],
     numbersY: win.y + win.h * 0.27,
     lamps: {
@@ -223,11 +220,11 @@ function drawScale(
     // The numbers run in a straight row, whatever the scale beneath does.
     if (label) ctx.fillText(label, x, layout.numbersY);
   }
-  // The leftmost stop is a solid block, as on the hardware.
-  ctx.lineWidth = wh * 0.05;
+  // The leftmost stop is a solid block, as on the hardware, level with the red zone.
+  ctx.lineWidth = wh * 0.04;
   ctx.beginPath();
-  ctx.moveTo(dial.x(0) - wh * 0.05, dial.y(0) - wh * 0.03);
-  ctx.lineTo(dial.x(0) + wh * 0.04, dial.y(0) - wh * 0.01);
+  ctx.moveTo(dial.x(0) - wh * 0.045, dial.y(0) + wh * 0.02);
+  ctx.lineTo(dial.x(0) + wh * 0.045, dial.y(0) + wh * 0.02);
   ctx.stroke();
 
   // Percentage dots on a line under the scale, their numbers in a row beneath.
@@ -574,8 +571,8 @@ class VuMeterMiniInstance implements VisualizerInstance {
     if (!this.dials || this.dialsFor !== key) {
       const halfSpan = width * 0.21;
       this.dials = [
-        new Dial(width * 0.25, halfSpan, height * 0.55, height * 0.04),
-        new Dial(width * 0.75, halfSpan, height * 0.55, height * 0.04),
+        new Dial(width * 0.25, halfSpan, height * 0.55),
+        new Dial(width * 0.75, halfSpan, height * 0.55),
       ];
       this.dialsFor = key;
     }
