@@ -64,6 +64,7 @@ impl TrackSnapshot {
             unavailable: true,
             ..Default::default()
         }
+        .with_derived_fields()
     }
 }
 

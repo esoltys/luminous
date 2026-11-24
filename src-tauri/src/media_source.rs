@@ -105,9 +105,9 @@ fn lookup_filesize(db: &Database, location: &str) -> Option<u64> {
 }
 
 /// If `location` is a `radio://` URI or a live-stream song row (a source
-/// listed in `LIVE_STREAM_SOURCES_SQL`, or `FileType::Stream`), returns the
-/// resolved HTTP(S) stream URL to open via [`LiveHttpSource`]. Returns
-/// `Ok(None)` when `location` is not a live stream.
+/// in `LIVE_STREAM_SOURCES` via `LIVE_STREAM_SOURCES_SQL`, or `FileType::Stream`),
+/// returns the resolved HTTP(S) stream URL to open via [`LiveHttpSource`].
+/// Returns `Ok(None)` when `location` is not a live stream.
 fn resolve_live_stream_url(db: &Database, location: &str) -> Result<Option<String>, String> {
     let Ok(conn) = db.pool.get() else {
         if location.starts_with(RADIO_URI_SCHEME) {

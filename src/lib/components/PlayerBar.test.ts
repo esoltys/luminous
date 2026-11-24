@@ -834,6 +834,7 @@ describe("PlayerBar.svelte", () => {
       ...mockSong,
       source: "radio_browser",
       path: "radio://station-1",
+      isLive: true,
       length_nanosec: undefined,
     };
     playerStore.state = "playing";

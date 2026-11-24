@@ -77,10 +77,17 @@ impl SongSource {
     }
 
     /// True for live internet radio streams (#2002, #2004, #2009).
+    /// Derived from `LIVE_STREAM_SOURCES` so Rust and SQL predicates stay aligned.
     pub fn is_live_stream(&self) -> bool {
-        matches!(self, Self::RadioBrowser | Self::Stream)
+        LIVE_STREAM_SOURCES.contains(self)
     }
 }
+
+/// Canonical list of `SongSource` variants treated as live internet-radio
+/// streams (#2002, #2004, #2009, #2320). `SongSource::is_live_stream()`,
+/// `LIVE_STREAM_SOURCES_SQL`, and `media_source::resolve_live_stream_url`
+/// all derive from this list.
+pub const LIVE_STREAM_SOURCES: &[SongSource] = &[SongSource::RadioBrowser, SongSource::Stream];
 
 impl fmt::Display for SongSource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -159,12 +166,13 @@ pub(crate) static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
 });
 
 /// SQL `IN (...)` fragment listing the live internet-radio source IDs (#2002, #2004, #2009).
+/// Derived from `LIVE_STREAM_SOURCES` so it cannot drift from `SongSource::is_live_stream()`.
 pub(crate) static LIVE_STREAM_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
-    format!(
-        "{}, {}",
-        SongSource::RadioBrowser as i32,
-        SongSource::Stream as i32
-    )
+    LIVE_STREAM_SOURCES
+        .iter()
+        .map(|s| (*s as i32).to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 });
 
 // ---------------------------------------------------------------------------
@@ -470,9 +478,32 @@ pub struct Song {
     /// visible and playable in Album/Artist views but is excluded from auto/smart-playlist
     /// generation and Auto-Play refill.
     pub not_included: bool,
+
+    /// Computed live-stream flag serialized to the frontend (#2320). Not stored in SQLite;
+    /// populated by `Song::with_derived_fields()` from `Song::compute_is_live()`.
+    #[serde(rename = "isLive", default)]
+    pub is_live: bool,
 }
 
 impl Song {
+    /// Single source of truth for whether `self` is an unbounded live stream
+    /// (internet radio, #2002, #2320): a source in `LIVE_STREAM_SOURCES`,
+    /// `FileType::Stream`, or a `radio://` URI path.
+    pub fn compute_is_live(&self) -> bool {
+        self.source.is_live_stream()
+            || self.filetype == FileType::Stream
+            || self
+                .path
+                .as_deref()
+                .is_some_and(|p| p.starts_with(crate::media_source::RADIO_URI_SCHEME))
+    }
+
+    /// Populates derived, non-persisted fields (currently `is_live`) on this `Song`.
+    pub fn with_derived_fields(mut self) -> Self {
+        self.is_live = self.compute_is_live();
+        self
+    }
+
     /// Returns the display title, falling back to the filename.
     pub fn display_title(&self) -> &str {
         self.title
@@ -804,6 +835,9 @@ pub struct PlaybackState {
     /// songs, stations that send no metadata, and while stopped.
     #[serde(default)]
     pub station_now_playing: Option<crate::now_playing::StationNowPlaying>,
+    /// Whether the current track supports seeking (`current_song` present and not live, #2320).
+    #[serde(default)]
+    pub can_seek: bool,
 }
 
 fn default_playback_speed() -> f32 {
@@ -1935,5 +1969,64 @@ mod tests {
                 r#""max_bands":20,"min_bands":1}}"#,
             )
         );
+    }
+
+    #[test]
+    fn live_stream_sources_sql_matches_is_live_stream() {
+        let sql_ids: Vec<i32> = LIVE_STREAM_SOURCES_SQL
+            .split(',')
+            .map(|s| s.trim().parse::<i32>().unwrap())
+            .collect();
+        let expected_ids: Vec<i32> = LIVE_STREAM_SOURCES.iter().map(|s| *s as i32).collect();
+        assert_eq!(sql_ids, expected_ids);
+        assert!(SongSource::RadioBrowser.is_live_stream());
+        assert!(SongSource::Stream.is_live_stream());
+        assert!(!SongSource::LocalFile.is_live_stream());
+        assert!(!SongSource::Subsonic.is_live_stream());
+    }
+
+    #[test]
+    fn song_serializes_is_live_for_all_live_variants() {
+        let radio_path = Song {
+            source: SongSource::LocalFile,
+            filetype: FileType::Unknown,
+            path: Some("radio://station-123".into()),
+            ..Default::default()
+        }
+        .with_derived_fields();
+        assert_eq!(serde_json::to_value(&radio_path).unwrap()["isLive"], true);
+
+        let stream_source_http = Song {
+            source: SongSource::Stream,
+            filetype: FileType::Mp3,
+            path: Some("https://icecast.example.com/live.mp3".into()),
+            ..Default::default()
+        }
+        .with_derived_fields();
+        assert_eq!(
+            serde_json::to_value(&stream_source_http).unwrap()["isLive"],
+            true
+        );
+
+        let stream_filetype = Song {
+            source: SongSource::LocalFile,
+            filetype: FileType::Stream,
+            path: Some("https://icecast.example.com/aac".into()),
+            ..Default::default()
+        }
+        .with_derived_fields();
+        assert_eq!(
+            serde_json::to_value(&stream_filetype).unwrap()["isLive"],
+            true
+        );
+
+        let local_mp3 = Song {
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            path: Some("/music/track.mp3".into()),
+            ..Default::default()
+        }
+        .with_derived_fields();
+        assert_eq!(serde_json::to_value(&local_mp3).unwrap()["isLive"], false);
     }
 }

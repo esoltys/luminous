@@ -29,14 +29,10 @@ where
     tokio::task::block_in_place(move || f(&mut a))
 }
 
-/// Whether `song` is an unbounded live stream (internet radio, #2002).
+/// Whether `song` is an unbounded live stream (internet radio, #2002, #2320).
+/// Delegates to `Song::compute_is_live` so there is a single definition.
 pub fn is_live_song(song: &Song) -> bool {
-    song.source.is_live_stream()
-        || song.filetype == FileType::Stream
-        || song
-            .path
-            .as_deref()
-            .is_some_and(|p| p.starts_with("radio://"))
+    song.compute_is_live()
 }
 
 /// The engine's view of a song. The location prefers the library path, then
