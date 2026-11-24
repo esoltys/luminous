@@ -27,35 +27,22 @@ function referenceForTargetLufs(targetLufs: number): number {
 }
 
 /**
- * The loudness a typical track has when nothing normalizes it. Sampled from 18 tracks
- * across 1981-2026 in a real library: integrated loudness from -15.4 to -6.0 LUFS, median
- * about -9, mean -9.3. Most listeners never turn normalization on, so their meters have to
- * work on whatever the masters are; calibrating to the -16 LUFS default target left a
- * -7 LUFS master in the red two thirds of the time.
+ * The per-channel RMS level, in dBFS, that reads 0 VU when nothing normalizes the music.
+ * Set by ear with a slider on a real library of mostly loud modern masters (stored
+ * loudness -15.4 to -6.0 LUFS, median about -9), where -10 looked right. Most listeners
+ * never turn normalization on, so their meters have to work on whatever the masters are;
+ * calibrating to the -16 LUFS default target left a -7 LUFS master in the red two thirds
+ * of the time.
  */
-const UNNORMALIZED_PROGRAM_LUFS = -9;
-
-/** The range a manual reference level may take, in dBFS per channel (the meter's calibration trim). */
-export const VU_REFERENCE_RANGE_DBFS = { min: -30, max: 0 } as const;
-
-/** `dbfs` limited to `VU_REFERENCE_RANGE_DBFS`; the one place a manual level is bounded. */
-export function clampReferenceDbfs(dbfs: number): number {
-  return Math.max(VU_REFERENCE_RANGE_DBFS.min, Math.min(VU_REFERENCE_RANGE_DBFS.max, dbfs));
-}
+const UNNORMALIZED_REFERENCE_DBFS = -10;
 
 /**
- * The per-channel RMS level, in dBFS, of the 0 VU mark. A manual level wins when the user
- * set one. Otherwise, with normalization on, music sits at the user's target and the meter
- * is calibrated to it, so the red zone means louder than the target; with it off the meter
- * is calibrated to a typical master, like a deck's fixed reference level.
+ * The per-channel RMS level, in dBFS, of the 0 VU mark. With normalization on, music sits
+ * at the user's target and the meter is calibrated to it, so the red zone means louder than
+ * the target. Otherwise the meter uses a fixed level, like a deck's reference level.
  */
-export function referenceForLoudness(
-  normalizationEnabled: boolean,
-  targetLufs: number,
-  manualDbfs: number | null = null,
-): number {
-  if (manualDbfs !== null) return clampReferenceDbfs(manualDbfs);
-  return referenceForTargetLufs(normalizationEnabled ? targetLufs : UNNORMALIZED_PROGRAM_LUFS);
+export function referenceForLoudness(normalizationEnabled: boolean, targetLufs: number): number {
+  return normalizationEnabled ? referenceForTargetLufs(targetLufs) : UNNORMALIZED_REFERENCE_DBFS;
 }
 
 /** The 0 VU level for the backend's default normalization target (-16 LUFS). */

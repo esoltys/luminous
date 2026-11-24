@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   NEEDLE_MAX,
   Needle,
-  VU_REFERENCE_RANGE_DBFS,
   VU_REFERENCE_DBFS,
   VuMeters,
   channelLevels,
@@ -60,32 +59,11 @@ describe("reference level", () => {
     expect(referenceForLoudness(false, -16)).toBe(referenceForLoudness(false, -23));
   });
 
-  it("uses a manual level over either automatic one, within the allowed range", () => {
-    expect(referenceForLoudness(true, -16, -10)).toBe(-10);
-    expect(referenceForLoudness(false, -16, -10)).toBe(-10);
-    expect(referenceForLoudness(true, -16, -90)).toBe(VU_REFERENCE_RANGE_DBFS.min);
-    expect(referenceForLoudness(true, -16, 5)).toBe(VU_REFERENCE_RANGE_DBFS.max);
-  });
-
-  it("moves 0 VU with the manual level", () => {
-    const rms = 10 ** (-12 / 20);
-    // Calibrated so -12 dBFS reads 0 VU, then 6 dB lower.
-    expect(deflectionForRms(rms, referenceForLoudness(true, -16, -12))).toBeCloseTo(
-      deflectionForVu(0),
-      6,
-    );
-    expect(deflectionForRms(rms, referenceForLoudness(true, -16, -6))).toBeCloseTo(
-      deflectionForVu(-6),
-      6,
-    );
-  });
-
-  it("keeps a typical unnormalized master out of the red", () => {
+  it("reads 0 VU at -10 dBFS RMS when nothing normalizes the music", () => {
     const reference = referenceForLoudness(false, -16);
-    // -9 LUFS stereo is about -12 dBFS RMS per channel.
-    expect(deflectionForRms(10 ** (-12 / 20), reference)).toBeLessThan(deflectionForVu(-3));
-    // A very loud -6 LUFS master still stays below 0 VU on average.
-    expect(deflectionForRms(10 ** (-9 / 20), reference)).toBeLessThan(deflectionForVu(0));
+    expect(reference).toBe(-10);
+    expect(deflectionForRms(10 ** (-10 / 20), reference)).toBeCloseTo(deflectionForVu(0), 6);
+    expect(deflectionForRms(10 ** (-20 / 20), reference)).toBeLessThan(deflectionForVu(-7));
   });
 });
 

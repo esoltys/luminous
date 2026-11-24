@@ -3278,10 +3278,6 @@ export const en = {
       right: "RIGHT",
       unit: "VU",
       peak: "PEAK",
-      referenceTitle: "Reference level",
-      referenceAuto: "Auto",
-      referenceHint: "Set the level that reads 0 VU, where the red zone begins.",
-      referenceValue: "{level} dBFS",
     },
     scope: {
       left: "L",

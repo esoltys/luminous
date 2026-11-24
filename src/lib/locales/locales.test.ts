@@ -98,7 +98,6 @@ const IDENTICAL_OK_FR = new Set([
   "visualizers.scope.balance",
   // VU meter: "VU" is the instrument's own marking, printed the same on every deck.
   "visualizers.vu.unit",
-  "visualizers.vu.referenceValue", // "{level} dBFS": a unit symbol, the same in every language
 
   "playerBar.ctrlKey", // "Ctrl"
   "smartPlaylistBuilder.fieldTempo", // "Tempo"
@@ -224,7 +223,6 @@ const IDENTICAL_OK_FR = new Set([
 
 const IDENTICAL_OK_IT = new Set<string>([
   "visualizers.vu.unit", // the instrument's own "VU" marking
-  "visualizers.vu.referenceValue", // "{level} dBFS": a unit symbol, the same in every language
   // Vectorscope: channel letters, "Balance" and the instrument name are shared words.
   "visualizers.scope.centre",
 
@@ -336,7 +334,6 @@ const IDENTICAL_OK_IT = new Set<string>([
 
 const IDENTICAL_OK_ES = new Set<string>([
   "visualizers.vu.unit", // the instrument's own "VU" marking
-  "visualizers.vu.referenceValue", // "{level} dBFS": a unit symbol, the same in every language
   // Vectorscope: channel letters, "Balance" and the instrument name are shared words.
   "visualizers.scope.centre",
   "visualizers.scope.balance",
@@ -411,7 +408,6 @@ const IDENTICAL_OK_ES = new Set<string>([
 // Cognates, loanwords and technical terms Windows and the field also leave in English, plus brands, acronyms and symbols.
 const IDENTICAL_OK_DE = new Set<string>([
   "visualizers.vu.unit", // the instrument's own "VU" marking
-  "visualizers.vu.referenceValue", // "{level} dBFS": a unit symbol, the same in every language
   // Vectorscope: channel letters, "Balance" and the instrument name are shared words.
   "visualizers.scope.left",
   "visualizers.scope.right",
@@ -562,7 +558,6 @@ const IDENTICAL_OK_DE = new Set<string>([
 // Brands, acronyms, units, symbols and example URLs or paths that Ukrainian leaves as they are.
 const IDENTICAL_OK_UK = new Set<string>([
   "visualizers.vu.unit", // the instrument's own "VU" marking
-  "visualizers.vu.referenceValue", // "{level} dBFS": a unit symbol, the same in every language
   "playerBar.ctrlKey", // "Ctrl"
   "units.lufs", // Loudness unit, written in Latin letters
   "collection.columnBpm", // BPM
@@ -608,7 +603,6 @@ const IDENTICAL_OK_UK = new Set<string>([
 // Brands, acronyms, units, symbols and example URLs or paths that Russian leaves as they are.
 const IDENTICAL_OK_RU = new Set<string>([
   "visualizers.vu.unit", // the instrument's own "VU" marking
-  "visualizers.vu.referenceValue", // "{level} dBFS": a unit symbol, the same in every language
   "playerBar.ctrlKey", // "Ctrl"
   "units.lufs", // Loudness unit, written in Latin letters
   "collection.columnBpm", // BPM

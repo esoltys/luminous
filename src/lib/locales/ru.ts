@@ -3561,10 +3561,6 @@ export const ru = {
       right: "ПРАВЫЙ",
       unit: "VU",
       peak: "ПИК",
-      referenceTitle: "Опорный уровень",
-      referenceAuto: "Авто",
-      referenceHint: "Задайте уровень, который соответствует 0 VU, где начинается красная зона.",
-      referenceValue: "{level} dBFS",
     },
     scope: {
       left: "Л",
