@@ -390,6 +390,19 @@ pub fn resolve_path_directory(
     (None, parent_name)
 }
 
+/// Optional pre-computed context from an active library scan so
+/// `find_missing_song_ids_with` can skip redundant `stat()` calls for paths
+/// already discovered during `WalkDir` and parallelize any remaining disk
+/// checks on the scan's bounded thread pool (#2366).
+#[derive(Default)]
+struct MissingCheckContext<'a> {
+    /// Normalized path keys (`library_paths::key`) of audio files and
+    /// CUE-claimed media files seen during the current scan's discovery.
+    known_keys: Option<&'a HashSet<String>>,
+    /// Bounded thread pool for parallelizing fallback `Path::exists()` checks.
+    pool: Option<&'a rayon::ThreadPool>,
+}
+
 impl CollectionScanner {
     pub fn new(db: Arc<Database>) -> Self {
         Self { db, scope: None }
@@ -543,6 +556,15 @@ impl CollectionScanner {
         conn: &rusqlite::Connection,
         only_available: bool,
     ) -> Result<Vec<i64>> {
+        self.find_missing_song_ids_with(conn, only_available, &MissingCheckContext::default())
+    }
+
+    fn find_missing_song_ids_with(
+        &self,
+        conn: &rusqlite::Connection,
+        only_available: bool,
+        ctx: &MissingCheckContext<'_>,
+    ) -> Result<Vec<i64>> {
         let watched = WatchedFolders::load(conn)?;
 
         let (active_webdav_song_ids, active_webdav_servers) = load_active_webdav_servers(conn);
@@ -562,6 +584,7 @@ impl CollectionScanner {
         })?;
 
         let mut missing = Vec::new();
+        let mut to_stat: Vec<(i64, String)> = Vec::new();
         for (id, path, source) in rows.flatten() {
             // WebDAV songs:
             // If the WebDAV server still exists (even if offline/unavailable or disabled/detached),
@@ -603,11 +626,35 @@ impl CollectionScanner {
                 continue;
             }
 
-            if p.exists() {
-                continue;
+            // Positive hit in the scan's discovered path set proves the file
+            // exists on disk without issuing a redundant stat() (#2366).
+            if let Some(known) = ctx.known_keys {
+                if known.contains(&library_paths::key(&path)) {
+                    continue;
+                }
             }
-            missing.push(id);
+
+            to_stat.push((id, path));
         }
+
+        if !to_stat.is_empty() {
+            if let Some(pool) = ctx.pool {
+                let missing_from_disk: Vec<i64> = pool.install(|| {
+                    to_stat
+                        .par_iter()
+                        .filter_map(|(id, path)| (!Path::new(path).exists()).then_some(*id))
+                        .collect()
+                });
+                missing.extend(missing_from_disk);
+            } else {
+                for (id, path) in to_stat {
+                    if !Path::new(&path).exists() {
+                        missing.push(id);
+                    }
+                }
+            }
+        }
+
         Ok(missing)
     }
 
@@ -626,10 +673,18 @@ impl CollectionScanner {
     /// database records are kept intact, and `on_incident` is called.
     pub fn mark_missing_unavailable_ext(
         &self,
+        on_incident: impl FnMut(MassRemovalIncident, Vec<i64>),
+    ) -> Result<usize> {
+        self.mark_missing_unavailable_with(&MissingCheckContext::default(), on_incident)
+    }
+
+    fn mark_missing_unavailable_with(
+        &self,
+        ctx: &MissingCheckContext<'_>,
         mut on_incident: impl FnMut(MassRemovalIncident, Vec<i64>),
     ) -> Result<usize> {
         let conn = self.db.pool.get()?;
-        let to_mark = self.find_missing_song_ids(&conn, true)?;
+        let to_mark = self.find_missing_song_ids_with(&conn, true, ctx)?;
 
         let verdict = safeguard::evaluate_missing_tracks(&conn, &to_mark, false)?;
         for incident in &verdict.incidents {
@@ -1550,6 +1605,11 @@ impl CollectionScanner {
         let cover_manager =
             CoverManager::new(Arc::clone(&self.db), app_data_dir).with_per_scan_album_dedup();
 
+        let scan_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(scan_thread_count())
+            .build()
+            .context("failed to build scan thread pool")?;
+
         let tag_phase_started = Instant::now();
         {
             let conn = self.db.pool.get()?;
@@ -1616,10 +1676,6 @@ impl CollectionScanner {
             // serialized in batched transactions, which also caps how many
             // decoded `Song`s are held in memory at once.
             let stat_started = Instant::now();
-            let scan_pool = rayon::ThreadPoolBuilder::new()
-                .num_threads(scan_thread_count())
-                .build()
-                .context("failed to build scan thread pool")?;
 
             // Stat file stamps in parallel before partitioning so network
             // shares, NAS, and spinning disks don't pay O(files) serial stat
@@ -1818,7 +1874,19 @@ impl CollectionScanner {
         // at scan time can't cause data loss. Hard-deleting is reserved for the explicit
         // "Clean Up Missing Songs" action (`prune_missing_songs`).
         let missing_check_started = Instant::now();
-        match self.mark_missing_unavailable_ext(on_incident) {
+        let mut known_keys: HashSet<String> =
+            HashSet::with_capacity(all_paths.len() + cue_jobs.len());
+        for p in &all_paths {
+            known_keys.insert(library_paths::key(&p.to_string_lossy()));
+        }
+        for job in &cue_jobs {
+            known_keys.insert(library_paths::key(&job.media_path.to_string_lossy()));
+        }
+        let missing_ctx = MissingCheckContext {
+            known_keys: Some(&known_keys),
+            pool: Some(&scan_pool),
+        };
+        match self.mark_missing_unavailable_with(&missing_ctx, on_incident) {
             Ok(marked) => report.marked_unavailable = marked,
             Err(e) => log::error!("Failed to mark missing songs during scan: {e}"),
         }
@@ -5836,5 +5904,85 @@ Official DR value: DR11\n",
         .unwrap();
         let missing = mgr.find_missing_song_ids(&conn, false).unwrap();
         assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn find_missing_song_ids_skips_disk_stat_for_known_keys_and_parallelizes_misses() {
+        let dir = tempfile::tempdir().unwrap();
+        let watched_dir = dir.path().join("music");
+        std::fs::create_dir_all(&watched_dir).unwrap();
+
+        let db = Arc::new(Database::new(dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        scanner
+            .add_directory(&watched_dir.to_string_lossy())
+            .unwrap();
+        let conn = db.pool.get().unwrap();
+
+        // Neither file exists on disk: `known_ghost` is in `known_keys` (so it must
+        // be trusted without statting), while `missing_track` is not in `known_keys`
+        // (so fallback disk stat detects it as missing).
+        let known_ghost = watched_dir.join("known_ghost.mp3");
+        let missing_track = watched_dir.join("missing_track.mp3");
+        let orphan_local = dir.path().join("outside_local.mp3");
+        std::fs::write(&orphan_local, b"exists-on-disk").unwrap();
+
+        for (path, source) in [
+            (&known_ghost, SongSource::LocalFile),
+            (&missing_track, SongSource::LocalFile),
+            (&orphan_local, SongSource::LocalFile),
+        ] {
+            let song = Song {
+                source,
+                filetype: FileType::Mp3,
+                path: Some(path.to_string_lossy().to_string()),
+                title: Some("Track".to_string()),
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        }
+
+        let id_for = |p: &Path| -> i64 {
+            conn.query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![p.to_string_lossy().as_ref()],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        let known_ghost_id = id_for(&known_ghost);
+        let missing_track_id = id_for(&missing_track);
+        let orphan_local_id = id_for(&orphan_local);
+
+        let mut known_keys = HashSet::new();
+        known_keys.insert(library_paths::key(&known_ghost.to_string_lossy()));
+        // Even if a path outside watched folders were somehow in known_keys,
+        // the LocalFile-outside-watched-folders orphan rule must run first.
+        known_keys.insert(library_paths::key(&orphan_local.to_string_lossy()));
+
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(2)
+            .build()
+            .unwrap();
+        let ctx = MissingCheckContext {
+            known_keys: Some(&known_keys),
+            pool: Some(&pool),
+        };
+
+        let missing = scanner
+            .find_missing_song_ids_with(&conn, true, &ctx)
+            .unwrap();
+        assert!(
+            !missing.contains(&known_ghost_id),
+            "known_keys hit should skip disk stat"
+        );
+        assert!(
+            missing.contains(&missing_track_id),
+            "miss in known_keys should fall back to disk stat"
+        );
+        assert!(
+            missing.contains(&orphan_local_id),
+            "local file outside watched folders should still be flagged as orphaned"
+        );
     }
 }
