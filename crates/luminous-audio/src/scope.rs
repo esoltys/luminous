@@ -83,7 +83,10 @@ impl OutputRenderer {
             // Whole frames only, so the ring always holds complete pairs.
             // Fixed-size ring buffer: overwrites the oldest samples, never allocates.
             // ast-grep-ignore: audio-callback-no-alloc
-            self.shared.scope_buf.push(&block[..block.len() & !1]);
+            self.shared
+                .visualizer
+                .scope_buf
+                .push(&block[..block.len() & !1]);
             return;
         }
         if channels == 0 {
@@ -100,7 +103,7 @@ impl OutputRenderer {
         }
         // Fixed-size ring buffer: overwrites the oldest samples, never allocates.
         // ast-grep-ignore: audio-callback-no-alloc
-        self.shared.scope_buf.push(&self.stereo_scratch);
+        self.shared.visualizer.scope_buf.push(&self.stereo_scratch);
     }
 }
 

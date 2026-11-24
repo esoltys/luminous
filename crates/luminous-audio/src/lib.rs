@@ -85,7 +85,7 @@ use ringbuf::{
     HeapRb,
 };
 use std::sync::{
-    atomic::{AtomicU32, AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     mpsc, Arc,
 };
 use symphonia::core::{
@@ -117,46 +117,120 @@ const _: () = assert!(PRELOAD_LEAD_NS >= (MAX_AUTO_CROSSFADE_SECS as u64 + 3) * 
 const TRUE_PEAK_CEILING: f32 = 0.891_250_9;
 
 /// Step count and per-step sleep duration for a gain ramp spread over
-/// `duration_ms` in ~10ms increments. Shared by `fade_out_then` (on the
-/// decode thread), `AudioShared::ramp_fade_gain`, and
-/// `AudioEngine::ramp_loudness_gain` (each on its own thread).
-fn ramp_steps(duration_ms: u32) -> (u32, std::time::Duration) {
+/// `duration_ms` in ~10ms increments. Shared by `RampedGain::ramp` and
+/// `RampedGain::fade_out_then`.
+fn ramp_steps(duration_ms: u64) -> (u64, std::time::Duration) {
     let steps = (duration_ms / 10).max(1);
-    let step_dur = std::time::Duration::from_millis((duration_ms / steps) as u64);
+    let step_dur = std::time::Duration::from_millis(duration_ms / steps);
     (steps, step_dur)
 }
 
 /// Linear interpolation from `start_gain` to `end_gain` at step `i` of
 /// `steps` total (`i == steps` yields exactly `end_gain`).
-fn ramp_gain_at_step(start_gain: f32, end_gain: f32, steps: u32, i: u32) -> f32 {
+fn ramp_gain_at_step(start_gain: f32, end_gain: f32, steps: u64, i: u64) -> f32 {
     let t = i as f32 / steps as f32;
     start_gain + (end_gain - start_gain) * t
 }
 
-/// Ramp the fade envelope down from its current level over `duration_ms`,
-/// run `then` (pause or stop the stream), and restore the envelope for the
-/// next start. Bumps `shared.fade_generation` so any in-flight fade-in ramp
-/// is cleanly cancelled. With no duration the envelope is reset to 1.0 at once,
-/// so an instant pause stays bit-identical to playing up to that point.
-fn fade_out_then(shared: &AudioShared, duration_ms: u32, then: impl FnOnce()) {
-    if duration_ms == 0 {
-        shared.reset_fade_gain();
-        then();
-        return;
-    }
-    let generation = shared.fade_generation.fetch_add(1, Ordering::AcqRel) + 1;
-    let start = f32::from_bits(shared.fade_gain.load(Ordering::Relaxed));
-    let (steps, step_dur) = ramp_steps(duration_ms);
-    for i in 0..=steps {
-        if shared.fade_generation.load(Ordering::Acquire) != generation {
-            break;
+/// An atomic `f32` multiplier paired with a monotonic generation counter so
+/// any newer write or ramp cancels an older background ramp in flight.
+pub(crate) struct RampedGain {
+    value: AtomicU32,
+    generation: AtomicU64,
+}
+
+impl RampedGain {
+    /// Creates a gain initialized to `initial`.
+    pub(crate) fn new(initial: f32) -> Self {
+        Self {
+            value: AtomicU32::new(initial.to_bits()),
+            generation: AtomicU64::new(0),
         }
-        let g = ramp_gain_at_step(start, 0.0, steps, i);
-        shared.fade_gain.store(g.to_bits(), Ordering::Relaxed);
-        std::thread::sleep(step_dur);
     }
-    then();
-    shared.reset_fade_gain();
+
+    /// Reads the current multiplier (`Ordering::Relaxed`).
+    /// Allocation-free for the audio callback.
+    pub(crate) fn get(&self) -> f32 {
+        f32::from_bits(self.value.load(Ordering::Relaxed))
+    }
+
+    /// Immediately stores `value` and bumps the generation (`Ordering::AcqRel`)
+    /// so any in-flight ramp stops without overwriting it.
+    pub(crate) fn set(&self, value: f32) {
+        self.generation.fetch_add(1, Ordering::AcqRel);
+        self.value.store(value.to_bits(), Ordering::Relaxed);
+    }
+
+    /// Bumps the generation without changing `value`, stopping any ramp in flight.
+    fn cancel_ramp(&self) {
+        self.generation.fetch_add(1, Ordering::AcqRel);
+    }
+
+    /// Glides from `start` to `target` over `duration_ms` on a background
+    /// thread named `thread_name`. Immediately sets `start` and bumps the
+    /// generation; lands on `target` immediately when `duration_ms == 0`, the
+    /// change is below `f32::EPSILON`, or the worker thread cannot be spawned.
+    pub(crate) fn ramp(
+        self: &Arc<Self>,
+        start: f32,
+        target: f32,
+        duration_ms: u64,
+        thread_name: &'static str,
+    ) {
+        let generation = self.generation.fetch_add(1, Ordering::AcqRel) + 1;
+        self.value.store(start.to_bits(), Ordering::Relaxed);
+
+        if duration_ms == 0 || (target - start).abs() < f32::EPSILON {
+            self.value.store(target.to_bits(), Ordering::Relaxed);
+            return;
+        }
+
+        let gain = Arc::clone(self);
+        let spawned = std::thread::Builder::new()
+            .name(thread_name.into())
+            .spawn(move || {
+                let (steps, step_dur) = ramp_steps(duration_ms);
+                for i in 0..=steps {
+                    if gain.generation.load(Ordering::Acquire) != generation {
+                        return;
+                    }
+                    let g = ramp_gain_at_step(start, target, steps, i);
+                    gain.value.store(g.to_bits(), Ordering::Relaxed);
+                    std::thread::sleep(step_dur);
+                }
+            });
+        if spawned.is_err() {
+            // No thread to ramp on: land on target immediately.
+            self.value.store(target.to_bits(), Ordering::Relaxed);
+        }
+    }
+
+    /// Ramps the multiplier down from its current level to `0.0` over
+    /// `duration_ms`, runs `then` (pause or stop the stream), and restores it
+    /// to `1.0` via `set(1.0)`. Bumps generation so any in-flight fade-in ramp
+    /// is cleanly cancelled. With no duration the multiplier is reset to `1.0`
+    /// at once, so an instant pause stays bit-identical to playing up to that
+    /// point.
+    pub(crate) fn fade_out_then(self: &Arc<Self>, duration_ms: u64, then: impl FnOnce()) {
+        if duration_ms == 0 {
+            self.set(1.0);
+            then();
+            return;
+        }
+        let generation = self.generation.fetch_add(1, Ordering::AcqRel) + 1;
+        let start = self.get();
+        let (steps, step_dur) = ramp_steps(duration_ms);
+        for i in 0..=steps {
+            if self.generation.load(Ordering::Acquire) != generation {
+                break;
+            }
+            let g = ramp_gain_at_step(start, 0.0, steps, i);
+            self.value.store(g.to_bits(), Ordering::Relaxed);
+            std::thread::sleep(step_dur);
+        }
+        then();
+        self.set(1.0);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -380,6 +454,78 @@ pub enum AudioEvent {
 // a single value instead of 6-10 individual Arcs through every layer.
 // ---------------------------------------------------------------------------
 
+/// Snapshot of the active audio output's published configuration and format,
+/// updated atomically under a lock by `AudioOutput::publish` and read by UI /
+/// analyzer callers (never touched on the audio callback thread).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OutputDescriptor {
+    pub sample_rate: u32,
+    pub channels: u16,
+    pub device_name: Option<String>,
+    pub backend_name: String,
+    pub bypasses_mixer: bool,
+    pub fell_back: bool,
+    pub format: &'static str,
+    pub hardware_volume: bool,
+}
+
+impl Default for OutputDescriptor {
+    fn default() -> Self {
+        Self {
+            sample_rate: 44_100,
+            channels: 2,
+            device_name: None,
+            backend_name: "CPAL".to_string(),
+            bypasses_mixer: false,
+            fell_back: false,
+            format: "32-bit float PCM",
+            hardware_volume: false,
+        }
+    }
+}
+
+/// Shared ring buffers and enable flags for the spectrum visualizer and
+/// stereo vectorscope taps fed by the audio callback.
+pub(crate) struct VisualizerTaps {
+    pub(crate) visualizer_buf: spectrum::AudioVisualizerBuffer,
+    /// Whether the output callback feeds `visualizer_buf` at all: the
+    /// downmix is skipped while nothing displays a spectrum.
+    pub(crate) spectrum_enabled: AtomicBool,
+    /// L/R pairs of what plays, taken before master volume, for the
+    /// vectorscope (`scope.rs`).
+    pub(crate) scope_buf: spectrum::AudioVisualizerBuffer,
+    /// Whether the output callback feeds `scope_buf`: the copy is skipped
+    /// while no vectorscope is shown.
+    pub(crate) scope_enabled: AtomicBool,
+    /// Bumped whenever the programme changes (a seek, a new track, gapless
+    /// or not, or a rebuilt device), so the vectorscope's meters, peak hold
+    /// and loudness history start afresh instead of spanning the change.
+    pub(crate) scope_epoch: AtomicU64,
+}
+
+impl VisualizerTaps {
+    pub(crate) fn new() -> Self {
+        Self {
+            visualizer_buf: spectrum::AudioVisualizerBuffer::new(),
+            spectrum_enabled: AtomicBool::new(false),
+            scope_buf: scope::new_stereo_buffer(),
+            scope_enabled: AtomicBool::new(false),
+            scope_epoch: AtomicU64::new(0),
+        }
+    }
+
+    /// Tell the vectorscope meters the programme changed (see `scope_epoch`).
+    pub(crate) fn restart_scope(&self) {
+        self.scope_epoch.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+impl Default for VisualizerTaps {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub(crate) struct AudioShared {
     pub(crate) open_source: Box<SourceOpener>,
     pub(crate) position: AtomicU64,
@@ -389,39 +535,16 @@ pub(crate) struct AudioShared {
     /// The volume safety ceiling (#1890); 1.0 while there is none.
     pub(crate) volume_ceiling: AtomicU32,
     pub(crate) play_state: Mutex<EngineState>,
-    pub(crate) visualizer_buf: spectrum::AudioVisualizerBuffer,
-    /// Whether the output callback feeds `visualizer_buf` at all: the
-    /// downmix is skipped while nothing displays a spectrum.
-    pub(crate) spectrum_enabled: std::sync::atomic::AtomicBool,
+    pub(crate) visualizer: VisualizerTaps,
     /// When `LUMINOUS_SILENT_AUDIO` is set (automated capture), zeroes the
     /// output buffer after feeding `visualizer_buf` so visualizers still
     /// react without playing sound out of speakers.
     pub(crate) silent_output: bool,
-    /// L/R pairs of what plays, taken before master volume, for the
-    /// vectorscope (`scope.rs`).
-    pub(crate) scope_buf: spectrum::AudioVisualizerBuffer,
-    /// Whether the output callback feeds `scope_buf`: the copy is skipped
-    /// while no vectorscope is shown.
-    pub(crate) scope_enabled: std::sync::atomic::AtomicBool,
-    /// Bumped whenever the programme changes (a seek, a new track, gapless
-    /// or not, or a rebuilt device), so the vectorscope's meters, peak hold
-    /// and loudness history start afresh instead of spanning the change.
-    pub(crate) scope_epoch: AtomicU64,
-    pub(crate) output_sample_rate: AtomicU32,
-    pub(crate) output_channels: std::sync::atomic::AtomicU16,
-    pub(crate) output_device_name: parking_lot::RwLock<Option<String>>,
-    pub(crate) output_backend_name: parking_lot::RwLock<String>,
-    pub(crate) output_bypasses_mixer: std::sync::atomic::AtomicBool,
-    pub(crate) output_fell_back: std::sync::atomic::AtomicBool,
-    pub(crate) output_format: parking_lot::RwLock<&'static str>,
+    pub(crate) output: parking_lot::RwLock<OutputDescriptor>,
     pub(crate) output_config: parking_lot::RwLock<AudioOutputConfig>,
     pub(crate) input_info: parking_lot::RwLock<Option<InputInfo>>,
     pub(crate) equalizer: Mutex<luminous_equalizer::Equalizer>,
-    pub(crate) loudness_gain: AtomicU32,
-    /// Bumped by every loudness-gain write that isn't a ramp step, so an
-    /// in-flight `ramp_loudness_gain` stops instead of overwriting it: the
-    /// newest write always wins.
-    pub(crate) loudness_generation: AtomicU64,
+    pub(crate) loudness_gain: Arc<RampedGain>,
     /// A loudness-gain change scheduled at an exact played-sample index
     /// (`AudioOutput::played_samples` space), applied by the output callback
     /// mid-buffer so a crossfade's incoming track takes over its gain at the
@@ -436,13 +559,11 @@ pub(crate) struct AudioShared {
     /// Fraction of a timeline sample the output callback has played but not
     /// yet added to `played_samples` (it only counts whole samples).
     pub(crate) speed_carry: AtomicU64,
-    pub(crate) fade_gain: AtomicU32,
-    /// Bumped by every fade-gain write that isn't a ramp step, so an
-    /// in-flight `ramp_fade_gain` stops instead of overwriting it: the
-    /// newest fade write always wins.
-    pub(crate) fade_generation: AtomicU64,
-    pub(crate) hardware_volume_active: std::sync::atomic::AtomicBool,
-    pub(crate) output_hardware_volume: std::sync::atomic::AtomicBool,
+    pub(crate) fade_gain: Arc<RampedGain>,
+    /// Bypass software volume scaling in `OutputRenderer::render` when device
+    /// hardware controls master volume; synced with `output.hardware_volume`
+    /// via `set_hardware_volume`.
+    pub(crate) skip_software_volume: AtomicBool,
     pub(crate) event_tx: mpsc::Sender<AudioEvent>,
 }
 
@@ -453,7 +574,7 @@ impl AudioShared {
     /// Switch the loudness gain to `gain` when the output callback plays
     /// sample `at`, replacing any switch already scheduled.
     fn schedule_loudness_switch(&self, at: u64, gain: f32) {
-        self.loudness_generation.fetch_add(1, Ordering::AcqRel);
+        self.loudness_gain.cancel_ramp();
         self.loudness_switch_gain
             .store(gain.max(0.0).to_bits(), Ordering::Relaxed);
         self.loudness_switch_at.store(at, Ordering::Release);
@@ -515,9 +636,12 @@ impl AudioShared {
         f32::from_bits(self.volume.load(Ordering::Relaxed))
     }
 
-    /// Tell the vectorscope meters the programme changed (see `scope_epoch`).
-    fn restart_scope(&self) {
-        self.scope_epoch.fetch_add(1, Ordering::Relaxed);
+    /// Records whether device hardware controls master volume, keeping the
+    /// callback's software-volume bypass flag and `output.hardware_volume`
+    /// in sync.
+    pub(crate) fn set_hardware_volume(&self, active: bool) {
+        self.skip_software_volume.store(active, Ordering::Release);
+        self.output.write().hardware_volume = active;
     }
 
     /// Drop a scheduled loudness switch: the played-sample space it was
@@ -529,9 +653,7 @@ impl AudioShared {
 
     /// Immediately set `fade_gain` to `gain`, cancelling any in-flight fade ramp.
     pub(crate) fn set_fade_gain(&self, gain: f32) {
-        self.fade_generation.fetch_add(1, Ordering::AcqRel);
-        self.fade_gain
-            .store(gain.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
+        self.fade_gain.set(gain.clamp(0.0, 1.0));
     }
 
     /// Reset `fade_gain` to unity (1.0), cancelling any in-flight fade ramp.
@@ -540,39 +662,14 @@ impl AudioShared {
     }
 
     /// Glide `fade_gain` from `start` to `target` over `duration_ms`.
-    /// Immediately sets `fade_gain` to `start` and bumps `fade_generation`.
-    /// If `duration_ms == 0` or `start == target`, stores `target` and returns.
-    /// Otherwise, spawns a dedicated worker thread to step the gain envelope.
-    /// Cancels early if any newer fade write bumps `fade_generation`.
+    /// Immediately sets `fade_gain` to `start` and cancels any older ramp.
     pub(crate) fn ramp_fade_gain(self: &Arc<Self>, start: f32, target: f32, duration_ms: u32) {
-        let start = start.clamp(0.0, 1.0);
-        let target = target.clamp(0.0, 1.0);
-        let generation = self.fade_generation.fetch_add(1, Ordering::AcqRel) + 1;
-        self.fade_gain.store(start.to_bits(), Ordering::Relaxed);
-
-        if duration_ms == 0 || (target - start).abs() < f32::EPSILON {
-            self.fade_gain.store(target.to_bits(), Ordering::Relaxed);
-            return;
-        }
-
-        let shared = Arc::clone(self);
-        let spawned = std::thread::Builder::new()
-            .name("luminous-fade-ramp".into())
-            .spawn(move || {
-                let (steps, step_dur) = ramp_steps(duration_ms);
-                for i in 0..=steps {
-                    if shared.fade_generation.load(Ordering::Acquire) != generation {
-                        return;
-                    }
-                    let g = ramp_gain_at_step(start, target, steps, i);
-                    shared.fade_gain.store(g.to_bits(), Ordering::Relaxed);
-                    std::thread::sleep(step_dur);
-                }
-            });
-        if spawned.is_err() {
-            // No thread to ramp on: land on target immediately.
-            self.fade_gain.store(target.to_bits(), Ordering::Relaxed);
-        }
+        self.fade_gain.ramp(
+            start.clamp(0.0, 1.0),
+            target.clamp(0.0, 1.0),
+            u64::from(duration_ms),
+            "luminous-fade-ramp",
+        );
     }
 }
 
@@ -588,9 +685,9 @@ pub struct AudioEngine {
     cmd_tx: mpsc::SyncSender<AudioCommand>,
     event_rx: Mutex<Option<mpsc::Receiver<AudioEvent>>>,
     shared: Arc<AudioShared>,
-    /// Reader side of `shared.visualizer_buf`: read position and onset state.
+    /// Reader side of `shared.visualizer.visualizer_buf`: read position and onset state.
     visualizer: Mutex<spectrum::VisualizerAnalyzer>,
-    /// Reader side of `shared.scope_buf`: read position and meter state.
+    /// Reader side of `shared.visualizer.scope_buf`: read position and meter state.
     scope: Mutex<scope::ScopeAnalyzer>,
 }
 
@@ -617,33 +714,23 @@ impl AudioEngine {
             volume: AtomicU32::new(1.0f32.to_bits()),
             volume_ceiling: AtomicU32::new(1.0f32.to_bits()),
             play_state: Mutex::new(EngineState::Stopped),
-            visualizer_buf: spectrum::AudioVisualizerBuffer::new(),
-            spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
+            visualizer: VisualizerTaps::new(),
             silent_output: std::env::var_os("LUMINOUS_SILENT_AUDIO")
                 .is_some_and(|v| !v.is_empty() && v != "0"),
-            scope_buf: scope::new_stereo_buffer(),
-            scope_enabled: std::sync::atomic::AtomicBool::new(false),
-            scope_epoch: AtomicU64::new(0),
-            output_sample_rate: AtomicU32::new(44100),
-            output_channels: std::sync::atomic::AtomicU16::new(2),
-            output_device_name: parking_lot::RwLock::new(get_default_device_name()),
-            output_backend_name: parking_lot::RwLock::new("CPAL".to_string()),
-            output_bypasses_mixer: std::sync::atomic::AtomicBool::new(false),
-            output_fell_back: std::sync::atomic::AtomicBool::new(false),
-            output_format: parking_lot::RwLock::new("32-bit float PCM"),
+            output: parking_lot::RwLock::new(OutputDescriptor {
+                device_name: get_default_device_name(),
+                ..OutputDescriptor::default()
+            }),
             output_config: parking_lot::RwLock::new(AudioOutputConfig::default()),
             input_info: parking_lot::RwLock::new(None),
             equalizer: Mutex::new(luminous_equalizer::Equalizer::new()),
-            loudness_gain: AtomicU32::new(1.0f32.to_bits()),
-            loudness_generation: AtomicU64::new(0),
+            loudness_gain: Arc::new(RampedGain::new(1.0)),
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
             speed: AtomicU32::new(1.0f32.to_bits()),
             speed_carry: AtomicU64::new(0.0f64.to_bits()),
-            fade_gain: AtomicU32::new(1.0f32.to_bits()),
-            fade_generation: AtomicU64::new(0),
-            hardware_volume_active: std::sync::atomic::AtomicBool::new(false),
-            output_hardware_volume: std::sync::atomic::AtomicBool::new(false),
+            fade_gain: Arc::new(RampedGain::new(1.0)),
+            skip_software_volume: AtomicBool::new(false),
             event_tx: event_tx.clone(),
         });
         let shared_clone = Arc::clone(&shared);
@@ -786,12 +873,7 @@ impl AudioEngine {
     /// Step the per-track loudness-normalization multiplier (#77) at once,
     /// e.g. as a track starts. Cancels any ramp in progress.
     pub fn set_loudness_gain(&self, gain: f32) {
-        self.shared
-            .loudness_generation
-            .fetch_add(1, Ordering::AcqRel);
-        self.shared
-            .loudness_gain
-            .store(gain.max(0.0).to_bits(), Ordering::Relaxed);
+        self.shared.loudness_gain.set(gain.max(0.0));
     }
 
     /// Glide the loudness multiplier to `target` over `duration_ms`, for a
@@ -800,39 +882,13 @@ impl AudioEngine {
     /// and stops early if any newer loudness write (a set, another ramp, a
     /// crossfade's switch) lands first.
     pub fn ramp_loudness_gain(&self, target: f32, duration_ms: u32) {
-        let target = target.max(0.0);
-        let generation = self
-            .shared
-            .loudness_generation
-            .fetch_add(1, Ordering::AcqRel)
-            + 1;
-        let start = f32::from_bits(self.shared.loudness_gain.load(Ordering::Relaxed));
-        if duration_ms == 0 || (target - start).abs() < f32::EPSILON {
-            self.shared
-                .loudness_gain
-                .store(target.to_bits(), Ordering::Relaxed);
-            return;
-        }
-        let shared = Arc::clone(&self.shared);
-        let spawned = std::thread::Builder::new()
-            .name("luminous-loudness-ramp".into())
-            .spawn(move || {
-                let (steps, step_dur) = ramp_steps(duration_ms);
-                for i in 0..=steps {
-                    if shared.loudness_generation.load(Ordering::Acquire) != generation {
-                        return;
-                    }
-                    let g = ramp_gain_at_step(start, target, steps, i);
-                    shared.loudness_gain.store(g.to_bits(), Ordering::Relaxed);
-                    std::thread::sleep(step_dur);
-                }
-            });
-        if spawned.is_err() {
-            // No thread to ramp on: land on the target rather than stay put.
-            self.shared
-                .loudness_gain
-                .store(target.to_bits(), Ordering::Relaxed);
-        }
+        let start = self.shared.loudness_gain.get();
+        self.shared.loudness_gain.ramp(
+            start,
+            target.max(0.0),
+            u64::from(duration_ms),
+            "luminous-loudness-ramp",
+        );
     }
 
     /// Audible position in the current track.
@@ -846,7 +902,7 @@ impl AudioEngine {
 
     /// The loudness multiplier in effect now (mid-ramp, the current step).
     pub fn current_loudness_gain(&self) -> f32 {
-        f32::from_bits(self.shared.loudness_gain.load(Ordering::Relaxed))
+        self.shared.loudness_gain.get()
     }
 
     pub fn current_state(&self) -> EngineState {
@@ -861,13 +917,17 @@ impl AudioEngine {
     }
 
     pub fn spectrum_enabled(&self) -> bool {
-        self.shared.spectrum_enabled.load(Ordering::Relaxed)
+        self.shared
+            .visualizer
+            .spectrum_enabled
+            .load(Ordering::Relaxed)
     }
 
     /// Start or stop feeding the visualizer. While it is off the output
     /// callback skips the work and `visualizer_frame` returns `None`.
     pub fn set_spectrum_enabled(&self, enabled: bool) {
         self.shared
+            .visualizer
             .spectrum_enabled
             .store(enabled, Ordering::Relaxed);
     }
@@ -882,15 +942,18 @@ impl AudioEngine {
             analyzer.reset();
             return None;
         }
-        let sample_rate = self.shared.output_sample_rate.load(Ordering::Relaxed);
+        let sample_rate = self.shared.output.read().sample_rate;
         let gain = self.shared.current_volume();
-        Some(analyzer.frame(&self.shared.visualizer_buf, sample_rate, gain))
+        Some(analyzer.frame(&self.shared.visualizer.visualizer_buf, sample_rate, gain))
     }
 
     /// Start or stop feeding the vectorscope. While it is off the output
     /// callback skips the stereo copy and `scope_frame` returns `None`.
     pub fn set_scope_enabled(&self, enabled: bool) {
-        self.shared.scope_enabled.store(enabled, Ordering::Relaxed);
+        self.shared
+            .visualizer
+            .scope_enabled
+            .store(enabled, Ordering::Relaxed);
     }
 
     /// The stereo trace and meters of what played since the previous call,
@@ -900,44 +963,43 @@ impl AudioEngine {
     /// still the same programme).
     pub fn scope_frame(&self) -> Option<ScopeFrame> {
         let mut analyzer = self.scope.lock();
-        if !self.shared.scope_enabled.load(Ordering::Relaxed) {
+        if !self.shared.visualizer.scope_enabled.load(Ordering::Relaxed) {
             analyzer.reset();
             return None;
         }
         if self.current_state() != EngineState::Playing {
             return None;
         }
-        let sample_rate = self.shared.output_sample_rate.load(Ordering::Relaxed);
-        let epoch = self.shared.scope_epoch.load(Ordering::Relaxed);
-        Some(analyzer.frame(&self.shared.scope_buf, sample_rate, epoch))
+        let sample_rate = self.shared.output.read().sample_rate;
+        let epoch = self.shared.visualizer.scope_epoch.load(Ordering::Relaxed);
+        Some(analyzer.frame(&self.shared.visualizer.scope_buf, sample_rate, epoch))
     }
 
     /// The output stage as currently configured, with sensible defaults
     /// before the first stream is built.
     pub fn output_info(&self) -> OutputInfo {
-        let rate = self.shared.output_sample_rate.load(Ordering::Relaxed);
-        let channels = self.shared.output_channels.load(Ordering::Relaxed);
-        let device_name = self
-            .shared
-            .output_device_name
-            .read()
-            .clone()
+        let desc = self.shared.output.read().clone();
+        let device_name = desc
+            .device_name
             .or_else(get_default_device_name)
             .unwrap_or_else(|| "Default Audio Device".to_string());
-        let backend_name = self.shared.output_backend_name.read().clone();
         OutputInfo {
-            sample_rate: if rate > 0 { rate } else { 44100 },
-            channels: if channels > 0 { channels } else { 2 },
+            sample_rate: if desc.sample_rate > 0 {
+                desc.sample_rate
+            } else {
+                44_100
+            },
+            channels: if desc.channels > 0 { desc.channels } else { 2 },
             device_name,
-            backend_name: if backend_name.is_empty() {
+            backend_name: if desc.backend_name.is_empty() {
                 "CPAL".to_string()
             } else {
-                backend_name
+                desc.backend_name
             },
-            bypasses_mixer: self.shared.output_bypasses_mixer.load(Ordering::Relaxed),
-            fell_back: self.shared.output_fell_back.load(Ordering::Relaxed),
-            format: self.shared.output_format.read().to_string(),
-            hardware_volume: self.shared.output_hardware_volume.load(Ordering::Relaxed),
+            bypasses_mixer: desc.bypasses_mixer,
+            fell_back: desc.fell_back,
+            format: desc.format.to_string(),
+            hardware_volume: desc.hardware_volume,
         }
     }
 
@@ -967,11 +1029,11 @@ impl AudioEngine {
             return None;
         }
         let current = get_default_device_name()?;
-        let mut guard = self.shared.output_device_name.write();
-        if guard.as_deref() == Some(current.as_str()) {
+        let mut output = self.shared.output.write();
+        if output.device_name.as_deref() == Some(current.as_str()) {
             return None;
         }
-        *guard = Some(current.clone());
+        output.device_name = Some(current.clone());
         Some(current)
     }
 
@@ -1399,24 +1461,16 @@ impl AudioOutput {
     /// Make this the output `AudioEngine::output_info` describes, and report
     /// a backend fallback if it is one.
     fn publish(&self, shared: &AudioShared, event_tx: &mpsc::Sender<AudioEvent>) {
-        shared
-            .output_sample_rate
-            .store(self.sample_rate, Ordering::Relaxed);
-        shared
-            .output_channels
-            .store(self.channels, Ordering::Relaxed);
-        *shared.output_device_name.write() = self.device_name.clone();
-        *shared.output_backend_name.write() = self.backend_name.clone();
-        shared
-            .output_bypasses_mixer
-            .store(self.sink.backend().bypasses_mixer(), Ordering::Relaxed);
-        shared
-            .output_fell_back
-            .store(self.fallback.is_some(), Ordering::Relaxed);
-        shared
-            .output_hardware_volume
-            .store(self.sink.has_hardware_volume(), Ordering::Relaxed);
-        *shared.output_format.write() = self.sink.output_format();
+        *shared.output.write() = OutputDescriptor {
+            sample_rate: self.sample_rate,
+            channels: self.channels,
+            device_name: self.device_name.clone(),
+            backend_name: self.backend_name.clone(),
+            bypasses_mixer: self.sink.backend().bypasses_mixer(),
+            fell_back: self.fallback.is_some(),
+            format: self.sink.output_format(),
+            hardware_volume: self.sink.has_hardware_volume(),
+        };
         if let Some((requested, reason)) = self.fallback {
             let _ = event_tx.send(AudioEvent::OutputFallback { requested, reason });
         }
@@ -1714,9 +1768,9 @@ impl OutputRenderer {
     /// Runs on the real-time audio thread: never allocates or blocks.
     pub(crate) fn render(&mut self, output: &mut [f32]) {
         let vol = f32::from_bits(self.shared.volume.load(Ordering::Relaxed));
-        let mut loudness = f32::from_bits(self.shared.loudness_gain.load(Ordering::Relaxed));
+        let mut loudness = self.shared.loudness_gain.get();
         let played_before = self.played_samples.load(Ordering::Relaxed);
-        let fade = f32::from_bits(self.shared.fade_gain.load(Ordering::Relaxed));
+        let fade = self.shared.fade_gain.get();
         let speed = f32::from_bits(self.shared.speed.load(Ordering::Relaxed));
         let mut played = 0;
 
@@ -1760,9 +1814,10 @@ impl OutputRenderer {
                 )
                 .is_ok()
             {
-                let new_bits = self.shared.loudness_switch_gain.load(Ordering::Relaxed);
-                self.shared.loudness_gain.store(new_bits, Ordering::Relaxed);
-                loudness = f32::from_bits(new_bits);
+                let new_gain =
+                    f32::from_bits(self.shared.loudness_switch_gain.load(Ordering::Relaxed));
+                self.shared.loudness_gain.set(new_gain);
+                loudness = new_gain;
                 split = k;
             }
         }
@@ -1793,12 +1848,12 @@ impl OutputRenderer {
         // The vectorscope meters what is playing (normalized, equalized,
         // faded) but not how loud the listener set it, so it taps here,
         // before volume, in both the software and hardware volume paths.
-        if played > 0 && self.shared.scope_enabled.load(Ordering::Relaxed) {
+        if played > 0 && self.shared.visualizer.scope_enabled.load(Ordering::Relaxed) {
             self.tap_stereo(&output[..played]);
         }
 
         // 4) Master volume: bypassed when hardware volume is active (keeps samples bit-perfect)
-        let hw_vol = self.shared.hardware_volume_active.load(Ordering::Relaxed);
+        let hw_vol = self.shared.skip_software_volume.load(Ordering::Relaxed);
         if !hw_vol && vol != 1.0 {
             for sample in output[..played].iter_mut() {
                 *sample *= vol;
@@ -1819,7 +1874,13 @@ impl OutputRenderer {
             }
         }
 
-        if played > 0 && self.shared.spectrum_enabled.load(Ordering::Relaxed) {
+        if played > 0
+            && self
+                .shared
+                .visualizer
+                .spectrum_enabled
+                .load(Ordering::Relaxed)
+        {
             let channels_u = self.channels as usize;
             self.mono_scratch.clear();
             // When hardware volume is active, `output` remains bit-perfect at full scale,
@@ -1834,7 +1895,10 @@ impl OutputRenderer {
             }
             // Fixed-size ring buffer: overwrites the oldest samples, never allocates.
             // ast-grep-ignore: audio-callback-no-alloc
-            self.shared.visualizer_buf.push(&self.mono_scratch);
+            self.shared
+                .visualizer
+                .visualizer_buf
+                .push(&self.mono_scratch);
         }
 
         if self.shared.silent_output && played > 0 {
@@ -2462,7 +2526,7 @@ fn decode_thread(
         let start_samples = samples_for_ns(current.start_ns, target_sample_rate, target_channels);
         out.played_samples.store(start_samples, Ordering::Relaxed);
         shared.cancel_loudness_switch();
-        shared.restart_scope();
+        shared.visualizer.restart_scope();
 
         if resume_fade_ms > 0 {
             shared.ramp_fade_gain(0.0, 1.0, resume_fade_ms);
@@ -2743,7 +2807,7 @@ fn check_and_rebuild_output(
         if is_virtual {
             if let Some(out) = output.as_mut() {
                 out.device_name = new_default_name.clone();
-                *shared.output_device_name.write() = new_default_name;
+                shared.output.write().device_name = new_default_name;
                 let _ = event_tx.send(AudioEvent::PipelineChanged);
                 return DeviceCheckOutcome::Ok;
             }
@@ -2798,7 +2862,7 @@ fn check_and_rebuild_output(
 
                 session.outgoing = None;
                 shared.cancel_loudness_switch();
-                shared.restart_scope();
+                shared.visualizer.restart_scope();
                 if let Some(t) = session.transition.take() {
                     // Mid-handover: `cur_pos` is still on the finished
                     // track's timeline, so reopen that track there (as
@@ -2915,7 +2979,7 @@ fn handle_decode_command(
     let position = &shared.position;
     match cmd {
         Ok(AudioCommand::Pause(dur_ms)) => {
-            fade_out_then(shared, dur_ms, || {
+            shared.fade_gain.fade_out_then(u64::from(dur_ms), || {
                 let _ = out.sink.pause();
             });
             {
@@ -2934,7 +2998,7 @@ fn handle_decode_command(
             CmdOutcome::BreakDecode
         }
         Ok(AudioCommand::Stop(dur_ms)) => {
-            fade_out_then(shared, dur_ms, || {
+            shared.fade_gain.fade_out_then(u64::from(dur_ms), || {
                 let _ = out.sink.pause();
             });
             {
@@ -3039,7 +3103,7 @@ fn seek_session(
     // A seek cuts any crossfade tail still being mixed in.
     session.outgoing = None;
     shared.cancel_loudness_switch();
-    shared.restart_scope();
+    shared.visualizer.restart_scope();
     if let Some(t) = session.transition.take() {
         // Mid-handover seek: the audible position is still in
         // the finished track but its decoder is gone — reopen
@@ -3162,7 +3226,7 @@ fn advance_transition_and_preload_signal(
             session.current.input_changed = false;
             // A new track is a new programme for the vectorscope's peak
             // hold and loudness history, gapless or not.
-            shared.restart_scope();
+            shared.visualizer.restart_scope();
             let finished_track_id = t.finished.id;
             let _ = event_tx.send(AudioEvent::TrackTransitioned {
                 finished_track_id,
@@ -3532,7 +3596,7 @@ fn maybe_start_crossfade(session: &mut DecodeSession, shared: &AudioShared) {
     // The loudness gain is one global slot applied after mixing: switch it to
     // the incoming track's at the overlap's first sample, and pre-scale the
     // tail so it still plays at its own normalized level.
-    let old_gain = f32::from_bits(shared.loudness_gain.load(Ordering::Relaxed));
+    let old_gain = shared.loudness_gain.get();
     let new_gain = session.crossfade_incoming_gain;
     shared.schedule_loudness_switch(session.pushed_samples, new_gain);
     session.outgoing = Some(CrossfadeTail {
@@ -3767,32 +3831,22 @@ mod tests {
             volume_ceiling: AtomicU32::new(1.0f32.to_bits()),
             open_source: Box::new(open_file),
             play_state: Mutex::new(EngineState::Playing),
-            visualizer_buf: spectrum::AudioVisualizerBuffer::new(),
-            spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
+            visualizer: VisualizerTaps::new(),
             silent_output: false,
-            scope_buf: scope::new_stereo_buffer(),
-            scope_enabled: std::sync::atomic::AtomicBool::new(false),
-            scope_epoch: AtomicU64::new(0),
-            output_sample_rate: AtomicU32::new(44100),
-            output_channels: std::sync::atomic::AtomicU16::new(2),
-            output_device_name: parking_lot::RwLock::new(None),
-            output_backend_name: parking_lot::RwLock::new("Test".to_string()),
-            output_bypasses_mixer: std::sync::atomic::AtomicBool::new(false),
-            output_fell_back: std::sync::atomic::AtomicBool::new(false),
-            output_format: parking_lot::RwLock::new("32-bit float PCM"),
+            output: parking_lot::RwLock::new(OutputDescriptor {
+                backend_name: "Test".to_string(),
+                ..OutputDescriptor::default()
+            }),
             output_config: parking_lot::RwLock::new(crate::sink::AudioOutputConfig::default()),
             input_info: parking_lot::RwLock::new(None),
             equalizer: Mutex::new(luminous_equalizer::Equalizer::new()),
-            loudness_gain: AtomicU32::new(1.0f32.to_bits()),
-            loudness_generation: AtomicU64::new(0),
+            loudness_gain: Arc::new(RampedGain::new(1.0)),
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
             speed: AtomicU32::new(1.0f32.to_bits()),
             speed_carry: AtomicU64::new(0.0f64.to_bits()),
-            fade_gain: AtomicU32::new(1.0f32.to_bits()),
-            fade_generation: AtomicU64::new(0),
-            hardware_volume_active: std::sync::atomic::AtomicBool::new(false),
-            output_hardware_volume: std::sync::atomic::AtomicBool::new(false),
+            fade_gain: Arc::new(RampedGain::new(1.0)),
+            skip_software_volume: AtomicBool::new(false),
             event_tx: mpsc::channel().0,
         }
     }
@@ -3910,11 +3964,96 @@ mod tests {
         assert!((out[1] - 0.4).abs() < 1e-6);
 
         // 2) With hardware volume active, samples pass through at unity: -0.4 * 1.0 = -0.4
-        shared.hardware_volume_active.store(true, Ordering::Relaxed);
+        shared.set_hardware_volume(true);
         let mut out2 = [0.0f32; 2];
         renderer.render(&mut out2);
         assert!((out2[0] - (-0.4)).abs() < 1e-6);
         assert!((out2[1] - (-0.4)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn set_hardware_volume_keeps_callback_flag_and_descriptor_in_sync() {
+        let shared = test_shared();
+        assert!(!shared.skip_software_volume.load(Ordering::Relaxed));
+        assert!(!shared.output.read().hardware_volume);
+
+        shared.set_hardware_volume(true);
+        assert!(shared.skip_software_volume.load(Ordering::Acquire));
+        assert!(shared.output.read().hardware_volume);
+
+        shared.set_hardware_volume(false);
+        assert!(!shared.skip_software_volume.load(Ordering::Acquire));
+        assert!(!shared.output.read().hardware_volume);
+    }
+
+    #[test]
+    fn publish_updates_output_descriptor_atomically() {
+        struct HardwareTestSink;
+        impl crate::sink::AudioSink for HardwareTestSink {
+            fn play(&self) -> Result<(), String> {
+                Ok(())
+            }
+            fn pause(&self) -> Result<(), String> {
+                Ok(())
+            }
+            fn sample_rate(&self) -> u32 {
+                96_000
+            }
+            fn channels(&self) -> u16 {
+                2
+            }
+            fn device_name(&self) -> Option<String> {
+                Some("Test USB DAC".into())
+            }
+            fn backend(&self) -> AudioBackendKind {
+                AudioBackendKind::WasapiExclusive
+            }
+            fn output_format(&self) -> &'static str {
+                "24-bit integer PCM"
+            }
+            fn is_errored(&self) -> bool {
+                false
+            }
+            fn has_hardware_volume(&self) -> bool {
+                true
+            }
+        }
+
+        let shared = test_shared();
+        let (event_tx, event_rx) = mpsc::channel();
+        let (producer, consumer) = HeapRb::<f32>::new(16).split();
+        let out = AudioOutput {
+            sink: Box::new(HardwareTestSink),
+            producer,
+            consumer: Arc::new(Mutex::new(consumer)),
+            played_samples: Arc::new(AtomicU64::new(0)),
+            sample_rate: 96_000,
+            channels: 2,
+            device_name: Some("Test USB DAC".into()),
+            backend_name: AudioBackendKind::WasapiExclusive.to_string(),
+            fallback: Some((AudioBackendKind::Asio, OutputFallbackReason::DeviceInUse)),
+            stands_in: false,
+            requested_rate: 96_000,
+        };
+
+        out.publish(&shared, &event_tx);
+
+        let desc = shared.output.read().clone();
+        assert_eq!(desc.sample_rate, 96_000);
+        assert_eq!(desc.channels, 2);
+        assert_eq!(desc.device_name.as_deref(), Some("Test USB DAC"));
+        assert_eq!(desc.backend_name, "WASAPI Exclusive");
+        assert!(desc.bypasses_mixer);
+        assert!(desc.fell_back);
+        assert_eq!(desc.format, "24-bit integer PCM");
+        assert!(desc.hardware_volume);
+        assert!(matches!(
+            event_rx.try_recv(),
+            Ok(AudioEvent::OutputFallback {
+                requested: AudioBackendKind::Asio,
+                reason: OutputFallbackReason::DeviceInUse,
+            })
+        ));
     }
 
     #[test]
@@ -4184,12 +4323,13 @@ mod tests {
             assert!(eq.load_builtin_preset("Rock"));
             eq.set_enabled(true);
         }
-        shared
-            .loudness_gain
-            .store(0.8f32.to_bits(), Ordering::Relaxed);
+        shared.loudness_gain.set(0.8);
         shared.volume.store(0.7f32.to_bits(), Ordering::Relaxed);
         // Measure the worst case: the spectrum downmix runs too.
-        shared.spectrum_enabled.store(true, Ordering::Relaxed);
+        shared
+            .visualizer
+            .spectrum_enabled
+            .store(true, Ordering::Relaxed);
         let len = FRAMES * CHANNELS as usize;
         let (mut producer, consumer) = HeapRb::<f32>::new(len * 2).split();
         let mut renderer = OutputRenderer::new(
@@ -4283,20 +4423,6 @@ mod tests {
         assert_eq!(engine.set_playback_speed(f32::NAN).unwrap(), 1.0);
     }
 
-    #[test]
-    fn set_loudness_gain_cancels_a_ramp_in_flight() {
-        let engine = AudioEngine::new();
-        engine.set_loudness_gain(1.0);
-        engine.ramp_loudness_gain(0.0, 2_000);
-        engine.set_loudness_gain(0.5);
-        // Give the ramp thread several of its ~10 ms steps to (not) run.
-        std::thread::sleep(std::time::Duration::from_millis(60));
-        assert_eq!(
-            f32::from_bits(engine.shared.loudness_gain.load(Ordering::Relaxed)),
-            0.5
-        );
-    }
-
     /// Waits for `cond` to become `true`, panicking with `msg` if the deadline expires.
     fn poll_until(msg: &str, mut cond: impl FnMut() -> bool) {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
@@ -4306,69 +4432,130 @@ mod tests {
         }
     }
 
+    mod ramped_gain {
+        use super::*;
+
+        #[test]
+        fn ramp_lands_on_target() {
+            let gain = Arc::new(RampedGain::new(0.0));
+            gain.ramp(0.0, 1.0, 30, "test-ramp-target");
+            poll_until("ramp never reached target", || gain.get() == 1.0);
+        }
+
+        #[test]
+        fn set_cancels_ramp_in_flight() {
+            let gain = Arc::new(RampedGain::new(0.0));
+            gain.ramp(0.0, 1.0, 2_000, "test-ramp-cancel");
+            gain.set(0.4);
+            // Give the ramp thread several of its ~10 ms steps to (not) run.
+            std::thread::sleep(std::time::Duration::from_millis(60));
+            assert_eq!(gain.get(), 0.4);
+        }
+
+        #[test]
+        fn fade_out_then_ramps_from_current_and_preempts() {
+            let gain = Arc::new(RampedGain::new(0.0));
+            gain.ramp(0.0, 1.0, 2_000, "test-ramp-preempt");
+            // Wait for the background ramp thread to advance past 0.0 rather than
+            // sleeping a fixed duration that can flake under heavy CPU contention.
+            poll_until("fade ramp never started advancing", || gain.get() > 0.0);
+            let mid_gain = gain.get();
+            assert!(mid_gain > 0.0 && mid_gain < 1.0);
+
+            let mut then_called = false;
+            gain.fade_out_then(30, || {
+                then_called = true;
+                assert_eq!(gain.get(), 0.0);
+            });
+            assert!(then_called);
+            assert_eq!(gain.get(), 1.0);
+        }
+    }
+
+    #[test]
+    fn set_loudness_gain_cancels_a_ramp_in_flight() {
+        let engine = AudioEngine::new();
+        engine.set_loudness_gain(1.0);
+        engine.ramp_loudness_gain(0.0, 2_000);
+        engine.set_loudness_gain(0.5);
+        // Give the ramp thread several of its ~10 ms steps to (not) run.
+        std::thread::sleep(std::time::Duration::from_millis(60));
+        assert_eq!(engine.current_loudness_gain(), 0.5);
+    }
+
     #[test]
     fn ramp_loudness_gain_lands_on_its_target() {
         let engine = AudioEngine::new();
         engine.set_loudness_gain(1.0);
         engine.ramp_loudness_gain(0.25, 30);
         poll_until("ramp never reached its target", || {
-            f32::from_bits(engine.shared.loudness_gain.load(Ordering::Relaxed)) == 0.25
+            engine.current_loudness_gain() == 0.25
         });
     }
 
     #[test]
-    fn ramp_fade_gain_lands_on_its_target() {
+    fn gain_callers_preserve_clamping_invariants() {
         let shared = Arc::new(test_shared());
-        shared.ramp_fade_gain(0.0, 1.0, 30);
-        poll_until("fade ramp never reached unity", || {
-            f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)) == 1.0
-        });
+        shared.set_fade_gain(-0.5);
+        assert_eq!(shared.fade_gain.get(), 0.0);
+        shared.set_fade_gain(2.5);
+        assert_eq!(shared.fade_gain.get(), 1.0);
+        shared.ramp_fade_gain(-1.0, 3.0, 0);
+        assert_eq!(shared.fade_gain.get(), 1.0);
+
+        shared.schedule_loudness_switch(10, -0.5);
+        assert_eq!(
+            f32::from_bits(shared.loudness_switch_gain.load(Ordering::Relaxed)),
+            0.0
+        );
+
+        let engine = AudioEngine::new();
+        engine.set_loudness_gain(-0.2);
+        assert_eq!(engine.current_loudness_gain(), 0.0);
+        engine.set_loudness_gain(2.0);
+        assert_eq!(engine.current_loudness_gain(), 2.0);
+        engine.ramp_loudness_gain(-1.0, 0);
+        assert_eq!(engine.current_loudness_gain(), 0.0);
     }
 
     #[test]
-    fn set_fade_gain_cancels_a_ramp_in_flight() {
+    fn scheduled_loudness_switch_updates_gain_and_cancels_ramp() {
         let shared = Arc::new(test_shared());
-        shared.ramp_fade_gain(0.0, 1.0, 2_000);
-        shared.set_fade_gain(0.4);
+        shared.loudness_gain.set(1.0);
+        shared.schedule_loudness_switch(2, 0.5);
+        // Start a ramp after scheduling so `OutputRenderer::render` is what
+        // cancels it via `RampedGain::set(new_gain)`.
+        shared
+            .loudness_gain
+            .ramp(1.0, 0.2, 2_000, "test-switch-cancel");
+
+        let rb = HeapRb::<f32>::new(8);
+        let (mut prod, cons) = rb.split();
+        prod.push_slice(&[0.8, 0.8, 0.8, 0.8]);
+        let mut renderer = OutputRenderer::new(
+            Arc::clone(&shared),
+            Arc::new(Mutex::new(cons)),
+            Arc::new(AtomicU64::new(0)),
+            48_000,
+            2,
+            4,
+        );
+        let mut out = [0.0f32; 4];
+        renderer.render(&mut out);
+        assert!((out[0] - 0.8).abs() < 1e-6);
+        assert!((out[2] - 0.4).abs() < 1e-6);
         std::thread::sleep(std::time::Duration::from_millis(60));
-        assert_eq!(
-            f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)),
-            0.4
-        );
-    }
-
-    #[test]
-    fn fade_out_then_ramps_from_current_gain_and_preempts_ramp() {
-        let shared = Arc::new(test_shared());
-        shared.ramp_fade_gain(0.0, 1.0, 2_000);
-        // Wait for the background ramp thread to advance past 0.0 rather than
-        // sleeping a fixed duration that can flake under heavy CPU contention.
-        poll_until("fade ramp never started advancing", || {
-            f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)) > 0.0
-        });
-        let mid_gain = f32::from_bits(shared.fade_gain.load(Ordering::Relaxed));
-        assert!(mid_gain > 0.0 && mid_gain < 1.0);
-
-        let mut then_called = false;
-        fade_out_then(&shared, 30, || {
-            then_called = true;
-            assert_eq!(
-                f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)),
-                0.0
-            );
-        });
-        assert!(then_called);
-        assert_eq!(
-            f32::from_bits(shared.fade_gain.load(Ordering::Relaxed)),
-            1.0
-        );
+        assert_eq!(shared.loudness_gain.get(), 0.5);
     }
 
     /// What the vectorscope tap receives from one rendered buffer of
     /// `input`, interleaved at `channels`, with master volume at `volume`.
     fn scope_tap_of(input: &[f32], channels: u16, volume: f32) -> Vec<f32> {
         let shared = Arc::new(test_shared());
-        shared.scope_enabled.store(true, Ordering::Relaxed);
+        shared
+            .visualizer
+            .scope_enabled
+            .store(true, Ordering::Relaxed);
         shared.volume.store(volume.to_bits(), Ordering::Relaxed);
         let (mut producer, consumer) = HeapRb::<f32>::new(input.len()).split();
         producer.push_slice(input);
@@ -4383,7 +4570,10 @@ mod tests {
         let mut output = vec![0.0f32; input.len()];
         renderer.render(&mut output);
         let mut tapped = Vec::new();
-        shared.scope_buf.read_since(0, usize::MAX, &mut tapped);
+        shared
+            .visualizer
+            .scope_buf
+            .read_since(0, usize::MAX, &mut tapped);
         tapped
     }
 
@@ -4425,7 +4615,7 @@ mod tests {
         let mut output = vec![0.0f32; len];
         renderer.render(&mut output);
 
-        let current_fade = f32::from_bits(shared.fade_gain.load(Ordering::Relaxed));
+        let current_fade = shared.fade_gain.get();
         assert!(
             current_fade < 1.0,
             "expected initial fade gain to be below 1.0, got {current_fade}"
