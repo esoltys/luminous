@@ -485,6 +485,7 @@ describe("PlayerStore", () => {
         updated: 0,
         track_count: 0,
         is_queue: true,
+        kind: "queue",
       },
       {
         id: 2,
@@ -494,6 +495,7 @@ describe("PlayerStore", () => {
         updated: 0,
         track_count: 5,
         is_queue: false,
+        kind: "custom",
       },
     ];
     const customPl = playlistsStore.playlists.find((p) => !p.is_queue);
@@ -561,6 +563,7 @@ describe("PlayerStore", () => {
             updated: 0,
             track_count: 1,
             is_queue: true,
+            kind: "queue",
           },
           {
             id: 2,
@@ -570,6 +573,7 @@ describe("PlayerStore", () => {
             updated: 0,
             track_count: 5,
             is_queue: false,
+            kind: "custom",
           },
         ];
         const base = {
@@ -653,6 +657,7 @@ describe("PlayerStore", () => {
             updated: 0,
             track_count: 2,
             is_queue: true,
+            kind: "queue",
           },
           {
             id: 2,
@@ -662,6 +667,7 @@ describe("PlayerStore", () => {
             updated: 0,
             track_count: 5,
             is_queue: false,
+            kind: "custom",
           },
         ];
         const plId = isQueue ? 1 : 2;

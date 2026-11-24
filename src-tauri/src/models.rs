@@ -640,6 +640,19 @@ impl From<&str> for QueuePopulationMode {
     }
 }
 
+/// Semantic kind of a `Playlist` row, computed by the backend so the
+/// frontend never has to reverse-engineer it from `dynamic_spec` or `name`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PlaylistKind {
+    Queue,
+    #[default]
+    Custom,
+    Smart,
+    SystemAuto,
+    StationList,
+}
+
 /// A named playlist.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Playlist {
@@ -688,6 +701,14 @@ pub struct Playlist {
     /// the user hasn't chosen which to keep; neither is written meanwhile.
     #[serde(default)]
     pub source_conflict: bool,
+    /// Semantic kind of this playlist, computed from the row by
+    /// `Playlist::classify_row`.
+    #[serde(default)]
+    pub kind: PlaylistKind,
+    /// Parsed `radio:...` spec when `kind == PlaylistKind::StationList`,
+    /// avoiding a duplicate parser in the frontend.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub station_list_spec: Option<crate::playlist::RadioStationListSpec>,
 }
 
 fn default_true() -> bool {
@@ -704,16 +725,46 @@ impl Playlist {
         !dynamic_enabled && name.trim().eq_ignore_ascii_case("queue")
     }
 
+    /// Classifies a playlist row into its semantic [`PlaylistKind`].
+    pub fn classify_row(
+        name: &str,
+        dynamic_enabled: bool,
+        is_system: bool,
+        dynamic_spec: Option<&str>,
+    ) -> PlaylistKind {
+        if Self::is_queue_row(name, dynamic_enabled) {
+            PlaylistKind::Queue
+        } else if !dynamic_enabled {
+            PlaylistKind::Custom
+        } else if is_system {
+            PlaylistKind::SystemAuto
+        } else if dynamic_spec.is_some_and(|s| s.trim().starts_with("radio:")) {
+            PlaylistKind::StationList
+        } else {
+            PlaylistKind::Smart
+        }
+    }
+
     /// Maps a row of [`PLAYLIST_SELECT_COLS`] followed by `track_count`.
     pub fn from_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
         let name: String = row.get(1)?;
         let dynamic_enabled: bool = row.get(2)?;
-        let is_queue = Self::is_queue_row(&name, dynamic_enabled);
+        let dynamic_spec: Option<String> = row.get(3)?;
+        let is_system = row.get::<_, Option<bool>>(12)?.unwrap_or(false);
+        let kind = Self::classify_row(&name, dynamic_enabled, is_system, dynamic_spec.as_deref());
+        let is_queue = kind == PlaylistKind::Queue;
+        let station_list_spec = if kind == PlaylistKind::StationList {
+            dynamic_spec
+                .as_deref()
+                .and_then(crate::playlist::RadioStationListSpec::parse)
+        } else {
+            None
+        };
         Ok(Playlist {
             id: row.get(0)?,
             name,
             dynamic_enabled,
-            dynamic_spec: row.get(3)?,
+            dynamic_spec,
             population_mode: QueuePopulationMode::from(
                 row.get::<_, Option<String>>(4)?
                     .unwrap_or_default()
@@ -729,11 +780,13 @@ impl Playlist {
             sort_field: row.get(9)?,
             sort_asc: row.get::<_, Option<bool>>(10)?.unwrap_or(true),
             size_limit_device: row.get(11)?,
-            is_system: row.get::<_, Option<bool>>(12)?.unwrap_or(false),
+            is_system,
             source_path: row.get(13)?,
             source_conflict: row.get::<_, Option<bool>>(14)?.unwrap_or(false),
             track_count: row.get(15)?,
             is_queue,
+            kind,
+            station_list_spec,
         })
     }
 }
@@ -1934,6 +1987,72 @@ mod tests {
                 r#""q":{"min":0.1,"max":10.0},"preamp":{"min":-24.0,"max":12.0},"#,
                 r#""max_bands":20,"min_bands":1}}"#,
             )
+        );
+    }
+
+    #[test]
+    fn playlist_classify_row_covers_all_kinds() {
+        assert_eq!(
+            Playlist::classify_row("Queue", false, false, None),
+            PlaylistKind::Queue
+        );
+        assert_eq!(
+            Playlist::classify_row("  queue ", false, true, None),
+            PlaylistKind::Queue
+        );
+        assert_eq!(
+            Playlist::classify_row("Queue", true, false, Some("genre:rock")),
+            PlaylistKind::Smart
+        );
+        assert_eq!(
+            Playlist::classify_row("Road Trip", false, false, None),
+            PlaylistKind::Custom
+        );
+        assert_eq!(
+            Playlist::classify_row("90s Rock", true, false, Some("genre:rock; year:1990..1999")),
+            PlaylistKind::Smart
+        );
+        assert_eq!(
+            Playlist::classify_row("1980s", true, true, Some("decade:1980s")),
+            PlaylistKind::SystemAuto
+        );
+        assert_eq!(
+            Playlist::classify_row(
+                "Jazz Stations",
+                true,
+                false,
+                Some("radio:tag=jazz;order=Votes;limit=0")
+            ),
+            PlaylistKind::StationList
+        );
+        // Even if a system playlist happened to have a radio: prefix, is_system wins.
+        assert_eq!(
+            Playlist::classify_row("System", true, true, Some("radio:tag=jazz")),
+            PlaylistKind::SystemAuto
+        );
+    }
+
+    #[test]
+    fn playlist_kind_serializes_as_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&PlaylistKind::Queue).unwrap(),
+            r#""queue""#
+        );
+        assert_eq!(
+            serde_json::to_string(&PlaylistKind::Custom).unwrap(),
+            r#""custom""#
+        );
+        assert_eq!(
+            serde_json::to_string(&PlaylistKind::Smart).unwrap(),
+            r#""smart""#
+        );
+        assert_eq!(
+            serde_json::to_string(&PlaylistKind::SystemAuto).unwrap(),
+            r#""system_auto""#
+        );
+        assert_eq!(
+            serde_json::to_string(&PlaylistKind::StationList).unwrap(),
+            r#""station_list""#
         );
     }
 }

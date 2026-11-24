@@ -12,11 +12,18 @@ function pl(name: string, over: Partial<Playlist> = {}): Playlist {
     track_count: 0,
     dynamic_enabled: false,
     is_queue: false,
+    kind: "custom",
     ...over,
   };
 }
 const auto = (name: string, spec: string, over: Partial<Playlist> = {}) =>
-  pl(name, { dynamic_enabled: true, dynamic_spec: spec, is_system: true, ...over });
+  pl(name, {
+    dynamic_enabled: true,
+    dynamic_spec: spec,
+    is_system: true,
+    kind: "system_auto",
+    ...over,
+  });
 const names = (list: Playlist[]) => list.map((p) => p.name);
 
 describe("orderPlaylists", () => {
@@ -26,7 +33,12 @@ describe("orderPlaylists", () => {
     const out = orderPlaylists([
       auto("Rock", "tag:Rock"),
       pl("Zed"),
-      pl("Smart", { dynamic_enabled: true, dynamic_spec: "rating>=4", is_system: false }),
+      pl("Smart", {
+        dynamic_enabled: true,
+        dynamic_spec: "rating>=4",
+        is_system: false,
+        kind: "smart",
+      }),
       pl("Alpha"),
     ]);
     expect(names(out)).toEqual(["Alpha", "Smart", "Zed", "Rock"]);

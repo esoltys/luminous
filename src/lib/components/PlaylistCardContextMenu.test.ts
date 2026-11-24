@@ -11,6 +11,7 @@ describe("PlaylistCardContextMenu.svelte", () => {
     name: "Summer Vibes",
     dynamic_enabled: false,
     is_queue: false,
+    kind: "custom",
     created: 0,
     updated: 0,
     track_count: 8,

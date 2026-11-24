@@ -609,6 +609,8 @@ mod tests {
             updated: 42,
             track_count,
             is_queue: false,
+            kind: crate::models::PlaylistKind::SystemAuto,
+            station_list_spec: None,
             size_limit_bytes: None,
             size_limit_device: None,
             sort_field: None,

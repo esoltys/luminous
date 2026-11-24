@@ -56,6 +56,7 @@ const genrePlaylist: Playlist = {
   dynamic_enabled: true,
   dynamic_spec: "tag:Synthwave",
   is_queue: false,
+  kind: "system_auto",
   size_limit_bytes: 16_000_000_000,
 };
 // Track One and Two fit; Track Three starts below the line.

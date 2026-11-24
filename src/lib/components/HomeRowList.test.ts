@@ -50,6 +50,7 @@ function makePlaylist(overrides: Partial<Playlist> = {}): Playlist {
     name: "Road Trip",
     dynamic_enabled: false,
     is_queue: false,
+    kind: "custom",
     created: 0,
     updated: 0,
     track_count: 5,
@@ -127,7 +128,11 @@ describe("HomeRowList.svelte", () => {
     const decadeItems: HomeItem[] = [
       {
         type: "playlist",
-        playlist: makePlaylist({ dynamic_enabled: true, dynamic_spec: "decade:1990s" }),
+        playlist: makePlaylist({
+          dynamic_enabled: true,
+          dynamic_spec: "decade:1990s",
+          kind: "system_auto",
+        }),
       },
     ];
     const { getByText: getByTextDecade } = render(HomeRowList, {
@@ -138,7 +143,11 @@ describe("HomeRowList.svelte", () => {
     const genreItems: HomeItem[] = [
       {
         type: "playlist",
-        playlist: makePlaylist({ dynamic_enabled: true, dynamic_spec: "tag:Rock" }),
+        playlist: makePlaylist({
+          dynamic_enabled: true,
+          dynamic_spec: "tag:Rock",
+          kind: "system_auto",
+        }),
       },
     ];
     const { getByText: getByTextGenre } = render(HomeRowList, {

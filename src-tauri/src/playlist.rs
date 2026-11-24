@@ -285,6 +285,8 @@ impl PlaylistManager {
             updated: now,
             track_count: 0,
             is_queue: Playlist::is_queue_row(name, false),
+            kind: crate::models::Playlist::classify_row(name, false, false, None),
+            station_list_spec: None,
             size_limit_bytes: None,
             size_limit_device: None,
             sort_field: None,

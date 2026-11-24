@@ -221,6 +221,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: true,
+        kind: "queue",
       },
       {
         id: 20,
@@ -230,6 +231,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
       {
         id: 30,
@@ -239,6 +241,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
     ];
     playlistsStore.pinnedPlaylistId = null;
@@ -274,6 +277,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: true,
+        kind: "queue",
       },
       {
         id: 20,
@@ -283,6 +287,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
       {
         id: 30,
@@ -292,6 +297,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
     ];
     playlistsStore.pinnedPlaylistId = 20;
@@ -324,6 +330,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: true,
+        kind: "queue",
       },
       {
         id: 20,
@@ -333,6 +340,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
     ];
     playlistsStore.pinnedPlaylistId = 20;
@@ -361,6 +369,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: true,
+        kind: "queue",
       },
       {
         id: 20,
@@ -370,6 +379,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: true,
         is_queue: false,
+        kind: "smart",
       },
     ];
     playlistsStore.pinnedPlaylistId = null;
@@ -402,6 +412,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: true,
+        kind: "queue",
       },
       {
         id: 20,
@@ -411,6 +422,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
     ];
     playlistsStore.pinnedPlaylistId = null;
@@ -444,6 +456,7 @@ describe("SongContextMenu.svelte", () => {
       updated: 0,
       dynamic_enabled: false,
       is_queue: false,
+      kind: "custom",
     });
     const addSongsSpy = vi.spyOn(playlistsStore, "addSongsToPlaylist").mockResolvedValue();
     const onClose = vi.fn();
@@ -457,6 +470,7 @@ describe("SongContextMenu.svelte", () => {
         updated: 0,
         dynamic_enabled: false,
         is_queue: true,
+        kind: "queue",
       },
     ];
     playlistsStore.pinnedPlaylistId = null;

@@ -70,6 +70,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
         updated: 100,
         dynamic_enabled: false,
         is_queue: true,
+        kind: "queue",
       },
     ];
 
@@ -90,6 +91,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
             updated: 100,
             dynamic_enabled: false,
             is_queue: true,
+            kind: "queue",
           },
         ]);
       }
@@ -102,6 +104,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
           updated: 100,
           dynamic_enabled: false,
           is_queue: true,
+          kind: "queue",
         });
       }
       if (cmd === "get_playlist_items") {

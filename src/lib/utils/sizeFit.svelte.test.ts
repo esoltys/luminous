@@ -18,6 +18,7 @@ const playlist = (over: Partial<Playlist> = {}): Playlist => ({
   updated: 0,
   dynamic_enabled: false,
   is_queue: false,
+  kind: "custom",
   size_limit_bytes: 10_000_000_000,
   ...over,
 });
