@@ -523,8 +523,7 @@ mod imp {
             let initial_vol = f32::from_bits(shared.volume.load(Ordering::Acquire));
             apply_to_selem(&selem, initial_vol, caps);
 
-            shared.hardware_volume_active.store(true, Ordering::Release);
-            shared.output_hardware_volume.store(true, Ordering::Release);
+            shared.set_hardware_volume(true);
 
             let quit = Arc::new(AtomicBool::new(false));
             let target_volume = Arc::new(AtomicU32::new(initial_vol.to_bits()));
@@ -661,12 +660,7 @@ mod imp {
                     let _ = selem.set_playback_switch_all(sw);
                 }
             }
-            self.shared
-                .hardware_volume_active
-                .store(false, Ordering::Release);
-            self.shared
-                .output_hardware_volume
-                .store(false, Ordering::Release);
+            self.shared.set_hardware_volume(false);
         }
     }
 

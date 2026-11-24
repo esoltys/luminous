@@ -320,8 +320,7 @@ mod imp {
             };
             match ready_rx.recv_timeout(ENDPOINT_VOLUME_TIMEOUT) {
                 Ok(true) => {
-                    shared.hardware_volume_active.store(true, Ordering::Release);
-                    shared.output_hardware_volume.store(true, Ordering::Release);
+                    shared.set_hardware_volume(true);
                     Some(Self {
                         control,
                         thread: Some(thread),
@@ -355,12 +354,7 @@ mod imp {
             if let Some(thread) = self.thread.take() {
                 let _ = thread.join();
             }
-            self.shared
-                .hardware_volume_active
-                .store(false, Ordering::Release);
-            self.shared
-                .output_hardware_volume
-                .store(false, Ordering::Release);
+            self.shared.set_hardware_volume(false);
         }
     }
 
