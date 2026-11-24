@@ -360,12 +360,13 @@ async fn test_scan_reports_external_tag_changes() {
         2
     );
 
-    // 4. Forced rescan after an mtime-preserving external edit reports the track
+    // 4. Forced rescan after an mtime- and size-preserving external edit reports the track
     let mtime_before = std::fs::metadata(&alpha_path).unwrap().modified().unwrap();
     luminous_metadata::audio::write_tags(
         &alpha_path,
         &luminous_metadata::audio::TagWriteRequest {
-            title: "Preserved Mtime Title Alpha",
+            // Same byte length as "Externally Edited Alpha" so filesize stays unchanged.
+            title: "Preserved Mtime Title A",
             artist: "External Artist Alpha",
             album: "External Album Alpha",
             ..Default::default()
@@ -562,4 +563,82 @@ async fn test_normal_scan_rereads_epoch_zero_mtime_file() {
         "normal scan must detect external tag edit on epoch-zero mtime file"
     );
     assert_eq!(env.available_titles(), vec!["Edited At Epoch Zero"]);
+}
+
+#[tokio::test]
+async fn test_scan_rereads_file_when_filesize_changes_with_same_mtime() {
+    let env = ScanTestEnv::new();
+    env.scanner
+        .add_directory(&env.scan_dir.to_string_lossy())
+        .expect("failed to add watched directory");
+
+    env.copy_fixture("song_alpha.mp3", "");
+    env.run_scan(false).await;
+
+    let file_path = env.scan_dir.join("song_alpha.mp3");
+    let prev_meta = std::fs::metadata(&file_path).unwrap();
+    let prev_mtime = prev_meta.modified().unwrap();
+    let prev_len = prev_meta.len();
+
+    // Rewrite tags so the file size changes, then restore the original mtime.
+    luminous_metadata::audio::write_tags(
+        &file_path,
+        &luminous_metadata::audio::TagWriteRequest {
+            title: "Updated Title With Extra Padding To Change File Size",
+            artist: "Phoebe Bridgers",
+            album: "Stranger in the Alps",
+            ..Default::default()
+        },
+    )
+    .expect("failed to write updated tags");
+    std::fs::File::options()
+        .write(true)
+        .open(&file_path)
+        .unwrap()
+        .set_modified(prev_mtime)
+        .expect("failed to restore mtime");
+
+    assert_ne!(
+        std::fs::metadata(&file_path).unwrap().len(),
+        prev_len,
+        "test setup requires file size to change"
+    );
+
+    let report = env.run_scan_report(false).await;
+    assert_eq!(
+        report.reread, 1,
+        "scan must re-read file when filesize changes with same mtime"
+    );
+    assert_eq!(report.unchanged, 0);
+
+    let titles = env.available_titles();
+    assert_eq!(
+        titles,
+        vec!["Updated Title With Extra Padding To Change File Size".to_string()]
+    );
+}
+
+#[tokio::test]
+async fn test_scan_skips_legacy_row_with_null_filesize_when_mtime_matches() {
+    let env = ScanTestEnv::new();
+    env.scanner
+        .add_directory(&env.scan_dir.to_string_lossy())
+        .expect("failed to add watched directory");
+
+    env.copy_fixture("song_alpha.mp3", "");
+    env.run_scan(false).await;
+
+    {
+        let conn = env.db.pool.get().unwrap();
+        conn.execute("UPDATE songs SET filesize = NULL", [])
+            .unwrap();
+    }
+
+    let report = env.run_scan_report(false).await;
+    assert_eq!(
+        report.unchanged, 1,
+        "legacy row with NULL filesize and matching mtime should be skipped"
+    );
+    assert_eq!(report.reread, 0);
+>>>>>>> f9dd3499 (feat: include file size in scan unchanged and analysis staleness checks (#2352))
 }

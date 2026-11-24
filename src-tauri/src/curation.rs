@@ -919,6 +919,7 @@ fn query_songs_by_integrity_status(
            AND s.unavailable = 0
            AND i.status = ?1
            AND i.mtime = s.mtime
+           AND (i.filesize IS NULL OR s.filesize IS NULL OR i.filesize = s.filesize)
          ORDER BY s.added DESC, s.id DESC",
         local_sources = *LOCAL_SOURCES_SQL
     ))?;
@@ -970,22 +971,23 @@ pub fn verify_song_integrity(db: &Database, song_id: i64) -> Result<Option<Corru
     let conn = db.pool.get().context("failed to get db connection")?;
 
     let row = conn.query_row(
-        "SELECT path, source, mtime, title, artist, album, filetype FROM songs WHERE id = ?1",
+        "SELECT path, source, mtime, filesize, title, artist, album, filetype FROM songs WHERE id = ?1",
         params![song_id],
         |row| {
             Ok((
                 row.get::<_, Option<String>>(0)?,
                 row.get::<_, i64>(1)?,
                 row.get::<_, Option<i64>>(2)?,
-                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<i64>>(3)?,
                 row.get::<_, Option<String>>(4)?,
                 row.get::<_, Option<String>>(5)?,
-                row.get::<_, i64>(6)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, i64>(7)?,
             ))
         },
     );
 
-    let (path_str, source_raw, mtime_val, title, artist, album, filetype) = match row {
+    let (path_str, source_raw, mtime_val, filesize, title, artist, album, filetype) = match row {
         Ok(vals) => vals,
         Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
         Err(e) => return Err(e.into()),
@@ -1004,14 +1006,15 @@ pub fn verify_song_integrity(db: &Database, song_id: i64) -> Result<Option<Corru
     let now = crate::clock::unix_now();
     let record = |status: &str, detail: Option<&str>| {
         conn.execute(
-            "INSERT INTO song_integrity (song_id, mtime, status, error_detail, verified_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)
+            "INSERT INTO song_integrity (song_id, mtime, filesize, status, error_detail, verified_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
              ON CONFLICT(song_id) DO UPDATE SET
                 mtime = excluded.mtime,
+                filesize = excluded.filesize,
                 status = excluded.status,
                 error_detail = excluded.error_detail,
                 verified_at = excluded.verified_at",
-            params![song_id, mtime, status, detail, now],
+            params![song_id, mtime, filesize, status, detail, now],
         )
     };
 
@@ -1071,7 +1074,7 @@ fn next_song_for_integrity(
             "SELECT s.id, s.path FROM songs s
              LEFT JOIN song_integrity i ON s.id = i.song_id
              WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
-               AND (i.song_id IS NULL OR i.mtime != s.mtime)
+               AND (i.song_id IS NULL OR i.mtime != s.mtime OR (i.filesize IS NOT NULL AND s.filesize IS NOT NULL AND i.filesize != s.filesize))
                AND {skip}
              ORDER BY s.added DESC, s.id DESC LIMIT 1",
             lib = *LOCAL_SOURCES_SQL,
@@ -1119,7 +1122,7 @@ pub fn verify_library_integrity(app: &AppHandle, db: &Database) -> Result<usize>
         "SELECT s.id FROM songs s
          LEFT JOIN song_integrity i ON s.id = i.song_id
          WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
-           AND (i.song_id IS NULL OR i.mtime != s.mtime)
+           AND (i.song_id IS NULL OR i.mtime != s.mtime OR (i.filesize IS NOT NULL AND s.filesize IS NOT NULL AND i.filesize != s.filesize))
          ORDER BY s.added DESC, s.id DESC",
         lib = *LOCAL_SOURCES_SQL
     ))?;
@@ -2198,5 +2201,55 @@ mod tests {
             next_song_for_integrity(&conn, &skipped).unwrap(),
             Some((song_id, track.to_string_lossy().into_owned()))
         );
+    }
+
+    #[test]
+    fn integrity_staleness_on_filesize_change() {
+        let (temp, db) = setup_test_db();
+        let conn = db.pool.get().unwrap();
+
+        let track = temp.path().join("track.flac");
+        let song_id = insert_local_flac(&conn, &track);
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('verify_audio_integrity_and_provenance', 'true')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE songs SET mtime = 1000, filesize = 5000 WHERE id = ?1",
+            params![song_id],
+        )
+        .unwrap();
+
+        // Legacy row with NULL filesize: not stale when mtime matches.
+        conn.execute(
+            "INSERT INTO song_integrity (song_id, mtime, filesize, status, error_detail)
+             VALUES (?1, 1000, NULL, 'corrupt', 'Bad frame')",
+            params![song_id],
+        )
+        .unwrap();
+        let skipped = crate::background_reads::Skipped::default();
+        assert_eq!(next_song_for_integrity(&conn, &skipped).unwrap(), None);
+        assert_eq!(query_corrupt_songs(&conn).unwrap().len(), 1);
+
+        // Matching filesize is fresh; changed filesize marks it stale and hides old report.
+        conn.execute(
+            "UPDATE song_integrity SET filesize = 5000 WHERE song_id = ?1",
+            params![song_id],
+        )
+        .unwrap();
+        assert_eq!(next_song_for_integrity(&conn, &skipped).unwrap(), None);
+        assert_eq!(query_corrupt_songs(&conn).unwrap().len(), 1);
+
+        conn.execute(
+            "UPDATE songs SET filesize = 6000 WHERE id = ?1",
+            params![song_id],
+        )
+        .unwrap();
+        assert_eq!(
+            next_song_for_integrity(&conn, &skipped).unwrap(),
+            Some((song_id, track.to_string_lossy().into_owned()))
+        );
+        assert!(query_corrupt_songs(&conn).unwrap().is_empty());
     }
 }
