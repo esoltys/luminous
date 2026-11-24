@@ -1822,6 +1822,19 @@ pub async fn reconcile_artist_hierarchy_and_notify(app: tauri::AppHandle) {
     }
 }
 
+/// Registers the `library-changed` listener that keeps the persisted Genres
+/// (#545) and Artist Tags (#1105) hierarchies in step with newly-seen or
+/// vanished tag names. Requires `AppState` to already be managed on `app`.
+pub fn start_reconcile(app: &tauri::AppHandle, _state: &crate::AppState) {
+    use tauri::Listener;
+
+    let handle = app.clone();
+    app.listen("library-changed", move |_| {
+        tauri::async_runtime::spawn(reconcile_hierarchy_and_notify(handle.clone()));
+        tauri::async_runtime::spawn(reconcile_artist_hierarchy_and_notify(handle.clone()));
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

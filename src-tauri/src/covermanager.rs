@@ -2288,6 +2288,73 @@ impl CoverManager {
     }
 }
 
+/// Resumes any interrupted sidecar artwork sweep in the background when the
+/// user has opt-in folder artwork export enabled (#1274).
+pub fn resume_pending_sweep(app: &tauri::AppHandle, state: &crate::AppState) {
+    use tauri::Emitter;
+
+    let is_save_artwork_enabled = state
+        .db
+        .pool
+        .get()
+        .map(|conn| crate::commands::settings::load_ui_preferences(&conn).save_artwork_to_folders)
+        .unwrap_or(false);
+
+    if !is_save_artwork_enabled {
+        return;
+    }
+
+    let db_clone = Arc::clone(&state.db);
+    let cover_mgr = Arc::clone(&state.cover_manager);
+    let covers_dir = cover_mgr.covers_dir().to_path_buf();
+    let app_handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let has_pending = db_clone
+            .pool
+            .get()
+            .map(|conn| {
+                let has_albums = conn
+                    .query_row(
+                        "SELECT 1 FROM songs
+                         WHERE art_automatic LIKE 'album-%'
+                           AND (source IN (1, 2) OR source IS NULL)
+                           AND album IS NOT NULL AND TRIM(album) != ''
+                           AND path IS NOT NULL
+                         LIMIT 1",
+                        [],
+                        |_| Ok(true),
+                    )
+                    .unwrap_or(false);
+                let has_artists = conn
+                    .query_row(
+                        "SELECT 1 FROM artist_profiles
+                         WHERE fetched_image_filename IS NOT NULL
+                            OR fetched_logo_filename IS NOT NULL
+                            OR fetched_background_filename IS NOT NULL
+                         LIMIT 1",
+                        [],
+                        |_| Ok(true),
+                    )
+                    .unwrap_or(false);
+                has_albums || has_artists
+            })
+            .unwrap_or(false);
+
+        if has_pending {
+            log::info!("Resuming pending artwork sidecar sweep in background...");
+            let _ = crate::commands::collection::sweep_artwork_to_folders_core(
+                db_clone,
+                cover_mgr,
+                covers_dir,
+                move |payload| {
+                    let _ = app_handle.emit("artwork-sweep-progress", payload);
+                },
+            )
+            .await;
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
