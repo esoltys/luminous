@@ -53,12 +53,16 @@ fn populate_synthetic_library(root: &Path, file_count: usize) {
 
 fn print_report(label: &str, report: &ScanReport) {
     println!(
-        "[{label}] files_found={} unchanged={} reread={} | discovery_ms={} partition_ms={} tag_read_ms={} missing_check_ms={} total_ms={}",
+        "[{label}] files_found={} unchanged={} reread={} | discovery_ms={} partition_ms={} (reconcile={} dedup={} stamps={} stat={}) tag_read_ms={} missing_check_ms={} total_ms={}",
         report.files_found,
         report.unchanged,
         report.reread,
         report.discovery_ms,
         report.partition_ms,
+        report.partition_reconcile_ms,
+        report.partition_dedup_ms,
+        report.partition_stamps_ms,
+        report.partition_stat_ms,
         report.tag_read_ms,
         report.missing_check_ms,
         report.total_ms,
