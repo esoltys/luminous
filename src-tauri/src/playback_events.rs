@@ -39,6 +39,8 @@ pub(crate) struct PlaybackErrorPayload {
     pub song_id: i64,
     pub title: Option<String>,
     pub path: Option<String>,
+    /// True when the failed track is an unbounded live stream (#2320).
+    pub is_live: bool,
     /// Why it failed, e.g. a Subsonic server's "Wrong username or password"
     /// (#1163), or `"Station offline"` for live streams. Never holds a signed URL.
     pub message: String,
@@ -469,7 +471,8 @@ pub(crate) async fn apply_event(
             } else {
                 let outcome = p.note_playback_error();
                 if let Some(song) = &outcome.failed_song {
-                    let display_message = if crate::audio::is_live_song(song) {
+                    let is_live = crate::audio::is_live_song(song);
+                    let display_message = if is_live {
                         "Station offline".to_string()
                     } else {
                         message
@@ -478,6 +481,7 @@ pub(crate) async fn apply_event(
                         song_id: song.id,
                         title: song.title.clone(),
                         path: song.path.clone(),
+                        is_live,
                         message: display_message,
                     });
                 }
@@ -1445,6 +1449,7 @@ mod tests {
                     song_id: 1,
                     title: Some("Dead Station".to_string()),
                     path: Some("radio://dead-station".to_string()),
+                    is_live: true,
                     message: "Station offline".to_string(),
                 }),
                 RecordedCall::LibraryChanged,

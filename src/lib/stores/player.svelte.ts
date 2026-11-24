@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
-  isLiveSong,
   type PlaybackState,
   type Playlist,
   type PlaylistItem,
@@ -109,6 +108,8 @@ export class PlayerStore {
    *  `station-now-playing` event and every playback snapshot. Display-only:
    *  never on the song row, never scrobbled. */
   stationNowPlaying = $state<StationNowPlaying | null>(null);
+  /** Whether the current track supports seeking (backend capability, #2320). */
+  canSeek = $state<boolean>(false);
   /** Title to display for the current song: the track a station announces,
    *  else "Nothing playing" when there is no song, "Unknown Song" when the
    *  song has no title tag (#1246). */
@@ -142,7 +143,12 @@ export class PlayerStore {
   /** Titles pending a "couldn't play" toast — batched so a run of consecutive
    *  unavailable tracks (e.g. a whole disconnected drive) shows one summary
    *  toast instead of a notification per failed track. */
-  private _playbackErrorBatch: { title: string; path: string | null; message: string }[] = [];
+  private _playbackErrorBatch: {
+    title: string;
+    path: string | null;
+    isLive: boolean;
+    message: string;
+  }[] = [];
   private _playbackErrorTimer: ReturnType<typeof setTimeout> | null = null;
   private _outputUnavailableToastId: number | null = null;
   private _outputFallbackToastId: number | null = null;
@@ -293,11 +299,13 @@ export class PlayerStore {
         songId: number;
         title: string | null;
         path: string | null;
+        isLive?: boolean;
         message: string;
       }>("playback-error", (event) => {
         this._playbackErrorBatch.push({
           title: event.payload.title || i18n.t("collection.unknownSong"),
           path: event.payload.path,
+          isLive: event.payload.isLive === true,
           message: event.payload.message,
         });
         if (this._playbackErrorTimer) clearTimeout(this._playbackErrorTimer);
@@ -393,12 +401,12 @@ export class PlayerStore {
     if (failures.length === 0) return;
 
     if (failures.length === 1) {
-      const { title, path, message } = failures[0];
+      const { title, path, isLive, message } = failures[0];
       // A remote song (WebDAV/OpenSubsonic, #916) fails for reasons other than
       // a missing file — bad credentials, server down — so surface the
       // backend's reason instead of "file not found".
       const reason = message && shortenQuotedUrls(message.trim().replace(/[.\s]+$/, ""));
-      if (path?.startsWith("radio://") || message === "Station offline") {
+      if (isLive) {
         toastStore.show(
           i18n.t("playerBar.stationOfflineToast", { title }, `"${title}" — Station offline.`),
           "error",
@@ -433,8 +441,8 @@ export class PlayerStore {
     this.currentSong = state.current_song;
     this.playlistId = state.playlist_id;
     this.playlistItemUuid = state.playlist_item_uuid;
-    this.positionNanosec =
-      isLiveSong(state.current_song) && state.state === "stopped" ? 0 : state.position_nanosec;
+    this.positionNanosec = state.position_nanosec;
+    this.canSeek = state.can_seek ?? false;
     this.volume = state.volume;
     this.volumeSafety = state.volume_safety ?? null;
     this.playbackSpeed = state.playback_speed ?? 1;
@@ -776,7 +784,7 @@ export class PlayerStore {
   }
 
   async seek(positionNs: number) {
-    if (isLiveSong(this.currentSong)) return;
+    if (!this.canSeek) return;
     const roundedNs = Math.round(positionNs);
     this.positionNanosec = roundedNs;
     console.log(
@@ -789,7 +797,7 @@ export class PlayerStore {
   }
 
   async seekRelative(deltaNs: number) {
-    if (isLiveSong(this.currentSong)) return;
+    if (!this.canSeek) return;
     const durationNs = this.currentSong?.length_nanosec;
     const maxPositionNs = typeof durationNs === "number" ? durationNs : Number.POSITIVE_INFINITY;
     const nextPositionNs = Math.min(Math.max(this.positionNanosec + deltaNs, 0), maxPositionNs);

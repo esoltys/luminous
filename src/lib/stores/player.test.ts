@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PlayerStore } from "./player.svelte";
 import { invoke } from "@tauri-apps/api/core";
-import type { Song } from "../types";
+import { isLiveSong, type Song } from "../types";
 import { listen } from "@tauri-apps/api/event";
 import { playlistsStore } from "./playlists.svelte";
 import { toastStore } from "./toast.svelte";
@@ -100,6 +100,7 @@ describe("PlayerStore", () => {
   });
 
   it("should update position and invoke seek_to on seek", async () => {
+    store.canSeek = true;
     await store.seek(1500.5);
     expect(store.positionNanosec).toBe(1501); // rounded
     expect(invoke).toHaveBeenCalledWith("seek_to", { positionNanosec: 1501 });
@@ -107,6 +108,7 @@ describe("PlayerStore", () => {
 
   it("should clamp relative seeking to the start and current song duration", async () => {
     store.currentSong = { length_nanosec: 30_000_000_000 } as any;
+    store.canSeek = true;
     store.positionNanosec = 25_000_000_000;
 
     await store.seekRelative(10_000_000_000);
@@ -116,13 +118,15 @@ describe("PlayerStore", () => {
     expect(invoke).toHaveBeenCalledWith("seek_to", { positionNanosec: 0 });
   });
 
-  it("should ignore seek and seekRelative for live radio stations", async () => {
+  it("should ignore seek and seekRelative when canSeek is false", async () => {
     store.currentSong = {
       id: 77,
       source: "radio_browser",
       path: "radio://station-77",
+      isLive: true,
       length_nanosec: undefined,
     } as any;
+    store.canSeek = false;
     store.positionNanosec = 0;
 
     await store.seek(10_000_000_000);
@@ -875,6 +879,74 @@ describe("PlayerStore (mocked listeners)", () => {
       nowPlayingCallback?.({ payload: null });
       expect(store.currentSongDisplayTitle).toBe("Groove Salad");
     } finally {
+      if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+    }
+  });
+
+  it("follows backend isLive flag on Song and playback-error, and can_seek on playback-state (#2320)", async () => {
+    expect(isLiveSong({ isLive: true })).toBe(true);
+    expect(isLiveSong({ isLive: false })).toBe(false);
+    expect(isLiveSong({ source: "radio_browser", path: "radio://1" } as Song)).toBe(false);
+    expect(isLiveSong(undefined)).toBe(false);
+
+    const originalListenImpl = vi.mocked(listen).getMockImplementation();
+    let errorCallback: ((event: { payload: unknown }) => void) | undefined;
+    let stateCallback: ((event: { payload: unknown }) => void) | undefined;
+    vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+      if (event === "playback-error") errorCallback = callback;
+      if (event === "playback-state") stateCallback = callback;
+      return () => {};
+    });
+    const showSpy = vi.spyOn(toastStore, "show");
+    vi.useFakeTimers();
+
+    try {
+      const store = new PlayerStore();
+      await vi.advanceTimersByTimeAsync(50);
+
+      stateCallback?.({
+        payload: {
+          state: "playing",
+          current_song: { id: 1, title: "Custom Stream", isLive: true },
+          position_nanosec: 0,
+          volume: 1,
+          shuffle_mode: "off",
+          repeat_mode: "off",
+          stop_after_current: false,
+          loudness_source: "disabled",
+          can_seek: false,
+        },
+      });
+      expect(store.canSeek).toBe(false);
+
+      stateCallback?.({
+        payload: {
+          state: "playing",
+          current_song: { id: 2, title: "Local Track", isLive: false },
+          position_nanosec: 5_000_000_000,
+          volume: 1,
+          shuffle_mode: "off",
+          repeat_mode: "off",
+          stop_after_current: false,
+          loudness_source: "disabled",
+          can_seek: true,
+        },
+      });
+      expect(store.canSeek).toBe(true);
+
+      errorCallback?.({
+        payload: {
+          songId: 1,
+          title: "Custom Stream",
+          path: "https://example.com/live.mp3",
+          isLive: true,
+          message: "Connection refused",
+        },
+      });
+      await vi.advanceTimersByTimeAsync(500);
+      expect(showSpy).toHaveBeenLastCalledWith('"Custom Stream" — Station offline.', "error");
+    } finally {
+      vi.useRealTimers();
       if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
     }
   });

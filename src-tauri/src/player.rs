@@ -2174,15 +2174,25 @@ impl Player {
             Some(idx) => (Some(idx + 1), self.virtual_len()),
             None => (None, self.virtual_len()),
         };
+        let state: crate::models::PlayState = audio.current_state().into();
+        let is_live = self
+            .current_song
+            .as_ref()
+            .is_some_and(crate::audio::is_live_song);
+        let can_seek = self.current_song.is_some() && !is_live;
+        let position_nanosec = if is_live && state == crate::models::PlayState::Stopped {
+            0
+        } else {
+            audio
+                .current_position_nanosec()
+                .saturating_sub(self.current_song_beginning_nanosec()) as i64
+        };
         PlaybackState {
-            state: audio.current_state().into(),
+            state,
             current_song: self.current_song.clone(),
             playlist_id: self.current_playlist_id,
             playlist_item_uuid: self.current_item_uuid.clone(),
-            position_nanosec: audio
-                .current_position_nanosec()
-                .saturating_sub(self.current_song_beginning_nanosec())
-                as i64,
+            position_nanosec,
             volume: audio.current_volume(),
             shuffle_mode: self.shuffle_mode,
             repeat_mode: self.repeat_mode,
@@ -2196,6 +2206,7 @@ impl Player {
             volume_safety: self.volume_safety,
             playback_speed: self.playback_speed,
             station_now_playing: self.station_now_playing.clone(),
+            can_seek,
         }
     }
 
@@ -4265,5 +4276,40 @@ mod tests {
                 "scrobble point case: {label}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn get_state_reports_can_seek_and_zero_stopped_position_for_live_stream() {
+        let (_dir, db) = setup_test_db();
+        let db = Arc::new(db);
+        let audio = Arc::new(tokio::sync::Mutex::new(crate::audio::AudioEngine::new()));
+        let mut player = Player::new(db, audio);
+
+        // No current song -> can_seek is false.
+        let empty = player.get_state().await;
+        assert!(!empty.can_seek);
+
+        // Stopped live stream -> can_seek is false, position_nanosec is 0.
+        player.current_song = Some(Song {
+            id: 1,
+            source: crate::models::SongSource::Stream,
+            path: Some("https://icecast.example.com/live.mp3".to_string()),
+            beginning_nanosec: 500,
+            ..Song::default()
+        });
+        let live_state = player.get_state().await;
+        assert!(!live_state.can_seek);
+        assert_eq!(live_state.position_nanosec, 0);
+
+        // Local track -> can_seek is true.
+        player.current_song = Some(Song {
+            id: 2,
+            source: crate::models::SongSource::LocalFile,
+            filetype: crate::models::FileType::Flac,
+            path: Some("/music/track.flac".to_string()),
+            ..Song::default()
+        });
+        let local_state = player.get_state().await;
+        assert!(local_state.can_seek);
     }
 }

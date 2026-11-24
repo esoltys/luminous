@@ -2825,7 +2825,8 @@ pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Re
         disc_subtitle: row.get(col(75))?,
         language: row.get(col(76))?,
         ..Default::default()
-    })
+    }
+    .with_derived_fields())
 }
 
 /// Parse a decade label like `"1990s"`/`"1990"` into its inclusive year

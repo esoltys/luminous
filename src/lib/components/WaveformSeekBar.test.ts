@@ -96,19 +96,27 @@ describe("WaveformSeekBar.svelte", () => {
       id: 99,
       source: "radio_browser",
       path: "radio://station-1",
+      isLive: true,
       length_nanosec: undefined,
     } as any;
+    playerStore.canSeek = false;
     playerStore.state = "paused";
 
+    const seekSpy = vi.spyOn(playerStore, "seek").mockResolvedValue();
     const rafSpy = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
     try {
       const { container } = render(WaveformSeekBar);
-      expect(container.querySelector("[data-waveform-container]")).toBeInTheDocument();
+      const el = container.querySelector("[data-waveform-container]") as HTMLElement;
+      expect(el).toBeInTheDocument();
       expect(rafSpy).not.toHaveBeenCalled();
+
+      el.dispatchEvent(new MouseEvent("mousedown", { clientX: 50, bubbles: true }));
+      expect(seekSpy).not.toHaveBeenCalled();
 
       playerStore.state = "playing";
     } finally {
       rafSpy.mockRestore();
+      seekSpy.mockRestore();
     }
   });
 });

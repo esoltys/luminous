@@ -38,10 +38,10 @@ export type FileType =
   | "ASF"
   | "STREAM";
 
-export function isLiveSong(
-  song: { source?: SongSource; path?: string | null } | null | undefined,
-): boolean {
-  return Boolean(song && (song.source === "radio_browser" || song.path?.startsWith("radio://")));
+/** Whether `song` is an unbounded live stream (internet radio, #2002, #2320).
+ *  Authoritatively computed by the backend and serialized as `Song.isLive`. */
+export function isLiveSong(song: { isLive?: boolean } | null | undefined): boolean {
+  return song?.isLive === true;
 }
 
 export function isLosslessFileType(filetype: FileType): boolean {
@@ -194,6 +194,8 @@ export interface Song {
   not_included?: boolean;
   /** Audio provenance warning indicator (#1373, #1586). */
   provenance?: string | null;
+  /** True when the backend classifies this track as an unbounded live stream (#2320). */
+  isLive?: boolean;
 }
 
 /** Result of `get_song_context` — cached live enrichment for the Details
@@ -742,6 +744,8 @@ export interface PlaybackState {
   playback_speed?: number;
   /** The track the playing station announces (#2008); null when none. */
   station_now_playing?: StationNowPlaying | null;
+  /** Whether the current track supports seeking (`current_song` present and not live, #2320). */
+  can_seek?: boolean;
 }
 
 /** The track an internet radio station announces in its stream metadata

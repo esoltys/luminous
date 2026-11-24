@@ -105,6 +105,7 @@ export interface CoverSource {
   art_automatic?: string | null;
   art_embedded?: boolean;
   art_unset?: boolean;
+  isLive?: boolean;
 }
 
 export interface CoverStackItem {
