@@ -7,6 +7,7 @@ import {
   channelLevels,
   deflectionForRms,
   deflectionForVu,
+  referenceForTargetLufs,
 } from "./vuMeterEngine";
 
 /** Interleaved pairs of a constant-amplitude square wave, so RMS equals the amplitude. */
@@ -24,18 +25,30 @@ describe("deflection", () => {
     expect(deflectionForRms(NaN)).toBe(0);
   });
 
-  it("puts 0 VU below the end of the scale and +5 VU at it", () => {
-    expect(deflectionForRms(REFERENCE_AMPLITUDE)).toBeCloseTo(deflectionForVu(0), 6);
+  it("follows the K-550 scale: 0 VU about 70% across, +5 VU at the end", () => {
+    expect(deflectionForVu(-20)).toBe(0);
+    expect(deflectionForVu(0)).toBeCloseTo(0.696, 6);
     expect(deflectionForVu(5)).toBeCloseTo(1, 6);
-    expect(deflectionForVu(0)).toBeLessThan(deflectionForVu(3));
+    expect(deflectionForRms(REFERENCE_AMPLITUDE)).toBeCloseTo(deflectionForVu(0), 6);
   });
 
-  it("is linear in amplitude and pinned past the scale", () => {
-    expect(deflectionForRms(REFERENCE_AMPLITUDE * 1.5)).toBeCloseTo(
-      1.5 * deflectionForRms(REFERENCE_AMPLITUDE),
-      6,
-    );
+  it("rises steadily through the scale and is pinned past it", () => {
+    let last = -1;
+    for (let vu = -20; vu <= 5; vu += 0.5) {
+      const f = deflectionForVu(vu);
+      expect(f).toBeGreaterThanOrEqual(last);
+      last = f;
+    }
+    expect(deflectionForVu(7)).toBeGreaterThan(1);
     expect(deflectionForRms(1)).toBe(NEEDLE_MAX);
+  });
+
+  it("keeps music at the normalization target out of the red", () => {
+    // -16 LUFS stereo is about -19 dBFS RMS per channel; the reference leaves headroom above that.
+    const atTarget = 10 ** (-19 / 20);
+    expect(deflectionForRms(atTarget, referenceForTargetLufs(-16))).toBeLessThan(
+      deflectionForVu(-3),
+    );
   });
 });
 

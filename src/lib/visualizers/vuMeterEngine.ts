@@ -9,26 +9,47 @@
  * at the same RMS reads about 3 dB higher in LUFS than either channel does in dBFS.
  */
 const CHANNEL_SUM_DB = 3.01;
+/**
+ * A needle follows the short-term level, which in music swings well above the integrated
+ * loudness a normalization target describes (its 300 ms peaks run about this far over).
+ * Decks are calibrated the same way: program material averages around -6 VU and only its
+ * peaks reach 0, so the red zone means "louder than the target" rather than "typical".
+ */
+const PROGRAM_HEADROOM_DB = 6;
 
 /**
- * The per-channel RMS level, in dBFS, at which music normalized to `targetLufs` sits: the
- * 0 VU mark, where the red zone begins. This is an approximation: K-weighting, which
- * emphasises highs, moves real music by another dB or two either way, and a needle
- * follows short-term RMS where the target is an integrated figure.
+ * The per-channel RMS level, in dBFS, of the 0 VU mark, where the red zone begins, for
+ * music normalized to `targetLufs`. An approximation: K-weighting, which emphasises highs,
+ * moves real music by another dB or two either way.
  */
 export function referenceForTargetLufs(targetLufs: number): number {
-  return targetLufs - CHANNEL_SUM_DB;
+  return targetLufs - CHANNEL_SUM_DB + PROGRAM_HEADROOM_DB;
 }
 
 /** The 0 VU level for the backend's default normalization target (-16 LUFS). */
 export const VU_REFERENCE_DBFS = referenceForTargetLufs(-16);
 
-/** The needle position (0 = left stop, 1 = right stop) a +5 VU signal reaches: the end of the scale. */
-const FULL_SCALE_VU = 5;
-/** Deflection per unit of amplitude relative to 0 VU: VU needles are linear in voltage. */
-const DEFLECTION_PER_AMPLITUDE = 1 / 10 ** (FULL_SCALE_VU / 20);
 /** The needle can swing a little past the end of the scale before it hits the pin. */
 export const NEEDLE_MAX = 1.06;
+
+/**
+ * The K-550's printed scale: where each VU mark sits along the sweep (0 = left stop,
+ * 1 = end of scale), measured from the deck. Marks bunch toward the left and spread out
+ * toward 0, so 0 VU is about 70% of the way across. Between marks the needle position is
+ * interpolated in dB.
+ */
+const SCALE: readonly (readonly [vu: number, position: number])[] = [
+  [-20, 0],
+  [-10, 0.195],
+  [-7, 0.31],
+  [-5, 0.43],
+  [-3, 0.534],
+  [0, 0.696],
+  [3, 0.852],
+  [5, 1],
+];
+/** Position gained per dB beyond the last mark, until the pin. */
+const OVERSCALE_PER_DB = 0.074;
 
 /**
  * Needle dynamics as a damped spring. The VU standard asks for 99% of a step in 300 ms
@@ -55,16 +76,23 @@ const LAMP_FADE_TAU_MS = 140;
 /** Below this brightness a fading lamp counts as off. */
 const LAMP_OFF = 0.02;
 
-/** The needle position for an RMS amplitude (full scale = 1), before the pin limit. */
-export function deflectionForRms(rms: number, referenceDbfs = VU_REFERENCE_DBFS): number {
-  if (!(rms > 0)) return 0;
-  const reference = 10 ** (referenceDbfs / 20);
-  return Math.min(NEEDLE_MAX, (rms / reference) * DEFLECTION_PER_AMPLITUDE);
+/** The needle position (0..NEEDLE_MAX) for a level of `vu` dB relative to 0 VU. */
+export function deflectionForVu(vu: number): number {
+  if (vu <= SCALE[0][0]) return 0;
+  for (let i = 1; i < SCALE.length; i++) {
+    const [vu1, f1] = SCALE[i];
+    if (vu <= vu1) {
+      const [vu0, f0] = SCALE[i - 1];
+      return f0 + ((f1 - f0) * (vu - vu0)) / (vu1 - vu0);
+    }
+  }
+  return Math.min(NEEDLE_MAX, 1 + (vu - SCALE[SCALE.length - 1][0]) * OVERSCALE_PER_DB);
 }
 
-/** The needle position of `vu` dB relative to 0 VU, for placing scale marks. */
-export function deflectionForVu(vu: number): number {
-  return DEFLECTION_PER_AMPLITUDE * 10 ** (vu / 20);
+/** The needle position for an RMS amplitude (full scale = 1), with 0 VU at `referenceDbfs`. */
+export function deflectionForRms(rms: number, referenceDbfs = VU_REFERENCE_DBFS): number {
+  if (!(rms > 0)) return 0;
+  return deflectionForVu(20 * Math.log10(rms) - referenceDbfs);
 }
 
 /** RMS and highest sample of each channel in interleaved `[l0, r0, l1, r1, …]` pairs. */
