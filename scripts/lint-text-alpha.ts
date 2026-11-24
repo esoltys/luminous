@@ -39,7 +39,7 @@ for (const file of walk(SRC)) {
     .split("\n")
     .forEach((line, i) => {
       for (const match of line.matchAll(TEXT_ALPHA)) {
-        if (/(^|:)disabled:/.test(match[0]) || match[0].startsWith("disabled:")) continue;
+        if (/(^|:)disabled:/.test(match[0])) continue;
         failures.push(`${path.relative(ROOT, file)}:${i + 1}  ${match[0]}`);
       }
     });

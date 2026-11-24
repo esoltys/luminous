@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { LYRIC_LINE_IDLE_LARGE, LYRIC_WORD_UNSUNG } from "../utils/lyricsStyle";
+  import { LYRIC_LINE_IDLE, LYRIC_WORD_UNSUNG } from "../utils/lyricsStyle";
   import { playerStore } from "../stores/player.svelte";
   import {
     FileTextIcon as FileText,
@@ -556,7 +556,7 @@
                 onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
                 class="text-xl @3xl:text-2xl font-bold transition-all duration-300 transform text-balance {isActive
                   ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold'
-                  : LYRIC_LINE_IDLE_LARGE}"
+                  : LYRIC_LINE_IDLE}"
               >
                 {#if isActive && line.words && line.words.length > 0}
                   {#each line.words as word}

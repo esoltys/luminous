@@ -11,9 +11,5 @@
 /** A line that is not the one currently being sung. */
 export const LYRIC_LINE_IDLE = "text-brand-text-secondary/35 hover:text-brand-text-secondary/60";
 
-/** A line that is not the one currently being sung (full-size lyrics view). */
-export const LYRIC_LINE_IDLE_LARGE =
-  "text-brand-text-secondary/30 hover:text-brand-text-secondary/60";
-
 /** A word of the current line that has not been sung yet. */
 export const LYRIC_WORD_UNSUNG = "text-brand-text-primary/40 opacity-40";
