@@ -1090,24 +1090,7 @@ pub fn run() {
 
             // A file association (or `luminous <file>` invocation) launched a
             // second instance; forward the opened paths to the running app.
-            let opened_paths: Vec<String> = args
-                .iter()
-                .skip(1)
-                .filter(|arg| {
-                    let path = std::path::Path::new(arg);
-                    if !path.is_file() {
-                        return false;
-                    }
-                    let ext = path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("")
-                        .to_ascii_lowercase();
-                    luminous_metadata::playlist::PlaylistFormat::from_path(path).is_some()
-                        || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str())
-                })
-                .cloned()
-                .collect();
+            let opened_paths = parse_open_file_args(&args);
 
             if !opened_paths.is_empty() {
                 let _ = app.emit("open-file-request", opened_paths);
@@ -1223,44 +1206,11 @@ pub fn run() {
             }
             let playlists = Arc::new(Mutex::new(manager));
 
-            // Rebuild curated-tag ("tag:") genre auto-playlists in the background
-            // once right after migrations run (see db.rs migration 19, #548), deferred
-            // so startup setup, window render, and initial playback requests proceed
-            // without lock contention (#1807).
-            {
-                let handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(crate::playlist::STARTUP_AUTO_SYNC_DELAY).await;
-                    if let Err(e) =
-                        crate::playlist::sync_all_auto_playlists_and_notify(&handle).await
-                    {
-                        log::error!("Failed to sync auto-playlists at startup: {e}");
-                    }
-                });
-            }
-
             let self_writes = Arc::new(collection::SelfWriteTracker::new());
 
             // Edits to playlists kept in sync with a file in a library
             // folder are written there in the background (#2280).
-            {
-                let handle = app.handle().clone();
-                match crate::playlist::file_sync::PlaylistFileWriter::spawn(
-                    Arc::clone(&db),
-                    move |report| crate::playlist::file_sync::announce(&handle, &report),
-                ) {
-                    Ok(writer) => {
-                        // The organizer and duplicate merges change songs
-                        // under file-backed playlists without an edit of
-                        // their own; their library change wakes the writer.
-                        use tauri::Listener;
-                        let nudger = writer.clone();
-                        app.listen("library-changed", move |_| nudger.nudge());
-                        playlists.blocking_lock().attach_file_sync(writer);
-                    }
-                    Err(e) => log::error!("Failed to start the playlist file writer: {e}"),
-                }
-            }
+            playlist::file_sync::start(app.handle(), Arc::clone(&db), &playlists);
 
             let cover_manager = Arc::new(
                 CoverManager::new(Arc::clone(&db), crate::paths::resolve_app_data_dir(app))
@@ -1279,28 +1229,7 @@ pub fn run() {
             stall_monitor::spawn();
 
             let args: Vec<String> = std::env::args().collect();
-            let startup_path = if args.len() > 1 {
-                let p = &args[1];
-                let path = std::path::Path::new(p);
-                if path.exists() && path.is_file() {
-                    let ext = path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("")
-                        .to_ascii_lowercase();
-                    if luminous_metadata::playlist::PlaylistFormat::from_path(path).is_some()
-                        || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str())
-                    {
-                        Some(p.clone())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+            let startup_path = parse_open_file_args(&args).into_iter().next();
 
             let watcher = Arc::new(parking_lot::Mutex::new(None));
 
@@ -1416,66 +1345,7 @@ pub fn run() {
             // Self-healing sidecar artwork sweep resume (#1274): if the user has
             // opt-in folder artwork enabled, resume sweeping any un-exported cached
             // covers or artist images in the background.
-            let is_save_artwork_enabled = managed_state
-                .db
-                .pool
-                .get()
-                .map(|conn| {
-                    crate::commands::settings::load_ui_preferences(&conn).save_artwork_to_folders
-                })
-                .unwrap_or(false);
-
-            if is_save_artwork_enabled {
-                let db_clone = Arc::clone(&managed_state.db);
-                let cover_mgr = Arc::clone(&managed_state.cover_manager);
-                let covers_dir = cover_mgr.covers_dir().to_path_buf();
-                let app_handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    let has_pending = db_clone
-                        .pool
-                        .get()
-                        .map(|conn| {
-                            let has_albums = conn
-                                .query_row(
-                                    "SELECT 1 FROM songs
-                             WHERE art_automatic LIKE 'album-%'
-                               AND (source IN (1, 2) OR source IS NULL)
-                               AND album IS NOT NULL AND TRIM(album) != ''
-                               AND path IS NOT NULL
-                             LIMIT 1",
-                                    [],
-                                    |_| Ok(true),
-                                )
-                                .unwrap_or(false);
-                            let has_artists = conn
-                                .query_row(
-                                    "SELECT 1 FROM artist_profiles
-                             WHERE fetched_image_filename IS NOT NULL
-                                OR fetched_logo_filename IS NOT NULL
-                                OR fetched_background_filename IS NOT NULL
-                             LIMIT 1",
-                                    [],
-                                    |_| Ok(true),
-                                )
-                                .unwrap_or(false);
-                            has_albums || has_artists
-                        })
-                        .unwrap_or(false);
-
-                    if has_pending {
-                        log::info!("Resuming pending artwork sidecar sweep in background...");
-                        let _ = crate::commands::collection::sweep_artwork_to_folders_core(
-                            db_clone,
-                            cover_mgr,
-                            covers_dir,
-                            move |payload| {
-                                let _ = app_handle.emit("artwork-sweep-progress", payload);
-                            },
-                        )
-                        .await;
-                    }
-                });
-            }
+            covermanager::resume_pending_sweep(app.handle(), &managed_state);
 
             // Spawn position tick loop (Tokio). Spawned after app.manage()
             // above since it calls media_session::mirror_state(), which
@@ -1510,60 +1380,11 @@ pub fn run() {
 
             register_media_shortcuts(app);
 
-            // Keep every dynamic playlist's membership in line with its
-            // definition the moment the library or song stats change —
-            // additions from scans/tag edits and stat-driven moves
-            // (favourite/unfavourite, deep-cut played) all land immediately.
-            // `reconcile_and_sync` coalesces event bursts into at most one
-            // follow-up pass, and holds the playlists mutex only to apply.
-            {
-                use tauri::Listener;
-                let handle = app.handle().clone();
-                for event in [
-                    "library-changed",
-                    "song-stats-changed",
-                    radio_directory::EVENT_RADIO_DIRECTORY_CHANGED,
-                ] {
-                    let handle = handle.clone();
-                    app.listen(event, move |_| {
-                        tauri::async_runtime::spawn(playlist::reconcile_and_sync(handle.clone()));
-                    });
-                }
-                // Relative-date rules ("played in the last 30 days") change
-                // with the clock alone, so also reconcile at startup and at
-                // each local midnight.
-                tauri::async_runtime::spawn(playlist::reconcile_each_day(handle));
-            }
-
-            // Keep the persisted Genres curation hierarchy (#545) in step
-            // with newly-seen or vanished tag names whenever the library
-            // changes (scans, tag edits, bulk merge/delete). Belt-and-braces
-            // alongside `get_tag_hierarchy`'s own reconcile-on-read: this is
-            // what lets an already-open Genres tab pick up a change without
-            // the user having to leave and reopen it.
-            {
-                use tauri::Listener;
-                let handle = app.handle().clone();
-                app.listen("library-changed", move |_| {
-                    tauri::async_runtime::spawn(tags::reconcile_hierarchy_and_notify(
-                        handle.clone(),
-                    ));
-                    tauri::async_runtime::spawn(tags::reconcile_artist_hierarchy_and_notify(
-                        handle.clone(),
-                    ));
-                });
-            }
-
-            // Load the shared hierarchy sidecar (#1312) off the main thread —
-            // the default library may be a slow network share. Registered
-            // after the `library-changed` reconcile listener so a reconcile
-            // it triggers is written back through the attached sidecar.
-            {
-                let handle = app.handle().clone();
-                let _ = std::thread::Builder::new()
-                    .name("luminous-hierarchy-init".into())
-                    .spawn(move || hierarchy_sidecar::init(&handle));
-            }
+            playlist::start_reconcile(app.handle(), &managed_state);
+            tags::start_reconcile(app.handle(), &managed_state);
+            // Registered after `tags::start_reconcile` so a reconcile it
+            // triggers writes back through the attached sidecar.
+            hierarchy_sidecar::spawn_init(app.handle(), &managed_state);
 
             // Startup is done: everything above (DB/migrations, playlist
             // bootstrap, watcher, tray, bridge server) has had a chance to
@@ -1958,6 +1779,22 @@ pub fn run() {
         .expect("error while running Luminous");
 }
 
+/// Filters CLI arguments (skipping `args[0]`, the executable path) to existing
+/// audio and playlist files that Luminous can open on cold start or via
+/// single-instance handoff.
+pub(crate) fn parse_open_file_args(args: &[String]) -> Vec<String> {
+    args.iter()
+        .skip(1)
+        .filter(|arg| {
+            let path = std::path::Path::new(arg);
+            path.is_file()
+                && (luminous_metadata::playlist::PlaylistFormat::from_path(path).is_some()
+                    || crate::collection::is_audio_file(path))
+        })
+        .cloned()
+        .collect()
+}
+
 #[cfg(test)]
 mod startup_rendering_workaround_tests {
     use super::*;
@@ -2148,5 +1985,55 @@ mod startup_rendering_workaround_tests {
             format_window_title(Some(&untitled_no_artist), true, "   ", "Luminous Debug"),
             "Unknown Song - Luminous Debug"
         );
+    }
+}
+
+#[cfg(test)]
+mod open_file_args_tests {
+    use super::parse_open_file_args;
+
+    #[test]
+    fn test_parse_open_file_args_filters_non_files_and_unsupported_extensions() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_open_file_args_")
+            .tempdir()
+            .unwrap();
+
+        let exe = dir.path().join("luminous.exe");
+        let audio = dir.path().join("track.flac");
+        let playlist = dir.path().join("mix.m3u8");
+        let text = dir.path().join("notes.txt");
+        let subdir = dir.path().join("album_dir");
+        std::fs::write(&exe, b"").unwrap();
+        std::fs::write(&audio, b"").unwrap();
+        std::fs::write(&playlist, b"").unwrap();
+        std::fs::write(&text, b"").unwrap();
+        std::fs::create_dir(&subdir).unwrap();
+
+        let missing = dir.path().join("missing.mp3");
+
+        let args = vec![
+            exe.to_string_lossy().into_owned(),
+            "--verbose".to_string(),
+            subdir.to_string_lossy().into_owned(),
+            missing.to_string_lossy().into_owned(),
+            text.to_string_lossy().into_owned(),
+            audio.to_string_lossy().into_owned(),
+            playlist.to_string_lossy().into_owned(),
+        ];
+
+        assert_eq!(
+            parse_open_file_args(&args),
+            vec![
+                audio.to_string_lossy().into_owned(),
+                playlist.to_string_lossy().into_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_open_file_args_empty_or_exe_only() {
+        assert!(parse_open_file_args(&[]).is_empty());
+        assert!(parse_open_file_args(&["luminous".to_string()]).is_empty());
     }
 }
