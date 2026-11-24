@@ -30,13 +30,18 @@ pub struct SongProvenance {
     pub analyzed_at: i64,
 }
 
-fn parse_verdict_str(s: &str) -> ProvenanceVerdict {
+/// Sentinel verdict stored in `song_provenance` when a reachable local file
+/// fails to open or decode, suppressing retries until its `mtime` changes (#2354).
+const UNREADABLE_VERDICT: &str = "unreadable";
+
+fn parse_verdict_str(s: &str) -> Option<ProvenanceVerdict> {
     match s {
-        "authentic_hires" => ProvenanceVerdict::AuthenticHiRes,
-        "suspected_lossy" => ProvenanceVerdict::SuspectedLossy,
-        "suspected_upsampled" => ProvenanceVerdict::SuspectedUpsampled,
-        "padded_bit_depth" => ProvenanceVerdict::PaddedBitDepth,
-        _ => ProvenanceVerdict::Authentic,
+        "authentic" => Some(ProvenanceVerdict::Authentic),
+        "authentic_hires" => Some(ProvenanceVerdict::AuthenticHiRes),
+        "suspected_lossy" => Some(ProvenanceVerdict::SuspectedLossy),
+        "suspected_upsampled" => Some(ProvenanceVerdict::SuspectedUpsampled),
+        "padded_bit_depth" => Some(ProvenanceVerdict::PaddedBitDepth),
+        _ => None,
     }
 }
 
@@ -51,8 +56,13 @@ fn verdict_to_str(v: ProvenanceVerdict) -> &'static str {
 }
 
 /// Background analysis of unverified local lossless tracks, newest first,
-/// scheduled by `crate::background_reads`. A track that can't be decoded
-/// stores nothing, so the runner skips it for the rest of the session.
+/// scheduled by `crate::background_reads`.
+///
+/// Reachable files that cannot be decoded are recorded in `song_provenance`
+/// with `verdict = 'unreadable'` keyed by `mtime`, so they are not retried
+/// across launches until the file changes (#2354). Unreachable files (e.g.
+/// asleep drive or disconnected share) store nothing and are skipped only for
+/// the rest of the session.
 pub struct ProvenanceReader {
     app: AppHandle,
     db: Arc<Database>,
@@ -104,15 +114,29 @@ impl crate::background_reads::BackgroundRead for ProvenanceReader {
     }
 
     fn read(&mut self, song_id: i64, _path: &Path) -> crate::background_reads::ReadOutcome {
-        match verify_song_provenance(&self.db, song_id) {
-            Ok(prov) => {
-                let _ = self.app.emit("song-provenance-changed", &prov);
-                crate::background_reads::ReadOutcome::Stored
-            }
-            Err(e) => {
-                log::debug!("Background provenance skipped song {song_id}: {e}");
-                crate::background_reads::ReadOutcome::NothingStored
-            }
+        let (outcome, prov) = verify_for_background(&self.db, song_id);
+        if let Some(prov) = prov {
+            let _ = self.app.emit("song-provenance-changed", &prov);
+        }
+        outcome
+    }
+}
+
+fn verify_for_background(
+    db: &Database,
+    song_id: i64,
+) -> (crate::background_reads::ReadOutcome, Option<SongProvenance>) {
+    match verify_song_provenance_inner(db, song_id) {
+        Ok(VerifyAttempt::Verified(prov)) => {
+            (crate::background_reads::ReadOutcome::Stored, Some(prov))
+        }
+        Ok(VerifyAttempt::RecordedUnreadable(e)) => {
+            log::debug!("Background provenance marked song {song_id} unreadable: {e}");
+            (crate::background_reads::ReadOutcome::Stored, None)
+        }
+        Err(e) => {
+            log::debug!("Background provenance skipped song {song_id}: {e}");
+            (crate::background_reads::ReadOutcome::NothingStored, None)
         }
     }
 }
@@ -131,6 +155,9 @@ pub fn get_cached_provenance(db: &Database, song_id: i64) -> Result<Option<SongP
         .query_row(params![song_id], |row| {
             let p_mtime: i64 = row.get(0)?;
             let verdict_str: String = row.get(1)?;
+            let Some(verdict) = parse_verdict_str(&verdict_str) else {
+                return Ok(None);
+            };
             let cutoff_hz: Option<u32> = row.get(2)?;
             let effective_bit_depth: Option<u32> = row.get(3)?;
             let effective_sample_rate: Option<u32> = row.get(4)?;
@@ -143,18 +170,19 @@ pub fn get_cached_provenance(db: &Database, song_id: i64) -> Result<Option<SongP
                 None => false,
             };
 
-            Ok(SongProvenance {
+            Ok(Some(SongProvenance {
                 song_id,
-                verdict: parse_verdict_str(&verdict_str),
+                verdict,
                 cutoff_hz,
                 effective_bit_depth,
                 effective_sample_rate,
                 description,
                 is_stale,
                 analyzed_at,
-            })
+            }))
         })
-        .ok();
+        .optional()?
+        .flatten();
 
     Ok(row)
 }
@@ -164,8 +192,9 @@ pub fn get_all_provenance_verdicts(
     db: &Database,
 ) -> Result<std::collections::HashMap<i64, String>> {
     let conn = db.pool.get().context("failed to get db connection")?;
-    let mut stmt = conn.prepare("SELECT song_id, verdict FROM song_provenance")?;
-    let rows = stmt.query_map([], |row| {
+    let mut stmt =
+        conn.prepare("SELECT song_id, verdict FROM song_provenance WHERE verdict != ?1")?;
+    let rows = stmt.query_map(params![UNREADABLE_VERDICT], |row| {
         Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
     })?;
 
@@ -176,8 +205,20 @@ pub fn get_all_provenance_verdicts(
     Ok(map)
 }
 
+enum VerifyAttempt {
+    Verified(SongProvenance),
+    RecordedUnreadable(anyhow::Error),
+}
+
 /// Verify a song's audio provenance, saving the result to `song_provenance`.
 pub fn verify_song_provenance(db: &Database, song_id: i64) -> Result<SongProvenance> {
+    match verify_song_provenance_inner(db, song_id)? {
+        VerifyAttempt::Verified(prov) => Ok(prov),
+        VerifyAttempt::RecordedUnreadable(err) => Err(err),
+    }
+}
+
+fn verify_song_provenance_inner(db: &Database, song_id: i64) -> Result<VerifyAttempt> {
     let conn = db.pool.get().context("failed to get db connection")?;
 
     let (path_str, source_raw, filetype_raw, mtime_val): (Option<String>, i64, i64, Option<i64>) =
@@ -204,13 +245,38 @@ pub fn verify_song_provenance(db: &Database, song_id: i64) -> Result<SongProvena
         );
     }
 
+    let file_path = Path::new(&path);
+    if !luminous_analysis::is_file_reachable(file_path) {
+        bail!("Couldn't reach {path} to verify provenance");
+    }
+
     let mtime = mtime_val.unwrap_or(0);
 
-    let decoder = crate::media_source::open_offline(db, Path::new(&path))
-        .with_context(|| format!("Failed to open audio decoder for song {song_id} at {path}"))?;
+    let analysis_res = crate::media_source::open_offline(db, file_path)
+        .with_context(|| format!("Failed to open audio decoder for song {song_id} at {path}"))
+        .and_then(|decoder| {
+            luminous_analysis::analyze_provenance(decoder)
+                .map_err(|e| anyhow::anyhow!("Provenance analysis failed: {e}"))
+        });
 
-    let analysis = luminous_analysis::analyze_provenance(decoder)
-        .map_err(|e| anyhow::anyhow!("Provenance analysis failed: {e}"))?;
+    let analysis = match analysis_res {
+        Ok(a) => a,
+        Err(err) => {
+            // If the drive went away mid-read, treat it as unreachable rather
+            // than recording a permanent failure (#2162, #2354).
+            if !luminous_analysis::is_file_reachable(file_path) {
+                return Err(err);
+            }
+            let detail = format!("{err:#}");
+            conn.execute(
+                "INSERT OR REPLACE INTO song_provenance
+                 (song_id, mtime, verdict, cutoff_hz, effective_bit_depth, effective_sample_rate, details, analyzed_at)
+                 VALUES (?1, ?2, ?3, NULL, NULL, NULL, ?4, strftime('%s', 'now'))",
+                params![song_id, mtime, UNREADABLE_VERDICT, detail],
+            )?;
+            return Ok(VerifyAttempt::RecordedUnreadable(err));
+        }
+    };
 
     let verdict_str = verdict_to_str(analysis.verdict);
 
@@ -235,7 +301,7 @@ pub fn verify_song_provenance(db: &Database, song_id: i64) -> Result<SongProvena
         |row| row.get(0),
     )?;
 
-    Ok(SongProvenance {
+    Ok(VerifyAttempt::Verified(SongProvenance {
         song_id,
         verdict: analysis.verdict,
         cutoff_hz: analysis.cutoff_hz,
@@ -244,7 +310,7 @@ pub fn verify_song_provenance(db: &Database, song_id: i64) -> Result<SongProvena
         description: analysis.description,
         is_stale: false,
         analyzed_at,
-    })
+    }))
 }
 
 #[cfg(test)]
@@ -332,6 +398,113 @@ mod tests {
         assert_eq!(
             next_song_to_verify(&conn, &skipped).unwrap(),
             Some((song_id, "/test.flac".to_string()))
+        );
+    }
+
+    #[test]
+    fn background_provenance_records_unreadable_file_and_skips_until_mtime_changes() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_prov_unreadable_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        let corrupt_path = temp_dir_guard.path().join("corrupt.flac");
+        std::fs::write(&corrupt_path, b"not a valid flac stream").unwrap();
+        let path_str = corrupt_path.to_string_lossy().into_owned();
+
+        conn.execute(
+            "INSERT INTO songs (path, title, source, filetype, mtime) VALUES (?1, 'Corrupt', 2, 2, 1000)",
+            params![path_str],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('verify_audio_integrity_and_provenance', 'true')",
+            [],
+        )
+        .unwrap();
+
+        // Manual verification still reports an error.
+        assert!(verify_song_provenance(&db, song_id).is_err());
+
+        // Background reader persists the failure marker and reports Stored so
+        // the runner does not retry it on every launch.
+        let (outcome, emitted) = verify_for_background(&db, song_id);
+        assert_eq!(outcome, crate::background_reads::ReadOutcome::Stored);
+        assert!(emitted.is_none());
+
+        let (verdict, mtime): (String, i64) = conn
+            .query_row(
+                "SELECT verdict, mtime FROM song_provenance WHERE song_id = ?1",
+                params![song_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(verdict, UNREADABLE_VERDICT);
+        assert_eq!(mtime, 1000);
+
+        // Suppressed on subsequent launches (fresh Skipped set) and hidden from
+        // user-facing provenance lookups.
+        let skipped = crate::background_reads::Skipped::default();
+        assert_eq!(next_song_to_verify(&conn, &skipped).unwrap(), None);
+        assert!(get_cached_provenance(&db, song_id).unwrap().is_none());
+        assert!(get_all_provenance_verdicts(&db).unwrap().is_empty());
+
+        // Changing mtime re-queues the file for verification.
+        conn.execute(
+            "UPDATE songs SET mtime = 2000 WHERE id = ?1",
+            params![song_id],
+        )
+        .unwrap();
+        assert_eq!(
+            next_song_to_verify(&conn, &skipped).unwrap(),
+            Some((song_id, path_str))
+        );
+    }
+
+    #[test]
+    fn background_provenance_stores_nothing_for_unreachable_file() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_prov_unreachable_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        let missing_path = temp_dir_guard.path().join("unplugged.flac");
+        let path_str = missing_path.to_string_lossy().into_owned();
+
+        conn.execute(
+            "INSERT INTO songs (path, title, source, filetype, mtime) VALUES (?1, 'Unplugged', 2, 2, 1000)",
+            params![path_str],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('verify_audio_integrity_and_provenance', 'true')",
+            [],
+        )
+        .unwrap();
+
+        let (outcome, emitted) = verify_for_background(&db, song_id);
+        assert_eq!(outcome, crate::background_reads::ReadOutcome::NothingStored);
+        assert!(emitted.is_none());
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM song_provenance WHERE song_id = ?1",
+                params![song_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+
+        let skipped = crate::background_reads::Skipped::default();
+        assert_eq!(
+            next_song_to_verify(&conn, &skipped).unwrap(),
+            Some((song_id, path_str))
         );
     }
 }
