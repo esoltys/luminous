@@ -3348,6 +3348,10 @@ export const it = {
       right: "DESTRO",
       unit: "VU",
       peak: "PICCO",
+      referenceTitle: "Livello di riferimento",
+      referenceAuto: "Automatico",
+      referenceHint: "Imposta il livello che corrisponde a 0 VU, dove inizia la zona rossa.",
+      referenceValue: "{level} dBFS",
     },
     scope: {
       left: "S",

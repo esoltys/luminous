@@ -3370,6 +3370,10 @@ export const fr: DeepStringRecord<typeof en> = {
       right: "DROITE",
       unit: "VU",
       peak: "CRÊTE",
+      referenceTitle: "Niveau de référence",
+      referenceAuto: "Automatique",
+      referenceHint: "Réglez le niveau qui correspond à 0 VU, là où la zone rouge commence.",
+      referenceValue: "{level} dBFS",
     },
     scope: {
       left: "G",

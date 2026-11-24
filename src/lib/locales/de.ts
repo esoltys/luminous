@@ -3364,6 +3364,10 @@ export const de = {
       right: "RECHTS",
       unit: "VU",
       peak: "SPITZE",
+      referenceTitle: "Referenzpegel",
+      referenceAuto: "Automatisch",
+      referenceHint: "Lege den Pegel fest, der 0 VU anzeigt, wo die rote Zone beginnt.",
+      referenceValue: "{level} dBFS",
     },
     scope: {
       left: "L",

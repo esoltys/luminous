@@ -1,6 +1,7 @@
 import { i18n } from "../stores/i18n.svelte";
 import { loudnessStore } from "../stores/loudness.svelte";
 import type { ThemeColors } from "../stores/theme.svelte";
+import { vuMeterSettings } from "../stores/vuMeterSettings.svelte";
 import { mixHex } from "../utils/colorUtils";
 import type {
   VisualizerFrame,
@@ -17,6 +18,23 @@ import {
   deflectionForVu,
   referenceForLoudness,
 } from "./vuMeterEngine";
+
+/**
+ * The level, in dBFS per channel, that reads 0 VU when the meter calibrates itself: from
+ * the normalization target while normalization is on, otherwise from a typical master.
+ */
+export function autoReferenceDbfs(): number {
+  return referenceForLoudness(loudnessStore.enabled, loudnessStore.targetLufs);
+}
+
+/** The level that reads 0 VU right now: the user's own setting, or the automatic one. */
+function currentReferenceDbfs(): number {
+  return referenceForLoudness(
+    loudnessStore.enabled,
+    loudnessStore.targetLufs,
+    vuMeterSettings.referenceDbfs,
+  );
+}
 
 /** Panel width over height: two wide meters, a peak column between them and a label strip below. */
 const PANEL_ASPECT = 3.6;
@@ -465,10 +483,7 @@ class VuMeterFullInstance implements VisualizerInstance {
 
   push(frame: VisualizerFrame): void {
     if (frame.scope) {
-      this.meters.push(
-        frame.scope.points,
-        referenceForLoudness(loudnessStore.enabled, loudnessStore.targetLufs),
-      );
+      this.meters.push(frame.scope.points, currentReferenceDbfs());
     } else if (!frame.playing) {
       this.meters.rest();
     }
@@ -583,10 +598,7 @@ class VuMeterMiniInstance implements VisualizerInstance {
 
   push(frame: VisualizerFrame): void {
     if (frame.scope) {
-      this.meters.push(
-        frame.scope.points,
-        referenceForLoudness(loudnessStore.enabled, loudnessStore.targetLufs),
-      );
+      this.meters.push(frame.scope.points, currentReferenceDbfs());
     } else if (!frame.playing) {
       this.meters.rest();
     }

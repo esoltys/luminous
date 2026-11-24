@@ -35,13 +35,26 @@ function referenceForTargetLufs(targetLufs: number): number {
  */
 const UNNORMALIZED_PROGRAM_LUFS = -9;
 
+/** The range a manual reference level may take, in dBFS per channel (the meter's calibration trim). */
+export const VU_REFERENCE_RANGE_DBFS = { min: -30, max: 0 } as const;
+
+/** `dbfs` limited to `VU_REFERENCE_RANGE_DBFS`; the one place a manual level is bounded. */
+export function clampReferenceDbfs(dbfs: number): number {
+  return Math.max(VU_REFERENCE_RANGE_DBFS.min, Math.min(VU_REFERENCE_RANGE_DBFS.max, dbfs));
+}
+
 /**
- * The per-channel RMS level, in dBFS, of the 0 VU mark. With normalization on, music sits
- * at the user's target and the meter is calibrated to it, so the red zone means louder than
- * the target. Otherwise the meter is calibrated to a typical master, like a deck's fixed
- * reference level.
+ * The per-channel RMS level, in dBFS, of the 0 VU mark. A manual level wins when the user
+ * set one. Otherwise, with normalization on, music sits at the user's target and the meter
+ * is calibrated to it, so the red zone means louder than the target; with it off the meter
+ * is calibrated to a typical master, like a deck's fixed reference level.
  */
-export function referenceForLoudness(normalizationEnabled: boolean, targetLufs: number): number {
+export function referenceForLoudness(
+  normalizationEnabled: boolean,
+  targetLufs: number,
+  manualDbfs: number | null = null,
+): number {
+  if (manualDbfs !== null) return clampReferenceDbfs(manualDbfs);
   return referenceForTargetLufs(normalizationEnabled ? targetLufs : UNNORMALIZED_PROGRAM_LUFS);
 }
 

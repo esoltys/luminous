@@ -3551,6 +3551,10 @@ export const uk = {
       right: "ПРАВИЙ",
       unit: "VU",
       peak: "ПІК",
+      referenceTitle: "Опорний рівень",
+      referenceAuto: "Авто",
+      referenceHint: "Задайте рівень, що відповідає 0 VU, де починається червона зона.",
+      referenceValue: "{level} dBFS",
     },
     scope: {
       left: "Л",
