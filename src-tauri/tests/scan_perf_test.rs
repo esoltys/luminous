@@ -53,7 +53,7 @@ fn populate_synthetic_library(root: &Path, file_count: usize) {
 
 fn print_report(label: &str, report: &ScanReport) {
     println!(
-        "[{label}] files_found={} unchanged={} reread={} | discovery_ms={} partition_ms={} (reconcile={} dedup={} stamps={} stat={}) tag_read_ms={} missing_check_ms={} total_ms={}",
+        "[{label}] files_found={} unchanged={} reread={} | discovery_ms={} partition_ms={} (reconcile={} dedup={} stamps={} stat={}) tag_read_ms={} missing_check_ms={} dr_logs_ms={} artwork_ms={} total_ms={}",
         report.files_found,
         report.unchanged,
         report.reread,
@@ -65,6 +65,8 @@ fn print_report(label: &str, report: &ScanReport) {
         report.partition_stat_ms,
         report.tag_read_ms,
         report.missing_check_ms,
+        report.dr_logs_ms,
+        report.artwork_ms,
         report.total_ms,
     );
 }
@@ -121,6 +123,8 @@ async fn bench_unchanged_large_library_scan() {
 
     let mut discovery_samples = Vec::with_capacity(UNCHANGED_RUNS);
     let mut partition_samples = Vec::with_capacity(UNCHANGED_RUNS);
+    let mut dr_logs_samples = Vec::with_capacity(UNCHANGED_RUNS);
+    let mut artwork_samples = Vec::with_capacity(UNCHANGED_RUNS);
     let mut total_samples = Vec::with_capacity(UNCHANGED_RUNS);
 
     for run in 1..=UNCHANGED_RUNS {
@@ -136,13 +140,17 @@ async fn bench_unchanged_large_library_scan() {
         );
         discovery_samples.push(report.discovery_ms);
         partition_samples.push(report.partition_ms);
+        dr_logs_samples.push(report.dr_logs_ms);
+        artwork_samples.push(report.artwork_ms);
         total_samples.push(report.total_ms);
     }
 
     println!(
-        "[median] discovery_ms={} partition_ms={} total_ms={}",
+        "[median] discovery_ms={} partition_ms={} dr_logs_ms={} artwork_ms={} total_ms={}",
         median(&mut discovery_samples),
         median(&mut partition_samples),
+        median(&mut dr_logs_samples),
+        median(&mut artwork_samples),
         median(&mut total_samples),
     );
 }
