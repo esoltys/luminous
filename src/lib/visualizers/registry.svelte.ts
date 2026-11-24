@@ -2,6 +2,7 @@ import { SALMON_RUN_PRESET } from "./salmonRun";
 import type { VisualizerPreset } from "./types";
 import { VECTORSCOPE_PRESET } from "./vectorscope";
 import { VOXEL_PRESET } from "./voxel";
+import { VU_METER_PRESET } from "./vuMeter";
 import { VOXEL_ISO_PRESET } from "./voxelIso";
 import { VOXEL_LOGO_PRESET } from "./voxelLogo";
 
@@ -16,6 +17,7 @@ let presets = $state.raw<readonly VisualizerPreset[]>([
   VOXEL_ISO_PRESET,
   VOXEL_LOGO_PRESET,
   VECTORSCOPE_PRESET,
+  VU_METER_PRESET,
   SALMON_RUN_PRESET,
 ]);
 

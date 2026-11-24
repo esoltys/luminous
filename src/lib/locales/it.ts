@@ -3342,6 +3342,13 @@ export const it = {
     voxelLogo: "Logo a voxel",
     vectorscope: "Vettorscopio",
     salmonRun: "Risalita dei salmoni",
+    vuMeter: "Indicatori VU",
+    vu: {
+      left: "SINISTRO",
+      right: "DESTRO",
+      unit: "VU",
+      peak: "PICCO",
+    },
     scope: {
       left: "S",
       right: "D",

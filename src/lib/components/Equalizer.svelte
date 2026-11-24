@@ -493,6 +493,7 @@
       const settings = await invoke<LoudnessSettings>("get_loudness_settings");
       loudnessStore.setEnabled(settings.enabled);
       targetLufs = settings.target_lufs;
+      loudnessStore.setTargetLufs(targetLufs);
       loudnessMode = settings.mode;
       fallbackGainDb = settings.fallback_gain_db;
     } catch (e) {
@@ -521,6 +522,7 @@
   }
 
   async function handleTargetLufsChange() {
+    loudnessStore.setTargetLufs(targetLufs);
     await saveLoudnessSettings();
   }
 

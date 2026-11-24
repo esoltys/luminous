@@ -3555,6 +3555,13 @@ export const ru = {
     voxelLogo: "Воксельный логотип",
     vectorscope: "Векторскоп",
     salmonRun: "Ход лосося",
+    vuMeter: "VU-метр",
+    vu: {
+      left: "ЛЕВЫЙ",
+      right: "ПРАВЫЙ",
+      unit: "VU",
+      peak: "ПИК",
+    },
     scope: {
       left: "Л",
       right: "П",
