@@ -33,6 +33,7 @@ const SCALE_MARKS: readonly { vu: number; label: string | null }[] = [
   { vu: 0, label: "0" },
   { vu: 3, label: "3" },
   { vu: 5, label: "5+" },
+  { vu: -15, label: null },
   { vu: -9, label: null },
   { vu: -8, label: null },
   { vu: -6, label: null },
@@ -220,12 +221,19 @@ function drawScale(
     // The numbers run in a straight row, whatever the scale beneath does.
     if (label) ctx.fillText(label, x, layout.numbersY);
   }
-  // The leftmost stop is a solid block, as on the hardware, level with the red zone.
-  ctx.lineWidth = wh * 0.04;
-  ctx.beginPath();
-  ctx.moveTo(dial.x(0) - wh * 0.045, dial.y(0) + wh * 0.02);
-  ctx.lineTo(dial.x(0) + wh * 0.045, dial.y(0) + wh * 0.02);
-  ctx.stroke();
+  // The leftmost stop is a solid wedge running left from the first tick's base, thicker at
+  // its outer end and level underneath with the red zone.
+  {
+    const x = dial.x(0);
+    const bottom = dial.y(0) + wh * 0.04;
+    ctx.beginPath();
+    ctx.moveTo(x - wh * 0.1, dial.y(0) - wh * 0.005);
+    ctx.lineTo(x + wh * 0.012, dial.y(0) + wh * 0.012);
+    ctx.lineTo(x + wh * 0.012, bottom);
+    ctx.lineTo(x - wh * 0.1, bottom);
+    ctx.closePath();
+    ctx.fill();
+  }
 
   // Percentage dots on a line under the scale, their numbers in a row beneath.
   ctx.font = `500 ${wh * 0.065}px ${FONT_STACK}`;
