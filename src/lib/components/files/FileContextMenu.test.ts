@@ -358,6 +358,7 @@ describe("FileContextMenu.svelte", () => {
       updated: 0,
       track_count: 2,
       is_queue: false,
+      kind: "custom",
     });
     const addSongsSpy = vi.spyOn(playlistsStore, "addSongsToPlaylist").mockResolvedValue();
 

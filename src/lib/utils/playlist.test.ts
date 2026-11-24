@@ -7,11 +7,15 @@ import {
   getDaypartMixLabel,
   getDaypartMixSourceLabel,
   getPlaylistAutoKindAndSubtitle,
+  getPlaylistCapabilities,
   getPlaylistDisplayName,
   getPopulationModeSuffix,
   isAutoContinueItem,
+  isSmartPlaylist,
+  isStationList,
+  isSystemAutoPlaylist,
 } from "./playlist";
-import type { Playlist, PlaylistItem } from "../types";
+import type { Playlist, PlaylistItem, PlaylistKind } from "../types";
 import { i18n } from "../stores/i18n.svelte";
 
 describe("playlist utils", () => {
@@ -24,6 +28,7 @@ describe("playlist utils", () => {
       track_count: 5,
       dynamic_enabled: false,
       is_queue: false,
+      kind: "custom",
     };
     expect(getPlaylistDisplayName(playlist)).toBe("My Favorites");
   });
@@ -39,6 +44,7 @@ describe("playlist utils", () => {
       track_count: 25,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "system_auto",
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Rock");
   });
@@ -54,6 +60,7 @@ describe("playlist utils", () => {
       track_count: 10,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "system_auto",
     };
     expect(getPlaylistDisplayName(playlistDeepCuts)).toBe("1980s Rock Deep Cuts");
 
@@ -67,6 +74,7 @@ describe("playlist utils", () => {
       track_count: 15,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "system_auto",
     };
     expect(getPlaylistDisplayName(playlistFavourites)).toBe("Jazz Favourites");
   });
@@ -96,6 +104,7 @@ describe("playlist utils", () => {
       track_count: 8,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "system_auto",
     };
     expect(getPlaylistDisplayName(subgenrePlaylist)).toBe("Death Metal");
 
@@ -109,6 +118,7 @@ describe("playlist utils", () => {
       track_count: 8,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "system_auto",
     };
     expect(getPlaylistDisplayName(otherSubgenrePlaylist)).toBe("Indie Pop");
   });
@@ -124,6 +134,7 @@ describe("playlist utils", () => {
       track_count: 8,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "system_auto",
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Death Metal Favourites");
   });
@@ -139,6 +150,7 @@ describe("playlist utils", () => {
       track_count: 8,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "system_auto",
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Jazz");
   });
@@ -152,6 +164,7 @@ describe("playlist utils", () => {
       track_count: 8,
       dynamic_enabled: false,
       is_queue: false,
+      kind: "custom",
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Rock; Indie Faves");
   });
@@ -166,6 +179,7 @@ describe("playlist utils", () => {
       track_count: 8,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "smart",
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Metal; Death Metal Favourites (Smart)");
   });
@@ -181,6 +195,7 @@ describe("playlist utils", () => {
       track_count: 8,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "smart",
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Canadian Deep Cuts");
     expect(getPlaylistDisplayName({ ...playlist, population_mode: "all" })).toBe("Canadian");
@@ -197,6 +212,7 @@ describe("playlist utils", () => {
       track_count: 3,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "system_auto",
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Missing Metadata");
   });
@@ -212,6 +228,7 @@ describe("playlist utils", () => {
       track_count: 10,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "system_auto",
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Japanese");
   });
@@ -227,6 +244,7 @@ describe("playlist utils", () => {
       track_count: 30,
       dynamic_enabled: true,
       is_queue: false,
+      kind: "system_auto",
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Canada");
   });
@@ -306,7 +324,12 @@ describe("getPlaylistDisplayName for the built-in Queue", () => {
 });
 
 describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
-  const makePlaylist = (name: string, dynamic_spec?: string, dynamic_enabled = true): Playlist => ({
+  const makePlaylist = (
+    name: string,
+    dynamic_spec?: string,
+    dynamic_enabled = true,
+    kind: PlaylistKind = "system_auto",
+  ): Playlist => ({
     id: 42,
     name,
     created: 100,
@@ -314,7 +337,8 @@ describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
     track_count: 10,
     dynamic_enabled,
     dynamic_spec,
-    is_queue: false,
+    is_queue: kind === "queue",
+    kind,
   });
 
   it("maps bpmrange: specs to bpm ref and formatted BPM subtitle", () => {
@@ -354,7 +378,9 @@ describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
       kind: "country",
       selector: "CA",
     });
-    expect(autoPlaylistRefFromPlaylist(makePlaylist("Mine", "country:ca"))).toBeNull();
+    expect(
+      autoPlaylistRefFromPlaylist(makePlaylist("Mine", "country:ca", true, "smart")),
+    ).toBeNull();
     expect(
       autoPlaylistRefFromPlaylist(makePlaylist("Missing Metadata", "missingmeta")),
     ).toMatchObject({
@@ -373,11 +399,11 @@ describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
   });
 
   it("returns null ref for plain custom playlists and smart playlists, while keeping smart card metadata", () => {
-    const custom = makePlaylist("Road Trip", undefined, false);
+    const custom = makePlaylist("Road Trip", undefined, false, "custom");
     expect(autoPlaylistRefFromPlaylist(custom)).toBeNull();
     expect(getPlaylistAutoKindAndSubtitle(custom)).toBeNull();
 
-    const smart = makePlaylist("High Rated Rock", "genre:rock rating:>=4");
+    const smart = makePlaylist("High Rated Rock", "genre:rock rating:>=4", true, "smart");
     expect(autoPlaylistRefFromPlaylist(smart)).toBeNull();
     expect(getPlaylistAutoKindAndSubtitle(smart)).toEqual({
       kind: "smart",
@@ -385,15 +411,69 @@ describe("autoPlaylistRefFromPlaylist & getPlaylistAutoKindAndSubtitle", () => {
     });
   });
 
-  it("treats user smart playlists with is_system: false as smart even when spec starts with language:/decade:/tag:", () => {
+  it("treats user smart playlists with kind: 'smart' as smart even when spec starts with language:/decade:/tag:", () => {
     for (const spec of ["language:ja", "decade:1980s", "tag:canadian", "tag:Rock; rating:>=4"]) {
-      const smart: Playlist = { ...makePlaylist("User Smart", spec), is_system: false };
+      const smart: Playlist = makePlaylist("User Smart", spec, true, "smart");
       expect(autoPlaylistRefFromPlaylist(smart), spec).toBeNull();
       expect(getPlaylistAutoKindAndSubtitle(smart), spec).toEqual({
         kind: "smart",
         subtitle: i18n.t("playlists.smartRulePlaylistLabel"),
       });
     }
+  });
+});
+
+describe("playlist kind predicates and capabilities", () => {
+  it("classifies playlists by backend kind", () => {
+    expect(isSmartPlaylist({ kind: "smart" })).toBe(true);
+    expect(isSmartPlaylist({ kind: "system_auto" })).toBe(false);
+    expect(isSystemAutoPlaylist({ kind: "system_auto" })).toBe(true);
+    expect(isSystemAutoPlaylist({ kind: "smart" })).toBe(false);
+    expect(isStationList({ kind: "station_list" })).toBe(true);
+    expect(isStationList({ kind: "custom" })).toBe(false);
+  });
+
+  it("maps each PlaylistKind to its UI capabilities", () => {
+    expect(getPlaylistCapabilities("queue")).toMatchObject({
+      isQueue: true,
+      usesLocalSort: true,
+      renamable: false,
+      showsAutoContinue: true,
+      canSaveAsCustom: true,
+      showsGenreHeader: false,
+      artworkStyle: "queue",
+      refreshable: false,
+      editableDefinition: null,
+    });
+    expect(getPlaylistCapabilities("custom")).toMatchObject({
+      isQueue: false,
+      renamable: true,
+      canMakeActive: true,
+      showsGenreHeader: true,
+      artworkStyle: "mosaic",
+      refreshable: false,
+    });
+    expect(getPlaylistCapabilities("smart")).toMatchObject({
+      showsPopulationMode: true,
+      showsGenreHeader: true,
+      artworkStyle: "smart",
+      refreshable: true,
+      editableDefinition: "smart",
+    });
+    expect(getPlaylistCapabilities("station_list")).toMatchObject({
+      showsStationUpdated: true,
+      showsGenreHeader: false,
+      artworkStyle: "mosaic",
+      refreshable: true,
+      editableDefinition: "station_list",
+    });
+    expect(getPlaylistCapabilities("system_auto")).toMatchObject({
+      canMakeActive: false,
+      showsGenreHeader: true,
+      artworkStyle: "mosaic",
+      refreshable: false,
+      editableDefinition: null,
+    });
   });
 });
 

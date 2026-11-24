@@ -266,6 +266,8 @@ export interface PlaylistItem {
   additional_metadata?: string;
 }
 
+export type PlaylistKind = "queue" | "custom" | "smart" | "system_auto" | "station_list";
+
 export interface Playlist {
   id: number;
   name: string;
@@ -279,6 +281,10 @@ export interface Playlist {
   /** True for the app's single built-in Queue playlist (backend-computed —
    * never derive this from the playlist name). */
   is_queue: boolean;
+  /** Semantic kind of this playlist, computed by the backend. */
+  kind: PlaylistKind;
+  /** Parsed `radio:...` spec when `kind === "station_list"`. */
+  station_list_spec?: RadioStationListSpec | null;
   /** True for system-managed auto-playlists; false for user custom and Smart Playlists (#2136). */
   is_system?: boolean;
   /** The playlist file in a library folder this playlist is kept in sync with

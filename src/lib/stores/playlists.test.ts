@@ -22,6 +22,7 @@ describe("PlaylistsStore", () => {
       updated: 1700000000,
       dynamic_enabled: false,
       is_queue: false,
+      kind: "custom",
     },
     {
       id: 102,
@@ -31,6 +32,7 @@ describe("PlaylistsStore", () => {
       updated: 1700000001,
       dynamic_enabled: false,
       is_queue: false,
+      kind: "custom",
     },
   ];
 
@@ -184,6 +186,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000000,
         dynamic_enabled: false,
         is_queue: true,
+        kind: "queue",
       },
       {
         id: 102,
@@ -193,6 +196,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000001,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
     ];
     playlistsStore.pinnedPlaylistId = null;
@@ -213,6 +217,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000000,
         dynamic_enabled: false,
         is_queue: true,
+        kind: "queue",
       },
       {
         id: 102,
@@ -222,6 +227,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000001,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
     ];
     playlistsStore.pinnedPlaylistId = 102;
@@ -297,6 +303,7 @@ describe("PlaylistsStore", () => {
           created: 1700000002,
           dynamic_enabled: false,
           is_queue: false,
+          kind: "custom",
         };
       }
       if (cmd === "get_playlists")
@@ -309,6 +316,7 @@ describe("PlaylistsStore", () => {
             created: 1700000002,
             dynamic_enabled: false,
             is_queue: false,
+            kind: "custom",
           },
         ];
       if (cmd === "get_playlist_tracks") return [];
@@ -388,6 +396,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000000,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
       {
         id: 102,
@@ -397,6 +406,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000001,
         dynamic_enabled: true,
         is_queue: false,
+        kind: "smart",
       },
     ];
     playlistsStore.pinnedPlaylistId = 101;
@@ -419,6 +429,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000000,
         dynamic_enabled: false,
         is_queue: true,
+        kind: "queue",
       },
       {
         id: 102,
@@ -428,6 +439,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000001,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
     ];
     playlistsStore.pinnedPlaylistId = null;
@@ -449,6 +461,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000000,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
     ];
     playlistsStore.pinnedPlaylistId = null;
@@ -470,6 +483,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000000,
         dynamic_enabled: false,
         is_queue: true,
+        kind: "queue",
       },
       {
         id: 2,
@@ -479,6 +493,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000001,
         dynamic_enabled: true,
         is_queue: false,
+        kind: "smart",
       },
       {
         id: 3,
@@ -488,6 +503,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000002,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
       {
         id: 4,
@@ -497,6 +513,7 @@ describe("PlaylistsStore", () => {
         updated: 1700000003,
         dynamic_enabled: false,
         is_queue: false,
+        kind: "custom",
       },
     ];
     expect(playlistsStore.customPlaylists.map((p) => p.name)).toEqual(["Road Trip", "Chill Beats"]);
@@ -517,6 +534,7 @@ describe("PlaylistsStore", () => {
                 updated: 0,
                 dynamic_enabled: false,
                 is_queue: true,
+                kind: "queue",
               },
               ...mockPlaylists,
             ];

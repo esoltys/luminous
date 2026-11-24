@@ -782,9 +782,10 @@ describe("ArtistDetailView", () => {
         dynamic_enabled: true,
         dynamic_spec: "tag:Rock",
         is_system: true,
+        kind: "system_auto",
       },
-      { ...base, id: 2, name: "Zed Mix", dynamic_enabled: false },
-      { ...base, id: 3, name: "Alpha Mix", dynamic_enabled: false },
+      { ...base, id: 2, name: "Zed Mix", dynamic_enabled: false, kind: "custom" },
+      { ...base, id: 3, name: "Alpha Mix", dynamic_enabled: false, kind: "custom" },
     ];
     vi.mocked(invoke).mockImplementation((cmd: string) => {
       if (cmd === "get_songs_by_artist") return Promise.resolve([SONG]);

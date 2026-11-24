@@ -56,6 +56,7 @@ describe("PinnedRow.svelte", () => {
     name: "My Best Songs",
     dynamic_enabled: false,
     is_queue: false,
+    kind: "custom",
     created: 0,
     updated: 0,
     track_count: 15,
@@ -281,18 +282,21 @@ describe("PinnedRow.svelte", () => {
       id: 42,
       name: "Playlist A",
       is_queue: false,
+      kind: "custom",
       track_count: 10,
     } as Playlist;
     const playlistB: Playlist = {
       id: 84,
       name: "Playlist B",
       is_queue: false,
+      kind: "custom",
       track_count: 5,
     } as Playlist;
     const queuePlaylist: Playlist = {
       id: 1,
       name: "Queue",
       is_queue: true,
+      kind: "queue",
       track_count: 0,
     } as Playlist;
 

@@ -195,6 +195,7 @@ describe("PlayerBar.svelte", () => {
     updated: 0,
     track_count: 0,
     is_queue: true,
+    kind: "queue",
   };
 
   // #876: cover art now only toggles Immersive View — navigating to the

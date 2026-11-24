@@ -315,6 +315,7 @@ impl PlaylistManager {
             params![name, now],
         )?;
         let id = conn.last_insert_rowid();
+        let kind = crate::models::Playlist::classify_row(name, false, false, None);
         Ok(Playlist {
             id,
             name: name.to_string(),
@@ -325,7 +326,9 @@ impl PlaylistManager {
             created: now,
             updated: now,
             track_count: 0,
-            is_queue: Playlist::is_queue_row(name, false),
+            is_queue: kind == crate::models::PlaylistKind::Queue,
+            kind,
+            station_list_spec: None,
             size_limit_bytes: None,
             size_limit_device: None,
             sort_field: None,

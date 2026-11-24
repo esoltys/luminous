@@ -4,6 +4,7 @@ import type {
   AutoPlaylistItem,
   Playlist,
   PlaylistItem,
+  PlaylistKind,
   QueuePopulationMode,
   Song,
 } from "../types";
@@ -12,7 +13,6 @@ import type { AutoPlaylistRef } from "../stores/navigation.svelte";
 import { countryDisplayName } from "./country";
 import { getLanguageDisplayName } from "./language";
 import { formatBpmRange } from "./formatters";
-import { isSmartPlaylistSpec, isStationListSpec } from "./filterParser";
 import type { PlaylistCardThemeKind } from "./playlistCardTheme";
 import { collectionStore } from "../stores/collection.svelte";
 import { playerStore } from "../stores/player.svelte";
@@ -379,14 +379,149 @@ export function autoContinueRunStarts(items: PlaylistItem[]): Set<string> {
 }
 
 /**
+ * UI capabilities for a playlist kind, so views branch on capabilities rather
+ * than overlapping kind booleans.
+ */
+export interface PlaylistCapabilities {
+  isQueue: boolean;
+  usesLocalSort: boolean;
+  renamable: boolean;
+  pinnableToHome: boolean;
+  shareable: boolean;
+  deletable: boolean;
+  hasSizeLimit: boolean;
+  canMakeActive: boolean;
+  showsAutoContinue: boolean;
+  canSaveAsCustom: boolean;
+  showsGenreHeader: boolean;
+  showsPopulationMode: boolean;
+  showsStationUpdated: boolean;
+  artworkStyle: "queue" | "smart" | "mosaic";
+  refreshable: boolean;
+  editableDefinition: "smart" | "station_list" | null;
+}
+
+const PLAYLIST_CAPABILITIES: Record<PlaylistKind, PlaylistCapabilities> = {
+  queue: {
+    isQueue: true,
+    usesLocalSort: true,
+    renamable: false,
+    pinnableToHome: false,
+    shareable: false,
+    deletable: false,
+    hasSizeLimit: false,
+    canMakeActive: false,
+    showsAutoContinue: true,
+    canSaveAsCustom: true,
+    showsGenreHeader: false,
+    showsPopulationMode: false,
+    showsStationUpdated: false,
+    artworkStyle: "queue",
+    refreshable: false,
+    editableDefinition: null,
+  },
+  custom: {
+    isQueue: false,
+    usesLocalSort: false,
+    renamable: true,
+    pinnableToHome: true,
+    shareable: true,
+    deletable: true,
+    hasSizeLimit: true,
+    canMakeActive: true,
+    showsAutoContinue: false,
+    canSaveAsCustom: false,
+    showsGenreHeader: true,
+    showsPopulationMode: false,
+    showsStationUpdated: false,
+    artworkStyle: "mosaic",
+    refreshable: false,
+    editableDefinition: null,
+  },
+  smart: {
+    isQueue: false,
+    usesLocalSort: false,
+    renamable: true,
+    pinnableToHome: true,
+    shareable: true,
+    deletable: true,
+    hasSizeLimit: true,
+    canMakeActive: false,
+    showsAutoContinue: false,
+    canSaveAsCustom: false,
+    showsGenreHeader: true,
+    showsPopulationMode: true,
+    showsStationUpdated: false,
+    artworkStyle: "smart",
+    refreshable: true,
+    editableDefinition: "smart",
+  },
+  system_auto: {
+    isQueue: false,
+    usesLocalSort: false,
+    renamable: true,
+    pinnableToHome: true,
+    shareable: true,
+    deletable: true,
+    hasSizeLimit: true,
+    canMakeActive: false,
+    showsAutoContinue: false,
+    canSaveAsCustom: false,
+    showsGenreHeader: true,
+    showsPopulationMode: false,
+    showsStationUpdated: false,
+    artworkStyle: "mosaic",
+    refreshable: false,
+    editableDefinition: null,
+  },
+  station_list: {
+    isQueue: false,
+    usesLocalSort: false,
+    renamable: true,
+    pinnableToHome: true,
+    shareable: true,
+    deletable: true,
+    hasSizeLimit: true,
+    canMakeActive: false,
+    showsAutoContinue: false,
+    canSaveAsCustom: false,
+    showsGenreHeader: false,
+    showsPopulationMode: false,
+    showsStationUpdated: true,
+    artworkStyle: "mosaic",
+    refreshable: true,
+    editableDefinition: "station_list",
+  },
+};
+
+const EMPTY_CAPABILITIES: PlaylistCapabilities = {
+  isQueue: false,
+  usesLocalSort: false,
+  renamable: false,
+  pinnableToHome: false,
+  shareable: false,
+  deletable: false,
+  hasSizeLimit: false,
+  canMakeActive: false,
+  showsAutoContinue: false,
+  canSaveAsCustom: false,
+  showsGenreHeader: false,
+  showsPopulationMode: false,
+  showsStationUpdated: false,
+  artworkStyle: "mosaic",
+  refreshable: false,
+  editableDefinition: null,
+};
+
+export function getPlaylistCapabilities(kind: PlaylistKind | undefined): PlaylistCapabilities {
+  return kind ? PLAYLIST_CAPABILITIES[kind] : EMPTY_CAPABILITIES;
+}
+
+/**
  * True if a playlist is a user-authored dynamic radio station list (`radio:...` spec).
  */
-export function isStationList(
-  playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system">,
-): boolean {
-  return (
-    !!playlist.dynamic_enabled && !playlist.is_system && isStationListSpec(playlist.dynamic_spec)
-  );
+export function isStationList(playlist: Pick<Playlist, "kind">): boolean {
+  return playlist.kind === "station_list";
 }
 
 /**
@@ -394,7 +529,7 @@ export function isStationList(
  * "songs" for regular/smart playlists.
  */
 export function formatPlaylistItemCount(
-  playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system"> | undefined,
+  playlist: Pick<Playlist, "kind"> | undefined,
   count: number,
 ): string {
   if (playlist && isStationList(playlist)) {
@@ -404,87 +539,18 @@ export function formatPlaylistItemCount(
 }
 
 /**
- * Parses a `radio:...` dynamic_spec string into a structured {@link RadioStationListSpec},
- * or returns `null` if the spec is not a station list spec.
- */
-export function parseStationListSpec(
-  spec: string | null | undefined,
-): import("../types").RadioStationListSpec | null {
-  if (!isStationListSpec(spec) || !spec) return null;
-  const body = spec.trim().slice("radio:".length);
-  const result: import("../types").RadioStationListSpec = {
-    tags: [],
-    country: null,
-    lang: null,
-    minBitrate: null,
-    order: "clickcount",
-    limit: 100,
-  };
-  for (const rawPart of body.split(";")) {
-    const part = rawPart.trim();
-    const eq = part.indexOf("=");
-    if (eq === -1) continue;
-    const key = part.slice(0, eq).trim().toLowerCase();
-    const val = part.slice(eq + 1).trim();
-    if (key === "tag" || key === "tags") {
-      const seen = new Set<string>();
-      result.tags = val
-        .split(",")
-        .map((t) => t.trim())
-        .filter((t) => {
-          if (!t) return false;
-          const lower = t.toLowerCase();
-          if (seen.has(lower)) return false;
-          seen.add(lower);
-          return true;
-        });
-    } else if (key === "country" || key === "countrycode") {
-      result.country = val ? val.toUpperCase() : null;
-    } else if (key === "lang" || key === "language") {
-      result.lang = val ? val.toLowerCase() : null;
-    } else if (key === "minbitrate" || key === "min_bitrate") {
-      const n = Number.parseInt(val, 10);
-      result.minBitrate = Number.isFinite(n) && n > 0 ? n : null;
-    } else if (key === "order") {
-      if (val === "votes" || val === "name" || val === "bitrate" || val === "clickcount") {
-        result.order = val;
-      }
-    } else if (key === "limit") {
-      const n = Number.parseInt(val, 10);
-      if (Number.isFinite(n) && n >= 1) {
-        result.limit = Math.min(500, n);
-      }
-    }
-  }
-  return result;
-}
-
-/**
  * True if a playlist is a user-authored Smart Playlist rather than a system
- * auto-playlist or a radio station list. Prefers the backend `is_system` flag
- * (#2136) and falls back to `isSmartPlaylistSpec` when `is_system` is omitted
- * in legacy fixtures.
+ * auto-playlist or a radio station list.
  */
-export function isSmartPlaylist(
-  playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system">,
-): boolean {
-  if (!playlist.dynamic_enabled) return false;
-  if (isStationListSpec(playlist.dynamic_spec)) return false;
-  if (playlist.is_system !== undefined) {
-    return !playlist.is_system && !!playlist.dynamic_spec;
-  }
-  return isSmartPlaylistSpec(playlist.dynamic_spec);
+export function isSmartPlaylist(playlist: Pick<Playlist, "kind">): boolean {
+  return playlist.kind === "smart";
 }
 
 /**
  * True if a playlist is a system-managed auto-playlist row.
  */
-export function isSystemAutoPlaylist(
-  playlist: Pick<Playlist, "dynamic_enabled" | "dynamic_spec" | "is_system">,
-): boolean {
-  if (!playlist.dynamic_enabled) return false;
-  if (playlist.is_system !== undefined) return playlist.is_system;
-  return !isSmartPlaylistSpec(playlist.dynamic_spec);
+export function isSystemAutoPlaylist(playlist: Pick<Playlist, "kind">): boolean {
+  return playlist.kind === "system_auto";
 }
 
 /**

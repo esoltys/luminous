@@ -44,10 +44,8 @@
   import {
     autoContinueRunStarts,
     formatPlaylistItemCount,
+    getPlaylistCapabilities,
     getPlaylistDisplayName,
-    isSmartPlaylist as isSmartPlaylistRow,
-    isStationList as isStationListRow,
-    parseStationListSpec,
   } from "../utils/playlist";
   import { formatUpdatedAgo, radioStore } from "../stores/radio.svelte";
   import StationListModal from "./radio/StationListModal.svelte";
@@ -170,7 +168,7 @@
   }
 
   function startRename() {
-    if (activePlaylist && !isQueue) {
+    if (activePlaylist && capabilities.renamable) {
       editTitleValue = activePlaylist.name;
       isEditingTitle = true;
     }
@@ -272,22 +270,18 @@
     activePlaylist !== undefined && playlistsStore.effectivePinnedPlaylistId === activePlaylist.id,
   );
 
-  let isQueue = $derived(activePlaylist !== undefined && activePlaylist.is_queue);
+  let capabilities = $derived(getPlaylistCapabilities(activePlaylist?.kind));
 
   let showShareModal = $state(false);
   let shareSongs = $derived(
     playlistsStore.activePlaylistTracks.filter((t) => !!t.song).map((t) => t.song!),
   );
 
-  let isSmartPlaylist = $derived(
-    activePlaylist !== undefined && isSmartPlaylistRow(activePlaylist),
-  );
-  let isStationListPlaylist = $derived(
-    activePlaylist !== undefined && isStationListRow(activePlaylist),
-  );
   let showStationListEditModal = $state(false);
   let stationListUpdatedLabel = $derived(
-    isStationListPlaylist ? formatUpdatedAgo(radioStore.status?.lastSyncedAt ?? null) : "",
+    capabilities.showsStationUpdated
+      ? formatUpdatedAgo(radioStore.status?.lastSyncedAt ?? null)
+      : "",
   );
 
   // Title shown everywhere (header, sidebar, Home): a smart playlist's carries its
@@ -313,16 +307,18 @@
   let queueSortField = $state<PlaylistSortField>("position");
   let queueSortAsc = $state(true);
   let sortField = $derived<PlaylistSortField>(
-    isQueue
+    capabilities.usesLocalSort
       ? queueSortField
       : ((activePlaylist?.sort_field as keyof Song | null | undefined) ?? "position"),
   );
-  let sortAsc = $derived(isQueue ? queueSortAsc : (activePlaylist?.sort_asc ?? true));
+  let sortAsc = $derived(
+    capabilities.usesLocalSort ? queueSortAsc : (activePlaylist?.sort_asc ?? true),
+  );
 
   function toggleSort(field: string) {
     const f = field as PlaylistSortField;
     const asc = sortField === f ? !sortAsc : true;
-    if (isQueue) {
+    if (capabilities.usesLocalSort) {
       queueSortField = f;
       queueSortAsc = asc;
     } else if (activePlaylist) {
@@ -338,7 +334,7 @@
     if (q) {
       result = result.filter((item) => matchesSongSearch(item.song, q));
     }
-    if (!isQueue) return result;
+    if (!capabilities.usesLocalSort) return result;
 
     if (sortField === "position") {
       return sortAsc ? result : [...result].reverse();
@@ -429,7 +425,10 @@
   // The divider only means something in playlist order: sorted or filtered,
   // Auto Continue's songs are no longer a contiguous run.
   let autoContinueStarts = $derived(
-    isQueue && sortField === "position" && sortAsc && !collectionStore.searchQuery.trim()
+    capabilities.showsAutoContinue &&
+      sortField === "position" &&
+      sortAsc &&
+      !collectionStore.searchQuery.trim()
       ? autoContinueRunStarts(playlistsStore.activePlaylistTracks)
       : new Set<string>(),
   );
@@ -477,7 +476,7 @@
   let showDeleteConfirm = $state(false);
 
   async function handleDeletePlaylist() {
-    if (!activePlaylist || isQueue) return;
+    if (!activePlaylist || !capabilities.deletable) return;
     showDeleteConfirm = false;
     await playlistsStore.deletePlaylist(activePlaylist.id);
     navigationStore.selectedPlaylistId = null;
@@ -582,7 +581,7 @@
   }
 
   const sizeLimit = new PlaylistSizeLimit(() => ({
-    playlist: isQueue ? undefined : activePlaylist,
+    playlist: capabilities.hasSizeLimit ? activePlaylist : undefined,
     items: playlistsStore.activePlaylistTracks,
   }));
   let breakBefore = $derived(sizeLimit.breakBefore(sortedTracks.map((t) => t.uuid)));
@@ -702,7 +701,7 @@
   // whatever position rememberScroll restored.
   $effect(() => {
     if (!navigationStore.pendingScrollToCurrentSong) return;
-    if (!isQueue || !songTable) return;
+    if (!capabilities.isQueue || !songTable) return;
     const uuid = playerStore.playlistItemUuid;
     const tracks = playlistsStore.activePlaylistTracks;
     if (tracks.length === 0) return;
@@ -745,7 +744,7 @@
   {:else}
     <div class="py-12 text-center text-brand-text-secondary select-none">
       <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary" />
-      {#if isQueue}
+      {#if capabilities.isQueue}
         {i18n.t("playlists.emptyQueueText")}
       {:else}
         {i18n.t("playlists.emptyPlaylistTitle")}
@@ -759,7 +758,7 @@
 <div
   class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full relative select-none"
 >
-  {#if currentCoverUrl && isQueue}
+  {#if currentCoverUrl && capabilities.isQueue}
     <div class="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
       {#key currentCoverUrl}
         <div class="absolute inset-0" in:fade={{ duration: 300 }}>
@@ -818,15 +817,17 @@
               {:else}
                 <div class="flex items-center gap-3 group/title">
                   <h1
-                    ondblclick={isQueue ? undefined : startRename}
-                    class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary transition-colors truncate py-0.5 leading-snug {isQueue
-                      ? ''
-                      : 'hover:text-brand-accent-text'}"
-                    title={isQueue ? undefined : i18n.t("playlists.renamePlaylistTooltip")}
+                    ondblclick={capabilities.renamable ? startRename : undefined}
+                    class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary transition-colors truncate py-0.5 leading-snug {capabilities.renamable
+                      ? 'hover:text-brand-accent-text'
+                      : ''}"
+                    title={capabilities.renamable
+                      ? i18n.t("playlists.renamePlaylistTooltip")
+                      : undefined}
                   >
                     {displayTitle}
                   </h1>
-                  {#if !isQueue}
+                  {#if capabilities.renamable}
                     <button
                       onclick={startRename}
                       class="opacity-0 group-hover/title:opacity-100 text-brand-text-secondary hover:text-brand-text-primary transition-opacity p-1"
@@ -871,7 +872,7 @@
                 <Play class="w-4 h-4 fill-current" />
                 {i18n.t("artistDetail.playAll")}
               </Button>
-              {#if isQueue}
+              {#if capabilities.showsAutoContinue}
                 <Button
                   onclick={() => playerStore.setAutoContinue(!playerStore.autoContinue)}
                   variant={playerStore.autoContinue ? "accent-soft" : "secondary"}
@@ -897,6 +898,8 @@
                     ></span>
                   </span>
                 </Button>
+              {/if}
+              {#if capabilities.canSaveAsCustom}
                 <IconActionButton
                   onclick={handleSaveQueueAsCustomPlaylist}
                   disabled={playlistsStore.activePlaylistTracks.length === 0}
@@ -906,7 +909,7 @@
                   {#snippet icon()}<FolderPlus class="w-4 h-4" />{/snippet}
                 </IconActionButton>
               {/if}
-              {#if !isQueue && activePlaylist}
+              {#if capabilities.pinnableToHome && activePlaylist}
                 <IconActionButton
                   onclick={() => pinnedStore.toggle("playlist", String(activePlaylist!.id))}
                   title={pinnedStore.isPinned("playlist", String(activePlaylist.id))
@@ -923,7 +926,7 @@
                   {/snippet}
                 </IconActionButton>
               {/if}
-              {#if !isQueue}
+              {#if capabilities.shareable}
                 <IconActionButton
                   onclick={() => {
                     showShareModal = true;
@@ -944,7 +947,7 @@
               </button>
             </div>
 
-            {#if isSmartPlaylist && activePlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
+            {#if capabilities.showsPopulationMode && activePlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
               <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
                 <PopulationModeTabs
                   mode={activePlaylist.population_mode ?? "all"}
@@ -952,7 +955,7 @@
                   onChange={handleChangePopulationMode}
                 />
               </div>
-            {:else if isStationListPlaylist && stationListUpdatedLabel && !windowLayoutStore.isDetailHeaderCollapsed}
+            {:else if capabilities.showsStationUpdated && stationListUpdatedLabel && !windowLayoutStore.isDetailHeaderCollapsed}
               <div
                 class="text-xs text-brand-text-secondary mt-2"
                 data-testid="station-list-detail-updated"
@@ -963,7 +966,7 @@
           </div>
 
           {#if !windowLayoutStore.isDetailHeaderCollapsed}
-            {#if isQueue}
+            {#if capabilities.artworkStyle === "queue"}
               <div
                 class="w-40 h-40 hidden @xl:flex shrink-0 bg-brand-main bg-gradient-to-br from-brand-accent/25 to-brand-accent/15 items-center justify-center overflow-hidden border border-brand-accent/30 shadow-[0_0_28px_3px] shadow-brand-accent/40"
               >
@@ -986,13 +989,13 @@
                   </div>
                 {/key}
               </div>
-            {:else if isSmartPlaylist && topAlbums.length > 0}
+            {:else if capabilities.artworkStyle === "smart" && topAlbums.length > 0}
               <div
                 class="w-40 h-40 hidden @xl:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#C2410C]/25 to-[#F59E0B]/15 items-center justify-center overflow-hidden border border-[#F59E0B]/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]"
               >
                 <CoverStack covers={topAlbums} sizeClass="w-[82%] h-[82%]" />
               </div>
-            {:else if isSmartPlaylist}
+            {:else if capabilities.artworkStyle === "smart"}
               <div
                 class="w-40 h-40 hidden @xl:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#C2410C]/25 to-[#F59E0B]/15 items-center justify-center overflow-hidden border border-[#F59E0B]/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]"
               >
@@ -1008,7 +1011,7 @@
       </div>
 
       <div class="p-6 flex flex-col gap-6 pb-dock">
-        {#if !isQueue && !isStationListPlaylist && !windowLayoutStore.isDetailHeaderCollapsed}
+        {#if capabilities.showsGenreHeader && !windowLayoutStore.isDetailHeaderCollapsed}
           <div class="flex flex-wrap items-center gap-3">
             {#if rawGenre}
               <GenreChips genre={rawGenre} variant="full" limit={4} />
@@ -1209,7 +1212,7 @@
         showOverflowMenu = false;
       }}
     />
-    {#if isSmartPlaylist}
+    {#if capabilities.refreshable}
       <ContextMenuDivider />
       <ContextMenuItem
         icon={RefreshCw}
@@ -1220,36 +1223,28 @@
           showOverflowMenu = false;
         }}
       />
-      <ContextMenuItem
-        icon={Pencil}
-        label={i18n.t("playlists.editSmartPlaylistBtn")}
-        onclick={() => {
-          handleEditSmartPlaylist();
-          showOverflowMenu = false;
-        }}
-      />
-    {:else if isStationListPlaylist}
-      <ContextMenuDivider />
-      <ContextMenuItem
-        icon={RefreshCw}
-        label={i18n.t("playlists.refreshPlaylistBtn")}
-        disabled={isRefreshing}
-        onclick={() => {
-          handleRefreshSmartPlaylist();
-          showOverflowMenu = false;
-        }}
-      />
-      <ContextMenuItem
-        icon={Pencil}
-        label={i18n.t("radio.editStationList")}
-        onclick={() => {
-          showStationListEditModal = true;
-          showOverflowMenu = false;
-        }}
-      />
+      {#if capabilities.editableDefinition === "smart"}
+        <ContextMenuItem
+          icon={Pencil}
+          label={i18n.t("playlists.editSmartPlaylistBtn")}
+          onclick={() => {
+            handleEditSmartPlaylist();
+            showOverflowMenu = false;
+          }}
+        />
+      {:else if capabilities.editableDefinition === "station_list"}
+        <ContextMenuItem
+          icon={Pencil}
+          label={i18n.t("radio.editStationList")}
+          onclick={() => {
+            showStationListEditModal = true;
+            showOverflowMenu = false;
+          }}
+        />
+      {/if}
     {/if}
-    {#if !isQueue}
-      {#if !isSmartPlaylist && !isStationListPlaylist}<ContextMenuDivider />{/if}
+    {#if capabilities.hasSizeLimit}
+      {#if !capabilities.refreshable}<ContextMenuDivider />{/if}
       <ContextMenuItem
         icon={Usb}
         label={i18n.t("playlists.sizeLimitMenuItem", {
@@ -1262,7 +1257,7 @@
           showOverflowMenu = false;
         }}
       />
-      {#if !isActive && !activePlaylist.dynamic_enabled}
+      {#if !isActive && capabilities.canMakeActive}
         <ContextMenuItem
           icon={Radio}
           label={i18n.t("playlists.makeActiveBtn")}
@@ -1334,7 +1329,7 @@
         showOverflowMenu = false;
       }}
     />
-    {#if !isQueue}
+    {#if capabilities.deletable}
       <ContextMenuItem
         icon={Trash2}
         destructive
@@ -1348,7 +1343,7 @@
   </ContextMenu>
 {/if}
 
-{#if activePlaylist && !isQueue}
+{#if activePlaylist && capabilities.hasSizeLimit}
   <PlaylistSizeLimitPopover
     isOpen={showSizeLimitPopover}
     anchorEl={overflowButtonEl ?? null}
@@ -1516,14 +1511,15 @@
   </Modal>
 {/if}
 
-{#if showStationListEditModal && activePlaylist}
-  {@const parsedSpec = parseStationListSpec(activePlaylist.dynamic_spec)}
-  {#if parsedSpec}
-    <StationListModal
-      editing={{ id: activePlaylist.id, name: activePlaylist.name, spec: parsedSpec }}
-      onClose={() => {
-        showStationListEditModal = false;
-      }}
-    />
-  {/if}
+{#if showStationListEditModal && activePlaylist?.station_list_spec}
+  <StationListModal
+    editing={{
+      id: activePlaylist.id,
+      name: activePlaylist.name,
+      spec: activePlaylist.station_list_spec,
+    }}
+    onClose={() => {
+      showStationListEditModal = false;
+    }}
+  />
 {/if}

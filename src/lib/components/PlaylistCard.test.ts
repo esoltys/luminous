@@ -12,6 +12,7 @@ const base: Playlist = {
   updated: 1700000000,
   track_count: 0,
   is_queue: false,
+  kind: "custom",
 };
 
 describe("PlaylistCard file badge (#2280)", () => {
