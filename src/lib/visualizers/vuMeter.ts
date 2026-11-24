@@ -231,18 +231,11 @@ function drawScale(
     // The numbers run in a straight row, each on the line of the tick beneath it.
     if (label) ctx.fillText(label, x + dial.lean(f, y - layout.numbersY), layout.numbersY);
   }
-  // The leftmost stop is a solid wedge running left from the first tick's base, thicker at
-  // its outer end and level underneath with the red zone.
+  // The leftmost stop is a solid square block, as thick as the red zone and level with it,
+  // ending at the first tick's base.
   {
-    const x = dial.x(0);
-    const bottom = dial.y(0) + wh * 0.04;
-    ctx.beginPath();
-    ctx.moveTo(x - wh * 0.1, dial.y(0) - wh * 0.005);
-    ctx.lineTo(x + wh * 0.012, dial.y(0) + wh * 0.012);
-    ctx.lineTo(x + wh * 0.012, bottom);
-    ctx.lineTo(x - wh * 0.1, bottom);
-    ctx.closePath();
-    ctx.fill();
+    const side = wh * 0.04;
+    ctx.fillRect(dial.x(0) - side, dial.y(0) + wh * 0.02 - side / 2, side, side);
   }
 
   // Percentage dots on a line under the scale, their numbers in a row beneath.
