@@ -494,8 +494,27 @@ const PLAYLIST_CAPABILITIES: Record<PlaylistKind, PlaylistCapabilities> = {
   },
 };
 
-export function getPlaylistCapabilities(kind: PlaylistKind): PlaylistCapabilities {
-  return PLAYLIST_CAPABILITIES[kind];
+const EMPTY_CAPABILITIES: PlaylistCapabilities = {
+  isQueue: false,
+  usesLocalSort: false,
+  renamable: false,
+  pinnableToHome: false,
+  shareable: false,
+  deletable: false,
+  hasSizeLimit: false,
+  canMakeActive: false,
+  showsAutoContinue: false,
+  canSaveAsCustom: false,
+  showsGenreHeader: false,
+  showsPopulationMode: false,
+  showsStationUpdated: false,
+  artworkStyle: "mosaic",
+  refreshable: false,
+  editableDefinition: null,
+};
+
+export function getPlaylistCapabilities(kind: PlaylistKind | undefined): PlaylistCapabilities {
+  return kind ? PLAYLIST_CAPABILITIES[kind] : EMPTY_CAPABILITIES;
 }
 
 /**

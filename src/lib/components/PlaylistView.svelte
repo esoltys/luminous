@@ -270,7 +270,7 @@
     activePlaylist !== undefined && playlistsStore.effectivePinnedPlaylistId === activePlaylist.id,
   );
 
-  let capabilities = $derived(getPlaylistCapabilities(activePlaylist?.kind ?? "custom"));
+  let capabilities = $derived(getPlaylistCapabilities(activePlaylist?.kind));
 
   let showShareModal = $state(false);
   let shareSongs = $derived(

@@ -165,7 +165,7 @@ describe("PlaylistView.svelte", () => {
   });
 
   describe("Auto Continue (#1235)", () => {
-    const queue = { ...mockPlaylist, name: "Queue", is_queue: true, kind: "queue" };
+    const queue: Playlist = { ...mockPlaylist, name: "Queue", is_queue: true, kind: "queue" };
     const AUTO = '{"autoContinue":true}';
 
     beforeEach(() => {
@@ -815,6 +815,32 @@ describe("PlaylistView.svelte", () => {
     it("leaves a plain playlist's title bare", () => {
       const { getByRole } = render(PlaylistView);
       expect(getByRole("heading", { level: 1 })).toHaveTextContent(/^My Playlist$/);
+    });
+
+    it("opens StationListModal with the backend-parsed station_list_spec for station lists", async () => {
+      playlistsStore.playlists = [
+        {
+          ...mockPlaylist,
+          name: "Jazz Radio",
+          dynamic_enabled: true,
+          dynamic_spec: "radio:tag=jazz;order=Votes;limit=0",
+          kind: "station_list",
+          station_list_spec: {
+            tags: ["jazz"],
+            country: null,
+            lang: null,
+            minBitrate: null,
+            order: "votes",
+            limit: 1,
+          },
+        },
+      ];
+      const { getByRole, getByDisplayValue, queryByRole } = render(PlaylistView);
+      expect(queryByRole("tablist")).toBeNull();
+      await fireEvent.click(getByRole("button", { name: "More actions" }));
+      await fireEvent.click(getByRole("menuitem", { name: "Edit Station Playlist" }));
+      expect(getByRole("dialog")).toBeInTheDocument();
+      expect(getByDisplayValue("Jazz Radio")).toBeInTheDocument();
     });
   });
 });
