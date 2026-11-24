@@ -144,8 +144,8 @@ function computeLayout(width: number, height: number): Layout {
   const bezel = height * 0.045;
   const win = { x: bezel, y: bezel, w: width - 2 * bezel, h: height * 0.66 };
   const meterW = (win.w - win.w * 0.09) / 2;
-  const halfSpan = meterW * 0.4;
-  const baseY = win.y + win.h * 0.52;
+  const halfSpan = meterW * 0.37;
+  const baseY = win.y + win.h * 0.41;
   return {
     width,
     height,
@@ -154,13 +154,13 @@ function computeLayout(width: number, height: number): Layout {
       new Dial(win.x + meterW / 2, halfSpan, baseY),
       new Dial(win.x + win.w - meterW / 2, halfSpan, baseY),
     ],
-    numbersY: win.y + win.h * 0.29,
+    numbersY: win.y + win.h * 0.18,
     lamps: {
       x: win.x + win.w / 2,
       w: win.w * 0.045,
       h: win.h * 0.055,
-      yHigh: win.y + win.h * 0.4,
-      yLow: win.y + win.h * 0.62,
+      yHigh: win.y + win.h * 0.29,
+      yLow: win.y + win.h * 0.51,
     },
     margin: Math.max(12, height * 0.12),
   };
@@ -548,7 +548,7 @@ class VuMeterFullInstance implements VisualizerInstance {
     const positions = needlePositions(this.meters, options.preview);
     const thickness = Math.max(1.2, win.h * 0.012);
     const lift = win.h * 0.02;
-    const tipY = win.y + win.h * 0.3;
+    const tipY = win.y + win.h * 0.19;
     strokeNeedle(ctx, p, layout.dials[0], positionOf(positions[0]), tipY, thickness, lift);
     strokeNeedle(ctx, p, layout.dials[1], positionOf(positions[1]), tipY, thickness, lift);
     ctx.restore();
