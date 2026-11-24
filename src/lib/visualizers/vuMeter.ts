@@ -200,6 +200,30 @@ function strokeBand(
   ctx.stroke();
 }
 
+/**
+ * Fills the stretch of a dial's scale from `f0` to `f1` between `top` and `top + height`.
+ * Each end is cut along the line of the tick at that position, continued down through the
+ * band, so the band's ends lean exactly as the marks above them do.
+ */
+function fillBand(
+  ctx: CanvasRenderingContext2D,
+  dial: Dial,
+  f0: number,
+  f1: number,
+  top: number,
+  height: number,
+): void {
+  const below = dial.baseY - (top + height);
+  const above = dial.baseY - top;
+  ctx.beginPath();
+  ctx.moveTo(dial.x(f0) + dial.lean(f0, above), top);
+  ctx.lineTo(dial.x(f1) + dial.lean(f1, above), top);
+  ctx.lineTo(dial.x(f1) + dial.lean(f1, below), top + height);
+  ctx.lineTo(dial.x(f0) + dial.lean(f0, below), top + height);
+  ctx.closePath();
+  ctx.fill();
+}
+
 /** One meter's static scale: marks, red zone, percentage dots and the "VU" legend. */
 function drawScale(
   ctx: CanvasRenderingContext2D,
@@ -211,10 +235,9 @@ function drawScale(
   const wh = layout.win.h;
 
   // The red zone: a band from 0 VU to the end of the scale.
-  ctx.strokeStyle = p.red;
-  ctx.lineWidth = wh * 0.04;
-  ctx.lineCap = "butt";
-  strokeBand(ctx, dial, deflectionForVu(0), 1, wh * 0.02);
+  const bandHeight = wh * 0.04;
+  ctx.fillStyle = p.red;
+  fillBand(ctx, dial, deflectionForVu(0), 1, dial.baseY, bandHeight);
 
   ctx.strokeStyle = p.ink;
   ctx.fillStyle = p.ink;
@@ -236,11 +259,19 @@ function drawScale(
     // The numbers run in a straight row, each on the line of the tick beneath it.
     if (label) ctx.fillText(label, x + dial.lean(f, y - layout.numbersY), layout.numbersY);
   }
-  // The leftmost stop is a solid square block, as thick as the red zone and level with it,
-  // ending at the first tick's base.
+  // The leftmost stop is a solid block, as thick as the red zone and level with it, ending
+  // at the first tick's base; both its ends lean along that tick, like the red zone's.
+  ctx.fillStyle = p.ink;
   {
-    const side = wh * 0.04;
-    ctx.fillRect(dial.x(0) - side, dial.y(0) + wh * 0.02 - side / 2, side, side);
+    const x = dial.x(0);
+    const lean = dial.lean(0, -bandHeight);
+    ctx.beginPath();
+    ctx.moveTo(x - bandHeight, dial.baseY);
+    ctx.lineTo(x, dial.baseY);
+    ctx.lineTo(x + lean, dial.baseY + bandHeight);
+    ctx.lineTo(x - bandHeight + lean, dial.baseY + bandHeight);
+    ctx.closePath();
+    ctx.fill();
   }
 
   // Percentage dots on a line under the scale, their numbers in a row beneath.
@@ -637,10 +668,9 @@ class VuMeterMiniInstance implements VisualizerInstance {
       ctx.lineWidth = 1;
       strokeBand(ctx, dials[i], 0, 1, 0);
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = p.red;
-      ctx.lineWidth = Math.max(1.5, height * 0.09);
-      ctx.lineCap = "butt";
-      strokeBand(ctx, dials[i], deflectionForVu(0), 1, 0);
+      const band = Math.max(1.5, height * 0.09);
+      ctx.fillStyle = p.red;
+      fillBand(ctx, dials[i], deflectionForVu(0), 1, dials[i].baseY - band / 2, band);
       strokeNeedle(ctx, p, dials[i], positionOf(positions[i]), height * 0.3, 1.1, 1);
     }
     ctx.restore();
