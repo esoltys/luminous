@@ -5,6 +5,7 @@ import {
   VU_REFERENCE_DBFS,
   VuMeters,
   channelLevels,
+  deflectionForPercent,
   deflectionForRms,
   deflectionForVu,
   referenceForTargetLufs,
@@ -49,6 +50,22 @@ describe("deflection", () => {
     expect(deflectionForRms(atTarget, referenceForTargetLufs(-16))).toBeLessThan(
       deflectionForVu(-3),
     );
+  });
+});
+
+describe("percentage scale", () => {
+  it("puts 100% at 0 VU and 0% at the left stop", () => {
+    expect(deflectionForPercent(100)).toBeCloseTo(deflectionForVu(0), 6);
+    expect(deflectionForPercent(0)).toBe(0);
+  });
+
+  it("is spaced by voltage, so the marks are not evenly spread", () => {
+    // 50% of the voltage is 6.02 dB down.
+    expect(deflectionForPercent(50)).toBeCloseTo(deflectionForVu(-6.0206), 4);
+    const gaps = [20, 40, 60, 80, 100].map(
+      (p, i, a) => deflectionForPercent(p) - deflectionForPercent(i ? a[i - 1] : 0),
+    );
+    expect(new Set(gaps.map((g) => g.toFixed(3))).size).toBe(gaps.length);
   });
 });
 

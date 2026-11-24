@@ -90,6 +90,15 @@ export function deflectionForVu(vu: number): number {
   return Math.min(NEEDLE_MAX, 1 + (vu - SCALE[SCALE.length - 1][0]) * OVERSCALE_PER_DB);
 }
 
+/**
+ * The needle position of a percentage-scale mark. The lower scale is modulation, a
+ * fraction of the 0 VU voltage (100% = 0 VU), so 20% is -14 dB, 50% about -6 dB and 0% is
+ * the left stop. Going through dB keeps each mark exactly under its place on the VU scale.
+ */
+export function deflectionForPercent(percent: number): number {
+  return percent > 0 ? deflectionForVu(20 * Math.log10(percent / 100)) : 0;
+}
+
 /** The needle position for an RMS amplitude (full scale = 1), with 0 VU at `referenceDbfs`. */
 export function deflectionForRms(rms: number, referenceDbfs = VU_REFERENCE_DBFS): number {
   if (!(rms > 0)) return 0;

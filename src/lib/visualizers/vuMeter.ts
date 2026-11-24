@@ -13,6 +13,7 @@ import {
   NEEDLE_MAX,
   type Needle,
   VuMeters,
+  deflectionForPercent,
   deflectionForVu,
   referenceForTargetLufs,
 } from "./vuMeterEngine";
@@ -44,7 +45,7 @@ const SCALE_MARKS: readonly { vu: number; label: string | null }[] = [
   { vu: 2, label: null },
   { vu: 4, label: null },
 ];
-/** The percentage scale under the VU scale: 100% is 0 VU. */
+/** The percentage scale under the VU scale: modulation, where 100% is 0 VU. */
 const PERCENT_MARKS = [0, 20, 40, 60, 80, 100] as const;
 /** Points the red zone's band is drawn through, since it follows the scale's slight arch. */
 const BAND_SEGMENTS = 12;
@@ -93,7 +94,7 @@ class Dial {
     readonly halfSpan: number,
     readonly baseY: number,
   ) {
-    this.depth = halfSpan * 1.5;
+    this.depth = halfSpan * 1.8;
   }
 
   get pivotY(): number {
@@ -102,6 +103,15 @@ class Dial {
 
   x(f: number): number {
     return this.cx + (f - 0.5) * 2 * this.halfSpan;
+  }
+
+  /**
+   * How far right of its base a point on a mark's own line sits when it is `dy` above the
+   * scale line (negative below it). Marks, numbers and percentage dots for one position
+   * all lie on that line, so they stay aligned however far the fan leans.
+   */
+  lean(f: number, dy: number): number {
+    return (dy * (this.x(f) - this.cx)) / this.depth;
   }
 
   /** The y of the scale line; the same for every mark. */
@@ -134,7 +144,7 @@ function computeLayout(width: number, height: number): Layout {
   const bezel = height * 0.045;
   const win = { x: bezel, y: bezel, w: width - 2 * bezel, h: height * 0.66 };
   const meterW = (win.w - win.w * 0.09) / 2;
-  const halfSpan = meterW * 0.43;
+  const halfSpan = meterW * 0.4;
   const baseY = win.y + win.h * 0.52;
   return {
     width,
@@ -144,7 +154,7 @@ function computeLayout(width: number, height: number): Layout {
       new Dial(win.x + meterW / 2, halfSpan, baseY),
       new Dial(win.x + win.w - meterW / 2, halfSpan, baseY),
     ],
-    numbersY: win.y + win.h * 0.27,
+    numbersY: win.y + win.h * 0.29,
     lamps: {
       x: win.x + win.w / 2,
       w: win.w * 0.045,
@@ -210,7 +220,7 @@ function drawScale(
     const f = Math.min(1, deflectionForVu(vu));
     const major = label !== null;
     const a = dial.angle(f);
-    const length = wh * (major ? 0.16 : 0.11);
+    const length = wh * (major ? 0.14 : 0.1);
     const x = dial.x(f);
     const y = dial.y(f);
     ctx.lineWidth = Math.max(1, wh * (major ? 0.011 : 0.008));
@@ -218,8 +228,8 @@ function drawScale(
     ctx.moveTo(x, y);
     ctx.lineTo(x + Math.sin(a) * length, y - Math.cos(a) * length);
     ctx.stroke();
-    // The numbers run in a straight row, whatever the scale beneath does.
-    if (label) ctx.fillText(label, x, layout.numbersY);
+    // The numbers run in a straight row, each on the line of the tick beneath it.
+    if (label) ctx.fillText(label, x + dial.lean(f, y - layout.numbersY), layout.numbersY);
   }
   // The leftmost stop is a solid wedge running left from the first tick's base, thicker at
   // its outer end and level underneath with the red zone.
@@ -238,11 +248,24 @@ function drawScale(
   // Percentage dots on a line under the scale, their numbers in a row beneath.
   ctx.font = `500 ${wh * 0.065}px ${FONT_STACK}`;
   for (const pct of PERCENT_MARKS) {
-    const f = deflectionForVu(0) * (pct / 100);
+    const f = deflectionForPercent(pct);
     ctx.beginPath();
-    ctx.arc(dial.x(f), dial.y(f) + wh * 0.1, Math.max(1, wh * 0.012), 0, Math.PI * 2);
+    // Below the scale line, on the same line as the mark above.
+    const dotY = dial.y(f) + wh * 0.1;
+    const labelY = dial.baseY + wh * 0.18;
+    ctx.arc(
+      dial.x(f) + dial.lean(f, dial.y(f) - dotY),
+      dotY,
+      Math.max(1, wh * 0.012),
+      0,
+      Math.PI * 2,
+    );
     ctx.fill();
-    ctx.fillText(pct === 100 ? "100%" : String(pct), dial.x(f), dial.baseY + wh * 0.18);
+    ctx.fillText(
+      pct === 100 ? "100%" : String(pct),
+      dial.x(f) + dial.lean(f, dial.y(f) - labelY),
+      labelY,
+    );
   }
 
   ctx.font = `600 ${wh * 0.14}px ${FONT_STACK}`;
