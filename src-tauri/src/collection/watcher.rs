@@ -363,7 +363,7 @@ fn is_unchanged_on_disk(conn: &rusqlite::Connection, path: &Path) -> bool {
     let Ok(meta) = std::fs::metadata(path) else {
         return false;
     };
-    let Some(mtime) = super::get_mtime(path) else {
+    let Some(mtime) = super::cacheable_mtime(path) else {
         return false;
     };
     conn.query_row(
@@ -1151,6 +1151,34 @@ mod tests {
         // An unavailable row (drive was offline) must be re-read when it returns.
         conn.execute("UPDATE songs SET filesize = 6, unavailable = 1", [])
             .unwrap();
+        assert!(!is_unchanged_on_disk(&conn, &track));
+    }
+
+    #[test]
+    fn test_is_unchanged_on_disk_rejects_epoch_zero_mtime() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        let track = dir.path().join("epoch.flac");
+        std::fs::write(&track, b"abc").unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&track)
+            .unwrap()
+            .set_modified(std::time::UNIX_EPOCH)
+            .expect("failed to set epoch-zero mtime");
+
+        let song = Song {
+            path: Some(track.to_string_lossy().to_string()),
+            source: SongSource::LocalFile,
+            mtime: Some(0),
+            filesize: Some(3),
+            ..Default::default()
+        };
+        super::super::upsert_song(&conn, &song).unwrap();
+
+        // Even with matching mtime = 0 and matching filesize, epoch-zero files
+        // must never be treated as unchanged (#2351).
         assert!(!is_unchanged_on_disk(&conn, &track));
     }
 
