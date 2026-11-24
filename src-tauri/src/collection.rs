@@ -1531,12 +1531,10 @@ impl CollectionScanner {
             // its folder was watched is re-read and upgraded to a library
             // song, even when the file itself hasn't changed (#1842).
             let stamps_started = Instant::now();
-            let mut known_stamps: HashMap<String, FileStamp> = if force {
+            let known_stamps: HashMap<String, FileStamp> = if force {
                 HashMap::new()
             } else {
-                HashMap::with_capacity(all_paths.len())
-            };
-            if !force {
+                let mut stamps = HashMap::with_capacity(all_paths.len());
                 let mut stmt = conn.prepare(
                     "SELECT path, mtime, filesize FROM songs WHERE unavailable = 0 AND source != ?1",
                 )?;
@@ -1550,9 +1548,10 @@ impl CollectionScanner {
                     ))
                 })?;
                 for row in rows.filter_map(|r| r.ok()) {
-                    known_stamps.insert(row.0, row.1);
+                    stamps.insert(row.0, row.1);
                 }
-            }
+                stamps
+            };
             report.partition_stamps_ms = stamps_started.elapsed().as_millis();
 
             // Read tags + resolve local art (and stat mtimes during partition)
