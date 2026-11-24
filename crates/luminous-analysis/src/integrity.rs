@@ -53,6 +53,23 @@ impl IntegrityVerdict {
     }
 }
 
+/// Returns the file length in bytes if `path` can be opened and stat'd, or
+/// `None` if it is unreachable.
+///
+/// Used by both integrity and provenance verification so an asleep drive,
+/// disconnected network share, or permission error is treated as unreachable
+/// rather than a permanent file failure (#2162, #2354).
+pub fn reachable_file_len(path: &Path) -> Option<u64> {
+    let file = std::fs::File::open(path).ok()?;
+    let meta = file.metadata().ok()?;
+    Some(meta.len())
+}
+
+/// Returns `true` if `path` can be opened and stat'd for reading (#2162, #2354).
+pub fn is_file_reachable(path: &Path) -> bool {
+    reachable_file_len(path).is_some()
+}
+
 /// Verifies container structure, frame decodability, and embedded checksums for an audio file.
 ///
 /// Encapsulates format probing, stream packet decoding, and MD5 streaminfo verification.
@@ -60,16 +77,12 @@ impl IntegrityVerdict {
 /// can't be reached (missing, permission denied, drive asleep or disconnected) is
 /// `Unverified`, since failing to read it says nothing about its contents (#2162).
 pub fn verify_audio_file(path: &Path) -> IntegrityVerdict {
-    // 1. Reach the file: metadata and an open both work before anything is judged.
-    let meta = match std::fs::metadata(path) {
-        Ok(m) => m,
-        Err(_) => return IntegrityVerdict::Unverified,
-    };
-    if std::fs::File::open(path).is_err() {
+    // 1. Reach the file: open and stat once before anything is judged.
+    let Some(len) = reachable_file_len(path) else {
         return IntegrityVerdict::Unverified;
-    }
+    };
 
-    if meta.len() == 0 {
+    if len == 0 {
         return IntegrityVerdict::Corrupt {
             reason: "Empty audio file (0 bytes)".to_string(),
         };
@@ -88,7 +101,7 @@ pub fn verify_audio_file(path: &Path) -> IntegrityVerdict {
 
     // The decoder reports a read error the same way as bad data. If the file
     // is no longer reachable, the drive went away mid-read: not corruption.
-    if std::fs::metadata(path).is_err() {
+    if !is_file_reachable(path) {
         return IntegrityVerdict::Unverified;
     }
     IntegrityVerdict::Corrupt { reason: failure }
