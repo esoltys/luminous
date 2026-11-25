@@ -222,13 +222,13 @@
         <div
           role="status"
           data-testid="station-connection-result"
-          class="flex items-start gap-2 px-3 py-2 rounded-lg border border-brand-border bg-brand-surface text-xs text-brand-text-primary"
+          class="flex items-center gap-1.5 text-xs text-brand-text-primary pt-0.5"
         >
           {#if connectionResult.ok}
-            <CheckCircle class="w-4 h-4 shrink-0 text-brand-accent-text mt-0.5" />
+            <CheckCircle class="w-4 h-4 shrink-0 text-brand-accent-text" />
             <span class="min-w-0 break-all">{connectionSummary}</span>
           {:else}
-            <AlertCircle class="w-4 h-4 shrink-0 text-brand-accent-text mt-0.5" />
+            <AlertCircle class="w-4 h-4 shrink-0 text-brand-accent-text" />
             <span class="min-w-0 break-all">
               {connectionResult.error || i18n.t("radio.connectionFailed")}
             </span>
