@@ -26,7 +26,6 @@
 
   const pinned = $derived(pinnedStore.isPinned("station", station.stationuuid));
   const saved = $derived(radioStore.isSaved(station.stationuuid));
-  const isCustom = $derived(station.stationuuid.startsWith("custom-"));
 
   onMount(() => {
     void radioStore.ensureSavedLoaded();
@@ -71,14 +70,12 @@
       onClose();
     }}
   />
-  {#if isCustom}
-    <ContextMenuItem
-      icon={Pencil}
-      label={i18n.t("radio.editStationMenu")}
-      onclick={() => {
-        radioStore.editingStation = station;
-        onClose();
-      }}
-    />
-  {/if}
+  <ContextMenuItem
+    icon={Pencil}
+    label={i18n.t("radio.editStationMenu")}
+    onclick={() => {
+      radioStore.openStationEditor(station);
+      onClose();
+    }}
+  />
 </ContextMenu>

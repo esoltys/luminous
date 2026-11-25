@@ -6,6 +6,7 @@
     WarningCircleIcon as AlertCircle,
     CheckCircleIcon as CheckCircle,
     PlugsConnectedIcon as PlugsConnected,
+    InfoIcon as Info,
   } from "phosphor-svelte";
   import { radioStore } from "../../stores/radio.svelte";
   import { i18n } from "../../stores/i18n.svelte";
@@ -160,9 +161,10 @@
     {#if isReadOnly}
       <p
         data-testid="station-readonly-note"
-        class="text-xs text-brand-text-secondary bg-brand-surface/60 border border-brand-border/50 rounded-lg px-3 py-2"
+        class="flex items-start gap-2 text-xs text-brand-text-secondary"
       >
-        {i18n.t("radio.directoryStationReadOnlyNote")}
+        <Info class="w-4 h-4 shrink-0 mt-0.5" />
+        <span>{i18n.t("radio.directoryStationReadOnlyNote")}</span>
       </p>
     {/if}
 
@@ -176,9 +178,9 @@
         type="text"
         bind:value={name}
         required
-        readonly={isReadOnly}
+        disabled={isReadOnly}
         placeholder={i18n.t("radio.stationNamePlaceholder")}
-        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent read-only:opacity-80"
+        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent disabled:opacity-60 disabled:cursor-not-allowed"
       />
     </div>
 
@@ -196,9 +198,9 @@
             connectionResult = null;
           }}
           required
-          readonly={isReadOnly}
+          disabled={isReadOnly}
           placeholder="https://example.com/stream.mp3"
-          class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent read-only:opacity-80"
+          class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent disabled:opacity-60 disabled:cursor-not-allowed"
         />
         <button
           type="button"
@@ -244,9 +246,9 @@
         data-testid="add-station-tags"
         type="text"
         bind:value={tags}
-        readonly={isReadOnly}
+        disabled={isReadOnly}
         placeholder={i18n.t("radio.stationTagsPlaceholder")}
-        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent read-only:opacity-80"
+        class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-sm text-brand-text-primary placeholder:text-brand-text-secondary focus:outline-none focus:border-brand-accent disabled:opacity-60 disabled:cursor-not-allowed"
       />
     </div>
 

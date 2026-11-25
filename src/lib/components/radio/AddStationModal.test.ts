@@ -49,7 +49,7 @@ describe("AddStationModal.svelte", () => {
     });
 
     const nameInput = getByTestId("add-station-name") as HTMLInputElement;
-    expect(nameInput.readOnly).toBe(false);
+    expect(nameInput.disabled).toBe(false);
     await fireEvent.input(nameInput, { target: { value: "Updated Station" } });
 
     await fireEvent.click(getByTestId("add-station-submit"));
@@ -66,7 +66,7 @@ describe("AddStationModal.svelte", () => {
     });
   });
 
-  it("renders directory stations as read-only without a save button", () => {
+  it("renders directory stations as disabled without a save button", () => {
     const station = makeStation({
       stationuuid: "dir-uuid-456",
       country: "United States",
@@ -78,9 +78,9 @@ describe("AddStationModal.svelte", () => {
     });
 
     expect(getByTestId("station-readonly-note")).toBeInTheDocument();
-    expect((getByTestId("add-station-name") as HTMLInputElement).readOnly).toBe(true);
-    expect((getByTestId("add-station-url") as HTMLInputElement).readOnly).toBe(true);
-    expect((getByTestId("add-station-tags") as HTMLInputElement).readOnly).toBe(true);
+    expect((getByTestId("add-station-name") as HTMLInputElement).disabled).toBe(true);
+    expect((getByTestId("add-station-url") as HTMLInputElement).disabled).toBe(true);
+    expect((getByTestId("add-station-tags") as HTMLInputElement).disabled).toBe(true);
     expect(queryByTestId("add-station-submit")).toBeNull();
     expect(getByTestId("test-station-connection")).not.toBeDisabled();
   });
