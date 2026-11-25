@@ -1370,6 +1370,13 @@ pub struct AlbumDetailsRetrievalResult {
 /// AllMusic, Wikidata, lyrics, other databases) into the album's curated
 /// link list — the same `album_profiles.links` the manual editor and the
 /// derived ListenBrainz link already render (#950).
+fn resolve_album_lookup_key(album: &str, album_key: Option<String>) -> String {
+    album_key
+        .map(|k| k.trim().to_string())
+        .filter(|k| !k.is_empty())
+        .unwrap_or_else(|| album.to_string())
+}
+
 #[tauri::command]
 pub async fn retrieve_album_details(
     album: String,
@@ -1388,17 +1395,15 @@ pub async fn retrieve_album_details(
         return Err("Online context enrichment is disabled".to_string());
     }
 
-    let lookup_key = album_key
-        .filter(|k| !k.trim().is_empty())
-        .unwrap_or_else(|| album.clone());
-    let album_for_lookup = lookup_key.clone();
+    let lookup_key = resolve_album_lookup_key(&album, album_key);
+    let key_for_lookup = lookup_key.clone();
     let db = state.db.clone();
     let (release_group_id, current_profile) =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
             let release_group_id =
-                scanner.get_representative_release_group_id_for_album(&album_for_lookup)?;
+                scanner.get_representative_release_group_id_for_album(&key_for_lookup)?;
             let conn = db.pool.get()?;
-            let profile = crate::profiles::get_album_profile(&conn, &album_for_lookup)?;
+            let profile = crate::profiles::get_album_profile(&conn, &key_for_lookup)?;
             Ok((release_group_id, profile))
         })
         .await
@@ -1456,12 +1461,12 @@ pub async fn retrieve_album_details(
     // bonus of the album lookup, not the reason it was run, so a failure
     // here doesn't fail the command.
     let artist_credit_id = relations.artist_credit_ids.into_iter().next();
-    let album_for_artist_lookup = lookup_key;
+    let key_for_artist_lookup = lookup_key;
     let db = state.db.clone();
     let artist_profile =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
             let Some(artist_key) =
-                scanner.get_representative_artist_for_album(&album_for_artist_lookup)?
+                scanner.get_representative_artist_for_album(&key_for_artist_lookup)?
             else {
                 return Ok(None);
             };
@@ -2186,18 +2191,16 @@ pub async fn retrieve_album_art(
         return Err("Online context enrichment is disabled".to_string());
     }
 
-    let lookup_key = album_key
-        .filter(|k| !k.trim().is_empty())
-        .unwrap_or_else(|| album.clone());
-    let album_for_lookup = lookup_key.clone();
+    let lookup_key = resolve_album_lookup_key(&album, album_key);
+    let key_for_lookup = lookup_key.clone();
     let db = state.db.clone();
     let (release_group_id, album_artist, current_profile) =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
             let conn = db.pool.get()?;
             Ok((
-                scanner.get_representative_release_group_id_for_album(&album_for_lookup)?,
-                scanner.get_representative_artist_for_album(&album_for_lookup)?,
-                crate::profiles::get_album_profile(&conn, &album_for_lookup)?,
+                scanner.get_representative_release_group_id_for_album(&key_for_lookup)?,
+                scanner.get_representative_artist_for_album(&key_for_lookup)?,
+                crate::profiles::get_album_profile(&conn, &key_for_lookup)?,
             ))
         })
         .await
