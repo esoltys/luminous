@@ -45,6 +45,10 @@ function song(id: number, title: string): Song {
     length_nanosec: 0,
     added: 0,
     unavailable: false,
+    loved: 0,
+    is_instrumental: false,
+    not_included: false,
+    isLive: false,
   };
 }
 

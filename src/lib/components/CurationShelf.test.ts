@@ -256,7 +256,7 @@ describe("CurationShelf.svelte", () => {
 
     expect(await findByTestId("curation-provenance-section")).toBeInTheDocument();
     expect(await findByText("Paranoid Android")).toBeInTheDocument();
-    expect(await findByText("suspected_lossy_transcode")).toBeInTheDocument();
+    expect(await findByText("Suspected Transcode")).toBeInTheDocument();
 
     const viewFilesBtn = await findByText("View in Files");
     await fireEvent.click(viewFilesBtn);

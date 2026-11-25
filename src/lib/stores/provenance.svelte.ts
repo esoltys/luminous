@@ -46,7 +46,7 @@ export class ProvenanceStore {
     return this.initPromise;
   }
 
-  async verifySongs(songIds: number[], contextName?: string): Promise<number> {
+  async verifySongs(songIds: number[], contextName?: string | null): Promise<number> {
     const validIds = songIds.filter((id) => Number.isFinite(id) && id > 0);
     if (validIds.length === 0) return 0;
 
@@ -63,7 +63,7 @@ export class ProvenanceStore {
       id: taskId,
       label: startLabel,
       total,
-      contextName,
+      contextName: contextName ?? undefined,
     });
 
     let unlisten: (() => void) | undefined;

@@ -51,9 +51,9 @@ const OUTPUT_FALLBACK_KEYS: Record<OutputFallbackReason, string> = {
 
 export class PlayerStore {
   state = $state<PlayState>("stopped");
-  currentSong = $state<Song | undefined>(undefined);
-  playlistId = $state<number | undefined>(undefined);
-  playlistItemUuid = $state<string | undefined>(undefined);
+  currentSong = $state<Song | null | undefined>(undefined);
+  playlistId = $state<number | null | undefined>(undefined);
+  playlistItemUuid = $state<string | null | undefined>(undefined);
   positionNanosec = $state<number>(0);
   volume = $state<number>(1.0);
   /** The volume safety ceiling (#1890); null until the first playback state. */
@@ -164,7 +164,7 @@ export class PlayerStore {
     try {
       const initialState: PlaybackState = await invoke("get_playback_state");
       this.updateState(initialState);
-      themeStore.updateArtworkColors(this.currentSong);
+      themeStore.updateArtworkColors(this.currentSong ?? undefined);
 
       // Listen for position changes (emitted every ~250ms or on seek)
       await this.events.listen<{ position_nanosec: number }>("playback-position", (event) => {
@@ -185,7 +185,7 @@ export class PlayerStore {
           await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
         }
         if (this.currentSong?.id !== oldSongId || this.playlistItemUuid !== oldItemUuid) {
-          themeStore.updateArtworkColors(this.currentSong);
+          themeStore.updateArtworkColors(this.currentSong ?? undefined);
         }
         if (this.currentSong?.id) {
           this.completedSession = null;
@@ -450,7 +450,7 @@ export class PlayerStore {
     this.repeatMode = state.repeat_mode;
     this.stopAfterCurrent = state.stop_after_current;
     this.loudnessSource = state.loudness_source;
-    this.loudnessGainDb = state.loudness_gain_db;
+    this.loudnessGainDb = state.loudness_gain_db ?? undefined;
     this.remainingPlaylistItems = state.remaining_playlist_items ?? 0;
     this.autoContinue = state.auto_continue ?? false;
     this.playlistIndex = state.playlist_index ?? null;
@@ -460,7 +460,7 @@ export class PlayerStore {
       this.audioPipeline = null;
     } else if (this.audioPipeline) {
       this.audioPipeline.loudness_source = state.loudness_source;
-      this.audioPipeline.loudness_gain_db = state.loudness_gain_db;
+      this.audioPipeline.loudness_gain_db = state.loudness_gain_db ?? undefined;
     }
   }
 

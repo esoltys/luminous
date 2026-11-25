@@ -34,6 +34,10 @@ describe("Miniplayer.svelte", () => {
     art_embedded: false,
     art_unset: false,
     unavailable: false,
+    loved: 0,
+    is_instrumental: false,
+    not_included: false,
+    isLive: false,
   };
 
   beforeEach(() => {

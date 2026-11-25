@@ -3,7 +3,7 @@ import { i18n, formatNumber } from "../stores/i18n.svelte";
 
 export { formatNumber };
 
-export function formatDuration(ns: number | undefined): string {
+export function formatDuration(ns: number | null | undefined): string {
   if (!ns) return "0:00";
   const sec = Math.floor(ns / 1_000_000_000);
   const m = Math.floor(sec / 60);
@@ -23,7 +23,7 @@ export function formatHoursMinutes(totalMinutes: number): string {
   return hours > 0 ? `${part(hours, "hour")} ${part(minutes, "minute")}` : part(minutes, "minute");
 }
 
-export function formatDate(timestamp?: number): string {
+export function formatDate(timestamp?: number | null): string {
   if (!timestamp) return "—";
   return new Date(timestamp * 1000).toLocaleDateString();
 }
@@ -45,7 +45,7 @@ export function formatBpmRange(spec?: string | null): string | null {
   return match[2] ? `${match[1]}–${match[2]} BPM` : `${match[1]}+ BPM`;
 }
 
-export function formatFileSize(bytes?: number): string {
+export function formatFileSize(bytes?: number | null): string {
   if (!bytes) return "—";
   if (bytes >= 1073741824) {
     return `${formatNumber(bytes / 1073741824, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} GB`;
@@ -69,17 +69,17 @@ export function formatStorageSize(bytes: number): string {
   return `${formatNumber(value, { maximumFractionDigits: 1 })} ${unit}`;
 }
 
-export function formatSampleRate(hz?: number): string {
+export function formatSampleRate(hz?: number | null): string {
   if (!hz) return "—";
   return `${formatNumber(hz / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ${i18n.t("units.khz", {}, "kHz")}`;
 }
 
-export function formatBitDepth(bits?: number): string {
+export function formatBitDepth(bits?: number | null): string {
   if (!bits) return "—";
   return `${bits}-bit`;
 }
 
-export function formatChannels(ch?: number): string {
+export function formatChannels(ch?: number | null): string {
   if (!ch) return "—";
   if (ch === 1) return "Mono";
   if (ch === 2) return "Stereo";

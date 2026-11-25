@@ -259,7 +259,7 @@
   }
 
   async function handleToggleFavourite() {
-    const isFav = song.loved === 1 || (song.loved === undefined && song.rating === 5);
+    const isFav = song.loved === 1;
     const newLoved = isFav ? 0 : 1;
     try {
       song.loved = await invoke<number>("set_song_loved", { songId: song.id, loved: newLoved });
@@ -407,7 +407,7 @@
     {#if selectedCount === 1}
       <ContextMenuItem
         icon={HeartIcon}
-        label={song.loved === 1 || (song.loved === undefined && song.rating === 5)
+        label={song.loved === 1
           ? i18n.t("rating.unfavoriteTooltip")
           : i18n.t("rating.favoriteTooltip")}
         onclick={() => {

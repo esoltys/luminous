@@ -123,7 +123,12 @@
 
   const musicbrainzRows = $derived.by(() => {
     if (!currentSong || isEntitySubject) return [];
-    const entries: { label: string; id?: string; entityPath: string; name?: string }[] = [
+    const entries: {
+      label: string;
+      id?: string | null;
+      entityPath: string;
+      name?: string | null;
+    }[] = [
       {
         label: i18n.t("playerBar.musicbrainzArtistLabel", {}, "Artist"),
         id: currentSong.musicbrainz_artist_id,
@@ -182,7 +187,7 @@
       render as plain text rows rather than clickable rows like `musicbrainzRows`. */
   const musicbrainzMetaRows = $derived.by(() => {
     if (!currentSong || isEntitySubject) return [];
-    const entries: { label: string; value?: string }[] = [
+    const entries: { label: string; value?: string | null }[] = [
       {
         label: i18n.t("playerBar.musicbrainzReleaseTypeLabel", {}, "Type"),
         value: currentSong.musicbrainz_release_type

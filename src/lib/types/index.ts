@@ -1,42 +1,13 @@
 // Frontend TypeScript types matching Rust models in models.rs
 
 import { isWindows } from "../platform";
+import type { FileType } from "./generated/FileType";
+import type { PlaybackState } from "./generated/PlaybackState";
+import type { PlayState } from "./generated/PlayState";
+import type { Song } from "./generated/Song";
+import type { SongSource } from "./generated/SongSource";
 
-export type SongSource =
-  | "unknown"
-  | "local_file"
-  | "collection"
-  | "stream"
-  | "tidal"
-  | "subsonic"
-  | "qobuz"
-  | "soma_fm"
-  | "radio_paradise"
-  | "spotify"
-  | "radio_browser"
-  | "web_dav"
-  | "opened_file";
-
-export type FileType =
-  | "UNKNOWN"
-  | "MP3"
-  | "FLAC"
-  | "OGG_FLAC"
-  | "OGG_VORBIS"
-  | "OGG_OPUS"
-  | "OGG_SPEEX"
-  | "AAC"
-  | "ALAC"
-  | "AIFF"
-  | "WAV"
-  | "WAV_PACK"
-  | "MPC"
-  | "TRUE_AUDIO"
-  | "APE"
-  | "DSF"
-  | "DSDIFF"
-  | "ASF"
-  | "STREAM";
+export type { FileType, PlaybackState, PlayState, Song, SongSource };
 
 /** Whether `song` is an unbounded live stream (internet radio, #2002, #2320).
  *  Authoritatively computed by the backend and serialized as `Song.isLive`. */
@@ -71,131 +42,6 @@ export interface SongProvenance {
   description: string;
   is_stale: boolean;
   analyzed_at: number;
-}
-
-export interface Song {
-  id: number;
-  source: SongSource;
-  filetype: FileType;
-
-  // Paths & URLs
-  path?: string;
-  url?: string;
-  stream_url?: string;
-
-  // Core metadata
-  title?: string;
-  titlesort?: string;
-  artist?: string;
-  artistsort?: string;
-  album?: string;
-  albumsort?: string;
-  album_artist?: string;
-  album_artist_sort?: string;
-  composer?: string;
-  composersort?: string;
-  performer?: string;
-  performersort?: string;
-  grouping?: string;
-  comment?: string;
-  lyrics?: string;
-  lyrics_source?: LyricsSource;
-
-  // Track info
-  track?: number;
-  disc?: number;
-  /** Title of this disc within a multi-disc release ("Live at the Marquee"). */
-  disc_subtitle?: string | null;
-  year?: number;
-  originalyear?: number;
-  genre?: string;
-  genresort?: string;
-  language?: string | null;
-  compilation: boolean;
-
-  // Extended tags
-  bpm?: number;
-  initial_key?: string;
-
-  // Audio properties
-  length_nanosec?: number;
-  beginning_nanosec: number;
-  end_nanosec: number;
-  bitrate?: number;
-  is_vbr?: boolean;
-  samplerate?: number;
-  bitdepth?: number;
-  channels?: number;
-  filesize?: number;
-  mtime?: number;
-
-  // Play statistics
-  rating: number;
-  loved?: number;
-  playcount: number;
-  skipcount: number;
-  lastplayed?: number;
-  lastseen?: number;
-  added?: number;
-
-  // Album art
-  art_embedded: boolean;
-  art_automatic?: string;
-  art_manual?: string;
-  art_unset: boolean;
-
-  // CUE support
-  cue_path?: string;
-
-  // MusicBrainz IDs
-  musicbrainz_album_artist_id?: string;
-  musicbrainz_artist_id?: string;
-  musicbrainz_original_artist_id?: string;
-  musicbrainz_album_id?: string;
-  musicbrainz_original_album_id?: string;
-  musicbrainz_recording_id?: string;
-  musicbrainz_track_id?: string;
-  musicbrainz_disc_id?: string;
-  musicbrainz_release_group_id?: string;
-  musicbrainz_work_id?: string;
-
-  // Release metadata adjacent to the MusicBrainz IDs, but not IDs themselves
-  musicbrainz_release_type?: string;
-  musicbrainz_release_country?: string;
-  barcode?: string;
-  catalog_number?: string;
-
-  // EBU R128 loudness
-  ebur128_integrated_loudness_lufs?: number;
-  ebur128_loudness_range_lu?: number;
-
-  // ReplayGain 2.0 tag fallback (#77)
-  replaygain_track_gain?: number;
-  replaygain_album_gain?: number;
-
-  // Dynamic Range Meter log fallback (#57) — parsed from a foobar2000
-  // foo_dr.txt sidecar. dynamic_range_album is album-wide, duplicated onto
-  // every song in the folder.
-  dynamic_range?: number;
-  dynamic_range_peak?: number;
-  dynamic_range_rms?: number;
-  dynamic_range_album?: number;
-
-  // Streaming service IDs
-  artist_id?: string;
-  album_id?: string;
-  song_id?: string;
-
-  /** True when the file is missing from disk (soft-deleted). Playlist items retain metadata. */
-  unavailable: boolean;
-  /** True when track is marked instrumental (online lyrics fetch bypassed). */
-  is_instrumental?: boolean;
-  /** True when the user marked this song "Not included" — hidden from auto/smart playlists and Auto-Play refill, but still visible and playable in Album/Artist views. */
-  not_included?: boolean;
-  /** Audio provenance warning indicator (#1373, #1586). */
-  provenance?: string | null;
-  /** True when the backend classifies this track as an unbounded live stream (#2320). */
-  isLive?: boolean;
 }
 
 /** Result of `get_song_context` — cached live enrichment for the Details
@@ -656,7 +502,6 @@ export type QueuePopulationMode = "all" | "favourites" | "familiar" | "discover"
 
 export type ShuffleMode = "off" | "all" | "inside_album" | "albums" | "artists";
 export type RepeatMode = "off" | "track" | "album" | "playlist" | "intro";
-export type PlayState = "stopped" | "playing" | "paused";
 export type LoudnessGainSource =
   "disabled" | "analyzed" | "replay_gain" | "dynamic_range_log" | "fallback";
 export type QualityTier = "lq" | "sq" | "hq" | "hi-res";
@@ -723,35 +568,6 @@ export interface AudioDeviceInfo {
 export interface AudioOutputConfig {
   backend: AudioBackendKind;
   device_id?: string | null;
-}
-
-export interface PlaybackState {
-  state: PlayState;
-  current_song?: Song;
-  playlist_id?: number;
-  playlist_item_uuid?: string;
-  position_nanosec: number;
-  volume: number;
-  shuffle_mode: ShuffleMode;
-  repeat_mode: RepeatMode;
-  stop_after_current: boolean;
-  loudness_source: LoudnessGainSource;
-  loudness_gain_db?: number;
-  remaining_playlist_items?: number;
-  /** Auto Continue (#1235): top up the Queue with similar songs near its end. */
-  auto_continue?: boolean;
-  /** 1-based index of the currently playing track within the active play order (#1605). */
-  playlist_index?: number;
-  /** Total number of tracks in the active play order (#1605). */
-  playlist_total?: number;
-  /** The volume safety ceiling (#1890); `volume` never exceeds it while on. */
-  volume_safety?: VolumeSafety;
-  /** 1 = normal; absent from a backend that predates #2142. */
-  playback_speed?: number;
-  /** The track the playing station announces (#2008); null when none. */
-  station_now_playing?: StationNowPlaying | null;
-  /** Whether the current track supports seeking (`current_song` present and not live, #2320). */
-  can_seek?: boolean;
 }
 
 /** The track an internet radio station announces in its stream metadata

@@ -426,7 +426,7 @@
                   <span
                     class="text-xs px-2 py-0.5 rounded-full border border-brand-border bg-brand-main text-brand-text-secondary font-medium whitespace-nowrap"
                   >
-                    {song.provenance || i18n.t("curation.shelfProvenanceBadge")}
+                    {i18n.t("curation.shelfProvenanceBadge")}
                   </span>
                 </div>
                 <p class="text-xs text-brand-text-secondary truncate mt-0.5">
