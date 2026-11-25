@@ -1,7 +1,7 @@
 //! Player — high-level playback controller.
 //!
 //! Mediates between AudioEngine, PlaylistManager, and the Tauri event system.
-//! Owns the shuffle index, repeat mode, queue, and scrobble point tracking.
+//! Owns playback state, persistence, and scrobble point tracking.
 
 mod order;
 
@@ -197,7 +197,7 @@ fn repeat_mode_from_key(key: &str) -> RepeatMode {
 }
 
 pub struct Player {
-    _db: Arc<Database>,
+    db: Arc<Database>,
     audio: Arc<Mutex<AudioEngine>>,
 
     // Current playback context
@@ -436,7 +436,7 @@ impl Player {
         let scrobble_point_nanosec = restored_song.as_ref().and_then(Self::scrobble_point_for);
 
         let player = Self {
-            _db: db,
+            db,
             audio,
             current_song: restored_song.clone(),
             current_playlist_id: restored_playlist_id,
@@ -482,7 +482,7 @@ impl Player {
         if playlist_id <= 0 {
             return false;
         }
-        if let Ok(conn) = self._db.pool.get() {
+        if let Ok(conn) = self.db.pool.get() {
             conn.query_row(
                 "SELECT EXISTS(SELECT 1 FROM playlists WHERE id = ?1 AND dynamic_enabled = 0 AND LOWER(TRIM(name)) = 'queue')",
                 rusqlite::params![playlist_id],
@@ -532,7 +532,7 @@ impl Player {
 
         let play_index = self.order.load(items, Some(start_index)).unwrap_or(0);
 
-        self.persist_adhoc_queue();
+        self.persist_adhoc_playlist();
 
         self.play_at_index(play_index).await
     }
@@ -559,7 +559,7 @@ impl Player {
             };
             self.scrobbled = false;
             self.order.load(items, None);
-            self.persist_adhoc_queue();
+            self.persist_adhoc_playlist();
         }
 
         let play_index = self
@@ -608,7 +608,7 @@ impl Player {
             .apply_order(order, self.current_item_uuid.as_deref());
     }
 
-    /// Clear all in-memory playlist items and queue state when the Queue is cleared.
+    /// Clear all in-memory playlist items and play-next state when the Queue is cleared.
     pub fn clear_playlist_items(&mut self) {
         self.order.clear();
     }
@@ -656,13 +656,13 @@ impl Player {
                 song,
                 uuid,
             } => Ok((song, uuid, OrderTargetKind::Index(virtual_index))),
-            OrderTarget::Queue { song, uuid } => Ok((song, uuid, OrderTargetKind::Queue)),
+            OrderTarget::PlayNext { song, uuid } => Ok((song, uuid, OrderTargetKind::PlayNext)),
         }
     }
 
     /// The single "start a track" sequence shared by `play_at_index`,
     /// `next_track`, and `on_gapless_transition`'s commit —
-    /// scrobble point, current song/uuid/(index or queue-pop), loudness
+    /// scrobble point, current song/uuid/(index or `play_next` pop), loudness
     /// gain, waveform preload, and restart persistence. `kind` mirrors
     /// `PlayOrder::peek_next_natural`'s already-decided target (#1072); `real_play`
     /// issues an actual `AudioEngine::play` call, skipped for gapless
@@ -684,7 +684,7 @@ impl Player {
         self.order.commit(kind);
         match kind {
             OrderTargetKind::Replay => {}
-            OrderTargetKind::Index(_) | OrderTargetKind::Queue => {
+            OrderTargetKind::Index(_) | OrderTargetKind::PlayNext => {
                 self.current_song = Some(song.clone());
                 self.current_item_uuid = uuid;
             }
@@ -699,7 +699,7 @@ impl Player {
         }
         self.preload_upcoming_waveforms();
         if profile.tracks_station_play {
-            if let Ok(conn) = self._db.pool.get() {
+            if let Ok(conn) = self.db.pool.get() {
                 crate::radio_directory::note_station_started(&conn, song.id, real_play);
             }
         }
@@ -727,13 +727,13 @@ impl Player {
     }
 
     /// Proactively pre-generates waveform visualizer data for the current song
-    /// and the upcoming next track in the queue/playlist on a background thread.
+    /// and the upcoming next track in `play_next`/playlist on a background thread.
     ///
     /// Remote sources (WebDAV, Subsonic) are excluded: full-file background decodes
     /// over HTTP saturate network connections and server worker pools, starving
     /// real-time audio playback (#1785).
     pub fn preload_upcoming_waveforms(&self) {
-        let db = Arc::clone(&self._db);
+        let db = Arc::clone(&self.db);
         let mut songs_to_preload = Vec::new();
 
         let next_target = self.order.peek_next_natural(self.stop_after_current);
@@ -766,13 +766,13 @@ impl Player {
         });
     }
 
-    /// Persist the ordered song-id list for ad-hoc queues (`playlist_id ==
+    /// Persist the ordered song-id list for ad-hoc playlists (`playlist_id ==
     /// 0` — album/artist/search selections, not a saved DB playlist) so a
     /// restart can rebuild the full playback context instead of just the
     /// current song. Saved playlists don't need this: they're reloaded from
     /// the `playlists`/`playlist_items` tables via `last_playlist_id`.
-    fn persist_adhoc_queue(&self) {
-        if let Ok(conn) = self._db.pool.get() {
+    fn persist_adhoc_playlist(&self) {
+        if let Ok(conn) = self.db.pool.get() {
             if self.current_playlist_id == Some(0) {
                 let song_ids: Vec<i64> = self
                     .order
@@ -801,7 +801,7 @@ impl Player {
     /// synchronously on the tokio worker would stall every other IPC command
     /// waiting on that lock for as long as the r2d2 pool takes.
     pub async fn persist_current_song(&self) {
-        let db = self._db.clone();
+        let db = self.db.clone();
         let song_id = self.current_song.as_ref().map(|s| s.id);
         let playlist_id = self.current_playlist_id;
         let item_uuid = self.current_item_uuid.clone();
@@ -837,7 +837,7 @@ impl Player {
     /// Runs on a blocking thread for the same reason as
     /// `persist_current_song` above (#1097).
     pub async fn persist_position(&self, position_nanosec: u64) {
-        let db = self._db.clone();
+        let db = self.db.clone();
         let result = tokio::task::spawn_blocking(move || {
             if let Ok(conn) = db.pool.get() {
                 app_state_set(
@@ -899,7 +899,7 @@ impl Player {
     /// global and flipping it early would affect the still-draining previous
     /// track's tail.
     async fn apply_loudness_gain(&mut self, song: &Song) {
-        let settings = match Self::load_loudness_settings(&self._db).await {
+        let settings = match Self::load_loudness_settings(&self.db).await {
             Ok(s) => s,
             Err(e) => {
                 log::warn!("Failed to load loudness settings: {e}");
@@ -922,7 +922,7 @@ impl Player {
         let Some(song) = self.current_song.clone() else {
             return;
         };
-        let settings = match Self::load_loudness_settings(&self._db).await {
+        let settings = match Self::load_loudness_settings(&self.db).await {
             Ok(s) => s,
             Err(e) => {
                 log::warn!("Failed to load loudness settings: {e}");
@@ -964,7 +964,7 @@ impl Player {
     /// synchronous read here would stall every other IPC command waiting on
     /// that lock for as long as the r2d2 pool takes.
     async fn fade_duration_ms(&self) -> u32 {
-        let db = self._db.clone();
+        let db = self.db.clone();
         let settings = tokio::task::spawn_blocking(move || {
             crate::fade::get_fade_settings_from_db(&db).unwrap_or_default()
         })
@@ -1075,7 +1075,7 @@ impl Player {
         };
         // Preserve `mtime` so the next scan still detects any tag edits made
         // alongside the external case rename (see `repath_song_preserving_mtime`).
-        let updated = match self._db.pool.get() {
+        let updated = match self.db.pool.get() {
             Ok(conn) => conn
                 .execute(
                     "UPDATE songs SET path = ?1 WHERE id = ?2",
@@ -1130,7 +1130,7 @@ impl Player {
                     .unwrap_or(false),
             };
             if should_flag_unavailable {
-                if let Ok(conn) = self._db.pool.get() {
+                if let Ok(conn) = self.db.pool.get() {
                     flagged_unavailable = conn
                         .execute(
                             "UPDATE songs SET unavailable = 1 WHERE id = ?1 AND unavailable = 0",
@@ -1195,7 +1195,7 @@ impl Player {
     /// the level actually applied.
     pub async fn set_volume(&mut self, vol: f32) -> Result<()> {
         self.volume = self.audio.lock().await.set_volume(vol);
-        if let Ok(conn) = self._db.pool.get() {
+        if let Ok(conn) = self.db.pool.get() {
             app_state_set(&conn, "volume", &self.volume.to_string());
         }
         Ok(())
@@ -1206,7 +1206,7 @@ impl Player {
     /// gets persisted.
     pub async fn set_playback_speed(&mut self, speed: f32) -> Result<()> {
         self.playback_speed = self.audio.lock().await.set_playback_speed(speed)?;
-        if let Ok(conn) = self._db.pool.get() {
+        if let Ok(conn) = self.db.pool.get() {
             app_state_set(&conn, "playback_speed", &self.playback_speed.to_string());
         }
         Ok(())
@@ -1222,7 +1222,7 @@ impl Player {
             .lock()
             .await
             .set_volume_ceiling(self.volume_safety.active_ceiling());
-        if let Ok(conn) = self._db.pool.get() {
+        if let Ok(conn) = self.db.pool.get() {
             app_state_set(&conn, "volume_safety_enabled", &enabled.to_string());
             app_state_set(
                 &conn,
@@ -1237,12 +1237,12 @@ impl Player {
     /// without re-issuing a volume command to the audio engine.
     pub fn update_external_volume(&mut self, vol: f32) {
         self.volume = vol.clamp(0.0, 1.0);
-        if let Ok(conn) = self._db.pool.get() {
+        if let Ok(conn) = self.db.pool.get() {
             app_state_set(&conn, "volume", &self.volume.to_string());
         }
     }
 
-    /// Advance playback: first drains any "play next" `queue` entries
+    /// Advance playback: first drains any `play_next` entries
     /// (skipping ones that became unplayable), and only once that's empty
     /// falls back to the normal shuffle/repeat-aware playlist advance.
     pub async fn next_track(&mut self) -> Result<()> {
@@ -1276,7 +1276,7 @@ impl Player {
         let (song, _, _) = self.resolve_order_target(target)?;
         let start_ns = song.beginning_nanosec.max(0) as u64;
 
-        let fade_settings = crate::fade::get_fade_settings_from_db(&self._db).unwrap_or_default();
+        let fade_settings = crate::fade::get_fade_settings_from_db(&self.db).unwrap_or_default();
 
         let is_same_album = if let Some(current) = &self.current_song {
             current.is_same_album_or_cue_sibling(&song)
@@ -1293,7 +1293,7 @@ impl Player {
             );
             // The engine switches to the incoming track's loudness gain at
             // the overlap's first sample, so it needs that gain up front.
-            let incoming_gain = match Self::load_loudness_settings(&self._db).await {
+            let incoming_gain = match Self::load_loudness_settings(&self.db).await {
                 Ok(settings) => Self::compute_loudness_gain(&settings, &song).0,
                 Err(e) => {
                     log::warn!("Failed to load loudness settings: {e}");
@@ -1315,9 +1315,9 @@ impl Player {
     }
 
     /// Commit a completed gapless handover reported by the engine. Advances
-    /// queue/index/scrobble bookkeeping exactly as `on_track_finished` would,
+    /// `play_next`/index/scrobble bookkeeping exactly as `on_track_finished` would,
     /// but without issuing a new `Play` (the audio never stopped). If the
-    /// playback context changed since the preload (mode/queue edits), falls
+    /// playback context changed since the preload (mode/playlist/`play_next` edits), falls
     /// back to the normal advance logic to self-heal.
     pub async fn on_gapless_transition(&mut self, started_song_id: i64) -> Result<()> {
         if self.stop_after_current {
@@ -1361,7 +1361,7 @@ impl Player {
 
     pub fn set_shuffle_mode(&mut self, mode: ShuffleMode) {
         self.order.set_shuffle_mode(mode);
-        if let Ok(conn) = self._db.pool.get() {
+        if let Ok(conn) = self.db.pool.get() {
             app_state_set(&conn, "shuffle_mode", shuffle_mode_to_key(mode));
         }
     }
@@ -1373,7 +1373,7 @@ impl Player {
 
     pub fn set_auto_continue(&mut self, enabled: bool) {
         self.auto_continue = enabled;
-        if let Ok(conn) = self._db.pool.get() {
+        if let Ok(conn) = self.db.pool.get() {
             app_state_set(
                 &conn,
                 "auto_continue",
@@ -1401,7 +1401,7 @@ impl Player {
 
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
         self.order.set_repeat_mode(mode);
-        if let Ok(conn) = self._db.pool.get() {
+        if let Ok(conn) = self.db.pool.get() {
             app_state_set(&conn, "repeat_mode", repeat_mode_to_key(mode));
         }
     }
@@ -1409,7 +1409,7 @@ impl Player {
     /// Re-fetch every queued item's `Song` (and the current song) from the DB
     /// by id.
     pub fn resync_queue_with_db(&mut self) -> Result<()> {
-        let conn = self._db.pool.get()?;
+        let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs WHERE id = ?1",
             crate::collection::SONG_SELECT_COLS
@@ -1519,7 +1519,7 @@ impl Player {
 
         let song_id = self.current_song.as_ref()?.id;
         let duration_secs = self.current_song.as_ref()?.duration_secs().round() as i64;
-        match self._db.pool.get() {
+        match self.db.pool.get() {
             Ok(conn) => match stats::record_play(&conn, song_id) {
                 Ok(()) => {
                     let context = self
@@ -1558,7 +1558,7 @@ impl Player {
             return None;
         }
         let song_id = self.current_song.as_ref()?.id;
-        let db = self._db.clone();
+        let db = self.db.clone();
         tokio::task::block_in_place(move || match db.pool.get() {
             Ok(conn) => match stats::record_skip(&conn, song_id) {
                 Ok(()) => Some(stats::stats_payload(&conn, song_id)),
@@ -2095,7 +2095,7 @@ mod tests {
     /// rather than stopping or spilling into the other album. Manual skip
     /// is intentionally NOT scoped this way — see the follow-up regression
     /// test below (a real bug this exact confusion caused).
-    /// Regression coverage for #1073: `next_track`'s ad-hoc queue branch
+    /// Regression coverage for #1073: `next_track`'s `play_next` branch
     /// used to update `current_song`/`current_item_uuid` in memory but skip
     /// `persist_current_song`/`persist_position` entirely — so quitting the
     /// app right after skipping into a queued "play next" track would
@@ -2155,13 +2155,13 @@ mod tests {
         let expected_start_ns = queued_song.beginning_nanosec.max(0) as u64;
         let queued_item = PlaylistItem::new_song(0, 0, queued_song);
         let queued_uuid = queued_item.uuid.clone();
-        player.order.queue_mut().push_back(queued_item);
+        player.order.play_next_mut().push_back(queued_item);
 
         player.next_track().await.unwrap();
         assert_eq!(
             player.current_song.as_ref().unwrap().id,
             4,
-            "manual skip must drain the play-next queue before continuing the playlist"
+            "manual skip must drain play_next before continuing the playlist"
         );
 
         // The concrete regression: restart persistence must reflect the
@@ -2196,13 +2196,12 @@ mod tests {
     }
 
     /// Coverage for the #1073 design decision: under `RepeatMode::Playlist`,
-    /// a track finishing naturally must drain the ad-hoc "play next" queue
-    /// first, the same as manual skip — previously `on_track_finished`'s
-    /// `Playlist` arm called `play_at_index` directly and never looked at
-    /// `self.queue` at all, so a queued track would be silently skipped
-    /// while repeat-playlist was on.
+    /// a track finishing naturally must drain `play_next` first, the same as
+    /// manual skip — previously `on_track_finished`'s `Playlist` arm called
+    /// `play_at_index` directly and never looked at `play_next` at all,
+    /// so a queued track would be silently skipped while repeat-playlist was on.
     #[tokio::test]
-    async fn test_repeat_playlist_drains_queue_before_wrapping() {
+    async fn test_repeat_playlist_drains_play_next_before_wrapping() {
         let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
@@ -2254,7 +2253,7 @@ mod tests {
         };
         player
             .order
-            .queue_mut()
+            .play_next_mut()
             .push_back(PlaylistItem::new_song(0, 0, queued_song));
 
         player.on_track_finished().await.unwrap();
@@ -2265,12 +2264,12 @@ mod tests {
              back to the start of the playlist"
         );
 
-        // The queue is now empty, so the *next* natural finish wraps as usual.
+        // `play_next` is now empty, so the *next* natural finish wraps as usual.
         player.on_track_finished().await.unwrap();
         assert_eq!(
             player.current_song.as_ref().unwrap().id,
             1,
-            "once the queue is drained, RepeatMode::Playlist still wraps to the first track"
+            "once play_next is drained, RepeatMode::Playlist still wraps to the first track"
         );
     }
 
@@ -2365,7 +2364,7 @@ mod tests {
 
     /// Coverage for #1077: `on_gapless_transition`'s doc comment promises a
     /// self-healing fallback to `on_track_finished` when the preloaded
-    /// track no longer matches what should play (e.g. mode/queue changed
+    /// track no longer matches what should play (e.g. mode/playlist/play_next changed
     /// after the preload was armed) — previously untested.
     #[tokio::test]
     async fn test_gapless_transition_mismatch_falls_back_to_on_track_finished() {
@@ -2884,7 +2883,7 @@ mod tests {
             .start_track(
                 station(1, "Groove Salad"),
                 None,
-                OrderTargetKind::Queue,
+                OrderTargetKind::PlayNext,
                 false,
             )
             .await
@@ -2920,7 +2919,7 @@ mod tests {
             .start_track(
                 station(2, "Drone Zone"),
                 None,
-                OrderTargetKind::Queue,
+                OrderTargetKind::PlayNext,
                 false,
             )
             .await
@@ -2944,7 +2943,7 @@ mod tests {
             ..Song::default()
         };
         player
-            .start_track(local, None, OrderTargetKind::Queue, false)
+            .start_track(local, None, OrderTargetKind::PlayNext, false)
             .await
             .unwrap();
         assert!(!player.note_stream_title(3, "Some - Thing"));
