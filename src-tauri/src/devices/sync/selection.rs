@@ -4,7 +4,7 @@
 use crate::album_key::album_key;
 use crate::collection::{row_to_song, SONG_SELECT_COLS, SONG_SELECT_COLS_QUALIFIED};
 use crate::library_paths;
-use crate::models::{Song, LOCAL_SOURCES_SQL};
+use crate::models::{included_local_song_where, local_song_where, playable_local_song_where, Song};
 use crate::playlist::{fit_to_limit, PlaylistManager};
 use anyhow::Result;
 use rusqlite::{params, OptionalExtension};
@@ -300,9 +300,9 @@ pub fn resolve(
 pub(super) fn local_songs(conn: &rusqlite::Connection) -> Result<Vec<Song>> {
     let sql = format!(
         "SELECT {SONG_SELECT_COLS} FROM songs
-          WHERE source IN ({}) AND unavailable = 0 AND path IS NOT NULL
+          WHERE {local_where} AND path IS NOT NULL
           ORDER BY id",
-        *LOCAL_SOURCES_SQL
+        local_where = local_song_where("")
     );
     let mut stmt = conn.prepare(&sql)?;
     let songs = stmt
@@ -380,12 +380,10 @@ fn auto_playlist_songs(
             format!(
                 "SELECT {SONG_SELECT_COLS} FROM songs
                  WHERE loved = 1
-                   AND source IN ({})
-                   AND unavailable = 0
-                   AND not_included = 0
+                   AND {local_where}
                    AND path IS NOT NULL
                  ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track",
-                *LOCAL_SOURCES_SQL
+                local_where = included_local_song_where("")
             ),
             None,
         ),
@@ -393,15 +391,12 @@ fn auto_playlist_songs(
             "Recently Added",
             format!(
                 "SELECT {SONG_SELECT_COLS} FROM songs
-                 WHERE source IN ({})
-                   AND unavailable = 0
-                   AND not_included = 0
-                   AND loved != -1
+                 WHERE {local_where}
                    AND added IS NOT NULL
                    AND path IS NOT NULL
                  ORDER BY added DESC
                  LIMIT ?1",
-                *LOCAL_SOURCES_SQL
+                local_where = playable_local_song_where("")
             ),
             Some(100),
         ),
@@ -415,14 +410,11 @@ fn auto_playlist_songs(
                      FROM play_history
                      GROUP BY song_id
                  ) ph ON ph.song_id = s.id
-                 WHERE s.source IN ({})
-                   AND s.unavailable = 0
-                   AND s.not_included = 0
-                   AND s.loved != -1
+                 WHERE {local_where}
                    AND s.path IS NOT NULL
                  ORDER BY ph.play_count DESC, s.added DESC
                  LIMIT ?1",
-                *LOCAL_SOURCES_SQL
+                local_where = playable_local_song_where("s")
             ),
             Some(100),
         ),
@@ -432,14 +424,11 @@ fn auto_playlist_songs(
                 "SELECT {SONG_SELECT_COLS_QUALIFIED}
                  FROM songs s
                  JOIN play_history ph ON ph.song_id = s.id
-                 WHERE s.source IN ({})
-                   AND s.unavailable = 0
-                   AND s.not_included = 0
-                   AND s.loved != -1
+                 WHERE {local_where}
                    AND s.path IS NOT NULL
                  ORDER BY ph.played_at DESC
                  LIMIT ?1",
-                *LOCAL_SOURCES_SQL
+                local_where = playable_local_song_where("s")
             ),
             Some(100),
         ),

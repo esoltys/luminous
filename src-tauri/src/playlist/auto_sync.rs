@@ -5,7 +5,7 @@
 use super::tempo_buckets::TEMPO_BUCKETS;
 use super::{PlaylistManager, NO_SONG_LIMIT};
 use crate::collection::CollectionScanner;
-use crate::models::{QueuePopulationMode, Song, LIBRARY_SOURCES_SQL};
+use crate::models::{playable_library_song_where, QueuePopulationMode, Song};
 use crate::tags::TagManager;
 use anyhow::Result;
 use rand::seq::IndexedRandom;
@@ -886,8 +886,8 @@ impl PlaylistManager {
         let total_library_songs: i64 = conn
             .query_row(
                 &format!(
-                    "SELECT COUNT(*) FROM songs WHERE source IN ({lib}) AND unavailable = 0 AND not_included = 0 AND loved != -1",
-                    lib = *LIBRARY_SOURCES_SQL
+                    "SELECT COUNT(*) FROM songs WHERE {lib_where}",
+                    lib_where = playable_library_song_where("")
                 ),
                 [],
                 |r| r.get(0),

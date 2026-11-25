@@ -13,7 +13,7 @@
 //! on disk.
 
 use crate::db::Database;
-use crate::models::LOCAL_SOURCES_SQL;
+use crate::models::local_song_where;
 use luminous_analysis::MusicalAnalysis;
 use rusqlite::{params, Connection, OptionalExtension};
 use std::sync::Arc;
@@ -217,12 +217,12 @@ fn candidates_sql(select: &str, tail: &str) -> String {
     format!(
         "SELECT {select} FROM songs s
          LEFT JOIN song_musical_analysis a ON a.song_id = s.id
-         WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+         WHERE {local_where} AND s.path IS NOT NULL
            AND (s.bpm IS NULL OR s.bpm <= 0
                 OR s.initial_key IS NULL OR TRIM(s.initial_key) = '')
            AND (s.length_nanosec IS NULL OR s.length_nanosec <= {max_nanos})
            AND {needs} {tail}",
-        lib = *LOCAL_SOURCES_SQL,
+        local_where = local_song_where("s"),
         max_nanos = MAX_BACKGROUND_TRACK_SECONDS * 1_000_000_000,
         needs = needs_analysis_sql()
     )

@@ -1,4 +1,4 @@
-use crate::models::{LoudnessSettings, LOCAL_SOURCES_SQL};
+use crate::models::{local_song_where, LoudnessSettings};
 use crate::AppState;
 use tauri::State;
 
@@ -40,9 +40,9 @@ pub async fn get_loudness_analysis_remaining(state: State<'_, AppState>) -> Resu
         conn.query_row(
             &format!(
                 "SELECT COUNT(*) FROM songs
-             WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
+             WHERE {local_where} AND path IS NOT NULL
                AND ebur128_integrated_loudness_lufs IS NULL",
-                lib = *LOCAL_SOURCES_SQL
+                local_where = local_song_where("")
             ),
             [],
             |row| row.get(0),

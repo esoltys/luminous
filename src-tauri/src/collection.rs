@@ -5,8 +5,8 @@ use crate::{
     db::Database,
     library_paths,
     models::{
-        FileType, MusicDirectory, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress, Song,
-        SongSource, LOCAL_SOURCES_SQL,
+        local_song_where, FileType, MusicDirectory, PruneResult, QueuePopulationMode, ScanPhase,
+        ScanProgress, Song, SongSource,
     },
 };
 use anyhow::{Context, Result};
@@ -451,8 +451,8 @@ impl CollectionScanner {
         let mut to_mark = Vec::new();
         {
             let sql = format!(
-                "SELECT id, path FROM songs WHERE source IN ({lib}) AND unavailable = 0",
-                lib = *LOCAL_SOURCES_SQL
+                "SELECT id, path FROM songs WHERE {local_where}",
+                local_where = local_song_where("")
             );
             let mut stmt = tx.prepare(&sql)?;
             let rows = stmt.query_map([], |row| {
@@ -746,8 +746,8 @@ impl CollectionScanner {
         // directory — cheaper than a query per folder for large libraries.
         let mut stmt = conn.prepare(&format!(
             "SELECT id, path, track, title, dr_log_mtime FROM songs
-             WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL",
-            lib = *LOCAL_SOURCES_SQL
+             WHERE {local_where} AND path IS NOT NULL",
+            local_where = local_song_where("")
         ))?;
         let rows = stmt.query_map([], |row| {
             Ok((
@@ -1924,11 +1924,11 @@ impl CollectionScanner {
                     album,
                     art_embedded
                  FROM songs
-                 WHERE source IN ({lib})
+                 WHERE {local_where}
                    AND album IS NOT NULL
                    AND (art_unset = 1 OR (art_automatic IS NULL AND art_manual IS NULL))
                  GROUP BY effective_artist, album_key",
-                    lib = *LOCAL_SOURCES_SQL
+                    local_where = local_song_where("")
                 );
                 if let Ok(mut stmt) = conn.prepare(&sql) {
                     if let Ok(mut rows) = stmt.query([]) {
@@ -2401,10 +2401,10 @@ pub(crate) fn reprobe_container_codecs(db: &Database) -> Result<usize> {
         // One row per file: CUE tracks sharing a media file share its path.
         let mut stmt = conn.prepare(&format!(
             "SELECT path, MIN(filetype) FROM songs
-             WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
+             WHERE {local_where} AND path IS NOT NULL
                AND (path LIKE '%.m4a' OR path LIKE '%.m4b' OR path LIKE '%.ogg')
              GROUP BY path",
-            lib = *LOCAL_SOURCES_SQL
+            local_where = local_song_where("")
         ))?;
         let rows = stmt
             .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?

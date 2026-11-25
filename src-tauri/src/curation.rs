@@ -8,7 +8,7 @@
 //! - Corrupted, truncated, or bit-rotted tracks failing physical audio integrity checks (#1938)
 
 use crate::db::Database;
-use crate::models::{Playlist, Song, SongSource, LOCAL_SOURCES_SQL};
+use crate::models::{local_song_where, playable_local_song_where, Playlist, Song, SongSource};
 use anyhow::{bail, Context, Result};
 use luminous_analysis::IntegrityVerdict;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -100,7 +100,7 @@ fn base_curation_album_ctes() -> String {
         "album_genres AS (
             SELECT album_key, genre, genresort, COUNT(*) AS g_count
             FROM songs
-            WHERE source IN ({local_sources}) AND unavailable = 0 AND not_included = 0 AND loved != -1
+            WHERE {local_where}
               AND album_key IS NOT NULL AND TRIM(album_key) != ''
               AND genre IS NOT NULL AND TRIM(genre) != ''
             GROUP BY album_key, genre
@@ -116,14 +116,11 @@ fn base_curation_album_ctes() -> String {
         ),
         album_tracks_ordered AS (
             SELECT * FROM songs
-            WHERE source IN ({local_sources})
-              AND unavailable = 0
-              AND not_included = 0
-              AND loved != -1
+            WHERE {local_where}
               AND album_key IS NOT NULL AND TRIM(album_key) != ''
             ORDER BY COALESCE(disc, 1) ASC, COALESCE(track, 0) ASC, id ASC
         )",
-        local_sources = *LOCAL_SOURCES_SQL
+        local_where = playable_local_song_where("")
     )
 }
 
@@ -248,10 +245,7 @@ pub(crate) fn query_incomplete_albums(
                 COUNT(DISTINCT beginning_nanosec) AS distinct_cues,
                 COUNT(*) AS total_rows
             FROM songs
-            WHERE source IN ({local_sources})
-              AND unavailable = 0
-              AND not_included = 0
-              AND loved != -1
+            WHERE {local_where}
               AND album_key IS NOT NULL AND TRIM(album_key) != ''
               AND track IS NOT NULL AND track > 0
               AND id NOT IN (SELECT value FROM json_each(?1))
@@ -292,7 +286,7 @@ pub(crate) fn query_incomplete_albums(
         {CURATION_ALBUM_ORDER_BY}",
         base_ctes = base_curation_album_ctes(),
         select_cols = curation_album_select_cols(),
-        local_sources = *LOCAL_SOURCES_SQL,
+        local_where = playable_local_song_where(""),
     );
 
     let ignored = serde_json::to_string(ignored_song_ids)
@@ -322,12 +316,9 @@ pub(crate) fn query_missing_core_tags_song_ids(conn: &Connection) -> Result<Vec<
     let sql = format!(
         "SELECT id FROM songs
          WHERE {}
-           AND source IN ({local_sources})
-           AND unavailable = 0
-           AND not_included = 0
-           AND loved != -1",
+           AND {local_where}",
         crate::collection::MISSING_CORE_TAGS_SQL,
-        local_sources = *LOCAL_SOURCES_SQL
+        local_where = playable_local_song_where("")
     );
     let mut stmt = conn.prepare(&sql)?;
     let ids = stmt
@@ -350,15 +341,12 @@ pub(crate) fn query_suspected_provenance_songs(conn: &Connection) -> Result<Vec<
 
     let sql = format!(
         "SELECT {} FROM songs
-         WHERE source IN ({local_sources})
-           AND unavailable = 0
-           AND not_included = 0
-           AND loved != -1
+         WHERE {local_where}
            AND filetype IN (1, 6)
            AND provenance IS NOT NULL AND TRIM(provenance) != '' AND provenance != 'authentic'
          ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track",
         crate::collection::SONG_SELECT_COLS,
-        local_sources = *LOCAL_SOURCES_SQL
+        local_where = playable_local_song_where("")
     );
 
     let mut stmt = conn.prepare(&sql)?;
@@ -484,12 +472,9 @@ fn candidate_sort_key(c: &DuplicateCandidate) -> (bool, bool, u32, u32, u32, i32
 pub fn query_duplicate_track_groups(conn: &Connection) -> Result<Vec<DuplicateTrackGroup>> {
     let sql = format!(
         "SELECT {} FROM songs
-         WHERE source IN ({local_sources})
-           AND unavailable = 0
-           AND not_included = 0
-           AND loved != -1",
+         WHERE {local_where}",
         crate::collection::SONG_SELECT_COLS,
-        local_sources = *LOCAL_SOURCES_SQL
+        local_where = playable_local_song_where("")
     );
 
     let mut stmt = conn.prepare(&sql)?;
@@ -915,12 +900,11 @@ fn query_songs_by_integrity_status(
         "SELECT s.id, s.title, s.artist, s.album, s.path, s.filetype, i.error_detail, i.verified_at
          FROM song_integrity i
          JOIN songs s ON s.id = i.song_id
-         WHERE s.source IN ({local_sources})
-           AND s.unavailable = 0
+         WHERE {local_where}
            AND i.status = ?1
            AND {fresh}
          ORDER BY s.added DESC, s.id DESC",
-        local_sources = *LOCAL_SOURCES_SQL,
+        local_where = local_song_where("s"),
         fresh = crate::db::sql_stamp_fresh("i")
     ))?;
 
@@ -1073,11 +1057,11 @@ fn next_song_for_integrity(
         &format!(
             "SELECT s.id, s.path FROM songs s
              LEFT JOIN song_integrity i ON s.id = i.song_id
-             WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+             WHERE {local_where} AND s.path IS NOT NULL
                AND {stale}
                AND {skip}
              ORDER BY s.added DESC, s.id DESC LIMIT 1",
-            lib = *LOCAL_SOURCES_SQL,
+            local_where = local_song_where("s"),
             stale = crate::db::sql_stamp_stale("i"),
             skip = skipped.sql_excluding("s.id")
         ),
@@ -1122,10 +1106,10 @@ pub fn verify_library_integrity(app: &AppHandle, db: &Database) -> Result<usize>
     let mut stmt = conn.prepare(&format!(
         "SELECT s.id FROM songs s
          LEFT JOIN song_integrity i ON s.id = i.song_id
-         WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+         WHERE {local_where} AND s.path IS NOT NULL
            AND {stale}
          ORDER BY s.added DESC, s.id DESC",
-        lib = *LOCAL_SOURCES_SQL,
+        local_where = local_song_where("s"),
         stale = crate::db::sql_stamp_stale("i")
     ))?;
 
