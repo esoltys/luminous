@@ -1313,7 +1313,7 @@ pub struct LibraryStats {
     pub thumbnail_bytes: i64,
 }
 
-/// Represents an album summary on the Home page.
+/// Represents an album summary across the library grid, compilations, and Home page.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlbumItem {
     pub artist: Option<String>,
@@ -1332,11 +1332,63 @@ pub struct AlbumItem {
     /// that have a DB connection handy (see `attach_album_ratings`); defaults to
     /// unrated at construction time.
     pub rating: f32,
+    #[serde(default)]
+    pub added: Option<i64>,
     /// Sum of every track's `length_nanosec`, used to classify a release as an
     /// EP (under 30 minutes) vs. an Album — the Home-carousel construction sites
     /// don't have this aggregate handy and default it to 0, which is harmless
     /// since those `AlbumItem`s aren't run through release-category logic.
     pub total_duration_nanosec: i64,
+    #[serde(default)]
+    pub artist_sort: Option<String>,
+    #[serde(default)]
+    pub albumsort: Option<String>,
+}
+
+impl AlbumItem {
+    /// Maps a row from `CollectionScanner::get_albums()` (16 columns).
+    pub fn from_album_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
+        Ok(Self {
+            artist: row.get(0)?,
+            album: row.get(1)?,
+            year: row.get(2)?,
+            track_count: row.get(3)?,
+            disc_count: row.get(4)?,
+            art_embedded: row.get(5)?,
+            art_automatic: row.get(6)?,
+            art_manual: row.get(7)?,
+            genre: row.get(8)?,
+            rating: row.get(9)?,
+            added: row.get(10)?,
+            total_duration_nanosec: row.get(11)?,
+            artist_sort: row.get(12)?,
+            albumsort: row.get(13)?,
+            sample_song_id: row.get(14)?,
+            album_key: row.get(15)?,
+        })
+    }
+
+    /// Maps a row from `CollectionScanner::get_compilations_by_artist()` (12 columns).
+    pub fn from_compilation_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
+        Ok(Self {
+            artist: Some("Various Artists".to_string()),
+            album: row.get(0)?,
+            year: row.get(1)?,
+            track_count: row.get(2)?,
+            disc_count: row.get(3)?,
+            art_embedded: row.get(4)?,
+            art_automatic: row.get(5)?,
+            art_manual: row.get(6)?,
+            genre: row.get(7)?,
+            rating: row.get(8)?,
+            added: row.get(9)?,
+            total_duration_nanosec: row.get(10)?,
+            sample_song_id: row.get(11)?,
+            album_key: None,
+            artist_sort: None,
+            albumsort: None,
+        })
+    }
 }
 
 /// One album's entry in the Home "Top Albums" weekly chart (#662) — an
@@ -1476,9 +1528,8 @@ pub enum HomeItem {
     Playlist { playlist: Playlist },
 }
 
-/// Represents an artist summary, typed equivalent of the ad-hoc JSON shape
-/// returned by `CollectionScanner::get_artists`/`get_top_artists` — used here
-/// so a pinned artist (see `PinnedItem`) has a concrete Rust type.
+/// Represents an artist summary returned by `CollectionScanner::get_artists`,
+/// `CollectionScanner::get_top_artists`, and `PinnedItem::Artist`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtistItem {
     pub name: Option<String>,
@@ -1487,6 +1538,32 @@ pub struct ArtistItem {
     pub song_count: i32,
     pub total_playcount: Option<i32>,
     pub genre: Option<String>,
+}
+
+impl ArtistItem {
+    /// Maps a row from `CollectionScanner::get_artists()` (6 columns).
+    pub fn from_artist_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
+        Ok(Self {
+            name: row.get(0)?,
+            album_count: row.get(1)?,
+            song_count: row.get(2)?,
+            genre: row.get(3)?,
+            sort_artist: row.get(4)?,
+            total_playcount: row.get(5)?,
+        })
+    }
+
+    /// Maps a row from `CollectionScanner::get_top_artists()` (5 columns).
+    pub fn from_top_artist_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
+        Ok(Self {
+            name: row.get(0)?,
+            album_count: row.get(1)?,
+            song_count: row.get(2)?,
+            total_playcount: row.get(3)?,
+            genre: row.get(4)?,
+            sort_artist: None,
+        })
+    }
 }
 
 /// A materialized or virtual auto-playlist referenced by a Home pin — mirrors

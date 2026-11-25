@@ -71,8 +71,8 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
         return Ok(Vec::new());
     }
 
-    let mut albums_cache: Option<Vec<serde_json::Value>> = None;
-    let mut artists_cache: Option<Vec<serde_json::Value>> = None;
+    let mut albums_cache: Option<Vec<crate::models::AlbumItem>> = None;
+    let mut artists_cache: Option<Vec<crate::models::ArtistItem>> = None;
     let mut playlists_cache: Option<Vec<crate::models::Playlist>> = None;
 
     let mut items = Vec::with_capacity(refs.len());
@@ -104,9 +104,9 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                         albums_cache.as_ref().unwrap()
                     }
                 };
-                if let Some(value) = pins::find_album(albums, &ref_key) {
+                if let Some(album) = pins::find_album(albums, &ref_key) {
                     items.push(PinnedItem::Album {
-                        album: pins::album_item_from_json(value),
+                        album: album.clone(),
                     });
                 }
             }
@@ -124,10 +124,10 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                         artists_cache.as_ref().unwrap()
                     }
                 };
-                if let Some(value) = pins::find_artist(artists, &ref_key) {
-                    if let Ok(artist) = pins::artist_item_from_json(value) {
-                        items.push(PinnedItem::Artist { artist });
-                    }
+                if let Some(artist) = pins::find_artist(artists, &ref_key) {
+                    items.push(PinnedItem::Artist {
+                        artist: artist.clone(),
+                    });
                 }
             }
             "playlist" => {
