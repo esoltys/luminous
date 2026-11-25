@@ -83,7 +83,7 @@
     const token = ++loadToken;
     const id = songId;
     if (artManual) {
-      imgSrc = resolveArtUrl(artManual);
+      imgSrc = resolveArtUrl(artManual, fullResolution);
       hasFailed = false;
       return;
     }
