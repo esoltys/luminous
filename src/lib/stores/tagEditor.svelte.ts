@@ -1,4 +1,5 @@
 import type { FileSource } from "../types";
+import { radioStore, stationUuidFromPath } from "./radio.svelte";
 
 interface FileTagTarget {
   filePath: string;
@@ -6,6 +7,11 @@ interface FileTagTarget {
   folderPath?: string[];
   folderName?: string;
   fileName?: string;
+}
+
+interface SongTagTarget {
+  id: number;
+  path?: string | null;
 }
 
 type TagEditorTarget = { kind: "song"; songId: number } | ({ kind: "file" } & FileTagTarget);
@@ -17,9 +23,10 @@ interface TagEditorOpenOptions {
 /**
  * Coordinates the single global `<TagEditor>` host mounted in `+layout.svelte`.
  *
- * Views call `tagEditorStore.open(songId, { onSaved })` or
- * `tagEditorStore.open({ filePath, ... }, { onSaved })` instead of mounting
- * their own `<TagEditor>` instance.
+ * Views call `tagEditorStore.open(song, { onSaved })`, `tagEditorStore.open(songId, { onSaved })`,
+ * or `tagEditorStore.open({ filePath, ... }, { onSaved })` instead of mounting their own
+ * `<TagEditor>` instance. Streaming radio tracks (`radio://...`) are routed to the radio
+ * station editor instead of the local-file tag editor.
  */
 class TagEditorStore {
   target = $state<TagEditorTarget | null>(null);
@@ -31,9 +38,19 @@ class TagEditorStore {
     return this.target !== null;
   }
 
-  open(target: number | FileTagTarget, options?: TagEditorOpenOptions): void {
-    this.target =
-      typeof target === "number" ? { kind: "song", songId: target } : { kind: "file", ...target };
+  open(target: number | SongTagTarget | FileTagTarget, options?: TagEditorOpenOptions): void {
+    if (typeof target === "object" && "id" in target) {
+      const stationUuid = stationUuidFromPath(target.path);
+      if (stationUuid) {
+        this.close();
+        void radioStore.openStationEditorByUuid(stationUuid, options?.onSaved);
+        return;
+      }
+      this.target = { kind: "song", songId: target.id };
+    } else {
+      this.target =
+        typeof target === "number" ? { kind: "song", songId: target } : { kind: "file", ...target };
+    }
     this.onSaved = options?.onSaved;
     this.openSeq += 1;
   }

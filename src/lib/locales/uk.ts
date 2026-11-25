@@ -3469,6 +3469,14 @@ export const uk = {
     editStationTitle: "Редагувати власну станцію",
     savingStation: "Збереження…",
     customStationUpdated: "Оновлено станцію {name}",
+    stationDetailsTitle: "Радіостанція",
+    directoryStationReadOnlyNote:
+      "Станції каталогу синхронізуються з Radio Browser і не можуть редагуватися локально.",
+    stationNotFound: "Радіостанцію не знайдено",
+    testConnection: "Перевірити з'єднання",
+    testingConnection: "Перевірка…",
+    connectionOk: "Підключено",
+    connectionFailed: "Помилка з'єднання",
     customStationsImported: {
       one: "Імпортовано {count} станцію",
       few: "Імпортовано {count} станції",

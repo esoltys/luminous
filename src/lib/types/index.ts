@@ -1534,6 +1534,16 @@ export interface RadioDirectoryStation {
   reducedQuality: boolean;
 }
 
+export interface RadioConnectionTestResult {
+  ok: boolean;
+  status: number | null;
+  resolvedUrl: string;
+  contentType: string | null;
+  bitrate: number | null;
+  stationName: string | null;
+  error: string | null;
+}
+
 export type RadioDirectoryOrder = "clickcount" | "votes" | "name" | "bitrate" | "relevance";
 
 export interface RadioDirectoryQuery {

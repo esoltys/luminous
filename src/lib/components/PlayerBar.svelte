@@ -764,7 +764,7 @@
       : undefined}
     onEditTags={() => {
       windowLayoutStore.exitImmersiveMode();
-      tagEditorStore.open(song.id);
+      tagEditorStore.open(song);
     }}
     onOpenInPicard={() => openInPicard([song.id])}
     onClose={() => {

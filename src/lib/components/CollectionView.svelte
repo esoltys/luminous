@@ -593,7 +593,7 @@
               onRowContextMenu={handleRowContextMenu}
               onRate={rateSong}
               onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
-              onEditTags={(song) => tagEditorStore.open(song.id)}
+              onEditTags={(song) => tagEditorStore.open(song)}
               emptyState={songsEmptyState}
             />
           </div>
@@ -928,7 +928,7 @@
     }}
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
-    onEditTags={() => tagEditorStore.open(song.id)}
+    onEditTags={() => tagEditorStore.open(song)}
     onEditBatchTags={() => {
       batchEditSongs = selectedSongs ?? null;
     }}

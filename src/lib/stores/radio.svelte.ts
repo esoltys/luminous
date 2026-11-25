@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   Playlist,
   RadioBrowserFacetEntry,
+  RadioConnectionTestResult,
   RadioDirectoryFacets,
   RadioDirectoryOrder,
   RadioDirectoryStation,
@@ -173,6 +174,7 @@ class RadioStore {
   savedStations = $state<RadioDirectoryStation[]>([]);
   recentStations = $state<RadioDirectoryStation[]>([]);
   editingStation = $state<RadioDirectoryStation | null>(null);
+  editingStationOnSaved = $state<(() => void) | undefined>(undefined);
   myStationsLoading = $state(false);
   stationListTags = $state<RadioBrowserFacetEntry[]>([]);
   suggestedLibraryGenres = $state<RadioBrowserFacetEntry[]>([]);
@@ -577,8 +579,68 @@ class RadioStore {
     this.recentStations = this.recentStations.map((s) =>
       s.stationuuid === station.stationuuid ? station : s,
     );
+    if (stationUuidFromPath(playerStore.currentSong?.path) === station.stationuuid) {
+      const genre = station.tags
+        ? station.tags
+            .split(/[,;]/)
+            .map((t) => t.trim())
+            .filter(Boolean)
+            .join("; ")
+        : undefined;
+      playerStore.currentSong = {
+        ...playerStore.currentSong!,
+        title: station.name,
+        stream_url: station.urlResolved,
+        genre: genre || undefined,
+      };
+    }
     toastStore.show(i18n.t("radio.customStationUpdated", { name: station.name }), "success");
     return station;
+  }
+
+  /** Opens the global radio station modal in `+layout.svelte` for `station`. */
+  openStationEditor(station: RadioDirectoryStation, onSaved?: () => void): void {
+    this.editingStation = station;
+    this.editingStationOnSaved = onSaved;
+  }
+
+  /** Closes the global radio station modal and clears any pending save callback. */
+  closeStationEditor(): void {
+    this.editingStation = null;
+    this.editingStationOnSaved = undefined;
+  }
+
+  /**
+   * Resolves a station by UUID from in-memory lists or the backend store and opens
+   * the global station modal, showing an error toast if the station no longer exists.
+   */
+  async openStationEditorByUuid(stationuuid: string, onSaved?: () => void): Promise<void> {
+    const existing =
+      this.savedStations.find((s) => s.stationuuid === stationuuid) ??
+      this.recentStations.find((s) => s.stationuuid === stationuuid) ??
+      this.discoverStations.find((s) => s.stationuuid === stationuuid) ??
+      this.globalSearchStations.find((s) => s.stationuuid === stationuuid);
+    if (existing) {
+      this.openStationEditor(existing, onSaved);
+      return;
+    }
+    try {
+      const fetched = await invoke<RadioDirectoryStation | null>("get_radio_directory_station", {
+        stationuuid,
+      });
+      if (fetched) {
+        this.openStationEditor(fetched, onSaved);
+      } else {
+        toastStore.show(i18n.t("radio.stationNotFound"), "error");
+      }
+    } catch (e) {
+      toastStore.show(e instanceof Error ? e.message : String(e), "error");
+    }
+  }
+
+  /** Probes a station stream or playlist URL without buffering the audio stream. */
+  async testStationUrl(url: string): Promise<RadioConnectionTestResult> {
+    return await invoke<RadioConnectionTestResult>("test_radio_station_url", { url });
   }
 
   async importCustomStations(filePath: string): Promise<RadioDirectoryStation[]> {

@@ -1957,6 +1957,126 @@ pub async fn resolve_station_url_with_client(
     anyhow::bail!("No stream URL found in playlist")
 }
 
+/// Result of probing a radio station's stream or playlist URL (#2393).
+#[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RadioConnectionTestResult {
+    pub ok: bool,
+    pub status: Option<u16>,
+    pub resolved_url: String,
+    pub content_type: Option<String>,
+    pub bitrate: Option<u32>,
+    pub station_name: Option<String>,
+    pub error: Option<String>,
+}
+
+impl RadioConnectionTestResult {
+    fn failure(resolved_url: String, station_name: Option<String>, error: String) -> Self {
+        Self {
+            ok: false,
+            status: None,
+            resolved_url,
+            content_type: None,
+            bitrate: None,
+            station_name,
+            error: Some(error),
+        }
+    }
+}
+
+/// Resolves a station URL (including `.pls`/`.m3u`/`.m3u8` playlists) and probes
+/// the resulting stream with a short-timeout `GET`, reading only status and
+/// headers without buffering the audio stream (#2393).
+pub async fn test_station_url(raw_url: &str) -> RadioConnectionTestResult {
+    let client = match reqwest::Client::builder()
+        .user_agent(RADIO_BROWSER_USER_AGENT)
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            return RadioConnectionTestResult::failure(
+                raw_url.trim().to_string(),
+                None,
+                e.to_string(),
+            );
+        }
+    };
+    test_station_url_with_client(&client, raw_url).await
+}
+
+/// Testable implementation of [`test_station_url`] using a caller-supplied client.
+pub async fn test_station_url_with_client(
+    client: &reqwest::Client,
+    raw_url: &str,
+) -> RadioConnectionTestResult {
+    let trimmed = raw_url.trim().to_string();
+    let resolved = match resolve_station_url_with_client(client, &trimmed).await {
+        Ok(r) => r,
+        Err(e) => {
+            return RadioConnectionTestResult::failure(trimmed, None, e.to_string());
+        }
+    };
+
+    let resp = match client
+        .get(&resolved.stream_url)
+        .header("Icy-MetaData", "1")
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            return RadioConnectionTestResult::failure(
+                resolved.stream_url,
+                resolved.title,
+                e.to_string(),
+            );
+        }
+    };
+
+    let status = resp.status().as_u16();
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.split(';').next().unwrap_or(s).trim().to_string())
+        .filter(|s| !s.is_empty());
+    let bitrate = resp
+        .headers()
+        .get("icy-br")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.trim().parse::<u32>().ok());
+    let station_name = resp
+        .headers()
+        .get("icy-name")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .or(resolved.title);
+
+    let is_html = content_type
+        .as_deref()
+        .is_some_and(|ct| ct.eq_ignore_ascii_case("text/html"));
+    let ok = resp.status().is_success() && !is_html;
+    let error = if !resp.status().is_success() {
+        Some(format!("Server returned HTTP {status}"))
+    } else if is_html {
+        Some("URL returned an HTML page instead of an audio stream".to_string())
+    } else {
+        None
+    };
+
+    RadioConnectionTestResult {
+        ok,
+        status: Some(status),
+        resolved_url: resolved.stream_url,
+        content_type,
+        bitrate,
+        station_name,
+        error,
+    }
+}
+
 /// Exports all saved stations (`radio_saved`) to `export_path` in M3U, M3U8, or
 /// PLS format (#2009).
 pub fn export_saved_stations<P: AsRef<std::path::Path>>(
@@ -3349,6 +3469,94 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.to_string().contains("Content-Type"));
+    }
+
+    #[tokio::test]
+    async fn test_station_url_reports_stream_headers_and_rejects_errors() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/live.mp3"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "audio/mpeg")
+                    .insert_header("icy-br", "128")
+                    .insert_header("icy-name", "Test FM"),
+            )
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/listen.pls"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(
+                    format!(
+                        "[playlist]\nNumberOfEntries=1\nFile1={}/live.mp3\n",
+                        server.uri()
+                    )
+                    .into_bytes(),
+                    "audio/x-scpls",
+                ),
+            )
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/missing"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/page"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(b"<html>hi</html>".to_vec(), "text/html"),
+            )
+            .mount(&server)
+            .await;
+
+        let client = reqwest::Client::new();
+
+        let ok_res =
+            test_station_url_with_client(&client, &format!("{}/listen.pls", server.uri())).await;
+        assert!(ok_res.ok);
+        assert_eq!(ok_res.status, Some(200));
+        assert_eq!(ok_res.resolved_url, format!("{}/live.mp3", server.uri()));
+        assert_eq!(ok_res.content_type.as_deref(), Some("audio/mpeg"));
+        assert_eq!(ok_res.bitrate, Some(128));
+        assert_eq!(ok_res.station_name.as_deref(), Some("Test FM"));
+        assert_eq!(ok_res.error, None);
+
+        let err_404 =
+            test_station_url_with_client(&client, &format!("{}/missing", server.uri())).await;
+        assert!(!err_404.ok);
+        assert_eq!(err_404.status, Some(404));
+        assert_eq!(err_404.error.as_deref(), Some("Server returned HTTP 404"));
+
+        let err_html =
+            test_station_url_with_client(&client, &format!("{}/page", server.uri())).await;
+        assert!(!err_html.ok);
+        assert!(err_html.error.unwrap().contains("HTML"));
+    }
+
+    #[test]
+    fn find_station_returns_custom_station_from_songs() {
+        let (_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        let added = add_custom_station(
+            &conn,
+            "SomaFM Indie Pop",
+            "https://ice1.somafm.com/indiepop-128-mp3",
+            "indie, pop",
+        )
+        .unwrap();
+
+        let found = find_station(&conn, &added.stationuuid).unwrap().unwrap();
+        assert_eq!(found.stationuuid, added.stationuuid);
+        assert_eq!(found.name, "SomaFM Indie Pop");
+        assert_eq!(
+            found.url_resolved,
+            "https://ice1.somafm.com/indiepop-128-mp3"
+        );
     }
 
     #[test]

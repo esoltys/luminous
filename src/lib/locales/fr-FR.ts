@@ -3297,6 +3297,14 @@ export const frFR: DeepStringRecord<typeof en> = {
     editStationTitle: "Modifier la station personnalisée",
     savingStation: "Enregistrement…",
     customStationUpdated: "{name} mise à jour",
+    stationDetailsTitle: "Station de radio",
+    directoryStationReadOnlyNote:
+      "Les stations de l'annuaire sont synchronisées depuis Radio Browser et ne peuvent pas être modifiées localement.",
+    stationNotFound: "Station de radio introuvable",
+    testConnection: "Tester la connexion",
+    testingConnection: "Test en cours…",
+    connectionOk: "Connecté",
+    connectionFailed: "Échec de la connexion",
     customStationsImported: {
       one: "{count} station importée",
       other: "{count} stations importées",

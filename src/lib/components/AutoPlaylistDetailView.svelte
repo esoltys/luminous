@@ -601,8 +601,8 @@
     }
   }
 
-  function openTagEditor(songId: number) {
-    tagEditorStore.open(songId, { onSaved: handleTagEditorSaved });
+  function openTagEditor(song: { id: number; path?: string | null }) {
+    tagEditorStore.open(song, { onSaved: handleTagEditorSaved });
   }
 
   function handleTagEditorSaved() {
@@ -953,7 +953,7 @@
         onRowContextMenu={handleRowContextMenu}
         onRate={rateSong}
         onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
-        onEditTags={(song) => openTagEditor(song.id)}
+        onEditTags={(song) => openTagEditor(song)}
         onEditAlbum={openAlbumEditor}
       />
     </div>
@@ -1012,7 +1012,7 @@
     }}
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
-    onEditTags={() => openTagEditor(song.id)}
+    onEditTags={() => openTagEditor(song)}
     onEditBatchTags={() => {
       batchEditSongs = selectedSongs ?? null;
     }}

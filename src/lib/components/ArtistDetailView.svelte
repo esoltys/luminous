@@ -205,8 +205,8 @@
     await playlistsStore.addSongsToActiveTarget(songIds, label);
   }
 
-  function openTagEditor(songId: number) {
-    tagEditorStore.open(songId, { onSaved: () => handleTagEditorSaved(songId) });
+  function openTagEditor(song: { id: number; path?: string | null }) {
+    tagEditorStore.open(song, { onSaved: () => handleTagEditorSaved(song.id) });
   }
 
   async function refetchSongs() {
@@ -953,7 +953,7 @@
             onRowContextMenu={handleRowContextMenu}
             onRate={rateSingle}
             onAddToPlaylist={(song) => handleAddSingleToPlaylist(song.id)}
-            onEditTags={(song) => openTagEditor(song.id)}
+            onEditTags={(song) => openTagEditor(song)}
           />
         </div>
       </div>
@@ -1105,7 +1105,7 @@
         handleAddSingleToPlaylist(song.id);
       }
     }}
-    onEditTags={() => openTagEditor(song.id)}
+    onEditTags={() => openTagEditor(song)}
     onEditBatchTags={() => {
       batchEditSongs = selectedSongs ?? null;
     }}
