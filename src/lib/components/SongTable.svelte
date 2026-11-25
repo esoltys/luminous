@@ -666,7 +666,7 @@
   {:else if col.key === "title"}
     <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
       <CoverArt
-        songId={song.id}
+        songId={isLiveSong(song) ? undefined : song.id}
         artEmbedded={song.art_embedded}
         artAutomatic={song.art_automatic}
         artManual={song.art_manual}

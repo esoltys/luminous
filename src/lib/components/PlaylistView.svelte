@@ -487,9 +487,13 @@
     playerStore.playPlaylistItemByUuid(activePlaylist.id, item.uuid);
   }
 
-  /** Returns true if the item's song is missing from disk or has no song data. */
+  /** Returns true if the item's song is missing from disk or has no song data.
+   * Live radio streams are not files on disk — a past stream hiccup must not
+   * strike them out or block playback in a station playlist. */
   function isItemUnavailable(item: PlaylistItem): boolean {
-    return !item.song || item.song.unavailable === true;
+    if (!item.song) return true;
+    if (isLiveSong(item.song)) return false;
+    return item.song.unavailable === true;
   }
 
   /** Remove all playlist items whose song is unavailable. */

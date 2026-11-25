@@ -2087,19 +2087,21 @@ impl CoverManager {
     /// `original` reads folder art in place (`local/`); otherwise it is served
     /// as a cached thumbnail (`thumb/`).
     fn cover_art_uri(&self, song_id: i64, original: bool) -> Result<Option<String>> {
-        let conn = self.db.pool.get()?;
-        let (_art_embedded, art_automatic, art_manual, art_unset) = conn.query_row(
-            "SELECT art_embedded, art_automatic, art_manual, art_unset FROM songs WHERE id = ?1",
-            params![song_id],
-            |row| {
-                Ok((
-                    row.get::<_, bool>(0)?,
-                    row.get::<_, Option<String>>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                    row.get::<_, bool>(3)?,
-                ))
-            },
-        )?;
+        let (_art_embedded, art_automatic, art_manual, art_unset) = {
+            let conn = self.db.pool.get()?;
+            conn.query_row(
+                "SELECT art_embedded, art_automatic, art_manual, art_unset FROM songs WHERE id = ?1",
+                params![song_id],
+                |row| {
+                    Ok((
+                        row.get::<_, bool>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, bool>(3)?,
+                    ))
+                },
+            )?
+        };
 
         if art_unset {
             // No embedded, folder or iTunes cover: fall back to fanart.tv's.

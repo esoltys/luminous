@@ -1153,6 +1153,17 @@ impl Player {
     /// confirms a track actually started playing.
     pub fn reset_playback_errors(&mut self) {
         self.consecutive_playback_errors = 0;
+        if let Some(song) = &mut self.current_song {
+            if song.unavailable {
+                if let Ok(conn) = self.db.pool.get() {
+                    let _ = conn.execute(
+                        "UPDATE songs SET unavailable = 0 WHERE id = ?1 AND unavailable = 1",
+                        rusqlite::params![song.id],
+                    );
+                }
+                song.unavailable = false;
+            }
+        }
     }
 
     pub async fn stop(&mut self) -> Result<()> {
