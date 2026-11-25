@@ -175,6 +175,26 @@ describe("contextStore", () => {
     ]);
   });
 
+  it("resolves album profiles stored under composite album_key in albumProfiles", async () => {
+    const compositeKey = "chris stapleton\u001fhigher";
+    collectionStore.albumProfiles = {
+      [compositeKey]: {
+        album_key: compositeKey,
+        description: "Fifth studio album",
+        links: [{ platform: "allmusic", handle_or_url: "https://www.allmusic.com/album/mw0001" }],
+      },
+    } as never;
+    const view = await mount(() =>
+      entitySubject("album", "Higher", [song(1, { album: "Higher", artist: "Chris Stapleton" })]),
+    );
+    const bio = view.sections.find((s) => s.id === "bio");
+    const links = view.sections.find((s) => s.id === "links");
+    expect(bio && bio.id === "bio" ? bio.text : null).toBe("Fifth studio album");
+    expect(links && links.id === "links" ? links.items.map((i) => i.label) : []).toEqual([
+      "AllMusic",
+    ]);
+  });
+
   it("hides CritiqueBrainz for an artist but exposes the rating for an album", async () => {
     context = ctx({ critiquebrainz_rating: 4.2, critiquebrainz_review_count: 7 });
     const withRg = song(1, { musicbrainz_release_group_id: MBID });

@@ -1203,9 +1203,22 @@ class CollectionStore {
     }
   }
 
-  getAlbumProfile(albumName: string | null | undefined): AlbumProfile | undefined {
+  getAlbumProfile(
+    albumName: string | null | undefined,
+    albumKeyParam?: string | null,
+  ): AlbumProfile | undefined {
+    if (albumKeyParam) {
+      const exact = this.albumProfiles[albumKey(albumKeyParam)];
+      if (exact) return exact;
+    }
     if (!albumName) return undefined;
-    return this.albumProfiles[albumKey(albumName)];
+    const folded = albumKey(albumName);
+    const direct = this.albumProfiles[folded];
+    if (direct) return direct;
+    if (folded.includes("\u{1f}")) return undefined;
+    const suffix = `\u{1f}${folded}`;
+    const matchedKey = Object.keys(this.albumProfiles).find((k) => k.endsWith(suffix));
+    return matchedKey ? this.albumProfiles[matchedKey] : undefined;
   }
 
   async saveAlbumProfile(profile: AlbumProfile): Promise<AlbumProfile> {

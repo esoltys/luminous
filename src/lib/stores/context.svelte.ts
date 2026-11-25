@@ -9,6 +9,7 @@ import {
 } from "../types";
 import { collectionStore } from "./collection.svelte";
 import { i18n } from "./i18n.svelte";
+import { albumKey } from "../utils/albumKey";
 import { prefs } from "./prefs.svelte";
 import {
   deriveFanartTvUrlFromMbid,
@@ -244,8 +245,18 @@ export class ContextView {
         : collectionStore.getArtistProfile(
             subject.kind === "artist" ? subject.name : subject.song.artist,
           );
+    const albumKeyHint =
+      subject.kind === "album"
+        ? albumKey(
+            subject.name,
+            subject.song.album_artist || subject.song.artist,
+            subject.song.compilation,
+          )
+        : undefined;
     const albumProfile: AlbumProfile | undefined =
-      subject.kind === "album" ? collectionStore.getAlbumProfile(subject.name) : undefined;
+      subject.kind === "album"
+        ? collectionStore.getAlbumProfile(subject.name, albumKeyHint)
+        : undefined;
 
     if (isStation) {
       const country = ctx?.station_country?.trim() || subject.song.artist?.trim() || "";

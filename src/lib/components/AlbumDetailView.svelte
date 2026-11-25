@@ -318,7 +318,7 @@
       }),
     ]);
   });
-  let albumProfile = $derived(collectionStore.getAlbumProfile(albumName));
+  let albumProfile = $derived(collectionStore.getAlbumProfile(albumName, albumKey));
   let hasChips = $derived(Boolean(rawGenre?.trim()));
 
   let lastAutoFetchedAlbum = $state<string | null>(null);
