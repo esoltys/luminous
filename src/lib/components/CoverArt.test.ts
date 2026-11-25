@@ -208,7 +208,7 @@ describe("CoverArt.svelte - manual cover size (#2372)", () => {
       const { container, unmount } = render(CoverArt, {
         props: { songId: 7, artManual: "/music/folder.jpg", fullResolution },
       });
-      expect(container.querySelector("img")?.getAttribute("src")).toContain(form);
+      expect(container.querySelector("img")?.getAttribute("src")).toContain(`/${form}/`);
       unmount();
     }
   });

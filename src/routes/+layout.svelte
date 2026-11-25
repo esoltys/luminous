@@ -658,14 +658,9 @@
               {/key}
             {/if}
 
-            <!-- Center Container: Card and Details (or Immersive Visualizer Stage).
-               Each immersive view owns its own width/height constraints; this wrapper
-               only centers them within .flip-back's outer margins and dock clearance.
-               Below md, the cover-view layout would stack the text under the cover
-               art — at that point it's just clutter (the floating PlayerBar dock
-               repeats the same info), so it's hidden and the cover art stands
-               alone. At md+, where there's room to sit it beside the art instead,
-               it stays. -->
+            <!-- Center Container: the immersive cover view or visualizer stage. Each owns its
+               own width/height constraints; this wrapper only centers them within
+               .flip-back's outer margins and dock clearance. -->
             <div
               class="relative z-10 flex flex-col md:flex-row items-center gap-12 w-full h-full justify-center"
             >
