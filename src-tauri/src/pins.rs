@@ -142,14 +142,25 @@ pub fn resolve_song(conn: &Connection, ref_key: &str) -> Result<Option<Song>> {
     Ok(conn.query_row(&sql, params![song_id], row_to_song).ok())
 }
 
-/// Finds the album entry (from `get_albums()`'s output) matching `ref_key`
-/// (an album title, matched by `album_key` like `album_ratings`).
+/// Finds the album entry (from `get_albums()`'s output) matching `ref_key`.
+///
+/// When `ref_key` is a composite `album_key` (`"{artist}\u{1f}{title}"`),
+/// matches exclusively against `AlbumItem::album_key` (folded) so same-title
+/// albums by different artists remain disambiguated. Otherwise (legacy bare
+/// album titles), falls back to matching `AlbumItem::album` via `album_key`.
 pub fn find_album<'a>(albums: &'a [AlbumItem], ref_key: &str) -> Option<&'a AlbumItem> {
     let key = crate::album_key::album_key(ref_key);
+    if key.is_empty() {
+        return None;
+    }
+    let is_composite = key.contains(crate::album_key::COMPOSITE_KEY_SEPARATOR);
     albums.iter().find(|a| {
-        a.album
-            .as_deref()
-            .is_some_and(|name| crate::album_key::album_key(name) == key)
+        let candidate = if is_composite {
+            a.album_key.as_deref()
+        } else {
+            a.album.as_deref()
+        };
+        candidate.is_some_and(|value| crate::album_key::album_key(value) == key)
     })
 }
 
@@ -458,6 +469,60 @@ mod tests {
         assert!(resolve_song(&conn, &id.to_string()).unwrap().is_none());
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    fn test_album_item(artist: &str, album: &str, album_key: Option<&str>) -> AlbumItem {
+        AlbumItem {
+            artist: Some(artist.to_string()),
+            album: Some(album.to_string()),
+            album_key: album_key.map(str::to_string),
+            year: None,
+            track_count: 10,
+            disc_count: 1,
+            art_embedded: false,
+            art_automatic: None,
+            art_manual: None,
+            genre: None,
+            sample_song_id: None,
+            rating: -1.0,
+            added: None,
+            total_duration_nanosec: 0,
+            artist_sort: None,
+            albumsort: None,
+        }
+    }
+
+    #[test]
+    fn find_album_matches_composite_key_and_disambiguates_same_title() {
+        let sep = crate::album_key::COMPOSITE_KEY_SEPARATOR;
+        let kacey_key = format!("kacey musgraves{sep}golden hour");
+        let balcony_key = format!("balcony sunrise{sep}golden hour");
+        let albums = vec![
+            test_album_item("Kacey Musgraves", "Golden Hour", Some(&kacey_key)),
+            test_album_item("Balcony Sunrise", "Golden Hour", Some(&balcony_key)),
+            test_album_item("No Key Artist", "Golden Hour", None),
+        ];
+
+        // Composite ref_key matches the exact artist+title album_key.
+        let found = find_album(&albums, &balcony_key).expect("should match second album");
+        assert_eq!(found.artist.as_deref(), Some("Balcony Sunrise"));
+
+        // Case and surrounding whitespace are folded on composite keys.
+        let unfolded = format!("  Kacey Musgraves{sep}GOLDEN HOUR  ");
+        let found_folded = find_album(&albums, &unfolded).expect("should match folded key");
+        assert_eq!(found_folded.artist.as_deref(), Some("Kacey Musgraves"));
+
+        // A composite key for an artist not present returns None rather than
+        // falling back to a bare-title match on another artist's album.
+        let missing_artist = format!("someone else{sep}golden hour");
+        assert!(find_album(&albums, &missing_artist).is_none());
+
+        // Bare-title ref_key still matches AlbumItem::album (legacy pins).
+        let bare = find_album(&albums, "  golden hour ").expect("bare title should match");
+        assert_eq!(bare.artist.as_deref(), Some("Kacey Musgraves"));
+
+        // Empty/whitespace ref_key returns None.
+        assert!(find_album(&albums, "   ").is_none());
     }
 
     #[test]
