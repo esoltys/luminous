@@ -3,6 +3,8 @@
 //! Mediates between AudioEngine, PlaylistManager, and the Tauri event system.
 //! Owns the shuffle index, repeat mode, queue, and scrobble point tracking.
 
+mod order;
+
 use crate::{
     audio::AudioEngine,
     db::Database,
@@ -13,7 +15,7 @@ use crate::{
     stats,
 };
 use anyhow::{anyhow, Result};
-use rand::seq::SliceRandom;
+use order::{OrderTarget, OrderTargetKind, PlayOrder};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -39,23 +41,6 @@ pub struct PlaybackErrorOutcome {
     /// result (its file was confirmed gone at the moment of failure) — the
     /// caller should let the frontend know its cached library data is stale.
     pub flagged_unavailable: bool,
-}
-
-/// A candidate for the gapless "next track" — resolved by peeking at the
-/// playback context without mutating it.
-struct GaplessTarget {
-    song: Song,
-    uuid: Option<String>,
-    kind: GaplessTargetKind,
-}
-
-enum GaplessTargetKind {
-    /// RepeatMode::Track — the current track plays again.
-    Replay,
-    /// The item at this virtual (shuffle-order) index.
-    Index(usize),
-    /// The first playable item in the play-next queue.
-    Queue,
 }
 
 /// Whether a playback failure should flag a song `unavailable = 1` in the DB.
@@ -224,9 +209,7 @@ pub struct Player {
     /// context-aware "Recently Played".
     current_play_context: Option<PlayContext>,
 
-    // Playback mode
-    pub shuffle_mode: ShuffleMode,
-    pub repeat_mode: RepeatMode,
+    // Playback mode & order
     pub stop_after_current: bool,
     /// Auto Continue (#1235): top the Queue up with fitting library songs
     /// as it nears its end. Persisted as `auto_continue`.
@@ -243,18 +226,7 @@ pub struct Player {
     pub current_loudness_source: LoudnessGainSource,
     pub current_loudness_gain_db: Option<f32>,
 
-    // Shuffle state
-    /// The playlist items in their current order.
-    playlist_items: Vec<PlaylistItem>,
-    /// Permuted indices for shuffle playback (virtual index list).
-    shuffle_order: Vec<usize>,
-    /// Current position in `shuffle_order` (or in `playlist_items` for sequential).
-    current_index: Option<usize>,
-    /// History stack for Previous navigation in shuffle mode.
-    played_indices: Vec<usize>,
-
-    // Queue ("play next") — items prepended before normal order
-    queue: std::collections::VecDeque<PlaylistItem>,
+    pub(super) order: PlayOrder,
 
     // Scrobble tracking
     /// Position at which we trigger the scrobble (50% of track length).
@@ -463,15 +435,13 @@ impl Player {
 
         let scrobble_point_nanosec = restored_song.as_ref().and_then(Self::scrobble_point_for);
 
-        let mut player = Self {
+        let player = Self {
             _db: db,
             audio,
             current_song: restored_song.clone(),
             current_playlist_id: restored_playlist_id,
             current_item_uuid: restored_item_uuid,
             current_play_context: None,
-            shuffle_mode,
-            repeat_mode,
             stop_after_current: false,
             auto_continue,
             volume,
@@ -479,11 +449,7 @@ impl Player {
             playback_speed,
             current_loudness_source: loudness_source,
             current_loudness_gain_db: loudness_gain_db,
-            playlist_items,
-            shuffle_order: Vec::new(),
-            current_index,
-            played_indices: Vec::new(),
-            queue: std::collections::VecDeque::new(),
+            order: PlayOrder::new(playlist_items, current_index, shuffle_mode, repeat_mode),
             scrobble_point_nanosec,
             scrobbled: false,
             scrobbler: None,
@@ -492,8 +458,6 @@ impl Player {
             consecutive_playback_errors: 0,
             remote_streaming_active: None,
         };
-
-        player.rebuild_shuffle_order();
 
         if let Some(song) = restored_song {
             if let Ok(engine) = player.audio.try_lock() {
@@ -532,8 +496,7 @@ impl Player {
 
     /// Whether the player currently has the specified item loaded in its active playlist.
     pub fn has_playlist_item(&self, playlist_id: i64, uuid: &str) -> bool {
-        self.current_playlist_id == Some(playlist_id)
-            && self.playlist_items.iter().any(|i| i.uuid == uuid)
+        self.current_playlist_id == Some(playlist_id) && self.order.contains_uuid(uuid)
     }
 
     /// Attach the scrobbler service manager to receive scrobble notifications.
@@ -557,7 +520,6 @@ impl Player {
         playlist_id: i64,
         context: Option<PlayContext>,
     ) -> Result<()> {
-        self.playlist_items = items;
         self.current_playlist_id = Some(playlist_id);
         self.current_play_context = context.or_else(|| {
             if playlist_id > 0 && !self.is_queue_playlist(playlist_id) {
@@ -566,28 +528,11 @@ impl Player {
                 None
             }
         });
-        self.played_indices.clear();
-        self.queue.clear();
         self.scrobbled = false;
-        self.current_index = if start_index < self.playlist_items.len() {
-            Some(start_index)
-        } else {
-            None
-        };
-        self.shuffle_order.clear();
+
+        let play_index = self.order.load(items, Some(start_index)).unwrap_or(0);
 
         self.persist_adhoc_queue();
-
-        self.rebuild_shuffle_order();
-
-        let play_index = if self.shuffle_mode != ShuffleMode::Off {
-            self.shuffle_order
-                .iter()
-                .position(|&i| i == start_index)
-                .unwrap_or(0)
-        } else {
-            start_index
-        };
 
         self.play_at_index(play_index).await
     }
@@ -600,70 +545,40 @@ impl Player {
         fresh_items: Option<Vec<PlaylistItem>>,
     ) -> Result<()> {
         let is_same_playlist = self.current_playlist_id == Some(playlist_id);
-        let has_uuid = is_same_playlist && self.playlist_items.iter().any(|i| i.uuid == uuid);
+        let has_uuid = is_same_playlist && self.order.contains_uuid(uuid);
 
         if !has_uuid {
             let items = fresh_items.ok_or_else(|| {
                 anyhow!("Playlist items needed to switch to playlist {playlist_id}")
             })?;
-            self.playlist_items = items;
             self.current_playlist_id = Some(playlist_id);
             self.current_play_context = if playlist_id > 0 && !self.is_queue_playlist(playlist_id) {
                 Some(PlayContext::Playlist { playlist_id })
             } else {
                 self.current_play_context.clone()
             };
-            self.played_indices.clear();
-            self.queue.clear();
             self.scrobbled = false;
-            self.current_index = None;
-            self.shuffle_order.clear();
+            self.order.load(items, None);
             self.persist_adhoc_queue();
-            self.rebuild_shuffle_order();
         }
 
-        let real_idx = self
-            .playlist_items
-            .iter()
-            .position(|i| i.uuid == uuid)
+        let play_index = self
+            .order
+            .virtual_index_for_uuid(uuid)
             .ok_or_else(|| anyhow!("Playlist item with uuid '{uuid}' not found"))?;
-
-        let play_index = if self.shuffle_mode != ShuffleMode::Off {
-            self.shuffle_order
-                .iter()
-                .position(|&i| i == real_idx)
-                .unwrap_or(0)
-        } else {
-            real_idx
-        };
 
         self.play_at_index(play_index).await
     }
 
-    /// Append songs directly to the in-memory `playlist_items` so the player
+    /// Append songs directly to the in-memory `PlayOrder` so the player
     /// can continue playing them seamlessly.  Called by Auto Continue (#1235,
     /// `continue_mix::extend`) after it has already persisted the new items
     /// to the DB.
     pub fn append_songs_to_playlist_items(&mut self, items: Vec<PlaylistItem>) {
-        self.playlist_items.extend(items);
-        // Keep the shuffle order in sync (append new indices at the end
-        // in sequential order; they'll be reached naturally)
-        let new_start = if self.shuffle_mode != ShuffleMode::Off {
-            self.shuffle_order.len()
-        } else {
-            0 // irrelevant in non-shuffle, order == position
-        };
-        let new_len = self.playlist_items.len();
-        let existing_ordered: std::collections::HashSet<usize> =
-            self.shuffle_order.iter().copied().collect();
-        for i in new_start..new_len {
-            if !existing_ordered.contains(&i) {
-                self.shuffle_order.push(i);
-            }
-        }
+        self.order.append(items);
     }
 
-    /// Remove items from the in-memory `playlist_items` by uuid, so the live
+    /// Remove items from the in-memory `PlayOrder` by uuid, so the live
     /// player stops treating them as up-next after they're deleted from the
     /// backing DB playlist (mirrors `append_songs_to_playlist_items` for the
     /// removal direction — see #262). The currently-playing item is never
@@ -671,109 +586,15 @@ impl Player {
     /// was removed, since yanking it out from under an in-flight decode
     /// would require a mid-playback jump this method doesn't attempt.
     pub fn remove_songs_from_playlist_items(&mut self, uuids: &[String]) {
-        if self.playlist_items.is_empty() {
-            return;
-        }
-
-        let uuid_set: std::collections::HashSet<&str> = uuids.iter().map(String::as_str).collect();
-        let current_uuid = self.current_item_uuid.clone();
-        let old_uuids: Vec<String> = self.playlist_items.iter().map(|i| i.uuid.clone()).collect();
-
-        self.playlist_items.retain(|item| {
-            !uuid_set.contains(item.uuid.as_str())
-                || current_uuid.as_deref() == Some(item.uuid.as_str())
-        });
-
-        let uuid_to_new_idx: std::collections::HashMap<&str, usize> = self
-            .playlist_items
-            .iter()
-            .enumerate()
-            .map(|(idx, item)| (item.uuid.as_str(), idx))
-            .collect();
-
-        let new_real_idx = current_uuid
-            .as_ref()
-            .and_then(|u| uuid_to_new_idx.get(u.as_str()).copied());
-
-        self.played_indices.clear();
-
-        if self.shuffle_mode == ShuffleMode::Off {
-            self.current_index = new_real_idx;
-            self.shuffle_order = (0..self.playlist_items.len()).collect();
-        } else {
-            let mut new_shuffle_order = Vec::with_capacity(self.playlist_items.len());
-            for &old_real_idx in &self.shuffle_order {
-                if let Some(old_uuid) = old_uuids.get(old_real_idx) {
-                    if let Some(&new_idx) = uuid_to_new_idx.get(old_uuid.as_str()) {
-                        new_shuffle_order.push(new_idx);
-                    }
-                }
-            }
-            let mut seen = std::collections::HashSet::new();
-            for &idx in &new_shuffle_order {
-                seen.insert(idx);
-            }
-            for i in 0..self.playlist_items.len() {
-                if !seen.contains(&i) {
-                    new_shuffle_order.push(i);
-                }
-            }
-            self.shuffle_order = new_shuffle_order;
-            self.current_index = new_real_idx
-                .and_then(|real_idx| self.shuffle_order.iter().position(|&idx| idx == real_idx));
-        }
-
-        if let Some(idx) = self.current_index {
-            self.played_indices.push(idx);
-        }
+        self.order
+            .remove_by_uuids(uuids, self.current_item_uuid.as_deref());
     }
 
-    /// Reorder items in the in-memory `playlist_items` so the live player
+    /// Reorder items in the in-memory `PlayOrder` so the live player
     /// respects track reordering performed in the Queue UI.
     pub fn reorder_playlist_items(&mut self, from: usize, to: usize) {
-        if from >= self.playlist_items.len() || to >= self.playlist_items.len() || from == to {
-            return;
-        }
-
-        let moved = self.playlist_items.remove(from);
-        self.playlist_items.insert(to, moved);
-
-        // Update current_index if the playing track was affected by reordering
-        let current_uuid = self.current_item_uuid.clone();
-        let new_real_idx = current_uuid
-            .as_ref()
-            .and_then(|u| self.playlist_items.iter().position(|i| &i.uuid == u));
-
-        // Where the item previously at real index `i` ends up (`remap` in
-        // verification/lean/Luminous/Move.lean).
-        let moved = |i: usize| {
-            if i == from {
-                to
-            } else if from < to && i > from && i <= to {
-                i - 1
-            } else if from > to && i >= to && i < from {
-                i + 1
-            } else {
-                i
-            }
-        };
-
-        if self.shuffle_mode == ShuffleMode::Off {
-            self.current_index = new_real_idx;
-            self.shuffle_order = (0..self.playlist_items.len()).collect();
-            // Virtual == real here, so history entries move with their items.
-            for idx in &mut self.played_indices {
-                *idx = moved(*idx);
-            }
-        } else {
-            // Positions in the play order stay put (so `played_indices` needs
-            // no change); only the real indices they hold move.
-            for idx in &mut self.shuffle_order {
-                *idx = moved(*idx);
-            }
-            self.current_index = new_real_idx
-                .and_then(|real_idx| self.shuffle_order.iter().position(|&i| i == real_idx));
-        }
+        self.order
+            .reorder(from, to, self.current_item_uuid.as_deref());
     }
 
     /// Rearranges the loaded playlist items into `order` (item uuids) after
@@ -783,81 +604,18 @@ impl Player {
     /// its play-order slots (shuffle on). Items missing from `order` keep
     /// their relative order after the listed ones; unknown uuids are ignored.
     pub fn apply_playlist_order(&mut self, order: &[String]) {
-        let rank: std::collections::HashMap<&str, usize> = order
-            .iter()
-            .enumerate()
-            .map(|(i, u)| (u.as_str(), i))
-            .collect();
-        let mut old_indices: Vec<usize> = (0..self.playlist_items.len()).collect();
-        old_indices.sort_by_key(|&i| {
-            rank.get(self.playlist_items[i].uuid.as_str())
-                .copied()
-                .unwrap_or(usize::MAX)
-        });
-        if old_indices.iter().enumerate().all(|(new, &old)| new == old) {
-            return;
-        }
-        // new_index_of[old real index] = its real index after the rearrange.
-        let mut new_index_of = vec![0; old_indices.len()];
-        for (new, &old) in old_indices.iter().enumerate() {
-            new_index_of[old] = new;
-        }
-        let mut items: Vec<Option<PlaylistItem>> = std::mem::take(&mut self.playlist_items)
-            .into_iter()
-            .map(Some)
-            .collect();
-        self.playlist_items = old_indices
-            .iter()
-            .filter_map(|&old| items[old].take())
-            .collect();
-
-        let new_real_idx = self
-            .current_item_uuid
-            .as_ref()
-            .and_then(|u| self.playlist_items.iter().position(|i| &i.uuid == u));
-        if self.shuffle_mode == ShuffleMode::Off {
-            self.current_index = new_real_idx;
-            self.shuffle_order = (0..self.playlist_items.len()).collect();
-            for idx in &mut self.played_indices {
-                if let Some(&new) = new_index_of.get(*idx) {
-                    *idx = new;
-                }
-            }
-        } else {
-            for idx in &mut self.shuffle_order {
-                if let Some(&new) = new_index_of.get(*idx) {
-                    *idx = new;
-                }
-            }
-            self.current_index = new_real_idx
-                .and_then(|real_idx| self.shuffle_order.iter().position(|&i| i == real_idx));
-        }
+        self.order
+            .apply_order(order, self.current_item_uuid.as_deref());
     }
 
     /// Clear all in-memory playlist items and queue state when the Queue is cleared.
     pub fn clear_playlist_items(&mut self) {
-        self.playlist_items.clear();
-        self.shuffle_order.clear();
-        self.queue.clear();
-        self.current_index = None;
-        self.played_indices.clear();
+        self.order.clear();
     }
 
     /// Number of playlist items that have not yet been played (ahead of current index).
     pub fn remaining_playlist_items(&self) -> usize {
-        let total = self.playlist_items.len();
-        match self.current_index {
-            Some(idx) => total.saturating_sub(idx + 1),
-            None => total,
-        }
-    }
-
-    /// Returns true if the playlist item has a playable (present + available) song.
-    fn is_item_playable(item: &PlaylistItem) -> bool {
-        match &item.song {
-            Some(song) => !song.unavailable,
-            None => false, // legacy ghost row (song_id = NULL)
-        }
+        self.order.remaining_count()
     }
 
     /// Half-track scrobble threshold in nanoseconds, or `None` when the track
@@ -877,11 +635,36 @@ impl Player {
         self.station_now_playing = None;
     }
 
+    fn resolve_order_target(
+        &self,
+        target: OrderTarget,
+    ) -> Result<(Song, Option<String>, OrderTargetKind)> {
+        match target {
+            OrderTarget::Replay => {
+                let song = self
+                    .current_song
+                    .clone()
+                    .ok_or_else(|| anyhow!("no current song to replay"))?;
+                Ok((
+                    song,
+                    self.current_item_uuid.clone(),
+                    OrderTargetKind::Replay,
+                ))
+            }
+            OrderTarget::Index {
+                virtual_index,
+                song,
+                uuid,
+            } => Ok((song, uuid, OrderTargetKind::Index(virtual_index))),
+            OrderTarget::Queue { song, uuid } => Ok((song, uuid, OrderTargetKind::Queue)),
+        }
+    }
+
     /// The single "start a track" sequence shared by `play_at_index`,
-    /// `next_track`'s queue branch, and `on_gapless_transition`'s commit —
+    /// `next_track`, and `on_gapless_transition`'s commit —
     /// scrobble point, current song/uuid/(index or queue-pop), loudness
     /// gain, waveform preload, and restart persistence. `kind` mirrors
-    /// `peek_next_natural`'s already-decided target (#1072); `real_play`
+    /// `PlayOrder::peek_next_natural`'s already-decided target (#1072); `real_play`
     /// issues an actual `AudioEngine::play` call, skipped for gapless
     /// commits where the audio is already playing (position is persisted as
     /// 0 in that case, matching a track that just started).
@@ -889,7 +672,7 @@ impl Player {
         &mut self,
         song: Song,
         uuid: Option<String>,
-        kind: GaplessTargetKind,
+        kind: OrderTargetKind,
         real_play: bool,
     ) -> Result<()> {
         let start_ns = song.beginning_nanosec.max(0) as u64;
@@ -898,27 +681,10 @@ impl Player {
         self.scrobble_point_nanosec = Self::scrobble_point_for(&song);
         self.reset_track_ephemeral_state();
 
+        self.order.commit(kind);
         match kind {
-            GaplessTargetKind::Replay => {
-                // current_song/uuid/index are already correct.
-            }
-            GaplessTargetKind::Index(candidate) => {
-                self.current_song = Some(song.clone());
-                self.current_item_uuid = uuid;
-                self.current_index = Some(candidate);
-                if !self.played_indices.contains(&candidate) {
-                    self.played_indices.push(candidate);
-                }
-            }
-            GaplessTargetKind::Queue => {
-                // Drop unplayable fronts, then the item that's starting.
-                while let Some(front) = self.queue.front() {
-                    if Self::is_item_playable(front) {
-                        break;
-                    }
-                    self.queue.pop_front();
-                }
-                self.queue.pop_front();
+            OrderTargetKind::Replay => {}
+            OrderTargetKind::Index(_) | OrderTargetKind::Queue => {
                 self.current_song = Some(song.clone());
                 self.current_item_uuid = uuid;
             }
@@ -952,28 +718,12 @@ impl Player {
     /// Play the item at the given index (in virtual/shuffle order).
     /// If the item is unavailable, auto-advances to the next playable track.
     async fn play_at_index(&mut self, index: usize) -> Result<()> {
-        let Some(candidate) = self.find_playable_from(index) else {
+        let Some(target) = self.order.resolve_playable_target(index) else {
             log::warn!("Entire playlist contains only unavailable tracks — stopping.");
             return self.stop().await;
         };
-
-        let item_index = self
-            .resolve_item_index(candidate)
-            .ok_or(anyhow!("index out of bounds"))?;
-
-        let item = self
-            .playlist_items
-            .get(item_index)
-            .ok_or(anyhow!("playlist item not found"))?;
-
-        let song = item
-            .song
-            .clone()
-            .ok_or(anyhow!("playlist item has no song"))?;
-        let uuid = Some(item.uuid.clone());
-
-        self.start_track(song, uuid, GaplessTargetKind::Index(candidate), true)
-            .await
+        let (song, uuid, kind) = self.resolve_order_target(target)?;
+        self.start_track(song, uuid, kind, true).await
     }
 
     /// Proactively pre-generates waveform visualizer data for the current song
@@ -986,8 +736,11 @@ impl Player {
         let db = Arc::clone(&self._db);
         let mut songs_to_preload = Vec::new();
 
-        let next_song = self.peek_next_natural().map(|t| t.song);
-        for song in [self.current_song.as_ref(), next_song.as_ref()]
+        let next_target = self.order.peek_next_natural(self.stop_after_current);
+        let next_song = next_target
+            .as_ref()
+            .and_then(|t| t.song(self.current_song.as_ref()));
+        for song in [self.current_song.as_ref(), next_song]
             .into_iter()
             .flatten()
         {
@@ -1022,7 +775,8 @@ impl Player {
         if let Ok(conn) = self._db.pool.get() {
             if self.current_playlist_id == Some(0) {
                 let song_ids: Vec<i64> = self
-                    .playlist_items
+                    .order
+                    .items()
                     .iter()
                     .filter_map(|i| i.song.as_ref().map(|s| s.id))
                     .collect();
@@ -1196,20 +950,8 @@ impl Player {
                 song.is_instrumental = is_instrumental;
             }
         }
-        for item in &mut self.playlist_items {
-            if let Some(ref mut song) = item.song {
-                if song.id == song_id {
-                    song.is_instrumental = is_instrumental;
-                }
-            }
-        }
-        for item in &mut self.queue {
-            if let Some(ref mut song) = item.song {
-                if song.id == song_id {
-                    song.is_instrumental = is_instrumental;
-                }
-            }
-        }
+        self.order
+            .update_song_instrumental(song_id, is_instrumental);
     }
 
     /// How long pause/resume/stop transitions should fade, in ms (0 when
@@ -1351,14 +1093,14 @@ impl Player {
             song.path = Some(healed_str.clone());
         }
         if let Some(uuid) = self.current_item_uuid.clone() {
-            if let Some(item) = self.playlist_items.iter_mut().find(|i| i.uuid == uuid) {
+            if let Some(item) = self.order.items_mut().iter_mut().find(|i| i.uuid == uuid) {
                 if let Some(song) = item.song.as_mut() {
                     song.path = Some(healed_str.clone());
                 }
             }
         }
 
-        if let Some(idx) = self.current_index {
+        if let Some(idx) = self.order.current_index() {
             let _ = self.play_at_index(idx).await;
         }
         true
@@ -1502,212 +1244,25 @@ impl Player {
 
     /// Advance playback: first drains any "play next" `queue` entries
     /// (skipping ones that became unplayable), and only once that's empty
-    /// falls back to the normal shuffle/repeat-aware playlist advance. This
-    /// `queue` is the ad-hoc "play next" list, unrelated to the persistent
-    /// Queue *playlist* (`is_queue_playlist`).
+    /// falls back to the normal shuffle/repeat-aware playlist advance.
     pub async fn next_track(&mut self) -> Result<()> {
-        while let Some(front) = self.queue.front() {
-            if Self::is_item_playable(front) {
-                break;
+        match self.order.next_manual() {
+            Some(target) => {
+                let (song, uuid, kind) = self.resolve_order_target(target)?;
+                self.start_track(song, uuid, kind, true).await
             }
-            log::debug!("Skipping unavailable queued item");
-            self.queue.pop_front();
-        }
-
-        if let Some(queued) = self.queue.front() {
-            let song = queued
-                .song
-                .clone()
-                .ok_or(anyhow!("queued item has no song"))?;
-            let uuid = Some(queued.uuid.clone());
-            return self
-                .start_track(song, uuid, GaplessTargetKind::Queue, true)
-                .await;
-        }
-
-        let next_index = self.get_next_index();
-        match next_index {
-            Some(idx) => self.play_at_index(idx).await,
             None => self.stop().await,
         }
     }
 
     /// Go back a track: in shuffle mode, walks back through actual play
-    /// history (see the comment below on `played_indices`); otherwise steps
-    /// to `current_index - 1` in playlist order.
+    /// history; otherwise steps to `current_index - 1` in playlist order.
     pub async fn previous_track(&mut self) -> Result<()> {
-        // In shuffle mode, walk back through history (skip unavailable).
-        // `play_at_index` pushes every track it plays onto `played_indices`,
-        // including the current one — so the entry on top of the stack right
-        // now is the current track's own history entry, not the prior track.
-        // Discard it (and any other stale entries matching current_index)
-        // before treating a popped entry as the destination, or Previous
-        // just replays the current song instead of moving back (#105).
-        if self.shuffle_mode != ShuffleMode::Off {
-            while let Some(prev_index) = self.played_indices.pop() {
-                if Some(prev_index) == self.current_index {
-                    continue;
-                }
-                if self.is_playable_at(prev_index) {
-                    return self.play_at_index(prev_index).await;
-                }
-            }
-        }
-
-        // Walk backwards from current, skipping unavailable items. Mirrors
-        // `get_next_index`'s boundary behavior: only wrap past the start
-        // under `RepeatMode::Playlist` — otherwise Previous at the first
-        // track is a no-op instead of jumping to the last track. The wrap
-        // applies wherever the walk crosses the start, not only when it
-        // begins there, so unavailable tracks before the current one can't
-        // strand Previous (#1223).
-        if let Some(current) = self.current_index {
-            let len = self.playlist_items.len();
-            if len == 0 {
-                return Ok(());
-            }
-            let wrap = self.repeat_mode == RepeatMode::Playlist;
-            let mut candidate = if current > 0 {
-                current - 1
-            } else if wrap {
-                len - 1
-            } else {
-                return Ok(());
-            };
-            for _ in 0..len {
-                if self.is_playable_at(candidate) {
-                    return self.play_at_index(candidate).await;
-                }
-                candidate = match candidate {
-                    0 if wrap => len - 1,
-                    0 => break,
-                    c => c - 1,
-                };
-            }
-        }
-        Ok(())
-    }
-
-    /// Number of virtual indices in whichever order is currently active:
-    /// `shuffle_order` while shuffling, `playlist_items` otherwise.
-    /// `rebuild_shuffle_order` keeps `shuffle_order` sized to match
-    /// `playlist_items` even when shuffle is off (as the identity mapping),
-    /// so every index-walking helper below can treat "virtual index" as the
-    /// single space to reason about instead of re-deriving it per call site.
-    fn virtual_len(&self) -> usize {
-        if self.shuffle_mode != ShuffleMode::Off {
-            self.shuffle_order.len()
+        if let Some(prev_index) = self.order.previous() {
+            self.play_at_index(prev_index).await
         } else {
-            self.playlist_items.len()
+            Ok(())
         }
-    }
-
-    /// Resolves a virtual index (position in the active play order) to its
-    /// underlying `playlist_items` index — identity when shuffle is off,
-    /// indirected through `shuffle_order` when shuffle is on. `None` only if
-    /// `virtual_index` is out of range for whichever indexing is active.
-    fn resolve_item_index(&self, virtual_index: usize) -> Option<usize> {
-        if self.shuffle_mode != ShuffleMode::Off {
-            self.shuffle_order.get(virtual_index).copied()
-        } else {
-            (virtual_index < self.playlist_items.len()).then_some(virtual_index)
-        }
-    }
-
-    /// True if the playlist item at virtual index `candidate` exists and is
-    /// currently playable (see `is_item_playable`).
-    fn is_playable_at(&self, candidate: usize) -> bool {
-        self.resolve_item_index(candidate)
-            .and_then(|i| self.playlist_items.get(i))
-            .map(Self::is_item_playable)
-            .unwrap_or(false)
-    }
-
-    /// Read-only walk forward from a virtual index (wrapping through the
-    /// active play order) to the first playable item, mirroring
-    /// `play_at_index`'s skip-unavailable behavior. `None` only if every
-    /// item was checked without finding one (an all-unavailable playlist).
-    fn find_playable_from(&self, start: usize) -> Option<usize> {
-        let total = self.virtual_len();
-        if total == 0 {
-            return None;
-        }
-        let mut candidate = start % total;
-        for _ in 0..total {
-            if self.is_playable_at(candidate) {
-                return Some(candidate);
-            }
-            candidate = (candidate + 1) % total;
-        }
-        None
-    }
-
-    /// Read-only walk from a virtual index to the first playable item,
-    /// mirroring `play_at_index`'s skip-unavailable behavior.
-    fn peek_playable_index(&self, index: usize) -> Option<usize> {
-        self.find_playable_from(index)
-    }
-
-    /// Determine what will play after the current track ends naturally,
-    /// without mutating any state. The single source of truth for "what
-    /// plays next" (#1072) — `prepare_gapless_next` preloads this,
-    /// `on_gapless_transition` commits it silently, and `on_track_finished`
-    /// commits it with a real `Play` call.
-    fn peek_next_natural(&self) -> Option<GaplessTarget> {
-        if self.stop_after_current {
-            return None;
-        }
-
-        if self.repeat_mode == RepeatMode::Track {
-            self.current_index?; // only replay when a playlist track is loaded
-            let song = self.current_song.clone()?;
-            return Some(GaplessTarget {
-                song,
-                uuid: self.current_item_uuid.clone(),
-                kind: GaplessTargetKind::Replay,
-            });
-        }
-
-        // Queue first (peek without popping) — every other repeat mode,
-        // including Playlist (#1073), lets a queued "play next" track take
-        // priority over the natural playlist advance, matching manual skip.
-        if let Some(item) = self.queue.iter().find(|i| Self::is_item_playable(i)) {
-            let song = item.song.clone()?;
-            return Some(GaplessTarget {
-                song,
-                uuid: Some(item.uuid.clone()),
-                kind: GaplessTargetKind::Queue,
-            });
-        }
-
-        // RepeatMode::Album scopes the *natural* advance to the current
-        // album's own tracks (wrapping within it) — but this must not reach
-        // manual skip (get_next_index, also used by next_track): a track
-        // with no/blank album tag is its own group of one, so scoping
-        // manual Next the same way would make it appear to do nothing.
-        // RepeatMode::Playlist wraps to the first track when nothing else is
-        // playing yet (current_index is None); every other mode simply has
-        // nothing left to advance to at that point.
-        let idx = if self.repeat_mode == RepeatMode::Album {
-            self.next_album_index()?
-        } else if self.repeat_mode == RepeatMode::Playlist {
-            self.get_next_index().unwrap_or(0)
-        } else {
-            self.get_next_index()?
-        };
-        let candidate = self.peek_playable_index(idx)?;
-        self.target_at_virtual_index(candidate)
-    }
-
-    fn target_at_virtual_index(&self, candidate: usize) -> Option<GaplessTarget> {
-        let item_index = self.resolve_item_index(candidate)?;
-        let item = self.playlist_items.get(item_index)?;
-        let song = item.song.clone()?;
-        Some(GaplessTarget {
-            song,
-            uuid: Some(item.uuid.clone()),
-            kind: GaplessTargetKind::Index(candidate),
-        })
     }
 
     /// Respond to the engine's `AboutToFinish` signal: prime the next track
@@ -1715,15 +1270,16 @@ impl Player {
     /// naturally stop after the current track.
     pub async fn prepare_gapless_next(&mut self) -> Result<()> {
         self.preload_upcoming_waveforms();
-        let Some(target) = self.peek_next_natural() else {
+        let Some(target) = self.order.peek_next_natural(self.stop_after_current) else {
             return Ok(());
         };
-        let start_ns = target.song.beginning_nanosec.max(0) as u64;
+        let (song, _, _) = self.resolve_order_target(target)?;
+        let start_ns = song.beginning_nanosec.max(0) as u64;
 
         let fade_settings = crate::fade::get_fade_settings_from_db(&self._db).unwrap_or_default();
 
         let is_same_album = if let Some(current) = &self.current_song {
-            current.is_same_album_or_cue_sibling(&target.song)
+            current.is_same_album_or_cue_sibling(&song)
         } else {
             false
         };
@@ -1733,19 +1289,19 @@ impl Player {
         {
             log::info!(
                 "Auto-crossfade armed for track transition to song {}",
-                target.song.id
+                song.id
             );
             // The engine switches to the incoming track's loudness gain at
             // the overlap's first sample, so it needs that gain up front.
             let incoming_gain = match Self::load_loudness_settings(&self._db).await {
-                Ok(settings) => Self::compute_loudness_gain(&settings, &target.song).0,
+                Ok(settings) => Self::compute_loudness_gain(&settings, &song).0,
                 Err(e) => {
                     log::warn!("Failed to load loudness settings: {e}");
                     1.0
                 }
             };
             self.audio.lock().await.preload_next_with_crossfade(
-                crate::audio::track_for(&target.song),
+                crate::audio::track_for(&song),
                 start_ns,
                 fade_settings.crossfade_auto_duration_secs,
                 incoming_gain,
@@ -1754,7 +1310,7 @@ impl Player {
             self.audio
                 .lock()
                 .await
-                .preload_next(crate::audio::track_for(&target.song), start_ns)
+                .preload_next(crate::audio::track_for(&song), start_ns)
         }
     }
 
@@ -1769,12 +1325,19 @@ impl Player {
             return self.stop().await;
         }
 
-        match self.peek_next_natural() {
-            Some(target) if target.song.id == started_song_id => {
-                self.start_track(target.song, target.uuid, target.kind, false)
-                    .await
+        match self.order.peek_next_natural(false) {
+            Some(target) => {
+                let (song, uuid, kind) = self.resolve_order_target(target)?;
+                if song.id == started_song_id {
+                    self.start_track(song, uuid, kind, false).await
+                } else {
+                    log::warn!(
+                        "Gapless transition to song {started_song_id} no longer matches playback context; correcting"
+                    );
+                    self.on_track_finished().await
+                }
             }
-            _ => {
+            None => {
                 // The preloaded track no longer matches what should play —
                 // correct by running the normal advance (issues a real Play).
                 log::warn!(
@@ -1796,287 +1359,24 @@ impl Player {
             return self.stop().await;
         }
 
-        if let Some(target) = self.peek_next_natural() {
-            return self
-                .start_track(target.song, target.uuid, target.kind, true)
-                .await;
+        if let Some(target) = self.order.peek_next_natural(false) {
+            let (song, uuid, kind) = self.resolve_order_target(target)?;
+            return self.start_track(song, uuid, kind, true).await;
         }
 
         self.next_track().await
     }
 
-    /// The key `ShuffleMode::Albums`/`InsideAlbum` group tracks under, also
-    /// reused by `RepeatMode::Album` to find "the current album"'s tracks —
-    /// a single source of truth so both features agree on what counts as
-    /// the same album. Falls back to the item's own uuid when the song has
-    /// no (or blank) album tag, so an ungrouped track forms a group of one
-    /// rather than colliding with other untagged tracks.
-    fn album_key(item: &PlaylistItem) -> String {
-        if let Some(ref song) = item.song {
-            if let Some(ref album) = song.album {
-                let key = crate::album_key::album_key(album);
-                if !key.is_empty() {
-                    return key;
-                }
-            }
-        }
-        item.uuid.clone()
-    }
-
-    /// The next virtual index within the current track's album, wrapping
-    /// back to the album's first (virtual-order) track after its last —
-    /// `RepeatMode::Album`'s "loop the current album indefinitely". A
-    /// single-track album (or an ungrouped track, its own group of one)
-    /// loops back to itself, mirroring `RepeatMode::Track`'s replay.
-    fn next_album_index(&self) -> Option<usize> {
-        let total = self.virtual_len();
-        if total == 0 {
-            return None;
-        }
-        let current_virtual = self.current_index?;
-        let current_real = self.resolve_item_index(current_virtual)?;
-        let key = Self::album_key(self.playlist_items.get(current_real)?);
-
-        let album_virtual_indices: Vec<usize> = (0..total)
-            .filter(|&v| {
-                self.resolve_item_index(v)
-                    .and_then(|r| self.playlist_items.get(r))
-                    .map(|item| Self::album_key(item) == key)
-                    .unwrap_or(false)
-            })
-            .collect();
-
-        let pos = album_virtual_indices
-            .iter()
-            .position(|&v| v == current_virtual)?;
-        let next_pos = (pos + 1) % album_virtual_indices.len();
-        Some(album_virtual_indices[next_pos])
-    }
-
-    /// Compute the next playback index based on mode.
-    fn get_next_index(&self) -> Option<usize> {
-        let total = self.virtual_len();
-        if total == 0 {
-            return None;
-        }
-
-        let current = self.current_index?;
-
-        let next = current + 1;
-        if next < total {
-            Some(next)
-        } else {
-            match self.repeat_mode {
-                RepeatMode::Playlist => Some(0),
-                _ => None,
-            }
-        }
-    }
-
-    /// Shared by `ShuffleMode::Albums`/`Artists`/`InsideAlbum`, which are
-    /// structurally identical modulo the key a track groups under and which
-    /// half of "group order" vs. "order within a group" gets shuffled:
-    /// - `Albums`/`Artists`: keep each group's original track order, but
-    ///   shuffle which group comes next (`shuffle_groups`).
-    /// - `InsideAlbum`: keep every group in its original playlist position,
-    ///   but shuffle the track order within each group
-    ///   (`shuffle_within_groups`).
-    ///
-    /// Returns the current item's own group's remaining tracks first,
-    /// followed by every other group — matching every mode's "don't jump
-    /// away from what's already playing" behavior. Does NOT include the
-    /// current item's own index; callers seed their own order with it, since
-    /// `current_real_idx` is excluded from grouping here. Note: unlike the
-    /// original per-mode code, this always tracks the current group's key in
-    /// `other_keys` too — harmless, since `groups.remove` on an
-    /// already-removed key is a no-op when that key is walked a second time
-    /// below.
-    fn shuffle_grouped(
-        &self,
-        len: usize,
-        current_real_idx: Option<usize>,
-        rng: &mut impl rand::Rng,
-        key_fn: impl Fn(&PlaylistItem) -> String,
-        shuffle_groups: bool,
-        shuffle_within_groups: bool,
-    ) -> Vec<usize> {
-        let current_key = current_real_idx.map(|idx| key_fn(&self.playlist_items[idx]));
-        let mut groups: std::collections::HashMap<String, Vec<usize>> =
-            std::collections::HashMap::new();
-        let mut other_keys = Vec::new();
-
-        for i in 0..len {
-            if current_real_idx == Some(i) {
-                continue;
-            }
-            let key = key_fn(&self.playlist_items[i]);
-            groups
-                .entry(key.clone())
-                .or_insert_with(|| {
-                    other_keys.push(key.clone());
-                    Vec::new()
-                })
-                .push(i);
-        }
-
-        if shuffle_within_groups {
-            for group_tracks in groups.values_mut() {
-                group_tracks.shuffle(rng);
-            }
-        }
-        if shuffle_groups {
-            other_keys.shuffle(rng);
-        }
-
-        // Note: the current item itself (excluded from `groups` above) is
-        // NOT included here — callers already seed their own order with it.
-        let mut order = Vec::with_capacity(len);
-
-        if let Some(ref key) = current_key {
-            if let Some(mut current_group) = groups.remove(key) {
-                order.append(&mut current_group);
-            }
-        }
-        for key in &other_keys {
-            if let Some(mut group) = groups.remove(key) {
-                order.append(&mut group);
-            }
-        }
-
-        order
-    }
-
-    /// Replaces `shuffle_order` for the current `shuffle_mode`, keeping the
-    /// virtual indices that point into it (`current_index`, `played_indices`)
-    /// on the same items: each is resolved to its real index through the
-    /// outgoing order, then re-found in the new one — including when shuffle
-    /// is turned *off*, where the new order is the identity (#1221, #1222).
-    /// Proven for every permutation in `verification/lean/Luminous/Player.lean`
-    /// (`rebuildFixed_ok`).
-    fn rebuild_shuffle_order(&mut self) {
-        let len = self.playlist_items.len();
-        if len == 0 {
-            self.shuffle_order = Vec::new();
-            return;
-        }
-
-        // An empty outgoing order means callers seeded `current_index` with
-        // a real index (`play_playlist`, `Player::new`).
-        let old_order = std::mem::take(&mut self.shuffle_order);
-        let to_real = |pos: usize| -> Option<usize> {
-            let idx = if old_order.is_empty() {
-                pos
-            } else {
-                old_order.get(pos).copied().unwrap_or(pos)
-            };
-            (idx < len).then_some(idx)
-        };
-        let current_real_idx = self.current_index.and_then(to_real);
-        let played_real: Vec<usize> = self
-            .played_indices
-            .iter()
-            .filter_map(|&v| to_real(v))
-            .collect();
-
-        let order = self.build_play_order(len, current_real_idx);
-
-        let mut virtual_of_real = vec![None; len];
-        for (virtual_idx, &real_idx) in order.iter().enumerate() {
-            virtual_of_real[real_idx] = Some(virtual_idx);
-        }
-        self.current_index = current_real_idx.and_then(|r| virtual_of_real[r]);
-        self.played_indices = played_real
-            .into_iter()
-            .filter_map(|r| virtual_of_real[r])
-            .collect();
-        self.shuffle_order = order;
-    }
-
-    /// A fresh play order (a permutation of `0..len`) for the current
-    /// `shuffle_mode`: the identity when shuffle is off, otherwise a shuffle
-    /// that starts with `current_real_idx` so the playing track stays put.
-    fn build_play_order(&self, len: usize, current_real_idx: Option<usize>) -> Vec<usize> {
-        let mut rng = rand::rng();
-
-        let get_artist_key = |item: &PlaylistItem| -> String {
-            if let Some(ref song) = item.song {
-                if let Some(ref artist) = song.artist {
-                    if !artist.trim().is_empty() {
-                        return artist.to_lowercase();
-                    }
-                }
-            }
-            item.uuid.clone()
-        };
-
-        let mut order = if let Some(idx) = current_real_idx {
-            vec![idx]
-        } else {
-            Vec::new()
-        };
-
-        match self.shuffle_mode {
-            ShuffleMode::Off => return (0..len).collect(),
-            ShuffleMode::All => {
-                let mut remaining_indices: Vec<usize> =
-                    (0..len).filter(|&i| current_real_idx != Some(i)).collect();
-                remaining_indices.shuffle(&mut rng);
-                order.extend(remaining_indices);
-            }
-            ShuffleMode::InsideAlbum => {
-                order.extend(self.shuffle_grouped(
-                    len,
-                    current_real_idx,
-                    &mut rng,
-                    Self::album_key,
-                    false, // keep album order as-is
-                    true,  // shuffle each album's own track order
-                ));
-            }
-            ShuffleMode::Albums => {
-                order.extend(self.shuffle_grouped(
-                    len,
-                    current_real_idx,
-                    &mut rng,
-                    Self::album_key,
-                    true,  // shuffle which album comes next
-                    false, // keep each album's own track order
-                ));
-            }
-            ShuffleMode::Artists => {
-                order.extend(self.shuffle_grouped(
-                    len,
-                    current_real_idx,
-                    &mut rng,
-                    get_artist_key,
-                    true,  // shuffle which artist comes next
-                    false, // keep each artist's own track order
-                ));
-            }
-        }
-
-        order
-    }
-
     pub fn set_shuffle_mode(&mut self, mode: ShuffleMode) {
-        self.shuffle_mode = mode;
-        self.rebuild_shuffle_order();
+        self.order.set_shuffle_mode(mode);
         if let Ok(conn) = self._db.pool.get() {
             app_state_set(&conn, "shuffle_mode", shuffle_mode_to_key(mode));
         }
     }
 
-    /// The current playlist's items in actual playback order: `shuffle_order`
-    /// holds identity order `[0, 1, 2, ...]` when shuffle is off, so this
-    /// works the same way regardless of shuffle mode. Includes every item —
-    /// already-played and upcoming — since `current_index` only marks a
-    /// position within this order, not a cutoff; a Queue row must stay
-    /// visible after it plays (#888/#902).
+    /// The current playlist's items in actual playback order.
     pub fn get_playlist_tracks_in_playback_order(&self) -> Vec<PlaylistItem> {
-        self.shuffle_order
-            .iter()
-            .filter_map(|&real_idx| self.playlist_items.get(real_idx).cloned())
-            .collect()
+        self.order.tracks_in_playback_order()
     }
 
     pub fn set_auto_continue(&mut self, enabled: bool) {
@@ -2098,46 +1398,24 @@ impl Player {
     /// included). The caller still checks the playlist is the Queue — that
     /// needs the playlists lock, which must not nest inside this one.
     pub fn auto_continue_seed(&self) -> Option<(i64, Vec<i64>)> {
-        if !self.auto_continue || self.repeat_mode != RepeatMode::Off {
+        if !self.auto_continue {
             return None;
         }
         let playlist_id = self.current_playlist_id?;
-        self.current_song.as_ref()?;
-        if self.remaining_playlist_items() + self.queue.len()
-            > crate::continue_mix::TOP_UP_THRESHOLD
-        {
-            return None;
-        }
-        let mut seeds: Vec<i64> = self.current_song.iter().map(|s| s.id).collect();
-        if let Some(pos) = self.current_index {
-            seeds.extend(
-                self.shuffle_order[..pos.min(self.shuffle_order.len())]
-                    .iter()
-                    .rev()
-                    .filter_map(|&real| self.playlist_items.get(real)?.song.as_ref())
-                    .map(|s| s.id)
-                    .filter(|id| Some(*id) != self.current_song.as_ref().map(|s| s.id)),
-            );
-        }
-        seeds.truncate(crate::continue_mix::SEED_COUNT);
+        let song = self.current_song.as_ref()?;
+        let seeds = self.order.auto_continue_seeds(song.id)?;
         Some((playlist_id, seeds))
     }
 
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
-        self.repeat_mode = mode;
+        self.order.set_repeat_mode(mode);
         if let Ok(conn) = self._db.pool.get() {
             app_state_set(&conn, "repeat_mode", repeat_mode_to_key(mode));
         }
     }
 
     /// Re-fetch every queued item's `Song` (and the current song) from the DB
-    /// by id. `playlist_items`/`current_song` are snapshots taken when the
-    /// queue was built, so a library rescan that repoints a moved file's path
-    /// (or hard-deletes a genuinely missing one) fixes the database but not
-    /// an already-loaded queue — this brings it back in sync without
-    /// requiring the queue to be rebuilt or the app restarted. A song id that
-    /// no longer exists (hard-deleted) is left untouched; `is_item_playable`
-    /// already treats a stale/unavailable row as unplayable and skips it.
+    /// by id.
     pub fn resync_queue_with_db(&mut self) -> Result<()> {
         let conn = self._db.pool.get()?;
         let sql = format!(
@@ -2145,7 +1423,7 @@ impl Player {
             crate::collection::SONG_SELECT_COLS
         );
 
-        for item in &mut self.playlist_items {
+        for item in self.order.items_mut() {
             let Some(id) = item.song.as_ref().map(|s| s.id) else {
                 continue;
             };
@@ -2170,10 +1448,7 @@ impl Player {
     /// Get the current playback state snapshot for the frontend.
     pub async fn get_state(&self) -> PlaybackState {
         let audio = self.audio.lock().await;
-        let (playlist_index, playlist_total) = match self.current_index {
-            Some(idx) => (Some(idx + 1), self.virtual_len()),
-            None => (None, self.virtual_len()),
-        };
+        let (playlist_index, playlist_total) = self.order.position_info();
         let state: crate::models::PlayState = audio.current_state().into();
         let is_live = self
             .current_song
@@ -2194,8 +1469,8 @@ impl Player {
             playlist_item_uuid: self.current_item_uuid.clone(),
             position_nanosec,
             volume: audio.current_volume(),
-            shuffle_mode: self.shuffle_mode,
-            repeat_mode: self.repeat_mode,
+            shuffle_mode: self.order.shuffle_mode(),
+            repeat_mode: self.order.repeat_mode(),
             stop_after_current: self.stop_after_current,
             loudness_source: self.current_loudness_source,
             loudness_gain_db: self.current_loudness_gain_db,
@@ -2398,23 +1673,22 @@ mod tests {
             id,
             ..Default::default()
         };
-        player.playlist_items = (1..=5)
+        let items = (1..=5)
             .map(|id| PlaylistItem::new_song(7, id as i32, song(id)))
             .collect();
-        player.shuffle_order = (0..5).collect();
+        player.order.load(items, Some(2));
         player.current_playlist_id = Some(7);
-        player.current_index = Some(2);
         player.current_song = Some(song(3));
 
         assert_eq!(player.auto_continue_seed(), None, "off by default");
         player.auto_continue = true;
         assert_eq!(player.auto_continue_seed(), None, "two songs still left");
 
-        player.current_index = Some(3);
+        player.order.set_current_index(Some(3));
         player.current_song = Some(song(4));
         assert_eq!(player.auto_continue_seed(), Some((7, vec![4, 3, 2])));
 
-        player.repeat_mode = RepeatMode::Playlist;
+        player.set_repeat_mode(RepeatMode::Playlist);
         assert_eq!(
             player.auto_continue_seed(),
             None,
@@ -2516,8 +1790,8 @@ mod tests {
         // Reopening the app re-runs Player::new against the same DB.
         let restarted = Player::new(db_arc.clone(), audio.clone());
         assert_eq!(restarted.current_song.as_ref().unwrap().id, 2);
-        assert_eq!(restarted.playlist_items.len(), 3);
-        assert_eq!(restarted.current_index, Some(1));
+        assert_eq!(restarted.order.items().len(), 3);
+        assert_eq!(restarted.order.current_index(), Some(1));
     }
 
     #[tokio::test]
@@ -2642,120 +1916,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_previous_track_walks_back_through_playlist() {
-        let (_temp_dir, db) = setup_test_db();
-        let db_arc = Arc::new(db);
-
-        {
-            let conn = db_arc.pool.get().unwrap();
-            for id in 1..=3i64 {
-                conn.execute(
-                    &format!(
-                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
-                    ),
-                    [],
-                )
-                .unwrap();
-            }
-        }
-
-        let audio = Arc::new(Mutex::new(AudioEngine::new()));
-        let mut player = Player::new(db_arc.clone(), audio.clone());
-
-        let items = (1..=3i64)
-            .map(|id| {
-                let conn = db_arc.pool.get().unwrap();
-                let sql = format!(
-                    "SELECT {} FROM songs WHERE id = ?1",
-                    crate::collection::SONG_SELECT_COLS
-                );
-                let song = conn
-                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
-                    .unwrap();
-                PlaylistItem::new_song(0, 0, song)
-            })
-            .collect::<Vec<_>>();
-
-        // Start on the last track (index 2, song id 3).
-        player.play_playlist(items, 2, 0, None).await.unwrap();
-        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
-        assert_eq!(player.current_index, Some(2));
-
-        player.previous_track().await.unwrap();
-        assert_eq!(
-            player.current_song.as_ref().unwrap().id,
-            2,
-            "previous should move to the prior track, not replay the current one"
-        );
-        assert_eq!(player.current_index, Some(1));
-
-        player.previous_track().await.unwrap();
-        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
-        assert_eq!(player.current_index, Some(0));
-    }
-
-    /// Pressing Previous at the very first track must not wrap around to the
-    /// last track — it should stay put, mirroring `get_next_index`'s
-    /// boundary behavior for Next. Wrapping unconditionally here silently
-    /// jumped playback to the end of the queue, which then triggered the
-    /// frontend's natural-completion handling (clearing the Queue) far
-    /// earlier than the user expected.
-    #[tokio::test]
-    async fn test_previous_track_does_not_wrap_at_start_without_repeat() {
-        let (_temp_dir, db) = setup_test_db();
-        let db_arc = Arc::new(db);
-
-        {
-            let conn = db_arc.pool.get().unwrap();
-            for id in 1..=3i64 {
-                conn.execute(
-                    &format!(
-                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
-                    ),
-                    [],
-                )
-                .unwrap();
-            }
-        }
-
-        let audio = Arc::new(Mutex::new(AudioEngine::new()));
-        let mut player = Player::new(db_arc.clone(), audio.clone());
-
-        let items = (1..=3i64)
-            .map(|id| {
-                let conn = db_arc.pool.get().unwrap();
-                let sql = format!(
-                    "SELECT {} FROM songs WHERE id = ?1",
-                    crate::collection::SONG_SELECT_COLS
-                );
-                let song = conn
-                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
-                    .unwrap();
-                PlaylistItem::new_song(0, 0, song)
-            })
-            .collect::<Vec<_>>();
-
-        // Start on the first track (index 0).
-        player.play_playlist(items, 0, 0, None).await.unwrap();
-        assert_eq!(player.current_index, Some(0));
-
-        player.previous_track().await.unwrap();
-        assert_eq!(
-            player.current_index,
-            Some(0),
-            "previous at the start of the queue must not wrap to the last track"
-        );
-        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
-
-        // With RepeatMode::Playlist, wrapping to the last track is intended.
-        player.set_repeat_mode(RepeatMode::Playlist);
-        player.previous_track().await.unwrap();
-        assert_eq!(player.current_index, Some(2));
-        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
-    }
-
-    /// Same scenario as `test_previous_track_walks_back_through_playlist`,
+    /// Same scenario as `PlayOrder::previous_walks_back_through_playlist`,
     /// but exercises the real saved-playlist path (`PlaylistManager` +
     /// `get_playlist_tracks`) instead of the ad-hoc `PlaylistItem::new_song`
     /// helper, to check for divergence between Album and Playlist playback
@@ -2796,7 +1957,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(player.current_song.as_ref().unwrap().id, 3);
-        assert_eq!(player.current_index, Some(2));
+        assert_eq!(player.order.current_index(), Some(2));
 
         player.previous_track().await.unwrap();
         assert_eq!(
@@ -2804,75 +1965,7 @@ mod tests {
             2,
             "previous should move to the prior playlist track, not replay the current one"
         );
-        assert_eq!(player.current_index, Some(1));
-    }
-
-    /// Root-caused #105's "Previous restarts the current song instead of
-    /// moving to the prior one" report: it only reproduces with Shuffle on.
-    /// `play_at_index` pushes every played (virtual) index onto
-    /// `played_indices`, including the current track's own entry, so the
-    /// naive top-of-stack pop in `previous_track` just replayed it.
-    #[tokio::test]
-    async fn test_previous_track_in_shuffle_mode_does_not_replay_current() {
-        let (_temp_dir, db) = setup_test_db();
-        let db_arc = Arc::new(db);
-
-        {
-            let conn = db_arc.pool.get().unwrap();
-            for id in 1..=4i64 {
-                conn.execute(
-                    &format!(
-                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
-                    ),
-                    [],
-                )
-                .unwrap();
-            }
-        }
-
-        let audio = Arc::new(Mutex::new(AudioEngine::new()));
-        let mut player = Player::new(db_arc.clone(), audio.clone());
-
-        let items = (1..=4i64)
-            .map(|id| {
-                let conn = db_arc.pool.get().unwrap();
-                let sql = format!(
-                    "SELECT {} FROM songs WHERE id = ?1",
-                    crate::collection::SONG_SELECT_COLS
-                );
-                let song = conn
-                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
-                    .unwrap();
-                PlaylistItem::new_song(0, 0, song)
-            })
-            .collect::<Vec<_>>();
-
-        player.set_shuffle_mode(ShuffleMode::All);
-        player.set_repeat_mode(RepeatMode::Playlist);
-        player.play_playlist(items, 0, 0, None).await.unwrap();
-        let first_song_id = player.current_song.as_ref().unwrap().id;
-
-        // Advance forward twice so there's real history to walk back through.
-        player.next_track().await.unwrap();
-        let second_song_id = player.current_song.as_ref().unwrap().id;
-        player.next_track().await.unwrap();
-        let third_song_id = player.current_song.as_ref().unwrap().id;
-        assert_ne!(second_song_id, first_song_id);
-        assert_ne!(third_song_id, second_song_id);
-
-        player.previous_track().await.unwrap();
-        assert_eq!(
-            player.current_song.as_ref().unwrap().id,
-            second_song_id,
-            "previous should move to the prior shuffled track, not replay the current one"
-        );
-
-        player.previous_track().await.unwrap();
-        assert_eq!(
-            player.current_song.as_ref().unwrap().id,
-            first_song_id,
-            "a second previous press should keep walking back, not stay put"
-        );
+        assert_eq!(player.order.current_index(), Some(1));
     }
 
     #[tokio::test]
@@ -3010,134 +2103,6 @@ mod tests {
     /// rather than stopping or spilling into the other album. Manual skip
     /// is intentionally NOT scoped this way — see the follow-up regression
     /// test below (a real bug this exact confusion caused).
-    #[tokio::test]
-    async fn test_repeat_album_stays_within_album_and_wraps() {
-        let (_temp_dir, db) = setup_test_db();
-        let db_arc = Arc::new(db);
-
-        {
-            let conn = db_arc.pool.get().unwrap();
-            for id in 1..=4i64 {
-                let album = if id % 2 == 1 { "Album A" } else { "Album B" };
-                conn.execute(
-                    &format!(
-                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', '{album}', 180000000000)"
-                    ),
-                    [],
-                )
-                .unwrap();
-            }
-        }
-
-        let audio = Arc::new(Mutex::new(AudioEngine::new()));
-        let mut player = Player::new(db_arc.clone(), audio.clone());
-
-        let items = (1..=4i64)
-            .map(|id| {
-                let conn = db_arc.pool.get().unwrap();
-                let sql = format!(
-                    "SELECT {} FROM songs WHERE id = ?1",
-                    crate::collection::SONG_SELECT_COLS
-                );
-                let song = conn
-                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
-                    .unwrap();
-                PlaylistItem::new_song(0, 0, song)
-            })
-            .collect::<Vec<_>>();
-
-        player.set_repeat_mode(RepeatMode::Album);
-        player
-            .play_playlist(items.clone(), 0, 0, None)
-            .await
-            .unwrap();
-        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
-
-        // Natural track-end must stay within Album A, skipping over song 2
-        // (Album B) to reach song 3.
-        player.on_track_finished().await.unwrap();
-        assert_eq!(
-            player.current_song.as_ref().unwrap().id,
-            3,
-            "RepeatMode::Album must advance to the next track within the same album, \
-             skipping over tracks that belong to a different album"
-        );
-
-        // Past Album A's last track, must wrap back to its first rather
-        // than stopping or continuing into Album B.
-        player.on_track_finished().await.unwrap();
-        assert_eq!(
-            player.current_song.as_ref().unwrap().id,
-            1,
-            "RepeatMode::Album must wrap back to the album's first track, not stop or \
-             spill into the next album"
-        );
-    }
-
-    /// Regression coverage for a real bug caught in manual testing: an
-    /// earlier version of the #1070 fix scoped `get_next_index` itself to
-    /// the current album, which meant manual skip (`next_track`) inherited
-    /// that scoping too. For a track with no/blank album tag (its own
-    /// group of one via `album_key`'s uuid fallback) — or a genuine
-    /// single-track album — that made pressing Next appear to do nothing:
-    /// it kept "advancing" to the same track. Manual skip must always
-    /// advance linearly through the whole playlist regardless of repeat
-    /// mode, exactly like `RepeatMode::Track` already does (repeat only
-    /// governs natural track-end, never user-initiated navigation).
-    #[tokio::test]
-    async fn test_repeat_album_does_not_confine_manual_skip() {
-        let (_temp_dir, db) = setup_test_db();
-        let db_arc = Arc::new(db);
-
-        {
-            let conn = db_arc.pool.get().unwrap();
-            for id in 1..=3i64 {
-                // No album tag at all — each track is its own group of one
-                // under `album_key`'s uuid fallback, the exact case that
-                // triggered the bug.
-                conn.execute(
-                    &format!(
-                        "INSERT INTO songs (id, path, title, artist, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 180000000000)"
-                    ),
-                    [],
-                )
-                .unwrap();
-            }
-        }
-
-        let audio = Arc::new(Mutex::new(AudioEngine::new()));
-        let mut player = Player::new(db_arc.clone(), audio.clone());
-
-        let items = (1..=3i64)
-            .map(|id| {
-                let conn = db_arc.pool.get().unwrap();
-                let sql = format!(
-                    "SELECT {} FROM songs WHERE id = ?1",
-                    crate::collection::SONG_SELECT_COLS
-                );
-                let song = conn
-                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
-                    .unwrap();
-                PlaylistItem::new_song(0, 0, song)
-            })
-            .collect::<Vec<_>>();
-
-        player.set_repeat_mode(RepeatMode::Album);
-        player.play_playlist(items, 0, 0, None).await.unwrap();
-        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
-
-        player.next_track().await.unwrap();
-        assert_eq!(
-            player.current_song.as_ref().unwrap().id,
-            2,
-            "manual skip must always advance to the next track, even when the current \
-             track's \"album\" is just itself under RepeatMode::Album"
-        );
-
-        player.next_track().await.unwrap();
-        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
-    }
-
     /// Regression coverage for #1073: `next_track`'s ad-hoc queue branch
     /// used to update `current_song`/`current_item_uuid` in memory but skip
     /// `persist_current_song`/`persist_position` entirely — so quitting the
@@ -3198,7 +2163,7 @@ mod tests {
         let expected_start_ns = queued_song.beginning_nanosec.max(0) as u64;
         let queued_item = PlaylistItem::new_song(0, 0, queued_song);
         let queued_uuid = queued_item.uuid.clone();
-        player.queue.push_back(queued_item);
+        player.order.queue_mut().push_back(queued_item);
 
         player.next_track().await.unwrap();
         assert_eq!(
@@ -3296,7 +2261,8 @@ mod tests {
             .unwrap()
         };
         player
-            .queue
+            .order
+            .queue_mut()
             .push_back(PlaylistItem::new_song(0, 0, queued_song));
 
         player.on_track_finished().await.unwrap();
@@ -3367,9 +2333,9 @@ mod tests {
         player.on_gapless_transition(2).await.unwrap();
 
         assert_eq!(player.current_song.as_ref().unwrap().id, 2);
-        assert_eq!(player.current_index, Some(1));
+        assert_eq!(player.order.current_index(), Some(1));
         assert!(
-            player.played_indices.contains(&1),
+            player.order.played_indices().contains(&1),
             "on_gapless_transition must record the new index in played_indices, matching \
              play_at_index's bookkeeping"
         );
@@ -3458,7 +2424,7 @@ mod tests {
             "a song-id mismatch must self-heal via on_track_finished's normal advance, not \
              leave playback stuck or desynced"
         );
-        assert_eq!(player.current_index, Some(1));
+        assert_eq!(player.order.current_index(), Some(1));
     }
 
     /// Coverage for #1077: scrobble-point computation and the `scrobbled`
@@ -3524,92 +2490,6 @@ mod tests {
     /// shuffle is a no-op (nothing to permute among one element), which
     /// makes `Albums`'s exact resulting order deterministic and assertable.
     #[tokio::test]
-    async fn test_shuffle_grouped_albums_keeps_track_order_inside_each_group() {
-        let (_temp_dir, db) = setup_test_db();
-        let db_arc = Arc::new(db);
-
-        {
-            let conn = db_arc.pool.get().unwrap();
-            for id in 1..=6i64 {
-                let album = if id % 2 == 1 { "Album A" } else { "Album B" };
-                conn.execute(
-                    &format!(
-                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', '{album}', 180000000000)"
-                    ),
-                    [],
-                )
-                .unwrap();
-            }
-        }
-
-        let audio = Arc::new(Mutex::new(AudioEngine::new()));
-        let mut player = Player::new(db_arc.clone(), audio.clone());
-
-        let items = (1..=6i64)
-            .map(|id| {
-                let conn = db_arc.pool.get().unwrap();
-                let sql = format!(
-                    "SELECT {} FROM songs WHERE id = ?1",
-                    crate::collection::SONG_SELECT_COLS
-                );
-                let song = conn
-                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
-                    .unwrap();
-                PlaylistItem::new_song(0, 0, song)
-            })
-            .collect::<Vec<_>>();
-
-        // current_index = 0 -> song 1 (Album A) is "now playing".
-        player.set_shuffle_mode(ShuffleMode::Albums);
-        player
-            .play_playlist(items.clone(), 0, 0, None)
-            .await
-            .unwrap();
-
-        let order_ids: Vec<i64> = player
-            .shuffle_order
-            .iter()
-            .map(|&idx| player.playlist_items[idx].song.as_ref().unwrap().id)
-            .collect();
-        assert_eq!(
-            order_ids,
-            vec![1, 3, 5, 2, 4, 6],
-            "Albums mode must keep each album's own track order (1,3,5 then 2,4,6), only \
-             reordering which album comes next — with just 2 albums here that reorder is a \
-             no-op, so the exact order is deterministic"
-        );
-
-        // InsideAlbum: album group order must stay as encountered in the
-        // playlist (A's group before B's group), but track order *within*
-        // each album is free to shuffle — assert group membership/position,
-        // not exact per-track order.
-        player.set_shuffle_mode(ShuffleMode::InsideAlbum);
-        player.play_playlist(items, 0, 0, None).await.unwrap();
-
-        let order_ids: Vec<i64> = player
-            .shuffle_order
-            .iter()
-            .map(|&idx| player.playlist_items[idx].song.as_ref().unwrap().id)
-            .collect();
-        assert_eq!(order_ids[0], 1, "current track must stay first");
-        let mut album_a_tail: Vec<i64> = order_ids[1..3].to_vec();
-        album_a_tail.sort();
-        assert_eq!(
-            album_a_tail,
-            vec![3, 5],
-            "InsideAlbum must keep Album A's remaining tracks immediately after the current \
-             track, before any Album B track"
-        );
-        let mut album_b: Vec<i64> = order_ids[3..6].to_vec();
-        album_b.sort();
-        assert_eq!(
-            album_b,
-            vec![2, 4, 6],
-            "InsideAlbum must keep Album B as a contiguous group after Album A"
-        );
-    }
-
-    #[tokio::test]
     async fn test_remove_songs_preserves_shuffle_order() {
         let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
@@ -3652,8 +2532,8 @@ mod tests {
 
         // Fix shuffle order manually to test deterministic preservation
         // Order: [Song 1 (idx 0), Song 4 (idx 3), Song 2 (idx 1), Song 5 (idx 4), Song 3 (idx 2)]
-        player.shuffle_order = vec![0, 3, 1, 4, 2];
-        player.current_index = Some(0);
+        player.order.set_shuffle_order(vec![0, 3, 1, 4, 2]);
+        player.order.set_current_index(Some(0));
 
         // Remove Song 2 (uuid of items[1])
         let removed_uuid = items[1].uuid.clone();
@@ -3662,8 +2542,8 @@ mod tests {
         // After removing Song 2 (items[1]):
         // Remaining items: Song 1 (idx 0), Song 3 (idx 1), Song 4 (idx 2), Song 5 (idx 3)
         // Shuffle order should be: Song 1 (0), Song 4 (2), Song 5 (3), Song 3 (1) -> vec![0, 2, 3, 1]
-        assert_eq!(player.shuffle_order, vec![0, 2, 3, 1]);
-        assert_eq!(player.current_index, Some(0));
+        assert_eq!(player.order.shuffle_order(), &[0, 2, 3, 1]);
+        assert_eq!(player.order.current_index(), Some(0));
     }
 
     #[tokio::test]
@@ -3708,7 +2588,7 @@ mod tests {
 
         // Simulate having advanced past the first two tracks (#902): they must
         // still be returned, not sliced away just because current_index moved.
-        player.current_index = Some(2);
+        player.order.set_current_index(Some(2));
 
         let result = player.get_playlist_tracks_in_playback_order();
         assert_eq!(result.len(), 3);
@@ -3892,7 +2772,7 @@ mod tests {
         let mut remote_song = items[1].song.clone().unwrap();
         remote_song.source = crate::models::SongSource::WebDav;
         player
-            .start_track(remote_song, None, GaplessTargetKind::Index(1), false)
+            .start_track(remote_song, None, OrderTargetKind::Index(1), false)
             .await
             .unwrap();
         assert!(indicator.load(std::sync::atomic::Ordering::Relaxed));
@@ -4012,7 +2892,7 @@ mod tests {
             .start_track(
                 station(1, "Groove Salad"),
                 None,
-                GaplessTargetKind::Queue,
+                OrderTargetKind::Queue,
                 false,
             )
             .await
@@ -4048,7 +2928,7 @@ mod tests {
             .start_track(
                 station(2, "Drone Zone"),
                 None,
-                GaplessTargetKind::Queue,
+                OrderTargetKind::Queue,
                 false,
             )
             .await
@@ -4072,7 +2952,7 @@ mod tests {
             ..Song::default()
         };
         player
-            .start_track(local, None, GaplessTargetKind::Queue, false)
+            .start_track(local, None, OrderTargetKind::Queue, false)
             .await
             .unwrap();
         assert!(!player.note_stream_title(3, "Some - Thing"));
@@ -4128,12 +3008,14 @@ mod tests {
 
         let audio = Arc::new(tokio::sync::Mutex::new(crate::audio::AudioEngine::new()));
         let mut player = Player::new(db.clone(), audio.clone());
-        player.playlist_items = vec![
-            crate::models::PlaylistItem::new_song(42, 0, s1.clone()),
-            crate::models::PlaylistItem::new_song(42, 1, s2),
-        ];
+        player.order.load(
+            vec![
+                crate::models::PlaylistItem::new_song(42, 0, s1.clone()),
+                crate::models::PlaylistItem::new_song(42, 1, s2),
+            ],
+            Some(0),
+        );
         player.current_playlist_id = Some(42);
-        player.current_index = Some(0);
         player.current_song = Some(s1);
 
         let outcome = player.note_playback_error();
@@ -4143,7 +3025,7 @@ mod tests {
 
         // Handover advances to the next station in the list (even if stream open fails offline, index advances).
         let _ = player.next_track().await;
-        assert_eq!(player.current_index, Some(1));
+        assert_eq!(player.order.current_index(), Some(1));
         assert_eq!(player.current_song.as_ref().map(|s| s.id), Some(id2));
     }
 

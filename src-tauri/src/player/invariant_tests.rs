@@ -76,19 +76,20 @@ fn op() -> impl Strategy<Value = Op> {
 /// The playlist items `played_indices` point back to (by uuid).
 fn history_uuids(player: &Player) -> Vec<String> {
     player
-        .played_indices
+        .order
+        .played_indices()
         .iter()
-        .filter_map(|&v| player.resolve_item_index(v))
-        .map(|r| player.playlist_items[r].uuid.clone())
+        .filter_map(|&v| player.order.resolve_item_index(v))
+        .map(|r| player.order.items()[r].uuid.clone())
         .collect()
 }
 
 fn check_invariants(player: &Player, after: &Op) -> Result<(), TestCaseError> {
-    let len = player.playlist_items.len();
+    let len = player.order.items().len();
 
     // WF: shuffle_order is a permutation of 0..len — the identity while
     // shuffle is off.
-    let mut sorted = player.shuffle_order.clone();
+    let mut sorted = player.order.shuffle_order().to_vec();
     sorted.sort_unstable();
     prop_assert_eq!(
         sorted,
@@ -96,10 +97,10 @@ fn check_invariants(player: &Player, after: &Op) -> Result<(), TestCaseError> {
         "shuffle_order is not a permutation after {:?}",
         after
     );
-    if player.shuffle_mode == ShuffleMode::Off {
+    if player.order.shuffle_mode() == ShuffleMode::Off {
         prop_assert_eq!(
-            &player.shuffle_order,
-            &(0..len).collect::<Vec<_>>(),
+            player.order.shuffle_order(),
+            &(0..len).collect::<Vec<_>>()[..],
             "shuffle_order is not the identity with shuffle off after {:?}",
             after
         );
@@ -110,10 +111,10 @@ fn check_invariants(player: &Player, after: &Op) -> Result<(), TestCaseError> {
     let playing_real = player
         .current_item_uuid
         .as_deref()
-        .and_then(|u| player.playlist_items.iter().position(|i| i.uuid == u));
-    if let (Some(real), Some(virtual_idx)) = (playing_real, player.current_index) {
+        .and_then(|u| player.order.items().iter().position(|i| i.uuid == u));
+    if let (Some(real), Some(virtual_idx)) = (playing_real, player.order.current_index()) {
         prop_assert_eq!(
-            player.resolve_item_index(virtual_idx),
+            player.order.resolve_item_index(virtual_idx),
             Some(real),
             "current_index does not designate the playing item after {:?}",
             after
@@ -121,9 +122,9 @@ fn check_invariants(player: &Player, after: &Op) -> Result<(), TestCaseError> {
     }
 
     // Every history entry designates some item.
-    for &v in &player.played_indices {
+    for &v in player.order.played_indices() {
         prop_assert!(
-            player.resolve_item_index(v).is_some(),
+            player.order.resolve_item_index(v).is_some(),
             "played_indices entry {} is out of range after {:?}",
             v,
             after
@@ -133,7 +134,7 @@ fn check_invariants(player: &Player, after: &Op) -> Result<(), TestCaseError> {
 }
 
 async fn apply(player: &mut Player, op: &Op, songs: &[Song]) {
-    let len = player.playlist_items.len();
+    let len = player.order.items().len();
     let item = |id: i64| PlaylistItem::new_song(0, 0, songs[(id - 1) as usize].clone());
     match *op {
         Op::Play { start } => {
@@ -154,7 +155,8 @@ async fn apply(player: &mut Player, op: &Op, songs: &[Song]) {
         Op::Reorder { from, to } if len > 0 => player.reorder_playlist_items(from % len, to % len),
         Op::Rearrange { by } if len > 0 => {
             let mut order: Vec<String> = player
-                .playlist_items
+                .order
+                .items()
                 .iter()
                 .map(|i| i.uuid.clone())
                 .collect();
@@ -163,11 +165,11 @@ async fn apply(player: &mut Player, op: &Op, songs: &[Song]) {
             player.apply_playlist_order(&order);
         }
         Op::Remove { at } if len > 0 => {
-            let uuid = player.playlist_items[at % len].uuid.clone();
+            let uuid = player.order.items()[at % len].uuid.clone();
             player.remove_songs_from_playlist_items(&[uuid]);
         }
         Op::Append { song } => player.append_songs_to_playlist_items(vec![item(song)]),
-        Op::QueueNext { song } => player.queue.push_back(item(song)),
+        Op::QueueNext { song } => player.order.queue_mut().push_back(item(song)),
         Op::Reorder { .. } | Op::Remove { .. } | Op::Rearrange { .. } => {}
     }
 }
