@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { radioStore } from "./radio.svelte";
 import { tagEditorStore } from "./tagEditor.svelte";
 
 describe("tagEditorStore", () => {
   beforeEach(() => {
     tagEditorStore.close();
+    radioStore.closeStationEditor();
+    vi.restoreAllMocks();
   });
 
   it("opens a library song target and tracks open state", () => {
@@ -62,5 +65,31 @@ describe("tagEditorStore", () => {
     expect(tagEditorStore.isOpen).toBe(false);
     expect(tagEditorStore.target).toBeNull();
     expect(tagEditorStore.onSaved).toBeUndefined();
+  });
+
+  it("opens local Song objects in TagEditor without triggering radioStore", () => {
+    const spy = vi.spyOn(radioStore, "openStationEditorByUuid");
+    const onSaved = vi.fn();
+
+    tagEditorStore.open({ id: 55, path: "/music/track.flac" }, { onSaved });
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(tagEditorStore.isOpen).toBe(true);
+    expect(tagEditorStore.target).toEqual({ kind: "song", songId: 55 });
+    expect(tagEditorStore.onSaved).toBe(onSaved);
+  });
+
+  it("routes radio:// Song objects to radioStore instead of opening TagEditor", () => {
+    const spy = vi.spyOn(radioStore, "openStationEditorByUuid").mockResolvedValue();
+    const onSaved = vi.fn();
+
+    tagEditorStore.open(
+      { id: 99, path: "radio://custom-beb67bbf-aa63-40aa-8921-38ec6837255d" },
+      { onSaved },
+    );
+
+    expect(tagEditorStore.isOpen).toBe(false);
+    expect(tagEditorStore.target).toBeNull();
+    expect(spy).toHaveBeenCalledWith("custom-beb67bbf-aa63-40aa-8921-38ec6837255d", onSaved);
   });
 });

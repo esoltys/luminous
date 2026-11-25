@@ -623,6 +623,14 @@ describe("RadioView", () => {
     const editItem = await screen.findByRole("menuitem", { name: "Edit station" });
     await fireEvent.click(editItem);
 
+    expect(radioStore.editingStation).toEqual(customStation);
+    // AddStationModal for editingStation is hosted globally in +layout.svelte
+    const { default: AddStationModal } = await import("./AddStationModal.svelte");
+    const modal = render(AddStationModal, {
+      station: radioStore.editingStation,
+      onClose: () => radioStore.closeStationEditor(),
+    });
+
     const nameInput = await screen.findByTestId("add-station-name");
     const urlInput = screen.getByTestId("add-station-url");
     const tagsInput = screen.getByTestId("add-station-tags");
@@ -642,6 +650,7 @@ describe("RadioView", () => {
       });
     });
     expect(await screen.findByText("Updated FM")).toBeInTheDocument();
+    modal.unmount();
   });
 
   it("toggles Saved stations between cards and compact rows and reorders saved stations (#2209)", async () => {

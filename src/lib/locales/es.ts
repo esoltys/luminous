@@ -3281,6 +3281,14 @@ export const es = {
     editStationTitle: "Editar emisora personalizada",
     savingStation: "Guardando…",
     customStationUpdated: "{name} actualizada",
+    stationDetailsTitle: "Emisora de radio",
+    directoryStationReadOnlyNote:
+      "Las emisoras del directorio se sincronizan desde Radio Browser y no se pueden editar localmente.",
+    stationNotFound: "Emisora de radio no encontrada",
+    testConnection: "Probar conexión",
+    testingConnection: "Probando…",
+    connectionOk: "Conectado",
+    connectionFailed: "Error de conexión",
     customStationsImported: {
       one: "{count} emisora importada",
       other: "{count} emisoras importadas",

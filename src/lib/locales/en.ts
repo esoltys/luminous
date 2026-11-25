@@ -3204,6 +3204,14 @@ export const en = {
     editStationTitle: "Edit custom station",
     savingStation: "Saving…",
     customStationUpdated: "Updated {name}",
+    stationDetailsTitle: "Radio station",
+    directoryStationReadOnlyNote:
+      "Directory stations are synced from Radio Browser and cannot be edited locally.",
+    stationNotFound: "Radio station not found",
+    testConnection: "Test Connection",
+    testingConnection: "Testing…",
+    connectionOk: "Connected",
+    connectionFailed: "Connection failed",
     customStationsImported: {
       one: "{count} station imported",
       other: "{count} stations imported",

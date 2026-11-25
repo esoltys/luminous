@@ -3479,6 +3479,14 @@ export const ru = {
     editStationTitle: "Редактировать свою станцию",
     savingStation: "Сохранение…",
     customStationUpdated: "Обновлена станция {name}",
+    stationDetailsTitle: "Радиостанция",
+    directoryStationReadOnlyNote:
+      "Станции каталога синхронизируются с Radio Browser и не могут редактироваться локально.",
+    stationNotFound: "Радиостанция не найдена",
+    testConnection: "Проверить соединение",
+    testingConnection: "Проверка…",
+    connectionOk: "Подключено",
+    connectionFailed: "Ошибка подключения",
     customStationsImported: {
       one: "Импортирована {count} станция",
       few: "Импортировано {count} станции",

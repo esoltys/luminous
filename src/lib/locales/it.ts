@@ -3274,6 +3274,14 @@ export const it = {
     editStationTitle: "Modifica stazione personalizzata",
     savingStation: "Salvataggio…",
     customStationUpdated: "{name} aggiornata",
+    stationDetailsTitle: "Stazione radio",
+    directoryStationReadOnlyNote:
+      "Le stazioni della directory sono sincronizzate da Radio Browser e non possono essere modificate localmente.",
+    stationNotFound: "Stazione radio non trovata",
+    testConnection: "Verifica connessione",
+    testingConnection: "Verifica in corso…",
+    connectionOk: "Connesso",
+    connectionFailed: "Connessione non riuscita",
     customStationsImported: {
       one: "{count} stazione importata",
       other: "{count} stazioni importate",

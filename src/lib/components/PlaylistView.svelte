@@ -239,8 +239,8 @@
     }
   }
 
-  function openTagEditor(songId: number) {
-    tagEditorStore.open(songId, { onSaved: handleTagEditorSaved });
+  function openTagEditor(song: { id: number; path?: string | null }) {
+    tagEditorStore.open(song, { onSaved: handleTagEditorSaved });
   }
 
   function handleTagEditorSaved() {
@@ -1079,7 +1079,7 @@
               activePlaylist && playerStore.playPlaylistItemByUuid(activePlaylist.id, row.key)}
             onRowContextMenu={handleRowContextMenu}
             onRate={rateSong}
-            onEditTags={(song) => openTagEditor(song.id)}
+            onEditTags={(song) => openTagEditor(song)}
             onRemoveFromPlaylist={(row) => handleRemoveItem(row.key)}
             onReorder={isSearching ? undefined : handleReorder}
             dragSourcePlaylistId={activePlaylist?.id ?? null}
@@ -1173,7 +1173,7 @@
       ? () => navigationStore.viewAlbum(singleItem.song?.album || "")
       : undefined}
     onEditTags={singleItem.song?.id && !isItemUnavailable(singleItem)
-      ? () => openTagEditor(singleItem.song!.id)
+      ? () => openTagEditor(singleItem.song!)
       : undefined}
     onEditBatchTags={batchEditable.length > 1
       ? () => {

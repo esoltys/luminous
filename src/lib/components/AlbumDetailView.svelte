@@ -532,8 +532,8 @@
     toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
   }
 
-  function openTagEditor(songId: number) {
-    tagEditorStore.open(songId, { onSaved: () => handleTagEditorSaved() });
+  function openTagEditor(song: { id: number; path?: string | null }) {
+    tagEditorStore.open(song, { onSaved: () => handleTagEditorSaved() });
   }
 
   let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
@@ -837,7 +837,7 @@
         onRowContextMenu={handleRowContextMenu}
         onRate={rateSong}
         onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
-        onEditTags={(song) => openTagEditor(song.id)}
+        onEditTags={(song) => openTagEditor(song)}
       />
     </div>
   </div>
@@ -883,7 +883,7 @@
     }}
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
-    onEditTags={() => openTagEditor(song.id)}
+    onEditTags={() => openTagEditor(song)}
     onEditBatchTags={() => {
       batchEditSongs = selectedSongs ?? null;
     }}

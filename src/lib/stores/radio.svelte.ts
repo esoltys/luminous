@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   Playlist,
   RadioBrowserFacetEntry,
+  RadioConnectionTestResult,
   RadioDirectoryFacets,
   RadioDirectoryOrder,
   RadioDirectoryStation,
@@ -173,6 +174,7 @@ class RadioStore {
   savedStations = $state<RadioDirectoryStation[]>([]);
   recentStations = $state<RadioDirectoryStation[]>([]);
   editingStation = $state<RadioDirectoryStation | null>(null);
+  editingStationOnSaved = $state<(() => void) | undefined>(undefined);
   myStationsLoading = $state(false);
   stationListTags = $state<RadioBrowserFacetEntry[]>([]);
   suggestedLibraryGenres = $state<RadioBrowserFacetEntry[]>([]);
@@ -577,8 +579,61 @@ class RadioStore {
     this.recentStations = this.recentStations.map((s) =>
       s.stationuuid === station.stationuuid ? station : s,
     );
+    if (playerStore.currentSong?.path === `radio://${station.stationuuid}`) {
+      const genre = station.tags
+        ? station.tags
+            .split(/[,;]/)
+            .map((t) => t.trim())
+            .filter(Boolean)
+            .join("; ")
+        : undefined;
+      playerStore.currentSong = {
+        ...playerStore.currentSong,
+        title: station.name,
+        stream_url: station.urlResolved,
+        genre: genre || undefined,
+      };
+    }
     toastStore.show(i18n.t("radio.customStationUpdated", { name: station.name }), "success");
     return station;
+  }
+
+  openStationEditor(station: RadioDirectoryStation, onSaved?: () => void): void {
+    this.editingStation = station;
+    this.editingStationOnSaved = onSaved;
+  }
+
+  closeStationEditor(): void {
+    this.editingStation = null;
+    this.editingStationOnSaved = undefined;
+  }
+
+  async openStationEditorByUuid(stationuuid: string, onSaved?: () => void): Promise<void> {
+    const existing =
+      this.savedStations.find((s) => s.stationuuid === stationuuid) ??
+      this.recentStations.find((s) => s.stationuuid === stationuuid) ??
+      this.discoverStations.find((s) => s.stationuuid === stationuuid) ??
+      this.globalSearchStations.find((s) => s.stationuuid === stationuuid);
+    if (existing) {
+      this.openStationEditor(existing, onSaved);
+      return;
+    }
+    try {
+      const fetched = await invoke<RadioDirectoryStation | null>("get_radio_directory_station", {
+        stationuuid,
+      });
+      if (fetched) {
+        this.openStationEditor(fetched, onSaved);
+      } else {
+        toastStore.show(i18n.t("radio.stationNotFound"), "error");
+      }
+    } catch (e) {
+      toastStore.show(e instanceof Error ? e.message : String(e), "error");
+    }
+  }
+
+  async testStationUrl(url: string): Promise<RadioConnectionTestResult> {
+    return await invoke<RadioConnectionTestResult>("test_radio_station_url", { url });
   }
 
   async importCustomStations(filePath: string): Promise<RadioDirectoryStation[]> {

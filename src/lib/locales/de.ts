@@ -3289,6 +3289,14 @@ export const de = {
     editStationTitle: "Eigenen Sender bearbeiten",
     savingStation: "Wird gespeichert…",
     customStationUpdated: "{name} aktualisiert",
+    stationDetailsTitle: "Radiosender",
+    directoryStationReadOnlyNote:
+      "Verzeichnissender werden über Radio Browser synchronisiert und können nicht lokal bearbeitet werden.",
+    stationNotFound: "Radiosender nicht gefunden",
+    testConnection: "Verbindung testen",
+    testingConnection: "Teste…",
+    connectionOk: "Verbunden",
+    connectionFailed: "Verbindung fehlgeschlagen",
     customStationsImported: {
       one: "{count} Sender importiert",
       other: "{count} Sender importiert",

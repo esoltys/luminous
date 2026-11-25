@@ -47,6 +47,8 @@
   import { FrontendErrorReporter } from "../lib/utils/frontendError";
   import TagEditor from "../lib/components/TagEditor.svelte";
   import { tagEditorStore } from "../lib/stores/tagEditor.svelte";
+  import AddStationModal from "../lib/components/radio/AddStationModal.svelte";
+  import { radioStore } from "../lib/stores/radio.svelte";
   import DeviceSyncDrawer from "../lib/components/devices/DeviceSyncDrawer.svelte";
   import { onMount } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -655,6 +657,14 @@
         onSave={tagEditorStore.onSaved}
       />
     {/key}
+  {/if}
+
+  {#if radioStore.editingStation !== null}
+    <AddStationModal
+      station={radioStore.editingStation}
+      onSaved={radioStore.editingStationOnSaved}
+      onClose={() => radioStore.closeStationEditor()}
+    />
   {/if}
 
   {#if welcomeStore.initialized && !welcomeStore.hasSeen}
