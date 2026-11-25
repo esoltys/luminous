@@ -144,6 +144,10 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         run: cargo test --workspace --lib --tests
 
+      - name: Verify generated TypeScript types are up to date
+        if: steps.scope.outputs.run == 'true'
+        run: git diff --exit-code src/lib/types/generated/
+
       - name: Run clippy
         if: steps.scope.outputs.run == 'true'
         run: cargo clippy --workspace --all-targets -- -D warnings
