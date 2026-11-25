@@ -1,8 +1,8 @@
 //! Read-query API for the library: search, browse-by-album/artist/genre/
-//! decade/BPM, home-screen sections (recently played/added, most frequently
-//! played), and artist-profile reads. Split out of `collection.rs` (#577
-//! item 17) — a second `impl CollectionScanner` block alongside the one in
-//! `collection.rs` that owns scanning/directory management.
+//! decade/BPM, and home-screen sections (recently played/added, most
+//! frequently played). Split out of `collection.rs` (#577 item 17) — a second
+//! `impl CollectionScanner` block alongside the one in `collection.rs` that
+//! owns scanning/directory management.
 
 use super::{
     mode_query_fragments, parse_decade_range, row_to_song, CollectionScanner, SONG_SELECT_COLS,
