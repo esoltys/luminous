@@ -216,7 +216,7 @@ describe("voxel preset (#2245)", () => {
     } as unknown as CanvasRenderingContext2D;
   }
 
-  it("draws the mini slot once per frame of data, with no animation of its own", () => {
+  it("draws the mini slot as a 16x6 voxel grid once per frame of data, with no animation of its own", () => {
     const mini = VOXEL_PRESET.create("mini");
     mini.setTheme(LUMINOUS_DARK_COLORS);
     mini.push({ bands: new Array(32).fill(0.5), playing: true, onset: 0, scope: null });
@@ -224,10 +224,22 @@ describe("voxel preset (#2245)", () => {
 
     const ctx = fakeCtx();
     mini.render(ctx, 96, 28, { reducedMotion: false, preview: false });
-    expect(ctx.roundRect).toHaveBeenCalledTimes(32);
+    // 16 columns x 3 active rows at level 0.5 (6 * 0.5 = 3)
+    expect(ctx.clearRect).toHaveBeenCalledWith(0, 0, 96, 28);
+    expect(ctx.fillRect).toHaveBeenCalledTimes(16 * 3);
+    expect(ctx.roundRect).not.toHaveBeenCalled();
+
+    // Paused frames settle immediately to the single resting base row
+    vi.mocked(ctx.fillRect).mockClear();
+    mini.push({ bands: new Array(32).fill(0.8), playing: false, onset: 0, scope: null });
     mini.render(ctx, 96, 28, { reducedMotion: false, preview: false });
-    // The bar gradient is built once per theme and height, not per draw.
-    expect(ctx.createLinearGradient).toHaveBeenCalledTimes(1);
+    expect(ctx.fillRect).toHaveBeenCalledTimes(16);
+
+    // Track accent updates the mini palette without error
+    mini.setTrack?.({ key: "track-1", accent: "#ff5500" });
+    vi.mocked(ctx.fillRect).mockClear();
+    mini.render(ctx, 96, 28, { reducedMotion: false, preview: true });
+    expect(vi.mocked(ctx.fillRect).mock.calls.length).toBeGreaterThan(16);
   });
 
   it("settles the full matrix to rest when playback stops", () => {
