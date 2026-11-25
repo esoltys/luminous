@@ -13,7 +13,7 @@ use crate::collection::{
 use crate::db::Database;
 use crate::devices::sync::manifest::{EntryKind, Manifest, MANIFEST_FILE_NAME};
 use crate::library_paths;
-use crate::models::{Song, SongSource, LOCAL_SOURCES_SQL};
+use crate::models::{local_song_where, Song, SongSource};
 use anyhow::{anyhow, Context, Result};
 use luminous_devices::{
     is_partial_file, is_system_clutter, DeviceBackend, DeviceProfile, FsBackend, MARKER_FILE_NAME,
@@ -522,8 +522,8 @@ pub fn search_folders(
 
     // Local library song folders under their deepest watched folder.
     let mut local_stmt = conn.prepare(&format!(
-        "SELECT DISTINCT path FROM songs WHERE source IN ({}) AND unavailable = 0 AND path IS NOT NULL",
-        *LOCAL_SOURCES_SQL
+        "SELECT DISTINCT path FROM songs WHERE {local_where} AND path IS NOT NULL",
+        local_where = local_song_where("")
     ))?;
     let local_paths = local_stmt
         .query_map([], |r| r.get::<_, String>(0))?
@@ -839,10 +839,10 @@ fn local_songs_under(conn: &Connection, folder: &Path) -> Result<Vec<Song>> {
     let pattern = format!("{}/%", escape_like(&folder_key.to_lowercase()));
     let mut stmt = conn.prepare(&format!(
         "SELECT {SONG_SELECT_COLS} FROM songs
-         WHERE source IN ({lib}) AND unavailable = 0
+         WHERE {local_where}
            AND (REPLACE(path, '\\', '/') LIKE ?1 ESCAPE '!'
                 OR REPLACE(cue_path, '\\', '/') LIKE ?1 ESCAPE '!')",
-        lib = *LOCAL_SOURCES_SQL
+        local_where = local_song_where("")
     ))?;
     let songs = stmt
         .query_map(params![pattern], row_to_song)?
@@ -1043,9 +1043,9 @@ fn list_device(db: &Database, storage: &dyn DeviceBackend, dir: &str) -> Result<
 
     let conn = db.pool.get()?;
     let mut song_at = conn.prepare(&format!(
-        "SELECT id FROM songs WHERE path = ?1 AND source IN ({}) AND unavailable = 0
+        "SELECT id FROM songs WHERE path = ?1 AND {local_where}
          ORDER BY id LIMIT 1",
-        *LOCAL_SOURCES_SQL
+        local_where = local_song_where("")
     ))?;
     let mut files = Vec::with_capacity(entries.len());
     for (mut entry, library_path) in entries {

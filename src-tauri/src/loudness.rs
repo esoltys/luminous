@@ -13,7 +13,7 @@
 //! DSP chain by #47.
 
 use crate::db::Database;
-use crate::models::{LoudnessMode, LoudnessSettings, LOCAL_SOURCES_SQL};
+use crate::models::{local_song_where, LoudnessMode, LoudnessSettings};
 use anyhow::{Context, Result};
 pub use luminous_analysis::{
     compute_gain, GainResult, ANALYSIS_FAILED_SENTINEL, PLAUSIBLE_LUFS_RANGE,
@@ -125,10 +125,10 @@ impl crate::background_reads::BackgroundRead for LoudnessReader {
         conn.query_row(
             &format!(
                 "SELECT id, path FROM songs
-                 WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
+                 WHERE {local_where} AND path IS NOT NULL
                    AND ebur128_integrated_loudness_lufs IS NULL AND {skip}
                  ORDER BY added DESC, id DESC LIMIT 1",
-                lib = *LOCAL_SOURCES_SQL,
+                local_where = local_song_where(""),
                 skip = skipped.sql_excluding("id")
             ),
             [],
@@ -160,9 +160,9 @@ impl crate::background_reads::BackgroundRead for LoudnessReader {
             conn.query_row(
                 &format!(
                     "SELECT COUNT(*) FROM songs
-                     WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
+                     WHERE {local_where} AND path IS NOT NULL
                        AND ebur128_integrated_loudness_lufs IS NULL",
-                    lib = *LOCAL_SOURCES_SQL
+                    local_where = local_song_where("")
                 ),
                 [],
                 |row| row.get::<_, i64>(0),

@@ -281,7 +281,7 @@ impl MbArtistResponse {
             .map(String::as_str);
         [self.country.as_deref(), area_code]
             .into_iter()
-            .find_map(|c| crate::collection::normalize_country_code(c))
+            .find_map(crate::profiles::normalize_country_code)
     }
 }
 

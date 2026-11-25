@@ -2857,8 +2857,8 @@ fn seed_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
 
     let sql = format!(
         "SELECT genre FROM songs
-         WHERE source IN ({lib}) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
-        lib = *crate::models::LIBRARY_SOURCES_SQL
+         WHERE {lib_where} AND genre IS NOT NULL AND genre != ''",
+        lib_where = crate::models::library_song_where("")
     );
     let mut stmt = conn.prepare(&sql)?;
     let lists: Vec<Vec<String>> = stmt
@@ -5810,10 +5810,10 @@ mod tests {
         let sql = format!(
             "EXPLAIN QUERY PLAN
              SELECT id FROM songs
-             WHERE +source IN ({lib}) AND unavailable = 0
+             WHERE {lib_where}
              ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track
              LIMIT 100 OFFSET 0",
-            lib = *crate::models::LIBRARY_SOURCES_SQL
+            lib_where = crate::models::library_song_where_for_sort("")
         );
         let mut stmt = conn.prepare(&sql).unwrap();
         let plan_lines: Vec<String> = stmt

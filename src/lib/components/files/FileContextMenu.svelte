@@ -14,6 +14,7 @@
   import PlusIcon from "../PlusIcon.svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
   import { filesStore } from "../../stores/files.svelte";
+  import { openerStore } from "../../stores/opener.svelte";
   import { playerStore } from "../../stores/player.svelte";
   import { toastStore } from "../../stores/toast.svelte";
   import { picardStore } from "../../stores/picard.svelte";
@@ -350,7 +351,7 @@
         icon={PlayIcon}
         accent
         label={i18n.t("files.playWithoutAdding")}
-        onclick={() => runAndClose(() => playerStore.openAndPlay(unscannedLocations))}
+        onclick={() => runAndClose(() => openerStore.openAndPlay(unscannedLocations))}
       />
     {/if}
     {#if canScanFiles}

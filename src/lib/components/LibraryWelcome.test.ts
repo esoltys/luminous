@@ -8,7 +8,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue({ played: 0, skipped: 0 }),
+  invoke: vi.fn(async (cmd: string) => {
+    if (cmd === "get_supported_extensions") {
+      return { audio: ["mp3", "flac"], playlists: ["m3u", "pls"] };
+    }
+    return { played: 0, skipped: 0 };
+  }),
 }));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({

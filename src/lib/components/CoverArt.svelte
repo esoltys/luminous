@@ -19,7 +19,8 @@
     artManual?: string | null;
     sizeClass?: string; // e.g. "w-12 h-12" or "w-full h-full"
     animateSpin?: boolean;
-    /** Show the original embedded picture rather than the downscaled cache copy (#1272). */
+    /** Show the original picture (embedded, folder or manual) rather than a downscaled copy
+     * (#1272). A source that only exists downscaled, such as a fetched cover, is shown as is. */
     fullResolution?: boolean;
     /** Fit the image inside the frame without cropping (e.g. radio station logos). */
     contain?: boolean;
@@ -83,7 +84,7 @@
     const token = ++loadToken;
     const id = songId;
     if (artManual) {
-      imgSrc = resolveArtUrl(artManual);
+      imgSrc = resolveArtUrl(artManual, fullResolution);
       hasFailed = false;
       return;
     }

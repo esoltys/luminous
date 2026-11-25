@@ -55,6 +55,7 @@ pub mod pins;
 mod playback_events;
 pub mod player;
 pub mod playlist;
+pub mod profiles;
 pub mod provenance;
 pub mod radio;
 pub mod radio_directory;
@@ -1114,6 +1115,7 @@ pub fn run() {
             commands::player::play_playlist_item_by_uuid,
             commands::player::open_and_play,
             commands::player::get_startup_file,
+            commands::player::get_supported_extensions,
             commands::player::add_songs_to_queue,
             commands::player::add_paths_to_queue,
             commands::player::is_shift_key_held,

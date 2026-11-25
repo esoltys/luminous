@@ -16,9 +16,9 @@ use crate::{
     genre_aliases::GenreAliases,
     language::canonical_language,
     models::{
-        join_multi_value, parse_multi_value, GenreGroup, LanguageSummary, QueuePopulationMode,
-        Song, Tag, TagCount, TagDuplicateGroup, TagGroup, TagGroupChild, TagSpelling,
-        LIBRARY_SOURCES_SQL,
+        included_library_song_where, join_multi_value, library_song_where, parse_multi_value,
+        playable_library_song_where, GenreGroup, LanguageSummary, QueuePopulationMode, Song, Tag,
+        TagCount, TagDuplicateGroup, TagGroup, TagGroupChild, TagSpelling,
     },
 };
 use anyhow::Result;
@@ -207,11 +207,10 @@ impl TagManager {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT genre FROM songs
-             WHERE source IN ({lib})
-               AND unavailable = 0
+             WHERE {lib_where}
                AND genre IS NOT NULL
                AND genre != ''",
-            lib = *LIBRARY_SOURCES_SQL
+            lib_where = library_song_where("")
         );
         let aliases = GenreAliases::load(&conn)?;
         let mut stmt = conn.prepare(&sql)?;
@@ -326,10 +325,9 @@ impl TagManager {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT COUNT(*) FROM songs
-             WHERE source IN ({lib})
-               AND unavailable = 0
+             WHERE {lib_where}
                AND (genre IS NULL OR genre = '')",
-            lib = *LIBRARY_SOURCES_SQL
+            lib_where = library_song_where("")
         );
         let count = conn.query_row(&sql, [], |row| row.get(0))?;
         Ok(count)
@@ -346,13 +344,12 @@ impl TagManager {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE (genre IS NULL OR genre = '')
-               AND source IN ({lib})
-               AND unavailable = 0
+               AND {lib_where}
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?1",
             SONG_SELECT_COLS,
-            lib = *LIBRARY_SOURCES_SQL
+            lib_where = library_song_where("")
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -388,14 +385,11 @@ impl TagManager {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE ({like_any})
-               AND source IN ({lib})
-               AND unavailable = 0
-               AND not_included = 0
-               AND loved != -1
+               AND {lib_where}
                {extra_where}
              ORDER BY {order_by}",
             SONG_SELECT_COLS,
-            lib = *LIBRARY_SOURCES_SQL
+            lib_where = playable_library_song_where("")
         );
         let mut stmt = conn.prepare(&sql)?;
         let candidates: Vec<Song> = stmt
@@ -426,12 +420,10 @@ impl TagManager {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT language, album_key FROM songs
-             WHERE source IN ({lib})
-               AND unavailable = 0
-               AND not_included = 0
+             WHERE {lib_where}
                AND language IS NOT NULL
                AND language != ''",
-            lib = *LIBRARY_SOURCES_SQL
+            lib_where = included_library_song_where("")
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], |row| {
@@ -502,14 +494,11 @@ impl TagManager {
             "SELECT {} FROM songs
              WHERE language IS NOT NULL
                AND language != ''
-               AND source IN ({lib})
-               AND unavailable = 0
-               AND not_included = 0
-               AND loved != -1
+               AND {lib_where}
                {extra_where}
              ORDER BY {order_by}",
             SONG_SELECT_COLS,
-            lib = *LIBRARY_SOURCES_SQL
+            lib_where = playable_library_song_where("")
         );
         let mut stmt = conn.prepare(&sql)?;
         let candidates: Vec<Song> = stmt
@@ -562,16 +551,13 @@ impl TagManager {
         let (extra_where, order_by) = mode_query_fragments(mode);
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN ({lib})
-               AND unavailable = 0
-               AND not_included = 0
-               AND loved != -1
+             WHERE {lib_where}
                AND genre IS NOT NULL
                AND genre != ''
                {extra_where}
              ORDER BY {order_by}",
             SONG_SELECT_COLS,
-            lib = *LIBRARY_SOURCES_SQL
+            lib_where = playable_library_song_where("")
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -630,13 +616,10 @@ impl TagManager {
         };
         let sql = format!(
             "SELECT genre FROM songs
-             WHERE source IN ({lib})
-               AND unavailable = 0
-               AND not_included = 0
-               AND loved != -1
+             WHERE {lib_where}
                AND genre IS NOT NULL
                AND genre != ''",
-            lib = *LIBRARY_SOURCES_SQL
+            lib_where = playable_library_song_where("")
         );
         let mut stmt = conn.prepare(&sql)?;
         let count = stmt
@@ -1141,8 +1124,8 @@ impl TagManager {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT id, path, genre FROM songs
-             WHERE source IN ({lib}) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
-            lib = *LIBRARY_SOURCES_SQL
+             WHERE {lib_where} AND genre IS NOT NULL AND genre != ''",
+            lib_where = library_song_where("")
         );
         let mut stmt = conn.prepare(&sql)?;
         let targets: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
@@ -1286,11 +1269,9 @@ impl TagManager {
              FROM artist_profiles, json_each(artist_profiles.tags)
              JOIN songs ON COALESCE(NULLIF(songs.album_artist, ''), songs.artist)
                  = artist_profiles.artist_key COLLATE NOCASE
-             WHERE songs.source IN ({lib})
-               AND songs.unavailable = 0
-               AND songs.not_included = 0
+             WHERE {lib_where}
              GROUP BY artist_profiles.artist_key, tag COLLATE NOCASE",
-            lib = *LIBRARY_SOURCES_SQL
+            lib_where = included_library_song_where("songs")
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
@@ -1390,10 +1371,8 @@ impl TagManager {
              FROM artist_profiles, json_each(artist_profiles.tags)
              JOIN songs ON COALESCE(NULLIF(songs.album_artist, ''), songs.artist)
                  = artist_profiles.artist_key COLLATE NOCASE
-             WHERE songs.source IN ({lib})
-               AND songs.unavailable = 0
-               AND songs.not_included = 0",
-            lib = *LIBRARY_SOURCES_SQL
+             WHERE {lib_where}",
+            lib_where = included_library_song_where("songs")
         ))?;
         let active_tags: Vec<String> = stmt
             .query_map([], |r| r.get(0))?
@@ -2961,16 +2940,20 @@ mod tests {
         insert_artist_song("/celine1.mp3", "Celine Dion");
         insert_artist_song("/adele1.mp3", "Adele");
 
-        scanner
-            .set_artist_profile(&ArtistProfile {
+        let conn = db.pool.get().unwrap();
+        crate::profiles::set_artist_profile(
+            &conn,
+            &ArtistProfile {
                 artist_key: "Rush".to_string(),
                 tags: vec!["Canadian".to_string(), "Juno Award".to_string()],
                 ..Default::default()
-            })
-            .unwrap();
+            },
+        )
+        .unwrap();
 
-        scanner
-            .set_artist_profile(&ArtistProfile {
+        crate::profiles::set_artist_profile(
+            &conn,
+            &ArtistProfile {
                 artist_key: "Celine Dion".to_string(),
                 tags: vec![
                     "Canadian".to_string(),
@@ -2978,11 +2961,13 @@ mod tests {
                     "Grammy Award".to_string(),
                 ],
                 ..Default::default()
-            })
-            .unwrap();
+            },
+        )
+        .unwrap();
 
-        scanner
-            .set_artist_profile(&ArtistProfile {
+        crate::profiles::set_artist_profile(
+            &conn,
+            &ArtistProfile {
                 artist_key: "Adele".to_string(),
                 tags: vec![
                     "English".to_string(),
@@ -2990,8 +2975,9 @@ mod tests {
                     "Grammy Award".to_string(),
                 ],
                 ..Default::default()
-            })
-            .unwrap();
+            },
+        )
+        .unwrap();
 
         // 1. Initial hierarchy builds individual cards for each distinct tag
         let hierarchy = manager.get_artist_tag_hierarchy().unwrap();
