@@ -1752,6 +1752,12 @@ export interface StationListFile {
   station_count: number;
 }
 
+/** Authoritative audio and playlist file extensions returned by `get_supported_extensions`. */
+export interface SupportedExtensions {
+  audio: string[];
+  playlists: string[];
+}
+
 export interface RadioStationListSpec {
   tags: string[];
   country?: string | null;

@@ -8,7 +8,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
-  import { playerStore } from "../stores/player.svelte";
+  import { openerStore } from "../stores/opener.svelte";
   import { walkthroughStore } from "../stores/walkthrough.svelte";
   import Button from "./Button.svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
@@ -81,11 +81,11 @@
     </Button>
 
     <div class="flex flex-wrap items-center justify-center gap-2 mt-3">
-      <Button onclick={() => playerStore.openFileDialog()} variant="secondary" size="sm">
+      <Button onclick={() => openerStore.openFileDialog()} variant="secondary" size="sm">
         <FileAudio class="w-3.5 h-3.5" />
         {i18n.t("emptyLibrary.openFiles")}
       </Button>
-      <Button onclick={() => playerStore.openFolderDialog()} variant="secondary" size="sm">
+      <Button onclick={() => openerStore.openFolderDialog()} variant="secondary" size="sm">
         <FolderOpen class="w-3.5 h-3.5" />
         {i18n.t("emptyLibrary.playFolder")}
       </Button>

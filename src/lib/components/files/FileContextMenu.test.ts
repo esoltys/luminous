@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import FileContextMenu from "./FileContextMenu.svelte";
 import { i18n } from "../../stores/i18n.svelte";
 import { playlistsStore } from "../../stores/playlists.svelte";
-import { playerStore } from "../../stores/player.svelte";
+import { openerStore } from "../../stores/opener.svelte";
 import { toastStore } from "../../stores/toast.svelte";
 import type { FileEntry, FileSource, Song } from "../../types";
 
@@ -184,7 +184,7 @@ describe("FileContextMenu.svelte", () => {
   });
 
   it("offers a file not in the library to play without adding it, or to scan its folder", async () => {
-    const openAndPlay = vi.spyOn(playerStore, "openAndPlay").mockResolvedValue(undefined as never);
+    const openAndPlay = vi.spyOn(openerStore, "openAndPlay").mockResolvedValue(undefined as never);
     open([entry("03 Bonus.flac")]);
 
     expect(screen.getByText("Scan this folder")).toBeInTheDocument();
