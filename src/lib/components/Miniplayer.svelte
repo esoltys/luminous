@@ -15,6 +15,14 @@
   import RadioSaveButton from "./radio/RadioSaveButton.svelte";
   import { stationUuidFromPath } from "../stores/radio.svelte";
   import {
+    nextRepeatMode,
+    nextShuffleMode,
+    repeatModeTooltip,
+    repeatTypeIcon,
+    shuffleModeTooltip,
+    shuffleTypeIcon,
+  } from "../playbackModes";
+  import {
     PlayIcon as Play,
     PauseIcon as Pause,
     SkipBackIcon as SkipBack,
@@ -24,9 +32,6 @@
     CornersOutIcon as Maximize2,
     SpeakerHighIcon as Volume2,
     SpeakerSimpleSlashIcon as VolumeX,
-    DiscIcon as DiscAlbum,
-    MicrophoneStageIcon as Mic2,
-    PlaylistIcon as ListMusic,
     MusicNotesIcon as Music,
     SubtitlesIcon as Lyrics,
     CheckCircleIcon as CheckCircle,
@@ -85,116 +90,11 @@
   }
 
   function cycleShuffle() {
-    const modes: import("../types").ShuffleMode[] = [
-      "off",
-      "all",
-      "inside_album",
-      "albums",
-      "artists",
-    ];
-    const currentIdx = modes.indexOf(playerStore.shuffleMode);
-    const nextIdx = (currentIdx + 1) % modes.length;
-    playerStore.setShuffleMode(modes[nextIdx]);
+    playerStore.setShuffleMode(nextShuffleMode(playerStore.shuffleMode));
   }
 
   function cycleRepeat() {
-    const modes: import("../types").RepeatMode[] = ["off", "track", "album", "playlist"];
-    const currentIdx = modes.indexOf(playerStore.repeatMode);
-    const nextIdx = (currentIdx + 1) % modes.length;
-    playerStore.setRepeatMode(modes[nextIdx]);
-  }
-
-  // A mode-type icon paired alongside the Shuffle/Repeat transport icon to
-  // disambiguate modes that would otherwise share the same base icon (e.g.
-  // "Shuffle Albums" and "Shuffle Inside Album" both pair with DiscAlbum) —
-  // rendered full-size next to the icon rather than as a tiny overlay badge,
-  // so it stays legible. Reuses the same Phosphor icons as the rest of the app.
-  function shuffleTypeIcon(mode: import("../types").ShuffleMode) {
-    switch (mode) {
-      case "inside_album":
-        return DiscAlbum;
-      case "albums":
-        return DiscAlbum;
-      case "artists":
-        return Mic2;
-      default:
-        return null;
-    }
-  }
-
-  function repeatTypeIcon(mode: import("../types").RepeatMode) {
-    switch (mode) {
-      case "track":
-        return Music;
-      case "album":
-        return DiscAlbum;
-      case "playlist":
-        return ListMusic;
-      default:
-        return null;
-    }
-  }
-
-  function shuffleModeLabel(mode: import("../types").ShuffleMode): string {
-    switch (mode) {
-      case "off":
-        return i18n.t("playerBar.shuffleOff");
-      case "all":
-        return i18n.t("playerBar.shuffleAll");
-      case "inside_album":
-        return i18n.t("playerBar.shuffleInsideAlbum");
-      case "albums":
-        return i18n.t("playerBar.shuffleAlbums");
-      case "artists":
-        return i18n.t("playerBar.shuffleArtists");
-    }
-  }
-
-  function repeatModeLabel(mode: import("../types").RepeatMode): string {
-    switch (mode) {
-      case "off":
-        return i18n.t("playerBar.repeatOff");
-      case "track":
-        return i18n.t("playerBar.repeatSong");
-      case "album":
-        return i18n.t("playerBar.repeatAlbum");
-      case "playlist":
-        return i18n.t("playerBar.repeatPlaylist");
-      default:
-        return mode;
-    }
-  }
-
-  // Mirrors the mode descriptions from the user guide so the tooltip explains
-  // what the mode does, not just its name.
-  function shuffleModeDescription(mode: import("../types").ShuffleMode): string {
-    switch (mode) {
-      case "off":
-        return i18n.t("playerBar.shuffleOffDesc");
-      case "all":
-        return i18n.t("playerBar.shuffleAllDesc");
-      case "inside_album":
-        return i18n.t("playerBar.shuffleInsideAlbumDesc");
-      case "albums":
-        return i18n.t("playerBar.shuffleAlbumsDesc");
-      case "artists":
-        return i18n.t("playerBar.shuffleArtistsDesc");
-    }
-  }
-
-  function repeatModeDescription(mode: import("../types").RepeatMode): string {
-    switch (mode) {
-      case "off":
-        return i18n.t("playerBar.repeatOffDesc");
-      case "track":
-        return i18n.t("playerBar.repeatSongDesc");
-      case "album":
-        return i18n.t("playerBar.repeatAlbumDesc");
-      case "playlist":
-        return i18n.t("playerBar.repeatPlaylistDesc");
-      default:
-        return "";
-    }
+    playerStore.setRepeatMode(nextRepeatMode(playerStore.repeatMode));
   }
 
   // The grabbers and resize edges go through our own window commands, which
@@ -785,7 +685,7 @@
             'off'
               ? 'text-brand-accent-text font-bold'
               : 'text-brand-text-secondary'}"
-            title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+            title={shuffleModeTooltip(playerStore.shuffleMode)}
           >
             {#if shuffleTypeIcon(playerStore.shuffleMode)}
               {@const ShuffleTypeIcon = shuffleTypeIcon(playerStore.shuffleMode)}
@@ -834,7 +734,7 @@
             'off'
               ? 'text-brand-accent-text font-bold'
               : 'text-brand-text-secondary'}"
-            title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+            title={repeatModeTooltip(playerStore.repeatMode)}
           >
             <Repeat class="w-4.5 h-4.5" />
             {#if repeatTypeIcon(playerStore.repeatMode)}

@@ -29,6 +29,16 @@
   import ContextMenuSubmenu from "./ContextMenuSubmenu.svelte";
   import PlaybackSpeedPanel from "./PlaybackSpeedPanel.svelte";
   import { PLAYBACK_SPEED_NORMAL, formatPlaybackSpeed } from "../playbackSpeed";
+  import {
+    nextRepeatMode,
+    nextShuffleMode,
+    repeatModeLabel,
+    repeatModeTooltip,
+    repeatTypeIcon,
+    shuffleModeLabel,
+    shuffleModeTooltip,
+    shuffleTypeIcon,
+  } from "../playbackModes";
   import { tagEditorStore } from "../stores/tagEditor.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { openInPicard } from "../utils/picard";
@@ -67,10 +77,6 @@
     CornersInIcon as CornersIn,
     SlidersIcon as Sliders,
     GaugeIcon as Gauge,
-    DiscIcon as DiscAlbum,
-    MicrophoneStageIcon as Mic2,
-    PlaylistIcon as ListMusic,
-    MusicNotesIcon as Music,
     InfoIcon as Info,
     SubtitlesIcon as Lyrics,
     StackIcon as Layers,
@@ -137,116 +143,11 @@
   }
 
   function cycleShuffle() {
-    const modes: import("../types").ShuffleMode[] = [
-      "off",
-      "all",
-      "inside_album",
-      "albums",
-      "artists",
-    ];
-    const currentIdx = modes.indexOf(playerStore.shuffleMode);
-    const nextIdx = (currentIdx + 1) % modes.length;
-    playerStore.setShuffleMode(modes[nextIdx]);
+    playerStore.setShuffleMode(nextShuffleMode(playerStore.shuffleMode));
   }
 
   function cycleRepeat() {
-    const modes: import("../types").RepeatMode[] = ["off", "track", "album", "playlist"];
-    const currentIdx = modes.indexOf(playerStore.repeatMode);
-    const nextIdx = (currentIdx + 1) % modes.length;
-    playerStore.setRepeatMode(modes[nextIdx]);
-  }
-
-  function shuffleModeLabel(mode: import("../types").ShuffleMode): string {
-    switch (mode) {
-      case "off":
-        return i18n.t("playerBar.shuffleOff");
-      case "all":
-        return i18n.t("playerBar.shuffleAll");
-      case "inside_album":
-        return i18n.t("playerBar.shuffleInsideAlbum");
-      case "albums":
-        return i18n.t("playerBar.shuffleAlbums");
-      case "artists":
-        return i18n.t("playerBar.shuffleArtists");
-    }
-  }
-
-  function repeatModeLabel(mode: import("../types").RepeatMode): string {
-    switch (mode) {
-      case "off":
-        return i18n.t("playerBar.repeatOff");
-      case "track":
-        return i18n.t("playerBar.repeatSong");
-      case "album":
-        return i18n.t("playerBar.repeatAlbum");
-      case "playlist":
-        return i18n.t("playerBar.repeatPlaylist");
-      default:
-        return mode;
-    }
-  }
-
-  // Mirrors the mode descriptions from the user guide so the tooltip explains
-  // what the mode does, not just its name.
-  function shuffleModeDescription(mode: import("../types").ShuffleMode): string {
-    switch (mode) {
-      case "off":
-        return i18n.t("playerBar.shuffleOffDesc");
-      case "all":
-        return i18n.t("playerBar.shuffleAllDesc");
-      case "inside_album":
-        return i18n.t("playerBar.shuffleInsideAlbumDesc");
-      case "albums":
-        return i18n.t("playerBar.shuffleAlbumsDesc");
-      case "artists":
-        return i18n.t("playerBar.shuffleArtistsDesc");
-    }
-  }
-
-  function repeatModeDescription(mode: import("../types").RepeatMode): string {
-    switch (mode) {
-      case "off":
-        return i18n.t("playerBar.repeatOffDesc");
-      case "track":
-        return i18n.t("playerBar.repeatSongDesc");
-      case "album":
-        return i18n.t("playerBar.repeatAlbumDesc");
-      case "playlist":
-        return i18n.t("playerBar.repeatPlaylistDesc");
-      default:
-        return "";
-    }
-  }
-
-  // A mode-type icon paired alongside the Shuffle/Repeat transport icon to
-  // disambiguate modes that would otherwise share the same base icon (e.g.
-  // "Shuffle Albums" and "Shuffle Inside Album" both pair with DiscAlbum) —
-  // rendered full-size next to the icon rather than as a tiny overlay badge,
-  // so it stays legible. Reuses the same Phosphor icons as the rest of the app.
-  function shuffleTypeIcon(mode: import("../types").ShuffleMode) {
-    switch (mode) {
-      case "inside_album":
-        return DiscAlbum;
-      case "albums":
-        return DiscAlbum;
-      case "artists":
-        return Mic2;
-      default:
-        return null;
-    }
-  }
-
-  function repeatTypeIcon(mode: import("../types").RepeatMode) {
-    switch (mode) {
-      case "track":
-        return Music;
-      case "album":
-        return DiscAlbum;
-      case "playlist":
-        return ListMusic;
-      default:
-        return null;
-    }
+    playerStore.setRepeatMode(nextRepeatMode(playerStore.repeatMode));
   }
 
   let coverTitle = $derived(
@@ -593,7 +494,7 @@
               <button
                 onclick={cycleShuffle}
                 class="label-small absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-brand-accent-text hover:text-brand-text-primary transition-colors whitespace-nowrap"
-                title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+                title={shuffleModeTooltip(playerStore.shuffleMode)}
               >
                 {i18n.t("playerBar.shuffle")}
                 {shuffleModeLabel(playerStore.shuffleMode)}
@@ -605,7 +506,7 @@
               'off'
                 ? 'text-brand-accent-text font-bold'
                 : 'text-brand-text-secondary'}"
-              title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+              title={shuffleModeTooltip(playerStore.shuffleMode)}
             >
               {#if shuffleTypeIcon(playerStore.shuffleMode)}
                 {@const ShuffleTypeIcon = shuffleTypeIcon(playerStore.shuffleMode)}
@@ -661,7 +562,7 @@
               'off'
                 ? 'text-brand-accent-text font-bold'
                 : 'text-brand-text-secondary'}"
-              title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+              title={repeatModeTooltip(playerStore.repeatMode)}
             >
               <Repeat class="w-4 h-4" />
               {#if repeatTypeIcon(playerStore.repeatMode)}
@@ -673,7 +574,7 @@
               <button
                 onclick={cycleRepeat}
                 class="label-small absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-brand-accent-text hover:text-brand-text-primary transition-colors whitespace-nowrap"
-                title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+                title={repeatModeTooltip(playerStore.repeatMode)}
               >
                 {i18n.t("playerBar.repeat")}
                 {repeatModeLabel(playerStore.repeatMode)}
