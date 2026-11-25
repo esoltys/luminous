@@ -55,6 +55,7 @@ pub mod pins;
 mod playback_events;
 pub mod player;
 pub mod playlist;
+pub mod profiles;
 pub mod provenance;
 pub mod radio;
 pub mod radio_directory;

@@ -4,12 +4,12 @@
 //! (see `db.rs` migration 28) with a 30-day TTL. Each source degrades
 //! independently on failure — see `context::ContextManager`'s doc comment.
 
-use crate::collection::get_artist_profile_conn;
 use crate::context::{
     is_cache_fresh, is_events_cache_fresh, ArtistEvent, ContextManager, StationContextLookupResult,
     ARTIST_EVENTS_FLIGHT, ARTIST_FLIGHT, RELEASE_GROUP_FLIGHT, STATION_CONTEXT_FLIGHT,
 };
 use crate::db::Database;
+use crate::profiles::get_artist_profile;
 use crate::AppState;
 use rusqlite::params;
 use serde::Serialize;
@@ -151,7 +151,7 @@ fn resolve_song_context_artist_mbid(
         .or_else(|| artist_name.filter(|a| !a.trim().is_empty()))
         .map(first_value)
         .filter(|a| !a.is_empty())?;
-    get_artist_profile_conn(conn, &effective_artist_name)
+    get_artist_profile(conn, &effective_artist_name)
         .ok()
         .and_then(|profile| profile.musicbrainz_artist_id)
 }
@@ -946,7 +946,7 @@ async fn backfill_artist_country(app: &tauri::AppHandle, artist_id: &str, countr
     let state = app.state::<AppState>();
     let (id, code) = (artist_id.to_string(), country.to_string());
     let changed = crate::db::run_blocking(&state.db, move |conn| {
-        crate::collection::fill_blank_artist_country_by_mbid_conn(conn, &id, &code)
+        crate::profiles::fill_blank_artist_country_by_mbid(conn, &id, &code)
     })
     .await;
     match changed {
@@ -987,7 +987,7 @@ pub async fn get_artist_events(
             let mut resolved_mbid: Option<String> = None;
 
             // Check artist profile first
-            if let Ok(profile) = get_artist_profile_conn(conn, &artist_name) {
+            if let Ok(profile) = get_artist_profile(conn, &artist_name) {
                 if let Some(mbid) = profile.musicbrainz_artist_id {
                     if !mbid.trim().is_empty() {
                         resolved_mbid = Some(mbid.trim().to_string());
@@ -1185,7 +1185,7 @@ mod tests {
         // Details" had persisted the artist's MBID onto their profile.
         let (_temp_dir, db) = temp_db("context_resolve_profile_fallback");
         let conn = db.pool.get().unwrap();
-        crate::collection::set_artist_profile_conn(
+        crate::profiles::set_artist_profile(
             &conn,
             &ArtistProfile {
                 artist_key: "Shania Twain".to_string(),

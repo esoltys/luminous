@@ -2940,16 +2940,20 @@ mod tests {
         insert_artist_song("/celine1.mp3", "Celine Dion");
         insert_artist_song("/adele1.mp3", "Adele");
 
-        scanner
-            .set_artist_profile(&ArtistProfile {
+        let conn = db.pool.get().unwrap();
+        crate::profiles::set_artist_profile(
+            &conn,
+            &ArtistProfile {
                 artist_key: "Rush".to_string(),
                 tags: vec!["Canadian".to_string(), "Juno Award".to_string()],
                 ..Default::default()
-            })
-            .unwrap();
+            },
+        )
+        .unwrap();
 
-        scanner
-            .set_artist_profile(&ArtistProfile {
+        crate::profiles::set_artist_profile(
+            &conn,
+            &ArtistProfile {
                 artist_key: "Celine Dion".to_string(),
                 tags: vec![
                     "Canadian".to_string(),
@@ -2957,11 +2961,13 @@ mod tests {
                     "Grammy Award".to_string(),
                 ],
                 ..Default::default()
-            })
-            .unwrap();
+            },
+        )
+        .unwrap();
 
-        scanner
-            .set_artist_profile(&ArtistProfile {
+        crate::profiles::set_artist_profile(
+            &conn,
+            &ArtistProfile {
                 artist_key: "Adele".to_string(),
                 tags: vec![
                     "English".to_string(),
@@ -2969,8 +2975,9 @@ mod tests {
                     "Grammy Award".to_string(),
                 ],
                 ..Default::default()
-            })
-            .unwrap();
+            },
+        )
+        .unwrap();
 
         // 1. Initial hierarchy builds individual cards for each distinct tag
         let hierarchy = manager.get_artist_tag_hierarchy().unwrap();
