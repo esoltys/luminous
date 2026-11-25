@@ -3541,6 +3541,27 @@ mod tests {
     }
 
     #[test]
+    fn find_station_returns_custom_station_from_songs() {
+        let (_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        let added = add_custom_station(
+            &conn,
+            "SomaFM Indie Pop",
+            "https://ice1.somafm.com/indiepop-128-mp3",
+            "indie, pop",
+        )
+        .unwrap();
+
+        let found = find_station(&conn, &added.stationuuid).unwrap().unwrap();
+        assert_eq!(found.stationuuid, added.stationuuid);
+        assert_eq!(found.name, "SomaFM Indie Pop");
+        assert_eq!(
+            found.url_resolved,
+            "https://ice1.somafm.com/indiepop-128-mp3"
+        );
+    }
+
+    #[test]
     fn station_tags_to_genre_normalizes_delimiters_trims_and_dedupes() {
         assert_eq!(
             station_tags_to_genre("alternative rock,commercial,vancouver"),

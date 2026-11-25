@@ -86,14 +86,14 @@ pub async fn search_stations(
     .map_err(|e| e.to_string())
 }
 
-/// Looks up a single station in the local `radio_directory` mirror by UUID.
+/// Looks up a single station by UUID in `radio_directory` or materialized custom stations in `songs`.
 #[tauri::command]
 pub async fn get_radio_directory_station(
     stationuuid: String,
     state: State<'_, AppState>,
 ) -> Result<Option<RadioDirectoryStation>, String> {
     crate::db::run_blocking(&state.db, move |conn| {
-        radio_directory::get_station_by_uuid(conn, &stationuuid)
+        radio_directory::find_station(conn, &stationuuid)
     })
     .await
     .map_err(|e| e.to_string())
