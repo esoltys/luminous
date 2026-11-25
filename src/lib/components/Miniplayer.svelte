@@ -17,11 +17,9 @@
   import {
     nextRepeatMode,
     nextShuffleMode,
-    repeatModeDescription,
-    repeatModeLabel,
+    repeatModeTooltip,
     repeatTypeIcon,
-    shuffleModeDescription,
-    shuffleModeLabel,
+    shuffleModeTooltip,
     shuffleTypeIcon,
   } from "../playbackModes";
   import {
@@ -687,7 +685,7 @@
             'off'
               ? 'text-brand-accent-text font-bold'
               : 'text-brand-text-secondary'}"
-            title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+            title={shuffleModeTooltip(playerStore.shuffleMode)}
           >
             {#if shuffleTypeIcon(playerStore.shuffleMode)}
               {@const ShuffleTypeIcon = shuffleTypeIcon(playerStore.shuffleMode)}
@@ -736,7 +734,7 @@
             'off'
               ? 'text-brand-accent-text font-bold'
               : 'text-brand-text-secondary'}"
-            title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+            title={repeatModeTooltip(playerStore.repeatMode)}
           >
             <Repeat class="w-4.5 h-4.5" />
             {#if repeatTypeIcon(playerStore.repeatMode)}

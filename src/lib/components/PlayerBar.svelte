@@ -32,11 +32,11 @@
   import {
     nextRepeatMode,
     nextShuffleMode,
-    repeatModeDescription,
     repeatModeLabel,
+    repeatModeTooltip,
     repeatTypeIcon,
-    shuffleModeDescription,
     shuffleModeLabel,
+    shuffleModeTooltip,
     shuffleTypeIcon,
   } from "../playbackModes";
   import TagEditor from "./TagEditor.svelte";
@@ -500,7 +500,7 @@
               <button
                 onclick={cycleShuffle}
                 class="label-small absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-brand-accent-text hover:text-brand-text-primary transition-colors whitespace-nowrap"
-                title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+                title={shuffleModeTooltip(playerStore.shuffleMode)}
               >
                 {i18n.t("playerBar.shuffle")}
                 {shuffleModeLabel(playerStore.shuffleMode)}
@@ -512,7 +512,7 @@
               'off'
                 ? 'text-brand-accent-text font-bold'
                 : 'text-brand-text-secondary'}"
-              title={`${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+              title={shuffleModeTooltip(playerStore.shuffleMode)}
             >
               {#if shuffleTypeIcon(playerStore.shuffleMode)}
                 {@const ShuffleTypeIcon = shuffleTypeIcon(playerStore.shuffleMode)}
@@ -568,7 +568,7 @@
               'off'
                 ? 'text-brand-accent-text font-bold'
                 : 'text-brand-text-secondary'}"
-              title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+              title={repeatModeTooltip(playerStore.repeatMode)}
             >
               <Repeat class="w-4 h-4" />
               {#if repeatTypeIcon(playerStore.repeatMode)}
@@ -580,7 +580,7 @@
               <button
                 onclick={cycleRepeat}
                 class="label-small absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-brand-accent-text hover:text-brand-text-primary transition-colors whitespace-nowrap"
-                title={`${i18n.t("playerBar.repeat")}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+                title={repeatModeTooltip(playerStore.repeatMode)}
               >
                 {i18n.t("playerBar.repeat")}
                 {repeatModeLabel(playerStore.repeatMode)}

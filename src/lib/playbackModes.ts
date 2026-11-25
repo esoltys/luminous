@@ -97,16 +97,19 @@ function isCycleableRepeatMode(mode: RepeatMode): mode is CycleableRepeatMode {
   return mode in REPEAT_MODE_META;
 }
 
+function cycleNext<T>(modes: readonly T[], current: unknown): T {
+  const idx = modes.indexOf(current as T);
+  return modes[(idx + 1) % modes.length];
+}
+
 /** Returns the next shuffle mode in `SHUFFLE_MODES`, wrapping to `"off"`. */
 export function nextShuffleMode(current: ShuffleMode): ShuffleMode {
-  const idx = SHUFFLE_MODES.indexOf(current);
-  return SHUFFLE_MODES[(idx + 1) % SHUFFLE_MODES.length];
+  return cycleNext(SHUFFLE_MODES, current);
 }
 
 /** Returns the next repeat mode in `REPEAT_MODES`, wrapping unlisted modes (e.g. `"intro"`) to `"off"`. */
 export function nextRepeatMode(current: RepeatMode): CycleableRepeatMode {
-  const idx = REPEAT_MODES.indexOf(current as CycleableRepeatMode);
-  return REPEAT_MODES[(idx + 1) % REPEAT_MODES.length];
+  return cycleNext(REPEAT_MODES, current);
 }
 
 export function shuffleModeLabel(mode: ShuffleMode): string {
@@ -123,6 +126,11 @@ export function shuffleTypeIcon(mode: ShuffleMode): ModeIcon | null {
   return SHUFFLE_MODE_META[mode].icon;
 }
 
+/** Full tooltip string combining the "Shuffle" prefix, mode label, and description. */
+export function shuffleModeTooltip(mode: ShuffleMode): string {
+  return `${i18n.t("playerBar.shuffle")}: ${shuffleModeLabel(mode)} — ${shuffleModeDescription(mode)}`;
+}
+
 export function repeatModeLabel(mode: RepeatMode): string {
   if (!isCycleableRepeatMode(mode)) return mode;
   return i18n.t(REPEAT_MODE_META[mode].labelKey);
@@ -136,4 +144,9 @@ export function repeatModeDescription(mode: RepeatMode): string {
 export function repeatTypeIcon(mode: RepeatMode): ModeIcon | null {
   if (!isCycleableRepeatMode(mode)) return null;
   return REPEAT_MODE_META[mode].icon;
+}
+
+/** Full tooltip string combining the "Repeat" prefix, mode label, and description. */
+export function repeatModeTooltip(mode: RepeatMode): string {
+  return `${i18n.t("playerBar.repeat")}: ${repeatModeLabel(mode)} — ${repeatModeDescription(mode)}`;
 }

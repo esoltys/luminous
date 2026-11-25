@@ -9,7 +9,9 @@ import {
   shuffleTypeIcon,
   repeatModeLabel,
   repeatModeDescription,
+  repeatModeTooltip,
   repeatTypeIcon,
+  shuffleModeTooltip,
 } from "./playbackModes";
 import type { RepeatMode, ShuffleMode } from "./types";
 
@@ -66,6 +68,10 @@ describe("playbackModes", () => {
       } else {
         expect(icon).not.toBeNull();
       }
+
+      const tooltip = shuffleModeTooltip(mode);
+      expect(tooltip).toContain(label);
+      expect(tooltip).toContain(desc);
     }
   });
 
@@ -86,6 +92,10 @@ describe("playbackModes", () => {
       } else {
         expect(icon).not.toBeNull();
       }
+
+      const tooltip = repeatModeTooltip(mode);
+      expect(tooltip).toContain(label);
+      expect(tooltip).toContain(desc);
     }
   });
 });
