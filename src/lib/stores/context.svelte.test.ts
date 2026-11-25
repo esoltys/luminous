@@ -195,6 +195,28 @@ describe("contextStore", () => {
     ]);
   });
 
+  it("derives a MusicBrainz release-group link when an album song has a release-group MBID", async () => {
+    const view = await mount(() =>
+      entitySubject("album", "Blood, Sweat & Beers", [
+        song(1, {
+          album: "Blood, Sweat & Beers",
+          artist: "The Reklaws",
+          musicbrainz_release_group_id: MBID,
+        }),
+      ]),
+    );
+    const links = view.sections.find((s) => s.id === "links");
+    expect(links && links.id === "links" ? links.items : []).toEqual([
+      {
+        key: "musicbrainz-derived",
+        platform: "musicbrainz",
+        url: `https://musicbrainz.org/release-group/${MBID}`,
+        label: "MusicBrainz",
+        isOfficial: false,
+      },
+    ]);
+  });
+
   it("hides CritiqueBrainz for an artist but exposes the rating for an album", async () => {
     context = ctx({ critiquebrainz_rating: 4.2, critiquebrainz_review_count: 7 });
     const withRg = song(1, { musicbrainz_release_group_id: MBID });

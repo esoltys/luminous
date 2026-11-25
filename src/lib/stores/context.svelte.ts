@@ -15,6 +15,7 @@ import {
   deriveFanartTvUrlFromMbid,
   deriveMusicbrainzArtistUrl,
   deriveMusicbrainzEventsUrl,
+  deriveMusicbrainzReleaseGroupUrl,
   formatDisplayLabel,
   isBlacklistedLink,
   normalizeWebsitePlatform,
@@ -357,7 +358,21 @@ export class ContextView {
       ]);
       if (items.length > 0) sections.push({ id: "links", items });
     } else if (subject.kind === "album") {
-      const items = linkItems(albumProfile?.website, albumProfile?.links, []);
+      const musicbrainz = deriveMusicbrainzReleaseGroupUrl(
+        subject.song.musicbrainz_release_group_id,
+      );
+      const items = linkItems(albumProfile?.website, albumProfile?.links, [
+        ...(musicbrainz
+          ? [
+              {
+                key: "musicbrainz-derived",
+                platform: "musicbrainz",
+                url: musicbrainz,
+                label: "MusicBrainz",
+              },
+            ]
+          : []),
+      ]);
       if (items.length > 0) sections.push({ id: "links", items });
     }
 
