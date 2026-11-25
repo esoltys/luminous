@@ -47,12 +47,39 @@ export interface SalmonRunPalette {
   readonly fishHead: string;
   readonly fishBodyFaces: IsoFaces;
   readonly fishHeadFaces: IsoFaces;
+  /** Rare voxel bear head: fur, lighter muzzle, and dark nose/eyes. */
+  readonly bearFur: IsoFaces;
+  readonly bearSnout: IsoFaces;
+  readonly bearDark: IsoFaces;
+  /** Tiny voxel frog sitting on one random boulder. */
+  readonly frogBody: IsoFaces;
+  readonly frogEye: IsoFaces;
+  /** Far-bank vegetation: bark trunk, evergreen pine, mossy shrub, and autumn bush. */
+  readonly trunk: IsoFaces;
+  readonly pine: IsoFaces;
+  readonly shrub: IsoFaces;
+  readonly autumnBush: IsoFaces;
   readonly leaf: string;
   /** The leaf's midrib and stem, a step down from `leaf`. */
   readonly leafVein: string;
 }
 
 const HEX6 = /^#[0-9a-f]{6}$/i;
+
+/** Fixed recognizable colours for the salmon (spawning crimson + olive head) and bear. */
+const SALMON_BODY = "#c8281c";
+const SALMON_HEAD = "#6f8322";
+const BEAR_FUR = "#7a4b2a";
+const BEAR_SNOUT = "#c99a6b";
+const BEAR_DARK = "#1c140e";
+const FROG_BODY = "#4ea843";
+const FROG_EYE = "#182214";
+const VEG_TRUNK = "#5c4028";
+const VEG_PINE = "#2f5d3a";
+const VEG_SHRUB = "#557a36";
+const VEG_AUTUMN = "#b57c2a";
+const MAPLE_LEAF = "#d80621";
+const MAPLE_VEIN = "#9e0418";
 
 function hexOr(value: string | undefined, fallback: string): string {
   return value && HEX6.test(value) ? value : fallback;
@@ -83,9 +110,14 @@ export function buildSalmonRunPalette(
       ),
     );
   }
-  // On the ladder the salmon lean further toward primary text, to stand out from accent water.
-  const fishBody = clampForContrast(mixHex(text, hover, 0.5), bg, 4.5);
-  const ladderFish = clampForContrast(mixHex(text, hover, 0.3), bg, 4.5);
+  // Salmon and bear use fixed natural hues (contrast-checked against the canvas surface) so they
+  // stay immediately identifiable regardless of theme, while the river and stone follow the theme.
+  const fishBody = clampForContrast(SALMON_BODY, bg, 4.5);
+  const fishHead = clampForContrast(SALMON_HEAD, bg, 3.0);
+  const ladderFish = clampForContrast(fishBody, surfaceWater, 2.1);
+  const bearFur = clampForContrast(BEAR_FUR, bg, 3.0);
+  const bearSnout = clampForContrast(BEAR_SNOUT, bg, 2.5);
+  const bearDark = clampForContrast(BEAR_DARK, bg, 2.0);
   return {
     stone: isoFaces(mixHex(bg, text, light ? 0.3 : 0.2)),
     cap: isoFaces(mixHex(bg, text, light ? 0.4 : 0.3)),
@@ -99,11 +131,20 @@ export function buildSalmonRunPalette(
     ripple: voxelAlphaLadder(mixHex(hover, bright, 0.6), FOAM_STEPS, 0.15, 0.75),
     glint: voxelAlphaLadder(mixHex(hover, bright, 0.45), FOAM_STEPS, 0.12, 0.6),
     fishBody,
-    fishHead: hover,
+    fishHead,
     fishBodyFaces: isoFaces(ladderFish),
-    fishHeadFaces: isoFaces(mixHex(ladderFish, hover, 0.5)),
-    leaf: clampForContrast(mixHex(text, hover, 0.15), bg, 4.5),
-    leafVein: hover,
+    fishHeadFaces: isoFaces(fishHead),
+    bearFur: isoFaces(bearFur),
+    bearSnout: isoFaces(bearSnout),
+    bearDark: isoFaces(bearDark),
+    frogBody: isoFaces(clampForContrast(FROG_BODY, bg, 3.0)),
+    frogEye: isoFaces(clampForContrast(FROG_EYE, bg, 3.0)),
+    trunk: isoFaces(clampForContrast(VEG_TRUNK, bg, 2.0)),
+    pine: isoFaces(clampForContrast(VEG_PINE, bg, 2.2)),
+    shrub: isoFaces(clampForContrast(VEG_SHRUB, bg, 2.2)),
+    autumnBush: isoFaces(clampForContrast(VEG_AUTUMN, bg, 2.2)),
+    leaf: clampForContrast(MAPLE_LEAF, bg, 4.5),
+    leafVein: clampForContrast(MAPLE_VEIN, bg, 3.0),
   };
 }
 
@@ -283,6 +324,15 @@ class FishLadderInstance implements VisualizerInstance {
 
   push(frame: VisualizerFrame): void {
     this.ladder.push(frame);
+  }
+
+  onClick(x: number, y: number): boolean {
+    if (!this.renderer.hitTestFrog(x, y)) return false;
+    return this.ladder.triggerFrogJump();
+  }
+
+  hitTest(x: number, y: number): boolean {
+    return this.renderer.hitTestFrog(x, y);
   }
 
   step(dtMs: number, reducedMotion: boolean): boolean {
