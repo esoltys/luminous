@@ -69,8 +69,9 @@ export function buildVoxelThemePalette(
   colors: ThemeColors,
   rowCount = DEFAULT_ROWS,
   trackAccent?: string | null,
+  surface: "bg-main" | "bg-playerbar" = "bg-main",
 ): VoxelThemePalette {
-  const bgMain = colors["bg-main"] || "#191918";
+  const bgMain = colors[surface] || colors["bg-main"] || "#191918";
   const isLight = isLightColor(bgMain);
 
   const safeAccentHex = clampForContrast(colors["color-accent"] || "#4f5bd5", bgMain, 3.0);
@@ -545,6 +546,76 @@ const STATIC_PREVIEW_PROFILE = [
 ] as const;
 
 /**
+ * Draws a compact 6-row discrete voxel bar grid for `levels` in `[0, 1]`, shared
+ * between the live playbar mini visualizer and its static immersion-mode preview.
+ * When `detachedAlternatingCaps` is true, even columns float a peak cap one row
+ * above the lit bar; otherwise the top lit cell of multi-row bars uses `peakCapColor`.
+ */
+export function renderCompactVoxelGrid(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  palette: VoxelThemePalette,
+  levels: readonly number[] | Float32Array,
+  detachedAlternatingCaps = false,
+): void {
+  if (width <= 0 || height <= 0 || levels.length === 0) return;
+  ctx.clearRect(0, 0, width, height);
+
+  const cols = levels.length;
+  const rows = 6;
+  const colGap = 2;
+  const rowGap = 1.5;
+  const cellWidth = Math.max(2, (width - (cols - 1) * colGap) / cols);
+  const cellHeight = Math.max(1.5, (height - (rows - 1) * rowGap) / rows);
+
+  for (let c = 0; c < cols; c++) {
+    const level = Math.max(0, Math.min(1, levels[c] || 0));
+    const activeCells = detachedAlternatingCaps
+      ? Math.max(1, Math.round(level * (rows - 1)))
+      : Math.min(rows, Math.max(1, Math.round(level * rows)));
+    const x = c * (cellWidth + colGap);
+
+    if (detachedAlternatingCaps) {
+      const peakCell = Math.min(rows, activeCells + (c % 2 === 0 ? 1 : 0));
+      for (let r = 0; r < activeCells; r++) {
+        const paletteIdx = Math.min(
+          palette.rowColors.length - 1,
+          Math.floor((r / Math.max(1, rows - 1)) * (palette.rowColors.length - 1)),
+        );
+        const y = height - (r + 1) * cellHeight - r * rowGap;
+        ctx.fillStyle = palette.rowColors[paletteIdx];
+        ctx.fillRect(x, y, cellWidth, cellHeight);
+      }
+      if (peakCell > activeCells) {
+        const r = peakCell - 1;
+        const y = height - peakCell * cellHeight - r * rowGap;
+        ctx.fillStyle = palette.peakCapColor;
+        ctx.fillRect(x, y, cellWidth, cellHeight);
+      }
+    } else {
+      const hasCap = activeCells >= 2;
+      const bodyRows = hasCap ? activeCells - 1 : activeCells;
+      for (let r = 0; r < bodyRows; r++) {
+        const paletteIdx = Math.min(
+          palette.rowColors.length - 1,
+          Math.floor((r / Math.max(1, rows - 1)) * (palette.rowColors.length - 1)),
+        );
+        const y = height - (r + 1) * cellHeight - r * rowGap;
+        ctx.fillStyle = palette.rowColors[paletteIdx];
+        ctx.fillRect(x, y, cellWidth, cellHeight);
+      }
+      if (hasCap) {
+        const r = activeCells - 1;
+        const y = height - activeCells * cellHeight - r * rowGap;
+        ctx.fillStyle = palette.peakCapColor;
+        ctx.fillRect(x, y, cellWidth, cellHeight);
+      }
+    }
+  }
+}
+
+/**
  * Draws a crisp, zero-animation static voxel-spectrum preview for the miniature
  * playbar visualizer slot while the immersive visualizer is active.
  */
@@ -554,37 +625,5 @@ export function renderStaticVoxelPreview(
   height: number,
   palette: VoxelThemePalette,
 ): void {
-  if (width <= 0 || height <= 0) return;
-  ctx.clearRect(0, 0, width, height);
-
-  const cols = STATIC_PREVIEW_PROFILE.length;
-  const rows = 6;
-  const colGap = 2;
-  const rowGap = 1.5;
-  const cellWidth = Math.max(2, (width - (cols - 1) * colGap) / cols);
-  const cellHeight = Math.max(1.5, (height - (rows - 1) * rowGap) / rows);
-
-  for (let c = 0; c < cols; c++) {
-    const level = STATIC_PREVIEW_PROFILE[c];
-    const activeCells = Math.max(1, Math.round(level * (rows - 1)));
-    const peakCell = Math.min(rows, activeCells + (c % 2 === 0 ? 1 : 0));
-    const x = c * (cellWidth + colGap);
-
-    for (let r = 0; r < activeCells; r++) {
-      const paletteIdx = Math.min(
-        palette.rowColors.length - 1,
-        Math.floor((r / Math.max(1, rows - 1)) * (palette.rowColors.length - 1)),
-      );
-      const y = height - (r + 1) * cellHeight - r * rowGap;
-      ctx.fillStyle = palette.rowColors[paletteIdx];
-      ctx.fillRect(x, y, cellWidth, cellHeight);
-    }
-
-    if (peakCell > activeCells) {
-      const r = peakCell - 1;
-      const y = height - peakCell * cellHeight - r * rowGap;
-      ctx.fillStyle = palette.peakCapColor;
-      ctx.fillRect(x, y, cellWidth, cellHeight);
-    }
-  }
+  renderCompactVoxelGrid(ctx, width, height, palette, STATIC_PREVIEW_PROFILE, true);
 }

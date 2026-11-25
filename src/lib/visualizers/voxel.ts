@@ -1,5 +1,4 @@
 import type { ThemeColors } from "../stores/theme.svelte";
-import { clampForContrast, hexToRgb } from "../utils/colorUtils";
 import type {
   VisualizerFrame,
   VisualizerInstance,
@@ -11,6 +10,7 @@ import type {
 import {
   VoxelSpectrumEngine,
   buildVoxelThemePalette,
+  renderCompactVoxelGrid,
   renderStaticVoxelPreview,
   renderVoxelMatrix,
   type VoxelThemePalette,
@@ -19,9 +19,9 @@ import { VoxelLayerCache } from "./voxelGrid";
 
 const FULL_COLUMNS = 64;
 const FULL_ROWS = 28;
-/** Rows in the still preview, sized for the playbar slot and menu thumbnails. */
+/** Dimensions of the compact voxel grid shared by the playbar slot and still preview. */
+const MINI_COLUMNS = 16;
 const PREVIEW_ROWS = 6;
-const MINI_BAR_GAP = 2.5;
 
 /** The immersive LED matrix: 64 smoothed columns with peak-hold caps and a reflection floor. */
 class VoxelFullInstance implements VisualizerInstance {
@@ -85,31 +85,52 @@ class VoxelFullInstance implements VisualizerInstance {
 }
 
 /**
- * The playbar slot: the raw 32 bands as accent bars, drawn once per frame of data with no
- * smoothing of its own, so it costs no more than one draw per spectrum event.
+ * The playbar slot: 32 bands downsampled into 16 discrete 6-row voxel columns,
+ * drawn once per frame of data with no smoothing of its own, so it matches the
+ * immersion-mode preview silhouette at zero extra animation cost.
  */
 class VoxelMiniInstance implements VisualizerInstance {
-  private bands: readonly number[] = [];
-  private accentRgb = { r: 0, g: 0, b: 0 };
-  private hoverColor = "#a78bfa";
-  private previewPalette!: VoxelThemePalette;
-  // The bar gradient only depends on the theme and canvas height; rebuilt when either changes.
-  private gradient: CanvasGradient | null = null;
-  private gradientHeight = 0;
+  private readonly levels = new Float32Array(MINI_COLUMNS);
+  private colors!: ThemeColors;
+  private trackAccent: string | null = null;
+  private palette!: VoxelThemePalette;
 
   setTheme(colors: ThemeColors): void {
-    // The slot sits on the playbar surface, so contrast is checked against that, not bg-main.
-    const surfaceBg = colors["bg-playerbar"] || colors["bg-main"] || "#191918";
-    this.accentRgb = hexToRgb(
-      clampForContrast(colors["color-accent"] || "#8b5cf6", surfaceBg, 3.0),
-    );
-    this.hoverColor = clampForContrast(colors["color-accent-hover"] || "#a78bfa", surfaceBg, 3.0);
-    this.previewPalette = buildVoxelThemePalette(colors, PREVIEW_ROWS);
-    this.gradient = null;
+    this.colors = colors;
+    this.palette = buildVoxelThemePalette(colors, PREVIEW_ROWS, this.trackAccent, "bg-playerbar");
+  }
+
+  setTrack(track: VisualizerTrack | null): void {
+    const nextAccent = track?.accent ?? null;
+    if (nextAccent !== this.trackAccent) {
+      this.trackAccent = nextAccent;
+      if (this.colors) {
+        this.palette = buildVoxelThemePalette(
+          this.colors,
+          PREVIEW_ROWS,
+          nextAccent,
+          "bg-playerbar",
+        );
+      }
+    }
   }
 
   push(frame: VisualizerFrame): void {
-    this.bands = frame.bands;
+    if (!frame.playing || frame.bands.length === 0) {
+      this.levels.fill(0);
+      return;
+    }
+    const n = frame.bands.length;
+    for (let c = 0; c < MINI_COLUMNS; c++) {
+      const start = Math.floor((c * n) / MINI_COLUMNS);
+      const end = Math.max(start + 1, Math.floor(((c + 1) * n) / MINI_COLUMNS));
+      let peak = 0;
+      for (let i = start; i < end; i++) {
+        const v = frame.bands[i] || 0;
+        if (v > peak) peak = v;
+      }
+      this.levels[c] = peak;
+    }
   }
 
   step(): boolean {
@@ -124,39 +145,10 @@ class VoxelMiniInstance implements VisualizerInstance {
   ): void {
     if (width <= 0 || height <= 0) return;
     if (options.preview) {
-      renderStaticVoxelPreview(ctx, width, height, this.previewPalette);
+      renderStaticVoxelPreview(ctx, width, height, this.palette);
       return;
     }
-
-    ctx.clearRect(0, 0, width, height);
-    if (!this.gradient || this.gradientHeight !== height) {
-      const { r, g, b } = this.accentRgb;
-      const grad = ctx.createLinearGradient(0, height, 0, 0);
-      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.2)`);
-      grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.8)`);
-      grad.addColorStop(1, this.hoverColor);
-      this.gradient = grad;
-      this.gradientHeight = height;
-    }
-    ctx.fillStyle = this.gradient;
-
-    const numBars = 32;
-    const barWidth = (width - (numBars - 1) * MINI_BAR_GAP) / numBars;
-    for (let i = 0; i < numBars; i++) {
-      // Bands already arrive normalized to the frame's own peak (see VisualizerAnalyzer::bands),
-      // so no extra gain: a fixed multiplier would clip most bars to the same height.
-      const val = this.bands[i] || 0;
-      const barHeight = Math.min(height, Math.max(1.5, val * height));
-      ctx.beginPath();
-      ctx.roundRect(
-        i * (barWidth + MINI_BAR_GAP),
-        height - barHeight,
-        barWidth,
-        barHeight,
-        [1.5, 1.5, 0, 0],
-      );
-      ctx.fill();
-    }
+    renderCompactVoxelGrid(ctx, width, height, this.palette, this.levels);
   }
 }
 
