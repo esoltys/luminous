@@ -518,6 +518,51 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     });
   });
 
+  it("passes albumKey to retrieve_album_details and retrieve_album_art when provided", async () => {
+    const invokeMock = vi.mocked(invoke);
+    const beatlesKey = "the beatles\u001fabbey road";
+    collectionStore.albumProfiles = {
+      [beatlesKey]: { album_key: beatlesKey, details_fetched: false, links: [] },
+    };
+    const songsWithMbid = [
+      {
+        id: 1,
+        title: "Come Together",
+        artist: "The Beatles",
+        album: "Abbey Road",
+        musicbrainz_release_group_id: "rg-123",
+      },
+    ];
+
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "get_songs_by_album") return Promise.resolve(songsWithMbid);
+      if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
+      if (cmd === "retrieve_album_details") {
+        return Promise.resolve({
+          added_count: 1,
+          profile: { album_key: beatlesKey, details_fetched: true, links: [] },
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(AlbumDetailView, { props: { albumName: mockAlbumName, albumKey: beatlesKey } });
+
+    await vi.waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_details", {
+        album: "Abbey Road",
+        albumKey: beatlesKey,
+      });
+    });
+    await vi.waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", {
+        album: "Abbey Road",
+        albumKey: beatlesKey,
+        onlyMissing: true,
+      });
+    });
+  });
+
   it("does not toast when the automatic album details fetch fails", async () => {
     const invokeMock = vi.mocked(invoke);
     collectionStore.albumProfiles = {

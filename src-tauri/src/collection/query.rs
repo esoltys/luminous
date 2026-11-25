@@ -59,6 +59,32 @@ fn push_query_clauses(
     Ok(())
 }
 
+/// Builds the SQL `WHERE` predicate and bound parameters for matching
+/// `songs.album_key` from an album display title (or composite key) and an
+/// optional explicit `album_key`.
+///
+/// When `explicit_key` is non-empty, or `album` already carries the composite
+/// key separator (`\u{1f}`), matches `album_key = ?1` exactly so same-title
+/// albums by different artists stay distinct. Otherwise matches either a bare
+/// `album_key` or any composite `{artist}\u{1f}{title}` suffix.
+fn album_key_filter(album: &str, explicit_key: Option<&str>) -> (&'static str, Vec<String>) {
+    if let Some(key) = explicit_key.map(str::trim).filter(|k| !k.is_empty()) {
+        return ("album_key = ?1", vec![album_key(key)]);
+    }
+    let folded = album_key(album);
+    if folded.contains(crate::album_key::COMPOSITE_KEY_SEPARATOR) {
+        ("album_key = ?1", vec![folded])
+    } else {
+        (
+            "(album_key = ?1 OR album_key LIKE '%' || ?2 || ?1)",
+            vec![
+                folded,
+                crate::album_key::COMPOSITE_KEY_SEPARATOR.to_string(),
+            ],
+        )
+    }
+}
+
 impl CollectionScanner {
     /// Full-text + field search across the library.
     pub fn search_songs(&self, query: &str, limit: i64) -> Result<Vec<Song>> {
@@ -211,45 +237,10 @@ impl CollectionScanner {
         album_key: Option<&str>,
     ) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
-        if let Some(key) = album_key {
-            let sql = format!(
-                "SELECT {} FROM songs
-                 WHERE album_key = ?1
-                   AND {lib_where}
-                 ORDER BY disc, track",
-                SONG_SELECT_COLS,
-                lib_where = library_song_where("")
-            );
-            let mut stmt = conn.prepare(&sql)?;
-            let songs = stmt
-                .query_map(params![key], row_to_song)?
-                .filter_map(|r| r.ok())
-                .collect();
-            return Ok(songs);
-        }
-
-        if album.contains(crate::album_key::COMPOSITE_KEY_SEPARATOR) {
-            let key = album.trim().to_lowercase();
-            let sql = format!(
-                "SELECT {} FROM songs
-                 WHERE album_key = ?1
-                   AND {lib_where}
-                 ORDER BY disc, track",
-                SONG_SELECT_COLS,
-                lib_where = library_song_where("")
-            );
-            let mut stmt = conn.prepare(&sql)?;
-            let songs = stmt
-                .query_map(params![key], row_to_song)?
-                .filter_map(|r| r.ok())
-                .collect();
-            return Ok(songs);
-        }
-
-        let key = album.trim().to_lowercase();
+        let (key_where, key_params) = album_key_filter(album, album_key);
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE (album_key = ?1 OR album_key LIKE '%' || ?2 || ?1)
+             WHERE {key_where}
                AND {lib_where}
              ORDER BY disc, track",
             SONG_SELECT_COLS,
@@ -257,10 +248,7 @@ impl CollectionScanner {
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
-            .query_map(
-                params![key, crate::album_key::COMPOSITE_KEY_SEPARATOR.to_string()],
-                row_to_song,
-            )?
+            .query_map(rusqlite::params_from_iter(key_params.iter()), row_to_song)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(songs)
@@ -1067,21 +1055,33 @@ impl CollectionScanner {
         Ok(path)
     }
 
+    fn query_representative_album_field(
+        &self,
+        select_expr: &str,
+        extra_where: &str,
+        album_or_key: &str,
+    ) -> Result<Option<String>> {
+        let conn = self.db.pool.get()?;
+        let (key_where, key_params) = album_key_filter(album_or_key, None);
+        let sql = if extra_where.is_empty() {
+            format!("SELECT {select_expr} FROM songs WHERE {key_where} LIMIT 1")
+        } else {
+            format!("SELECT {select_expr} FROM songs WHERE {key_where} AND {extra_where} LIMIT 1")
+        };
+        let mut stmt = conn.prepare(&sql)?;
+        stmt.query_row(rusqlite::params_from_iter(key_params.iter()), |row| {
+            row.get::<_, Option<String>>(0)
+        })
+        .optional()
+        .map(|opt| opt.flatten())
+        .map_err(Into::into)
+    }
+
     /// Resolve a representative song's file path for an album, used to
     /// locate the album directory for `album.md`/`cover.jpg`.
+    /// Accepts either a composite `album_key` or a bare album title.
     pub fn get_representative_song_path_for_album(&self, album: &str) -> Result<Option<String>> {
-        let conn = self.db.pool.get()?;
-        let path = conn
-            .query_row(
-                "SELECT path FROM songs
-                 WHERE album_key = ?1 AND path IS NOT NULL
-                 LIMIT 1",
-                params![album_key(album)],
-                |row| row.get::<_, Option<String>>(0),
-            )
-            .optional()?
-            .flatten();
-        Ok(path)
+        self.query_representative_album_field("path", "path IS NOT NULL", album)
     }
 
     /// A MusicBrainz release-group MBID for this album, read off whichever
@@ -1089,43 +1089,29 @@ impl CollectionScanner {
     /// as `get_representative_song_path_for_album`. Used by the album
     /// details overflow menu's "Retrieve Album Details" action to know
     /// which release group to query MusicBrainz for.
+    /// Accepts either a composite `album_key` or a bare album title.
     pub fn get_representative_release_group_id_for_album(
         &self,
         album: &str,
     ) -> Result<Option<String>> {
-        let conn = self.db.pool.get()?;
-        let id = conn
-            .query_row(
-                "SELECT musicbrainz_release_group_id FROM songs
-                 WHERE album_key = ?1
-                   AND musicbrainz_release_group_id IS NOT NULL
-                   AND musicbrainz_release_group_id != ''
-                 LIMIT 1",
-                params![album_key(album)],
-                |row| row.get::<_, Option<String>>(0),
-            )
-            .optional()?
-            .flatten();
-        Ok(id)
+        self.query_representative_album_field(
+            "musicbrainz_release_group_id",
+            "musicbrainz_release_group_id IS NOT NULL AND musicbrainz_release_group_id != ''",
+            album,
+        )
     }
 
     /// This album's effective artist (album artist, falling back to the
     /// track artist), used by `retrieve_album_details` to know which
     /// `ArtistProfile` row to backfill `musicbrainz_artist_id` onto from the
     /// release-group's `artist-credit` (#1123).
+    /// Accepts either a composite `album_key` or a bare album title.
     pub fn get_representative_artist_for_album(&self, album: &str) -> Result<Option<String>> {
-        let conn = self.db.pool.get()?;
-        let artist = conn
-            .query_row(
-                "SELECT COALESCE(NULLIF(album_artist, ''), artist) FROM songs
-                 WHERE album_key = ?1
-                 LIMIT 1",
-                params![album_key(album)],
-                |row| row.get::<_, Option<String>>(0),
-            )
-            .optional()?
-            .flatten();
-        Ok(artist)
+        self.query_representative_album_field(
+            "COALESCE(NULLIF(album_artist, ''), artist)",
+            "",
+            album,
+        )
     }
 
     /// A MusicBrainz artist MBID for this artist, read off whichever of
@@ -3391,6 +3377,98 @@ mod tests {
                 .get_representative_artist_for_album("No Such Album")
                 .unwrap(),
             None
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_representative_album_helpers_match_composite_album_keys_and_disambiguate() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_representative_composite_key_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let reklaws_key = crate::album_key::album_key_for(
+            "Blood, Sweat & Beers",
+            Some("The Reklaws"),
+            Some("The Reklaws"),
+            false,
+        );
+        let other_key = crate::album_key::album_key_for(
+            "Blood, Sweat & Beers",
+            Some("Other Band"),
+            Some("Other Band"),
+            false,
+        );
+
+        conn.execute(
+            "INSERT INTO songs (path, title, album, album_key, artist, album_artist, musicbrainz_release_group_id, source, unavailable)
+             VALUES (?1, 'Track 1', 'Blood, Sweat & Beers', ?2, 'The Reklaws', 'The Reklaws', 'rg-reklaws', 1, 0)",
+            params!["/music/reklaws/track1.flac", reklaws_key],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (path, title, album, album_key, artist, album_artist, musicbrainz_release_group_id, source, unavailable)
+             VALUES (?1, 'Track 1', 'Blood, Sweat & Beers', ?2, 'Other Band', 'Other Band', 'rg-other', 1, 0)",
+            params!["/music/other/track1.flac", other_key],
+        )
+        .unwrap();
+
+        // Bare title still resolves when no explicit composite key is passed.
+        assert!(scanner
+            .get_representative_release_group_id_for_album("Blood, Sweat & Beers")
+            .unwrap()
+            .is_some());
+        assert!(scanner
+            .get_representative_artist_for_album("Blood, Sweat & Beers")
+            .unwrap()
+            .is_some());
+        assert!(scanner
+            .get_representative_song_path_for_album("Blood, Sweat & Beers")
+            .unwrap()
+            .is_some());
+
+        // Explicit composite key disambiguates same-title albums by different artists.
+        assert_eq!(
+            scanner
+                .get_representative_release_group_id_for_album(&reklaws_key)
+                .unwrap(),
+            Some("rg-reklaws".to_string())
+        );
+        assert_eq!(
+            scanner
+                .get_representative_release_group_id_for_album(&other_key)
+                .unwrap(),
+            Some("rg-other".to_string())
+        );
+        assert_eq!(
+            scanner
+                .get_representative_artist_for_album(&reklaws_key)
+                .unwrap(),
+            Some("The Reklaws".to_string())
+        );
+        assert_eq!(
+            scanner
+                .get_representative_artist_for_album(&other_key)
+                .unwrap(),
+            Some("Other Band".to_string())
+        );
+        assert_eq!(
+            scanner
+                .get_representative_song_path_for_album(&reklaws_key)
+                .unwrap(),
+            Some("/music/reklaws/track1.flac".to_string())
+        );
+        assert_eq!(
+            scanner
+                .get_representative_song_path_for_album(&other_key)
+                .unwrap(),
+            Some("/music/other/track1.flac".to_string())
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);

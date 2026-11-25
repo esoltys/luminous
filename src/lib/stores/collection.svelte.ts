@@ -1222,9 +1222,13 @@ class CollectionStore {
   /** Album detail overflow menu's "Retrieve Album Details": fetches
    * MusicBrainz release-group relations (Discogs, AllMusic, Wikidata, lyrics,
    * other databases) and merges them into the album's curated link list. */
-  async retrieveAlbumDetails(albumName: string): Promise<AlbumDetailsRetrievalResult> {
+  async retrieveAlbumDetails(
+    albumName: string,
+    albumKeyParam?: string | null,
+  ): Promise<AlbumDetailsRetrievalResult> {
     const result = await invoke<AlbumDetailsRetrievalResult>("retrieve_album_details", {
       album: albumName,
+      ...(albumKeyParam ? { albumKey: albumKeyParam } : {}),
     });
     if (result?.profile?.album_key) {
       this.albumProfiles = {
@@ -1254,10 +1258,11 @@ class CollectionStore {
    * cache so cover stacks re-scan and count it. */
   async retrieveAlbumArt(
     albumName: string,
-    options: { onlyMissing?: boolean } = {},
+    options: { onlyMissing?: boolean; albumKey?: string | null } = {},
   ): Promise<AlbumArtRetrievalResult> {
     const result = await invoke<AlbumArtRetrievalResult>("retrieve_album_art", {
       album: albumName,
+      ...(options.albumKey ? { albumKey: options.albumKey } : {}),
       onlyMissing: options.onlyMissing ?? false,
     });
     if (result?.profile?.album_key) {

@@ -1373,6 +1373,7 @@ pub struct AlbumDetailsRetrievalResult {
 #[tauri::command]
 pub async fn retrieve_album_details(
     album: String,
+    album_key: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<AlbumDetailsRetrievalResult, String> {
     // See `set_artist_profile`'s matching guard — same reasoning, for the
@@ -1387,7 +1388,10 @@ pub async fn retrieve_album_details(
         return Err("Online context enrichment is disabled".to_string());
     }
 
-    let album_for_lookup = album.clone();
+    let lookup_key = album_key
+        .filter(|k| !k.trim().is_empty())
+        .unwrap_or_else(|| album.clone());
+    let album_for_lookup = lookup_key.clone();
     let db = state.db.clone();
     let (release_group_id, current_profile) =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
@@ -1424,7 +1428,7 @@ pub async fn retrieve_album_details(
         .collect();
 
     let mut updated_profile = current_profile;
-    updated_profile.album_key = album.clone();
+    updated_profile.album_key = lookup_key.clone();
     updated_profile.details_fetched = true;
     let existing_links =
         dedupe_links_by_platform_and_url(std::mem::take(&mut updated_profile.links), |l| {
@@ -1452,7 +1456,7 @@ pub async fn retrieve_album_details(
     // bonus of the album lookup, not the reason it was run, so a failure
     // here doesn't fail the command.
     let artist_credit_id = relations.artist_credit_ids.into_iter().next();
-    let album_for_artist_lookup = album.clone();
+    let album_for_artist_lookup = lookup_key;
     let db = state.db.clone();
     let artist_profile =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
@@ -2165,6 +2169,7 @@ pub struct AlbumArtRetrievalResult {
 #[tauri::command]
 pub async fn retrieve_album_art(
     album: String,
+    album_key: Option<String>,
     only_missing: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<AlbumArtRetrievalResult, String> {
@@ -2181,7 +2186,10 @@ pub async fn retrieve_album_art(
         return Err("Online context enrichment is disabled".to_string());
     }
 
-    let album_for_lookup = album.clone();
+    let lookup_key = album_key
+        .filter(|k| !k.trim().is_empty())
+        .unwrap_or_else(|| album.clone());
+    let album_for_lookup = lookup_key.clone();
     let db = state.db.clone();
     let (release_group_id, album_artist, current_profile) =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
@@ -2223,7 +2231,7 @@ pub async fn retrieve_album_art(
     let mut result = AlbumArtRetrievalResult::default();
     let mut download_error = None;
     let mut profile = current_profile;
-    profile.album_key = album;
+    profile.album_key = lookup_key;
 
     if want_cover {
         match fanart.cover {
