@@ -45,6 +45,7 @@
   import { publishScrollbarWidth } from "../lib/utils/scrollbarWidth";
   import { FrontendErrorReporter } from "../lib/utils/frontendError";
   import TagEditor from "../lib/components/TagEditor.svelte";
+  import { tagEditorStore } from "../lib/stores/tagEditor.svelte";
   import DeviceSyncDrawer from "../lib/components/devices/DeviceSyncDrawer.svelte";
   import { onMount } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -106,7 +107,6 @@
     walkthroughStore.start();
   }
   let isShortcutsModalOpen = $state(false);
-  let editingSongId = $state<number | null>(null);
   let isResizingSidebar = $state(false);
   // "Luminous Debug" when LUMINOUS_REMOTE_DEVTOOLS is set backend-side, so a
   // remote-devtools session is never mistaken for a normal instance in the
@@ -233,14 +233,14 @@
             isShortcutsModalOpen = true;
           },
           openTagEditor: (songId: number) => {
-            editingSongId = songId;
+            tagEditorStore.open(songId);
           },
           closeAll: () => {
             isShortcutsModalOpen = false;
-            editingSongId = null;
+            tagEditorStore.close();
           },
           isShortcutsOpen: () => isShortcutsModalOpen,
-          isTagEditorOpen: () => editingSongId !== null,
+          isTagEditorOpen: () => tagEditorStore.isOpen,
         });
       });
     }
@@ -675,13 +675,20 @@
     <KeyboardShortcutsModal onClose={() => (isShortcutsModalOpen = false)} />
   {/if}
 
-  {#if editingSongId !== null}
-    <TagEditor
-      songId={editingSongId}
-      onClose={() => {
-        editingSongId = null;
-      }}
-    />
+  {#if tagEditorStore.target !== null}
+    {@const t = tagEditorStore.target}
+    {#key tagEditorStore.openSeq}
+      <TagEditor
+        songId={t.kind === "song" ? t.songId : undefined}
+        filePath={t.kind === "file" ? t.filePath : undefined}
+        fileName={t.kind === "file" ? t.fileName : undefined}
+        folderPath={t.kind === "file" ? t.folderPath : undefined}
+        folderName={t.kind === "file" ? t.folderName : undefined}
+        source={t.kind === "file" ? t.source : undefined}
+        onClose={() => tagEditorStore.close()}
+        onSave={tagEditorStore.onSaved}
+      />
+    {/key}
   {/if}
 
   {#if welcomeStore.initialized && !welcomeStore.hasSeen}

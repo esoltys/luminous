@@ -23,7 +23,7 @@
   import CommunityRating from "./CommunityRating.svelte";
   import MarkdownBio from "./MarkdownBio.svelte";
   import SocialIcon from "./SocialIcon.svelte";
-  import TagEditor from "./TagEditor.svelte";
+  import { tagEditorStore } from "../stores/tagEditor.svelte";
 
   interface Props {
     /** What to render; see `contextStore.for()`. */
@@ -45,8 +45,6 @@
   let isLive = $derived(song != null && isLiveSong(song));
   let canOpenPicard = $derived(song != null && !isRemoteSource(song) && !isLive);
   let canEditTags = $derived(song != null && !isLive);
-
-  let editingSongId = $state<number | null>(null);
 
   let folderPath = $derived(
     song?.path ? getAlbumFolderPath([song.path]) || getParentFolder(song.path) : "",
@@ -257,7 +255,7 @@
             <button
               type="button"
               onclick={() => {
-                editingSongId = song.id;
+                tagEditorStore.open(song.id);
               }}
               class="w-full @sm:flex-1 max-w-xs flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-brand-accent text-brand-accent-contrast font-medium text-xs hover:opacity-95 active:opacity-90 transition-opacity cursor-pointer shadow-sm"
             >
@@ -331,12 +329,3 @@
     </div>
   {/if}
 </div>
-
-{#if editingSongId !== null}
-  <TagEditor
-    songId={editingSongId}
-    onClose={() => {
-      editingSongId = null;
-    }}
-  />
-{/if}

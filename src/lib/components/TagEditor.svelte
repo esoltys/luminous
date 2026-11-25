@@ -15,7 +15,6 @@
     BroomIcon as Broom,
     ProhibitIcon as Prohibit,
   } from "phosphor-svelte";
-  import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import SongRating from "./SongRating.svelte";
@@ -418,12 +417,7 @@
           "success",
         );
         await loadMetadata();
-        await collectionStore.refreshStats();
-        await collectionStore.refreshLibrary();
-        if (playlistsStore.activePlaylistId != null) {
-          await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
-        }
-        await playerStore.refreshPlaybackState();
+        await syncActivePlaybackAndPlaylist();
       } else if (result.unchangedTracks > 0) {
         toastStore.show(i18n.t("tagEditor.restoreNoOp"), "info");
       } else if (result.skippedTracks > 0) {
@@ -464,12 +458,7 @@
           );
         }
         await loadMetadata();
-        await collectionStore.refreshStats();
-        await collectionStore.refreshLibrary();
-        if (playlistsStore.activePlaylistId != null) {
-          await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
-        }
-        await playerStore.refreshPlaybackState();
+        await syncActivePlaybackAndPlaylist();
       } else if (result.unchangedTracks > 0 && result.skippedTracks === 0) {
         toastStore.show(i18n.t("tagEditor.restoreNoOp"), "info");
       } else if (result.skippedTracks > 0) {
@@ -484,6 +473,13 @@
     } finally {
       isRestoring = false;
     }
+  }
+
+  async function syncActivePlaybackAndPlaylist() {
+    if (playlistsStore.activePlaylistId != null) {
+      await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+    }
+    await playerStore.refreshPlaybackState();
   }
 
   async function handleSave() {
@@ -515,16 +511,7 @@
           initialKey,
         });
 
-        await collectionStore.refreshStats();
-        await collectionStore.refreshLibrary();
-
-        if (
-          playlistsStore.activePlaylistId !== null &&
-          playlistsStore.activePlaylistId !== undefined
-        ) {
-          await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
-        }
-        await playerStore.refreshPlaybackState();
+        await syncActivePlaybackAndPlaylist();
       } else if (filePath) {
         await invoke("save_file_tags", {
           path: filePath,
@@ -621,7 +608,6 @@
       await invoke("clear_song_cover_art", { songId });
       artEmbedded = false;
       coverArtVersion++;
-      await collectionStore.refreshLibrary();
       toastStore.show(i18n.t("tagEditor.clearArtSuccess"), "success");
     } catch (e: any) {
       console.error("Failed to clear embedded artwork:", e);
@@ -639,7 +625,6 @@
       await invoke("reject_album_cover", { songId });
       artAutomatic = null;
       coverArtVersion++;
-      await collectionStore.refreshLibrary();
       toastStore.show(
         i18n.t("tagEditor.rejectRemoteCoverSuccess", {}, "Remote cover rejected and blocklisted"),
         "success",

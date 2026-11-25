@@ -54,7 +54,7 @@
   import { openInPicard } from "../utils/picard";
   import { invoke } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
-  import TagEditor from "./TagEditor.svelte";
+  import { tagEditorStore } from "../stores/tagEditor.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import BlurredCover from "./BlurredCover.svelte";
   import GenreChips from "./GenreChips.svelte";
@@ -126,7 +126,6 @@
     actions: "80px",
   };
 
-  let editingSongId = $state<number | null>(null);
   /** A multi-song selection open in the batch tag editor. */
   let batchEditSongs = $state<Song[] | null>(null);
 
@@ -241,11 +240,10 @@
   }
 
   function openTagEditor(songId: number) {
-    editingSongId = songId;
+    tagEditorStore.open(songId, { onSaved: handleTagEditorSaved });
   }
 
   function handleTagEditorSaved() {
-    tagsStore.load();
     if (playlistsStore.activePlaylistId !== null) {
       playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
     }
@@ -1362,16 +1360,6 @@
     onClose={() => {
       showShareModal = false;
     }}
-  />
-{/if}
-
-{#if editingSongId !== null}
-  <TagEditor
-    songId={editingSongId}
-    onClose={() => {
-      editingSongId = null;
-    }}
-    onSave={handleTagEditorSaved}
   />
 {/if}
 

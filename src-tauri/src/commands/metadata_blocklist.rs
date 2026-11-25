@@ -3,7 +3,7 @@
 use crate::lyrics::{get_lyrics_for_song, LyricsManager, LyricsPayload};
 use crate::metadata_blocklist::{MetadataBlocklist, MetadataRejection};
 use crate::AppState;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 /// Rejects the online lyrics currently associated with `song_id`, records
 /// the provider in the metadata blocklist, and attempts to resolve alternative
@@ -70,7 +70,11 @@ struct SongCoverInfo {
 /// records the rejection in the blocklist, removes cached image files, and
 /// sets `art_unset = 1` so automated lookups do not re-fetch the rejected art.
 #[tauri::command]
-pub async fn reject_album_cover(state: State<'_, AppState>, song_id: i64) -> Result<(), String> {
+pub async fn reject_album_cover(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    song_id: i64,
+) -> Result<(), String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
 
     let info = conn
@@ -133,6 +137,8 @@ pub async fn reject_album_cover(state: State<'_, AppState>, song_id: i64) -> Res
         rusqlite::params![key, query_artist, query_album],
     )
     .map_err(|e| e.to_string())?;
+
+    let _ = app.emit("library-changed", ());
 
     Ok(())
 }
