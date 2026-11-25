@@ -8,7 +8,7 @@
  * For compilations, the artist portion is `[va]`.
  */
 
-const ALBUM_KEY_SEPARATOR = "\u{1f}";
+export const ALBUM_KEY_SEPARATOR = "\u{1f}";
 const COMPILATION_ARTIST_KEY = "[va]";
 
 function foldKey(s: string | null | undefined): string {

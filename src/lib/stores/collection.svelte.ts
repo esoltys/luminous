@@ -48,7 +48,7 @@ import { toastStore } from "./toast.svelte";
 import { tasksStore } from "./tasks.svelte";
 import { prefs } from "./prefs.svelte";
 import { MAX_RECENT_SEARCHES, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY } from "../constants";
-import { albumKey, sameAlbum } from "$lib/utils/albumKey";
+import { ALBUM_KEY_SEPARATOR, albumKey, sameAlbum } from "$lib/utils/albumKey";
 import { matchWebDavPath } from "../webdavDisplay";
 
 export interface VisibleColumns {
@@ -1207,16 +1207,21 @@ class CollectionStore {
     albumName: string | null | undefined,
     albumKeyParam?: string | null,
   ): AlbumProfile | undefined {
-    if (albumKeyParam) {
-      const exact = this.albumProfiles[albumKey(albumKeyParam)];
+    const foldedParam = albumKeyParam ? albumKey(albumKeyParam) : "";
+    if (foldedParam) {
+      const exact = this.albumProfiles[foldedParam];
       if (exact) return exact;
     }
     if (!albumName) return undefined;
     const folded = albumKey(albumName);
     const direct = this.albumProfiles[folded];
     if (direct) return direct;
-    if (folded.includes("\u{1f}")) return undefined;
-    const suffix = `\u{1f}${folded}`;
+    // When the caller gave an explicit composite key for a specific artist+album,
+    // don't fall back to a different artist's composite entry with the same title.
+    if (foldedParam.includes(ALBUM_KEY_SEPARATOR) || folded.includes(ALBUM_KEY_SEPARATOR)) {
+      return undefined;
+    }
+    const suffix = `${ALBUM_KEY_SEPARATOR}${folded}`;
     const matchedKey = Object.keys(this.albumProfiles).find((k) => k.endsWith(suffix));
     return matchedKey ? this.albumProfiles[matchedKey] : undefined;
   }
