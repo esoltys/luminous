@@ -94,10 +94,6 @@
     }
   }
 
-  function openTagEditor(songId: number) {
-    tagEditorStore.open(songId);
-  }
-
   // Indexed once per collectionStore.albums/songs change instead of re-filtering
   // the full arrays for every artist on every render (search keystroke, sort
   // toggle, view switch) — see the same matching rules in getArtistAlbums/
@@ -597,7 +593,7 @@
               onRowContextMenu={handleRowContextMenu}
               onRate={rateSong}
               onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
-              onEditTags={(song) => openTagEditor(song.id)}
+              onEditTags={(song) => tagEditorStore.open(song.id)}
               emptyState={songsEmptyState}
             />
           </div>
@@ -932,7 +928,7 @@
     }}
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
-    onEditTags={() => openTagEditor(song.id)}
+    onEditTags={() => tagEditorStore.open(song.id)}
     onEditBatchTags={() => {
       batchEditSongs = selectedSongs ?? null;
     }}

@@ -798,24 +798,18 @@
   {/if}
 
   {#if tagEditorStore.target !== null}
+    {@const t = tagEditorStore.target}
     {#key tagEditorStore.openSeq}
-      {#if tagEditorStore.target.kind === "song"}
-        <TagEditor
-          songId={tagEditorStore.target.songId}
-          onClose={() => tagEditorStore.close()}
-          onSave={tagEditorStore.onSaved}
-        />
-      {:else}
-        <TagEditor
-          filePath={tagEditorStore.target.filePath}
-          fileName={tagEditorStore.target.fileName}
-          folderPath={tagEditorStore.target.folderPath}
-          folderName={tagEditorStore.target.folderName}
-          source={tagEditorStore.target.source}
-          onClose={() => tagEditorStore.close()}
-          onSave={tagEditorStore.onSaved}
-        />
-      {/if}
+      <TagEditor
+        songId={t.kind === "song" ? t.songId : undefined}
+        filePath={t.kind === "file" ? t.filePath : undefined}
+        fileName={t.kind === "file" ? t.fileName : undefined}
+        folderPath={t.kind === "file" ? t.folderPath : undefined}
+        folderName={t.kind === "file" ? t.folderName : undefined}
+        source={t.kind === "file" ? t.source : undefined}
+        onClose={() => tagEditorStore.close()}
+        onSave={tagEditorStore.onSaved}
+      />
     {/key}
   {/if}
 

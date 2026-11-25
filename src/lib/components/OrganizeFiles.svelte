@@ -513,10 +513,6 @@
   let duplicateSongIds = $state<Set<number>>(new Set());
   let contextMenu = $state<{ x: number; y: number; item: OrganizePreviewItem } | null>(null);
 
-  function openTagEditor(songId: number) {
-    tagEditorStore.open(songId);
-  }
-
   async function loadDuplicateSongIds() {
     try {
       const groups = await invoke<import("../types").DuplicateTrackGroup[]>(
@@ -564,7 +560,7 @@
 
   function handleRowDblClick(item: OrganizePreviewItem) {
     if (getItemStatus(item) === "missing_tag") {
-      openTagEditor(item.song_id);
+      tagEditorStore.open(item.song_id);
     }
   }
 
@@ -1428,7 +1424,7 @@
                         type="button"
                         onclick={(e) => {
                           e.stopPropagation();
-                          openTagEditor(item.song_id);
+                          tagEditorStore.open(item.song_id);
                         }}
                         class="px-2 py-1 rounded bg-brand-sidebar hover:bg-brand-accent hover:text-brand-accent-contrast text-brand-text-secondary text-[10px] font-medium border border-brand-border/60 transition-colors flex items-center gap-1 shadow-sm"
                         title={i18n.t("organizer.editTags")}
@@ -1701,7 +1697,7 @@
         onclick={() => {
           const id = contextMenu!.item.song_id;
           contextMenu = null;
-          openTagEditor(id);
+          tagEditorStore.open(id);
         }}
       />
       {#if picardStore.available}
@@ -1734,7 +1730,7 @@
         fetchPreview();
       }}
       onEditTags={(songId) => {
-        openTagEditor(songId);
+        tagEditorStore.open(songId);
       }}
     />
   {/if}
