@@ -470,3 +470,12 @@ pub async fn export_saved_radio_stations(
     .await
     .map_err(|e| e.to_string())
 }
+
+/// Probes a radio station stream or playlist URL and returns connection status
+/// and stream headers without downloading the stream body (#2393).
+#[tauri::command]
+pub async fn test_radio_station_url(
+    url: String,
+) -> Result<radio_directory::RadioConnectionTestResult, String> {
+    Ok(radio_directory::test_station_url(&url).await)
+}
