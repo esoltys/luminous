@@ -48,6 +48,7 @@
   const NO_BANDS: readonly number[] = [];
 
   let canvas = $state<HTMLCanvasElement | null>(null);
+  let pointerInteractive = $state(false);
   // Plain (non-reactive) on purpose: the draw loop reads these, and as $state the effects
   // below would re-run on every spectrum event. `instance` is created by the first run of
   // the $effect.pre below, before any other effect reads it.
@@ -230,4 +231,23 @@
   data-preset={preset.id}
   data-preview={preview ? "true" : "false"}
   class={className}
+  style:cursor={pointerInteractive ? "pointer" : "default"}
+  onpointermove={(e) => {
+    if (preview || !canvas || !instance.hitTest) {
+      pointerInteractive = false;
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    pointerInteractive = instance.hitTest(e.clientX - rect.left, e.clientY - rect.top);
+  }}
+  onpointerleave={() => {
+    pointerInteractive = false;
+  }}
+  onclick={(e) => {
+    if (preview || !canvas || !instance.onClick) return;
+    const rect = canvas.getBoundingClientRect();
+    if (instance.onClick(e.clientX - rect.left, e.clientY - rect.top)) {
+      requestFrame();
+    }
+  }}
 ></canvas>

@@ -58,6 +58,10 @@ export interface VisualizerInstance {
   setTrack?(track: VisualizerTrack | null): void;
   /** Called with each new frame of audio data, and when playback starts or stops. */
   push(frame: VisualizerFrame): void;
+  /** Optional. Called on canvas click (CSS px relative to canvas); returns true if handled. */
+  onClick?(x: number, y: number): boolean;
+  /** Optional. True when CSS px `(x, y)` is over an interactive target (shows pointer cursor). */
+  hitTest?(x: number, y: number): boolean;
   /**
    * Advances animation by `dtMs`. Returns true while there is motion left to show without
    * new data, so the host keeps drawing; false once another frame would look the same.

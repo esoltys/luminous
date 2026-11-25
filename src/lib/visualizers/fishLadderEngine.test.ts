@@ -3,8 +3,8 @@ import {
   DROP,
   FishLadder,
   LEAP_S,
+  MAX_NOTCHES,
   MAX_POOLS,
-  NOTCH_WIDTH,
   PATIENCE_S,
   MAX_RIPPLES,
   RIVER_WIDTH,
@@ -31,7 +31,10 @@ function run(ladder: FishLadder, seconds: number, reducedMotion = false): boolea
 function layout(ladder: FishLadder): number[] {
   const out: number[] = [ladder.poolCount, ladder.boulderCount, ladder.fishCount];
   for (let k = 0; k < ladder.poolCount; k++) {
-    out.push(ladder.poolStart[k], ladder.poolEnd[k], ladder.notchY[k]);
+    out.push(ladder.poolStart[k], ladder.poolEnd[k], ladder.notchCount[k]);
+    for (let n = 0; n < ladder.notchCount[k]; n++) {
+      out.push(ladder.notchY[k * MAX_NOTCHES + n], ladder.notchW[k * MAX_NOTCHES + n]);
+    }
   }
   for (let b = 0; b < ladder.boulderCount; b++) out.push(ladder.boulderX[b], ladder.boulderY[b]);
   return out;
@@ -89,8 +92,15 @@ describe("FishLadder layout", () => {
       }
       expect(ladder.length).toBe(ladder.poolEnd[ladder.poolCount - 1]);
       for (let k = 0; k < ladder.poolCount; k++) {
-        expect(ladder.notchY[k]).toBeGreaterThanOrEqual(0);
-        expect(ladder.notchY[k] + NOTCH_WIDTH).toBeLessThanOrEqual(RIVER_WIDTH);
+        expect(ladder.notchCount[k]).toBeGreaterThanOrEqual(1);
+        expect(ladder.notchCount[k]).toBeLessThanOrEqual(MAX_NOTCHES);
+        let prevEnd = 0;
+        for (let n = 0; n < ladder.notchCount[k]; n++) {
+          const slot = k * MAX_NOTCHES + n;
+          expect(ladder.notchY[slot]).toBeGreaterThanOrEqual(prevEnd);
+          expect(ladder.notchY[slot] + ladder.notchW[slot]).toBeLessThanOrEqual(RIVER_WIDTH);
+          prevEnd = ladder.notchY[slot] + ladder.notchW[slot] + 1;
+        }
       }
     }
   });
@@ -143,6 +153,10 @@ describe("FishLadder climbing", () => {
               expect(wasLeaping[i]).toBe(true);
               expect(ladder.fishLeapS[i]).toBe(0);
               climbs++;
+            } else if (wasLeaping[i]) {
+              // Caught mid-leap by the rare bear, rejoining below the bottom pool.
+              expect(k).toBe(ladder.poolCount - 1);
+              expect(ladder.fishX[i]).toBeGreaterThan(ladder.length);
             } else {
               // Out of the top pool, rejoining below the bottom one.
               expect([pool[i], k]).toEqual([0, ladder.poolCount - 1]);
@@ -175,7 +189,7 @@ describe("FishLadder climbing", () => {
     expect(climbed).toBe(true);
   });
 
-  it("sends the waiting salmon up a step on a strong transient", () => {
+  it("sends the waiting salmon in each pool up a step on a strong transient", () => {
     const ladder = settled();
     run(ladder, 1);
     const i = waiting(ladder);
@@ -183,7 +197,11 @@ describe("FishLadder climbing", () => {
     const k = ladder.fishPool[i];
     ladder.push(frame(LOUD_TREBLE));
     ladder.step(FRAME_MS, false);
-    expect(leapers(ladder)).toEqual([i]);
+    const leaping = leapers(ladder);
+    expect(leaping).toContain(i);
+    // At most one leaper per pool.
+    const pools = leaping.map((idx) => ladder.fishPool[idx]);
+    expect(new Set(pools).size).toBe(pools.length);
     expect(activeRipples(ladder)).toBeGreaterThan(0);
     run(ladder, LEAP_S + 0.1);
     expect(ladder.fishPool[i]).toBe(k - 1);
@@ -196,7 +214,7 @@ describe("FishLadder climbing", () => {
     const k = ladder.fishPool[i];
     ladder.push(frame(NUDGE_TREBLE));
     ladder.step(FRAME_MS, false);
-    expect(leapers(ladder)).toEqual([i]);
+    expect(leapers(ladder)).toContain(i);
     let highest = 0;
     for (let t = 0; t < LEAP_S * 60; t++) {
       ladder.step(FRAME_MS, false);
@@ -205,6 +223,25 @@ describe("FishLadder climbing", () => {
     expect(ladder.fishPool[i]).toBe(k);
     expect(highest).toBeGreaterThan(ladder.poolSurface[k]);
     expect(highest).toBeLessThan(ladder.poolSurface[k - 1]);
+  });
+
+  it("fans queued salmon laterally across the pool instead of stacking at one spot", () => {
+    const ladder = new FishLadder();
+    ladder.setTrack("fan-test");
+    ladder.push(frame(QUIET));
+    run(ladder, 3);
+    // Check that fish sharing a pool do not collapse onto the same position.
+    for (let i = 0; i < ladder.fishCount; i++) {
+      for (let j = i + 1; j < ladder.fishCount; j++) {
+        if (ladder.fishPool[i] !== ladder.fishPool[j]) continue;
+        if (ladder.fishLeapS[i] > 0 || ladder.fishLeapS[j] > 0) continue;
+        const dist = Math.hypot(
+          ladder.fishX[i] - ladder.fishX[j],
+          ladder.fishY[i] - ladder.fishY[j],
+        );
+        expect(dist).toBeGreaterThan(0.5);
+      }
+    }
   });
 
   it("never leaps or ripples under reduced motion, and shifts the light instead", () => {
@@ -263,5 +300,117 @@ describe("FishLadder motion", () => {
     const still = ladder.fallPhase;
     run(ladder, 1, true);
     expect(ladder.fallPhase).toBe(still);
+  });
+});
+
+describe("FishLadder bear pop-up", () => {
+  it("rises, catches a leaping salmon, respawns it at the foot, and sinks back down", () => {
+    const ladder = settled();
+    run(ladder, 1);
+    const i = waiting(ladder);
+    expect(i).toBeGreaterThanOrEqual(0);
+    const upperPool = ladder.fishPool[i] - 1;
+    ladder.push(frame(LOUD_TREBLE));
+    ladder.step(FRAME_MS, false);
+    expect(ladder.fishLeapS[i]).toBeGreaterThan(0);
+
+    ladder.spawnBear(i, upperPool);
+    expect(ladder.bearActive).toBe(true);
+    expect(ladder.bearJaw).toBe(1);
+
+    // Advance until the bear snaps its jaw shut on the salmon.
+    let caught = false;
+    for (let t = 0; t < LEAP_S * 60 && !caught; t++) {
+      ladder.step(FRAME_MS, false);
+      if (ladder.bearJaw === 0) caught = true;
+    }
+    expect(caught).toBe(true);
+    expect(ladder.fishLeapS[i]).toBe(0);
+    expect(ladder.fishPool[i]).toBe(ladder.poolCount - 1);
+    expect(ladder.fishX[i]).toBeGreaterThan(ladder.length);
+
+    // Bear holds briefly then sinks out of sight.
+    run(ladder, 1.2);
+    expect(ladder.bearActive).toBe(false);
+  });
+
+  it("hides the bear immediately under reduced motion", () => {
+    const ladder = settled();
+    run(ladder, 1);
+    const i = waiting(ladder);
+    ladder.spawnBear(i, ladder.fishPool[i] - 1);
+    expect(ladder.bearActive).toBe(true);
+    ladder.step(FRAME_MS, true);
+    expect(ladder.bearActive).toBe(false);
+  });
+});
+
+describe("FishLadder frog", () => {
+  it("places a frog on one boulder, stays still on beats, and jumps into the water when clicked", () => {
+    const ladder = new FishLadder();
+    ladder.setTrack("frog-track");
+    if (ladder.boulderCount > 0) {
+      expect(ladder.frogBoulder).toBeGreaterThanOrEqual(0);
+      expect(ladder.frogBoulder).toBeLessThan(ladder.boulderCount);
+      const startZ = ladder.frogZ;
+      const startY = ladder.frogY;
+
+      // Beats alone do not move the frog.
+      ladder.push(frame(QUIET, 0.9));
+      ladder.step(FRAME_MS, false);
+      expect(ladder.frogZ).toBe(startZ);
+      expect(ladder.frogY).toBe(startY);
+
+      // Clicking triggers a jump into the water with a splash, hiding in the water, then hopping back.
+      expect(ladder.frogVisible).toBe(true);
+      expect(ladder.triggerFrogJump()).toBe(true);
+      run(ladder, 0.7);
+      expect(ladder.frogVisible).toBe(false);
+      expect(ladder.frogY).not.toBe(startY);
+      expect(ladder.frogZ).toBe(ladder.poolSurface[ladder.boulderPool[ladder.frogBoulder]]);
+      expect(activeRipples(ladder)).toBeGreaterThan(0);
+
+      run(ladder, 3.2);
+      expect(ladder.frogVisible).toBe(true);
+      expect(ladder.frogY).toBeCloseTo(startY, 4);
+      expect(ladder.frogZ).toBeCloseTo(startZ, 4);
+    } else {
+      expect(ladder.frogBoulder).toBe(-1);
+    }
+  });
+});
+
+describe("FishLadder top-pool sitting bear", () => {
+  it("sits in the center of the top pool and stays still on beats without eating", () => {
+    const ladder = new FishLadder();
+    ladder.setTrack("top-bear");
+    expect(ladder.topBearX).toBe((ladder.poolStart[0] + ladder.poolEnd[0]) * 0.5);
+    expect(ladder.topBearY).toBe(RIVER_WIDTH * 0.5);
+    expect(ladder.topBearNod).toBe(0);
+
+    ladder.push(frame(QUIET, 0.8));
+    ladder.step(FRAME_MS, false);
+    expect(ladder.topBearNod).toBe(0);
+    expect(ladder.topBearIdle).toBeGreaterThan(0);
+  });
+
+  it("eats salmon that swim up to it in the top pool, chomps, and respawns them at the foot", () => {
+    const ladder = settled();
+    ladder.fishPool[0] = 0;
+    ladder.fishLeapS[0] = 0;
+    ladder.fishX[0] = ladder.topBearX + 0.6;
+    ladder.fishY[0] = ladder.topBearY;
+    ladder.fishZ[0] = ladder.poolSurface[0];
+
+    ladder.push(frame(QUIET));
+    ladder.step(FRAME_MS, false);
+    expect(ladder.fishPool[0]).toBe(ladder.poolCount - 1);
+    expect(ladder.fishX[0]).toBeGreaterThan(ladder.length);
+    expect(ladder.topBearNod).toBeGreaterThan(0);
+    expect(activeRipples(ladder)).toBeGreaterThan(0);
+
+    // Finishes the chomp nod cleanly.
+    run(ladder, 0.4);
+    expect(ladder.topBearNod).toBe(0);
   });
 });

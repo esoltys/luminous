@@ -51,14 +51,16 @@ describe("buildSalmonRunPalette", () => {
     });
   }
 
-  it("takes its colours from the theme", () => {
+  it("takes its environment colours from the theme while keeping salmon and bear palettes fixed", () => {
     const plain = buildSalmonRunPalette(LUMINOUS_DARK_COLORS, "bg-main");
     const other = buildSalmonRunPalette(
       { ...LUMINOUS_DARK_COLORS, "color-accent": "#e0b020", "color-accent-hover": "#f0c040" },
       "bg-main",
     );
-    expect(other.fishBody).not.toBe(plain.fishBody);
     expect(other.water).not.toEqual(plain.water);
+    expect(other.fishBody).toBe(plain.fishBody);
+    expect(other.fishHead).toBe(plain.fishHead);
+    expect(other.bearFur).toEqual(plain.bearFur);
   });
 
   it("washes more light over the water at each reduced-motion light step", () => {
