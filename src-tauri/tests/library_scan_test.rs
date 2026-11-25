@@ -641,3 +641,82 @@ async fn test_scan_skips_legacy_row_with_null_filesize_when_mtime_matches() {
     );
     assert_eq!(report.reread, 0);
 }
+
+#[tokio::test]
+async fn test_system_and_recycle_folders_never_scanned() {
+    let env = ScanTestEnv::new();
+    env.scanner
+        .add_directory(&env.scan_dir.to_string_lossy())
+        .expect("failed to add watched directory");
+
+    env.copy_fixture("song_alpha.mp3", "Alpha");
+    env.copy_fixture("song_beta.wav", "#recycle/Deleted");
+    env.copy_fixture("song_beta.wav", "Alpha/.Trash-1000/files");
+    env.copy_fixture("song_beta.wav", "@Recycle/Deleted");
+    env.copy_fixture("song_beta.wav", "$RECYCLE.BIN/S-1-5-21");
+    env.copy_fixture("song_beta.wav", "Alpha/@eaDir");
+    env.copy_fixture("song_beta.wav", ".stfolder");
+    env.run_scan(false).await;
+
+    // Scoped scan directly inside a recycle folder must also skip it.
+    CollectionScanner::new(Arc::clone(&env.db))
+        .scoped_to(env.scan_dir.join("#recycle/Deleted"))
+        .scan_all_core(
+            env.app_data_dir.clone(),
+            false,
+            false,
+            false,
+            |_progress| {},
+        )
+        .await
+        .expect("scoped scan failed");
+
+    let titles = env.available_titles();
+    assert_eq!(titles, vec!["Song Alpha".to_string()]);
+
+    // A watched folder whose own root is named `#recycle` is still scanned.
+    let recycle_root_env = ScanTestEnv::new();
+    let named_recycle = recycle_root_env.scan_dir.join("#recycle");
+    std::fs::create_dir_all(&named_recycle).unwrap();
+    recycle_root_env
+        .scanner
+        .add_directory(&named_recycle.to_string_lossy())
+        .expect("failed to add #recycle watched directory");
+    recycle_root_env.copy_fixture("song_alpha.mp3", "#recycle/Album");
+    recycle_root_env.run_scan(false).await;
+
+    assert_eq!(
+        recycle_root_env.available_titles(),
+        vec!["Song Alpha".to_string()]
+    );
+}
+
+#[tokio::test]
+async fn test_scan_marks_preexisting_song_in_recycle_folder_unavailable() {
+    let env = ScanTestEnv::new();
+    env.scanner
+        .add_directory(&env.scan_dir.to_string_lossy())
+        .expect("failed to add watched directory");
+
+    env.copy_fixture("song_alpha.mp3", "Alpha");
+    env.copy_fixture("song_beta.wav", "#recycle/Deleted");
+    env.run_scan(false).await;
+
+    // Simulate a pre-upgrade DB row that was imported from `#recycle` before
+    // recycle folders were excluded.
+    let recycled_path = env.scan_dir.join("#recycle/Deleted/song_beta.wav");
+    {
+        let conn = env.db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, artist, album, path, source, unavailable)
+             VALUES ('Song Beta', 'Artist Beta', 'Album Beta', ?1, 1, 0)",
+            [recycled_path.to_string_lossy().as_ref()],
+        )
+        .unwrap();
+    }
+    assert_eq!(env.available_titles().len(), 2);
+
+    env.run_scan(false).await;
+
+    assert_eq!(env.available_titles(), vec!["Song Alpha".to_string()]);
+}

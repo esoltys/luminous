@@ -614,11 +614,23 @@ impl CollectionScanner {
             let p = Path::new(&path);
 
             // A library file (source 1 or 2) outside every watched folder is
-            // orphaned. Opened files live outside them by definition and only
+            // orphaned, and one inside a reserved/system-excluded folder of its
+            // watched root (e.g. a pre-upgrade import from `#recycle`) should
+            // likewise be retired through the normal missing-song safeguard.
+            // Opened files live outside watched folders by definition and only
             // go missing when the file itself does.
-            if source.is_local() && watched.source_for(p) == SongSource::OpenedFile {
-                missing.push(id);
-                continue;
+            if source.is_local() {
+                match watched.root_for(p) {
+                    None => {
+                        missing.push(id);
+                        continue;
+                    }
+                    Some(root) if is_in_reserved_folder(p, root) => {
+                        missing.push(id);
+                        continue;
+                    }
+                    Some(_) => {}
+                }
             }
 
             // Positive hit in the scan's discovered path set proves the file
@@ -2099,17 +2111,41 @@ enum ScanEvent {
 // Audio file detection
 // ---------------------------------------------------------------------------
 
+/// Well-known NAS and OS recycle, trash, metadata, and sync folders that the
+/// scanner and watcher must never walk into when they appear inside a watched
+/// folder (matched case-insensitively).
+fn is_system_ignored_dir_name(name: &std::ffi::OsStr) -> bool {
+    let Some(s) = name.to_str() else {
+        return false;
+    };
+    const EXACT_NAMES: &[&str] = &[
+        "#recycle",     // Synology shared-folder recycle bin
+        "@recycle",     // QNAP shared-folder recycle bin
+        ".trashes",     // macOS volume trash
+        "$recycle.bin", // Windows drive recycle bin
+        "@eadir",       // Synology DSM metadata / thumbnails
+        ".stfolder",    // Syncthing folder marker
+    ];
+    if EXACT_NAMES.iter().any(|n| s.eq_ignore_ascii_case(n)) {
+        return true;
+    }
+    // FreeDesktop / Linux per-user trash folders: `.Trash-<uid>`
+    const TRASH_PREFIX: &str = ".trash-";
+    s.len() > TRASH_PREFIX.len()
+        && s.as_bytes()[..TRASH_PREFIX.len()].eq_ignore_ascii_case(TRASH_PREFIX.as_bytes())
+}
+
 /// Whether a folder with this name is one the scanner never looks inside:
-/// the organizer's `Duplicates` folder, where it sets aside files that
-/// collide with one already in the library. The Files view shows these
-/// folders as excluded.
+/// either Luminous's own `Duplicates` folder (where the organizer sets aside
+/// colliding files) or a third-party OS/NAS system or recycle folder. The Files
+/// view shows these folders as excluded.
 pub(crate) fn is_reserved_dir_name(name: &std::ffi::OsStr) -> bool {
-    name == "Duplicates"
+    name == "Duplicates" || is_system_ignored_dir_name(name)
 }
 
 /// Whether `path` is a reserved folder of the watched folder `root`, or lies
 /// inside one. `root` itself never counts, so a watched folder that happens
-/// to be named `Duplicates` is scanned as usual.
+/// to be named `Duplicates` or `#recycle` is scanned as usual.
 pub(crate) fn is_in_reserved_folder(path: &Path, root: &Path) -> bool {
     path.components()
         .skip(root.components().count())
@@ -2673,15 +2709,26 @@ impl WatchedFolders {
         Ok(Self(roots))
     }
 
+    /// The deepest watched root holding `path` (matched case- and
+    /// separator-insensitively on Windows), or `None` if `path` is outside
+    /// every watched folder (#1842).
+    pub(crate) fn root_for_in<'a>(roots: &'a [PathBuf], path: &Path) -> Option<&'a Path> {
+        roots
+            .iter()
+            .filter(|root| relocate::is_under_root(path, root))
+            .max_by_key(|root| root.as_os_str().len())
+            .map(PathBuf::as_path)
+    }
+
+    pub(crate) fn root_for(&self, path: &Path) -> Option<&Path> {
+        Self::root_for_in(&self.0, path)
+    }
+
     /// The source a local file at `path` belongs to: `LocalFile` inside a
     /// watched folder (matched case- and separator-insensitively on
     /// Windows), `OpenedFile` anywhere else (#1842).
     pub(crate) fn source_for(&self, path: &Path) -> SongSource {
-        if self
-            .0
-            .iter()
-            .any(|root| relocate::is_under_root(path, root))
-        {
+        if self.root_for(path).is_some() {
             SongSource::LocalFile
         } else {
             SongSource::OpenedFile
@@ -3114,6 +3161,65 @@ mod tests {
         detect_mp3_vbr, read_embedded_lyrics, read_multi_value, write_tags, TagWriteRequest,
     };
     use std::sync::Arc;
+
+    #[test]
+    fn test_is_reserved_dir_name_matches_system_and_recycle_folders() {
+        use std::ffi::OsStr;
+
+        for name in [
+            "Duplicates",
+            "#recycle",
+            "#RECYCLE",
+            "@Recycle",
+            "@recycle",
+            ".Trash-1000",
+            ".trash-0",
+            ".Trashes",
+            ".TRASHES",
+            "$RECYCLE.BIN",
+            "$Recycle.Bin",
+            "@eaDir",
+            "@EADIR",
+            ".stfolder",
+            ".STFOLDER",
+        ] {
+            assert!(
+                is_reserved_dir_name(OsStr::new(name)),
+                "expected {name} to be reserved"
+            );
+        }
+
+        for name in [
+            "duplicates",
+            ".Trash-",
+            ".Trash",
+            "Trash",
+            "Recycle",
+            "Music",
+        ] {
+            assert!(
+                !is_reserved_dir_name(OsStr::new(name)),
+                "expected {name} not to be reserved"
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_in_reserved_folder_skips_watched_root() {
+        assert!(is_in_reserved_folder(
+            Path::new("/nas/music/#recycle/Artist/01.flac"),
+            Path::new("/nas/music")
+        ));
+        assert!(is_in_reserved_folder(
+            Path::new("/nas/music/.Trash-1000/files/01.flac"),
+            Path::new("/nas/music")
+        ));
+        // A watched folder whose own name matches a system folder is scanned as usual.
+        assert!(!is_in_reserved_folder(
+            Path::new("/nas/#recycle/Artist/01.flac"),
+            Path::new("/nas/#recycle")
+        ));
+    }
 
     #[test]
     fn test_read_multi_value_uses_multivalue_items_directly() {

@@ -6,7 +6,6 @@
 use crate::{
     covermanager::CoverManager,
     db::Database,
-    library_paths,
     models::{BatchPhase, BatchProgress},
 };
 use anyhow::Result;
@@ -334,15 +333,11 @@ fn classify_watched_path(kind: &notify::EventKind, path: &Path) -> WatchedPathCh
     }
 }
 
-/// Whether a full scan would leave `path` out because it is in a reserved
-/// folder (`Duplicates`) of the watched folder holding it, so the watcher
-/// must not add it either.
+/// Whether a full scan would leave `path` out because it is in a reserved or
+/// system-ignored folder (such as `Duplicates`, `#recycle`, or `.Trash-*`) of
+/// the watched folder holding it, so the watcher must not add it either.
 fn is_in_reserved_folder(path: &Path, roots: &[PathBuf]) -> bool {
-    let path_str = path.to_string_lossy();
-    roots
-        .iter()
-        .filter(|root| library_paths::is_under(&path_str, &root.to_string_lossy()))
-        .max_by_key(|root| root.as_os_str().len())
+    super::WatchedFolders::root_for_in(roots, path)
         .is_some_and(|root| super::is_in_reserved_folder(path, root))
 }
 
@@ -1066,6 +1061,32 @@ mod tests {
         assert!(!is_in_reserved_folder(
             Path::new("/elsewhere/Duplicates/01.flac"),
             &[music]
+        ));
+    }
+
+    #[test]
+    fn test_files_in_system_trash_folders_are_not_added() {
+        let roots = vec![PathBuf::from("/nas/music")];
+
+        for excluded in [
+            "/nas/music/#recycle/01.flac",
+            "/nas/music/Rock/@Recycle/01.flac",
+            "/nas/music/.Trash-1000/files/01.flac",
+            "/nas/music/.Trashes/501/01.flac",
+            "/nas/music/$RECYCLE.BIN/S-1-5-21/01.flac",
+            "/nas/music/Album/@eaDir/01.flac",
+            "/nas/music/.stfolder/01.flac",
+        ] {
+            assert!(
+                is_in_reserved_folder(Path::new(excluded), &roots),
+                "expected watcher to ignore {excluded}"
+            );
+        }
+
+        // A watched folder whose own root is named like a system folder is still watched.
+        assert!(!is_in_reserved_folder(
+            Path::new("/nas/#recycle/Album/01.flac"),
+            &[PathBuf::from("/nas/#recycle")]
         ));
     }
 
