@@ -11,6 +11,7 @@
   import { isFallbackEscape } from "../lib/utils/globalShortcuts";
   import { windowLayoutStore } from "../lib/stores/windowLayout.svelte";
   import { openerStore } from "../lib/stores/opener.svelte";
+  import { immersiveDock } from "../lib/stores/immersiveDock.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
   import StationListImportDialog from "../lib/components/radio/StationListImportDialog.svelte";
   import ImmersiveCover from "../lib/components/ImmersiveCover.svelte";
@@ -76,28 +77,6 @@
   const dockCoversSidebar = $derived(
     dockVisible && doesPlayerDockCoverLeft(windowLayoutStore.viewportWidth, effectiveSidebarWidth),
   );
-
-  function handleDockPointerDown() {
-    if (!windowLayoutStore.effectiveImmersiveMode) return;
-    windowLayoutStore.setImmersiveDockHeld(true);
-    const onPointerUp = () => {
-      window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("pointercancel", onPointerUp);
-      windowLayoutStore.setImmersiveDockHeld(false);
-    };
-    window.addEventListener("pointerup", onPointerUp);
-    window.addEventListener("pointercancel", onPointerUp);
-  }
-
-  $effect(() => {
-    const isImmersive = windowLayoutStore.effectiveImmersiveMode;
-    const _view = windowLayoutStore.immersiveView;
-    if (isImmersive) {
-      windowLayoutStore.revealImmersiveDock();
-    } else {
-      windowLayoutStore.immersiveDockHidden = false;
-    }
-  });
 
   function handleWelcomeGetStarted() {
     // Unconditional: this is an explicit user request to start the tour, not
@@ -348,14 +327,7 @@
         console.warn("Failed to attach window focus listener:", e);
       });
 
-    const handleImmersivePointerMove = (e: PointerEvent) => {
-      if (!windowLayoutStore.effectiveImmersiveMode) return;
-      const inDockZone = e.clientY >= window.innerHeight - PLAYER_DOCK_CONTENT_RESERVE_PX;
-      windowLayoutStore.setImmersiveDockHovered(inDockZone);
-    };
-
     window.addEventListener("keydown", handleGlobalHotkeys);
-    window.addEventListener("pointermove", handleImmersivePointerMove, { passive: true });
 
     // Forwards uncaught JS errors/rejections to the backend crash log (#684)
     // with benign notice filtering and burst repeat-collapsing (#1261) — without
@@ -367,7 +339,6 @@
 
     return () => {
       window.removeEventListener("keydown", handleGlobalHotkeys);
-      window.removeEventListener("pointermove", handleImmersivePointerMove);
       window.removeEventListener("focus", handleWindowFocus);
       window.removeEventListener("error", errorReporter.handleWindowError);
       window.removeEventListener("unhandledrejection", errorReporter.handleUnhandledRejection);
@@ -624,20 +595,15 @@
          whenever there's no current song, so it doesn't linger showing
          "Nothing playing" after the queue ends. -->
       {#if dockVisible}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           class="absolute inset-x-4 bottom-4 z-40"
           data-testid="player-dock-zone"
-          onpointerenter={() => windowLayoutStore.setImmersiveDockHovered(true)}
-          onpointermove={() => windowLayoutStore.setImmersiveDockHovered(true)}
-          onpointerleave={() => windowLayoutStore.setImmersiveDockHovered(false)}
-          onpointerdown={handleDockPointerDown}
-          onfocusin={() => windowLayoutStore.revealImmersiveDock()}
+          use:immersiveDock.attach
         >
           <div
             data-testid="immersive-dock-motion"
             class="immersive-dock"
-            class:immersive-dock-hidden={windowLayoutStore.isImmersiveDockHidden}
+            class:immersive-dock-hidden={immersiveDock.isHidden}
           >
             <PlayerBar />
           </div>
