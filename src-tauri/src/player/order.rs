@@ -140,6 +140,16 @@ impl PlayOrder {
         }
     }
 
+    /// Clears `unavailable` on a live station item so a transient stream
+    /// failure never permanently locks it out.
+    fn clear_live_unavailable(item: &mut PlaylistItem) {
+        if let Some(song) = &mut item.song {
+            if crate::audio::is_live_song(song) {
+                song.unavailable = false;
+            }
+        }
+    }
+
     /// Replaces the loaded items and resets history/queue, returning the virtual
     /// index corresponding to `start_real_index` (if in range).
     /// Live radio stations are always treated as retryable on a fresh load so
@@ -150,11 +160,7 @@ impl PlayOrder {
         start_real_index: Option<usize>,
     ) -> Option<usize> {
         for item in &mut items {
-            if let Some(song) = &mut item.song {
-                if crate::audio::is_live_song(song) {
-                    song.unavailable = false;
-                }
-            }
+            Self::clear_live_unavailable(item);
         }
         self.items = items;
         self.played_indices.clear();
@@ -173,11 +179,7 @@ impl PlayOrder {
     /// selects it to play, so a transient stream failure can be retried.
     pub(crate) fn clear_live_unavailable_for_uuid(&mut self, uuid: &str) {
         if let Some(item) = self.items.iter_mut().find(|i| i.uuid == uuid) {
-            if let Some(song) = &mut item.song {
-                if crate::audio::is_live_song(song) {
-                    song.unavailable = false;
-                }
-            }
+            Self::clear_live_unavailable(item);
         }
     }
 
