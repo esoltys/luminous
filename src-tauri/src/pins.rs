@@ -149,7 +149,7 @@ pub fn resolve_song(conn: &Connection, ref_key: &str) -> Result<Option<Song>> {
 /// albums by different artists remain disambiguated. Otherwise (legacy bare
 /// album titles), falls back to matching `AlbumItem::album` via `album_key`.
 pub fn find_album<'a>(albums: &'a [AlbumItem], ref_key: &str) -> Option<&'a AlbumItem> {
-    let key = crate::album_key::album_key(ref_key);
+    let key = crate::album_key::fold_key(ref_key);
     if key.is_empty() {
         return None;
     }
@@ -160,7 +160,7 @@ pub fn find_album<'a>(albums: &'a [AlbumItem], ref_key: &str) -> Option<&'a Albu
         } else {
             a.album.as_deref()
         };
-        candidate.is_some_and(|value| crate::album_key::album_key(value) == key)
+        candidate.is_some_and(|value| crate::album_key::fold_key(value) == key)
     })
 }
 
