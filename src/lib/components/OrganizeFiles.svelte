@@ -44,7 +44,7 @@
   } from "../utils/organizePresets";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
-  import TagEditor from "./TagEditor.svelte";
+  import { tagEditorStore } from "../stores/tagEditor.svelte";
   import ViewInFilesItem from "./ViewInFilesItem.svelte";
   import DuplicateReviewModal from "./DuplicateReviewModal.svelte";
 
@@ -509,13 +509,12 @@
   });
 
   let isConfigExpanded = $state(false);
-  let editingSongId = $state<number | null>(null);
   let reviewDuplicateSongId = $state<number | null>(null);
   let duplicateSongIds = $state<Set<number>>(new Set());
   let contextMenu = $state<{ x: number; y: number; item: OrganizePreviewItem } | null>(null);
 
   function openTagEditor(songId: number) {
-    editingSongId = songId;
+    tagEditorStore.open(songId);
   }
 
   async function loadDuplicateSongIds() {
@@ -557,11 +556,6 @@
     } catch {
       reviewDuplicateSongId = songId;
     }
-  }
-
-  async function handleTagEditorSaved() {
-    await collectionStore.refreshLibrary();
-    await fetchPreview();
   }
 
   async function handleOpenInPicard(songId: number) {
@@ -1728,16 +1722,6 @@
         }}
       />
     </ContextMenu>
-  {/if}
-
-  {#if editingSongId !== null}
-    <TagEditor
-      songId={editingSongId}
-      onClose={() => {
-        editingSongId = null;
-      }}
-      onSave={handleTagEditorSaved}
-    />
   {/if}
 
   {#if reviewDuplicateSongId !== null}

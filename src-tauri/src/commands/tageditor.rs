@@ -565,10 +565,9 @@ pub async fn save_song_tags(
         {
             let _ = app.emit("auto-organize-result", &auto_res);
         }
-        if auto_res.moved_count > 0 {
-            let _ = app.emit("library-changed", ());
-        }
     }
+
+    let _ = app.emit("library-changed", ());
 
     Ok(())
 }
@@ -578,6 +577,7 @@ pub async fn save_song_tags(
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn save_file_tags(
+    app: AppHandle,
     state: State<'_, AppState>,
     path: String,
     title: String,
@@ -760,6 +760,8 @@ pub async fn save_file_tags(
         crate::musical::mark_user_curated_by_path(&conn, &path);
     }
 
+    let _ = app.emit("library-changed", ());
+
     Ok(())
 }
 
@@ -934,10 +936,9 @@ pub async fn save_album_tags(
         {
             let _ = app.emit("auto-organize-result", &auto_res);
         }
-        if auto_res.moved_count > 0 {
-            let _ = app.emit("library-changed", ());
-        }
     }
+
+    let _ = app.emit("library-changed", ());
 
     Ok(updated_count)
 }
@@ -1061,6 +1062,8 @@ pub async fn save_batch_file_tags(
         },
     );
 
+    let _ = app.emit("library-changed", ());
+
     Ok(updated_count)
 }
 
@@ -1108,7 +1111,11 @@ fn write_shared_tags(
 /// in. A manually-picked cover (`art_manual`) always takes precedence over
 /// automatic art regardless, so it's left untouched.
 #[tauri::command]
-pub async fn clear_song_cover_art(state: State<'_, AppState>, song_id: i64) -> Result<(), String> {
+pub async fn clear_song_cover_art(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    song_id: i64,
+) -> Result<(), String> {
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
@@ -1150,6 +1157,8 @@ pub async fn clear_song_cover_art(state: State<'_, AppState>, song_id: i64) -> R
     )
     .map_err(|e| e.to_string())?;
 
+    let _ = app.emit("library-changed", ());
+
     Ok(())
 }
 
@@ -1158,6 +1167,7 @@ pub async fn clear_song_cover_art(state: State<'_, AppState>, song_id: i64) -> R
 /// file couldn't be cleared, returning the count that actually succeeded.
 #[tauri::command]
 pub async fn clear_album_cover_art(
+    app: AppHandle,
     state: State<'_, AppState>,
     song_ids: Vec<i64>,
 ) -> Result<u32, String> {
@@ -1217,6 +1227,10 @@ pub async fn clear_album_cover_art(
         .map_err(|e| e.to_string())?;
     }
     tx.commit().map_err(|e| e.to_string())?;
+
+    if !cleared.is_empty() {
+        let _ = app.emit("library-changed", ());
+    }
 
     Ok(cleared.len() as u32)
 }

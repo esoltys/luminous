@@ -46,6 +46,7 @@
   import { publishScrollbarWidth } from "../lib/utils/scrollbarWidth";
   import { FrontendErrorReporter } from "../lib/utils/frontendError";
   import TagEditor from "../lib/components/TagEditor.svelte";
+  import { tagEditorStore } from "../lib/stores/tagEditor.svelte";
   import DeviceSyncDrawer from "../lib/components/devices/DeviceSyncDrawer.svelte";
   import { onMount } from "svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -108,7 +109,6 @@
     walkthroughStore.start();
   }
   let isShortcutsModalOpen = $state(false);
-  let editingSongId = $state<number | null>(null);
   let isDragActive = $state(false);
   let isShiftHeld = $state(false);
   let isResizingSidebar = $state(false);
@@ -237,14 +237,14 @@
             isShortcutsModalOpen = true;
           },
           openTagEditor: (songId: number) => {
-            editingSongId = songId;
+            tagEditorStore.open(songId);
           },
           closeAll: () => {
             isShortcutsModalOpen = false;
-            editingSongId = null;
+            tagEditorStore.close();
           },
           isShortcutsOpen: () => isShortcutsModalOpen,
-          isTagEditorOpen: () => editingSongId !== null,
+          isTagEditorOpen: () => tagEditorStore.isOpen,
         });
       });
     }
@@ -797,13 +797,26 @@
     <KeyboardShortcutsModal onClose={() => (isShortcutsModalOpen = false)} />
   {/if}
 
-  {#if editingSongId !== null}
-    <TagEditor
-      songId={editingSongId}
-      onClose={() => {
-        editingSongId = null;
-      }}
-    />
+  {#if tagEditorStore.target !== null}
+    {#key tagEditorStore.openSeq}
+      {#if tagEditorStore.target.kind === "song"}
+        <TagEditor
+          songId={tagEditorStore.target.songId}
+          onClose={() => tagEditorStore.close()}
+          onSave={tagEditorStore.onSaved}
+        />
+      {:else}
+        <TagEditor
+          filePath={tagEditorStore.target.filePath}
+          fileName={tagEditorStore.target.fileName}
+          folderPath={tagEditorStore.target.folderPath}
+          folderName={tagEditorStore.target.folderName}
+          source={tagEditorStore.target.source}
+          onClose={() => tagEditorStore.close()}
+          onSave={tagEditorStore.onSaved}
+        />
+      {/if}
+    {/key}
   {/if}
 
   {#if welcomeStore.initialized && !welcomeStore.hasSeen}

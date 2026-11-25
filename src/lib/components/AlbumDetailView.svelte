@@ -25,7 +25,7 @@
   import SongRating from "./SongRating.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import BoxSetDiscIcons from "./BoxSetDiscIcons.svelte";
-  import TagEditor from "./TagEditor.svelte";
+  import { tagEditorStore } from "../stores/tagEditor.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import GenreChips from "./GenreChips.svelte";
@@ -81,7 +81,6 @@
   let loading = $state(true);
   let refreshing = $state(false);
   let retrievingDetails = $state(false);
-  let editingSongId = $state<number | null>(null);
   /** A multi-song selection open in the batch tag editor. */
   let batchEditSongs = $state<Song[] | null>(null);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
@@ -534,7 +533,7 @@
   }
 
   function openTagEditor(songId: number) {
-    editingSongId = songId;
+    tagEditorStore.open(songId, { onSaved: () => handleTagEditorSaved() });
   }
 
   let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
@@ -581,8 +580,6 @@
   }
 
   async function handleTagEditorSaved(isAlbumEdit: boolean = false) {
-    collectionStore.refreshLibrary();
-    tagsStore.load();
     loading = true;
 
     // The album-level editor renames every song currently loaded here at once,
@@ -845,16 +842,6 @@
     </div>
   </div>
 </div>
-
-{#if editingSongId !== null}
-  <TagEditor
-    songId={editingSongId}
-    onClose={() => {
-      editingSongId = null;
-    }}
-    onSave={handleTagEditorSaved}
-  />
-{/if}
 
 {#if batchEditSongs !== null}
   <AlbumTagEditor

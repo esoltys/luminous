@@ -14,7 +14,7 @@
   import { CONTEXT_MENU_WIDTH_PX } from "../../constants";
   import type { DirListing, FileEntry, FileMenuTarget } from "../../types";
   import Button from "../Button.svelte";
-  import TagEditor from "../TagEditor.svelte";
+  import { tagEditorStore } from "../../stores/tagEditor.svelte";
   import AlbumTagEditor from "../AlbumTagEditor.svelte";
   import FileBrowser from "./FileBrowser.svelte";
   import FileContextMenu from "./FileContextMenu.svelte";
@@ -34,13 +34,6 @@
   let selection = $state<string[]>([]);
   let menu = $state<(FileMenuTarget & { x: number; y: number; fromHeader?: boolean }) | null>(null);
   let headerMenuButtonEl = $state<HTMLButtonElement | null>(null);
-  let editingSongId = $state<number | null>(null);
-  let editingFile = $state<{
-    path: string;
-    name: string;
-    folderPath: string[];
-    folderName: string;
-  } | null>(null);
   let editingFolder = $state<{
     folderName: string;
     songIds: number[];
@@ -339,38 +332,24 @@
         folderLocation={menu.fromHeader ? listing?.location : null}
         scannable={isLocal && !listing?.excluded}
         onFolderSettings={() => navigationStore.openSettings("sources")}
-        onEditTags={(id) => (editingSongId = id)}
+        onEditTags={(id) => tagEditorStore.open(id, { onSaved: () => filesStore.reloadFolder() })}
         onEditFileTags={(entry) => {
           if (entry.location) {
-            editingFile = {
-              path: entry.location,
-              name: entry.name,
-              folderPath: location.path,
-              folderName: title,
-            };
+            tagEditorStore.open(
+              {
+                filePath: entry.location,
+                fileName: entry.name,
+                folderPath: location.path,
+                folderName: title,
+                source: location.source,
+              },
+              { onSaved: () => filesStore.reloadFolder() },
+            );
           }
         }}
         onEditFolderTags={editFolderTags}
         onEditBatchTags={editBatchTags}
         onClose={() => (menu = null)}
-      />
-    {/if}
-    {#if editingSongId !== null}
-      <TagEditor
-        songId={editingSongId}
-        onClose={() => (editingSongId = null)}
-        onSave={() => filesStore.reloadFolder()}
-      />
-    {/if}
-    {#if editingFile !== null}
-      <TagEditor
-        filePath={editingFile.path}
-        fileName={editingFile.name}
-        folderPath={editingFile.folderPath}
-        folderName={editingFile.folderName}
-        source={location.source}
-        onClose={() => (editingFile = null)}
-        onSave={() => filesStore.reloadFolder()}
       />
     {/if}
     {#if editingFolder !== null}

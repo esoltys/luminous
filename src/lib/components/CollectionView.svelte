@@ -10,7 +10,7 @@
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
-  import TagEditor from "./TagEditor.svelte";
+  import { tagEditorStore } from "../stores/tagEditor.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import {
     PlayIcon as Play,
@@ -48,7 +48,6 @@
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
-  let editingSongId = $state<number | null>(null);
   /** A multi-song selection open in the batch tag editor. */
   let batchEditSongs = $state<Song[] | null>(null);
   let showColumnsMenu = $state(false);
@@ -96,12 +95,7 @@
   }
 
   function openTagEditor(songId: number) {
-    editingSongId = songId;
-  }
-
-  function handleTagEditorSaved() {
-    collectionStore.refreshLibrary();
-    tagsStore.load();
+    tagEditorStore.open(songId);
   }
 
   // Indexed once per collectionStore.albums/songs change instead of re-filtering
@@ -899,16 +893,6 @@
   </div>
 {/if}
 
-{#if editingSongId !== null}
-  <TagEditor
-    songId={editingSongId}
-    onClose={() => {
-      editingSongId = null;
-    }}
-    onSave={handleTagEditorSaved}
-  />
-{/if}
-
 {#if batchEditSongs !== null}
   <AlbumTagEditor
     title={i18n.t("collection.editTagsTooltip")}
@@ -918,7 +902,6 @@
     onClose={() => {
       batchEditSongs = null;
     }}
-    onSave={handleTagEditorSaved}
   />
 {/if}
 

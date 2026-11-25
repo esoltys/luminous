@@ -16,7 +16,7 @@
   import Button from "./Button.svelte";
   import CoverArt from "./CoverArt.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
-  import TagEditor from "./TagEditor.svelte";
+  import { tagEditorStore } from "../stores/tagEditor.svelte";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import {
@@ -52,7 +52,6 @@
   let deleteFilesFromDisk = $state(true);
   let isResolving = $state(false);
   let showConfirmMerge = $state(false);
-  let tagEditorSongId = $state<number | null>(null);
   let isLoading = $state(false);
 
   // Sync groups from prop or fetch if not provided
@@ -175,7 +174,7 @@
     if (onEditTags) {
       onEditTags(songId);
     } else {
-      tagEditorSongId = songId;
+      tagEditorStore.open(songId, { onSaved: () => onResolved?.() });
     }
   }
 
@@ -706,20 +705,6 @@
     onConfirm={executeResolve}
     onCancel={() => {
       showConfirmMerge = false;
-    }}
-  />
-{/if}
-
-<!-- Inline TagEditor when opened via Keep Both -->
-{#if tagEditorSongId !== null}
-  <TagEditor
-    songId={tagEditorSongId}
-    onClose={() => {
-      tagEditorSongId = null;
-    }}
-    onSave={() => {
-      tagEditorSongId = null;
-      onResolved?.();
     }}
   />
 {/if}

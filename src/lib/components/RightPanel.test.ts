@@ -8,6 +8,7 @@ import { contextStore } from "../stores/context.svelte";
 import { inspectorStore } from "../stores/inspector.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { picardStore } from "../stores/picard.svelte";
+import { tagEditorStore } from "../stores/tagEditor.svelte";
 import * as picardUtils from "../utils/picard";
 import { flushSync } from "svelte";
 import type { Song, AudioPipelineInfo } from "../types";
@@ -435,25 +436,9 @@ describe("RightPanel.svelte", () => {
   });
 
   it("opens TagEditor when clicking Edit tags in empty state", async () => {
+    tagEditorStore.close();
     vi.mocked(invoke).mockImplementation(async (cmd) => {
       if (cmd === "get_song_context") return null;
-      if (cmd === "get_song_details" || cmd === "get_song_tags") {
-        return {
-          title: "Test Track Title",
-          artist: "Test Artist",
-          album: "Test Album",
-          album_artist: "Test Artist",
-          composer: "",
-          genre: "Rock",
-          track: 1,
-          disc: 1,
-          year: 2024,
-          original_year: null,
-          grouping: "",
-          bpm: null,
-          initial_key: null,
-        };
-      }
       return null;
     });
 
@@ -464,8 +449,9 @@ describe("RightPanel.svelte", () => {
     const editTagsBtn = await findByRole("button", { name: "Edit tags" });
     await fireEvent.click(editTagsBtn);
 
-    const dialog = await findByRole("dialog");
-    expect(dialog).toBeInTheDocument();
+    expect(tagEditorStore.isOpen).toBe(true);
+    expect(tagEditorStore.target).toEqual({ kind: "song", songId: mockSong.id });
+    tagEditorStore.close();
   });
 
   it("resets scroll position to top when the inspected subject changes", async () => {

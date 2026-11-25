@@ -13,7 +13,7 @@
   import CoverMosaic from "./CoverMosaic.svelte";
   import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
   import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
-  import TagEditor from "./TagEditor.svelte";
+  import { tagEditorStore } from "../stores/tagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import EmptyState from "./EmptyState.svelte";
   import SearchEmptyState from "./SearchEmptyState.svelte";
@@ -156,7 +156,6 @@
   // `null` otherwise.
   let playlistItems = $state<PlaylistItem[] | null>(null);
   let loading = $state(true);
-  let editingSongId = $state<number | null>(null);
   /** A multi-song selection open in the batch tag editor. */
   let batchEditSongs = $state<Song[] | null>(null);
   let editingAlbumSongs = $state<Song[] | null>(null);
@@ -603,12 +602,10 @@
   }
 
   function openTagEditor(songId: number) {
-    editingSongId = songId;
+    tagEditorStore.open(songId, { onSaved: handleTagEditorSaved });
   }
 
   function handleTagEditorSaved() {
-    collectionStore.refreshLibrary();
-    tagsStore.load();
     loading = true;
     fetchSongs(kind, selector, playlistId)
       .then(applyLoaded)
@@ -962,16 +959,6 @@
     </div>
   </div>
 </div>
-
-{#if editingSongId !== null}
-  <TagEditor
-    songId={editingSongId}
-    onClose={() => {
-      editingSongId = null;
-    }}
-    onSave={handleTagEditorSaved}
-  />
-{/if}
 
 {#if editingAlbumSongs !== null && editingAlbumSongs.length > 0}
   <AlbumTagEditor
