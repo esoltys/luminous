@@ -36,11 +36,6 @@ class WindowLayoutStore {
   rightPanelWidth = $state<number>(288);
   immersiveMode = $state<boolean>(false);
   immersiveView = $state<ImmersiveView>("cover");
-  immersiveDockHidden = $state<boolean>(false);
-  static readonly IMMERSIVE_DOCK_HIDE_DELAY_MS = 2500;
-  private immersiveDockHeld = false;
-  private immersiveDockHovered = false;
-  private immersiveDockHideTimer: ReturnType<typeof setTimeout> | null = null;
   isFullscreen = $state<boolean>(false);
   isMiniplayer = $state<boolean>(
     typeof window !== "undefined" && localStorage.getItem("layout_isMiniplayer") === "true",
@@ -177,7 +172,6 @@ class WindowLayoutStore {
     if (view !== undefined) {
       if (this.immersiveMode && this.immersiveView !== view) {
         this.setImmersiveView(view);
-        this.revealImmersiveDock();
         return;
       }
       this.setImmersiveView(view);
@@ -185,12 +179,6 @@ class WindowLayoutStore {
     this.immersiveMode = !this.immersiveMode;
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_immersiveMode", this.immersiveMode.toString());
-    }
-    if (this.effectiveImmersiveMode) {
-      this.revealImmersiveDock();
-    } else {
-      this.clearImmersiveDockTimer();
-      this.immersiveDockHidden = false;
     }
   }
 
@@ -201,78 +189,10 @@ class WindowLayoutStore {
     }
   }
 
-  private clearImmersiveDockTimer() {
-    if (this.immersiveDockHideTimer) {
-      clearTimeout(this.immersiveDockHideTimer);
-      this.immersiveDockHideTimer = null;
-    }
-  }
-
-  private scheduleImmersiveDockHide() {
-    this.clearImmersiveDockTimer();
-    if (!this.effectiveImmersiveMode || this.immersiveDockHeld || this.immersiveDockHovered) return;
-    this.immersiveDockHideTimer = setTimeout(() => {
-      this.immersiveDockHideTimer = null;
-      if (this.effectiveImmersiveMode && !this.immersiveDockHeld && !this.immersiveDockHovered) {
-        this.immersiveDockHidden = true;
-      }
-    }, WindowLayoutStore.IMMERSIVE_DOCK_HIDE_DELAY_MS);
-  }
-
-  /**
-   * Reveals the floating PlayerBar dock in immersive mode and starts the
-   * auto-hide timer (unless the cursor is currently resting inside the dock).
-   */
-  revealImmersiveDock() {
-    this.immersiveDockHidden = false;
-    if (this.effectiveImmersiveMode) {
-      this.scheduleImmersiveDockHide();
-    } else {
-      this.clearImmersiveDockTimer();
-    }
-  }
-
-  /**
-   * Tracks whether the pointer is resting inside the playerbar area. While
-   * hovered, the playbar stays visible indefinitely; leaving starts the hide countdown.
-   */
-  setImmersiveDockHovered(hovered: boolean) {
-    if (this.immersiveDockHovered === hovered && (!hovered || !this.immersiveDockHidden)) return;
-    this.immersiveDockHovered = hovered;
-    if (hovered) {
-      this.immersiveDockHidden = false;
-      this.clearImmersiveDockTimer();
-    } else if (this.effectiveImmersiveMode) {
-      this.scheduleImmersiveDockHide();
-    }
-  }
-
-  /**
-   * Holds the immersive dock visible while an interaction (pointer drag) is active;
-   * releasing the hold restarts the auto-hide timer if the pointer is no longer hovering.
-   */
-  setImmersiveDockHeld(held: boolean) {
-    this.immersiveDockHeld = held;
-    if (held) {
-      this.immersiveDockHidden = false;
-      this.clearImmersiveDockTimer();
-    } else if (this.effectiveImmersiveMode) {
-      this.scheduleImmersiveDockHide();
-    }
-  }
-
-  get isImmersiveDockHidden(): boolean {
-    return this.effectiveImmersiveMode && this.immersiveDockHidden;
-  }
-
   // Force immersive mode off — used when there's nothing playing, since the
   // only way back out is a toggle on the PlayerBar, which is itself hidden
   // until a track has ever played this session (issue #71).
   exitImmersiveMode() {
-    this.clearImmersiveDockTimer();
-    this.immersiveDockHidden = false;
-    this.immersiveDockHovered = false;
-    this.immersiveDockHeld = false;
     if (!this.immersiveMode) return;
     this.immersiveMode = false;
     if (typeof window !== "undefined") {
