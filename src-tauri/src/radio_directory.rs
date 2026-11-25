@@ -1695,6 +1695,13 @@ fn upsert_stream_station_inner(
         .query_row(&existing_sql, params![url], crate::collection::row_to_song)
         .optional()?
     {
+        if existing.unavailable {
+            conn.execute(
+                "UPDATE songs SET unavailable = 0 WHERE id = ?1",
+                params![existing.id],
+            )?;
+            existing.unavailable = false;
+        }
         if update_existing_stream && existing.source == crate::models::SongSource::Stream {
             let trimmed_name = name.map(str::trim).filter(|s| !s.is_empty());
             let genre = tags.and_then(station_tags_to_genre);

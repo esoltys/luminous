@@ -172,7 +172,6 @@ class RadioStore {
   // My stations state
   savedStations = $state<RadioDirectoryStation[]>([]);
   recentStations = $state<RadioDirectoryStation[]>([]);
-  radioPlaylistIds = $state<number[]>([]);
   editingStation = $state<RadioDirectoryStation | null>(null);
   myStationsLoading = $state(false);
   stationListTags = $state<RadioBrowserFacetEntry[]>([]);
@@ -410,7 +409,7 @@ class RadioStore {
   async loadMyStations(): Promise<void> {
     this.myStationsLoading = true;
     try {
-      const [saved, recent, playlistIds] = await Promise.all([
+      const [saved, recent] = await Promise.all([
         invoke<RadioDirectoryStation[]>("get_saved_radio_stations", {
           hideUnsupported: this._hideUnsupported,
         }),
@@ -418,11 +417,9 @@ class RadioStore {
           limit: 10,
           hideUnsupported: this._hideUnsupported,
         }),
-        invoke<number[]>("get_radio_playlist_ids"),
       ]);
       this.savedStations = saved ?? [];
       this.recentStations = recent ?? [];
-      this.radioPlaylistIds = playlistIds ?? [];
       this.savedLoaded = true;
     } catch (err) {
       console.error("Failed to load saved/recent radio stations:", err);

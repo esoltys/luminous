@@ -467,6 +467,15 @@ describe("playlist kind predicates and capabilities", () => {
       refreshable: true,
       editableDefinition: "station_list",
     });
+    expect(getPlaylistCapabilities({ kind: "station_list", dynamic_enabled: false })).toMatchObject(
+      {
+        showsStationUpdated: false,
+        showsGenreHeader: false,
+        canMakeActive: false,
+        refreshable: false,
+        editableDefinition: null,
+      },
+    );
     expect(getPlaylistCapabilities("system_auto")).toMatchObject({
       canMakeActive: false,
       showsGenreHeader: true,

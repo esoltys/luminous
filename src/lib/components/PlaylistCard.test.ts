@@ -42,4 +42,21 @@ describe("PlaylistCard file badge (#2280)", () => {
     render(PlaylistCard, { props: { playlist: base, onClick: () => {} } });
     expect(screen.queryByText("File")).toBeNull();
   });
+
+  it("omits Make Active on a file-backed station_list while keeping its File badge", () => {
+    render(PlaylistCard, {
+      props: {
+        playlist: {
+          ...base,
+          kind: "station_list",
+          source_path: "/music/soma_fm.m3u",
+          track_count: 43,
+        },
+        onClick: () => {},
+      },
+    });
+    expect(screen.getByText("File")).toBeTruthy();
+    expect(screen.getByText("43 stations")).toBeTruthy();
+    expect(screen.queryByTitle("Make Active")).toBeNull();
+  });
 });

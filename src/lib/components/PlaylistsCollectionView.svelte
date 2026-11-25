@@ -162,8 +162,10 @@
     ),
   );
   let customPlaylists = $derived.by(() => {
-    // Include non-dynamic playlists + user-created Smart playlists
-    const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylist(p));
+    // Include non-dynamic custom playlists + user-created Smart playlists (exclude station lists).
+    const list = playlistsStore.playlists.filter(
+      (p) => (!p.dynamic_enabled && !isStationList(p)) || isSmartPlaylist(p),
+    );
     const queue = list.find((p) => p.is_queue);
     const rest = list.filter((p) => !p.is_queue);
     return queue ? [queue, ...rest] : rest;

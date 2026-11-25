@@ -8,6 +8,7 @@ import { picardStore } from "./picard.svelte";
 import { getDaypartBucket } from "../utils/daypart";
 import { navigationStore } from "./navigation.svelte";
 import { reveal, revealLabel } from "../utils/reveal";
+import { isStationList } from "../utils/playlist";
 
 /** How often to check whether the Daypart Mix's local-time bucket has
  * crossed a boundary while the app stays open (#223) — cheap since the
@@ -50,12 +51,12 @@ export class PlaylistsStore {
   activeCustomPlaylist = $derived.by((): Playlist | null => {
     if (this.effectivePinnedPlaylistId === null) return null;
     const pl = this.playlists.find((p) => p.id === this.effectivePinnedPlaylistId);
-    return pl && !pl.dynamic_enabled ? pl : null;
+    return pl && !pl.dynamic_enabled && !isStationList(pl) ? pl : null;
   });
 
-  /** All user-created custom playlists (not dynamic, not queue). */
+  /** All user-created custom playlists (not dynamic, not queue, not station lists). */
   customPlaylists = $derived.by((): Playlist[] => {
-    return this.playlists.filter((p) => !p.dynamic_enabled && !p.is_queue);
+    return this.playlists.filter((p) => !p.dynamic_enabled && !p.is_queue && !isStationList(p));
   });
 
   constructor() {

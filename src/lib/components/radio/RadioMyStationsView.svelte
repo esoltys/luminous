@@ -71,14 +71,11 @@
 
   const recentStations = $derived(radioStore.recentStations.slice(0, 10));
 
-  const dynamicStationLists = $derived.by(() =>
+  const stationLists = $derived.by(() =>
     playlistsStore.playlists.filter((pl) => isStationList(pl)),
   );
 
-  const manualRadioPlaylists = $derived.by(() => {
-    const ids = new Set(radioStore.radioPlaylistIds);
-    return playlistsStore.customPlaylists.filter((pl) => ids.has(pl.id) && !isStationList(pl));
-  });
+  const hasDynamicStationLists = $derived(stationLists.some((pl) => pl.dynamic_enabled));
 
   const updatedAgoLabel = $derived(formatUpdatedAgo(radioStore.status?.lastSyncedAt ?? null));
 
@@ -202,7 +199,7 @@
           <h2 class="text-xl font-semibold text-brand-text-primary truncate">
             {i18n.t("radio.stationListsTitle")}
           </h2>
-          {#if updatedAgoLabel && dynamicStationLists.length > 0}
+          {#if updatedAgoLabel && hasDynamicStationLists}
             <span
               class="text-xs text-brand-text-secondary font-medium shrink-0"
               data-testid="station-lists-updated-ago"
@@ -224,7 +221,7 @@
         {/if}
       </div>
 
-      {#if dynamicStationLists.length === 0 && manualRadioPlaylists.length === 0}
+      {#if stationLists.length === 0}
         <div
           class="p-5 rounded-xl border border-brand-border/40 bg-brand-surface/40 text-center space-y-1.5"
         >
@@ -237,7 +234,7 @@
           <!-- Station lists read like playlists elsewhere (PlaylistRowCard, no
                inline controls): open one to play, refresh, edit or delete it,
                or right-click it. Imported lists (#2279) count stations too. -->
-          {#each [...dynamicStationLists, ...manualRadioPlaylists] as pl (pl.id)}
+          {#each stationLists as pl (pl.id)}
             <PlaylistRowCard
               playlist={pl}
               countLabel={i18n.t("radio.stationCount", { count: pl.track_count })}

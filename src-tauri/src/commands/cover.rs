@@ -14,12 +14,17 @@ pub async fn get_cover_art_uri(
     song_id: i64,
     full_resolution: Option<bool>,
 ) -> Result<Option<String>, String> {
-    let manager = &state.cover_manager;
-    if full_resolution.unwrap_or(false) {
-        manager.get_full_resolution_cover_art_uri(song_id)
-    } else {
-        manager.get_cover_art_uri(song_id)
-    }
+    let manager = state.cover_manager.clone();
+    let full = full_resolution.unwrap_or(false);
+    tokio::task::spawn_blocking(move || {
+        if full {
+            manager.get_full_resolution_cover_art_uri(song_id)
+        } else {
+            manager.get_cover_art_uri(song_id)
+        }
+    })
+    .await
+    .map_err(|e| format!("Cover art task failed: {e}"))?
     .map_err(|e| e.to_string())
 }
 
