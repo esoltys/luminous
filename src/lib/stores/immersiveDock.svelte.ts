@@ -65,14 +65,8 @@ class ImmersiveDockStore {
     }
   }
 
-  /**
-   * Tracks whether the pointer is resting inside the playerbar area. While
-   * hovered, the dock stays visible indefinitely; leaving starts the hide countdown.
-   */
-  setHovered(hovered: boolean) {
-    if (this.hovered === hovered && (!hovered || !this.hidden)) return;
-    this.hovered = hovered;
-    if (hovered) {
+  private syncPinState(pinned: boolean) {
+    if (pinned) {
       this.hidden = false;
       this.clearTimer();
     } else if (windowLayoutStore.effectiveImmersiveMode) {
@@ -81,17 +75,22 @@ class ImmersiveDockStore {
   }
 
   /**
+   * Tracks whether the pointer is resting inside the playerbar area. While
+   * hovered, the dock stays visible indefinitely; leaving starts the hide countdown.
+   */
+  setHovered(hovered: boolean) {
+    if (this.hovered === hovered && (!hovered || !this.hidden)) return;
+    this.hovered = hovered;
+    this.syncPinState(hovered);
+  }
+
+  /**
    * Holds the immersive dock visible while an interaction (pointer drag) is active;
    * releasing the hold restarts the auto-hide timer if the pointer is no longer hovering.
    */
   setHeld(held: boolean) {
     this.held = held;
-    if (held) {
-      this.hidden = false;
-      this.clearTimer();
-    } else if (windowLayoutStore.effectiveImmersiveMode) {
-      this.scheduleHide();
-    }
+    this.syncPinState(held);
   }
 
   /**
@@ -136,6 +135,8 @@ class ImmersiveDockStore {
     const onPointerLeave = () => this.setHovered(false);
     const onPointerDown = () => this.startHold();
     const onFocusIn = () => this.reveal();
+    // When hidden, `.immersive-dock-hidden` sets `pointer-events: none` on the dock,
+    // so a window-level listener is required to detect entry into the bottom zone.
     const onWindowPointerMove = (e: PointerEvent) => {
       if (!windowLayoutStore.effectiveImmersiveMode) return;
       const inDockZone = e.clientY >= window.innerHeight - PLAYER_DOCK_CONTENT_RESERVE_PX;
