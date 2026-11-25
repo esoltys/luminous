@@ -77,6 +77,71 @@ pub fn is_reserved_playlist_name(name: &str) -> bool {
     RESERVED_PLAYLIST_NAMES.contains(&trimmed.as_str())
 }
 
+const ATOMIC_RENAME_RETRIES: u32 = 5;
+const ATOMIC_RENAME_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(100);
+static ATOMIC_TMP_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Temp-file path in `path`'s directory for an atomic write. Its `.tmp`
+/// extension is ignored by `file_sync::is_playlist_file` and `is_audio_file`,
+/// so neither the file watcher nor library scans treat it as a playlist.
+fn atomic_temp_path(path: &std::path::Path) -> std::path::PathBuf {
+    let seq = ATOMIC_TMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let pid = std::process::id();
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("playlist");
+    let tmp_name = format!("{name}.{pid}.{seq}.tmp");
+    match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent.join(tmp_name),
+        _ => std::path::PathBuf::from(tmp_name),
+    }
+}
+
+/// Writes `bytes` to `path` via a same-directory temporary file, `sync_all`,
+/// and atomic rename, so readers and crash recovery never see a truncated or
+/// empty file.
+///
+/// Retries the rename briefly on Windows transient-lock errors
+/// (`ERROR_ACCESS_DENIED`, `ERROR_SHARING_VIOLATION`, `ERROR_LOCK_VIOLATION`)
+/// in case another player, sync client, or scanner briefly holds the file open.
+/// Cleans up the temporary file if any step fails.
+pub(super) fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> Result<()> {
+    use anyhow::Context;
+    use std::io::Write;
+
+    let tmp = atomic_temp_path(path);
+    let write_res = (|| -> std::io::Result<()> {
+        let mut file = std::fs::File::create(&tmp)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        Ok(())
+    })();
+    if let Err(e) = write_res {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e).with_context(|| format!("writing {}", tmp.display()));
+    }
+
+    let mut attempt = 0;
+    loop {
+        match std::fs::rename(&tmp, path) {
+            Ok(()) => return Ok(()),
+            Err(e)
+                if attempt < ATOMIC_RENAME_RETRIES
+                    && cfg!(windows)
+                    && matches!(e.raw_os_error(), Some(5 | 32 | 33)) =>
+            {
+                attempt += 1;
+                std::thread::sleep(ATOMIC_RENAME_RETRY_DELAY * attempt);
+            }
+            Err(e) => {
+                let _ = std::fs::remove_file(&tmp);
+                return Err(e).with_context(|| format!("replacing {}", path.display()));
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Undo/Redo stack operations
 // ---------------------------------------------------------------------------
@@ -756,5 +821,48 @@ mod tests {
             GENRES,
             "the pass still builds every genre"
         );
+    }
+
+    #[test]
+    fn write_atomic_replaces_file_and_cleans_up_temp() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("Mix.m3u8");
+        std::fs::write(&target, b"old-content").unwrap();
+
+        write_atomic(&target, b"new-content").unwrap();
+
+        assert_eq!(std::fs::read(&target).unwrap(), b"new-content");
+        let entries: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(entries, vec!["Mix.m3u8"]);
+    }
+
+    #[test]
+    fn write_atomic_failure_leaves_existing_state_intact_and_cleans_temp() {
+        let dir = tempfile::tempdir().unwrap();
+
+        // Missing parent directory: File::create fails before rename.
+        let missing = dir.path().join("no_such_dir").join("Mix.m3u");
+        assert!(write_atomic(&missing, b"data").is_err());
+
+        // Target is a directory: temp write succeeds, rename fails, temp is cleaned up.
+        let target_dir = dir.path().join("ExistingDir.m3u");
+        std::fs::create_dir(&target_dir).unwrap();
+        assert!(write_atomic(&target_dir, b"data").is_err());
+        assert!(target_dir.is_dir());
+        let entries: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(entries, vec!["ExistingDir.m3u"]);
+    }
+
+    #[test]
+    fn atomic_temp_path_is_ignored_by_playlist_and_audio_filters() {
+        let tmp = atomic_temp_path(std::path::Path::new("library/Mix.m3u8"));
+        assert!(!file_sync::is_playlist_file(&tmp));
+        assert!(!crate::collection::is_audio_file(&tmp));
     }
 }

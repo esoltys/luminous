@@ -567,7 +567,7 @@ impl PlaylistManager {
             return Ok(unchanged);
         }
         if hash != linked.file_hash {
-            if let Err(e) = std::fs::write(&linked.path, &bytes) {
+            if let Err(e) = super::write_atomic(&linked.path, &bytes) {
                 conn.execute(
                     swap,
                     params![
@@ -578,7 +578,7 @@ impl PlaylistManager {
                         hash
                     ],
                 )?;
-                return Err(e.into());
+                return Err(e);
             }
         }
         Ok(unchanged)
@@ -1351,5 +1351,52 @@ mod tests {
 
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(text.contains("#EXTINF:-1,Band - Renamed\r\n"), "{text}");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn failed_write_preserves_previous_file_and_rolls_back_hash_claim() {
+        let mut lib = Library::new();
+        let path = lib.playlist_file("Mix.m3u", MIX);
+        let id = lib.only_synced(&path);
+        let before = std::fs::read(&path).unwrap();
+
+        lib.pm.add_songs_to_playlist(id, &[1]).unwrap();
+
+        // Mark the destination read-only so std::fs::rename fails on Windows.
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&path, perms).unwrap();
+
+        let conn = lib.db.pool.get().unwrap();
+        let err = lib.pm.write_file(&conn, id);
+        drop(conn);
+        assert!(
+            err.is_err(),
+            "expected write_file to fail on read-only target"
+        );
+
+        // Previous file content is untouched and no .tmp files remain.
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        let leftovers: Vec<_> = std::fs::read_dir(path.parent().unwrap())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".tmp"))
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "temp files left behind: {leftovers:?}"
+        );
+
+        // Clear read-only; the rolled-back hash claim lets the next pass write.
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        perms.set_readonly(false);
+        std::fs::set_permissions(&path, perms).unwrap();
+
+        lib.pm.write_edited_playlist_files().unwrap();
+        let after = std::fs::read_to_string(&path).unwrap();
+        assert!(after.contains("01.mp3"), "{after}");
+        assert!(after.contains("02.mp3"), "{after}");
     }
 }

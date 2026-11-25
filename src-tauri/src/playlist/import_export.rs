@@ -482,7 +482,7 @@ impl PlaylistManager {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(path, &bytes)?;
+        super::write_atomic(path, &bytes)?;
         self.link_exported_file(&conn, playlist_id, path, &bytes, &style)?;
         Ok(())
     }
@@ -678,5 +678,19 @@ mod tests {
         let m3u_text = std::fs::read_to_string(&export_m3u).unwrap();
         assert!(m3u_text.contains(stream_url));
         assert!(!m3u_text.contains("radio://"));
+
+        // Overwrite via export_playlist atomically and leave no .tmp file.
+        manager
+            .export_playlist(imported.id, &export_m3u, true)
+            .unwrap();
+        let leftovers: Vec<_> = std::fs::read_dir(temp_dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".tmp"))
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "temp files left behind: {leftovers:?}"
+        );
     }
 }
