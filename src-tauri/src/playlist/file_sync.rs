@@ -1206,7 +1206,10 @@ mod tests {
         assert_eq!(station.stream_url.as_deref(), Some(url));
 
         // The Radio view's "Import as a station list?" calls import_playlist.
-        assert_eq!(lib.pm.import_playlist(&path).unwrap().id, id);
+        let imported = lib.pm.import_playlist(&path).unwrap();
+        assert_eq!(imported.id, id);
+        assert_eq!(imported.kind, crate::models::PlaylistKind::StationList);
+        assert!(imported.station_list_spec.is_none());
         assert_eq!(lib.pm.get_playlists().unwrap().len(), 1);
 
         lib.pm.add_songs_to_playlist(id, &[station.id]).unwrap();

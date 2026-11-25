@@ -844,7 +844,18 @@ fn default_true() -> bool {
 
 /// Columns of `playlists p` that `Playlist::from_row` maps, in order. A
 /// query selects these followed by one `track_count` column.
-pub const PLAYLIST_SELECT_COLS: &str = "p.id, p.name, p.dynamic_enabled, p.dynamic_spec,      p.population_mode, p.last_played_row, p.created, p.updated,      p.size_limit_bytes, p.sort_field, p.sort_asc, p.size_limit_device,      p.is_system,      (SELECT pf.path FROM playlist_files pf WHERE pf.playlist_id = p.id),      (SELECT pf.conflict FROM playlist_files pf WHERE pf.playlist_id = p.id)";
+pub static PLAYLIST_SELECT_COLS: LazyLock<String> = LazyLock::new(|| {
+    let sources_sql = &*LIVE_STREAM_SOURCES_SQL;
+    format!(
+        "p.id, p.name, p.dynamic_enabled, p.dynamic_spec, \
+         p.population_mode, p.last_played_row, p.created, p.updated, \
+         p.size_limit_bytes, p.sort_field, p.sort_asc, p.size_limit_device, \
+         p.is_system, \
+         (SELECT pf.path FROM playlist_files pf WHERE pf.playlist_id = p.id), \
+         (SELECT pf.conflict FROM playlist_files pf WHERE pf.playlist_id = p.id), \
+         EXISTS(SELECT 1 FROM playlist_items pi JOIN songs s ON s.id = pi.song_id WHERE pi.playlist_id = p.id AND s.source IN ({sources_sql}))"
+    )
+});
 
 impl Playlist {
     /// The single definition of what makes a row "the Queue".
@@ -853,16 +864,26 @@ impl Playlist {
     }
 
     /// Classifies a playlist row into its semantic [`PlaylistKind`].
+    ///
+    /// Both dynamic `radio:...` lists and static/file-backed playlists whose
+    /// items include live radio stations classify as [`PlaylistKind::StationList`];
+    /// callers that need to distinguish dynamic lists check `station_list_spec`
+    /// or `dynamic_enabled`.
     pub fn classify_row(
         name: &str,
         dynamic_enabled: bool,
         is_system: bool,
         dynamic_spec: Option<&str>,
+        has_radio_stations: bool,
     ) -> PlaylistKind {
         if Self::is_queue_row(name, dynamic_enabled) {
             PlaylistKind::Queue
         } else if !dynamic_enabled {
-            PlaylistKind::Custom
+            if has_radio_stations {
+                PlaylistKind::StationList
+            } else {
+                PlaylistKind::Custom
+            }
         } else if is_system {
             PlaylistKind::SystemAuto
         } else if dynamic_spec.is_some_and(|s| s.trim().starts_with("radio:")) {
@@ -878,7 +899,14 @@ impl Playlist {
         let dynamic_enabled: bool = row.get(2)?;
         let dynamic_spec: Option<String> = row.get(3)?;
         let is_system = row.get::<_, Option<bool>>(12)?.unwrap_or(false);
-        let kind = Self::classify_row(&name, dynamic_enabled, is_system, dynamic_spec.as_deref());
+        let has_radio_stations = row.get::<_, Option<bool>>(15)?.unwrap_or(false);
+        let kind = Self::classify_row(
+            &name,
+            dynamic_enabled,
+            is_system,
+            dynamic_spec.as_deref(),
+            has_radio_stations,
+        );
         let is_queue = kind == PlaylistKind::Queue;
         let station_list_spec = if kind == PlaylistKind::StationList {
             dynamic_spec
@@ -910,7 +938,7 @@ impl Playlist {
             is_system,
             source_path: row.get(13)?,
             source_conflict: row.get::<_, Option<bool>>(14)?.unwrap_or(false),
-            track_count: row.get(15)?,
+            track_count: row.get(16)?,
             is_queue,
             kind,
             station_list_spec,
@@ -2259,27 +2287,37 @@ mod tests {
     #[test]
     fn playlist_classify_row_covers_all_kinds() {
         assert_eq!(
-            Playlist::classify_row("Queue", false, false, None),
+            Playlist::classify_row("Queue", false, false, None, false),
             PlaylistKind::Queue
         );
         assert_eq!(
-            Playlist::classify_row("  queue ", false, true, None),
+            Playlist::classify_row("  queue ", false, true, None, false),
             PlaylistKind::Queue
         );
         assert_eq!(
-            Playlist::classify_row("Queue", true, false, Some("genre:rock")),
+            Playlist::classify_row("Queue", true, false, Some("genre:rock"), false),
             PlaylistKind::Smart
         );
         assert_eq!(
-            Playlist::classify_row("Road Trip", false, false, None),
+            Playlist::classify_row("Road Trip", false, false, None, false),
             PlaylistKind::Custom
         );
         assert_eq!(
-            Playlist::classify_row("90s Rock", true, false, Some("genre:rock; year:1990..1999")),
+            Playlist::classify_row("SomaFM", false, false, None, true),
+            PlaylistKind::StationList
+        );
+        assert_eq!(
+            Playlist::classify_row(
+                "90s Rock",
+                true,
+                false,
+                Some("genre:rock; year:1990..1999"),
+                false
+            ),
             PlaylistKind::Smart
         );
         assert_eq!(
-            Playlist::classify_row("1980s", true, true, Some("decade:1980s")),
+            Playlist::classify_row("1980s", true, true, Some("decade:1980s"), false),
             PlaylistKind::SystemAuto
         );
         assert_eq!(
@@ -2287,13 +2325,14 @@ mod tests {
                 "Jazz Stations",
                 true,
                 false,
-                Some("radio:tag=jazz;order=Votes;limit=0")
+                Some("radio:tag=jazz;order=Votes;limit=0"),
+                false
             ),
             PlaylistKind::StationList
         );
         // Even if a system playlist happened to have a radio: prefix, is_system wins.
         assert_eq!(
-            Playlist::classify_row("System", true, true, Some("radio:tag=jazz")),
+            Playlist::classify_row("System", true, true, Some("radio:tag=jazz"), false),
             PlaylistKind::SystemAuto
         );
     }

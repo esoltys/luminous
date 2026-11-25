@@ -1950,7 +1950,7 @@ fn get_playlists_by_ids(
         "SELECT {cols},
                 (SELECT COUNT(*) FROM playlist_items pi WHERE pi.playlist_id = p.id) as track_count
          FROM playlists p WHERE p.id IN ({placeholders})",
-        cols = crate::models::PLAYLIST_SELECT_COLS
+        cols = *crate::models::PLAYLIST_SELECT_COLS
     );
     let mut stmt = conn.prepare(&sql)?;
     let map = stmt

@@ -315,7 +315,7 @@ impl PlaylistManager {
             params![name, now],
         )?;
         let id = conn.last_insert_rowid();
-        let kind = crate::models::Playlist::classify_row(name, false, false, None);
+        let kind = crate::models::Playlist::classify_row(name, false, false, None, false);
         Ok(Playlist {
             id,
             name: name.to_string(),
@@ -395,8 +395,9 @@ impl PlaylistManager {
 
     pub fn get_playlists(&self) -> Result<Vec<Playlist>> {
         let conn = self.db.pool.get()?;
+        let cols = &*PLAYLIST_SELECT_COLS;
         let mut stmt = conn.prepare(&format!(
-            "SELECT {PLAYLIST_SELECT_COLS}, COUNT(pi.id) as track_count
+            "SELECT {cols}, COUNT(pi.id) as track_count
                  FROM playlists p
                  LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
                  GROUP BY p.id
@@ -414,9 +415,10 @@ impl PlaylistManager {
     /// playlists named after the artist.
     pub fn get_playlists_by_artist(&self, artist: &str) -> Result<Vec<Playlist>> {
         let conn = self.db.pool.get()?;
+        let cols = &*PLAYLIST_SELECT_COLS;
         let mut stmt = conn.prepare(
             &format!(
-                "SELECT {PLAYLIST_SELECT_COLS},
+                "SELECT {cols},
                         (SELECT COUNT(*) FROM playlist_items pi2 WHERE pi2.playlist_id = p.id) as track_count
                  FROM playlists p
                  WHERE EXISTS (

@@ -381,7 +381,10 @@ impl PlaylistManager {
         let tx = conn.unchecked_transaction()?;
         replace_items(&tx, playlist.id, &entries)?;
         tx.commit()?;
-        Ok(playlist)
+        self.get_playlists()?
+            .into_iter()
+            .find(|p| p.id == playlist.id)
+            .ok_or_else(|| anyhow!("Imported playlist {} not found", playlist.id))
     }
 
     /// Relinks `playlist_id`'s missing tracks (items whose library song is
@@ -657,6 +660,9 @@ mod tests {
 
         let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
         let imported = manager.import_playlist(&pls_file).unwrap();
+        assert_eq!(imported.kind, crate::models::PlaylistKind::StationList);
+        assert!(imported.station_list_spec.is_none());
+        assert_eq!(imported.track_count, 1);
         let tracks = manager.get_playlist_tracks(imported.id).unwrap();
         assert_eq!(tracks.len(), 1);
         let song = tracks[0].song.as_ref().expect("station should be a Song");
