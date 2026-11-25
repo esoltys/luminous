@@ -118,8 +118,8 @@ impl From<i64> for SongSource {
 /// SQL `IN (...)` fragment listing the source IDs that make up the browsable
 /// library (local files, managed collection folders, WebDAV mounts, and
 /// OpenSubsonic servers). Derived from `SongSource` discriminants so it can't
-/// silently drift from the enum. Interpolate into query strings, e.g.
-/// `format!("source IN ({})", *LIBRARY_SOURCES_SQL)`.
+/// silently drift from the enum. Prefer [`library_song_where`] and its
+/// variants over assembling `source IN (...) AND unavailable = 0` by hand.
 pub(crate) static LIBRARY_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
     format!(
         "{}, {}, {}, {}",
@@ -164,6 +164,88 @@ pub(crate) static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
         SongSource::Collection as i32,
     )
 });
+
+fn song_where_impl(
+    alias: &str,
+    sources_sql: &str,
+    suppress_source_index: bool,
+    exclude_unavailable: bool,
+    exclude_not_included: bool,
+    exclude_disliked: bool,
+) -> String {
+    let prefix = if alias.is_empty() {
+        String::new()
+    } else {
+        format!("{alias}.")
+    };
+    let source_col = if suppress_source_index {
+        format!("+{prefix}source")
+    } else {
+        format!("{prefix}source")
+    };
+    let mut parts = vec![format!("{source_col} IN ({sources_sql})")];
+    if exclude_unavailable {
+        parts.push(format!("{prefix}unavailable = 0"));
+    }
+    if exclude_not_included {
+        parts.push(format!("{prefix}not_included = 0"));
+    }
+    if exclude_disliked {
+        parts.push(format!("{prefix}loved != -1"));
+    }
+    parts.join(" AND ")
+}
+
+/// SQL `WHERE` predicate for available browsable library songs:
+/// `source IN ({LIBRARY_SOURCES_SQL}) AND unavailable = 0`.
+/// Pass `""` for unqualified `songs` queries or a table alias (e.g. `"s"`).
+pub(crate) fn library_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LIBRARY_SOURCES_SQL, false, true, false, false)
+}
+
+/// Variant of [`library_song_where`] that prefixes `source` with `+` to
+/// suppress `idx_songs_source`, allowing SQLite to use `idx_songs_library_sort`
+/// directly on `ORDER BY COALESCE(album_artist_sort, album_artist), ...` (#1806).
+pub(crate) fn library_song_where_for_sort(alias: &str) -> String {
+    song_where_impl(alias, &LIBRARY_SOURCES_SQL, true, true, false, false)
+}
+
+/// SQL `WHERE` predicate for available, included (`not_included = 0`) library
+/// songs. Use when `loved` is filtered separately or intentionally ignored
+/// (e.g. Favourites, artist tag counts, rating sync).
+pub(crate) fn included_library_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LIBRARY_SOURCES_SQL, false, true, true, false)
+}
+
+/// SQL `WHERE` predicate for playable/recommendation-eligible library songs:
+/// available, `not_included = 0`, and `loved != -1`.
+pub(crate) fn playable_library_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LIBRARY_SOURCES_SQL, false, true, true, true)
+}
+
+/// SQL `WHERE` predicate for available local library songs:
+/// `source IN ({LOCAL_SOURCES_SQL}) AND unavailable = 0`.
+pub(crate) fn local_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LOCAL_SOURCES_SQL, false, true, false, false)
+}
+
+/// SQL `WHERE` predicate for available, included (`not_included = 0`) local
+/// library songs.
+pub(crate) fn included_local_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LOCAL_SOURCES_SQL, false, true, true, false)
+}
+
+/// SQL `WHERE` predicate for playable/curation-eligible local library songs:
+/// available, `not_included = 0`, and `loved != -1`.
+pub(crate) fn playable_local_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LOCAL_SOURCES_SQL, false, true, true, true)
+}
+
+/// SQL `WHERE` predicate for local library songs *including* unavailable rows
+/// (e.g. file relocation and missing-file tools).
+pub(crate) fn local_song_where_including_unavailable(alias: &str) -> String {
+    song_where_impl(alias, &LOCAL_SOURCES_SQL, false, false, false, false)
+}
 
 /// SQL `IN (...)` fragment listing the live internet-radio source IDs (#2002, #2004, #2009).
 /// Derived from `LIVE_STREAM_SOURCES` so it cannot drift from `SongSource::is_live_stream()`.
@@ -1888,6 +1970,55 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&SongSource::OpenedFile).unwrap(),
             "\"opened_file\""
+        );
+    }
+
+    #[test]
+    fn test_song_where_helpers_format_variants_and_aliases() {
+        let lib = &*LIBRARY_SOURCES_SQL;
+        let local = &*LOCAL_SOURCES_SQL;
+
+        assert_eq!(
+            library_song_where(""),
+            format!("source IN ({lib}) AND unavailable = 0")
+        );
+        assert_eq!(
+            library_song_where("s"),
+            format!("s.source IN ({lib}) AND s.unavailable = 0")
+        );
+        assert_eq!(
+            library_song_where_for_sort(""),
+            format!("+source IN ({lib}) AND unavailable = 0")
+        );
+        assert_eq!(
+            library_song_where_for_sort("s"),
+            format!("+s.source IN ({lib}) AND s.unavailable = 0")
+        );
+        assert_eq!(
+            included_library_song_where("s"),
+            format!("s.source IN ({lib}) AND s.unavailable = 0 AND s.not_included = 0")
+        );
+        assert_eq!(
+            playable_library_song_where(""),
+            format!("source IN ({lib}) AND unavailable = 0 AND not_included = 0 AND loved != -1")
+        );
+        assert_eq!(
+            local_song_where(""),
+            format!("source IN ({local}) AND unavailable = 0")
+        );
+        assert_eq!(
+            included_local_song_where("s"),
+            format!("s.source IN ({local}) AND s.unavailable = 0 AND s.not_included = 0")
+        );
+        assert_eq!(
+            playable_local_song_where("s"),
+            format!(
+                "s.source IN ({local}) AND s.unavailable = 0 AND s.not_included = 0 AND s.loved != -1"
+            )
+        );
+        assert_eq!(
+            local_song_where_including_unavailable("s"),
+            format!("s.source IN ({local})")
         );
     }
 
