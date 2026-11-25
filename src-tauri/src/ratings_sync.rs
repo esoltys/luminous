@@ -3,7 +3,7 @@
 //! working out which local loves still need pushing. HTTP lives in
 //! `scrobbler.rs`; everything here is plain SQLite so it can be tested alone.
 
-use crate::models::LIBRARY_SOURCES_SQL;
+use crate::models::included_library_song_where;
 use anyhow::Result;
 use rusqlite::{params, Connection};
 use std::collections::{HashMap, HashSet};
@@ -92,9 +92,9 @@ pub fn pending_pushes(
         "SELECT musicbrainz_recording_id, loved FROM songs
          WHERE loved != 0
            AND musicbrainz_recording_id IS NOT NULL AND musicbrainz_recording_id != ''
-           AND source IN ({lib}) AND unavailable = 0 AND not_included = 0
+           AND {lib_where}
          ORDER BY id",
-        lib = *LIBRARY_SOURCES_SQL
+        lib_where = included_library_song_where("")
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i32>(1)?)))?;
@@ -175,15 +175,15 @@ pub fn reconcile_lastfm_loved(
         "SELECT id, loved FROM songs
          WHERE musicbrainz_recording_id = ?1
            AND musicbrainz_recording_id IS NOT NULL AND musicbrainz_recording_id != ''
-           AND source IN ({lib}) AND unavailable = 0 AND not_included = 0",
-        lib = *LIBRARY_SOURCES_SQL
+           AND {lib_where}",
+        lib_where = included_library_song_where("")
     );
 
     let sql_by_text = format!(
         "SELECT id, loved FROM songs
          WHERE LOWER(artist) = LOWER(?1) AND LOWER(title) = LOWER(?2)
-           AND source IN ({lib}) AND unavailable = 0 AND not_included = 0",
-        lib = *LIBRARY_SOURCES_SQL
+           AND {lib_where}",
+        lib_where = included_library_song_where("")
     );
 
     let tx = conn.transaction()?;
@@ -236,9 +236,9 @@ pub fn reconcile_lastfm_loved(
          WHERE loved = 1
            AND artist IS NOT NULL AND artist != ''
            AND title IS NOT NULL AND title != ''
-           AND source IN ({lib}) AND unavailable = 0 AND not_included = 0
+           AND {lib_where}
          ORDER BY id",
-        lib = *LIBRARY_SOURCES_SQL
+        lib_where = included_library_song_where("")
     );
     let mut stmt = conn.prepare(&sql_pushes)?;
     let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
