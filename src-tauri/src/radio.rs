@@ -9,7 +9,7 @@
 //! `artist_profiles`, era/decade proximity, BPM/tempo matching, and loved/rating boosts).
 
 use crate::genre_aliases::GenreAliases;
-use crate::models::{parse_multi_value, PlayContext, ShuffleMode, LIBRARY_SOURCES_SQL};
+use crate::models::{parse_multi_value, playable_library_song_where, PlayContext, ShuffleMode};
 use crate::AppState;
 use anyhow::Result;
 use rand::seq::SliceRandom;
@@ -325,8 +325,8 @@ const CANDIDATE_SELECT: &str =
 fn load_library(conn: &Connection) -> Result<Vec<Candidate>> {
     let sql = format!(
         "SELECT {CANDIDATE_SELECT} FROM songs
-         WHERE source IN ({lib}) AND unavailable = 0 AND not_included = 0 AND loved != -1",
-        lib = *LIBRARY_SOURCES_SQL
+         WHERE {lib_where}",
+        lib_where = playable_library_song_where("")
     );
     let mut stmt = conn.prepare(&sql)?;
     let aliases = GenreAliases::load(conn)?;
@@ -353,9 +353,9 @@ fn load_artist_seed_song(conn: &Connection, artist: &str) -> Result<Option<Candi
     let sql = format!(
         "SELECT {CANDIDATE_SELECT} FROM songs
          WHERE (artist = ?1 COLLATE NOCASE OR album_artist = ?1 COLLATE NOCASE)
-           AND source IN ({lib}) AND unavailable = 0 AND not_included = 0 AND loved != -1
+           AND {lib_where}
          ORDER BY (loved = 1) DESC, rating DESC, playcount DESC, RANDOM() LIMIT 1",
-        lib = *LIBRARY_SOURCES_SQL
+        lib_where = playable_library_song_where("")
     );
     let mut stmt = conn.prepare(&sql)?;
     let aliases = GenreAliases::load(conn)?;

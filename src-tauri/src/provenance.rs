@@ -4,7 +4,7 @@
 //! `songs.mtime`, and offline DSP execution via `luminous_analysis`.
 
 use crate::db::Database;
-use crate::models::{FileType, SongSource, LOCAL_SOURCES_SQL};
+use crate::models::{local_song_where, FileType, SongSource};
 use anyhow::{bail, Context, Result};
 pub use luminous_analysis::{analyze_provenance, ProvenanceAnalysis, ProvenanceVerdict};
 use rusqlite::params;
@@ -85,12 +85,12 @@ fn next_song_to_verify(
         &format!(
             "SELECT s.id, s.path FROM songs s
              LEFT JOIN song_provenance p ON s.id = p.song_id
-             WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+             WHERE {local_where} AND s.path IS NOT NULL
                AND s.filetype IN ({lossless})
                AND {stale}
                AND {skip}
              ORDER BY s.added DESC, s.id DESC LIMIT 1",
-            lib = *LOCAL_SOURCES_SQL,
+            local_where = local_song_where("s"),
             lossless = LOSSLESS_FILETYPES_SQL,
             stale = crate::db::sql_stamp_stale("p"),
             skip = skipped.sql_excluding("s.id")

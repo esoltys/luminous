@@ -8,7 +8,7 @@
 //! canonical name is never itself an alias. [`set_alias`] keeps that true,
 //! which makes a lookup one hop and rules out cycles by construction.
 
-use crate::models::{parse_multi_value, LIBRARY_SOURCES_SQL};
+use crate::models::{library_song_where, parse_multi_value};
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -173,8 +173,8 @@ pub fn list_aliases(conn: &Connection) -> Result<Vec<GenreAlias>> {
 
     let sql = format!(
         "SELECT genre FROM songs
-         WHERE source IN ({lib}) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
-        lib = *LIBRARY_SOURCES_SQL
+         WHERE {lib_where} AND genre IS NOT NULL AND genre != ''",
+        lib_where = library_song_where("")
     );
     let mut counts: HashMap<String, i64> = HashMap::new();
     let mut stmt = conn.prepare(&sql)?;

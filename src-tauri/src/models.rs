@@ -118,9 +118,9 @@ impl From<i64> for SongSource {
 /// SQL `IN (...)` fragment listing the source IDs that make up the browsable
 /// library (local files, managed collection folders, WebDAV mounts, and
 /// OpenSubsonic servers). Derived from `SongSource` discriminants so it can't
-/// silently drift from the enum. Interpolate into query strings, e.g.
-/// `format!("source IN ({})", *LIBRARY_SOURCES_SQL)`.
-pub(crate) static LIBRARY_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
+/// silently drift from the enum. Kept private so callers go through
+/// [`library_song_where`] and its variants instead of assembling predicates by hand.
+static LIBRARY_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
     format!(
         "{}, {}, {}, {}",
         SongSource::LocalFile as i32,
@@ -156,14 +156,97 @@ pub(crate) static FILE_SOURCES_SQL: LazyLock<String> =
 /// like the Organize feature — and opened files outside the library
 /// (`OpenedFile`), which library-wide operations (organize, device sync,
 /// relocate, analysis sweeps) must not touch. Derived from `SongSource`
-/// discriminants so it can't silently drift from the enum.
-pub(crate) static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
+/// discriminants so it can't silently drift from the enum. Kept private so
+/// callers go through [`local_song_where`] and its variants.
+static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
     format!(
         "{}, {}",
         SongSource::LocalFile as i32,
         SongSource::Collection as i32,
     )
 });
+
+fn song_where_impl(
+    alias: &str,
+    sources_sql: &str,
+    suppress_source_index: bool,
+    exclude_unavailable: bool,
+    exclude_not_included: bool,
+    exclude_disliked: bool,
+) -> String {
+    let prefix = if alias.is_empty() {
+        String::new()
+    } else {
+        format!("{alias}.")
+    };
+    let source_col = if suppress_source_index {
+        format!("+{prefix}source")
+    } else {
+        format!("{prefix}source")
+    };
+    let mut parts = vec![format!("{source_col} IN ({sources_sql})")];
+    if exclude_unavailable {
+        parts.push(format!("{prefix}unavailable = 0"));
+    }
+    if exclude_not_included {
+        parts.push(format!("{prefix}not_included = 0"));
+    }
+    if exclude_disliked {
+        parts.push(format!("{prefix}loved != -1"));
+    }
+    parts.join(" AND ")
+}
+
+/// SQL `WHERE` predicate for available browsable library songs:
+/// `source IN ({LIBRARY_SOURCES_SQL}) AND unavailable = 0`.
+/// Pass `""` for unqualified `songs` queries or a table alias (e.g. `"s"`).
+pub(crate) fn library_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LIBRARY_SOURCES_SQL, false, true, false, false)
+}
+
+/// Variant of [`library_song_where`] that prefixes `source` with `+` to
+/// suppress `idx_songs_source`, allowing SQLite to use `idx_songs_library_sort`
+/// directly on `ORDER BY COALESCE(album_artist_sort, album_artist), ...` (#1806).
+pub(crate) fn library_song_where_for_sort(alias: &str) -> String {
+    song_where_impl(alias, &LIBRARY_SOURCES_SQL, true, true, false, false)
+}
+
+/// SQL `WHERE` predicate for available, included (`not_included = 0`) library
+/// songs. Use when `loved` is filtered separately or intentionally ignored
+/// (e.g. Favourites, artist tag counts, rating sync).
+pub(crate) fn included_library_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LIBRARY_SOURCES_SQL, false, true, true, false)
+}
+
+/// SQL `WHERE` predicate for playable/recommendation-eligible library songs:
+/// available, `not_included = 0`, and `loved != -1`.
+pub(crate) fn playable_library_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LIBRARY_SOURCES_SQL, false, true, true, true)
+}
+
+/// SQL `WHERE` predicate for available local library songs:
+/// `source IN ({LOCAL_SOURCES_SQL}) AND unavailable = 0`.
+pub(crate) fn local_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LOCAL_SOURCES_SQL, false, true, false, false)
+}
+
+/// SQL `WHERE` predicate for available, included (`not_included = 0`) local
+/// library songs.
+pub(crate) fn included_local_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LOCAL_SOURCES_SQL, false, true, true, false)
+}
+
+/// SQL `WHERE` predicate for playable/curation-eligible local library songs:
+/// available, `not_included = 0`, and `loved != -1`.
+pub(crate) fn playable_local_song_where(alias: &str) -> String {
+    song_where_impl(alias, &LOCAL_SOURCES_SQL, false, true, true, true)
+}
+
+/// SQL `WHERE` predicate for local library songs *including* unavailable rows
+/// (e.g. file relocation and missing-file tools).
+pub(crate) fn local_song_where_including_unavailable(alias: &str) -> String {
+    song_where_impl(alias, &LOCAL_SOURCES_SQL, false, false, false, false)
+}
 
 /// SQL `IN (...)` fragment listing the live internet-radio source IDs (#2002, #2004, #2009).
 /// Derived from `LIVE_STREAM_SOURCES` so it cannot drift from `SongSource::is_live_stream()`.
@@ -1313,7 +1396,7 @@ pub struct LibraryStats {
     pub thumbnail_bytes: i64,
 }
 
-/// Represents an album summary on the Home page.
+/// Represents an album summary across the library grid, compilations, and Home page.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlbumItem {
     pub artist: Option<String>,
@@ -1332,11 +1415,63 @@ pub struct AlbumItem {
     /// that have a DB connection handy (see `attach_album_ratings`); defaults to
     /// unrated at construction time.
     pub rating: f32,
+    #[serde(default)]
+    pub added: Option<i64>,
     /// Sum of every track's `length_nanosec`, used to classify a release as an
     /// EP (under 30 minutes) vs. an Album — the Home-carousel construction sites
     /// don't have this aggregate handy and default it to 0, which is harmless
     /// since those `AlbumItem`s aren't run through release-category logic.
     pub total_duration_nanosec: i64,
+    #[serde(default)]
+    pub artist_sort: Option<String>,
+    #[serde(default)]
+    pub albumsort: Option<String>,
+}
+
+impl AlbumItem {
+    /// Maps a row from `CollectionScanner::get_albums()` (16 columns).
+    pub fn from_album_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
+        Ok(Self {
+            artist: row.get(0)?,
+            album: row.get(1)?,
+            year: row.get(2)?,
+            track_count: row.get(3)?,
+            disc_count: row.get(4)?,
+            art_embedded: row.get(5)?,
+            art_automatic: row.get(6)?,
+            art_manual: row.get(7)?,
+            genre: row.get(8)?,
+            rating: row.get(9)?,
+            added: row.get(10)?,
+            total_duration_nanosec: row.get(11)?,
+            artist_sort: row.get(12)?,
+            albumsort: row.get(13)?,
+            sample_song_id: row.get(14)?,
+            album_key: row.get(15)?,
+        })
+    }
+
+    /// Maps a row from `CollectionScanner::get_compilations_by_artist()` (12 columns).
+    pub fn from_compilation_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
+        Ok(Self {
+            artist: Some("Various Artists".to_string()),
+            album: row.get(0)?,
+            year: row.get(1)?,
+            track_count: row.get(2)?,
+            disc_count: row.get(3)?,
+            art_embedded: row.get(4)?,
+            art_automatic: row.get(5)?,
+            art_manual: row.get(6)?,
+            genre: row.get(7)?,
+            rating: row.get(8)?,
+            added: row.get(9)?,
+            total_duration_nanosec: row.get(10)?,
+            sample_song_id: row.get(11)?,
+            album_key: None,
+            artist_sort: None,
+            albumsort: None,
+        })
+    }
 }
 
 /// One album's entry in the Home "Top Albums" weekly chart (#662) — an
@@ -1476,9 +1611,8 @@ pub enum HomeItem {
     Playlist { playlist: Playlist },
 }
 
-/// Represents an artist summary, typed equivalent of the ad-hoc JSON shape
-/// returned by `CollectionScanner::get_artists`/`get_top_artists` — used here
-/// so a pinned artist (see `PinnedItem`) has a concrete Rust type.
+/// Represents an artist summary returned by `CollectionScanner::get_artists`,
+/// `CollectionScanner::get_top_artists`, and `PinnedItem::Artist`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtistItem {
     pub name: Option<String>,
@@ -1487,6 +1621,32 @@ pub struct ArtistItem {
     pub song_count: i32,
     pub total_playcount: Option<i32>,
     pub genre: Option<String>,
+}
+
+impl ArtistItem {
+    /// Maps a row from `CollectionScanner::get_artists()` (6 columns).
+    pub fn from_artist_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
+        Ok(Self {
+            name: row.get(0)?,
+            album_count: row.get(1)?,
+            song_count: row.get(2)?,
+            genre: row.get(3)?,
+            sort_artist: row.get(4)?,
+            total_playcount: row.get(5)?,
+        })
+    }
+
+    /// Maps a row from `CollectionScanner::get_top_artists()` (5 columns).
+    pub fn from_top_artist_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
+        Ok(Self {
+            name: row.get(0)?,
+            album_count: row.get(1)?,
+            song_count: row.get(2)?,
+            total_playcount: row.get(3)?,
+            genre: row.get(4)?,
+            sort_artist: None,
+        })
+    }
 }
 
 /// A materialized or virtual auto-playlist referenced by a Home pin — mirrors
@@ -1888,6 +2048,55 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&SongSource::OpenedFile).unwrap(),
             "\"opened_file\""
+        );
+    }
+
+    #[test]
+    fn test_song_where_helpers_format_variants_and_aliases() {
+        let lib = &*LIBRARY_SOURCES_SQL;
+        let local = &*LOCAL_SOURCES_SQL;
+
+        assert_eq!(
+            library_song_where(""),
+            format!("source IN ({lib}) AND unavailable = 0")
+        );
+        assert_eq!(
+            library_song_where("s"),
+            format!("s.source IN ({lib}) AND s.unavailable = 0")
+        );
+        assert_eq!(
+            library_song_where_for_sort(""),
+            format!("+source IN ({lib}) AND unavailable = 0")
+        );
+        assert_eq!(
+            library_song_where_for_sort("s"),
+            format!("+s.source IN ({lib}) AND s.unavailable = 0")
+        );
+        assert_eq!(
+            included_library_song_where("s"),
+            format!("s.source IN ({lib}) AND s.unavailable = 0 AND s.not_included = 0")
+        );
+        assert_eq!(
+            playable_library_song_where(""),
+            format!("source IN ({lib}) AND unavailable = 0 AND not_included = 0 AND loved != -1")
+        );
+        assert_eq!(
+            local_song_where(""),
+            format!("source IN ({local}) AND unavailable = 0")
+        );
+        assert_eq!(
+            included_local_song_where("s"),
+            format!("s.source IN ({local}) AND s.unavailable = 0 AND s.not_included = 0")
+        );
+        assert_eq!(
+            playable_local_song_where("s"),
+            format!(
+                "s.source IN ({local}) AND s.unavailable = 0 AND s.not_included = 0 AND s.loved != -1"
+            )
+        );
+        assert_eq!(
+            local_song_where_including_unavailable("s"),
+            format!("s.source IN ({local})")
         );
     }
 

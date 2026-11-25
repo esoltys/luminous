@@ -1121,9 +1121,9 @@ pub fn suggest_radio_genres_from_library(
     let sql = format!(
         "SELECT genre, SUM(COALESCE(playcount, 0)) AS plays, COUNT(*) AS tracks
          FROM songs
-         WHERE source IN ({}) AND TRIM(COALESCE(genre, '')) != ''
+         WHERE {lib_where} AND TRIM(COALESCE(genre, '')) != ''
          GROUP BY genre",
-        *crate::models::LIBRARY_SOURCES_SQL
+        lib_where = crate::models::library_song_where("")
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map([], |r| {

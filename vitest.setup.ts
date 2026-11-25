@@ -101,6 +101,9 @@ vi.mock("@tauri-apps/api/core", () => {
       if (cmd === "is_shift_key_held") {
         return false;
       }
+      if (cmd === "get_supported_extensions") {
+        return { audio: ["mp3", "flac"], playlists: ["m3u", "pls"] };
+      }
       // The backend bootstraps the built-in Queue playlist at startup, so a
       // playlist listing always contains it — model that guarantee here.
       if (cmd === "get_playlists") {

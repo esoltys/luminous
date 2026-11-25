@@ -151,9 +151,9 @@ pub fn get_missing_visualizer_songs(db: &Database) -> Result<Vec<(i64, String)>>
         "SELECT s.id, s.path FROM songs s
          LEFT JOIN waveforms w ON s.id = w.song_id
          LEFT JOIN band_waveforms m ON s.id = m.song_id
-         WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
+         WHERE {local_where} AND s.path IS NOT NULL
            AND (w.song_id IS NULL OR m.song_id IS NULL OR w.style != ?1 OR m.style != ?2)",
-        lib = *crate::models::LOCAL_SOURCES_SQL
+        local_where = crate::models::local_song_where("s")
     );
     let mut stmt = conn.prepare(&sql)?;
 

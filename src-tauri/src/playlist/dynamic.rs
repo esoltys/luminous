@@ -820,7 +820,7 @@ mod tests {
             let conn = db_arc.pool.get().unwrap();
             for (i, genre) in ["Progressive Rock", "Prog Rock", "Jazz"].iter().enumerate() {
                 conn.execute(
-                    "INSERT INTO songs (title, artist, genre, path) VALUES (?1, 'A', ?2, ?3)",
+                    "INSERT INTO songs (title, artist, genre, path, source) VALUES (?1, 'A', ?2, ?3, 1)",
                     params![format!("Song {}", i + 1), genre, format!("/s{}.mp3", i + 1)],
                 )
                 .unwrap();
@@ -867,7 +867,7 @@ mod tests {
             let conn = db_arc.pool.get().unwrap();
             for (i, genre) in ["Rock", "Rock", "Jazz"].iter().enumerate() {
                 conn.execute(
-                    "INSERT INTO songs (title, artist, genre, path) VALUES (?1, 'A', ?2, ?3)",
+                    "INSERT INTO songs (title, artist, genre, path, source) VALUES (?1, 'A', ?2, ?3, 1)",
                     params![format!("Song {}", i + 1), genre, format!("/s{}.mp3", i + 1)],
                 )
                 .unwrap();
@@ -887,7 +887,7 @@ mod tests {
         {
             let conn = db_arc.pool.get().unwrap();
             conn.execute(
-                "INSERT INTO songs (title, artist, genre, path) VALUES ('Song 4', 'A', 'Rock', '/s4.mp3')",
+                "INSERT INTO songs (title, artist, genre, path, source) VALUES ('Song 4', 'A', 'Rock', '/s4.mp3', 1)",
                 [],
             )
             .unwrap();
@@ -996,7 +996,7 @@ mod tests {
             let conn = db_arc.pool.get().unwrap();
             for (i, genre) in ["Rock", "Jazz"].iter().enumerate() {
                 conn.execute(
-                    "INSERT INTO songs (title, artist, genre, path) VALUES (?1, 'A', ?2, ?3)",
+                    "INSERT INTO songs (title, artist, genre, path, source) VALUES (?1, 'A', ?2, ?3, 1)",
                     params![format!("Song {}", i + 1), genre, format!("/s{}.mp3", i + 1)],
                 )
                 .unwrap();

@@ -39,7 +39,7 @@
     shuffleModeTooltip,
     shuffleTypeIcon,
   } from "../playbackModes";
-  import TagEditor from "./TagEditor.svelte";
+  import { tagEditorStore } from "../stores/tagEditor.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { openInPicard } from "../utils/picard";
   import QualityBadge from "./QualityBadge.svelte";
@@ -235,7 +235,6 @@
   // The song menu behind the "more" button (#876, #2042). Besides the song actions it carries
   // Lyrics, Song info, Mini-player and the seek bar mode, which the dock no longer shows.
   let contextMenuState = $state<{ x: number; y: number } | null>(null);
-  let editingSongId = $state<number | null>(null);
 
   /** Runs a dock-specific menu item's action, then closes the menu. */
   function chooseMenuItem(action: () => void) {
@@ -271,11 +270,6 @@
     } else {
       windowLayoutStore.toggleRightPanel();
     }
-  }
-
-  function handleTagEditorSaved() {
-    collectionStore.refreshLibrary();
-    tagsStore.load();
   }
 
   /**
@@ -770,7 +764,7 @@
       : undefined}
     onEditTags={() => {
       windowLayoutStore.exitImmersiveMode();
-      editingSongId = song.id;
+      tagEditorStore.open(song.id);
     }}
     onOpenInPicard={() => openInPicard([song.id])}
     onClose={() => {
@@ -843,16 +837,6 @@
       {/if}
     {/snippet}
   </SongContextMenu>
-{/if}
-
-{#if editingSongId !== null}
-  <TagEditor
-    songId={editingSongId}
-    onClose={() => {
-      editingSongId = null;
-    }}
-    onSave={handleTagEditorSaved}
-  />
 {/if}
 
 <style>

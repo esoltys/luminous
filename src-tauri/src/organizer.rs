@@ -6,7 +6,7 @@
 use crate::collection::is_audio_file;
 use crate::covermanager::CoverManager;
 use crate::db::Database;
-use crate::models::{self, Song, LOCAL_SOURCES_SQL};
+use crate::models::{self, local_song_where, Song};
 use anyhow::{anyhow, Result};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -697,8 +697,8 @@ pub fn compute_preview(
     let songs: Vec<Song> = if song_ids.is_empty() {
         let sql = format!(
             "SELECT {ORGANIZE_SONG_COLS}
-             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN ({lib}) AND unavailable = 0",
-            lib = *LOCAL_SOURCES_SQL
+             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND {local_where}",
+            local_where = local_song_where("")
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], organize_song_from_row)?;
@@ -710,9 +710,9 @@ pub fn compute_preview(
             let placeholders = vec!["?"; chunk.len()].join(",");
             let sql = format!(
                 "SELECT {ORGANIZE_SONG_COLS}
-                 FROM songs WHERE id IN ({}) AND path IS NOT NULL AND TRIM(path) != '' AND source IN ({lib}) AND unavailable = 0",
+                 FROM songs WHERE id IN ({}) AND path IS NOT NULL AND TRIM(path) != '' AND {local_where}",
                 placeholders,
-                lib = *LOCAL_SOURCES_SQL
+                local_where = local_song_where("")
             );
             let mut stmt = conn.prepare(&sql)?;
             let params = rusqlite::params_from_iter(chunk.iter());
@@ -734,8 +734,8 @@ pub fn compute_preview(
     } else {
         let sql = format!(
             "SELECT {ORGANIZE_SONG_COLS}
-             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN ({lib}) AND unavailable = 0",
-            lib = *LOCAL_SOURCES_SQL
+             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND {local_where}",
+            local_where = local_song_where("")
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], organize_song_from_row)?;

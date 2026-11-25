@@ -23,7 +23,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { tasksStore } from "../stores/tasks.svelte";
   import { prefs, type CollectionViewMode } from "../stores/prefs.svelte";
-  import TagEditor from "./TagEditor.svelte";
+  import { tagEditorStore } from "../stores/tagEditor.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import Button from "./Button.svelte";
   import IconActionButton from "./IconActionButton.svelte";
@@ -95,7 +95,6 @@
   // "Not included" tracks stay visible/individually playable but drop out of
   // the whole-artist Play actions (#104).
   let playableSongs = $derived(songs.filter((s) => !s.not_included));
-  let editingSongId = $state<number | null>(null);
   /** A multi-song selection open in the batch tag editor. */
   let batchEditSongs = $state<Song[] | null>(null);
   let isEditorOpen = $state(false);
@@ -207,7 +206,7 @@
   }
 
   function openTagEditor(songId: number) {
-    editingSongId = songId;
+    tagEditorStore.open(songId, { onSaved: () => handleTagEditorSaved(songId) });
   }
 
   async function refetchSongs() {
@@ -413,11 +412,7 @@
     }
   }
 
-  async function handleTagEditorSaved() {
-    collectionStore.refreshLibrary();
-    tagsStore.load();
-
-    const editedSongId = editingSongId;
+  async function handleTagEditorSaved(editedSongId?: number) {
     await refetchSongs();
 
     // Renaming the just-edited track's (album) artist can leave this artist
@@ -425,7 +420,7 @@
     // get_songs_by_artist then comes back empty even though the artist still
     // exists, just under a new name. Follow it instead of showing a stale,
     // empty page.
-    if (songs.length === 0 && editedSongId !== null) {
+    if (songs.length === 0 && editedSongId !== undefined) {
       try {
         const details = await invoke<{ artist: string; album_artist: string }>("get_song_details", {
           songId: editedSongId,
@@ -1247,16 +1242,6 @@
     onClose={() => {
       showShareModal = false;
     }}
-  />
-{/if}
-
-{#if editingSongId !== null}
-  <TagEditor
-    songId={editingSongId}
-    onClose={() => {
-      editingSongId = null;
-    }}
-    onSave={handleTagEditorSaved}
   />
 {/if}
 

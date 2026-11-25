@@ -21,15 +21,22 @@ pub enum PlaylistFormat {
 }
 
 impl PlaylistFormat {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Option<Self> {
-        let ext = path.as_ref().extension()?.to_str()?.to_ascii_lowercase();
-        match ext.as_str() {
+    /// Lowercase file extensions (without leading dot) supported by this parser/exporter.
+    pub const EXTENSIONS: &'static [&'static str] = &["m3u", "m3u8", "pls", "xspf"];
+
+    pub fn from_extension(ext: &str) -> Option<Self> {
+        match ext.to_ascii_lowercase().as_str() {
             "m3u" => Some(PlaylistFormat::M3u),
             "m3u8" => Some(PlaylistFormat::M3u8),
             "pls" => Some(PlaylistFormat::Pls),
             "xspf" => Some(PlaylistFormat::Xspf),
             _ => None,
         }
+    }
+
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Option<Self> {
+        let ext = path.as_ref().extension()?.to_str()?;
+        Self::from_extension(ext)
     }
 }
 
@@ -983,5 +990,19 @@ Length2=150
         }
         assert!(is_relative_location("../a.mp3"));
         assert!(is_relative_location("a.mp3"));
+    }
+
+    #[test]
+    fn extensions_list_matches_from_extension() {
+        for ext in PlaylistFormat::EXTENSIONS {
+            assert!(
+                PlaylistFormat::from_extension(ext).is_some(),
+                "PlaylistFormat::EXTENSIONS entry '{ext}' is not handled by from_extension"
+            );
+            assert!(
+                PlaylistFormat::from_extension(&ext.to_ascii_uppercase()).is_some(),
+                "PlaylistFormat::from_extension should be case-insensitive for '{ext}'"
+            );
+        }
     }
 }

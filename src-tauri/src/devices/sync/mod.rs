@@ -19,7 +19,7 @@ pub mod worker;
 
 use crate::db::Database;
 use crate::devices::{assess_song, DeviceMonitor};
-use crate::models::LOCAL_SOURCES_SQL;
+use crate::models::local_song_where_including_unavailable;
 use anyhow::{anyhow, Result};
 use luminous_devices::{
     is_partial_file, ConvertMode, ConvertSettings, DeviceBackend, DeviceProfile, MARKER_FILE_NAME,
@@ -551,8 +551,8 @@ fn read_inventory(backend: &dyn DeviceBackend, roots: &[String]) -> Result<Inven
 /// Every local library file by path, and whether it can be read now.
 fn library_files(conn: &rusqlite::Connection) -> Result<HashMap<String, LibraryFile>> {
     let sql = format!(
-        "SELECT path, unavailable FROM songs WHERE source IN ({}) AND path IS NOT NULL",
-        *LOCAL_SOURCES_SQL
+        "SELECT path, unavailable FROM songs WHERE {local_where} AND path IS NOT NULL",
+        local_where = local_song_where_including_unavailable("")
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map([], |row| {

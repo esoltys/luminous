@@ -4,7 +4,7 @@
 
 use crate::collection::SelfWriteTracker;
 use crate::db::Database;
-use crate::models::{SongSource, LOCAL_SOURCES_SQL};
+use crate::models::{local_song_where, SongSource};
 use luminous_metadata::{audio, find_cruft, strip_cruft, CruftField};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -187,8 +187,8 @@ fn load_songs(db: &Database, song_ids: &[i64]) -> Result<Vec<SongFile>, String> 
     if song_ids.is_empty() {
         let sql = format!(
             "SELECT {columns} FROM songs
-             WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN ({lib}) AND unavailable = 0",
-            lib = *LOCAL_SOURCES_SQL
+             WHERE path IS NOT NULL AND TRIM(path) != '' AND {local_where}",
+            local_where = local_song_where("")
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], row_to_song).map_err(|e| e.to_string())?;
