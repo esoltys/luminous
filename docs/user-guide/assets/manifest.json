@@ -111,7 +111,7 @@
           "src": "assets/de/screenshots/dark/visualizer-menu.webp",
           "name": "visualizer-menu",
           "width": 336,
-          "height": 173
+          "height": 301
         },
         {
           "src": "assets/de/screenshots/dark/playback-speed.webp",
@@ -351,7 +351,7 @@
           "src": "assets/en-CA/screenshots/dark/visualizer-menu.webp",
           "name": "visualizer-menu",
           "width": 336,
-          "height": 173
+          "height": 301
         },
         {
           "src": "assets/en-CA/screenshots/dark/playback-speed.webp",
@@ -591,7 +591,7 @@
           "src": "assets/es/screenshots/dark/visualizer-menu.webp",
           "name": "visualizer-menu",
           "width": 336,
-          "height": 173
+          "height": 301
         },
         {
           "src": "assets/es/screenshots/dark/playback-speed.webp",
@@ -831,7 +831,7 @@
           "src": "assets/fr-CA/screenshots/dark/visualizer-menu.webp",
           "name": "visualizer-menu",
           "width": 336,
-          "height": 173
+          "height": 301
         },
         {
           "src": "assets/fr-CA/screenshots/dark/playback-speed.webp",
@@ -1071,7 +1071,7 @@
           "src": "assets/it/screenshots/dark/visualizer-menu.webp",
           "name": "visualizer-menu",
           "width": 336,
-          "height": 173
+          "height": 301
         },
         {
           "src": "assets/it/screenshots/dark/playback-speed.webp",
@@ -1311,7 +1311,7 @@
           "src": "assets/ru/screenshots/dark/visualizer-menu.webp",
           "name": "visualizer-menu",
           "width": 336,
-          "height": 173
+          "height": 301
         },
         {
           "src": "assets/ru/screenshots/dark/playback-speed.webp",
@@ -1551,7 +1551,7 @@
           "src": "assets/uk/screenshots/dark/visualizer-menu.webp",
           "name": "visualizer-menu",
           "width": 336,
-          "height": 173
+          "height": 301
         },
         {
           "src": "assets/uk/screenshots/dark/playback-speed.webp",
