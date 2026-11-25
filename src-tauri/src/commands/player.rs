@@ -816,6 +816,22 @@ pub async fn get_startup_file(state: State<'_, AppState>) -> Result<Option<Strin
     Ok(lock.take())
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SupportedExtensions {
+    pub audio: &'static [&'static str],
+    pub playlists: &'static [&'static str],
+}
+
+/// Authoritative audio and playlist file extensions for the frontend file-open
+/// dialog, derived from `collection::AUDIO_EXTENSIONS` and `PlaylistFormat::EXTENSIONS`.
+#[tauri::command]
+pub fn get_supported_extensions() -> SupportedExtensions {
+    SupportedExtensions {
+        audio: crate::collection::AUDIO_EXTENSIONS,
+        playlists: playlist::PlaylistFormat::EXTENSIONS,
+    }
+}
+
 /// Add songs to the built-in Queue: appends the DB rows AND mirrors them
 /// into the live in-memory play order, so "Add to Queue" is one call and the
 /// two sides of that invariant can't drift (previously the frontend had to
@@ -1267,5 +1283,14 @@ mod tests {
         assert!(!is_shift_key_held());
         #[cfg(windows)]
         let _ = is_shift_key_held();
+    }
+
+    #[test]
+    fn get_supported_extensions_returns_authoritative_lists() {
+        let exts = get_supported_extensions();
+        assert_eq!(exts.audio, crate::collection::AUDIO_EXTENSIONS);
+        assert_eq!(exts.playlists, playlist::PlaylistFormat::EXTENSIONS);
+        assert!(!exts.audio.is_empty());
+        assert!(!exts.playlists.is_empty());
     }
 }

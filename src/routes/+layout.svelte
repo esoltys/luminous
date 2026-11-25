@@ -10,9 +10,10 @@
   import { navigationStore } from "../lib/stores/navigation.svelte";
   import { isFallbackEscape } from "../lib/utils/globalShortcuts";
   import { windowLayoutStore } from "../lib/stores/windowLayout.svelte";
+  import { openerStore } from "../lib/stores/opener.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
   import StationListImportDialog from "../lib/components/radio/StationListImportDialog.svelte";
-  import CoverArt from "../lib/components/CoverArt.svelte";
+  import ImmersiveCover from "../lib/components/ImmersiveCover.svelte";
   import Miniplayer from "../lib/components/Miniplayer.svelte";
   import ImmersiveSessionWrap from "../lib/components/ImmersiveSessionWrap.svelte";
   import ImmersiveVisualizer from "../lib/components/ImmersiveVisualizer.svelte";
@@ -36,12 +37,10 @@
   import { picardStore } from "../lib/stores/picard.svelte";
   import { scrobblerStore } from "../lib/stores/scrobbler.svelte";
   import { organizeStore } from "../lib/stores/organizer.svelte";
-  import { toastStore } from "../lib/stores/toast.svelte";
   import { walkthroughStore } from "../lib/stores/walkthrough.svelte";
   import { welcomeStore } from "../lib/stores/welcome.svelte";
   import { themeStore } from "../lib/stores/theme.svelte";
   import { generateEllipseGradientSvg } from "../lib/utils/ellipseGradient";
-  import { isLiveSong } from "../lib/types";
   import { formatWindowTitle } from "../lib/utils/formatters";
   import { publishScrollbarWidth } from "../lib/utils/scrollbarWidth";
   import { FrontendErrorReporter } from "../lib/utils/frontendError";
@@ -49,7 +48,6 @@
   import { tagEditorStore } from "../lib/stores/tagEditor.svelte";
   import DeviceSyncDrawer from "../lib/components/devices/DeviceSyncDrawer.svelte";
   import { onMount } from "svelte";
-  import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api/core";
   import {
@@ -109,8 +107,6 @@
     walkthroughStore.start();
   }
   let isShortcutsModalOpen = $state(false);
-  let isDragActive = $state(false);
-  let isShiftHeld = $state(false);
   let isResizingSidebar = $state(false);
   // "Luminous Debug" when LUMINOUS_REMOTE_DEVTOOLS is set backend-side, so a
   // remote-devtools session is never mistaken for a normal instance in the
@@ -321,81 +317,11 @@
           break;
         case "o":
           e.preventDefault();
-          playerStore.openFileDialog();
+          openerStore.openFileDialog();
           break;
       }
     }
-    // Tracks whether Shift is currently held so a drop can be told apart from
-    // a plain drop (replace Queue & play) vs. a Shift-drop (append to Queue).
-    // The native DragDropEvent payload carries no modifier state, and an OS
-    // file drag never gives the target window keyboard focus while hovering
-    // — so keydown/keyup here would never fire. Instead this polls the
-    // physical key state via a backend command (is_shift_key_held, queried
-    // from the OS rather than the DOM) while a drag is active, and re-checks
-    // it definitively at drop time.
-    let shiftPollInterval: ReturnType<typeof setInterval> | undefined;
-    async function refreshShiftHeld() {
-      try {
-        isShiftHeld = await invoke<boolean>("is_shift_key_held");
-      } catch (e) {
-        console.warn("Failed to query Shift key state:", e);
-      }
-    }
-    function stopShiftPolling() {
-      if (shiftPollInterval) {
-        clearInterval(shiftPollInterval);
-        shiftPollInterval = undefined;
-      }
-    }
-
-    async function handleFilesDropped(paths: string[]) {
-      const append = await invoke<boolean>("is_shift_key_held").catch(() => false);
-      if (append) {
-        const outcome = await playerStore.addPathsToQueue(paths);
-        if (outcome.added > 0) {
-          const text = i18n.plural("dragDrop.addedSongs", outcome.added);
-          toastStore.show(text, "success");
-        }
-      } else {
-        const outcome = await playerStore.openAndPlay(paths);
-        if (outcome.played > 0) {
-          const text = i18n.plural("dragDrop.playingSongs", outcome.played);
-          toastStore.show(text, "success");
-        }
-      }
-    }
-
-    // Must be getCurrentWebview(), not getCurrentWindow(): the Rust side
-    // (manager/webview.rs's emit_to_webview) emits drag-drop events scoped to
-    // an EventTarget::Webview, but Window.onDragDropEvent() subscribes with
-    // an EventTarget::Window target — a kind mismatch the backend's target
-    // filter never matches, so a Window-level listener silently never fires.
-    // Webview.onDragDropEvent() (and only that one) targets EventTarget::Webview
-    // and actually receives the events.
-    let dragDropUnlisten: (() => void) | undefined;
-    getCurrentWebview()
-      .onDragDropEvent((event) => {
-        if (event.payload.type === "drop") {
-          isDragActive = false;
-          stopShiftPolling();
-          void handleFilesDropped(event.payload.paths);
-        } else if (event.payload.type === "leave") {
-          isDragActive = false;
-          stopShiftPolling();
-        } else if (!isDragActive) {
-          // 'enter' or 'over', first time this hover — start live-polling the
-          // Shift state so the overlay hint tracks it while dragging.
-          isDragActive = true;
-          void refreshShiftHeld();
-          shiftPollInterval = setInterval(refreshShiftHeld, 150);
-        }
-      })
-      .then((unlisten) => {
-        dragDropUnlisten = unlisten;
-      })
-      .catch((e) => {
-        console.warn("Failed to attach drag-and-drop listener:", e);
-      });
+    const detachDragDrop = openerStore.attachDragDrop();
 
     const handleWindowFocus = () => {
       // When restoring from minimized or background occlusion on Windows,
@@ -446,8 +372,7 @@
       window.removeEventListener("error", errorReporter.handleWindowError);
       window.removeEventListener("unhandledrejection", errorReporter.handleUnhandledRejection);
       errorReporter.flush();
-      stopShiftPolling();
-      dragDropUnlisten?.();
+      detachDragDrop();
       focusUnlisten?.();
     };
   });
@@ -659,14 +584,9 @@
               {/key}
             {/if}
 
-            <!-- Center Container: Card and Details (or Immersive Visualizer Stage).
-               Each immersive view owns its own width/height constraints; this wrapper
-               only centers them within .flip-back's outer margins and dock clearance.
-               Below md, the cover-view layout would stack the text under the cover
-               art — at that point it's just clutter (the floating PlayerBar dock
-               repeats the same info), so it's hidden and the cover art stands
-               alone. At md+, where there's room to sit it beside the art instead,
-               it stays. -->
+            <!-- Center Container: the immersive cover view or visualizer stage. Each owns its
+               own width/height constraints; this wrapper only centers them within
+               .flip-back's outer margins and dock clearance. -->
             <div
               class="relative z-10 flex flex-col md:flex-row items-center gap-12 w-full h-full justify-center"
             >
@@ -677,49 +597,7 @@
                       windowLayoutStore.immersiveView === "visualizer"}
                   />
                 {:else}
-                  <!-- Floating Cover Art Frame -->
-                  <div
-                    class="w-56 h-56 xs:w-72 xs:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-200 bg-brand-sidebar flex items-center justify-center relative select-none"
-                  >
-                    <CoverArt
-                      songId={playerStore.currentSong?.id}
-                      artEmbedded={playerStore.currentSong?.art_embedded}
-                      artAutomatic={playerStore.currentSong?.art_automatic}
-                      artManual={playerStore.currentSong?.art_manual}
-                      sizeClass="w-full h-full"
-                      fullResolution
-                      contain={isLiveSong(playerStore.currentSong)}
-                    />
-                  </div>
-
-                  <!-- Song Details Info: hidden below md, where it would stack
-                     under the cover art instead of sitting beside it. -->
-                  <div class="hidden md:flex flex-col text-center md:text-left w-full max-w-md">
-                    <span
-                      class="label-heading self-start px-3 py-1 bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none"
-                    >
-                      {i18n.t("playerBar.nowPlaying")}
-                    </span>
-                    <h1
-                      class="mt-3 text-4xl md:text-6xl font-heading font-bold text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance"
-                    >
-                      {playerStore.currentSongDisplayTitle}
-                    </h1>
-                    {#if playerStore.currentSong.album?.trim()}
-                      <p
-                        class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold"
-                      >
-                        {playerStore.currentSong.album}
-                      </p>
-                    {/if}
-                    <p
-                      class="{playerStore.currentSong.album?.trim()
-                        ? 'mt-0.5'
-                        : 'mt-3'} text-base md:text-lg text-brand-text-secondary select-text font-medium"
-                    >
-                      {playerStore.currentSongDisplaySubtitle}
-                    </p>
-                  </div>
+                  <ImmersiveCover />
                 {/if}
               {:else if playerStore.completedSession}
                 <!-- Immersive Session Wrap Screen (#1380) -->
@@ -771,7 +649,7 @@
        hovering the window (native `dragDropEnabled` events, not HTML5 DnD).
        Purely visual — pointer-events-none so it never intercepts the drop
        itself, which the window-level listener in onMount handles. -->
-    {#if isDragActive}
+    {#if openerStore.isDragActive}
       <div
         class="absolute inset-0 z-[100] flex items-center justify-center acrylic-scrim [--acrylic-tint:var(--color-brand-main)] border-4 border-dashed border-brand-accent pointer-events-none select-none"
         transition:fly={{ duration: 150 }}
@@ -779,12 +657,12 @@
         <div class="flex flex-col items-center gap-3 text-center px-8">
           <UploadCloud class="w-14 h-14 text-brand-accent" />
           <p class="text-2xl font-bold text-brand-text-primary">
-            {isShiftHeld
+            {openerStore.isShiftHeld
               ? i18n.t("dragDrop.overlayAppendTitle", {}, "Drop to append to queue")
               : i18n.t("dragDrop.overlayReplaceTitle", {}, "Drop to replace queue & play")}
           </p>
           <p class="text-sm text-brand-text-secondary">
-            {isShiftHeld
+            {openerStore.isShiftHeld
               ? i18n.t("dragDrop.overlayAppendHint", {}, "Playback won't be interrupted")
               : i18n.t("dragDrop.overlayReplaceHint", {}, "Hold Shift to append instead")}
           </p>

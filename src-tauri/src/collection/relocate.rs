@@ -6,7 +6,7 @@
 //! would insert fresh rows instead and leave all of that behind.
 
 use super::reconcile::merge_song_rows;
-use super::LOCAL_SOURCES_SQL;
+use crate::models::local_song_where_including_unavailable;
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
@@ -267,8 +267,8 @@ pub fn relocate_root(
     let songs: Vec<SongPaths> = {
         let sql = format!(
             "SELECT id, path, beginning_nanosec, art_automatic, art_manual, cue_path
-             FROM songs WHERE path IS NOT NULL AND source IN ({lib})",
-            lib = *LOCAL_SOURCES_SQL
+             FROM songs WHERE path IS NOT NULL AND {local_where}",
+            local_where = local_song_where_including_unavailable("")
         );
         let mut stmt = tx.prepare(&sql)?;
         let rows = stmt.query_map([], |r| {

@@ -714,7 +714,7 @@ fn parse_field_filter(token: &str, today: Date) -> Option<FieldFilter> {
             Op::Neq => Op::Neq,
             _ => return None,
         };
-        let code = crate::collection::normalize_country_code(Some(raw_val.as_str()))?;
+        let code = crate::profiles::normalize_country_code(Some(raw_val.as_str()))?;
         return Some(FieldFilter {
             field: field_clean,
             sql_column,

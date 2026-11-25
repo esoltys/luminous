@@ -11,7 +11,7 @@
 use crate::album_key::album_key;
 use crate::collection::{row_to_song, SONG_SELECT_COLS};
 use crate::covermanager::{clean_or_encode_to_jpeg, CoverManager};
-use crate::models::{Song, LOCAL_SOURCES_SQL};
+use crate::models::{local_song_where, Song};
 use crate::organizer::{
     apply_dir_casing_map, build_dir_casing_map, expand_template, sanitize_component,
 };
@@ -421,10 +421,7 @@ pub fn preview_track_path(
 /// `song_id` when it is a local library song, else the most recently added
 /// one with an album, title and track number (a year too when any has one).
 fn example_song(conn: &rusqlite::Connection, song_id: Option<i64>) -> Result<Option<Song>> {
-    let local = format!(
-        "source IN ({}) AND unavailable = 0 AND path IS NOT NULL",
-        *LOCAL_SOURCES_SQL
-    );
+    let local = format!("{} AND path IS NOT NULL", local_song_where(""));
     if let Some(id) = song_id {
         let sql = format!("SELECT {SONG_SELECT_COLS} FROM songs WHERE id = ?1 AND {local}");
         if let Some(song) = conn.query_row(&sql, [id], row_to_song).optional()? {

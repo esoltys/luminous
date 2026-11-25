@@ -152,9 +152,9 @@ fn album_title_display_sql(title_col: &str) -> String {
 fn album_display_where_sql(key_match: &str) -> String {
     format!(
         "(SELECT d.album FROM songs d
-          WHERE {key_match} AND d.source IN ({lib}) AND d.unavailable = 0
+          WHERE {key_match} AND {lib_where}
           GROUP BY d.album ORDER BY COUNT(*) DESC, d.album LIMIT 1)",
-        lib = *crate::models::LIBRARY_SOURCES_SQL
+        lib_where = crate::models::library_song_where("d")
     )
 }
 

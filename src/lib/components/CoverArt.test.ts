@@ -198,3 +198,18 @@ describe("CoverArt.svelte - image fit", () => {
     });
   });
 });
+
+describe("CoverArt.svelte - manual cover size (#2372)", () => {
+  it("loads a manual cover file itself, not its thumbnail, at full resolution", () => {
+    for (const [fullResolution, form] of [
+      [false, "thumb"],
+      [true, "local"],
+    ] as const) {
+      const { container, unmount } = render(CoverArt, {
+        props: { songId: 7, artManual: "/music/folder.jpg", fullResolution },
+      });
+      expect(container.querySelector("img")?.getAttribute("src")).toContain(`/${form}/`);
+      unmount();
+    }
+  });
+});

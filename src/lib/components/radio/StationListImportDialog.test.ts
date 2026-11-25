@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import { flushSync } from "svelte";
 import StationListImportDialog from "./StationListImportDialog.svelte";
-import { playerStore } from "../../stores/player.svelte";
+import { openerStore } from "../../stores/opener.svelte";
 import { radioStore } from "../../stores/radio.svelte";
 
 const lists = [
@@ -13,7 +13,7 @@ const lists = [
 
 describe("StationListImportDialog (#2279)", () => {
   afterEach(() => {
-    playerStore.pendingStationLists = [];
+    openerStore.pendingStationLists = [];
     vi.restoreAllMocks();
   });
 
@@ -24,7 +24,7 @@ describe("StationListImportDialog (#2279)", () => {
 
   it("totals the stations, names the files, and imports them on confirm", async () => {
     const importLists = vi.spyOn(radioStore, "importStationLists").mockResolvedValue();
-    playerStore.pendingStationLists = lists;
+    openerStore.pendingStationLists = lists;
     render(StationListImportDialog);
 
     expect(
@@ -34,19 +34,19 @@ describe("StationListImportDialog (#2279)", () => {
     flushSync();
 
     expect(importLists).toHaveBeenCalledWith(lists);
-    expect(playerStore.pendingStationLists).toEqual([]);
+    expect(openerStore.pendingStationLists).toEqual([]);
     expect(screen.queryByText("Import radio stations?")).toBeNull();
   });
 
   it("drops the offer on cancel without importing", async () => {
     const importLists = vi.spyOn(radioStore, "importStationLists").mockResolvedValue();
-    playerStore.pendingStationLists = lists;
+    openerStore.pendingStationLists = lists;
     render(StationListImportDialog);
 
     await fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     flushSync();
 
     expect(importLists).not.toHaveBeenCalled();
-    expect(playerStore.pendingStationLists).toEqual([]);
+    expect(openerStore.pendingStationLists).toEqual([]);
   });
 });

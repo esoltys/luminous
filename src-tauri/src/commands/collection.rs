@@ -3,8 +3,8 @@ use crate::{
     collection::{CollectionScanner, WatcherPauseGuard},
     context::ContextManager,
     models::{
-        AlbumLink, AlbumProfile, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats,
-        MusicDirectory, PruneResult, Song, Tag, TopAlbumItem,
+        AlbumItem, AlbumLink, AlbumProfile, ArtistItem, ArtistProfile, ArtistSocialLink, HomeItem,
+        LibraryStats, MusicDirectory, PruneResult, Song, Tag, TopAlbumItem,
     },
     AppState,
 };
@@ -388,8 +388,8 @@ pub async fn search_songs(
 #[derive(serde::Serialize)]
 pub struct LibrarySnapshot {
     pub songs: Vec<Song>,
-    pub albums: Vec<serde_json::Value>,
-    pub artists: Vec<serde_json::Value>,
+    pub albums: Vec<AlbumItem>,
+    pub artists: Vec<ArtistItem>,
     pub total_songs: i64,
 }
 
@@ -482,7 +482,7 @@ pub async fn get_songs_by_artist(
 pub async fn get_compilations_by_artist(
     artist: String,
     state: State<'_, AppState>,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> Result<Vec<AlbumItem>, String> {
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
         scanner.get_compilations_by_artist(&artist)
     })
@@ -529,7 +529,7 @@ pub async fn get_most_played_songs(
 pub async fn get_top_artists(
     limit: Option<i64>,
     state: State<'_, AppState>,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> Result<Vec<ArtistItem>, String> {
     let limit = limit.unwrap_or(10);
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
         scanner.get_top_artists(limit)
@@ -755,8 +755,10 @@ pub async fn get_artist_profile(
     artist: String,
     state: State<'_, AppState>,
 ) -> Result<ArtistProfile, String> {
+    let db = state.db.clone();
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        let mut profile = scanner.get_artist_profile(&artist)?;
+        let conn = db.pool.get()?;
+        let mut profile = crate::profiles::get_artist_profile(&conn, &artist)?;
 
         // Self-heal a bio value polluted by an earlier bug where the whole
         // sidecar file — including its generated "## Tags"/"## Links" sections —
@@ -764,7 +766,8 @@ pub async fn get_artist_profile(
         let cleaned_bio = profile.bio.as_deref().and_then(extract_bio_prose);
         if cleaned_bio != profile.bio {
             profile.bio = cleaned_bio;
-            let _ = scanner.set_artist_bio(&profile.artist_key, profile.bio.as_deref());
+            let _ =
+                crate::profiles::set_artist_bio(&conn, &profile.artist_key, profile.bio.as_deref());
         }
 
         if profile.bio.is_none() {
@@ -777,7 +780,11 @@ pub async fn get_artist_profile(
                 biomanager::ARTIST_BIO_FILENAME,
             ) {
                 profile.bio = Some(bio);
-                let _ = scanner.set_artist_bio(&profile.artist_key, profile.bio.as_deref());
+                let _ = crate::profiles::set_artist_bio(
+                    &conn,
+                    &profile.artist_key,
+                    profile.bio.as_deref(),
+                );
             }
         }
 
@@ -793,9 +800,10 @@ pub async fn get_artist_profile(
 /// persistence path — same convention as `save_album_profile_with_sidecar`.
 fn save_artist_profile_with_sidecar(
     scanner: &CollectionScanner,
+    conn: &rusqlite::Connection,
     profile: &ArtistProfile,
 ) -> anyhow::Result<ArtistProfile> {
-    let saved = scanner.set_artist_profile(profile)?;
+    let saved = crate::profiles::set_artist_profile(conn, profile)?;
 
     let song_path = scanner
         .get_representative_song_path_for_artist(&saved.artist_key)
@@ -845,7 +853,7 @@ fn merge_artist_details_retrieval(
     stored.details_fetched = true;
     // A hand-entered country always wins; MusicBrainz only fills a blank (#2095).
     if stored.country.as_deref().is_none_or(str::is_empty) {
-        stored.country = crate::collection::normalize_country_code(country);
+        stored.country = crate::profiles::normalize_country_code(country);
     }
     if stored.musicbrainz_artist_id.is_none() {
         stored.musicbrainz_artist_id = Some(artist_mbid.to_string());
@@ -966,9 +974,15 @@ pub async fn set_artist_profile(
     // platforms) and kick off a redundant full rescan on top of the
     // in-memory update this command's return value already applies (#1123).
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+    let db = state.db.clone();
     let saved = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        let stored = scanner.get_artist_profile(&profile.artist_key)?;
-        save_artist_profile_with_sidecar(scanner, &merge_artist_profile_edit(stored, profile))
+        let conn = db.pool.get()?;
+        let stored = crate::profiles::get_artist_profile(&conn, &profile.artist_key)?;
+        save_artist_profile_with_sidecar(
+            scanner,
+            &conn,
+            &merge_artist_profile_edit(stored, profile),
+        )
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -986,11 +1000,9 @@ pub async fn set_artist_profile(
 pub async fn get_all_artist_profiles(
     state: State<'_, AppState>,
 ) -> Result<Vec<ArtistProfile>, String> {
-    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
-        scanner.get_all_artist_profiles()
-    })
-    .await
-    .map_err(|e| e.to_string())
+    crate::db::run_blocking(&state.db, crate::profiles::get_all_artist_profiles)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Retrieve an album's bio profile, adopting one from an `album.md` sidecar
@@ -1001,15 +1013,17 @@ pub async fn get_album_profile(
     album: String,
     state: State<'_, AppState>,
 ) -> Result<AlbumProfile, String> {
+    let db = state.db.clone();
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        let mut profile = scanner.get_album_profile(&album)?;
+        let conn = db.pool.get()?;
+        let mut profile = crate::profiles::get_album_profile(&conn, &album)?;
 
         // Self-heal a description value polluted by an earlier bug — see the
         // matching comment in `get_artist_profile`.
         let cleaned_description = profile.description.as_deref().and_then(extract_bio_prose);
         if cleaned_description != profile.description {
             profile.description = cleaned_description;
-            if let Ok(saved) = scanner.set_album_profile(&profile) {
+            if let Ok(saved) = crate::profiles::set_album_profile(&conn, &profile) {
                 profile = saved;
             }
         }
@@ -1024,7 +1038,7 @@ pub async fn get_album_profile(
                 biomanager::ALBUM_BIO_FILENAME,
             ) {
                 profile.description = Some(description);
-                if let Ok(saved) = scanner.set_album_profile(&profile) {
+                if let Ok(saved) = crate::profiles::set_album_profile(&conn, &profile) {
                     profile = saved;
                 }
             }
@@ -1042,9 +1056,10 @@ pub async fn get_album_profile(
 /// persistence path.
 fn save_album_profile_with_sidecar(
     scanner: &CollectionScanner,
+    conn: &rusqlite::Connection,
     profile: &AlbumProfile,
 ) -> anyhow::Result<AlbumProfile> {
-    let saved = scanner.set_album_profile(profile)?;
+    let saved = crate::profiles::set_album_profile(conn, profile)?;
 
     let song_path = scanner
         .get_representative_song_path_for_album(&saved.album_key)
@@ -1084,9 +1099,11 @@ pub async fn set_album_profile(
     // See `set_artist_profile`'s matching guard — same reasoning, for
     // `album.md` (#1123).
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+    let db = state.db.clone();
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        let stored = scanner.get_album_profile(&profile.album_key)?;
-        save_album_profile_with_sidecar(scanner, &merge_album_profile_edit(stored, profile))
+        let conn = db.pool.get()?;
+        let stored = crate::profiles::get_album_profile(&conn, &profile.album_key)?;
+        save_album_profile_with_sidecar(scanner, &conn, &merge_album_profile_edit(stored, profile))
     })
     .await
     .map_err(|e| e.to_string())
@@ -1096,11 +1113,9 @@ pub async fn set_album_profile(
 pub async fn get_all_album_profiles(
     state: State<'_, AppState>,
 ) -> Result<Vec<AlbumProfile>, String> {
-    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
-        scanner.get_all_album_profiles()
-    })
-    .await
-    .map_err(|e| e.to_string())
+    crate::db::run_blocking(&state.db, crate::profiles::get_all_album_profiles)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Opens an artist's `artist.md` bio sidecar file in the OS default editor.
@@ -1373,11 +1388,13 @@ pub async fn retrieve_album_details(
     }
 
     let album_for_lookup = album.clone();
+    let db = state.db.clone();
     let (release_group_id, current_profile) =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
             let release_group_id =
                 scanner.get_representative_release_group_id_for_album(&album_for_lookup)?;
-            let profile = scanner.get_album_profile(&album_for_lookup)?;
+            let conn = db.pool.get()?;
+            let profile = crate::profiles::get_album_profile(&conn, &album_for_lookup)?;
             Ok((release_group_id, profile))
         })
         .await
@@ -1416,8 +1433,10 @@ pub async fn retrieve_album_details(
     let (merged_links, added_count) = merge_album_links(existing_links, fetched_links);
     updated_profile.links = merged_links;
 
+    let db = state.db.clone();
     let profile = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        save_album_profile_with_sidecar(scanner, &updated_profile)
+        let conn = db.pool.get()?;
+        save_album_profile_with_sidecar(scanner, &conn, &updated_profile)
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -1434,6 +1453,7 @@ pub async fn retrieve_album_details(
     // here doesn't fail the command.
     let artist_credit_id = relations.artist_credit_ids.into_iter().next();
     let album_for_artist_lookup = album.clone();
+    let db = state.db.clone();
     let artist_profile =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
             let Some(artist_key) =
@@ -1441,10 +1461,15 @@ pub async fn retrieve_album_details(
             else {
                 return Ok(None);
             };
-            let mut artist_profile = scanner.get_artist_profile(&artist_key)?;
+            let conn = db.pool.get()?;
+            let mut artist_profile = crate::profiles::get_artist_profile(&conn, &artist_key)?;
             if let Some(artist_credit_id) = artist_credit_id {
                 if artist_profile.musicbrainz_artist_id.is_none() {
-                    scanner.set_artist_mbid(&artist_profile.artist_key, &artist_credit_id)?;
+                    crate::profiles::set_artist_mbid(
+                        &conn,
+                        &artist_profile.artist_key,
+                        &artist_credit_id,
+                    )?;
                     artist_profile.musicbrainz_artist_id = Some(artist_credit_id);
                 }
             }
@@ -1600,8 +1625,10 @@ async fn resolve_artist_mbid_and_profile(
     artist: &str,
 ) -> Result<(Option<String>, ArtistProfile), String> {
     let artist_for_lookup = artist.to_string();
+    let db = state.db.clone();
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        let profile = scanner.get_artist_profile(&artist_for_lookup)?;
+        let conn = db.pool.get()?;
+        let profile = crate::profiles::get_artist_profile(&conn, &artist_for_lookup)?;
         let mbid = match &profile.musicbrainz_artist_id {
             Some(id) => Some(id.clone()),
             None => scanner.get_representative_artist_mbid_for_artist(&artist_for_lookup)?,
@@ -1671,9 +1698,11 @@ pub async fn retrieve_artist_details(
         })
         .collect();
 
+    let db = state.db.clone();
     let (profile, added_count) =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-            let stored = scanner.get_artist_profile(&artist)?;
+            let conn = db.pool.get()?;
+            let stored = crate::profiles::get_artist_profile(&conn, &artist)?;
             let (updated_profile, added_count) = merge_artist_details_retrieval(
                 stored,
                 &artist,
@@ -1682,7 +1711,7 @@ pub async fn retrieve_artist_details(
                 fetched_links,
                 country.as_deref(),
             );
-            let saved = save_artist_profile_with_sidecar(scanner, &updated_profile)?;
+            let saved = save_artist_profile_with_sidecar(scanner, &conn, &updated_profile)?;
             Ok((saved, added_count))
         })
         .await
@@ -2090,10 +2119,12 @@ pub async fn retrieve_artist_image(
         }
     }
 
+    let db = state.db.clone();
     let profile = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        let stored = scanner.get_artist_profile(&artist)?;
+        let conn = db.pool.get()?;
+        let stored = crate::profiles::get_artist_profile(&conn, &artist)?;
         let merged = merge_artist_image_retrieval(stored, &artist, update);
-        save_artist_profile_with_sidecar(scanner, &merged)
+        save_artist_profile_with_sidecar(scanner, &conn, &merged)
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -2151,12 +2182,14 @@ pub async fn retrieve_album_art(
     }
 
     let album_for_lookup = album.clone();
+    let db = state.db.clone();
     let (release_group_id, album_artist, current_profile) =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+            let conn = db.pool.get()?;
             Ok((
                 scanner.get_representative_release_group_id_for_album(&album_for_lookup)?,
                 scanner.get_representative_artist_for_album(&album_for_lookup)?,
-                scanner.get_album_profile(&album_for_lookup)?,
+                crate::profiles::get_album_profile(&conn, &album_for_lookup)?,
             ))
         })
         .await
@@ -2226,8 +2259,10 @@ pub async fn retrieve_album_art(
     }
 
     let to_save = profile.clone();
+    let db = state.db.clone();
     let saved = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        save_album_profile_with_sidecar(scanner, &to_save)
+        let conn = db.pool.get()?;
+        save_album_profile_with_sidecar(scanner, &conn, &to_save)
     })
     .await
     .map_err(|e| e.to_string())?;
