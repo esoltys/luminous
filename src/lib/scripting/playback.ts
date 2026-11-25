@@ -152,12 +152,7 @@ export function createPlaybackController(wait: ScriptWaitApi): ScriptPlaybackApi
         remaining_playlist_items: playerStore.remainingPlaylistItems,
         auto_continue: playerStore.autoContinue,
         playlist_total: playerStore.playlistTotal,
-        volume_safety: playerStore.volumeSafety ?? {
-          enabled: false,
-          ceiling: 0.7,
-          min: 0.2,
-          max: 0.95,
-        },
+        volume_safety: playerStore.volumeSafety,
         playback_speed: playerStore.playbackSpeed,
         can_seek: playerStore.canSeek,
       };

@@ -1291,7 +1291,10 @@ export function playingStationFor(song: Song | null | undefined): PlayingStation
 }
 
 /** What `playback.status()` returns: the backend snapshot plus the derived station. */
-export type ScriptPlaybackSnapshot = PlaybackState & { current_station?: PlayingStation };
+export type ScriptPlaybackSnapshot = Omit<PlaybackState, "volume_safety"> & {
+  volume_safety?: VolumeSafety | null;
+  current_station?: PlayingStation;
+};
 
 // What the user was inside when a play started — lets "Recently Played"
 // show an Album/Playlist card instead of always collapsing to a Song.
