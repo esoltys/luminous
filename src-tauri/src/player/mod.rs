@@ -567,6 +567,7 @@ impl Player {
             .virtual_index_for_uuid(uuid)
             .ok_or_else(|| anyhow!("Playlist item with uuid '{uuid}' not found"))?;
 
+        self.order.clear_live_unavailable_for_uuid(uuid);
         self.play_at_index(play_index).await
     }
 
