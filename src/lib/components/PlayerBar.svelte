@@ -170,10 +170,7 @@
     if (!playerStore.currentSong) return;
     e.stopPropagation();
 
-    // While the window is too narrow to show the front face at all
-    // (isImmersiveForced), immersive is already engaged regardless of what
-    // this toggles, so leave it alone until the window widens back out.
-    if (windowLayoutStore.isImmersiveForced) return;
+    if (!windowLayoutStore.canToggleImmersive) return;
 
     windowLayoutStore.toggleImmersiveMode("cover");
   }
@@ -182,7 +179,7 @@
     if (!playerStore.currentSong) return;
     e.stopPropagation();
 
-    if (windowLayoutStore.isImmersiveForced) return;
+    if (!windowLayoutStore.canToggleImmersive) return;
 
     windowLayoutStore.toggleImmersiveMode("visualizer");
   }
@@ -326,6 +323,26 @@
      cluster in the full tier, the transport row in the compact tier. -->
 <!-- Shown only away from normal speed, so a speed that persists across restarts is never
      invisible; a click puts it back to normal. -->
+{#snippet libraryMetadata(text: string, filterTitle: string, onNavigate: () => void)}
+  {#if windowLayoutStore.canNavigateToLibrary}
+    <LinkButton
+      onclick={(e) => {
+        e.stopPropagation();
+        windowLayoutStore.exitImmersiveMode();
+        onNavigate();
+      }}
+      class="text-xs text-brand-text-secondary truncate"
+      title={filterTitle}
+    >
+      {text}
+    </LinkButton>
+  {:else}
+    <span class="text-xs text-brand-text-secondary truncate" title={text}>
+      {text}
+    </span>
+  {/if}
+{/snippet}
+
 {#snippet speedChip()}
   {#if playerStore.playbackSpeed !== PLAYBACK_SPEED_NORMAL}
     <button
@@ -398,7 +415,7 @@
     >
       <button
         onclick={handleCoverClick}
-        disabled={!playerStore.currentSong}
+        disabled={!playerStore.currentSong || !windowLayoutStore.canToggleImmersive}
         class="group relative overflow-hidden focus:outline-hidden flex-shrink-0 disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-transform duration-200"
         title={coverTitle}
       >
@@ -435,17 +452,11 @@
           {/if}
         </div>
         {#if playerStore.currentSong?.album?.trim()}
-          <LinkButton
-            onclick={(e) => {
-              e.stopPropagation();
-              windowLayoutStore.exitImmersiveMode();
-              navigationStore.viewAlbum(playerStore.currentSong?.album || "");
-            }}
-            class="text-xs text-brand-text-secondary truncate"
-            title={i18n.t("collection.filterByAlbum", { album: playerStore.currentSong.album })}
-          >
-            {playerStore.currentSong.album}
-          </LinkButton>
+          {@render libraryMetadata(
+            playerStore.currentSong.album,
+            i18n.t("collection.filterByAlbum", { album: playerStore.currentSong.album }),
+            () => navigationStore.viewAlbum(playerStore.currentSong?.album || ""),
+          )}
         {/if}
         {#if playerStore.stationNowPlaying}
           <!-- The station's announced track: its artist and the station, not a library link (#2008). -->
@@ -457,21 +468,18 @@
             {playerStore.currentSongDisplaySubtitle}
           </span>
         {:else if playerStore.currentSong?.artist}
-          <LinkButton
-            onclick={(e) => {
-              e.stopPropagation();
-              windowLayoutStore.exitImmersiveMode();
+          {@render libraryMetadata(
+            playerStore.currentSong.artist,
+            i18n.t("collection.filterByArtist", {
+              artist: playerStore.currentSong.artist,
+            }),
+            () =>
               navigationStore.viewArtist(
                 playerStore.currentSong?.album_artist?.trim() ||
                   playerStore.currentSong?.artist ||
                   "",
-              );
-            }}
-            class="text-xs text-brand-text-secondary truncate"
-            title={i18n.t("collection.filterByArtist", { artist: playerStore.currentSong.artist })}
-          >
-            {playerStore.currentSong.artist}
-          </LinkButton>
+              ),
+          )}
         {:else}
           <span class="text-xs text-brand-text-secondary truncate">
             {playerStore.currentSong ? i18n.t("collection.unknownArtist") : ""}
@@ -650,7 +658,7 @@
               <button
                 type="button"
                 onclick={handleVisualizerClick}
-                disabled={!playerStore.currentSong}
+                disabled={!playerStore.currentSong || !windowLayoutStore.canToggleImmersive}
                 aria-pressed={isImmersiveVisualizerActive}
                 aria-label={i18n.t("playerBar.visualizerTooltip", {}, "Toggle audio visualizer")}
                 aria-keyshortcuts={visualizerStore.canSwitch ? "[ ]" : undefined}
@@ -693,17 +701,19 @@
               {/if}
             </div>
           {/if}
-          <button
-            onclick={navigateToQueue}
-            data-drop-target="queue"
-            class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors {songDrag.isDragging &&
-            songDrag.dropTarget?.kind === 'queue'
-              ? 'text-brand-accent-text scale-110'
-              : ''}"
-            title={i18n.t("playerBar.queueTitle", {}, "Queue")}
-          >
-            <Layers class="w-5 h-5" />
-          </button>
+          {#if !windowLayoutStore.isPlaybarOnlyMode}
+            <button
+              onclick={navigateToQueue}
+              data-drop-target="queue"
+              class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors {songDrag.isDragging &&
+              songDrag.dropTarget?.kind === 'queue'
+                ? 'text-brand-accent-text scale-110'
+                : ''}"
+              title={i18n.t("playerBar.queueTitle", {}, "Queue")}
+            >
+              <Layers class="w-5 h-5" />
+            </button>
+          {/if}
           <button
             onclick={toggleMute}
             class="inline-flex items-center justify-center text-brand-text-secondary hover:text-brand-text-primary transition-colors"
@@ -750,31 +760,34 @@
     {song}
     onPlay={() => playerStore.playSong(song.id)}
     onAddToPlaylist={() => playlistsStore.addSongsToActiveTarget([song.id], song.title || "Song")}
-    onGoToArtist={song.artist
+    onGoToArtist={windowLayoutStore.canNavigateToLibrary && song.artist
       ? () => {
           windowLayoutStore.exitImmersiveMode();
           navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "");
         }
       : undefined}
-    onGoToAlbum={song.album
+    onGoToAlbum={windowLayoutStore.canNavigateToLibrary && song.album
       ? () => {
           windowLayoutStore.exitImmersiveMode();
           navigationStore.viewAlbum(song.album || "");
         }
       : undefined}
-    onEditTags={() => {
-      windowLayoutStore.exitImmersiveMode();
-      tagEditorStore.open(song);
-    }}
+    onEditTags={!windowLayoutStore.isPlaybarOnlyMode
+      ? () => {
+          windowLayoutStore.exitImmersiveMode();
+          tagEditorStore.open(song);
+        }
+      : undefined}
     onOpenInPicard={() => openInPicard([song.id])}
     onClose={() => {
       contextMenuState = null;
     }}
   >
     {#snippet trailing()}
-      <!-- Lyrics and the info panel are hidden below the right-panel breakpoint, and the
-           seek bar below the compact one, so the menu leaves out what the window can't show. -->
-      {#if !windowLayoutStore.isRightPanelAutoHidden}
+      <!-- Lyrics and the info panel are hidden below the right-panel breakpoint, the seek bar
+           below the compact one, and view-dependent items in playbar-only mode, so the menu
+           leaves out what the window can't show. -->
+      {#if !windowLayoutStore.isRightPanelAutoHidden && !windowLayoutStore.isPlaybarOnlyMode}
         <ContextMenuItem
           icon={Lyrics}
           label={i18n.t("sidebar.lyrics")}
@@ -791,16 +804,18 @@
           onclick={() => chooseMenuItem(handleInfoClick)}
         />
       {/if}
-      <ContextMenuItem
-        icon={Sliders}
-        label={i18n.t("settings.tabEqualizer", {}, "Equalizer")}
-        shortcut={`${ctrlKey}+Shift+E`}
-        onclick={() =>
-          chooseMenuItem(() => {
-            windowLayoutStore.exitImmersiveMode();
-            navigationStore.openSettings("equalizer");
-          })}
-      />
+      {#if !windowLayoutStore.isPlaybarOnlyMode}
+        <ContextMenuItem
+          icon={Sliders}
+          label={i18n.t("settings.tabEqualizer", {}, "Equalizer")}
+          shortcut={`${ctrlKey}+Shift+E`}
+          onclick={() =>
+            chooseMenuItem(() => {
+              windowLayoutStore.exitImmersiveMode();
+              navigationStore.openSettings("equalizer");
+            })}
+        />
+      {/if}
       <ContextMenuSubmenu
         icon={Gauge}
         label={playerStore.playbackSpeed === PLAYBACK_SPEED_NORMAL

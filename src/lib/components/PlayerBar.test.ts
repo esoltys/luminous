@@ -798,6 +798,53 @@ describe("PlayerBar.svelte", () => {
     expect(glowNormal?.querySelector("svg")).not.toBeNull();
   });
 
+  it("hides the Queue button in playbar-only mode (< 160px tall)", () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.viewportWidth = 1024;
+    windowLayoutStore.viewportHeight = 140;
+
+    const { queryByTitle, unmount } = render(PlayerBar);
+    expect(queryByTitle("Queue")).toBeNull();
+    unmount();
+
+    windowLayoutStore.viewportHeight = 500;
+    const { getByTitle } = render(PlayerBar);
+    expect(getByTitle("Queue")).toBeInTheDocument();
+  });
+
+  it("disables immersive toggles, library links, and view-dependent menu items in playbar-only mode", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.viewportWidth = 1280;
+    windowLayoutStore.viewportHeight = 140;
+
+    const { getByTitle, getByText, queryByText, getByTestId } = render(PlayerBar);
+
+    expect(getByTitle("Immersive Mode")).toBeDisabled();
+    expect(getByTestId("player-bar-visualizer-btn")).toBeDisabled();
+    expect(getByText(mockSong.album!).closest("button")).toBeNull();
+    expect(getByText(mockSong.artist!).closest("button")).toBeNull();
+
+    await fireEvent.click(getByTitle("Song menu"));
+    expect(queryByText("Lyrics")).toBeNull();
+    expect(queryByText("Song info")).toBeNull();
+    expect(queryByText("Equalizer")).toBeNull();
+    expect(queryByText("Go to Artist")).toBeNull();
+    expect(queryByText("Go to Album")).toBeNull();
+    expect(queryByText("Edit Tags")).toBeNull();
+    expect(getByText("Mini-player")).toBeInTheDocument();
+  });
+
+  it("renders Album and Artist as plain text instead of navigation links when immersive is forced (< 640px wide)", () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.viewportWidth = 500;
+    windowLayoutStore.viewportHeight = 800;
+
+    const { getByTitle, getByText } = render(PlayerBar);
+    expect(getByTitle("Immersive Mode")).toBeDisabled();
+    expect(getByText(mockSong.album!).closest("button")).toBeNull();
+    expect(getByText(mockSong.artist!).closest("button")).toBeNull();
+  });
+
   it("closes the song menu when its button is pressed again instead of reopening it", async () => {
     playerStore.currentSong = mockSong;
     const { getByTitle, queryByRole } = render(PlayerBar);

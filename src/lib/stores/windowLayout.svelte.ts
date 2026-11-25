@@ -485,6 +485,16 @@ class WindowLayoutStore {
     return this.viewportHeight < HEIGHT_BREAKPOINT_MINIMAL_PX;
   }
 
+  /** Whether the user can toggle immersive mode (unavailable when forced by narrow width or hidden in playbar-only mode). */
+  get canToggleImmersive(): boolean {
+    return !this.isImmersiveForced && !this.isPlaybarOnlyMode;
+  }
+
+  /** Whether the main library view is reachable (unavailable when playbar-only or forced-immersive). */
+  get canNavigateToLibrary(): boolean {
+    return !this.isPlaybarOnlyMode && !this.isImmersiveForced;
+  }
+
   get isDetailHeaderCollapsed(): boolean {
     return this.viewportHeight < HEIGHT_BREAKPOINT_SHORT_PX;
   }
