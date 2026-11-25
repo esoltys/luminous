@@ -5526,4 +5526,56 @@ mod tests {
         assert_eq!(by_title.len(), 1);
         assert_eq!(by_title[0].title.as_deref(), Some("Ambient Drift"));
     }
+
+    #[test]
+    fn search_songs_by_mode_excludes_non_library_sources() {
+        let _dir = tempfile::Builder::new()
+            .prefix("luminous_search_mode_source_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        {
+            let conn = db.pool.get().unwrap();
+            for (path, title, source, filetype) in [
+                (
+                    "/music/ambient.flac",
+                    "Ambient Drift",
+                    SongSource::LocalFile,
+                    FileType::Flac,
+                ),
+                (
+                    "/tmp/opened.flac",
+                    "Ambient Opened",
+                    SongSource::OpenedFile,
+                    FileType::Flac,
+                ),
+                (
+                    "radio://station-ambient",
+                    "Ambient FM",
+                    SongSource::RadioBrowser,
+                    FileType::Stream,
+                ),
+            ] {
+                upsert_song(
+                    &conn,
+                    &Song {
+                        path: Some(path.to_string()),
+                        title: Some(title.to_string()),
+                        artist: Some("Artist".to_string()),
+                        source,
+                        filetype,
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+            }
+        }
+
+        let results = scanner
+            .search_songs_by_mode("title:ambient", 50, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title.as_deref(), Some("Ambient Drift"));
+    }
 }

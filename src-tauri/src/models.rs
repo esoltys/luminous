@@ -118,9 +118,9 @@ impl From<i64> for SongSource {
 /// SQL `IN (...)` fragment listing the source IDs that make up the browsable
 /// library (local files, managed collection folders, WebDAV mounts, and
 /// OpenSubsonic servers). Derived from `SongSource` discriminants so it can't
-/// silently drift from the enum. Prefer [`library_song_where`] and its
-/// variants over assembling `source IN (...) AND unavailable = 0` by hand.
-pub(crate) static LIBRARY_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
+/// silently drift from the enum. Kept private so callers go through
+/// [`library_song_where`] and its variants instead of assembling predicates by hand.
+static LIBRARY_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
     format!(
         "{}, {}, {}, {}",
         SongSource::LocalFile as i32,
@@ -156,8 +156,9 @@ pub(crate) static FILE_SOURCES_SQL: LazyLock<String> =
 /// like the Organize feature — and opened files outside the library
 /// (`OpenedFile`), which library-wide operations (organize, device sync,
 /// relocate, analysis sweeps) must not touch. Derived from `SongSource`
-/// discriminants so it can't silently drift from the enum.
-pub(crate) static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
+/// discriminants so it can't silently drift from the enum. Kept private so
+/// callers go through [`local_song_where`] and its variants.
+static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
     format!(
         "{}, {}",
         SongSource::LocalFile as i32,
