@@ -28,6 +28,10 @@ describe("PinnedRow.svelte", () => {
     added: 1_700_000_000,
     year: 1997,
     unavailable: false,
+    loved: 0,
+    is_instrumental: false,
+    not_included: false,
+    isLive: false,
   };
 
   const mockAlbum: AlbumItem = {

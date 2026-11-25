@@ -38,6 +38,10 @@ const baseSong: Song = {
   art_embedded: false,
   art_unset: false,
   unavailable: false,
+  loved: 0,
+  is_instrumental: false,
+  not_included: false,
+  isLive: false,
 };
 
 function renderTable(rows: SongTableRow[]) {
@@ -103,6 +107,10 @@ describe("SongTable.svelte — Last Played column", () => {
     art_embedded: false,
     art_unset: false,
     unavailable: false,
+    loved: 0,
+    is_instrumental: false,
+    not_included: false,
+    isLive: false,
   };
 
   beforeEach(() => {
@@ -279,6 +287,10 @@ describe("SongTable.svelte — windowing (#1898)", () => {
     art_embedded: false,
     art_unset: false,
     unavailable: false,
+    loved: 0,
+    is_instrumental: false,
+    not_included: false,
+    isLive: false,
   });
 
   function renderInScroller(rows: SongTableRow[]) {
@@ -400,6 +412,10 @@ describe("SongTable.svelte — dragging songs out (#1974)", () => {
     art_embedded: false,
     art_unset: false,
     unavailable: false,
+    loved: 0,
+    is_instrumental: false,
+    not_included: false,
+    isLive: false,
   });
   const rows: SongTableRow[] = [
     { key: "a", song: makeSong(1, "One"), underlyingIndex: 0 },

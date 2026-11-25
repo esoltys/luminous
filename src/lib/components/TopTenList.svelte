@@ -104,11 +104,14 @@
       beginning_nanosec: 0,
       end_nanosec: 0,
       rating: item.rating ?? -1,
-      loved: item.loved,
+      loved: item.loved ?? 0,
       playcount: item.play_count,
       skipcount: 0,
       year: item.year ?? undefined,
       unavailable: false,
+      is_instrumental: false,
+      not_included: false,
+      isLive: false,
     };
     contextMenuState = { x: e.clientX, y: e.clientY, song };
   }

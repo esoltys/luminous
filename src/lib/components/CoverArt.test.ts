@@ -120,6 +120,10 @@ describe("CoverArt.svelte - remote cover propagation (#1823)", () => {
         playcount: 0,
         skipcount: 0,
         unavailable: false,
+        loved: 0,
+        is_instrumental: false,
+        not_included: false,
+        isLive: false,
       },
       {
         id: 51,
@@ -139,6 +143,10 @@ describe("CoverArt.svelte - remote cover propagation (#1823)", () => {
         playcount: 0,
         skipcount: 0,
         unavailable: false,
+        loved: 0,
+        is_instrumental: false,
+        not_included: false,
+        isLive: false,
       },
     ];
     collectionStore.albums = [

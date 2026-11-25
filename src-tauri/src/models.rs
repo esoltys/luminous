@@ -15,6 +15,7 @@ use uuid::Uuid;
 /// Where a Song originates. Determines URL resolution, scrobbling eligibility,
 /// and display appearance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum SongSource {
     #[default]
@@ -263,6 +264,7 @@ pub(crate) static LIVE_STREAM_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum FileType {
     #[default]
@@ -432,7 +434,10 @@ pub use luminous_metadata::values::{join_multi_value, parse_multi_value, MULTI_V
 /// Represents a single audio track. Mirrors the `songs` table in SQLite.
 /// Durations are in nanoseconds for precision (CUE sheet support).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(optional_fields = nullable))]
 pub struct Song {
+    #[cfg_attr(test, ts(type = "number"))]
     pub id: i64,
     pub source: SongSource,
     pub filetype: FileType,
@@ -478,15 +483,20 @@ pub struct Song {
     pub initial_key: Option<String>,
 
     // Audio properties (durations in nanoseconds)
+    #[cfg_attr(test, ts(as = "Option<f64>"))]
     pub length_nanosec: Option<i64>,
+    #[cfg_attr(test, ts(type = "number"))]
     pub beginning_nanosec: i64, // CUE sheet start (0 for normal files)
-    pub end_nanosec: i64,       // CUE sheet end (0 for normal files)
+    #[cfg_attr(test, ts(type = "number"))]
+    pub end_nanosec: i64, // CUE sheet end (0 for normal files)
     pub bitrate: Option<i32>,
     pub is_vbr: Option<bool>,
     pub samplerate: Option<i32>,
     pub bitdepth: Option<i32>,
     pub channels: Option<i32>,
+    #[cfg_attr(test, ts(as = "Option<f64>"))]
     pub filesize: Option<i64>,
+    #[cfg_attr(test, ts(as = "Option<f64>"))]
     pub mtime: Option<i64>,
 
     // Play statistics
@@ -494,8 +504,11 @@ pub struct Song {
     pub loved: i32,  // 1 = loved, 0 = neutral, -1 = hated
     pub playcount: i32,
     pub skipcount: i32,
+    #[cfg_attr(test, ts(as = "Option<f64>"))]
     pub lastplayed: Option<i64>,
+    #[cfg_attr(test, ts(as = "Option<f64>"))]
     pub lastseen: Option<i64>,
+    #[cfg_attr(test, ts(as = "Option<f64>"))]
     pub added: Option<i64>,
 
     // Album art
@@ -933,18 +946,25 @@ pub enum RepeatMode {
 
 /// Current playback state snapshot, sent to the frontend.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(optional_fields = nullable))]
 pub struct PlaybackState {
     pub state: PlayState,
     pub current_song: Option<Song>,
+    #[cfg_attr(test, ts(as = "Option<f64>"))]
     pub playlist_id: Option<i64>,
     pub playlist_item_uuid: Option<String>,
+    #[cfg_attr(test, ts(type = "number"))]
     pub position_nanosec: i64,
     pub volume: f32, // 0.0–1.0
+    #[cfg_attr(test, ts(type = "ShuffleMode"))]
     pub shuffle_mode: ShuffleMode,
+    #[cfg_attr(test, ts(type = "RepeatMode"))]
     pub repeat_mode: RepeatMode,
     pub stop_after_current: bool,
     /// Where the currently applied loudness-normalization gain came from
     /// (#77), for a player-bar indicator.
+    #[cfg_attr(test, ts(type = "LoudnessGainSource"))]
     pub loudness_source: LoudnessGainSource,
     /// The applied gain in dB, when normalization is active for this track.
     pub loudness_gain_db: Option<f32>,
@@ -963,6 +983,7 @@ pub struct PlaybackState {
     pub playlist_total: usize,
     /// The volume safety ceiling (#1890); `volume` never exceeds it while on.
     #[serde(default)]
+    #[cfg_attr(test, ts(type = "VolumeSafety"))]
     pub volume_safety: VolumeSafety,
     /// Playback speed (#2142), 1.0 = normal. Pitch is preserved.
     #[serde(default = "default_playback_speed")]
@@ -970,6 +991,7 @@ pub struct PlaybackState {
     /// The track the playing station announces (#2008). `None` for library
     /// songs, stations that send no metadata, and while stopped.
     #[serde(default)]
+    #[cfg_attr(test, ts(optional = nullable, type = "StationNowPlaying | null"))]
     pub station_now_playing: Option<crate::now_playing::StationNowPlaying>,
     /// Whether the current track supports seeking (`current_song` present and not live, #2320).
     #[serde(default)]
@@ -1027,6 +1049,7 @@ impl Default for VolumeSafety {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum PlayState {
     #[default]
@@ -2356,5 +2379,35 @@ mod tests {
         }
         .with_derived_fields();
         assert_eq!(serde_json::to_value(&local_mp3).unwrap()["isLive"], false);
+    }
+
+    #[test]
+    fn export_ts_bindings() {
+        use ts_rs::TS;
+        let out_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("src")
+            .join("lib")
+            .join("types")
+            .join("generated");
+        let cfg = ts_rs::Config::default().with_out_dir(&out_dir);
+        SongSource::export_all(&cfg).expect("export SongSource");
+        FileType::export_all(&cfg).expect("export FileType");
+        PlayState::export_all(&cfg).expect("export PlayState");
+        Song::export_all(&cfg).expect("export Song");
+        PlaybackState::export_all(&cfg).expect("export PlaybackState");
+
+        // `PlaybackState` references hand-written types in `../index` via `#[ts(type = "...")]`.
+        // Prepend their type-only import so the generated file type-checks standalone.
+        let playback_path = out_dir.join("PlaybackState.ts");
+        let content = std::fs::read_to_string(&playback_path).expect("read PlaybackState.ts");
+        let import_line = "import type { LoudnessGainSource, RepeatMode, ShuffleMode, StationNowPlaying, VolumeSafety } from \"../index\";\n";
+        if !content.contains(import_line) {
+            let mut lines = content.splitn(2, '\n');
+            let header = lines.next().unwrap_or_default();
+            let rest = lines.next().unwrap_or_default();
+            let updated = format!("{header}\n{import_line}{rest}");
+            std::fs::write(&playback_path, updated).expect("write PlaybackState.ts");
+        }
     }
 }

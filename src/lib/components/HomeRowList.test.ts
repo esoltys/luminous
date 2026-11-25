@@ -23,6 +23,10 @@ function makeSong(overrides: Partial<Song> = {}): Song {
     added: 1_700_000_000,
     year: 1994,
     unavailable: false,
+    loved: 0,
+    is_instrumental: false,
+    not_included: false,
+    isLive: false,
     ...overrides,
   };
 }

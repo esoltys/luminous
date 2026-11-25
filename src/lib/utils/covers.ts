@@ -98,7 +98,7 @@ export function coverRequestUrl(
 
 export interface CoverSource {
   id: number;
-  path?: string;
+  path?: string | null;
   source?: SongSource;
   album?: string | null;
   art_manual?: string | null;

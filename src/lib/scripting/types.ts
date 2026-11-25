@@ -83,15 +83,15 @@ export type ScriptLocale = string;
 /** The song fields the contract promises; the app's real songs carry more. */
 export interface ScriptSong {
   id: number;
-  title?: string;
-  artist?: string;
-  album?: string;
-  album_artist?: string;
-  track?: number;
-  disc?: number;
-  year?: number;
-  genre?: string;
-  length_nanosec?: number;
+  title?: string | null;
+  artist?: string | null;
+  album?: string | null;
+  album_artist?: string | null;
+  track?: number | null;
+  disc?: number | null;
+  year?: number | null;
+  genre?: string | null;
+  length_nanosec?: number | null;
 }
 
 export type ScriptPlayState = "stopped" | "playing" | "paused";
@@ -111,10 +111,10 @@ export interface ScriptStation {
 /** The playback fields the contract promises; the app's real snapshot carries more. */
 export interface ScriptPlaybackState {
   state: ScriptPlayState;
-  current_song?: ScriptSong;
+  current_song?: ScriptSong | null;
   /** Set while a radio station is the current item (since 1.5); `current_song` is its stand-in row. */
   current_station?: ScriptStation;
-  playlist_id?: number;
+  playlist_id?: number | null;
   position_nanosec: number;
   volume: number;
 }

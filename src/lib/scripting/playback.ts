@@ -151,6 +151,10 @@ export function createPlaybackController(wait: ScriptWaitApi): ScriptPlaybackApi
         loudness_gain_db: playerStore.loudnessGainDb,
         remaining_playlist_items: playerStore.remainingPlaylistItems,
         auto_continue: playerStore.autoContinue,
+        playlist_total: playerStore.playlistTotal,
+        volume_safety: playerStore.volumeSafety,
+        playback_speed: playerStore.playbackSpeed,
+        can_seek: playerStore.canSeek,
       };
     },
   };

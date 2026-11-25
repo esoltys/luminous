@@ -56,6 +56,10 @@ describe("ArtistCard.svelte", () => {
     playcount: 0,
     skipcount: 0,
     unavailable: false,
+    loved: 0,
+    is_instrumental: false,
+    not_included: false,
+    isLive: false,
   };
 
   beforeEach(() => {

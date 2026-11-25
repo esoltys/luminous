@@ -186,4 +186,5 @@ zvariant = "5"
 luminous-audio = { path = "../crates/luminous-audio", features = ["test-util"] }
 proptest = "1.11.0"
 tempfile = "3"
+ts-rs = "12"
 wiremock = "0.6"
