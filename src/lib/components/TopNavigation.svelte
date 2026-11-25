@@ -21,6 +21,7 @@
   import { navigationStore, type AutoPlaylistRef } from "../stores/navigation.svelte";
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { openerStore } from "../stores/opener.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -1126,7 +1127,7 @@
        icon it read as a search option, not as the way to play loose files. -->
     <button
       type="button"
-      onclick={() => playerStore.openFileDialog()}
+      onclick={() => openerStore.openFileDialog()}
       class="flex items-center gap-2 px-3 py-2 rounded-lg border border-brand-border bg-brand-main text-sm text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent transition-colors flex-shrink-0"
       title={i18n.t("topNav.openFilesTooltip")}
     >

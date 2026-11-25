@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import {
   type PlaybackState,
   type Playlist,
@@ -18,7 +17,6 @@ import {
   type AudioBackendKind,
   type VolumeSafety,
   type StationNowPlaying,
-  type StationListFile,
 } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { createEventScope } from "../utils/eventScope";
@@ -76,10 +74,6 @@ export class PlayerStore {
   playlistIndex = $state<number | null>(null);
   /** Total number of tracks in the active play order (#1605). */
   playlistTotal = $state<number>(0);
-  /** Station-list playlist files the user just opened or dropped, waiting
-   * for them to confirm the import; `+layout.svelte` shows the dialog while
-   * this is non-empty (#2279). */
-  pendingStationLists = $state<StationListFile[]>([]);
 
   /**
    * Formatted progress string for the active playlist/queue (e.g. "3/10"),
@@ -358,18 +352,6 @@ export class PlayerStore {
         }
       });
 
-      // A file association (or `luminous <file>`) launched a second instance
-      // while this one was already running; the backend forwards the paths
-      // here instead of spawning a separate window.
-      await this.events.listen<string[]>("open-file-request", (event) => {
-        this.openAndPlay(event.payload);
-      });
-
-      const startupFile = await invoke<string | null>("get_startup_file");
-      if (startupFile) {
-        await this.openAndPlay([startupFile]);
-      }
-
       const initialPipeline = await invoke<AudioPipelineInfo | null>(
         "get_audio_pipeline_info",
       ).catch(() => null);
@@ -487,178 +469,6 @@ export class PlayerStore {
     const queuePl = await playlistsStore.requireQueue();
     this.activeContextName = "Queue";
     await playlistsStore.selectPlaylist(queuePl.id);
-  }
-
-  /** Holds station-list files from an open/drop outcome for the import
-   * confirmation, and reports whether there were any. */
-  private offerStationLists(lists: StationListFile[] | undefined): boolean {
-    if (!lists?.length) return false;
-    this.pendingStationLists = lists;
-    return true;
-  }
-
-  /** Takes the station lists awaiting confirmation, clearing the offer —
-   * called by the dialog's Import (to import them) and Cancel (to drop them). */
-  takePendingStationLists(): StationListFile[] {
-    const lists = this.pendingStationLists;
-    this.pendingStationLists = [];
-    return lists;
-  }
-
-  async openAndPlay(paths: string[]) {
-    this.completedSession = null;
-    const outcome = await invoke<{
-      played: number;
-      skipped: number;
-      station_lists: StationListFile[];
-    }>("open_and_play", { paths });
-    const offeredStations = this.offerStationLists(outcome.station_lists);
-    if (outcome.played === 0) {
-      if (!offeredStations) {
-        toastStore.show(
-          i18n.t("playerBar.openNothingPlayable", {}, "No supported audio files found to play."),
-          "error",
-        );
-      }
-      return outcome;
-    }
-    if (outcome.skipped > 0) {
-      toastStore.show(i18n.plural("playerBar.tracksSkippedToast", outcome.skipped), "error");
-    }
-    await playlistsStore.refreshPlaylists();
-    const queuePl = await playlistsStore.requireQueue();
-    this.activeContextName = "Queue";
-    await playlistsStore.selectPlaylist(queuePl.id);
-    return outcome;
-  }
-
-  /** Drag-and-dropped (or otherwise opened) paths, appended to the end of the
-   * Queue instead of replacing it — the "hold Shift to append" counterpart to
-   * `openAndPlay`. Playback is left untouched. */
-  async addPathsToQueue(paths: string[]) {
-    this.completedSession = null;
-    const outcome = await invoke<{
-      added: number;
-      skipped: number;
-      station_lists: StationListFile[];
-    }>("add_paths_to_queue", { paths });
-    const offeredStations = this.offerStationLists(outcome.station_lists);
-    if (outcome.added === 0) {
-      if (!offeredStations) {
-        toastStore.show(
-          i18n.t("dragDrop.nothingToAdd", {}, "No supported audio files found to add."),
-          "error",
-        );
-      }
-      return outcome;
-    }
-    if (outcome.skipped > 0) {
-      toastStore.show(i18n.plural("playerBar.tracksSkippedToast", outcome.skipped), "error");
-    }
-    await playlistsStore.refreshPlaylists();
-    const qPl = playlistsStore.queuePlaylist;
-    if (qPl && playlistsStore.activePlaylistId === qPl.id) {
-      await playlistsStore.selectPlaylist(qPl.id);
-    }
-    return outcome;
-  }
-
-  async openFileDialog() {
-    try {
-      const selected = await open({
-        multiple: true,
-        directory: false,
-        title: i18n.t("topNav.openFilesTitle", {}, "Open Audio Files or Playlists"),
-        filters: [
-          {
-            name: i18n.t("topNav.fileFilterSupported"),
-            extensions: [
-              "mp3",
-              "flac",
-              "ogg",
-              "opus",
-              "m4a",
-              "aac",
-              "alac",
-              "wav",
-              "aiff",
-              "aif",
-              "wv",
-              "mpc",
-              "ape",
-              "tta",
-              "dsf",
-              "dff",
-              "asf",
-              "wma",
-              "m4b",
-              "m3u",
-              "m3u8",
-              "pls",
-              "xspf",
-            ],
-          },
-          {
-            name: i18n.t("topNav.fileFilterAudio"),
-            extensions: [
-              "mp3",
-              "flac",
-              "ogg",
-              "opus",
-              "m4a",
-              "aac",
-              "alac",
-              "wav",
-              "aiff",
-              "aif",
-              "wv",
-              "mpc",
-              "ape",
-              "tta",
-              "dsf",
-              "dff",
-              "asf",
-              "wma",
-              "m4b",
-            ],
-          },
-          {
-            name: i18n.t("topNav.fileFilterPlaylists"),
-            extensions: ["m3u", "m3u8", "pls", "xspf"],
-          },
-        ],
-      });
-
-      if (selected) {
-        const paths = Array.isArray(selected) ? selected : [selected];
-        if (paths.length > 0) {
-          await this.openAndPlay(paths);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to open files/playlists:", err);
-    }
-  }
-
-  /** Plays every audio file under the picked folder(s) (recursively) without
-   * adding the folder to the watched library — the button counterpart to
-   * dropping a folder on the window. */
-  async openFolderDialog() {
-    try {
-      const selected = await open({
-        multiple: true,
-        directory: true,
-        title: i18n.t("emptyLibrary.playFolder"),
-      });
-      if (selected) {
-        const paths = Array.isArray(selected) ? selected : [selected];
-        if (paths.length > 0) {
-          await this.openAndPlay(paths);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to open folder:", err);
-    }
   }
 
   async playSongs(
