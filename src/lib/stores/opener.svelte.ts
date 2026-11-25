@@ -79,6 +79,29 @@ export class OpenerStore {
     return lists;
   }
 
+  /** Handles the shared post-IPC outcome for `openAndPlay` and `addPathsToQueue`:
+   * offers any station lists, shows empty/skipped toasts, and refreshes playlists.
+   * Returns true when at least one track was opened or added. */
+  private async applyOpenOutcome(
+    count: number,
+    skipped: number,
+    stationLists: StationListFile[],
+    emptyToast: string,
+  ): Promise<boolean> {
+    const offeredStations = this.offerStationLists(stationLists);
+    if (count === 0) {
+      if (!offeredStations) {
+        toastStore.show(emptyToast, "error");
+      }
+      return false;
+    }
+    if (skipped > 0) {
+      toastStore.show(i18n.plural("playerBar.tracksSkippedToast", skipped), "error");
+    }
+    await playlistsStore.refreshPlaylists();
+    return true;
+  }
+
   async openAndPlay(paths: string[]) {
     playerStore.completedSession = null;
     const outcome = await invoke<{
@@ -86,20 +109,13 @@ export class OpenerStore {
       skipped: number;
       station_lists: StationListFile[];
     }>("open_and_play", { paths });
-    const offeredStations = this.offerStationLists(outcome.station_lists);
-    if (outcome.played === 0) {
-      if (!offeredStations) {
-        toastStore.show(
-          i18n.t("playerBar.openNothingPlayable", {}, "No supported audio files found to play."),
-          "error",
-        );
-      }
-      return outcome;
-    }
-    if (outcome.skipped > 0) {
-      toastStore.show(i18n.plural("playerBar.tracksSkippedToast", outcome.skipped), "error");
-    }
-    await playlistsStore.refreshPlaylists();
+    const hasPlayed = await this.applyOpenOutcome(
+      outcome.played,
+      outcome.skipped,
+      outcome.station_lists,
+      i18n.t("playerBar.openNothingPlayable", {}, "No supported audio files found to play."),
+    );
+    if (!hasPlayed) return outcome;
     const queuePl = await playlistsStore.requireQueue();
     playerStore.activeContextName = "Queue";
     await playlistsStore.selectPlaylist(queuePl.id);
@@ -116,20 +132,13 @@ export class OpenerStore {
       skipped: number;
       station_lists: StationListFile[];
     }>("add_paths_to_queue", { paths });
-    const offeredStations = this.offerStationLists(outcome.station_lists);
-    if (outcome.added === 0) {
-      if (!offeredStations) {
-        toastStore.show(
-          i18n.t("dragDrop.nothingToAdd", {}, "No supported audio files found to add."),
-          "error",
-        );
-      }
-      return outcome;
-    }
-    if (outcome.skipped > 0) {
-      toastStore.show(i18n.plural("playerBar.tracksSkippedToast", outcome.skipped), "error");
-    }
-    await playlistsStore.refreshPlaylists();
+    const hasAdded = await this.applyOpenOutcome(
+      outcome.added,
+      outcome.skipped,
+      outcome.station_lists,
+      i18n.t("dragDrop.nothingToAdd", {}, "No supported audio files found to add."),
+    );
+    if (!hasAdded) return outcome;
     const qPl = playlistsStore.queuePlaylist;
     if (qPl && playlistsStore.activePlaylistId === qPl.id) {
       await playlistsStore.selectPlaylist(qPl.id);
@@ -137,29 +146,9 @@ export class OpenerStore {
     return outcome;
   }
 
-  async openFileDialog() {
+  private async pickAndOpen(options: Parameters<typeof open>[0], errorContext: string) {
     try {
-      const { audio, playlists } = await this.getSupportedExtensions();
-      const selected = await open({
-        multiple: true,
-        directory: false,
-        title: i18n.t("topNav.openFilesTitle", {}, "Open Audio Files or Playlists"),
-        filters: [
-          {
-            name: i18n.t("topNav.fileFilterSupported"),
-            extensions: [...audio, ...playlists],
-          },
-          {
-            name: i18n.t("topNav.fileFilterAudio"),
-            extensions: [...audio],
-          },
-          {
-            name: i18n.t("topNav.fileFilterPlaylists"),
-            extensions: [...playlists],
-          },
-        ],
-      });
-
+      const selected = await open(options);
       if (selected) {
         const paths = Array.isArray(selected) ? selected : [selected];
         if (paths.length > 0) {
@@ -167,7 +156,37 @@ export class OpenerStore {
         }
       }
     } catch (err) {
-      console.error("Failed to open files/playlists:", err);
+      console.error(`Failed to open ${errorContext}:`, err);
+    }
+  }
+
+  async openFileDialog() {
+    try {
+      const { audio, playlists } = await this.getSupportedExtensions();
+      await this.pickAndOpen(
+        {
+          multiple: true,
+          directory: false,
+          title: i18n.t("topNav.openFilesTitle", {}, "Open Audio Files or Playlists"),
+          filters: [
+            {
+              name: i18n.t("topNav.fileFilterSupported"),
+              extensions: [...audio, ...playlists],
+            },
+            {
+              name: i18n.t("topNav.fileFilterAudio"),
+              extensions: [...audio],
+            },
+            {
+              name: i18n.t("topNav.fileFilterPlaylists"),
+              extensions: [...playlists],
+            },
+          ],
+        },
+        "files/playlists",
+      );
+    } catch (err) {
+      console.error("Failed to load supported extensions:", err);
     }
   }
 
@@ -175,21 +194,14 @@ export class OpenerStore {
    * adding the folder to the watched library — the button counterpart to
    * dropping a folder on the window. */
   async openFolderDialog() {
-    try {
-      const selected = await open({
+    await this.pickAndOpen(
+      {
         multiple: true,
         directory: true,
         title: i18n.t("emptyLibrary.playFolder"),
-      });
-      if (selected) {
-        const paths = Array.isArray(selected) ? selected : [selected];
-        if (paths.length > 0) {
-          await this.openAndPlay(paths);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to open folder:", err);
-    }
+      },
+      "folder",
+    );
   }
 
   private async refreshShiftHeld() {
@@ -205,6 +217,7 @@ export class OpenerStore {
       clearInterval(this.shiftPollInterval);
       this.shiftPollInterval = undefined;
     }
+    this.isShiftHeld = false;
   }
 
   private async handleFilesDropped(paths: string[]) {
@@ -223,10 +236,9 @@ export class OpenerStore {
   }
 
   /**
-   * Attaches the native webview drag-and-drop listener and polls physical Shift
-   * key state while a drag hovers (an OS file drag never gives the target window
-   * keyboard focus, so DOM keydown/keyup listeners cannot fire). Returns a
-   * cleanup function for `onMount`.
+   * Attaches the native webview drag-and-drop listener, keeping `isDragActive`
+   * and `isShiftHeld` updated while mounted. Returns a cleanup function for
+   * `onMount`.
    */
   attachDragDrop(): () => void {
     let disposed = false;
@@ -245,6 +257,9 @@ export class OpenerStore {
           this.isDragActive = false;
           this.stopShiftPolling();
         } else if (!this.isDragActive) {
+          // An OS file drag never gives the target window keyboard focus while
+          // hovering, so DOM keydown/keyup listeners cannot fire; poll physical
+          // Shift state from the OS while the drag is active.
           this.isDragActive = true;
           void this.refreshShiftHeld();
           this.shiftPollInterval = setInterval(() => void this.refreshShiftHeld(), 150);
