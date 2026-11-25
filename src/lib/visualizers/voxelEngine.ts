@@ -71,19 +71,23 @@ export function buildVoxelThemePalette(
   trackAccent?: string | null,
   surface: "bg-main" | "bg-playerbar" = "bg-main",
 ): VoxelThemePalette {
-  const bgMain = colors[surface] || colors["bg-main"] || "#191918";
-  const isLight = isLightColor(bgMain);
+  const surfaceBg = colors[surface] || colors["bg-main"] || "#191918";
+  const isLight = isLightColor(surfaceBg);
 
-  const safeAccentHex = clampForContrast(colors["color-accent"] || "#4f5bd5", bgMain, 3.0);
-  const safeHoverHex = clampForContrast(colors["color-accent-hover"] || safeAccentHex, bgMain, 3.0);
-  const blendedHoverHex = voxelTrackHighlight(safeHoverHex, bgMain, trackAccent, 0.55);
+  const safeAccentHex = clampForContrast(colors["color-accent"] || "#4f5bd5", surfaceBg, 3.0);
+  const safeHoverHex = clampForContrast(
+    colors["color-accent-hover"] || safeAccentHex,
+    surfaceBg,
+    3.0,
+  );
+  const blendedHoverHex = voxelTrackHighlight(safeHoverHex, surfaceBg, trackAccent, 0.55);
   const textPrimaryHex = colors["color-text-primary"] || (isLight ? "#16181d" : "#f1f3f8");
   const borderHex = colors["color-border"] || safeAccentHex;
 
   const accentRgb = hexToRgb(safeAccentHex);
   const hoverRgb = hexToRgb(blendedHoverHex);
   const textPrimaryRgb = hexToRgb(textPrimaryHex);
-  const bgRgb = hexToRgb(bgMain);
+  const bgRgb = hexToRgb(surfaceBg);
   const borderRgb = hexToRgb(borderHex);
 
   // Base rows start slightly deeper toward the canvas polarity so the vertical
@@ -110,7 +114,7 @@ export function buildVoxelThemePalette(
   const rawCapRgb = mixRgb(textPrimaryRgb, hoverRgb, 0.28);
   const peakCapColor = clampForContrast(
     rgbToHex(rawCapRgb.r, rawCapRgb.g, rawCapRgb.b),
-    bgMain,
+    surfaceBg,
     4.5,
   );
 
@@ -576,41 +580,31 @@ export function renderCompactVoxelGrid(
       : Math.min(rows, Math.max(1, Math.round(level * rows)));
     const x = c * (cellWidth + colGap);
 
+    let bodyRows = activeCells;
+    let capRow = 0;
     if (detachedAlternatingCaps) {
       const peakCell = Math.min(rows, activeCells + (c % 2 === 0 ? 1 : 0));
-      for (let r = 0; r < activeCells; r++) {
-        const paletteIdx = Math.min(
-          palette.rowColors.length - 1,
-          Math.floor((r / Math.max(1, rows - 1)) * (palette.rowColors.length - 1)),
-        );
-        const y = height - (r + 1) * cellHeight - r * rowGap;
-        ctx.fillStyle = palette.rowColors[paletteIdx];
-        ctx.fillRect(x, y, cellWidth, cellHeight);
-      }
-      if (peakCell > activeCells) {
-        const r = peakCell - 1;
-        const y = height - peakCell * cellHeight - r * rowGap;
-        ctx.fillStyle = palette.peakCapColor;
-        ctx.fillRect(x, y, cellWidth, cellHeight);
-      }
-    } else {
-      const hasCap = activeCells >= 2;
-      const bodyRows = hasCap ? activeCells - 1 : activeCells;
-      for (let r = 0; r < bodyRows; r++) {
-        const paletteIdx = Math.min(
-          palette.rowColors.length - 1,
-          Math.floor((r / Math.max(1, rows - 1)) * (palette.rowColors.length - 1)),
-        );
-        const y = height - (r + 1) * cellHeight - r * rowGap;
-        ctx.fillStyle = palette.rowColors[paletteIdx];
-        ctx.fillRect(x, y, cellWidth, cellHeight);
-      }
-      if (hasCap) {
-        const r = activeCells - 1;
-        const y = height - activeCells * cellHeight - r * rowGap;
-        ctx.fillStyle = palette.peakCapColor;
-        ctx.fillRect(x, y, cellWidth, cellHeight);
-      }
+      if (peakCell > activeCells) capRow = peakCell;
+    } else if (activeCells >= 2) {
+      bodyRows = activeCells - 1;
+      capRow = activeCells;
+    }
+
+    for (let r = 0; r < bodyRows; r++) {
+      const paletteIdx = Math.min(
+        palette.rowColors.length - 1,
+        Math.floor((r / Math.max(1, rows - 1)) * (palette.rowColors.length - 1)),
+      );
+      const y = height - (r + 1) * cellHeight - r * rowGap;
+      ctx.fillStyle = palette.rowColors[paletteIdx];
+      ctx.fillRect(x, y, cellWidth, cellHeight);
+    }
+
+    if (capRow > 0) {
+      const r = capRow - 1;
+      const y = height - capRow * cellHeight - r * rowGap;
+      ctx.fillStyle = palette.peakCapColor;
+      ctx.fillRect(x, y, cellWidth, cellHeight);
     }
   }
 }

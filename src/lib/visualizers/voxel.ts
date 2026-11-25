@@ -143,12 +143,8 @@ class VoxelMiniInstance implements VisualizerInstance {
     height: number,
     options: VisualizerRenderOptions,
   ): void {
-    if (width <= 0 || height <= 0) return;
-    if (options.preview) {
-      renderStaticVoxelPreview(ctx, width, height, this.palette);
-      return;
-    }
-    renderCompactVoxelGrid(ctx, width, height, this.palette, this.levels);
+    if (options.preview) renderStaticVoxelPreview(ctx, width, height, this.palette);
+    else renderCompactVoxelGrid(ctx, width, height, this.palette, this.levels);
   }
 }
 
