@@ -340,9 +340,8 @@ impl PlayOrder {
         self.target_at_virtual_index(candidate)
     }
 
-    /// Determines what plays on a manual "Next" skip without mutating state.
-    /// Drains any unplayable play-next queue entries logically via peek; `commit`
-    /// pops them when the track actually starts.
+    /// Determines what plays on a manual "Next" skip without mutating state,
+    /// preferring playable play-next queue entries over the playlist advance.
     pub(crate) fn next_manual(&self) -> Option<OrderTarget> {
         if let Some(queued) = self.peek_queue_front() {
             return Some(queued);
@@ -492,8 +491,8 @@ impl PlayOrder {
         }
     }
 
-    /// Reorders a single item from `from` to `to`, keeping `current_index`,
-    /// `shuffle_order`, and `played_indices` aligned.
+    /// Reorders a single item from `from` to `to`, keeping the current track
+    /// and play history aligned.
     pub(crate) fn reorder(&mut self, from: usize, to: usize, current_uuid: Option<&str>) {
         if from >= self.items.len() || to >= self.items.len() || from == to {
             return;
@@ -502,11 +501,9 @@ impl PlayOrder {
         let moved_item = self.items.remove(from);
         self.items.insert(to, moved_item);
 
-        let new_real_idx = current_uuid.and_then(|u| self.items.iter().position(|i| i.uuid == u));
-
         // Where the item previously at real index `i` ends up (`remap` in
         // verification/lean/Luminous/Move.lean).
-        let moved = |i: usize| {
+        self.remap_indices(current_uuid, |i| {
             if i == from {
                 to
             } else if from < to && i > from && i <= to {
@@ -516,21 +513,7 @@ impl PlayOrder {
             } else {
                 i
             }
-        };
-
-        if self.shuffle_mode == ShuffleMode::Off {
-            self.current_index = new_real_idx;
-            self.shuffle_order = (0..self.items.len()).collect();
-            for idx in &mut self.played_indices {
-                *idx = moved(*idx);
-            }
-        } else {
-            for idx in &mut self.shuffle_order {
-                *idx = moved(*idx);
-            }
-            self.current_index = new_real_idx
-                .and_then(|real_idx| self.shuffle_order.iter().position(|&i| i == real_idx));
-        }
+        });
     }
 
     /// Rearranges the loaded items into `order` (item UUIDs), preserving the
@@ -564,20 +547,24 @@ impl PlayOrder {
             .filter_map(|&old| items[old].take())
             .collect();
 
+        self.remap_indices(current_uuid, |old| {
+            new_index_of.get(old).copied().unwrap_or(old)
+        });
+    }
+
+    /// Re-indexes `current_index`, `shuffle_order`, and `played_indices` after
+    /// `self.items` has been permuted via `remap(old_real_index) -> new_real_index`.
+    fn remap_indices(&mut self, current_uuid: Option<&str>, remap: impl Fn(usize) -> usize) {
         let new_real_idx = current_uuid.and_then(|u| self.items.iter().position(|i| i.uuid == u));
         if self.shuffle_mode == ShuffleMode::Off {
             self.current_index = new_real_idx;
             self.shuffle_order = (0..self.items.len()).collect();
             for idx in &mut self.played_indices {
-                if let Some(&new) = new_index_of.get(*idx) {
-                    *idx = new;
-                }
+                *idx = remap(*idx);
             }
         } else {
             for idx in &mut self.shuffle_order {
-                if let Some(&new) = new_index_of.get(*idx) {
-                    *idx = new;
-                }
+                *idx = remap(*idx);
             }
             self.current_index = new_real_idx
                 .and_then(|real_idx| self.shuffle_order.iter().position(|&i| i == real_idx));

@@ -1325,27 +1325,19 @@ impl Player {
             return self.stop().await;
         }
 
-        match self.order.peek_next_natural(false) {
-            Some(target) => {
-                let (song, uuid, kind) = self.resolve_order_target(target)?;
-                if song.id == started_song_id {
-                    self.start_track(song, uuid, kind, false).await
-                } else {
-                    log::warn!(
-                        "Gapless transition to song {started_song_id} no longer matches playback context; correcting"
-                    );
-                    self.on_track_finished().await
-                }
-            }
-            None => {
-                // The preloaded track no longer matches what should play —
-                // correct by running the normal advance (issues a real Play).
-                log::warn!(
-                    "Gapless transition to song {started_song_id} no longer matches playback context; correcting"
-                );
-                self.on_track_finished().await
+        if let Some(target) = self.order.peek_next_natural(false) {
+            let (song, uuid, kind) = self.resolve_order_target(target)?;
+            if song.id == started_song_id {
+                return self.start_track(song, uuid, kind, false).await;
             }
         }
+
+        // The preloaded track no longer matches what should play —
+        // correct by running the normal advance (issues a real Play).
+        log::warn!(
+            "Gapless transition to song {started_song_id} no longer matches playback context; correcting"
+        );
+        self.on_track_finished().await
     }
 
     /// Called when the audio engine reports a track has finished. Commits
