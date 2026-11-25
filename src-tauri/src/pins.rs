@@ -165,13 +165,6 @@ pub fn find_artist<'a>(artists: &'a [ArtistItem], ref_key: &str) -> Option<&'a A
     })
 }
 
-/// Fetches every current album summary — a thin pass-through kept here so
-/// `commands::pins::get_pinned_items` doesn't need to import
-/// `CollectionScanner` directly.
-pub fn all_albums(scanner: &CollectionScanner) -> Result<Vec<AlbumItem>> {
-    scanner.get_albums()
-}
-
 /// Splits an auto-playlist ref_key into its kind and (for genre/decade/bpm/
 /// artist_tag) selector — e.g. `"genre:Rock"` -> `("genre", Some("Rock"))`,
 /// `"favourites"` -> `("favourites", None)`. Split on the *first* colon only,
@@ -303,10 +296,6 @@ pub fn resolve_auto_playlist(
         _ => None,
     };
     Ok(item)
-}
-
-pub fn all_artists(scanner: &CollectionScanner) -> Result<Vec<ArtistItem>> {
-    scanner.get_artists()
 }
 
 #[cfg(test)]

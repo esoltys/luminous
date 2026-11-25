@@ -8,7 +8,7 @@
 //! is left in place and self-heals if the item reappears. The DB/query logic
 //! itself lives in `crate::pins`; this file is just the Tauri wiring.
 
-use crate::{models::PinnedItem, pins, AppState};
+use crate::{collection::CollectionScanner, models::PinnedItem, pins, AppState};
 use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
@@ -96,7 +96,7 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                     None => {
                         let a = crate::collection::with_collection_scanner(
                             state.db.clone(),
-                            pins::all_albums,
+                            CollectionScanner::get_albums,
                         )
                         .await
                         .map_err(|e| e.to_string())?;
@@ -116,7 +116,7 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                     None => {
                         let a = crate::collection::with_collection_scanner(
                             state.db.clone(),
-                            pins::all_artists,
+                            CollectionScanner::get_artists,
                         )
                         .await
                         .map_err(|e| e.to_string())?;
