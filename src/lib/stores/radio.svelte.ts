@@ -579,7 +579,7 @@ class RadioStore {
     this.recentStations = this.recentStations.map((s) =>
       s.stationuuid === station.stationuuid ? station : s,
     );
-    if (playerStore.currentSong?.path === `radio://${station.stationuuid}`) {
+    if (stationUuidFromPath(playerStore.currentSong?.path) === station.stationuuid) {
       const genre = station.tags
         ? station.tags
             .split(/[,;]/)
@@ -588,7 +588,7 @@ class RadioStore {
             .join("; ")
         : undefined;
       playerStore.currentSong = {
-        ...playerStore.currentSong,
+        ...playerStore.currentSong!,
         title: station.name,
         stream_url: station.urlResolved,
         genre: genre || undefined,
@@ -598,16 +598,22 @@ class RadioStore {
     return station;
   }
 
+  /** Opens the global radio station modal in `+layout.svelte` for `station`. */
   openStationEditor(station: RadioDirectoryStation, onSaved?: () => void): void {
     this.editingStation = station;
     this.editingStationOnSaved = onSaved;
   }
 
+  /** Closes the global radio station modal and clears any pending save callback. */
   closeStationEditor(): void {
     this.editingStation = null;
     this.editingStationOnSaved = undefined;
   }
 
+  /**
+   * Resolves a station by UUID from in-memory lists or the backend store and opens
+   * the global station modal, showing an error toast if the station no longer exists.
+   */
   async openStationEditorByUuid(stationuuid: string, onSaved?: () => void): Promise<void> {
     const existing =
       this.savedStations.find((s) => s.stationuuid === stationuuid) ??
@@ -632,6 +638,7 @@ class RadioStore {
     }
   }
 
+  /** Probes a station stream or playlist URL without buffering the audio stream. */
   async testStationUrl(url: string): Promise<RadioConnectionTestResult> {
     return await invoke<RadioConnectionTestResult>("test_radio_station_url", { url });
   }

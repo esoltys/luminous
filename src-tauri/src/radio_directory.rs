@@ -1970,6 +1970,20 @@ pub struct RadioConnectionTestResult {
     pub error: Option<String>,
 }
 
+impl RadioConnectionTestResult {
+    fn failure(resolved_url: String, station_name: Option<String>, error: String) -> Self {
+        Self {
+            ok: false,
+            status: None,
+            resolved_url,
+            content_type: None,
+            bitrate: None,
+            station_name,
+            error: Some(error),
+        }
+    }
+}
+
 /// Resolves a station URL (including `.pls`/`.m3u`/`.m3u8` playlists) and probes
 /// the resulting stream with a short-timeout `GET`, reading only status and
 /// headers without buffering the audio stream (#2393).
@@ -1981,15 +1995,11 @@ pub async fn test_station_url(raw_url: &str) -> RadioConnectionTestResult {
     {
         Ok(c) => c,
         Err(e) => {
-            return RadioConnectionTestResult {
-                ok: false,
-                status: None,
-                resolved_url: raw_url.trim().to_string(),
-                content_type: None,
-                bitrate: None,
-                station_name: None,
-                error: Some(e.to_string()),
-            };
+            return RadioConnectionTestResult::failure(
+                raw_url.trim().to_string(),
+                None,
+                e.to_string(),
+            );
         }
     };
     test_station_url_with_client(&client, raw_url).await
@@ -2004,15 +2014,7 @@ pub async fn test_station_url_with_client(
     let resolved = match resolve_station_url_with_client(client, &trimmed).await {
         Ok(r) => r,
         Err(e) => {
-            return RadioConnectionTestResult {
-                ok: false,
-                status: None,
-                resolved_url: trimmed,
-                content_type: None,
-                bitrate: None,
-                station_name: None,
-                error: Some(e.to_string()),
-            };
+            return RadioConnectionTestResult::failure(trimmed, None, e.to_string());
         }
     };
 
@@ -2024,15 +2026,11 @@ pub async fn test_station_url_with_client(
     {
         Ok(r) => r,
         Err(e) => {
-            return RadioConnectionTestResult {
-                ok: false,
-                status: None,
-                resolved_url: resolved.stream_url,
-                content_type: None,
-                bitrate: None,
-                station_name: resolved.title,
-                error: Some(e.to_string()),
-            };
+            return RadioConnectionTestResult::failure(
+                resolved.stream_url,
+                resolved.title,
+                e.to_string(),
+            );
         }
     };
 

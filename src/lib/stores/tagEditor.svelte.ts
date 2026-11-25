@@ -42,6 +42,7 @@ class TagEditorStore {
     if (typeof target === "object" && "id" in target) {
       const stationUuid = stationUuidFromPath(target.path);
       if (stationUuid) {
+        this.close();
         void radioStore.openStationEditorByUuid(stationUuid, options?.onSaved);
         return;
       }
