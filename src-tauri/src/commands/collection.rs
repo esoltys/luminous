@@ -1370,9 +1370,17 @@ pub struct AlbumDetailsRetrievalResult {
 /// AllMusic, Wikidata, lyrics, other databases) into the album's curated
 /// link list — the same `album_profiles.links` the manual editor and the
 /// derived ListenBrainz link already render (#950).
+fn resolve_album_lookup_key(album: &str, album_key: Option<String>) -> String {
+    album_key
+        .map(|k| k.trim().to_string())
+        .filter(|k| !k.is_empty())
+        .unwrap_or_else(|| album.to_string())
+}
+
 #[tauri::command]
 pub async fn retrieve_album_details(
     album: String,
+    album_key: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<AlbumDetailsRetrievalResult, String> {
     // See `set_artist_profile`'s matching guard — same reasoning, for the
@@ -1387,14 +1395,15 @@ pub async fn retrieve_album_details(
         return Err("Online context enrichment is disabled".to_string());
     }
 
-    let album_for_lookup = album.clone();
+    let lookup_key = resolve_album_lookup_key(&album, album_key);
+    let key_for_lookup = lookup_key.clone();
     let db = state.db.clone();
     let (release_group_id, current_profile) =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
             let release_group_id =
-                scanner.get_representative_release_group_id_for_album(&album_for_lookup)?;
+                scanner.get_representative_release_group_id_for_album(&key_for_lookup)?;
             let conn = db.pool.get()?;
-            let profile = crate::profiles::get_album_profile(&conn, &album_for_lookup)?;
+            let profile = crate::profiles::get_album_profile(&conn, &key_for_lookup)?;
             Ok((release_group_id, profile))
         })
         .await
@@ -1424,7 +1433,7 @@ pub async fn retrieve_album_details(
         .collect();
 
     let mut updated_profile = current_profile;
-    updated_profile.album_key = album.clone();
+    updated_profile.album_key = lookup_key.clone();
     updated_profile.details_fetched = true;
     let existing_links =
         dedupe_links_by_platform_and_url(std::mem::take(&mut updated_profile.links), |l| {
@@ -1452,12 +1461,12 @@ pub async fn retrieve_album_details(
     // bonus of the album lookup, not the reason it was run, so a failure
     // here doesn't fail the command.
     let artist_credit_id = relations.artist_credit_ids.into_iter().next();
-    let album_for_artist_lookup = album.clone();
+    let key_for_artist_lookup = lookup_key;
     let db = state.db.clone();
     let artist_profile =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
             let Some(artist_key) =
-                scanner.get_representative_artist_for_album(&album_for_artist_lookup)?
+                scanner.get_representative_artist_for_album(&key_for_artist_lookup)?
             else {
                 return Ok(None);
             };
@@ -2165,6 +2174,7 @@ pub struct AlbumArtRetrievalResult {
 #[tauri::command]
 pub async fn retrieve_album_art(
     album: String,
+    album_key: Option<String>,
     only_missing: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<AlbumArtRetrievalResult, String> {
@@ -2181,15 +2191,16 @@ pub async fn retrieve_album_art(
         return Err("Online context enrichment is disabled".to_string());
     }
 
-    let album_for_lookup = album.clone();
+    let lookup_key = resolve_album_lookup_key(&album, album_key);
+    let key_for_lookup = lookup_key.clone();
     let db = state.db.clone();
     let (release_group_id, album_artist, current_profile) =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
             let conn = db.pool.get()?;
             Ok((
-                scanner.get_representative_release_group_id_for_album(&album_for_lookup)?,
-                scanner.get_representative_artist_for_album(&album_for_lookup)?,
-                crate::profiles::get_album_profile(&conn, &album_for_lookup)?,
+                scanner.get_representative_release_group_id_for_album(&key_for_lookup)?,
+                scanner.get_representative_artist_for_album(&key_for_lookup)?,
+                crate::profiles::get_album_profile(&conn, &key_for_lookup)?,
             ))
         })
         .await
@@ -2223,7 +2234,7 @@ pub async fn retrieve_album_art(
     let mut result = AlbumArtRetrievalResult::default();
     let mut download_error = None;
     let mut profile = current_profile;
-    profile.album_key = album;
+    profile.album_key = lookup_key;
 
     if want_cover {
         match fanart.cover {

@@ -48,7 +48,7 @@ import { toastStore } from "./toast.svelte";
 import { tasksStore } from "./tasks.svelte";
 import { prefs } from "./prefs.svelte";
 import { MAX_RECENT_SEARCHES, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY } from "../constants";
-import { albumKey, sameAlbum } from "$lib/utils/albumKey";
+import { ALBUM_KEY_SEPARATOR, albumKey, sameAlbum } from "$lib/utils/albumKey";
 import { matchWebDavPath } from "../webdavDisplay";
 
 export interface VisibleColumns {
@@ -1203,9 +1203,27 @@ class CollectionStore {
     }
   }
 
-  getAlbumProfile(albumName: string | null | undefined): AlbumProfile | undefined {
+  getAlbumProfile(
+    albumName: string | null | undefined,
+    albumKeyParam?: string | null,
+  ): AlbumProfile | undefined {
+    const foldedParam = albumKeyParam ? albumKey(albumKeyParam) : "";
+    if (foldedParam) {
+      const exact = this.albumProfiles[foldedParam];
+      if (exact) return exact;
+    }
     if (!albumName) return undefined;
-    return this.albumProfiles[albumKey(albumName)];
+    const folded = albumKey(albumName);
+    const direct = this.albumProfiles[folded];
+    if (direct) return direct;
+    // When the caller gave an explicit composite key for a specific artist+album,
+    // don't fall back to a different artist's composite entry with the same title.
+    if (foldedParam.includes(ALBUM_KEY_SEPARATOR) || folded.includes(ALBUM_KEY_SEPARATOR)) {
+      return undefined;
+    }
+    const suffix = `${ALBUM_KEY_SEPARATOR}${folded}`;
+    const matchedKey = Object.keys(this.albumProfiles).find((k) => k.endsWith(suffix));
+    return matchedKey ? this.albumProfiles[matchedKey] : undefined;
   }
 
   async saveAlbumProfile(profile: AlbumProfile): Promise<AlbumProfile> {
@@ -1222,9 +1240,13 @@ class CollectionStore {
   /** Album detail overflow menu's "Retrieve Album Details": fetches
    * MusicBrainz release-group relations (Discogs, AllMusic, Wikidata, lyrics,
    * other databases) and merges them into the album's curated link list. */
-  async retrieveAlbumDetails(albumName: string): Promise<AlbumDetailsRetrievalResult> {
+  async retrieveAlbumDetails(
+    albumName: string,
+    albumKeyParam?: string | null,
+  ): Promise<AlbumDetailsRetrievalResult> {
     const result = await invoke<AlbumDetailsRetrievalResult>("retrieve_album_details", {
       album: albumName,
+      ...(albumKeyParam ? { albumKey: albumKeyParam } : {}),
     });
     if (result?.profile?.album_key) {
       this.albumProfiles = {
@@ -1254,10 +1276,11 @@ class CollectionStore {
    * cache so cover stacks re-scan and count it. */
   async retrieveAlbumArt(
     albumName: string,
-    options: { onlyMissing?: boolean } = {},
+    options: { onlyMissing?: boolean; albumKey?: string | null } = {},
   ): Promise<AlbumArtRetrievalResult> {
     const result = await invoke<AlbumArtRetrievalResult>("retrieve_album_art", {
       album: albumName,
+      ...(options.albumKey ? { albumKey: options.albumKey } : {}),
       onlyMissing: options.onlyMissing ?? false,
     });
     if (result?.profile?.album_key) {

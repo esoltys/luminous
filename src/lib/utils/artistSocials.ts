@@ -448,6 +448,12 @@ export function deriveMusicbrainzArtistUrl(mbid: string | null | undefined): str
   return mbid ? `https://musicbrainz.org/artist/${mbid}` : null;
 }
 
+/** Derives a MusicBrainz release-group page URL from a release-group MBID. */
+export function deriveMusicbrainzReleaseGroupUrl(mbid: string | null | undefined): string | null {
+  const match = mbid?.trim().match(MBID_PATTERN);
+  return match ? `https://musicbrainz.org/release-group/${match[1].toLowerCase()}` : null;
+}
+
 /** Derives a MusicBrainz artist events page URL from a resolved MBID (#1431). */
 export function deriveMusicbrainzEventsUrl(mbid: string | null | undefined): string | null {
   return mbid ? `https://musicbrainz.org/artist/${mbid}/events` : null;

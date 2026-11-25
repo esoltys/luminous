@@ -152,7 +152,7 @@
   async function retrieveAlbumArt(onlyMissing: boolean) {
     if (!prefs.onlineEnabled) return;
     try {
-      const result = await collectionStore.retrieveAlbumArt(albumName, { onlyMissing });
+      const result = await collectionStore.retrieveAlbumArt(albumName, { onlyMissing, albumKey });
       if (result.disc_uri) artworkRefreshToken++;
     } catch (e) {
       console.warn("Failed to retrieve album art:", e);
@@ -174,7 +174,7 @@
       total: 1,
     });
     try {
-      const result = await collectionStore.retrieveAlbumDetails(albumName);
+      const result = await collectionStore.retrieveAlbumDetails(albumName, albumKey);
       const label =
         result.added_count > 1
           ? i18n.plural("albumDetail.retrieveDetailsSuccess", result.added_count)
@@ -318,7 +318,7 @@
       }),
     ]);
   });
-  let albumProfile = $derived(collectionStore.getAlbumProfile(albumName));
+  let albumProfile = $derived(collectionStore.getAlbumProfile(albumName, albumKey));
   let hasChips = $derived(Boolean(rawGenre?.trim()));
 
   let lastAutoFetchedAlbum = $state<string | null>(null);
