@@ -22,6 +22,7 @@
   import {
     formatPlaylistItemCount,
     getPlaylistAutoKindAndSubtitle,
+    getPlaylistCapabilities,
     getPlaylistDisplayName,
   } from "../utils/playlist";
 
@@ -116,7 +117,7 @@
 {/snippet}
 
 {#snippet footer()}
-  {#if !playlist.dynamic_enabled}
+  {#if getPlaylistCapabilities(playlist.kind).canMakeActive}
     {#if !isActive}
       <button
         onclick={(e) => {

@@ -415,6 +415,7 @@ describe("RadioView", () => {
       dynamic_spec: null,
       is_system: false,
       is_queue: false,
+      kind: "station_list",
       created: 1000,
       updated: 1000,
     };

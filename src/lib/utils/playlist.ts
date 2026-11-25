@@ -518,7 +518,8 @@ export function getPlaylistCapabilities(kind: PlaylistKind | undefined): Playlis
 }
 
 /**
- * True if a playlist is a user-authored dynamic radio station list (`radio:...` spec).
+ * True if a playlist is a radio station list (either a dynamic `radio:...`
+ * list or a static/file-backed playlist containing live radio stations).
  */
 export function isStationList(playlist: Pick<Playlist, "kind">): boolean {
   return playlist.kind === "station_list";

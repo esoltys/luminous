@@ -277,7 +277,7 @@
 
   let showStationListEditModal = $state(false);
   let stationListUpdatedLabel = $derived(
-    capabilities.showsStationUpdated
+    capabilities.showsStationUpdated && activePlaylist?.dynamic_enabled
       ? formatUpdatedAgo(radioStore.status?.lastSyncedAt ?? null)
       : "",
   );
@@ -1210,7 +1210,7 @@
         showOverflowMenu = false;
       }}
     />
-    {#if capabilities.refreshable}
+    {#if capabilities.refreshable && activePlaylist.dynamic_enabled}
       <ContextMenuDivider />
       <ContextMenuItem
         icon={RefreshCw}
@@ -1242,7 +1242,7 @@
       {/if}
     {/if}
     {#if capabilities.hasSizeLimit}
-      {#if !capabilities.refreshable}<ContextMenuDivider />{/if}
+      {#if !(capabilities.refreshable && activePlaylist.dynamic_enabled)}<ContextMenuDivider />{/if}
       <ContextMenuItem
         icon={Usb}
         label={i18n.t("playlists.sizeLimitMenuItem", {
