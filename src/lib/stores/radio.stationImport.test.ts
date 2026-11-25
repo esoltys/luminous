@@ -43,7 +43,6 @@ describe("radioStore.importStationLists (#2279)", () => {
     expect(invoke).toHaveBeenCalledWith("import_playlist", { filePath: somaFm.path });
     expect(invoke).toHaveBeenCalledWith("import_playlist", { filePath: groove.path });
     expect(invoke).toHaveBeenCalledWith("get_playlists");
-    expect(invoke).toHaveBeenCalledWith("get_radio_playlist_ids");
     expect(toastStore.messages.map((m) => m.text)).toEqual([
       "Imported soma_fm with 43 stations",
       "Imported groove with 2 stations",

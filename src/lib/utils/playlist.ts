@@ -513,8 +513,25 @@ const EMPTY_CAPABILITIES: PlaylistCapabilities = {
   editableDefinition: null,
 };
 
-export function getPlaylistCapabilities(kind: PlaylistKind | undefined): PlaylistCapabilities {
-  return kind ? PLAYLIST_CAPABILITIES[kind] : EMPTY_CAPABILITIES;
+export function getPlaylistCapabilities(
+  playlistOrKind: PlaylistKind | Pick<Playlist, "kind" | "dynamic_enabled"> | undefined,
+): PlaylistCapabilities {
+  if (!playlistOrKind) return EMPTY_CAPABILITIES;
+  const kind = typeof playlistOrKind === "string" ? playlistOrKind : playlistOrKind.kind;
+  const base = PLAYLIST_CAPABILITIES[kind];
+  if (
+    typeof playlistOrKind !== "string" &&
+    kind === "station_list" &&
+    !playlistOrKind.dynamic_enabled
+  ) {
+    return {
+      ...base,
+      showsStationUpdated: false,
+      refreshable: false,
+      editableDefinition: null,
+    };
+  }
+  return base;
 }
 
 /**

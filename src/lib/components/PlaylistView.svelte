@@ -268,7 +268,7 @@
     activePlaylist !== undefined && playlistsStore.effectivePinnedPlaylistId === activePlaylist.id,
   );
 
-  let capabilities = $derived(getPlaylistCapabilities(activePlaylist?.kind));
+  let capabilities = $derived(getPlaylistCapabilities(activePlaylist));
 
   let showShareModal = $state(false);
   let shareSongs = $derived(
@@ -277,7 +277,7 @@
 
   let showStationListEditModal = $state(false);
   let stationListUpdatedLabel = $derived(
-    capabilities.showsStationUpdated && activePlaylist?.dynamic_enabled
+    capabilities.showsStationUpdated
       ? formatUpdatedAgo(radioStore.status?.lastSyncedAt ?? null)
       : "",
   );
@@ -1210,7 +1210,7 @@
         showOverflowMenu = false;
       }}
     />
-    {#if capabilities.refreshable && activePlaylist.dynamic_enabled}
+    {#if capabilities.refreshable}
       <ContextMenuDivider />
       <ContextMenuItem
         icon={RefreshCw}
@@ -1242,7 +1242,7 @@
       {/if}
     {/if}
     {#if capabilities.hasSizeLimit}
-      {#if !(capabilities.refreshable && activePlaylist.dynamic_enabled)}<ContextMenuDivider />{/if}
+      {#if !capabilities.refreshable}<ContextMenuDivider />{/if}
       <ContextMenuItem
         icon={Usb}
         label={i18n.t("playlists.sizeLimitMenuItem", {

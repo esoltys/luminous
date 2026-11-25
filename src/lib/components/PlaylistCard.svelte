@@ -117,7 +117,7 @@
 {/snippet}
 
 {#snippet footer()}
-  {#if getPlaylistCapabilities(playlist.kind).canMakeActive}
+  {#if getPlaylistCapabilities(playlist).canMakeActive}
     {#if !isActive}
       <button
         onclick={(e) => {
