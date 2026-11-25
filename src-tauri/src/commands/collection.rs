@@ -3,8 +3,8 @@ use crate::{
     collection::{CollectionScanner, WatcherPauseGuard},
     context::ContextManager,
     models::{
-        AlbumLink, AlbumProfile, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats,
-        MusicDirectory, PruneResult, Song, Tag, TopAlbumItem,
+        AlbumItem, AlbumLink, AlbumProfile, ArtistItem, ArtistProfile, ArtistSocialLink, HomeItem,
+        LibraryStats, MusicDirectory, PruneResult, Song, Tag, TopAlbumItem,
     },
     AppState,
 };
@@ -388,8 +388,8 @@ pub async fn search_songs(
 #[derive(serde::Serialize)]
 pub struct LibrarySnapshot {
     pub songs: Vec<Song>,
-    pub albums: Vec<serde_json::Value>,
-    pub artists: Vec<serde_json::Value>,
+    pub albums: Vec<AlbumItem>,
+    pub artists: Vec<ArtistItem>,
     pub total_songs: i64,
 }
 
@@ -482,7 +482,7 @@ pub async fn get_songs_by_artist(
 pub async fn get_compilations_by_artist(
     artist: String,
     state: State<'_, AppState>,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> Result<Vec<AlbumItem>, String> {
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
         scanner.get_compilations_by_artist(&artist)
     })
@@ -529,7 +529,7 @@ pub async fn get_most_played_songs(
 pub async fn get_top_artists(
     limit: Option<i64>,
     state: State<'_, AppState>,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> Result<Vec<ArtistItem>, String> {
     let limit = limit.unwrap_or(10);
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
         scanner.get_top_artists(limit)

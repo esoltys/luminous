@@ -142,70 +142,13 @@ pub fn resolve_song(conn: &Connection, ref_key: &str) -> Result<Option<Song>> {
     Ok(conn.query_row(&sql, params![song_id], row_to_song).ok())
 }
 
-/// Builds an `AlbumItem` from one entry of `CollectionScanner::get_albums()`'s
-/// JSON output. Built field-by-field rather than via `serde_json::from_value`:
-/// that JSON shape carries extra fields (added, artist_sort, albumsort) and
-/// omits `sample_song_id` (which `AlbumItem` declares as a plain,
-/// non-defaulted `Option`), so a blanket deserialize would fail on the
-/// missing key.
-pub fn album_item_from_json(value: &serde_json::Value) -> AlbumItem {
-    AlbumItem {
-        artist: value
-            .get("artist")
-            .and_then(|v| v.as_str())
-            .map(String::from),
-        album: value
-            .get("album")
-            .and_then(|v| v.as_str())
-            .map(String::from),
-        album_key: value
-            .get("album_key")
-            .and_then(|v| v.as_str())
-            .map(String::from),
-        year: value.get("year").and_then(|v| v.as_i64()).map(|n| n as i32),
-        track_count: value
-            .get("track_count")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(0) as i32,
-        disc_count: value
-            .get("disc_count")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(1) as i32,
-        art_embedded: value
-            .get("art_embedded")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false),
-        art_automatic: value
-            .get("art_automatic")
-            .and_then(|v| v.as_str())
-            .map(String::from),
-        art_manual: value
-            .get("art_manual")
-            .and_then(|v| v.as_str())
-            .map(String::from),
-        genre: value
-            .get("genre")
-            .and_then(|v| v.as_str())
-            .map(String::from),
-        sample_song_id: value.get("sample_song_id").and_then(|v| v.as_i64()),
-        rating: value.get("rating").and_then(|v| v.as_f64()).unwrap_or(-1.0) as f32,
-        total_duration_nanosec: value
-            .get("total_duration_nanosec")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(0),
-    }
-}
-
 /// Finds the album entry (from `get_albums()`'s output) matching `ref_key`
 /// (an album title, matched by `album_key` like `album_ratings`).
-pub fn find_album<'a>(
-    albums: &'a [serde_json::Value],
-    ref_key: &str,
-) -> Option<&'a serde_json::Value> {
+pub fn find_album<'a>(albums: &'a [AlbumItem], ref_key: &str) -> Option<&'a AlbumItem> {
     let key = crate::album_key::album_key(ref_key);
     albums.iter().find(|a| {
-        a.get("album")
-            .and_then(|v| v.as_str())
+        a.album
+            .as_deref()
             .is_some_and(|name| crate::album_key::album_key(name) == key)
     })
 }
@@ -214,26 +157,12 @@ pub fn find_album<'a>(
 /// case-insensitively — `get_artists` groups artists `COLLATE NOCASE` (#295),
 /// so an exact-case match could miss a pin whose stored casing drifted from
 /// the group's chosen display casing.
-pub fn find_artist<'a>(
-    artists: &'a [serde_json::Value],
-    ref_key: &str,
-) -> Option<&'a serde_json::Value> {
+pub fn find_artist<'a>(artists: &'a [ArtistItem], ref_key: &str) -> Option<&'a ArtistItem> {
     artists.iter().find(|a| {
-        a.get("name")
-            .and_then(|v| v.as_str())
+        a.name
+            .as_deref()
             .is_some_and(|name| name.eq_ignore_ascii_case(ref_key))
     })
-}
-
-pub fn artist_item_from_json(value: &serde_json::Value) -> Result<ArtistItem> {
-    Ok(serde_json::from_value(value.clone())?)
-}
-
-/// Fetches every current album summary — a thin pass-through kept here so
-/// `commands::pins::get_pinned_items` doesn't need to import
-/// `CollectionScanner` directly.
-pub fn all_albums(scanner: &CollectionScanner) -> Result<Vec<serde_json::Value>> {
-    scanner.get_albums()
 }
 
 /// Splits an auto-playlist ref_key into its kind and (for genre/decade/bpm/
@@ -367,10 +296,6 @@ pub fn resolve_auto_playlist(
         _ => None,
     };
     Ok(item)
-}
-
-pub fn all_artists(scanner: &CollectionScanner) -> Result<Vec<serde_json::Value>> {
-    scanner.get_artists()
 }
 
 #[cfg(test)]
@@ -536,48 +461,15 @@ mod tests {
     }
 
     #[test]
-    fn album_item_from_json_maps_fields_and_defaults_missing_sample_song_id() {
-        let value = serde_json::json!({
-            "artist": "Test Artist",
-            "album": "Test Album",
-            "year": 2020,
-            "track_count": 10,
-            "disc_count": 1,
-            "art_embedded": true,
-            "art_automatic": null,
-            "art_manual": null,
-            "genre": "Rock",
-            "rating": 4.5,
-            "added": 1234,
-            "total_duration_nanosec": 999,
-            "artist_sort": "Artist, Test",
-            "albumsort": null,
-        });
-        let album = album_item_from_json(&value);
-        assert_eq!(album.album.as_deref(), Some("Test Album"));
-        assert_eq!(album.artist.as_deref(), Some("Test Artist"));
-        assert_eq!(album.track_count, 10);
-        assert_eq!(album.rating, 4.5);
-        assert_eq!(album.sample_song_id, None);
-
-        let with_sample = serde_json::json!({
-            "artist": "Test Artist",
-            "album": "Test Album",
-            "sample_song_id": 42,
-        });
-        assert_eq!(album_item_from_json(&with_sample).sample_song_id, Some(42));
-    }
-
-    #[test]
     fn find_artist_matches_case_insensitively() {
-        let artists = vec![serde_json::json!({
-            "name": "The War On Drugs",
-            "album_count": 3,
-            "song_count": 20,
-            "genre": null,
-            "sort_artist": "War On Drugs, The",
-            "total_playcount": 5,
-        })];
+        let artists = vec![ArtistItem {
+            name: Some("The War On Drugs".to_string()),
+            album_count: 3,
+            song_count: 20,
+            genre: None,
+            sort_artist: Some("War On Drugs, The".to_string()),
+            total_playcount: Some(5),
+        }];
         assert!(find_artist(&artists, "the war on drugs").is_some());
         assert!(find_artist(&artists, "THE WAR ON DRUGS").is_some());
         assert!(find_artist(&artists, "Someone Else").is_none());

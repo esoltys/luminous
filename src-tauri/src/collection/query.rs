@@ -13,8 +13,8 @@ use crate::filter_parser::ParsedQuery;
 use crate::genre_aliases::GenreAliases;
 use crate::models::{
     included_library_song_where, library_song_where, library_song_where_for_sort,
-    playable_library_song_where, AlbumItem, CountrySummary, HomeItem, LibraryStats, Playlist,
-    QueuePopulationMode, Song, Tag, TopAlbumItem, LISTENED_SOURCES_SQL,
+    playable_library_song_where, AlbumItem, ArtistItem, CountrySummary, HomeItem, LibraryStats,
+    Playlist, QueuePopulationMode, Song, Tag, TopAlbumItem, LISTENED_SOURCES_SQL,
 };
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension, ToSql};
@@ -322,7 +322,7 @@ impl CollectionScanner {
     /// `album_artist` is literally "Various Artists". Returns the same
     /// aggregated shape as `get_albums()`, but with `artist` always
     /// "Various Artists" since these are compilations by definition.
-    pub fn get_compilations_by_artist(&self, artist: &str) -> Result<Vec<serde_json::Value>> {
+    pub fn get_compilations_by_artist(&self, artist: &str) -> Result<Vec<AlbumItem>> {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT
@@ -387,24 +387,11 @@ impl CollectionScanner {
             display = album_display_sql("songs.album_key"),
         );
         let mut stmt = conn.prepare(&sql)?;
-        let albums: Vec<serde_json::Value> = stmt
-            .query_map(params![multi_value_contains_pattern(artist)], |row| {
-                Ok(serde_json::json!({
-                    "artist": "Various Artists",
-                    "album": row.get::<_, Option<String>>(0)?,
-                    "year": row.get::<_, Option<i32>>(1)?,
-                    "track_count": row.get::<_, i32>(2)?,
-                    "disc_count": row.get::<_, i32>(3)?,
-                    "art_embedded": row.get::<_, bool>(4)?,
-                    "art_automatic": row.get::<_, Option<String>>(5)?,
-                    "art_manual": row.get::<_, Option<String>>(6)?,
-                    "genre": row.get::<_, Option<String>>(7)?,
-                    "rating": row.get::<_, f32>(8)?,
-                    "added": row.get::<_, Option<i64>>(9)?,
-                    "total_duration_nanosec": row.get::<_, i64>(10)?,
-                    "sample_song_id": row.get::<_, Option<i64>>(11)?,
-                }))
-            })?
+        let albums: Vec<AlbumItem> = stmt
+            .query_map(
+                params![multi_value_contains_pattern(artist)],
+                AlbumItem::from_compilation_row,
+            )?
             .filter_map(|r| r.ok())
             .collect();
         Ok(albums)
@@ -848,11 +835,10 @@ impl CollectionScanner {
 
     /// One aggregated entry per album (distinct `album_key`, so spellings
     /// differing only in case or surrounding whitespace are one album, #1752)
-    /// across the whole library (untyped JSON, not a `Song`/`AlbumItem` — see
-    /// the query below for the exact field set), each summarizing every track
-    /// of that album regardless of which artist tagged it. `album` is the
-    /// album's display spelling (`album_display_sql`).
-    pub fn get_albums(&self) -> Result<Vec<serde_json::Value>> {
+    /// across the whole library, each summarizing every track of that album
+    /// regardless of which artist tagged it. `album` is the album's display
+    /// spelling (`album_display_sql`).
+    pub fn get_albums(&self) -> Result<Vec<AlbumItem>> {
         let conn = self.db.pool.get()?;
         // The grid reloads after external edits (luminous-mcp), so pick up any
         // album keys they left stale before grouping on them.
@@ -915,38 +901,19 @@ impl CollectionScanner {
             display = album_display_sql("songs.album_key"),
         );
         let mut stmt = conn.prepare(&sql)?;
-        let albums: Vec<serde_json::Value> = stmt
-            .query_map([], |row| {
-                Ok(serde_json::json!({
-                    "artist": row.get::<_, Option<String>>(0)?,
-                    "album": row.get::<_, Option<String>>(1)?,
-                    "year": row.get::<_, Option<i32>>(2)?,
-                    "track_count": row.get::<_, i32>(3)?,
-                    "disc_count": row.get::<_, i32>(4)?,
-                    "art_embedded": row.get::<_, bool>(5)?,
-                    "art_automatic": row.get::<_, Option<String>>(6)?,
-                    "art_manual": row.get::<_, Option<String>>(7)?,
-                    "genre": row.get::<_, Option<String>>(8)?,
-                    "rating": row.get::<_, f32>(9)?,
-                    "added": row.get::<_, Option<i64>>(10)?,
-                    "total_duration_nanosec": row.get::<_, i64>(11)?,
-                    "artist_sort": row.get::<_, Option<String>>(12)?,
-                    "albumsort": row.get::<_, Option<String>>(13)?,
-                    "sample_song_id": row.get::<_, Option<i64>>(14)?,
-                    "album_key": row.get::<_, Option<String>>(15)?,
-                }))
-            })?
+        let albums: Vec<AlbumItem> = stmt
+            .query_map([], AlbumItem::from_album_row)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(albums)
     }
 
     /// One aggregated entry per effective artist (album_artist, falling back
-    /// to artist) across the library — untyped JSON, see the query below for
-    /// the exact field set. Multi-value album_artist/artist columns group as
-    /// one combined pseudo-artist rather than fanning out per individual
-    /// artist — see `get_songs_by_artist` for why that's out of scope here.
-    pub fn get_artists(&self) -> Result<Vec<serde_json::Value>> {
+    /// to artist) across the library. Multi-value album_artist/artist columns
+    /// group as one combined pseudo-artist rather than fanning out per
+    /// individual artist — see `get_songs_by_artist` for why that's out of
+    /// scope here.
+    pub fn get_artists(&self) -> Result<Vec<ArtistItem>> {
         let conn = self.db.pool.get()?;
         // Artists are grouped case-insensitively (COLLATE NOCASE) so that tag-casing
         // drift across files/albums for the same real-world artist (e.g. "The War On
@@ -1002,17 +969,8 @@ impl CollectionScanner {
             lib_s = library_song_where("s"),
         );
         let mut stmt = conn.prepare(&sql)?;
-        let artists: Vec<serde_json::Value> = stmt
-            .query_map([], |row| {
-                Ok(serde_json::json!({
-                    "name": row.get::<_, Option<String>>(0)?,
-                    "album_count": row.get::<_, i32>(1)?,
-                    "song_count": row.get::<_, i32>(2)?,
-                    "genre": row.get::<_, Option<String>>(3)?,
-                    "sort_artist": row.get::<_, Option<String>>(4)?,
-                    "total_playcount": row.get::<_, i32>(5)?,
-                }))
-            })?
+        let artists: Vec<ArtistItem> = stmt
+            .query_map([], ArtistItem::from_artist_row)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(artists)
@@ -1024,7 +982,7 @@ impl CollectionScanner {
     /// instead of excluding every artist — this powers the Home "Top
     /// Artists" carousel, not a full artist directory (see `get_artists`
     /// for that).
-    pub fn get_top_artists(&self, limit: i64) -> Result<Vec<serde_json::Value>> {
+    pub fn get_top_artists(&self, limit: i64) -> Result<Vec<ArtistItem>> {
         let conn = self.db.pool.get()?;
         // See get_artists() for why grouping is case-insensitive (issue #295).
         let sql = format!(
@@ -1083,16 +1041,8 @@ impl CollectionScanner {
             lib_sg = library_song_where("sg"),
         );
         let mut stmt = conn.prepare(&sql)?;
-        let artists: Vec<serde_json::Value> = stmt
-            .query_map(params![limit], |row| {
-                Ok(serde_json::json!({
-                    "name": row.get::<_, Option<String>>(0)?,
-                    "album_count": row.get::<_, i32>(1)?,
-                    "song_count": row.get::<_, i32>(2)?,
-                    "total_playcount": row.get::<_, i32>(3)?,
-                    "genre": row.get::<_, Option<String>>(4)?,
-                }))
-            })?
+        let artists: Vec<ArtistItem> = stmt
+            .query_map(params![limit], ArtistItem::from_top_artist_row)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(artists)
@@ -1634,7 +1584,10 @@ fn rank_week_items(
                 genre: song.genre.clone(),
                 sample_song_id: Some(song.id),
                 rating: crate::stats::RATING_UNRATED,
+                added: None,
                 total_duration_nanosec: 0,
+                artist_sort: None,
+                albumsort: None,
             },
             week_plays,
         ));
@@ -1856,7 +1809,10 @@ fn group_songs_into_home_items(
                             genre: song.genre.clone(),
                             sample_song_id: Some(song.id),
                             rating: crate::stats::RATING_UNRATED,
+                            added: None,
                             total_duration_nanosec: 0,
+                            artist_sort: None,
+                            albumsort: None,
                         },
                     });
                 }
@@ -1983,7 +1939,10 @@ fn home_item_for_context(
                     genre: song.genre.clone(),
                     sample_song_id: Some(song.id),
                     rating: crate::stats::RATING_UNRATED,
+                    added: None,
                     total_duration_nanosec: 0,
+                    artist_sort: None,
+                    albumsort: None,
                 },
             }
         }
@@ -2260,33 +2219,33 @@ mod tests {
 
         let albums = scanner.get_albums().unwrap();
 
-        let find_album = |name: &str| -> &serde_json::Value {
+        let find_album = |name: &str| -> &AlbumItem {
             albums
                 .iter()
-                .find(|a| a["album"].as_str() == Some(name))
+                .find(|a| a.album.as_deref() == Some(name))
                 .unwrap()
         };
 
         // Assert Album One -> album_artist is "Artist A"
         let album_one = find_album("Album One");
-        assert_eq!(album_one["artist"].as_str(), Some("Artist A"));
-        assert_eq!(album_one["track_count"].as_i64(), Some(2));
-        assert!(album_one["added"].is_number());
+        assert_eq!(album_one.artist.as_deref(), Some("Artist A"));
+        assert_eq!(album_one.track_count, 2);
+        assert!(album_one.added.is_some());
 
         // Assert Album Two -> album_artist is Various Artists
         let album_two = find_album("Album Two");
-        assert_eq!(album_two["artist"].as_str(), Some("Various Artists"));
-        assert_eq!(album_two["track_count"].as_i64(), Some(2));
+        assert_eq!(album_two.artist.as_deref(), Some("Various Artists"));
+        assert_eq!(album_two.track_count, 2);
 
         // Assert Album Three -> album_artist is "Artist A"
         let album_three = find_album("Album Three");
-        assert_eq!(album_three["artist"].as_str(), Some("Artist A"));
-        assert_eq!(album_three["track_count"].as_i64(), Some(2));
+        assert_eq!(album_three.artist.as_deref(), Some("Artist A"));
+        assert_eq!(album_three.track_count, 2);
 
         // Assert Album Four -> album_artist is Various Artists
         let album_four = find_album("Album Four");
-        assert_eq!(album_four["artist"].as_str(), Some("Various Artists"));
-        assert_eq!(album_four["track_count"].as_i64(), Some(2));
+        assert_eq!(album_four.artist.as_deref(), Some("Various Artists"));
+        assert_eq!(album_four.track_count, 2);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2333,11 +2292,11 @@ mod tests {
         let albums = scanner.get_albums().unwrap();
 
         assert!(
-            albums.iter().all(|a| a["album"].as_str() != Some("")),
+            albums.iter().all(|a| a.album.as_deref() != Some("")),
             "empty-string album should not produce a pseudo-album entry: {albums:?}"
         );
         assert_eq!(albums.len(), 1);
-        assert_eq!(albums[0]["album"].as_str(), Some("Real Album"));
+        assert_eq!(albums[0].album.as_deref(), Some("Real Album"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2410,20 +2369,20 @@ mod tests {
         );
 
         let comps = scanner.get_compilations_by_artist("Artist A").unwrap();
-        let names: Vec<&str> = comps.iter().map(|a| a["album"].as_str().unwrap()).collect();
+        let names: Vec<&str> = comps.iter().map(|a| a.album.as_deref().unwrap()).collect();
         assert!(names.contains(&"Compilation One"));
         assert!(names.contains(&"Compilation Two"));
         assert!(!names.contains(&"Solo Album"));
         assert_eq!(comps.len(), 2);
 
         for comp in &comps {
-            assert_eq!(comp["artist"].as_str(), Some("Various Artists"));
+            assert_eq!(comp.artist.as_deref(), Some("Various Artists"));
         }
 
         // Artist B only appears on Compilation One.
         let comps_b = scanner.get_compilations_by_artist("Artist B").unwrap();
         assert_eq!(comps_b.len(), 1);
-        assert_eq!(comps_b[0]["album"].as_str(), Some("Compilation One"));
+        assert_eq!(comps_b[0].album.as_deref(), Some("Compilation One"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2467,17 +2426,17 @@ mod tests {
 
         let single_artist = artists
             .iter()
-            .find(|a| a["name"].as_str() == Some("Artist Single"))
+            .find(|a| a.name.as_deref() == Some("Artist Single"))
             .unwrap();
-        assert_eq!(single_artist["album_count"].as_i64(), Some(0));
-        assert_eq!(single_artist["song_count"].as_i64(), Some(1));
+        assert_eq!(single_artist.album_count, 0);
+        assert_eq!(single_artist.song_count, 1);
 
         let full_artist = artists
             .iter()
-            .find(|a| a["name"].as_str() == Some("Artist Full"))
+            .find(|a| a.name.as_deref() == Some("Artist Full"))
             .unwrap();
-        assert_eq!(full_artist["album_count"].as_i64(), Some(1));
-        assert_eq!(full_artist["song_count"].as_i64(), Some(8));
+        assert_eq!(full_artist.album_count, 1);
+        assert_eq!(full_artist.song_count, 8);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2523,15 +2482,15 @@ mod tests {
 
         let high = artists
             .iter()
-            .find(|a| a["name"].as_str() == Some("Artist High"))
+            .find(|a| a.name.as_deref() == Some("Artist High"))
             .unwrap();
-        assert_eq!(high["total_playcount"].as_i64(), Some(10));
+        assert_eq!(high.total_playcount, Some(10));
 
         let low = artists
             .iter()
-            .find(|a| a["name"].as_str() == Some("Artist Low"))
+            .find(|a| a.name.as_deref() == Some("Artist Low"))
             .unwrap();
-        assert_eq!(low["total_playcount"].as_i64(), Some(1));
+        assert_eq!(low.total_playcount, Some(1));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2577,11 +2536,11 @@ mod tests {
         let scanner = CollectionScanner::new(db.clone());
         let artists = scanner.get_artists().unwrap();
 
-        let matches: Vec<&serde_json::Value> = artists
+        let matches: Vec<&ArtistItem> = artists
             .iter()
             .filter(|a| {
-                a["name"]
-                    .as_str()
+                a.name
+                    .as_deref()
                     .is_some_and(|n| n.eq_ignore_ascii_case("the war on drugs"))
             })
             .collect();
@@ -2591,7 +2550,7 @@ mod tests {
             "expected a single merged artist entry, got {:?}",
             artists
         );
-        assert_eq!(matches[0]["song_count"].as_i64(), Some(2));
+        assert_eq!(matches[0].song_count, 2);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2631,9 +2590,9 @@ mod tests {
 
         let untagged = artists
             .iter()
-            .find(|a| a["name"].as_str() == Some(""))
+            .find(|a| a.name.as_deref() == Some(""))
             .expect("untagged song should surface as an empty-string artist entry");
-        assert_eq!(untagged["song_count"].as_i64(), Some(1));
+        assert_eq!(untagged.song_count, 1);
 
         let songs = scanner.get_songs_by_artist("").unwrap();
         assert_eq!(
@@ -2855,16 +2814,16 @@ mod tests {
 
         let names: Vec<&str> = top_artists
             .iter()
-            .map(|a| a["name"].as_str().unwrap())
+            .map(|a| a.name.as_deref().unwrap())
             .collect();
         assert_eq!(names, vec!["Artist High", "Artist Low", "Artist Unplayed"]);
 
         let high = &top_artists[0];
-        assert_eq!(high["song_count"].as_i64(), Some(2));
-        assert_eq!(high["total_playcount"].as_i64(), Some(10));
+        assert_eq!(high.song_count, 2);
+        assert_eq!(high.total_playcount, Some(10));
 
         let low = &top_artists[1];
-        assert_eq!(low["total_playcount"].as_i64(), Some(2));
+        assert_eq!(low.total_playcount, Some(2));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2966,11 +2925,11 @@ mod tests {
         // to song_count DESC instead of collapsing to alphabetical order.
         let names: Vec<&str> = top_artists
             .iter()
-            .map(|a| a["name"].as_str().unwrap())
+            .map(|a| a.name.as_deref().unwrap())
             .collect();
         assert_eq!(names, vec!["Artist Big", "Artist Small"]);
-        assert_eq!(top_artists[0]["song_count"].as_i64(), Some(2));
-        assert_eq!(top_artists[1]["song_count"].as_i64(), Some(1));
+        assert_eq!(top_artists[0].song_count, 2);
+        assert_eq!(top_artists[1].song_count, 1);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -4297,14 +4256,14 @@ mod tests {
         assert_eq!(albums.len(), 2, "{albums:?}");
         let sea = albums
             .iter()
-            .find(|a| a["album"] == "Songs of the Sea")
+            .find(|a| a.album.as_deref() == Some("Songs of the Sea"))
             .expect("merged album shows its majority spelling");
-        assert_eq!(sea["track_count"], 3);
+        assert_eq!(sea.track_count, 3);
         let elan = albums
             .iter()
-            .find(|a| a["album"].as_str().is_some_and(|n| album_key(n) == "élan"))
+            .find(|a| a.album.as_deref().is_some_and(|n| album_key(n) == "élan"))
             .unwrap();
-        assert_eq!(elan["track_count"], 2);
+        assert_eq!(elan.track_count, 2);
 
         // Detail: any spelling opens every track.
         assert_eq!(
@@ -4326,9 +4285,9 @@ mod tests {
             .get_albums()
             .unwrap()
             .into_iter()
-            .find(|a| a["album"] == "Songs of the Sea")
+            .find(|a| a.album.as_deref() == Some("Songs of the Sea"))
             .unwrap();
-        assert_eq!(sea["rating"], 4.0);
+        assert_eq!(sea.rating, 4.0);
 
         // Home: one Album card with the full track count and display spelling.
         let recent = scanner.get_recently_added(10).unwrap();
@@ -4456,15 +4415,21 @@ mod tests {
 
         let scanner = CollectionScanner::new(db);
         let albums = scanner.get_albums().unwrap();
-        let album_a = albums.iter().find(|a| a["album"] == "Album A").unwrap();
-        let album_b = albums.iter().find(|a| a["album"] == "Album B").unwrap();
-        assert_eq!(album_a["sample_song_id"], 10);
-        assert_eq!(album_b["sample_song_id"], 21);
+        let album_a = albums
+            .iter()
+            .find(|a| a.album.as_deref() == Some("Album A"))
+            .unwrap();
+        let album_b = albums
+            .iter()
+            .find(|a| a.album.as_deref() == Some("Album B"))
+            .unwrap();
+        assert_eq!(album_a.sample_song_id, Some(10));
+        assert_eq!(album_b.sample_song_id, Some(21));
 
         let comps = scanner.get_compilations_by_artist("Artist A").unwrap();
         assert_eq!(comps.len(), 1);
-        assert_eq!(comps[0]["album"], "Comp C");
-        assert_eq!(comps[0]["sample_song_id"], 31);
+        assert_eq!(comps[0].album.as_deref(), Some("Comp C"));
+        assert_eq!(comps[0].sample_song_id, Some(31));
     }
 
     /// #1932: albums with the exact same title released by different artists
@@ -4533,19 +4498,19 @@ mod tests {
 
         let kacey_album = albums
             .iter()
-            .find(|a| a["artist"] == "Kacey Musgraves")
+            .find(|a| a.artist.as_deref() == Some("Kacey Musgraves"))
             .expect("Kacey Musgraves album present");
-        assert_eq!(kacey_album["album"], "Golden Hour");
-        assert_eq!(kacey_album["track_count"], 2);
-        let kacey_key = kacey_album["album_key"].as_str().unwrap();
+        assert_eq!(kacey_album.album.as_deref(), Some("Golden Hour"));
+        assert_eq!(kacey_album.track_count, 2);
+        let kacey_key = kacey_album.album_key.as_deref().unwrap();
 
         let balcony_album = albums
             .iter()
-            .find(|a| a["artist"] == "Balcony Sunrise")
+            .find(|a| a.artist.as_deref() == Some("Balcony Sunrise"))
             .expect("Balcony Sunrise album present");
-        assert_eq!(balcony_album["album"], "Golden Hour");
-        assert_eq!(balcony_album["track_count"], 1);
-        let balcony_key = balcony_album["album_key"].as_str().unwrap();
+        assert_eq!(balcony_album.album.as_deref(), Some("Golden Hour"));
+        assert_eq!(balcony_album.track_count, 1);
+        let balcony_key = balcony_album.album_key.as_deref().unwrap();
 
         assert_ne!(kacey_key, balcony_key, "Album keys must be distinct");
 
@@ -4659,5 +4624,116 @@ mod tests {
             .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].title.as_deref(), Some("Ambient Drift"));
+    }
+
+    #[test]
+    fn test_summary_queries_preserve_expected_json_keys() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_summary_json_keys_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        upsert_song(
+            &conn,
+            &Song {
+                path: Some("music/solo.mp3".to_string()),
+                title: Some("Solo Track".to_string()),
+                artist: Some("Solo Artist".to_string()),
+                album: Some("Solo Album".to_string()),
+                album_artist: Some("Solo Artist".to_string()),
+                genre: Some("Rock".to_string()),
+                year: Some(2020),
+                source: SongSource::LocalFile,
+                filetype: FileType::Mp3,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        upsert_song(
+            &conn,
+            &Song {
+                path: Some("music/comp.mp3".to_string()),
+                title: Some("Comp Track".to_string()),
+                artist: Some("Solo Artist".to_string()),
+                album: Some("Various Comp".to_string()),
+                album_artist: Some("Various Artists".to_string()),
+                compilation: true,
+                genre: Some("Electronic".to_string()),
+                year: Some(2021),
+                source: SongSource::LocalFile,
+                filetype: FileType::Mp3,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let keys_of = |v: serde_json::Value| -> std::collections::BTreeSet<String> {
+            v.as_object().unwrap().keys().cloned().collect()
+        };
+
+        let expected_album_keys: std::collections::BTreeSet<String> = [
+            "added",
+            "album",
+            "album_key",
+            "albumsort",
+            "art_automatic",
+            "art_embedded",
+            "art_manual",
+            "artist",
+            "artist_sort",
+            "disc_count",
+            "genre",
+            "rating",
+            "sample_song_id",
+            "total_duration_nanosec",
+            "track_count",
+            "year",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let albums = scanner.get_albums().unwrap();
+        assert!(!albums.is_empty());
+        assert_eq!(
+            keys_of(serde_json::to_value(&albums[0]).unwrap()),
+            expected_album_keys
+        );
+
+        let comps = scanner.get_compilations_by_artist("Solo Artist").unwrap();
+        assert_eq!(comps.len(), 1);
+        assert_eq!(
+            keys_of(serde_json::to_value(&comps[0]).unwrap()),
+            expected_album_keys
+        );
+
+        let expected_artist_keys: std::collections::BTreeSet<String> = [
+            "album_count",
+            "genre",
+            "name",
+            "song_count",
+            "sort_artist",
+            "total_playcount",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let artists = scanner.get_artists().unwrap();
+        assert!(!artists.is_empty());
+        assert_eq!(
+            keys_of(serde_json::to_value(&artists[0]).unwrap()),
+            expected_artist_keys
+        );
+
+        let top_artists = scanner.get_top_artists(10).unwrap();
+        assert!(!top_artists.is_empty());
+        assert_eq!(
+            keys_of(serde_json::to_value(&top_artists[0]).unwrap()),
+            expected_artist_keys
+        );
     }
 }
