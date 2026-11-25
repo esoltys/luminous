@@ -1,7 +1,7 @@
 //! Playback order state machine (`PlayOrder`).
 //!
 //! Owns the loaded playlist items, the active shuffle permutation, the current
-//! virtual position, the shuffle back-history, the ad-hoc "play next" queue,
+//! virtual position, the shuffle back-history, the ad-hoc play-next list,
 //! and the shuffle/repeat modes. All operations are pure and synchronous so
 //! navigation and playlist-edit invariants can be tested without a database or
 //! audio engine.
@@ -17,8 +17,8 @@ pub(crate) enum OrderTargetKind {
     Replay,
     /// Advance to the item at this virtual (shuffle-order) index.
     Index(usize),
-    /// Consume the first playable item in the ad-hoc play-next queue.
-    Queue,
+    /// Consume the first playable item in the ad-hoc play-next list.
+    PlayNext,
 }
 
 /// A resolved next-track candidate produced by peeking at `PlayOrder` without
@@ -31,7 +31,7 @@ pub(crate) enum OrderTarget {
         song: Song,
         uuid: Option<String>,
     },
-    Queue {
+    PlayNext {
         song: Song,
         uuid: Option<String>,
     },
@@ -43,7 +43,7 @@ impl OrderTarget {
     pub(crate) fn song<'a>(&'a self, current_song: Option<&'a Song>) -> Option<&'a Song> {
         match self {
             Self::Replay => current_song,
-            Self::Index { song, .. } | Self::Queue { song, .. } => Some(song),
+            Self::Index { song, .. } | Self::PlayNext { song, .. } => Some(song),
         }
     }
 }
@@ -60,7 +60,7 @@ pub(crate) struct PlayOrder {
     shuffle_order: Vec<usize>,
     current_index: Option<usize>,
     played_indices: Vec<usize>,
-    queue: VecDeque<PlaylistItem>,
+    play_next: VecDeque<PlaylistItem>,
     shuffle_mode: ShuffleMode,
     repeat_mode: RepeatMode,
 }
@@ -79,7 +79,7 @@ impl PlayOrder {
             shuffle_order: Vec::new(),
             current_index: current_real_index,
             played_indices: Vec::new(),
-            queue: VecDeque::new(),
+            play_next: VecDeque::new(),
             shuffle_mode,
             repeat_mode,
         };
@@ -128,8 +128,8 @@ impl PlayOrder {
     }
 
     #[cfg(test)]
-    pub(crate) fn queue_mut(&mut self) -> &mut VecDeque<PlaylistItem> {
-        &mut self.queue
+    pub(crate) fn play_next_mut(&mut self) -> &mut VecDeque<PlaylistItem> {
+        &mut self.play_next
     }
 
     /// Returns true if the playlist item has a playable (present + available) song.
@@ -149,7 +149,7 @@ impl PlayOrder {
     ) -> Option<usize> {
         self.items = items;
         self.played_indices.clear();
-        self.queue.clear();
+        self.play_next.clear();
         self.shuffle_order.clear();
         self.current_index = start_real_index.filter(|&i| i < self.items.len());
         self.rebuild_shuffle_order();
@@ -183,7 +183,7 @@ impl PlayOrder {
     pub(crate) fn clear(&mut self) {
         self.items.clear();
         self.shuffle_order.clear();
-        self.queue.clear();
+        self.play_next.clear();
         self.current_index = None;
         self.played_indices.clear();
     }
@@ -220,7 +220,7 @@ impl PlayOrder {
         if self.repeat_mode != RepeatMode::Off {
             return None;
         }
-        if self.remaining_count() + self.queue.len() > crate::continue_mix::TOP_UP_THRESHOLD {
+        if self.remaining_count() + self.play_next.len() > crate::continue_mix::TOP_UP_THRESHOLD {
             return None;
         }
         let mut seeds = vec![current_song_id];
@@ -305,9 +305,9 @@ impl PlayOrder {
     }
 
     fn peek_queue_front(&self) -> Option<OrderTarget> {
-        let item = self.queue.iter().find(|i| Self::is_item_playable(i))?;
+        let item = self.play_next.iter().find(|i| Self::is_item_playable(i))?;
         let song = item.song.clone()?;
-        Some(OrderTarget::Queue {
+        Some(OrderTarget::PlayNext {
             song,
             uuid: Some(item.uuid.clone()),
         })
@@ -394,7 +394,7 @@ impl PlayOrder {
     }
 
     /// Commits a started track target to `PlayOrder`, updating `current_index`
-    /// and `played_indices` or pruning unplayable fronts and popping `queue`.
+    /// and `played_indices` or pruning unplayable fronts and popping `play_next`.
     pub(crate) fn commit(&mut self, kind: OrderTargetKind) {
         match kind {
             OrderTargetKind::Replay => {}
@@ -404,15 +404,15 @@ impl PlayOrder {
                     self.played_indices.push(candidate);
                 }
             }
-            OrderTargetKind::Queue => {
-                while let Some(front) = self.queue.front() {
+            OrderTargetKind::PlayNext => {
+                while let Some(front) = self.play_next.front() {
                     if Self::is_item_playable(front) {
                         break;
                     }
                     log::debug!("Skipping unavailable queued item");
-                    self.queue.pop_front();
+                    self.play_next.pop_front();
                 }
-                self.queue.pop_front();
+                self.play_next.pop_front();
             }
         }
     }
@@ -580,7 +580,7 @@ impl PlayOrder {
                 }
             }
         }
-        for item in &mut self.queue {
+        for item in &mut self.play_next {
             if let Some(ref mut song) = item.song {
                 if song.id == song_id {
                     song.is_instrumental = is_instrumental;
@@ -835,8 +835,8 @@ mod tests {
                 order.commit(OrderTargetKind::Index(virtual_index));
                 Some(song.id)
             }
-            OrderTarget::Queue { song, .. } => {
-                order.commit(OrderTargetKind::Queue);
+            OrderTarget::PlayNext { song, .. } => {
+                order.commit(OrderTargetKind::PlayNext);
                 Some(song.id)
             }
         }
@@ -854,8 +854,8 @@ mod tests {
                 order.commit(OrderTargetKind::Index(virtual_index));
                 Some(song.id)
             }
-            OrderTarget::Queue { song, .. } => {
-                order.commit(OrderTargetKind::Queue);
+            OrderTarget::PlayNext { song, .. } => {
+                order.commit(OrderTargetKind::PlayNext);
                 Some(song.id)
             }
         }
@@ -1015,18 +1015,18 @@ mod tests {
     fn commit_queue_drops_unplayable_front_items() {
         let items = make_items(vec![make_song(1, Some("Album"), false)]);
         let mut order = PlayOrder::new(items, Some(0), ShuffleMode::Off, RepeatMode::Off);
-        order.queue_mut().push_back(PlaylistItem::new_song(
+        order.play_next_mut().push_back(PlaylistItem::new_song(
             0,
             0,
             make_song(10, Some("Album"), true),
         ));
-        order.queue_mut().push_back(PlaylistItem::new_song(
+        order.play_next_mut().push_back(PlaylistItem::new_song(
             0,
             1,
             make_song(11, Some("Album"), false),
         ));
 
         assert_eq!(advance_manual(&mut order), Some(11));
-        assert!(order.queue_mut().is_empty());
+        assert!(order.play_next_mut().is_empty());
     }
 }

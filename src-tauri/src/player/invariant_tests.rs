@@ -36,7 +36,7 @@ enum Op {
     Append {
         song: i64,
     },
-    /// Pushes onto the ad-hoc "play next" `queue` directly — nothing in
+    /// Pushes onto the ad-hoc `play_next` list directly — nothing in
     /// production populates it today, but `next_track` and gapless still
     /// consume it.
     QueueNext {
@@ -169,7 +169,7 @@ async fn apply(player: &mut Player, op: &Op, songs: &[Song]) {
             player.remove_songs_from_playlist_items(&[uuid]);
         }
         Op::Append { song } => player.append_songs_to_playlist_items(vec![item(song)]),
-        Op::QueueNext { song } => player.order.queue_mut().push_back(item(song)),
+        Op::QueueNext { song } => player.order.play_next_mut().push_back(item(song)),
         Op::Reorder { .. } | Op::Remove { .. } | Op::Rearrange { .. } => {}
     }
 }
