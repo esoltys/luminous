@@ -388,11 +388,18 @@ export class PlayerStore {
       // a missing file — bad credentials, server down — so surface the
       // backend's reason instead of "file not found".
       const reason = message && shortenQuotedUrls(message.trim().replace(/[.\s]+$/, ""));
-      if (isLive) {
+      const isSpecificLiveReason =
+        isLive &&
+        reason &&
+        (reason.startsWith("Can't play ") ||
+          /encrypted|isn't supported|not an audio stream|codec/i.test(reason));
+      if (isLive && !isSpecificLiveReason) {
         toastStore.show(
           i18n.t("playerBar.stationOfflineToast", { title }, `"${title}" — Station offline.`),
           "error",
         );
+      } else if (isSpecificLiveReason) {
+        toastStore.show(`"${title}" — ${reason}.`, "error");
       } else if (isRemotePath(path) && reason) {
         toastStore.show(
           i18n.t(

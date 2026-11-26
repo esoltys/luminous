@@ -687,7 +687,7 @@ fn row_to_station(row: &rusqlite::Row<'_>) -> rusqlite::Result<RadioDirectorySta
         countrycode: row.get(7)?,
         language: row.get(8)?,
         codec,
-        bitrate: row.get(10)?,
+        bitrate: luminous_remote::radiobrowser::normalize_bitrate_kbps(row.get(10)?),
         hls,
         votes: row.get(12)?,
         clickcount: row.get(13)?,
@@ -1462,7 +1462,7 @@ fn station_from_joined_row(
             countrycode: row.get(8)?,
             language: row.get(9)?,
             codec,
-            bitrate: row.get(11)?,
+            bitrate: luminous_remote::radiobrowser::normalize_bitrate_kbps(row.get(11)?),
             hls,
             votes: row.get(13)?,
             clickcount: row.get(14)?,
@@ -1491,7 +1491,9 @@ fn station_from_joined_row(
         countrycode: String::new(),
         language: String::new(),
         codec: String::new(),
-        bitrate: row.get::<_, Option<i32>>(24)?.unwrap_or(0),
+        bitrate: luminous_remote::radiobrowser::normalize_bitrate_kbps(
+            row.get::<_, Option<i32>>(24)?.unwrap_or(0),
+        ),
         hls: false,
         votes: 0,
         clickcount: 0,
@@ -1902,26 +1904,28 @@ pub async fn resolve_station_url_with_client(
         anyhow::bail!("Playlist URL returned HTTP {}", resp.status().as_u16());
     }
 
+    let final_url = resp.url().clone();
     let ct = resp
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .map(str::to_string);
     let format = classify_playlist_content_type(ct.as_deref(), url_format)?;
+    let body = read_bounded_playlist_body(resp).await?;
 
-    if let Some(len) = resp.content_length() {
-        if len > MAX_REMOTE_PLAYLIST_BYTES as u64 {
-            anyhow::bail!("Playlist response exceeds maximum size");
-        }
+    // HLS `.m3u8` playlists are live segment/variant manifests, not static M3U
+    // station lists — preserve the playlist URL so `HlsLiveSource` handles it.
+    if matches!(
+        format,
+        luminous_metadata::playlist::PlaylistFormat::M3u
+            | luminous_metadata::playlist::PlaylistFormat::M3u8
+    ) && crate::hls::playlist::looks_like_hls(&body)
+    {
+        return Ok(ResolvedStationUrl {
+            stream_url: final_url.to_string(),
+            title: None,
+        });
     }
-    let bytes = resp
-        .bytes()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to read playlist response: {e}"))?;
-    if bytes.len() > MAX_REMOTE_PLAYLIST_BYTES {
-        anyhow::bail!("Playlist response exceeds maximum size");
-    }
-    let body = String::from_utf8_lossy(&bytes);
 
     let tracks = match format {
         luminous_metadata::playlist::PlaylistFormat::Pls => {
@@ -2035,6 +2039,7 @@ pub async fn test_station_url_with_client(
     };
 
     let status = resp.status().as_u16();
+    let final_url = resp.url().clone();
     let content_type = resp
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
@@ -2057,14 +2062,30 @@ pub async fn test_station_url_with_client(
     let is_html = content_type
         .as_deref()
         .is_some_and(|ct| ct.eq_ignore_ascii_case("text/html"));
-    let ok = resp.status().is_success() && !is_html;
-    let error = if !resp.status().is_success() {
+    let mut ok = resp.status().is_success() && !is_html;
+    let mut error = if !resp.status().is_success() {
         Some(format!("Server returned HTTP {status}"))
     } else if is_html {
         Some("URL returned an HTML page instead of an audio stream".to_string())
     } else {
         None
     };
+
+    let maybe_hls = ok
+        && (content_type
+            .as_deref()
+            .is_some_and(crate::hls::is_playlist_mime)
+            || crate::hls::has_m3u8_extension(final_url.as_ref()));
+    if maybe_hls {
+        if let Ok(body) = read_bounded_playlist_body(resp).await {
+            if crate::hls::playlist::looks_like_hls(&body) {
+                if let Err(hls_err) = validate_hls_playlist(client, &body, &final_url).await {
+                    ok = false;
+                    error = Some(hls_err);
+                }
+            }
+        }
+    }
 
     RadioConnectionTestResult {
         ok,
@@ -2074,6 +2095,52 @@ pub async fn test_station_url_with_client(
         bitrate,
         station_name,
         error,
+    }
+}
+
+async fn read_bounded_playlist_body(resp: reqwest::Response) -> Result<String> {
+    if let Some(len) = resp.content_length() {
+        if len > MAX_REMOTE_PLAYLIST_BYTES as u64 {
+            anyhow::bail!("Playlist response exceeds maximum size");
+        }
+    }
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to read playlist response: {e}"))?;
+    if bytes.len() > MAX_REMOTE_PLAYLIST_BYTES {
+        anyhow::bail!("Playlist response exceeds maximum size");
+    }
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+async fn validate_hls_playlist(
+    client: &reqwest::Client,
+    body: &str,
+    base: &reqwest::Url,
+) -> std::result::Result<(), String> {
+    let label = base.as_str();
+    match crate::hls::playlist::parse(body, base)? {
+        crate::hls::playlist::Playlist::Media(media) => crate::hls::check_supported(&media, label),
+        crate::hls::playlist::Playlist::Master(master) => {
+            let prefer_lc = !luminous_audio::decodes_full_he_aac();
+            let variant_url =
+                crate::hls::playlist::choose_variant(&master, prefer_lc).ok_or_else(|| {
+                    "None of this HLS stream's variants uses AAC or MP3 audio".to_string()
+                })?;
+            if let Ok(resp) = client.get(variant_url.clone()).send().await {
+                if resp.status().is_success() {
+                    if let Ok(variant_body) = read_bounded_playlist_body(resp).await {
+                        if let Ok(crate::hls::playlist::Playlist::Media(media)) =
+                            crate::hls::playlist::parse(&variant_body, &variant_url)
+                        {
+                            crate::hls::check_supported(&media, label)?;
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
     }
 }
 
@@ -3604,6 +3671,55 @@ mod tests {
         assert_eq!(
             song.genre.as_deref(),
             Some("alternative rock; commercial; vancouver")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_station_url_preserves_hls_m3u8_and_validates_support() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/hls/program.m3u8"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(
+                    b"#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-TARGETDURATION:10\n\
+                  #EXT-X-MEDIA-SEQUENCE:1\n#EXT-X-MAP:URI=\"program_init.mp4\"\n\
+                  #EXTINF:10,\nseg1.m4s\n"
+                        .to_vec(),
+                    "application/vnd.apple.mpegurl",
+                ),
+            )
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/hls/enc.m3u8"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(
+                    b"#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXT-X-KEY:METHOD=AES-128,URI=\"k\"\n\
+                  #EXTINF:6,\nseg1.ts\n"
+                        .to_vec(),
+                    "application/vnd.apple.mpegurl",
+                ),
+            )
+            .mount(&server)
+            .await;
+
+        let client = reqwest::Client::new();
+        let hls_url = format!("{}/hls/program.m3u8", server.uri());
+        let ok_res = test_station_url_with_client(&client, &hls_url).await;
+        assert!(ok_res.ok, "{ok_res:?}");
+        assert_eq!(ok_res.resolved_url, hls_url);
+        assert_eq!(
+            ok_res.content_type.as_deref(),
+            Some("application/vnd.apple.mpegurl")
+        );
+
+        let enc_res =
+            test_station_url_with_client(&client, &format!("{}/hls/enc.m3u8", server.uri())).await;
+        assert!(!enc_res.ok);
+        assert!(
+            enc_res.error.as_deref().unwrap_or("").contains("encrypted"),
+            "{:?}",
+            enc_res.error
         );
     }
 }
