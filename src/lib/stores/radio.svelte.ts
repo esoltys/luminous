@@ -477,7 +477,13 @@ class RadioStore {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       toastStore.show(
-        i18n.t("playerBar.stationOfflineToast", { title: name }, `"${name}" — ${msg}`),
+        msg.trim()
+          ? `"${name}" — ${msg}`
+          : i18n.t(
+              "playerBar.stationOfflineToast",
+              { title: name },
+              `"${name}" — Station offline.`,
+            ),
         "error",
       );
     }

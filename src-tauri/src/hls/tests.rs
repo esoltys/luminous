@@ -1,7 +1,9 @@
 //! End-to-end HLS tests against a mock HTTP server, opened through the same
 //! live-stream entry point the audio engine uses.
 
-use super::segment::tests::{adts_frame, fmp4_aac_init, fmp4_aac_segment, id3_tag, ts_segment};
+use super::segment::tests::{
+    adts_frame, fmp4_aac_init, fmp4_aac_segment, fmp4_flac_init, id3_tag, ts_segment,
+};
 use crate::media_source::LiveHttpSource;
 use std::io::Read;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -245,6 +247,67 @@ async fn fragmented_mp4_aac_hls_stream_plays_as_adts() {
         assert_eq!(&all[7..11], b"abcd");
         assert_eq!(&all[11..13], &[0xff, 0xf1]);
         assert_eq!(&all[18..20], b"ef");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn fragmented_mp4_flac_hls_stream_plays_as_flac() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/hls/program.m3u8"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", PLAYLIST_MIME)
+                .set_body_string(
+                    "#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-TARGETDURATION:10\n\
+                     #EXT-X-MEDIA-SEQUENCE:1\n#EXT-X-MAP:URI=\"program_init.mp4\"\n\
+                     #EXTINF:9.984,\nseg1.m4s\n#EXTINF:9.984,\nseg2.m4s\n#EXT-X-ENDLIST\n",
+                ),
+        )
+        .mount(&server)
+        .await;
+    let mut blocks = vec![0x80, 0x00, 0x00, 34];
+    blocks.extend_from_slice(&[0x10; 34]);
+    let blocks_expected = blocks.clone();
+    Mock::given(method("GET"))
+        .and(path("/hls/program_init.mp4"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(fmp4_flac_init(1, &blocks)))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/hls/seg1.m4s"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "application/octet-stream")
+                .set_body_bytes(fmp4_aac_segment(1, &[b"flac1"])),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/hls/seg2.m4s"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "application/octet-stream")
+                .set_body_bytes(fmp4_aac_segment(1, &[b"flac2"])),
+        )
+        .mount(&server)
+        .await;
+
+    let url = format!("{}/hls/program.m3u8", server.uri());
+    tokio::task::spawn_blocking(move || {
+        let opened = LiveHttpSource::open_with_backoffs(&url, Some("SomaFM FLAC"), Vec::new())
+            .expect("open fMP4 FLAC HLS station");
+        assert_eq!(opened.mime_type.as_deref(), Some("audio/flac"));
+        let mut all = Vec::new();
+        opened.reader.take(1 << 20).read_to_end(&mut all).unwrap();
+        assert_eq!(&all[..4], b"fLaC");
+        assert_eq!(
+            &all[4..4 + blocks_expected.len()],
+            blocks_expected.as_slice()
+        );
+        assert_eq!(&all[4 + blocks_expected.len()..], b"flac1flac2");
     })
     .await
     .unwrap();

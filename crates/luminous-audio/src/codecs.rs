@@ -28,13 +28,13 @@ pub(crate) static CODEC_REGISTRY: LazyLock<CodecRegistry> = LazyLock::new(|| {
 /// `"AACP"`, `"HE-AAC"`), at reduced quality where the platform has no full
 /// HE-AAC decoder (see [`plays_at_reduced_quality`]).
 ///
-/// HLS stations (`hls == true`, #2012) play when their segments carry AAC or
-/// MP3, which is all MPEG-TS and packed-audio HLS can carry. Their directory
-/// codec is often `"UNKNOWN"` or names the video too (`"AAC,H.264"`), so both
-/// are accepted; the real codec is learned from the stream when it opens, and
-/// one the engine can't decode (or encrypted / fragmented-MP4 HLS) fails there
-/// with a clear error. Case- and whitespace-insensitive; accepts multi-token
-/// Radio Browser codec strings (e.g. `"OGG,VORBIS"` or `"MP3"`).
+/// HLS stations (`hls == true`, #2012) play when their segments carry AAC, MP3,
+/// or FLAC (via fMP4, #2408). Their directory codec is often `"UNKNOWN"`,
+/// `"MP4"` (for fMP4), or names the video too (`"AAC,H.264"`), so those are
+/// accepted; the real codec is learned from the stream when it opens, and one
+/// the engine can't decode (or encrypted HLS) fails there with a clear error.
+/// Case- and whitespace-insensitive; accepts multi-token Radio Browser codec
+/// strings (e.g. `"OGG,VORBIS"` or `"MP3"`).
 pub fn can_play_stream(codec: &str, hls: bool) -> bool {
     let normalized = codec.trim().to_ascii_lowercase();
     if hls {
@@ -52,6 +52,7 @@ pub fn can_play_stream(codec: &str, hls: bool) -> bool {
                     | "mpeg"
                     | "mp4"
                     | "m4a"
+                    | "flac"
                     | "unknown"
                     | "h.264"
                     | "h264"
@@ -170,6 +171,7 @@ mod tests {
             "AAC+",
             "MP3",
             "MP4",
+            "FLAC",
             "",
             "UNKNOWN",
             "AAC,H.264",
@@ -180,7 +182,7 @@ mod tests {
                 "expected HLS {codec:?} to be playable"
             );
         }
-        for codec in ["FLAC", "OGG,OPUS", "WMA", "FLV", "AAC,WMA"] {
+        for codec in ["OGG,OPUS", "WMA", "FLV", "AAC,WMA"] {
             assert!(
                 !can_play_stream(codec, true),
                 "expected HLS {codec:?} to be rejected"

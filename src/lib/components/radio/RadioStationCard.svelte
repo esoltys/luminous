@@ -24,6 +24,11 @@
   let artFailed = $state(false);
   let menu = $state<{ x: number; y: number } | null>(null);
   const artworkUrl = $derived(resolveArtUrl(station.favicon));
+  const formatLabel = $derived(
+    [station.codec?.trim(), station.bitrate > 0 ? `${station.bitrate} kbps` : ""]
+      .filter(Boolean)
+      .join(" "),
+  );
 
   $effect(() => {
     void station.favicon;
@@ -103,9 +108,9 @@
       {station.name || i18n.t("radio.unnamedStation")}
     </button>
 
-    {#if station.bitrate > 0}
+    {#if formatLabel}
       <p class="mt-0.5 text-xs text-brand-text-secondary font-medium truncate">
-        {station.bitrate} kbps
+        {formatLabel}
       </p>
     {/if}
   </div>

@@ -6,8 +6,8 @@
 //! an HLS station like any other non-seekable live stream.
 //!
 //! Supported: MPEG-TS, packed-audio (ID3 + ADTS/MP3), and fragmented MP4
-//! (fMP4 / CMAF `EXT-X-MAP` + `.m4s` AAC) segments, master playlists (variant
-//! and audio-rendition selection) and live window reloads.
+//! (fMP4 / CMAF `EXT-X-MAP` + `.m4s` AAC or FLAC) segments, master playlists
+//! (variant and audio-rendition selection) and live window reloads.
 //! Not supported, with a clear error at open: encrypted segments (`EXT-X-KEY`).
 
 pub mod playlist;
