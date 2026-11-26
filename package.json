@@ -47,7 +47,7 @@
     "@tauri-apps/plugin-process": "^2",
     "@tauri-apps/plugin-updater": "^2",
     "phosphor-svelte": "^3.1.1",
-    "simple-icons": "^16.38.0",
+    "simple-icons": "^16.38.1",
     "svelte-virtual-list-ts": "^0.0.3",
     "tailwindcss": "^4.3.5"
   },
