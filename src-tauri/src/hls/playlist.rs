@@ -44,8 +44,8 @@ pub struct MediaPlaylist {
     pub end_list: bool,
     /// An `EXT-X-KEY` with a method other than `NONE`.
     pub encrypted: bool,
-    /// An `EXT-X-MAP` init section, which means fragmented MP4 segments.
-    pub has_init_map: bool,
+    /// An `EXT-X-MAP` init section URI (used by fragmented MP4 / CMAF segments).
+    pub init_map: Option<Url>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -121,8 +121,11 @@ pub fn parse(text: &str, base: &Url) -> Result<Playlist, String> {
             if attr(&attrs, "METHOD").is_some_and(|m| m != "NONE") {
                 media.encrypted = true;
             }
-        } else if line.starts_with("#EXT-X-MAP") {
-            media.has_init_map = true;
+        } else if let Some(rest) = line.strip_prefix("#EXT-X-MAP:") {
+            let attrs = parse_attributes(rest);
+            if let Some(uri) = attr(&attrs, "URI").and_then(|u| base.join(u).ok()) {
+                media.init_map = Some(uri);
+            }
         } else if line.starts_with("#EXTINF") {
             pending_segment = true;
         } else if line.starts_with('#') {
@@ -280,7 +283,7 @@ mod tests {
         };
         assert_eq!(media.target_duration_secs, 10);
         assert_eq!(media.media_sequence, 4711);
-        assert!(!media.end_list && !media.encrypted && !media.has_init_map);
+        assert!(!media.end_list && !media.encrypted && media.init_map.is_none());
         let seqs: Vec<u64> = media.segments.iter().map(|s| s.sequence).collect();
         assert_eq!(seqs, vec![4711, 4712, 4713]);
         assert_eq!(
@@ -304,7 +307,7 @@ mod tests {
         let Playlist::Media(media) = parse(text, &base()).unwrap() else {
             panic!("expected a media playlist");
         };
-        assert!(media.encrypted && media.has_init_map && media.end_list);
+        assert!(media.encrypted && media.init_map.is_some() && media.end_list);
 
         let clear = "#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXT-X-KEY:METHOD=NONE\n#EXTINF:6,\na.ts\n";
         let Playlist::Media(media) = parse(clear, &base()).unwrap() else {

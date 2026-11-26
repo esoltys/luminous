@@ -5,10 +5,10 @@
 //! ADTS AAC or MPEG audio byte stream (see [`segment`]), so the engine treats
 //! an HLS station like any other non-seekable live stream.
 //!
-//! Supported: MPEG-TS and packed-audio (ID3 + ADTS/MP3) segments, master
-//! playlists (variant and audio-rendition selection) and live window reloads.
-//! Not supported, with a clear error at open: encrypted segments (`EXT-X-KEY`)
-//! and fragmented MP4 (`EXT-X-MAP`).
+//! Supported: MPEG-TS, packed-audio (ID3 + ADTS/MP3), and fragmented MP4
+//! (fMP4 / CMAF `EXT-X-MAP` + `.m4s` AAC) segments, master playlists (variant
+//! and audio-rendition selection) and live window reloads.
+//! Not supported, with a clear error at open: encrypted segments (`EXT-X-KEY`).
 
 pub mod playlist;
 pub mod segment;
@@ -134,6 +134,10 @@ impl HlsLiveSource {
         };
 
         let mut demux = SegmentDemuxer::new();
+        if let Some(ref map_url) = media.init_map {
+            let init_bytes = fetch_bytes(map_url, MAX_SEGMENT_BYTES)?;
+            demux.set_init_segment(&init_bytes)?;
+        }
         let first_audio = demux.process(&fetch_bytes(&first.uri, MAX_SEGMENT_BYTES)?)?;
         let kind = first_audio
             .kind
@@ -148,6 +152,7 @@ impl HlsLiveSource {
         let worker = Worker {
             media_url,
             next_sequence: first.sequence + 1,
+            last_init_map: media.init_map.clone(),
             last_media: media,
             demux,
             tx,
@@ -241,6 +246,7 @@ impl MediaSource for HlsLiveSource {
 struct Worker {
     media_url: Url,
     next_sequence: u64,
+    last_init_map: Option<Url>,
     last_media: MediaPlaylist,
     demux: SegmentDemuxer,
     tx: mpsc::SyncSender<Result<Vec<u8>, String>>,
@@ -270,7 +276,25 @@ impl Worker {
                 return;
             }
             match self.reload() {
-                Some(next) => media = next,
+                Some(next) => {
+                    if next.init_map != self.last_init_map {
+                        if let Some(ref map_url) = next.init_map {
+                            match fetch_bytes(map_url, MAX_SEGMENT_BYTES)
+                                .and_then(|b| self.demux.set_init_segment(&b))
+                            {
+                                Ok(()) => self.last_init_map = next.init_map.clone(),
+                                Err(e) => {
+                                    let _ = self.tx.send(Err(format!(
+                                        "HLS station '{}' failed to load init segment: {e}",
+                                        self.label
+                                    )));
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    media = next;
+                }
                 None => return,
             }
         }
@@ -394,14 +418,9 @@ impl Worker {
     }
 }
 
-fn check_supported(media: &MediaPlaylist, label: &str) -> Result<(), String> {
+pub(crate) fn check_supported(media: &MediaPlaylist, label: &str) -> Result<(), String> {
     if media.encrypted {
         return Err(format!("Can't play '{label}': its HLS stream is encrypted"));
-    }
-    if media.has_init_map {
-        return Err(format!(
-            "Can't play '{label}': its HLS stream uses fragmented MP4, which isn't supported"
-        ));
     }
     Ok(())
 }

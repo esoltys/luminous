@@ -6,6 +6,10 @@
 //! - MPEG-TS segments are remuxed at the byte level: the audio PES payloads of
 //!   the program's first audio stream are extracted, and video, timed ID3
 //!   metadata and every other PID are dropped.
+//! - Fragmented MP4 (fMP4 / CMAF) segments (`EXT-X-MAP` init + `.m4s`
+//!   fragments) have their raw AAC frames extracted from `moof`/`mdat` and
+//!   wrapped in 7-byte ADTS headers using the `AudioSpecificConfig` from the
+//!   init segment's `moov`/`mp4a`/`esds`.
 //!
 //! The result is an ADTS or MPEG audio byte stream, so no container demuxer is
 //! needed downstream.
@@ -41,13 +45,16 @@ pub struct SegmentAudio {
 }
 
 /// Stateful segment processor: an MPEG-TS stream's PIDs normally repeat in
-/// every segment, but are remembered across segments in case one omits them.
+/// every segment, but are remembered across segments in case one omits them;
+/// an fMP4 stream's `EXT-X-MAP` init segment provides the AAC codec config
+/// for all subsequent `.m4s` fragments.
 #[derive(Debug, Default)]
 pub struct SegmentDemuxer {
     pmt_pid: Option<u16>,
     audio_pid: Option<u16>,
     audio_kind: Option<AudioKind>,
     unsupported_audio: bool,
+    fmp4_init: Option<Fmp4Init>,
 }
 
 impl SegmentDemuxer {
@@ -55,20 +62,42 @@ impl SegmentDemuxer {
         Self::default()
     }
 
+    /// Parses an fMP4 `EXT-X-MAP` initialization segment (`ftyp` + `moov`) so
+    /// subsequent `.m4s` media segments can be demuxed into ADTS AAC frames.
+    pub fn set_init_segment(&mut self, data: &[u8]) -> Result<(), String> {
+        let init = parse_fmp4_init(data)?;
+        self.fmp4_init = Some(init);
+        Ok(())
+    }
+
     /// Extracts the audio from one downloaded segment.
     pub fn process(&mut self, data: &[u8]) -> Result<SegmentAudio, String> {
         if is_transport_stream(data) {
             return self.process_ts(data);
         }
+        if is_fmp4_segment(data) {
+            return self.process_fmp4(data);
+        }
         let (title, rest) = strip_id3_tags(data);
         let kind = sniff_frame_kind(rest).ok_or_else(|| {
-            "HLS segment is neither MPEG-TS nor ADTS/MPEG audio (fragmented MP4 isn't supported)"
-                .to_string()
+            "HLS segment is neither MPEG-TS, fMP4, nor ADTS/MPEG audio".to_string()
         })?;
         Ok(SegmentAudio {
             kind: Some(kind),
             bytes: rest.to_vec(),
             title,
+        })
+    }
+
+    fn process_fmp4(&self, data: &[u8]) -> Result<SegmentAudio, String> {
+        let init = self.fmp4_init.as_ref().ok_or_else(|| {
+            "HLS fragmented MP4 segment arrived without an EXT-X-MAP init segment".to_string()
+        })?;
+        let bytes = extract_fmp4_adts(data, init)?;
+        Ok(SegmentAudio {
+            kind: Some(AudioKind::Adts),
+            bytes,
+            title: None,
         })
     }
 
@@ -299,6 +328,427 @@ fn id3_text(frame: &[u8]) -> Option<String> {
     (!cleaned.is_empty()).then(|| cleaned.to_string())
 }
 
+// ---------------------------------------------------------------------------
+// Fragmented MP4 (fMP4 / CMAF) AAC extraction
+// ---------------------------------------------------------------------------
+
+/// Codec configuration extracted from an fMP4 `EXT-X-MAP` init segment.
+#[derive(Debug, Clone)]
+struct Fmp4Init {
+    track_id: Option<u32>,
+    default_sample_size: Option<u32>,
+    adts_profile: u8,
+    sampling_freq_idx: u8,
+    channel_config: u8,
+}
+
+struct Mp4Box<'a> {
+    box_type: [u8; 4],
+    payload: &'a [u8],
+    offset: usize,
+    total_len: usize,
+}
+
+fn iter_mp4_boxes(data: &[u8]) -> impl Iterator<Item = Mp4Box<'_>> {
+    let mut pos = 0usize;
+    std::iter::from_fn(move || {
+        if pos + 8 > data.len() {
+            return None;
+        }
+        let size32 = u32::from_be_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]);
+        let box_type = [data[pos + 4], data[pos + 5], data[pos + 6], data[pos + 7]];
+        let (header, total_len) = if size32 == 0 {
+            (8usize, data.len() - pos)
+        } else if size32 == 1 {
+            if pos + 16 > data.len() {
+                return None;
+            }
+            let size64 = u64::from_be_bytes([
+                data[pos + 8],
+                data[pos + 9],
+                data[pos + 10],
+                data[pos + 11],
+                data[pos + 12],
+                data[pos + 13],
+                data[pos + 14],
+                data[pos + 15],
+            ]) as usize;
+            (16usize, size64)
+        } else {
+            (8usize, size32 as usize)
+        };
+        if total_len < header || pos + total_len > data.len() {
+            return None;
+        }
+        let offset = pos;
+        let payload = &data[pos + header..pos + total_len];
+        pos += total_len;
+        Some(Mp4Box {
+            box_type,
+            payload,
+            offset,
+            total_len,
+        })
+    })
+}
+
+fn is_fmp4_segment(data: &[u8]) -> bool {
+    let Some(first) = iter_mp4_boxes(data).next() else {
+        return false;
+    };
+    matches!(
+        &first.box_type,
+        b"styp" | b"moof" | b"sidx" | b"emsg" | b"ftyp" | b"free" | b"mdat"
+    ) && first.total_len >= 8
+}
+
+fn find_box<'a>(data: &'a [u8], target: &[u8; 4]) -> Option<&'a [u8]> {
+    iter_mp4_boxes(data)
+        .find(|b| &b.box_type == target)
+        .map(|b| b.payload)
+}
+
+fn parse_fmp4_init(data: &[u8]) -> Result<Fmp4Init, String> {
+    let moov = find_box(data, b"moov")
+        .ok_or_else(|| "HLS fMP4 init segment has no 'moov' box".to_string())?;
+
+    let mut trex_defaults: Vec<(u32, u32)> = Vec::new();
+    if let Some(mvex) = find_box(moov, b"mvex") {
+        for b in iter_mp4_boxes(mvex) {
+            if &b.box_type == b"trex" && b.payload.len() >= 24 {
+                let tid =
+                    u32::from_be_bytes([b.payload[4], b.payload[5], b.payload[6], b.payload[7]]);
+                let def_sz = u32::from_be_bytes([
+                    b.payload[16],
+                    b.payload[17],
+                    b.payload[18],
+                    b.payload[19],
+                ]);
+                trex_defaults.push((tid, def_sz));
+            }
+        }
+    }
+
+    for trak in iter_mp4_boxes(moov).filter(|b| &b.box_type == b"trak") {
+        let track_id = find_box(trak.payload, b"tkhd").and_then(|tkhd| {
+            let version = *tkhd.first()?;
+            let off = if version == 1 { 20 } else { 12 };
+            let bytes = tkhd.get(off..off + 4)?;
+            Some(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+        });
+
+        let Some(mdia) = find_box(trak.payload, b"mdia") else {
+            continue;
+        };
+        if let Some(hdlr) = find_box(mdia, b"hdlr") {
+            if hdlr.get(8..12) != Some(b"soun".as_slice()) {
+                continue;
+            }
+        }
+        let Some(stsd) = find_box(mdia, b"minf")
+            .and_then(|m| find_box(m, b"stbl"))
+            .and_then(|s| find_box(s, b"stsd"))
+        else {
+            continue;
+        };
+        let Some(entries) = stsd.get(8..) else {
+            continue;
+        };
+        if let Some(mp4a) = find_box(entries, b"mp4a") {
+            if mp4a.len() < 28 {
+                continue;
+            }
+            let channel_count = u16::from_be_bytes([mp4a[16], mp4a[17]]);
+            let esds = find_box(&mp4a[28..], b"esds").ok_or_else(|| {
+                "HLS fMP4 audio track has 'mp4a' without 'esds' descriptor".to_string()
+            })?;
+            let asc = parse_esds_audio_specific_config(esds)?;
+            let (adts_profile, sampling_freq_idx, mut channel_config) =
+                parse_audio_specific_config(&asc)?;
+            if channel_config == 0 && channel_count > 0 {
+                channel_config = channel_count.min(7) as u8;
+            }
+            let default_sample_size = track_id
+                .and_then(|tid| {
+                    trex_defaults
+                        .iter()
+                        .find(|(t, _)| *t == tid)
+                        .map(|(_, s)| *s)
+                })
+                .filter(|&s| s > 0);
+            return Ok(Fmp4Init {
+                track_id,
+                default_sample_size,
+                adts_profile,
+                sampling_freq_idx,
+                channel_config,
+            });
+        }
+    }
+
+    Err("HLS fMP4 init segment has no supported AAC ('mp4a') audio track".to_string())
+}
+
+fn read_mp4_descr_len(data: &[u8], pos: &mut usize) -> Option<usize> {
+    let mut len = 0usize;
+    for _ in 0..4 {
+        let b = *data.get(*pos)?;
+        *pos += 1;
+        len = (len << 7) | usize::from(b & 0x7f);
+        if b & 0x80 == 0 {
+            return Some(len);
+        }
+    }
+    Some(len)
+}
+
+fn parse_esds_audio_specific_config(esds: &[u8]) -> Result<Vec<u8>, String> {
+    // FullBox header is 4 bytes.
+    let mut pos = 4usize;
+    while pos < esds.len() {
+        let tag = esds[pos];
+        pos += 1;
+        let len = read_mp4_descr_len(esds, &mut pos)
+            .ok_or_else(|| "Truncated ESDS descriptor in fMP4 init segment".to_string())?;
+        let end = (pos + len).min(esds.len());
+        match tag {
+            0x03 => {
+                // ES_Descriptor: 2B ES_ID + 1B flags (+ optional fields)
+                if pos + 3 > end {
+                    break;
+                }
+                let flags = esds[pos + 2];
+                pos += 3;
+                if flags & 0x80 != 0 {
+                    pos += 2;
+                }
+                if flags & 0x40 != 0 {
+                    let url_len = *esds.get(pos).unwrap_or(&0) as usize;
+                    pos += 1 + url_len;
+                }
+                if flags & 0x20 != 0 {
+                    pos += 2;
+                }
+            }
+            0x04 => {
+                // DecoderConfigDescriptor: 13B fixed header before child descriptors
+                if pos + 13 > end {
+                    break;
+                }
+                pos += 13;
+            }
+            0x05 => {
+                // DecoderSpecificInfo = AudioSpecificConfig
+                return Ok(esds[pos..end].to_vec());
+            }
+            _ => pos = end,
+        }
+    }
+    Err("HLS fMP4 'esds' box missing AudioSpecificConfig".to_string())
+}
+
+fn parse_audio_specific_config(asc: &[u8]) -> Result<(u8, u8, u8), String> {
+    if asc.len() < 2 {
+        return Err("HLS fMP4 AudioSpecificConfig is too short".to_string());
+    }
+    let obj_type = (asc[0] >> 3) & 0x1f;
+    let mut freq_idx = ((asc[0] & 0x07) << 1) | ((asc[1] >> 7) & 0x01);
+    let mut chan_cfg = (asc[1] >> 3) & 0x0f;
+    if freq_idx == 15 {
+        if asc.len() < 5 {
+            return Err("HLS fMP4 AudioSpecificConfig has truncated explicit sample rate".into());
+        }
+        let hz = (u32::from(asc[1] & 0x7f) << 17)
+            | (u32::from(asc[2]) << 9)
+            | (u32::from(asc[3]) << 1)
+            | u32::from((asc[4] >> 7) & 1);
+        freq_idx = match hz {
+            96_000 => 0,
+            88_200 => 1,
+            64_000 => 2,
+            48_000 => 3,
+            44_100 => 4,
+            32_000 => 5,
+            24_000 => 6,
+            22_050 => 7,
+            16_000 => 8,
+            12_000 => 9,
+            11_025 => 10,
+            8_000 => 11,
+            7_350 => 12,
+            _ => return Err(format!("Unsupported AAC sample rate in fMP4: {hz} Hz")),
+        };
+        chan_cfg = (asc[4] >> 3) & 0x0f;
+    }
+    if freq_idx > 12 {
+        return Err(format!(
+            "Unsupported AAC sample rate index in fMP4: {freq_idx}"
+        ));
+    }
+    // ADTS 2-bit profile: 0=Main, 1=LC, 2=SSR, 3=LTP. Explicit SBR/PS (5/29)
+    // wrap an LC core, so ADTS carries profile 1 (LC).
+    let adts_profile = match obj_type {
+        2 | 5 | 29 => 1,
+        1..=4 => obj_type - 1,
+        _ => 1,
+    };
+    Ok((adts_profile, freq_idx, chan_cfg))
+}
+
+struct PendingMoof {
+    moof_offset: usize,
+    data_offset: Option<i32>,
+    sample_sizes: Vec<u32>,
+}
+
+fn parse_moof_samples(moof: &[u8], moof_offset: usize, init: &Fmp4Init) -> PendingMoof {
+    let mut data_offset = None;
+    let mut sample_sizes = Vec::new();
+    for traf in iter_mp4_boxes(moof).filter(|b| &b.box_type == b"traf") {
+        let Some(tfhd) = find_box(traf.payload, b"tfhd") else {
+            continue;
+        };
+        if tfhd.len() < 8 {
+            continue;
+        }
+        let tfhd_flags = u32::from_be_bytes([0, tfhd[1], tfhd[2], tfhd[3]]);
+        let track_id = u32::from_be_bytes([tfhd[4], tfhd[5], tfhd[6], tfhd[7]]);
+        if init.track_id.is_some_and(|tid| tid != track_id) {
+            continue;
+        }
+        let mut off = 8usize;
+        if tfhd_flags & 0x000001 != 0 {
+            off += 8;
+        }
+        if tfhd_flags & 0x000002 != 0 {
+            off += 4;
+        }
+        if tfhd_flags & 0x000008 != 0 {
+            off += 4;
+        }
+        let tfhd_default_size = if tfhd_flags & 0x000010 != 0 {
+            let sz = tfhd
+                .get(off..off + 4)
+                .map(|b| u32::from_be_bytes([b[0], b[1], b[2], b[3]]));
+            sz
+        } else {
+            None
+        };
+        let default_size = tfhd_default_size.or(init.default_sample_size).unwrap_or(0);
+
+        for trun in iter_mp4_boxes(traf.payload).filter(|b| &b.box_type == b"trun") {
+            if trun.payload.len() < 8 {
+                continue;
+            }
+            let flags = u32::from_be_bytes([0, trun.payload[1], trun.payload[2], trun.payload[3]]);
+            let sample_count = u32::from_be_bytes([
+                trun.payload[4],
+                trun.payload[5],
+                trun.payload[6],
+                trun.payload[7],
+            ]) as usize;
+            let mut p = 8usize;
+            if flags & 0x000001 != 0 {
+                if let Some(b) = trun.payload.get(p..p + 4) {
+                    if data_offset.is_none() {
+                        data_offset = Some(i32::from_be_bytes([b[0], b[1], b[2], b[3]]));
+                    }
+                }
+                p += 4;
+            }
+            if flags & 0x000004 != 0 {
+                p += 4;
+            }
+            for _ in 0..sample_count {
+                if flags & 0x000100 != 0 {
+                    p += 4;
+                }
+                let sz = if flags & 0x000200 != 0 {
+                    let Some(b) = trun.payload.get(p..p + 4) else {
+                        break;
+                    };
+                    p += 4;
+                    u32::from_be_bytes([b[0], b[1], b[2], b[3]])
+                } else {
+                    default_size
+                };
+                if flags & 0x000400 != 0 {
+                    p += 4;
+                }
+                if flags & 0x000800 != 0 {
+                    p += 4;
+                }
+                if sz > 0 {
+                    sample_sizes.push(sz);
+                }
+            }
+        }
+    }
+    PendingMoof {
+        moof_offset,
+        data_offset,
+        sample_sizes,
+    }
+}
+
+fn write_adts_header(out: &mut Vec<u8>, init: &Fmp4Init, frame_payload_len: usize) {
+    let frame_len = 7 + frame_payload_len;
+    let profile = init.adts_profile & 0x03;
+    let freq = init.sampling_freq_idx & 0x0f;
+    let chan = init.channel_config & 0x07;
+    out.extend_from_slice(&[
+        0xff,
+        0xf1,
+        (profile << 6) | (freq << 2) | (chan >> 2),
+        ((chan & 0x03) << 6) | (((frame_len >> 11) & 0x03) as u8),
+        ((frame_len >> 3) & 0xff) as u8,
+        (((frame_len & 0x07) << 5) as u8) | 0x1f,
+        0xfc,
+    ]);
+}
+
+fn extract_fmp4_adts(data: &[u8], init: &Fmp4Init) -> Result<Vec<u8>, String> {
+    let mut out = Vec::new();
+    let mut pending: Option<PendingMoof> = None;
+
+    for b in iter_mp4_boxes(data) {
+        match &b.box_type {
+            b"moof" => {
+                pending = Some(parse_moof_samples(b.payload, b.offset, init));
+            }
+            b"mdat" => {
+                let Some(moof) = pending.take() else {
+                    continue;
+                };
+                let mut cursor = moof
+                    .data_offset
+                    .and_then(|off| {
+                        let abs = moof.moof_offset.checked_add_signed(off as isize)?;
+                        let payload_start = b.offset + (b.total_len - b.payload.len());
+                        abs.checked_sub(payload_start)
+                    })
+                    .filter(|&rel| rel <= b.payload.len())
+                    .unwrap_or(0);
+                for sz in moof.sample_sizes {
+                    let sz = sz as usize;
+                    let Some(sample) = b.payload.get(cursor..cursor + sz) else {
+                        return Err("Truncated AAC sample in fMP4 'mdat' box".to_string());
+                    };
+                    write_adts_header(&mut out, init, sz);
+                    out.extend_from_slice(sample);
+                    cursor += sz;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if out.is_empty() {
+        return Err("HLS fMP4 segment contained no AAC audio samples".to_string());
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -477,11 +927,86 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn fragmented_mp4_segments_are_rejected() {
+    fn fmp4_segments_without_init_are_rejected() {
         let mut data = vec![0, 0, 0, 24];
         data.extend_from_slice(b"styp");
         data.extend_from_slice(&[0; 16]);
-        assert!(SegmentDemuxer::new().process(&data).is_err());
+        let err = SegmentDemuxer::new().process(&data).unwrap_err();
+        assert!(err.contains("init segment"), "{err}");
+    }
+
+    fn mp4_box(tag: &[u8; 4], payload: &[u8]) -> Vec<u8> {
+        let mut out = ((payload.len() + 8) as u32).to_be_bytes().to_vec();
+        out.extend_from_slice(tag);
+        out.extend_from_slice(payload);
+        out
+    }
+
+    pub(crate) fn fmp4_aac_init(track_id: u32, asc: [u8; 2]) -> Vec<u8> {
+        let mut tkhd = vec![0u8; 84];
+        tkhd[12..16].copy_from_slice(&track_id.to_be_bytes());
+        let mut hdlr = vec![0u8; 16];
+        hdlr[8..12].copy_from_slice(b"soun");
+        // esds: FullBox(4) + tag3(len=20) + es_id(2)+flags(1) + tag4(len=15) + 13B + tag5(len=2) + asc(2)
+        let mut esds = vec![0, 0, 0, 0, 0x03, 20, 0, 1, 0, 0x04, 15, 0x40, 0x15];
+        esds.extend_from_slice(&[0; 11]);
+        esds.extend_from_slice(&[0x05, 2, asc[0], asc[1]]);
+        let mut mp4a = vec![0u8; 28];
+        mp4a[16..18].copy_from_slice(&2u16.to_be_bytes());
+        mp4a.extend(mp4_box(b"esds", &esds));
+        let mut stsd = vec![0, 0, 0, 0, 0, 0, 0, 1];
+        stsd.extend(mp4_box(b"mp4a", &mp4a));
+        let stbl = mp4_box(b"stbl", &mp4_box(b"stsd", &stsd));
+        let minf = mp4_box(b"minf", &stbl);
+        let mdia = mp4_box(b"mdia", &[mp4_box(b"hdlr", &hdlr), minf].concat());
+        let trak = mp4_box(b"trak", &[mp4_box(b"tkhd", &tkhd), mdia].concat());
+        let moov = mp4_box(b"moov", &trak);
+        [mp4_box(b"ftyp", b"isom\0\0\0\0"), moov].concat()
+    }
+
+    pub(crate) fn fmp4_aac_segment(track_id: u32, frames: &[&[u8]]) -> Vec<u8> {
+        let mut tfhd = vec![0, 0, 0, 0];
+        tfhd.extend_from_slice(&track_id.to_be_bytes());
+        // trun: flags=0x000201 (data_offset + sample_size)
+        let mut trun = vec![0, 0, 0x02, 0x01];
+        trun.extend_from_slice(&(frames.len() as u32).to_be_bytes());
+        let data_offset_pos = trun.len();
+        trun.extend_from_slice(&0i32.to_be_bytes());
+        for f in frames {
+            trun.extend_from_slice(&(f.len() as u32).to_be_bytes());
+        }
+        let traf = mp4_box(
+            b"traf",
+            &[mp4_box(b"tfhd", &tfhd), mp4_box(b"trun", &trun)].concat(),
+        );
+        let moof_len = 8 + traf.len();
+        // Patch data_offset = moof_len + 8 (mdat header)
+        let trun_offset_in_moof = 8 + 8 + 8 + tfhd.len() + 8 + data_offset_pos;
+        let mut moof = mp4_box(b"moof", &traf);
+        moof[trun_offset_in_moof..trun_offset_in_moof + 4]
+            .copy_from_slice(&((moof_len + 8) as i32).to_be_bytes());
+        let payload: Vec<u8> = frames.iter().flat_map(|f| f.iter().copied()).collect();
+        [moof, mp4_box(b"mdat", &payload)].concat()
+    }
+
+    #[test]
+    fn fmp4_init_and_media_segment_emit_adts_frames() {
+        // AAC-LC (2), 44100 Hz (4), stereo (2) -> 0x12, 0x10
+        let init = fmp4_aac_init(1, [0x12, 0x10]);
+        let f1 = [0xde, 0xad, 0xbe, 0xef];
+        let f2 = [0xca, 0xfe];
+        let seg = fmp4_aac_segment(1, &[&f1, &f2]);
+
+        let mut demux = SegmentDemuxer::new();
+        demux.set_init_segment(&init).unwrap();
+        let audio = demux.process(&seg).unwrap();
+        assert_eq!(audio.kind, Some(AudioKind::Adts));
+        // Two frames, each with 7-byte ADTS header + payload
+        assert_eq!(audio.bytes.len(), (7 + f1.len()) + (7 + f2.len()));
+        assert_eq!(&audio.bytes[..2], &[0xff, 0xf1]);
+        assert_eq!(&audio.bytes[7..7 + f1.len()], &f1);
+        assert_eq!(&audio.bytes[7 + f1.len()..7 + f1.len() + 2], &[0xff, 0xf1]);
+        assert_eq!(&audio.bytes[7 + f1.len() + 7..], &f2);
     }
 
     #[test]

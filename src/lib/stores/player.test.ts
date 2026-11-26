@@ -877,6 +877,21 @@ describe("PlayerStore (mocked listeners)", () => {
       });
       await vi.advanceTimersByTimeAsync(500);
       expect(showSpy).toHaveBeenLastCalledWith('"Custom Stream" — Station offline.', "error");
+
+      errorCallback?.({
+        payload: {
+          songId: 1,
+          title: "Enc FM",
+          path: "https://example.com/enc.m3u8",
+          isLive: true,
+          message: "Can't play 'Enc FM': its HLS stream is encrypted",
+        },
+      });
+      await vi.advanceTimersByTimeAsync(500);
+      expect(showSpy).toHaveBeenLastCalledWith(
+        `"Enc FM" — Can't play 'Enc FM': its HLS stream is encrypted.`,
+        "error",
+      );
     } finally {
       vi.useRealTimers();
       if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);

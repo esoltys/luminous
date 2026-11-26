@@ -152,6 +152,18 @@ struct WireStation {
     lastchangetime_iso8601: Option<String>,
 }
 
+/// Normalizes a Radio Browser `bitrate` value to kbps. Some directory entries
+/// report bps (e.g. `320000`) instead of kbps (`320`); values `>= 10_000`
+/// are divided by 1000.
+pub fn normalize_bitrate_kbps(raw: i32) -> i32 {
+    let clamped = raw.max(0);
+    if clamped >= 10_000 {
+        clamped / 1000
+    } else {
+        clamped
+    }
+}
+
 impl WireStation {
     fn into_normalized(self) -> Option<RadioBrowserStation> {
         let stationuuid = self.stationuuid.trim().to_ascii_lowercase();
@@ -196,7 +208,7 @@ impl WireStation {
             countrycode,
             language,
             codec,
-            bitrate: self.bitrate.max(0),
+            bitrate: normalize_bitrate_kbps(self.bitrate),
             hls: self.hls,
             votes: self.votes.max(0),
             clickcount: self.clickcount.max(0),
@@ -1010,5 +1022,14 @@ mod tests {
 
         let url = client.report_station_click("station-123").await.unwrap();
         assert_eq!(url, "https://stream.example.com/live.mp3");
+    }
+
+    #[test]
+    fn normalize_bitrate_kbps_scales_bps_values() {
+        assert_eq!(normalize_bitrate_kbps(-10), 0);
+        assert_eq!(normalize_bitrate_kbps(320), 320);
+        assert_eq!(normalize_bitrate_kbps(1411), 1411);
+        assert_eq!(normalize_bitrate_kbps(320_000), 320);
+        assert_eq!(normalize_bitrate_kbps(128_000), 128);
     }
 }

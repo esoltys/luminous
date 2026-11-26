@@ -1,7 +1,7 @@
 //! End-to-end HLS tests against a mock HTTP server, opened through the same
 //! live-stream entry point the audio engine uses.
 
-use super::segment::tests::{adts_frame, id3_tag, ts_segment};
+use super::segment::tests::{adts_frame, fmp4_aac_init, fmp4_aac_segment, id3_tag, ts_segment};
 use crate::media_source::LiveHttpSource;
 use std::io::Read;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -178,20 +178,15 @@ async fn packed_audio_segments_publish_their_id3_titles() {
 }
 
 #[tokio::test]
-async fn encrypted_and_fragmented_mp4_streams_fail_with_a_clear_error() {
+async fn encrypted_streams_fail_with_a_clear_error() {
     let server = MockServer::start().await;
-    for (name, tag) in [
-        ("enc", "#EXT-X-KEY:METHOD=AES-128,URI=\"key\""),
-        ("fmp4", "#EXT-X-MAP:URI=\"init.mp4\""),
-    ] {
-        Mock::given(method("GET"))
-            .and(path(format!("/{name}.m3u8")))
-            .respond_with(ResponseTemplate::new(200).set_body_string(format!(
-                "#EXTM3U\n#EXT-X-TARGETDURATION:6\n{tag}\n#EXTINF:6,\nseg.ts\n"
-            )))
-            .mount(&server)
-            .await;
-    }
+    Mock::given(method("GET"))
+        .and(path("/enc.m3u8"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(
+            "#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXT-X-KEY:METHOD=AES-128,URI=\"key\"\n#EXTINF:6,\nseg.ts\n",
+        ))
+        .mount(&server)
+        .await;
 
     let base = server.uri();
     tokio::task::spawn_blocking(move || {
@@ -203,14 +198,53 @@ async fn encrypted_and_fragmented_mp4_streams_fail_with_a_clear_error() {
         .err()
         .expect("encrypted stream rejected");
         assert!(err.contains("encrypted"), "{err}");
-        let err = LiveHttpSource::open_with_backoffs(
-            &format!("{base}/fmp4.m3u8"),
-            Some("Mp4 FM"),
-            Vec::new(),
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn fragmented_mp4_aac_hls_stream_plays_as_adts() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/hls/program.m3u8"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", PLAYLIST_MIME)
+                .set_body_string(
+                    "#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-TARGETDURATION:10\n\
+                     #EXT-X-MEDIA-SEQUENCE:1\n#EXT-X-MAP:URI=\"program_init.mp4\"\n\
+                     #EXTINF:9.984,\nseg1.m4s\n#EXT-X-ENDLIST\n",
+                ),
         )
-        .err()
-        .expect("fMP4 stream rejected");
-        assert!(err.contains("fragmented MP4"), "{err}");
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/hls/program_init.mp4"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(fmp4_aac_init(1, [0x12, 0x10])))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/hls/seg1.m4s"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "application/octet-stream")
+                .set_body_bytes(fmp4_aac_segment(1, &[b"abcd", b"ef"])),
+        )
+        .mount(&server)
+        .await;
+
+    let url = format!("{}/hls/program.m3u8", server.uri());
+    tokio::task::spawn_blocking(move || {
+        let opened = LiveHttpSource::open_with_backoffs(&url, Some("SomaFM"), Vec::new())
+            .expect("open fMP4 HLS station");
+        assert_eq!(opened.mime_type.as_deref(), Some("audio/aac"));
+        let mut all = Vec::new();
+        opened.reader.take(1 << 20).read_to_end(&mut all).unwrap();
+        assert_eq!(&all[..2], &[0xff, 0xf1]);
+        assert_eq!(&all[7..11], b"abcd");
+        assert_eq!(&all[11..13], &[0xff, 0xf1]);
+        assert_eq!(&all[18..20], b"ef");
     })
     .await
     .unwrap();
