@@ -392,7 +392,7 @@ export class PlayerStore {
         isLive &&
         reason &&
         (reason.startsWith("Can't play ") ||
-          /encrypted|isn't supported|not an audio stream|codec|has no supported|fMP4|HLS/i.test(
+          /encrypted|isn't supported|not an audio stream|codec|has no supported|no audio in/i.test(
             reason,
           ));
       if (isLive && !isSpecificLiveReason) {

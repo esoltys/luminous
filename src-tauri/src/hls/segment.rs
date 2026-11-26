@@ -100,8 +100,7 @@ impl SegmentDemuxer {
         let init = self.fmp4_init.as_ref().ok_or_else(|| {
             "HLS fragmented MP4 segment arrived without an EXT-X-MAP init segment".to_string()
         })?;
-        let mut emit_flac_header = !self.flac_header_emitted;
-        let (kind, bytes) = extract_fmp4_audio(data, init, &mut emit_flac_header)?;
+        let (kind, bytes) = extract_fmp4_audio(data, init, !self.flac_header_emitted)?;
         if kind == AudioKind::Flac {
             self.flac_header_emitted = true;
         }
@@ -775,7 +774,7 @@ fn write_adts_header(
 fn extract_fmp4_audio(
     data: &[u8],
     init: &Fmp4Init,
-    emit_flac_header: &mut bool,
+    mut include_flac_header: bool,
 ) -> Result<(AudioKind, Vec<u8>), String> {
     let mut out = Vec::new();
     let mut pending: Option<PendingMoof> = None;
@@ -825,10 +824,10 @@ fn extract_fmp4_audio(
                             out.extend_from_slice(sample);
                         }
                         Fmp4Codec::Flac { metadata_blocks } => {
-                            if *emit_flac_header {
+                            if include_flac_header {
                                 out.extend_from_slice(b"fLaC");
                                 out.extend_from_slice(metadata_blocks);
-                                *emit_flac_header = false;
+                                include_flac_header = false;
                             }
                             out.extend_from_slice(sample);
                         }
@@ -1062,7 +1061,7 @@ pub(crate) mod tests {
         [mp4_box(b"ftyp", b"isom\0\0\0\0"), moov].concat()
     }
 
-    pub(crate) fn fmp4_aac_segment(track_id: u32, frames: &[&[u8]]) -> Vec<u8> {
+    pub(crate) fn fmp4_media_segment(track_id: u32, frames: &[&[u8]]) -> Vec<u8> {
         let mut tfhd = vec![0, 0, 0, 0];
         tfhd.extend_from_slice(&track_id.to_be_bytes());
         // trun: flags=0x000201 (data_offset + sample_size)
@@ -1093,7 +1092,7 @@ pub(crate) mod tests {
         let init = fmp4_aac_init(1, [0x12, 0x10]);
         let f1 = [0xde, 0xad, 0xbe, 0xef];
         let f2 = [0xca, 0xfe];
-        let seg = fmp4_aac_segment(1, &[&f1, &f2]);
+        let seg = fmp4_media_segment(1, &[&f1, &f2]);
 
         let mut demux = SegmentDemuxer::new();
         demux.set_init_segment(&init).unwrap();
@@ -1135,8 +1134,8 @@ pub(crate) mod tests {
         let init = fmp4_flac_init(1, &blocks);
         let f1 = [0xff, 0xf8, 0x69, 0x00];
         let f2 = [0xff, 0xf8, 0x69, 0x01];
-        let seg1 = fmp4_aac_segment(1, &[&f1]);
-        let seg2 = fmp4_aac_segment(1, &[&f2]);
+        let seg1 = fmp4_media_segment(1, &[&f1]);
+        let seg2 = fmp4_media_segment(1, &[&f2]);
 
         let mut demux = SegmentDemuxer::new();
         demux.set_init_segment(&init).unwrap();

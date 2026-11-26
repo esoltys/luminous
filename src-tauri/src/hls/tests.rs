@@ -2,7 +2,7 @@
 //! live-stream entry point the audio engine uses.
 
 use super::segment::tests::{
-    adts_frame, fmp4_aac_init, fmp4_aac_segment, fmp4_flac_init, id3_tag, ts_segment,
+    adts_frame, fmp4_aac_init, fmp4_flac_init, fmp4_media_segment, id3_tag, ts_segment,
 };
 use crate::media_source::LiveHttpSource;
 use std::io::Read;
@@ -231,7 +231,7 @@ async fn fragmented_mp4_aac_hls_stream_plays_as_adts() {
         .respond_with(
             ResponseTemplate::new(200)
                 .insert_header("content-type", "application/octet-stream")
-                .set_body_bytes(fmp4_aac_segment(1, &[b"abcd", b"ef"])),
+                .set_body_bytes(fmp4_media_segment(1, &[b"abcd", b"ef"])),
         )
         .mount(&server)
         .await;
@@ -281,7 +281,7 @@ async fn fragmented_mp4_flac_hls_stream_plays_as_flac() {
         .respond_with(
             ResponseTemplate::new(200)
                 .insert_header("content-type", "application/octet-stream")
-                .set_body_bytes(fmp4_aac_segment(1, &[b"flac1"])),
+                .set_body_bytes(fmp4_media_segment(1, &[b"flac1"])),
         )
         .mount(&server)
         .await;
@@ -290,7 +290,7 @@ async fn fragmented_mp4_flac_hls_stream_plays_as_flac() {
         .respond_with(
             ResponseTemplate::new(200)
                 .insert_header("content-type", "application/octet-stream")
-                .set_body_bytes(fmp4_aac_segment(1, &[b"flac2"])),
+                .set_body_bytes(fmp4_media_segment(1, &[b"flac2"])),
         )
         .mount(&server)
         .await;
