@@ -294,6 +294,32 @@ Measured on 2026-11-18 in scratch profiles over the same 3,999-track library, on
 
 **Speed.** The first measurement of the 4.0.0 branch found a forced full rescan taking 118.7s against 1.8s on 3.2.0 (#2160), because four background analysis threads decoded whole files alongside the scan. Background analysis now runs on one scheduler that waits for the library to settle and pauses during scans (#2164); the rescan is back to 2.1s and the first scan matches 3.2.0 on the same day. The first-scan time on this machine drifts with the drive's cache (3.2.0 took 2.2s on 2026-10-27 and 116s on 2026-11-18), so only same-day runs are comparable. Settled CPU is higher in every scenario (up to 2 percentage points of the machine), consistent with the analysis scheduler still working through the library during the measurement window; this wasn't investigated further.
 
+### 4.1 vs. 4.0 (Windows)
+
+![Memory: 4.1.0 vs. 4.0.0](performance-4.0.0-vs-4.1.0.png)
+
+| Scenario | Private bytes Δ | Working set Δ | Peak private bytes Δ | Peak working set Δ |
+| --- | --- | --- | --- | --- |
+| Idle | −21.2 MB (−4.3%) | −8.8 MB (−1.6%) | −29.0 MB (−4.4%) | −5.2 MB (−0.9%) |
+| After full scan | −51.7 MB (−11.4%) | +13.9 MB (+2.5%) | +20.6 MB (+3.8%) | +5.6 MB (+1.0%) |
+| During playback (EQ + analyzer on) | +24.3 MB (+4.9%) | +18.4 MB (+3.3%) | −18.3 MB (−3.4%) | +19.7 MB (+3.5%) |
+| First scan (with artwork) | +20.5 MB (+4.6%) | +15.1 MB (+3.0%) | +37.9 MB (+7.4%) | +22.8 MB (+4.3%) |
+| Albums grid scrolled (thumbnails) | +5.3 MB (+0.7%) | +3.7 MB (+0.6%) | +15.6 MB (+1.9%) | +47.2 MB (+7.7%) |
+
+Measured on 2026-11-26 in scratch profiles over the same 4,064-track library, one run per version on the same day, playing the baseline track. 4.0.0 is the `v4.0.0` tag (`342371ee`) built in its own worktree; 4.1.0 is the release branch at `dd2826d6`.
+
+**Memory.** Idle (−4.3%) and after-full-scan (−11.4%) private bytes are lower in 4.1.0, and the Albums grid is flat (+0.7%). First scan (+4.6%, +20.5 MB) and playback (+4.9%, +24.3 MB; peak −3.4%) are slightly above the ~3% single-run noise band, in line with the new radio directory/visualizer state and single-run WebView2 variance.
+
+| Scenario | CPU, settled (% of machine) | CPU used by the work (CPU-seconds) | Time |
+| --- | --- | --- | --- |
+| Idle | 2.2 → 0.0 | | startup 1.0s → 0.6s |
+| After full scan | 1.6 → 0.0 | 24.4 → 20.0 | forced scan 118.0s → 2.5s |
+| Playback (EQ + analyzer on) | 2.6 → 0.8 | | |
+| First scan (with artwork) | 0.5 → 0.0 | 24.8 → 34.8 | 121.8s → 236.5s |
+| Albums grid scrolled | 1.3 → 0.1 | 18.7 → 15.8 | |
+
+**Speed.** Settled CPU is near zero across idle, scan, and grid scenarios (down from 1.3–2.2% in 4.0.0) and playback CPU dropped from 2.6% to 0.8%, reflecting opt-in background integrity/provenance checks (#2189). Forced full rescan dropped from 118.0s in 4.0.0 to 2.5s in 4.1.0, and startup improved from 1.0s to 0.6s. Binary size grew from 54.6 MB to 60.5 MB. Zero stall warnings in any scenario.
+
 ### Trend across versions (Windows)
 
 ![Memory by version](performance-trend.png)
