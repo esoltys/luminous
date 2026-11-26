@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/svelte";
+import { render, fireEvent, screen } from "@testing-library/svelte";
 import HomeRowList from "./HomeRowList.svelte";
 import type { HomeItem, Song, AlbumItem, Playlist } from "../types";
 
@@ -173,5 +173,24 @@ describe("HomeRowList.svelte", () => {
     });
 
     expect(getByText("Top 5 Most Played")).toBeInTheDocument();
+  });
+
+  it("opens AlbumContextMenu on right-click on an album row", async () => {
+    const items: HomeItem[] = [{ type: "album", album: makeAlbum() }];
+    const { getByText } = render(HomeRowList, { props: { items, variant: "added" } });
+
+    await fireEvent.contextMenu(getByText("Full Moon Fever"));
+
+    expect(await screen.findByText("Play Album")).toBeInTheDocument();
+    expect(await screen.findByText("Go to Artist")).toBeInTheDocument();
+  });
+
+  it("opens SongContextMenu on right-click on a song row", async () => {
+    const items: HomeItem[] = [{ type: "song", song: makeSong() }];
+    const { getByText } = render(HomeRowList, { props: { items, variant: "rank" } });
+
+    await fireEvent.contextMenu(getByText("Wildflowers"));
+
+    expect(await screen.findByText("Play Song")).toBeInTheDocument();
   });
 });
