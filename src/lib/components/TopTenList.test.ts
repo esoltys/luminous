@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, fireEvent } from "@testing-library/svelte";
+import { render, fireEvent, screen } from "@testing-library/svelte";
 import TopTenList from "./TopTenList.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { prefs } from "../stores/prefs.svelte";
@@ -518,5 +518,51 @@ describe("TopTenList.svelte", () => {
       props: { items: artistItems, kind: "artist", showAccentBars: true },
     });
     expect(getByTestId("stats-accent-bar")).toHaveStyle({ width: "100%" });
+  });
+
+  it("opens AlbumContextMenu on right-click on an album row", async () => {
+    const albumItems: StatsTopItem[] = [
+      {
+        key: "album_1",
+        label: "Album One",
+        secondary: "Artist One",
+        play_count: 10,
+        minutes: 120,
+        excluded: false,
+        album: null,
+      },
+    ];
+
+    const { getByText } = render(TopTenList, {
+      props: { items: albumItems, kind: "album" },
+    });
+
+    await fireEvent.contextMenu(getByText("Album One"));
+
+    expect(await screen.findByText("Play Album")).toBeInTheDocument();
+    expect(await screen.findByText("Go to Artist")).toBeInTheDocument();
+  });
+
+  it("omits Go to Artist in AlbumContextMenu when album row uses secondaryFallback", async () => {
+    const albumItems: StatsTopItem[] = [
+      {
+        key: "album_1",
+        label: "Compilation Album",
+        secondary: null,
+        play_count: 5,
+        minutes: 20,
+        excluded: false,
+        album: null,
+      },
+    ];
+
+    const { getByText } = render(TopTenList, {
+      props: { items: albumItems, kind: "album", secondaryFallback: "Various Artists" },
+    });
+
+    await fireEvent.contextMenu(getByText("Compilation Album"));
+
+    expect(await screen.findByText("Play Album")).toBeInTheDocument();
+    expect(screen.queryByText("Go to Artist")).not.toBeInTheDocument();
   });
 });

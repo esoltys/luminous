@@ -12,9 +12,11 @@
   import SongRating from "./SongRating.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import AlbumRowCard from "./AlbumRowCard.svelte";
   import ArtistRowCard from "./ArtistRowCard.svelte";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
+  import { queueAlbumAsPlaylist } from "../utils/playlist";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { CaretRightIcon as ChevronRight, ShareNetworkIcon as Share } from "phosphor-svelte";
   import { rowListGap, useCardAppearance } from "../utils/cardAppearance";
@@ -68,7 +70,11 @@
     return showAccentBars ? (barPercents[items.indexOf(item)] ?? 0) : 0;
   }
 
-  let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
+  let contextMenuState = $state<
+    | { x: number; y: number; kind: "song"; song: Song }
+    | { x: number; y: number; kind: "album"; album: AlbumItem; artistName?: string }
+    | null
+  >(null);
 
   function openItem(item: StatsTopItem) {
     if (kind === "artist") {
@@ -113,7 +119,12 @@
       not_included: false,
       isLive: false,
     };
-    contextMenuState = { x: e.clientX, y: e.clientY, song };
+    contextMenuState = { x: e.clientX, y: e.clientY, kind: "song", song };
+  }
+
+  function handleAlbumContextMenu(e: MouseEvent, album: AlbumItem, artistName?: string) {
+    e.preventDefault();
+    contextMenuState = { x: e.clientX, y: e.clientY, kind: "album", album, artistName };
   }
 
   let localLoved = $state<Record<string, number>>({});
@@ -327,6 +338,8 @@
               yearNote={rankInsideRow ? movementNote : undefined}
               progressPercent={showAccentBars ? itemPercent : undefined}
               onclick={() => openItem(item)}
+              oncontextmenu={(e) =>
+                handleAlbumContextMenu(e, albumItem, item.secondary || undefined)}
               onRate={(r) => {
                 item.rating = r;
               }}
@@ -471,16 +484,34 @@
 </div>
 
 {#if contextMenuState}
-  {@const song = contextMenuState.song}
-  <SongContextMenu
-    x={contextMenuState.x}
-    y={contextMenuState.y}
-    {song}
-    onPlay={() => playerStore.playSong(song.id)}
-    onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
-    onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
-    onClose={() => {
-      contextMenuState = null;
-    }}
-  />
+  {#if contextMenuState.kind === "song"}
+    {@const song = contextMenuState.song}
+    <SongContextMenu
+      x={contextMenuState.x}
+      y={contextMenuState.y}
+      {song}
+      onPlay={() => playerStore.playSong(song.id)}
+      onGoToArtist={() =>
+        navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
+      onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
+      onClose={() => {
+        contextMenuState = null;
+      }}
+    />
+  {:else}
+    {@const album = contextMenuState.album}
+    {@const artistName = contextMenuState.artistName}
+    <AlbumContextMenu
+      x={contextMenuState.x}
+      y={contextMenuState.y}
+      albumName={album.album || i18n.t("collection.unknownAlbum")}
+      {artistName}
+      rating={album.album ? album.rating : undefined}
+      onPlay={() => queueAlbumAsPlaylist(album)}
+      onGoToArtist={artistName ? () => navigationStore.viewArtist(artistName) : undefined}
+      onClose={() => {
+        contextMenuState = null;
+      }}
+    />
+  {/if}
 {/if}
