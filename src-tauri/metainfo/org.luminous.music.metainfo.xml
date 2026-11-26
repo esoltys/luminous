@@ -64,6 +64,7 @@
   </categories>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="4.1.0" date="2026-11-26" />
     <release version="4.0.0" date="2026-11-18" />
     <release version="3.2.0" date="2026-10-27" />
     <release version="3.1.0" date="2026-10-16" />
