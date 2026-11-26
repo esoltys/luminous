@@ -430,63 +430,67 @@ fn parse_fmp4_init(data: &[u8]) -> Result<Fmp4Init, String> {
     }
 
     for trak in iter_mp4_boxes(moov).filter(|b| &b.box_type == b"trak") {
-        let track_id = find_box(trak.payload, b"tkhd").and_then(|tkhd| {
-            let version = *tkhd.first()?;
-            let off = if version == 1 { 20 } else { 12 };
-            let bytes = tkhd.get(off..off + 4)?;
-            Some(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
-        });
-
-        let Some(mdia) = find_box(trak.payload, b"mdia") else {
-            continue;
-        };
-        if let Some(hdlr) = find_box(mdia, b"hdlr") {
-            if hdlr.get(8..12) != Some(b"soun".as_slice()) {
-                continue;
-            }
-        }
-        let Some(stsd) = find_box(mdia, b"minf")
-            .and_then(|m| find_box(m, b"stbl"))
-            .and_then(|s| find_box(s, b"stsd"))
-        else {
-            continue;
-        };
-        let Some(entries) = stsd.get(8..) else {
-            continue;
-        };
-        if let Some(mp4a) = find_box(entries, b"mp4a") {
-            if mp4a.len() < 28 {
-                continue;
-            }
-            let channel_count = u16::from_be_bytes([mp4a[16], mp4a[17]]);
-            let esds = find_box(&mp4a[28..], b"esds").ok_or_else(|| {
-                "HLS fMP4 audio track has 'mp4a' without 'esds' descriptor".to_string()
-            })?;
-            let asc = parse_esds_audio_specific_config(esds)?;
-            let (adts_profile, sampling_freq_idx, mut channel_config) =
-                parse_audio_specific_config(&asc)?;
-            if channel_config == 0 && channel_count > 0 {
-                channel_config = channel_count.min(7) as u8;
-            }
-            let default_sample_size = track_id
-                .and_then(|tid| {
-                    trex_defaults
-                        .iter()
-                        .find(|(t, _)| *t == tid)
-                        .map(|(_, s)| *s)
-                })
-                .filter(|&s| s > 0);
-            return Ok(Fmp4Init {
-                track_id,
-                default_sample_size,
-                adts_profile,
-                sampling_freq_idx,
-                channel_config,
-            });
+        if let Some(init) = parse_mp4a_track(trak.payload, &trex_defaults)? {
+            return Ok(init);
         }
     }
 
     Err("HLS fMP4 init segment has no supported AAC ('mp4a') audio track".to_string())
+}
+
+fn parse_mp4a_track(trak: &[u8], trex_defaults: &[(u32, u32)]) -> Result<Option<Fmp4Init>, String> {
+    let track_id = find_box(trak, b"tkhd").and_then(|tkhd| {
+        let version = *tkhd.first()?;
+        let off = if version == 1 { 20 } else { 12 };
+        let bytes = tkhd.get(off..off + 4)?;
+        Some(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+    });
+
+    let Some(mdia) = find_box(trak, b"mdia") else {
+        return Ok(None);
+    };
+    if let Some(hdlr) = find_box(mdia, b"hdlr") {
+        if hdlr.get(8..12) != Some(b"soun".as_slice()) {
+            return Ok(None);
+        }
+    }
+    let Some(entries) = find_box(mdia, b"minf")
+        .and_then(|m| find_box(m, b"stbl"))
+        .and_then(|s| find_box(s, b"stsd"))
+        .and_then(|stsd| stsd.get(8..))
+    else {
+        return Ok(None);
+    };
+    let Some(mp4a) = find_box(entries, b"mp4a") else {
+        return Ok(None);
+    };
+    if mp4a.len() < 28 {
+        return Ok(None);
+    }
+
+    let channel_count = u16::from_be_bytes([mp4a[16], mp4a[17]]);
+    let esds = find_box(&mp4a[28..], b"esds")
+        .ok_or_else(|| "HLS fMP4 audio track has 'mp4a' without 'esds' descriptor".to_string())?;
+    let asc = parse_esds_audio_specific_config(esds)?;
+    let (adts_profile, sampling_freq_idx, mut channel_config) = parse_audio_specific_config(&asc)?;
+    if channel_config == 0 && channel_count > 0 {
+        channel_config = channel_count.min(7) as u8;
+    }
+    let default_sample_size = track_id
+        .and_then(|tid| {
+            trex_defaults
+                .iter()
+                .find(|(t, _)| *t == tid)
+                .map(|(_, s)| *s)
+        })
+        .filter(|&s| s > 0);
+    Ok(Some(Fmp4Init {
+        track_id,
+        default_sample_size,
+        adts_profile,
+        sampling_freq_idx,
+        channel_config,
+    }))
 }
 
 fn read_mp4_descr_len(data: &[u8], pos: &mut usize) -> Option<usize> {
@@ -692,6 +696,8 @@ fn parse_moof_samples(moof: &[u8], moof_offset: usize, init: &Fmp4Init) -> Pendi
 }
 
 fn write_adts_header(out: &mut Vec<u8>, init: &Fmp4Init, frame_payload_len: usize) {
+    // 7-byte ADTS header (ISO/IEC 13818-7): sync=0xFFF, ID=0 (MPEG-4),
+    // protection_absent=1 (no CRC), buffer_fullness=0x7FF (VBR), 1 raw block.
     let frame_len = 7 + frame_payload_len;
     let profile = init.adts_profile & 0x03;
     let freq = init.sampling_freq_idx & 0x0f;

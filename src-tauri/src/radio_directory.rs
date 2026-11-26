@@ -1911,20 +1911,7 @@ pub async fn resolve_station_url_with_client(
         .and_then(|v| v.to_str().ok())
         .map(str::to_string);
     let format = classify_playlist_content_type(ct.as_deref(), url_format)?;
-
-    if let Some(len) = resp.content_length() {
-        if len > MAX_REMOTE_PLAYLIST_BYTES as u64 {
-            anyhow::bail!("Playlist response exceeds maximum size");
-        }
-    }
-    let bytes = resp
-        .bytes()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to read playlist response: {e}"))?;
-    if bytes.len() > MAX_REMOTE_PLAYLIST_BYTES {
-        anyhow::bail!("Playlist response exceeds maximum size");
-    }
-    let body = String::from_utf8_lossy(&bytes);
+    let body = read_bounded_playlist_body(resp).await?;
 
     // HLS `.m3u8` playlists are live segment/variant manifests, not static M3U
     // station lists — preserve the playlist URL so `HlsLiveSource` handles it.
@@ -2090,9 +2077,7 @@ pub async fn test_station_url_with_client(
             .is_some_and(crate::hls::is_playlist_mime)
             || crate::hls::has_m3u8_extension(final_url.as_ref()));
     if maybe_hls {
-        if let Ok(bytes) = resp.bytes().await {
-            let limit = bytes.len().min(MAX_REMOTE_PLAYLIST_BYTES);
-            let body = String::from_utf8_lossy(&bytes[..limit]);
+        if let Ok(body) = read_bounded_playlist_body(resp).await {
             if crate::hls::playlist::looks_like_hls(&body) {
                 if let Err(hls_err) = validate_hls_playlist(client, &body, &final_url).await {
                     ok = false;
@@ -2113,6 +2098,22 @@ pub async fn test_station_url_with_client(
     }
 }
 
+async fn read_bounded_playlist_body(resp: reqwest::Response) -> Result<String> {
+    if let Some(len) = resp.content_length() {
+        if len > MAX_REMOTE_PLAYLIST_BYTES as u64 {
+            anyhow::bail!("Playlist response exceeds maximum size");
+        }
+    }
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to read playlist response: {e}"))?;
+    if bytes.len() > MAX_REMOTE_PLAYLIST_BYTES {
+        anyhow::bail!("Playlist response exceeds maximum size");
+    }
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
 async fn validate_hls_playlist(
     client: &reqwest::Client,
     body: &str,
@@ -2129,9 +2130,7 @@ async fn validate_hls_playlist(
                 })?;
             if let Ok(resp) = client.get(variant_url.clone()).send().await {
                 if resp.status().is_success() {
-                    if let Ok(bytes) = resp.bytes().await {
-                        let limit = bytes.len().min(MAX_REMOTE_PLAYLIST_BYTES);
-                        let variant_body = String::from_utf8_lossy(&bytes[..limit]);
+                    if let Ok(variant_body) = read_bounded_playlist_body(resp).await {
                         if let Ok(crate::hls::playlist::Playlist::Media(media)) =
                             crate::hls::playlist::parse(&variant_body, &variant_url)
                         {
