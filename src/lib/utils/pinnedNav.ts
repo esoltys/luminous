@@ -237,7 +237,6 @@ export function toNavigablePin(item: PinnedItem): NavigablePin {
         rawItem: item,
         type: "station",
         title: station.name || i18n.t("radio.unnamedStation"),
-        subtitle: station.country || undefined,
         icon: Broadcast,
         station,
         isActive: radioStore.isPlayingStation(station.stationuuid),
