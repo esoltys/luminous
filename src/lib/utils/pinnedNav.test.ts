@@ -209,7 +209,7 @@ describe("pinnedNav.ts", () => {
     const pin = toNavigablePin(stationItem);
     expect(pin.id).toBe("station:uuid-jazz");
     expect(pin.title).toBe("Jazz FM91");
-    expect(pin.subtitle).toBe("Canada");
+    expect(pin.subtitle).toBeUndefined();
     expect(pin.station?.stationuuid).toBe("uuid-jazz");
     expect(pin.isActive).toBe(false);
 
