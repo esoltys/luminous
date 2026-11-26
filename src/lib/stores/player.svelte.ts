@@ -392,7 +392,9 @@ export class PlayerStore {
         isLive &&
         reason &&
         (reason.startsWith("Can't play ") ||
-          /encrypted|isn't supported|not an audio stream|codec/i.test(reason));
+          /encrypted|isn't supported|not an audio stream|codec|has no supported|no audio in/i.test(
+            reason,
+          ));
       if (isLive && !isSpecificLiveReason) {
         toastStore.show(
           i18n.t("playerBar.stationOfflineToast", { title }, `"${title}" — Station offline.`),

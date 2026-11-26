@@ -388,6 +388,8 @@ pub struct InputInfo {
     pub sample_rate: u32,
     /// Decoded channel count.
     pub channels: u16,
+    /// Bit depth reported by the container/stream header, if known.
+    pub bits_per_sample: Option<u32>,
     /// Decoder chosen by the engine (e.g. `"Symphonia FLAC decoder"`, `"libopus (via Symphonia)"`, `"Media Foundation AAC"`).
     pub decoder_name: String,
     /// True when an HE-AAC stream is decoded by Symphonia's core-only decoder at <= 24 kHz (no SBR/PS).
@@ -1072,6 +1074,7 @@ struct ActiveTrack {
     track_id: u32,
     src_rate: u32,
     src_channels: usize,
+    src_bits_per_sample: Option<u32>,
     resampler: Resampler,
     start_ns: u64,
     /// Hard decode cutoff (CUE end boundary); always `None` for live streams.
@@ -1121,8 +1124,15 @@ fn build_input_info(
     decoder: &dyn symphonia::core::codecs::audio::AudioDecoder,
     sample_rate: u32,
     channels: usize,
+    bits_per_sample: Option<u32>,
 ) -> InputInfo {
-    input_info_from_codec(track_id, decoder.codec_info(), sample_rate, channels)
+    input_info_from_codec(
+        track_id,
+        decoder.codec_info(),
+        sample_rate,
+        channels,
+        bits_per_sample,
+    )
 }
 
 fn input_info_from_codec(
@@ -1130,6 +1140,7 @@ fn input_info_from_codec(
     info: &symphonia::core::codecs::CodecInfo,
     sample_rate: u32,
     channels: usize,
+    bits_per_sample: Option<u32>,
 ) -> InputInfo {
     let codec = info.short_name.to_string();
     let format = display_format_name(&codec);
@@ -1149,6 +1160,7 @@ fn input_info_from_codec(
         format,
         sample_rate,
         channels: channels as u16,
+        bits_per_sample,
         decoder_name,
         aac_core_only,
     }
@@ -1163,6 +1175,7 @@ impl ActiveTrack {
             &*self.decoder,
             self.src_rate,
             self.src_channels,
+            self.src_bits_per_sample,
         );
         if updated != self.input_info {
             self.input_info = updated;
@@ -1201,7 +1214,7 @@ impl ActiveTrack {
             track_id,
             sample_rate: src_rate,
             channels: src_channels,
-            ..
+            bits_per_sample: src_bits_per_sample,
         } = ProbedTrack::open(source, extension, mime_type.as_deref())?;
 
         // Live streams are non-seekable; ignore any initial seek offset.
@@ -1231,7 +1244,13 @@ impl ActiveTrack {
             end_ns.or(spec.length_ns)
         };
 
-        let input_info = build_input_info(spec.id, &*decoder, src_rate, src_channels);
+        let input_info = build_input_info(
+            spec.id,
+            &*decoder,
+            src_rate,
+            src_channels,
+            src_bits_per_sample,
+        );
 
         Ok(Self {
             spec,
@@ -1240,6 +1259,7 @@ impl ActiveTrack {
             track_id,
             src_rate,
             src_channels,
+            src_bits_per_sample,
             resampler: Resampler::new(src_rate, target_rate, target_channels),
             start_ns: effective_start_ns,
             end_ns,
@@ -4848,16 +4868,16 @@ id 76, type PipeWire:Interface:Node
             long_name: "Opus",
             profiles: &[],
         };
-        assert!(input_info_from_codec(1, &core_info, 24_000, 2).aac_core_only);
-        assert!(!input_info_from_codec(1, &core_info, 44_100, 2).aac_core_only);
-        let mf = input_info_from_codec(1, &mf_info, 24_000, 2);
+        assert!(input_info_from_codec(1, &core_info, 24_000, 2, None).aac_core_only);
+        assert!(!input_info_from_codec(1, &core_info, 44_100, 2, None).aac_core_only);
+        let mf = input_info_from_codec(1, &mf_info, 24_000, 2, None);
         assert!(!mf.aac_core_only);
         assert_eq!(mf.decoder_name, "Media Foundation AAC");
-        let libav = input_info_from_codec(1, &libav_info, 24_000, 2);
+        let libav = input_info_from_codec(1, &libav_info, 24_000, 2, None);
         assert!(!libav.aac_core_only);
         assert_eq!(libav.decoder_name, "libavcodec AAC");
         assert_eq!(
-            input_info_from_codec(1, &opus_info, 48_000, 2).decoder_name,
+            input_info_from_codec(1, &opus_info, 48_000, 2, None).decoder_name,
             "libopus (via Symphonia)"
         );
 

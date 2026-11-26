@@ -7,12 +7,14 @@
 //!   the program's first audio stream are extracted, and video, timed ID3
 //!   metadata and every other PID are dropped.
 //! - Fragmented MP4 (fMP4 / CMAF) segments (`EXT-X-MAP` init + `.m4s`
-//!   fragments) have their raw AAC frames extracted from `moof`/`mdat` and
-//!   wrapped in 7-byte ADTS headers using the `AudioSpecificConfig` from the
-//!   init segment's `moov`/`mp4a`/`esds`.
+//!   fragments):
+//!   - AAC (`mp4a` + `esds`): raw AAC frames are extracted from `moof`/`mdat`
+//!     and wrapped in 7-byte ADTS headers using `AudioSpecificConfig`.
+//!   - FLAC (`fLaC` + `dfLa`): the `fLaC` stream marker and metadata blocks from
+//!     `dfLa` are emitted once before the first segment's raw FLAC frames.
 //!
-//! The result is an ADTS or MPEG audio byte stream, so no container demuxer is
-//! needed downstream.
+//! The result is an ADTS, MPEG, or native FLAC byte stream, so no container
+//! demuxer is needed downstream.
 
 const TS_PACKET: usize = 188;
 const TS_SYNC: u8 = 0x47;
@@ -24,6 +26,8 @@ pub enum AudioKind {
     Adts,
     /// MPEG-1/2 audio (MP3).
     Mpeg,
+    /// Native FLAC stream (`fLaC` + metadata blocks + raw frames).
+    Flac,
 }
 
 impl AudioKind {
@@ -31,6 +35,7 @@ impl AudioKind {
         match self {
             AudioKind::Adts => "audio/aac",
             AudioKind::Mpeg => "audio/mpeg",
+            AudioKind::Flac => "audio/flac",
         }
     }
 }
@@ -46,8 +51,8 @@ pub struct SegmentAudio {
 
 /// Stateful segment processor: an MPEG-TS stream's PIDs normally repeat in
 /// every segment, but are remembered across segments in case one omits them;
-/// an fMP4 stream's `EXT-X-MAP` init segment provides the AAC codec config
-/// for all subsequent `.m4s` fragments.
+/// an fMP4 stream's `EXT-X-MAP` init segment provides the AAC or FLAC codec
+/// config for all subsequent `.m4s` fragments.
 #[derive(Debug, Default)]
 pub struct SegmentDemuxer {
     pmt_pid: Option<u16>,
@@ -55,6 +60,7 @@ pub struct SegmentDemuxer {
     audio_kind: Option<AudioKind>,
     unsupported_audio: bool,
     fmp4_init: Option<Fmp4Init>,
+    flac_header_emitted: bool,
 }
 
 impl SegmentDemuxer {
@@ -63,7 +69,8 @@ impl SegmentDemuxer {
     }
 
     /// Parses an fMP4 `EXT-X-MAP` initialization segment (`ftyp` + `moov`) so
-    /// subsequent `.m4s` media segments can be demuxed into ADTS AAC frames.
+    /// subsequent `.m4s` media segments can be demuxed into ADTS AAC or native
+    /// FLAC frames.
     pub fn set_init_segment(&mut self, data: &[u8]) -> Result<(), String> {
         let init = parse_fmp4_init(data)?;
         self.fmp4_init = Some(init);
@@ -89,13 +96,16 @@ impl SegmentDemuxer {
         })
     }
 
-    fn process_fmp4(&self, data: &[u8]) -> Result<SegmentAudio, String> {
+    fn process_fmp4(&mut self, data: &[u8]) -> Result<SegmentAudio, String> {
         let init = self.fmp4_init.as_ref().ok_or_else(|| {
             "HLS fragmented MP4 segment arrived without an EXT-X-MAP init segment".to_string()
         })?;
-        let bytes = extract_fmp4_adts(data, init)?;
+        let (kind, bytes) = extract_fmp4_audio(data, init, !self.flac_header_emitted)?;
+        if kind == AudioKind::Flac {
+            self.flac_header_emitted = true;
+        }
         Ok(SegmentAudio {
-            kind: Some(AudioKind::Adts),
+            kind: Some(kind),
             bytes,
             title: None,
         })
@@ -329,7 +339,7 @@ fn id3_text(frame: &[u8]) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------
-// Fragmented MP4 (fMP4 / CMAF) AAC extraction
+// Fragmented MP4 (fMP4 / CMAF) audio extraction
 // ---------------------------------------------------------------------------
 
 /// Codec configuration extracted from an fMP4 `EXT-X-MAP` init segment.
@@ -337,9 +347,20 @@ fn id3_text(frame: &[u8]) -> Option<String> {
 struct Fmp4Init {
     track_id: Option<u32>,
     default_sample_size: Option<u32>,
-    adts_profile: u8,
-    sampling_freq_idx: u8,
-    channel_config: u8,
+    codec: Fmp4Codec,
+}
+
+#[derive(Debug, Clone)]
+enum Fmp4Codec {
+    Aac {
+        adts_profile: u8,
+        sampling_freq_idx: u8,
+        channel_config: u8,
+    },
+    Flac {
+        /// Raw FLAC metadata blocks from `dfLa` (after the 4-byte FullBox header).
+        metadata_blocks: Vec<u8>,
+    },
 }
 
 struct Mp4Box<'a> {
@@ -430,15 +451,21 @@ fn parse_fmp4_init(data: &[u8]) -> Result<Fmp4Init, String> {
     }
 
     for trak in iter_mp4_boxes(moov).filter(|b| &b.box_type == b"trak") {
-        if let Some(init) = parse_mp4a_track(trak.payload, &trex_defaults)? {
+        if let Some(init) = parse_fmp4_audio_track(trak.payload, &trex_defaults)? {
             return Ok(init);
         }
     }
 
-    Err("HLS fMP4 init segment has no supported AAC ('mp4a') audio track".to_string())
+    Err(
+        "HLS fMP4 init segment has no supported AAC ('mp4a') or FLAC ('fLaC') audio track"
+            .to_string(),
+    )
 }
 
-fn parse_mp4a_track(trak: &[u8], trex_defaults: &[(u32, u32)]) -> Result<Option<Fmp4Init>, String> {
+fn parse_fmp4_audio_track(
+    trak: &[u8],
+    trex_defaults: &[(u32, u32)],
+) -> Result<Option<Fmp4Init>, String> {
     let track_id = find_box(trak, b"tkhd").and_then(|tkhd| {
         let version = *tkhd.first()?;
         let off = if version == 1 { 20 } else { 12 };
@@ -461,21 +488,6 @@ fn parse_mp4a_track(trak: &[u8], trex_defaults: &[(u32, u32)]) -> Result<Option<
     else {
         return Ok(None);
     };
-    let Some(mp4a) = find_box(entries, b"mp4a") else {
-        return Ok(None);
-    };
-    if mp4a.len() < 28 {
-        return Ok(None);
-    }
-
-    let channel_count = u16::from_be_bytes([mp4a[16], mp4a[17]]);
-    let esds = find_box(&mp4a[28..], b"esds")
-        .ok_or_else(|| "HLS fMP4 audio track has 'mp4a' without 'esds' descriptor".to_string())?;
-    let asc = parse_esds_audio_specific_config(esds)?;
-    let (adts_profile, sampling_freq_idx, mut channel_config) = parse_audio_specific_config(&asc)?;
-    if channel_config == 0 && channel_count > 0 {
-        channel_config = channel_count.min(7) as u8;
-    }
     let default_sample_size = track_id
         .and_then(|tid| {
             trex_defaults
@@ -484,13 +496,53 @@ fn parse_mp4a_track(trak: &[u8], trex_defaults: &[(u32, u32)]) -> Result<Option<
                 .map(|(_, s)| *s)
         })
         .filter(|&s| s > 0);
-    Ok(Some(Fmp4Init {
-        track_id,
-        default_sample_size,
-        adts_profile,
-        sampling_freq_idx,
-        channel_config,
-    }))
+
+    if let Some(mp4a) = find_box(entries, b"mp4a") {
+        if mp4a.len() < 28 {
+            return Ok(None);
+        }
+        let channel_count = u16::from_be_bytes([mp4a[16], mp4a[17]]);
+        let esds = find_box(&mp4a[28..], b"esds").ok_or_else(|| {
+            "HLS fMP4 audio track has 'mp4a' without 'esds' descriptor".to_string()
+        })?;
+        let asc = parse_esds_audio_specific_config(esds)?;
+        let (adts_profile, sampling_freq_idx, mut channel_config) =
+            parse_audio_specific_config(&asc)?;
+        if channel_config == 0 && channel_count > 0 {
+            channel_config = channel_count.min(7) as u8;
+        }
+        return Ok(Some(Fmp4Init {
+            track_id,
+            default_sample_size,
+            codec: Fmp4Codec::Aac {
+                adts_profile,
+                sampling_freq_idx,
+                channel_config,
+            },
+        }));
+    }
+
+    if let Some(flac) = find_box(entries, b"fLaC") {
+        if flac.len() < 28 {
+            return Ok(None);
+        }
+        let dfla = find_box(&flac[28..], b"dfLa")
+            .ok_or_else(|| "HLS fMP4 audio track has 'fLaC' without 'dfLa' box".to_string())?;
+        // dfLa is a FullBox (4-byte version/flags) followed by FLAC metadata blocks
+        // (at least a 4-byte block header + 34-byte STREAMINFO).
+        let metadata_blocks = dfla
+            .get(4..)
+            .filter(|blocks| blocks.len() >= 38)
+            .ok_or_else(|| "HLS fMP4 'dfLa' box is missing FLAC STREAMINFO metadata".to_string())?
+            .to_vec();
+        return Ok(Some(Fmp4Init {
+            track_id,
+            default_sample_size,
+            codec: Fmp4Codec::Flac { metadata_blocks },
+        }));
+    }
+
+    Ok(None)
 }
 
 fn read_mp4_descr_len(data: &[u8], pos: &mut usize) -> Option<usize> {
@@ -695,13 +747,19 @@ fn parse_moof_samples(moof: &[u8], moof_offset: usize, init: &Fmp4Init) -> Pendi
     }
 }
 
-fn write_adts_header(out: &mut Vec<u8>, init: &Fmp4Init, frame_payload_len: usize) {
+fn write_adts_header(
+    out: &mut Vec<u8>,
+    adts_profile: u8,
+    sampling_freq_idx: u8,
+    channel_config: u8,
+    frame_payload_len: usize,
+) {
     // 7-byte ADTS header (ISO/IEC 13818-7): sync=0xFFF, ID=0 (MPEG-4),
     // protection_absent=1 (no CRC), buffer_fullness=0x7FF (VBR), 1 raw block.
     let frame_len = 7 + frame_payload_len;
-    let profile = init.adts_profile & 0x03;
-    let freq = init.sampling_freq_idx & 0x0f;
-    let chan = init.channel_config & 0x07;
+    let profile = adts_profile & 0x03;
+    let freq = sampling_freq_idx & 0x0f;
+    let chan = channel_config & 0x07;
     out.extend_from_slice(&[
         0xff,
         0xf1,
@@ -713,9 +771,19 @@ fn write_adts_header(out: &mut Vec<u8>, init: &Fmp4Init, frame_payload_len: usiz
     ]);
 }
 
-fn extract_fmp4_adts(data: &[u8], init: &Fmp4Init) -> Result<Vec<u8>, String> {
+fn extract_fmp4_audio(
+    data: &[u8],
+    init: &Fmp4Init,
+    mut include_flac_header: bool,
+) -> Result<(AudioKind, Vec<u8>), String> {
     let mut out = Vec::new();
     let mut pending: Option<PendingMoof> = None;
+    let mut sample_count = 0usize;
+
+    let kind = match init.codec {
+        Fmp4Codec::Aac { .. } => AudioKind::Adts,
+        Fmp4Codec::Flac { .. } => AudioKind::Flac,
+    };
 
     for b in iter_mp4_boxes(data) {
         match &b.box_type {
@@ -738,10 +806,33 @@ fn extract_fmp4_adts(data: &[u8], init: &Fmp4Init) -> Result<Vec<u8>, String> {
                 for sz in moof.sample_sizes {
                     let sz = sz as usize;
                     let Some(sample) = b.payload.get(cursor..cursor + sz) else {
-                        return Err("Truncated AAC sample in fMP4 'mdat' box".to_string());
+                        return Err("Truncated audio sample in fMP4 'mdat' box".to_string());
                     };
-                    write_adts_header(&mut out, init, sz);
-                    out.extend_from_slice(sample);
+                    match &init.codec {
+                        Fmp4Codec::Aac {
+                            adts_profile,
+                            sampling_freq_idx,
+                            channel_config,
+                        } => {
+                            write_adts_header(
+                                &mut out,
+                                *adts_profile,
+                                *sampling_freq_idx,
+                                *channel_config,
+                                sz,
+                            );
+                            out.extend_from_slice(sample);
+                        }
+                        Fmp4Codec::Flac { metadata_blocks } => {
+                            if include_flac_header {
+                                out.extend_from_slice(b"fLaC");
+                                out.extend_from_slice(metadata_blocks);
+                                include_flac_header = false;
+                            }
+                            out.extend_from_slice(sample);
+                        }
+                    }
+                    sample_count += 1;
                     cursor += sz;
                 }
             }
@@ -749,10 +840,10 @@ fn extract_fmp4_adts(data: &[u8], init: &Fmp4Init) -> Result<Vec<u8>, String> {
         }
     }
 
-    if out.is_empty() {
-        return Err("HLS fMP4 segment contained no AAC audio samples".to_string());
+    if sample_count == 0 {
+        return Err("HLS fMP4 segment contained no audio samples".to_string());
     }
-    Ok(out)
+    Ok((kind, out))
 }
 
 #[cfg(test)]
@@ -970,7 +1061,7 @@ pub(crate) mod tests {
         [mp4_box(b"ftyp", b"isom\0\0\0\0"), moov].concat()
     }
 
-    pub(crate) fn fmp4_aac_segment(track_id: u32, frames: &[&[u8]]) -> Vec<u8> {
+    pub(crate) fn fmp4_media_segment(track_id: u32, frames: &[&[u8]]) -> Vec<u8> {
         let mut tfhd = vec![0, 0, 0, 0];
         tfhd.extend_from_slice(&track_id.to_be_bytes());
         // trun: flags=0x000201 (data_offset + sample_size)
@@ -1001,7 +1092,7 @@ pub(crate) mod tests {
         let init = fmp4_aac_init(1, [0x12, 0x10]);
         let f1 = [0xde, 0xad, 0xbe, 0xef];
         let f2 = [0xca, 0xfe];
-        let seg = fmp4_aac_segment(1, &[&f1, &f2]);
+        let seg = fmp4_media_segment(1, &[&f1, &f2]);
 
         let mut demux = SegmentDemuxer::new();
         demux.set_init_segment(&init).unwrap();
@@ -1013,6 +1104,53 @@ pub(crate) mod tests {
         assert_eq!(&audio.bytes[7..7 + f1.len()], &f1);
         assert_eq!(&audio.bytes[7 + f1.len()..7 + f1.len() + 2], &[0xff, 0xf1]);
         assert_eq!(&audio.bytes[7 + f1.len() + 7..], &f2);
+    }
+
+    pub(crate) fn fmp4_flac_init(track_id: u32, metadata_blocks: &[u8]) -> Vec<u8> {
+        let mut tkhd = vec![0u8; 84];
+        tkhd[12..16].copy_from_slice(&track_id.to_be_bytes());
+        let mut hdlr = vec![0u8; 16];
+        hdlr[8..12].copy_from_slice(b"soun");
+        let mut dfla = vec![0, 0, 0, 0]; // FullBox header
+        dfla.extend_from_slice(metadata_blocks);
+        let mut flac = vec![0u8; 28];
+        flac[16..18].copy_from_slice(&2u16.to_be_bytes());
+        flac.extend(mp4_box(b"dfLa", &dfla));
+        let mut stsd = vec![0, 0, 0, 0, 0, 0, 0, 1];
+        stsd.extend(mp4_box(b"fLaC", &flac));
+        let stbl = mp4_box(b"stbl", &mp4_box(b"stsd", &stsd));
+        let minf = mp4_box(b"minf", &stbl);
+        let mdia = mp4_box(b"mdia", &[mp4_box(b"hdlr", &hdlr), minf].concat());
+        let trak = mp4_box(b"trak", &[mp4_box(b"tkhd", &tkhd), mdia].concat());
+        let moov = mp4_box(b"moov", &trak);
+        [mp4_box(b"ftyp", b"isom\0\0\0\0"), moov].concat()
+    }
+
+    #[test]
+    fn fmp4_flac_init_and_media_segments_emit_native_flac_stream() {
+        // Minimal 38-byte STREAMINFO metadata block (last-block bit + type 0 + len 34 + payload)
+        let mut blocks = vec![0x80, 0x00, 0x00, 34];
+        blocks.extend_from_slice(&[0x10; 34]);
+        let init = fmp4_flac_init(1, &blocks);
+        let f1 = [0xff, 0xf8, 0x69, 0x00];
+        let f2 = [0xff, 0xf8, 0x69, 0x01];
+        let seg1 = fmp4_media_segment(1, &[&f1]);
+        let seg2 = fmp4_media_segment(1, &[&f2]);
+
+        let mut demux = SegmentDemuxer::new();
+        demux.set_init_segment(&init).unwrap();
+
+        let first = demux.process(&seg1).unwrap();
+        assert_eq!(first.kind, Some(AudioKind::Flac));
+        assert_eq!(&first.bytes[..4], b"fLaC");
+        assert_eq!(&first.bytes[4..4 + blocks.len()], blocks.as_slice());
+        assert_eq!(&first.bytes[4 + blocks.len()..], &f1);
+
+        // Even if the init segment is reloaded, the stream header is not repeated mid-stream.
+        demux.set_init_segment(&init).unwrap();
+        let second = demux.process(&seg2).unwrap();
+        assert_eq!(second.kind, Some(AudioKind::Flac));
+        assert_eq!(second.bytes, f2);
     }
 
     #[test]

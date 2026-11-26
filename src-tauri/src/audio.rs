@@ -82,6 +82,28 @@ impl From<EngineState> for PlayState {
     }
 }
 
+/// For live streams or unknown container types, resolves the engine-probed codec
+/// short name to a concrete [`FileType`] so lossless streams (e.g. HLS FLAC)
+/// classify as HQ / Hi-Res rather than falling into the lossy bitrate check.
+fn effective_filetype(song_filetype: FileType, input: Option<&InputInfo>) -> FileType {
+    if !matches!(song_filetype, FileType::Stream | FileType::Unknown) {
+        return song_filetype;
+    }
+    let Some(codec) = input.map(|i| i.codec.as_str()) else {
+        return song_filetype;
+    };
+    match codec {
+        "flac" => FileType::Flac,
+        "alac" => FileType::Alac,
+        "wav" | "pcm_s16le" | "pcm_s24le" | "pcm_s32le" | "pcm_f32le" => FileType::Wav,
+        "aiff" | "pcm_s16be" | "pcm_s24be" | "pcm_s32be" => FileType::Aiff,
+        "wavpack" => FileType::WavPack,
+        "monkeys_audio" | "ape" => FileType::Ape,
+        "dsd" => FileType::Dsf,
+        _ => song_filetype,
+    }
+}
+
 /// Pure function mapping codec + bitrate + sample rate + bit depth to a `QualityTier` (#1041).
 /// - LQ — lossy codec below 256 kbps
 /// - SQ — lossy codec at 256 kbps or higher
@@ -219,23 +241,29 @@ fn assemble_pipeline_info(
         .as_ref()
         .map(|i| i.channels)
         .or_else(|| song.channels.map(|c| c as u16));
+    let input_bit_depth = song.bitdepth.or_else(|| {
+        input
+            .as_ref()
+            .and_then(|i| i.bits_per_sample.map(|b| b as i32))
+    });
+    let quality_filetype = effective_filetype(song.filetype, input.as_ref());
     let input_aac_core_only = input.as_ref().is_some_and(|i| i.aac_core_only);
     let resample_rate = sample_rate.filter(|&r| r != output.sample_rate);
     let eq_snapshot = PipelineEqSnapshot::from_equalizer(eq);
 
     AudioPipelineInfo {
         quality_tier: classify_quality_tier(
-            song.filetype,
+            quality_filetype,
             song.bitrate,
             sample_rate,
-            song.bitdepth,
+            input_bit_depth,
         ),
         input_source: song.source,
         input_format,
         input_codec,
         input_bitrate_kbps: song.bitrate,
         input_sample_rate: sample_rate,
-        input_bit_depth: song.bitdepth,
+        input_bit_depth,
         input_channels,
         input_path: song.path.clone().or_else(|| song.url.clone()),
         input_aac_core_only,
@@ -477,6 +505,7 @@ mod tests {
             format: "MP3".into(),
             sample_rate: 44_100,
             channels: 2,
+            bits_per_sample: None,
             decoder_name: "Symphonia MP3 decoder".into(),
             aac_core_only: false,
         };
@@ -503,6 +532,7 @@ mod tests {
             format: "AAC".into(),
             sample_rate: 24_000,
             channels: 2,
+            bits_per_sample: None,
             decoder_name: "Symphonia AAC decoder".into(),
             aac_core_only: true,
         };
@@ -535,6 +565,7 @@ mod tests {
             format: "AAC".into(),
             sample_rate: 48_000,
             channels: 2,
+            bits_per_sample: None,
             decoder_name: "Media Foundation AAC".into(),
             aac_core_only: false,
         };
@@ -560,5 +591,34 @@ mod tests {
         assert_eq!(fallback.input_format, "Stream");
         assert_eq!(fallback.input_codec, "stream");
         assert_eq!(fallback.input_sample_rate, None);
+
+        // Lossless FLAC stream with unknown bitrate classifies as HQ (or HiRes) using InputInfo.
+        let flac_stream = Song {
+            id: 99,
+            filetype: FileType::Stream,
+            bitrate: None,
+            source: crate::models::SongSource::RadioBrowser,
+            ..Song::default()
+        };
+        let flac_input = InputInfo {
+            track_id: 99,
+            codec: "flac".into(),
+            format: "FLAC".into(),
+            sample_rate: 48_000,
+            channels: 2,
+            bits_per_sample: Some(16),
+            decoder_name: "Symphonia FLAC decoder".into(),
+            aac_core_only: false,
+        };
+        let info = assemble_pipeline_info(
+            &flac_stream,
+            LoudnessGainSource::Disabled,
+            None,
+            &eq,
+            Some(flac_input),
+            test_output(),
+        );
+        assert_eq!(info.quality_tier, QualityTier::Hq);
+        assert_eq!(info.input_bit_depth, Some(16));
     }
 }
