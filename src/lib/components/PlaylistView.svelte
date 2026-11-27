@@ -778,11 +778,11 @@
   {/if}
 
   {#if activePlaylist}
-    <div
-      class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto"
-      use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
-    >
+    <!-- The page itself doesn't scroll: the header, genre chips and conflict banner stay put
+         and only the song table's frame scrolls, so its column headings stay pinned (#2273). -->
+    <div class="flex-1 flex flex-col min-h-0 relative z-10 overflow-hidden">
       <div
+        data-testid="playlist-header"
         class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 {windowLayoutStore.isDetailHeaderCollapsed
           ? 'py-3'
           : 'pt-6 pb-6'} shrink-0"
@@ -1012,9 +1012,9 @@
         </div>
       </div>
 
-      <div class="p-6 flex flex-col gap-6 pb-dock">
+      <div class="flex-1 min-h-0 p-6 flex flex-col gap-6 pb-dock">
         {#if capabilities.showsGenreHeader && !windowLayoutStore.isDetailHeaderCollapsed}
-          <div class="flex flex-wrap items-center gap-3">
+          <div class="flex flex-wrap items-center gap-3 shrink-0">
             {#if rawGenre}
               <GenreChips genre={rawGenre} variant="full" limit={4} />
             {:else}
@@ -1030,7 +1030,7 @@
           <!-- Both the playlist and its file changed (#2280): nothing is written
                until the user keeps one side. -->
           <div
-            class="mb-3 px-4 py-3 rounded-xl border border-brand-border/60 acrylic-chrome flex flex-wrap items-center gap-3"
+            class="shrink-0 mb-3 px-4 py-3 rounded-xl border border-brand-border/60 acrylic-chrome flex flex-wrap items-center gap-3"
             data-testid="playlist-file-conflict"
           >
             <InlineMessage class="flex-1 min-w-60">
@@ -1060,7 +1060,9 @@
           </div>
         {/if}
         <div
-          class="border border-brand-border/60 rounded-xl acrylic-chrome relative overflow-hidden"
+          data-testid="playlist-song-scroll"
+          class="flex-1 min-h-0 overflow-x-hidden overflow-y-auto border border-brand-border/60 rounded-xl acrylic-chrome relative"
+          use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
         >
           <SongTable
             bind:this={songTable}

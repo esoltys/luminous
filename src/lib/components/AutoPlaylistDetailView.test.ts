@@ -109,6 +109,13 @@ describe("AutoPlaylistDetailView size limit and sort (#344)", () => {
     expect(await findByRole("menuitem", { name: /16 GB/ })).toBeInTheDocument();
   });
 
+  it("scrolls only the song table, so the header and column headings stay put (#2273)", async () => {
+    const { findByText, getByTestId } = render(AutoPlaylistDetailView, { view: genreView });
+    const scroller = getByTestId("autoplaylist-song-scroll");
+    expect(scroller).toContainElement(await findByText("Track One"));
+    expect(scroller).not.toContainElement(getByTestId("autoplaylist-header"));
+  });
+
   it("hides the break when the fit was computed for a different order", async () => {
     fitAnswer = { ...fit, order: ["uuid-2", "uuid-1", "uuid-3"] };
     const { findByText, queryByRole } = render(AutoPlaylistDetailView, { view: genreView });

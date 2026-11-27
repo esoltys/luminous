@@ -165,6 +165,14 @@ describe("PlaylistView.svelte", () => {
     expect(getByText("Track Three")).toBeInTheDocument();
   });
 
+  it("scrolls only the song table, so the header and column headings stay put (#2273)", () => {
+    const { getByTestId, getByText } = render(PlaylistView);
+    const scroller = getByTestId("playlist-song-scroll");
+    expect(scroller).toContainElement(getByText("Track One"));
+    expect(scroller).not.toContainElement(getByTestId("playlist-header"));
+    expect(getByTestId("playlist-header")).toContainElement(getByText("My Playlist"));
+  });
+
   it("offers a rename affordance for a regular playlist", () => {
     const { getAllByTitle } = render(PlaylistView);
     expect(getAllByTitle("Rename playlist").length).toBeGreaterThan(0);

@@ -761,11 +761,13 @@
   {/if}
 {/snippet}
 
+<!-- The page itself doesn't scroll: the header stays put and only the song table's frame
+     scrolls, so its column headings stay pinned (#2273). -->
 <div
-  class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full"
-  use:rememberScroll={`autoplaylist:${view.kind}:${view.selector ?? ""}`}
+  class="flex-1 flex flex-col min-h-0 overflow-hidden bg-brand-main text-brand-text-secondary h-full"
 >
   <div
+    data-testid="autoplaylist-header"
     class="relative z-30 w-full border-b border-brand-border/60 acrylic-chrome-tint [--acrylic-tint:var(--color-brand-main)] px-6 pt-6 pb-6 shrink-0"
   >
     <div class="flex items-stretch justify-between gap-6 relative z-10">
@@ -938,8 +940,12 @@
     </div>
   </div>
 
-  <div class="px-6 py-6 flex flex-col pb-dock">
-    <div class="border border-brand-border/60 rounded-xl acrylic-chrome relative overflow-hidden">
+  <div class="flex-1 min-h-0 px-6 py-6 flex flex-col pb-dock">
+    <div
+      data-testid="autoplaylist-song-scroll"
+      class="flex-1 min-h-0 overflow-x-hidden overflow-y-auto border border-brand-border/60 rounded-xl acrylic-chrome relative"
+      use:rememberScroll={`autoplaylist:${view.kind}:${view.selector ?? ""}`}
+    >
       <SongTable
         rows={tableRows}
         mode="position"
