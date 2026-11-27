@@ -1155,6 +1155,7 @@ pub async fn clear_song_cover_art(
             .await
             .map_err(|e| e.to_string())?
             .map_err(|e| format!("{e:#}"))?;
+        crate::tag_history::record_own_write_stamp(&conn, song_id, &path);
     }
 
     let folder_art = state
@@ -1223,9 +1224,12 @@ pub async fn clear_album_cover_art(
         })
         .await
         .map_err(|e| e.to_string())?;
-    cleared.extend(remote_paths);
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    for (song_id, path) in &cleared {
+        crate::tag_history::record_own_write_stamp(&tx, *song_id, path);
+    }
+    cleared.extend(remote_paths);
     for (song_id, path) in &cleared {
         let folder_art = state
             .cover_manager

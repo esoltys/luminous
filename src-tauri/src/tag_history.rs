@@ -378,6 +378,21 @@ pub fn file_mtime_and_size(path: &Path) -> (Option<i64>, Option<i64>) {
     (mtime, size)
 }
 
+/// Records on song `song_id`'s row the file stamp `path` has after a write
+/// Luminous just made that changed only its tags or embedded art, keeping the
+/// file's audio analysis fresh (see `db::carry_stamps_across_tag_write`).
+/// For writers whose own `UPDATE songs` doesn't already store the stamp.
+pub fn record_own_write_stamp(conn: &rusqlite::Connection, song_id: i64, path: &Path) {
+    let (mtime, size) = file_mtime_and_size(path);
+    crate::db::carry_stamps_across_tag_write(conn, &path.to_string_lossy(), mtime, size);
+    if let Err(e) = conn.execute(
+        "UPDATE songs SET mtime = COALESCE(?1, mtime), filesize = COALESCE(?2, filesize) WHERE id = ?3",
+        params![mtime, size, song_id],
+    ) {
+        log::warn!("Couldn't record the new file stamp of song {song_id}: {e}");
+    }
+}
+
 static BATCH_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Generates a unique correlation ID for grouping multi-track tag edits performed together.
