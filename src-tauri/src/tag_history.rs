@@ -378,21 +378,6 @@ pub fn file_mtime_and_size(path: &Path) -> (Option<i64>, Option<i64>) {
     (mtime, size)
 }
 
-/// Records on song `song_id`'s row the file stamp `path` has after a write
-/// Luminous just made that changed only its tags or embedded art, keeping the
-/// file's audio analysis fresh (see `db::carry_stamps_across_tag_write`).
-/// For writers whose own `UPDATE songs` doesn't already store the stamp.
-pub fn record_own_write_stamp(conn: &rusqlite::Connection, song_id: i64, path: &Path) {
-    let (mtime, size) = file_mtime_and_size(path);
-    crate::db::carry_stamps_across_tag_write(conn, &path.to_string_lossy(), mtime, size);
-    if let Err(e) = conn.execute(
-        "UPDATE songs SET mtime = COALESCE(?1, mtime), filesize = COALESCE(?2, filesize) WHERE id = ?3",
-        params![mtime, size, song_id],
-    ) {
-        log::warn!("Couldn't record the new file stamp of song {song_id}: {e}");
-    }
-}
-
 static BATCH_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Generates a unique correlation ID for grouping multi-track tag edits performed together.
@@ -973,12 +958,9 @@ pub fn restore_song_tags(
     // 4. Capture snapshot before updating SQLite
     let before = snapshot_by_id(conn, song_id).map_err(|e| e.to_string())?;
 
-    let (new_mtime, new_filesize) = if on_disk {
-        file_mtime_and_size(file_path)
-    } else {
-        (None, None)
-    };
-    crate::db::carry_stamps_across_tag_write(conn, &path_str, new_mtime, new_filesize);
+    if on_disk {
+        crate::db::record_tag_write(conn, file_path);
+    }
 
     let album_artist_trimmed = album_artist.trim();
     let artist_trimmed = artist.trim();
@@ -1023,10 +1005,8 @@ pub fn restore_song_tags(
             compilation = ?21,
             comment = ?22,
             album_key = ?23,
-            language = ?24,
-            mtime = COALESCE(?25, mtime),
-            filesize = COALESCE(?26, filesize)
-         WHERE id = ?27",
+            language = ?24
+         WHERE id = ?25",
         rusqlite::params![
             title,
             titlesort,
@@ -1052,8 +1032,6 @@ pub fn restore_song_tags(
             comment,
             album_key,
             language,
-            new_mtime,
-            new_filesize,
             song_id,
         ],
     )

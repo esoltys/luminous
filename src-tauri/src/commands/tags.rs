@@ -564,7 +564,7 @@ async fn rewrite_genre_and_persist(
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         for (song_id, new_genre, written) in &writes {
             if let Some(path) = written {
-                crate::tag_history::record_own_write_stamp(&tx, *song_id, path);
+                crate::db::record_tag_write(&tx, path);
             }
             tx.execute(
                 "UPDATE songs SET genre = ?1 WHERE id = ?2",

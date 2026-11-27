@@ -144,16 +144,10 @@ pub fn apply(
                 let before = crate::tag_history::snapshot_by_id(&conn, song.id)
                     .ok()
                     .flatten();
-                let (new_mtime, new_filesize) = crate::tag_history::file_mtime_and_size(&path);
-                crate::db::carry_stamps_across_tag_write(
-                    &conn,
-                    &song.path,
-                    new_mtime,
-                    new_filesize,
-                );
+                crate::db::record_tag_write(&conn, &path);
                 if let Err(e) = conn.execute(
-                    "UPDATE songs SET comment = ?1, mtime = COALESCE(?2, mtime), filesize = COALESCE(?3, filesize) WHERE id = ?4",
-                    rusqlite::params![comment, new_mtime, new_filesize, song.id],
+                    "UPDATE songs SET comment = ?1 WHERE id = ?2",
+                    rusqlite::params![comment, song.id],
                 ) {
                     log::warn!("tag clean-up: cannot update comment for {}: {e}", song.id);
                 } else {

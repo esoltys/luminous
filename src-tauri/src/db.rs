@@ -32,43 +32,46 @@ pub(crate) fn sql_stamp_stale(alias: &str) -> String {
 
 /// Sidecar tables whose rows hold analysis of a file's audio, checked against
 /// the song's file stamp by [`sql_stamp_fresh`] / [`sql_stamp_stale`]. A new
-/// table of that kind belongs here, so [`carry_stamps_across_tag_write`]
-/// keeps it fresh too.
+/// table of that kind belongs here, so [`record_tag_write`] keeps it fresh
+/// too.
 const AUDIO_ANALYSIS_TABLES: [&str; 3] =
     ["song_provenance", "song_integrity", "song_musical_analysis"];
 
-/// Keeps the audio analysis of the songs at `path` fresh across a tag write
-/// Luminous just made to that file. Call it after the write and before
-/// recording `new_mtime` / `new_filesize` on those songs' rows.
+/// Records the file stamp `path` has after Luminous wrote tags or embedded
+/// art to it, on every song row of that file, keeping their audio analysis
+/// fresh. Every Luminous write to a library file's tags ends with this; the
+/// callers' own `UPDATE songs` leave `mtime` / `filesize` to it.
 ///
-/// A tag write changes the file's stamp but never its audio, so each analysis
+/// Such a write changes the file's stamp but never its audio, so each analysis
 /// row that matched the song's recorded stamp moves to the new one instead of
 /// going stale and making a background reader decode the whole file again
 /// (#2426). Rows that were already stale stay stale. The recorded stamp is
 /// trusted to describe the file as it was just before the write, so an
 /// external edit that no scan has recorded yet is carried over with it.
-/// Does nothing when `new_mtime` is unknown, since the callers then keep the
-/// old stamp as well. Best-effort: a failure is logged, and costs only a
-/// re-analysis.
-pub(crate) fn carry_stamps_across_tag_write(
-    conn: &rusqlite::Connection,
-    path: &str,
-    new_mtime: Option<i64>,
-    new_filesize: Option<i64>,
-) {
-    let Some(new_mtime) = new_mtime else {
+/// Best-effort: an unreadable file keeps its old stamp, and a failed update is
+/// logged; either way the cost is a re-read later, never a wrong tag.
+pub(crate) fn record_tag_write(conn: &rusqlite::Connection, path: &std::path::Path) {
+    let (Some(mtime), filesize) = crate::tag_history::file_mtime_and_size(path) else {
         return;
     };
-    for table in AUDIO_ANALYSIS_TABLES {
-        if let Err(e) = conn.execute(
-            &format!(
+    let path = path.to_string_lossy();
+    let statements = AUDIO_ANALYSIS_TABLES
+        .iter()
+        .map(|table| {
+            format!(
                 "UPDATE {table} SET mtime = ?2, filesize = COALESCE(?3, filesize)
                  WHERE song_id IN (SELECT s.id FROM songs s WHERE s.path = ?1 AND {fresh})",
                 fresh = sql_stamp_fresh(table)
-            ),
-            params![path, new_mtime, new_filesize],
-        ) {
-            log::warn!("Couldn't keep {table} current after a tag write to {path}: {e}");
+            )
+        })
+        // Last, since the carry-forward above compares against the old stamp.
+        .chain(std::iter::once(
+            "UPDATE songs SET mtime = ?2, filesize = COALESCE(?3, filesize) WHERE path = ?1"
+                .to_string(),
+        ));
+    for sql in statements {
+        if let Err(e) = conn.execute(&sql, params![path, mtime, filesize]) {
+            log::warn!("Couldn't record the new file stamp of {path}: {e}");
         }
     }
 }
@@ -5647,20 +5650,24 @@ mod tests {
     }
 
     #[test]
-    fn carry_stamps_across_tag_write_keeps_fresh_analysis_fresh_only() {
+    fn record_tag_write_stores_the_new_stamp_and_keeps_fresh_analysis_fresh() {
         let dir = tempfile::tempdir().unwrap();
         let db = Database::new(dir.path().to_path_buf()).unwrap();
         let conn = db.pool.get().unwrap();
-        let add_song = |path: &str| -> i64 {
+        let edited_path = dir.path().join("edited.flac");
+        std::fs::write(&edited_path, [0u8; 20]).unwrap();
+        let other_path = dir.path().join("other.flac");
+        std::fs::write(&other_path, [0u8; 20]).unwrap();
+        let add_song = |path: &std::path::Path| -> i64 {
             conn.execute(
                 "INSERT INTO songs (path, title, source, mtime, filesize) VALUES (?1, 'T', 0, 100, 10)",
-                params![path],
+                params![path.to_string_lossy()],
             )
             .unwrap();
             conn.last_insert_rowid()
         };
-        let edited = add_song("/edited.flac");
-        let other = add_song("/other.flac");
+        let edited = add_song(&edited_path);
+        let other = add_song(&other_path);
 
         // Fresh, legacy (no filesize), and stale analysis of the edited file.
         conn.execute(
@@ -5684,12 +5691,18 @@ mod tests {
         )
         .unwrap();
 
-        carry_stamps_across_tag_write(&conn, "/edited.flac", Some(200), Some(20));
-        conn.execute(
-            "UPDATE songs SET mtime = 200, filesize = 20 WHERE id = ?1",
-            params![edited],
-        )
-        .unwrap();
+        record_tag_write(&conn, &edited_path);
+
+        let (disk_mtime, disk_size) = crate::tag_history::file_mtime_and_size(&edited_path);
+        let recorded: (Option<i64>, Option<i64>) = conn
+            .query_row(
+                "SELECT mtime, filesize FROM songs WHERE id = ?1",
+                params![edited],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(recorded, (disk_mtime, disk_size));
+        assert_eq!(disk_size, Some(20));
 
         let fresh = |table: &str, alias: &str, song_id: i64| -> bool {
             conn.query_row(
@@ -5717,8 +5730,9 @@ mod tests {
             .unwrap();
         assert_eq!(other_stamp, (100, 10), "other files are untouched");
 
-        // An unknown new stamp leaves everything as it was.
-        carry_stamps_across_tag_write(&conn, "/edited.flac", None, None);
+        // A file that can no longer be read keeps the stamp it had.
+        std::fs::remove_file(&edited_path).unwrap();
+        record_tag_write(&conn, &edited_path);
         assert!(fresh("song_provenance", "p", edited));
     }
 

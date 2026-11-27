@@ -6,12 +6,17 @@
 //! entire audio stream after them, in 64 KiB seek/read/write steps. For a hi-res
 //! file on a network share that is tens of megabytes of round trips per edit.
 //!
-//! [`save`] lets lofty encode the new metadata into an in-memory copy of only
-//! the metadata region (the audio is never read), then resizes the padding so
-//! the region keeps its exact length and overwrites it in place: one small
-//! write. Only when the new metadata no longer fits in the old metadata plus
-//! its padding do the frames move, and then they are left
+//! [`save_if_flac`] lets lofty encode the new metadata into an in-memory copy
+//! of only the metadata region (the audio is never read), then resizes the
+//! padding so the region keeps its exact length and overwrites it in place:
+//! one small write. Only when the new metadata no longer fits in the old
+//! metadata plus its padding do the frames move, and then they are left
 //! [`REWRITE_PADDING`] bytes of room, so the next edits fit.
+//!
+//! Like lofty's own save, this writes in place: a crash or a dropped network
+//! connection part-way through a write can leave the file damaged. Fitting
+//! into the padding makes that window one small write instead of the whole
+//! file.
 
 use std::fs::File;
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
@@ -33,7 +38,7 @@ const MOVE_CHUNK: usize = 4 * 1024 * 1024;
 /// `Ok(false)`, having written nothing and with `file` rewound to its start,
 /// when `file` doesn't begin with a readable FLAC metadata region, so the
 /// caller can fall back to a plain save of the same handle.
-pub(crate) fn save(
+pub(crate) fn save_if_flac(
     file: &mut File,
     encode: impl FnOnce(&mut Cursor<Vec<u8>>) -> io::Result<()>,
 ) -> io::Result<bool> {
@@ -64,56 +69,31 @@ pub(crate) fn save(
     Ok(true)
 }
 
-/// Length of the metadata region at the start of `file`: an optional ID3v2
-/// tag, `fLaC`, and the metadata blocks up to the one flagged last. `None`
-/// when the file doesn't parse as that.
+/// Length of the metadata region at the start of `file`, or `None` when the
+/// file doesn't start with one (see [`walk_metadata`]). Only block headers
+/// are read, not their contents.
 fn metadata_region_len(file: &mut File) -> io::Result<Option<u64>> {
     let file_len = file.seek(SeekFrom::End(0))?;
-    file.rewind()?;
-    let mut head = [0u8; 10];
-    if file.read_exact(&mut head).is_err() {
-        return Ok(None);
-    }
-    let mut pos = id3v2_len(&head) as u64;
-
-    let mut marker = [0u8; 4];
-    file.seek(SeekFrom::Start(pos))?;
-    if file.read_exact(&mut marker).is_err() || &marker != b"fLaC" {
-        return Ok(None);
-    }
-    pos += 4;
-
-    loop {
-        let mut header = [0u8; BLOCK_HEADER_LEN];
-        file.seek(SeekFrom::Start(pos))?;
-        if file.read_exact(&mut header).is_err() {
-            return Ok(None);
-        }
-        pos += (BLOCK_HEADER_LEN + block_len(&header)) as u64;
-        if pos > file_len {
-            return Ok(None);
-        }
-        if header[0] & 0x80 != 0 {
-            return Ok(Some(pos));
-        }
-    }
+    let region = walk_metadata(|offset, buf| {
+        file.seek(SeekFrom::Start(offset as u64)).is_ok() && file.read_exact(buf).is_ok()
+    });
+    Ok(region
+        .map(|(_, end)| end as u64)
+        .filter(|&end| end <= file_len))
 }
 
-/// Bytes taken by an ID3v2 tag at the start of `head` (its 10-byte header,
-/// body and optional footer), or 0 when there is none.
-fn id3v2_len(head: &[u8]) -> usize {
-    if head.len() < 10 || &head[..3] != b"ID3" {
-        return 0;
-    }
-    let body = head[6..10]
-        .iter()
-        .fold(0usize, |acc, &b| (acc << 7) | (b & 0x7f) as usize);
-    let footer = if head[5] & 0x10 != 0 { 10 } else { 0 };
-    10 + body + footer
-}
-
-fn block_len(header: &[u8]) -> usize {
-    u32::from_be_bytes([0, header[1], header[2], header[3]]) as usize
+/// The metadata blocks of `region`, or `None` unless it is exactly one whole
+/// metadata region (see [`walk_metadata`]).
+fn parse_blocks(region: &[u8]) -> Option<Vec<Block>> {
+    let (blocks, end) =
+        walk_metadata(|offset, buf| match region.get(offset..offset + buf.len()) {
+            Some(bytes) => {
+                buf.copy_from_slice(bytes);
+                true
+            }
+            None => false,
+        })?;
+    (end == region.len()).then_some(blocks)
 }
 
 /// A metadata block's position inside a metadata region.
@@ -123,29 +103,57 @@ struct Block {
     len: usize,
 }
 
-/// The metadata blocks of a whole metadata `region`, or `None` unless they
-/// end, at the block flagged last, exactly where `region` does.
-fn parse_blocks(region: &[u8]) -> Option<Vec<Block>> {
-    let start = id3v2_len(region);
-    if region.get(start..start + 4)? != b"fLaC" {
+/// Walks a FLAC metadata region (an optional ID3v2 tag, `fLaC`, then metadata
+/// blocks up to the one flagged last), reading through `read_at(offset, buf)`,
+/// which fills `buf` from `offset` or returns false when it can't. Returns
+/// the blocks and the offset where the region ends, or `None` when the bytes
+/// aren't such a region.
+fn walk_metadata(mut read_at: impl FnMut(usize, &mut [u8]) -> bool) -> Option<(Vec<Block>, usize)> {
+    let mut id3_header = [0u8; 10];
+    let mut pos = if read_at(0, &mut id3_header) {
+        id3v2_len(&id3_header)
+    } else {
+        0
+    };
+
+    let mut marker = [0u8; 4];
+    if !read_at(pos, &mut marker) || &marker != b"fLaC" {
         return None;
     }
-    let mut pos = start + 4;
+    pos += marker.len();
+
     let mut blocks = Vec::new();
     loop {
-        let header = region.get(pos..pos + BLOCK_HEADER_LEN)?;
+        let mut header = [0u8; BLOCK_HEADER_LEN];
+        if !read_at(pos, &mut header) {
+            return None;
+        }
         let block = Block {
             header_at: pos,
             ty: header[0] & 0x7f,
-            len: block_len(header),
+            len: u32::from_be_bytes([0, header[1], header[2], header[3]]) as usize,
         };
-        let last = header[0] & 0x80 != 0;
         pos += BLOCK_HEADER_LEN + block.len;
         blocks.push(block);
-        if last {
-            return (pos == region.len()).then_some(blocks);
+        // The high bit of a block's first byte marks the last metadata block.
+        if header[0] & 0x80 != 0 {
+            return Some((blocks, pos));
         }
     }
+}
+
+/// Bytes taken by the ID3v2 tag whose 10-byte header is `header` (header,
+/// body and optional footer), or 0 when it isn't one.
+fn id3v2_len(header: &[u8; 10]) -> usize {
+    if &header[..3] != b"ID3" {
+        return 0;
+    }
+    // The body size is a "syncsafe" integer: 4 bytes of 7 bits each.
+    let body = header[6..10]
+        .iter()
+        .fold(0usize, |acc, &b| (acc << 7) | (b & 0x7f) as usize);
+    let footer = if header[5] & 0x10 != 0 { 10 } else { 0 };
+    10 + body + footer
 }
 
 /// Resizes or adds padding so `region` is exactly `target` bytes long.
@@ -315,7 +323,7 @@ mod tests {
         let path = dir.path().join("not.flac");
         std::fs::write(&path, b"RIFF\0\0\0\0WAVE").unwrap();
         let mut file = File::options().read(true).write(true).open(&path).unwrap();
-        assert!(!save(&mut file, |_| Ok(())).unwrap());
+        assert!(!save_if_flac(&mut file, |_| Ok(())).unwrap());
         assert_eq!(file.stream_position().unwrap(), 0);
         assert_eq!(std::fs::read(&path).unwrap(), b"RIFF\0\0\0\0WAVE");
     }

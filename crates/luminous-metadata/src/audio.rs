@@ -830,7 +830,7 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
 
     sanitize_tag_languages(tag);
 
-    save_tagged_file_with_retry(&tagged_file, path, "write tags")
+    save_tags_to_path(path, "write tags", &tagged_file)
 }
 
 /// Sanitizes all language-bearing tag items in `tag` before saving to disk.
@@ -880,14 +880,6 @@ pub fn format_error_chain(err: &dyn std::error::Error) -> String {
     parts.join(": ")
 }
 
-fn save_tagged_file_with_retry(
-    tagged_file: &lofty::file::TaggedFile,
-    path: &Path,
-    action: &str,
-) -> Result<()> {
-    save_tags_to_path(path, action, tagged_file)
-}
-
 /// Something lofty can save into a file: a whole [`TaggedFile`] or one tag
 /// (see [`TagSave`]).
 ///
@@ -903,7 +895,9 @@ impl LoftySave for lofty::file::TaggedFile {
     }
 }
 
-/// Saves a single tag through [`LoftySave`].
+/// Saves a single tag through [`LoftySave`]. A wrapper rather than an impl
+/// for every `T: TagExt`, which Rust rejects next to the `TaggedFile` impl
+/// because lofty could one day make `TaggedFile` a `TagExt`.
 pub(crate) struct TagSave<'a, T>(pub &'a T);
 
 impl<T: lofty::tag::TagExt> LoftySave for TagSave<'_, T> {
@@ -923,7 +917,7 @@ impl<T: lofty::tag::TagExt> LoftySave for TagSave<'_, T> {
 pub(crate) fn save_tags_to_path(path: &Path, action: &str, tags: &impl LoftySave) -> Result<()> {
     save_with_retry(path, action, || -> std::io::Result<()> {
         let mut file = std::fs::File::options().read(true).write(true).open(path)?;
-        if crate::flac_write::save(&mut file, |region| tags.save_into(region))? {
+        if crate::flac_write::save_if_flac(&mut file, |region| tags.save_into(region))? {
             return Ok(());
         }
         tags.save_into(&mut file)
@@ -981,7 +975,7 @@ pub fn clear_embedded_art(path: &Path) -> Result<()> {
 
     sanitize_tag_languages(tag);
 
-    save_tagged_file_with_retry(&tagged_file, path, "clear embedded art")
+    save_tags_to_path(path, "clear embedded art", &tagged_file)
 }
 
 #[cfg(test)]
@@ -1173,7 +1167,7 @@ mod tests {
                 .mime_type(MimeType::Jpeg)
                 .build(),
         );
-        save_tagged_file_with_retry(&tagged_file, &path, "add art").unwrap();
+        save_tags_to_path(&path, "add art", &tagged_file).unwrap();
         write_tags(&path, &genre_request("Progressive Symphonic Metal")).unwrap();
         clear_embedded_art(&path).unwrap();
 

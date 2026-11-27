@@ -460,19 +460,10 @@ pub async fn save_song_tags(
         .map_err(|e| format!("{e:#}"))?;
     }
 
-    let (new_mtime, new_filesize) = if !is_remote {
-        crate::tag_history::file_mtime_and_size(&path)
-    } else {
-        (None, None)
-    };
-    crate::db::carry_stamps_across_tag_write(
-        &conn,
-        &path.to_string_lossy(),
-        new_mtime,
-        new_filesize,
-    );
-
     let before = crate::tag_history::snapshot_by_id(&conn, song_id).map_err(|e| e.to_string())?;
+    if !is_remote {
+        crate::db::record_tag_write(&conn, &path);
+    }
 
     // 3. Update SQLite database cache in-place
     conn.execute(
@@ -498,9 +489,7 @@ pub async fn save_song_tags(
             initial_key = ?19,
             album_key = ?21,
             disc_subtitle = ?22,
-            language = ?23,
-            mtime = COALESCE(?24, mtime),
-            filesize = COALESCE(?25, filesize)
+            language = ?23
          WHERE id = ?20",
         rusqlite::params![
             title,
@@ -539,8 +528,6 @@ pub async fn save_song_tags(
             ),
             disc_subtitle,
             language,
-            new_mtime,
-            new_filesize,
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -683,8 +670,7 @@ pub async fn save_file_tags(
         let before = crate::tag_history::snapshot_by_path(&conn, &path, 0)
             .ok()
             .flatten();
-        let (new_mtime, new_filesize) = crate::tag_history::file_mtime_and_size(&p);
-        crate::db::carry_stamps_across_tag_write(&conn, &path, new_mtime, new_filesize);
+        crate::db::record_tag_write(&conn, &p);
 
         let _ = conn.execute(
             "UPDATE songs SET
@@ -708,9 +694,7 @@ pub async fn save_file_tags(
                 bpm = ?18,
                 initial_key = ?19,
                 disc_subtitle = ?21,
-                language = ?24,
-                mtime = COALESCE(?22, mtime),
-                filesize = COALESCE(?23, filesize)
+                language = ?22
              WHERE path = ?20",
             rusqlite::params![
                 title,
@@ -752,8 +736,6 @@ pub async fn save_file_tags(
                 initial_key,
                 path,
                 disc_subtitle,
-                new_mtime,
-                new_filesize,
                 language,
             ],
         );
@@ -824,6 +806,7 @@ pub async fn save_album_tags(
     let app_clone = app.clone();
     let (updated_count, edited) = tauri::async_runtime::spawn_blocking(move || {
         let mut count = 0u32;
+        // Each song with its new tags and the file written for it, if any.
         let mut with_meta = Vec::with_capacity(edited.len());
         for (idx, (song, tags)) in edited.into_iter().enumerate() {
             let _ = app_clone.emit(
@@ -842,15 +825,14 @@ pub async fn save_album_tags(
             // this to the user), same as save_song_tags/rewrite_genre_and_persist.
             if song.source.is_remote() {
                 count += 1;
-                with_meta.push((song, tags, None, None));
+                with_meta.push((song, tags, None));
                 continue;
             }
             let path = std::path::PathBuf::from(song.path.as_deref().unwrap_or_default());
             match write_shared_tags(&path, &song, &tags) {
                 Ok(_) => {
                     count += 1;
-                    let (mtime, size) = crate::tag_history::file_mtime_and_size(&path);
-                    with_meta.push((song, tags, mtime, size));
+                    with_meta.push((song, tags, Some(path)));
                 }
                 Err(ref e) => {
                     log::warn!("Failed to persist tags to disk for song {}: {e:#}", song.id);
@@ -863,11 +845,11 @@ pub async fn save_album_tags(
     .map_err(|e| e.to_string())?;
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-    for (song, tags, new_mtime, new_filesize) in &edited {
-        if let Some(path) = song.path.as_deref() {
-            crate::db::carry_stamps_across_tag_write(&tx, path, *new_mtime, *new_filesize);
-        }
+    for (song, tags, written) in &edited {
         let before = crate::tag_history::snapshot_by_id(&tx, song.id).map_err(|e| e.to_string())?;
+        if let Some(path) = written {
+            crate::db::record_tag_write(&tx, path);
+        }
         let key = crate::album_key::album_key_for(
             &tags.album,
             Some(tags.album_artist.as_str()).filter(|s| !s.trim().is_empty()),
@@ -887,9 +869,7 @@ pub async fn save_album_tags(
                 compilation = ?9,
                 album_key = ?11,
                 disc_subtitle = ?12,
-                language = ?13,
-                mtime = COALESCE(?14, mtime),
-                filesize = COALESCE(?15, filesize)
+                language = ?13
              WHERE id = ?10",
             rusqlite::params![
                 tags.album,
@@ -905,8 +885,6 @@ pub async fn save_album_tags(
                 key,
                 tags.disc_subtitle,
                 tags.language,
-                new_mtime,
-                new_filesize,
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -928,7 +906,7 @@ pub async fn save_album_tags(
             total: total_songs,
             title: edited
                 .first()
-                .map(|(_, tags, _, _)| tags.album.clone())
+                .map(|(_, tags, _)| tags.album.clone())
                 .unwrap_or_default(),
             done: true,
         },
@@ -980,8 +958,7 @@ pub async fn save_batch_file_tags(
     // Each written file with the tags it was saved with, for the DB update.
     let (updated_count, written) = tauri::async_runtime::spawn_blocking(move || {
         let mut count = 0u32;
-        let mut written: Vec<(std::path::PathBuf, SharedTags, Option<i64>, Option<i64>)> =
-            Vec::new();
+        let mut written: Vec<(std::path::PathBuf, SharedTags)> = Vec::new();
         for (idx, p) in path_bufs.into_iter().enumerate() {
             let mut song = match crate::collection::read_tags(&p) {
                 Ok(s) => s,
@@ -1005,8 +982,7 @@ pub async fn save_batch_file_tags(
             let tags = edit.apply(SharedTags::of(&song));
             if write_shared_tags(&p, &song, &tags).is_ok() {
                 count += 1;
-                let (mtime, size) = crate::tag_history::file_mtime_and_size(&p);
-                written.push((p, tags, mtime, size));
+                written.push((p, tags));
             }
         }
         (count, written)
@@ -1016,12 +992,12 @@ pub async fn save_batch_file_tags(
 
     // Also update any matching rows in SQLite DB
     if let Ok(conn) = state.db.pool.get() {
-        for (path, tags, mtime, size) in &written {
+        for (path, tags) in &written {
             let path_str = path.to_string_lossy();
             let before = crate::tag_history::snapshot_by_path(&conn, &path_str, 0)
                 .ok()
                 .flatten();
-            crate::db::carry_stamps_across_tag_write(&conn, &path_str, *mtime, *size);
+            crate::db::record_tag_write(&conn, path);
             let _ = conn.execute(
                 "UPDATE songs SET
                     album = ?1,
@@ -1033,9 +1009,7 @@ pub async fn save_batch_file_tags(
                     year = ?7,
                     disc = ?8,
                     compilation = ?9,
-                    disc_subtitle = ?11,
-                    mtime = COALESCE(?12, mtime),
-                    filesize = COALESCE(?13, filesize)
+                    disc_subtitle = ?11
                  WHERE path = ?10",
                 rusqlite::params![
                     tags.album,
@@ -1049,8 +1023,6 @@ pub async fn save_batch_file_tags(
                     tags.compilation,
                     path_str,
                     tags.disc_subtitle,
-                    mtime,
-                    size,
                 ],
             );
 
@@ -1155,7 +1127,7 @@ pub async fn clear_song_cover_art(
             .await
             .map_err(|e| e.to_string())?
             .map_err(|e| format!("{e:#}"))?;
-        crate::tag_history::record_own_write_stamp(&conn, song_id, &path);
+        crate::db::record_tag_write(&conn, &path);
     }
 
     let folder_art = state
@@ -1226,8 +1198,8 @@ pub async fn clear_album_cover_art(
         .map_err(|e| e.to_string())?;
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-    for (song_id, path) in &cleared {
-        crate::tag_history::record_own_write_stamp(&tx, *song_id, path);
+    for (_, path) in &cleared {
+        crate::db::record_tag_write(&tx, path);
     }
     cleared.extend(remote_paths);
     for (song_id, path) in &cleared {
