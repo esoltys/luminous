@@ -12,14 +12,17 @@
 use crate::genre_aliases::GenreAliases;
 use crate::models::{parse_multi_value, playable_library_song_where};
 use anyhow::Result;
-use rand::seq::SliceRandom;
 use rand::RngExt;
 use rusqlite::{params_from_iter, Connection};
 use std::collections::{HashMap, HashSet};
 
-/// Upper bound of the random jitter added to each score — enough to vary the
-/// pick between equally good matches, not enough to beat a real match.
-const JITTER: f64 = 1.0;
+/// Score points per factor of e in a match's sampling weight: each point
+/// makes a song about twice as likely to be drawn next. Scores are additive
+/// points, so weighting by the raw score would let a large pool of weak
+/// matches outdraw a few strong ones; the exponential keeps strong matches
+/// dominant while weaker ones still turn up. Goes when #2286 replaces the
+/// additive score with weights of its own.
+const WEIGHT_SCALE: f64 = 1.5;
 /// Points per shared genre, and how many shared genres count.
 const GENRE_POINTS: f64 = 3.0;
 const MAX_SHARED_GENRES: usize = 2;
@@ -267,9 +270,10 @@ pub struct MixOptions<'a> {
 ///
 /// Never returns a seed song (other than the lead) or an excluded song, and
 /// never more than `tuning.max_per_artist` songs by one artist, counting the
-/// lead. Matching songs come first, best score first with a little jitter;
-/// if there aren't enough, random eligible songs fill the rest, with
-/// deferred recent plays last. Returns fewer than `limit` only when no
+/// lead. Matching songs come first, drawn at random in proportion to how
+/// well they fit, so every call differs and strong matches are likely but
+/// not certain to lead. Unmatched eligible songs follow in random order,
+/// then deferred recent plays. Returns fewer than `limit` only when no
 /// eligible song is left under its artist's cap.
 pub fn pick(
     profile: &Profile,
@@ -280,58 +284,41 @@ pub fn pick(
     let t = opts.tuning;
     let seed_ids: HashSet<i64> = profile.seeds.iter().map(|(id, _)| *id).collect();
     let mut picked = Vec::with_capacity(opts.limit);
-    let mut picked_ids = HashSet::new();
     let mut per_artist: HashMap<&str, usize> = HashMap::new();
 
     if opts.lead_with_seed && opts.limit > 0 {
         if let Some((id, artist_key)) = profile.seeds.first() {
             picked.push(*id);
-            picked_ids.insert(*id);
             if let Some(key) = artist_key.as_deref() {
                 per_artist.insert(key, 1);
             }
         }
     }
 
-    let eligible = pool
+    let entries = pool
         .candidates
         .iter()
-        .filter(|c| !seed_ids.contains(&c.id) && !pool.exclusions.excludes(c));
-    let (fresh, recent): (Vec<&Candidate>, Vec<&Candidate>) = match opts.defer_played_since {
-        Some(cutoff) => eligible.partition(|c| c.lastplayed.is_none_or(|p| p < cutoff)),
-        None => (eligible.collect(), Vec::new()),
-    };
-
-    let mut scored: Vec<(f64, &Candidate)> = fresh
-        .iter()
-        .filter_map(|c| {
+        .filter(|c| !seed_ids.contains(&c.id) && !pool.exclusions.excludes(c))
+        .map(|c| {
+            let deferred = opts
+                .defer_played_since
+                .is_some_and(|cutoff| c.lastplayed.is_some_and(|p| p >= cutoff));
+            if deferred {
+                return (Tier::Deferred, 1.0, c);
+            }
             let s = profile.similarity(c, pool, t);
-            (s > 0.0).then(|| {
-                (
-                    s + rating_boost(c, &t.rating) + rng.random::<f64>() * JITTER,
-                    *c,
-                )
-            })
+            if s > 0.0 {
+                let w = match_weight(s + rating_boost(c, &t.rating));
+                (Tier::Match, w, c)
+            } else {
+                (Tier::Unmatched, 1.0, c)
+            }
         })
         .collect();
-    scored.sort_by(|a, b| b.0.total_cmp(&a.0));
 
-    let mut fallback_fresh = fresh;
-    fallback_fresh.shuffle(rng);
-    let mut fallback_recent = recent;
-    fallback_recent.shuffle(rng);
-
-    let ordered = scored
-        .into_iter()
-        .map(|(_, c)| c)
-        .chain(fallback_fresh)
-        .chain(fallback_recent);
-    for c in ordered {
+    for c in sample_order(entries, rng) {
         if picked.len() >= opts.limit {
             break;
-        }
-        if picked_ids.contains(&c.id) {
-            continue;
         }
         if let Some(key) = c.artist_key.as_deref() {
             let n = per_artist.entry(key).or_default();
@@ -340,10 +327,46 @@ pub fn pick(
             }
             *n += 1;
         }
-        picked_ids.insert(c.id);
         picked.push(c.id);
     }
     picked
+}
+
+/// Which part of the pick order a candidate falls in; every candidate in an
+/// earlier tier comes before any in a later one, whatever their weights.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Tier {
+    /// Shares something with the profile; weighted by `match_weight`.
+    Match,
+    /// Nothing in common: filler once the matches run out.
+    Unmatched,
+    /// Played since `MixOptions::defer_played_since`: used last.
+    Deferred,
+}
+
+/// Sampling weight for a match's score (similarity plus rating boost).
+fn match_weight(score: f64) -> f64 {
+    (score / WEIGHT_SCALE).exp()
+}
+
+/// Orders `entries` by tier, and within a tier by weighted random sampling
+/// without replacement (Efraimidis–Spirakis): each entry draws the key
+/// `ln(u) / weight` with `u` uniform in (0, 1], and the highest key goes
+/// first. Any prefix of a tier is then an exact weighted sample of it: the
+/// next entry is chosen with probability proportional to its weight among
+/// those left. Equal weights give a uniform shuffle. Weights must be
+/// positive and finite.
+fn sample_order<T>(entries: Vec<(Tier, f64, T)>, rng: &mut impl rand::Rng) -> Vec<T> {
+    let mut keyed: Vec<(Tier, f64, T)> = entries
+        .into_iter()
+        .map(|(tier, weight, item)| {
+            // `random` is in [0, 1), so this is in (0, 1] and `ln` is finite.
+            let u = 1.0 - rng.random::<f64>();
+            (tier, u.ln() / weight, item)
+        })
+        .collect();
+    keyed.sort_by(|a, b| a.0.cmp(&b.0).then(b.1.total_cmp(&a.1)));
+    keyed.into_iter().map(|(_, _, item)| item).collect()
 }
 
 const CANDIDATE_COLS: &str = "id, title, artist, album_artist, album, genre, year, originalyear, \
@@ -597,27 +620,90 @@ mod tests {
         assert_eq!(profile.similarity(&unrelated, &p, &TUNING), 0.0);
     }
 
+    /// How often each id is picked first, over `runs` seeds.
+    fn first_pick_counts(seeds: &[Candidate], lib: Vec<Candidate>, runs: u64) -> HashMap<i64, u64> {
+        let p = pool(lib);
+        let mut counts = HashMap::new();
+        for seed in 0..runs {
+            if let Some(&id) = pick_with(seeds, &p, &opts(1), seed).first() {
+                *counts.entry(id).or_default() += 1;
+            }
+        }
+        counts
+    }
+
+    /// Share of 10k draws in which entry 0 comes first, for weights `w0, w1`.
+    fn first_share(w0: f64, w1: f64) -> f64 {
+        let mut rng = StdRng::seed_from_u64(11);
+        let draws = 10_000;
+        let wins = (0..draws)
+            .filter(|_| {
+                let order =
+                    sample_order(vec![(Tier::Match, w0, 0), (Tier::Match, w1, 1)], &mut rng);
+                order[0] == 0
+            })
+            .count();
+        wins as f64 / draws as f64
+    }
+
     #[test]
-    fn favourite_breaks_tie_between_equal_matches() {
+    fn sampling_frequency_tracks_weight_ratio() {
+        assert!((first_share(2.0, 1.0) - 2.0 / 3.0).abs() < 0.02);
+        assert!((first_share(3.0, 1.0) - 0.75).abs() < 0.02);
+        assert!((first_share(1.0, 1.0) - 0.5).abs() < 0.02);
+    }
+
+    #[test]
+    fn earlier_tier_always_comes_first_whatever_the_weight() {
+        let mut rng = StdRng::seed_from_u64(3);
+        for _ in 0..100 {
+            let order = sample_order(
+                vec![
+                    (Tier::Deferred, 1e9, 'd'),
+                    (Tier::Unmatched, 1e9, 'u'),
+                    (Tier::Match, 1e-9, 'm'),
+                ],
+                &mut rng,
+            );
+            assert_eq!(order, vec!['m', 'u', 'd']);
+        }
+    }
+
+    #[test]
+    fn each_score_point_roughly_doubles_the_weight() {
+        let ratio = match_weight(7.0) / match_weight(6.0);
+        assert!((1.8..2.1).contains(&ratio), "ratio {ratio}");
+    }
+
+    #[test]
+    fn favourites_are_picked_more_often_but_not_always() {
         let seeds = [song(1, "A", &["Rock"], 1980, 120.0)];
         let mut fav = song(11, "Y", &["Rock"], 1980, 120.0);
         fav.rating = 5.0;
         let mut loved = song(12, "Z", &["Rock"], 1980, 120.0);
         loved.loved = 1;
-        let lib = vec![song(10, "X", &["Rock"], 1980, 120.0), fav];
-        assert_eq!(pick_default(&seeds, lib, 1), vec![11]);
-        let lib = vec![song(10, "X", &["Rock"], 1980, 120.0), loved];
-        assert_eq!(pick_default(&seeds, lib, 1), vec![12]);
+        for boosted in [fav, loved] {
+            let id = boosted.id;
+            let counts = first_pick_counts(
+                &seeds,
+                vec![song(10, "X", &["Rock"], 1980, 120.0), boosted],
+                400,
+            );
+            assert!(counts[&id] > 240, "{counts:?}");
+            assert!(counts[&10] > 40, "{counts:?}");
+        }
     }
 
     #[test]
-    fn nearby_bpm_scores_higher_than_distant_bpm() {
+    fn nearby_bpm_is_picked_more_often_than_distant_bpm() {
         let seeds = [song(1, "A", &["Rock"], 1980, 120.0)];
         let lib = vec![
             song(10, "X", &["Rock"], 1980, 60.0),
             song(11, "Y", &["Rock"], 1980, 122.0),
         ];
-        assert_eq!(pick_default(&seeds, lib, 1), vec![11]);
+        let counts = first_pick_counts(&seeds, lib, 400);
+        assert!(counts[&11] > 230, "{counts:?}");
+        assert!(counts[&10] > 40, "{counts:?}");
     }
 
     #[test]
@@ -722,7 +808,7 @@ mod tests {
     }
 
     #[test]
-    fn jitter_varies_picks_between_equal_matches() {
+    fn different_seeds_give_different_queues() {
         let seeds = [song(1, "A", &["Rock"], 1980, 120.0)];
         let p = pool(
             (10..30)
