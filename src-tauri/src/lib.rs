@@ -64,6 +64,7 @@ pub mod remote_scheduler;
 pub mod restart_manager;
 pub mod scrobbler;
 pub mod shell_open;
+pub mod song_mix;
 pub mod stall_monitor;
 pub mod stats;
 pub mod stats_summary;
