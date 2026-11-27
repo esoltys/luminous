@@ -18,9 +18,9 @@ use std::time::Duration;
 /// Default target size of a generated radio queue.
 pub const DEFAULT_RADIO_LIMIT: usize = 40;
 
-/// Radio's scoring: up to 3 songs per artist (the seed song included) for
-/// variety, ListenBrainz similarity weighted above any single local signal,
-/// and loved songs boosted like 5-star ones.
+/// Radio's scoring, unchanged from before the shared engine (#2284) until
+/// #2286 / #2288 replace it: up to 3 songs per artist (the seed song
+/// included), and loved songs boosted like 5-star ones.
 const TUNING: Tuning = Tuning {
     max_per_artist: 3,
     similar_artist: 5.0,

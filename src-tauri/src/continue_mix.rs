@@ -30,11 +30,13 @@ pub const RECENT_PLAY_WINDOW_SECS: i64 = 3 * 24 * 60 * 60;
 /// view draws its "Auto Continue" divider before the first one.
 pub const MARKER_JSON: &str = r#"{"autoContinue":true}"#;
 
-/// Auto Continue's scoring: at most 2 songs per artist per batch, so a strong
-/// match on one artist doesn't turn the continuation into their discography,
-/// and a tighter BPM window than Radio since it follows what just played.
+/// Auto Continue's scoring, unchanged from before the shared engine (#2284)
+/// until #2286 / #2288 replace it: at most 2 songs per artist per batch, so a
+/// strong match on one artist doesn't turn the continuation into their
+/// discography.
 const TUNING: Tuning = Tuning {
     max_per_artist: 2,
+    // Unused for now: Auto Continue sets no similar-artist map (#2289).
     similar_artist: 0.0,
     same_artist: 1.5,
     same_decade: 1.0,

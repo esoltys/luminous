@@ -75,7 +75,6 @@ pub struct Candidate {
     /// Star rating, or -1.0 when unrated.
     pub rating: f32,
     pub loved: i32,
-    pub playcount: i64,
     pub lastplayed: Option<i64>,
     pub musicbrainz_artist_id: Option<String>,
 }
@@ -348,7 +347,7 @@ pub fn pick(
 }
 
 const CANDIDATE_COLS: &str = "id, title, artist, album_artist, album, genre, year, originalyear, \
-     bpm, rating, loved, playcount, lastplayed, musicbrainz_artist_id";
+     bpm, rating, loved, lastplayed, musicbrainz_artist_id";
 
 fn lower_opt(s: Option<String>) -> Option<String> {
     s.map(|v| v.trim().to_lowercase()).filter(|v| !v.is_empty())
@@ -386,9 +385,8 @@ fn row_to_candidate(row: &rusqlite::Row, aliases: &GenreAliases) -> rusqlite::Re
         bpm: row.get(8)?,
         rating: row.get::<_, Option<f32>>(9)?.unwrap_or(-1.0),
         loved: row.get::<_, Option<i32>>(10)?.unwrap_or(0),
-        playcount: row.get::<_, Option<i64>>(11)?.unwrap_or(0),
-        lastplayed: row.get(12)?,
-        musicbrainz_artist_id: lower_opt(row.get(13)?),
+        lastplayed: row.get(11)?,
+        musicbrainz_artist_id: lower_opt(row.get(12)?),
     })
 }
 
