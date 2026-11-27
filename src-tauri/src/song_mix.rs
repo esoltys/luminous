@@ -270,8 +270,8 @@ pub struct MixOptions<'a> {
 /// never more than `tuning.max_per_artist` songs by one artist, counting the
 /// lead. Matching songs come first, best score first with a little jitter;
 /// if there aren't enough, random eligible songs fill the rest, with
-/// deferred recent plays last. Returns fewer than `limit` only when the pool
-/// runs out.
+/// deferred recent plays last. Returns fewer than `limit` only when no
+/// eligible song is left under its artist's cap.
 pub fn pick(
     profile: &Profile,
     pool: &Pool,
